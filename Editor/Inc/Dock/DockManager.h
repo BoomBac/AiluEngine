@@ -82,6 +82,7 @@ namespace Ailu
             void AddDock(Ref<DockWindow> dock);
             void RemoveDock(DockWindow *dock);
             void Update(f32 dt);
+            void SetMainDockArea(Vector2f position, Vector2f size);
 
             void BeginFloatWindow(DockWindow* w);
             void BeginFloatNode(DockNode* w);
@@ -106,6 +107,7 @@ namespace Ailu
             void BringNodeWidgetsToFront(DockNode *node);
             void SendNodeWidgetsToBack(DockNode *node);
             void NormalizeWindowWidgetOrder(Window *window);
+            Vector4f MainDockArea() const;
         public:
             Vector<DockNode*> _roots;
         private:
@@ -136,6 +138,8 @@ namespace Ailu
             WString _dock_layout_path;
             DockNode *_focused_node = nullptr;
             u32 _next_serialize_node_id = 0u;
+            Vector2f _main_dock_position = Vector2f::kZero;
+            Vector2f _main_dock_size = Vector2f::kZero;
         };
     }// namespace Editor
 }// namespace Ailu

@@ -87,7 +87,7 @@ namespace Ailu::Render
         shader_state_mat = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/debug.hlsl"), "ShaderStateDebug");
         _error_shader_pass_id = 0;
         _compiling_shader_pass_id = 1;
-        _forward_lit_shader = ResourceMgr::Get().Get<Shader>(L"Shaders/forwardlit.alasset");
+        _forward_lit_shader = ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/forwardlit.alasset");
         AL_ASSERT(_forward_lit_shader != nullptr);
         _event = (ERenderPassEvent::ERenderPassEvent)(ERenderPassEvent::kBeforeTransparent + 25u);
     }
@@ -559,7 +559,7 @@ namespace Ailu::Render
         for (f32 i = 0.0f; i < mipmap_level; i++)
         {
             u16 cur_mipmap_size = size >> (u16) i;
-            _reflection_prefilter_mateirals.emplace_back(MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/filter_irradiance.alasset"), "ReflectionPrefilter"));
+            _reflection_prefilter_mateirals.emplace_back(MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/filter_irradiance.alasset"), "ReflectionPrefilter"));
             _reflection_prefilter_mateirals.back()->SetFloat("_roughness", i / mipmap_level);
             _reflection_prefilter_mateirals.back()->SetFloat("_width", cur_mipmap_size);
             //_reflection_prefilter_mateirals.back()->SetTexture("SrcTex", ToWChar(src_texture_name));
@@ -814,7 +814,7 @@ namespace Ailu::Render
     //-------------------------------------------------------------DeferedLightingPass-------------------------------------------------------------
     DeferredLightingPass::DeferredLightingPass() : RenderPass("DeferredLightingPass")
     {
-        _p_lighting_material = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/deferred_lighting.alasset"), "DeferedGbufferLighting");
+        _p_lighting_material = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/deferred_lighting.alasset"), "DeferedGbufferLighting");
         _brdf_lut = ResourceMgr::Get().Load<Texture2D>(L"Textures/ibl_brdf_lut.alasset");
         _event = (ERenderPassEvent::ERenderPassEvent)(ERenderPassEvent::kBeforeDeferedLighting + 25u);
     }
@@ -883,7 +883,7 @@ namespace Ailu::Render
     SkyboxPass::SkyboxPass() : RenderPass("SkyboxPass")
     {
         _p_lut_gen = ComputeShader::Create(ResourceMgr::GetResSysPath(L"Shaders/hlsl/Compute/atmosphere_lut_gen.hlsl"));
-        _p_skybox_material = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/skybox.alasset"), "Skybox");
+        _p_skybox_material = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/skybox.alasset"), "Skybox");
         Matrix4x4f world_mat;
         MatrixScale(world_mat, 1000000.f, 1000000.f, 1000000.f);
         _p_cbuffer.reset(ConstantBuffer::Create(RenderConstants::kPerObjectDataSize));
@@ -1010,51 +1010,22 @@ namespace Ailu::Render
     static void GetScreenAxis(const RenderingData &rendering_data, Vector4f *out) 
     {
         auto &cam = rendering_data._camera;
-        // 获取相机参数
-        float nearPlane = cam->Near() + 0.05f;
-        float verticalFOV = cam->FovH() * k2Radius;// 单位为弧度
-        float aspectRatio = cam->Aspect();
+        const static f32 s_axis_length = 34.f;
+        const static f32 s_axis_margin = 58.f;
+        Vector2f origin((f32) rendering_data._width - s_axis_margin, (f32) rendering_data._height - s_axis_margin);
 
-        // 计算半视野角度
-        float halfHeight = nearPlane * tan(verticalFOV / 2.0f);
-        float halfWidth = halfHeight * aspectRatio;
+        auto GetAxisEnd = [&](const Vector3f &world_axis)
+        {
+            Vector2f axis_dir(DotProduct(world_axis, cam->Right()), DotProduct(world_axis, cam->Up()));
+            return origin + axis_dir * s_axis_length;
+        };
 
-        // 获取相机的方向向量
-        Vector3f cameraForward = cam->Forward();
-        Vector3f cameraRight = cam->Right();
-        Vector3f cameraUp = cam->Up();
-
-        // 计算近裁剪面的左下角
-        Vector3f nearCenter = cam->Position() + cameraForward * nearPlane;
-        Vector3f bottomLeft = nearCenter - cameraRight * halfWidth * 0.95f - cameraUp * halfHeight * 0.95f;
-
-
-        const static f32 s_axis_length = 30.f;
-        Vector3f camera_target = cam->Position() + cam->Forward() * (cam->Near() + 50.f);
-        Matrix4x4f vp = rendering_data._camera->GetView() * rendering_data._camera->GetProj();
-        Vector2f half_size((f32) (rendering_data._width >> 1), (f32) (rendering_data._height >> 1));
-        Vector2f viewport_size((f32) rendering_data._width, (f32) rendering_data._height);
-        half_size -= s_axis_length;
-        //camera_target = Vector3f::kZero;
-        Vector4f cpos_camera_target = {camera_target, 1.0f};
-        Vector4f cpos_y_axis = {camera_target + Vector3f::kUp * s_axis_length, 1.0f};
-        Vector4f cpos_x_axis = {camera_target + Vector3f::kRight * s_axis_length, 1.0f};
-        Vector4f cpos_z_axis = {camera_target + Vector3f::kForward * s_axis_length, 1.0f};
-        TransformVector(cpos_camera_target, vp);
-        TransformVector(cpos_x_axis, vp);
-        TransformVector(cpos_y_axis, vp);
-        TransformVector(cpos_z_axis, vp);
-        Vector2f screen_pos_x_axis = cpos_x_axis.xy;
-        Vector2f screen_pos_y_axis = cpos_y_axis.xy;
-        Vector2f screen_pos_z_axis = cpos_z_axis.xy;
-
-        cpos_camera_target.xy += s_axis_length;
-        screen_pos_x_axis += s_axis_length;
-        screen_pos_y_axis += s_axis_length;
-        screen_pos_z_axis += s_axis_length;
-        out[0] = Vector4f(cpos_camera_target.x, cpos_camera_target.y, screen_pos_y_axis.x,screen_pos_y_axis.y);
-        out[1] = Vector4f(cpos_camera_target.x, cpos_camera_target.y, screen_pos_x_axis.x, screen_pos_x_axis.y);
-        out[2] = Vector4f(cpos_camera_target.x, cpos_camera_target.y, screen_pos_z_axis.x, screen_pos_z_axis.y);
+        Vector2f y_axis_end = GetAxisEnd(Vector3f::kUp);
+        Vector2f x_axis_end = GetAxisEnd(Vector3f::kRight);
+        Vector2f z_axis_end = GetAxisEnd(Vector3f::kForward);
+        out[0] = Vector4f(origin.x, origin.y, y_axis_end.x, y_axis_end.y);
+        out[1] = Vector4f(origin.x, origin.y, x_axis_end.x, x_axis_end.y);
+        out[2] = Vector4f(origin.x, origin.y, z_axis_end.x, z_axis_end.y);
     }
     using SceneManagement::SceneMgr;
 
@@ -1441,7 +1412,7 @@ namespace Ailu::Render
     {
         _event = ERenderPassEvent::kAfterPostprocess;
         const u16 vertex_count = 1000u;
-        _ui_default_shader = ResourceMgr::Get().GetRef<Shader>(L"Shaders/default_ui.alasset");
+        _ui_default_shader = ResourceMgr::Get().GetRef<Shader>(L"Shaders/hlsl/default_ui.alasset");
         _ui_default_mat = MakeRef<Material>(_ui_default_shader.get(), "DefaultUIMaterial");
         _ui_default_mat->SetTexture("_MainTex", Texture::s_p_default_white);
         _ui_default_mat->SetVector("_Color", Colors::kWhite);
@@ -1514,7 +1485,7 @@ namespace Ailu::Render
     MotionVectorPass::MotionVectorPass() : RenderPass("MotionVectorPass")
     {
         _event = ERenderPassEvent::kBeforeTransparent;
-        _motion_vector_mat = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/motion_vector.alasset"), "Runtime/MotionVector");
+        _motion_vector_mat = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/motion_vector.alasset"), "Runtime/MotionVector");
     }
 
     MotionVectorPass::~MotionVectorPass()
@@ -1612,7 +1583,7 @@ namespace Ailu::Render
 #pragma region HZB
     HZBPass::HZBPass() : RenderPass("HZB")
     {
-        _hzb_gen = ResourceMgr::Get().GetRef<ComputeShader>(L"Shaders/hzb.alasset");
+        _hzb_gen = ResourceMgr::Get().GetRef<ComputeShader>(L"Shaders/hlsl/Compute/hzb.alasset");
         _event = ERenderPassEvent::kAfterGbuffer;
     }
     HZBPass::~HZBPass()

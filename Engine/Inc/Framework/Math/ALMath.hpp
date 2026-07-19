@@ -2792,6 +2792,7 @@ namespace Ailu
             static const Color kDarkGreen = {0.f, 0.5f, 0.f, 1.0f};
             static const Color kBeige = {0.96f, 0.96f, 0.86f, 1.0f};
             static const Color kTurquoise = {0.25f, 0.88f, 0.82f, 1.0f};
+            static const Color kTransparent = {0.0f, 0.0f, 0.0f, 0.0f};
         }// namespace Colors
 
         namespace ALHash

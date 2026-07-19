@@ -10,7 +10,8 @@
                                 friend Type* Z_Construct_DockNodeData_Type();\
                                 static Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};
+                                static Type *StaticType() {return GetPrivateStaticClass();};\
+                                Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu::Editor{
 struct DockNodeData ;
@@ -25,7 +26,8 @@ class Ailu::Type* Ailu::StaticClass<struct Ailu::Editor::DockNodeData>();
                                 friend Type* Z_Construct_DockNodeDataArray_Type();\
                                 static Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};
+                                static Type *StaticType() {return GetPrivateStaticClass();};\
+                                Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu::Editor{
 struct DockNodeDataArray ;

@@ -64,7 +64,8 @@ namespace Ailu
 			style.Colors[ImGuiCol_WindowBg].w = 0.8f;
 		}
         //_font = io.Fonts->AddFontFromFileTTF(ResourceMgr::GetResSysPath("Fonts/VictorMono-Regular.ttf").c_str(), 13.0f);
-        io.Fonts->AddFontFromFileTTF(ResourceMgr::GetResSysPath("Fonts/Open_Sans/static/OpenSans-Regular.ttf").c_str(), 14.0f);
+		auto font_path = ResourceMgr::GetResSysPath(L"Fonts/Open_Sans/static/OpenSans-Regular.ttf");
+        io.Fonts->AddFontFromFileTTF(ToChar(font_path).c_str(), 14.0f);
         io.Fonts->Build();
         style.WindowMinSize.y = 16.0f;
         ImVec4* colors = ImGui::GetStyle().Colors;

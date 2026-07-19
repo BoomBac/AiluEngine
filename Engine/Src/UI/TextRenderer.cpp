@@ -7,6 +7,7 @@
 #include "Render/Gizmo.h"
 #include <Framework/Common/Profiler.h>
 #include <Framework/Common/ResourceMgr.h>
+#include <limits>
 
 namespace Ailu
 {
@@ -21,9 +22,9 @@ namespace Ailu
         {
             TIMER_BLOCK("TextRenderer::Init")
             s_default_font = ResourceMgr::Get()._default_font.get();
-            _bitmap_mat = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/default_text.alasset"), "DefaultTextMaterial");
+            _bitmap_mat = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/default_text.alasset"), "DefaultTextMaterial");
             _bitmap_mat->SetTexture("_MainTex", s_default_font->_pages[0]._texture.get());
-            _msdf_mat = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/default_text.alasset"), "DefaultTextMaterial");
+            _msdf_mat = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/default_text.alasset"), "DefaultTextMaterial");
             _msdf_mat->SetTexture("_MainTex", s_default_font->_pages[0]._texture.get());
             _msdf_mat->EnableKeyword("_MSDF");
             _default_block = new DrawerBlock(_bitmap_mat);
@@ -88,6 +89,14 @@ namespace Ailu
                 block->_color_buf[v_base + 1] = color;
                 block->_color_buf[v_base + 2] = color;
                 block->_color_buf[v_base + 3] = color;
+                block->_rect_buf[v_base] = pos_rect;
+                block->_rect_buf[v_base + 1] = pos_rect;
+                block->_rect_buf[v_base + 2] = pos_rect;
+                block->_rect_buf[v_base + 3] = pos_rect;
+                block->_corner_radius_buf[v_base] = Vector4f::kZero;
+                block->_corner_radius_buf[v_base + 1] = Vector4f::kZero;
+                block->_corner_radius_buf[v_base + 2] = Vector4f::kZero;
+                block->_corner_radius_buf[v_base + 3] = Vector4f::kZero;
                 block->_index_buf[i_base] = v_base;
                 block->_index_buf[i_base + 1] = v_base + 1;
                 block->_index_buf[i_base + 2] = v_base + 2;
@@ -159,6 +168,30 @@ namespace Ailu
 
             font = font ? font : s_default_font;
             return LayoutText(text, Vector2f::kZero, font_size, scale, Vector2f::kZero, font)._size;
+        }
+
+        Vector4f TextRenderer::CalculateTextVisualBounds(const String &text, f32 font_size, Font *font, Vector2f scale)
+        {
+            if (text.empty())
+                return Vector4f::kZero;
+
+            font = font ? font : s_default_font;
+            const auto layout = LayoutText(text, Vector2f::kZero, font_size, scale, Vector2f::kZero, font);
+            if (layout._glyphs.empty())
+                return Vector4f(0.0f, 0.0f, layout._size.x, layout._size.y);
+
+            f32 min_x = std::numeric_limits<f32>::max();
+            f32 min_y = std::numeric_limits<f32>::max();
+            f32 max_x = std::numeric_limits<f32>::lowest();
+            f32 max_y = std::numeric_limits<f32>::lowest();
+            for (const auto &glyph: layout._glyphs)
+            {
+                min_x = std::min(min_x, glyph._pos.x);
+                min_y = std::min(min_y, glyph._pos.y);
+                max_x = std::max(max_x, glyph._pos.x + glyph._size.x);
+                max_y = std::max(max_y, glyph._pos.y + glyph._size.y);
+            }
+            return Vector4f(min_x, min_y, max_x - min_x, max_y - min_y);
         }
     }// namespace UI
 }// namespace Ailu

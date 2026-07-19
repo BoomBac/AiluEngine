@@ -59,7 +59,8 @@ namespace Ailu
             UIElement *capture_target = s_mgr->_capture_target;
             const bool has_capture = s_mgr->_capture_target != nullptr;
             const bool is_capture_sensitive_mouse_event = has_capture &&
-                                                         (ue._type == UI::UIEvent::EType::kMouseUp);
+                                                         (ue._type == UI::UIEvent::EType::kMouseMove ||
+                                                          ue._type == UI::UIEvent::EType::kMouseUp);
             const auto is_capture_owner_widget = [capture_target](Widget *w)
             {
                 if (!capture_target || !w || !w->Root())

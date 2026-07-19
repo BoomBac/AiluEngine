@@ -100,7 +100,7 @@ namespace Ailu
         }
         TransformGizmo::TransformGizmo()
         {
-            auto shader = ResourceMgr::Get().Load<Shader>(L"Shaders/transform_gizmo.alasset");
+            auto shader = ResourceMgr::Get().Load<Shader>(L"Shaders/hlsl/transform_gizmo.alasset");
             auto mat_x = MakeRef<Render::Material>(shader.get(), "TransformGizmoMat");
             mat_x->SetVector("_color", Colors::kRed);
             auto mat_y = MakeRef<Render::Material>(shader.get(), "TransformGizmoMat");
@@ -160,7 +160,7 @@ namespace Ailu
             Vector3f dir = Normalize(axis);
             Matrix4x4f orient;
 
-            // 基础方向为 +Y，如果不是 +Y，需要旋转到目标方向
+            // Base direction is +Y; rotate it to the target axis when needed.
             Vector3f base = Vector3f::kUp;
             f32 dot = DotProduct(base, dir);
 
@@ -170,7 +170,7 @@ namespace Ailu
             }
             else if (fabs(dot + 1.0f) < 1e-6f)
             {
-                orient = MatrixRotationX(Math::kPi);// 反向朝下
+                orient = MatrixRotationX(Math::kPi);// Reverse to -Y.
             }
             else
             {
@@ -179,11 +179,10 @@ namespace Ailu
                 MatrixRotationAxis(orient,axis_rot, angle);
             }
 
-            // 缩放与平移
-            Matrix4x4f scale = MatrixScale(axis_radius, axis_length * 0.5f, axis_radius);
+            // Scale and translate.
+            Matrix4x4f scl = MatrixScale(axis_radius, axis_length * 0.5f, axis_radius);
             Matrix4x4f translate = MatrixTranslation(0, axis_length * 0.5f, 0);
-
-            return scale * translate * orient * MatrixTranslation(origin);
+            return scl * translate * orient * MatrixTranslation(origin);
         }
 
         static Matrix4x4f MakeGizmoCone(const Vector3f &axis, const Vector3f &origin, f32 height, f32 axis_radius)
@@ -209,11 +208,11 @@ namespace Ailu
                 MatrixRotationAxis(orient, axis_rot, angle);
             }
 
-            // 缩放与平移
-            Matrix4x4f scale = MatrixScale(axis_radius, axis_radius, axis_radius);
+            // Scale and translate.
+            Matrix4x4f scl = MatrixScale(axis_radius, axis_radius, axis_radius);
             Matrix4x4f translate = MatrixTranslation(0, height, 0);
 
-            return scale * translate * orient * MatrixTranslation(origin);
+            return scl * translate * orient * MatrixTranslation(origin);
         }
 
         static Matrix4x4f MakeGizmoPlane(Vector3f axis, Vector3f sub_axisa, Vector3f sub_axisb, const Vector3f &origin, f32 size)
@@ -236,8 +235,8 @@ namespace Ailu
             orient[2][2] = sub_axisb.z;
 
             size *= 0.5f;
-            Matrix4x4f scale = MatrixScale(size, 0.1f, size);
-            return scale * orient * MatrixTranslation(origin + sub_axisa * size + sub_axisb * size);
+            Matrix4x4f scl = MatrixScale(size, 0.1f, size);
+            return scl * orient * MatrixTranslation(origin + sub_axisa * size + sub_axisb * size);
         }
 
         static Matrix4x4f MakeCircle(Vector3f axis)
@@ -321,20 +320,20 @@ namespace Ailu
             if (_space == EGizmoSpace::kWorld)
                 return Normalize(localAxis);
 
-            // 本地空间：把本地轴旋到世界
-            // 假设存在 Transform::GetWorldRotation
+            // Local space: rotate the local axis into world space.
+            // This assumes the target transform exposes world rotation.
             auto *target = Target();
             if (!target)
                 return Normalize(localAxis);
             Quaternion worldRot = target->GetRotation();
             return Normalize(worldRot * localAxis);
         }
-        // 让轴线段足够长，避免s被夹在[0, axis_length]
+        // Keep the axis segment long enough so s is not clamped to [0, axis_length].
         static const f32 kVirualRayLen = 10000.0f;
 
         f32 TransformGizmo::ComputeAxisParamS(Vector2f mouse_pos, const Vector3f &origin, const Vector3f &axisDir) const
         {
-            // 鼠标射线
+            // Mouse ray.
             Vector3f camPos = _cam->Position();
             Vector3f rayDir = _cam->ScreenToWorld(mouse_pos, 0.0f);
 
@@ -346,7 +345,7 @@ namespace Ailu
                     camPos,
                     camPos + rayDir * kVirualRayLen,
                     s, t, c1, c2);
-            // 此处的s通常是“从第一个端点起”的线性参数，配合上面的中心对称定义，可直接用于差分
+            // s is usually measured from the first endpoint; with the centered segment it can be diffed directly.
             return s * kVirualRayLen;// _axis_length;
         }
 
@@ -355,7 +354,7 @@ namespace Ailu
             auto *target = Target();
             if (!target) return;
 
-            // 锁定当前轴
+            // Lock the current axis.
             _drag_axis = _hover_axis;
             if (_drag_axis < 0) return;
 
@@ -387,7 +386,7 @@ namespace Ailu
                     auto axis_dir = GetAxisDirWorld(2);
                     _drag_axis_ctx[_drag_axis_num++] = {axis_dir, ComputeAxisParamS(mouse_pos, _drag_origin, axis_dir)};
                 }
-                _drag_start_pos = _drag_origin;// 简化：无父层或以世界位移为准
+                _drag_start_pos = _drag_origin;// Simplified: use world movement as the drag basis.
                 if (_drag_axis_num == 2)
                 {
                     s_drag_plane = Plane(_drag_start_pos, CrossProduct(_drag_axis_ctx[0]._drag_axis_dir, _drag_axis_ctx[1]._drag_axis_dir));
@@ -465,7 +464,7 @@ namespace Ailu
                     RefreshAxisDirections();
                     if (_mode == EGizmoMode::kTranslate)
                     {
-                        //s_p_plane 为2x2
+                        // s_p_plane is 2x2.
                         f32 quad_w = _scaled_axis_length * _axis_quad_width_scale;
                         //X->YZ Plane
                         {
@@ -531,7 +530,7 @@ namespace Ailu
                         }
                     }
                 }
-                // 正在拖拽：计算位移并应用
+                // While dragging, compute and apply the transform delta.
                 if (_is_dragging && _drag_axis >= 0)
                 {
                     if (_mode == EGizmoMode::kTranslate)
@@ -544,7 +543,7 @@ namespace Ailu
                             f32 delta_s = s_now - ctx._drag_start_s;
                             world_delta = ctx._drag_axis_dir * delta_s;
                         }
-                        else if (_drag_axis_num == 2)//多轴不能简单叠加，因为两轴的最近点可能不在同一平面
+                        else if (_drag_axis_num == 2)// Multi-axis movement uses the drag plane.
                         {
                             Ray ray{_cam->Position(), _cam->ScreenToWorld(mouse_pos)};
                             Vector3f hit = CollisionDetection::Intersect(ray, s_drag_plane)._point;
@@ -575,58 +574,58 @@ namespace Ailu
                             _drag_scale_factor[_drag_axis >> 1] = delta_s;
                             target->SetLocalScale(_drag_start_scale * world_scale);
                         }
-                        else if (_drag_axis_num == 3)//多轴不能简单叠加，因为两轴的最近点可能不在同一平面
+                        else if (_drag_axis_num == 3)// Uniform scale uses screen-space movement.
                         {
-                            // 屏幕空间拖拽距离
+                            // Screen-space drag distance.
                             Vector2f v = _drag_start_mouse_pos - _mouse_pos;
                             float pixel_distance = Magnitude(v);
 
-                            // 拖拽方向与相机-物体方向在屏幕的投影点积，稳定符号
+                            // Project the camera-to-gizmo direction onto screen space for a stable sign.
                             Vector3f gizmo_dir_ws = Normalize(_drag_start_pos - _cam->Position());
                             Vector2f gizmo_dir_ss = Normalize(Vector2f(DotProduct(gizmo_dir_ws, _cam->Right()), -DotProduct(gizmo_dir_ws, _cam->Up())));
                             Render::Gizmo::DrawLine(Vector2f{500.0f, 500.0f}, Vector2f{500.0f, 500.0f}  + gizmo_dir_ss);
                             Vector2f drag_dir = Normalize(v);
                             float proj = DotProduct(gizmo_dir_ss, drag_dir);
 
-                            // 防止微小跳变
+                            // Avoid tiny jitter.
                             if (fabs(proj) < 0.1f)
                                 proj = 0.0f;
 
-                            // 将屏幕距离映射为世界空间距离
-                            // 计算屏幕上移动 1 像素对应的世界单位长度
+                            // Map screen distance to world-space distance.
+                            // Compute the world units represented by one screen pixel.
                             Ray ray0 = Ray{_cam->Position(), _cam->ScreenToWorld(_drag_start_mouse_pos)};
                             Ray ray1 = Ray{_cam->Position(), _cam->ScreenToWorld(_drag_start_mouse_pos + Vector2f(1, 1))};
 
-                            // 在 gizmo 所在平面上求交点
+                            // Intersect on the gizmo plane.
                             Vector3f hit0 = CollisionDetection::Intersect(ray0, s_drag_plane)._point;
                             Vector3f hit1 = CollisionDetection::Intersect(ray1, s_drag_plane)._point;
 
-                            // 每像素对应的世界单位
+                            // World units per pixel.
                             float world_per_pixel = Magnitude(hit1 - hit0);
 
-                            // 得到当前世界空间“缩放距离”
+                            // Current scale distance in world space.
                             float world_distance = pixel_distance * world_per_pixel * proj;
 
-                            // 根据 gizmo 尺寸或场景比例做调节
-                            float s = world_distance * 0.5f;// scale 系数调节
+                            // Adjust based on gizmo size or scene scale.
+                            float s = world_distance * 0.5f;// Scale tuning.
 
-                            // 三轴统一缩放
+                            // Uniform scale on all three axes.
                             world_scale = Vector3f(s);
 
-                            // 应用到目标
+                            // Apply to target.
                             target->SetLocalScale(_drag_start_scale + world_scale);
                             _drag_scale_factor = Vector3f::kOne + world_scale;
                             Vector2f p = mouse_pos + Vector2f{20, 20};
                             Render::Gizmo::DrawText(std::format("now s: {}", s), p, 10u, Colors::kCyan);
                         }
                         else {}
-                        // 注意：有父节点层级时，需要把world_delta转换到local空间再叠加到local position
+                        // With hierarchy, world_delta should be converted to local space before adding to local position.
 
                         Render::Gizmo::DrawLine(Vector3f::kZero, target->_position);
                     }
                     else//if (_mode == EGizmoMode::kRotate)
                     {
-                        Vector3f axis = GetAxisDirWorld(_drag_axis >> 1);// 例如 X: (1,0,0)
+                        Vector3f axis = GetAxisDirWorld(_drag_axis >> 1);// Example: X is (1, 0, 0).
                         _drag_current_hit = CollisionDetection::Intersect(
                                                Ray{_cam->Position(), _cam->ScreenToWorld(_mouse_pos)},
                                                s_rotate_plane[_drag_axis >> 1])
@@ -663,7 +662,7 @@ namespace Ailu
                                             MakeGizmoCone(axis._dir, _cur_target_pos, _scaled_axis_length, _scaled_axis_radius * 4.0f * scale_factor),
                                             axis._mat.get());
                 }
-                //s_p_plane 为2x2
+                // s_p_plane is 2x2.
                 const f32 quad_w = _scaled_axis_length * _axis_quad_width_scale;
                 //X->YZ Plane
                 {

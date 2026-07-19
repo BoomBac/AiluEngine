@@ -32,11 +32,11 @@ namespace Ailu::Render
         TextureImportSetting setting;
         setting._generate_mipmap = true;
         _weather_map = ResourceMgr::Get().Load<Texture2D>(EnginePath::kEngineTexturePathW + L"weather_map.alasset", &setting);
-        auto cloud_shader = ResourceMgr::Get().Load<Shader>(L"Shaders/global_volumetric_cloud.alasset");
+        auto cloud_shader = ResourceMgr::Get().Load<Shader>(L"Shaders/hlsl/global_volumetric_cloud.alasset");
         _global_cloud = MakeRef<Material>(cloud_shader.get(), "Runtime/VolumetricClouds");
         _event = ERenderPassEvent::kAfterSkybox;
-        _noise_gen = ResourceMgr::Get().Load<ComputeShader>(L"Shaders/volumetric_noise_generator.alasset");
-        _cloud_gen = ResourceMgr::Get().Load<ComputeShader>(L"Shaders/volumetric_cloud.alasset");
+        _noise_gen = ResourceMgr::Get().Load<ComputeShader>(L"Shaders/hlsl/Compute/volumetric_noise_generator.alasset");
+        _cloud_gen = ResourceMgr::Get().Load<ComputeShader>(L"Shaders/hlsl/Compute/volumetric_cloud.alasset");
         _cloud_gen->EnableKeyword("_QUALITY_HIGH");
         u16 w = 128, h = w, d = w;
         TextureDesc desc;

@@ -405,7 +405,7 @@ namespace Ailu::RHI::DX12
         GpuResource::BindImpl(rhi_cmd, params);
         for (const auto &layout_ele: *params._params._vb_binder._layout)
         {
-            auto it = _buffer_layout_indexer.find(layout_ele.Name);
+            auto it = _buffer_layout_indexer.find(std::make_pair(layout_ele.Name, layout_ele._semantic_index));
             if (it != _buffer_layout_indexer.end())
             {
                 const u8 stream_index = it->second;
@@ -415,7 +415,7 @@ namespace Ailu::RHI::DX12
             }
             else
             {
-                LOG_WARNING("Try to bind a vertex buffer with an invalid layout element name {}", layout_ele.Name);
+                LOG_WARNING("Try to bind a vertex buffer with an invalid layout element name {}{}", layout_ele.Name, layout_ele._semantic_index);
             }
         }
     }
@@ -470,7 +470,7 @@ namespace Ailu::RHI::DX12
             _buffer_views[stream_index].BufferLocation = _vertex_buffers[stream_index]->GetGPUVirtualAddress();
             _buffer_views[stream_index].StrideInBytes = _buffer_layout.GetStride(stream_index);
             _buffer_views[stream_index].SizeInBytes = (u32) _stream_data[i]._size;
-            _buffer_layout_indexer.emplace(std::make_pair(_buffer_layout[stream_index].Name, stream_index));
+            _buffer_layout_indexer.emplace(std::make_pair(std::make_pair(_buffer_layout[stream_index].Name, _buffer_layout[stream_index]._semantic_index), stream_index));
 
             ReleaseBindlessSrvIndex(_bindless_srv_indices[stream_index]);
             CreateBindlessBufferSrv(d3d_dev, _vertex_buffers[stream_index].Get(), _stream_data[i]._size, _bindless_srv_indices[stream_index]);

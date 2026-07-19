@@ -7,6 +7,7 @@
 #include "UI/UIFramework.h"
 #include "UI/UIRenderer.h"
 #include "UI/DragDrop.h"
+#include "Objects/JsonArchive.h"
 #include "Render/AssetPreviewGenerator.h"
 #include "Framework/Common/Input.h"
 
@@ -56,27 +57,11 @@ namespace Ailu
                 return std::nullopt;
             }
 
-            WString NormalizePathWithoutTrailingSlash(const WString &path)
-            {
-                WString normalized = PathUtils::FormatFilePath(path);
-                while (!normalized.empty() && normalized.back() == L'/')
-                    normalized.pop_back();
-                return normalized;
-            }
-
-            WString NormalizeDirectoryPath(const WString &path)
-            {
-                WString normalized = NormalizePathWithoutTrailingSlash(path);
-                if (!normalized.empty())
-                    normalized.push_back(L'/');
-                return normalized;
-            }
-
             WString AppendChildAssetPath(const WString &directory_asset_path, const WString &file_name)
             {
                 if (directory_asset_path.empty())
                     return file_name;
-                return NormalizeDirectoryPath(directory_asset_path) + file_name;
+                return PathUtils::NormalizeDirectoryPath(directory_asset_path) + file_name;
             }
 
             bool RewriteAssetHeaderName(const WString &sys_path, const String &new_name)
@@ -116,24 +101,23 @@ namespace Ailu
         AssetBrowser::AssetBrowser() : DockWindow("Asset Browser")
         {
             _sv = _content_root->AddChild<UI::SplitView>();
-            _sv->SlotSizePolicy(UI::ESizePolicy::kFill);
-            _sv->SlotPadding(_content_root->Thickness());
+            _sv->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
+            _sv->SlotPadding() = UI::Padding(_content_root->Thickness());
+            _sv->InvalidateLayout();
             _sv->AddChild<UI::Border>();
             _right = _sv->AddChild<UI::VerticalBox>();
-            _right->SlotPadding({2.0f,2.0f,0.0f,0.0f});
-            _right->SlotSizePolicy(UI::ESizePolicy::kFill);
+            _right->SlotPadding() = UI::Padding(2.0f, 2.0f, 0.0f, 0.0f);
+            _right->InvalidateLayout();
             _on_size_change += [this](Vector2f new_size)
             {
                 auto t = _content_root->Thickness();
-                _sv->SlotSize(new_size.x, new_size.y - kTitleBarHeight);
+                _sv->GetSlot()->Size({new_size.x, new_size.y - kTitleBarHeight});
             };
             _current_path = ResourceMgr::Get().EngineResRootPath();
             auto hb = _right->AddChild<UI::HorizontalBox>();
-            hb->SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto);
-            hb->SlotAlignmentH(UI::EAlignment::kFill);
+            hb->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto).CrossAlignment(UI::EAlignment::kFill);
             auto back_btn = hb->AddChild<UI::Button>();
-            back_btn->SlotSizePolicy(UI::ESizePolicy::kFixed);
-            back_btn->SlotSize(16.0f, 16.0f);
+            back_btn->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFixed).Size({16.0f, 16.0f});
             back_btn->OnMouseClick() += [&](UI::UIEvent& e) 
             {
                 _current_path = _current_path.parent_path();
@@ -142,16 +126,15 @@ namespace Ailu
             };
             back_btn->SetText("<");
             _path_title = hb->AddChild<UI::Text>("Current Path");
-            _path_title->SlotSizePolicy(UI::ESizePolicy::kFill);
+            _path_title->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto);
             _path_title->_horizontal_align = EAlignment::kLeft;
             _icon_area = _right->AddChild<UI::ScrollView>();
-            _icon_area->SlotSizePolicy(UI::ESizePolicy::kFill);
-            _icon_area->SlotAlignmentH(UI::EAlignment::kFill);
+            _icon_area->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill).CrossAlignment(UI::EAlignment::kFill);
             auto slider = _right->AddChild<UI::Slider>();
             slider->_range = {50.0f, 200.0f};
             slider->SetValue(64.0f);
             _icon_content = _icon_area->AddChild<UI::Canvas>();
-            _icon_content->SlotSizePolicy(UI::ESizePolicy::kAuto);
+            _icon_content->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kAuto, UI::ESizePolicy::kAuto);
             const auto blank_context_handler = [this](UI::UIEvent &e)
             {
                 if (e._key_code != EKey::kRBUTTON)
@@ -243,7 +226,7 @@ namespace Ailu
                                           [setting, file_name](UI::VerticalBox *content, UI::Text *)
                                           {
                                               auto *file_text = content->AddChild<Text>(std::format("File: {}", file_name));
-                                              file_text->SlotSizePolicy(ESizePolicy::kFill, ESizePolicy::kAuto);
+                                              file_text->GetSlotAs<LinearSlot>().SizePolicy(ESizePolicy::kFill, ESizePolicy::kAuto);
                                               file_text->_horizontal_align = EAlignment::kLeft;
 
                                               auto *srgb = EditorPopup::AddCheckBoxRow(content, "sRGB", setting->_is_sRGB);
@@ -289,7 +272,7 @@ namespace Ailu
                                           [setting, file_name](UI::VerticalBox *content, UI::Text *)
                                           {
                                               auto *file_text = content->AddChild<Text>(std::format("File: {}", file_name));
-                                              file_text->SlotSizePolicy(ESizePolicy::kFill, ESizePolicy::kAuto);
+                                              file_text->GetSlotAs<LinearSlot>().SizePolicy(ESizePolicy::kFill, ESizePolicy::kAuto);
                                               file_text->_horizontal_align = EAlignment::kLeft;
 
                                               auto *materials = EditorPopup::AddCheckBoxRow(content, "Import Materials", setting->_is_import_material);
@@ -346,9 +329,29 @@ namespace Ailu
             ShowNextImportPopup();
         }
 
+        void AssetBrowser::SaveDockLayoutState(JsonArchive &ar)
+        {
+            if (_sv)
+                _split_ratio = _sv->GetRatio();
+            ar.BeginObject("_split_ratio");
+            ar << _split_ratio;
+            ar.EndObject();
+        }
+
+        void AssetBrowser::LoadDockLayoutState(JsonArchive &ar)
+        {
+            if (ar.HasField("_split_ratio"))
+            {
+                ar.BeginObject("_split_ratio");
+                ar >> _split_ratio;
+                ar.EndObject();
+            }
+        }
+
         void AssetBrowser::OnDockLayoutLoaded()
         {
-            // Kept for DockWindow extension point; SplitView ratio restore is disabled in current UI API.
+            if (_sv)
+                _sv->SetRatio(_split_ratio);
         }
 
         void AssetBrowser::Update(f32 dt)
@@ -388,15 +391,16 @@ namespace Ailu
                     const auto create_icon_group = []() -> std::tuple<Ref<UI::VerticalBox>,UI::Image*,UI::Text*>
                     {
                         auto vb = MakeRef<UI::VerticalBox>();
-                        vb->SlotSizePolicy(UI::ESizePolicy::kFixed);
-                        vb->SlotPadding(2.0f);
+                        vb->GetSlot()->Size({64.0f, 84.0f});
+                        vb->SlotPadding() = UI::Padding(2.0f);
+                        vb->InvalidateLayout();
                         auto icon = vb->AddChild<UI::Image>();
-                        icon->SlotSizePolicy(UI::ESizePolicy::kFill);
-                        icon->SlotAlignmentH(UI::EAlignment::kFill);
+                        icon->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill).CrossAlignment(UI::EAlignment::kFill);
                         auto text = vb->AddChild<UI::Text>();
-                        text->SlotAlignmentH(UI::EAlignment::kFill);
+                        text->GetSlotAs<UI::LinearSlot>().CrossAlignment(UI::EAlignment::kFill);
                         text->_vertical_align = UI::EAlignment::kCenter;
-                        text->SlotPadding(6.0f);
+                        text->SlotPadding() = UI::Padding(6.0f);
+                        text->InvalidateLayout();
                         text->FontSize(14.0f);
                         return std::make_tuple(vb, icon, text);
                     };
@@ -407,7 +411,7 @@ namespace Ailu
                         fs::path item_path = dir_it.path();
                         const auto folder_sys_path = item_path.wstring();
                         auto [vb, icon,text] = create_icon_group();
-                        vb->SlotSize({_icon_size, _icon_size + 20.0f});
+                        vb->GetSlot()->Size({_icon_size, _icon_size + 20.0f});
                         icon->Name(item_path.filename().string().c_str());
                         text->SetText(item_path.filename().string().c_str());
                         icon->SetTexture(s_folder_icon);
@@ -448,7 +452,7 @@ namespace Ailu
                     {
                         auto [vb, icon, text] = create_icon_group();
                         Color tint = asset->_p_obj ? Colors::kWhite : Colors::kGray;
-                        vb->SlotSize({_icon_size, _icon_size + 20.0f});
+                        vb->GetSlot()->Size({_icon_size, _icon_size + 20.0f});
                         icon->Name(asset-> Name());
                         text->SetText(asset->_p_obj ? asset->_p_obj->Name() : asset->Name());
                         icon->_tint_color = tint;
@@ -559,8 +563,7 @@ namespace Ailu
                 for (u32 i = 0; i < (u32) _icon_content->GetChildren().size(); i++)
                 {
                     auto child = _icon_content->ChildAt(i);
-                    child->SlotPosition({x, y});
-                    child->SlotSize({_icon_size, _icon_size + 20.0f});
+                    child->GetSlotAs<UI::CanvasSlot>().Position({x, y}).Size({_icon_size, _icon_size + 20.0f});
                     if ((i + 1) % num_per_row == 0)
                     {
                         x = 0.0f;
@@ -829,8 +832,8 @@ namespace Ailu
             if (fs::exists(new_path))
                 return false;
 
-            const WString old_dir_asset_path = NormalizePathWithoutTrailingSlash(PathUtils::ExtractAssetPath(old_path.wstring()));
-            const WString new_dir_asset_path = NormalizePathWithoutTrailingSlash(PathUtils::ExtractAssetPath(new_path.wstring()));
+            const WString old_dir_asset_path = PathUtils::NormalizePathWithoutTrailingSlash(PathUtils::ExtractAssetPath(old_path.wstring()));
+            const WString new_dir_asset_path = PathUtils::NormalizePathWithoutTrailingSlash(PathUtils::ExtractAssetPath(new_path.wstring()));
             auto nested_assets = CollectAssetsUnderDirectory(old_dir_asset_path);
 
             std::error_code rename_error;
@@ -841,10 +844,10 @@ namespace Ailu
                 return false;
             }
 
-            const WString old_prefix = NormalizeDirectoryPath(old_dir_asset_path);
+            const WString old_prefix = PathUtils::NormalizeDirectoryPath(old_dir_asset_path);
             for (auto *asset: nested_assets)
             {
-                WString asset_path = NormalizePathWithoutTrailingSlash(asset->_asset_path);
+                WString asset_path = PathUtils::NormalizePathWithoutTrailingSlash(asset->_asset_path);
                 if (asset_path.compare(0, old_prefix.size(), old_prefix) != 0)
                     continue;
                 WString suffix = asset_path.substr(old_prefix.size());
@@ -884,7 +887,7 @@ namespace Ailu
             if (!fs::exists(folder_path) || !fs::is_directory(folder_path))
                 return;
 
-            const WString dir_asset_path = NormalizePathWithoutTrailingSlash(PathUtils::ExtractAssetPath(folder_sys_path));
+            const WString dir_asset_path = PathUtils::NormalizePathWithoutTrailingSlash(PathUtils::ExtractAssetPath(folder_sys_path));
             auto assets_to_delete = CollectAssetsUnderDirectory(dir_asset_path);
 
             std::error_code remove_error;
@@ -950,7 +953,7 @@ namespace Ailu
             auto shader = Render::Shader::s_p_defered_standart_lit.lock();
             if (!shader)
             {
-                shader = ResourceMgr::Get().Load<Render::Shader>(L"Shaders/defered_standard_lit.alasset");
+                shader = ResourceMgr::Get().Load<Render::Shader>(L"Shaders/hlsl/defered_standard_lit.alasset");
                 Render::Shader::s_p_defered_standart_lit = shader;
             }
             if (!shader)
@@ -965,11 +968,11 @@ namespace Ailu
 
         WString AssetBrowser::CurrentAssetDirectoryPath() const
         {
-            const WString current_path = NormalizePathWithoutTrailingSlash(_current_path.wstring());
-            const WString root_path = NormalizePathWithoutTrailingSlash(ResourceMgr::Get().EngineResRootPath());
+            const WString current_path = PathUtils::NormalizePathWithoutTrailingSlash(_current_path.wstring());
+            const WString root_path = PathUtils::NormalizePathWithoutTrailingSlash(ResourceMgr::Get().EngineResRootPath());
             if (current_path == root_path)
                 return L"";
-            return NormalizePathWithoutTrailingSlash(PathUtils::ExtractAssetPath(current_path));
+            return PathUtils::NormalizePathWithoutTrailingSlash(PathUtils::ExtractAssetPath(current_path));
         }
 
         WString AssetBrowser::BuildCurrentAssetPath(const WString &file_name) const
@@ -980,12 +983,12 @@ namespace Ailu
         Vector<Asset *> AssetBrowser::CollectAssetsUnderDirectory(const WString &directory_asset_path) const
         {
             Vector<Asset *> assets;
-            const WString normalized_dir = NormalizePathWithoutTrailingSlash(directory_asset_path);
-            const WString normalized_prefix = NormalizeDirectoryPath(normalized_dir);
+            const WString normalized_dir = PathUtils::NormalizePathWithoutTrailingSlash(directory_asset_path);
+            const WString normalized_prefix = PathUtils::NormalizeDirectoryPath(normalized_dir);
             for (auto it = ResourceMgr::Get().Begin(); it != ResourceMgr::Get().End(); ++it)
             {
                 Asset *asset = it->second.get();
-                WString asset_path = NormalizePathWithoutTrailingSlash(asset->_asset_path);
+                WString asset_path = PathUtils::NormalizePathWithoutTrailingSlash(asset->_asset_path);
                 if (asset_path == normalized_dir || asset_path.compare(0, normalized_prefix.size(), normalized_prefix) == 0)
                     assets.push_back(asset);
             }

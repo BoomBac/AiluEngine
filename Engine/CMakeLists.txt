@@ -123,6 +123,8 @@ set(UI_MODULE
         Src/UI/UIFramework.cpp
         Src/UI/UIElement.cpp
         Inc/UI/UIElement.h
+        Src/UI/UISlot.cpp
+        Inc/UI/UISlot.h
         Src/UI/UIRenderer.cpp
         Inc/UI/UIRenderer.h)
 set(IMGUI_BACKENDS ${ENGINE_ROOT_PATH}/Ext/imgui/backends/imgui_impl_dx12.cpp;${ENGINE_ROOT_PATH}/Ext/imgui/backends/imgui_impl_win32.cpp)
@@ -219,7 +221,7 @@ set_target_properties (Engine PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY "${OUTPUT_ROOT}/$<CONFIG>")
 # 编译器参数
 if (MSVC)
-        target_compile_options(Engine PRIVATE /MP /bigobj /wd4819 /wd4251)
+        target_compile_options(Engine PRIVATE /MP /bigobj /utf-8 /wd4819 /wd4251)
     # Enable RTC checks in Debug
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /RTC1")
     # or: set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /RTCs /RTCu")

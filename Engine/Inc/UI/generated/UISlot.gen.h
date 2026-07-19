@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __UISLOT_GEN_H__
 //Class UISlot begin...........................
-#define UISLOT_GEN_H_106_GENERATED_BODY \
+#define UISLOT_GEN_H_70_GENERATED_BODY \
                             private: \
                                 friend Type* Z_Construct_UISlot_Type();\
                                 static Type* GetPrivateStaticClass();\
@@ -21,7 +21,7 @@ AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::UI::UISlot>();
 //Class UISlot end...........................
 
 //Class CanvasSlot begin...........................
-#define UISLOT_GEN_H_116_GENERATED_BODY \
+#define UISLOT_GEN_H_92_GENERATED_BODY \
                             private: \
                                 friend Type* Z_Construct_CanvasSlot_Type();\
                                 static Type* GetPrivateStaticClass();\
@@ -37,7 +37,7 @@ AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::UI::CanvasSlot>();
 //Class CanvasSlot end...........................
 
 //Class LinearSlot begin...........................
-#define UISLOT_GEN_H_135_GENERATED_BODY \
+#define UISLOT_GEN_H_115_GENERATED_BODY \
                             private: \
                                 friend Type* Z_Construct_LinearSlot_Type();\
                                 static Type* GetPrivateStaticClass();\
@@ -53,12 +53,13 @@ AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::UI::LinearSlot>();
 //Class LinearSlot end...........................
 
 //Struct Padding begin...........................
-#define UISLOT_GEN_H_47_GENERATED_BODY \
+#define UISLOT_GEN_H_41_GENERATED_BODY \
                             private: \
                                 friend Type* Z_Construct_Padding_Type();\
                                 static Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};
+                                static Type *StaticType() {return GetPrivateStaticClass();};\
+                                AILU_API Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu::UI{
 struct Padding ;
@@ -66,21 +67,6 @@ struct Padding ;
 template<>
 AILU_API class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::Padding>();
 //Struct Padding end...........................
-
-//Struct Slot begin...........................
-#define UISLOT_GEN_H_76_GENERATED_BODY \
-                            private: \
-                                friend Type* Z_Construct_Slot_Type();\
-                                static Type* GetPrivateStaticClass();\
-                            public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};
-                            namespace Ailu {class Type;}
-namespace Ailu::UI{
-struct Slot ;
-}
-template<>
-AILU_API class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::Slot>();
-//Struct Slot end...........................
 
 //Enum EAlignment begin...........................
 const Ailu::Enum* Z_Construct_Enum_EAlignment_Type();
@@ -90,15 +76,6 @@ enum class EAlignment : i32;
 template<>
 AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::UI::EAlignment>();
 //Enum EAlignment end...........................
-
-//Enum ESlotType begin...........................
-const Ailu::Enum* Z_Construct_Enum_ESlotType_Type();
-namespace Ailu::UI { 
-enum class ESlotType : i32;
-}
-template<>
-AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::UI::ESlotType>();
-//Enum ESlotType end...........................
 
 //Enum ESizePolicy begin...........................
 const Ailu::Enum* Z_Construct_Enum_ESizePolicy_Type();

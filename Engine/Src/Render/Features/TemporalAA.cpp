@@ -102,7 +102,7 @@ namespace Ailu::Render
     TAAExecutePass::TAAExecutePass() : RenderPass("TAAExecutePass")
     {
         _origin_camera_cbuf = std::unique_ptr<ConstantBuffer>(ConstantBuffer::Create(RenderConstants::kPerCameraDataSize));
-        _taa_gen = ResourceMgr::Get().GetRef<ComputeShader>(L"Shaders/taa.alasset");
+        _taa_gen = ResourceMgr::Get().GetRef<ComputeShader>(L"Shaders/hlsl/Compute/taa.alasset");
     }
     void TAAExecutePass::Setup(Matrix4x4f pre_matrix, Matrix4x4f cur_matrix, Material *taa_mat, int camera_hash, Vector2f jitter,Vector4f params,Vector4f quality)
     {

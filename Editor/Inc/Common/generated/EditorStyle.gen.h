@@ -10,7 +10,8 @@
                                 friend Type* Z_Construct_EditorStyle_Type();\
                                 static Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};
+                                static Type *StaticType() {return GetPrivateStaticClass();};\
+                                Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu::Editor{
 struct EditorStyle ;

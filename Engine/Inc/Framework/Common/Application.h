@@ -29,6 +29,14 @@ namespace Ailu
         u32 _gameview_width, _gameview_height;
     };
 
+    struct AILU_API ApplicationInitContext
+    {
+        WString _project_file_path;
+        Vector<WString> _arguments;
+
+        bool _require_project = true;
+    };
+
     enum class ECursorType
     {
         kArrow,
@@ -115,16 +123,15 @@ namespace Ailu
         /// @brief 返回当前应用程序缓存目录
         /// @return 目录 working_path/cache/
         static WString GetAppCachePath();
-        static void SetProjectRootPath(const WString &project_root);
-        static const WString &GetProjectRootPath() { return s_project_root_path; }
+        static const WString &GetProjectRootPath();
         static void SetEngineConfigPath(const WString &engine_config_path);
-        static WString ResolveProjectPath(const WString &relative_path);
         /// @brief 获取用户目录，c:/UserName/
         /// @return 用户目录
-        static WString GetUseHomePath();
+        static WString GetUserHomePath();
+        static WString GetAiluRoot();
         static Application& Get();
         int Initialize() override;
-        int Initialize(ApplicationDesc desc);
+        int Initialize(ApplicationDesc desc,const ApplicationInitContext& init_ctx);
         void Finalize() override;
         void Tick(f32 delta_time) override;
         void ReloadEngineConfig();
@@ -178,7 +185,7 @@ namespace Ailu
         inline static Application *sp_instance = nullptr;
         inline static Window *s_focus_window = nullptr;
         inline static WString s_project_root_path;
-        inline static WString s_default_engine_config_path;
+        inline static WString s_engine_config_path;
 
         LayerStack *_layer_stack;
         ImGUILayer *_p_imgui_layer;
@@ -189,7 +196,6 @@ namespace Ailu
         EApplicationState::EApplicationState _state = EApplicationState::EApplicationState_None;
         double _render_lag = 0.0;
         double _update_lag = 0.0;
-        WString _engin_config_path;
         Array<ObjectLayer,32> _object_layers;
         ECursorType _cursor_type = ECursorType::kArrow;
         ECursorPriority _cursor_priority = ECursorPriority::kFallback;

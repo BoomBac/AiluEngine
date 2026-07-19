@@ -161,22 +161,20 @@ namespace Ailu
         void WorldOutline::BuildUI()
         {
             auto* vb = _content_root->AddChild<VerticalBox>();
-            vb->SlotSizePolicy(ESizePolicy::kFill);
+            vb->GetSlotAs<LinearSlot>().SizePolicy(ESizePolicy::kFill, ESizePolicy::kFill);
 
             // Toolbar
             auto* toolbar = vb->AddChild<HorizontalBox>();
-            toolbar->SlotSizePolicy(ESizePolicy::kAuto, ESizePolicy::kFixed);
-            toolbar->SlotSize(Vector2f(0.0f, 28.0f));
+            toolbar->GetSlotAs<LinearSlot>().SizePolicy(ESizePolicy::kFill, ESizePolicy::kFixed).Size(Vector2f(0.0f, 28.0f));
 
             _scene_title = toolbar->AddChild<Text>("No Scene");
-            _scene_title->SlotSizePolicy(ESizePolicy::kFill, ESizePolicy::kAuto);
+            _scene_title->GetSlotAs<LinearSlot>().SizePolicy(ESizePolicy::kFill, ESizePolicy::kAuto);
             _scene_title->_color = Colors::kGray;
-            _scene_title->SlotMargin(Padding(4.0f, 0.0f, 0.0f, 0.0f));
+            _scene_title->GetSlotAs<LinearSlot>().Margin(Padding(4.0f, 0.0f, 0.0f, 0.0f));
 
             _add_button = toolbar->AddChild<Button>("+");
-            _add_button->SlotSizePolicy(ESizePolicy::kFixed, ESizePolicy::kFixed);
-            _add_button->SlotSize(Vector2f(24.0f, 22.0f));
-            _add_button->SlotMargin(Padding(2.0f, 0.0f, 4.0f, 0.0f));
+            _add_button->GetSlotAs<LinearSlot>().SizePolicy(ESizePolicy::kFixed, ESizePolicy::kFixed).Size(Vector2f(24.0f, 22.0f))
+                    .Margin(Padding(2.0f, 0.0f, 4.0f, 0.0f));
             _add_button->OnMouseClick() += [this](UIEvent& e)
             {
                 auto* scene = SceneMgr::Get().ActiveScene();
@@ -189,7 +187,7 @@ namespace Ailu
 
             // TreeView
             _tree_view = vb->AddChild<TreeView>();
-            _tree_view->SlotSizePolicy(ESizePolicy::kFill);
+            _tree_view->GetSlotAs<LinearSlot>().SizePolicy(ESizePolicy::kFill, ESizePolicy::kFill);
         }
 
         void WorldOutline::BindTreeEvents()

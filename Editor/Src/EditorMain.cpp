@@ -16,12 +16,28 @@ int WINAPI WinMain(_In_ HINSTANCE hInst, _In_opt_ HINSTANCE hInstPrev, _In_ PSTR
     _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
     //_CrtSetBreakAlloc(4627010);
 #endif// _DEBUG_MEM_LEAK
-    Editor::EditorApp *app = new Editor::EditorApp();
-    //Ailu::Application* app = new Ailu::Application();
-    app->Initialize();
-    app->Tick(16.6f);
-    app->Finalize();
-    DESTORY_PTR(app)
+
+    int argc = 0;
+    LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(),&argc);
+    WString project_file_path = argc > 1? argv[1] : L"";
+
+    if (project_file_path.empty())
+    {
+        MessageBoxW(nullptr,L"No project file specified.",L"Ailu Editor",MB_OK | MB_ICONERROR);
+        return 1;
+    }
+    ApplicationInitContext ctx;
+    for(auto i = 0; i < argc; i++)
+        ctx._arguments.push_back(argv[i]);
+    ctx._project_file_path = ctx._arguments[1];
+    ctx._require_project = true;
+    Editor::EditorApp app;
+    if (app.Initialize(ctx) != 0)
+    {
+        return 1;
+    }
+    app.Tick(16.6f);
+    app.Finalize();
 #ifdef _DEBUG_MEM_LEAK
     _CrtDumpMemoryLeaks();// Check for memory leaks
 #endif

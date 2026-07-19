@@ -283,6 +283,9 @@ namespace Ailu
     Enum::Enum(const EnumInitializer &initializer) : Type(TypeInitializer{})
     {
         _name = initializer._name;
+        _namespace = initializer._namespace;
+        _full_name = initializer._full_name.empty() ? initializer._name : initializer._full_name;
+        _is_class = false;
         _is_enum = true;
         _str_to_enum_lut = initializer._str_to_enum_lut;
         for (auto &pair: _str_to_enum_lut)
@@ -311,6 +314,7 @@ namespace Ailu
     void Enum::RegisterEnum(Enum *enum_ptr)
     {
         s_global_enums[enum_ptr->Name()] = enum_ptr;
+        s_global_enums[enum_ptr->FullName()] = enum_ptr;
         Type::RegisterType(enum_ptr);
     }
 

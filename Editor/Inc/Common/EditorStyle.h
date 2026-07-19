@@ -25,6 +25,15 @@ namespace Ailu
             APROPERTY()
             Color _window_border_color;// 窗口边框颜色
 
+            APROPERTY()
+            Color _window_focus_border_color;// 焦点窗口边框颜色
+
+            APROPERTY()
+            f32 _window_corner_radius = 6.0f;
+
+            APROPERTY()
+            f32 _dock_panel_gap = 2.0f;
+
 
             // ----------------- Tab 栏 -----------------
             APROPERTY()
@@ -74,19 +83,22 @@ namespace Ailu
         {
             EditorStyle s{};
             // 窗口
-            s._window_bg_color = Color(0.12f, 0.12f, 0.12f, 1.0f);
-            s._window_title_bar_color = Color(0.18f, 0.18f, 0.19f, 1.0f);
-            s._window_title_text_color = Color(0.86f, 0.86f, 0.86f, 1.0f);
-            s._window_border_color = Color(0.24f, 0.24f, 0.24f, 1.0f);
+            s._window_bg_color = Color(0.145f, 0.155f, 0.175f, 1.0f);
+            s._window_title_bar_color = Color(0.118f, 0.126f, 0.145f, 1.0f);
+            s._window_title_text_color = Color(0.80f, 0.84f, 0.90f, 1.0f);
+            s._window_border_color = Color(0.255f, 0.275f, 0.315f, 1.0f);
+            s._window_focus_border_color = Color(0.18f, 0.46f, 0.78f, 1.0f);
+            s._window_corner_radius = 6.0f;
+            s._dock_panel_gap = 2.0f;
 
             // Tab
-            s._tab_bg_color = Color(0.20f, 0.20f, 0.22f, 1.0f);
-            s._tab_active_bg_color = Color(0.28f, 0.28f, 0.29f, 1.0f);
-            s._tab_hover_bg_color = Color(0.25f, 0.25f, 0.27f, 1.0f);
-            s._tab_text_color = Color(0.78f, 0.78f, 0.78f, 1.0f);
-            s._tab_active_text_color = Color(1.0f, 1.0f, 1.0f, 1.0f);
-            s._tab_hover_text_color = Color(0.90f, 0.90f, 0.90f, 1.0f);
-            s._tab_border_color = Color(0.31f, 0.31f, 0.31f, 1.0f);
+            s._tab_bg_color = Color(0.118f, 0.126f, 0.145f, 1.0f);
+            s._tab_active_bg_color = Color(0.145f, 0.155f, 0.175f, 1.0f);
+            s._tab_hover_bg_color = Color(0.18f, 0.195f, 0.225f, 1.0f);
+            s._tab_text_color = Color(0.68f, 0.72f, 0.78f, 1.0f);
+            s._tab_active_text_color = Color(0.92f, 0.94f, 0.97f, 1.0f);
+            s._tab_hover_text_color = Color(0.84f, 0.87f, 0.92f, 1.0f);
+            s._tab_border_color = Color(0.255f, 0.275f, 0.315f, 1.0f);
 
             // 分隔条
             s._splitter_color = Color(0.31f, 0.31f, 0.33f, 1.0f);
@@ -109,6 +121,9 @@ namespace Ailu
             s._window_title_bar_color = Color(0.88f, 0.88f, 0.88f, 1.0f);
             s._window_title_text_color = Color(0.12f, 0.12f, 0.12f, 1.0f);
             s._window_border_color = Color(0.71f, 0.71f, 0.71f, 1.0f);
+            s._window_focus_border_color = Color(0.10f, 0.42f, 0.76f, 1.0f);
+            s._window_corner_radius = 6.0f;
+            s._dock_panel_gap = 2.0f;
 
             // Tab
             s._tab_bg_color = Color(0.92f, 0.92f, 0.92f, 1.0f);

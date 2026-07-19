@@ -11,8 +11,8 @@
             "_tab_id": "",
             "_window_position": [-858993472.0, -858993472.0],
             "_window_size": [1255.0, 644.0],
-            "_position": [-2.0, -1.0],
-            "_size": [1255.0, 644.0],
+            "_position": [0.0, 34.0],
+            "_size": [1255.0, 586.0],
             "_flags": 16,
             "_window_state": ""
         }, {
@@ -27,8 +27,8 @@
             "_tab_id": "",
             "_window_position": [-858993472.0, -858993472.0],
             "_window_size": [1255.0, 644.0],
-            "_position": [-2.0, -1.0],
-            "_size": [958.0, 644.0],
+            "_position": [0.0, 34.0],
+            "_size": [958.0, 586.0],
             "_flags": 0,
             "_window_state": ""
         }, {
@@ -37,14 +37,14 @@
             "_parent_id": 4,
             "_type": 0,
             "_is_vertical_split": true,
-            "_split_ratio": 0.22,
+            "_split_ratio": 0.2199999988079071,
             "_title": "null",
             "_window_id": 0,
             "_tab_id": "",
             "_window_position": [-858993472.0, -858993472.0],
             "_window_size": [1255.0, 644.0],
-            "_position": [-2.0, -1.0],
-            "_size": [958.0, 410.0],
+            "_position": [0.0, 34.0],
+            "_size": [958.0, 373.0745544433594],
             "_flags": 0,
             "_window_state": ""
         }, {
@@ -59,8 +59,8 @@
             "_tab_id": "",
             "_window_position": [-858993472.0, -858993472.0],
             "_window_size": [1255.0, 644.0],
-            "_position": [-2.0, -1.0],
-            "_size": [210.0, 410.0],
+            "_position": [0.0, 34.0],
+            "_size": [210.75999450683594, 373.0745544433594],
             "_flags": 0,
             "_window_state": ""
         }, {
@@ -75,8 +75,8 @@
             "_tab_id": "",
             "_window_position": [-858993472.0, -858993472.0],
             "_window_size": [1255.0, 644.0],
-            "_position": [-2.0, -1.0],
-            "_size": [748.0, 410.0],
+            "_position": [210.75999450683594, 34.0],
+            "_size": [747.239990234375, 373.0745544433594],
             "_flags": 0,
             "_window_state": ""
         }, {
@@ -91,10 +91,10 @@
             "_tab_id": "",
             "_window_position": [-858993472.0, -858993472.0],
             "_window_size": [1255.0, 644.0],
-            "_position": [-2.0, 409.0],
-            "_size": [958.0, 234.0],
+            "_position": [0.0, 407.0745544433594],
+            "_size": [958.0, 212.92544555664063],
             "_flags": 0,
-            "_window_state": ""
+            "_window_state": "{\n    \"_split_ratio\": 0.21278825402259827\n}"
         }, {
             "_type_id": "Ailu::Editor::ObjectDetail",
             "_id": 2,
@@ -107,8 +107,8 @@
             "_tab_id": "",
             "_window_position": [-858993472.0, -858993472.0],
             "_window_size": [1255.0, 644.0],
-            "_position": [956.0, -1.0],
-            "_size": [297.0, 644.0],
+            "_position": [958.0, 34.0],
+            "_size": [297.0, 586.0],
             "_flags": 0,
             "_window_state": ""
         }]

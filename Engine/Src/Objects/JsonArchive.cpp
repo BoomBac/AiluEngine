@@ -914,6 +914,27 @@ namespace Ailu
         }
         return true;
     }
+
+    bool JsonArchive::IsCurrentNodeObject()
+    {
+        JsonValue *node = FindNode();
+        return node != nullptr && std::holds_alternative<JsonObject>(node->value);
+    }
+
+    Vector<String> JsonArchive::GetCurrentObjectKeys()
+    {
+        Vector<String> keys;
+        JsonValue *node = FindNode();
+        if (node == nullptr || !std::holds_alternative<JsonObject>(node->value))
+            return keys;
+
+        const JsonObject &obj = std::get<JsonObject>(node->value);
+        keys.reserve(obj._entries.size());
+        for (const auto &entry: obj._entries)
+            keys.push_back(entry._key);
+        return keys;
+    }
+
     JsonArchive::JsonValue *JsonArchive::FindNode()
     {
         JsonValue *node = &_root;

@@ -20,55 +20,38 @@ namespace Ailu
     {
         namespace
         {
-            constexpr StringView kDockLayoutCategory = "DockLayout";
-
-            void CollectDockLayoutProperties(Type *type, Vector<const PropertyInfo *> &out_properties)
+            UI::UIBrush ColorBrush(const Color &color)
             {
-                if (type == nullptr)
-                    return;
-                CollectDockLayoutProperties(type->BaseType(), out_properties);
-                for (const auto &property : type->GetProperties())
-                {
-                    if (property.MetaInfo().GetString("Category") == kDockLayoutCategory)
-                        out_properties.push_back(&property);
-                }
+                UI::UIBrush brush;
+                brush._type = UI::EUIBrushType::kColor;
+                brush._tint = color;
+                return brush;
             }
 
-            void SaveDockLayoutProperties(DockWindow *window, String &out_state)
+            void SaveDockLayoutState(DockWindow *window, String &out_state)
             {
                 out_state.clear();
                 if (window == nullptr)
                     return;
 
-                Vector<const PropertyInfo *> dock_layout_properties;
-                CollectDockLayoutProperties(window->GetType(), dock_layout_properties);
-                if (dock_layout_properties.empty())
-                    return;
-
                 JsonArchive ar;
-                for (const auto *property : dock_layout_properties)
-                    property->Serialize(window, ar);
+                window->SaveDockLayoutState(ar);
                 out_state = ar.SaveToString();
+                if (out_state == "{}")
+                    out_state.clear();
             }
 
-            void LoadDockLayoutProperties(DockWindow *window, const String &saved_state)
+            void LoadDockLayoutState(DockWindow *window, const String &saved_state)
             {
                 if (window == nullptr)
                     return;
 
-                Vector<const PropertyInfo *> dock_layout_properties;
-                CollectDockLayoutProperties(window->GetType(), dock_layout_properties);
                 if (!saved_state.empty())
                 {
                     JsonArchive ar;
                     if (ar.LoadFromString(saved_state))
                     {
-                        for (const auto *property : dock_layout_properties)
-                        {
-                            if (!ar.HasField(property->Name()))
-                                continue;
-                            property->Deserialize(window, ar);
-                        }
+                        window->LoadDockLayoutState(ar);
                     }
                     else
                     {
@@ -195,12 +178,18 @@ namespace Ailu
             }
             void UpdateLayout(f32 dt)
             {
+                auto inset_panel_rect = [](Vector2f position, Vector2f size) -> Vector4f
+                {
+                    const f32 gap = g_editor_style._dock_panel_gap;
+                    const Vector2f inset_pos = position + Vector2f(gap, gap);
+                    const Vector2f inset_size = Max(size - Vector2f(gap * 2.0f, gap * 2.0f), DockWindow::kMinSize);
+                    return {inset_pos, inset_size};
+                };
                 if (_type == EType::kLeaf)
                 {
                     if (!_window)
                         return;
-                    _window->SetPosition(_position);
-                    _window->SetSize(_size);
+                    _window->SetRect(inset_panel_rect(_position, _size));
                 }
                 else if (_type == EType::kSplit)
                 {
@@ -237,8 +226,9 @@ namespace Ailu
                 {
                     if (!_tab)
                         return;
-                    _tab->_position = _position;
-                    _tab->_size = _size;
+                    const Vector4f rect = inset_panel_rect(_position, _size);
+                    _tab->_position = rect.xy;
+                    _tab->_size = rect.zw;
                     _tab->Update(dt);
                 }
             }
@@ -705,13 +695,13 @@ namespace Ailu
             if (other == nullptr)//停靠至主窗口
             {
                 auto &main_window = Application::Get().GetWindow();
-                const Vector2f size = Vector2f{(f32) main_window.GetWidth(), (f32) main_window.GetHeight()};
+                const Vector4f main_area = dock_mgr.MainDockArea();
                 dock_mgr.UntrackFloatNode(this);
                 if (area == EDockArea::kCenter)
                 {
                     SetOwnWindow(&main_window);
-                    _size = size;
-                    _position = Vector2f::kZero;
+                    _size = main_area.zw;
+                    _position = main_area.xy;
                     SetDockedWindowState(true);
                 }
                 else
@@ -720,8 +710,8 @@ namespace Ailu
                     auto placeholder = MakeRef<DockNode>(&main_window);
                     placeholder->_parent = this;
                     placeholder->_own_window = &main_window;
-                    _size = size;
-                    _position = Vector2f::kZero;
+                    _size = main_area.zw;
+                    _position = main_area.xy;
                     ConfigureSplitNode(this,
                                        placeholder,
                                        current_root,
@@ -988,7 +978,11 @@ namespace Ailu
                 for (auto &n: _roots)
                 {
                     if (n->_own_window == w)
-                        n->_size = {(f32) n->_own_window->GetWidth(), (f32) n->_own_window->GetHeight()};
+                    {
+                        const Vector4f area = (w == &Application::Get().GetWindow()) ? MainDockArea() : Vector4f{Vector2f::kZero, size};
+                        n->_position = area.xy;
+                        n->_size = area.zw;
+                    }
                 }
             };
             _dock_layout_path = EditorApp::GetEditorRootPath() + L"dock_layout.json";
@@ -1038,7 +1032,7 @@ namespace Ailu
                     //same with AddDock
                     UI::UIManager::Get()->RegisterWidget(w->TitleWidgetRef());
                     UI::UIManager::Get()->RegisterWidget(w->ContentWidgetRef());
-                    LoadDockLayoutProperties(w.get(), n._window_state);
+                    LoadDockLayoutState(w.get(), n._window_state);
                     node->_window = w;
                 }
                 else if (node->_type == DockNode::EType::kTab)
@@ -1133,6 +1127,12 @@ namespace Ailu
                 {
                     node->SetOwnWindow(Application::Get().GetWindowPtr());
                 }
+                if ((node->_flags & EDockWindowFlag::kFullSize) != 0u)
+                {
+                    const Vector4f area = node->_own_window == &Application::Get().GetWindow() ? MainDockArea() : Vector4f{Vector2f::kZero, Vector2f{(f32) node->_own_window->GetWidth(), (f32) node->_own_window->GetHeight()}};
+                    node->_position = area.xy;
+                    node->_size = area.zw;
+                }
                 TryAddFloatNode(node);
                 if (node->_flags & EDockWindowFlag::kFullSize)
                     _roots.push_back(node.get());
@@ -1173,6 +1173,32 @@ namespace Ailu
             }
             ar.Save(_dock_layout_path);
         }
+
+        Vector4f DockManager::MainDockArea() const
+        {
+            auto &main_window = Application::Get().GetWindow();
+            if (_main_dock_size.x <= 0.0f || _main_dock_size.y <= 0.0f)
+                return {Vector2f::kZero, Vector2f{(f32) main_window.GetWidth(), (f32) main_window.GetHeight()}};
+            return {_main_dock_position, _main_dock_size};
+        }
+
+        void DockManager::SetMainDockArea(Vector2f position, Vector2f size)
+        {
+            size = {std::max(0.0f, size.x), std::max(0.0f, size.y)};
+            if (NearbyEqual(_main_dock_position, position) && NearbyEqual(_main_dock_size, size))
+                return;
+            _main_dock_position = position;
+            _main_dock_size = size;
+            for (auto &n: _roots)
+            {
+                if (n && n->_own_window == &Application::Get().GetWindow())
+                {
+                    n->_position = _main_dock_position;
+                    n->_size = _main_dock_size;
+                }
+            }
+        }
+
         void DockManager::AddDock(Ref<DockWindow> dock)
         {
             UI::UIManager::Get()->RegisterWidget(dock->TitleWidgetRef());
@@ -1267,7 +1293,7 @@ namespace Ailu
                 Vector2f pos = Input::GetMousePos();
                 if (_can_draw_float_preview)
                 {
-                    UI::UIRenderer::Get()->DrawQuad({pos - Vector2f{100.0f, 70.0f}, Vector2f{200.0f, 140.0f}}, g_editor_style._dock_hint_color);
+                    UI::UIRenderer::Get()->DrawQuad({pos - Vector2f{100.0f, 70.0f}, Vector2f{200.0f, 140.0f}}, ColorBrush(g_editor_style._dock_hint_color));
                     OnWindowFloat();
                     if (!Input::IsKeyDown(EKey::kLBUTTON) && _floating_preview_node)
                     {
@@ -1643,8 +1669,9 @@ namespace Ailu
 
             if (_dock_quad_hover_node == nullptr)
             {
-                auto &cur_window = Application::Get().GetWindow();
-                size = {(f32) cur_window.GetWidth(), (f32) cur_window.GetHeight()};
+                const Vector4f main_area = MainDockArea();
+                start_pos = main_area.xy;
+                size = main_area.zw;
                 DrawPreviewDockArea(Input::GetMousePos(), size, start_pos);
             }
             else
@@ -1657,7 +1684,7 @@ namespace Ailu
                     const Vector2f lpos = Input::GetMousePos(_dock_quad_hover_node->_own_window);
                     if (UI::UIElement::IsPointInside(lpos, rect))
                     {
-                        UI::UIRenderer::Get()->DrawQuad({start_pos, size}, Vector4f(1.0f, 1.0f, 1.0f, 0.5f));
+                        UI::UIRenderer::Get()->DrawQuad({start_pos, size}, ColorBrush(Vector4f(1.0f, 1.0f, 1.0f, 0.5f)));
                         _is_float_on_cancel_area = true;
                     }
                     else
@@ -1698,7 +1725,7 @@ namespace Ailu
                 Color c = is_hover
                                   ? _dock_quad_hover_color
                                   : _dock_quad_normal_color;
-                r->DrawQuad(rect, c);
+                r->DrawQuad(rect, ColorBrush(c));
                 is_area_changed |= is_hover;
                 return is_hover;
             };
@@ -1811,6 +1838,8 @@ namespace Ailu
                         for (auto &n: nodes)
                         {
                             if (!n || !n->_is_valid)
+                                continue;
+                            if (n->_flags & EDockWindowFlag::kFullSize)
                                 continue;
                             if (n->_flags & EDockWindowFlag::kNoResize)
                                 continue;
@@ -2135,7 +2164,11 @@ namespace Ailu
                     Render::GraphicsContext::Get().ResizeSwapChain(it->get()->GetNativeWindowPtr(), resize_event->_width, resize_event->_height);
                 }
                 for (auto &n: _roots)
-                    n->_size = {(f32) n->_own_window->GetWidth(), (f32) n->_own_window->GetHeight()};
+                {
+                    const Vector4f area = n->_own_window == &Application::Get().GetWindow() ? MainDockArea() : Vector4f{Vector2f::kZero, Vector2f{(f32) n->_own_window->GetWidth(), (f32) n->_own_window->GetHeight()}};
+                    n->_position = area.xy;
+                    n->_size = area.zw;
+                }
             }
             else if (e.GetEventType() == EEventType::kMouseButtonPressed)
             {
@@ -2205,7 +2238,7 @@ namespace Ailu
             data._window_id = n->_own_window == Application::Get().GetWindowPtr() ? 0u : 999u;
             data._tab_id = n->_tab ? std::to_string(n->_tab->ActiveIndex()) : "";
             if (n->_type == DockNode::EType::kLeaf && n->_window)
-                SaveDockLayoutProperties(n->_window.get(), data._window_state);
+                SaveDockLayoutState(n->_window.get(), data._window_state);
             _node_data_array._node_data.push_back(data);
             if (n->_type == DockNode::EType::kSplit)
             {
@@ -2233,7 +2266,7 @@ namespace Ailu
                         child._position = n->_position;
                         child._size = n->_size;
                         child._flags = tab_window->_flags;
-                        SaveDockLayoutProperties(tab_window.get(), child._window_state);
+                        SaveDockLayoutState(tab_window.get(), child._window_state);
                         _node_data_array._node_data.push_back(child);
                     }
                     else if (auto split_item = std::dynamic_pointer_cast<DockNodeTabItem>(tab_item))

@@ -18,6 +18,7 @@ namespace Ailu
         class UILayer;
         class UIRenderer;
         class UIElement;
+        class UITheme;
         class AILU_API UIManager
         {
         public:
@@ -44,6 +45,8 @@ namespace Ailu
             void ShowPopupAt(f32 x, f32 y, Ref<UIElement> root, std::function<void()> on_close = nullptr, Window *win = nullptr);
             void HidePopup();
             Widget *GetPopupWidget() const { return _popup_widget; }
+            UITheme *GetTheme() const { return _theme; }
+            void SetTheme(UITheme *theme);
             void Destroy(Ref<UIElement> element);
             void OnElementDestroying(UIElement *element);
             [[nodiscard]] std::span<const InteractionZone> GetInteractionZones() const noexcept { return _interaction_zones; };
@@ -65,6 +68,7 @@ namespace Ailu
         private:
             UILayer *_ui_layer;
             UIRenderer *_renderer;
+            UITheme *_theme = nullptr;
             Widget *_popup_widget;
             std::function<void()> _on_popup_close;
             Vector<Ref<UIElement>> _pending_destroy;

@@ -28,6 +28,7 @@
 #include "Render/Features/VolumetricClouds.h"
 #include "Render/GraphicsContext.h"
 #include "Render/RenderPipeline.h"
+#include "Project/ProjectManager.h"
 
 #if defined(TRACY_ENABLE)
 #include "tracy/Tracy.hpp"
@@ -41,21 +42,10 @@ namespace Ailu
 {
 #define BIND_EVENT_HANDLER(f) std::bind(&Application::f, this, std::placeholders::_1)
 
-    namespace
-    {
-        WString NormalizeDirectoryPath(const WString &path)
-        {
-            WString normalized = PathUtils::FormatFilePath(path);
-            if (!normalized.empty() && normalized.back() != L'/')
-                normalized.push_back(L'/');
-            return normalized;
-        }
-    }
-
     void Application::LoadEngineConfig()
     {
         JsonArchive ar;
-        ar.Load(_engin_config_path);
+        ar.Load(s_engine_config_path);
         Type *type = EngineConfig::StaticType();
         for (auto &it: type->GetProperties())
             it.Deserialize(&g_engine_config, ar);
@@ -65,7 +55,7 @@ namespace Ailu
     void Application::ReloadEngineConfig()
     {
         LoadEngineConfig();
-        LOG_INFO(L"Reloaded engine config: {}", _engin_config_path);
+        LOG_INFO(L"Reloaded engine config: {}", s_engine_config_path);
     }
 
     WString Application::GetWorkingPath()
@@ -82,23 +72,16 @@ namespace Ailu
     {
         return GetWorkingPath() + L"cache/";
     }
-    void Application::SetProjectRootPath(const WString &project_root)
-    {
-        s_project_root_path = NormalizeDirectoryPath(project_root);
-    }
     void Application::SetEngineConfigPath(const WString &engine_config_path)
     {
-        s_default_engine_config_path = PathUtils::FormatFilePath(engine_config_path);
+        s_engine_config_path = PathUtils::FormatFilePath(engine_config_path);
     }
-    WString Application::ResolveProjectPath(const WString &relative_path)
+    const WString& Application::GetProjectRootPath()
     {
-        if (relative_path.empty())
-            return relative_path;
-        if (PathUtils::IsSystemPath(relative_path))
-            return PathUtils::FormatFilePath(relative_path);
-        return PathUtils::FormatFilePath((fs::path(s_project_root_path) / fs::path(relative_path)).wstring());
+        return ProjectManager::Get().CurrentProject().RootDirectory();
     }
-    WString Application::GetUseHomePath()
+
+    WString Application::GetUserHomePath()
     {
         wchar_t userProfile[MAX_PATH];
         if (SUCCEEDED(SHGetFolderPath(NULL, CSIDL_PROFILE, NULL, 0, userProfile)))
@@ -112,6 +95,16 @@ namespace Ailu
         }
     }
 
+    WString Application::GetAiluRoot()
+    {
+        static WString root;
+        if (root.empty())
+        {
+            root = PathUtils::NormalizeDirectoryPath(GetUserHomePath() + L"OneDrive/AiluEngine");
+        }
+        return root;
+    }
+
     int Application::Initialize()
     {
         ApplicationDesc desc;
@@ -119,10 +112,10 @@ namespace Ailu
         desc._window_height = 900;
         desc._gameview_width = 1600;
         desc._gameview_height = 900;
-        return Initialize(desc);
+        return Initialize(desc,ApplicationInitContext{});
     }
 
-    int Application::Initialize(ApplicationDesc desc)
+    int Application::Initialize(ApplicationDesc desc,const ApplicationInitContext& init_ctx)
     {
         AL_ASSERT_MSG(sp_instance == nullptr, "Application already init!");
         ObjectRegister::Initialize();
@@ -136,12 +129,19 @@ namespace Ailu
         LogMgr::Get().AddAppender(new FileAppender());
         //Load ini
         {
-            if (s_project_root_path.empty())
-                SetProjectRootPath(GetWorkingPath());
+            ProjectManager::Init();
+            auto& proj_mgr = ProjectManager::Get();
+            if (!proj_mgr.OpenProject(init_ctx._project_file_path))
+            {
+                LOG_ERROR(L"Open project {} failed!",init_ctx._project_file_path)
+                return -1;
+            }
+            Project& project = proj_mgr.CurrentProject();
+            s_project_root_path = GetProjectRootPath();
             LOG_INFO(L"ProjectRoot: {}", s_project_root_path);
-            if (ResourceMgr::EngineResRootPath().empty())
-                ResourceMgr::ConfigProjectRoot(s_project_root_path);
-            _engin_config_path = s_default_engine_config_path.empty() ? ResolveProjectPath(L"Editor/EngineConfig.json") : PathUtils::FormatFilePath(s_default_engine_config_path);
+            ResourceMgr::ConfigProject(&project);
+            ResourceMgr::ConfigEngineResRoot(GetAiluRoot() + L"Engine/Res/");
+            ResourceMgr::ConfigEditorResRoot(GetAiluRoot() + L"Editor/Res/");
             LoadEngineConfig();
         }
         //LogMgr::Get().AddAppender(new ConsoleAppender());
@@ -197,7 +197,7 @@ namespace Ailu
         Type *type = EngineConfig::StaticType();
         for (auto &it: type->GetProperties())
             it.Serialize(&g_engine_config,ar);
-        ar.Save(_engin_config_path);
+        ar.Save(s_engine_config_path);
         DESTORY_PTR(_layer_stack);
         UI::UIManager::Shutdown();
         Gizmo::Shutdown();
@@ -211,6 +211,7 @@ namespace Ailu
         TimeMgr::Get().Finalize();
         TimeMgr::Shutdown();
         JobSystem::Shutdown();
+        ProjectManager::Shutdown();
         ObjectRegister::Shutdown();
         Core::Allocator::Get().PrintLeaks();
         Core::Allocator::Shutdown();

@@ -43,11 +43,17 @@ namespace Ailu
             SceneView();
             void Update(f32 dt) final;
         private:
+            void UpdateCameraOutputSize(f32 dt);
+            Vector2f ViewToRenderPosition(const Vector2f &view_pos) const;
             void ProcessCameraInput(f32 dt);
         private:
             FirstPersonCameraController *_camera_controller;
             Scope<TransformGizmo> _transform_gizmo;
             Vector2f _mouse_pos;
+            Vector2f _view_size = Vector2f::kZero;
+            Vector2UInt _pending_output_size = Vector2UInt::kZero;
+            Vector2UInt _committed_output_size = Vector2UInt::kZero;
+            f32 _resize_stable_time = 0.0f;
             Vector3f _drag_preview_pos;
             Ref<Render::Mesh> _drag_preview_mesh = nullptr;
         };

@@ -177,6 +177,7 @@ namespace Ailu::UI
             }
         }
     }
+    void UIManager::SetTheme(UITheme *theme) { _theme = theme; }
     void UIManager::Destroy(Ref<UIElement> element)
     {
         if (element)

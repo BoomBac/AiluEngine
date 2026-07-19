@@ -1,93 +1,439 @@
-012efc02-825c-42e9-b512-35c19e7eb1db,Icons/light_probe.alasset,Ailu::Render::Texture2D
-04f85376-b16b-43cc-b53e-e5c236755e53,Meshs/capsule.alasset,Ailu::Render::Mesh
-05027d6c-b9f3-4e05-aa86-e62a2067e69a,Meshs/torus.alasset,Ailu::Render::Mesh
-05ee0670-c4c7-4b96-893e-c0a49cba1434,Meshs/cone.alasset,Ailu::Render::Mesh
-094a838b-c1fe-4d9b-a05b-a5df05378c96,Icons/dark/scene.alasset,Ailu::Render::Texture2D
-0b247b0b-22b8-47e4-b69b-21e2f73133af,Meshs/cylinder.alasset,Ailu::Render::Mesh
-0c0c98a5-1f90-4caa-9b72-bc4257ef17ae,Shaders/texture3d_drawer.alasset,Ailu::Render::Shader
-0c23d3c1-67bc-4fbe-a617-b96e82538e6c,Textures/weather_map.alasset,Ailu::Render::Texture2D
-0cb0c79b-7c5d-4942-a23d-8df54448ca9b,Shaders/moion_vector.alasset,Ailu::Render::Shader
-0cd86d2c-e28b-4816-a032-0ef7fb1843f5,Shaders/standard_volume.alasset,Ailu::Render::Shader
-0d1b35fd-6d5e-4166-aa95-f44e2f8905ed,Shaders/filter_irradiance.alasset,Ailu::Render::Shader
-0ef18bda-d965-4e64-9a25-734bd35947a9,Shaders/volumetric_noise_generator.alasset,Ailu::Render::ComputeShader
-0f4943a3-8df4-4917-8730-92c9de6ef6ce,Textures/blue_noise.alasset,Ailu::Render::Texture2D
-0f97befc-6131-4cd1-a041-c56ce694dce9,AnimClips/SimpleAnim.alasset,Ailu::Render::SkeletonMesh
-10806073-d5d1-45c9-b7c4-bd55d68184e9,Shaders/volumetric_noise_generator.alasset,Ailu::Render::ComputeShader
-13dbddd5-0785-405b-af21-435a472a3813,Shaders/global_volumetric_cloud.alasset,Ailu::Render::Shader
-14af7970-dcc5-461f-af8c-9940c52e4766,Shaders/voxelize.alasset,Ailu::Render::ComputeShader
-171e4e1b-a8f2-4436-b024-ff5bc128c200,Shaders/bloom.alasset,Ailu::Render::Shader
-19e162eb-c2bf-4ea6-a9a2-26bb81437c33,Icons/image.alasset,Ailu::Render::Texture2D
-1a2e2991-11c9-4052-84b0-ebcdf455b61b,WaterTest/MAT_Red.alasset,Ailu::Render::Material
-1b5c8e8f-c721-4c6a-b678-59ec49f4ebae,Icons/area_light.alasset,Ailu::Render::Texture2D
-21ed1f88-ac3b-404c-a296-b16784617df7,Shaders/cs_mipmap_gen.alasset,Ailu::Render::ComputeShader
-26247411-5cb6-4bf7-a6c4-7c48b9f5caee,Shaders/default_ui.alasset,Ailu::Render::Shader
-266fceb5-389b-4a08-892c-1e9b2f58d83f,Shaders/default_text.alasset,Ailu::Render::Shader
-2800bee2-b69e-46af-8111-e454ff8a5660,Shaders/terrain.alasset,Ailu::Render::Shader
-2ff30e48-6661-479b-a90c-863e606734f6,Meshs/sphere.alasset,Ailu::Render::Mesh
-32414c6f-47f1-47a1-883c-678fac6e47e8,Meshs/terrain_plane.alasset,Ailu::Render::Mesh
-324335bf-8def-4583-911a-047863b48455,Shaders/voxel_drawer.alasset,Ailu::Render::Shader
-339a1a1a-522a-4872-a110-cfbc21f0215c,Shaders/gizmo.alasset,Ailu::Render::Shader
-352bbe93-08cc-4780-bacf-2eb126bfba98,Icons/shader.alasset,Ailu::Render::Texture2D
-38aeba40-8fc5-48c3-a785-739a107a9629,WaterTest/Grass_Wildgrass08.alasset,Ailu::Render::Mesh
-3a47674b-7028-4f49-a308-92c9fd4e9917,Icons/file.alasset,Ailu::Render::Texture2D
-3bc80454-31f8-4ad0-a5ab-0d85ca43ca15,Icons/dark/anim_clip.alasset,Ailu::Render::Texture2D
-4428ffdf-97de-4732-b74b-240a0bce3872,Icons/dark/skeleton.alasset,Ailu::Render::Texture2D
-46601513-96ea-4cc4-86db-0400c8824ec1,Materials/MAT_Red.alasset,Ailu::Render::Material
-4eac1bdc-8122-4414-809e-80d7fd4b8fbf,Shaders/volumetric_light.alasset,Ailu::Render::ComputeShader
-4f376455-17b9-4a39-b9ad-c9dbac0a939f,Shaders/transform_gizmo.alasset,Ailu::Render::Shader
-4f6e2fa4-c9af-4800-9ff9-70874abfbd50,Materials/StandardPBR.alasset,Ailu::Render::Material
-54238902-542d-44ca-9bed-dbe40c90cdcb,Shaders/wireframe.alasset,Ailu::Render::Shader
-58ec7c7a-220d-4d5c-a84d-dcc7faaf38e5,WaterTest/MAT_Grass.alasset,Ailu::Render::Material
-60fb44b6-864f-4c6a-b49b-f4b26829b57d,Shaders/defered_standard_lit.alasset,Ailu::Render::Shader
-61719aa4-e2e6-4ba7-bab7-5d6e6b78935f,WaterTest/Alpha_Joints.alasset,Ailu::Render::SkeletonMesh
-687dd7a6-c8d4-40f1-8a33-694707d9c423,Icons/directional_light.alasset,Ailu::Render::Texture2D
-6abca545-d271-4c76-b214-913472735574,WaterTest/empty_scene.almap,Ailu::SceneManagement::Scene
-6b616d87-aefe-4b8d-9914-531b11a6efc5,Shaders/raytrace_debug_draw.alasset,Ailu::Render::Shader
-6d1148fb-00a4-4720-8ca0-7dd877b0da55,Shaders/max_z.alasset,Ailu::Render::ComputeShader
-6fd672ec-676e-41b4-9da8-b367d6ab6d2b,WaterTest/Grass_Wildgrass08_N.alasset,Ailu::Render::Texture2D
-7182a502-ba5e-4de5-a517-ed226a6b7805,Shaders/gpu_terrain.alasset,Ailu::Render::ComputeShader
-73ce2ce4-6e29-4128-904a-b0f3b9c6a211,Shaders/transform_gizmo.alasset,Ailu::Render::Shader
-798c6e92-05f5-43a3-abb0-7007caf7f3dc,Shaders/transform_gizmo.alasset,Ailu::Render::Shader
-7b23d109-715f-4944-8669-d0ba3c40e06a,Textures/ibl_brdf_lut.alasset,Ailu::Render::Texture2D
-7baa598b-7eb4-478d-91ae-bf758da25d3b,Meshs/monkey.alasset,Ailu::Render::Mesh
-7dc9d93a-4d0f-4d22-b1f3-f6da63526010,Shaders/rtxdi.alasset,Ailu::Render::ComputeShader
-7f0dc87f-001c-4dfd-8f3c-f6aca6fdc32f,AnimClips/Sk_YBot.alasset,Ailu::Render::SkeletonMesh
-7fa3f1ac-fa22-4613-b60c-54cae46bdf4e,breakfast_room/living_room.alasset,Ailu::Render::Mesh
-8353ebb5-ab8e-4a52-bc3f-86260e54720e,Icons/3d.alasset,Ailu::Render::Texture2D
-86ff4fb6-27ed-4041-9029-1ff7661361a2,WaterTest/Alpha_Joints_MAT.001.alasset,Ailu::Render::Material
-88038f2b-8b36-4a3e-a271-2ed294a5c54f,Shaders/deferred_lighting.alasset,Ailu::Render::Shader
-881f94ee-2dbb-48e9-b084-72c9bfb729ea,Icons/folder.alasset,Ailu::Render::Texture2D
-92f5350a-f983-4448-93a3-ae0fd06ce1f3,Shaders/hzb.alasset,Ailu::Render::ComputeShader
-9335dc10-f963-420c-b8af-977eabf3a3a1,Shaders/transform_gizmo.alasset,Ailu::Render::Shader
-949381d0-6c70-457a-ac9b-afcb1eab3547,AnimClips/ik_test_leg_mesh.alasset,Ailu::AnimationClip
-953c51c3-fcd0-49d0-89f9-151fdfbe0e33,breakfast_room/Arcade.alasset,Ailu::Render::Mesh
-97913004-ecc3-4cbb-b226-f8d68e5903ab,Shaders/cubemap_gen.alasset,Ailu::Render::Shader
-D390A432-7AD9-475D-B1A5-726EB91072FB,Shaders/forwardlit.alasset,Ailu::Render::Shader
-a39101e3-586a-4b9d-ad20-e33970c21509,AnimClips/leg_mesh.alasset,Ailu::Render::SkeletonMesh
-a40c454a-c967-4810-88c9-651706104062,WaterTest/default_scene.almap,Ailu::SceneManagement::Scene
-a5ad5353-4bed-47b7-a4c2-aa26036f7ac2,Materials/MAT_Cloud.alasset,Ailu::Render::Material
-a5e4a76d-c915-48a4-a940-5dba8a0c936e,WaterTest/Grass_Wildgrass08_D.alasset,Ailu::Render::Texture2D
-aaa391ce-746b-445d-9dda-c678ad8b41b7,AnimClips/anim_run.alasset,Ailu::AnimationClip
-aab1797f-d730-4302-8982-7fc075364eba,breakfast_room/conference.alasset,Ailu::Render::Mesh
-abcb7c17-1767-4b43-9850-f7a36a428b96,WaterTest/M_Water.alasset,Ailu::Render::Material
-acf26f2f-c3dd-4d1c-a1e8-1c3a22bfea7c,Icons/point_light.alasset,Ailu::Render::Texture2D
-b165a501-5eaa-4e5e-a3c6-3271ea1d9352,Shaders/skybox.alasset,Ailu::Render::Shader
-b3df3b8f-0bd8-4cbf-9510-e063fc6eb49f,Shaders/blit.alasset,Ailu::Render::Shader
-b456b5ba-1a04-4e85-9744-ecdf9aee3773,Icons/camera.alasset,Ailu::Render::Texture2D
-bbc9ad8e-1533-47f1-ac06-886158e971a9,WaterTest/MAT_Green.alasset,Ailu::Render::Material
-beccf997-dcb3-4217-b213-42059ec71ce8,breakfast_room/Plane.alasset,Ailu::Render::Mesh
-c3315e03-1052-4825-98f7-a676beae0615,Meshs/plane.alasset,Ailu::Render::Mesh
-ca033bea-e576-4c45-ac86-b1291c0ff11d,Shaders/transform_gizmo.alasset,Ailu::Render::Shader
-cf40ec2f-ceb8-4cc7-b21f-8ec31d0995ea,Shaders/taa.alasset,Ailu::Render::ComputeShader
-cffbfce1-eb20-4319-aa0e-20a68eb19f22,Textures/small_cave_1k.alasset,Ailu::Render::Texture2D
-d137d2a7-0d2b-40bc-9c76-6d2708923869,Meshs/cube.alasset,Ailu::Render::Mesh
-d3075919-313e-45b5-8de1-fdf4247232dd,Shaders/raytrace_gi.alasset,Ailu::Render::ComputeShader
-d7e07be5-55ed-4b47-ad7f-107a64cda4bf,Icons/spot_light.alasset,Ailu::Render::Texture2D
-da893f79-e318-4de1-8a73-68c4a51b6892,Shaders/motion_vector.alasset,Ailu::Render::Shader
-de5c5eb2-4c96-4eca-a05c-c11443b70c87,Shaders/ssao_cs.alasset,Ailu::Render::ComputeShader
-e3891c79-694a-4968-bb84-49c409a611ce,Materials/M_Default.alasset,Ailu::Render::Material
-ea68f293-f49a-45f7-a91d-7ac04bfd3433,Textures/T_Default_Material_Grid_N.alasset,Ailu::Render::Texture2D
-eb07fa74-875a-467e-bf40-6d14647da7b4,Textures/T_Default_Material_Grid_M.alasset,Ailu::Render::Texture2D
-ef3ed829-387b-4013-8492-95e574d5e949,Icons/dark/material.alasset,Ailu::Render::Texture2D
-f891ec73-10c8-404b-91ac-5bac15cda5fb,Shaders/water.alasset,Ailu::Render::Shader
-fc17adc1-f67a-4a15-a756-09c672438b53,Shaders/volumetric_cloud.alasset,Ailu::Render::ComputeShader
+{
+  "assets": [
+    {
+      "guid": "012efc02-825c-42e9-b512-35c19e7eb1db",
+      "path": "engine://Icons/light_probe.alasset",
+      "type": "Ailu::Render::Texture2D"
+    },
+    {
+      "guid": "04f85376-b16b-43cc-b53e-e5c236755e53",
+      "path": "engine://Meshs/src_res/capsule.alasset",
+      "type": "Ailu::Render::Mesh"
+    },
+    {
+      "guid": "05027d6c-b9f3-4e05-aa86-e62a2067e69a",
+      "path": "engine://Meshs/src_res/torus.alasset",
+      "type": "Ailu::Render::Mesh"
+    },
+    {
+      "guid": "05ee0670-c4c7-4b96-893e-c0a49cba1434",
+      "path": "engine://Meshs/src_res/cone.alasset",
+      "type": "Ailu::Render::Mesh"
+    },
+    {
+      "guid": "094a838b-c1fe-4d9b-a05b-a5df05378c96",
+      "path": "engine://Icons/dark/scene.alasset",
+      "type": "Ailu::Render::Texture2D"
+    },
+    {
+      "guid": "0b247b0b-22b8-47e4-b69b-21e2f73133af",
+      "path": "engine://Meshs/src_res/cylinder.alasset",
+      "type": "Ailu::Render::Mesh"
+    },
+    {
+      "guid": "0c0c98a5-1f90-4caa-9b72-bc4257ef17ae",
+      "path": "engine://Shaders/hlsl/texture3d_drawer.alasset",
+      "type": "Ailu::Render::Shader"
+    },
+    {
+      "guid": "0c23d3c1-67bc-4fbe-a617-b96e82538e6c",
+      "path": "engine://Textures/weather_map.alasset",
+      "type": "Ailu::Render::Texture2D"
+    },
+    {
+      "guid": "0cd86d2c-e28b-4816-a032-0ef7fb1843f5",
+      "path": "engine://Shaders/hlsl/standard_volume.alasset",
+      "type": "Ailu::Render::Shader"
+    },
+    {
+      "guid": "0d1b35fd-6d5e-4166-aa95-f44e2f8905ed",
+      "path": "engine://Shaders/hlsl/filter_irradiance.alasset",
+      "type": "Ailu::Render::Shader"
+    },
+    {
+      "guid": "0f4943a3-8df4-4917-8730-92c9de6ef6ce",
+      "path": "engine://Textures/blue_noise.alasset",
+      "type": "Ailu::Render::Texture2D"
+    },
+    {
+      "guid": "0f97befc-6131-4cd1-a041-c56ce694dce9",
+      "path": "engine://AnimClips/SimpleAnim.alasset",
+      "type": "Ailu::Render::SkeletonMesh"
+    },
+    {
+      "guid": "10806073-d5d1-45c9-b7c4-bd55d68184e9",
+      "path": "engine://Shaders/hlsl/Compute/volumetric_noise_generator.alasset",
+      "type": "Ailu::Render::ComputeShader"
+    },
+    {
+      "guid": "13dbddd5-0785-405b-af21-435a472a3813",
+      "path": "engine://Shaders/hlsl/global_volumetric_cloud.alasset",
+      "type": "Ailu::Render::Shader"
+    },
+    {
+      "guid": "14af7970-dcc5-461f-af8c-9940c52e4766",
+      "path": "engine://Shaders/hlsl/Compute/voxelize.alasset",
+      "type": "Ailu::Render::ComputeShader"
+    },
+    {
+      "guid": "171e4e1b-a8f2-4436-b024-ff5bc128c200",
+      "path": "engine://Shaders/hlsl/PostProcess/bloom.alasset",
+      "type": "Ailu::Render::Shader"
+    },
+    {
+      "guid": "19e162eb-c2bf-4ea6-a9a2-26bb81437c33",
+      "path": "engine://Icons/image.alasset",
+      "type": "Ailu::Render::Texture2D"
+    },
+    {
+      "guid": "1a2e2991-11c9-4052-84b0-ebcdf455b61b",
+      "path": "engine://WaterTest/MAT_Red.alasset",
+      "type": "Ailu::Render::Material"
+    },
+    {
+      "guid": "1b5c8e8f-c721-4c6a-b678-59ec49f4ebae",
+      "path": "engine://Icons/area_light.alasset",
+      "type": "Ailu::Render::Texture2D"
+    },
+    {
+      "guid": "21ed1f88-ac3b-404c-a296-b16784617df7",
+      "path": "engine://Shaders/hlsl/Compute/cs_mipmap_gen.alasset",
+      "type": "Ailu::Render::ComputeShader"
+    },
+    {
+      "guid": "26247411-5cb6-4bf7-a6c4-7c48b9f5caee",
+      "path": "engine://Shaders/hlsl/default_ui.alasset",
+      "type": "Ailu::Render::Shader"
+    },
+    {
+      "guid": "266fceb5-389b-4a08-892c-1e9b2f58d83f",
+      "path": "engine://Shaders/hlsl/default_text.alasset",
+      "type": "Ailu::Render::Shader"
+    },
+    {
+      "guid": "2800bee2-b69e-46af-8111-e454ff8a5660",
+      "path": "engine://Shaders/hlsl/terrain.alasset",
+      "type": "Ailu::Render::Shader"
+    },
+    {
+      "guid": "2ff30e48-6661-479b-a90c-863e606734f6",
+      "path": "engine://Meshs/src_res/sphere.alasset",
+      "type": "Ailu::Render::Mesh"
+    },
+    {
+      "guid": "32414c6f-47f1-47a1-883c-678fac6e47e8",
+      "path": "engine://Meshs/src_res/terrain_plane.alasset",
+      "type": "Ailu::Render::Mesh"
+    },
+    {
+      "guid": "324335bf-8def-4583-911a-047863b48455",
+      "path": "engine://Shaders/hlsl/voxel_drawer.alasset",
+      "type": "Ailu::Render::Shader"
+    },
+    {
+      "guid": "339a1a1a-522a-4872-a110-cfbc21f0215c",
+      "path": "engine://Shaders/hlsl/gizmo.alasset",
+      "type": "Ailu::Render::Shader"
+    },
+    {
+      "guid": "352bbe93-08cc-4780-bacf-2eb126bfba98",
+      "path": "engine://Icons/shader.alasset",
+      "type": "Ailu::Render::Texture2D"
+    },
+    {
+      "guid": "38aeba40-8fc5-48c3-a785-739a107a9629",
+      "path": "engine://WaterTest/Grass_Wildgrass08.alasset",
+      "type": "Ailu::Render::Mesh"
+    },
+    {
+      "guid": "3a47674b-7028-4f49-a308-92c9fd4e9917",
+      "path": "engine://Icons/file.alasset",
+      "type": "Ailu::Render::Texture2D"
+    },
+    {
+      "guid": "3bc80454-31f8-4ad0-a5ab-0d85ca43ca15",
+      "path": "engine://Icons/dark/anim_clip.alasset",
+      "type": "Ailu::Render::Texture2D"
+    },
+    {
+      "guid": "4428ffdf-97de-4732-b74b-240a0bce3872",
+      "path": "engine://Icons/dark/skeleton.alasset",
+      "type": "Ailu::Render::Texture2D"
+    },
+    {
+      "guid": "46601513-96ea-4cc4-86db-0400c8824ec1",
+      "path": "engine://Materials/MAT_Red.alasset",
+      "type": "Ailu::Render::Material"
+    },
+    {
+      "guid": "4eac1bdc-8122-4414-809e-80d7fd4b8fbf",
+      "path": "engine://Shaders/hlsl/Compute/volumetric_light.alasset",
+      "type": "Ailu::Render::ComputeShader"
+    },
+    {
+      "guid": "4f6e2fa4-c9af-4800-9ff9-70874abfbd50",
+      "path": "engine://Materials/StandardPBR.alasset",
+      "type": "Ailu::Render::Material"
+    },
+    {
+      "guid": "54238902-542d-44ca-9bed-dbe40c90cdcb",
+      "path": "engine://Shaders/hlsl/wireframe.alasset",
+      "type": "Ailu::Render::Shader"
+    },
+    {
+      "guid": "58ec7c7a-220d-4d5c-a84d-dcc7faaf38e5",
+      "path": "engine://WaterTest/MAT_Grass.alasset",
+      "type": "Ailu::Render::Material"
+    },
+    {
+      "guid": "60fb44b6-864f-4c6a-b49b-f4b26829b57d",
+      "path": "engine://Shaders/hlsl/defered_standard_lit.alasset",
+      "type": "Ailu::Render::Shader"
+    },
+    {
+      "guid": "61719aa4-e2e6-4ba7-bab7-5d6e6b78935f",
+      "path": "engine://WaterTest/Alpha_Joints.alasset",
+      "type": "Ailu::Render::SkeletonMesh"
+    },
+    {
+      "guid": "687dd7a6-c8d4-40f1-8a33-694707d9c423",
+      "path": "engine://Icons/directional_light.alasset",
+      "type": "Ailu::Render::Texture2D"
+    },
+    {
+      "guid": "6abca545-d271-4c76-b214-913472735574",
+      "path": "engine://WaterTest/empty_scene.almap",
+      "type": "Ailu::SceneManagement::Scene"
+    },
+    {
+      "guid": "6b616d87-aefe-4b8d-9914-531b11a6efc5",
+      "path": "engine://Shaders/hlsl/ray_trace/raytrace_debug_draw.alasset",
+      "type": "Ailu::Render::Shader"
+    },
+    {
+      "guid": "6d1148fb-00a4-4720-8ca0-7dd877b0da55",
+      "path": "engine://Shaders/hlsl/Compute/max_z.alasset",
+      "type": "Ailu::Render::ComputeShader"
+    },
+    {
+      "guid": "6fd672ec-676e-41b4-9da8-b367d6ab6d2b",
+      "path": "engine://WaterTest/Grass_Wildgrass08_N.alasset",
+      "type": "Ailu::Render::Texture2D"
+    },
+    {
+      "guid": "7182a502-ba5e-4de5-a517-ed226a6b7805",
+      "path": "engine://Shaders/hlsl/Compute/gpu_terrain.alasset",
+      "type": "Ailu::Render::ComputeShader"
+    },
+    {
+      "guid": "798c6e92-05f5-43a3-abb0-7007caf7f3dc",
+      "path": "engine://Shaders/hlsl/transform_gizmo.alasset",
+      "type": "Ailu::Render::Shader"
+    },
+    {
+      "guid": "7b23d109-715f-4944-8669-d0ba3c40e06a",
+      "path": "engine://Textures/ibl_brdf_lut.alasset",
+      "type": "Ailu::Render::Texture2D"
+    },
+    {
+      "guid": "7baa598b-7eb4-478d-91ae-bf758da25d3b",
+      "path": "engine://Meshs/src_res/monkey.alasset",
+      "type": "Ailu::Render::Mesh"
+    },
+    {
+      "guid": "7dc9d93a-4d0f-4d22-b1f3-f6da63526010",
+      "path": "engine://Shaders/hlsl/ray_trace/RTXDI/rtxdi.alasset",
+      "type": "Ailu::Render::ComputeShader"
+    },
+    {
+      "guid": "7f0dc87f-001c-4dfd-8f3c-f6aca6fdc32f",
+      "path": "engine://AnimClips/Sk_YBot.alasset",
+      "type": "Ailu::Render::SkeletonMesh"
+    },
+    {
+      "guid": "7fa3f1ac-fa22-4613-b60c-54cae46bdf4e",
+      "path": "engine://breakfast_room/living_room.alasset",
+      "type": "Ailu::Render::Mesh"
+    },
+    {
+      "guid": "8353ebb5-ab8e-4a52-bc3f-86260e54720e",
+      "path": "engine://Icons/3d.alasset",
+      "type": "Ailu::Render::Texture2D"
+    },
+    {
+      "guid": "86ff4fb6-27ed-4041-9029-1ff7661361a2",
+      "path": "engine://WaterTest/Alpha_Joints_MAT.001.alasset",
+      "type": "Ailu::Render::Material"
+    },
+    {
+      "guid": "88038f2b-8b36-4a3e-a271-2ed294a5c54f",
+      "path": "engine://Shaders/hlsl/deferred_lighting.alasset",
+      "type": "Ailu::Render::Shader"
+    },
+    {
+      "guid": "881f94ee-2dbb-48e9-b084-72c9bfb729ea",
+      "path": "engine://Icons/folder.alasset",
+      "type": "Ailu::Render::Texture2D"
+    },
+    {
+      "guid": "92f5350a-f983-4448-93a3-ae0fd06ce1f3",
+      "path": "engine://Shaders/hlsl/Compute/hzb.alasset",
+      "type": "Ailu::Render::ComputeShader"
+    },
+    {
+      "guid": "949381d0-6c70-457a-ac9b-afcb1eab3547",
+      "path": "engine://AnimClips/ik_test_leg_mesh.alasset",
+      "type": "Ailu::AnimationClip"
+    },
+    {
+      "guid": "953c51c3-fcd0-49d0-89f9-151fdfbe0e33",
+      "path": "engine://breakfast_room/Arcade.alasset",
+      "type": "Ailu::Render::Mesh"
+    },
+    {
+      "guid": "97913004-ecc3-4cbb-b226-f8d68e5903ab",
+      "path": "engine://Shaders/hlsl/cubemap_gen.alasset",
+      "type": "Ailu::Render::Shader"
+    },
+    {
+      "guid": "D390A432-7AD9-475D-B1A5-726EB91072FB",
+      "path": "engine://Shaders/hlsl/forwardlit.alasset",
+      "type": "Ailu::Render::Shader"
+    },
+    {
+      "guid": "a39101e3-586a-4b9d-ad20-e33970c21509",
+      "path": "engine://AnimClips/leg_mesh.alasset",
+      "type": "Ailu::Render::SkeletonMesh"
+    },
+    {
+      "guid": "a40c454a-c967-4810-88c9-651706104062",
+      "path": "engine://WaterTest/default_scene.almap",
+      "type": "Ailu::SceneManagement::Scene"
+    },
+    {
+      "guid": "a5ad5353-4bed-47b7-a4c2-aa26036f7ac2",
+      "path": "engine://Materials/MAT_Cloud.alasset",
+      "type": "Ailu::Render::Material"
+    },
+    {
+      "guid": "a5e4a76d-c915-48a4-a940-5dba8a0c936e",
+      "path": "engine://WaterTest/Grass_Wildgrass08_D.alasset",
+      "type": "Ailu::Render::Texture2D"
+    },
+    {
+      "guid": "aaa391ce-746b-445d-9dda-c678ad8b41b7",
+      "path": "engine://AnimClips/anim_run.alasset",
+      "type": "Ailu::AnimationClip"
+    },
+    {
+      "guid": "aab1797f-d730-4302-8982-7fc075364eba",
+      "path": "engine://breakfast_room/conference.alasset",
+      "type": "Ailu::Render::Mesh"
+    },
+    {
+      "guid": "abcb7c17-1767-4b43-9850-f7a36a428b96",
+      "path": "engine://WaterTest/M_Water.alasset",
+      "type": "Ailu::Render::Material"
+    },
+    {
+      "guid": "acf26f2f-c3dd-4d1c-a1e8-1c3a22bfea7c",
+      "path": "engine://Icons/point_light.alasset",
+      "type": "Ailu::Render::Texture2D"
+    },
+    {
+      "guid": "b165a501-5eaa-4e5e-a3c6-3271ea1d9352",
+      "path": "engine://Shaders/hlsl/skybox.alasset",
+      "type": "Ailu::Render::Shader"
+    },
+    {
+      "guid": "b3df3b8f-0bd8-4cbf-9510-e063fc6eb49f",
+      "path": "engine://Shaders/hlsl/blit.alasset",
+      "type": "Ailu::Render::Shader"
+    },
+    {
+      "guid": "b456b5ba-1a04-4e85-9744-ecdf9aee3773",
+      "path": "engine://Icons/camera.alasset",
+      "type": "Ailu::Render::Texture2D"
+    },
+    {
+      "guid": "bbc9ad8e-1533-47f1-ac06-886158e971a9",
+      "path": "engine://WaterTest/MAT_Green.alasset",
+      "type": "Ailu::Render::Material"
+    },
+    {
+      "guid": "beccf997-dcb3-4217-b213-42059ec71ce8",
+      "path": "engine://breakfast_room/Plane.alasset",
+      "type": "Ailu::Render::Mesh"
+    },
+    {
+      "guid": "c3315e03-1052-4825-98f7-a676beae0615",
+      "path": "engine://Meshs/src_res/plane.alasset",
+      "type": "Ailu::Render::Mesh"
+    },
+    {
+      "guid": "cf40ec2f-ceb8-4cc7-b21f-8ec31d0995ea",
+      "path": "engine://Shaders/hlsl/Compute/taa.alasset",
+      "type": "Ailu::Render::ComputeShader"
+    },
+    {
+      "guid": "cffbfce1-eb20-4319-aa0e-20a68eb19f22",
+      "path": "engine://Textures/small_cave_1k.alasset",
+      "type": "Ailu::Render::Texture2D"
+    },
+    {
+      "guid": "d137d2a7-0d2b-40bc-9c76-6d2708923869",
+      "path": "engine://Meshs/src_res/cube.alasset",
+      "type": "Ailu::Render::Mesh"
+    },
+    {
+      "guid": "d3075919-313e-45b5-8de1-fdf4247232dd",
+      "path": "engine://Shaders/hlsl/ray_trace/raytrace_gi.alasset",
+      "type": "Ailu::Render::ComputeShader"
+    },
+    {
+      "guid": "d7e07be5-55ed-4b47-ad7f-107a64cda4bf",
+      "path": "engine://Icons/spot_light.alasset",
+      "type": "Ailu::Render::Texture2D"
+    },
+    {
+      "guid": "da893f79-e318-4de1-8a73-68c4a51b6892",
+      "path": "engine://Shaders/hlsl/motion_vector.alasset",
+      "type": "Ailu::Render::Shader"
+    },
+    {
+      "guid": "de5c5eb2-4c96-4eca-a05c-c11443b70c87",
+      "path": "engine://Shaders/hlsl/Compute/ssao_cs.alasset",
+      "type": "Ailu::Render::ComputeShader"
+    },
+    {
+      "guid": "e3891c79-694a-4968-bb84-49c409a611ce",
+      "path": "engine://Materials/M_Default.alasset",
+      "type": "Ailu::Render::Material"
+    },
+    {
+      "guid": "ea68f293-f49a-45f7-a91d-7ac04bfd3433",
+      "path": "engine://Textures/T_Default_Material_Grid_N.alasset",
+      "type": "Ailu::Render::Texture2D"
+    },
+    {
+      "guid": "eb07fa74-875a-467e-bf40-6d14647da7b4",
+      "path": "engine://Textures/T_Default_Material_Grid_M.alasset",
+      "type": "Ailu::Render::Texture2D"
+    },
+    {
+      "guid": "ef3ed829-387b-4013-8492-95e574d5e949",
+      "path": "engine://Icons/dark/material.alasset",
+      "type": "Ailu::Render::Texture2D"
+    },
+    {
+      "guid": "f891ec73-10c8-404b-91ac-5bac15cda5fb",
+      "path": "engine://Shaders/hlsl/water.alasset",
+      "type": "Ailu::Render::Shader"
+    },
+    {
+      "guid": "fc17adc1-f67a-4a15-a756-09c672438b53",
+      "path": "engine://Shaders/hlsl/Compute/volumetric_cloud.alasset",
+      "type": "Ailu::Render::ComputeShader"
+    }
+  ]
+}

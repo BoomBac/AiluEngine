@@ -1,0 +1,11 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "6b616d87-aefe-4b8d-9914-531b11a6efc5",
+        "_asset_type": "Ailu::Render::Shader",
+        "_asset_name": "RayTraceDebugDraw"
+    },
+    "_file": "raytrace_debug_draw.hlsl",
+    "_vs_entry": "VSMain",
+    "_ps_entry": "PSMain"
+}

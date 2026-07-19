@@ -3,6 +3,7 @@
 #define __EDITOR_APP__
 
 #include "Framework/Common/Application.h"
+#include "Framework/Common/FileWatcher.h"
 #include "Widgets/EditorLayer.h"
 #include "generated/EditorApp.gen.h"
 
@@ -77,6 +78,7 @@ namespace Ailu
             EditorApp();
             ~EditorApp();
             int Initialize() final;
+            int Initialize(ApplicationInitContext init_ctx);
             void Finalize() final;
             void Tick(f32 delta_time) final;
             FirstPersonCameraController &GetSceneCameraController() { return *_camera_controller; }
@@ -87,6 +89,7 @@ namespace Ailu
             void LoadEditorConfig(ApplicationDesc &desc);
             void SaveEditorConfig();
             void LoadEditorResource();
+            void ConfigureResourceReloading();
             void WatchDirectory();
 
         private:
@@ -100,6 +103,10 @@ namespace Ailu
             WString _opened_scene_path;
             EditorConfig _editor_config;
             Scope<FirstPersonCameraController> _camera_controller;
+            FileWatchService _file_watch_service;
+            FileChangeDispatcher _file_change_dispatcher;
+            ResourceReloadService _resource_reload_service;
+            bool _is_resource_reload_configured = false;
         };// namespace Editor
     }// namespace Editor
 }// namespace Ailu

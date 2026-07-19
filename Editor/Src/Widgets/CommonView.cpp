@@ -19,15 +19,15 @@ namespace Ailu
 		CommonView::CommonView() :DockWindow("CommonView")
 		{
             _root = _content_root->AddChild<UI::ScrollView>();
-            _root->SlotSizePolicy(UI::ESizePolicy::kFill);
+            _root->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
             _vb = _root->AddChild<UI::VerticalBox>();
-            _vb->SlotSizePolicy(UI::ESizePolicy::kAuto);
+            _vb->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kAuto, UI::ESizePolicy::kAuto);
             _vb->AddChild<UI::Text>("Features");
             s_cur_renderer = Render::RenderPipeline::Get().GetRenderer();
             for (auto feature: s_cur_renderer->GetFeatures())
             {
                 auto text = _vb->AddChild<UI::Text>(feature->Name());
-                text->SlotMargin({5.0f, 0.0f, 0.0f, 0.0f});
+                text->GetSlotAs<UI::LinearSlot>().Margin({5.0f, 0.0f, 0.0f, 0.0f});
             }
             g_statics_texts.push_back(_vb->AddChild<UI::Text>());
             g_statics_texts.push_back(_vb->AddChild<UI::Text>());
@@ -41,7 +41,7 @@ namespace Ailu
             g_statics_texts.push_back(_vb->AddChild<UI::Text>());
             for (auto text: g_statics_texts)
             {
-                text->SlotAlignmentH(UI::EAlignment::kLeft).SlotMargin({1.0f, 1.0f, 1.0f, 1.0f});
+                text->GetSlotAs<UI::LinearSlot>().CrossAlignment(UI::EAlignment::kLeft).Margin({1.0f, 1.0f, 1.0f, 1.0f});
             }
             auto btn = _vb->AddChild<UI::Button>();
             btn->SetText("Capture RenderGraph");

@@ -46,6 +46,20 @@ namespace Ailu
         /// @param asset_path 
         /// @return c:/xx/aa/
         WString AILU_API ExtarctDirectory(const WString &asset_path);
+
+        /// @brief 规范化路径，去除末尾 '/'
+        WString AILU_API NormalizePathWithoutTrailingSlash(const WString &path);
+        /// @brief 规范化路径，去除末尾 '/'
+        String AILU_API NormalizePathWithoutTrailingSlash(const String &path);
+
+        /// @brief 规范化目录路径，确保以 '/' 结尾
+        WString AILU_API NormalizeDirectoryPath(const WString &path);
+        /// @brief 规范化目录路径，确保以 '/' 结尾
+        String AILU_API NormalizeDirectoryPath(const String &path);
+        /// @brief 规范化相对目录路径，去除首尾 '/'
+        WString AILU_API NormalizeRelativeDirectory(const WString &path);
+        /// @brief 规范化相对目录路径，去除首尾 '/'
+        String AILU_API NormalizeRelativeDirectory(const String &path);
     } // namespace PathUtils
 
 }// namespace Ailu

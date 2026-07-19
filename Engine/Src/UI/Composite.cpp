@@ -199,20 +199,17 @@ namespace Ailu
             constexpr int N = Traits::kDimension;
 
             auto hb = MakeRef<UI::HorizontalBox>();
-            hb->AddChild<UI::Text>(label)
-                    ->SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto)
-                    .SlotFillRate(GetLabelFillRate(N)).SlotMargin(kDefaultLabelMargin);
+            auto label_text = hb->AddChild<UI::Text>(label);
+            label_text->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto)
+                    .FillRate(GetLabelFillRate(N)).Margin(kDefaultLabelMargin);
 
             for (int i = 0; i < N; ++i)
             {
                 Scalar value = Traits::Get(property->Get<VecT>(instance), i);
 
-                auto input = hb->AddChild<UI::InputBlock>(
-                                       std::format("{}", value))
-                                     ->SlotMargin({2, 0, 2, 2})
-                                     .SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto)
-                                     .SlotFillRate(GetInputFillRate(N)).SlotMargin({2, 2, 2, 4})
-                                     .As<UI::InputBlock>();
+                auto input = hb->AddChild<UI::InputBlock>(std::format("{}", value));
+                input->GetSlotAs<UI::LinearSlot>().Margin({2, 2, 2, 4}).SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto)
+                        .FillRate(GetInputFillRate(N));
 
                 input->_on_content_changed +=
                         [property, instance, i](String content)
@@ -247,10 +244,18 @@ namespace Ailu
                                               auto vec = property->Get<VecT>(instance);
                                               for (int i = 0; i < Traits::kDimension; ++i)
                                               {
+                                                  auto value = Traits::Get(vec, i);
                                                   hb->ChildAt(i + 1)
                                                           ->As<UI::InputBlock>()
                                                           ->SetContent(
-                                                                  std::format("{:.2f}", Traits::Get(vec, i)), false);
+                                                                  [&]()
+                                                                  {
+                                                                      if constexpr (std::is_floating_point_v<decltype(value)>)
+                                                                          return std::format("{:.2f}", value);
+                                                                      else
+                                                                          return std::format("{}", value);
+                                                                  }(),
+                                                                  false);
                                               }
                                           }));
 
@@ -262,14 +267,16 @@ namespace Ailu
         Ref<UIElement> BuildScaleFieldImpl(const String &label, PropertyInfo *property, void *instance)
         {
             auto hb = MakeRef<UI::HorizontalBox>();
-            hb->AddChild<UI::Text>(label)->SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto).SlotMargin(kDefaultLabelMargin);
+            hb->AddChild<UI::Text>(label)->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto).Margin(kDefaultLabelMargin);
             auto data = property->Get<T>(instance);
             String text;
             if constexpr (std::is_floating_point_v<T>)
                 text = std::format("{:.2f}", data);
             else
                 text = std::to_string(data);
-            auto input_block = hb->AddChild<UI::InputBlock>(text)->SlotMargin({2.0f, 0.0f, 2.0f, 2.0f}).SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto).SlotFillRate(GetInputFillRate(3)).As<UI::InputBlock>();
+            auto input_block = hb->AddChild<UI::InputBlock>(text);
+            input_block->GetSlotAs<UI::LinearSlot>().Margin({2.0f, 0.0f, 2.0f, 2.0f}).SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto)
+                    .FillRate(GetInputFillRate(3));
             if constexpr (std::is_floating_point_v<T>)
             {
                 input_block->_on_content_changed += [property, instance](String content)
@@ -308,21 +315,16 @@ namespace Ailu
         Ref<UIElement> BuildRangeFieldImpl(const String &label, PropertyInfo *property,void* instance,Vector2f range)
         {
             auto hb = MakeRef<UI::HorizontalBox>();
-            hb->AddChild<UI::Text>(label)->SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto).SlotMargin(kDefaultLabelMargin);
+            hb->AddChild<UI::Text>(label)->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto).Margin(kDefaultLabelMargin);
             auto data = property->Get<T>(instance);
-            auto slider = hb->AddChild<UI::Slider>()
-                                ->SlotMargin({10.0f, 0.0f, 2.0f, 2.0f})
-                                .SlotAlignmentH(UI::EAlignment::kRight)
-                                .SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto)
-                                .As<UI::Slider>();
+            auto slider = hb->AddChild<UI::Slider>();
+            slider->GetSlotAs<UI::LinearSlot>().Margin({10.0f, 0.0f, 2.0f, 2.0f}).CrossAlignment(UI::EAlignment::kRight)
+                    .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto);
             slider->_range = range;
             slider->SetValue(static_cast<f32>(data));
-            auto input_block = hb->AddChild<UI::InputBlock>(FormatNumericFieldValue(data))
-                                ->SlotMargin({2.0f, 0.0f, 2.0f, 2.0f})
-                                .SlotAlignmentH(UI::EAlignment::kRight)
-                                .SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto)
-                                .SlotFillRate(1.2f)
-                                .As<UI::InputBlock>();
+            auto input_block = hb->AddChild<UI::InputBlock>(FormatNumericFieldValue(data));
+            input_block->GetSlotAs<UI::LinearSlot>().Margin({2.0f, 0.0f, 2.0f, 2.0f}).CrossAlignment(UI::EAlignment::kRight)
+                    .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto).FillRate(1.2f);
             slider->_on_value_change += [property, instance](f32 v)
             {
                 property->Set<T>(instance,static_cast<T>(v),PropertyInfo::EPropertyChangeSource::kUI);
@@ -404,13 +406,11 @@ namespace Ailu
             s_builders[StaticClass<bool>()] = [](const String &label, PropertyInfo *property, void *instance, Params *params) -> Ref<UIElement>
             {
                 auto hb = MakeRef<UI::HorizontalBox>();
-                hb->AddChild<UI::Text>(label)->SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto).SlotMargin(kDefaultLabelMargin);
+                hb->AddChild<UI::Text>(label)->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto).Margin(kDefaultLabelMargin);
                 auto data = property->Get<bool>(instance);
-                auto checkbox = hb->AddChild<UI::CheckBox>()
-                                    ->SlotMargin({10.0f, 0.0f, 2.0f, 2.0f})
-                                    .SlotAlignmentH(UI::EAlignment::kRight)
-                                    .SlotSizePolicy(UI::ESizePolicy::kAuto, UI::ESizePolicy::kAuto)
-                                    .As<UI::CheckBox>();
+                auto checkbox = hb->AddChild<UI::CheckBox>();
+                checkbox->GetSlotAs<UI::LinearSlot>().Margin({10.0f, 0.0f, 2.0f, 2.0f}).CrossAlignment(UI::EAlignment::kRight)
+                        .SizePolicy(UI::ESizePolicy::kAuto, UI::ESizePolicy::kAuto);
                 checkbox->SetChecked(data);
                 checkbox->_on_click += [property, instance](bool v)
                 {
@@ -440,13 +440,15 @@ namespace Ailu
         Ref<UIElement> BuildRangeField(const String &label, f32 *data, f32 min, f32 max)
         {
             auto hb = MakeRef<UI::HorizontalBox>();
-            hb->AddChild<UI::Text>(label)->SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto);
+            hb->AddChild<UI::Text>(label)->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto);
             auto slider = hb->AddChild<UI::Slider>();
-            slider->SlotMargin({10.0f, 0.0f, 2.0f, 2.0f}).SlotAlignmentH(UI::EAlignment::kRight).SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto);
+            slider->GetSlotAs<UI::LinearSlot>().Margin({10.0f, 0.0f, 2.0f, 2.0f}).CrossAlignment(UI::EAlignment::kRight)
+                    .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto);
             slider->_range = {min, max};
             slider->SetValue(*data, false);
             auto input_block = hb->AddChild<UI::InputBlock>(FormatNumericFieldValue(*data));
-            input_block->SlotMargin({2.0f, 0.0f, 2.0f, 2.0f}).SlotAlignmentH(UI::EAlignment::kRight).SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto).SlotFillRate(1.2f);
+            input_block->GetSlotAs<UI::LinearSlot>().Margin({2.0f, 0.0f, 2.0f, 2.0f}).CrossAlignment(UI::EAlignment::kRight)
+                    .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto).FillRate(1.2f);
             slider->_on_value_change += [data, input_block](f32 v)
             {
                 *data = v;
@@ -465,9 +467,10 @@ namespace Ailu
         Ref<UIElement> BuildToggleField(const String &label, bool *data)
         {
             auto hb = MakeRef<UI::HorizontalBox>();
-            hb->AddChild<UI::Text>(label)->SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto);
+            hb->AddChild<UI::Text>(label)->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto);
             auto checkbox = hb->AddChild<UI::CheckBox>();
-            checkbox->SlotMargin({10.0f, 0.0f, 2.0f, 2.0f}).SlotAlignmentH(UI::EAlignment::kRight).SlotSizePolicy(UI::ESizePolicy::kAuto, UI::ESizePolicy::kAuto);
+            checkbox->GetSlotAs<UI::LinearSlot>().Margin({10.0f, 0.0f, 2.0f, 2.0f}).CrossAlignment(UI::EAlignment::kRight)
+                    .SizePolicy(UI::ESizePolicy::kAuto, UI::ESizePolicy::kAuto);
             checkbox->_on_click += [data](bool v)
             {
                 *data = v;

@@ -1,0 +1,11 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "0cd86d2c-e28b-4816-a032-0ef7fb1843f5",
+        "_asset_type": "Ailu::Render::Shader",
+        "_asset_name": "standard_volume"
+    },
+    "_file": "standard_volume.hlsl",
+    "_vs_entry": "VSMain",
+    "_ps_entry": "PSMain"
+}

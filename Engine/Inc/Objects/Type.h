@@ -588,6 +588,7 @@ namespace Ailu
     struct AILU_API EnumInitializer
     {
         String _name;
+        String _namespace;
         String _full_name;
         Map<String, u32> _str_to_enum_lut;
     };

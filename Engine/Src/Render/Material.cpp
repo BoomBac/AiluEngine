@@ -881,7 +881,7 @@ namespace Ailu::Render
         else if (value == ESurfaceType::kTransparent)
         {
             DisableKeyword("ALPHA_TEST");
-            _p_active_shader = ResourceMgr::Get().Get<Shader>(L"Shaders/forwardlit.alasset");
+            _p_active_shader = ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/forwardlit.alasset");
             _render_queue = Shader::kRenderQueueTransparent;
         }
         else if (value == ESurfaceType::kAlphaTest)

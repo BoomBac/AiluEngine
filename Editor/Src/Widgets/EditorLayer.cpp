@@ -27,6 +27,7 @@
 
 #include "Framework/Common/Profiler.h"
 #include "Render/RenderPipeline.h"
+#include "Scene/Scene.h"
 
 #include "UI/Basic.h"
 #include "UI/Container.h"
@@ -47,6 +48,7 @@
 
 #include "Widgets/CommonView.h"
 #include "Widgets/RenderView.h"
+#include "Widgets/StyleThemeEditor.h"
 
 #include "Framework/Parser/TextParser.h"
 #include "Platform/Process.h"
@@ -161,26 +163,28 @@ namespace Ailu
                 }
             }
 
-            bool static DrawMemberProperty(PropertyInfo &prop_info, Object &obj)
+            bool DrawReflectedPropertiesByType(Type *type, void *obj, const std::function<bool(const PropertyInfo &)> &filter = {});
+
+            bool static DrawMemberProperty(PropertyInfo &prop_info, void *obj)
             {
                 bool changed = false;
-                ImGui::PushID(obj.Name().c_str());
+                ImGui::PushID(obj);
                 auto &meta_info = prop_info.MetaInfo();
                 if (!prop_info.IsConst())
                 {
                     if (prop_info.GetType() == StaticClass<bool>())
                     {
-                        bool old_value = prop_info.Get<bool>(&obj);
+                        bool old_value = prop_info.Get<bool>(obj);
                         bool new_value = old_value;
                         if (ImGui::Checkbox(prop_info.Name().c_str(), &new_value))
                         {
-                            prop_info.Set<bool>(&obj, new_value);
+                            prop_info.Set<bool>(obj, new_value);
                             changed = true;
                         }
                     }
                     else if (prop_info.GetType() == StaticClass<f32>())
                     {
-                        f32 old_value = prop_info.Get<f32>(&obj);
+                        f32 old_value = prop_info.Get<f32>(obj);
                         f32 new_value = old_value;
                         if (meta_info.GetBool("IsRange"))
                         {
@@ -190,13 +194,13 @@ namespace Ailu
                             ImGui::InputFloat(prop_info.Name().c_str(), &new_value);
                         if (old_value != new_value)
                         {
-                            prop_info.Set<f32>(&obj, new_value);
+                            prop_info.Set<f32>(obj, new_value);
                             changed = true;
                         }
                     }
                     else if (prop_info.GetType() == StaticClass<i8>())
                     {
-                        i32 old_value = prop_info.Get<i8>(&obj);
+                        i32 old_value = prop_info.Get<i8>(obj);
                         i32 new_value = old_value;
                         if (meta_info.GetBool("IsRange"))
                         {
@@ -206,13 +210,13 @@ namespace Ailu
                             ImGui::InputInt(prop_info.Name().c_str(), &new_value);
                         if (old_value != new_value)
                         {
-                            prop_info.Set<i8>(&obj, (i8) new_value);
+                            prop_info.Set<i8>(obj, (i8) new_value);
                             changed = true;
                         }
                     }
                     else if (prop_info.GetType() == StaticClass<i16>())
                     {
-                        i32 old_value = prop_info.Get<i16>(&obj);
+                        i32 old_value = prop_info.Get<i16>(obj);
                         i32 new_value = old_value;
                         if (meta_info.GetBool("IsRange"))
                         {
@@ -222,13 +226,13 @@ namespace Ailu
                             ImGui::InputInt(prop_info.Name().c_str(), &new_value);
                         if (old_value != new_value)
                         {
-                            prop_info.Set<i16>(&obj, (i16) new_value);
+                            prop_info.Set<i16>(obj, (i16) new_value);
                             changed = true;
                         }
                     }
                     else if (prop_info.GetType() == StaticClass<i32>())
                     {
-                        i32 old_value = prop_info.Get<i32>(&obj);
+                        i32 old_value = prop_info.Get<i32>(obj);
                         i32 new_value = old_value;
                         if (meta_info.GetBool("IsRange"))
                         {
@@ -238,13 +242,13 @@ namespace Ailu
                             ImGui::InputInt(prop_info.Name().c_str(), &new_value);
                         if (old_value != new_value)
                         {
-                            prop_info.Set<i32>(&obj, new_value);
+                            prop_info.Set<i32>(obj, new_value);
                             changed = true;
                         }
                     }
                     else if (prop_info.GetType() == StaticClass<u8>())
                     {
-                        i32 old_value = prop_info.Get<u8>(&obj);
+                        i32 old_value = prop_info.Get<u8>(obj);
                         i32 new_value = old_value;
                         if (meta_info.GetBool("IsRange"))
                         {
@@ -254,13 +258,13 @@ namespace Ailu
                             ImGui::InputInt(prop_info.Name().c_str(), &new_value);
                         if (old_value != new_value)
                         {
-                            prop_info.Set<u8>(&obj, (u8) new_value);
+                            prop_info.Set<u8>(obj, (u8) new_value);
                             changed = true;
                         }
                     }
                     else if (prop_info.GetType() == StaticClass<u16>())
                     {
-                        i32 old_value = prop_info.Get<u16>(&obj);
+                        i32 old_value = prop_info.Get<u16>(obj);
                         i32 new_value = old_value;
                         if (meta_info.GetBool("IsRange"))
                         {
@@ -270,13 +274,13 @@ namespace Ailu
                             ImGui::InputInt(prop_info.Name().c_str(), &new_value);
                         if (old_value != new_value)
                         {
-                            prop_info.Set<u16>(&obj, (u16) new_value);
+                            prop_info.Set<u16>(obj, (u16) new_value);
                             changed = true;
                         }
                     }
                     else if (prop_info.GetType() == StaticClass<u32>())
                     {
-                        i32 old_value = prop_info.Get<u32>(&obj);
+                        i32 old_value = prop_info.Get<u32>(obj);
                         i32 new_value = old_value;
                         if (meta_info.GetBool("IsRange"))
                         {
@@ -286,37 +290,47 @@ namespace Ailu
                             ImGui::InputInt(prop_info.Name().c_str(), &new_value);
                         if (old_value != new_value)
                         {
-                            prop_info.Set<u32>(&obj, (u32) new_value);
+                            prop_info.Set<u32>(obj, (u32) new_value);
+                            changed = true;
+                        }
+                    }
+                    else if (prop_info.GetType() == StaticClass<u64>())
+                    {
+                        u64 old_value = prop_info.Get<u64>(obj);
+                        u64 new_value = old_value;
+                        if (ImGui::InputScalar(prop_info.Name().c_str(), ImGuiDataType_U64, &new_value))
+                        {
+                            prop_info.Set<u64>(obj, new_value);
                             changed = true;
                         }
                     }
                     else if (prop_info.GetType() == StaticClass<String>())
                     {
-                        String old_value = prop_info.Get<String>(&obj);
+                        String old_value = prop_info.Get<String>(obj);
                         auto str_len = old_value.size();
                         char buf[256];
                         memcpy(buf, old_value.c_str(), str_len);
                         buf[str_len] = '\0';
                         if (ImGui::InputText(prop_info.Name().c_str(), buf, 256, ImGuiInputTextFlags_EnterReturnsTrue))
                         {
-                            prop_info.Set<String>(&obj, buf);
+                            prop_info.Set<String>(obj, buf);
                             changed = true;
                         }
                     }
                     else if (prop_info.GetType() == StaticClass<Vector2f>())
                     {
-                        Vector2f old_value = prop_info.Get<Vector2f>(&obj);
+                        Vector2f old_value = prop_info.Get<Vector2f>(obj);
                         Vector2f new_value = old_value;
                         if (ImGui::InputFloat2(prop_info.Name().c_str(), new_value.data))
                         {
-                            prop_info.Set<Vector2f>(&obj, new_value);
+                            prop_info.Set<Vector2f>(obj, new_value);
                             changed = true;
                         }
                     }
                     else if (prop_info.GetType() != nullptr && prop_info.GetType()->IsEnum())
                     {
                         const auto *enum_type = static_cast<const Enum *>(prop_info.GetType());
-                        i32 current_value = static_cast<i32>(prop_info.Get<u32>(&obj));
+                        i32 current_value = static_cast<i32>(prop_info.Get<u32>(obj));
                         const String &preview = enum_type->GetNameByIndex(static_cast<u32>(current_value));
                         if (ImGui::BeginCombo(prop_info.Name().c_str(), preview.c_str()))
                         {
@@ -328,7 +342,7 @@ namespace Ailu
                                 const bool is_selected = (enum_value == current_value);
                                 if (ImGui::Selectable(name->c_str(), is_selected))
                                 {
-                                    prop_info.Set<u32>(&obj, static_cast<u32>(enum_value));
+                                    prop_info.Set<u32>(obj, static_cast<u32>(enum_value));
                                     changed = true;
                                     current_value = enum_value;
                                 }
@@ -338,73 +352,112 @@ namespace Ailu
                             ImGui::EndCombo();
                         }
                     }
-                    else if (prop_info.TypeName() == "Padding")
+                    else if (prop_info.GetType() == StaticClass<UI::Padding>())
                     {
-                        UI::Padding old_value = prop_info.Get<UI::Padding>(&obj);
+                        UI::Padding old_value = prop_info.Get<UI::Padding>(obj);
                         Vector4f new_value = {old_value._l, old_value._t, old_value._r, old_value._b};
                         if (ImGui::InputFloat4(prop_info.Name().c_str(), new_value.data))
                         {
-                            prop_info.Set<UI::Padding>(&obj, UI::Padding(new_value));
+                            prop_info.Set<UI::Padding>(obj, UI::Padding(new_value));
                             changed = true;
                         }
                     }
                     else if (prop_info.GetType() == StaticClass<Vector3f>())
                     {
-                        Vector3f old_value = prop_info.Get<Vector3f>(&obj);
+                        Vector3f old_value = prop_info.Get<Vector3f>(obj);
                         Vector3f new_value = old_value;
                         if (ImGui::InputFloat3(prop_info.Name().c_str(), new_value.data))
                         {
-                            prop_info.Set<Vector3f>(&obj, new_value);
+                            prop_info.Set<Vector3f>(obj, new_value);
+                            changed = true;
+                        }
+                    }
+                    else if (prop_info.TypeName() == "Color")
+                    {
+                        Color old_value = prop_info.Get<Color>(obj);
+                        Color new_value = old_value;
+                        if (ImGui::ColorEdit4(prop_info.Name().c_str(), new_value.data, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR))
+                        {
+                            prop_info.Set<Color>(obj, new_value);
                             changed = true;
                         }
                     }
                     else if (prop_info.GetType() == StaticClass<Vector4f>())
                     {
-                        Vector4f old_value = prop_info.Get<Vector4f>(&obj);
+                        Vector4f old_value = prop_info.Get<Vector4f>(obj);
                         Vector4f new_value = old_value;
                         if (meta_info.GetBool("IsColor"))
                         {
-                            ImGui::ColorEdit4(prop_info.Name().c_str(), new_value.data, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
-                            prop_info.Set<Vector4f>(&obj, new_value);
-                            changed = true;
+                            if (ImGui::ColorEdit4(prop_info.Name().c_str(), new_value.data, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR))
+                            {
+                                prop_info.Set<Vector4f>(obj, new_value);
+                                changed = true;
+                            }
                         }
                         else
                         {
                             if (ImGui::InputFloat4(prop_info.Name().c_str(), new_value.data))
                             {
-                                prop_info.Set<Vector4f>(&obj, new_value);
+                                prop_info.Set<Vector4f>(obj, new_value);
                                 changed = true;
                             }
                         }
                     }
                     else if (prop_info.GetType() == StaticClass<Vector2Int>())
                     {
-                        Vector2Int old_value = prop_info.Get<Vector2Int>(&obj);
+                        Vector2Int old_value = prop_info.Get<Vector2Int>(obj);
                         Vector2Int new_value = old_value;
                         if (ImGui::InputInt2(prop_info.Name().c_str(), new_value.data))
                         {
-                            prop_info.Set<Vector2Int>(&obj, new_value);
+                            prop_info.Set<Vector2Int>(obj, new_value);
                             changed = true;
                         }
                     }
                     else if (prop_info.GetType() == StaticClass<Vector3Int>())
                     {
-                        Vector3Int old_value = prop_info.Get<Vector3Int>(&obj);
+                        Vector3Int old_value = prop_info.Get<Vector3Int>(obj);
                         Vector3Int new_value = old_value;
                         if (ImGui::InputInt3(prop_info.Name().c_str(), new_value.data))
                         {
-                            prop_info.Set<Vector3Int>(&obj, new_value);
+                            prop_info.Set<Vector3Int>(obj, new_value);
                             changed = true;
                         }
                     }
                     else if (prop_info.GetType() == StaticClass<Vector4Int>())
                     {
-                        Vector4Int old_value = prop_info.Get<Vector4Int>(&obj);
+                        Vector4Int old_value = prop_info.Get<Vector4Int>(obj);
                         Vector4Int new_value = old_value;
                         if (ImGui::InputInt4(prop_info.Name().c_str(), new_value.data))
                         {
-                            prop_info.Set<Vector4Int>(&obj, new_value);
+                            prop_info.Set<Vector4Int>(obj, new_value);
                             changed = true;
+                        }
+                    }
+                    else if (prop_info.GetType() == StaticClass<UI::UIControlVisual>())
+                    {
+                        if (ImGui::TreeNode(prop_info.Name().c_str()))
+                        {
+                            auto &visual = prop_info.Get<UI::UIControlVisual>(obj);
+                            changed = DrawReflectedPropertiesByType(visual.GetType(), &visual);
+                            ImGui::TreePop();
+                        }
+                    }
+                    else if (prop_info.GetType() == StaticClass<UI::UIBrush>())
+                    {
+                        if (ImGui::TreeNode(prop_info.Name().c_str()))
+                        {
+                            auto &brush = prop_info.Get<UI::UIBrush>(obj);
+                            changed = DrawReflectedPropertiesByType(brush.GetType(), &brush);
+                            ImGui::TreePop();
+                        }
+                    }
+                    else if (prop_info.GetType() == StaticClass<UI::UIScrollBarStyle>())
+                    {
+                        if (ImGui::TreeNode(prop_info.Name().c_str()))
+                        {
+                            auto &bar_style = prop_info.Get<UI::UIScrollBarStyle>(obj);
+                            changed = DrawReflectedPropertiesByType(bar_style.GetType(), &bar_style);
+                            ImGui::TreePop();
                         }
                     }
                     else
@@ -418,7 +471,7 @@ namespace Ailu
                 return changed;
             }
 
-            bool DrawReflectedPropertiesByType(Type *type, Object &obj, const std::function<bool(const PropertyInfo &)> &filter = {})
+            bool DrawReflectedPropertiesByType(Type *type, void *obj, const std::function<bool(const PropertyInfo &)> &filter)
             {
                 bool any_changed = false;
                 for (Type *cur_type = type; cur_type != nullptr; cur_type = cur_type->BaseType())
@@ -437,6 +490,210 @@ namespace Ailu
                     }
                 }
                 return any_changed;
+            }
+
+            template<typename TObject>
+            bool DrawReflectedPropertiesByType(Type *type, TObject &obj, const std::function<bool(const PropertyInfo &)> &filter = {})
+            {
+                return DrawReflectedPropertiesByType(type, static_cast<void *>(&obj), filter);
+            }
+
+            void DrawUIReflectorStyleEditor(UI::UIElement *selected)
+            {
+                if (selected == nullptr)
+                    return;
+
+                bool style_changed = false;
+
+                ImGui::Separator();
+                ImGui::Spacing();
+
+                // ── Button ──────────────────────────────────────────
+                if (auto *btn = dynamic_cast<UI::Button *>(selected))
+                {
+                    if (ImGui::CollapsingHeader("Style (Button)", ImGuiTreeNodeFlags_DefaultOpen))
+                    {
+                        UI::UIStyleId style_id = btn->GetStyleId();
+                        char buf[256];
+                        auto len = std::min(style_id.size(), (size_t)255);
+                        memcpy(buf, style_id.c_str(), len);
+                        buf[len] = '\0';
+                        if (ImGui::InputText("Style ID", buf, 256, ImGuiInputTextFlags_EnterReturnsTrue))
+                        {
+                            btn->SetStyleId(String(buf));
+                            style_changed = true;
+                        }
+                        auto &ov = btn->GetStyleOverride();
+                        if (DrawReflectedPropertiesByType(ov.GetType(), ov))
+                        {
+                            ov._override_mask = ~0u;
+                            style_changed = true;
+                        }
+                    }
+                }
+                // ── Slider ──────────────────────────────────────────
+                else if (auto *s = dynamic_cast<UI::Slider *>(selected))
+                {
+                    if (ImGui::CollapsingHeader("Style (Slider)", ImGuiTreeNodeFlags_DefaultOpen))
+                    {
+                        UI::UIStyleId style_id = s->GetStyleId();
+                        char buf[256];
+                        auto len = std::min(style_id.size(), (size_t)255);
+                        memcpy(buf, style_id.c_str(), len);
+                        buf[len] = '\0';
+                        if (ImGui::InputText("Style ID", buf, 256, ImGuiInputTextFlags_EnterReturnsTrue))
+                        {
+                            s->SetStyleId(String(buf));
+                            style_changed = true;
+                        }
+                        auto &ov = s->GetStyleOverride();
+                        if (DrawReflectedPropertiesByType(ov.GetType(), ov))
+                        {
+                            ov._override_mask = ~0u;
+                            style_changed = true;
+                        }
+                    }
+                }
+                // ── CheckBox ────────────────────────────────────────
+                else if (auto *cb = dynamic_cast<UI::CheckBox *>(selected))
+                {
+                    if (ImGui::CollapsingHeader("Style (CheckBox)", ImGuiTreeNodeFlags_DefaultOpen))
+                    {
+                        UI::UIStyleId style_id = cb->GetStyleId();
+                        char buf[256];
+                        auto len = std::min(style_id.size(), (size_t)255);
+                        memcpy(buf, style_id.c_str(), len);
+                        buf[len] = '\0';
+                        if (ImGui::InputText("Style ID", buf, 256, ImGuiInputTextFlags_EnterReturnsTrue))
+                        {
+                            cb->SetStyleId(String(buf));
+                            style_changed = true;
+                        }
+                        auto &ov = cb->GetStyleOverride();
+                        if (DrawReflectedPropertiesByType(ov.GetType(), ov))
+                        {
+                            ov._override_mask = ~0u;
+                            style_changed = true;
+                        }
+                    }
+                }
+                // ── InputBlock ──────────────────────────────────────
+                else if (auto *ib = dynamic_cast<UI::InputBlock *>(selected))
+                {
+                    if (ImGui::CollapsingHeader("Style (InputBlock)", ImGuiTreeNodeFlags_DefaultOpen))
+                    {
+                        UI::UIStyleId style_id = ib->GetStyleId();
+                        char buf[256];
+                        auto len = std::min(style_id.size(), (size_t)255);
+                        memcpy(buf, style_id.c_str(), len);
+                        buf[len] = '\0';
+                        if (ImGui::InputText("Style ID", buf, 256, ImGuiInputTextFlags_EnterReturnsTrue))
+                        {
+                            ib->SetStyleId(String(buf));
+                            style_changed = true;
+                        }
+                        auto &ov = ib->GetStyleOverride();
+                        if (DrawReflectedPropertiesByType(ov.GetType(), ov))
+                        {
+                            ov._override_mask = ~0u;
+                            style_changed = true;
+                        }
+                    }
+                }
+                // ── ScrollView ──────────────────────────────────────
+                else if (auto *sv = dynamic_cast<UI::ScrollView *>(selected))
+                {
+                    if (ImGui::CollapsingHeader("Style (ScrollView)", ImGuiTreeNodeFlags_DefaultOpen))
+                    {
+                        auto &ov = sv->GetStyleOverride();
+                        if (DrawReflectedPropertiesByType(ov.GetType(), ov))
+                        {
+                            ov._override_mask = ~0u;
+                            style_changed = true;
+                        }
+                    }
+                }
+                // ── Text ────────────────────────────────────────────
+                else if (auto *t = dynamic_cast<UI::Text *>(selected))
+                {
+                    if (ImGui::CollapsingHeader("Style (Text)", ImGuiTreeNodeFlags_DefaultOpen))
+                    {
+                        auto &ov = t->GetStyleOverride();
+                        if (DrawReflectedPropertiesByType(ov.GetType(), ov))
+                        {
+                            ov._override_mask = ~0u;
+                            style_changed = true;
+                        }
+                    }
+                }
+                // ── Border ──────────────────────────────────────────
+                else if (auto *b = dynamic_cast<UI::Border *>(selected))
+                {
+                    if (ImGui::CollapsingHeader("Style (Border)", ImGuiTreeNodeFlags_DefaultOpen))
+                    {
+                        auto &ov = b->GetStyleOverride();
+                        if (DrawReflectedPropertiesByType(ov.GetType(), ov))
+                        {
+                            ov._override_mask = ~0u;
+                            style_changed = true;
+                        }
+                    }
+                }
+                // ── Image ───────────────────────────────────────────
+                else if (auto *img = dynamic_cast<UI::Image *>(selected))
+                {
+                    if (ImGui::CollapsingHeader("Style (Image)", ImGuiTreeNodeFlags_DefaultOpen))
+                    {
+                        auto &ov = img->GetStyleOverride();
+                        if (DrawReflectedPropertiesByType(ov.GetType(), ov))
+                        {
+                            ov._override_mask = ~0u;
+                            style_changed = true;
+                        }
+                    }
+                }
+                // ── Canvas ──────────────────────────────────────────
+                else if (auto *c = dynamic_cast<UI::Canvas *>(selected))
+                {
+                    if (ImGui::CollapsingHeader("Style (Canvas)", ImGuiTreeNodeFlags_DefaultOpen))
+                    {
+                        auto &ov = c->GetStyleOverride();
+                        if (DrawReflectedPropertiesByType(ov.GetType(), ov))
+                        {
+                            ov._override_mask = ~0u;
+                            style_changed = true;
+                        }
+                    }
+                }
+                // ── LinearBox (includes VerticalBox, HorizontalBox) ─
+                else if (auto *lb = dynamic_cast<UI::LinearBox *>(selected))
+                {
+                    if (ImGui::CollapsingHeader("Style (LinearBox)", ImGuiTreeNodeFlags_DefaultOpen))
+                    {
+                        auto &ov = lb->GetStyleOverride();
+                        if (DrawReflectedPropertiesByType(ov.GetType(), ov))
+                        {
+                            ov._override_mask = ~0u;
+                            style_changed = true;
+                        }
+                    }
+                }
+                // ── SplitView ───────────────────────────────────────
+                else if (auto *spv = dynamic_cast<UI::SplitView *>(selected))
+                {
+                    if (ImGui::CollapsingHeader("Style (SplitView)", ImGuiTreeNodeFlags_DefaultOpen))
+                    {
+                        auto &ov = spv->GetStyleOverride();
+                        if (DrawReflectedPropertiesByType(ov.GetType(), ov))
+                        {
+                            ov._override_mask = ~0u;
+                            style_changed = true;
+                        }
+                    }
+                }
+
+                if (style_changed)
+                    selected->InvalidateStyle();
             }
 
             void DrawUIReflectorSelectionDetails(UI::UIElement *selected)
@@ -461,9 +718,9 @@ namespace Ailu
                 ImGui::Text("AbsRect: %.1f, %.1f, %.1f, %.1f", arr_rect.x, arr_rect.y, arr_rect.z, arr_rect.w);
                 ImGui::Text("ContentRect: %.1f, %.1f, %.1f, %.1f", cnt_rect.x, cnt_rect.y, cnt_rect.z, cnt_rect.w);
                 ImGui::Text("Visible: %s", selected->IsVisible() ? "true" : "false");
-                ImGui::Text("Hovered: %s", selected->_state._is_hovered ? "true" : "false");
-                ImGui::Text("Pressed: %s", selected->_state._is_pressed ? "true" : "false");
-                ImGui::Text("Focused: %s", selected->_state._is_focused ? "true" : "false");
+                ImGui::Text("Hovered: %s", selected->IsHovered() ? "true" : "false");
+                ImGui::Text("Pressed: %s", selected->IsPressed() ? "true" : "false");
+                ImGui::Text("Focused: %s", selected->IsFocused() ? "true" : "false");
                 ImGui::Separator();
 
                 auto slot = selected->GetSlot();
@@ -475,15 +732,16 @@ namespace Ailu
                         const bool slot_changed = DrawReflectedPropertiesByType(slot->GetType(), *slot);
                         if (slot_changed)
                         {
-                            selected->SlotMargin();
-                            selected->InvalidateLayout();
+                            slot->PostPropertyChanged();
                         }
                     }
                     ImGui::Separator();
                 }
 
                 DrawReflectedPropertiesByType(selected->GetType(), *selected, [](const PropertyInfo &prop)
-                                              { return prop.Name() != "_slot" && prop.Name() != "_state"; });
+                                              { return prop.Name() != "_slot_obj" && prop.Name() != "_state"; });
+
+                DrawUIReflectorStyleEditor(selected);
             }
             void ShowUIReflectorWindow(bool *is_show)
             {
@@ -803,6 +1061,30 @@ namespace Ailu
             }
         }
 
+        namespace
+        {
+            constexpr f32 kEditorToolbarHeight = 34.0f;
+            constexpr f32 kEditorStatusBarHeight = 24.0f;
+
+            UI::Button *AddToolbarButton(UI::HorizontalBox *toolbar, const String &text, f32 width)
+            {
+                auto *button = toolbar->AddChild<UI::Button>(text);
+                button->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFixed)
+                        .Size({width, 26.0f})
+                        .Margin({4.0f, 4.0f, 0.0f, 4.0f});
+                return button;
+            }
+
+            void ResizeWidgetRoot(const Ref<UI::Widget> &widget, Vector2f position, Vector2f size)
+            {
+                if (!widget || !widget->Root())
+                    return;
+                widget->SetPosition(position);
+                widget->SetSize(size);
+                widget->Root()->Arrange(0.0f, 0.0f, size.x, size.y);
+            }
+        }
+
         RenderView *render_view;
         void EditorLayer::OnAttach()
         {
@@ -815,7 +1097,7 @@ namespace Ailu
 
             _main_widget = MakeRef<UI::Widget>();
 
-            auto p = Application::ResolveProjectPath(L"Editor/Res/UI/main_widget.json");
+            auto p = ResourceMgr::GetResSysPath(EAssetDomain::kEditor,L"UI/main_widget.json");
             JsonArchive ar;
             ar.Load(p);
             ar >> *_main_widget;
@@ -837,14 +1119,26 @@ namespace Ailu
                     FindFirstText(_main_widget.get());
                 }
             };
+
+            BuildEditorChrome();
         }
 
         void EditorLayer::OnDetach()
         {
+            if (_toolbar_widget)
+                UI::UIManager::Get()->UnRegisterWidget(_toolbar_widget.get());
+            if (_status_bar_widget)
+                UI::UIManager::Get()->UnRegisterWidget(_status_bar_widget.get());
+            _toolbar_widget.reset();
+            _status_bar_widget.reset();
+            _status_bar_border = nullptr;
+            _was_playing = false;
+            _status_left_text = nullptr;
+            _status_right_text = nullptr;
             DockManager::Shutdown();
             JsonArchive ar;
             ar << *_main_widget;
-            auto p = Application::ResolveProjectPath(L"Editor/Res/UI/main_widget.json");
+            auto p = ResourceMgr::GetResSysPath(EAssetDomain::kEditor,L"UI/main_widget.json");
             LOG_INFO(L"Save widget to ", p);
             ar.Save(p);
         }
@@ -963,6 +1257,7 @@ namespace Ailu
         std::once_flag flag;
         void EditorLayer::OnUpdate(f32 dt)
         {
+            UpdateEditorChrome(dt);
             DockManager::Get().Update(dt);
             //Gizmo::DrawLine(Vector2f::kZero, Vector2f{200, 200}, Colors::kRed);
             //LOG_INFO("--------------------------------------");
@@ -1027,14 +1322,179 @@ namespace Ailu
             //            }
         }
 
+        void EditorLayer::BuildEditorChrome()
+        {
+            _toolbar_widget = MakeRef<UI::Widget>();
+            _toolbar_widget->Name("EditorToolbar");
+            auto toolbar_border = MakeRef<UI::Border>();
+            toolbar_border->_bg_color = Color(0.18f, 0.19f, 0.21f, 1.0f);
+            toolbar_border->_border_color = Color(0.34f, 0.36f, 0.40f, 1.0f);
+            toolbar_border->Thickness({0.0f, 0.0f, 0.0f, 1.0f});
+            auto *toolbar = toolbar_border->AddChild<UI::HorizontalBox>();
+            toolbar->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
+
+            auto *open_scene = AddToolbarButton(toolbar, "Open Scene", 96.0f);
+            open_scene->OnMouseClick() += [this](UI::UIEvent &e)
+            {
+                _editor_status_message = "Open Scene is not wired yet";
+                LOG_INFO("EditorToolbar: Open Scene clicked");
+                e._is_handled = true;
+            };
+
+            auto *save_scene = AddToolbarButton(toolbar, "Save Scene", 92.0f);
+            save_scene->OnMouseClick() += [this](UI::UIEvent &e)
+            {
+                SaveAllAssets();
+                e._is_handled = true;
+            };
+
+            auto *play = AddToolbarButton(toolbar, "Play", 58.0f);
+            play->OnMouseClick() += [this](UI::UIEvent &e)
+            {
+                if (!Application::Get()._is_playing_mode)
+                {
+                    SceneMgr::Get().EnterPlayMode();
+                    _editor_status_message = "Play mode";
+                    LOG_INFO("EditorToolbar: enter play mode");
+                }
+                e._is_handled = true;
+            };
+
+            auto *pause = AddToolbarButton(toolbar, "Pause", 64.0f);
+            pause->OnMouseClick() += [this](UI::UIEvent &e)
+            {
+                _editor_status_message = "Pause is not wired yet";
+                LOG_INFO("EditorToolbar: Pause clicked");
+                e._is_handled = true;
+            };
+
+            auto *stop = AddToolbarButton(toolbar, "Stop", 58.0f);
+            stop->OnMouseClick() += [this](UI::UIEvent &e)
+            {
+                if (Application::Get()._is_playing_mode)
+                {
+                    SceneMgr::Get().ExitPlayMode();
+                    _editor_status_message = "Edit mode";
+                    LOG_INFO("EditorToolbar: exit play mode");
+                }
+                e._is_handled = true;
+            };
+
+            auto *spacer = toolbar->AddChild<UI::Text>("");
+            spacer->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
+
+            auto *title = toolbar->AddChild<UI::Text>("AiluEngine");
+            title->_color = Colors::kGray;
+            title->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kAuto, UI::ESizePolicy::kFill)
+                    .Margin({0.0f, 0.0f, 10.0f, 0.0f});
+            _toolbar_widget->AddToWidget(toolbar_border);
+            UI::UIManager::Get()->RegisterWidget(_toolbar_widget);
+
+            _status_bar_widget = MakeRef<UI::Widget>();
+            _status_bar_widget->Name("EditorStatusBar");
+            _status_bar_widget->_is_receive_event = false;
+            auto status_border = MakeRef<UI::Border>();
+            status_border->_bg_color = Color(0.16f, 0.17f, 0.18f, 1.0f);
+            status_border->_border_color = Color(0.34f, 0.36f, 0.40f, 1.0f);
+            status_border->Thickness({0.0f, 1.0f, 0.0f, 0.0f});
+            auto *status = status_border->AddChild<UI::HorizontalBox>();
+            status->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
+
+            _status_left_text = status->AddChild<UI::Text>("Ready");
+            _status_left_text->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill)
+                    .Margin({8.0f, 0.0f, 0.0f, 0.0f});
+            _status_left_text->_color = Colors::kGray;
+
+            _status_right_text = status->AddChild<UI::Text>("");
+            _status_right_text->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kAuto, UI::ESizePolicy::kFill)
+                    .Margin({0.0f, 0.0f, 8.0f, 0.0f});
+            _status_right_text->_color = Colors::kGray;
+
+            _status_bar_border = status_border.get();
+            _status_bar_widget->AddToWidget(status_border);
+            UI::UIManager::Get()->RegisterWidget(_status_bar_widget);
+            UpdateEditorChrome(0.0f);
+        }
+
+        void EditorLayer::UpdateEditorChrome(f32 dt)
+        {
+            (void) dt;
+            auto &window = Application::Get().GetWindow();
+            const Vector2f window_size{(f32) window.GetWidth(), (f32) window.GetHeight()};
+            const f32 dock_height = std::max(0.0f, window_size.y - kEditorToolbarHeight - kEditorStatusBarHeight);
+            ResizeWidgetRoot(_toolbar_widget, Vector2f::kZero, {window_size.x, kEditorToolbarHeight});
+            ResizeWidgetRoot(_status_bar_widget, {0.0f, kEditorToolbarHeight + dock_height}, {window_size.x, kEditorStatusBarHeight});
+            DockManager::Get().SetMainDockArea({0.0f, kEditorToolbarHeight}, {window_size.x, dock_height});
+
+            auto *scene = SceneMgr::Get().ActiveScene();
+            const String scene_name = scene ? scene->Name() : String("No Scene");
+            String selection_name = "No Selection";
+            if (scene && _selected_entity != ECS::kInvalidEntity && scene->IsValidEntity(_selected_entity))
+            {
+                auto &r = scene->GetRegister();
+                if (auto *tag = r.GetComponent<ECS::TagComponent>(_selected_entity); tag != nullptr && !tag->_name.empty())
+                    selection_name = tag->_name;
+                else
+                    selection_name = "Entity";
+            }
+
+            // Update status bar background color based on play mode (VS Code-style)
+            const bool is_playing = Application::Get()._is_playing_mode;
+            if (_status_bar_border && _was_playing != is_playing)
+            {
+                _was_playing = is_playing;
+                if (is_playing)
+                    _status_bar_border->_bg_color = Color(0.85f, 0.45f, 0.10f, 1.0f);
+                else
+                    _status_bar_border->_bg_color = Color(0.16f, 0.17f, 0.18f, 1.0f);
+                _status_bar_border->InvalidateStyle();
+            }
+
+            if (_status_left_text)
+            {
+                _status_left_text->SetText(std::format("{} | Scene: {} | Selection: {}",
+                                                       _editor_status_message,
+                                                       scene_name,
+                                                       selection_name),
+                                           false);
+            }
+            if (_status_right_text)
+            {
+                _status_right_text->SetText(std::format("FPS: {:.1f} | Frame: {:.2f} ms",
+                                                        RenderingStates::GetFrameRate(),
+                                                        RenderingStates::GetFrameTime()),
+                                            false);
+            }
+
+            auto *ui_mgr = UI::UIManager::Get();
+            if (_toolbar_widget)
+                ui_mgr->BringToFrontSilently(_toolbar_widget.get());
+            if (_status_bar_widget)
+                ui_mgr->BringToFrontSilently(_status_bar_widget.get());
+        }
+
+        void EditorLayer::SaveAllAssets()
+        {
+            _editor_status_message = "Save assets queued";
+            LOG_INFO("EditorToolbar: Save Scene clicked, saving assets...");
+            Core::ThreadPool::Get().Enqueue([]()
+            {
+                for (auto it = ResourceMgr::Get().Begin(); it != ResourceMgr::Get().End(); it++)
+                {
+                    ResourceMgr::Get().SaveAsset(it->second.get());
+                }
+            });
+        }
+
         static bool show = false;
         static bool s_show_plot_demo = false;
         static bool s_show_asset_table = false;
         static bool s_show_rt = false;
         static bool s_show_renderview = true;
-        static bool s_show_threadpool_view = false;
-        static bool s_show_imguinode = false;
-        static bool s_show_ui_reflector = false;
+            static bool s_show_threadpool_view = false;
+            static bool s_show_imguinode = false;
+            static bool s_show_ui_reflector = false;
+            static bool s_show_style_theme_editor = false;
 
         static void ShowThreadPoolView(bool *is_show)
         {
@@ -1118,7 +1578,7 @@ namespace Ailu
                     {
                         for (auto &prop: cur_type->GetProperties())
                         {
-                            DrawMemberProperty(prop, *feature);
+                            DrawMemberProperty(prop, feature);
                         }
                     }
                 }
@@ -1199,6 +1659,7 @@ namespace Ailu
             ImGui::Checkbox("ShowThreadPoolView", &s_show_threadpool_view);
             ImGui::Checkbox("ShowNode", &s_show_imguinode);
             ImGui::Checkbox("ShowUIReflector", &s_show_ui_reflector);
+            ImGui::Checkbox("ShowStyleThemeEditor", &s_show_style_theme_editor);
             ImGui::Checkbox("Raytracing Pipeline", &s_raytracing_pipeline);
             RenderPipeline::Get().GetRenderer()->_is_use_raytracing = s_raytracing_pipeline;
             if (ImGui::Button("Capture RDG"))
@@ -1381,7 +1842,7 @@ namespace Ailu
             }
             if (ImGui::Button("Tracy Profiler"))
             {
-                auto tarcy_path = Application::ResolveProjectPath(L"Tools/Tracy/tracy-profiler.exe");
+                auto tarcy_path = Application::GetAiluRoot() + L"Tools/Tracy/tracy-profiler.exe";
                 ProcessStartInfo psi(tarcy_path);
                 auto p = ProcessFactory::Create();
                 if (p)
@@ -1413,6 +1874,8 @@ namespace Ailu
                 ShowUIReflectorWindow(&s_show_ui_reflector);
             if (!s_show_ui_reflector)
                 UI::UIManager::Get()->SetDebugHighlightTarget(nullptr);
+            if (s_show_style_theme_editor)
+                ShowStyleThemeEditorWindow(&s_show_style_theme_editor);
             s_prifile_wd->Show();
         }
 

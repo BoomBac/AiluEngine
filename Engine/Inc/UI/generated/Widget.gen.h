@@ -26,7 +26,8 @@ AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::UI::Widget>();
                                 friend Type* Z_Construct_SlotItemData_Type();\
                                 static Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};
+                                static Type *StaticType() {return GetPrivateStaticClass();};\
+                                AILU_API Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu::UI{
 struct SlotItemData ;

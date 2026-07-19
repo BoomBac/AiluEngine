@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __DOCKWINDOW_GEN_H__
 //Class DockWindow begin...........................
-#define DOCKWINDOW_GEN_H_59_GENERATED_BODY \
+#define DOCKWINDOW_GEN_H_60_GENERATED_BODY \
                             private: \
                                 friend Type* Z_Construct_DockWindow_Type();\
                                 static Type* GetPrivateStaticClass();\

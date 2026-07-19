@@ -21,7 +21,7 @@ namespace Ailu
         {
             GENERATED_BODY()
             APROPERTY()
-            Slot _slot;
+            Ref<UISlot> _slot;
             APROPERTY()
             String _element_id;
             APROPERTY()

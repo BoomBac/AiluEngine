@@ -12,7 +12,7 @@ namespace Ailu
         VolumetricFogPass::VolumetricFogPass()
         {
             _event = ERenderPassEvent::kAfterDeferedLighting;
-            _debug_material = MakeRef<Material>(ResourceMgr::Get().Load<Shader>(L"Shaders/voxel_drawer.alasset").get(), "VolumeRayDebugLineMat");
+            _debug_material = MakeRef<Material>(ResourceMgr::Get().Load<Shader>(L"Shaders/hlsl/voxel_drawer.alasset").get(), "VolumeRayDebugLineMat");
             _debug_material->SetVector("_GridNum", Vector4Int(8,8,8,0));
         }
         VolumetricFogPass::~VolumetricFogPass()
@@ -154,8 +154,8 @@ namespace Ailu
             _volumetric_light_b->Name("VolumetricLightTextureB");
             _volumetric_light_b->Apply();
             _volumetric_light_b->CreateView();
-            _volumetric_fog_cs = ResourceMgr::Get().Load<ComputeShader>(L"Shaders/volumetric_light.alasset");
-            _max_z_cs = ResourceMgr::Get().Load<ComputeShader>(L"Shaders/max_z.alasset");
+            _volumetric_fog_cs = ResourceMgr::Get().Load<ComputeShader>(L"Shaders/hlsl/Compute/volumetric_light.alasset");
+            _max_z_cs = ResourceMgr::Get().Load<ComputeShader>(L"Shaders/hlsl/Compute/max_z.alasset");
             _accum_texture = Texture3D::Create(desc);
             _accum_texture->Name("VolumetricFogAccumTexture");
             _accum_texture->Apply();

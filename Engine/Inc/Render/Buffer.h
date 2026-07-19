@@ -197,7 +197,7 @@ namespace Ailu
                 bool _is_dynamic;
             };
             Vector<StreamData> _stream_data;
-            std::map<String, u8> _buffer_layout_indexer;
+            std::map<std::pair<String, u8>, u8> _buffer_layout_indexer;
             Vector<i32> _bindless_srv_indices;
         };
 

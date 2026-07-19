@@ -12,6 +12,7 @@
 
 #include "Objects/JsonArchive.h"
 #include "Objects/Serialize.h"
+#include "Project/ProjectManager.h"
 #include "Render/GraphicsPipelineStateObject.h"
 
 using namespace Ailu::Render;
@@ -22,14 +23,6 @@ namespace Ailu
     namespace
     {
         ResourceMgr *g_pResourceMgr = nullptr;
-
-        WString NormalizeDirectoryPath(const WString &path)
-        {
-            WString normalized = PathUtils::FormatFilePath(path);
-            if (!normalized.empty() && normalized.back() != L'/')
-                normalized.push_back(L'/');
-            return normalized;
-        }
 
         std::optional<EMeshLoader> ResolveMeshLoader(const WString &path)
         {
@@ -206,7 +199,7 @@ namespace Ailu
                 return external_asset_path;
             return PathUtils::GetFileName(external_asset_path, true);
         }
-    }
+    }// namespace
 
     void ResourceMgr::Init()
     {
@@ -219,32 +212,74 @@ namespace Ailu
         DESTORY_PTR(g_pResourceMgr);
     }
 
-    ResourceMgr& ResourceMgr::Get()
+    ResourceMgr &ResourceMgr::Get()
     {
         return *g_pResourceMgr;
     }
 
-    String ResourceMgr::GetResSysPath(const String &sub_path)
+    WString ResourceMgr::GetResSysPath(const WString &p)
     {
-        String path = sub_path;
-        if (PathUtils::IsSystemPath(path))
-            return sub_path;
-        if (sub_path.starts_with("/"))
-            path = path.substr(1);
-        else if (sub_path.starts_with("\\"))
-            path = path.substr(2);
-        return ToChar(s_engine_res_root_pathw) + path;
+        // 1. System path (e.g., C:/...) → format and return as-is
+        if (PathUtils::IsSystemPath(p))
+            return PathUtils::FormatFilePath(p);
+
+        WString path = p;
+        WString base_path;
+
+        // 2. Check for known scheme prefixes, resolve to the corresponding root
+        //     Order must match kPathScheme: { engine://, editor://, project:// }
+        const WString *const kSchemeRoots[] = {
+            &s_engine_res_root_path,
+            &s_editor_res_root_path,
+            &s_project_root_path,
+        };
+
+        bool found_scheme = false;
+        for (size_t i = 0; i < kPathScheme.size(); ++i)
+        {
+            if (path.starts_with(kPathScheme[i]))
+            {
+                base_path = *kSchemeRoots[i];
+                path = path.substr(kPathScheme[i].length());
+                found_scheme = true;
+                break;
+            }
+        }
+
+        if (!found_scheme)
+        {
+            // 3. Plain relative path — default to engine res root (backward compatible)
+            base_path = s_engine_res_root_path;
+        }
+
+        // Strip leading slashes/backslashes from the path portion
+        while (!path.empty() && (path.front() == L'/' || path.front() == L'\\'))
+            path.erase(path.begin());
+
+        return base_path + path;
     }
-    WString ResourceMgr::GetResSysPath(const WString &sub_path)
+
+    WString ResourceMgr::GetResSysPath(EAssetDomain domain, const WString &relative_path)
     {
-        WString path = sub_path;
-        if (PathUtils::IsSystemPath(path))
-            return sub_path;
-        if (sub_path.starts_with(L"/"))
-            path = path.substr(1);
-        else if (sub_path.starts_with(L"\\"))
-            path = path.substr(2);
-        return s_engine_res_root_pathw + path;
+        if (domain == EAssetDomain::kRuntime)
+        {
+            LOG_ERROR("GetResSysPath: kRuntime domain has no scheme mapping");
+            return relative_path;
+        }
+        return GetResSysPath(kPathScheme[static_cast<int>(domain)] + relative_path);
+    }
+
+    void ResourceMgr::ConfigProject(Project *proj)
+    {
+        if (!proj)
+        {
+            LOG_ERROR("ResourceMgr::ConfigProject: proj is null");
+            return;
+        }
+        s_project_root_path = proj->RootDirectory();
+        s_project_asset_root_path = proj->AssetDirectory();
+        s_project_library_root_path = proj->LibraryDirectory();
+        s_project_asset_database_path = proj->LibraryDirectory() + L"/AssetDatabase.json";
     }
 
     WString ResourceMgr::GetAssetTypeName(const Type *type)
@@ -280,8 +315,8 @@ namespace Ailu
     int ResourceMgr::Initialize()
     {
         TimerBlock b("-----------------------------------------------------------ResourceMgr::Initialize");
-        AL_ASSERT(!s_engine_res_root_pathw.empty());
-        FileManager::SetCurPath(s_engine_res_root_pathw);
+        AL_ASSERT(!s_engine_res_root_path.empty());
+        FileManager::SetCurPath(s_engine_res_root_path);
         _lut_global_resources_by_type[Material::StaticType()] = {};
         _lut_global_resources_by_type[Texture2D::StaticType()] = {};
         _lut_global_resources_by_type[Texture3D::StaticType()] = {};
@@ -291,26 +326,49 @@ namespace Ailu
         _lut_global_resources_by_type[ComputeShader::StaticType()] = {};
         _lut_global_resources_by_type[Scene::StaticType()] = {};
         _lut_global_resources_by_type[AnimationClip::StaticType()] = {};
-        _project_root_path = s_project_root_pathw;
-        LoadAssetDB();
+        _asset_domains.emplace_back(AssetMountDesc{
+            EAssetDomain::kEngine,
+            kPathScheme[0],
+            s_engine_res_root_path,
+            s_engine_res_root_path + L"assetdb.alasset",
+            true
+        });
+        _asset_domains.emplace_back(AssetMountDesc{
+            EAssetDomain::kEditor,
+            kPathScheme[1],
+            s_editor_res_root_path,
+            s_editor_res_root_path + L"assetdb.alasset",
+            true
+        });
+        _asset_domains.emplace_back(AssetMountDesc{
+            EAssetDomain::kProject,
+            kPathScheme[2],
+            s_project_asset_root_path,
+            s_project_asset_database_path,
+            true
+        });
+        LoadAssetDB(_asset_domains[0]);
+        LoadAssetDB(_asset_domains[1]);
+        LoadAssetDB(_asset_domains[2]);
+        
         Vector<WString> shader_asset_pathes = {
-                L"Shaders/deferred_lighting.alasset",
-                L"Shaders/wireframe.alasset",
-                L"Shaders/gizmo.alasset",
-                L"Shaders/cubemap_gen.alasset",
-                L"Shaders/filter_irradiance.alasset",
-                L"Shaders/blit.alasset",
-                L"Shaders/skybox.alasset",
-                L"Shaders/bloom.alasset",
-                L"Shaders/forwardlit.alasset",
-                L"Shaders/default_ui.alasset",
-                L"Shaders/default_text.alasset",
-                L"Shaders/voxel_drawer.alasset",
-                L"Shaders/texture3d_drawer.alasset",
-                L"Shaders/standard_volume.alasset",
-                L"Shaders/motion_vector.alasset",
-                L"Shaders/terrain.alasset",
-                L"Shaders/water.alasset"};
+                L"Shaders/hlsl/deferred_lighting.alasset",
+                L"Shaders/hlsl/wireframe.alasset",
+                L"Shaders/hlsl/gizmo.alasset",
+                L"Shaders/hlsl/cubemap_gen.alasset",
+                L"Shaders/hlsl/filter_irradiance.alasset",
+                L"Shaders/hlsl/blit.alasset",
+                L"Shaders/hlsl/skybox.alasset",
+                L"Shaders/hlsl/PostProcess/bloom.alasset",
+                L"Shaders/hlsl/forwardlit.alasset",
+                L"Shaders/hlsl/default_ui.alasset",
+                L"Shaders/hlsl/default_text.alasset",
+                L"Shaders/hlsl/voxel_drawer.alasset",
+                L"Shaders/hlsl/texture3d_drawer.alasset",
+                L"Shaders/hlsl/standard_volume.alasset",
+                L"Shaders/hlsl/motion_vector.alasset",
+                L"Shaders/hlsl/terrain.alasset",
+                L"Shaders/hlsl/water.alasset"};
         Vector<WString> shader_pathes = {
                 L"Shaders/hlsl/debug.hlsl",
                 L"Shaders/hlsl/billboard.hlsl",
@@ -325,7 +383,7 @@ namespace Ailu
 
         //        std::atomic<int> shader_load_count = shader_asset_pathes.size() + shader_pathes.size();
         //		{
-        //			Shader::s_p_defered_standart_lit = Load<Shader>(L"Shaders/defered_standard_lit.alasset");
+        //			Shader::s_p_defered_standart_lit = Load<Shader>(L"Shaders/hlsl/defered_standard_lit.alasset");
         //            for (auto &p: shader_asset_pathes)
         //                Core::ThreadPool::Get().Enqueue([&](WString p)
         //                                       { Load<Shader>(p); --shader_load_count ; }, p);
@@ -335,35 +393,34 @@ namespace Ailu
         //                                       { RegisterResource(p, LoadExternalShader(p)); --shader_load_count ; }, p);
         //			//RegisterResource(L"Shaders/hlsl/forwardlit.hlsl",LoadExternalShader(L"Shaders/hlsl/forwardlit.hlsl"));
         //
-        //			Load<ComputeShader>(L"Shaders/cs_mipmap_gen.alasset");
+        //			Load<ComputeShader>(L"Shaders/hlsl/Compute/cs_mipmap_gen.alasset");
         //		}
         JobSystem::Get().Dispatch([](ResourceMgr *mgr)
-                               { Shader::s_p_defered_standart_lit = mgr->Load<Shader>(L"Shaders/defered_standard_lit.alasset"); },
-                               this);
+                                  { Shader::s_p_defered_standart_lit = mgr->Load<Shader>(L"Shaders/hlsl/defered_standard_lit.alasset"); },
+                                  this);
         Vector<WString> compute_shader_pathes = {
-                    L"Shaders/cs_mipmap_gen.alasset",
-                    L"Shaders/voxelize.alasset",
-                    L"Shaders/ssao_cs.alasset",
-                    L"Shaders/taa.alasset",
-                    L"Shaders/hzb.alasset",
+                L"Shaders/hlsl/Compute/cs_mipmap_gen.alasset",
+                L"Shaders/hlsl/Compute/voxelize.alasset",
+                L"Shaders/hlsl/Compute/ssao_cs.alasset",
+                L"Shaders/hlsl/Compute/taa.alasset",
+                L"Shaders/hlsl/Compute/hzb.alasset",
         };
         for (auto &p: shader_asset_pathes)
             JobSystem::Get().Dispatch([&](WString p)
-                                   { Load<Shader>(p); },
-                                   p);
+                                      { Load<Shader>(p); },
+                                      p);
         for (auto &p: shader_pathes)
             JobSystem::Get().Dispatch([&](WString p)
-                                   { RegisterResource(p, LoadExternalShader(p)); },
-                                   p);
+                                      { RegisterResource(p, LoadExternalShader(p)); },
+                                      p);
         for (auto &p: compute_shader_pathes)
-            JobSystem::Get().Dispatch([&](WString p){
-                Load<ComputeShader>(p);
-            },p);
+            JobSystem::Get().Dispatch([&](WString p)
+                                      { Load<ComputeShader>(p); }, p);
         JobSystem::Get().Wait();//防止加载mesh时，shader未加载完成
         {
             u8 *default_data = new u8[4 * 4 * 4];
             memset(default_data, 255, 64);
-            auto default_white = Texture2D::Create(4, 4,ETextureFormat::kRGBA32);
+            auto default_white = Texture2D::Create(4, 4, ETextureFormat::kRGBA32);
             default_white->SetPixelData(default_data, 0);
             default_white->Name("default_white");
             default_white->Apply();
@@ -372,7 +429,7 @@ namespace Ailu
             memset(default_data, 0, 64);
             for (int i = 3; i < 64; i += 4)
                 default_data[i] = 255;
-            auto default_black = Texture2D::Create(4, 4,ETextureFormat::kRGBA32);
+            auto default_black = Texture2D::Create(4, 4, ETextureFormat::kRGBA32);
             default_black->SetPixelData(default_data, 0);
             default_black->Name("default_black");
             default_black->Apply();
@@ -380,7 +437,7 @@ namespace Ailu
             memset(default_data, 128, 64);
             for (int i = 3; i < 64; i += 4)
                 default_data[i] = 255;
-            auto default_gray = Texture2D::Create(4, 4,ETextureFormat::kRGBA32);
+            auto default_gray = Texture2D::Create(4, 4, ETextureFormat::kRGBA32);
             default_gray->SetPixelData(default_data, 0);
             default_gray->Name("default_gray");
             default_gray->Apply();
@@ -391,7 +448,7 @@ namespace Ailu
                 default_data[i] = 128;
                 default_data[i + 1] = 128;
             }
-            auto default_normal = Texture2D::Create(4, 4,ETextureFormat::kRGBA32);
+            auto default_normal = Texture2D::Create(4, 4, ETextureFormat::kRGBA32);
             default_normal->SetPixelData(default_data, 0);
             default_normal->Name("default_normal");
             default_normal->Apply();
@@ -405,15 +462,15 @@ namespace Ailu
             TextureImportSetting setting;
             setting._is_sRGB = false;
             setting._generate_mipmap = false;
-            auto lut1 = LoadExternalTexture(EnginePath::kEngineTexturePathW + L"ltc_1.dds",setting);
-            auto lut2 = LoadExternalTexture(EnginePath::kEngineTexturePathW + L"ltc_2.dds",setting);
+            auto lut1 = LoadExternalTexture(EnginePath::kEngineTexturePathW + L"ltc_1.dds", setting);
+            auto lut2 = LoadExternalTexture(EnginePath::kEngineTexturePathW + L"ltc_2.dds", setting);
             RegisterResource(L"Runtime/ltc_lut1", lut1);
             RegisterResource(L"Runtime/ltc_lut2", lut2);
-            auto noise = LoadExternalTexture(EnginePath::kEngineTexturePathW + L"rgba-noise-medium.png",setting);
+            auto noise = LoadExternalTexture(EnginePath::kEngineTexturePathW + L"rgba-noise-medium.png", setting);
             RegisterResource(L"Textures/noise_medium.png", noise);
             JobSystem::Get().Dispatch([&](ResourceMgr *mgr)
-                                   { mgr->Load<Texture2D>(EnginePath::kEngineTexturePathW + L"blue_noise.alasset",&TextureImportSetting::Default()); },
-                                   this);
+                                      { mgr->Load<Texture2D>(EnginePath::kEngineTexturePathW + L"blue_noise.alasset", &TextureImportSetting::Default()); },
+                                      this);
             JobSystem::Get().Dispatch([this](ResourceMgr *mgr)
                                       { 
                                           auto setting = TextureImportSetting::Default();
@@ -424,17 +481,16 @@ namespace Ailu
                                           setting._is_sRGB = true;
                                           setting._generate_mipmap = true;
                                           terrain_map = LoadExternalTexture(EnginePath::kEngineTexturePathW + L"terrain_color.png", setting); 
-                                          RegisterResource(L"Textures/TerrainDiffuse", terrain_map);
-                                      },this);
+                                          RegisterResource(L"Textures/TerrainDiffuse", terrain_map); }, this);
         }
-        WString mesh_path_cube = L"Meshs/cube.alasset";
-        WString mesh_path_sphere = L"Meshs/sphere.alasset";
-        WString mesh_path_plane = L"Meshs/plane.alasset";
-        WString mesh_path_monkey = L"Meshs/monkey.alasset";
-        WString mesh_path_capsule = L"Meshs/capsule.alasset";
-        WString mesh_path_cone = L"Meshs/cone.alasset";
-        WString mesh_path_cylinder = L"Meshs/cylinder.alasset";
-        WString mesh_path_torus = L"Meshs/torus.alasset";
+        WString mesh_path_cube = L"Meshs/src_res/cube.alasset";
+        WString mesh_path_sphere = L"Meshs/src_res/sphere.alasset";
+        WString mesh_path_plane = L"Meshs/src_res/plane.alasset";
+        WString mesh_path_monkey = L"Meshs/src_res/monkey.alasset";
+        WString mesh_path_capsule = L"Meshs/src_res/capsule.alasset";
+        WString mesh_path_cone = L"Meshs/src_res/cone.alasset";
+        WString mesh_path_cylinder = L"Meshs/src_res/cylinder.alasset";
+        WString mesh_path_torus = L"Meshs/src_res/torus.alasset";
 
         //		Load<Mesh>(mesh_path_cube);
         //        Load<Mesh>(mesh_path_sphere);
@@ -447,35 +503,35 @@ namespace Ailu
         //		Mesh::s_p_capsule = std::static_pointer_cast<Mesh>(_global_resources[mesh_path_capsule]);
 
         JobSystem::Get().Dispatch([&](ResourceMgr *mgr)
-                               {mgr->Load<Mesh>(mesh_path_cube);Mesh::s_cube = std::static_pointer_cast<Mesh>(_global_resources[mesh_path_cube]); },
-                               this);
+                                  {mgr->Load<Mesh>(mesh_path_cube);Mesh::s_cube = std::static_pointer_cast<Mesh>(_global_resources[mesh_path_cube]); },
+                                  this);
         JobSystem::Get().Dispatch([&](ResourceMgr *mgr)
                                   {mgr->Load<Mesh>(mesh_path_sphere);Mesh::s_sphere = std::static_pointer_cast<Mesh>(_global_resources[mesh_path_sphere]); },
-                               this);
+                                  this);
         JobSystem::Get().Dispatch([&](ResourceMgr *mgr)
-                               {mgr->Load<Mesh>(mesh_path_plane);Mesh::s_plane = std::static_pointer_cast<Mesh>(_global_resources[mesh_path_plane]); },
-                               this);
+                                  {mgr->Load<Mesh>(mesh_path_plane);Mesh::s_plane = std::static_pointer_cast<Mesh>(_global_resources[mesh_path_plane]); },
+                                  this);
         JobSystem::Get().Dispatch([&](ResourceMgr *mgr)
-                               {mgr->Load<Mesh>(mesh_path_capsule);Mesh::s_capsule = std::static_pointer_cast<Mesh>(_global_resources[mesh_path_capsule]); },
-                               this);
+                                  {mgr->Load<Mesh>(mesh_path_capsule);Mesh::s_capsule = std::static_pointer_cast<Mesh>(_global_resources[mesh_path_capsule]); },
+                                  this);
         JobSystem::Get().Dispatch([&](ResourceMgr *mgr)
-                               {mgr->Load<Mesh>(mesh_path_monkey);Mesh::s_monkey = std::static_pointer_cast<Mesh>(_global_resources[mesh_path_monkey]); },
-                               this);
+                                  {mgr->Load<Mesh>(mesh_path_monkey);Mesh::s_monkey = std::static_pointer_cast<Mesh>(_global_resources[mesh_path_monkey]); },
+                                  this);
         JobSystem::Get().Dispatch([&](ResourceMgr *mgr)
-                               {mgr->Load<Mesh>(mesh_path_cone);Mesh::s_cone = std::static_pointer_cast<Mesh>(_global_resources[mesh_path_cone]); },
-                               this);
+                                  {mgr->Load<Mesh>(mesh_path_cone);Mesh::s_cone = std::static_pointer_cast<Mesh>(_global_resources[mesh_path_cone]); },
+                                  this);
         JobSystem::Get().Dispatch([&](ResourceMgr *mgr)
-                               {mgr->Load<Mesh>(mesh_path_cylinder);Mesh::s_cylinder = std::static_pointer_cast<Mesh>(_global_resources[mesh_path_cylinder]); },
-                               this);
+                                  {mgr->Load<Mesh>(mesh_path_cylinder);Mesh::s_cylinder = std::static_pointer_cast<Mesh>(_global_resources[mesh_path_cylinder]); },
+                                  this);
         JobSystem::Get().Dispatch([&](ResourceMgr *mgr)
-                               {mgr->Load<Mesh>(mesh_path_torus);Mesh::s_torus = std::static_pointer_cast<Mesh>(_global_resources[mesh_path_torus]); },
-                               this);
+                                  {mgr->Load<Mesh>(mesh_path_torus);Mesh::s_torus = std::static_pointer_cast<Mesh>(_global_resources[mesh_path_torus]); },
+                                  this);
         JobSystem::Get().Dispatch([&](ResourceMgr *mgr)
-                        {mgr->Load<Mesh>(L"Meshs/terrain_plane.alasset");},
-                        this);
+                                  { mgr->Load<Mesh>(L"Meshs/src_res/terrain_plane.alasset"); },
+                                  this);
 
         auto FullScreenQuad = MakeRef<Mesh>("FullScreenQuad");
-        Vector<u32>  indices = {0, 1, 2, 1, 3, 2};
+        Vector<u32> indices = {0, 1, 2, 1, 3, 2};
         FullScreenQuad->SetVertices({{-1.0f, 1.0f, 0.0f},
                                      {1.0f, 1.0f, 0.0f},
                                      {-1.0f, -1.0f, 0.0f},
@@ -501,16 +557,16 @@ namespace Ailu
             {
                 RegisterResource(mat_path, MakeRef<Material>(Get<Shader>(shader_path), mat_name));
             };
-            mat_creator(L"Shaders/wireframe.alasset", L"Runtime/Material/Wireframe", "Wireframe");
-            mat_creator(L"Shaders/skybox.alasset", L"Runtime/Material/Skybox", "Skybox");
-            mat_creator(L"Shaders/cubemap_gen.alasset", L"Runtime/Material/CubemapGen", "CubemapGen");
-            mat_creator(L"Shaders/filter_irradiance.alasset", L"Runtime/Material/EnvmapFilter", "EnvmapFilter");
-            mat_creator(L"Shaders/blit.alasset", L"Runtime/Material/Blit", "Blit");
-            mat_creator(L"Shaders/gizmo.alasset", L"Runtime/Material/Gizmo", "GizmoDrawer");
-            mat_creator(L"Shaders/forwardlit.alasset", L"Runtime/Material/ForwardLit", "ForwardLit");
-            mat_creator(L"Shaders/texture3d_drawer.alasset", L"Runtime/Material/Texture3dDrawer", "Texture3dDrawer");
+            mat_creator(L"Shaders/hlsl/wireframe.alasset", L"Runtime/Material/Wireframe", "Wireframe");
+            mat_creator(L"Shaders/hlsl/skybox.alasset", L"Runtime/Material/Skybox", "Skybox");
+            mat_creator(L"Shaders/hlsl/cubemap_gen.alasset", L"Runtime/Material/CubemapGen", "CubemapGen");
+            mat_creator(L"Shaders/hlsl/filter_irradiance.alasset", L"Runtime/Material/EnvmapFilter", "EnvmapFilter");
+            mat_creator(L"Shaders/hlsl/blit.alasset", L"Runtime/Material/Blit", "Blit");
+            mat_creator(L"Shaders/hlsl/gizmo.alasset", L"Runtime/Material/Gizmo", "GizmoDrawer");
+            mat_creator(L"Shaders/hlsl/forwardlit.alasset", L"Runtime/Material/ForwardLit", "ForwardLit");
+            mat_creator(L"Shaders/hlsl/texture3d_drawer.alasset", L"Runtime/Material/Texture3dDrawer", "Texture3dDrawer");
             Material::s_standard_forward_lit = GetRef<Material>(L"Runtime/Material/ForwardLit");
-            Material::s_standard_forward_lit.lock()->SetVector("_AlbedoValue",Colors::kWhite);
+            Material::s_standard_forward_lit.lock()->SetVector("_AlbedoValue", Colors::kWhite);
         }
         //_default_font = Font::Create(GetResSysPath(L"Fonts/Open_Sans/open_sans_regular_65.fnt"));
         _default_font = Font::Create(GetResSysPath(L"Fonts/msdf/Open_Sans/atlas.png"), GetResSysPath(L"Fonts/msdf/Open_Sans/atlas.json"));
@@ -522,12 +578,6 @@ namespace Ailu
             p._texture = LoadExternalTexture(p._file, setting);
             RegisterResource(PathUtils::ExtractAssetPath(p._file), p._texture);
         }
-        //Core::ThreadPool::Get().Enqueue("ResourceMgr::WatchDirectory", &ResourceMgr::WatchDirectory, this);
-        //        std::ifstream is(GetResSysPath(L"AnimClips/a.clip"));
-        //        TextIArchive ar(&is);
-        //        auto clip = MakeRef<AnimationClip>();
-        //        clip->Deserialize(ar);
-        //        AnimationClipLibrary::AddClip("load_test", clip);
         return 0;
     }
 
@@ -539,30 +589,7 @@ namespace Ailu
             if (asset->_asset_type == Scene::StaticType() || asset->_asset_type == Material::StaticType())
                 SaveAsset(asset.get());
         }
-        SaveAssetDB();
-        //for (auto it = AnimationClipLibrary::Begin(); it != AnimationClipLibrary::End(); it++)
-        //{
-        //    AnimationClip *clip = it->second.get();
-        //    using namespace std;
-        //    std::ostringstream ss;
-        //    TextOArchive ar(&ss);
-        //    try
-        //    {
-        //        clip->Serialize(ar);
-        //    }
-        //    catch (const std::exception &)
-        //    {
-        //        LOG_ERROR("Serialize failed when save scene: {}!", clip->Name());
-        //        return;
-        //    }
-        //    WString sys_path = ResourceMgr::GetResSysPath(std::format(L"AnimClips/a.clip"));
-        //    if (!FileManager::WriteFile(sys_path, true, ss.str()))
-        //    {
-        //        LOG_ERROR(L"Save scene failed to {}", sys_path);
-        //        return;
-        //    }
-        //    LOG_INFO(L"Save scene to {}", sys_path);
-        //}
+        SaveAssetDB(EAssetDomain::kProject);
     }
 
     void ResourceMgr::Tick(f32 delta_time)
@@ -647,12 +674,12 @@ namespace Ailu
             SaveAsset(s_pending_save_assets.front());
             s_pending_save_assets.pop();
         }
-        SaveAssetDB();
+        SaveAssetDB(EAssetDomain::kProject);
     }
 
     void ResourceMgr::MigrateLegacyAssetDocuments(const WString &root_asset_dir)
     {
-        const fs::path root_path = root_asset_dir.empty() ? fs::path(s_engine_res_root_pathw) : fs::path(ResourceMgr::GetResSysPath(root_asset_dir));
+        const fs::path root_path = root_asset_dir.empty() ? fs::path(s_engine_res_root_path) : fs::path(ResourceMgr::GetResSysPath(root_asset_dir));
         if (!fs::exists(root_path))
         {
             LOG_ERROR(L"MigrateLegacyAssetDocuments: root {} does not exist", root_path.wstring());
@@ -686,7 +713,7 @@ namespace Ailu
                 continue;
             }
 
-            const WString asset_path = PathUtils::FormatFilePath(fs::relative(entry.path(), fs::path(s_engine_res_root_pathw)).wstring());
+            const WString asset_path = PathUtils::FormatFilePath(fs::relative(entry.path(), fs::path(s_engine_res_root_path)).wstring());
             WString asset_name;
             Guid guid;
             const Type *type = nullptr;
@@ -741,27 +768,16 @@ namespace Ailu
     }
 
 
-    void ResourceMgr::ConfigProjectRoot(const WString &project_root)
+    void ResourceMgr::ConfigEditorResRoot(const WString &root)
     {
-        s_project_root_pathw = NormalizeDirectoryPath(project_root);
-        s_engine_res_root_pathw = s_project_root_pathw + L"Engine/Res/";
-        kAssetDatabasePath = ToChar(s_engine_res_root_pathw) + "assetdb.alasset";
+        s_editor_res_root_path = PathUtils::NormalizeDirectoryPath(root);
     }
 
-    void ResourceMgr::ConfigEngineResRoot(const WString &engine_res_root)
+    void ResourceMgr::ConfigEngineResRoot(const WString &root)
     {
-        s_engine_res_root_pathw = NormalizeDirectoryPath(engine_res_root);
-        fs::path res_path(s_engine_res_root_pathw);
-        if (res_path.filename().empty())
-            res_path = res_path.parent_path();
-        s_project_root_pathw = NormalizeDirectoryPath(res_path.parent_path().parent_path().wstring());
-        kAssetDatabasePath = ToChar(s_engine_res_root_pathw) + "assetdb.alasset";
+        s_engine_res_root_path = PathUtils::NormalizeDirectoryPath(root);
     }
 
-    void ResourceMgr::ConfigRootPath(const WString &prex)
-    {
-        ConfigProjectRoot(prex);
-    }
     Ref<Shader> ResourceMgr::LoadExternalShader(const WString &asset_path)
     {
         auto sys_path = ResourceMgr::GetResSysPath(asset_path);
@@ -810,7 +826,7 @@ namespace Ailu
         }
     }
 
-    Scope<Asset> ResourceMgr::LoadShader(const WString &asset_path,const ImportSetting& settings)
+    Scope<Asset> ResourceMgr::LoadShader(const WString &asset_path, const ImportSetting &settings)
     {
         auto sys_path = ResourceMgr::GetResSysPath(asset_path);
         WString data;
@@ -1153,7 +1169,7 @@ namespace Ailu
         return mesh_list;
     }
 
-    Ref<Texture2D> ResourceMgr::LoadExternalTexture(const WString &asset_path,const ImportSetting& settings)
+    Ref<Texture2D> ResourceMgr::LoadExternalTexture(const WString &asset_path, const ImportSetting &settings)
     {
         auto sys_path = ResourceMgr::GetResSysPath(asset_path);
         if (!FileManager::Exist(sys_path))
@@ -1175,14 +1191,16 @@ namespace Ailu
         {
             tex_parser = std::move(TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kDDS));
         }
-        else {};
+        else
+        {
+        };
         AL_ASSERT(tex_parser != nullptr);
         LOG_INFO(L"Start load image file {}...", sys_path);
-        auto tex = tex_parser->Parser(sys_path,dynamic_cast<const TextureImportSetting&>(settings));
+        auto tex = tex_parser->Parser(sys_path, dynamic_cast<const TextureImportSetting &>(settings));
         tex->Apply();
         return tex;
     }
-    bool ResourceMgr::LoadExternalTexture(const WString &asset_path,Ref<Texture2D>& tex,const ImportSetting& settings)
+    bool ResourceMgr::LoadExternalTexture(const WString &asset_path, Ref<Texture2D> &tex, const ImportSetting &settings)
     {
         auto sys_path = ResourceMgr::GetResSysPath(asset_path);
         String ext = fs::path(ToChar(asset_path.c_str())).extension().string();
@@ -1199,19 +1217,21 @@ namespace Ailu
         {
             tex_parser = std::move(TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kDDS));
         }
-        else {};
+        else
+        {
+        };
         AL_ASSERT(tex_parser != nullptr);
         LOG_INFO(L"Start load image file {}...", sys_path);
-        bool ret = tex_parser->Parser(sys_path,tex,dynamic_cast<const TextureImportSetting&>(settings));
+        bool ret = tex_parser->Parser(sys_path, tex, dynamic_cast<const TextureImportSetting &>(settings));
         tex->Apply();
         return ret;
     }
 
-    Scope<Asset> ResourceMgr::LoadTexture(const WString &asset_path,const ImportSetting& settings)
+    Scope<Asset> ResourceMgr::LoadTexture(const WString &asset_path, const ImportSetting &settings)
     {
         auto sys_path = ResourceMgr::GetResSysPath(asset_path);
         WString data;
-        auto setting = dynamic_cast<const TextureImportSetting&>(settings);
+        auto setting = dynamic_cast<const TextureImportSetting &>(settings);
         if (FileManager::ReadFile(sys_path, data))
         {
             if (IsLikelyJsonAssetDocument(data))
@@ -1253,13 +1273,13 @@ namespace Ailu
             setting._is_sRGB = is_srgb;
             if (!IsAssetLoaded(asset_path))
             {
-                auto tex = LoadExternalTexture(resolved_file,setting);
+                auto tex = LoadExternalTexture(resolved_file, setting);
                 auto asset = MakeScope<Asset>();
                 asset->_asset_path = asset_path;
                 asset->_asset_type = Texture2D::StaticType();
                 asset->_external_asset_path = file;
                 asset->_p_obj = tex;
-                _importers[asset_path] = AL_NEW(TextureImportSetting,setting);
+                _importers[asset_path] = AL_NEW(TextureImportSetting, setting);
                 return asset;
             }
             else
@@ -1267,7 +1287,7 @@ namespace Ailu
                 AL_ASSERT(false);
                 auto exist_asset = GetAsset(asset_path);
                 auto tex = exist_asset->AsRef<Texture2D>();
-                LoadExternalTexture(resolved_file,tex,setting);
+                LoadExternalTexture(resolved_file, tex, setting);
                 auto asset = MakeScope<Asset>();
                 asset->_asset_path = asset_path;
                 asset->_asset_type = Texture2D::StaticType();
@@ -1279,7 +1299,7 @@ namespace Ailu
         return nullptr;
     }
 
-    Scope<Asset> ResourceMgr::LoadMaterial(const WString &asset_path,const ImportSetting& settings)
+    Scope<Asset> ResourceMgr::LoadMaterial(const WString &asset_path, const ImportSetting &settings)
     {
         WString sys_path = ResourceMgr::GetResSysPath(asset_path);
         std::ifstream file(sys_path);
@@ -1470,7 +1490,7 @@ namespace Ailu
         return asset;
     }
 
-    Scope<Asset> ResourceMgr::LoadMesh(const WString &asset_path,const ImportSetting& settings)
+    Scope<Asset> ResourceMgr::LoadMesh(const WString &asset_path, const ImportSetting &settings)
     {
         auto sys_path = ResourceMgr::GetResSysPath(asset_path);
         WString data;
@@ -1513,7 +1533,7 @@ namespace Ailu
             setting._is_combine_mesh = c.size() > 6 && c[5].substr(c[5].find_first_of(L":") + 2) == WString(L"true") ? true : false;
             //setting._import_flag |= MeshImportSetting::kImportFlagAnimation;
             auto &&mesh_list = std::move(LoadExternalMesh(resolved_file, setting, clips));
-            AL_ASSERT(mesh_list.size() !=0);
+            AL_ASSERT(mesh_list.size() != 0);
             bool is_sk_mesh = dynamic_cast<SkeletonMesh *>(mesh_list.front().get()) != nullptr;
             auto asset = MakeScope<Asset>();
             asset->_asset_path = asset_path;
@@ -1522,13 +1542,13 @@ namespace Ailu
             asset->_p_obj = mesh_list.front();
             asset->_name = PathUtils::GetFileName(asset_path);
             CreateAndRegisterEmbeddedMaterial(mesh_list.front().get());
-            _importers[asset_path] = AL_NEW(MeshImportSetting,setting);
+            _importers[asset_path] = AL_NEW(MeshImportSetting, setting);
             return asset;
         }
         return nullptr;
     }
 
-    Scope<Asset> ResourceMgr::LoadComputeShader(const WString &asset_path,const ImportSetting& settings)
+    Scope<Asset> ResourceMgr::LoadComputeShader(const WString &asset_path, const ImportSetting &settings)
     {
         auto sys_path = ResourceMgr::GetResSysPath(asset_path);
         WString data;
@@ -1562,7 +1582,7 @@ namespace Ailu
         return nullptr;
     }
 
-    Scope<Asset> ResourceMgr::LoadScene(const WString &asset_path,const ImportSetting& settings)
+    Scope<Asset> ResourceMgr::LoadScene(const WString &asset_path, const ImportSetting &settings)
     {
         WString sys_path = ResourceMgr::GetResSysPath(asset_path);
         WString data;
@@ -1756,7 +1776,7 @@ namespace Ailu
         asset->_p_obj = loaded_scene;
         return asset;
     }
-    Scope<Asset> ResourceMgr::LoadAnimClip(const WString &asset_path,const ImportSetting& settings)
+    Scope<Asset> ResourceMgr::LoadAnimClip(const WString &asset_path, const ImportSetting &settings)
     {
         WString sys_path = ResourceMgr::GetResSysPath(asset_path);
         WString data;
@@ -1992,46 +2012,113 @@ namespace Ailu
         return false;
     }
 
-    void ResourceMgr::LoadAssetDB()
+    void ResourceMgr::LoadAssetDB(const AssetMountDomain& domain)
     {
-        std::wifstream file(kAssetDatabasePath);
-        if (!file.is_open())
+        JsonArchive ar;
+        ar.Load(domain._database_path);
+        if (!ar.IsLoaded())
         {
-            LOG_ERROR("Load asset_db with path: {} failed!", kAssetDatabasePath);
+            LOG_ERROR(L"Load asset_db with path: {} failed!", domain._database_path);
             return;
         }
-        WString line;
-        while (std::getline(file, line))
+
+        // Navigate into the "assets" array
+        ar.BeginObject("assets");
+        FStructedArchive::EStructedDataType type;
+        u32 count = ar.BeginArray(type);
+        for (u32 i = 0; i < count; ++i)
         {
-            std::vector<WString> tokens;
-            std::wistringstream lineStream(line);
-            WString token;
-            while (std::getline(lineStream, token, L','))
-                tokens.push_back(token);
-            String guid = ToChar(tokens[0]);
-            WString asset_path = tokens[1];
-            const Type *asset_type = FindAssetType(tokens[2]);
-            auto asset = MakeScope<Asset>(Guid(guid), asset_type, asset_path);
+            String guid_str, asset_path_str, type_name;
+
+            ar.BeginObject(std::to_string(i));
+
+            ar.BeginObject("guid");
+            ar.ReadString(guid_str);
+            ar.EndObject();
+
+            ar.BeginObject("path");
+            ar.ReadString(asset_path_str);
+            ar.EndObject();
+
+            ar.BeginObject("type");
+            ar.ReadString(type_name);
+            ar.EndObject();
+
+            ar.EndObject(); // end of array item
+
+            // Strip the scheme prefix from the path (e.g. "engine://Materials/..." → "Materials/...")
+            WString asset_path = ToWChar(asset_path_str);
+            if (!domain._scheme.empty() && asset_path.starts_with(domain._scheme))
+                asset_path = asset_path.substr(domain._scheme.length());
+            // Strip any leading slashes
+            while (!asset_path.empty() && (asset_path.front() == L'/' || asset_path.front() == L'\\'))
+                asset_path.erase(asset_path.begin());
+
+            const Type *asset_type = FindAssetType(ToWChar(type_name));
+            auto asset = MakeScope<Asset>(Guid(guid_str), asset_type, asset_path);
             asset->Name(ToChar(PathUtils::GetFileName(asset_path).c_str()));
+            asset->_domain = domain._domain;
             //先占位，不进行资源加载，实际有使用时才加载。
             RegisterAsset(std::move(asset));
         }
-        file.close();
+        ar.EndArray();
+        ar.EndObject();
     }
 
-    void ResourceMgr::SaveAssetDB()
+    void ResourceMgr::SaveAssetDB(EAssetDomain domain)
     {
-        std::wofstream file(kAssetDatabasePath, std::ios::out | std::ios::trunc);
-        u64 db_size = _asset_db.size() - 1, cur_count = 0;
+        // Find the matching AssetMountDomain
+        const AssetMountDomain *mount_domain = nullptr;
+        for (auto &d: _asset_domains)
+        {
+            if (d._domain == domain)
+            {
+                mount_domain = &d;
+                break;
+            }
+        }
+        if (mount_domain == nullptr)
+        {
+            LOG_ERROR("SaveAssetDB: domain {} not found in _asset_domains", (int)domain);
+            return;
+        }
+
+        // Collect assets belonging to this domain
+        Vector<std::pair<Guid, const Asset *>> domain_assets;
         for (auto &[guid, asset]: _asset_db)
         {
-            if (cur_count != db_size)
-                file << ToWChar(guid.ToString()) << "," << asset->_asset_path << "," << GetAssetTypeName(asset->_asset_type) << std::endl;
-            else
-                file << ToWChar(guid.ToString()) << "," << asset->_asset_path << "," << GetAssetTypeName(asset->_asset_type);
-            ++cur_count;
+            if (asset->_domain == domain)
+                domain_assets.emplace_back(guid, asset.get());
         }
-        //_asset_db.clear();
+
+        JsonArchive ar;
+        ar.BeginObject("assets");
+        ar.BeginArray(domain_assets.size(), FStructedArchive::EStructedDataType::kStruct);
+
+        for (size_t i = 0; i < domain_assets.size(); ++i)
+        {
+            auto &[guid, asset] = domain_assets[i];
+
+            ar.BeginObject(std::to_string(i));
+
+            ar.BeginObject("guid");
+            ar.WriteString(guid.ToString());
+            ar.EndObject();
+
+            ar.BeginObject("path");
+            ar.WriteString(ToChar(mount_domain->_scheme + asset->_asset_path));
+            ar.EndObject();
+
+            ar.BeginObject("type");
+            ar.WriteString(asset->_asset_type ? asset->_asset_type->FullName() : String{});
+            ar.EndObject();
+
+            ar.EndObject(); // end of array item
+        }
+
+        ar.EndArray();
+        ar.EndObject();
+        ar.Save(mount_domain->_database_path);
     }
 
     Ref<Material> ResourceMgr::GetEmbeddedMaterial(Mesh *mesh, u16 slot)
@@ -2297,26 +2384,24 @@ namespace Ailu
 
     Ref<void> ResourceMgr::ImportResource(const WString &sys_path, const WString &target_dir, const ImportSetting &setting)
     {
-        return ImportResourceImpl(sys_path, target_dir, & setting);
+        return ImportResourceImpl(sys_path, target_dir, &setting);
     }
     void ResourceMgr::SubmitTaskSync(ResourceTask task)
     {
-        _sync_tasks.push([=](){
-            task();
-        });
+        _sync_tasks.push([=]()
+                         { task(); });
     }
 
-    void ResourceMgr::SubmitTaskSync(ResourceTask task,std::function<void(bool)> callback)
+    void ResourceMgr::SubmitTaskSync(ResourceTask task, std::function<void(bool)> callback)
     {
-        _sync_tasks.push([=](){
-            callback(task());
-        });
+        _sync_tasks.push([=]()
+                         { callback(task()); });
     }
 
-    Ref<void> ResourceMgr::ImportResourceAsync(const WString &sys_path, const WString &target_dir,const ImportSetting &setting, OnResourceTaskCompleted callback)
+    Ref<void> ResourceMgr::ImportResourceAsync(const WString &sys_path, const WString &target_dir, const ImportSetting &setting, OnResourceTaskCompleted callback)
     {
         _async_tasks.push([=]()
-                                  {
+                          {
 			callback(ImportResourceImpl(sys_path,target_dir,&setting));
 			return nullptr; });
         return nullptr;
@@ -2325,7 +2410,7 @@ namespace Ailu
     Ref<void> ResourceMgr::ImportResourceImpl(const WString &sys_path, const WString &target_dir, const ImportSetting *setting)
     {
         const ImportSetting *resolved_setting = setting ? setting : &ImportSetting::Default();
-        fs::path p(sys_path),dir(target_dir);
+        fs::path p(sys_path), dir(target_dir);
         if (!FileManager::Exist(sys_path))
         {
             LOG_ERROR(L"Path {} not exist on the disk!", sys_path);
@@ -2428,12 +2513,14 @@ namespace Ailu
         {
             auto tex_import_setting = dynamic_cast<const TextureImportSetting *>(resolved_setting);
             tex_import_setting = tex_import_setting ? tex_import_setting : &TextureImportSetting::Default();
-            auto tex = LoadExternalTexture(external_asset_path,*tex_import_setting);
+            auto tex = LoadExternalTexture(external_asset_path, *tex_import_setting);
             WString imported_asset_path = created_asset_dir;
             imported_asset_path.append(std::format(L"{}.alasset", ToWChar(tex->Name().c_str())));
             loaded_objects.push(std::make_tuple(imported_asset_path, tex));
         }
-        else {}
+        else
+        {
+        }
         while (!loaded_objects.empty())
         {
             auto &[path, obj] = loaded_objects.front();
@@ -2443,13 +2530,13 @@ namespace Ailu
             {
                 auto mesh_import_setting = dynamic_cast<const MeshImportSetting *>(resolved_setting);
                 mesh_import_setting = mesh_import_setting ? mesh_import_setting : &MeshImportSetting::Default();
-                _importers[new_asset->_asset_path] = AL_NEW(MeshImportSetting,(*mesh_import_setting));
+                _importers[new_asset->_asset_path] = AL_NEW(MeshImportSetting, (*mesh_import_setting));
             }
             else if (obj->GetType() == Texture2D::StaticType() || obj->GetType() == Texture3D::StaticType())
             {
                 auto tex_import_setting = dynamic_cast<const TextureImportSetting *>(resolved_setting);
                 tex_import_setting = tex_import_setting ? tex_import_setting : &TextureImportSetting::Default();
-                _importers[new_asset->_asset_path] = AL_NEW(TextureImportSetting,(*tex_import_setting));
+                _importers[new_asset->_asset_path] = AL_NEW(TextureImportSetting, (*tex_import_setting));
             }
             LOG_INFO(L"Create asset at path {}", path);
             loaded_objects.pop();

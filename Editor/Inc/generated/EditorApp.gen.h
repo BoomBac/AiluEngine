@@ -5,12 +5,13 @@
 #include "Objects/ReflectTemplate.h"
 #define __EDITORAPP_GEN_H__
 //Struct EditorConfig begin...........................
-#define EDITORAPP_GEN_H_17_GENERATED_BODY \
+#define EDITORAPP_GEN_H_18_GENERATED_BODY \
                             private: \
                                 friend Type* Z_Construct_EditorConfig_Type();\
                                 static Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};
+                                static Type *StaticType() {return GetPrivateStaticClass();};\
+                                Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu::Editor{
 struct EditorConfig ;
@@ -20,12 +21,13 @@ class Ailu::Type* Ailu::StaticClass<struct Ailu::Editor::EditorConfig>();
 //Struct EditorConfig end...........................
 
 //Struct TestObj begin...........................
-#define EDITORAPP_GEN_H_45_GENERATED_BODY \
+#define EDITORAPP_GEN_H_46_GENERATED_BODY \
                             private: \
                                 friend Type* Z_Construct_TestObj_Type();\
                                 static Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};
+                                static Type *StaticType() {return GetPrivateStaticClass();};\
+                                Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu::Editor{
 struct TestObj ;

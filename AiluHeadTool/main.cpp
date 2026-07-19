@@ -267,7 +267,10 @@ int main(int argc, char **argv)
         }
         cache_file_hashes[p.string()] = file_hash;
         if (is_rebuild_all)
+        {
             work_files.insert(sys_path);
+            class_ns_update_files.insert(sys_path);
+        }
     }
     ofstream cache_file(cache_dir.string());
     for (auto &p: cache_file_hashes)

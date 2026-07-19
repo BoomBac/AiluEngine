@@ -6,6 +6,7 @@
 #include "generated/DockWindow.gen.h"
 namespace Ailu
 {
+    class JsonArchive;
     class Window;
     namespace UI
     {
@@ -101,6 +102,8 @@ namespace Ailu
             bool ContainsWindow(DockWindow *w) const override { return this == w; }
             DockWindow *PrimaryWindow() const override { return const_cast<DockWindow *>(this); }
             void AttachToWindow(Window *w) override;
+            virtual void SaveDockLayoutState(JsonArchive &ar) {}
+            virtual void LoadDockLayoutState(JsonArchive &ar) {}
             virtual void OnDockLayoutLoaded() {}
         private:
             inline static DockWindow* s_cur_resizing_window = nullptr;

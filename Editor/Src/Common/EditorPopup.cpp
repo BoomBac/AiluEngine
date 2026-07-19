@@ -20,17 +20,12 @@ namespace Ailu
         UI::HorizontalBox *EditorPopup::AddPropertyRow(UI::UIElement *parent, const String &label, UI::HorizontalBox **out_value_box)
         {
             auto row = parent->AddChild<UI::HorizontalBox>();
-            row->AddChild<UI::Text>(label)
-                    ->SlotMargin(kPropLabelMargin)
-                    .SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto)
-                    .SlotFillRate(kPropLabelFill);
+            row->AddChild<UI::Text>(label)->GetSlotAs<UI::LinearSlot>().Margin(kPropLabelMargin)
+                    .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto).FillRate(kPropLabelFill);
 
-            auto value_box = row->AddChild<UI::HorizontalBox>()
-                                     ->SlotMargin(kPropValueMargin)
-                                     .SlotAlignmentH(UI::EAlignment::kRight)
-                                     .SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto)
-                                     .SlotFillRate(kPropValueFill)
-                                     .As<UI::HorizontalBox>();
+            auto value_box = row->AddChild<UI::HorizontalBox>();
+            value_box->GetSlotAs<UI::LinearSlot>().Margin(kPropValueMargin).CrossAlignment(UI::EAlignment::kRight)
+                    .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto).FillRate(kPropValueFill);
 
             if (out_value_box != nullptr)
                 *out_value_box = value_box;
@@ -41,11 +36,9 @@ namespace Ailu
         {
             UI::HorizontalBox *value_box = nullptr;
             AddPropertyRow(parent, label, &value_box);
-            auto checkbox = value_box->AddChild<UI::CheckBox>()
-                                    ->SlotMargin(kPropInnerMargin)
-                                    .SlotAlignmentH(UI::EAlignment::kRight)
-                                    .SlotSizePolicy(UI::ESizePolicy::kAuto, UI::ESizePolicy::kAuto)
-                                    .As<UI::CheckBox>();
+            auto checkbox = value_box->AddChild<UI::CheckBox>();
+            checkbox->GetSlotAs<UI::LinearSlot>().Margin(kPropInnerMargin).CrossAlignment(UI::EAlignment::kRight)
+                    .SizePolicy(UI::ESizePolicy::kAuto, UI::ESizePolicy::kAuto);
             checkbox->SetChecked(initial_state);
             return checkbox;
         }
@@ -61,17 +54,16 @@ namespace Ailu
 
             auto list_view = MakeRef<UI::ListView>();
             list_view->Name("EditorPopupMenu");
-            list_view->SlotSizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFixed);
             const f32 popup_height = std::min(kRowHeight * static_cast<f32>(actions.size()), kMaxHeight);
-            list_view->SlotSize(kMenuWidth, popup_height);
+            list_view->GetSlot()->Size({kMenuWidth, popup_height});
             list_view->SetViewportHeight(popup_height);
 
             for (const auto &action: actions)
             {
                 auto item = MakeRef<UI::Text>(action._label);
-                item->SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed);
-                item->SlotSize(kMenuWidth, kRowHeight);
-                item->SlotPadding({6.0f, 4.0f, 6.0f, 4.0f});
+                item->GetSlot()->Size({kMenuWidth, kRowHeight});
+                item->SlotPadding() = UI::Padding(6.0f, 4.0f, 6.0f, 4.0f);
+                item->InvalidateLayout();
                 item->_horizontal_align = UI::EAlignment::kLeft;
                 item->_vertical_align = UI::EAlignment::kCenter;
                 if (action._is_destructive)
@@ -83,6 +75,7 @@ namespace Ailu
                     e._is_handled = true;
                 };
                 list_view->AddItem(item);
+                item->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed).Size({kMenuWidth, kRowHeight});
             }
 
             UI::UIManager::Get()->HidePopup();
@@ -96,27 +89,26 @@ namespace Ailu
         {
             auto root = MakeRef<UI::Border>();
             root->Name(popup_name);
-            root->SlotSizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFixed);
-            root->SlotSize(size.x, size.y);
+            root->GetSlot()->Size({size.x, size.y});
             root->Thickness(1.0f);
-            root->SlotPadding(8.0f);
+            root->SlotPadding() = UI::Padding(8.0f);
+            root->InvalidateLayout();
             root->_bg_color = {0.12f, 0.12f, 0.12f, 0.96f};
             root->_border_color = Colors::kWhite;
 
             auto *layout = root->AddChild<UI::VerticalBox>();
-            layout->SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
+            layout->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
 
             auto popup_position = std::make_shared<Vector2f>(popup_pos);
             auto is_dragging = std::make_shared<bool>(false);
             auto drag_offset = std::make_shared<Vector2f>(0.0f, 0.0f);
 
             auto *title_bar = layout->AddChild<UI::Border>();
-            title_bar->SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed);
-            title_bar->SlotSize(size.x - 20.0f, 20.0f);
+            title_bar->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed).Size({size.x - 20.0f, 20.0f});
             title_bar->Thickness(0.0f);
 
             auto *title_text = title_bar->AddChild<UI::Text>(title);
-            title_text->SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
+            title_text->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
             title_text->_horizontal_align = UI::EAlignment::kLeft;
 
             title_bar->OnMouseDown() += [popup_position, is_dragging, drag_offset](UI::UIEvent &e)
@@ -145,8 +137,7 @@ namespace Ailu
             };
 
             auto *content = layout->AddChild<UI::VerticalBox>();
-            content->SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
-            content->SlotMargin({0.0f, 8.0f, 0.0f, 8.0f});
+            content->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill).Margin({0.0f, 8.0f, 0.0f, 8.0f});
 
             if (build_content)
                 build_content(content, title_text);
@@ -154,15 +145,12 @@ namespace Ailu
             if (!actions.empty())
             {
                 auto *button_row = layout->AddChild<UI::HorizontalBox>();
-                button_row->SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed);
-                button_row->SlotSize(size.x - 20.0f, 24.0f);
+                button_row->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed).Size({size.x - 20.0f, 24.0f});
 
                 for (const auto &action: actions)
                 {
                     auto btn = button_row->AddChild<UI::Button>();
-                    btn->SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed);
-                    btn->SlotSize(0.0f, 24.0f);
-                    btn->SlotFillRate(1.0f);
+                    btn->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed).Size({0.0f, 24.0f}).FillRate(1.0f);
                     btn->SetText(action._label);
 
                     btn->OnMouseClick() += [action, title, title_text](UI::UIEvent &e)
@@ -203,8 +191,7 @@ namespace Ailu
                          [input_value, initial_value, &input](UI::VerticalBox *content, UI::Text *)
                          {
                              input = content->AddChild<UI::InputBlock>();
-                             input->SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed);
-                             input->SlotSize(240.0f, 24.0f);
+                             input->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed).Size({240.0f, 24.0f});
                              input->_on_content_changed += [input_value](String value)
                              {
                                  *input_value = std::move(value);
@@ -238,8 +225,7 @@ namespace Ailu
                          [message](UI::VerticalBox *content, UI::Text *)
                          {
                              auto *message_text = content->AddChild<UI::Text>(message);
-                             message_text->SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed);
-                             message_text->SlotSize(240.0f, 36.0f);
+                             message_text->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed).Size({240.0f, 36.0f});
                              message_text->_horizontal_align = UI::EAlignment::kLeft;
                          },
                          {

@@ -1,6 +1,8 @@
 #ifndef __UI_CONTAINER_H__
 #define __UI_CONTAINER_H__
 #include "UIElement.h"
+#include "UI/Style/UIStyles.h"
+#include "UI/Style/UITheme.h"
 #include "generated/Container.gen.h"
 
 namespace Ailu
@@ -16,9 +18,18 @@ namespace Ailu
             ~Canvas();
             Vector2f MeasureDesiredSize() override;
 
+            // ── Style ────────────────────────────────────────────
+            UIControlVisualOverride &GetStyleOverride() { return _style_override; }
+
         private:
+            Ref<UISlot> CreateSlotForChild() override;
             void MeasureAndArrange(f32 dt) override;
             void RenderImpl(UIRenderer &r) final;
+            void ResolveStyle(const UIStyleContext &context) override;
+            const UIControlVisual *GetVisual(EUIVisualState state) const override;
+
+            UIControlVisualOverride _style_override;
+            mutable UIControlVisual _resolved_visual;
         };
 
         ACLASS()
@@ -33,11 +44,21 @@ namespace Ailu
             };
             LinearBox(EOrientation orientation = EOrientation::kHorizontal);
             Vector2f MeasureDesiredSize() override;
+
+            // ── Style ────────────────────────────────────────────
+            UIControlVisualOverride &GetStyleOverride() { return _style_override; }
+
         private:
+            Ref<UISlot> CreateSlotForChild() override;
+            bool UsesVerticalChildLayout() const override { return _orientation == EOrientation::kVertical; }
             void MeasureAndArrange(f32 dt) override;
             void RenderImpl(UIRenderer &r) override;
+            void ResolveStyle(const UIStyleContext &context) override;
+            const UIControlVisual *GetVisual(EUIVisualState state) const override;
         private:
             EOrientation _orientation;
+            UIControlVisualOverride _style_override;
+            mutable UIControlVisual _resolved_visual;
         };
 
 
@@ -67,14 +88,26 @@ namespace Ailu
             ScrollView();
             virtual ~ScrollView() = default;
             void PreUpdate(f32 dt) override;
-            void SetViewportHeight(f32 height) { _slot._size.y = height; }
-            void SetViewportWidth(f32 w) { _slot._size.x = w; }
+            void SetViewportHeight(f32 height) { GetSlot()->Size({GetSlot()->_size.x, height}); }
+            void SetViewportWidth(f32 w) { GetSlot()->Size({w, GetSlot()->_size.y}); }
             Vector2f MeasureDesiredSize() override;
+            UIElement *HitTest(Vector2f pos) override;
+
+            // ── Style ────────────────────────────────────────────
+            UIScrollViewStyleOverride &GetStyleOverride() { return _style_override; }
+
         protected:
+            Ref<UISlot> CreateSlotForChild() override;
             void RenderImpl(UIRenderer &r) override;
             void PostDeserialize() override;
             void MeasureAndArrange(f32 dt) override;
             void PostArrange() override;
+            void ResolveStyle(const UIStyleContext &context) override;
+            const UIControlVisual *GetVisual(EUIVisualState state) const override;
+            bool HasVerticalBar() const;
+            bool HasHorizontalBar() const;
+            Vector4f CalculateVerticalBarRect() const;
+            Vector4f CalculateHorizontalBarRect() const;
         protected:
             inline static const f32 kScrollBarWidth = 6.0f;
             Vector2f _current_offset = Vector2f::kZero;
@@ -87,6 +120,8 @@ namespace Ailu
             f32 _drag_start_offset = 0.0f;// 按下时的_scroll_offset
             f32 _scroll_speed = 10.0f;
             bool _is_vertical = true;
+            UIScrollViewStyleOverride _style_override;
+            UIScrollViewStyle _resolved_style;
         };
 
         ACLASS()
@@ -188,6 +223,12 @@ namespace Ailu
             inline static const f32 kSplitBarThickness = 2.0f;
             SplitView();
             void Update(f32 dt) override;
+            f32 GetRatio() const { return _ratio; }
+            void SetRatio(f32 ratio);
+
+            // ── Style ────────────────────────────────────────────
+            UIControlVisualOverride &GetStyleOverride() { return _style_override; }
+
         public:
             APROPERTY()
             bool _is_horizontal = true;
@@ -195,11 +236,15 @@ namespace Ailu
             void RenderImpl(UIRenderer &r) override;
             void PostDeserialize() override;
             void MeasureAndArrange(f32 dt) override;
+            void ResolveStyle(const UIStyleContext &context) override;
+            const UIControlVisual *GetVisual(EUIVisualState state) const override;
         private:
             APROPERTY()
             f32 _ratio = 0.5f;
             bool _is_dragging_bar = false;
             bool _is_hover_bar = false;
+            UIControlVisualOverride _style_override;
+            mutable UIControlVisual _resolved_visual;
         };
     }
 }// namespace Ailu

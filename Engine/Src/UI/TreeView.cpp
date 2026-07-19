@@ -25,28 +25,26 @@ namespace Ailu
                     Thickness(0.0f);
 
                     auto* hb = AddChild<HorizontalBox>();
-                    hb->SlotSizePolicy(ESizePolicy::kFill, ESizePolicy::kAuto);
+                    hb->GetSlotAs<LinearSlot>().SizePolicy(ESizePolicy::kFill, ESizePolicy::kAuto);
 
                     // Indent via left margin on the horizontal box
                     f32 indent = depth * tree->_indent_width + 4.0f;
-                    hb->SlotMargin(Padding(indent, 0.0f, 0.0f, 0.0f));
+                    hb->GetSlotAs<LinearSlot>().Margin(Padding(indent, 0.0f, 0.0f, 0.0f));
 
                     // Expand button
                     if (_has_children)
                     {
                         _expand_btn = hb->AddChild<Text>(expanded ? "v" : ">");
-                        _expand_btn->SlotSize(tree->_expand_button_width, tree->_row_height);
-                        _expand_btn->SlotSizePolicy(ESizePolicy::kFixed, ESizePolicy::kFixed);
+                        _expand_btn->GetSlotAs<LinearSlot>().Size({tree->_expand_button_width, tree->_row_height}).SizePolicy(ESizePolicy::kFixed, ESizePolicy::kFixed);
                         _expand_btn->_color = Colors::kGray;
-                        _expand_btn->SlotMargin(Padding(0.0f, 0.0f, 2.0f, 0.0f));
+                        _expand_btn->GetSlotAs<LinearSlot>().Margin(Padding(0.0f, 0.0f, 2.0f, 0.0f));
                     }
                     else
                     {
                         // Spacer for alignment with items that have expand buttons
                         auto* spacer = hb->AddChild<Text>(" ");
-                        spacer->SlotSize(tree->_expand_button_width, tree->_row_height);
-                        spacer->SlotSizePolicy(ESizePolicy::kFixed, ESizePolicy::kFixed);
-                        spacer->SlotMargin(Padding(0.0f, 0.0f, 2.0f, 0.0f));
+                        spacer->GetSlotAs<LinearSlot>().Size({tree->_expand_button_width, tree->_row_height}).SizePolicy(ESizePolicy::kFixed, ESizePolicy::kFixed)
+                                .Margin(Padding(0.0f, 0.0f, 2.0f, 0.0f));
                     }
 
                     // Icon
@@ -54,14 +52,13 @@ namespace Ailu
                     {
                         auto* icon = hb->AddChild<Image>();
                         icon->SetTexture(pres._icon);
-                        icon->SlotSize(16.0f, 16.0f);
-                        icon->SlotSizePolicy(ESizePolicy::kFixed, ESizePolicy::kFixed);
-                        icon->SlotMargin(Padding(0.0f, 0.0f, 4.0f, 0.0f));
+                        icon->GetSlotAs<LinearSlot>().Size({16.0f, 16.0f}).SizePolicy(ESizePolicy::kFixed, ESizePolicy::kFixed)
+                                .Margin(Padding(0.0f, 0.0f, 4.0f, 0.0f));
                     }
 
                     // Label
                     _label = hb->AddChild<Text>(pres._label);
-                    _label->SlotSizePolicy(ESizePolicy::kFill, ESizePolicy::kAuto);
+                    _label->GetSlotAs<LinearSlot>().SizePolicy(ESizePolicy::kFill, ESizePolicy::kAuto);
                     _label->_color = pres._text_color;
                 }
 
@@ -90,6 +87,14 @@ namespace Ailu
                 }
                 return nullptr;
             }
+
+            UIBrush MakeColorBrush(const Color& color)
+            {
+                UIBrush brush;
+                brush._type = EUIBrushType::kColor;
+                brush._tint = color;
+                return brush;
+            }
         } // anonymous namespace
 
         // =========================================================================
@@ -99,7 +104,7 @@ namespace Ailu
         {
             _name = "TreeView";
             _content_box = AddChild<VerticalBox>();
-            _content_box->SlotSizePolicy(ESizePolicy::kFill, ESizePolicy::kAuto);
+            _content_box->GetSlotAs<LinearSlot>().SizePolicy(ESizePolicy::kFill, ESizePolicy::kAuto);
 
             // Mouse tracking for hover
             OnMouseMove() += [this](UIEvent& e)
@@ -208,7 +213,7 @@ namespace Ailu
                 _empty_drop_handler = border.get();
                 _empty_drop_handler_ref = border;
                 _content_box->AddChild(std::move(border));
-                _empty_drop_handler->SlotSizePolicy(ESizePolicy::kFill, ESizePolicy::kFill);
+                _empty_drop_handler->GetSlotAs<LinearSlot>().SizePolicy(ESizePolicy::kFill, ESizePolicy::kFill);
             }
             _empty_drop_handler->Thickness(0.0f);
             _empty_drop_handler->_bg_color = Color(0.0f, 0.0f, 0.0f, 0.0f);
@@ -330,8 +335,6 @@ namespace Ailu
                 bool expanded = _expanded_items.contains(vi._id);
 
                 auto row = MakeRef<TreeViewRow>(this, vi._id, pres, vi._depth, vi._has_children, expanded);
-                row->SlotSizePolicy(ESizePolicy::kFill, ESizePolicy::kFixed);
-                row->SlotSize(Vector2f(0.0f, _row_height));
 
                 // Set up drop handler if this item accepts drops
                 if (pres._drop_target)
@@ -355,6 +358,7 @@ namespace Ailu
                 }
 
                 _content_box->AddChild(row);
+                row->GetSlotAs<LinearSlot>().SizePolicy(ESizePolicy::kFill, ESizePolicy::kFixed).Size({0.0f, _row_height});
                 _item_rows[vi._id] = row.get();
             }
 
@@ -367,7 +371,6 @@ namespace Ailu
                 auto border = MakeRef<Border>();
                 _empty_drop_handler = border.get();
                 _empty_drop_handler_ref = std::move(border);
-                _empty_drop_handler->SlotSizePolicy(ESizePolicy::kFill, ESizePolicy::kFill);
                 _empty_drop_handler->Thickness(0.0f);
                 _empty_drop_handler->_bg_color = Color(0.0f, 0.0f, 0.0f, 0.0f);
                 {
@@ -389,6 +392,7 @@ namespace Ailu
                     _empty_drop_handler->SetDropHandler(dh);
                 }
                 _content_box->AddChild(_empty_drop_handler_ref);
+                _empty_drop_handler->GetSlotAs<LinearSlot>().SizePolicy(ESizePolicy::kFill, ESizePolicy::kFill);
             }
         }
 
@@ -589,6 +593,9 @@ namespace Ailu
                     row->_bg_color = _hover_color;
                 else
                     row->_bg_color = _normal_color;
+
+                row->GetStyleOverride().SetBackground(MakeColorBrush(row->_bg_color));
+                row->InvalidateStyle(EStyleInvalidation::kPaintOnly);
             }
 
             ScrollView::RenderImpl(r);

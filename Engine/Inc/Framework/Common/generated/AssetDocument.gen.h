@@ -138,7 +138,8 @@ AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::SceneAssetDocument>();
                                 friend Type* Z_Construct_AssetDocumentHeader_Type();\
                                 static Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};
+                                static Type *StaticType() {return GetPrivateStaticClass();};\
+                                Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu{
 struct AssetDocumentHeader ;
@@ -153,7 +154,8 @@ AILU_API class Ailu::Type* Ailu::StaticClass<struct Ailu::AssetDocumentHeader>()
                                 friend Type* Z_Construct_AssetNamedUIntProperty_Type();\
                                 static Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};
+                                static Type *StaticType() {return GetPrivateStaticClass();};\
+                                Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu{
 struct AssetNamedUIntProperty ;
@@ -168,7 +170,8 @@ AILU_API class Ailu::Type* Ailu::StaticClass<struct Ailu::AssetNamedUIntProperty
                                 friend Type* Z_Construct_AssetNamedFloatProperty_Type();\
                                 static Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};
+                                static Type *StaticType() {return GetPrivateStaticClass();};\
+                                Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu{
 struct AssetNamedFloatProperty ;
@@ -183,7 +186,8 @@ AILU_API class Ailu::Type* Ailu::StaticClass<struct Ailu::AssetNamedFloatPropert
                                 friend Type* Z_Construct_AssetNamedVectorProperty_Type();\
                                 static Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};
+                                static Type *StaticType() {return GetPrivateStaticClass();};\
+                                Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu{
 struct AssetNamedVectorProperty ;
@@ -198,7 +202,8 @@ AILU_API class Ailu::Type* Ailu::StaticClass<struct Ailu::AssetNamedVectorProper
                                 friend Type* Z_Construct_AssetNamedIntVectorProperty_Type();\
                                 static Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};
+                                static Type *StaticType() {return GetPrivateStaticClass();};\
+                                Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu{
 struct AssetNamedIntVectorProperty ;
@@ -213,7 +218,8 @@ AILU_API class Ailu::Type* Ailu::StaticClass<struct Ailu::AssetNamedIntVectorPro
                                 friend Type* Z_Construct_AssetTextureBinding_Type();\
                                 static Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};
+                                static Type *StaticType() {return GetPrivateStaticClass();};\
+                                Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu{
 struct AssetTextureBinding ;
@@ -228,7 +234,8 @@ AILU_API class Ailu::Type* Ailu::StaticClass<struct Ailu::AssetTextureBinding>()
                                 friend Type* Z_Construct_AnimationClipFrameDocument_Type();\
                                 static Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};
+                                static Type *StaticType() {return GetPrivateStaticClass();};\
+                                Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu{
 struct AnimationClipFrameDocument ;
@@ -243,7 +250,8 @@ AILU_API class Ailu::Type* Ailu::StaticClass<struct Ailu::AnimationClipFrameDocu
                                 friend Type* Z_Construct_AnimationClipTrackDocument_Type();\
                                 static Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};
+                                static Type *StaticType() {return GetPrivateStaticClass();};\
+                                Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu{
 struct AnimationClipTrackDocument ;
@@ -258,7 +266,8 @@ AILU_API class Ailu::Type* Ailu::StaticClass<struct Ailu::AnimationClipTrackDocu
                                 friend Type* Z_Construct_SceneTagComponentDocument_Type();\
                                 static Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};
+                                static Type *StaticType() {return GetPrivateStaticClass();};\
+                                Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu{
 struct SceneTagComponentDocument ;
@@ -273,7 +282,8 @@ AILU_API class Ailu::Type* Ailu::StaticClass<struct Ailu::SceneTagComponentDocum
                                 friend Type* Z_Construct_SceneTransformComponentDocument_Type();\
                                 static Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};
+                                static Type *StaticType() {return GetPrivateStaticClass();};\
+                                Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu{
 struct SceneTransformComponentDocument ;
@@ -288,7 +298,8 @@ AILU_API class Ailu::Type* Ailu::StaticClass<struct Ailu::SceneTransformComponen
                                 friend Type* Z_Construct_SceneScriptComponentDocument_Type();\
                                 static Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};
+                                static Type *StaticType() {return GetPrivateStaticClass();};\
+                                Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu{
 struct SceneScriptComponentDocument ;
@@ -303,7 +314,8 @@ AILU_API class Ailu::Type* Ailu::StaticClass<struct Ailu::SceneScriptComponentDo
                                 friend Type* Z_Construct_SceneStaticMeshComponentDocument_Type();\
                                 static Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};
+                                static Type *StaticType() {return GetPrivateStaticClass();};\
+                                Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu{
 struct SceneStaticMeshComponentDocument ;
@@ -318,7 +330,8 @@ AILU_API class Ailu::Type* Ailu::StaticClass<struct Ailu::SceneStaticMeshCompone
                                 friend Type* Z_Construct_SceneLightDataDocument_Type();\
                                 static Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};
+                                static Type *StaticType() {return GetPrivateStaticClass();};\
+                                Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu{
 struct SceneLightDataDocument ;
@@ -333,7 +346,8 @@ AILU_API class Ailu::Type* Ailu::StaticClass<struct Ailu::SceneLightDataDocument
                                 friend Type* Z_Construct_SceneShadowDataDocument_Type();\
                                 static Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};
+                                static Type *StaticType() {return GetPrivateStaticClass();};\
+                                Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu{
 struct SceneShadowDataDocument ;
@@ -348,7 +362,8 @@ AILU_API class Ailu::Type* Ailu::StaticClass<struct Ailu::SceneShadowDataDocumen
                                 friend Type* Z_Construct_SceneLightComponentDocument_Type();\
                                 static Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};
+                                static Type *StaticType() {return GetPrivateStaticClass();};\
+                                Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu{
 struct SceneLightComponentDocument ;
@@ -363,7 +378,8 @@ AILU_API class Ailu::Type* Ailu::StaticClass<struct Ailu::SceneLightComponentDoc
                                 friend Type* Z_Construct_SceneHierarchyComponentDocument_Type();\
                                 static Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};
+                                static Type *StaticType() {return GetPrivateStaticClass();};\
+                                Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu{
 struct SceneHierarchyComponentDocument ;
@@ -378,7 +394,8 @@ AILU_API class Ailu::Type* Ailu::StaticClass<struct Ailu::SceneHierarchyComponen
                                 friend Type* Z_Construct_SceneCameraComponentDocument_Type();\
                                 static Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};
+                                static Type *StaticType() {return GetPrivateStaticClass();};\
+                                Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu{
 struct SceneCameraComponentDocument ;
@@ -393,7 +410,8 @@ AILU_API class Ailu::Type* Ailu::StaticClass<struct Ailu::SceneCameraComponentDo
                                 friend Type* Z_Construct_SceneLightProbeComponentDocument_Type();\
                                 static Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};
+                                static Type *StaticType() {return GetPrivateStaticClass();};\
+                                Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu{
 struct SceneLightProbeComponentDocument ;
@@ -408,7 +426,8 @@ AILU_API class Ailu::Type* Ailu::StaticClass<struct Ailu::SceneLightProbeCompone
                                 friend Type* Z_Construct_SceneRigidBodyComponentDocument_Type();\
                                 static Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};
+                                static Type *StaticType() {return GetPrivateStaticClass();};\
+                                Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu{
 struct SceneRigidBodyComponentDocument ;
@@ -423,7 +442,8 @@ AILU_API class Ailu::Type* Ailu::StaticClass<struct Ailu::SceneRigidBodyComponen
                                 friend Type* Z_Construct_SceneColliderComponentDocument_Type();\
                                 static Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};
+                                static Type *StaticType() {return GetPrivateStaticClass();};\
+                                Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu{
 struct SceneColliderComponentDocument ;
@@ -438,7 +458,8 @@ AILU_API class Ailu::Type* Ailu::StaticClass<struct Ailu::SceneColliderComponent
                                 friend Type* Z_Construct_SceneSkeletonMeshComponentDocument_Type();\
                                 static Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};
+                                static Type *StaticType() {return GetPrivateStaticClass();};\
+                                Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu{
 struct SceneSkeletonMeshComponentDocument ;
@@ -453,7 +474,8 @@ AILU_API class Ailu::Type* Ailu::StaticClass<struct Ailu::SceneSkeletonMeshCompo
                                 friend Type* Z_Construct_SceneVXGIComponentDocument_Type();\
                                 static Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};
+                                static Type *StaticType() {return GetPrivateStaticClass();};\
+                                Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu{
 struct SceneVXGIComponentDocument ;
@@ -468,7 +490,8 @@ AILU_API class Ailu::Type* Ailu::StaticClass<struct Ailu::SceneVXGIComponentDocu
                                 friend Type* Z_Construct_SceneEntityDocument_Type();\
                                 static Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};
+                                static Type *StaticType() {return GetPrivateStaticClass();};\
+                                Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu{
 struct SceneEntityDocument ;

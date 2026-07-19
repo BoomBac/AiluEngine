@@ -6,6 +6,7 @@
 #include "UI/UIRenderer.h"
 #include "UI/TextRenderer.h"
 #include "UI/UIFramework.h"
+#include "UI/Style/UITheme.h"
 #include <memory>
 
 namespace Ailu
@@ -44,16 +45,45 @@ namespace Ailu
         }
         UIElement::~UIElement()
         {
+            if (_slot_obj != nullptr)
+                _slot_obj->SetOwner(nullptr);
             UIManager::Get()->OnElementDestroying(this);
             _property_observers.clear();
             _children.clear();
         }
         UIElement *UIElement::AddChild(Ref<UIElement> child)
         {
+            if (child == nullptr)
+                return nullptr;
+            if (child->_parent == this)
+                return child.get();
+
+            Ref<UISlot> old_slot = child->_slot_obj;
+            if (child->_parent != nullptr)
+            {
+                UIElement *old_parent = child->_parent;
+                auto it = std::find_if(old_parent->_children.begin(), old_parent->_children.end(), [&](const Ref<UIElement> &c)
+                                       { return c.get() == child.get(); });
+                if (it != old_parent->_children.end())
+                {
+                    old_parent->_on_child_remove_delegate.Invoke(child.get());
+                    old_parent->_children.erase(it);
+                    old_parent->InvalidateLayout();
+                }
+            }
+
             child->_parent = this;
-            ++child->_hierarchy_depth;
+            child->_hierarchy_depth = _hierarchy_depth + 1u;
+            Ref<UISlot> new_slot = CreateSlotForChild();
+            if (old_slot != nullptr && new_slot != nullptr)
+            {
+                new_slot->_margin = old_slot->_margin;
+                new_slot->_size = old_slot->_size;
+            }
+            child->SetSlot(new_slot);
             _children.emplace_back(child);
             _on_child_add_delegate.Invoke(child.get());
+            InvalidateLayout();
             return child.get();
         }
         void UIElement::RemoveChild(Ref<UIElement> child)
@@ -65,7 +95,8 @@ namespace Ailu
             {
                 _on_child_remove_delegate.Invoke(it->get());
                 child->_parent = nullptr;
-                --child->_hierarchy_depth;
+                child->_hierarchy_depth = 0u;
+                child->SetSlot(nullptr);
                 UI::UIManager::Get()->Destroy(*it);
                 _children.erase(it);
             }
@@ -80,7 +111,8 @@ namespace Ailu
             {
                 _on_child_remove_delegate.Invoke(it->get());
                 (*it)->_parent = nullptr;
-                --(*it)->_hierarchy_depth;
+                (*it)->_hierarchy_depth = 0u;
+                (*it)->SetSlot(nullptr);
                 UI::UIManager::Get()->Destroy(*it);
                 _children.erase(it);
             }
@@ -93,7 +125,8 @@ namespace Ailu
             for (auto &child: _children)
             {
                 child->_parent = nullptr;
-                --child->_hierarchy_depth;
+                child->_hierarchy_depth = 0u;
+                child->SetSlot(nullptr);
                 _on_child_remove_delegate.Invoke(child.get());
                 UI::UIManager::Get()->Destroy(child);
             }
@@ -117,7 +150,6 @@ namespace Ailu
         }
         void UIElement::Update(f32 dt)
         {
-            SyncLegacyFromSlotObject();
             if (!_is_visible)
                 return;
             if (_is_transf_dirty)
@@ -169,6 +201,7 @@ namespace Ailu
         {
             if (!_is_visible)
                 return;
+            EnsureStyleResolved();
             RenderImpl(r);
         }
         void UIElement::PreUpdate(f32 dt)
@@ -180,31 +213,31 @@ namespace Ailu
         }
         void UIElement::OnEvent(UIEvent &e)
         {
-            if (!_state._is_enabled || !_state._is_visible || !_state._wants_mouse_events)
+            if (!IsInteractiveEnabled() || !IsStateVisible() || !WantsMouseEvents())
                 return;// 不可交互控件直接忽略
             if (e._is_handled)
                 return;
             switch (e._type)
             {
                 case UIEvent::EType::kMouseEnter:
-                    _state._is_hovered = true;
+                    SetHovered(true);
                     _eventmap[UIEvent::EType::kMouseEnter].Invoke(e);
                     break;
 
                 case UIEvent::EType::kMouseExit:
-                    _state._is_hovered = false;
+                    SetHovered(false);
                     _eventmap[UIEvent::EType::kMouseExit].Invoke(e);
                     break;
 
                 case UIEvent::EType::kMouseDown:
                     if (e._current_target == this)// 确保事件是作用在当前元素
-                        _state._is_pressed = true;
+                        SetPressed(true);
                     _eventmap[UIEvent::EType::kMouseDown].Invoke(e);
                     break;
 
                 case UIEvent::EType::kMouseUp:
-                    if (_state._is_pressed)
-                        _state._is_pressed = false;// 松开鼠标恢复 pressed 状态
+                    if (IsPressed())
+                        SetPressed(false);// 松开鼠标恢复 pressed 状态
                     _eventmap[UIEvent::EType::kMouseUp].Invoke(e);
                     break;
 
@@ -218,8 +251,8 @@ namespace Ailu
 
                 case UIEvent::EType::kMouseMove:
                     // 如果鼠标在控件内部且不是 hover，则更新 hover 状态
-                    if (!_state._is_hovered)
-                        _state._is_hovered = true;
+                    if (!IsHovered())
+                        SetHovered(true);
                     _eventmap[UIEvent::EType::kMouseMove].Invoke(e);
                     break;
                 case UIEvent::EType::kKeyDown:
@@ -289,7 +322,6 @@ namespace Ailu
         }
         void UIElement::Arrange(f32 x, f32 y, f32 width, f32 height)
         {
-            SyncLegacyFromSlotObject();
             _arrange_rect = {x, y, width, height};
             _content_rect = _arrange_rect;
             _content_rect.x += _padding._l;
@@ -339,15 +371,21 @@ namespace Ailu
         {
             _depth = depth;
         }
+        void UIElement::SetSlot(Ref<UISlot> slot)
+        {
+            if (_slot_obj != nullptr)
+                _slot_obj->SetOwner(nullptr);
+            _slot_obj = slot;
+            if (_slot_obj != nullptr)
+                _slot_obj->SetOwner(this);
+            InvalidateLayout();
+        }
         void UIElement::OnPropertyChanged(const PropertyInfo &prop)
         {
             Object::OnPropertyChanged(prop);
             const String &name = prop.Name();
-            if (name == "_slot")
+            if (name == "_slot_obj")
             {
-                SyncSlotObjectFromLegacy();
-                _legacy_slot_dirty = false;
-                _slot_obj_dirty = false;
                 InvalidateLayout();
             }
             else if (name == "_padding")
@@ -365,7 +403,7 @@ namespace Ailu
         }
         void UIElement::Serialize(FArchive &ar)
         {
-            SyncLegacyFromSlotObject();
+            EnsureSlotObject();
             SerializeObject::Serialize(ar);
             if (auto sar = dynamic_cast<FStructedArchive *>(&ar); sar != nullptr)
             {
@@ -385,6 +423,10 @@ namespace Ailu
         void UIElement::Deserialize(FArchive &ar)
         {
             SerializeObject::Deserialize(ar);
+            if (_slot_obj != nullptr)
+                _slot_obj->SetOwner(this);
+            else
+                EnsureSlotObject();
             if (auto sar = dynamic_cast<FStructedArchive *>(&ar); sar != nullptr)
             {
                 sar->BeginObject("_children");
@@ -449,7 +491,7 @@ namespace Ailu
         }
         void UIElement::RequestFocus()
         {
-            if (!_state._is_enabled || !_state._is_visible)
+            if (!IsInteractiveEnabled() || !IsStateVisible())
                 return;
             UIManager::Get()->SetFocus(this);
         }
@@ -480,11 +522,77 @@ namespace Ailu
                     c->InvalidateTransform();
             }
         }
+        // ── 交互状态位域访问器实现 ─────────────────────────────────────
+        bool UIElement::IsHovered() const { return (_state_flags & (u32)EUIElementState::kHovered) != 0u; }
+        bool UIElement::IsPressed() const { return (_state_flags & (u32)EUIElementState::kPressed) != 0u; }
+        bool UIElement::IsFocused() const { return (_state_flags & (u32)EUIElementState::kFocused) != 0u; }
+        bool UIElement::IsInteractiveEnabled() const { return (_state_flags & (u32)EUIElementState::kEnabled) != 0u; }
+        bool UIElement::IsStateVisible() const { return (_state_flags & (u32)EUIElementState::kVisible) != 0u; }
+        bool UIElement::WantsMouseEvents() const { return (_state_flags & (u32)EUIElementState::kMouseEvents) != 0u; }
+
+        void UIElement::SetHovered(bool v) { v ? (_state_flags |= (u32)EUIElementState::kHovered) : (_state_flags &= ~(u32)EUIElementState::kHovered); }
+        void UIElement::SetPressed(bool v) { v ? (_state_flags |= (u32)EUIElementState::kPressed) : (_state_flags &= ~(u32)EUIElementState::kPressed); }
+        void UIElement::SetInteractiveEnabled(bool v) { v ? (_state_flags |= (u32)EUIElementState::kEnabled) : (_state_flags &= ~(u32)EUIElementState::kEnabled); }
+        void UIElement::SetStateVisible(bool v) { v ? (_state_flags |= (u32)EUIElementState::kVisible) : (_state_flags &= ~(u32)EUIElementState::kVisible); }
+        void UIElement::SetWantsMouseEvents(bool v) { v ? (_state_flags |= (u32)EUIElementState::kMouseEvents) : (_state_flags &= ~(u32)EUIElementState::kMouseEvents); }
+        void UIElement::SetFocused(bool v) { v ? (_state_flags |= (u32)EUIElementState::kFocused) : (_state_flags &= ~(u32)EUIElementState::kFocused); }
+
+        EUIVisualState UIElement::GetVisualState() const
+        {
+            if (!IsInteractiveEnabled())  return EUIVisualState::kDisabled;
+            if (IsPressed())              return EUIVisualState::kPressed;
+            if (IsHovered())              return EUIVisualState::kHovered;
+            if (IsFocused())              return EUIVisualState::kFocused;
+            return EUIVisualState::kNormal;
+        }
+
+        // ── Style 解析 ──────────────────────────────────────────────────
+        const UITheme *UIElement::GetTheme() const
+        {
+            return UIManager::Get()->GetTheme();
+        }
+
+        UIStyleContext UIElement::BuildStyleContext() const
+        {
+            UIStyleContext ctx;
+            ctx._theme = GetTheme();
+            ctx._parent = _parent;
+            ctx._theme_revision = ctx._theme ? ctx._theme->Revision() : 0u;
+            return ctx;
+        }
+
+        void UIElement::EnsureStyleResolved()
+        {
+            const UITheme *theme = GetTheme();
+            if (!theme)
+                return;
+
+            const u64 current_revision = theme->Revision();
+
+            if (!_is_style_dirty && _resolved_theme_revision == current_revision)
+                return;
+
+            const UIStyleContext context = BuildStyleContext();
+            ResolveStyle(context);
+
+            _resolved_theme_revision = context._theme_revision;
+            _is_style_dirty = false;
+        }
+
+        void UIElement::InvalidateStyle(EStyleInvalidation invalidation)
+        {
+            _is_style_dirty = true;
+            _paint_dirty = true;
+
+            if (invalidation == EStyleInvalidation::kLayoutAndPaint)
+                InvalidateLayout();
+        }
+
         void UIElement::SetFocusedInternal(bool v)
         {
-            if (_state._is_focused == v)
+            if (IsFocused() == v)
                 return;
-            _state._is_focused = v;
+            SetFocused(v);
             if (v)
                 _on_focus_gained_delegate.Invoke();
             else
@@ -496,71 +604,21 @@ namespace Ailu
         }
         Vector2f UIElement::MeasureDesiredSize()
         {
-            SyncLegacyFromSlotObject();
-            return _slot._size;
+            EnsureStyleResolved();
+        return EnsureSlotObject()->_size;
         }
-        void UIElement::SyncSlotObjectFromLegacy() const
+        Ref<UISlot> &UIElement::EnsureSlotObject() const
         {
-            if (!_slot_obj_dirty && _slot_obj != nullptr)
-                return;
-
-            if (_slot._type == ESlotType::kCanvas)
+            if (_slot_obj == nullptr)
             {
-                auto canvas_slot = std::dynamic_pointer_cast<CanvasSlot>(_slot_obj);
-                if (canvas_slot == nullptr)
-                    canvas_slot = MakeRef<CanvasSlot>();
-                canvas_slot->_margin = _slot._margin;
-                canvas_slot->_anchor = _slot._anchor;
-                canvas_slot->_position = _slot._position;
-                canvas_slot->_size = _slot._size;
-                canvas_slot->_size_to_content = _slot._is_size_to_content;
-                canvas_slot->_alignment_h = _slot._alignment_h;
-                canvas_slot->_alignment_v = _slot._alignment_v;
-                _slot_obj = canvas_slot;
+                _slot_obj = MakeRef<UISlot>();
+                _slot_obj->SetOwner(const_cast<UIElement *>(this));
             }
-            else
-            {
-                auto linear_slot = std::dynamic_pointer_cast<LinearSlot>(_slot_obj);
-                if (linear_slot == nullptr)
-                    linear_slot = MakeRef<LinearSlot>();
-                linear_slot->_margin = _slot._margin;
-                linear_slot->_size_policy_h = _slot._size_policy_h;
-                linear_slot->_size_policy_v = _slot._size_policy_v;
-                linear_slot->_fill_rate = _slot._fill_rate;
-                linear_slot->_cross_align = _slot._alignment_v;
-                _slot_obj = linear_slot;
-            }
-
-            _slot_obj_dirty = false;
+            return _slot_obj;
         }
-        void UIElement::SyncLegacyFromSlotObject() const
+        Ref<UISlot> UIElement::CreateSlotForChild()
         {
-            if (!_legacy_slot_dirty || _slot_obj == nullptr)
-                return;
-
-            auto &legacy_slot = const_cast<Slot &>(_slot);
-            legacy_slot._margin = _slot_obj->_margin;
-            if (const auto canvas_slot = dynamic_cast<CanvasSlot *>(_slot_obj.get()); canvas_slot != nullptr)
-            {
-                legacy_slot._type = ESlotType::kCanvas;
-                legacy_slot._anchor = canvas_slot->_anchor;
-                legacy_slot._position = canvas_slot->_position;
-                legacy_slot._size = canvas_slot->_size;
-                legacy_slot._is_size_to_content = canvas_slot->_size_to_content;
-                legacy_slot._alignment_h = canvas_slot->_alignment_h;
-                legacy_slot._alignment_v = canvas_slot->_alignment_v;
-            }
-            else if (const auto linear_slot = dynamic_cast<LinearSlot *>(_slot_obj.get()); linear_slot != nullptr)
-            {
-                if (legacy_slot._type == ESlotType::kCanvas)
-                    legacy_slot._type = ESlotType::kVerticalBox;
-                legacy_slot._size_policy_h = linear_slot->_size_policy_h;
-                legacy_slot._size_policy_v = linear_slot->_size_policy_v;
-                legacy_slot._fill_rate = linear_slot->_fill_rate;
-                legacy_slot._alignment_v = linear_slot->_cross_align;
-            }
-
-            const_cast<UIElement *>(this)->_legacy_slot_dirty = false;
+            return MakeRef<UISlot>();
         }
         Matrix4x4f UIElement::CalculateWorldMatrix(bool is_exclude_self_offset) const
         {

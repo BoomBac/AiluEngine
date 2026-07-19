@@ -5,9 +5,18 @@
 #include "GlobalMarco.h"
 #include "Objects/Object.h"
 #include "Objects/Type.h"
+#include "generated/Asset.gen.h"
 
 namespace Ailu
 {
+    AENUM()
+    enum class EAssetDomain
+    {
+        kEngine,
+        kEditor,
+        kProject,
+        kRuntime
+    };
     class AILU_API Asset : public Object
     {
     public:
@@ -36,6 +45,7 @@ namespace Ailu
         }
 
     public:
+        EAssetDomain _domain = EAssetDomain::kProject;
         WString _asset_path;
         //with ext
         WString _name;

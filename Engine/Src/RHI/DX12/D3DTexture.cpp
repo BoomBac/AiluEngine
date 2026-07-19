@@ -263,7 +263,7 @@ namespace Ailu::RHI::DX12
 
     void D3DTexture2D::GenerateMipmap()
     {
-        auto mipmap_gen = ResourceMgr::Get().GetRef<ComputeShader>(L"Shaders/cs_mipmap_gen.alasset");
+        auto mipmap_gen = ResourceMgr::Get().GetRef<ComputeShader>(L"Shaders/hlsl/Compute/cs_mipmap_gen.alasset");
         auto kernel = mipmap_gen->FindKernel("MipmapGen2D");
         auto cmd = CommandBufferPool::Get("MipmapGen2D");
         mipmap_gen->SetInt("SrcMipLevel", 0);
@@ -495,8 +495,8 @@ namespace Ailu::RHI::DX12
     {
         if (_p_mipmapgen_cs0 == nullptr)
         {
-            _p_mipmapgen_cs0 = ResourceMgr::Get().GetRef<ComputeShader>(L"Shaders/cs_mipmap_gen.alasset");
-            _p_mipmapgen_cs1 = ResourceMgr::Get().GetRef<ComputeShader>(L"Shaders/cs_mipmap_gen.alasset");
+            _p_mipmapgen_cs0 = ResourceMgr::Get().GetRef<ComputeShader>(L"Shaders/hlsl/Compute/cs_mipmap_gen.alasset");
+            _p_mipmapgen_cs1 = ResourceMgr::Get().GetRef<ComputeShader>(L"Shaders/hlsl/Compute/cs_mipmap_gen.alasset");
         }
     }
 
@@ -1166,7 +1166,7 @@ namespace Ailu::RHI::DX12
 
     void D3DRenderTexture::GenerateMipmap()
     {
-        static ComputeShader *s_mipmap_gen = ResourceMgr::Get().Get<ComputeShader>(L"Shaders/cs_mipmap_gen.alasset");
+        static ComputeShader *s_mipmap_gen = ResourceMgr::Get().Get<ComputeShader>(L"Shaders/hlsl/Compute/cs_mipmap_gen.alasset");
         auto cmd = CommandBufferPool::Get("MipmapGen");
         cmd->StateTransition(this, D3DConvertUtils::ToALResState(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
         u16 kernel = s_mipmap_gen->FindKernel("MipmapGen2D");

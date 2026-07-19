@@ -14,6 +14,8 @@ if(s_enum_type_EAntiAliasing == nullptr)
 {
 EnumInitializer initializer;
 initializer._name = "EAntiAliasing";
+initializer._namespace = "Ailu::Render";
+initializer._full_name = "Ailu::Render::EAntiAliasing";
 initializer._str_to_enum_lut["kNone"] = 0;
 initializer._str_to_enum_lut["kFXAA"] = 1;
 initializer._str_to_enum_lut["kTAA"] = 2;

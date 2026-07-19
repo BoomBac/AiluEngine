@@ -51,6 +51,8 @@ namespace Ailu
             WString BuildCurrentAssetPath(const WString &file_name) const;
             Vector<Asset *> CollectAssetsUnderDirectory(const WString &directory_asset_path) const;
             String MakeUniqueEntryName(const WString &directory_sys_path, const String &base_name, const WString &extension, bool is_directory) const;
+            void SaveDockLayoutState(JsonArchive &ar) override;
+            void LoadDockLayoutState(JsonArchive &ar) override;
             void OnDockLayoutLoaded() override;
 
             inline static const f32 kDragThreshold = 5.0f;

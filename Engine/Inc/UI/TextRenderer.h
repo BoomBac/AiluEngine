@@ -23,6 +23,7 @@ namespace Ailu
         public:
             inline static u16 kMaxCharacters = 1024u;
             static Vector2f CalculateTextSize(const String &text, f32 font_size = 14u, Font *font = nullptr, Vector2f scale = Vector2f::kOne);
+            static Vector4f CalculateTextVisualBounds(const String &text, f32 font_size = 14u, Font *font = nullptr, Vector2f scale = Vector2f::kOne);
         public:
             static Font *GetDefaultFont() { return s_default_font; };
             TextRenderer();

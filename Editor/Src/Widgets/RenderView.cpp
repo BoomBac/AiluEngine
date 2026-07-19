@@ -30,16 +30,32 @@ namespace Ailu
     namespace Editor
     {
         using SceneManagement::SceneMgr;
+        namespace
+        {
+            constexpr u32 kSceneViewRTAlign = 64u;
+            constexpr f32 kSceneViewResizeDebounceTime = 0.15f;
+
+            u32 AlignSceneViewSize(f32 value)
+            {
+                const u32 clamped = std::max<u32>(1u, static_cast<u32>(std::ceil(value)));
+                return ((clamped + kSceneViewRTAlign - 1u) / kSceneViewRTAlign) * kSceneViewRTAlign;
+            }
+
+            Vector2UInt CalculateSceneViewOutputSize(const Vector2f &view_size)
+            {
+                return Vector2UInt(AlignSceneViewSize(view_size.x), AlignSceneViewSize(view_size.y));
+            }
+        }
         #pragma region RenderView
         static class EditorLayer* s_editor_layer;
         RenderView::RenderView() : DockWindow("RenderView")
         {
             _vb = _content_root->AddChild<UI::VerticalBox>();
-            _vb->SlotSizePolicy(UI::ESizePolicy::kFixed);
-            _vb->SlotPadding(_content_root->Thickness());
+            _vb->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFixed);
+            _vb->SlotPadding() = UI::Padding(_content_root->Thickness());
+            _vb->InvalidateLayout();
             _source = _vb->AddChild<UI::Image>();
-            _source->SlotSizePolicy(UI::ESizePolicy::kFill);
-            _source->SlotAlignmentH(UI::EAlignment::kFill);
+            _source->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill).CrossAlignment(UI::EAlignment::kFill);
         }
         void RenderView::Update(f32 dt)
         {
@@ -74,9 +90,12 @@ namespace Ailu
             _on_size_change += [this](Vector2f new_size)
             {
                 auto t = _content_root->Thickness();
-                _vb->SlotSize(new_size.x, new_size.y - kTitleBarHeight);
-                if (Render::Camera::sCurrent)
-                    Render::Camera::sCurrent->OutputSize((u16) (new_size.x - t.x - t.z), (u16) (new_size.y - kTitleBarHeight - t.y - t.w));
+                _vb->GetSlot()->Size({new_size.x, new_size.y - kTitleBarHeight});
+                _view_size = {
+                        std::max(1.0f, new_size.x - t.x - t.z),
+                        std::max(1.0f, new_size.y - kTitleBarHeight - t.y - t.w)};
+                _pending_output_size = CalculateSceneViewOutputSize(_view_size);
+                _resize_stable_time = 0.0f;
             };
             _on_size_change_delegate.Invoke(_size);
             s_renderer = Render::RenderPipeline::Get().GetRenderer();
@@ -94,7 +113,7 @@ namespace Ailu
                 {
                     auto &payload = DragDropManager::Get().GetPayload();
                     _drag_preview_mesh = reinterpret_cast<Asset*>(payload->_data)->AsRef<Render::Mesh>();
-                    Ray ray{Camera::sCurrent->Position(), Camera::sCurrent->ScreenToWorld(_mouse_pos)};
+                    Ray ray{Camera::sCurrent->Position(), Camera::sCurrent->ScreenToWorld(ViewToRenderPosition(_mouse_pos))};
                     if (auto hit = SceneMgr::Get().ActiveScene()->Pick(ray); hit != ECS::kInvalidEntity)
                     {
                         auto &box = SceneMgr::Get().ActiveScene()->GetRegister().GetComponent<ECS::StaticMeshComponent>(hit)->_transformed_aabbs[0];
@@ -115,8 +134,9 @@ namespace Ailu
                 {
                     Vector4f rect = e._current_target->GetArrangeRect();
                     Vector2f local_pos = e._mouse_position - rect.xy;
-                    if (_transform_gizmo->IsHover(local_pos,Camera::sCurrent))
-                        _transform_gizmo->BeginDrag(local_pos);
+                    Vector2f render_pos = ViewToRenderPosition(local_pos);
+                    if (_transform_gizmo->IsHover(render_pos,Camera::sCurrent))
+                        _transform_gizmo->BeginDrag(render_pos);
                     // 可视需要决定是否拦截
                     // e._is_handled = true;
                 }
@@ -148,7 +168,8 @@ namespace Ailu
                     {
                         Vector4f rect = e._current_target->GetArrangeRect();
                         Vector2f local_pos = e._mouse_position - rect.xy;
-                        s_editor_layer->_pick.GetPickID((u16) local_pos.x, (u16) local_pos.y, [this, local_pos](u32 closest_entity,u32 submesh_index)
+                        Vector2f render_pos = ViewToRenderPosition(local_pos);
+                        s_editor_layer->_pick.GetPickID((u16) render_pos.x, (u16) render_pos.y, [this, local_pos](u32 closest_entity,u32 submesh_index)
                         {
                             LOG_INFO("Pick entity: {},subidex: {} on pos {}", closest_entity, submesh_index, local_pos.ToString());
                             Selection::AddAndRemovePreSelection(closest_entity,submesh_index);
@@ -221,6 +242,7 @@ namespace Ailu
         void SceneView::Update(f32 dt)
         {
             RenderView::Update(dt);
+            UpdateCameraOutputSize(dt);
             SetSource(s_renderer->TargetTexture());
             if (Render::Camera::sCurrent)
             {
@@ -228,13 +250,58 @@ namespace Ailu
                 s_editor_layer->_viewport_size = Vector2f{rect.z, rect.w};
                 s_editor_layer->_scene_vp_rect = rect;
             }
-            _transform_gizmo->Update(dt, _mouse_pos,Camera::sCurrent);
+            _transform_gizmo->Update(dt, ViewToRenderPosition(_mouse_pos),Camera::sCurrent);
             _transform_gizmo->Draw();
             if (_drag_preview_mesh)
             {
                 Render::Gizmo::DrawMesh(_drag_preview_mesh.get(), MatrixTranslation(_drag_preview_pos), Render::Material::s_standard_forward_lit.lock().get());
             }
             ProcessCameraInput(dt);
+        }
+        void SceneView::UpdateCameraOutputSize(f32 dt)
+        {
+            if (!Render::Camera::sCurrent)
+                return;
+
+            if (_pending_output_size == Vector2UInt::kZero)
+            {
+                auto rect = _source->GetArrangeRect();
+                _view_size = {std::max(1.0f, rect.z), std::max(1.0f, rect.w)};
+                _pending_output_size = CalculateSceneViewOutputSize(_view_size);
+            }
+
+            _resize_stable_time += dt;
+            Vector2UInt desired_output_size = _committed_output_size;
+            const bool need_grow = _pending_output_size.x > _committed_output_size.x || _pending_output_size.y > _committed_output_size.y;
+            const bool need_first_commit = _committed_output_size == Vector2UInt::kZero;
+            const bool can_shrink = _pending_output_size.x < _committed_output_size.x || _pending_output_size.y < _committed_output_size.y;
+
+            if (need_first_commit || need_grow)
+            {
+                desired_output_size = {
+                        std::max(_pending_output_size.x, _committed_output_size.x),
+                        std::max(_pending_output_size.y, _committed_output_size.y)};
+            }
+            else if (can_shrink && _resize_stable_time >= kSceneViewResizeDebounceTime)
+            {
+                desired_output_size = _pending_output_size;
+            }
+
+            if (desired_output_size != _committed_output_size)
+            {
+                _committed_output_size = desired_output_size;
+                Render::Camera::sCurrent->OutputSize(
+                        static_cast<u16>(std::min<u32>(_committed_output_size.x, UINT16_MAX)),
+                        static_cast<u16>(std::min<u32>(_committed_output_size.y, UINT16_MAX)));
+            }
+        }
+        Vector2f SceneView::ViewToRenderPosition(const Vector2f &view_pos) const
+        {
+            if (_view_size.x <= 0.0f || _view_size.y <= 0.0f || _committed_output_size == Vector2UInt::kZero)
+                return view_pos;
+            return {
+                    view_pos.x * static_cast<f32>(_committed_output_size.x) / _view_size.x,
+                    view_pos.y * static_cast<f32>(_committed_output_size.y) / _view_size.y};
         }
         void SceneView::ProcessCameraInput(f32 dt)
         {
@@ -305,11 +372,11 @@ namespace Ailu
             _split_view = _content_root->AddChild<UI::SplitView>();
             _split_view->_is_horizontal = true;
             _left_preview = _split_view->AddChild<UI::Image>();
-            _left_preview->SlotSizePolicy(UI::ESizePolicy::kFill);
-            _left_preview->SlotAlignmentH(UI::EAlignment::kFill);
+            _left_preview->GetSlot()->Size({0.0f, 0.0f});
             _right_menu = _split_view->AddChild<UI::VerticalBox>();
-            _right_menu->SlotSizePolicy(UI::ESizePolicy::kFixed);
-            _right_menu->SlotPadding(_content_root->Thickness());
+            _right_menu->GetSlot()->Size({100.0f, 100.0f});
+            _right_menu->SlotPadding() = UI::Padding(_content_root->Thickness());
+            _right_menu->InvalidateLayout();
             _pass = new Render::VolumeTexturePreviewPass();
             _orbit_controller.Attach(_pass);
             auto pass_type = _pass->GetType();

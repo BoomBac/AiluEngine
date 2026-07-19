@@ -1011,7 +1011,7 @@ namespace Ailu::SceneManagement
         //{
         //    Ref<Scene> default_scene = MakeRef<Scene>("DefaultScene");
         //    auto p = default_scene->AddObject("empty");
-        //    auto child1 = default_scene->AddObject(ResourceMgr::Get().GetRef<Mesh>(L"Meshs/plane.alasset"), ResourceMgr::Get().GetRef<Material>(L"Materials/StandardPBR.alasset"));
+        //    auto child1 = default_scene->AddObject(ResourceMgr::Get().GetRef<Mesh>(L"Meshs/src_res/plane.alasset"), ResourceMgr::Get().GetRef<Material>(L"Materials/StandardPBR.alasset"));
         //    default_scene->Attach(child1, p);
         //    {
         //        auto &comp = default_scene->GetRegister().AddComponent<LightComponent>(default_scene->AddObject("directional_light"));

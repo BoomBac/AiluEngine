@@ -13,6 +13,8 @@ namespace Ailu
 {
     namespace UI
     {
+        class UIElement;
+
         AENUM()
         enum class EAlignment
         {
@@ -22,14 +24,6 @@ namespace Ailu
             kTop,
             kBottom,
             kFill
-        };
-
-        AENUM()
-        enum class ESlotType
-        {
-            kCanvas,
-            kVerticalBox,
-            kHorizontalBox
         };
 
         //用于vertical/horizontal box布局
@@ -70,44 +64,26 @@ namespace Ailu
             }
         };
 
-        ASTRUCT()
-        struct Slot
-        {
-            GENERATED_BODY()
-            Slot(Vector2f size) : _anchor(), _position(), _size(size) {};
-            Slot() : Slot({100.f, 100.f}) {};
-            APROPERTY()
-            Vector2f _size;
-            APROPERTY()
-            Vector2f _anchor = Vector2f::kZero;
-            APROPERTY()
-            Vector2f _position = Vector2f::kZero;
-            APROPERTY()
-            EAlignment _alignment_h = EAlignment::kLeft;
-            APROPERTY()
-            EAlignment _alignment_v = EAlignment::kCenter;
-            APROPERTY()
-            Padding _margin;// ltrb，元素外边距
-            APROPERTY()
-            ESlotType _type = ESlotType::kCanvas;
-            APROPERTY()
-            ESizePolicy _size_policy_h = ESizePolicy::kFill;//用于linear box slot
-            APROPERTY()
-            ESizePolicy _size_policy_v = ESizePolicy::kAuto;//用于linear box slot
-            APROPERTY()
-            bool _is_size_to_content = false;//用于canvas slot
-            APROPERTY()
-            f32 _fill_rate = 1.0f;//linear box slot,所有fill的fill_rate之和为总权重
-        };
-
         ACLASS()
         class AILU_API UISlot : public SerializeObject
         {
             GENERATED_BODY()
+            friend class UIElement;
         public:
             virtual ~UISlot() = default;
+            UISlot &Margin(const Padding &margin);
+            UISlot &Size(const Vector2f &size);
+            void InvalidateLayout();
+            void PostPropertyChanged();
             APROPERTY()
             Padding _margin;
+            APROPERTY()
+            Vector2f _size = {100.0f, 100.0f};
+        protected:
+            void OnPropertyChanged(const PropertyInfo &prop) override;
+        private:
+            void SetOwner(UIElement *owner);
+            UIElement *_owner = nullptr;
         };
 
         ACLASS()
@@ -115,12 +91,16 @@ namespace Ailu
         {
             GENERATED_BODY()
         public:
+            CanvasSlot &Margin(const Padding &margin);
+            CanvasSlot &Size(const Vector2f &size);
+            CanvasSlot &Position(const Vector2f &position);
+            CanvasSlot &Anchor(const Vector2f &anchor);
+            CanvasSlot &SizeToContent(bool value);
+            CanvasSlot &Alignment(EAlignment horizontal, EAlignment vertical);
             APROPERTY()
             Vector2f _anchor = Vector2f::kZero;
             APROPERTY()
             Vector2f _position = Vector2f::kZero;
-            APROPERTY()
-            Vector2f _size = {100.0f, 100.0f};
             APROPERTY()
             bool _size_to_content = false;
             APROPERTY()
@@ -134,6 +114,11 @@ namespace Ailu
         {
             GENERATED_BODY()
         public:
+            LinearSlot &Margin(const Padding &margin);
+            LinearSlot &Size(const Vector2f &size);
+            LinearSlot &SizePolicy(ESizePolicy horizontal, ESizePolicy vertical);
+            LinearSlot &FillRate(f32 fill_rate);
+            LinearSlot &CrossAlignment(EAlignment alignment);
             APROPERTY()
             ESizePolicy _size_policy_h = ESizePolicy::kFill;
             APROPERTY()

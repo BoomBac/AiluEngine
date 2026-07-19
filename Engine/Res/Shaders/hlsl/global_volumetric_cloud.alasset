@@ -1,0 +1,11 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "13dbddd5-0785-405b-af21-435a472a3813",
+        "_asset_type": "Ailu::Render::Shader",
+        "_asset_name": "global_volumetric_cloud"
+    },
+    "_file": "global_volumetric_cloud.hlsl",
+    "_vs_entry": "FullscreenVSMain",
+    "_ps_entry": "ComputePSMain"
+}

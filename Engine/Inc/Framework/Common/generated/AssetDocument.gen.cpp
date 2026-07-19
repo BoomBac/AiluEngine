@@ -30,7 +30,7 @@ meta_header.Set("RangeMin",(f32)0);
 meta_header.Set("RangeMax",(f32)1);
 MemberBuilder builder_header;
 builder_header._name = "_header";
-builder_header._type_name = "AssetDocumentHeader";
+builder_header._type_name = "Ailu::AssetDocumentHeader";
 builder_header._offset = offsetof(AssetHeaderProbeDocument,_header);
 builder_header._is_const = false;
 builder_header._is_static = false;
@@ -87,7 +87,7 @@ meta_header.Set("RangeMin",(f32)0);
 meta_header.Set("RangeMax",(f32)1);
 MemberBuilder builder_header;
 builder_header._name = "_header";
-builder_header._type_name = "AssetDocumentHeader";
+builder_header._type_name = "Ailu::AssetDocumentHeader";
 builder_header._offset = offsetof(ShaderAssetDocument,_header);
 builder_header._is_const = false;
 builder_header._is_static = false;
@@ -207,7 +207,7 @@ meta_header.Set("RangeMin",(f32)0);
 meta_header.Set("RangeMax",(f32)1);
 MemberBuilder builder_header;
 builder_header._name = "_header";
-builder_header._type_name = "AssetDocumentHeader";
+builder_header._type_name = "Ailu::AssetDocumentHeader";
 builder_header._offset = offsetof(ComputeShaderAssetDocument,_header);
 builder_header._is_const = false;
 builder_header._is_static = false;
@@ -306,7 +306,7 @@ meta_header.Set("RangeMin",(f32)0);
 meta_header.Set("RangeMax",(f32)1);
 MemberBuilder builder_header;
 builder_header._name = "_header";
-builder_header._type_name = "AssetDocumentHeader";
+builder_header._type_name = "Ailu::AssetDocumentHeader";
 builder_header._offset = offsetof(Texture2DAssetDocument,_header);
 builder_header._is_const = false;
 builder_header._is_static = false;
@@ -405,7 +405,7 @@ meta_header.Set("RangeMin",(f32)0);
 meta_header.Set("RangeMax",(f32)1);
 MemberBuilder builder_header;
 builder_header._name = "_header";
-builder_header._type_name = "AssetDocumentHeader";
+builder_header._type_name = "Ailu::AssetDocumentHeader";
 builder_header._offset = offsetof(MeshAssetDocument,_header);
 builder_header._is_const = false;
 builder_header._is_static = false;
@@ -525,7 +525,7 @@ meta_header.Set("RangeMin",(f32)0);
 meta_header.Set("RangeMax",(f32)1);
 MemberBuilder builder_header;
 builder_header._name = "_header";
-builder_header._type_name = "AssetDocumentHeader";
+builder_header._type_name = "Ailu::AssetDocumentHeader";
 builder_header._offset = offsetof(MaterialAssetDocument,_header);
 builder_header._is_const = false;
 builder_header._is_static = false;
@@ -729,7 +729,7 @@ meta_header.Set("RangeMin",(f32)0);
 meta_header.Set("RangeMax",(f32)1);
 MemberBuilder builder_header;
 builder_header._name = "_header";
-builder_header._type_name = "AssetDocumentHeader";
+builder_header._type_name = "Ailu::AssetDocumentHeader";
 builder_header._offset = offsetof(AnimationClipAssetDocument,_header);
 builder_header._is_const = false;
 builder_header._is_static = false;
@@ -933,7 +933,7 @@ meta_header.Set("RangeMin",(f32)0);
 meta_header.Set("RangeMax",(f32)1);
 MemberBuilder builder_header;
 builder_header._name = "_header";
-builder_header._type_name = "AssetDocumentHeader";
+builder_header._type_name = "Ailu::AssetDocumentHeader";
 builder_header._offset = offsetof(SceneAssetDocument,_header);
 builder_header._is_const = false;
 builder_header._is_static = false;
@@ -1101,6 +1101,10 @@ template<> Ailu::Type* Ailu::StaticClass<Ailu::AssetDocumentHeader>()
 {
 return Ailu::AssetDocumentHeader::StaticType();
 }
+    Type *Ailu::AssetDocumentHeader::GetType()
+{
+return Ailu::AssetDocumentHeader::GetPrivateStaticClass();
+}
 ClassTypeRegister s_register_AssetDocumentHeader(&Ailu::AssetDocumentHeader::StaticType, "Ailu::AssetDocumentHeader");
 Ailu::Type* Ailu::Z_Construct_AssetNamedUIntProperty_Type()
 {
@@ -1173,6 +1177,10 @@ Ailu::Type* Ailu::AssetNamedUIntProperty::GetPrivateStaticClass()
 template<> Ailu::Type* Ailu::StaticClass<Ailu::AssetNamedUIntProperty>()
 {
 return Ailu::AssetNamedUIntProperty::StaticType();
+}
+    Type *Ailu::AssetNamedUIntProperty::GetType()
+{
+return Ailu::AssetNamedUIntProperty::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_AssetNamedUIntProperty(&Ailu::AssetNamedUIntProperty::StaticType, "Ailu::AssetNamedUIntProperty");
 Ailu::Type* Ailu::Z_Construct_AssetNamedFloatProperty_Type()
@@ -1247,6 +1255,10 @@ template<> Ailu::Type* Ailu::StaticClass<Ailu::AssetNamedFloatProperty>()
 {
 return Ailu::AssetNamedFloatProperty::StaticType();
 }
+    Type *Ailu::AssetNamedFloatProperty::GetType()
+{
+return Ailu::AssetNamedFloatProperty::GetPrivateStaticClass();
+}
 ClassTypeRegister s_register_AssetNamedFloatProperty(&Ailu::AssetNamedFloatProperty::StaticType, "Ailu::AssetNamedFloatProperty");
 Ailu::Type* Ailu::Z_Construct_AssetNamedVectorProperty_Type()
 {
@@ -1319,6 +1331,10 @@ Ailu::Type* Ailu::AssetNamedVectorProperty::GetPrivateStaticClass()
 template<> Ailu::Type* Ailu::StaticClass<Ailu::AssetNamedVectorProperty>()
 {
 return Ailu::AssetNamedVectorProperty::StaticType();
+}
+    Type *Ailu::AssetNamedVectorProperty::GetType()
+{
+return Ailu::AssetNamedVectorProperty::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_AssetNamedVectorProperty(&Ailu::AssetNamedVectorProperty::StaticType, "Ailu::AssetNamedVectorProperty");
 Ailu::Type* Ailu::Z_Construct_AssetNamedIntVectorProperty_Type()
@@ -1393,6 +1409,10 @@ template<> Ailu::Type* Ailu::StaticClass<Ailu::AssetNamedIntVectorProperty>()
 {
 return Ailu::AssetNamedIntVectorProperty::StaticType();
 }
+    Type *Ailu::AssetNamedIntVectorProperty::GetType()
+{
+return Ailu::AssetNamedIntVectorProperty::GetPrivateStaticClass();
+}
 ClassTypeRegister s_register_AssetNamedIntVectorProperty(&Ailu::AssetNamedIntVectorProperty::StaticType, "Ailu::AssetNamedIntVectorProperty");
 Ailu::Type* Ailu::Z_Construct_AssetTextureBinding_Type()
 {
@@ -1466,6 +1486,10 @@ template<> Ailu::Type* Ailu::StaticClass<Ailu::AssetTextureBinding>()
 {
 return Ailu::AssetTextureBinding::StaticType();
 }
+    Type *Ailu::AssetTextureBinding::GetType()
+{
+return Ailu::AssetTextureBinding::GetPrivateStaticClass();
+}
 ClassTypeRegister s_register_AssetTextureBinding(&Ailu::AssetTextureBinding::StaticType, "Ailu::AssetTextureBinding");
 Ailu::Type* Ailu::Z_Construct_AnimationClipFrameDocument_Type()
 {
@@ -1511,7 +1535,7 @@ meta_rotation.Set("RangeMin",(f32)0);
 meta_rotation.Set("RangeMax",(f32)1);
 MemberBuilder builder_rotation;
 builder_rotation._name = "_rotation";
-builder_rotation._type_name = "Quaternion";
+builder_rotation._type_name = "Ailu::Math::Quaternion";
 builder_rotation._offset = offsetof(AnimationClipFrameDocument,_rotation);
 builder_rotation._is_const = false;
 builder_rotation._is_static = false;
@@ -1559,6 +1583,10 @@ Ailu::Type* Ailu::AnimationClipFrameDocument::GetPrivateStaticClass()
 template<> Ailu::Type* Ailu::StaticClass<Ailu::AnimationClipFrameDocument>()
 {
 return Ailu::AnimationClipFrameDocument::StaticType();
+}
+    Type *Ailu::AnimationClipFrameDocument::GetType()
+{
+return Ailu::AnimationClipFrameDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_AnimationClipFrameDocument(&Ailu::AnimationClipFrameDocument::StaticType, "Ailu::AnimationClipFrameDocument");
 Ailu::Type* Ailu::Z_Construct_AnimationClipTrackDocument_Type()
@@ -1633,6 +1661,10 @@ template<> Ailu::Type* Ailu::StaticClass<Ailu::AnimationClipTrackDocument>()
 {
 return Ailu::AnimationClipTrackDocument::StaticType();
 }
+    Type *Ailu::AnimationClipTrackDocument::GetType()
+{
+return Ailu::AnimationClipTrackDocument::GetPrivateStaticClass();
+}
 ClassTypeRegister s_register_AnimationClipTrackDocument(&Ailu::AnimationClipTrackDocument::StaticType, "Ailu::AnimationClipTrackDocument");
 Ailu::Type* Ailu::Z_Construct_SceneTagComponentDocument_Type()
 {
@@ -1706,6 +1738,10 @@ template<> Ailu::Type* Ailu::StaticClass<Ailu::SceneTagComponentDocument>()
 {
 return Ailu::SceneTagComponentDocument::StaticType();
 }
+    Type *Ailu::SceneTagComponentDocument::GetType()
+{
+return Ailu::SceneTagComponentDocument::GetPrivateStaticClass();
+}
 ClassTypeRegister s_register_SceneTagComponentDocument(&Ailu::SceneTagComponentDocument::StaticType, "Ailu::SceneTagComponentDocument");
 Ailu::Type* Ailu::Z_Construct_SceneTransformComponentDocument_Type()
 {
@@ -1751,7 +1787,7 @@ meta_rotation.Set("RangeMin",(f32)0);
 meta_rotation.Set("RangeMax",(f32)1);
 MemberBuilder builder_rotation;
 builder_rotation._name = "_rotation";
-builder_rotation._type_name = "Quaternion";
+builder_rotation._type_name = "Ailu::Math::Quaternion";
 builder_rotation._offset = offsetof(SceneTransformComponentDocument,_rotation);
 builder_rotation._is_const = false;
 builder_rotation._is_static = false;
@@ -1799,6 +1835,10 @@ Ailu::Type* Ailu::SceneTransformComponentDocument::GetPrivateStaticClass()
 template<> Ailu::Type* Ailu::StaticClass<Ailu::SceneTransformComponentDocument>()
 {
 return Ailu::SceneTransformComponentDocument::StaticType();
+}
+    Type *Ailu::SceneTransformComponentDocument::GetType()
+{
+return Ailu::SceneTransformComponentDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_SceneTransformComponentDocument(&Ailu::SceneTransformComponentDocument::StaticType, "Ailu::SceneTransformComponentDocument");
 Ailu::Type* Ailu::Z_Construct_SceneScriptComponentDocument_Type()
@@ -1851,6 +1891,10 @@ Ailu::Type* Ailu::SceneScriptComponentDocument::GetPrivateStaticClass()
 template<> Ailu::Type* Ailu::StaticClass<Ailu::SceneScriptComponentDocument>()
 {
 return Ailu::SceneScriptComponentDocument::StaticType();
+}
+    Type *Ailu::SceneScriptComponentDocument::GetType()
+{
+return Ailu::SceneScriptComponentDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_SceneScriptComponentDocument(&Ailu::SceneScriptComponentDocument::StaticType, "Ailu::SceneScriptComponentDocument");
 Ailu::Type* Ailu::Z_Construct_SceneStaticMeshComponentDocument_Type()
@@ -1924,6 +1968,10 @@ Ailu::Type* Ailu::SceneStaticMeshComponentDocument::GetPrivateStaticClass()
 template<> Ailu::Type* Ailu::StaticClass<Ailu::SceneStaticMeshComponentDocument>()
 {
 return Ailu::SceneStaticMeshComponentDocument::StaticType();
+}
+    Type *Ailu::SceneStaticMeshComponentDocument::GetType()
+{
+return Ailu::SceneStaticMeshComponentDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_SceneStaticMeshComponentDocument(&Ailu::SceneStaticMeshComponentDocument::StaticType, "Ailu::SceneStaticMeshComponentDocument");
 Ailu::Type* Ailu::Z_Construct_SceneLightDataDocument_Type()
@@ -2019,6 +2067,10 @@ template<> Ailu::Type* Ailu::StaticClass<Ailu::SceneLightDataDocument>()
 {
 return Ailu::SceneLightDataDocument::StaticType();
 }
+    Type *Ailu::SceneLightDataDocument::GetType()
+{
+return Ailu::SceneLightDataDocument::GetPrivateStaticClass();
+}
 ClassTypeRegister s_register_SceneLightDataDocument(&Ailu::SceneLightDataDocument::StaticType, "Ailu::SceneLightDataDocument");
 Ailu::Type* Ailu::Z_Construct_SceneShadowDataDocument_Type()
 {
@@ -2113,6 +2165,10 @@ template<> Ailu::Type* Ailu::StaticClass<Ailu::SceneShadowDataDocument>()
 {
 return Ailu::SceneShadowDataDocument::StaticType();
 }
+    Type *Ailu::SceneShadowDataDocument::GetType()
+{
+return Ailu::SceneShadowDataDocument::GetPrivateStaticClass();
+}
 ClassTypeRegister s_register_SceneShadowDataDocument(&Ailu::SceneShadowDataDocument::StaticType, "Ailu::SceneShadowDataDocument");
 Ailu::Type* Ailu::Z_Construct_SceneLightComponentDocument_Type()
 {
@@ -2158,7 +2214,7 @@ meta_light.Set("RangeMin",(f32)0);
 meta_light.Set("RangeMax",(f32)1);
 MemberBuilder builder_light;
 builder_light._name = "_light";
-builder_light._type_name = "SceneLightDataDocument";
+builder_light._type_name = "Ailu::SceneLightDataDocument";
 builder_light._offset = offsetof(SceneLightComponentDocument,_light);
 builder_light._is_const = false;
 builder_light._is_static = false;
@@ -2179,7 +2235,7 @@ meta_shadow.Set("RangeMin",(f32)0);
 meta_shadow.Set("RangeMax",(f32)1);
 MemberBuilder builder_shadow;
 builder_shadow._name = "_shadow";
-builder_shadow._type_name = "SceneShadowDataDocument";
+builder_shadow._type_name = "Ailu::SceneShadowDataDocument";
 builder_shadow._offset = offsetof(SceneLightComponentDocument,_shadow);
 builder_shadow._is_const = false;
 builder_shadow._is_static = false;
@@ -2206,6 +2262,10 @@ Ailu::Type* Ailu::SceneLightComponentDocument::GetPrivateStaticClass()
 template<> Ailu::Type* Ailu::StaticClass<Ailu::SceneLightComponentDocument>()
 {
 return Ailu::SceneLightComponentDocument::StaticType();
+}
+    Type *Ailu::SceneLightComponentDocument::GetType()
+{
+return Ailu::SceneLightComponentDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_SceneLightComponentDocument(&Ailu::SceneLightComponentDocument::StaticType, "Ailu::SceneLightComponentDocument");
 Ailu::Type* Ailu::Z_Construct_SceneHierarchyComponentDocument_Type()
@@ -2364,6 +2424,10 @@ template<> Ailu::Type* Ailu::StaticClass<Ailu::SceneHierarchyComponentDocument>(
 {
 return Ailu::SceneHierarchyComponentDocument::StaticType();
 }
+    Type *Ailu::SceneHierarchyComponentDocument::GetType()
+{
+return Ailu::SceneHierarchyComponentDocument::GetPrivateStaticClass();
+}
 ClassTypeRegister s_register_SceneHierarchyComponentDocument(&Ailu::SceneHierarchyComponentDocument::StaticType, "Ailu::SceneHierarchyComponentDocument");
 Ailu::Type* Ailu::Z_Construct_SceneCameraComponentDocument_Type()
 {
@@ -2521,6 +2585,10 @@ template<> Ailu::Type* Ailu::StaticClass<Ailu::SceneCameraComponentDocument>()
 {
 return Ailu::SceneCameraComponentDocument::StaticType();
 }
+    Type *Ailu::SceneCameraComponentDocument::GetType()
+{
+return Ailu::SceneCameraComponentDocument::GetPrivateStaticClass();
+}
 ClassTypeRegister s_register_SceneCameraComponentDocument(&Ailu::SceneCameraComponentDocument::StaticType, "Ailu::SceneCameraComponentDocument");
 Ailu::Type* Ailu::Z_Construct_SceneLightProbeComponentDocument_Type()
 {
@@ -2594,6 +2662,10 @@ template<> Ailu::Type* Ailu::StaticClass<Ailu::SceneLightProbeComponentDocument>
 {
 return Ailu::SceneLightProbeComponentDocument::StaticType();
 }
+    Type *Ailu::SceneLightProbeComponentDocument::GetType()
+{
+return Ailu::SceneLightProbeComponentDocument::GetPrivateStaticClass();
+}
 ClassTypeRegister s_register_SceneLightProbeComponentDocument(&Ailu::SceneLightProbeComponentDocument::StaticType, "Ailu::SceneLightProbeComponentDocument");
 Ailu::Type* Ailu::Z_Construct_SceneRigidBodyComponentDocument_Type()
 {
@@ -2645,6 +2717,10 @@ Ailu::Type* Ailu::SceneRigidBodyComponentDocument::GetPrivateStaticClass()
 template<> Ailu::Type* Ailu::StaticClass<Ailu::SceneRigidBodyComponentDocument>()
 {
 return Ailu::SceneRigidBodyComponentDocument::StaticType();
+}
+    Type *Ailu::SceneRigidBodyComponentDocument::GetType()
+{
+return Ailu::SceneRigidBodyComponentDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_SceneRigidBodyComponentDocument(&Ailu::SceneRigidBodyComponentDocument::StaticType, "Ailu::SceneRigidBodyComponentDocument");
 Ailu::Type* Ailu::Z_Construct_SceneColliderComponentDocument_Type()
@@ -2761,6 +2837,10 @@ template<> Ailu::Type* Ailu::StaticClass<Ailu::SceneColliderComponentDocument>()
 {
 return Ailu::SceneColliderComponentDocument::StaticType();
 }
+    Type *Ailu::SceneColliderComponentDocument::GetType()
+{
+return Ailu::SceneColliderComponentDocument::GetPrivateStaticClass();
+}
 ClassTypeRegister s_register_SceneColliderComponentDocument(&Ailu::SceneColliderComponentDocument::StaticType, "Ailu::SceneColliderComponentDocument");
 Ailu::Type* Ailu::Z_Construct_SceneSkeletonMeshComponentDocument_Type()
 {
@@ -2855,6 +2935,10 @@ template<> Ailu::Type* Ailu::StaticClass<Ailu::SceneSkeletonMeshComponentDocumen
 {
 return Ailu::SceneSkeletonMeshComponentDocument::StaticType();
 }
+    Type *Ailu::SceneSkeletonMeshComponentDocument::GetType()
+{
+return Ailu::SceneSkeletonMeshComponentDocument::GetPrivateStaticClass();
+}
 ClassTypeRegister s_register_SceneSkeletonMeshComponentDocument(&Ailu::SceneSkeletonMeshComponentDocument::StaticType, "Ailu::SceneSkeletonMeshComponentDocument");
 Ailu::Type* Ailu::Z_Construct_SceneVXGIComponentDocument_Type()
 {
@@ -2928,6 +3012,10 @@ template<> Ailu::Type* Ailu::StaticClass<Ailu::SceneVXGIComponentDocument>()
 {
 return Ailu::SceneVXGIComponentDocument::StaticType();
 }
+    Type *Ailu::SceneVXGIComponentDocument::GetType()
+{
+return Ailu::SceneVXGIComponentDocument::GetPrivateStaticClass();
+}
 ClassTypeRegister s_register_SceneVXGIComponentDocument(&Ailu::SceneVXGIComponentDocument::StaticType, "Ailu::SceneVXGIComponentDocument");
 Ailu::Type* Ailu::Z_Construct_SceneEntityDocument_Type()
 {
@@ -2973,7 +3061,7 @@ meta_tag_component.Set("RangeMin",(f32)0);
 meta_tag_component.Set("RangeMax",(f32)1);
 MemberBuilder builder_tag_component;
 builder_tag_component._name = "_tag_component";
-builder_tag_component._type_name = "SceneTagComponentDocument";
+builder_tag_component._type_name = "Ailu::SceneTagComponentDocument";
 builder_tag_component._offset = offsetof(SceneEntityDocument,_tag_component);
 builder_tag_component._is_const = false;
 builder_tag_component._is_static = false;
@@ -3015,7 +3103,7 @@ meta_transform_component.Set("RangeMin",(f32)0);
 meta_transform_component.Set("RangeMax",(f32)1);
 MemberBuilder builder_transform_component;
 builder_transform_component._name = "_transform_component";
-builder_transform_component._type_name = "SceneTransformComponentDocument";
+builder_transform_component._type_name = "Ailu::SceneTransformComponentDocument";
 builder_transform_component._offset = offsetof(SceneEntityDocument,_transform_component);
 builder_transform_component._is_const = false;
 builder_transform_component._is_static = false;
@@ -3057,7 +3145,7 @@ meta_script_component.Set("RangeMin",(f32)0);
 meta_script_component.Set("RangeMax",(f32)1);
 MemberBuilder builder_script_component;
 builder_script_component._name = "_script_component";
-builder_script_component._type_name = "SceneScriptComponentDocument";
+builder_script_component._type_name = "Ailu::SceneScriptComponentDocument";
 builder_script_component._offset = offsetof(SceneEntityDocument,_script_component);
 builder_script_component._is_const = false;
 builder_script_component._is_static = false;
@@ -3099,7 +3187,7 @@ meta_static_mesh_component.Set("RangeMin",(f32)0);
 meta_static_mesh_component.Set("RangeMax",(f32)1);
 MemberBuilder builder_static_mesh_component;
 builder_static_mesh_component._name = "_static_mesh_component";
-builder_static_mesh_component._type_name = "SceneStaticMeshComponentDocument";
+builder_static_mesh_component._type_name = "Ailu::SceneStaticMeshComponentDocument";
 builder_static_mesh_component._offset = offsetof(SceneEntityDocument,_static_mesh_component);
 builder_static_mesh_component._is_const = false;
 builder_static_mesh_component._is_static = false;
@@ -3141,7 +3229,7 @@ meta_light_component.Set("RangeMin",(f32)0);
 meta_light_component.Set("RangeMax",(f32)1);
 MemberBuilder builder_light_component;
 builder_light_component._name = "_light_component";
-builder_light_component._type_name = "SceneLightComponentDocument";
+builder_light_component._type_name = "Ailu::SceneLightComponentDocument";
 builder_light_component._offset = offsetof(SceneEntityDocument,_light_component);
 builder_light_component._is_const = false;
 builder_light_component._is_static = false;
@@ -3183,7 +3271,7 @@ meta_hierarchy_component.Set("RangeMin",(f32)0);
 meta_hierarchy_component.Set("RangeMax",(f32)1);
 MemberBuilder builder_hierarchy_component;
 builder_hierarchy_component._name = "_hierarchy_component";
-builder_hierarchy_component._type_name = "SceneHierarchyComponentDocument";
+builder_hierarchy_component._type_name = "Ailu::SceneHierarchyComponentDocument";
 builder_hierarchy_component._offset = offsetof(SceneEntityDocument,_hierarchy_component);
 builder_hierarchy_component._is_const = false;
 builder_hierarchy_component._is_static = false;
@@ -3225,7 +3313,7 @@ meta_camera_component.Set("RangeMin",(f32)0);
 meta_camera_component.Set("RangeMax",(f32)1);
 MemberBuilder builder_camera_component;
 builder_camera_component._name = "_camera_component";
-builder_camera_component._type_name = "SceneCameraComponentDocument";
+builder_camera_component._type_name = "Ailu::SceneCameraComponentDocument";
 builder_camera_component._offset = offsetof(SceneEntityDocument,_camera_component);
 builder_camera_component._is_const = false;
 builder_camera_component._is_static = false;
@@ -3267,7 +3355,7 @@ meta_lightprobe_component.Set("RangeMin",(f32)0);
 meta_lightprobe_component.Set("RangeMax",(f32)1);
 MemberBuilder builder_lightprobe_component;
 builder_lightprobe_component._name = "_lightprobe_component";
-builder_lightprobe_component._type_name = "SceneLightProbeComponentDocument";
+builder_lightprobe_component._type_name = "Ailu::SceneLightProbeComponentDocument";
 builder_lightprobe_component._offset = offsetof(SceneEntityDocument,_lightprobe_component);
 builder_lightprobe_component._is_const = false;
 builder_lightprobe_component._is_static = false;
@@ -3309,7 +3397,7 @@ meta_rigidbody_component.Set("RangeMin",(f32)0);
 meta_rigidbody_component.Set("RangeMax",(f32)1);
 MemberBuilder builder_rigidbody_component;
 builder_rigidbody_component._name = "_rigidbody_component";
-builder_rigidbody_component._type_name = "SceneRigidBodyComponentDocument";
+builder_rigidbody_component._type_name = "Ailu::SceneRigidBodyComponentDocument";
 builder_rigidbody_component._offset = offsetof(SceneEntityDocument,_rigidbody_component);
 builder_rigidbody_component._is_const = false;
 builder_rigidbody_component._is_static = false;
@@ -3351,7 +3439,7 @@ meta_collider_component.Set("RangeMin",(f32)0);
 meta_collider_component.Set("RangeMax",(f32)1);
 MemberBuilder builder_collider_component;
 builder_collider_component._name = "_collider_component";
-builder_collider_component._type_name = "SceneColliderComponentDocument";
+builder_collider_component._type_name = "Ailu::SceneColliderComponentDocument";
 builder_collider_component._offset = offsetof(SceneEntityDocument,_collider_component);
 builder_collider_component._is_const = false;
 builder_collider_component._is_static = false;
@@ -3393,7 +3481,7 @@ meta_skeleton_mesh_component.Set("RangeMin",(f32)0);
 meta_skeleton_mesh_component.Set("RangeMax",(f32)1);
 MemberBuilder builder_skeleton_mesh_component;
 builder_skeleton_mesh_component._name = "_skeleton_mesh_component";
-builder_skeleton_mesh_component._type_name = "SceneSkeletonMeshComponentDocument";
+builder_skeleton_mesh_component._type_name = "Ailu::SceneSkeletonMeshComponentDocument";
 builder_skeleton_mesh_component._offset = offsetof(SceneEntityDocument,_skeleton_mesh_component);
 builder_skeleton_mesh_component._is_const = false;
 builder_skeleton_mesh_component._is_static = false;
@@ -3435,7 +3523,7 @@ meta_vxgi_component.Set("RangeMin",(f32)0);
 meta_vxgi_component.Set("RangeMax",(f32)1);
 MemberBuilder builder_vxgi_component;
 builder_vxgi_component._name = "_vxgi_component";
-builder_vxgi_component._type_name = "SceneVXGIComponentDocument";
+builder_vxgi_component._type_name = "Ailu::SceneVXGIComponentDocument";
 builder_vxgi_component._offset = offsetof(SceneEntityDocument,_vxgi_component);
 builder_vxgi_component._is_const = false;
 builder_vxgi_component._is_static = false;
@@ -3462,5 +3550,9 @@ Ailu::Type* Ailu::SceneEntityDocument::GetPrivateStaticClass()
 template<> Ailu::Type* Ailu::StaticClass<Ailu::SceneEntityDocument>()
 {
 return Ailu::SceneEntityDocument::StaticType();
+}
+    Type *Ailu::SceneEntityDocument::GetType()
+{
+return Ailu::SceneEntityDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_SceneEntityDocument(&Ailu::SceneEntityDocument::StaticType, "Ailu::SceneEntityDocument");

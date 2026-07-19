@@ -28,7 +28,7 @@ namespace Ailu::Render
     #pragma region SSAOPass
     SSAOPass::SSAOPass() : RenderPass("SSAOPass")
     {
-        _ssao_computer = ResourceMgr::Get().GetRef<ComputeShader>(L"Shaders/ssao_cs.alasset");
+        _ssao_computer = ResourceMgr::Get().GetRef<ComputeShader>(L"Shaders/hlsl/Compute/ssao_cs.alasset");
         _ssao_gen = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/ssao.hlsl"), "Runtime/SSAOGen");
         _event = ERenderPassEvent::kBeforeDeferedLighting;
     }

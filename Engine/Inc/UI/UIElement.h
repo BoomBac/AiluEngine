@@ -103,6 +103,50 @@ namespace Ailu
 
         using ElementEvent = Delegate<UIEvent &>;
         class UILayout;
+        class Widget;
+        class UITheme;
+        struct UIControlVisual;
+
+        // ── Style 失效范围 ───────────────────────────────────────
+        AENUM()
+        enum class EStyleInvalidation : u8
+        {
+            kPaintOnly,       // 仅重绘（color, border 等）
+            kLayoutAndPaint,  // 需重新布局 + 重绘（font_size, padding, min_size 等）
+        };
+
+        // ── Style 解析上下文 ─────────────────────────────────────
+        struct UIStyleContext
+        {
+            const UITheme *_theme = nullptr;
+            const UIElement *_parent = nullptr;
+            Widget *_widget = nullptr;
+            u64 _theme_revision = 0u;
+        };
+
+        // ── 元素交互状态位域（可组合）───────────────────────────
+        AENUM()
+        enum class EUIElementState : u32
+        {
+            kNone        = 0u,
+            kHovered     = 1u << 0u,
+            kPressed     = 1u << 1u,
+            kFocused     = 1u << 2u,
+            kEnabled     = 1u << 3u,
+            kVisible     = 1u << 4u,
+            kMouseEvents = 1u << 5u,
+        };
+
+        // ── 控件视觉状态（互斥）───────────────────────────────
+        AENUM()
+        enum class EUIVisualState
+        {
+            kNormal,
+            kHovered,
+            kPressed,
+            kFocused,
+            kDisabled
+        };
 
         ACLASS()
         class AILU_API UIElement : public SerializeObject
@@ -114,21 +158,47 @@ namespace Ailu
             DECLARE_DELEGATE(on_focus_lost);
             friend class UIManager;
         public:
-            struct State
-            {
-                bool _is_hovered = false;       // 鼠标在控件内部
-                bool _is_pressed = false;       // 鼠标按下状态
-                bool _is_focused = false;       // 当前控件获取焦点
-                bool _is_enabled = true;        // 控件是否可交互
-                bool _is_visible = true;        // 控件是否可见
-                bool _wants_mouse_events = true; // 是否接受鼠标事件
-            };
-        public:
             static bool IsPointInside(Vector2f point,Vector4f rect)
             {
                 return point.x >= rect.x && point.x <= rect.x + rect.z &&
                        point.y >= rect.y && point.y <= rect.y + rect.w;
             }
+
+            // ── 交互状态位域访问器（替代原 State 结构体）─────────────
+            bool IsHovered() const;
+            bool IsPressed() const;
+            bool IsFocused() const;
+            bool IsInteractiveEnabled() const;
+            bool IsStateVisible() const;
+            bool WantsMouseEvents() const;
+
+            void SetHovered(bool v);
+            void SetPressed(bool v);
+            void SetInteractiveEnabled(bool v);
+            void SetStateVisible(bool v);
+            void SetWantsMouseEvents(bool v);
+            void SetFocused(bool v);
+
+            /// 从当前交互状态推导控件视觉状态（Disabled > Pressed > Hovered > Focused > Normal）
+            EUIVisualState GetVisualState() const;
+
+            // ── Style 解析（惰性触发，由 Measure / Render 入口驱动）────
+            void EnsureStyleResolved();
+            void InvalidateStyle(EStyleInvalidation invalidation = EStyleInvalidation::kLayoutAndPaint);
+
+        protected:
+            /// 子控件覆写：根据 Theme + Local Override 生成 resolved style
+            virtual void ResolveStyle(const UIStyleContext &context) {}
+            UIStyleContext BuildStyleContext() const;
+            const UITheme *GetTheme() const;
+            const UIControlVisual *GetCurrentVisual() const { return GetVisual(GetVisualState()); }
+            virtual const UIControlVisual *GetVisual(EUIVisualState state) const { return nullptr; }
+
+        private:
+            bool _is_style_dirty = true;
+            u64 _resolved_theme_revision = 0u;
+
+        public:
             ~UIElement();
             UIElement();
             explicit UIElement(const String &name);
@@ -180,16 +250,23 @@ namespace Ailu
             /// </summary>
             /// <returns>ltwh</returns>
             [[nodiscard]] Vector4f GetContentRect() const;
+            void SetSlot(Ref<UISlot> slot);
             Ref<UISlot> &GetSlot()
             {
-                SyncSlotObjectFromLegacy();
-                _legacy_slot_dirty = true;
+                EnsureSlotObject();
                 return _slot_obj;
             }
             const Ref<UISlot> &GetSlot() const
             {
-                SyncSlotObjectFromLegacy();
+                EnsureSlotObject();
                 return _slot_obj;
+            }
+            template<typename T>
+            T &GetSlotAs()
+            {
+                T *slot = dynamic_cast<T *>(EnsureSlotObject().get());
+                AL_ASSERT(slot != nullptr);
+                return *slot;
             }
             void SetDepth(f32 depth);
             ElementEvent::EventView OnMouseEnter();
@@ -217,158 +294,11 @@ namespace Ailu
             [[nodiscard]] f32 GetDepth() const { return _depth; }
             //焦点管理
             void RequestFocus();// 主动请求焦点
-            bool IsFocused() const { return _state._is_focused; }
             //默认向上传递dirty,true则只标记子元素
             void InvalidateLayout(bool propagate_down = false);
             void InvalidateTransform();
-            //插槽属性
-            FORCEINLINE UIElement& SlotPosition(Vector2f pos)
-            {
-                _slot._position = pos;
-                _slot._type = ESlotType::kCanvas;
-                SyncSlotObjectFromLegacy();
-                if (auto canvas_slot = dynamic_cast<CanvasSlot *>(_slot_obj.get()); canvas_slot != nullptr)
-                    canvas_slot->_position = pos;
-                _slot_obj_dirty = false;
-                _legacy_slot_dirty = false;
-                InvalidateLayout();
-                return *this;
-            }
-            FORCEINLINE UIElement& SlotSize(f32 w, f32 h)
-            {
-                SlotSize({w, h});
-                return *this;
-            }
-            FORCEINLINE UIElement& SlotSize(Vector2f size)
-            {
-                _slot._size = size;
-                _slot._type = ESlotType::kCanvas;
-                SyncSlotObjectFromLegacy();
-                if (auto canvas_slot = dynamic_cast<CanvasSlot *>(_slot_obj.get()); canvas_slot != nullptr)
-                    canvas_slot->_size = size;
-                _slot_obj_dirty = false;
-                _legacy_slot_dirty = false;
-                InvalidateLayout();
-                return *this;
-            }
-            FORCEINLINE UIElement& SlotAnchor(Vector2f anchor)
-            {
-                _slot._anchor = anchor;
-                _slot._type = ESlotType::kCanvas;
-                SyncSlotObjectFromLegacy();
-                if (auto canvas_slot = dynamic_cast<CanvasSlot *>(_slot_obj.get()); canvas_slot != nullptr)
-                    canvas_slot->_anchor = anchor;
-                _slot_obj_dirty = false;
-                _legacy_slot_dirty = false;
-                InvalidateLayout();
-                return *this;
-            }
-            FORCEINLINE UIElement& SlotAlignmentH(EAlignment h)
-            {
-                _slot._alignment_h = h;
-                _slot._type = ESlotType::kCanvas;
-                SyncSlotObjectFromLegacy();
-                if (auto canvas_slot = dynamic_cast<CanvasSlot *>(_slot_obj.get()); canvas_slot != nullptr)
-                    canvas_slot->_alignment_h = h;
-                _slot_obj_dirty = false;
-                _legacy_slot_dirty = false;
-                InvalidateLayout();
-                return *this;
-            }
-            FORCEINLINE UIElement& SlotAlignmentV(EAlignment v)
-            {
-                _slot._alignment_v = v;
-                SyncSlotObjectFromLegacy();
-                if (const auto canvas_slot = dynamic_cast<CanvasSlot *>(_slot_obj.get()); canvas_slot != nullptr)
-                    canvas_slot->_alignment_v = v;
-                if (auto linear_slot = dynamic_cast<LinearSlot *>(_slot_obj.get()); linear_slot != nullptr)
-                    linear_slot->_cross_align = v;
-                _slot_obj_dirty = false;
-                _legacy_slot_dirty = false;
-                InvalidateLayout();
-                return *this;
-            }
-            //外边距
-            FORCEINLINE UIElement& SlotMargin(Padding margin)
-            {
-                _slot._margin = margin;
-                SyncSlotObjectFromLegacy();
-                if (_slot_obj != nullptr)
-                    _slot_obj->_margin = margin;
-                _slot_obj_dirty = false;
-                _legacy_slot_dirty = false;
-                InvalidateLayout();
-                return *this;
-            }
-            FORCEINLINE UIElement& SlotSizePolicy(ESizePolicy policy_h,ESizePolicy policy_v)
-            {
-                _slot._size_policy_h = policy_h;
-                _slot._size_policy_v = policy_v;
-                SyncSlotObjectFromLegacy();
-                if (auto linear_slot = dynamic_cast<LinearSlot *>(_slot_obj.get()); linear_slot != nullptr)
-                {
-                    linear_slot->_size_policy_h = policy_h;
-                    linear_slot->_size_policy_v = policy_v;
-                }
-                _slot_obj_dirty = false;
-                _legacy_slot_dirty = false;
-                InvalidateLayout();
-                return *this;
-            }
-            FORCEINLINE UIElement &SlotSizePolicy(ESizePolicy policy)
-            {
-                _slot._size_policy_h = policy;
-                _slot._size_policy_v = policy;
-                SyncSlotObjectFromLegacy();
-                if (auto linear_slot = dynamic_cast<LinearSlot *>(_slot_obj.get()); linear_slot != nullptr)
-                {
-                    linear_slot->_size_policy_h = policy;
-                    linear_slot->_size_policy_v = policy;
-                }
-                _slot_obj_dirty = false;
-                _legacy_slot_dirty = false;
-                InvalidateLayout();
-                return *this;
-            }
-            FORCEINLINE UIElement& SlotSizeToContent(bool v)
-            {
-                _slot._is_size_to_content = v;
-                _slot._type = ESlotType::kCanvas;
-                SyncSlotObjectFromLegacy();
-                if (auto canvas_slot = dynamic_cast<CanvasSlot *>(_slot_obj.get()); canvas_slot != nullptr)
-                    canvas_slot->_size_to_content = v;
-                _slot_obj_dirty = false;
-                _legacy_slot_dirty = false;
-                InvalidateLayout();
-                return *this;
-            }
-            FORCEINLINE UIElement& SlotFillRate(f32 rate)
-            {
-                _slot._fill_rate = rate;
-                SyncSlotObjectFromLegacy();
-                if (auto linear_slot = dynamic_cast<LinearSlot *>(_slot_obj.get()); linear_slot != nullptr)
-                    linear_slot->_fill_rate = rate;
-                _slot_obj_dirty = false;
-                _legacy_slot_dirty = false;
-                InvalidateLayout();
-                return *this;
-            }
             //内边距
-            FORCEINLINE UIElement& SlotPadding(Padding padding)
-            {
-                _padding = padding;
-                InvalidateLayout();
-                return *this;
-            }
-            Vector2f SlotPosition() const { SyncLegacyFromSlotObject(); return _slot._position; }
-            Vector2f SlotSize() const { SyncLegacyFromSlotObject(); return _slot._size; }
-            Vector2f SlotAnchor() const { SyncLegacyFromSlotObject(); return _slot._anchor; }
-            EAlignment SlotAlignmentH() const { SyncLegacyFromSlotObject(); return _slot._alignment_h; }
-            EAlignment SlotAlignmentV() const { SyncLegacyFromSlotObject(); return _slot._alignment_v; }
-            Padding SlotMargin() const { SyncLegacyFromSlotObject(); return _slot._margin; }
-            ESizePolicy SlotSizePolicy(bool is_h = true) const { SyncLegacyFromSlotObject(); return is_h ? _slot._size_policy_h : _slot._size_policy_v; }
-            bool SlotSizeToContent() const { SyncLegacyFromSlotObject(); return _slot._is_size_to_content; }
-            f32 SlotFillRate() const { SyncLegacyFromSlotObject(); return _slot._fill_rate; }
+            Padding &SlotPadding() { return _padding; }
             Padding SlotPadding() const { return _padding; }
             //变换
             void Translate(f32 x, f32 y)
@@ -411,12 +341,13 @@ namespace Ailu
         public:
             APROPERTY()
             EVisibility _visibility = EVisibility::kVisible;
-            State _state;
+            u32 _state_flags = (u32)EUIElementState::kEnabled | (u32)EUIElementState::kVisible | (u32)EUIElementState::kMouseEvents;
         private:
             void SetFocusedInternal(bool v);// 仅 UIManager 使用
             void ApplyTransform();
-            void SyncSlotObjectFromLegacy() const;
-            void SyncLegacyFromSlotObject() const;
+            Ref<UISlot> &EnsureSlotObject() const;
+            virtual Ref<UISlot> CreateSlotForChild();
+            virtual bool UsesVerticalChildLayout() const { return false; }
         protected:
             void OnPropertyChanged(const PropertyInfo& prop) override;
             virtual void RenderImpl(UIRenderer &r) {};
@@ -429,10 +360,7 @@ namespace Ailu
             virtual void PostArrange() {};
         protected:
             APROPERTY()
-            Slot _slot;
             mutable Ref<UISlot> _slot_obj;
-            mutable bool _slot_obj_dirty = true;
-            mutable bool _legacy_slot_dirty = false;
             APROPERTY()
             Padding _padding;      // ltrb，元素内边距
             Vector4f _desired_rect;//元素所需要的rect，一般而言就是slot.pos/size

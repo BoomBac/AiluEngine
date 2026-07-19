@@ -20,7 +20,7 @@ namespace Ailu
             _use_hardware_ray_tracing = GraphicsContext::Get().IsHardwareRayTracingSupported();
             if (_use_hardware_ray_tracing)
                 _gi_raytracing_shader = RayTracingShader::Create(ResourceMgr::GetResSysPath(L"Shaders/hlsl/DXR/Raytracing.hlsl"), "RayTraceGI_RayTracingShader");
-            _gi_compute_shader = ResourceMgr::Get().Load<ComputeShader>(L"Shaders/raytrace_gi.alasset");
+            _gi_compute_shader = ResourceMgr::Get().Load<ComputeShader>(L"Shaders/hlsl/ray_trace/raytrace_gi.alasset");
             _gi_pass = MakeScope<GIPass>(_gi_compute_shader.get(), _gi_raytracing_shader.get());
             _gi_compute_shader->SetInts("_PickPixel",{200,200});
             _gi_compute_shader->SetBool("_enable_ris", _enable_ris);
@@ -90,7 +90,7 @@ namespace Ailu
             g_perCamData.reset(ConstantBuffer::Create(sizeof(CBufferPerCameraData), "PerCamData"));
 
 
-            _debug_line_mat = MakeRef<Material>(ResourceMgr::Get().Load<Shader>(L"Shaders/raytrace_debug_draw.alasset").get(), "RayDebugLineMat");
+            _debug_line_mat = MakeRef<Material>(ResourceMgr::Get().Load<Shader>(L"Shaders/hlsl/ray_trace/raytrace_debug_draw.alasset").get(), "RayDebugLineMat");
             // _kernel_ray_gen = cs->FindKernel("PrimaryRay");
             _kernel_ray_gen = cs->FindKernel("RayGen");
             _kernel_denoise = cs->FindKernel("Denoise");

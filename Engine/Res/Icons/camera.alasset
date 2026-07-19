@@ -5,6 +5,6 @@
         "_asset_type": "Ailu::Render::Texture2D",
         "_asset_name": "camera"
     },
-    "_file": "Icons/camera.png",
+    "_file": "camera.png",
     "_is_srgb": true
 }

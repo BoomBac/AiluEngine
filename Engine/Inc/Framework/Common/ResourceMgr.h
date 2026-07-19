@@ -96,10 +96,39 @@ namespace Ailu
     private:
         Vector<WString> _asset_names;
     };
+    class Project;
+    using AssetPath = WString;
+    using SystemPath = WString;
 
     class AILU_API ResourceMgr : public IRuntimeModule
     {
     public:
+        struct AssetMountDesc
+        {
+            EAssetDomain _domain;
+            WString _scheme;
+            WString _asset_root;
+            WString _database_path;
+            bool _read_only;
+        };
+
+        struct AssetMountDomain
+        {
+            AssetMountDomain(const AssetMountDesc& desc)
+            {
+                _domain = desc._domain;
+                _scheme = desc._scheme;
+                _asset_root = desc._asset_root;
+                _database_path = desc._database_path;
+                _read_only = desc._read_only;
+            }
+            EAssetDomain _domain;
+            WString _scheme;
+            WString _asset_root;
+            WString _database_path;
+            bool _read_only;
+        };
+
         static void Init();
         static void Shutdown();
         static ResourceMgr& Get();
@@ -114,12 +143,19 @@ namespace Ailu
         inline const static std::set<String> kLDRImageExt = {".png", ".PNG", ".tga", ".TGA", ".jpg", ".JPG", ".jpg", ".JPEG"};
         inline const static std::set<String> kHDRImageExt = {".exr", ".EXR", ".hdr", ".HDR"};
         inline const static std::set<String> kMeshExt = {".obj", ".OBJ", ".fbx", ".FBX", ".gltf", ".GLTF"};
+        inline const static Array<WString,3> kPathScheme = {L"engine://",L"editor://",L"project://"};
 
     public:
-        static const WString &EngineResRootPath() { return s_engine_res_root_pathw; };
-        static const WString &ProjectRootPath() { return s_project_root_pathw; };
-        static String GetResSysPath(const String &sub_path);
-        static WString GetResSysPath(const WString &sub_path);
+        static const WString &EngineResRootPath() { return s_engine_res_root_path; };
+        static const WString &EditorResRootPath() { return s_editor_res_root_path; };
+        static const WString &ProjectRootPath() { return s_project_root_path; };
+        static void ConfigProject(Project* proj);
+        static void ConfigEditorResRoot(const WString &root);
+        static void ConfigEngineResRoot(const WString &root);
+
+        static WString GetResSysPath(const WString &p);
+        static WString GetResSysPath(EAssetDomain domain, const WString &relative_path);
+
         DISALLOW_COPY_AND_ASSIGN(ResourceMgr)
         ResourceMgr() = default;
         int Initialize() final;
@@ -137,14 +173,6 @@ namespace Ailu
         void SaveAllUnsavedAssets();
         void MigrateLegacyAssetDocuments(const WString &root_asset_dir = L"");
         Asset *GetLinkedAsset(Object *obj);
-        static void ConfigProjectRoot(const WString &project_root);
-        static void ConfigEngineResRoot(const WString &engine_res_root);
-        static void ConfigRootPath(const WString &prex);
-        //.../Res，最后不带斜杠
-        const WString &GetEngineRootSysPath() const
-        {
-            return _project_root_path;
-        }
         //提交一个任务，该任务会在ResourceMgr tick时在主线程执行
         void SubmitTaskSync(ResourceTask task);
         void SubmitTaskSync(ResourceTask task,std::function<void(bool)> callback);
@@ -297,8 +325,8 @@ namespace Ailu
         void RemoveFromAssetDB(const Asset *asset);
         bool IsAssetLoaded(const WString &asset_path) const;
 
-        void LoadAssetDB();
-        void SaveAssetDB();
+        void LoadAssetDB(const AssetMountDomain& domain);
+        void SaveAssetDB(EAssetDomain domain);
 
         void CreateAndRegisterEmbeddedMaterial(Mesh* mesh);
 
@@ -330,9 +358,13 @@ namespace Ailu
         void OnAssetDataBaseChanged();
 
     private:
-        inline static String kAssetDatabasePath;
-        inline static WString s_engine_res_root_pathw;
-        inline static WString s_project_root_pathw;
+        inline static WString s_engine_res_root_path;
+        inline static WString s_editor_res_root_path;
+        inline static WString s_project_root_path;
+        inline static WString s_project_asset_root_path;
+        inline static WString s_project_library_root_path;
+        inline static WString s_project_asset_database_path;
+
         inline static Map<u32, WString> s_object_sys_path_map;
         inline static Queue<Asset *> s_pending_save_assets;
         HashMap<WString, fs::file_time_type> _file_last_load_time;
@@ -345,7 +377,6 @@ namespace Ailu
         std::map<WString, Guid> _asset_looktable{};
         //object_id,asset*
         std::map<u32, Asset *> _object_to_asset{};
-
         ResourcePoolContainer _global_resources;
         ResourcePoolLut _lut_global_resources;
         ResourceTypeLut _lut_global_resources_by_type;
@@ -354,6 +385,7 @@ namespace Ailu
         Queue<std::function<void()>> _async_tasks;
         Queue<Asset *> _pending_delete_assets;
         HashMap<WString, ImportSetting*> _importers;
+        Vector<AssetMountDomain> _asset_domains;
     };
     template<typename T>
     inline Ref<T> ResourceMgr::Load(const WString &asset_path, const ImportSetting *setting)

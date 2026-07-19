@@ -226,6 +226,8 @@ namespace Ailu
         String SaveToString();
         bool LoadFromString(const String &json_text);
         bool HasField(const String &name);
+        bool IsCurrentNodeObject();
+        Vector<String> GetCurrentObjectKeys();
     private:
         JsonValue *FindNode();
         void Reset()

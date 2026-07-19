@@ -13,6 +13,7 @@ namespace Ailu
 	namespace UI
 	{
 		class Widget;
+        class Text;
 	}
 	namespace Editor
 	{
@@ -38,10 +39,20 @@ namespace Ailu
 			Render::PickFeature _pick;
             Vector4f _scene_vp_rect;
 
-        private:
+		private:
             void ProcessTransformGizmo();
+            void BuildEditorChrome();
+            void UpdateEditorChrome(f32 dt);
+            void SaveAllAssets();
 		private:
 			Ref<UI::Widget> _main_widget = nullptr;
+            Ref<UI::Widget> _toolbar_widget = nullptr;
+            Ref<UI::Widget> _status_bar_widget = nullptr;
+            UI::Border *_status_bar_border = nullptr;
+            bool _was_playing = false;
+            UI::Text *_status_left_text = nullptr;
+            UI::Text *_status_right_text = nullptr;
+            String _editor_status_message = "Ready";
 			//transform gizmo
             i16 _transform_gizmo_type = -1;
             bool _is_transform_gizmo_snap = false;

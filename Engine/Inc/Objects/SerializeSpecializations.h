@@ -2,7 +2,9 @@
 #define AILU_SERIALIZE_SPECIALIZATIONS_H
 
 #include "Objects/Serialize.h"
+#include "Objects/JsonArchive.h"
 #include "Framework/Math/ALMath.hpp"
+#include "Framework/Math/Guid.h"
 #include <deque>
 #include <list>
 #include <map>
@@ -234,6 +236,26 @@ namespace Ailu
             if (name)
                 sar->BeginObject(*name);
 
+            if constexpr (std::is_same_v<std::remove_cv_t<Key>, String>)
+            {
+                if (auto *json_ar = dynamic_cast<JsonArchive *>(&ar); json_ar != nullptr && json_ar->IsCurrentNodeObject())
+                {
+                    Vector<String> keys = json_ar->GetCurrentObjectKeys();
+                    container->clear();
+                    ReserveIfSupported(*container, keys.size());
+                    for (const String &key: keys)
+                    {
+                        Value value{};
+                        DeserializeValue(value, ar, key);
+                        container->emplace(key, std::move(value));
+                    }
+
+                    if (name)
+                        sar->EndObject();
+                    return;
+                }
+            }
+
             FStructedArchive::EStructedDataType type{};
             const u64 arr_size = sar->BeginArray(type);
             container->clear();
@@ -255,6 +277,20 @@ namespace Ailu
 
     template<>
     struct AILU_API SerializerWrapper<String>
+    {
+        static void Serialize(void *data, FArchive &ar, const String *name = nullptr);
+        static void Deserialize(void *data, FArchive &ar, const String *name = nullptr);
+    };
+
+    template<>
+    struct AILU_API SerializerWrapper<WString>
+    {
+        static void Serialize(void *data, FArchive &ar, const String *name = nullptr);
+        static void Deserialize(void *data, FArchive &ar, const String *name = nullptr);
+    };
+
+    template<>
+    struct AILU_API SerializerWrapper<Guid>
     {
         static void Serialize(void *data, FArchive &ar, const String *name = nullptr);
         static void Deserialize(void *data, FArchive &ar, const String *name = nullptr);

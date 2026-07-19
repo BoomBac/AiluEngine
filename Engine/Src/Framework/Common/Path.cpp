@@ -214,5 +214,57 @@ namespace Ailu
             return dir.substr(0, dir.find_last_of(L"/") + 1);
         }
 
+        WString NormalizePathWithoutTrailingSlash(const WString &path)
+        {
+            WString normalized = FormatFilePath(path);
+            while (!normalized.empty() && normalized.back() == L'/')
+                normalized.pop_back();
+            return normalized;
+        }
+
+        String NormalizePathWithoutTrailingSlash(const String &path)
+        {
+            String normalized = FormatFilePath(path);
+            while (!normalized.empty() && normalized.back() == '/')
+                normalized.pop_back();
+            return normalized;
+        }
+
+        WString NormalizeDirectoryPath(const WString &path)
+        {
+            WString normalized = FormatFilePath(path);
+            if (!normalized.empty() && normalized.back() != L'/')
+                normalized.push_back(L'/');
+            return normalized;
+        }
+
+        String NormalizeDirectoryPath(const String &path)
+        {
+            String normalized = FormatFilePath(path);
+            if (!normalized.empty() && normalized.back() != '/')
+                normalized.push_back('/');
+            return normalized;
+        }
+
+        WString NormalizeRelativeDirectory(const WString &path)
+        {
+            WString result = FormatFilePath(path);
+            while (!result.empty() && result.front() == L'/')
+                result.erase(result.begin());
+            while (!result.empty() && result.back() == L'/')
+                result.pop_back();
+            return result;
+        }
+
+        String NormalizeRelativeDirectory(const String &path)
+        {
+            String result = FormatFilePath(path);
+            while (!result.empty() && result.front() == '/')
+                result.erase(result.begin());
+            while (!result.empty() && result.back() == '/')
+                result.pop_back();
+            return result;
+        }
+
     } // namespace PathUtils
 }

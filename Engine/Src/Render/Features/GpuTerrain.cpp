@@ -11,9 +11,9 @@ namespace Ailu::Render
     GpuTerrain::GpuTerrain() : RenderFeature("GpuTerrain")
     {
         _terrain_pass = AL_NEW(TerrainPass);
-        _terrain_gen = ResourceMgr::Get().Load<ComputeShader>(L"Shaders/gpu_terrain.alasset");
-        _plane = ResourceMgr::Get().Load<Mesh>(L"Meshs/terrain_plane.alasset");
-        _terrain_mat = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/terrain.alasset"),"DefaultTerrain");
+        _terrain_gen = ResourceMgr::Get().Load<ComputeShader>(L"Shaders/hlsl/Compute/gpu_terrain.alasset");
+        _plane = ResourceMgr::Get().Load<Mesh>(L"Meshs/src_res/terrain_plane.alasset");
+        _terrain_mat = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/terrain.alasset"),"DefaultTerrain");
         _terrain_mat->SetTexture("_BaseColor", ResourceMgr::Get().Get<Texture2D>(L"Textures/TerrainDiffuse"));
         _terrain_mat->SetTexture("_HeightMap", ResourceMgr::Get().Get<Texture2D>(L"Textures/TerrainHeight"));
         _terrain_pass->Setup(_terrain_gen.get(),_plane.get(),_terrain_mat.get(),&_max_height);

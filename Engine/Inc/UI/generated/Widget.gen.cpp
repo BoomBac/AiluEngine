@@ -72,7 +72,7 @@ meta_visibility.Set("RangeMin",(f32)0);
 meta_visibility.Set("RangeMax",(f32)1);
 MemberBuilder builder_visibility;
 builder_visibility._name = "_visibility";
-builder_visibility._type_name = "EVisibility";
+builder_visibility._type_name = "Ailu::UI::EVisibility";
 builder_visibility._offset = offsetof(Widget,_visibility);
 builder_visibility._is_const = false;
 builder_visibility._is_static = false;
@@ -191,7 +191,7 @@ meta_slot.Set("RangeMin",(f32)0);
 meta_slot.Set("RangeMax",(f32)1);
 MemberBuilder builder_slot;
 builder_slot._name = "_slot";
-builder_slot._type_name = "Slot";
+builder_slot._type_name = "Ref<UISlot>";
 builder_slot._offset = offsetof(SlotItemData,_slot);
 builder_slot._is_const = false;
 builder_slot._is_static = false;
@@ -200,8 +200,8 @@ builder_slot._is_pointer = false;
 builder_slot._is_ref = false;
 builder_slot._is_template = false;
 builder_slot._meta = meta_slot;
-builder_slot._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Slot>);
-builder_slot._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Slot>);
+builder_slot._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Ref<UISlot>>);
+builder_slot._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Ref<UISlot>>);
 initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_slot));
 Meta meta_element_id;
 meta_element_id.Set("Category","");
@@ -260,5 +260,9 @@ Ailu::Type* Ailu::UI::SlotItemData::GetPrivateStaticClass()
 template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::SlotItemData>()
 {
 return Ailu::UI::SlotItemData::StaticType();
+}
+    Type *Ailu::UI::SlotItemData::GetType()
+{
+return Ailu::UI::SlotItemData::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_SlotItemData(&Ailu::UI::SlotItemData::StaticType, "Ailu::UI::SlotItemData");

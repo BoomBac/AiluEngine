@@ -13,6 +13,46 @@
 
 static Timer g_Timer;
 
+static std::string ParentNamespace(const std::string &ns)
+{
+    const auto pos = ns.rfind("::");
+    return pos == std::string::npos ? "" : ns.substr(0, pos);
+}
+
+static std::string ResolveReflectedTypeName(const std::string &type_name,
+                                            const std::string &current_namespace,
+                                            const std::unordered_map<std::string, std::set<std::string>> &type_namespace_map)
+{
+    if (type_name.find("::") != std::string::npos)
+        return type_name;
+
+    auto it = type_namespace_map.find(type_name);
+    if (it == type_namespace_map.end())
+        return type_name;
+
+    const auto &candidates = it->second;
+    const std::string current_full_name = current_namespace.empty() ? type_name : current_namespace + "::" + type_name;
+    if (candidates.contains(current_full_name))
+        return current_full_name;
+
+    std::string ns = current_namespace;
+    while (!ns.empty())
+    {
+        ns = ParentNamespace(ns);
+        if (!ns.empty())
+        {
+            const std::string parent_full_name = ns + "::" + type_name;
+            if (candidates.contains(parent_full_name))
+                return parent_full_name;
+        }
+    }
+
+    if (candidates.size() == 1)
+        return *candidates.begin();
+
+    return type_name;
+}
+
 static void ParserClassOrStructInfo(const std::string& line,AiluHeadTool::ClassInfo& info,AiluHeadTool& aht)
 {
     // 支持：
@@ -566,7 +606,9 @@ static void ParserMeta(std::string line, AiluHeadTool::PropertyMeta &meta)
 
 #define BOOL_STR(x) x ? "true" : "false"
 
-static void GenerateClassTypeInfo(const AiluHeadTool::ClassInfo &class_info, std::ofstream &file)
+static void GenerateClassTypeInfo(const AiluHeadTool::ClassInfo &class_info,
+                                  std::ofstream &file,
+                                  const std::unordered_map<std::string, std::set<std::string>> &type_namespace_map)
 {
     using std::endl;
     std::string full_name = class_info._namespace + "::" + class_info._name;
@@ -630,9 +672,10 @@ static void GenerateClassTypeInfo(const AiluHeadTool::ClassInfo &class_info, std
                 file << std::format("{}.Set(\"RangeMax\",(i32){});", cur_meta, mem._meta._max)<< std::endl;
             }
             auto bd_name = "builder" + mem._name;
+            const std::string reflected_type_name = ResolveReflectedTypeName(mem._type, class_info._namespace, type_namespace_map);
             file << std::format("MemberBuilder {};", bd_name) << std::endl;
             file << std::format("{}._name = \"{}\";", bd_name,mem._name) << std::endl;
-            file << std::format("{}._type_name = \"{}\";", bd_name,mem._type) << std::endl;
+            file << std::format("{}._type_name = \"{}\";", bd_name, reflected_type_name) << std::endl;
             file << std::format("{}._offset = offsetof({},{});", bd_name, class_info._name, mem._name) << std::endl;
             file << std::format("{}._is_const = {};", bd_name,BOOL_STR(mem._is_const)) << std::endl;
             file << std::format("{}._is_static = {};", bd_name, BOOL_STR(mem._is_static)) << std::endl;
@@ -663,19 +706,17 @@ static void GenerateClassTypeInfo(const AiluHeadTool::ClassInfo &class_info, std
     file << "{" << std::endl;
     file << "return " << std::format("{}::StaticType();", full_name) << std::endl;
     file << "}" << std::endl;
-    if (!class_info._is_struct)
-    {
-        file << std::format("    Type *{}::GetType()", full_name) << std::endl;
-        file << "{" << std::endl;
-        file << "return " << std::format("{}::GetPrivateStaticClass();", full_name) << std::endl;
-        file << "}" << std::endl;
-    }
+    file << std::format("    Type *{}::GetType()", full_name) << std::endl;
+    file << "{" << std::endl;
+    file << "return " << std::format("{}::GetPrivateStaticClass();", full_name) << std::endl;
+    file << "}" << std::endl;
     //ClassTypeRegister s_register_object(&Ailu::Object::StaticType, "Ailu::Object");
     file << std::format("ClassTypeRegister s_register_{}(&{}::StaticType, \"{}\");", class_info._name, full_name, full_name) << std::endl;
 }
 
 static void GenerateEnumTypeInfo(const AiluHeadTool::EnumInfo &enum_info, std::ofstream &file)
 {
+    const std::string full_name = enum_info._namespace.empty() ? enum_info._name : enum_info._namespace + "::" + enum_info._name;
     std::string type_ins_name = std::format("s_enum_type_{}", enum_info._name);
     file << std::format("static std::unique_ptr<Ailu::Enum> {} = nullptr;", type_ins_name) << std::endl;
     std::string construct_enum_func = std::format("Z_Construct_Enum_{}_Type", enum_info._name);
@@ -686,6 +727,8 @@ static void GenerateEnumTypeInfo(const AiluHeadTool::EnumInfo &enum_info, std::o
     file << "{" << std::endl;
     file << "EnumInitializer initializer;" << std::endl;
     file << std::format("initializer._name = \"{}\"", enum_info._name) << ";" << std::endl;
+    file << std::format("initializer._namespace = \"{}\"", enum_info._namespace) << ";" << std::endl;
+    file << std::format("initializer._full_name = \"{}\"", full_name) << ";" << std::endl;
     for (auto &mem: enum_info._members)
     {
         auto &[name, id] = mem;
@@ -952,10 +995,10 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                         out_file << std::format("#define {} \\", class_info._gen_macro_body);
                         // Replace "Person" with the specified className
                         std::string search = "TClass";
-                        bool is_base_object = class_info._name == "Object";
+                        const std::string get_type_decl_prefix = _is_cur_file_engine_lib && class_info._export_id.empty() ? "AILU_API " : "";
                         size_t pos = 0;
                         std::string generate_body;
-                        if (is_base_object)
+                        if (class_info._name == "Object")
                         {
                             generate_body = R"(
                             private: \
@@ -963,7 +1006,18 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                                 static Type* GetPrivateStaticClass();\
                             public:\
                                 static Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual Type  *GetType();
+                                virtual TGetTypeApiType  *GetType();
+                            )";
+                        }
+                        else if (!class_info._parent.empty())
+                        {
+                            generate_body = R"(
+                            private: \
+                                friend Type* Z_Construct_TClass_Type();\
+                                static Type* GetPrivateStaticClass();\
+                            public:\
+                                static Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual TGetTypeApiType  *GetType() override;
                             )";
                         }
                         else
@@ -974,7 +1028,7 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                                 static Type* GetPrivateStaticClass();\
                             public:\
                                 static Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual Type  *GetType() override;
+                                TGetTypeApiType  *GetType();
                             )";
                         }
 
@@ -983,6 +1037,7 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                             generate_body.replace(pos, search.length(), class_info._name);
                             pos += class_info._name.length();
                         }
+                        Replace(generate_body, "TGetTypeApi", get_type_decl_prefix);
                         out_file << generate_body;
                         out_file << "namespace Ailu {class Type;}" << std::endl;
                         out_file << "namespace " << class_info._namespace << "{" << std::endl;
@@ -1003,13 +1058,15 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                         out_file << "//Struct " << struct_info._name << " begin..........................." << std::endl;
                         out_file << std::format("#define {} \\", struct_info._gen_macro_body);
                         std::string search = "TClass";
+                        const std::string get_type_decl_prefix = _is_cur_file_engine_lib && struct_info._export_id.empty() ? "AILU_API " : "";
                         size_t pos = 0;
                         std::string generate_body = R"(
                             private: \
                                 friend Type* Z_Construct_TClass_Type();\
                                 static Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};
+                                static Type *StaticType() {return GetPrivateStaticClass();};\
+                                TGetTypeApiType  *GetType();
                             )";
 
                         while ((pos = generate_body.find(search, pos)) != std::string::npos)
@@ -1017,6 +1074,7 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                             generate_body.replace(pos, search.length(), struct_info._name);
                             pos += struct_info._name.length();
                         }
+                        Replace(generate_body, "TGetTypeApi", get_type_decl_prefix);
                         out_file << generate_body;
                         out_file << "namespace Ailu {class Type;}" << std::endl;
                         out_file << "namespace " << struct_info._namespace << "{" << std::endl;
@@ -1068,10 +1126,10 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                     cpp_file << "using namespace " << work_namespace << ";" << std::endl;
                     for (const auto &class_info: _classes)
                     {
-                        GenerateClassTypeInfo(class_info, cpp_file);
+                        GenerateClassTypeInfo(class_info, cpp_file, _class_ns_map);
                     }
                     for (const auto &struct_info: _structs)
-                        GenerateClassTypeInfo(struct_info, cpp_file);
+                        GenerateClassTypeInfo(struct_info, cpp_file, _class_ns_map);
                     for (auto &enum_info: _enums)
                         GenerateEnumTypeInfo(enum_info, cpp_file);
                     cpp_file.close();
@@ -1230,6 +1288,7 @@ void AiluHeadTool::ColloctClassNamespace(std::set<fs::path> inc_files, Path p)
         _tracker.Clean();
         std::regex classRegex(R"(^\s*(class|struct)\s+([_A-Za-z]\w*)(?:\s*[:{]|$))");
         std::regex classWithMacroRegex(R"(^\s*(class|struct)\s+[A-Z0-9_]+\s+([_A-Za-z]\w*)(?:\s*[:{]|$))");
+        std::regex enumRegex(R"(^\s*enum\s+(?:class\s+)?([_A-Za-z]\w*)(?:\s*[:{]|$))");
         while (std::getline(file, line))
         {
             auto &&cur_namespace = _tracker.ProcessLine(line);
@@ -1243,10 +1302,23 @@ void AiluHeadTool::ColloctClassNamespace(std::set<fs::path> inc_files, Path p)
                                                : cur_namespace + "::" + class_name;
                 if (!_class_ns_map.contains(class_name))
                 {
-                    _class_ns_map[p.string()] = {};
+                    _class_ns_map[class_name] = {};
                 }
                 _class_ns_map[class_name].insert(full_name);
                 Log(std::format("Found class {} in namespace {}", class_name, cur_namespace));
+            }
+            else if (std::regex_search(line, match, enumRegex))
+            {
+                std::string enum_name = match[1].str();
+                std::string full_name = cur_namespace.empty()
+                                               ? enum_name
+                                               : cur_namespace + "::" + enum_name;
+                if (!_class_ns_map.contains(enum_name))
+                {
+                    _class_ns_map[enum_name] = {};
+                }
+                _class_ns_map[enum_name].insert(full_name);
+                Log(std::format("Found enum {} in namespace {}", enum_name, cur_namespace));
             }
         }
     }

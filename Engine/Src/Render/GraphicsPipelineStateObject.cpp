@@ -183,7 +183,7 @@ namespace Ailu::Render
         LOG_WARNING("Begin initialize PSO cache...");
         TimeMgr::Get().Mark();
 
-        Shader *shader = ResourceMgr::Get().Get<Shader>(L"Shaders/defered_standard_lit.alasset");
+        Shader *shader = ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/defered_standard_lit.alasset");
         auto pso_desc = GraphicsPipelineStateInitializer::GetNormalOpaquePSODesc();
         pso_desc._input_layout = shader->PipelineInputLayout();
         pso_desc._p_vertex_shader = shader;
@@ -198,7 +198,7 @@ namespace Ailu::Render
         AddPSO(std::move(stand_pso));
 
         memset(&pso_desc, 0, sizeof(GraphicsPipelineStateInitializer));
-        shader = ResourceMgr::Get().Get<Shader>(L"Shaders/deferred_lighting.alasset");
+        shader = ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/deferred_lighting.alasset");
         pso_desc = GraphicsPipelineStateInitializer::GetNormalOpaquePSODesc();
         pso_desc._input_layout = shader->PipelineInputLayout();
         pso_desc._p_vertex_shader = shader;
@@ -210,7 +210,7 @@ namespace Ailu::Render
         AddPSO(std::move(stand_pso));
 
         memset(&pso_desc, 0, sizeof(GraphicsPipelineStateInitializer));
-        shader = ResourceMgr::Get().Get<Shader>(L"Shaders/blit.alasset");
+        shader = ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/blit.alasset");
         for (i16 i = 0; i < shader->PassCount(); i++)
         {
             auto &pass = shader->GetPassInfo(i);
@@ -227,7 +227,7 @@ namespace Ailu::Render
 
 
         memset(&pso_desc, 0, sizeof(GraphicsPipelineStateInitializer));
-        shader = ResourceMgr::Get().Get<Shader>(L"Shaders/wireframe.alasset");
+        shader = ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/wireframe.alasset");
         pso_desc._p_vertex_shader = shader;
         pso_desc._p_pixel_shader = shader;
         pso_desc._depth_stencil_state = TStaticDepthStencilState<false, ECompareFunc::kLessEqual>::GetRHI();
@@ -238,7 +238,7 @@ namespace Ailu::Render
         AddPSO(std::move(wireframe_pso));
 
         memset(&pso_desc, 0, sizeof(GraphicsPipelineStateInitializer));
-        shader = ResourceMgr::Get().Get<Shader>(L"Shaders/cubemap_gen.alasset");
+        shader = ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/cubemap_gen.alasset");
         pso_desc._input_layout = shader->PipelineInputLayout();
         pso_desc._blend_state = shader->PipelineBlendState();
         pso_desc._raster_state = shader->PipelineRasterizerState();
@@ -252,7 +252,7 @@ namespace Ailu::Render
         GraphicsPipelineStateMgr::AddPSO(std::move(pso));
 
         memset(&pso_desc, 0, sizeof(GraphicsPipelineStateInitializer));
-        shader = ResourceMgr::Get().Get<Shader>(L"Shaders/filter_irradiance.alasset");
+        shader = ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/filter_irradiance.alasset");
         for (i16 i = 0; i < shader->PassCount(); i++)
         {
             auto &pass = shader->GetPassInfo(i);
@@ -287,7 +287,7 @@ namespace Ailu::Render
             GraphicsPipelineStateMgr::AddPSO(std::move(pso));
         }
         memset(&pso_desc, 0, sizeof(GraphicsPipelineStateInitializer));
-        shader = ResourceMgr::Get().Get<Shader>(L"Shaders/forwardlit.alasset");
+        shader = ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/forwardlit.alasset");
         for (i16 i = 0; i < shader->PassCount(); i++)
         {
             auto &pass = shader->GetPassInfo(i);

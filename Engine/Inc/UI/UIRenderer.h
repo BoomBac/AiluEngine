@@ -7,6 +7,8 @@
 #include "Framework/Math/Transform2D.h"
 #include "GlobalMarco.h"
 #include "DrawerBlock.h"
+#include "Style/UIStyleBasic.h"
+#include "Style/UIStyles.h"
 
 #undef DrawText
 
@@ -50,8 +52,11 @@ namespace Ailu
             UIRenderer();
             ~UIRenderer();
             void Render(CommandBuffer* cmd);
-            void DrawQuad(Vector4f rect, Color color = Colors::kWhite, f32 depth = 0.0f);
-            void DrawQuad(Vector4f rect, Matrix4x4f matrix, Color color = Colors::kWhite, f32 depth = 0.0f);
+            void DrawQuad(Vector4f rect, const UIBrush& brush, f32 depth = 0.0f);
+            void DrawQuad(Vector4f rect, const UIBrush& brush, Vector4f corner_radius, f32 depth = 0.0f);
+            void DrawQuad(Vector4f rect, Matrix4x4f matrix, const UIBrush& brush, f32 depth = 0.0f);
+            void DrawQuad(Vector4f rect, Matrix4x4f matrix, const UIBrush& brush, Vector4f corner_radius, f32 depth = 0.0f);
+            void DrawVisual(Vector4f rect, Matrix4x4f matrix, const UIControlVisual &visual);
             void DrawText(const String &text, Vector2f pos, f32 font_size = 14u, Color color = Colors::kWhite,Vector2f scale = Vector2f::kOne, Render::Font *font = nullptr);
             void DrawText(const String &text, Vector2f pos, Matrix4x4f matrix,f32 font_size = 14u, Color color = Colors::kWhite,Vector2f scale = Vector2f::kOne, Render::Font *font = nullptr);
             void DrawImage(Render::Texture *texture, Vector4f rect, const ImageDrawOptions &opts = {});

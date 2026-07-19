@@ -99,4 +99,8 @@ template<> Ailu::Type* Ailu::StaticClass<Ailu::Math::Transform2D>()
 {
 return Ailu::Math::Transform2D::StaticType();
 }
+    Type *Ailu::Math::Transform2D::GetType()
+{
+return Ailu::Math::Transform2D::GetPrivateStaticClass();
+}
 ClassTypeRegister s_register_Transform2D(&Ailu::Math::Transform2D::StaticType, "Ailu::Math::Transform2D");

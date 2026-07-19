@@ -10,7 +10,7 @@ namespace Ailu::Render
     PostProcessPass::PostProcessPass() : RenderPass("PostProcessPass")
     {
         _cs_blur = ComputeShader::Create(ResourceMgr::GetResSysPath(L"Shaders/hlsl/Compute/blur.hlsl"));
-        _p_bloom_thread_mat = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/bloom.alasset"), "BloomThread");
+        _p_bloom_thread_mat = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/PostProcess/bloom.alasset"), "BloomThread");
         _p_blit_mat = ResourceMgr::Get().Get<Material>(L"Runtime/Material/Blit");
         _p_obj_cb = ConstantBuffer::Create(256);
         memcpy(_p_obj_cb->GetData(), &BuildIdentityMatrix(), sizeof(Matrix4x4f));
@@ -18,7 +18,7 @@ namespace Ailu::Render
         _p_quad_mesh = ResourceMgr::Get().Get<Mesh>(L"Runtime/Mesh/FullScreenQuad");
         for (u16 i = 0; i < _bloom_iterator_count; i++)
         {
-            _bloom_mats.emplace_back(MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/bloom.alasset"), std::format("bloom_mip_{}", i)));
+            _bloom_mats.emplace_back(MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/PostProcess/bloom.alasset"), std::format("bloom_mip_{}", i)));
         }
         _event = (ERenderPassEvent::ERenderPassEvent)(ERenderPassEvent::kBeforePostprocess + 25);
         _nose_tex = ResourceMgr::Get().Get<Texture2D>(L"Textures/noise_medium.png");

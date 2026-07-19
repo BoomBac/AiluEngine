@@ -45,7 +45,7 @@ public:
 
         // 匹配 class/struct（用于追踪类作用域），允许导出宏等修饰符
         // 示例：class AILU_API CompositeBuilder
-        if (std::regex_search(clean_line, match, std::regex(R"(\b(class|struct)\s+(?:[A-Z_][A-Z0-9_]*\s+)*([a-zA-Z_][a-zA-Z0-9_]*)\b)")))
+        if (std::regex_search(clean_line, match, std::regex(R"(^\s*(class|struct)\s+(?:[A-Z_][A-Z0-9_]*\s+)*([a-zA-Z_][a-zA-Z0-9_]*)\b)")))
         {
             // 过滤前向声明：class Foo; 或 struct Bar;
             if (clean_line.find('{') == std::string::npos && clean_line.find(';') != std::string::npos)
@@ -128,6 +128,7 @@ public:
     void Clean()
     {
         _stack.clear();
+        _pending_frames.clear();
         _waiting_brace = 0;
     }
 

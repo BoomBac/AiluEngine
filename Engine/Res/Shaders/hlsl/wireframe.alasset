@@ -1,0 +1,11 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "54238902-542d-44ca-9bed-dbe40c90cdcb",
+        "_asset_type": "Ailu::Render::Shader",
+        "_asset_name": "wireframe"
+    },
+    "_file": "wireframe.hlsl",
+    "_vs_entry": "VSMain",
+    "_ps_entry": "PSMain"
+}

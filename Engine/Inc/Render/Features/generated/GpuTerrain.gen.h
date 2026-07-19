@@ -11,7 +11,7 @@
                                 static Type* GetPrivateStaticClass();\
                             public:\
                                 static Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual Type  *GetType() override;
+                                virtual AILU_API Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::Render{
 class GpuTerrain ;

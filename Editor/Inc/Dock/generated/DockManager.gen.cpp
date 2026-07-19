@@ -351,6 +351,10 @@ template<> Ailu::Type* Ailu::StaticClass<Ailu::Editor::DockNodeData>()
 {
 return Ailu::Editor::DockNodeData::StaticType();
 }
+    Type *Ailu::Editor::DockNodeData::GetType()
+{
+return Ailu::Editor::DockNodeData::GetPrivateStaticClass();
+}
 ClassTypeRegister s_register_DockNodeData(&Ailu::Editor::DockNodeData::StaticType, "Ailu::Editor::DockNodeData");
 Ailu::Type* Ailu::Editor::Z_Construct_DockNodeDataArray_Type()
 {
@@ -403,6 +407,10 @@ template<> Ailu::Type* Ailu::StaticClass<Ailu::Editor::DockNodeDataArray>()
 {
 return Ailu::Editor::DockNodeDataArray::StaticType();
 }
+    Type *Ailu::Editor::DockNodeDataArray::GetType()
+{
+return Ailu::Editor::DockNodeDataArray::GetPrivateStaticClass();
+}
 ClassTypeRegister s_register_DockNodeDataArray(&Ailu::Editor::DockNodeDataArray::StaticType, "Ailu::Editor::DockNodeDataArray");
 static std::unique_ptr<Ailu::Enum> s_enum_type_EDockArea = nullptr;
 //Enum EDockArea begin...........................
@@ -412,6 +420,8 @@ if(s_enum_type_EDockArea == nullptr)
 {
 EnumInitializer initializer;
 initializer._name = "EDockArea";
+initializer._namespace = "Ailu::Editor";
+initializer._full_name = "Ailu::Editor::EDockArea";
 initializer._str_to_enum_lut["kFloat"] = 0;
 initializer._str_to_enum_lut["kCenter"] = 1;
 initializer._str_to_enum_lut["kLeft"] = 2;

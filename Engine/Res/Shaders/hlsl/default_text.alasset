@@ -1,0 +1,11 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "266fceb5-389b-4a08-892c-1e9b2f58d83f",
+        "_asset_type": "Ailu::Render::Shader",
+        "_asset_name": "default_text"
+    },
+    "_file": "default_text.hlsl",
+    "_vs_entry": "VSMain",
+    "_ps_entry": "PSMain"
+}

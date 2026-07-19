@@ -1,0 +1,10 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "d3075919-313e-45b5-8de1-fdf4247232dd",
+        "_asset_type": "Ailu::Render::ComputeShader",
+        "_asset_name": "RayTraceGI"
+    },
+    "_file": "raytrace_gi.hlsl",
+    "_kernel": "Noname"
+}

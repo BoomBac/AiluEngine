@@ -1,6 +1,8 @@
 #ifndef __UI_BASIC_H__
 #define __UI_BASIC_H__
 #include "UIElement.h"
+#include "UI/Style/UIStyles.h"
+#include "UI/Style/UITheme.h"
 #include "generated/Basic.gen.h"
 namespace Ailu
 {
@@ -20,18 +22,35 @@ namespace Ailu
             GENERATED_BODY()
         public:
             Button();
-            explicit Button(const String &name);
+            explicit Button(const String &text);
             Vector2f MeasureDesiredSize() override;
             void SetText(const String &text, bool trigger_event = true);
             String GetText() const;
             void SetTexture(Render::Texture *tex);
             Render::Texture *GetTexture() const;
+
+            // ── Style ────────────────────────────────────────────
+            void SetStyleId(const UIStyleId &id);
+            const UIStyleId &GetStyleId() const { return _style_id; }
+            UIButtonStyleOverride &GetStyleOverride() { return _style_override; }
+
+        protected:
+            void ResolveStyle(const UIStyleContext &context) override;
+            const UIControlVisual *GetVisual(EUIVisualState state) const override;
+
         private:
             void RenderImpl(UIRenderer &r) override;
             void PostArrange() override;
+            void PostDeserialize() override;
+            void RebindContentChildren();
+            Ref<UISlot> CreateSlotForChild() override;
         private:
             Text *_text;
             Image *_icon;
+
+            UIStyleId _style_id;
+            UIButtonStyleOverride _style_override;
+            UIButtonStyle _resolved_style;
         };
 
         ACLASS()
@@ -47,7 +66,13 @@ namespace Ailu
             Vector2f MeasureDesiredSize() override;
             f32 FontSize() const { return _font_size; }
             void FontSize(f32 size);
+
+            // ── Style ────────────────────────────────────────────
+            UIControlVisualOverride &GetStyleOverride() { return _style_override; }
+
         private:
+            void ResolveStyle(const UIStyleContext &context) override;
+            const UIControlVisual *GetVisual(EUIVisualState state) const override;
             void OnPropertyChanged(const PropertyInfo& prop) override;
             void UpdateTextLayout();
             void RenderImpl(UIRenderer &r) override;
@@ -65,6 +90,9 @@ namespace Ailu
             APROPERTY()
             String _text;
             Vector2f _text_size;
+            Vector4f _text_visual_bounds;
+            UIControlVisualOverride _style_override;
+            mutable UIControlVisual _resolved_visual;
         };
 
         ACLASS()
@@ -81,7 +109,15 @@ namespace Ailu
             Vector2f MeasureDesiredSize() override;
             f32 GetValue() const { return _value; }
             void SetValue(f32 v, bool trigger_event = true);
+            UISliderStyleOverride &GetStyleOverride() { return _style_override; }
+
+            // ── Style ────────────────────────────────────────────
+            void SetStyleId(const UIStyleId &id);
+            const UIStyleId &GetStyleId() const { return _style_id; }
+
         private:
+            void ResolveStyle(const UIStyleContext &context) override;
+            const UIControlVisual *GetVisual(EUIVisualState state) const override;
             void RenderImpl(UIRenderer &r) override;
         public:
             APROPERTY()
@@ -89,6 +125,9 @@ namespace Ailu
 
         private:
             Vector4f _bar_rect,_dot_rect;
+            UIStyleId _style_id;
+            UISliderStyleOverride _style_override;
+            UISliderStyle _resolved_style;
             APROPERTY()
             f32 _value = 0.0f;
         };
@@ -103,9 +142,20 @@ namespace Ailu
             Vector2f MeasureDesiredSize() override;
             void SetChecked(bool is_checked);
             bool IsChecked() const { return _is_checked; }
+            UICheckBoxStyleOverride &GetStyleOverride() { return _style_override; }
+
+            // ── Style ────────────────────────────────────────────
+            void SetStyleId(const UIStyleId &id);
+            const UIStyleId &GetStyleId() const { return _style_id; }
+
         private:
+            void ResolveStyle(const UIStyleContext &context) override;
+            const UIControlVisual *GetVisual(EUIVisualState state) const override;
             void RenderImpl(UIRenderer &r) override;
         private:
+            UIStyleId _style_id;
+            UICheckBoxStyleOverride _style_override;
+            UICheckBoxStyle _resolved_style;
             APROPERTY()
             bool _is_checked = false;
         };
@@ -122,10 +172,17 @@ namespace Ailu
             void Thickness(f32 thickness) { _thickness = Vector4f{thickness}; };
             void Thickness(Vector4f ltrb) { _thickness = ltrb; };
             Vector4f Thickness() const { return _thickness; }
+
+            // ── Style ────────────────────────────────────────────
+            UIControlVisualOverride &GetStyleOverride() { return _style_override; }
+
         private:
+            Ref<UISlot> CreateSlotForChild() override;
             void RenderImpl(UIRenderer &r) final;
             void MeasureAndArrange(f32 dt) override;
             void PostDeserialize() override;
+            void ResolveStyle(const UIStyleContext &context) override;
+            const UIControlVisual *GetVisual(EUIVisualState state) const override;
         public:
             APROPERTY()
             Color _bg_color = Colors::kGray;
@@ -134,6 +191,9 @@ namespace Ailu
         protected:
             APROPERTY()
             Vector4f _thickness = Vector4f::kZero;
+        private:
+            UIControlVisualOverride _style_override;
+            mutable UIControlVisual _resolved_visual;
         };
 
         ACLASS()
@@ -148,7 +208,15 @@ namespace Ailu
             void SetContent(const String& content, bool trigger_event = true);
             Vector2f MeasureDesiredSize() override;
             bool IsEditing() const { return _is_editing; }
+            UIInputStyleOverride &GetStyleOverride() { return _style_override; }
+
+            // ── Style ────────────────────────────────────────────
+            void SetStyleId(const UIStyleId &id);
+            const UIStyleId &GetStyleId() const { return _style_id; }
+
         private:
+            void ResolveStyle(const UIStyleContext &context) override;
+            const UIControlVisual *GetVisual(EUIVisualState state) const override;
             void OnPropertyChanged(const PropertyInfo& prop) override;
             void RenderImpl(UIRenderer &r) final;
             void FillCursorOffsetTable();
@@ -175,6 +243,9 @@ namespace Ailu
             Vector2f _text_rect_size;
             bool _is_editing = false;
             bool _is_need_recalc_offset_table = true;
+            UIStyleId _style_id;
+            UIInputStyleOverride _style_override;
+            UIInputStyle _resolved_style;
         };
 
         ACLASS()
@@ -188,8 +259,14 @@ namespace Ailu
             void SetTexture(Render::Texture* tex);
             Render::Texture *GetTexture() const { return _texture; }
             void PostDeserialize() override;
+
+            // ── Style ────────────────────────────────────────────
+            UIControlVisualOverride &GetStyleOverride() { return _style_override; }
+
         private:
             void RenderImpl(UIRenderer &r) override;
+            void ResolveStyle(const UIStyleContext &context) override;
+            const UIControlVisual *GetVisual(EUIVisualState state) const override;
         public:
             APROPERTY()
             Color _tint_color = Colors::kWhite;
@@ -197,6 +274,9 @@ namespace Ailu
             Vector2f _tex_size = Vector2f::kZero;
             APROPERTY()
             String _texture_guid;
+        private:
+            UIControlVisualOverride _style_override;
+            mutable UIControlVisual _resolved_visual;
         };
     }// namespace UI
 }// namespace Ailu

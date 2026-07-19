@@ -30,7 +30,7 @@ meta_visibility.Set("RangeMin",(f32)0);
 meta_visibility.Set("RangeMax",(f32)1);
 MemberBuilder builder_visibility;
 builder_visibility._name = "_visibility";
-builder_visibility._type_name = "EVisibility";
+builder_visibility._type_name = "Ailu::UI::EVisibility";
 builder_visibility._offset = offsetof(UIElement,_visibility);
 builder_visibility._is_const = false;
 builder_visibility._is_static = false;
@@ -42,27 +42,27 @@ builder_visibility._meta = meta_visibility;
 builder_visibility._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<EVisibility>);
 builder_visibility._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<EVisibility>);
 initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_visibility));
-Meta meta_slot;
-meta_slot.Set("Category","");
-meta_slot.Set("IsColor",false);
-meta_slot.Set("IsRange",false);
-meta_slot.Set("IsFloatRange",true);
-meta_slot.Set("RangeMin",(f32)0);
-meta_slot.Set("RangeMax",(f32)1);
-MemberBuilder builder_slot;
-builder_slot._name = "_slot";
-builder_slot._type_name = "Slot";
-builder_slot._offset = offsetof(UIElement,_slot);
-builder_slot._is_const = false;
-builder_slot._is_static = false;
-builder_slot._is_public = false;
-builder_slot._is_pointer = false;
-builder_slot._is_ref = false;
-builder_slot._is_template = false;
-builder_slot._meta = meta_slot;
-builder_slot._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Slot>);
-builder_slot._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Slot>);
-initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_slot));
+Meta meta_slot_obj;
+meta_slot_obj.Set("Category","");
+meta_slot_obj.Set("IsColor",false);
+meta_slot_obj.Set("IsRange",false);
+meta_slot_obj.Set("IsFloatRange",true);
+meta_slot_obj.Set("RangeMin",(f32)0);
+meta_slot_obj.Set("RangeMax",(f32)1);
+MemberBuilder builder_slot_obj;
+builder_slot_obj._name = "_slot_obj";
+builder_slot_obj._type_name = "Ref<UISlot>";
+builder_slot_obj._offset = offsetof(UIElement,_slot_obj);
+builder_slot_obj._is_const = false;
+builder_slot_obj._is_static = false;
+builder_slot_obj._is_public = false;
+builder_slot_obj._is_pointer = false;
+builder_slot_obj._is_ref = false;
+builder_slot_obj._is_template = false;
+builder_slot_obj._meta = meta_slot_obj;
+builder_slot_obj._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Ref<UISlot>>);
+builder_slot_obj._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Ref<UISlot>>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_slot_obj));
 Meta meta_padding;
 meta_padding.Set("Category","");
 meta_padding.Set("IsColor",false);
@@ -72,7 +72,7 @@ meta_padding.Set("RangeMin",(f32)0);
 meta_padding.Set("RangeMax",(f32)1);
 MemberBuilder builder_padding;
 builder_padding._name = "_padding";
-builder_padding._type_name = "Padding";
+builder_padding._type_name = "Ailu::UI::Padding";
 builder_padding._offset = offsetof(UIElement,_padding);
 builder_padding._is_const = false;
 builder_padding._is_static = false;
@@ -176,6 +176,8 @@ if(s_enum_type_EVisibility == nullptr)
 {
 EnumInitializer initializer;
 initializer._name = "EVisibility";
+initializer._namespace = "Ailu::UI";
+initializer._full_name = "Ailu::UI::EVisibility";
 initializer._str_to_enum_lut["kVisible"] = 0;
 initializer._str_to_enum_lut["kHide"] = 1;
 s_enum_type_EVisibility = std::make_unique<Ailu::Enum>(initializer);
@@ -189,4 +191,84 @@ template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::UI::EVisibility>()
 return s_enum_type_EVisibility.get();
 }
 //Enum EVisibility end...........................
+
+static std::unique_ptr<Ailu::Enum> s_enum_type_EStyleInvalidation = nullptr;
+//Enum EStyleInvalidation begin...........................
+const Ailu::Enum* Z_Construct_Enum_EStyleInvalidation_Type()
+{
+if(s_enum_type_EStyleInvalidation == nullptr)
+{
+EnumInitializer initializer;
+initializer._name = "EStyleInvalidation";
+initializer._namespace = "Ailu::UI";
+initializer._full_name = "Ailu::UI::EStyleInvalidation";
+initializer._str_to_enum_lut["kPaintOnly"] = 0;
+initializer._str_to_enum_lut["kLayoutAndPaint"] = 1;
+s_enum_type_EStyleInvalidation = std::make_unique<Ailu::Enum>(initializer);
+Ailu::Enum::RegisterEnum(s_enum_type_EStyleInvalidation.get());
+}
+return s_enum_type_EStyleInvalidation.get();
+}
+static Ailu::EnumTypeRegister g_register_EStyleInvalidation(Z_Construct_Enum_EStyleInvalidation_Type);
+template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::UI::EStyleInvalidation>()
+{
+return s_enum_type_EStyleInvalidation.get();
+}
+//Enum EStyleInvalidation end...........................
+
+static std::unique_ptr<Ailu::Enum> s_enum_type_EUIElementState = nullptr;
+//Enum EUIElementState begin...........................
+const Ailu::Enum* Z_Construct_Enum_EUIElementState_Type()
+{
+if(s_enum_type_EUIElementState == nullptr)
+{
+EnumInitializer initializer;
+initializer._name = "EUIElementState";
+initializer._namespace = "Ailu::UI";
+initializer._full_name = "Ailu::UI::EUIElementState";
+initializer._str_to_enum_lut["kNone"] = 0;
+initializer._str_to_enum_lut["kHovered"] = 1;
+initializer._str_to_enum_lut["kPressed"] = 2;
+initializer._str_to_enum_lut["kFocused"] = 4;
+initializer._str_to_enum_lut["kEnabled"] = 8;
+initializer._str_to_enum_lut["kVisible"] = 16;
+initializer._str_to_enum_lut["kMouseEvents"] = 32;
+s_enum_type_EUIElementState = std::make_unique<Ailu::Enum>(initializer);
+Ailu::Enum::RegisterEnum(s_enum_type_EUIElementState.get());
+}
+return s_enum_type_EUIElementState.get();
+}
+static Ailu::EnumTypeRegister g_register_EUIElementState(Z_Construct_Enum_EUIElementState_Type);
+template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::UI::EUIElementState>()
+{
+return s_enum_type_EUIElementState.get();
+}
+//Enum EUIElementState end...........................
+
+static std::unique_ptr<Ailu::Enum> s_enum_type_EUIVisualState = nullptr;
+//Enum EUIVisualState begin...........................
+const Ailu::Enum* Z_Construct_Enum_EUIVisualState_Type()
+{
+if(s_enum_type_EUIVisualState == nullptr)
+{
+EnumInitializer initializer;
+initializer._name = "EUIVisualState";
+initializer._namespace = "Ailu::UI";
+initializer._full_name = "Ailu::UI::EUIVisualState";
+initializer._str_to_enum_lut["kNormal"] = 0;
+initializer._str_to_enum_lut["kHovered"] = 1;
+initializer._str_to_enum_lut["kPressed"] = 2;
+initializer._str_to_enum_lut["kFocused"] = 3;
+initializer._str_to_enum_lut["kDisabled"] = 4;
+s_enum_type_EUIVisualState = std::make_unique<Ailu::Enum>(initializer);
+Ailu::Enum::RegisterEnum(s_enum_type_EUIVisualState.get());
+}
+return s_enum_type_EUIVisualState.get();
+}
+static Ailu::EnumTypeRegister g_register_EUIVisualState(Z_Construct_Enum_EUIVisualState_Type);
+template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::UI::EUIVisualState>()
+{
+return s_enum_type_EUIVisualState.get();
+}
+//Enum EUIVisualState end...........................
 

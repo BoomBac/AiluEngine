@@ -34,13 +34,13 @@ namespace Ailu
         UIRenderer::UIRenderer()
         {
             _obj_cb.reset(ConstantBuffer::Create(Render::RenderConstants::kPerObjectDataSize));
-            _default_material = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/default_ui.alasset"), "DefaultUIMaterial");
+            _default_material = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/default_ui.alasset"), "DefaultUIMaterial");
             _default_material->SetTexture("_MainTex", Render::Texture::s_p_default_white);
             for (auto &frame_blocks: _drawer_blocks)
             {
                 frame_blocks.push_back(AL_NEW(DrawerBlock, _default_material,9600u));
             }
-            _text_block = AL_NEW(DrawerBlock,MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/default_text.alasset"), "DefaultTextMaterial"));
+            _text_block = AL_NEW(DrawerBlock,MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/default_text.alasset"), "DefaultTextMaterial"));
             _text_renderer = MakeScope<TextRenderer>();
         }
         UIRenderer::~UIRenderer()
@@ -57,6 +57,10 @@ namespace Ailu
 
         void UIRenderer::Render(CommandBuffer *cmd)
         {
+            if (auto selected = UIManager::Get()->GetDebugHighlightTarget(); selected != nullptr && selected->IsVisible())
+            {
+                DrawBox(selected->GetArrangeRect().xy, selected->GetArrangeRect().zw, 2.0f, Color(0.1f, 0.85f, 1.0f, 1.0f));
+            }
             //DrawDebugPannel();
             const f32 dt = TimeMgr::s_delta_time;
             auto& widgets = UI::UIManager::Get()->_widgets;
@@ -99,14 +103,25 @@ namespace Ailu
             //_text_block->Clear();
         }
 
-        void UIRenderer::DrawQuad(Vector4f rect, Color color, f32 depth)
+        void UIRenderer::DrawQuad(Vector4f rect, const UIBrush& brush, f32 depth)
         {
-            DrawQuad(rect, kIdentityMatrix, color, depth);
+            DrawQuad(rect, kIdentityMatrix, brush, depth);
         }
 
-        void UIRenderer::DrawQuad(Vector4f rect,Matrix4x4f matrix, Color color, f32 depth)
+        void UIRenderer::DrawQuad(Vector4f rect, const UIBrush& brush, Vector4f corner_radius, f32 depth)
+        {
+            DrawQuad(rect, kIdentityMatrix, brush, corner_radius, depth);
+        }
+
+        void UIRenderer::DrawQuad(Vector4f rect,Matrix4x4f matrix, const UIBrush& brush, f32 depth)
+        {
+            DrawQuad(rect, matrix, brush, Vector4f::kZero, depth);
+        }
+
+        void UIRenderer::DrawQuad(Vector4f rect, Matrix4x4f matrix, const UIBrush& brush, Vector4f corner_radius, f32 depth)
         {
             DrawerBlock *cb = GetAvailableBlock(4u, 6u);
+            auto color = brush._tint;
             u32 cur_vert_num = cb->CurrentVertNum(), cur_index_num = cb->CurrentIndexNum();
             cb->_pos_buf[cur_vert_num] = {rect.xy, depth};
             cb->_pos_buf[cur_vert_num + 1] = {rect.x + rect.z, rect.y, depth};
@@ -124,6 +139,14 @@ namespace Ailu
             cb->_color_buf[cur_vert_num + 1] = color;
             cb->_color_buf[cur_vert_num + 2] = color;
             cb->_color_buf[cur_vert_num + 3] = color;
+            cb->_rect_buf[cur_vert_num] = rect;
+            cb->_rect_buf[cur_vert_num + 1] = rect;
+            cb->_rect_buf[cur_vert_num + 2] = rect;
+            cb->_rect_buf[cur_vert_num + 3] = rect;
+            cb->_corner_radius_buf[cur_vert_num] = corner_radius;
+            cb->_corner_radius_buf[cur_vert_num + 1] = corner_radius;
+            cb->_corner_radius_buf[cur_vert_num + 2] = corner_radius;
+            cb->_corner_radius_buf[cur_vert_num + 3] = corner_radius;
             cb->_index_buf[cur_index_num] = cur_vert_num + 0u;
             cb->_index_buf[cur_index_num + 1] = cur_vert_num + 1u;
             cb->_index_buf[cur_index_num + 2] = cur_vert_num + 2u;
@@ -131,6 +154,14 @@ namespace Ailu
             cb->_index_buf[cur_index_num + 4] = cur_vert_num + 3u;
             cb->_index_buf[cur_index_num + 5] = cur_vert_num + 2u;
             AppendNode(cb, 4u, 6u, _default_material.get());
+        }
+
+        void UIRenderer::DrawVisual(Vector4f rect, Matrix4x4f matrix, const UIControlVisual &visual)
+        {
+            if (visual._background._type != EUIBrushType::kNone && visual._background._tint.a > 0.0f)
+                DrawQuad(rect, matrix, visual._background, visual._corner_radius);
+            if (visual._border_width > 0.0f && visual._border_color.a > 0.0f)
+                DrawBox(rect.xy, rect.zw, matrix, visual._border_width, visual._border_color);
         }
 
         void UIRenderer::DrawText(const String &text, Vector2f pos, f32 font_size, Color color,Vector2f scale, Render::Font *font)
@@ -165,6 +196,14 @@ namespace Ailu
             cb->_color_buf[cur_vert_num + 1] = opts._tint;
             cb->_color_buf[cur_vert_num + 2] = opts._tint;
             cb->_color_buf[cur_vert_num + 3] = opts._tint;
+            cb->_rect_buf[cur_vert_num] = rect;
+            cb->_rect_buf[cur_vert_num + 1] = rect;
+            cb->_rect_buf[cur_vert_num + 2] = rect;
+            cb->_rect_buf[cur_vert_num + 3] = rect;
+            cb->_corner_radius_buf[cur_vert_num] = Vector4f::kZero;
+            cb->_corner_radius_buf[cur_vert_num + 1] = Vector4f::kZero;
+            cb->_corner_radius_buf[cur_vert_num + 2] = Vector4f::kZero;
+            cb->_corner_radius_buf[cur_vert_num + 3] = Vector4f::kZero;
             cb->_index_buf[cur_index_num] = cur_vert_num + 0u;
             cb->_index_buf[cur_index_num + 1] = cur_vert_num + 1u;
             cb->_index_buf[cur_index_num + 2] = cur_vert_num + 2u;
@@ -215,6 +254,15 @@ namespace Ailu
             cb->_color_buf[v + 1] = color;
             cb->_color_buf[v + 2] = color;
             cb->_color_buf[v + 3] = color;
+            const Vector4f rect = {p0.x, p0.y, b.x - a.x, thickness};
+            cb->_rect_buf[v + 0] = rect;
+            cb->_rect_buf[v + 1] = rect;
+            cb->_rect_buf[v + 2] = rect;
+            cb->_rect_buf[v + 3] = rect;
+            cb->_corner_radius_buf[v + 0] = Vector4f::kZero;
+            cb->_corner_radius_buf[v + 1] = Vector4f::kZero;
+            cb->_corner_radius_buf[v + 2] = Vector4f::kZero;
+            cb->_corner_radius_buf[v + 3] = Vector4f::kZero;
 
             cb->_index_buf[i + 0] = v + 0;
             cb->_index_buf[i + 1] = v + 1;
@@ -351,21 +399,27 @@ namespace Ailu
                 pen.y += line_height;
                 DrawText(std::format("Pos: {},Size: {}", Vector2f(abs_rect.xy).ToString(), Vector2f(abs_rect.zw).ToString()), pen, font_size);
                 pen.y += line_height;
-                DrawText(std::format("Padding: {},Margin: {}", capture->SlotPadding().ToString(), capture->SlotMargin().ToString()),pen,font_size);
+                auto slot = capture->GetSlot();
+                DrawText(std::format("Padding: {},Margin: {}", capture->SlotPadding().ToString(), slot->_margin.ToString()),pen,font_size);
                 pen.y += line_height;
-                DrawText(std::format("SizePolicyH: {},SizePolicyV: {}", StaticEnum<UI::ESizePolicy>()->GetNameByEnum(capture->SlotSizePolicy(true)),
-                                     StaticEnum<UI::ESizePolicy>()->GetNameByEnum(capture->SlotSizePolicy(false))), pen, font_size);
-                pen.y += line_height;
-                DrawText(std::format("AlighH: {},AlighV: {}", StaticEnum<UI::EAlignment>()->GetNameByEnum(capture->SlotAlignmentH()),
-                                     StaticEnum<UI::EAlignment>()->GetNameByEnum(capture->SlotAlignmentV())),
-                         pen, font_size);
-                pen.y += line_height;
-                DrawText(std::format("IsFocused: {},IsHover: {},IsPressed: {}", capture->_state._is_focused, capture->_state._is_hovered, capture->_state._is_pressed), pen, font_size);
+                if (auto linear_slot = dynamic_cast<UI::LinearSlot *>(slot.get()))
+                {
+                    DrawText(std::format("SizePolicyH: {},SizePolicyV: {}", StaticEnum<UI::ESizePolicy>()->GetNameByEnum(linear_slot->_size_policy_h),
+                                         StaticEnum<UI::ESizePolicy>()->GetNameByEnum(linear_slot->_size_policy_v)), pen, font_size);
+                    pen.y += line_height;
+                    DrawText(std::format("CrossAlign: {}", StaticEnum<UI::EAlignment>()->GetNameByEnum(linear_slot->_cross_align)), pen, font_size);
+                    pen.y += line_height;
+                }
+                else if (auto canvas_slot = dynamic_cast<UI::CanvasSlot *>(slot.get()))
+                {
+                    DrawText(std::format("Position: {}, Anchor: {}", canvas_slot->_position.ToString(), canvas_slot->_anchor.ToString()), pen, font_size);
+                    pen.y += line_height;
+                    DrawText(std::format("AlighH: {},AlighV: {}", StaticEnum<UI::EAlignment>()->GetNameByEnum(canvas_slot->_alignment_h),
+                                         StaticEnum<UI::EAlignment>()->GetNameByEnum(canvas_slot->_alignment_v)), pen, font_size);
+                    pen.y += line_height;
+                }
+                DrawText(std::format("IsFocused: {},IsHover: {},IsPressed: {}", capture->IsFocused(), capture->IsHovered(), capture->IsPressed()), pen, font_size);
                 DrawBox(capture->GetArrangeRect().xy, capture->GetArrangeRect().zw, 1.0f, Color(1.0f, 0.5f, 0.0f, 1.0f));
-            }
-            if (auto selected = UIManager::Get()->GetDebugHighlightTarget(); selected != nullptr && selected != capture && selected->IsVisible())
-            {
-                DrawBox(selected->GetArrangeRect().xy, selected->GetArrangeRect().zw, 2.0f, Color(0.1f, 0.85f, 1.0f, 1.0f));
             }
         }
     }// namespace UI

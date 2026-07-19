@@ -22,7 +22,7 @@ namespace Ailu
             if (fs::exists(direct_path))
                 return fs::weakly_canonical(direct_path);
 
-            fs::path resource_path(ResourceMgr::GetResSysPath(path));
+            fs::path resource_path(ToChar(ResourceMgr::GetResSysPath(ToWChar(path))));
             if (fs::exists(resource_path))
                 return fs::weakly_canonical(resource_path);
 

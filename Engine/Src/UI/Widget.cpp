@@ -105,8 +105,6 @@ namespace Ailu
         {
             if (_root)
             {
-                //const auto& s = _root->SlotSize();
-                //const auto& p = _root->SlotPosition();
                 //_root->Arrange(p.x + _position.x, p.y + _position.y,s.x,s.y);
                 _root->Update(dt);
             }

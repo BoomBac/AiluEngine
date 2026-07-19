@@ -28,9 +28,17 @@ namespace Ailu
             return static_cast<u8>(v * 255.0f + 0.5f);
         }
 
+        static UIBrush ColorBrush(const Color &color)
+        {
+            UIBrush brush;
+            brush._type = EUIBrushType::kColor;
+            brush._tint = color;
+            return brush;
+        }
+
         ColorPicker::ColorPicker() : UIElement("ColorPicker")
         {
-            _state._wants_mouse_events = true;
+            SetWantsMouseEvents(true);
             const Array<String, 4> channel_names = {"R", "G", "B", "A"};
             for (u32 i = 0; i < channel_names.size(); ++i)
             {
@@ -179,7 +187,8 @@ namespace Ailu
 
         Vector2f ColorPicker::MeasureDesiredSize()
         {
-            if (_slot._size_policy_h == ESizePolicy::kFixed) return _slot._size;
+            if (auto slot = dynamic_cast<LinearSlot *>(GetSlot().get()); slot != nullptr && slot->_size_policy_h == ESizePolicy::kFixed)
+                return slot->_size;
             // default minimum footprint
             return {320.0f, 240.0f};
         }
@@ -257,7 +266,7 @@ namespace Ailu
 
         void ColorPicker::RenderImpl(UIRenderer &r)
         {
-            r.DrawQuad(_arrange_rect, _matrix, Colors::kBlack);
+            r.DrawQuad(_arrange_rect, _matrix, ColorBrush(Colors::kBlack));
             // SV box
             if (_tex_sv)
             {
@@ -268,7 +277,7 @@ namespace Ailu
             }
             else
             {
-                r.DrawQuad(_rect_sv, _matrix, Colors::kBlack);
+                r.DrawQuad(_rect_sv, _matrix, ColorBrush(Colors::kBlack));
             }
 
 
@@ -321,7 +330,7 @@ namespace Ailu
                     f32 intensity = HdrIntensityFromNormalized((t0 + t1) * 0.5f);
                     Vector3f preview_rgb = ToneMapPreview(base_rgb * intensity);
                     r.DrawQuad({_rect_hdr.x + _rect_hdr.z * t0, _rect_hdr.y, _rect_hdr.z * (t1 - t0), _rect_hdr.w}, _matrix,
-                               {preview_rgb.x, preview_rgb.y, preview_rgb.z, 1.0f});
+                               ColorBrush({preview_rgb.x, preview_rgb.y, preview_rgb.z, 1.0f}));
                 }
                 r.DrawBox(_rect_hdr.xy, _rect_hdr.zw, _matrix, 1.0f, Colors::kWhite);
                 r.DrawText(std::format("HDR {:.2f}x", _hdr_intensity), {_rect_hdr.x + 4.0f, _rect_hdr.y + 1.0f}, _matrix, 12.0f, Colors::kWhite);
@@ -336,8 +345,8 @@ namespace Ailu
                 Vector4f right = {pr.x + pr.z * 0.5f, pr.y, pr.z * 0.5f, pr.w};
                 Vector3f old_preview = ToneMapPreview({_old_color.x, _old_color.y, _old_color.z});
                 Vector3f new_preview = ToneMapPreview(_rgba);
-                r.DrawQuad(left, _matrix, {old_preview.x, old_preview.y, old_preview.z, std::clamp(_old_color.w, 0.0f, 1.0f)});
-                r.DrawQuad(right, _matrix, {new_preview.x, new_preview.y, new_preview.z, _alpha});
+                r.DrawQuad(left, _matrix, ColorBrush({old_preview.x, old_preview.y, old_preview.z, std::clamp(_old_color.w, 0.0f, 1.0f)}));
+                r.DrawQuad(right, _matrix, ColorBrush({new_preview.x, new_preview.y, new_preview.z, _alpha}));
                 r.DrawBox(pr.xy, pr.zw, _matrix, 1.0f, Colors::kWhite);
                 r.DrawText("Old", {left.x + 4.0f, left.y + 4.0f}, _matrix, 12.0f, Colors::kWhite);
                 r.DrawText(std::format("New {:.2f}x", _hdr_intensity), {right.x + 4.0f, right.y + 4.0f}, _matrix, 12.0f, Colors::kWhite);

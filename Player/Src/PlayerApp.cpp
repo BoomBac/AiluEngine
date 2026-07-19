@@ -12,17 +12,6 @@
 
 namespace Ailu
 {
-    namespace
-    {
-        WString NormalizeDirectoryPath(const WString &path)
-        {
-            WString normalized = PathUtils::FormatFilePath(path);
-            if (!normalized.empty() && normalized.back() != L'/')
-                normalized.push_back(L'/');
-            return normalized;
-        }
-    }
-
     int PlayerApp::Initialize()
     {
         LogMgr::Init();
@@ -91,7 +80,7 @@ namespace Ailu
 
         const auto resource_root = fs::weakly_canonical(config_dir / fs::path(ToWChar(doc["resourceRoot"].GetString())));
         ResourceMgr::ConfigEngineResRoot(resource_root.wstring());
-        Application::SetProjectRootPath(NormalizeDirectoryPath(config_dir.wstring()));
+        Application::SetProjectRootPath(PathUtils::NormalizeDirectoryPath(config_dir.wstring()));
         Application::SetEngineConfigPath(PathUtils::FormatFilePath((config_dir / "EngineConfig.json").wstring()));
 
         if (doc.HasMember("startupScene") && doc["startupScene"].IsString())

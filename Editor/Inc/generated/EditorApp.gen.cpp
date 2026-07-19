@@ -267,6 +267,10 @@ template<> Ailu::Type* Ailu::StaticClass<Ailu::Editor::EditorConfig>()
 {
 return Ailu::Editor::EditorConfig::StaticType();
 }
+    Type *Ailu::Editor::EditorConfig::GetType()
+{
+return Ailu::Editor::EditorConfig::GetPrivateStaticClass();
+}
 ClassTypeRegister s_register_EditorConfig(&Ailu::Editor::EditorConfig::StaticType, "Ailu::Editor::EditorConfig");
 Ailu::Type* Ailu::Editor::Z_Construct_TestObj_Type()
 {
@@ -312,7 +316,7 @@ meta_p.Set("RangeMin",(f32)0);
 meta_p.Set("RangeMax",(f32)1);
 MemberBuilder builder_p;
 builder_p._name = "_p";
-builder_p._type_name = "Object";
+builder_p._type_name = "Ailu::Object";
 builder_p._offset = offsetof(TestObj,_p);
 builder_p._is_const = false;
 builder_p._is_static = false;
@@ -444,5 +448,9 @@ Ailu::Type* Ailu::Editor::TestObj::GetPrivateStaticClass()
 template<> Ailu::Type* Ailu::StaticClass<Ailu::Editor::TestObj>()
 {
 return Ailu::Editor::TestObj::StaticType();
+}
+    Type *Ailu::Editor::TestObj::GetType()
+{
+return Ailu::Editor::TestObj::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_TestObj(&Ailu::Editor::TestObj::StaticType, "Ailu::Editor::TestObj");

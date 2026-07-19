@@ -16,7 +16,7 @@ namespace Ailu::Render
         _standard_lit_forward = Shader::s_p_defered_standart_lit.lock();
         _voxel_pass_index = _standard_lit_forward->FindPass("VoxelLit");
         _cam_cbuf = ConstantBuffer::Create(sizeof(CBufferPerCameraData), "VoxelCbuf");
-        _voxelize_cs = ResourceMgr::Get().GetRef<ComputeShader>(L"Shaders/voxelize.alasset");
+        _voxelize_cs = ResourceMgr::Get().GetRef<ComputeShader>(L"Shaders/hlsl/Compute/voxelize.alasset");
     }
     VoxelizePass::~VoxelizePass()
     {
@@ -122,7 +122,7 @@ namespace Ailu::Render
     //---------------------------------------------------------------------------VoxelDebugPass-----------------------------------------------------------------------------
     VoxelDebugPass::VoxelDebugPass() : RenderPass("VoxelDebugPass")
     {
-        _voxel_debug = ResourceMgr::Get().GetRef<Shader>(L"Shaders/voxel_drawer.alasset");
+        _voxel_debug = ResourceMgr::Get().GetRef<Shader>(L"Shaders/hlsl/voxel_drawer.alasset");
         _voxel_debug_mat = MakeRef<Material>(_voxel_debug.get(), "Runtime/VoxelDrawer");
         _data._grid_num = {32, 32, 1};
         _data._grid_size = Vector3f::kOne;
