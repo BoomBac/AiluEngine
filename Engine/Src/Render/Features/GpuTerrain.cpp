@@ -122,7 +122,7 @@ namespace Ailu::Render
     {
         auto cmd = CommandBufferPool::Get("Terrain");
         {
-            PROFILE_BLOCK_GPU(cmd.get(), GpuTerrain);
+            PROFILE_BLOCK_GPU(cmd.get(), "GpuTerrain");
             auto kernel = _terrain_gen->FindKernel("QuadTreeProcessor");
             GPUBuffer* src_buf = _src_node_buf.get();
             GPUBuffer *dst_buf = _temp_node_buf.get();

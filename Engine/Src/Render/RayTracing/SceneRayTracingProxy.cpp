@@ -311,7 +311,7 @@ namespace Ailu::Render
 
     void SceneRayTracingProxy::Sync(const SceneManagement::Scene *scene)
     {
-        CPUProfileBlock b("SceneRayTracingProxy::Sync");
+        PROFILE_BLOCK_CPU("SceneRayTracingProxy::Sync")
         SyncLightCache(scene);
         if (scene == nullptr)
             return;
@@ -792,7 +792,7 @@ namespace Ailu::Render
 
     void SceneRayTracingProxy::UpdateMaterials(const SceneManagement::Scene &s)
     {
-        PROFILE_BLOCK_CPU(Renderer_PrepareMaterial)
+        PROFILE_BLOCK_CPU("Renderer::PrepareMaterial")
 
         for (auto& static_mesh : s.GetRegister().View<ECS::StaticMeshComponent>())
         {

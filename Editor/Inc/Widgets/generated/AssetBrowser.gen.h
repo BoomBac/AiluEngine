@@ -5,19 +5,19 @@
 #include "Objects/ReflectTemplate.h"
 #define __ASSETBROWSER_GEN_H__
 //Class AssetBrowser begin...........................
-#define ASSETBROWSER_GEN_H_29_GENERATED_BODY \
+#define ASSETBROWSER_GEN_H_33_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_AssetBrowser_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_AssetBrowser_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual Type  *GetType() override;
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::Editor{
 class AssetBrowser ;
 }
 template<>
-class Ailu::Type* Ailu::StaticClass<class Ailu::Editor::AssetBrowser>();
+const class Ailu::Type* Ailu::StaticClass<class Ailu::Editor::AssetBrowser>();
 //Class AssetBrowser end...........................
 
 #undef CURRENT_FILE_ID

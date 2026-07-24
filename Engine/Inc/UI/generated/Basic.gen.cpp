@@ -6,7 +6,7 @@
 #include <Objects/SerializeSpecializations.h>
 #include <Framework/Common/Log.h>
 using namespace Ailu;
-Ailu::Type* Ailu::UI::Z_Construct_Button_Type()
+const Ailu::Type* Ailu::UI::Z_Construct_Button_Type()
 {
 Ailu::UI::UIElement::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -27,22 +27,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::UI::Button::GetPrivateStaticClass()
+const Ailu::Type* Ailu::UI::Button::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_Button_Type();
+	static const Ailu::Type* type = Z_Construct_Button_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::Button>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::Button>()
 {
 return Ailu::UI::Button::StaticType();
 }
-    Type *Ailu::UI::Button::GetType()
+    const Type *Ailu::UI::Button::GetType()
 {
 return Ailu::UI::Button::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_Button(&Ailu::UI::Button::StaticType, "Ailu::UI::Button");
-Ailu::Type* Ailu::UI::Z_Construct_Text_Type()
+const Ailu::Type* Ailu::UI::Z_Construct_Text_Type()
 {
 Ailu::UI::UIElement::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -168,22 +168,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::UI::Text::GetPrivateStaticClass()
+const Ailu::Type* Ailu::UI::Text::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_Text_Type();
+	static const Ailu::Type* type = Z_Construct_Text_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::Text>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::Text>()
 {
 return Ailu::UI::Text::StaticType();
 }
-    Type *Ailu::UI::Text::GetType()
+    const Type *Ailu::UI::Text::GetType()
 {
 return Ailu::UI::Text::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_Text(&Ailu::UI::Text::StaticType, "Ailu::UI::Text");
-Ailu::Type* Ailu::UI::Z_Construct_Slider_Type()
+const Ailu::Type* Ailu::UI::Z_Construct_Slider_Type()
 {
 Ailu::UI::UIElement::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -246,22 +246,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::UI::Slider::GetPrivateStaticClass()
+const Ailu::Type* Ailu::UI::Slider::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_Slider_Type();
+	static const Ailu::Type* type = Z_Construct_Slider_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::Slider>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::Slider>()
 {
 return Ailu::UI::Slider::StaticType();
 }
-    Type *Ailu::UI::Slider::GetType()
+    const Type *Ailu::UI::Slider::GetType()
 {
 return Ailu::UI::Slider::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_Slider(&Ailu::UI::Slider::StaticType, "Ailu::UI::Slider");
-Ailu::Type* Ailu::UI::Z_Construct_CheckBox_Type()
+const Ailu::Type* Ailu::UI::Z_Construct_CheckBox_Type()
 {
 Ailu::UI::UIElement::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -303,22 +303,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::UI::CheckBox::GetPrivateStaticClass()
+const Ailu::Type* Ailu::UI::CheckBox::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_CheckBox_Type();
+	static const Ailu::Type* type = Z_Construct_CheckBox_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::CheckBox>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::CheckBox>()
 {
 return Ailu::UI::CheckBox::StaticType();
 }
-    Type *Ailu::UI::CheckBox::GetType()
+    const Type *Ailu::UI::CheckBox::GetType()
 {
 return Ailu::UI::CheckBox::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_CheckBox(&Ailu::UI::CheckBox::StaticType, "Ailu::UI::CheckBox");
-Ailu::Type* Ailu::UI::Z_Construct_Border_Type()
+const Ailu::Type* Ailu::UI::Z_Construct_Border_Type()
 {
 Ailu::UI::UIElement::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -396,28 +396,49 @@ builder_thickness._meta = meta_thickness;
 builder_thickness._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector4f>);
 builder_thickness._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector4f>);
 initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_thickness));
+Meta meta_corner_radius;
+meta_corner_radius.Set("Category","");
+meta_corner_radius.Set("IsColor",false);
+meta_corner_radius.Set("IsRange",false);
+meta_corner_radius.Set("IsFloatRange",true);
+meta_corner_radius.Set("RangeMin",(f32)0);
+meta_corner_radius.Set("RangeMax",(f32)1);
+MemberBuilder builder_corner_radius;
+builder_corner_radius._name = "_corner_radius";
+builder_corner_radius._type_name = "Vector4f";
+builder_corner_radius._offset = offsetof(Border,_corner_radius);
+builder_corner_radius._is_const = false;
+builder_corner_radius._is_static = false;
+builder_corner_radius._is_public = false;
+builder_corner_radius._is_pointer = false;
+builder_corner_radius._is_ref = false;
+builder_corner_radius._is_template = false;
+builder_corner_radius._meta = meta_corner_radius;
+builder_corner_radius._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector4f>);
+builder_corner_radius._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector4f>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_corner_radius));
 cur_type = std::make_unique<Ailu::Type>(initializer);
 Ailu::Type::RegisterType(cur_type.get());
 }
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::UI::Border::GetPrivateStaticClass()
+const Ailu::Type* Ailu::UI::Border::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_Border_Type();
+	static const Ailu::Type* type = Z_Construct_Border_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::Border>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::Border>()
 {
 return Ailu::UI::Border::StaticType();
 }
-    Type *Ailu::UI::Border::GetType()
+    const Type *Ailu::UI::Border::GetType()
 {
 return Ailu::UI::Border::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_Border(&Ailu::UI::Border::StaticType, "Ailu::UI::Border");
-Ailu::Type* Ailu::UI::Z_Construct_InputBlock_Type()
+const Ailu::Type* Ailu::UI::Z_Construct_InputBlock_Type()
 {
 Ailu::UI::UIElement::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -459,22 +480,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::UI::InputBlock::GetPrivateStaticClass()
+const Ailu::Type* Ailu::UI::InputBlock::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_InputBlock_Type();
+	static const Ailu::Type* type = Z_Construct_InputBlock_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::InputBlock>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::InputBlock>()
 {
 return Ailu::UI::InputBlock::StaticType();
 }
-    Type *Ailu::UI::InputBlock::GetType()
+    const Type *Ailu::UI::InputBlock::GetType()
 {
 return Ailu::UI::InputBlock::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_InputBlock(&Ailu::UI::InputBlock::StaticType, "Ailu::UI::InputBlock");
-Ailu::Type* Ailu::UI::Z_Construct_Image_Type()
+const Ailu::Type* Ailu::UI::Z_Construct_Image_Type()
 {
 Ailu::UI::UIElement::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -537,17 +558,17 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::UI::Image::GetPrivateStaticClass()
+const Ailu::Type* Ailu::UI::Image::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_Image_Type();
+	static const Ailu::Type* type = Z_Construct_Image_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::Image>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::Image>()
 {
 return Ailu::UI::Image::StaticType();
 }
-    Type *Ailu::UI::Image::GetType()
+    const Type *Ailu::UI::Image::GetType()
 {
 return Ailu::UI::Image::GetPrivateStaticClass();
 }

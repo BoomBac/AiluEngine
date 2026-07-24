@@ -7,17 +7,17 @@
 //Struct ProjectDescriptor begin...........................
 #define PROJECTDESCRIPTOR_GEN_H_11_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_ProjectDescriptor_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_ProjectDescriptor_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                Type  *GetType();
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                const Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu{
 struct ProjectDescriptor ;
 }
 template<>
-AILU_API class Ailu::Type* Ailu::StaticClass<struct Ailu::ProjectDescriptor>();
+AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::ProjectDescriptor>();
 //Struct ProjectDescriptor end...........................
 
 #undef CURRENT_FILE_ID

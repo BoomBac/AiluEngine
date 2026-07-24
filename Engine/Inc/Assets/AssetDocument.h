@@ -2,15 +2,15 @@
 #ifndef __ASSET_DOCUMENT_H__
 #define __ASSET_DOCUMENT_H__
 
+#include "Framework/Math/Guid.h"
 #include "Framework/Math/ALMath.hpp"
 #include "Objects/JsonArchive.h"
 #include "Objects/Object.h"
+#include "AssetCommon.h"
 #include "generated/AssetDocument.gen.h"
 
 namespace Ailu
 {
-    inline constexpr u32 kSerializedAssetDocumentVersion = 1u;
-
     ASTRUCT()
     struct AILU_API AssetDocumentHeader
     {
@@ -24,6 +24,8 @@ namespace Ailu
         String _asset_type;
         APROPERTY()
         String _asset_name;
+        APROPERTY()
+        Vector<AssetDependency> _dependencies;
     };
 
     ASTRUCT()
@@ -223,6 +225,27 @@ namespace Ailu
         Vector<AnimationClipTrackDocument> _tracks;
     };
 
+    ACLASS()
+    class AILU_API SpriteAssetDocument : public Object
+    {
+        GENERATED_BODY()
+    public:
+        APROPERTY()
+        AssetDocumentHeader _header;
+        APROPERTY()
+        Guid _texture = Guid::EmptyGuid();
+        APROPERTY()
+        Vector4f _uv_rect = {0.0f,0.0f,1.0f,1.0f};
+        APROPERTY()
+        Vector2f _pivot = {0.5f,0.5f};
+        APROPERTY()
+        Vector2f _size = Vector2f::kOne;
+        //九宫格slice,RLBT，靠近边界的像素不会被拉伸
+        APROPERTY()
+        Vector4f _border = Vector4f::kZero;
+    };
+
+
     ASTRUCT()
     struct AILU_API SceneTagComponentDocument
     {
@@ -404,26 +427,64 @@ namespace Ailu
     };
 
     ASTRUCT()
+    struct AILU_API SceneSpriteRendererComponentDocument
+    {
+        GENERATED_BODY()
+
+        APROPERTY()
+        String _sprite_guid;
+        APROPERTY()
+        String _material_guid;
+        APROPERTY()
+        Vector4f _color = Vector4f(1.0f, 1.0f, 1.0f, 1.0f);
+        APROPERTY()
+        i32 _sorting_layer = 0;
+        APROPERTY()
+        i32 _order_in_layer = 0;
+        APROPERTY()
+        i32 _blend_mode = 0;
+        APROPERTY()
+        bool _flip_x = false;
+        APROPERTY()
+        bool _flip_y = false;
+        APROPERTY()
+        bool _visible = true;
+    };
+
+    ASTRUCT()
     struct AILU_API SceneEntityDocument
     {
         GENERATED_BODY()
 
+        inline static const String kEntityId = "_entity_id";
+        inline static const String kTagComponent = "_tag_component";
+        inline static const String kHasTransformComponent = "_has_transform_component";
+        inline static const String kTransformComponent = "_transform_component";
+        inline static const String kHasScriptComponent = "_has_script_component";
+        inline static const String kScriptComponent = "_script_component";
+        inline static const String kHasStaticMeshComponent = "_has_static_mesh_component";
+        inline static const String kStaticMeshComponent = "_static_mesh_component";
+        inline static const String kHasLightComponent = "_has_light_component";
+        inline static const String kLightComponent = "_light_component";
+        inline static const String kHasHierarchyComponent = "_has_hierarchy_component";
+        inline static const String kHierarchyComponent = "_hierarchy_component";
+        inline static const String kHasCameraComponent = "_has_camera_component";
+        inline static const String kCameraComponent = "_camera_component";
+        inline static const String kHasLightprobeComponent = "_has_lightprobe_component";
+        inline static const String kLightprobeComponent = "_lightprobe_component";
+        inline static const String kHasRigidbodyComponent = "_has_rigidbody_component";
+        inline static const String kRigidbodyComponent = "_rigidbody_component";
+        inline static const String kHasColliderComponent = "_has_collider_component";
+        inline static const String kColliderComponent = "_collider_component";
+        inline static const String kHasSkeletonMeshComponent = "_has_skeleton_mesh_component";
+        inline static const String kSkeletonMeshComponent = "_skeleton_mesh_component";
+        inline static const String kHasSpriteRendererComponent = "_has_sprite_renderer_component";
+        inline static const String kSpriteRendererComponent = "_sprite_renderer_component";
+        inline static const String kHasVxgiComponent = "_has_vxgi_component";
+        inline static const String kVxgiComponent = "_vxgi_component";
+
         void Serialize(FArchive &ar)
         {
-            static const String kEntityId = "_entity_id";
-            static const String kTagComponent = "_tag_component";
-            static const String kTransformComponent = "_transform_component";
-            static const String kScriptComponent = "_script_component";
-            static const String kStaticMeshComponent = "_static_mesh_component";
-            static const String kLightComponent = "_light_component";
-            static const String kHierarchyComponent = "_hierarchy_component";
-            static const String kCameraComponent = "_camera_component";
-            static const String kLightprobeComponent = "_lightprobe_component";
-            static const String kRigidbodyComponent = "_rigidbody_component";
-            static const String kColliderComponent = "_collider_component";
-            static const String kSkeletonMeshComponent = "_skeleton_mesh_component";
-            static const String kVxgiComponent = "_vxgi_component";
-
             SerializerWrapper<u64>::Serialize(&_entity_id, ar, &kEntityId);
             SerializerWrapper<SceneTagComponentDocument>::Serialize(&_tag_component, ar, &kTagComponent);
 
@@ -449,35 +510,12 @@ namespace Ailu
                 SerializerWrapper<SceneSkeletonMeshComponentDocument>::Serialize(&_skeleton_mesh_component, ar, &kSkeletonMeshComponent);
             if (_has_vxgi_component)
                 SerializerWrapper<SceneVXGIComponentDocument>::Serialize(&_vxgi_component, ar, &kVxgiComponent);
+            if (_has_sprite_renderer_component)
+                SerializerWrapper<SceneSpriteRendererComponentDocument>::Serialize(&_sprite_renderer_component, ar, &kSpriteRendererComponent);
         }
 
         void Deserialize(FArchive &ar)
         {
-            static const String kEntityId = "_entity_id";
-            static const String kTagComponent = "_tag_component";
-            static const String kHasTransformComponent = "_has_transform_component";
-            static const String kTransformComponent = "_transform_component";
-            static const String kHasScriptComponent = "_has_script_component";
-            static const String kScriptComponent = "_script_component";
-            static const String kHasStaticMeshComponent = "_has_static_mesh_component";
-            static const String kStaticMeshComponent = "_static_mesh_component";
-            static const String kHasLightComponent = "_has_light_component";
-            static const String kLightComponent = "_light_component";
-            static const String kHasHierarchyComponent = "_has_hierarchy_component";
-            static const String kHierarchyComponent = "_hierarchy_component";
-            static const String kHasCameraComponent = "_has_camera_component";
-            static const String kCameraComponent = "_camera_component";
-            static const String kHasLightprobeComponent = "_has_lightprobe_component";
-            static const String kLightprobeComponent = "_lightprobe_component";
-            static const String kHasRigidbodyComponent = "_has_rigidbody_component";
-            static const String kRigidbodyComponent = "_rigidbody_component";
-            static const String kHasColliderComponent = "_has_collider_component";
-            static const String kColliderComponent = "_collider_component";
-            static const String kHasSkeletonMeshComponent = "_has_skeleton_mesh_component";
-            static const String kSkeletonMeshComponent = "_skeleton_mesh_component";
-            static const String kHasVxgiComponent = "_has_vxgi_component";
-            static const String kVxgiComponent = "_vxgi_component";
-
             SerializerWrapper<u64>::Deserialize(&_entity_id, ar, &kEntityId);
             SerializerWrapper<SceneTagComponentDocument>::Deserialize(&_tag_component, ar, &kTagComponent);
 
@@ -513,6 +551,7 @@ namespace Ailu
             deserialize_component(_has_rigidbody_component, _rigidbody_component, kHasRigidbodyComponent, kRigidbodyComponent);
             deserialize_component(_has_collider_component, _collider_component, kHasColliderComponent, kColliderComponent);
             deserialize_component(_has_skeleton_mesh_component, _skeleton_mesh_component, kHasSkeletonMeshComponent, kSkeletonMeshComponent);
+            deserialize_component(_has_sprite_renderer_component, _sprite_renderer_component, kHasSpriteRendererComponent, kSpriteRendererComponent);
             deserialize_component(_has_vxgi_component, _vxgi_component, kHasVxgiComponent, kVxgiComponent);
         }
 
@@ -564,6 +603,10 @@ namespace Ailu
         bool _has_vxgi_component = false;
         APROPERTY()
         SceneVXGIComponentDocument _vxgi_component;
+        APROPERTY()
+        bool _has_sprite_renderer_component = false;
+        APROPERTY()
+        SceneSpriteRendererComponentDocument _sprite_renderer_component;
     };
 
     ACLASS()

@@ -6,7 +6,7 @@
 #include <Objects/SerializeSpecializations.h>
 #include <Framework/Common/Log.h>
 using namespace Ailu;
-Ailu::Type* Ailu::Editor::Z_Construct_WorldOutline_Type()
+const Ailu::Type* Ailu::Editor::Z_Construct_WorldOutline_Type()
 {
 Ailu::Editor::DockWindow::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -27,17 +27,17 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::Editor::WorldOutline::GetPrivateStaticClass()
+const Ailu::Type* Ailu::Editor::WorldOutline::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_WorldOutline_Type();
+	static const Ailu::Type* type = Z_Construct_WorldOutline_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::Editor::WorldOutline>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::Editor::WorldOutline>()
 {
 return Ailu::Editor::WorldOutline::StaticType();
 }
-    Type *Ailu::Editor::WorldOutline::GetType()
+    const Type *Ailu::Editor::WorldOutline::GetType()
 {
 return Ailu::Editor::WorldOutline::GetPrivateStaticClass();
 }

@@ -7,17 +7,17 @@
 //Class UIElement begin...........................
 #define UIELEMENT_GEN_H_154_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_UIElement_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_UIElement_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual Type  *GetType() override;
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::UI{
 class UIElement ;
 }
 template<>
-AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::UI::UIElement>();
+AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::UI::UIElement>();
 //Class UIElement end...........................
 
 //Enum EVisibility begin...........................

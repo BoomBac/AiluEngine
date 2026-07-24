@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "Render/Mesh.h"
 #include "Render/GraphicsContext.h"
-#include "Framework/Common/Asset.h"
+#include "Assets/Asset.h"
 #include "Framework/Common/Utils.h"
 #include "Framework/Common/JobSystem.h"
 #include "Framework/Common/TimeMgr.h"

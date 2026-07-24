@@ -75,8 +75,8 @@ namespace Ailu::RHI::DX12
             return;
         for (u16 i = 0; i < _buffer_num; i++)
         {
-            _back_buffers[i].Reset();
             AL_DELETE(_state_guard[i]);
+            _back_buffers[i].Reset();
         }
         SwapchainTexture::Resize(w, h);
         DXGI_SWAP_CHAIN_DESC desc = {};

@@ -6,7 +6,7 @@
 #include <Objects/SerializeSpecializations.h>
 #include <Framework/Common/Log.h>
 using namespace Ailu;
-Ailu::Type* Ailu::Render::Z_Construct_GpuTerrain_Type()
+const Ailu::Type* Ailu::Render::Z_Construct_GpuTerrain_Type()
 {
 Ailu::Render::RenderFeature::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -111,17 +111,17 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::Render::GpuTerrain::GetPrivateStaticClass()
+const Ailu::Type* Ailu::Render::GpuTerrain::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_GpuTerrain_Type();
+	static const Ailu::Type* type = Z_Construct_GpuTerrain_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::Render::GpuTerrain>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::Render::GpuTerrain>()
 {
 return Ailu::Render::GpuTerrain::StaticType();
 }
-    Type *Ailu::Render::GpuTerrain::GetType()
+    const Type *Ailu::Render::GpuTerrain::GetType()
 {
 return Ailu::Render::GpuTerrain::GetPrivateStaticClass();
 }

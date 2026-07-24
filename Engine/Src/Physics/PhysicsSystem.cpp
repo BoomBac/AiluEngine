@@ -34,7 +34,7 @@ namespace Ailu
         {
             if (Application::Get()._is_playing_mode || Application::Get()._is_simulate_mode)
             {
-                PROFILE_BLOCK_CPU(PhysicsSystem_Update)
+                PROFILE_BLOCK_CPU("PhysicsSystem::Update")
                 _collisions.clear();
                 delta_time *= 0.001f;
                 delta_time *= TimeMgr::s_time_scale;

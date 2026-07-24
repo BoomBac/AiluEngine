@@ -1,6 +1,6 @@
 #include "Render/Texture.h"
 #include "Framework/Common/Application.h"
-#include "Framework/Common/Asset.h"
+#include "Assets/Asset.h"
 #include "Framework/Parser/AssetParser.h"
 #include "RHI/DX12/D3DTexture.h"
 #include "Render/Renderer.h"

@@ -6,7 +6,7 @@
 #include <Objects/SerializeSpecializations.h>
 #include <Framework/Common/Log.h>
 using namespace Ailu;
-Ailu::Type* Ailu::Render::Z_Construct_GpuResource_Type()
+const Ailu::Type* Ailu::Render::Z_Construct_GpuResource_Type()
 {
 Ailu::Object::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -27,17 +27,17 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::Render::GpuResource::GetPrivateStaticClass()
+const Ailu::Type* Ailu::Render::GpuResource::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_GpuResource_Type();
+	static const Ailu::Type* type = Z_Construct_GpuResource_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::Render::GpuResource>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::Render::GpuResource>()
 {
 return Ailu::Render::GpuResource::StaticType();
 }
-    Type *Ailu::Render::GpuResource::GetType()
+    const Type *Ailu::Render::GpuResource::GetType()
 {
 return Ailu::Render::GpuResource::GetPrivateStaticClass();
 }

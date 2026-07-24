@@ -497,6 +497,7 @@ static void ParserPropertyInfo(const std::string &line, AiluHeadTool::MemberInfo
         info._is_pointer = ptrref.find('*') != std::string::npos;
         info._is_reference = ptrref.find('&') != std::string::npos;
         info._name = matches[4].str();
+        info._is_template = info._type.find('<') != std::string::npos;
         info._is_enum = info._type.size() > 1 && info._type[0] == 'E' && std::isupper(info._type[1]);
     }
     else
@@ -612,7 +613,7 @@ static void GenerateClassTypeInfo(const AiluHeadTool::ClassInfo &class_info,
 {
     using std::endl;
     std::string full_name = class_info._namespace + "::" + class_info._name;
-    file << std::format("Ailu::Type* {}::Z_Construct_{}_Type()", class_info._namespace, class_info._name) << std::endl;
+    file << std::format("const Ailu::Type* {}::Z_Construct_{}_Type()", class_info._namespace, class_info._name) << std::endl;
     file << "{" << std::endl;
     if (!class_info._parent.empty())
         file << std::format("{}::StaticType();",class_info._parent) << std::endl;
@@ -696,17 +697,17 @@ static void GenerateClassTypeInfo(const AiluHeadTool::ClassInfo &class_info,
     file << "return cur_type.get();" << std::endl;
     file << "}" << std::endl;
     file << std::endl;
-    file << std::format("Ailu::Type* {}::GetPrivateStaticClass()", full_name) << std::endl;
+    file << std::format("const Ailu::Type* {}::GetPrivateStaticClass()", full_name) << std::endl;
     file << "{" << std::endl;
-    file << std::format("\tstatic Ailu::Type* type = Z_Construct_{}_Type();", class_info._name) << std::endl;
+    file << std::format("\tstatic const Ailu::Type* type = Z_Construct_{}_Type();", class_info._name) << std::endl;
     file << std::format("\treturn type;") << std::endl;
     file << "}" << std::endl;
     file << std::endl;
-    file << std::format("template<> Ailu::Type* Ailu::StaticClass<{}::{}>()", class_info._namespace, class_info._name) << std::endl;
+    file << std::format("template<> const Ailu::Type* Ailu::StaticClass<{}::{}>()", class_info._namespace, class_info._name) << std::endl;
     file << "{" << std::endl;
     file << "return " << std::format("{}::StaticType();", full_name) << std::endl;
     file << "}" << std::endl;
-    file << std::format("    Type *{}::GetType()", full_name) << std::endl;
+    file << std::format("    const Type *{}::GetType()", full_name) << std::endl;
     file << "{" << std::endl;
     file << "return " << std::format("{}::GetPrivateStaticClass();", full_name) << std::endl;
     file << "}" << std::endl;
@@ -1002,33 +1003,33 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                         {
                             generate_body = R"(
                             private: \
-                                friend Type* Z_Construct_TClass_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_TClass_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual TGetTypeApiType  *GetType();
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const TGetTypeApiType  *GetType();
                             )";
                         }
                         else if (!class_info._parent.empty())
                         {
                             generate_body = R"(
                             private: \
-                                friend Type* Z_Construct_TClass_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_TClass_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual TGetTypeApiType  *GetType() override;
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const TGetTypeApiType  *GetType() override;
                             )";
                         }
                         else
                         {
                             generate_body = R"(
                             private: \
-                                friend Type* Z_Construct_TClass_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_TClass_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                TGetTypeApiType  *GetType();
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                const TGetTypeApiType  *GetType();
                             )";
                         }
 
@@ -1046,9 +1047,9 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                         out_file << "template<>" << std::endl;
                         std::string full_name = class_info._namespace + "::" + class_info._name;
                         if (_is_cur_file_engine_lib)
-                            out_file << std::format("AILU_API class Ailu::Type* Ailu::StaticClass<class {}>();", full_name) << std::endl;
+                            out_file << std::format("AILU_API const class Ailu::Type* Ailu::StaticClass<class {}>();", full_name) << std::endl;
                         else
-                            out_file << std::format("class Ailu::Type* Ailu::StaticClass<class {}>();", full_name) << std::endl;
+                            out_file << std::format("const class Ailu::Type* Ailu::StaticClass<class {}>();", full_name) << std::endl;
                             
                         out_file << "//Class " << class_info._name << " end..........................." << std::endl;
                         out_file << std::endl;
@@ -1062,11 +1063,11 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                         size_t pos = 0;
                         std::string generate_body = R"(
                             private: \
-                                friend Type* Z_Construct_TClass_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_TClass_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                TGetTypeApiType  *GetType();
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                const TGetTypeApiType  *GetType();
                             )";
 
                         while ((pos = generate_body.find(search, pos)) != std::string::npos)
@@ -1083,9 +1084,9 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                         out_file << "template<>" << std::endl;
                         std::string full_name = struct_info._namespace + "::" + struct_info._name;
                         if (_is_cur_file_engine_lib)
-                            out_file << std::format("AILU_API class Ailu::Type* Ailu::StaticClass<struct {}>();", full_name) << std::endl;
+                            out_file << std::format("AILU_API const class Ailu::Type* Ailu::StaticClass<struct {}>();", full_name) << std::endl;
                         else
-                            out_file << std::format("class Ailu::Type* Ailu::StaticClass<struct {}>();", full_name) << std::endl;
+                            out_file << std::format("const class Ailu::Type* Ailu::StaticClass<struct {}>();", full_name) << std::endl;
                         out_file << "//Struct " << struct_info._name << " end..........................." << std::endl;
                         out_file << std::endl;
                     }

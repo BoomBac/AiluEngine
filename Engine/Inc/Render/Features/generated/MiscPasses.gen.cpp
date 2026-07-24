@@ -6,7 +6,7 @@
 #include <Objects/SerializeSpecializations.h>
 #include <Framework/Common/Log.h>
 using namespace Ailu;
-Ailu::Type* Ailu::Render::Z_Construct_VolumeTexturePreviewPass_Type()
+const Ailu::Type* Ailu::Render::Z_Construct_VolumeTexturePreviewPass_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -131,17 +131,17 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::Render::VolumeTexturePreviewPass::GetPrivateStaticClass()
+const Ailu::Type* Ailu::Render::VolumeTexturePreviewPass::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_VolumeTexturePreviewPass_Type();
+	static const Ailu::Type* type = Z_Construct_VolumeTexturePreviewPass_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::Render::VolumeTexturePreviewPass>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::Render::VolumeTexturePreviewPass>()
 {
 return Ailu::Render::VolumeTexturePreviewPass::StaticType();
 }
-    Type *Ailu::Render::VolumeTexturePreviewPass::GetType()
+    const Type *Ailu::Render::VolumeTexturePreviewPass::GetType()
 {
 return Ailu::Render::VolumeTexturePreviewPass::GetPrivateStaticClass();
 }

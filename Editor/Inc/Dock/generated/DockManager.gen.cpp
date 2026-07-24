@@ -6,7 +6,7 @@
 #include <Objects/SerializeSpecializations.h>
 #include <Framework/Common/Log.h>
 using namespace Ailu;
-Ailu::Type* Ailu::Editor::Z_Construct_DockNodeData_Type()
+const Ailu::Type* Ailu::Editor::Z_Construct_DockNodeData_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -341,22 +341,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::Editor::DockNodeData::GetPrivateStaticClass()
+const Ailu::Type* Ailu::Editor::DockNodeData::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_DockNodeData_Type();
+	static const Ailu::Type* type = Z_Construct_DockNodeData_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::Editor::DockNodeData>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::Editor::DockNodeData>()
 {
 return Ailu::Editor::DockNodeData::StaticType();
 }
-    Type *Ailu::Editor::DockNodeData::GetType()
+    const Type *Ailu::Editor::DockNodeData::GetType()
 {
 return Ailu::Editor::DockNodeData::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_DockNodeData(&Ailu::Editor::DockNodeData::StaticType, "Ailu::Editor::DockNodeData");
-Ailu::Type* Ailu::Editor::Z_Construct_DockNodeDataArray_Type()
+const Ailu::Type* Ailu::Editor::Z_Construct_DockNodeDataArray_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -386,7 +386,7 @@ builder_node_data._is_static = false;
 builder_node_data._is_public = true;
 builder_node_data._is_pointer = false;
 builder_node_data._is_ref = false;
-builder_node_data._is_template = false;
+builder_node_data._is_template = true;
 builder_node_data._meta = meta_node_data;
 builder_node_data._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<DockNodeData>>);
 builder_node_data._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<DockNodeData>>);
@@ -397,17 +397,17 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::Editor::DockNodeDataArray::GetPrivateStaticClass()
+const Ailu::Type* Ailu::Editor::DockNodeDataArray::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_DockNodeDataArray_Type();
+	static const Ailu::Type* type = Z_Construct_DockNodeDataArray_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::Editor::DockNodeDataArray>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::Editor::DockNodeDataArray>()
 {
 return Ailu::Editor::DockNodeDataArray::StaticType();
 }
-    Type *Ailu::Editor::DockNodeDataArray::GetType()
+    const Type *Ailu::Editor::DockNodeDataArray::GetType()
 {
 return Ailu::Editor::DockNodeDataArray::GetPrivateStaticClass();
 }

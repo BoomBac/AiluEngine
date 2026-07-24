@@ -6,7 +6,7 @@
 #include <Objects/SerializeSpecializations.h>
 #include <Framework/Common/Log.h>
 using namespace Ailu;
-Ailu::Type* Ailu::Render::Z_Construct_RayTracingShader_Type()
+const Ailu::Type* Ailu::Render::Z_Construct_RayTracingShader_Type()
 {
 Ailu::Object::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -27,17 +27,17 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::Render::RayTracingShader::GetPrivateStaticClass()
+const Ailu::Type* Ailu::Render::RayTracingShader::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_RayTracingShader_Type();
+	static const Ailu::Type* type = Z_Construct_RayTracingShader_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::Render::RayTracingShader>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::Render::RayTracingShader>()
 {
 return Ailu::Render::RayTracingShader::StaticType();
 }
-    Type *Ailu::Render::RayTracingShader::GetType()
+    const Type *Ailu::Render::RayTracingShader::GetType()
 {
 return Ailu::Render::RayTracingShader::GetPrivateStaticClass();
 }

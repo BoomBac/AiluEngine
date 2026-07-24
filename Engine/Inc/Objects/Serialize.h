@@ -272,7 +272,7 @@ namespace Ailu
         virtual ~SerializeObject() = default;
         virtual void Serialize(FArchive &ar) 
         {
-            Type *class_type = GetType();
+            const Type *class_type = GetType();
             auto sar = dynamic_cast<FStructedArchive *>(&ar);
             if (sar != nullptr)
             {
@@ -291,7 +291,7 @@ namespace Ailu
         }
         virtual void Deserialize(FArchive &ar)
         {
-            Type *class_type = GetType();
+            const Type *class_type = GetType();
             while (class_type != nullptr)
             {
                 for (auto &p: class_type->GetProperties())
@@ -349,7 +349,7 @@ namespace Ailu
             }
             else
             {
-                Type *class_type = StaticClass<T>();
+                const Type *class_type = StaticClass<T>();
                 if (class_type == nullptr)
                 {
                     if (sar && name) 
@@ -407,7 +407,7 @@ namespace Ailu
             }
             else
             {
-                Type *class_type = StaticClass<T>();
+                const Type *class_type = StaticClass<T>();
                 if (class_type == nullptr)
                 {
                     if (sar && name)
@@ -500,7 +500,7 @@ namespace Ailu
             ar >> type_name;
             sar->EndObject();
 
-            Type *object_type = Type::Find(type_name);
+            const Type *object_type = Type::Find(type_name);
             if (object_type == nullptr)
             {
                 LOG_ERROR("SerializerWrapper<Ref<T>>::Deserialize: type {} not found", type_name);

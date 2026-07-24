@@ -91,7 +91,7 @@ namespace Ailu
             root->Name(popup_name);
             root->GetSlot()->Size({size.x, size.y});
             root->Thickness(1.0f);
-            root->SlotPadding() = UI::Padding(8.0f);
+            root->SlotPadding() = UI::Padding(4.0f);
             root->InvalidateLayout();
             root->_bg_color = {0.12f, 0.12f, 0.12f, 0.96f};
             root->_border_color = Colors::kWhite;

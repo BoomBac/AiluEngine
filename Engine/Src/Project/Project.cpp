@@ -23,7 +23,7 @@ namespace Ailu
             return false;
 
         ProjectDescriptor descriptor;
-        Type *type = ProjectDescriptor::StaticType();
+        const Type *type = ProjectDescriptor::StaticType();
         for (auto &property: type->GetProperties())
             property.Deserialize(&descriptor, ar);
 
@@ -42,7 +42,7 @@ namespace Ailu
         }
 
         JsonArchive ar;
-        Type *type = ProjectDescriptor::StaticType();
+        const Type *type = ProjectDescriptor::StaticType();
         for (auto &property: type->GetProperties())
             property.Serialize(const_cast<ProjectDescriptor *>(&_descriptor), ar);
         ar.Save(_project_file_path);

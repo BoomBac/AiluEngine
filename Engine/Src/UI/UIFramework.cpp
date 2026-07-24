@@ -35,12 +35,6 @@ namespace Ailu::UI
         _renderer = UIRenderer::Get();
         _capture_target = nullptr;
         _debug_highlight_target = nullptr;
-        auto popup_widget = MakeRef<Widget>();
-        popup_widget->Name("PopupWidget");
-        popup_widget->AddToWidget(MakeRef<Canvas>());
-        popup_widget->_visibility = EVisibility::kHide;
-        RegisterWidget(popup_widget);
-        _popup_widget = popup_widget.get();
     }
     UIManager::~UIManager()
     {
@@ -53,6 +47,14 @@ namespace Ailu::UI
 
     void UIManager::Update(f32 dt)
     {
+        for (auto &widget: _pending_popup_destroy)
+        {
+            if (widget)
+                widget->Destory();
+            widget.reset();
+        }
+        _pending_popup_destroy.clear();
+
         // 处理待销毁的元素
         for (auto &e: _pending_destroy)
         {
@@ -153,29 +155,74 @@ namespace Ailu::UI
     }
     void UIManager::ShowPopupAt(f32 x, f32 y, Ref<UIElement> root, std::function<void()> on_close, Window *win)
     {
-        _popup_widget->SetPosition({x, y});
-        _popup_widget->_visibility = EVisibility::kVisible;
-        _popup_widget->BindOutput(RenderTexture::WindowBackBuffer(win? win : &Application::Get().GetWindow()));
-        _popup_widget->Root()->AddChild(root);
-        BringToFront(_popup_widget);
-        _popup_widget->SetSize(_popup_widget->Root()->MeasureDesiredSize());
-        if (on_close)
-            _on_popup_close = on_close;
+        if (!root)
+            return;
+
+        Window *target_window = win ? win : &Application::Get().GetWindow();
+        auto popup_widget = MakeRef<Widget>();
+        popup_widget->Name(std::format("PopupWidget_{}", _popup_stack.size()));
+        auto popup_root = MakeRef<Canvas>();
+        popup_root->Name(std::format("{}Root", popup_widget->Name()));
+        popup_root->AddChild(root);
+        popup_widget->AddToWidget(popup_root);
+        const Vector2f popup_size = popup_root->MeasureDesiredSize();
+        const Vector2f window_size = {(f32) target_window->GetWidth(), (f32) target_window->GetHeight()};
+        constexpr f32 kScreenPadding = 4.0f;
+        Vector2f popup_pos{x, y};
+        if (popup_pos.x + popup_size.x + kScreenPadding > window_size.x)
+            popup_pos.x = x - popup_size.x;
+        if (popup_pos.y + popup_size.y + kScreenPadding > window_size.y)
+            popup_pos.y = y - popup_size.y;
+        popup_pos.x = std::clamp(popup_pos.x, kScreenPadding, std::max(kScreenPadding, window_size.x - popup_size.x - kScreenPadding));
+        popup_pos.y = std::clamp(popup_pos.y, kScreenPadding, std::max(kScreenPadding, window_size.y - popup_size.y - kScreenPadding));
+
+        popup_widget->SetPosition(popup_pos);
+        popup_widget->_visibility = EVisibility::kVisible;
+        popup_widget->SetParent(target_window);
+        popup_widget->BindOutput(RenderTexture::WindowBackBuffer(target_window));
+        popup_widget->SetSize(popup_size);
+        RegisterWidget(popup_widget);
+        BringToFront(popup_widget.get());
+        _popup_stack.push_back({popup_widget, on_close});
     }
     void UIManager::HidePopup()
     {
-        if (_popup_widget)
+        if (_popup_stack.empty())
+            return;
+
+        PopupEntry entry = std::move(_popup_stack.back());
+        _popup_stack.pop_back();
+        if (entry._widget)
         {
-            _popup_widget->_visibility = EVisibility::kHide;
-            if (!_popup_widget->Root()->GetChildren().empty())
-                LOG_INFO("UIManager::HidePopup: destory element {}", _popup_widget->Root()->ChildAt(0u)->Name())
-            _popup_widget->Root()->ClearChildren();
-            if (_on_popup_close)
+            entry._widget->_visibility = EVisibility::kHide;
+            if (entry._widget->Root() && !entry._widget->Root()->GetChildren().empty())
+                LOG_INFO("UIManager::HidePopup: destory element {}", entry._widget->Root()->ChildAt(0u)->Name())
+            UnRegisterWidget(entry._widget.get());
+            if (_pre_hover_widget == entry._widget.get())
+                _pre_hover_widget = nullptr;
+            if (_capture_target != nullptr && entry._widget->Root() != nullptr)
             {
-                _on_popup_close();
-                _on_popup_close = nullptr;
+                UIElement *node = _capture_target;
+                while (node != nullptr)
+                {
+                    if (node == entry._widget->Root())
+                    {
+                        _capture_target = nullptr;
+                        break;
+                    }
+                    node = node->GetParent();
+                }
             }
+            _pending_popup_destroy.push_back(entry._widget);
         }
+        if (entry._on_close)
+            entry._on_close();
+    }
+    Widget *UIManager::GetPopupWidget() const
+    {
+        if (_popup_stack.empty())
+            return nullptr;
+        return _popup_stack.back()._widget.get();
     }
     void UIManager::SetTheme(UITheme *theme) { _theme = theme; }
     void UIManager::Destroy(Ref<UIElement> element)

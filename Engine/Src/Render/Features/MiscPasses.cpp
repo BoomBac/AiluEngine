@@ -110,7 +110,7 @@ namespace Ailu
             EnsureTarget();
             Matrix4x4f world_mat = MatrixTranslation(Vector3f::kZero);
             {
-                GpuProfileBlock profile(cmd.get(), _name);
+                PROFILE_BLOCK_GPU(cmd.get(), _name)
                 cmd->SetRenderTarget(_color_buffer.get(), _depth_buffer.get());
                 cmd->ClearRenderTarget(kBackgroundColor);
                 if (_is_slice_mode)

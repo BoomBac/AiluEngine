@@ -6,7 +6,7 @@
 #include <Objects/SerializeSpecializations.h>
 #include <Framework/Common/Log.h>
 using namespace Ailu;
-Ailu::Type* Ailu::Math::Z_Construct_Transform2D_Type()
+const Ailu::Type* Ailu::Math::Z_Construct_Transform2D_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -89,17 +89,17 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::Math::Transform2D::GetPrivateStaticClass()
+const Ailu::Type* Ailu::Math::Transform2D::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_Transform2D_Type();
+	static const Ailu::Type* type = Z_Construct_Transform2D_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::Math::Transform2D>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::Math::Transform2D>()
 {
 return Ailu::Math::Transform2D::StaticType();
 }
-    Type *Ailu::Math::Transform2D::GetType()
+    const Type *Ailu::Math::Transform2D::GetType()
 {
 return Ailu::Math::Transform2D::GetPrivateStaticClass();
 }

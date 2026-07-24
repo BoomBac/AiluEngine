@@ -6,7 +6,7 @@
 #include <Objects/SerializeSpecializations.h>
 #include <Framework/Common/Log.h>
 using namespace Ailu;
-Ailu::Type* Ailu::UI::Z_Construct_UISlot_Type()
+const Ailu::Type* Ailu::UI::Z_Construct_UISlot_Type()
 {
 Ailu::SerializeObject::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -69,22 +69,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::UI::UISlot::GetPrivateStaticClass()
+const Ailu::Type* Ailu::UI::UISlot::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_UISlot_Type();
+	static const Ailu::Type* type = Z_Construct_UISlot_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::UISlot>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::UISlot>()
 {
 return Ailu::UI::UISlot::StaticType();
 }
-    Type *Ailu::UI::UISlot::GetType()
+    const Type *Ailu::UI::UISlot::GetType()
 {
 return Ailu::UI::UISlot::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_UISlot(&Ailu::UI::UISlot::StaticType, "Ailu::UI::UISlot");
-Ailu::Type* Ailu::UI::Z_Construct_CanvasSlot_Type()
+const Ailu::Type* Ailu::UI::Z_Construct_CanvasSlot_Type()
 {
 Ailu::UI::UISlot::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -210,22 +210,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::UI::CanvasSlot::GetPrivateStaticClass()
+const Ailu::Type* Ailu::UI::CanvasSlot::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_CanvasSlot_Type();
+	static const Ailu::Type* type = Z_Construct_CanvasSlot_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::CanvasSlot>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::CanvasSlot>()
 {
 return Ailu::UI::CanvasSlot::StaticType();
 }
-    Type *Ailu::UI::CanvasSlot::GetType()
+    const Type *Ailu::UI::CanvasSlot::GetType()
 {
 return Ailu::UI::CanvasSlot::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_CanvasSlot(&Ailu::UI::CanvasSlot::StaticType, "Ailu::UI::CanvasSlot");
-Ailu::Type* Ailu::UI::Z_Construct_LinearSlot_Type()
+const Ailu::Type* Ailu::UI::Z_Construct_LinearSlot_Type()
 {
 Ailu::UI::UISlot::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -330,22 +330,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::UI::LinearSlot::GetPrivateStaticClass()
+const Ailu::Type* Ailu::UI::LinearSlot::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_LinearSlot_Type();
+	static const Ailu::Type* type = Z_Construct_LinearSlot_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::LinearSlot>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::LinearSlot>()
 {
 return Ailu::UI::LinearSlot::StaticType();
 }
-    Type *Ailu::UI::LinearSlot::GetType()
+    const Type *Ailu::UI::LinearSlot::GetType()
 {
 return Ailu::UI::LinearSlot::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_LinearSlot(&Ailu::UI::LinearSlot::StaticType, "Ailu::UI::LinearSlot");
-Ailu::Type* Ailu::UI::Z_Construct_Padding_Type()
+const Ailu::Type* Ailu::UI::Z_Construct_Padding_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -365,17 +365,17 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::UI::Padding::GetPrivateStaticClass()
+const Ailu::Type* Ailu::UI::Padding::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_Padding_Type();
+	static const Ailu::Type* type = Z_Construct_Padding_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::Padding>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::Padding>()
 {
 return Ailu::UI::Padding::StaticType();
 }
-    Type *Ailu::UI::Padding::GetType()
+    const Type *Ailu::UI::Padding::GetType()
 {
 return Ailu::UI::Padding::GetPrivateStaticClass();
 }

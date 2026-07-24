@@ -7,17 +7,17 @@
 //Class CommonView begin...........................
 #define COMMONVIEW_GEN_H_18_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_CommonView_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_CommonView_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual Type  *GetType() override;
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::Editor{
 class CommonView ;
 }
 template<>
-class Ailu::Type* Ailu::StaticClass<class Ailu::Editor::CommonView>();
+const class Ailu::Type* Ailu::StaticClass<class Ailu::Editor::CommonView>();
 //Class CommonView end...........................
 
 #undef CURRENT_FILE_ID

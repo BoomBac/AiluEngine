@@ -574,11 +574,41 @@ namespace Ailu
                 }
             };
         }
+
+        void Border::Thickness(f32 thickness)
+        {
+            Thickness(Vector4f{thickness});
+        }
+
+        void Border::Thickness(Vector4f ltrb)
+        {
+            if (_thickness == ltrb)
+                return;
+            _thickness = ltrb;
+            SlotPadding() = Padding(_thickness);
+            InvalidateStyle();
+            InvalidateLayout();
+        }
+
+        void Border::CornerRadius(f32 radius)
+        {
+            CornerRadius(Vector4f{radius});
+        }
+
+        void Border::CornerRadius(Vector4f radius)
+        {
+            if (_corner_radius == radius)
+                return;
+            _corner_radius = radius;
+            InvalidateStyle();
+        }
+
         void Border::ResolveStyle(const UIStyleContext &context)
         {
             _resolved_visual._background = ColorBrush(_bg_color);
             _resolved_visual._border_color = _border_color;
             _resolved_visual._border_width = (_thickness.x + _thickness.y + _thickness.z + _thickness.w) * 0.25f;
+            _resolved_visual._corner_radius = _corner_radius;
             _style_override.ApplyTo(_resolved_visual);
         }
 
@@ -596,7 +626,8 @@ namespace Ailu
             {
                 if (_thickness == Vector4f::kZero)
                 {
-                    r.DrawQuad(_content_rect, _matrix, ColorBrush(bg), corner_radius);
+                    if (bg.a > 0.0f)
+                        r.DrawQuad(_content_rect, _matrix, ColorBrush(bg), corner_radius);
                 }
                 else
                 {
@@ -610,7 +641,8 @@ namespace Ailu
             else
             if (_thickness == Vector4f::kZero)
             {
-                r.DrawQuad(_content_rect, _matrix, ColorBrush(bg));
+                if (bg.a > 0.0f)
+                    r.DrawQuad(_content_rect, _matrix, ColorBrush(bg));
             }
             else
             {
@@ -622,21 +654,26 @@ namespace Ailu
                 f32 innerT = _content_rect.y;
                 f32 innerR = _content_rect.x + _content_rect.z;
                 f32 innerB = _content_rect.y + _content_rect.w;
-                // top 边
-                if (_thickness.y > 0)
-                    r.DrawQuad({outerL, outerT, outerR - outerL, innerT - outerT}, _matrix, ColorBrush(border));
-                // bottom 边
-                if (_thickness.w > 0)
-                    r.DrawQuad({outerL, innerB, outerR - outerL, outerB - innerB}, _matrix, ColorBrush(border));
-                // left 边
-                if (_thickness.x > 0)
-                    r.DrawQuad({outerL, innerT, innerL - outerL, innerB - innerT}, _matrix, ColorBrush(border));
-                // right 边
-                if (_thickness.z > 0)
-                    r.DrawQuad({innerR, innerT, outerR - innerR, innerB - innerT}, _matrix, ColorBrush(border));
 
                 // 背景
-                r.DrawQuad(_content_rect, _matrix, ColorBrush(bg));
+                if (bg.a > 0.0f)
+                    r.DrawQuad(_content_rect, _matrix, ColorBrush(bg));
+
+                if (border.a > 0.0f)
+                {
+                    // top 边
+                    if (_thickness.y > 0)
+                        r.DrawQuad({outerL, outerT, outerR - outerL, innerT - outerT}, _matrix, ColorBrush(border));
+                    // bottom 边
+                    if (_thickness.w > 0)
+                        r.DrawQuad({outerL, innerB, outerR - outerL, outerB - innerB}, _matrix, ColorBrush(border));
+                    // left 边
+                    if (_thickness.x > 0)
+                        r.DrawQuad({outerL, innerT, innerL - outerL, innerB - innerT}, _matrix, ColorBrush(border));
+                    // right 边
+                    if (_thickness.z > 0)
+                        r.DrawQuad({innerR, innerT, outerR - innerR, innerB - innerT}, _matrix, ColorBrush(border));
+                }
             }
 
             if (!_children.empty())
@@ -681,6 +718,25 @@ namespace Ailu
         {
             SlotPadding() = Padding(_thickness);
             InvalidateLayout();
+        }
+        void Border::OnPropertyChanged(const PropertyInfo &prop)
+        {
+            UIElement::OnPropertyChanged(prop);
+            const String &name = prop.Name();
+            if (name == "_thickness")
+            {
+                SlotPadding() = Padding(_thickness);
+                InvalidateStyle();
+                InvalidateLayout();
+            }
+            else if (name == "_bg_color" || name == "_border_color")
+            {
+                InvalidateStyle();
+            }
+            else if (name == "_corner_radius")
+            {
+                InvalidateStyle();
+            }
         }
         Ref<UISlot> Border::CreateSlotForChild()
         {

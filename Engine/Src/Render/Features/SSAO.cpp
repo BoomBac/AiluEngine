@@ -137,7 +137,7 @@ namespace Ailu::Render
         static bool is_compute = true;
         cmd->Clear();
         {
-            PROFILE_BLOCK_GPU(cmd.get(), SSAOCompute);
+            PROFILE_BLOCK_GPU(cmd.get(), "SSAOCompute");
             Vector4f params;
             if (_is_half_res)
                 params = {1.0f, 1.0f,(f32) (rendering_data._width >> 1), (f32) (rendering_data._height >> 1)};

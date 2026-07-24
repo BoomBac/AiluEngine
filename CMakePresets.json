@@ -25,6 +25,19 @@
       }
     },
     {
+      "name": "develop",
+      "displayName": "Ailu Develop",
+      "inherits": "windows-base",
+      "cacheVariables": {
+        "AILU_ENABLE_ASSERTS": "ON",
+        "AILU_ENABLE_D3D_DEBUG_LAYER": "OFF",
+        "AILU_ENABLE_PIX_MARKERS": "OFF",
+        "AILU_ENABLE_ENGINE_PROFILER": "OFF",
+        "AILU_ENABLE_TRACY": "ON",
+        "AILU_TRACY_ON_DEMAND": "ON"
+      }
+    },
+    {
       "name": "debug",
       "displayName": "Ailu Debug",
       "inherits": "windows-base"
@@ -45,6 +58,11 @@
       "name": "build-release",
       "configurePreset": "release",
       "configuration": "Release"
+    },
+    {
+      "name": "build-develop",
+      "configurePreset": "develop",
+      "configuration": "RelWithDebInfo"
     }
   ]
 }

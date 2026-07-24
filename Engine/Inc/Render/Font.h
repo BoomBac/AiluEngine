@@ -61,6 +61,7 @@ namespace Ailu::Render
         bool _is_italic;
         bool _is_packed;
         bool _is_msdf = false;
+        mutable FontChar _space_char{}; // 用于GetChar中对空白字符的兜底返回
         [[nodiscard]] f32 GetKerning(char first, char second) const
         {
             auto it = _kerning_list.find(first);
@@ -76,12 +77,32 @@ namespace Ailu::Render
         }
         [[nodiscard]] const FontChar& GetChar(char id) const
         {
+            // 空白字符：如果不在字体表中，返回零尺寸glyph，仅推进光标
+            if (id == ' ' || id == '\t' || id == '\r' || id == '\f' || id == '\v')
+            {
+                if (_char_list.contains(id))
+                    return _char_list.at(id);
+                _space_char._id = id;
+                _space_char._width = 0.0f;
+                _space_char._height = 0.0f;
+                const f32 space_advance = _size > 0 ? static_cast<f32>(_size) * 0.25f : 16.0f;
+                _space_char._xadvance = id == '\t' ? space_advance * 4.0f : space_advance;
+                _space_char._u = _space_char._v = 0.0f;
+                _space_char._twidth = _space_char._theight = 0.0f;
+                _space_char._xoffset = _space_char._yoffset = 0.0f;
+                _space_char._page = 0;
+                return _space_char;
+            }
             if (_char_list.contains(id))
             {
                 return _char_list.at(id);
             }
-            char replace_char = '?';
-            return _char_list.at(replace_char);
+            // 回退到'?'，如果'?'也不存在则返回第一个可用字符
+            if (_char_list.contains('?'))
+                return _char_list.at('?');
+            if (!_char_list.empty())
+                return _char_list.begin()->second;
+            return _space_char; // 最终兜底
         }
         static Ref<Font> Create(const WString& file_path);
         //create from msdf

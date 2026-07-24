@@ -175,8 +175,15 @@ namespace Ailu
         std::optional<tracy::ScopedZone> _tracy_zone;
     #endif
     };
-#define PROFILE_BLOCK_GPU(cmd, block_name) GpuProfileBlock block_name##_GPU(cmd, #block_name);
-#define PROFILE_BLOCK_CPU(block_name) CPUProfileBlock block_name##_CPU(#block_name);
+
+#if AILU_ENABLE_ENGINE_PROFILER || TRACY_ENABLE
+    #define PROFILE_BLOCK_GPU(cmd, block_name) GpuProfileBlock CONTACTW2(gpb_,__LINE__)(cmd,block_name);
+    #define PROFILE_BLOCK_CPU(block_name) CPUProfileBlock CONTACTW2(cpb_,__LINE__)(block_name);
+#else
+    #define PROFILE_BLOCK_GPU(cmd, block_name)
+    #define PROFILE_BLOCK_CPU(block_name)
+#endif
+
 }// namespace Ailu
 
 

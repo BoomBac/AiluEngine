@@ -7,65 +7,65 @@
 //Struct UIBrush begin...........................
 #define UISTYLEBASIC_GEN_H_28_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_UIBrush_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_UIBrush_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                AILU_API Type  *GetType();
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                const AILU_API Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu::UI{
 struct UIBrush ;
 }
 template<>
-AILU_API class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UIBrush>();
+AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UIBrush>();
 //Struct UIBrush end...........................
 
 //Struct UIColorTokens begin...........................
 #define UISTYLEBASIC_GEN_H_51_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_UIColorTokens_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_UIColorTokens_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                AILU_API Type  *GetType();
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                const AILU_API Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu::UI{
 struct UIColorTokens ;
 }
 template<>
-AILU_API class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UIColorTokens>();
+AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UIColorTokens>();
 //Struct UIColorTokens end...........................
 
 //Struct UISpacingTokens begin...........................
 #define UISTYLEBASIC_GEN_H_78_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_UISpacingTokens_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_UISpacingTokens_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                AILU_API Type  *GetType();
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                const AILU_API Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu::UI{
 struct UISpacingTokens ;
 }
 template<>
-AILU_API class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UISpacingTokens>();
+AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UISpacingTokens>();
 //Struct UISpacingTokens end...........................
 
 //Struct UITypographyTokens begin...........................
 #define UISTYLEBASIC_GEN_H_96_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_UITypographyTokens_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_UITypographyTokens_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                AILU_API Type  *GetType();
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                const AILU_API Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu::UI{
 struct UITypographyTokens ;
 }
 template<>
-AILU_API class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UITypographyTokens>();
+AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UITypographyTokens>();
 //Struct UITypographyTokens end...........................
 
 //Enum EUIBrushType begin...........................

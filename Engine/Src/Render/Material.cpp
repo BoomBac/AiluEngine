@@ -1,5 +1,5 @@
 ﻿#include "Render/Material.h"
-#include "Framework/Common/Asset.h"
+#include "Assets/Asset.h"
 #include "Framework/Common/Log.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Render/GraphicsPipelineStateObject.h"

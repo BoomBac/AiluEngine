@@ -6,7 +6,7 @@
 #include <Objects/SerializeSpecializations.h>
 #include <Framework/Common/Log.h>
 using namespace Ailu;
-Ailu::Type* Ailu::UI::Z_Construct_Widget_Type()
+const Ailu::Type* Ailu::UI::Z_Construct_Widget_Type()
 {
 Ailu::SerializeObject::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -153,22 +153,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::UI::Widget::GetPrivateStaticClass()
+const Ailu::Type* Ailu::UI::Widget::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_Widget_Type();
+	static const Ailu::Type* type = Z_Construct_Widget_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::Widget>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::Widget>()
 {
 return Ailu::UI::Widget::StaticType();
 }
-    Type *Ailu::UI::Widget::GetType()
+    const Type *Ailu::UI::Widget::GetType()
 {
 return Ailu::UI::Widget::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_Widget(&Ailu::UI::Widget::StaticType, "Ailu::UI::Widget");
-Ailu::Type* Ailu::UI::Z_Construct_SlotItemData_Type()
+const Ailu::Type* Ailu::UI::Z_Construct_SlotItemData_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -198,7 +198,7 @@ builder_slot._is_static = false;
 builder_slot._is_public = false;
 builder_slot._is_pointer = false;
 builder_slot._is_ref = false;
-builder_slot._is_template = false;
+builder_slot._is_template = true;
 builder_slot._meta = meta_slot;
 builder_slot._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Ref<UISlot>>);
 builder_slot._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Ref<UISlot>>);
@@ -251,17 +251,17 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::UI::SlotItemData::GetPrivateStaticClass()
+const Ailu::Type* Ailu::UI::SlotItemData::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_SlotItemData_Type();
+	static const Ailu::Type* type = Z_Construct_SlotItemData_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::SlotItemData>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::SlotItemData>()
 {
 return Ailu::UI::SlotItemData::StaticType();
 }
-    Type *Ailu::UI::SlotItemData::GetType()
+    const Type *Ailu::UI::SlotItemData::GetType()
 {
 return Ailu::UI::SlotItemData::GetPrivateStaticClass();
 }

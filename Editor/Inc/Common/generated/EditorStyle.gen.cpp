@@ -6,7 +6,7 @@
 #include <Objects/SerializeSpecializations.h>
 #include <Framework/Common/Log.h>
 using namespace Ailu;
-Ailu::Type* Ailu::Editor::Z_Construct_EditorStyle_Type()
+const Ailu::Type* Ailu::Editor::Z_Construct_EditorStyle_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -446,17 +446,17 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::Editor::EditorStyle::GetPrivateStaticClass()
+const Ailu::Type* Ailu::Editor::EditorStyle::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_EditorStyle_Type();
+	static const Ailu::Type* type = Z_Construct_EditorStyle_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::Editor::EditorStyle>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::Editor::EditorStyle>()
 {
 return Ailu::Editor::EditorStyle::StaticType();
 }
-    Type *Ailu::Editor::EditorStyle::GetType()
+    const Type *Ailu::Editor::EditorStyle::GetType()
 {
 return Ailu::Editor::EditorStyle::GetPrivateStaticClass();
 }

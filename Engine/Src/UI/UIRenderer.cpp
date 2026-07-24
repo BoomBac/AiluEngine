@@ -321,7 +321,7 @@ namespace Ailu
             auto &frame_block = _drawer_blocks[_frame_index];
             if (frame_block.size() < _cur_widget_index + 1u)
             {
-                frame_block.push_back(AL_NEW(DrawerBlock, _default_material,8092u));
+                frame_block.push_back(AL_NEW(DrawerBlock, _default_material,8092u * 4));
                 available_block = frame_block.back();
             }
             else

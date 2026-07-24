@@ -181,6 +181,13 @@ namespace Ailu::SceneManagement
                 arch.NewLine();
                 arch << (*c);
             }
+            if (auto c = _register.GetComponent<ECS::SpriteRendererComponent>(e); c != nullptr)
+            {
+                arch.InsertIndent();
+                arch << "_sprite_renderer_component:";
+                arch.NewLine();
+                arch << (*c);
+            }
             arch.DecreaseIndent();
         }
     }
@@ -253,6 +260,10 @@ namespace Ailu::SceneManagement
             {
                 arch >> _register.AddComponent<ECS::CVXGI>(e);
             }
+            else if (su::BeginWith(line, "_sprite_renderer_component"))
+            {
+                arch >> _register.AddComponent<ECS::SpriteRendererComponent>(e);
+            }
             else
             {
                 AL_ASSERT_MSG(true, "Unkown Component");
@@ -275,6 +286,7 @@ namespace Ailu::SceneManagement
         _register.RegisterComponent<ECS::CCollider>();
         _register.RegisterComponent<ECS::CSkeletonMesh>();
         _register.RegisterComponent<ECS::CVXGI>();
+        _register.RegisterComponent<ECS::SpriteRendererComponent>();
         ECS::Signature transf_sig;
         transf_sig.set(_register.GetComponentTypeID<ECS::TransformComponent>(), true);
         _register.RegisterSystem<ECS::TransformSystem>(transf_sig);
@@ -665,6 +677,8 @@ namespace Ailu::SceneManagement
             _register.AddComponent<ECS::CRigidBody>(new_one, *_register.GetComponent<ECS::CRigidBody>(e));
         if (_register.HasComponent<ECS::CCollider>(e))
             _register.AddComponent<ECS::CCollider>(new_one, *_register.GetComponent<ECS::CCollider>(e));
+        if (_register.HasComponent<ECS::SpriteRendererComponent>(e))
+            _register.AddComponent<ECS::SpriteRendererComponent>(new_one, *_register.GetComponent<ECS::SpriteRendererComponent>(e));
 
         // Reparent to same parent, then restore local transform
         if (source_has_hierarchy && source_parent != ECS::kInvalidEntity)
@@ -841,7 +855,7 @@ namespace Ailu::SceneManagement
 
     void Scene::RebuildBVHTree()
     {
-        PROFILE_BLOCK_CPU(Scene_RebuildBVHTree)
+        PROFILE_BLOCK_CPU("Scene::RebuildBVHTree")
         u32 index = 0;
         Vector<AABB> aabbs;
         for (auto &comp: _register.View<ECS::StaticMeshComponent>())

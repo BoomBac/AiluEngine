@@ -59,7 +59,7 @@ namespace Ailu
             SerializeObject::Deserialize(ar);
             if (auto sar = dynamic_cast<FStructedArchive *>(&ar); sar != nullptr)
             {
-                Type *root_type = nullptr;
+                const Type *root_type = nullptr;
                 sar->BeginObject("_root");
                 {
                     String type_name;
@@ -130,6 +130,14 @@ namespace Ailu
         Vector2f Widget::GetSize() const
         {
             return _size;
+        }
+        void Widget::SetSize(Vector2f size)
+        {
+            if (NearbyEqual(size, _size))
+                return;
+            _size = size;
+            if (_root)
+                _root->Arrange(0.0f, 0.0f, _size.x, _size.y);
         }
         void Widget::SetPosition(Vector2f position)
         {

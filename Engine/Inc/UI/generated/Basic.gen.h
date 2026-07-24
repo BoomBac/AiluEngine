@@ -7,113 +7,113 @@
 //Class Button begin...........................
 #define BASIC_GEN_H_22_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_Button_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_Button_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual Type  *GetType() override;
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::UI{
 class Button ;
 }
 template<>
-AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::UI::Button>();
+AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::UI::Button>();
 //Class Button end...........................
 
 //Class Text begin...........................
 #define BASIC_GEN_H_60_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_Text_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_Text_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual Type  *GetType() override;
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::UI{
 class Text ;
 }
 template<>
-AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::UI::Text>();
+AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::UI::Text>();
 //Class Text end...........................
 
 //Class Slider begin...........................
 #define BASIC_GEN_H_101_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_Slider_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_Slider_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual Type  *GetType() override;
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::UI{
 class Slider ;
 }
 template<>
-AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::UI::Slider>();
+AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::UI::Slider>();
 //Class Slider end...........................
 
 //Class CheckBox begin...........................
 #define BASIC_GEN_H_138_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_CheckBox_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_CheckBox_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual Type  *GetType() override;
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::UI{
 class CheckBox ;
 }
 template<>
-AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::UI::CheckBox>();
+AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::UI::CheckBox>();
 //Class CheckBox end...........................
 
 //Class Border begin...........................
 #define BASIC_GEN_H_168_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_Border_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_Border_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual Type  *GetType() override;
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::UI{
 class Border ;
 }
 template<>
-AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::UI::Border>();
+AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::UI::Border>();
 //Class Border end...........................
 
 //Class InputBlock begin...........................
-#define BASIC_GEN_H_202_GENERATED_BODY \
+#define BASIC_GEN_H_208_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_InputBlock_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_InputBlock_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual Type  *GetType() override;
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::UI{
 class InputBlock ;
 }
 template<>
-AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::UI::InputBlock>();
+AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::UI::InputBlock>();
 //Class InputBlock end...........................
 
 //Class Image begin...........................
-#define BASIC_GEN_H_254_GENERATED_BODY \
+#define BASIC_GEN_H_260_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_Image_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_Image_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual Type  *GetType() override;
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::UI{
 class Image ;
 }
 template<>
-AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::UI::Image>();
+AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::UI::Image>();
 //Class Image end...........................
 
 #undef CURRENT_FILE_ID

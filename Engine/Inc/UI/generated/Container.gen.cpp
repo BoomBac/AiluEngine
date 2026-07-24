@@ -6,7 +6,7 @@
 #include <Objects/SerializeSpecializations.h>
 #include <Framework/Common/Log.h>
 using namespace Ailu;
-Ailu::Type* Ailu::UI::Z_Construct_Canvas_Type()
+const Ailu::Type* Ailu::UI::Z_Construct_Canvas_Type()
 {
 Ailu::UI::UIElement::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -27,22 +27,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::UI::Canvas::GetPrivateStaticClass()
+const Ailu::Type* Ailu::UI::Canvas::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_Canvas_Type();
+	static const Ailu::Type* type = Z_Construct_Canvas_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::Canvas>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::Canvas>()
 {
 return Ailu::UI::Canvas::StaticType();
 }
-    Type *Ailu::UI::Canvas::GetType()
+    const Type *Ailu::UI::Canvas::GetType()
 {
 return Ailu::UI::Canvas::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_Canvas(&Ailu::UI::Canvas::StaticType, "Ailu::UI::Canvas");
-Ailu::Type* Ailu::UI::Z_Construct_LinearBox_Type()
+const Ailu::Type* Ailu::UI::Z_Construct_LinearBox_Type()
 {
 Ailu::UI::UIElement::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -63,22 +63,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::UI::LinearBox::GetPrivateStaticClass()
+const Ailu::Type* Ailu::UI::LinearBox::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_LinearBox_Type();
+	static const Ailu::Type* type = Z_Construct_LinearBox_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::LinearBox>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::LinearBox>()
 {
 return Ailu::UI::LinearBox::StaticType();
 }
-    Type *Ailu::UI::LinearBox::GetType()
+    const Type *Ailu::UI::LinearBox::GetType()
 {
 return Ailu::UI::LinearBox::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_LinearBox(&Ailu::UI::LinearBox::StaticType, "Ailu::UI::LinearBox");
-Ailu::Type* Ailu::UI::Z_Construct_VerticalBox_Type()
+const Ailu::Type* Ailu::UI::Z_Construct_VerticalBox_Type()
 {
 Ailu::UI::LinearBox::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -99,22 +99,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::UI::VerticalBox::GetPrivateStaticClass()
+const Ailu::Type* Ailu::UI::VerticalBox::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_VerticalBox_Type();
+	static const Ailu::Type* type = Z_Construct_VerticalBox_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::VerticalBox>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::VerticalBox>()
 {
 return Ailu::UI::VerticalBox::StaticType();
 }
-    Type *Ailu::UI::VerticalBox::GetType()
+    const Type *Ailu::UI::VerticalBox::GetType()
 {
 return Ailu::UI::VerticalBox::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_VerticalBox(&Ailu::UI::VerticalBox::StaticType, "Ailu::UI::VerticalBox");
-Ailu::Type* Ailu::UI::Z_Construct_HorizontalBox_Type()
+const Ailu::Type* Ailu::UI::Z_Construct_HorizontalBox_Type()
 {
 Ailu::UI::LinearBox::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -135,22 +135,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::UI::HorizontalBox::GetPrivateStaticClass()
+const Ailu::Type* Ailu::UI::HorizontalBox::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_HorizontalBox_Type();
+	static const Ailu::Type* type = Z_Construct_HorizontalBox_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::HorizontalBox>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::HorizontalBox>()
 {
 return Ailu::UI::HorizontalBox::StaticType();
 }
-    Type *Ailu::UI::HorizontalBox::GetType()
+    const Type *Ailu::UI::HorizontalBox::GetType()
 {
 return Ailu::UI::HorizontalBox::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_HorizontalBox(&Ailu::UI::HorizontalBox::StaticType, "Ailu::UI::HorizontalBox");
-Ailu::Type* Ailu::UI::Z_Construct_ScrollView_Type()
+const Ailu::Type* Ailu::UI::Z_Construct_ScrollView_Type()
 {
 Ailu::UI::UIElement::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -171,22 +171,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::UI::ScrollView::GetPrivateStaticClass()
+const Ailu::Type* Ailu::UI::ScrollView::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_ScrollView_Type();
+	static const Ailu::Type* type = Z_Construct_ScrollView_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::ScrollView>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::ScrollView>()
 {
 return Ailu::UI::ScrollView::StaticType();
 }
-    Type *Ailu::UI::ScrollView::GetType()
+    const Type *Ailu::UI::ScrollView::GetType()
 {
 return Ailu::UI::ScrollView::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_ScrollView(&Ailu::UI::ScrollView::StaticType, "Ailu::UI::ScrollView");
-Ailu::Type* Ailu::UI::Z_Construct_ListView_Type()
+const Ailu::Type* Ailu::UI::Z_Construct_ListView_Type()
 {
 Ailu::UI::ScrollView::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -228,22 +228,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::UI::ListView::GetPrivateStaticClass()
+const Ailu::Type* Ailu::UI::ListView::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_ListView_Type();
+	static const Ailu::Type* type = Z_Construct_ListView_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::ListView>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::ListView>()
 {
 return Ailu::UI::ListView::StaticType();
 }
-    Type *Ailu::UI::ListView::GetType()
+    const Type *Ailu::UI::ListView::GetType()
 {
 return Ailu::UI::ListView::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_ListView(&Ailu::UI::ListView::StaticType, "Ailu::UI::ListView");
-Ailu::Type* Ailu::UI::Z_Construct_Dropdown_Type()
+const Ailu::Type* Ailu::UI::Z_Construct_Dropdown_Type()
 {
 Ailu::UI::UIElement::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -274,7 +274,7 @@ builder_items._is_static = false;
 builder_items._is_public = false;
 builder_items._is_pointer = false;
 builder_items._is_ref = false;
-builder_items._is_template = false;
+builder_items._is_template = true;
 builder_items._meta = meta_items;
 builder_items._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<String>>);
 builder_items._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<String>>);
@@ -285,22 +285,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::UI::Dropdown::GetPrivateStaticClass()
+const Ailu::Type* Ailu::UI::Dropdown::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_Dropdown_Type();
+	static const Ailu::Type* type = Z_Construct_Dropdown_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::Dropdown>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::Dropdown>()
 {
 return Ailu::UI::Dropdown::StaticType();
 }
-    Type *Ailu::UI::Dropdown::GetType()
+    const Type *Ailu::UI::Dropdown::GetType()
 {
 return Ailu::UI::Dropdown::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_Dropdown(&Ailu::UI::Dropdown::StaticType, "Ailu::UI::Dropdown");
-Ailu::Type* Ailu::UI::Z_Construct_CollapsibleView_Type()
+const Ailu::Type* Ailu::UI::Z_Construct_CollapsibleView_Type()
 {
 Ailu::UI::UIElement::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -363,22 +363,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::UI::CollapsibleView::GetPrivateStaticClass()
+const Ailu::Type* Ailu::UI::CollapsibleView::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_CollapsibleView_Type();
+	static const Ailu::Type* type = Z_Construct_CollapsibleView_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::CollapsibleView>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::CollapsibleView>()
 {
 return Ailu::UI::CollapsibleView::StaticType();
 }
-    Type *Ailu::UI::CollapsibleView::GetType()
+    const Type *Ailu::UI::CollapsibleView::GetType()
 {
 return Ailu::UI::CollapsibleView::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_CollapsibleView(&Ailu::UI::CollapsibleView::StaticType, "Ailu::UI::CollapsibleView");
-Ailu::Type* Ailu::UI::Z_Construct_SplitView_Type()
+const Ailu::Type* Ailu::UI::Z_Construct_SplitView_Type()
 {
 Ailu::UI::UIElement::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -441,17 +441,17 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::UI::SplitView::GetPrivateStaticClass()
+const Ailu::Type* Ailu::UI::SplitView::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_SplitView_Type();
+	static const Ailu::Type* type = Z_Construct_SplitView_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::SplitView>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::SplitView>()
 {
 return Ailu::UI::SplitView::StaticType();
 }
-    Type *Ailu::UI::SplitView::GetType()
+    const Type *Ailu::UI::SplitView::GetType()
 {
 return Ailu::UI::SplitView::GetPrivateStaticClass();
 }

@@ -6,7 +6,7 @@
 #include <Objects/SerializeSpecializations.h>
 #include <Framework/Common/Log.h>
 using namespace Ailu;
-Ailu::Type* Ailu::Render::Z_Construct_Mesh_Type()
+const Ailu::Type* Ailu::Render::Z_Construct_Mesh_Type()
 {
 Ailu::Object::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -27,22 +27,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::Render::Mesh::GetPrivateStaticClass()
+const Ailu::Type* Ailu::Render::Mesh::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_Mesh_Type();
+	static const Ailu::Type* type = Z_Construct_Mesh_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::Render::Mesh>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::Render::Mesh>()
 {
 return Ailu::Render::Mesh::StaticType();
 }
-    Type *Ailu::Render::Mesh::GetType()
+    const Type *Ailu::Render::Mesh::GetType()
 {
 return Ailu::Render::Mesh::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_Mesh(&Ailu::Render::Mesh::StaticType, "Ailu::Render::Mesh");
-Ailu::Type* Ailu::Render::Z_Construct_SkeletonMesh_Type()
+const Ailu::Type* Ailu::Render::Z_Construct_SkeletonMesh_Type()
 {
 Ailu::Render::Mesh::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -63,17 +63,17 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::Render::SkeletonMesh::GetPrivateStaticClass()
+const Ailu::Type* Ailu::Render::SkeletonMesh::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_SkeletonMesh_Type();
+	static const Ailu::Type* type = Z_Construct_SkeletonMesh_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::Render::SkeletonMesh>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::Render::SkeletonMesh>()
 {
 return Ailu::Render::SkeletonMesh::StaticType();
 }
-    Type *Ailu::Render::SkeletonMesh::GetType()
+    const Type *Ailu::Render::SkeletonMesh::GetType()
 {
 return Ailu::Render::SkeletonMesh::GetPrivateStaticClass();
 }

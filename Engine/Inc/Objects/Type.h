@@ -204,12 +204,12 @@ namespace Ailu
 
         using Observer = std::function<void(void* instance)>;
         friend struct MemberBuilder;
-        const Type *GetType();
+        const Type *GetType() const;
         const String &TypeName() const { return _type_name; }
         void Serialize(void *instance, FArchive &ar) const;
         void Deserialize(void *instance, FArchive &ar) const;
         template<typename T, typename ClassType>
-        T &Get(ClassType* instance)
+        T &Get(ClassType* instance) const
         {
             return *reinterpret_cast<T *>(reinterpret_cast<u8 *>(instance) + _offset);
         }
@@ -231,9 +231,17 @@ namespace Ailu
                 *value_ptr = value;
             }
             if constexpr (std::is_base_of_v<Object, ClassType>)
+            {
                 NotifyObject(reinterpret_cast<Object*>(instance), source);
+            }
             else
-                Notify(reinterpret_cast<void*>(instance), source);
+            {
+                Object *maybe_obj = reinterpret_cast<Object*>(instance);
+                if (ObjectRegister::Get().Alive(maybe_obj))
+                    NotifyObject(maybe_obj, source);
+                else
+                    Notify(reinterpret_cast<void*>(instance), source);
+            }
         }
         PropertyObserverHandle AddObserver(void* instance, Observer cb)
         {
@@ -255,7 +263,7 @@ namespace Ailu
     private:
         String _type_name;               // 原始类型名（可含模板）：std::vector<int>
         TemplateParamInfo _template_info;// 模板结构树（非模板则 name=基名，subParams空）
-        const Type *_type = nullptr;
+        mutable const Type *_type = nullptr;
         struct ObserverEntry
         {
             void* _instance;
@@ -328,7 +336,8 @@ namespace Ailu
             p._flags |= b._is_public ? EMemberFlags::kPublic : 0u;
             p._flags |= b._is_pointer ? EMemberFlags::kPointer : 0u;
             p._flags |= b._is_ref ? EMemberFlags::kRef : 0u;
-            p._flags |= b._is_template ? EMemberFlags::kTemplate : 0u;
+            const bool is_template = b._is_template || b._type_name.find('<') != String::npos;
+            p._flags |= is_template ? EMemberFlags::kTemplate : 0u;
             p._meta = b._meta;
 
             p._serialize_fn = b._serialize_fn;
@@ -494,10 +503,10 @@ namespace Ailu
     class AILU_API Type : public Object
     {
         friend class ClassTypeRegister;
-        using RegisterFunc = std::function<Type *()>;
+        using RegisterFunc = std::function<const Type *()>;
     public:
         static void RegisterType(Type *type);
-        static Type *Find(const String &name);
+        static const Type *Find(const String &name);
 
     public:
         Type();
@@ -507,7 +516,7 @@ namespace Ailu
         [[nodiscard]] bool IsAbstract() const;
         [[nodiscard]] bool IsEnum() const { return _is_enum; };
         template<typename T>
-        [[nodiscard]] T *CreateInstance()
+        [[nodiscard]] T *CreateInstance() const
         {
             if (_constructor)
             {
@@ -518,7 +527,7 @@ namespace Ailu
         //name without namespace
         [[nodiscard]] String FullName() const;
         [[nodiscard]] String Namespace() const;
-        [[nodiscard]] Vector<PropertyInfo> &GetProperties();
+        [[nodiscard]] const Vector<PropertyInfo> &GetProperties() const;
         [[nodiscard]] const Vector<FunctionInfo> &GetFunctions() const;
         [[nodiscard]] const Vector<MemberInfo *> &GetMembers() const;
         [[nodiscard]] u32 Size() const;
@@ -539,7 +548,7 @@ namespace Ailu
         static void InitBaseTypeInfo();
 
     private:
-        inline static Map<String, Type *> s_global_types;
+        inline static Map<String,Type *> s_global_types;
         inline static HashMap<String, RegisterFunc> s_global_register;
         inline static bool s_is_base_type_init = false;
         SerializeFunc _serialize_fn;

@@ -139,7 +139,7 @@ namespace Ailu
                     _position = e._mouse_position + _drag_start_offset;
                 }
             };
-            _title_drag_area->SetVisible(false);
+            //_title_drag_area->SetVisible(false);
 
             _btn_close = hb->AddChild<UI::Button>();
             _btn_close->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFixed).Size({kTitleBarHeight, kTitleBarHeight});

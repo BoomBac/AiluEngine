@@ -25,6 +25,8 @@ namespace Ailu
         bool EnableCpuStateBatchedSubmission;
         APROPERTY(Category = "Render")
         bool EnableIncrementalGraphicsBinding;
+        APROPERTY(Category = "Debug")
+        bool _enable_d3d12_debug_layer;
     };
     inline EngineConfig g_engine_config;
 }

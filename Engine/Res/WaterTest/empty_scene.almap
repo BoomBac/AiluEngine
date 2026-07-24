@@ -170,5 +170,35 @@
                 "_children_num": 0,
                 "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0"
             }
+        }, {
+            "_entity_id": 7,
+            "_tag_component": {
+                "_name": "sprite_test",
+                "_layer_mask": 1
+            },
+            "_transform_component": {
+                "_position": [4.314676761627197, 3.5541651248931885, -1.1920928955078125e-7],
+                "_rotation": [0.0, 6.755127657243065e-8, 0.0, 1.0],
+                "_scale": [1.0, 1.0, 1.0]
+            },
+            "_hierarchy_component": {
+                "_first_child": 0,
+                "_prev_sibling": 0,
+                "_next_sibling": 0,
+                "_parent": 0,
+                "_children_num": 0,
+                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0"
+            },
+            "_sprite_renderer_component": {
+                "_sprite_guid": "e9bfde03-b5ab-4282-be2b-8fdc88f873ad",
+                "_material_guid": "",
+                "_color": [1.0, 1.0, 1.0, 1.0],
+                "_sorting_layer": 0,
+                "_order_in_layer": 0,
+                "_blend_mode": 0,
+                "_flip_x": false,
+                "_flip_y": false,
+                "_visible": true
+            }
         }]
 }

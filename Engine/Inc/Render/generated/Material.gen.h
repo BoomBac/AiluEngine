@@ -7,33 +7,33 @@
 //Class Material begin...........................
 #define MATERIAL_GEN_H_20_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_Material_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_Material_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual Type  *GetType() override;
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::Render{
 class Material ;
 }
 template<>
-AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::Render::Material>();
+AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::Material>();
 //Class Material end...........................
 
 //Class StandardMaterial begin...........................
-#define MATERIAL_GEN_H_151_GENERATED_BODY \
+#define MATERIAL_GEN_H_152_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_StandardMaterial_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_StandardMaterial_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual Type  *GetType() override;
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::Render{
 class StandardMaterial ;
 }
 template<>
-AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::Render::StandardMaterial>();
+AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::StandardMaterial>();
 //Class StandardMaterial end...........................
 
 #undef CURRENT_FILE_ID

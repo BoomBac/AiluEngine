@@ -162,7 +162,7 @@ namespace Ailu::Render
             return;
         auto cmd = CommandBufferPool::Get(_name);
         {
-            GpuProfileBlock b(cmd.get(), _name);
+            PROFILE_BLOCK_GPU(cmd.get(), _name)
             cmd->SetRenderTarget(rendering_data._camera_color_target_handle, rendering_data._camera_depth_target_handle);
             for (auto &it: all_renderable)
             {
@@ -355,7 +355,7 @@ namespace Ailu::Render
         auto cmd = CommandBufferPool::Get("MainLightShadowCastPass");
         cmd->Clear();
         {
-            GpuProfileBlock profile(cmd.get(), _name);
+            PROFILE_BLOCK_GPU(cmd.get(), _name)
             u32 obj_index = 0u;
             CBufferPerCameraData camera_data;
             //方向光阴影，只有一个
@@ -777,7 +777,7 @@ namespace Ailu::Render
         auto w = rendering_data._width, h = rendering_data._height;
         auto cmd = CommandBufferPool::Get("DeferredRenderPass");
         {
-            GpuProfileBlock profile(cmd.get(), _name);
+            PROFILE_BLOCK_GPU(cmd.get(), _name)
             cmd->SetRenderTargetLoadAction(rendering_data._camera_color_target_handle, ELoadStoreAction::kNotCare);
             cmd->SetRenderTargetLoadAction(rendering_data._camera_depth_target_handle, ELoadStoreAction::kClear);
             cmd->SetRenderTargets(rendering_data._gbuffers, rendering_data._camera_depth_target_handle);
@@ -828,10 +828,14 @@ namespace Ailu::Render
                           builder.Read(rendering_data._rg_handles._gbuffers[2]);
                           builder.Read(rendering_data._rg_handles._gbuffers[3]);
                           builder.Read(rendering_data._rg_handles._depth_target);
-                          builder.Read(rendering_data._rg_handles._main_light_shadow_map);
-                          builder.Read(rendering_data._rg_handles._addi_shadow_maps);
-                          builder.Read(rendering_data._rg_handles._point_light_shadow_maps);
-                          builder.Read(rendering_data._rg_handles._ao_tex);
+                          if (rendering_data._camera && rendering_data._camera->_is_render_shadow)
+                          {
+                              builder.Read(rendering_data._rg_handles._main_light_shadow_map);
+                              builder.Read(rendering_data._rg_handles._addi_shadow_maps);
+                              builder.Read(rendering_data._rg_handles._point_light_shadow_maps);
+                          }
+                          if (rendering_data._rg_handles._ao_tex.IsValid())
+                              builder.Read(rendering_data._rg_handles._ao_tex);
                           rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target);
                       },
                           [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
@@ -842,7 +846,8 @@ namespace Ailu::Render
                             _p_lighting_material->SetTexture("_GBuffer3", graph.Resolve<Texture>(data._rg_handles._gbuffers[3]));
                             _p_lighting_material->SetTexture("_CameraDepthTexture", graph.Resolve<Texture>(data._rg_handles._depth_target));
                             _p_lighting_material->SetTexture("IBLLut", _brdf_lut.get());
-                            _p_lighting_material->SetTexture("_OcclusionTex",graph.Resolve<Texture>(data._rg_handles._ao_tex));
+                            auto *occlusion_tex = data._rg_handles._ao_tex.IsValid() ? graph.Resolve<Texture>(data._rg_handles._ao_tex) : nullptr;
+                            _p_lighting_material->SetTexture("_OcclusionTex", occlusion_tex ? occlusion_tex : Texture::s_p_default_white);
                             cmd->SetRenderTargetLoadAction(data._rg_handles._color_target, ELoadStoreAction::kNotCare);
                             cmd->SetRenderTarget(data._rg_handles._color_target);
                             cmd->DrawFullScreenQuad(_p_lighting_material.get());
@@ -859,7 +864,7 @@ namespace Ailu::Render
         _p_lighting_material->SetTexture("IBLLut", _brdf_lut.get());
         auto cmd = CommandBufferPool::Get("DeferredLightingPass");
         {
-            GpuProfileBlock profile(cmd.get(), _name);
+            PROFILE_BLOCK_GPU(cmd.get(), _name)
             cmd->SetRenderTargetLoadAction(rendering_data._camera_color_target_handle, ELoadStoreAction::kNotCare);
             cmd->SetRenderTargetLoadAction(rendering_data._camera_depth_target_handle, ELoadStoreAction::kNotCare);
             cmd->SetRenderTarget(rendering_data._camera_color_target_handle, rendering_data._camera_depth_target_handle);
@@ -957,7 +962,7 @@ namespace Ailu::Render
         auto cmd = CommandBufferPool::Get("SkyboxPass");
         cmd->Clear();
         {
-            GpuProfileBlock profile(cmd.get(), _name);
+            PROFILE_BLOCK_GPU(cmd.get(), _name)
             auto sv_lut = cmd->GetTempRT(_sky_lut_size.x, _sky_lut_size.y, "_SkyLightLUT", ERenderTargetFormat::kRGBAHalf, false, false, true);
 
 
@@ -1137,7 +1142,7 @@ namespace Ailu::Render
             Gizmo::DrawLine(axis[2].xy, axis[2].zw, Colors::kBlue);
 
             //cmd->SetViewProjectionMatrix(rendering_data._camera->GetView(), rendering_data._camera->GetProj());
-            GpuProfileBlock profile(cmd.get(), _name);
+            PROFILE_BLOCK_GPU(cmd.get(), _name)
             cmd->SetViewport(rendering_data._viewport);
             cmd->SetScissorRect(rendering_data._scissor_rect);
             cmd->SetRenderTarget(rendering_data._camera_color_target_handle, rendering_data._camera_depth_target_handle);
@@ -1247,7 +1252,7 @@ namespace Ailu::Render
         auto cmd = CommandBufferPool::Get("CopyColor");
         cmd->Clear();
         {
-            GpuProfileBlock profile(cmd.get(), _name);
+            PROFILE_BLOCK_GPU(cmd.get(), _name)
             cmd->Blit(rendering_data._camera_color_target_handle, rendering_data._camera_opaque_tex_handle);
         }
         context->ExecuteCommandBuffer(cmd);
@@ -1292,7 +1297,7 @@ namespace Ailu::Render
         auto cmd = CommandBufferPool::Get("CopyDepth");
         cmd->Clear();
         {
-            GpuProfileBlock profile(cmd.get(), _name);
+            PROFILE_BLOCK_GPU(cmd.get(), _name)
             cmd->Blit(rendering_data._camera_depth_target_handle, rendering_data._camera_depth_tex_handle);
         }
         context->ExecuteCommandBuffer(cmd);
@@ -1366,7 +1371,7 @@ namespace Ailu::Render
         auto &all_renderable = *rendering_data._cull_results;
         auto cmd = CommandBufferPool::Get(_name);
         {
-            GpuProfileBlock b(cmd.get(), _name);
+            PROFILE_BLOCK_GPU(cmd.get(), _name)
             cmd->SetRenderTarget(rendering_data._camera_color_target_handle, rendering_data._camera_depth_target_handle);
             for (auto &it: all_renderable)
             {
@@ -1538,7 +1543,7 @@ namespace Ailu::Render
         RTHandle motion_vector_depth = cmd->GetTempRT(rendering_data._width, rendering_data._height, "_MotionVectorDepth", ERenderTargetFormat::kDepth, false, false, false);
         cmd->Clear();
         {
-            PROFILE_BLOCK_GPU(cmd.get(), CameraMotionVector)
+            PROFILE_BLOCK_GPU(cmd.get(), "CameraMotionVector")
             //camera motion vector
             cmd->SetRenderTarget(motion_vector_rt, motion_vector_depth);
             //cmd->ClearRenderTarget(motion_vector_rt, motion_vector_depth,Colors::kBlack,kZFar);
@@ -1644,7 +1649,7 @@ namespace Ailu::Render
         RTHandle hzb_rt = cmd->GetTempRT(w, h, "_HZB", ERenderTargetFormat::kRFloat, true, false, true);
         cmd->Clear();
         {
-            PROFILE_BLOCK_GPU(cmd.get(), HZB)
+            PROFILE_BLOCK_GPU(cmd.get(), "HZB")
             auto kernel = _hzb_gen->FindKernel("CSMain");
             _hzb_gen->SetTexture("_DepthInput", rendering_data._camera_depth_target_handle);
             u16 mip = Texture::MaxMipmapCount(w, h);

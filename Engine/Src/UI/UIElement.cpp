@@ -437,7 +437,7 @@ namespace Ailu
                 {
                     String item_name{};
                     item_name = std::to_string(i);
-                    Type *child_type = nullptr;
+                    const Type *child_type = nullptr;
                     {
                         String type_name;
                         sar->BeginObject(item_name);

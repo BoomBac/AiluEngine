@@ -6,7 +6,7 @@
 #include <Objects/SerializeSpecializations.h>
 #include <Framework/Common/Log.h>
 using namespace Ailu;
-Ailu::Type* Ailu::Editor::Z_Construct_DockWindow_Type()
+const Ailu::Type* Ailu::Editor::Z_Construct_DockWindow_Type()
 {
 Ailu::Object::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -27,17 +27,17 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::Editor::DockWindow::GetPrivateStaticClass()
+const Ailu::Type* Ailu::Editor::DockWindow::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_DockWindow_Type();
+	static const Ailu::Type* type = Z_Construct_DockWindow_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::Editor::DockWindow>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::Editor::DockWindow>()
 {
 return Ailu::Editor::DockWindow::StaticType();
 }
-    Type *Ailu::Editor::DockWindow::GetType()
+    const Type *Ailu::Editor::DockWindow::GetType()
 {
 return Ailu::Editor::DockWindow::GetPrivateStaticClass();
 }

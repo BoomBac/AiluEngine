@@ -21,12 +21,23 @@ set(AILU_FBXSDK_LINK_LIB
 
 option(AILU_ENABLE_TRACY "Enable Tracy profiler instrumentation" ON)
 option(AILU_TRACY_ON_DEMAND "Tracy connects only when profiler is attached" ON)
+option(AILU_ENABLE_ASSERTS "Enable engine assertions" ON)
+option(AILU_ENABLE_ENGINE_PROFILER "Enable built-in profiler" OFF)
+option(AILU_ENABLE_D3D_DEBUG_LAYER "Enable D3D12 debug layer" OFF)
+option(AILU_ENABLE_PIX_MARKERS "Enable PIX event markers" OFF)
 
 set(AILU_AHT_CONFIG_FILE "${CMAKE_SOURCE_DIR}/AiluHeadTool/aht.ini")
 set(AILU_ENGINE_GENERATED_SOURCES)
 set(AILU_EDITOR_GENERATED_SOURCES)
 set(AILU_REFLECTION_INPUT_HEADERS)
 set(AILU_REFLECTION_OUTPUTS)
+
+if(WIN32)
+    add_compile_definitions(
+        NOMINMAX
+        WIN32_LEAN_AND_MEAN
+    )
+endif()
 
 function(ailu_collect_reflection_outputs root_dir output_var)
 	file(GLOB_RECURSE candidate_headers CONFIGURE_DEPENDS "${root_dir}/*.h" "${root_dir}/*.hpp")
@@ -68,6 +79,18 @@ add_custom_command(
 	VERBATIM)
 
 add_custom_target(ailu_reflection_codegen DEPENDS ${AILU_REFLECTION_OUTPUTS})
+
+# 直接运行已编译好的 AiluHeadTool.exe（不触发 AiluHeadTool 的编译）
+set(AILU_AHT_EXE_DIR "${CMAKE_SOURCE_DIR}/AiluHeadTool/bin/x64" CACHE PATH "Directory containing pre-built AiluHeadTool.exe")
+add_custom_target(ailu_reflection_run
+	COMMAND ${CMAKE_COMMAND} -E make_directory "${AILU_AHT_EXE_DIR}/$<CONFIG>/AHT"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different "${AILU_AHT_CONFIG_FILE}" "${AILU_AHT_EXE_DIR}/$<CONFIG>/AHT/aht.ini"
+	COMMAND ${CMAKE_COMMAND} -E touch "${AILU_AHT_EXE_DIR}/$<CONFIG>/AHT/cache.txt"
+	COMMAND ${CMAKE_COMMAND} -E touch "${AILU_AHT_EXE_DIR}/$<CONFIG>/AHT/class_ns_map.txt"
+	COMMAND "${AILU_AHT_EXE_DIR}/$<CONFIG>/AiluHeadTool.exe"
+	WORKING_DIRECTORY "${AILU_AHT_EXE_DIR}/$<CONFIG>"
+	COMMENT "Running AiluHeadTool (pre-built) to generate reflection code"
+	VERBATIM)
 
 # 添加engine子目录
 add_subdirectory(Engine)

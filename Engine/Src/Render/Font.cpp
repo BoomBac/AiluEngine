@@ -9,6 +9,69 @@
 
 namespace Ailu::Render
 {
+    namespace
+    {
+        f32 GetSpaceAdvance(const Font *font, const Vector2f &font_scale, f32 font_size, const Vector2f &scale, f32 multiplier = 1.0f)
+        {
+            const auto space_it = font->_char_list.find(' ');
+            const f32 advance = space_it != font->_char_list.end()
+                                      ? space_it->second._xadvance * font_scale.x
+                                      : font_size * scale.x * 0.25f;
+            return advance * multiplier;
+        }
+
+        bool TryConsumeHorizontalWhitespace(const String &text, u32 &index, const Font *font, const Vector2f &font_scale, f32 font_size, const Vector2f &scale, f32 &advance)
+        {
+            const auto byte = static_cast<unsigned char>(text[index]);
+            if (byte == ' ' || byte == '\r' || byte == '\f' || byte == '\v')
+            {
+                advance = GetSpaceAdvance(font, font_scale, font_size, scale);
+                return true;
+            }
+            if (byte == '\t')
+            {
+                advance = GetSpaceAdvance(font, font_scale, font_size, scale, 4.0f);
+                return true;
+            }
+
+            const auto remaining = text.size() - index;
+            if (remaining >= 2u && byte == 0xC2u && static_cast<unsigned char>(text[index + 1u]) == 0xA0u)
+            {
+                // U+00A0 no-break space
+                advance = GetSpaceAdvance(font, font_scale, font_size, scale);
+                ++index;
+                return true;
+            }
+            if (remaining >= 3u && byte == 0xE3u && static_cast<unsigned char>(text[index + 1u]) == 0x80u && static_cast<unsigned char>(text[index + 2u]) == 0x80u)
+            {
+                // U+3000 ideographic space
+                advance = font_size * scale.x;
+                index += 2u;
+                return true;
+            }
+            if (remaining >= 3u && byte == 0xE2u)
+            {
+                const auto byte1 = static_cast<unsigned char>(text[index + 1u]);
+                const auto byte2 = static_cast<unsigned char>(text[index + 2u]);
+                if (byte1 == 0x80u && ((byte2 >= 0x80u && byte2 <= 0x8Au) || byte2 == 0xAFu))
+                {
+                    // U+2000..U+200A and U+202F
+                    advance = GetSpaceAdvance(font, font_scale, font_size, scale);
+                    index += 2u;
+                    return true;
+                }
+                if (byte1 == 0x81u && byte2 == 0x9Fu)
+                {
+                    // U+205F medium mathematical space
+                    advance = GetSpaceAdvance(font, font_scale, font_size, scale);
+                    index += 2u;
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+
     Ref<Font> Font::Create(const WString &file_path)
     {
         auto parent = PathUtils::Parent(file_path);
@@ -379,6 +442,15 @@ namespace Ailu::Render
                     continue;
                 }
 
+                f32 whitespace_advance = 0.0f;
+                if (TryConsumeHorizontalWhitespace(text, i, font, font_scale, font_size, scale, whitespace_advance))
+                {
+                    x += whitespace_advance;
+                    max_width = std::max(max_width, x - pos.x);
+                    last_char = -1;
+                    continue;
+                }
+
                 const auto &char_info = font->GetChar(c);
                 const f32 kerning = last_char >= 0 ? font->GetKerning(last_char, c) * font_scale.x : 0.0f;
                 const f32 advance = char_info._xadvance * font_scale.x;
@@ -443,6 +515,15 @@ namespace Ailu::Render
                 baseline_y += line_height + line_gap;
                 last_char = -1;
                 ++line_count;
+                continue;
+            }
+
+            f32 whitespace_advance = 0.0f;
+            if (TryConsumeHorizontalWhitespace(text, i, font, font_scale, font_size, scale, whitespace_advance))
+            {
+                x += whitespace_advance;
+                max_width = std::max(max_width, x - pos.x);
+                last_char = -1;
                 continue;
             }
 

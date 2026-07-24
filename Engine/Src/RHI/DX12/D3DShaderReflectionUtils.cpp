@@ -81,7 +81,9 @@ namespace Ailu::RHI::DX12::ShaderReflectionUtils
         }
         else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_TEXTURE)
         {
-            ret = std::make_pair(bind_desc.Name, Render::ShaderBindResourceInfo{Render::EBindResDescType::kTexture2D, static_cast<uint16_t>(bind_desc.BindPoint), 255u, bind_desc.Name});
+            auto info = Render::ShaderBindResourceInfo{Render::EBindResDescType::kTexture2D, static_cast<uint16_t>(bind_desc.BindPoint), 255u, bind_desc.Name};
+            info._register_space = static_cast<u16>(bind_desc.Space);
+            ret = std::make_pair(bind_desc.Name, info);
         }
         else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_SAMPLER)
         {
@@ -89,11 +91,15 @@ namespace Ailu::RHI::DX12::ShaderReflectionUtils
         }
         else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_STRUCTURED || res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_BYTEADDRESS)
         {
-            ret = std::make_pair(bind_desc.Name, Render::ShaderBindResourceInfo{Render::EBindResDescType::kBuffer, static_cast<uint16_t>(bind_desc.BindPoint), 255u, bind_desc.Name});
+            auto info = Render::ShaderBindResourceInfo{Render::EBindResDescType::kBuffer, static_cast<uint16_t>(bind_desc.BindPoint), 255u, bind_desc.Name};
+            info._register_space = static_cast<u16>(bind_desc.Space);
+            ret = std::make_pair(bind_desc.Name, info);
         }
         else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_UAV_RWSTRUCTURED || res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_UAV_APPEND_STRUCTURED || res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_UAV_CONSUME_STRUCTURED || res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_UAV_RWSTRUCTURED_WITH_COUNTER || res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_UAV_RWBYTEADDRESS)
         {
-            ret = std::make_pair(bind_desc.Name, Render::ShaderBindResourceInfo{Render::EBindResDescType::kRWBuffer, static_cast<uint16_t>(bind_desc.BindPoint), 255u, bind_desc.Name});
+            auto info = Render::ShaderBindResourceInfo{Render::EBindResDescType::kRWBuffer, static_cast<uint16_t>(bind_desc.BindPoint), 255u, bind_desc.Name};
+            info._register_space = static_cast<u16>(bind_desc.Space);
+            ret = std::make_pair(bind_desc.Name, info);
         }
         else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_UAV_RWTYPED)
         {

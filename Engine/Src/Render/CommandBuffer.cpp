@@ -320,6 +320,20 @@ namespace Ailu::Render
             PushMaterialState(cmd, true);
             _commands.push_back(cmd);
         }
+        void DrawIndexedInstanced(VertexBuffer *vb, IndexBuffer *ib, ConstantBuffer *per_obj_cb, Material *mat, u16 pass_index, u32 instance_count, u32 index_start, u32 index_num)
+        {
+            auto cmd = CommandPool::Get().Alloc<CommandDraw>();
+            cmd->_vb = vb;
+            cmd->_ib = ib;
+            cmd->_per_obj_cb = per_obj_cb;
+            cmd->_mat = mat;
+            cmd->_pass_index = pass_index;
+            cmd->_instance_count = instance_count;
+            PushMaterialState(cmd, true);
+            cmd->_index_start = index_start;
+            cmd->_index_num = index_num;
+            _commands.push_back(cmd);
+        }
         void SetViewport(Rect viewport)
         {
             _viewports[0] = viewport;
@@ -806,6 +820,10 @@ namespace Ailu::Render
     void CommandBuffer::DrawInstanced(VertexBuffer *vb, ConstantBuffer *per_obj_cb, Material *mat, u16 pass_index, u16 instance_count)
     {
         _impl->DrawInstanced(vb, per_obj_cb, mat, pass_index, instance_count);
+    }
+    void CommandBuffer::DrawIndexedInstanced(VertexBuffer *vb, IndexBuffer *ib, ConstantBuffer *per_obj_cb, Material *mat, u16 pass_index, u32 instance_count, u32 index_start, u32 index_num)
+    {
+        _impl->DrawIndexedInstanced(vb,ib,per_obj_cb,mat,pass_index,instance_count,index_start,index_num);
     }
     void CommandBuffer::SetViewport(Rect viewport)
     {

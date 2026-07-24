@@ -6,7 +6,7 @@
 #include <Objects/SerializeSpecializations.h>
 #include <Framework/Common/Log.h>
 using namespace Ailu;
-Ailu::Type* Ailu::UI::Z_Construct_UITheme_Type()
+const Ailu::Type* Ailu::UI::Z_Construct_UITheme_Type()
 {
 Ailu::SerializeObject::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -205,7 +205,7 @@ builder_button_styles._is_static = false;
 builder_button_styles._is_public = false;
 builder_button_styles._is_pointer = false;
 builder_button_styles._is_ref = false;
-builder_button_styles._is_template = false;
+builder_button_styles._is_template = true;
 builder_button_styles._meta = meta_button_styles;
 builder_button_styles._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<HashMap<UIStyleId, UIButtonStyle>>);
 builder_button_styles._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<HashMap<UIStyleId, UIButtonStyle>>);
@@ -226,7 +226,7 @@ builder_slider_styles._is_static = false;
 builder_slider_styles._is_public = false;
 builder_slider_styles._is_pointer = false;
 builder_slider_styles._is_ref = false;
-builder_slider_styles._is_template = false;
+builder_slider_styles._is_template = true;
 builder_slider_styles._meta = meta_slider_styles;
 builder_slider_styles._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<HashMap<UIStyleId, UISliderStyle>>);
 builder_slider_styles._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<HashMap<UIStyleId, UISliderStyle>>);
@@ -247,7 +247,7 @@ builder_check_box_styles._is_static = false;
 builder_check_box_styles._is_public = false;
 builder_check_box_styles._is_pointer = false;
 builder_check_box_styles._is_ref = false;
-builder_check_box_styles._is_template = false;
+builder_check_box_styles._is_template = true;
 builder_check_box_styles._meta = meta_check_box_styles;
 builder_check_box_styles._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<HashMap<UIStyleId, UICheckBoxStyle>>);
 builder_check_box_styles._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<HashMap<UIStyleId, UICheckBoxStyle>>);
@@ -268,7 +268,7 @@ builder_input_styles._is_static = false;
 builder_input_styles._is_public = false;
 builder_input_styles._is_pointer = false;
 builder_input_styles._is_ref = false;
-builder_input_styles._is_template = false;
+builder_input_styles._is_template = true;
 builder_input_styles._meta = meta_input_styles;
 builder_input_styles._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<HashMap<UIStyleId, UIInputStyle>>);
 builder_input_styles._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<HashMap<UIStyleId, UIInputStyle>>);
@@ -279,17 +279,17 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::UI::UITheme::GetPrivateStaticClass()
+const Ailu::Type* Ailu::UI::UITheme::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_UITheme_Type();
+	static const Ailu::Type* type = Z_Construct_UITheme_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::UITheme>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::UITheme>()
 {
 return Ailu::UI::UITheme::StaticType();
 }
-    Type *Ailu::UI::UITheme::GetType()
+    const Type *Ailu::UI::UITheme::GetType()
 {
 return Ailu::UI::UITheme::GetPrivateStaticClass();
 }

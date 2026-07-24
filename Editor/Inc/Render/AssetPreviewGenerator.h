@@ -7,6 +7,7 @@ namespace Ailu
     {
         class Mesh;
         class RenderTexture;
+        class Sprite;
     }
     namespace Editor
     {
@@ -14,6 +15,7 @@ namespace Ailu
         {
         public:
             static void GeneratorMeshSnapshot(u16 w, u16 h, Render::Mesh *mesh, Ref<Render::RenderTexture>& target);
+            static void GeneratorSpriteSnapshot(u16 w, u16 h, Render::Sprite *sprite, Ref<Render::RenderTexture>& target);
         };
     }// namespace Editor
 }// namespace Ailu

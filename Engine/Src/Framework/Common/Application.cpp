@@ -46,7 +46,7 @@ namespace Ailu
     {
         JsonArchive ar;
         ar.Load(s_engine_config_path);
-        Type *type = EngineConfig::StaticType();
+        const Type *type = EngineConfig::StaticType();
         for (auto &it: type->GetProperties())
             it.Deserialize(&g_engine_config, ar);
         _is_multi_thread_rendering = g_engine_config.isMultiThreadRender;
@@ -120,7 +120,7 @@ namespace Ailu
         AL_ASSERT_MSG(sp_instance == nullptr, "Application already init!");
         ObjectRegister::Initialize();
         Enum::InitTypeInfo();
-        Core::Allocator::Init();
+        Allocator::Init();
         _raw_event_queue = MakeScope<Core::RawEventQueue>();
         TimeMgr::Init();
         TimeMgr::Get().Initialize();
@@ -194,7 +194,7 @@ namespace Ailu
     void Application::Finalize()
     {
         JsonArchive ar;
-        Type *type = EngineConfig::StaticType();
+        const Type *type = EngineConfig::StaticType();
         for (auto &it: type->GetProperties())
             it.Serialize(&g_engine_config,ar);
         ar.Save(s_engine_config_path);
@@ -213,8 +213,8 @@ namespace Ailu
         JobSystem::Shutdown();
         ProjectManager::Shutdown();
         ObjectRegister::Shutdown();
-        Core::Allocator::Get().PrintLeaks();
-        Core::Allocator::Shutdown();
+        Allocator::Get().PrintLeaks();
+        Allocator::Shutdown();
     }
 
     void Application::Tick(f32 delta_time)
@@ -266,8 +266,7 @@ namespace Ailu
     }
     void Application::WaitForRender()
     {
-        //LOG_INFO("Application::WaitForRender...");
-        CPUProfileBlock b("Application::WaitForRender");
+        PROFILE_BLOCK_CPU("Application::WaitForRender")
         std::unique_lock<std::mutex> lock(_mutex);
         _main_wait.wait(lock, [this]
                         { return _render_finished; });
@@ -276,8 +275,7 @@ namespace Ailu
 
     void Application::WaitForMain()
     {
-        //LOG_INFO("Application::WaitForMain...");
-        CPUProfileBlock b("Application::WaitForMain");
+        PROFILE_BLOCK_CPU("Application::WaitForMain")
         std::unique_lock<std::mutex> lock(_mutex);
         _render_wait.wait(lock, [this]
                           { return _main_finished || _state == EApplicationState::EApplicationState_Exit; });
@@ -515,14 +513,14 @@ namespace Ailu
         BeginCursorFrame();
         TimeMgr::Get().Mark();
         {
-            CPUProfileBlock main_b("Application::Tick");
+            PROFILE_BLOCK_CPU("Application::Tick")
             {
 #if defined(TRACY_ENABLE)
                 ZoneScopedN("UI::Update + Events");
 #endif
                 UI::UIManager::Get()->Update(delta_time);
 #if defined(SEPARATE_LOGIC_THREAD)
-                CPUProfileBlock main_b("Application::OnEvent");
+                PROFILE_BLOCK_CPU(Application_OnEvent)
                 static u8 event_mem[Core::RawEventQueue::MAX_EVENT_SIZE];
                 while (auto e = _raw_event_queue->Pop(event_mem))
                 {
@@ -561,7 +559,7 @@ namespace Ailu
             //这也是固定频率更新，所以实际上delta_time始终为1
             //if (_update_lag >= s_target_lag)
             {
-                CPUProfileBlock b("LayerUpdate");
+                PROFILE_BLOCK_CPU("LayerUpdate")
 #if defined(TRACY_ENABLE)
                 ZoneScopedN("LayerUpdate");
 #endif
@@ -581,7 +579,7 @@ namespace Ailu
             //if (_render_lag >= s_target_lag)
             {
                 {
-                    CPUProfileBlock b("SceneTick");
+                    PROFILE_BLOCK_CPU("SceneTick")
 #if defined(TRACY_ENABLE)
                     ZoneScopedN("SceneTick");
 #endif
@@ -589,7 +587,7 @@ namespace Ailu
                     ScriptSystem::Get().Tick(delta_time);
                 }
                 {
-                    CPUProfileBlock b("RenderScene");
+                    PROFILE_BLOCK_CPU("RenderScene")
 #if defined(TRACY_ENABLE)
                     ZoneScopedN("RenderScene");
 #endif
@@ -597,7 +595,7 @@ namespace Ailu
                 }
 #ifdef DEAR_IMGUI
                 {
-                    CPUProfileBlock b("RenderImGui");
+                    PROFILE_BLOCK_CPU("RenderImGui")
 #if defined(TRACY_ENABLE)
                     ZoneScopedN("RenderImGui");
 #endif

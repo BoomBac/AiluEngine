@@ -93,6 +93,7 @@ namespace Ailu
             Widget *TitleWidget() { return _title_widget.get(); };
             Ref<Widget> ContentWidgetRef() const { return _content_widget; };
             Ref<Widget> TitleWidgetRef() const { return _title_widget; };
+            UI::Button *GetCloseButton() { return _btn_close; }
             Vector2f Position() const override { return _position; };
             Vector2f Size() const override { return _size; };
             void SetSize(Vector2f size);

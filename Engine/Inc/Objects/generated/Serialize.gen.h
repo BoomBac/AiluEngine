@@ -7,17 +7,17 @@
 //Class SerializeObject begin...........................
 #define SERIALIZE_GEN_H_270_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_SerializeObject_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_SerializeObject_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual Type  *GetType() override;
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu{
 class SerializeObject ;
 }
 template<>
-AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::SerializeObject>();
+AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::SerializeObject>();
 //Class SerializeObject end...........................
 
 #undef CURRENT_FILE_ID

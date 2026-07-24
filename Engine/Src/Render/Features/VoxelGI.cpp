@@ -35,7 +35,7 @@ namespace Ailu::Render
             cbuf_cam->_MatrixVP = cbuf_cam->_MatrixV * cbuf_cam->_MatrixP;
             auto color = cmd->GetTempRT(_data._grid_num.x, _data._grid_num.y, "VoxelColorRT", ERenderTargetFormat::kDefault, false, false, false);
             {
-                PROFILE_BLOCK_GPU(cmd.get(), Voxelize)
+                PROFILE_BLOCK_GPU(cmd.get(), "Voxelize")
                 cmd->SetRenderTarget(color);
                 //voxelize
                 for (const auto &it: *rendering_data._cull_results)
@@ -63,7 +63,7 @@ namespace Ailu::Render
             u16 x, y, z;
             _voxelize_cs->GetThreadNum(kernel, x, y, z);
             {
-                PROFILE_BLOCK_GPU(cmd.get(), FillTexture3D)
+                PROFILE_BLOCK_GPU(cmd.get(), "FillTexture3D")
                 auto [gx,gy,gz] = _voxelize_cs->CalculateDispatchNum(kernel,(u16)_data._grid_num.x,(u16)_data._grid_num.y,(u16)_data._grid_num.z);
                 cmd->Dispatch(_voxelize_cs.get(), kernel,gx,gy,gz);
             }
@@ -144,7 +144,7 @@ namespace Ailu::Render
     {
         auto cmd = CommandBufferPool::Get("VoxelDebug");
         {
-            PROFILE_BLOCK_GPU(cmd.get(), VoxelDebug)
+            PROFILE_BLOCK_GPU(cmd.get(), "VoxelDebug")
             cmd->SetRenderTarget(rendering_data._camera_color_target_handle, rendering_data._camera_depth_target_handle);
             u16 mip = rendering_data._vxgi_debug_mipmap;
             i32 mip_grid_num_x = _data._grid_num.x >> mip;

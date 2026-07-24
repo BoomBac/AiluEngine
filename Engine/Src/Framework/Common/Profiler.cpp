@@ -308,13 +308,13 @@ namespace Ailu
 //         TracyCZone(_tracy_ctx, true);
 //         TracyCZoneName(_tracy_ctx, _name.c_str(), _name.size());
 // #endif
-        cmdList->BeginProfiler(name);
+        //cmdList->BeginProfiler(name);
         //		idx = Profiler::Get().StartGpuProfile(cmdList, name);
         //		Profiler::Get().AddGPUProfilerHierarchy(true, idx);
     }
     GpuProfileBlock::~GpuProfileBlock()
     {
-        _cmdList->EndProfiler();
+        //_cmdList->EndProfiler();
         //		Profiler::Get().EndGpuProfile(cmdList, idx);
         //		Profiler::Get().AddGPUProfilerHierarchy(false, idx);
 
@@ -333,9 +333,9 @@ namespace Ailu
         _tracy_zone.emplace(&tracy_cpu_profileblock_srcloc, true);
         _tracy_zone->Name(name.c_str(), name.size());
 #endif
-        std::lock_guard<std::mutex> lock(_mutex);
-        idx = Profiler::Get().StartCPUProfile(name);
-        Profiler::Get().AddCPUProfilerHierarchy(true, idx);
+        //std::lock_guard<std::mutex> lock(_mutex);
+        //idx = Profiler::Get().StartCPUProfile(name);
+        //Profiler::Get().AddCPUProfilerHierarchy(true, idx);
     }
     CPUProfileBlock::~CPUProfileBlock()
     {
@@ -343,9 +343,9 @@ namespace Ailu
         // Tracy requires zone begin/end on the same thread.
         AL_ASSERT(_owner_thread_id == std::this_thread::get_id());
     #endif
-        std::lock_guard<std::mutex> lock(_mutex);
-        Profiler::Get().EndCPUProfile(idx);
-        Profiler::Get().AddCPUProfilerHierarchy(false, idx);
+        //std::lock_guard<std::mutex> lock(_mutex);
+        //Profiler::Get().EndCPUProfile(idx);
+        //Profiler::Get().AddCPUProfilerHierarchy(false, idx);
 
     #if defined(TRACY_ENABLE)
         // End the zone after CPU profiler bookkeeping.

@@ -6,7 +6,7 @@
 #include <Objects/SerializeSpecializations.h>
 #include <Framework/Common/Log.h>
 using namespace Ailu;
-Ailu::Type* Ailu::Editor::Z_Construct_AssetBrowser_Type()
+const Ailu::Type* Ailu::Editor::Z_Construct_AssetBrowser_Type()
 {
 Ailu::Editor::DockWindow::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -48,17 +48,17 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::Editor::AssetBrowser::GetPrivateStaticClass()
+const Ailu::Type* Ailu::Editor::AssetBrowser::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_AssetBrowser_Type();
+	static const Ailu::Type* type = Z_Construct_AssetBrowser_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::Editor::AssetBrowser>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::Editor::AssetBrowser>()
 {
 return Ailu::Editor::AssetBrowser::StaticType();
 }
-    Type *Ailu::Editor::AssetBrowser::GetType()
+    const Type *Ailu::Editor::AssetBrowser::GetType()
 {
 return Ailu::Editor::AssetBrowser::GetPrivateStaticClass();
 }

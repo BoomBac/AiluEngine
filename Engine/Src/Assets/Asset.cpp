@@ -1,4 +1,4 @@
-#include "Framework/Common/Asset.h"
+#include "Assets/Asset.h"
 #include "Framework/Common/Path.h"
 #include "Framework/Common/Utils.h"
 #include "pch.h"
@@ -12,7 +12,7 @@ namespace Ailu
     Asset::Asset(Guid guid, const Type *type, const WString &asset_path) : _guid(guid), _asset_type(type), _p_obj(nullptr)
     {
         _asset_path = asset_path;
-        _name = PathUtils::GetFileName(_asset_path);
+        _name = ToChar(PathUtils::GetFileName(_asset_path));
     }
 
     void Asset::CopyFrom(const Asset &other)

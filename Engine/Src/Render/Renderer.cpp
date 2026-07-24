@@ -14,6 +14,7 @@
 #include "Render/Features/RayTraceGI.h"
 #include "Render/Features/RTXDI.h"
 #include "Render/Features/VolumetricFog.h"
+#include "Render/2D/SpriteRenderFeature.h"
 #include "Render/RenderPipeline.h"
 #include "Render/RenderingData.h"
 #include "Render/CommandBuffer.h"
@@ -67,6 +68,8 @@ namespace Ailu::Render
         _rtxdi = _owned_features.back().get();
         _owned_features.push_back(std::move(std::unique_ptr<RenderFeature>(new VolumetricFog())));
         _fog = _owned_features.back().get();
+        _owned_features.push_back(std::move(std::unique_ptr<RenderFeature>(new SpriteRenderFeature())));
+        _sprite = _owned_features.back().get();
         //_features.push_back(_vxgi);
         //_features.push_back(_cloud);
         //_features.push_back(_taa);
@@ -77,6 +80,7 @@ namespace Ailu::Render
         _rtxdi->SetActive(false);
         _features.push_back(_fog);
         _fog->SetActive(true);
+        _features.push_back(_sprite);
         _material_data_lut[0] = 0; //default material
         MaterialData miss_mat{};
         miss_mat._base_color = float3(1.0f, 0.0f, 1.0f);//洋红色
@@ -113,14 +117,17 @@ namespace Ailu::Render
         {
             if (cam.TargetTexture()->Dimension() == ETextureDimension::kTex2D)
             {
-                DoRender(cam, s);
-                auto cmd = CommandBufferPool::Get("FinalBlit");
+                DoRender(cam, s, _is_use_render_graph ? cam.TargetTexture() : nullptr);
+                if (!_is_use_render_graph)
                 {
-                    GpuProfileBlock b(cmd.get(), cmd->Name());
-                    cmd->Blit(_rendering_data._camera_color_target_handle, cam.TargetTexture());
+                    auto cmd = CommandBufferPool::Get("FinalBlit");
+                    {
+                        PROFILE_BLOCK_GPU(cmd.get(), cmd->Name())
+                        cmd->Blit(_rendering_data._camera_color_target_handle, cam.TargetTexture());
+                    }
+                    _p_context->ExecuteCommandBuffer(cmd);
+                    CommandBufferPool::Release(cmd);
                 }
-                _p_context->ExecuteCommandBuffer(cmd);
-                CommandBufferPool::Release(cmd);
             }
             else if (cam.TargetTexture()->Dimension() == ETextureDimension::kCube)
             {
@@ -132,15 +139,19 @@ namespace Ailu::Render
                     tmp_cam._is_render_shadow = false;
                     tmp_cam.OutputSize(cam.TargetTexture()->Width(), cam.TargetTexture()->Height());
                     Cull(s, tmp_cam);
-                    DoRender(tmp_cam, s);
-                    auto cmd = CommandBufferPool::Get("FinalBlit");
+                    const u16 dst_view_index = cam.TargetTexture()->CalculateViewIndex(Texture::ETextureViewType::kRTV, face, 0, 0);
+                    DoRender(tmp_cam, s, _is_use_render_graph ? cam.TargetTexture() : nullptr, dst_view_index);
+                    if (!_is_use_render_graph)
                     {
-                        GpuProfileBlock b(cmd.get(), cmd->Name());
-                        cmd->Blit(g_pRenderTexturePool->Get(_rendering_data._camera_color_target_handle), cam.TargetTexture(), 0,
-                                  cam.TargetTexture()->CalculateViewIndex(Texture::ETextureViewType::kRTV, face, 0, 0), nullptr);
+                        auto cmd = CommandBufferPool::Get("FinalBlit");
+                        {
+                            PROFILE_BLOCK_GPU(cmd.get(), cmd->Name())
+                            cmd->Blit(g_pRenderTexturePool->Get(_rendering_data._camera_color_target_handle), cam.TargetTexture(), 0,
+                                      dst_view_index, nullptr);
+                        }
+                        _p_context->ExecuteCommandBuffer(cmd);
+                        CommandBufferPool::Release(cmd);
                     }
-                    _p_context->ExecuteCommandBuffer(cmd);
-                    CommandBufferPool::Release(cmd);
                     //CommandBufferPool::WaitForAllCommand();
                 }
             }
@@ -245,6 +256,7 @@ namespace Ailu::Render
             hzb_desc._is_random_access = true;
             hzb_desc._mip_num = Texture::MaxMipmapCount(hzb_desc._width, hzb_desc._height);
             _rendering_data._rg_handles._hzb = _rd_graph->CreateResource(hzb_desc, RenderResourceName::kHZB);
+            _rendering_data._rg_handles._ao_tex = RDG::RGHandle{0u, 0u};
         }
         else
         {
@@ -273,6 +285,7 @@ namespace Ailu::Render
         
         Cull(*SceneMgr::Get().ActiveScene(),cam);
         PrepareCamera(cam);
+        _rendering_data._scene = &s;
         PrepareMaterial(*SceneMgr::Get().ActiveScene());//不需要tick，之后再优化
         PrepareScene(*SceneMgr::Get().ActiveScene());
         PrepareLight(*SceneMgr::Get().ActiveScene());
@@ -294,8 +307,24 @@ namespace Ailu::Render
         _rendering_data._camera_depth_target_handle = _camera_depth_handle;
         _rendering_data._camera_depth_tex_handle = _camera_depth_tex_handle;
         _rendering_data._final_rt_handle = _gameview_rt_handle;
-        _vxgi->SetActive(cam._is_gen_voxel || _vxgi->IsActive());
-        if (_is_use_raytracing)
+        _vxgi->SetActive(!_is_render_light_probe && (cam._is_gen_voxel || _vxgi->IsActive()));
+        if (_is_render_light_probe)
+        {
+            _ssao->SetActive(false);
+            _fog->SetActive(false);
+            _raytrace_gi->SetActive(false);
+            _rtxdi->SetActive(false);
+            if (_mode & EShadingMode::kLit)
+            {
+                _skybox_pass->Setup(false);
+                _render_passes.emplace_back(_gbuffer_pass.get());
+                _render_passes.emplace_back(_lighting_pass.get());
+                _render_passes.emplace_back(_forward_pass.get());
+            }
+            if (cam._is_render_sky_box)
+                _render_passes.emplace_back(_skybox_pass.get());
+        }
+        else if (_is_use_raytracing)
         {
             //_raytrace_gi->SetActive(true);
             _rtxdi->SetActive(true);
@@ -361,7 +390,7 @@ namespace Ailu::Render
         ComputeShader::SetGlobalBuffer(RenderConstants::kCBufNamePerScene, _cur_fs->GetSceneCB(s.HashCode()));
         ComputeShader::SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, _cur_fs->GetCameraCB(cam.HashCode()));
         {
-            PROFILE_BLOCK_CPU(WaitForSys)
+            PROFILE_BLOCK_CPU("WaitForSys")
             for (auto &sys: s.GetRegister().SystemView())
                 sys.second->WaitFor();
         }
@@ -372,7 +401,7 @@ namespace Ailu::Render
             {
                 for (auto *pass: _render_passes)
                 {
-                    CPUProfileBlock b(std::format("Record {}", pass->Name()).c_str());
+                    PROFILE_BLOCK_CPU(std::format("Record {}", pass->Name()).c_str())
                     pass->OnRecordRenderGraph(*_rd_graph, _rendering_data);
                 }
                 _rd_graph->Compile();
@@ -560,6 +589,7 @@ namespace Ailu::Render
         uint16_t direction_light_index = 0, point_light_index = 0, spot_light_index = 0, area_light_index = 0;
         u16 addi_shadow_map_index = 0u;
         auto per_scene_cbuf_data = ConstantBuffer::As<CBufferPerSceneData>(_cur_fs->GetSceneCB(s.HashCode()));
+        const bool should_render_shadow = _rendering_data._camera && _rendering_data._camera->_is_render_shadow;
         for (const auto &comp: s.GetRegister().View<ECS::LightComponent>())
         {
             auto &light_data = comp._light;
@@ -579,7 +609,7 @@ namespace Ailu::Render
                     per_scene_cbuf_data->_DirectionalLights[direction_light_index]._LightColor = Colors::kBlack.xyz;
                     continue;
                 }
-                if (comp._shadow._is_cast_shadow && !is_exist_directional_shaodw)
+                if (should_render_shadow && comp._shadow._is_cast_shadow && !is_exist_directional_shaodw)
                 {
                     for (int cascade_index = 0; cascade_index < QuailtySetting::s_cascade_shadow_map_count; cascade_index++)
                     {
@@ -614,7 +644,7 @@ namespace Ailu::Render
                     per_scene_cbuf_data->_PointLights[point_light_index]._LightColor = Colors::kBlack.xyz;
                     continue;
                 }
-                if (comp._shadow._is_cast_shadow)
+                if (should_render_shadow && comp._shadow._is_cast_shadow)
                 {
                     per_scene_cbuf_data->_PointLights[point_light_index]._shadowmap_index = point_light_index;//点光源使用这个值来索引cubearray
                     per_scene_cbuf_data->_PointLights[point_light_index]._ShadowDistance = light_data._light_param.x * 1.5f;
@@ -646,7 +676,7 @@ namespace Ailu::Render
                     per_scene_cbuf_data->_SpotLights[spot_light_index]._LightColor = Colors::kBlack.xyz;
                     continue;
                 }
-                if (comp._shadow._is_cast_shadow)
+                if (should_render_shadow && comp._shadow._is_cast_shadow)
                 {
                     auto &shadow_cam = comp._shadow_cameras[0];
                     Cull(*SceneMgr::Get().ActiveScene(), shadow_cam);
@@ -679,7 +709,7 @@ namespace Ailu::Render
                     per_scene_cbuf_data->_AreaLights[area_light_index]._LightColor = Colors::kBlack.xyz;
                     continue;
                 }
-                if (comp._shadow._is_cast_shadow)
+                if (should_render_shadow && comp._shadow._is_cast_shadow)
                 {
                     auto &shadow_cam = comp._shadow_cameras[0];
                     Matrix4x4f shaodw_matrix = shadow_cam.GetView() * shadow_cam.GetProj();
@@ -816,7 +846,7 @@ namespace Ailu::Render
 
     void Renderer::PrepareMaterial(const Scene &s)
     {
-        PROFILE_BLOCK_CPU(Renderer_PrepareMaterial)
+        PROFILE_BLOCK_CPU("Renderer_PrepareMaterial")
 
         for (auto& static_mesh : s.GetRegister().View<ECS::StaticMeshComponent>())
         {
@@ -840,7 +870,7 @@ namespace Ailu::Render
     {
         return _target_tex;
     }
-    void Renderer::DoRender(const Camera &cam, const Scene &s)
+    void Renderer::DoRender(const Camera &cam, const Scene &s, RenderTexture *output_target, i32 output_view_index)
     {
         if (Application::Get()._is_multi_thread_rendering && _p_cur_pipeline->_is_need_wait_for_render_thread)
         {
@@ -849,12 +879,28 @@ namespace Ailu::Render
             _p_cur_pipeline->_is_need_wait_for_render_thread = false;
         }
         {
-            PROFILE_BLOCK_CPU(BeginScene)
+            PROFILE_BLOCK_CPU("BeginScene")
             BeginScene(cam, s);
         }
         if (_is_use_render_graph)
         {
             _rd_graph->Execute(*_p_context,_rendering_data);
+            if (output_target != nullptr)
+            {
+                if (auto *src = _rd_graph->Resolve<Texture>(_rendering_data._rg_handles._color_target); src != nullptr)
+                {
+                    auto cmd = CommandBufferPool::Get("FinalBlit");
+                    {
+                        PROFILE_BLOCK_GPU(cmd.get(), cmd->Name())
+                        if (output_view_index >= 0)
+                            cmd->Blit(src, output_target, 0, (u16)output_view_index, nullptr);
+                        else
+                            cmd->Blit(src, output_target);
+                    }
+                    _p_context->ExecuteCommandBuffer(cmd);
+                    CommandBufferPool::Release(cmd);
+                }
+            }
         }
         else
         {
@@ -864,7 +910,7 @@ namespace Ailu::Render
                 {
                     if (pass->IsActive())
                     {
-                        CPUProfileBlock cblock(pass->GetName());
+                        PROFILE_BLOCK_CPU(pass->GetName())
                         pass->BeginPass(_p_context);
                         pass->Execute(_p_context, _rendering_data);
                         pass->EndPass(_p_context);
@@ -873,7 +919,7 @@ namespace Ailu::Render
             }
             else if (cam._layer_mask & ERenderLayer::kSkyBox)
             {
-                CPUProfileBlock cblock(_skybox_pass->GetName());
+                PROFILE_BLOCK_CPU(_skybox_pass->GetName())
                 _skybox_pass->BeginPass(_p_context);
                 _skybox_pass->Execute(_p_context, _rendering_data);
                 _skybox_pass->EndPass(_p_context);

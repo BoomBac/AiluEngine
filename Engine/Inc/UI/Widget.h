@@ -59,7 +59,7 @@ namespace Ailu
                 return _is_external_output ? std::make_tuple(_external_color, _external_depth) : std::make_tuple(_color.get(), _depth.get());
             };
             Vector2f GetSize() const;
-            void SetSize(Vector2f size) { _size = size; };
+            void SetSize(Vector2f size);
             void SetPosition(Vector2f position);
             auto begin() { return _root->begin(); }
             auto end() { return _root->end(); }

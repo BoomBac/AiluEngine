@@ -186,8 +186,10 @@ namespace Ailu
             if (_children.empty())
                 return;
 
-            const f32 inner_w = std::max(0.0f,_content_rect.z - _padding._l - _padding._r);
-            const f32 inner_h = std::max(0.0f,_content_rect.w - _padding._t - _padding._b);
+            const f32 inner_w = std::max(0.0f, _content_rect.z);
+            const f32 inner_h = std::max(0.0f, _content_rect.w);
+            const f32 content_x = _padding._l;
+            const f32 content_y = _padding._t;
             f32 occupied_main_size = 0.0f;
             f32 fill_margin_size = 0.0f;
             f32 fill_rate_total = 0.0f;
@@ -267,8 +269,8 @@ namespace Ailu
 
                 f32 child_w = 0.0f;
                 f32 child_h = 0.0f;
-                f32 x = _padding._l;
-                f32 y = _padding._t;
+                f32 x = content_x;
+                f32 y = content_y;
 
                 if (_orientation == EOrientation::kVertical)
                 {
@@ -323,28 +325,28 @@ namespace Ailu
                     {
                         case EAlignment::kFill:
                         case EAlignment::kLeft:
-                            x = _padding._l + margin._l;
+                            x = content_x + margin._l;
                             break;
 
                         case EAlignment::kCenter:
-                            x = _padding._l +
+                            x = content_x +
                                 margin._l +
                                 (available_cross_size - child_w) * 0.5f;
                             break;
 
                         case EAlignment::kRight:
-                            x = _padding._l +
+                            x = content_x +
                                 inner_w -
                                 child_w -
                                 margin._r;
                             break;
 
                         default:
-                            x = _padding._l + margin._l;
+                            x = content_x + margin._l;
                             break;
                     }
 
-                    y = _padding._t + offset + margin._t;
+                    y = content_y + offset + margin._t;
 
                     child->Arrange(x, y, child_w, child_h);
 
@@ -403,27 +405,27 @@ namespace Ailu
                     {
                         case EAlignment::kFill:
                         case EAlignment::kTop:
-                            y = _padding._t + margin._t;
+                            y = content_y + margin._t;
                             break;
 
                         case EAlignment::kCenter:
-                            y = _padding._t +
+                            y = content_y +
                                 margin._t +
                                 (available_cross_size - child_h) * 0.5f;
                             break;
 
                         case EAlignment::kBottom:
-                            y = _padding._t +
+                            y = content_y +
                                 inner_h -
                                 child_h -
                                 margin._b;
                             break;
 
                         default:
-                            y = _padding._t + margin._t;
+                            y = content_y + margin._t;
                             break;
                     }
-                    x = _padding._l + offset + margin._l;
+                    x = content_x + offset + margin._l;
                     child->Arrange(x, y, child_w, child_h);
                     offset += margin._l + child_w + margin._r;
                 }

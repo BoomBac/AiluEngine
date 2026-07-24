@@ -2,8 +2,8 @@
 #ifndef __RAY_TRACING_SHADER_H__
 #define __RAY_TRACING_SHADER_H__
 #include "../Shader.h"
-#include "generated/RayTracingShader.gen.h"
 #include <mutex>
+#include "generated/RayTracingShader.gen.h"
 namespace Ailu::Render
 {
     class Camera;

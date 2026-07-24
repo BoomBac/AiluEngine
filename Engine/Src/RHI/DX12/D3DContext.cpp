@@ -7,22 +7,22 @@
 #include "Framework/Common/Profiler.h"
 #include "RHI/DX12/D3DCommandBuffer.h"
 #include "RHI/DX12/D3DGPUTimer.h"
+#include "RHI/DX12/D3DSwapchain.h"
 #include "RHI/DX12/GPUResourceManager.h"
 #include "RHI/DX12/dxhelper.h"
-#include "RHI/DX12/D3DSwapchain.h"
 #include "Render/Buffer.h"
 #include "Render/Gizmo.h"
 #include "Render/GpuResource.h"
-#include "Render/RenderingStates.h"
 #include "Render/GraphicsPipelineStateObject.h"
 #include "Render/Material.h"
 #include "Render/RenderingData.h"
+#include "Render/RenderingStates.h"
 #include "pch.h"
+#include <cstring>
 #include <dxgidebug.h>
 #include <limits>
 #include <memory>
 #include <stack>
-#include <cstring>
 
 #include "RHI/DX12/D3DBuffer.h"
 #include "RHI/DX12/D3DGraphicsPipelineState.h"
@@ -36,14 +36,16 @@
 #include "RHI/DX12/RayTracing/D3DRayTracingShader.h"
 #include "Render/RayTracing/RayTracingShader.h"
 
+#include "Framework/Common/EngineConfig.h"
+
 #ifdef _PIX_DEBUG
-#define USE_PIX 1
-#include "Ext/pix/Include/WinPixEventRuntime/pix3.h"
-#include "Ext/renderdoc_app.h"//1.35
+    #define USE_PIX 1
+    #include "Ext/pix/Include/WinPixEventRuntime/pix3.h"
+    #include "Ext/renderdoc_app.h"//1.35
 #endif                        // _PIX_DEBUG
 #include <Render/ImGuiRenderer.h>
 
-#define D3D_DEBUG_LAYER 1
+//#define D3D_DEBUG_LAYER 1
 
 using namespace Ailu::Render;
 
@@ -51,21 +53,15 @@ namespace Ailu::RHI::DX12
 {
 #pragma region GpuCommandWorker
 
-    GpuCommandWorker::GpuCommandWorker(GraphicsContext *context) : _ctx(context), _is_stop(false),
-                                                                   _worker_thread(nullptr)
-    {
-    }
+    GpuCommandWorker::GpuCommandWorker(GraphicsContext *context) : _ctx(context), _is_stop(false), _worker_thread(nullptr) {}
     GpuCommandWorker::~GpuCommandWorker()
     {
-        if (_worker_thread && _worker_thread->joinable())
-            _worker_thread->join();
+        if (_worker_thread && _worker_thread->joinable()) _worker_thread->join();
         LOG_INFO("Destory GpuCommandWorker");
     }
 
     void GpuCommandWorker::Push(Vector<GfxCommand *> &&cmds, SubmitParams &&params)
-    {
-        _cmd_queue.Push(CommandGroup(std::move(cmds), std::move(params)));
-    }
+    { _cmd_queue.Push(CommandGroup(std::move(cmds), std::move(params))); }
     void GpuCommandWorker::RunAsync()
     {
         SetThreadName("RenderThread");
@@ -77,7 +73,8 @@ namespace Ailu::RHI::DX12
                 _is_stop = true;
                 break;
             }
-            CPUProfileBlock b("GpuCommandWorker::RunAsync");
+            //CPUProfileBlock b("GpuCommandWorker::RunAsync");
+            PROFILE_BLOCK_CPU("GpuCommandWorker_RunAsync")
             if (Application::Get().State() == EApplicationState::EApplicationState_Exit)
             {
                 _is_stop = true;
@@ -89,18 +86,17 @@ namespace Ailu::RHI::DX12
                 if (group_opt.has_value())
                 {
                     auto cmd = RHICommandBufferPool::Get(group_opt.value()._params._name);
-                    for (auto *task: group_opt.value()._cmds)
-                        _ctx->ProcessGpuCommand(task, cmd.get());
+                    for (auto *task: group_opt.value()._cmds) _ctx->ProcessGpuCommand(task, cmd.get());
                     if (group_opt.value()._cmds.size() >= 1)
                     {
-                        CPUProfileBlock b(group_opt.value()._params._name + "_Execute");
+                        PROFILE_BLOCK_CPU(group_opt.value()._params._name + "_Execute")
                         _ctx->ExecuteRHICommandBuffer(cmd.get());
                     }
                     RenderTexture::ResetRenderTarget();
                     RHICommandBufferPool::Release(cmd);
                     if (group_opt.value()._params._is_end_frame)
                     {
-                        CPUProfileBlock b("EndFrame");
+                        PROFILE_BLOCK_CPU("EndFrame")
                         EndFrame();
                         break;
                     }
@@ -112,8 +108,7 @@ namespace Ailu::RHI::DX12
             }
         }
         LOG_INFO("GpuCommandWorker::RunAsync: Release {} un-executed cmd", _cmd_queue.Size());
-        while (!_cmd_queue.Empty())
-            _cmd_queue.Pop();
+        while (!_cmd_queue.Empty()) _cmd_queue.Pop();
     }
     void GpuCommandWorker::EndFrame()
     {
@@ -135,10 +130,7 @@ namespace Ailu::RHI::DX12
                             // {
                             //     is_all_succeed &= shader->Compile(i, mat->ActiveVariantHash(i));
                             // }
-                            if (is_all_succeed)
-                            {
-                                mat->ChangeShader(shader);
-                            }
+                            if (is_all_succeed) { mat->ChangeShader(shader); }
                         }
                         compiled_shader_num++;
                     }
@@ -162,18 +154,15 @@ namespace Ailu::RHI::DX12
         }
         if (compiled_shader_num + compiled_compute_shader_num + compiled_raytracing_shader_num > 0u)
         {
-            LOG_INFO("Compiled {} shaders, {} compute shaders and {} ray tracing shaders!", compiled_shader_num, compiled_compute_shader_num, compiled_raytracing_shader_num);
+            LOG_INFO("Compiled {} shaders, {} compute shaders and {} ray tracing shaders!", compiled_shader_num,
+                     compiled_compute_shader_num, compiled_raytracing_shader_num);
         }
-        if (Application::Get()._is_multi_thread_rendering)
-            Application::Get().NotifyMain();
+        if (Application::Get()._is_multi_thread_rendering) Application::Get().NotifyMain();
         Render::RenderingStates::Reset();
     }
     void GpuCommandWorker::Start()
     {
-        if (_worker_thread == nullptr)
-        {
-            _worker_thread = new std::thread(&GpuCommandWorker::RunAsync, this);
-        }
+        if (_worker_thread == nullptr) { _worker_thread = new std::thread(&GpuCommandWorker::RunAsync, this); }
         _is_stop = false;
     }
     void GpuCommandWorker::Stop()
@@ -181,19 +170,18 @@ namespace Ailu::RHI::DX12
         if (_worker_thread)
         {
             _is_stop = true;
-            if (_worker_thread->joinable())
-                _worker_thread->join();
+            if (_worker_thread->joinable()) _worker_thread->join();
             DESTORY_PTR(_worker_thread);
             LOG_INFO("Exit RenderThread")
         }
     }
     void GpuCommandWorker::RunSync()
     {
-        CPUProfileBlock b("GpuCommandWorker::RunSync");
+        PROFILE_BLOCK_CPU("GpuCommandWorker::RunSync")
         while (!_cmd_queue.Empty())
         {
             auto &&group_opt = _cmd_queue.Pop();
-            CPUProfileBlock b(group_opt.value()._params._name + "_Execute");
+            PROFILE_BLOCK_CPU(group_opt.value()._params._name + "_Execute")
             auto cmd = RHICommandBufferPool::Get(group_opt.value()._params._name);
             for (u32 i = 0; i < group_opt.value()._cmds.size(); i++)
             {
@@ -205,14 +193,16 @@ namespace Ailu::RHI::DX12
             RHICommandBufferPool::Release(cmd);
         }
         {
-            CPUProfileBlock b("EndFrame");
+            PROFILE_BLOCK_CPU("EndFrame")
             EndFrame();
         }
     }
 #pragma endregion
 
 #pragma region DX Helper
-    static void GetHardwareAdapter(IDXGIFactory6 *pFactory, IDXGIAdapter4 **ppAdapter, DXGI_QUERY_VIDEO_MEMORY_INFO *p_local_video_memory_info, DXGI_QUERY_VIDEO_MEMORY_INFO *p_non_local_video_memory_info)
+    static void GetHardwareAdapter(IDXGIFactory6 *pFactory, IDXGIAdapter4 **ppAdapter,
+                                   DXGI_QUERY_VIDEO_MEMORY_INFO *p_local_video_memory_info,
+                                   DXGI_QUERY_VIDEO_MEMORY_INFO *p_non_local_video_memory_info)
     {
         IDXGIAdapter *pAdapter = nullptr;
         IDXGIAdapter4 *pAdapter4 = nullptr;
@@ -267,10 +257,7 @@ namespace Ailu::RHI::DX12
             }
             // Check to see if the adapter supports Direct3D 12, but don't create the
             // actual device yet.
-            if (SUCCEEDED(D3D12CreateDevice(pAdapter4, D3D_FEATURE_LEVEL_11_0, __uuidof(ID3D12Device), nullptr)))
-            {
-                break;
-            }
+            if (SUCCEEDED(D3D12CreateDevice(pAdapter4, D3D_FEATURE_LEVEL_11_0, __uuidof(ID3D12Device), nullptr))) { break; }
         }
         *ppAdapter = pAdapter4;
     }
@@ -279,14 +266,14 @@ namespace Ailu::RHI::DX12
 
 #endif// _PIX_DEBUG
 
-    static inline bool IsDirectXRaytracingSupported(IDXGIAdapter4* adapter)
+    static inline bool IsDirectXRaytracingSupported(IDXGIAdapter4 *adapter)
     {
         ComPtr<ID3D12Device> testDevice;
         D3D12_FEATURE_DATA_D3D12_OPTIONS5 featureSupportData = {};
 
-        return SUCCEEDED(D3D12CreateDevice(adapter, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&testDevice)))
-            && SUCCEEDED(testDevice->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &featureSupportData, sizeof(featureSupportData)))
-            && featureSupportData.RaytracingTier != D3D12_RAYTRACING_TIER_NOT_SUPPORTED;
+        return SUCCEEDED(D3D12CreateDevice(adapter, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&testDevice))) &&
+               SUCCEEDED(testDevice->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &featureSupportData, sizeof(featureSupportData))) &&
+               featureSupportData.RaytracingTier != D3D12_RAYTRACING_TIER_NOT_SUPPORTED;
     }
 
     static void RdcLoadLatestRdcGpuCapturerLibrary()
@@ -297,14 +284,9 @@ namespace Ailu::RHI::DX12
         wchar_t value[256];              // 存储结果
         DWORD bufferSize = sizeof(value);// 缓冲区大小
         // 获取值
-        LONG result = RegGetValue(
-                hKey,
-                subKey,
-                nullptr,//default name
-                RRF_RT_REG_SZ,
-                nullptr,
-                value,
-                &bufferSize);
+        LONG result = RegGetValue(hKey, subKey,
+                                  nullptr,//default name
+                                  RRF_RT_REG_SZ, nullptr, value, &bufferSize);
 #ifdef _PIX_DEBUG
         if (result == ERROR_SUCCESS)
         {
@@ -359,12 +341,9 @@ namespace Ailu::RHI::DX12
 
 #pragma region SignatureHelper
     // 创建命令签名的实用函数
-    HRESULT CreateCommandSignature(
-            ID3D12Device *device,
-            ID3D12RootSignature *rootSignature,
-            const std::vector<D3D12_INDIRECT_ARGUMENT_DESC> &arguments,
-            UINT byteStride,
-            ID3D12CommandSignature **ppCommandSignature)
+    HRESULT CreateCommandSignature(ID3D12Device *device, ID3D12RootSignature *rootSignature,
+                                   const std::vector<D3D12_INDIRECT_ARGUMENT_DESC> &arguments, UINT byteStride,
+                                   ID3D12CommandSignature **ppCommandSignature)
     {
         D3D12_COMMAND_SIGNATURE_DESC desc = {};
         desc.ByteStride = byteStride;
@@ -378,62 +357,38 @@ namespace Ailu::RHI::DX12
     namespace CommandSignatureHelper
     {
         // 1. 创建用于间接调度的命令签名
-        HRESULT CreateDispatchCommandSignature(
-                ID3D12Device *device,
-                ID3D12RootSignature *rootSignature,
-                ID3D12CommandSignature **ppCommandSignature)
+        HRESULT CreateDispatchCommandSignature(ID3D12Device *device, ID3D12RootSignature *rootSignature,
+                                               ID3D12CommandSignature **ppCommandSignature)
         {
             D3D12_INDIRECT_ARGUMENT_DESC argDesc = {};
             argDesc.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DISPATCH;
 
-            return CreateCommandSignature(
-                    device,
-                    rootSignature,
-                    {argDesc},
-                    sizeof(D3D12_DISPATCH_ARGUMENTS),
-                    ppCommandSignature);
+            return CreateCommandSignature(device, rootSignature, {argDesc}, sizeof(D3D12_DISPATCH_ARGUMENTS), ppCommandSignature);
         }
 
         // 2. 创建用于间接绘制的命令签名
-        HRESULT CreateDrawCommandSignature(
-                ID3D12Device *device,
-                ID3D12RootSignature *rootSignature,
-                ID3D12CommandSignature **ppCommandSignature)
+        HRESULT CreateDrawCommandSignature(ID3D12Device *device, ID3D12RootSignature *rootSignature,
+                                           ID3D12CommandSignature **ppCommandSignature)
         {
             D3D12_INDIRECT_ARGUMENT_DESC argDesc = {};
             argDesc.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW;
 
-            return CreateCommandSignature(
-                    device,
-                    rootSignature,
-                    {argDesc},
-                    sizeof(D3D12_DRAW_ARGUMENTS),
-                    ppCommandSignature);
+            return CreateCommandSignature(device, rootSignature, {argDesc}, sizeof(D3D12_DRAW_ARGUMENTS), ppCommandSignature);
         }
 
         // 3. 创建用于间接索引绘制的命令签名
-        HRESULT CreateDrawIndexedCommandSignature(
-                ID3D12Device *device,
-                ID3D12RootSignature *rootSignature,
-                ID3D12CommandSignature **ppCommandSignature)
+        HRESULT CreateDrawIndexedCommandSignature(ID3D12Device *device, ID3D12RootSignature *rootSignature,
+                                                  ID3D12CommandSignature **ppCommandSignature)
         {
             D3D12_INDIRECT_ARGUMENT_DESC argDesc = {};
             argDesc.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED;
 
-            return CreateCommandSignature(
-                    device,
-                    rootSignature,
-                    {argDesc},
-                    sizeof(D3D12_DRAW_INDEXED_ARGUMENTS),
-                    ppCommandSignature);
+            return CreateCommandSignature(device, rootSignature, {argDesc}, sizeof(D3D12_DRAW_INDEXED_ARGUMENTS), ppCommandSignature);
         }
 
         // 4. 创建带顶点缓冲区视图的间接绘制命令签名
-        HRESULT CreateDrawCommandSignatureWithVBV(
-                ID3D12Device *device,
-                ID3D12RootSignature *rootSignature,
-                UINT slot,
-                ID3D12CommandSignature **ppCommandSignature)
+        HRESULT CreateDrawCommandSignatureWithVBV(ID3D12Device *device, ID3D12RootSignature *rootSignature, UINT slot,
+                                                  ID3D12CommandSignature **ppCommandSignature)
         {
             std::vector<D3D12_INDIRECT_ARGUMENT_DESC> args;
 
@@ -448,20 +403,13 @@ namespace Ailu::RHI::DX12
             drawArg.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW;
             args.push_back(drawArg);
 
-            return CreateCommandSignature(
-                    device,
-                    rootSignature,
-                    args,
-                    sizeof(D3D12_VERTEX_BUFFER_VIEW) + sizeof(D3D12_DRAW_ARGUMENTS),
-                    ppCommandSignature);
+            return CreateCommandSignature(device, rootSignature, args, sizeof(D3D12_VERTEX_BUFFER_VIEW) + sizeof(D3D12_DRAW_ARGUMENTS),
+                                          ppCommandSignature);
         }
 
         // 5. 创建带常量的间接调度命令签名
-        HRESULT CreateDispatchCommandSignatureWithConstants(
-                ID3D12Device *device,
-                ID3D12RootSignature *rootSignature,
-                UINT rootParameterIndex,
-                ID3D12CommandSignature **ppCommandSignature)
+        HRESULT CreateDispatchCommandSignatureWithConstants(ID3D12Device *device, ID3D12RootSignature *rootSignature,
+                                                            UINT rootParameterIndex, ID3D12CommandSignature **ppCommandSignature)
         {
             std::vector<D3D12_INDIRECT_ARGUMENT_DESC> args;
 
@@ -478,12 +426,9 @@ namespace Ailu::RHI::DX12
             dispatchArg.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DISPATCH;
             args.push_back(dispatchArg);
 
-            return CreateCommandSignature(
-                    device,
-                    rootSignature,
-                    args,
-                    sizeof(UINT) + sizeof(D3D12_DISPATCH_ARGUMENTS),// 常量+调度参数
-                    ppCommandSignature);
+            return CreateCommandSignature(device, rootSignature, args,
+                                          sizeof(UINT) + sizeof(D3D12_DISPATCH_ARGUMENTS),// 常量+调度参数
+                                          ppCommandSignature);
         }
     };// namespace CommandSignatureHelper
 #pragma endregion
@@ -518,7 +463,7 @@ namespace Ailu::RHI::DX12
             u64 gpu_fence_value = _fence->GetCompletedValue();
             if (gpu_fence_value < _fence_value[_frame_index])
             {
-                CPUProfileBlock p("WaitForGPU");
+                PROFILE_BLOCK_CPU("WaitForGPU")
                 ThrowIfFailed(_fence->SetEventOnCompletion(_fence_value[_frame_index], _fence_event));
                 WaitForSingleObjectEx(_fence_event, INFINITE, FALSE);
             }
@@ -545,8 +490,7 @@ namespace Ailu::RHI::DX12
         void FlushCommandQueue(ID3D12CommandQueue *cmd_queue, ID3D12Fence *fence, u64 &fence_value)
         {
             // 注意：这里 fence_value 是局部副本，必须在锁下修改
-            if (fence_value < fence->GetCompletedValue())
-                return;
+            if (fence_value < fence->GetCompletedValue()) return;
 
             ++fence_value;
             ThrowIfFailed(cmd_queue->Signal(fence, fence_value));
@@ -581,10 +525,7 @@ namespace Ailu::RHI::DX12
         LoadAssets();
         _readback_pool = MakeScope<ReadbackBufferPool>(m_device.Get());
         _p_gpu_timer = MakeScope<D3DGPUTimer>(m_device.Get(), m_commandQueue.Get(), RenderConstants::kFrameCount);
-        if (Application::Get()._is_multi_thread_rendering)
-        {
-            _cmd_worker->Start();
-        }
+        if (Application::Get()._is_multi_thread_rendering) { _cmd_worker->Start(); }
         _is_hardware_ray_tracing_supported = IsDirectXRaytracingSupported(_p_adapter.Get());
     }
 
@@ -594,22 +535,15 @@ namespace Ailu::RHI::DX12
         {
             u64 origin_res_num = _global_tracked_resource.size();
             auto it = _global_tracked_resource.lower_bound(_frame_count);
-            if (it != _global_tracked_resource.end())
-            {
-                _global_tracked_resource.erase(_global_tracked_resource.begin(), it);
-            }
+            if (it != _global_tracked_resource.end()) { _global_tracked_resource.erase(_global_tracked_resource.begin(), it); }
             else
                 _global_tracked_resource.clear();
 
             origin_res_num -= _global_tracked_resource.size();
-            if (origin_res_num > 0)
-                LOG_WARNING("Release unused upload buffer with num {}.", origin_res_num);
+            if (origin_res_num > 0) LOG_WARNING("Release unused upload buffer with num {}.", origin_res_num);
         }
         g_pRenderTexturePool->TryCleanUp();
-        if (auto num = D3DDescriptorMgr::Get().ReleaseSpace(); num > 0)
-        {
-            LOG_INFO("Release GPUVisibleDescriptor at with num {}.", num);
-        }
+        if (auto num = D3DDescriptorMgr::Get().ReleaseSpace(); num > 0) { LOG_INFO("Release GPUVisibleDescriptor at with num {}.", num); }
     }
 
     f32 D3DContext::TotalGPUMemeryUsage()
@@ -637,35 +571,23 @@ namespace Ailu::RHI::DX12
     }
 
     void D3DContext::TrackResource(ComPtr<ID3D12Resource> resource)
-    {
-        _global_tracked_resource.insert(std::make_pair(_frame_count, resource));
-    }
+    { _global_tracked_resource.insert(std::make_pair(_frame_count, resource)); }
 
-    const u32 D3DContext::CurBackbufIndex() const
-    {
-        return _render_windows[0]->_frame_index;
-    }
+    const u32 D3DContext::CurBackbufIndex() const { return _render_windows[0]->_frame_index; }
 
-    void D3DContext::ExecuteCommandBuffer(Ref<CommandBuffer> &cmd)
-    {
-        _cmd_worker->Push(cmd->TakeCommands(), SubmitParams{cmd->Name()});
-    }
+    void D3DContext::ExecuteCommandBuffer(Ref<CommandBuffer> &cmd) { _cmd_worker->Push(cmd->TakeCommands(), SubmitParams{cmd->Name()}); }
 
     void D3DContext::ExecuteCommandBufferSync(Ref<CommandBuffer> &cmd)
     {
         auto rhi_cmd = RHICommandBufferPool::Get(cmd->Name());
-        for (auto *gfx_cmd: cmd->GetCommands())
-        {
-            ProcessGpuCommand(gfx_cmd, rhi_cmd.get());
-        }
+        for (auto *gfx_cmd: cmd->GetCommands()) { ProcessGpuCommand(gfx_cmd, rhi_cmd.get()); }
         ExecuteRHICommandBuffer(rhi_cmd.get());
         RHICommandBufferPool::Release(rhi_cmd);
     }
 
     void D3DContext::ExecuteRHICommandBuffer(RHICommandBuffer *cmd)
     {
-        if (cmd->IsExecuted())
-            return;
+        if (cmd->IsExecuted()) return;
         auto d3dcmd = static_cast<D3DCommandBuffer *>(cmd);
         d3dcmd->Close();
         ID3D12CommandList *ppCommandLists[] = {d3dcmd->NativeCmdList()};
@@ -673,12 +595,15 @@ namespace Ailu::RHI::DX12
         PIXBeginEvent(m_commandQueue.Get(), cmd->ID(), ToWChar(cmd->Name()).c_str());
 #endif// _PIX_DEBUG
         m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
-        ++_fence_value;
-        ThrowIfFailed(m_commandQueue->Signal(_p_cmd_buffer_fence.Get(), _fence_value));
+        {
+            std::lock_guard lock(_cmd_fence_mtx);
+            ++_fence_value;
+            ThrowIfFailed(m_commandQueue->Signal(_p_cmd_buffer_fence.Get(), _fence_value));
+            d3dcmd->_fence_value = _fence_value;
+        }
 #ifdef _PIX_DEBUG
         PIXEndEvent(m_commandQueue.Get());
 #endif// _PIX_DEBUG
-        d3dcmd->_fence_value = _fence_value;
         d3dcmd->PostExecute();
     }
 
@@ -688,16 +613,19 @@ namespace Ailu::RHI::DX12
         // cleaned up by the destructor.
         WaitForGpu();
 
-// #if defined(TRACY_ENABLE)
-//         if (_tracy_d3d12_ctx)
-//         {
-//             TracyD3D12Destroy(_tracy_d3d12_ctx);
-//             _tracy_d3d12_ctx = nullptr;
-//         }
-// #endif
-        //CloseHandle(m_fenceEvent);
-        if (Application::Get()._is_multi_thread_rendering)
-            _cmd_worker->Stop();
+        // #if defined(TRACY_ENABLE)
+        //         if (_tracy_d3d12_ctx)
+        //         {
+        //             TracyD3D12Destroy(_tracy_d3d12_ctx);
+        //             _tracy_d3d12_ctx = nullptr;
+        //         }
+        // #endif
+        if (Application::Get()._is_multi_thread_rendering) _cmd_worker->Stop();
+        if (_p_cmd_buffer_fence_event != nullptr)
+        {
+            CloseHandle(_p_cmd_buffer_fence_event);
+            _p_cmd_buffer_fence_event = nullptr;
+        }
         //_p_gpu_timer->ReleaseDevice();
         //在这里析构分配器应该会有问题，纹理实际在在这之后还需要归还之前的分配
         D3DDescriptorMgr::Shutdown();
@@ -710,52 +638,42 @@ namespace Ailu::RHI::DX12
         }
     }
 
-    bool D3DContext::IsHardwareRayTracingSupported() const
-    {
-        return _is_hardware_ray_tracing_supported;
-    }
+    bool D3DContext::IsHardwareRayTracingSupported() const { return _is_hardware_ray_tracing_supported; }
 
     void D3DContext::LoadPipeline()
     {
         UINT dxgiFactoryFlags = 0;
-
-#if D3D_DEBUG_LAYER
-        // Enable the debug layer (requires the Graphics Tools "optional feature").
-        // NOTE: Enabling the debug layer after device creation will invalidate the active device.
+        if (g_engine_config._enable_d3d12_debug_layer)
         {
-            ComPtr<ID3D12Debug> debugController;
-            if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
+            // Enable the debug layer (requires the Graphics Tools "optional feature").
+            // NOTE: Enabling the debug layer after device creation will invalidate the active device.
             {
-                debugController->EnableDebugLayer();
+                ComPtr<ID3D12Debug> debugController;
+                if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
+                {
+                    debugController->EnableDebugLayer();
 
-                // Enable additional debug layers.
-                dxgiFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
+                    // Enable additional debug layers.
+                    dxgiFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
+                }
             }
-        }
-        //https://learn.microsoft.com/zh-cn/windows/win32/direct3d12/using-d3d12-debug-layer-gpu-based-validation
-        //EnableShaderBasedValidation();
+            //https://learn.microsoft.com/zh-cn/windows/win32/direct3d12/using-d3d12-debug-layer-gpu-based-validation
+            //EnableShaderBasedValidation();
 #if defined(CLSID_D3D12DeviceConfiguration)
-        ComPtr<ID3D12DeviceConfiguration> config;
-        if (SUCCEEDED(D3D12GetInterface(
-                    CLSID_D3D12DeviceConfiguration,
-                    IID_PPV_ARGS(&config))) && config)
-        {
-            config->SetEnabledExperimentalFeatures(
-                    1,
-                    &D3D12ExperimentalShaderModels,
-                    nullptr,
-                    nullptr);
+            ComPtr<ID3D12DeviceConfiguration> config;
+            if (SUCCEEDED(D3D12GetInterface(CLSID_D3D12DeviceConfiguration, IID_PPV_ARGS(&config))) && config)
+            {
+                config->SetEnabledExperimentalFeatures(1, &D3D12ExperimentalShaderModels, nullptr, nullptr);
+            }
+#endif
         }
-#endif
-
-#endif
 
         ComPtr<IDXGIFactory6> factory;
         ThrowIfFailed(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory)));
         GetHardwareAdapter(factory.Get(), _p_adapter.GetAddressOf(), &_local_video_memory_info, &_non_local_video_memory_info);
         ThrowIfFailed(D3D12CreateDevice(_p_adapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&m_device)));
         _is_hardware_ray_tracing_supported = IsDirectXRaytracingSupported(_p_adapter.Get());
-        LOG_INFO(" DirectX Raytracing Supported: {}", _is_hardware_ray_tracing_supported? "Yes" : "No");
+        LOG_INFO(" DirectX Raytracing Supported: {}", _is_hardware_ray_tracing_supported ? "Yes" : "No");
 
         ComPtr<ID3D12InfoQueue> infoQueue;
         if (SUCCEEDED(m_device->QueryInterface(IID_PPV_ARGS(&infoQueue))))
@@ -785,14 +703,14 @@ namespace Ailu::RHI::DX12
         queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
         ThrowIfFailed(m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_commandQueue)));
 
-    // #if defined(TRACY_ENABLE)
-    //     _tracy_d3d12_ctx = TracyD3D12Context(m_device.Get(), m_commandQueue.Get());
-    //     if (_tracy_d3d12_ctx)
-    //     {
-    //         static const char kQueueName[] = "D3D12 Graphics Queue";
-    //         TracyD3D12ContextName(_tracy_d3d12_ctx, kQueueName, (uint16_t) (sizeof(kQueueName) - 1));
-    //     }
-    // #endif
+        // #if defined(TRACY_ENABLE)
+        //     _tracy_d3d12_ctx = TracyD3D12Context(m_device.Get(), m_commandQueue.Get());
+        //     if (_tracy_d3d12_ctx)
+        //     {
+        //         static const char kQueueName[] = "D3D12 Graphics Queue";
+        //         TracyD3D12ContextName(_tracy_d3d12_ctx, kQueueName, (uint16_t) (sizeof(kQueueName) - 1));
+        //     }
+        // #endif
 
         //m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
         //m_frameIndex = _swapchain->GetCurrentBackBufferIndex();
@@ -804,9 +722,11 @@ namespace Ailu::RHI::DX12
         //}
 
         {
-            ThrowIfFailed(CommandSignatureHelper::CreateDispatchCommandSignature(m_device.Get(), nullptr, _dispatch_cmd_sig.GetAddressOf()));
+            ThrowIfFailed(
+                    CommandSignatureHelper::CreateDispatchCommandSignature(m_device.Get(), nullptr, _dispatch_cmd_sig.GetAddressOf()));
             ThrowIfFailed(CommandSignatureHelper::CreateDrawCommandSignature(m_device.Get(), nullptr, _draw_cmd_sig.GetAddressOf()));
-            ThrowIfFailed(CommandSignatureHelper::CreateDrawIndexedCommandSignature(m_device.Get(), nullptr, _draw_indexed_cmd_sig.GetAddressOf()));
+            ThrowIfFailed(CommandSignatureHelper::CreateDrawIndexedCommandSignature(m_device.Get(), nullptr,
+                                                                                    _draw_indexed_cmd_sig.GetAddressOf()));
         }
 #ifdef _DIRECT_WRITE
         InitDirectWriteContext();
@@ -818,11 +738,9 @@ namespace Ailu::RHI::DX12
 #pragma warning(disable : 4996)// GetDesktopDpi is deprecated.
         m_d2dFactory->GetDesktopDpi(&dpiX, &dpiY);
 #pragma warning(pop)
-        D2D1_BITMAP_PROPERTIES1 bitmapProperties = D2D1::BitmapProperties1(
-                D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
-                D2D1::PixelFormat(DXGI_FORMAT_UNKNOWN, D2D1_ALPHA_MODE_PREMULTIPLIED),
-                dpiX,
-                dpiY);
+        D2D1_BITMAP_PROPERTIES1 bitmapProperties =
+                D2D1::BitmapProperties1(D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
+                                        D2D1::PixelFormat(DXGI_FORMAT_UNKNOWN, D2D1_ALPHA_MODE_PREMULTIPLIED), dpiX, dpiY);
         for (UINT n = 0; n < RenderConstants::kFrameCount; n++)
         {
             // Create a wrapped 11On12 resource of this back buffer. Since we are
@@ -832,20 +750,13 @@ namespace Ailu::RHI::DX12
             // ReleaseWrappedResources() is called on the 11On12 device, the resource
             // will be transitioned to the PRESENT state.
             D3D11_RESOURCE_FLAGS d3d11Flags = {D3D11_BIND_RENDER_TARGET};
-            ThrowIfFailed(m_d3d11On12Device->CreateWrappedResource(
-                    _color_buffer[n].Get(),
-                    &d3d11Flags,
-                    D3D12_RESOURCE_STATE_RENDER_TARGET,
-                    D3D12_RESOURCE_STATE_PRESENT,
-                    IID_PPV_ARGS(&m_wrappedBackBuffers[n])));
+            ThrowIfFailed(m_d3d11On12Device->CreateWrappedResource(_color_buffer[n].Get(), &d3d11Flags, D3D12_RESOURCE_STATE_RENDER_TARGET,
+                                                                   D3D12_RESOURCE_STATE_PRESENT, IID_PPV_ARGS(&m_wrappedBackBuffers[n])));
 
             // Create a render target for D2D to draw directly to this back buffer.
             ComPtr<IDXGISurface> surface;
             ThrowIfFailed(m_wrappedBackBuffers[n].As(&surface));
-            ThrowIfFailed(m_d2dDeviceContext->CreateBitmapFromDxgiSurface(
-                    surface.Get(),
-                    &bitmapProperties,
-                    &m_d2dRenderTargets[n]));
+            ThrowIfFailed(m_d2dDeviceContext->CreateBitmapFromDxgiSurface(surface.Get(), &bitmapProperties, &m_d2dRenderTargets[n]));
         }
 #endif
     }
@@ -857,15 +768,8 @@ namespace Ailu::RHI::DX12
         // Create D2D/DWrite objects for rendering text.
         {
             ThrowIfFailed(m_d2dDeviceContext->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::Black), &m_textBrush));
-            ThrowIfFailed(m_dWriteFactory->CreateTextFormat(
-                    L"Verdana",
-                    NULL,
-                    DWRITE_FONT_WEIGHT_NORMAL,
-                    DWRITE_FONT_STYLE_NORMAL,
-                    DWRITE_FONT_STRETCH_NORMAL,
-                    50,
-                    L"en-us",
-                    &m_textFormat));
+            ThrowIfFailed(m_dWriteFactory->CreateTextFormat(L"Verdana", NULL, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL,
+                                                            DWRITE_FONT_STRETCH_NORMAL, 50, L"en-us", &m_textFormat));
             ThrowIfFailed(m_textFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER));
             ThrowIfFailed(m_textFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER));
         }
@@ -875,11 +779,8 @@ namespace Ailu::RHI::DX12
         {
             ThrowIfFailed(m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(_p_cmd_buffer_fence.GetAddressOf())));
             _p_cmd_buffer_fence->SetName(L"ALD3DFence");
-            //m_fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
-            //if (m_fenceEvent == nullptr)
-            //{
-            //    ThrowIfFailed(HRESULT_FROM_WIN32(GetLastError()));
-            //}
+            _p_cmd_buffer_fence_event = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+            if (_p_cmd_buffer_fence_event == nullptr) { ThrowIfFailed(HRESULT_FROM_WIN32(GetLastError())); }
             //WaitForGpu();
         }
     }
@@ -888,10 +789,7 @@ namespace Ailu::RHI::DX12
     {
         Vector<GfxCommand *> cmds{CommandPool::Get().Alloc<CommandPresent>()};
         _cmd_worker->Push(std::move(cmds), SubmitParams{"Present", true});
-        if (!Application::Get()._is_multi_thread_rendering)
-        {
-            _cmd_worker->RunSync();
-        }
+        if (!Application::Get()._is_multi_thread_rendering) { _cmd_worker->RunSync(); }
     }
 
     u64 D3DContext::GetFenceValueGPU()
@@ -900,31 +798,11 @@ namespace Ailu::RHI::DX12
         return _cur_fence_value;
     }
 
-    u64 D3DContext::GetFenceValueCPU() const
-    {
-        return _fence_value;
-    }
+    u64 D3DContext::GetFenceValueCPU() const { return _fence_value; }
 
     void D3DContext::RegisterWindow(Window *window)
     {
         UINT dxgiFactoryFlags = 0;
-
-#if D3D_DEBUG_LAYER
-        // Enable the debug layer (requires the Graphics Tools "optional feature").
-        // NOTE: Enabling the debug layer after device creation will invalidate the active device.
-        {
-            ComPtr<ID3D12Debug> debugController;
-            if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
-            {
-                debugController->EnableDebugLayer();
-
-                // Enable additional debug layers.
-                dxgiFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
-            }
-        }
-        //https://learn.microsoft.com/zh-cn/windows/win32/direct3d12/using-d3d12-debug-layer-gpu-based-validation
-        //EnableShaderBasedValidation();
-#endif
 
         ComPtr<IDXGIFactory6> factory;
         ThrowIfFailed(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory)));
@@ -939,7 +817,8 @@ namespace Ailu::RHI::DX12
         swapChainDesc.BufferCount = RenderConstants::kFrameCount;
         swapChainDesc.Width = window->GetWidth();
         swapChainDesc.Height = window->GetHeight();
-        swapChainDesc.Format = RenderConstants::kColorRange == EColorRange::kLDR ? ConvertToDXGIFormat(RenderConstants::kLDRFormat) : ConvertToDXGIFormat(RenderConstants::kHDRFormat);
+        swapChainDesc.Format = RenderConstants::kColorRange == EColorRange::kLDR ? ConvertToDXGIFormat(RenderConstants::kLDRFormat)
+                                                                                 : ConvertToDXGIFormat(RenderConstants::kHDRFormat);
         swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
         swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
         swapChainDesc.SampleDesc.Count = 1;
@@ -950,11 +829,11 @@ namespace Ailu::RHI::DX12
             initializer._command_queue = m_commandQueue.Get();
             initializer._device = m_device.Get();
             initializer._factory = factory.Get();
-            initializer._format = RenderConstants::kColorRange == EColorRange::kLDR ? RenderConstants::kLDRFormat : RenderConstants::kHDRFormat;
+            initializer._format =
+                    RenderConstants::kColorRange == EColorRange::kLDR ? RenderConstants::kLDRFormat : RenderConstants::kHDRFormat;
             initializer._is_fullscreen = false;
             Vector<D3D12_CPU_DESCRIPTOR_HANDLE> rtvs(RenderConstants::kFrameCount);
-            for (u16 i = 0; i < RenderConstants::kFrameCount; i++)
-                rtvs[i] = ctx->_rtv_allocation.At(i);
+            for (u16 i = 0; i < RenderConstants::kFrameCount; i++) rtvs[i] = ctx->_rtv_allocation.At(i);
             initializer._rtvs = rtvs;
             initializer._swapchain_desc = swapChainDesc;
             initializer._window = window;
@@ -975,8 +854,7 @@ namespace Ailu::RHI::DX12
 
     void D3DContext::UnRegisterWindow(Window *window)
     {
-        std::erase_if(_render_windows, [&](Scope<RenderWindowCtx> &ctx) -> bool
-                      { return ctx->_window == window; });
+        std::erase_if(_render_windows, [&](Scope<RenderWindowCtx> &ctx) -> bool { return ctx->_window == window; });
     }
 
     void D3DContext::TakeCapture()
@@ -989,8 +867,8 @@ namespace Ailu::RHI::DX12
 
     void D3DContext::ResizeSwapChain(void *window_handle, const u32 width, const u32 height)
     {
-        auto it = std::find_if(_render_windows.begin(), _render_windows.end(), [&](Scope<RenderWindowCtx> &ctx) -> bool
-                               { return ctx->_window->GetNativeWindowPtr() == window_handle; });
+        auto it = std::find_if(_render_windows.begin(), _render_windows.end(),
+                               [&](Scope<RenderWindowCtx> &ctx) -> bool { return ctx->_window->GetNativeWindowPtr() == window_handle; });
         if (it != _render_windows.end())
         {
             u32 new_size = (static_cast<u32>(width) << 16) | static_cast<u32>(height & 0xFFFF);
@@ -1001,24 +879,30 @@ namespace Ailu::RHI::DX12
 
     void D3DContext::WaitForGpu()
     {
-        for (auto &ctx: _render_windows)
+        std::lock_guard lock(_cmd_fence_mtx);
+        ++_fence_value;
+        ThrowIfFailed(m_commandQueue->Signal(_p_cmd_buffer_fence.Get(), _fence_value));
+        if (_p_cmd_buffer_fence->GetCompletedValue() < _fence_value)
         {
-            ctx->WaitForGpu(m_commandQueue.Get());
+            ThrowIfFailed(_p_cmd_buffer_fence->SetEventOnCompletion(_fence_value, _p_cmd_buffer_fence_event));
+            WaitForSingleObjectEx(_p_cmd_buffer_fence_event, INFINITE, FALSE);
         }
     }
 
     void D3DContext::WaitForFence(u64 fence_value)
     {
-        for (auto &ctx: _render_windows)
+        std::lock_guard lock(_cmd_fence_mtx);
+        if (_p_cmd_buffer_fence->GetCompletedValue() < fence_value)
         {
-            ctx->WaitForFence(m_commandQueue.Get(), fence_value);
+            ThrowIfFailed(_p_cmd_buffer_fence->SetEventOnCompletion(fence_value, _p_cmd_buffer_fence_event));
+            WaitForSingleObjectEx(_p_cmd_buffer_fence_event, INFINITE, FALSE);
         }
     }
 
     void D3DContext::PresentImpl(D3DCommandBuffer *cmd)
     {
         static TimeMgr s_timer;
-        CPUProfileBlock b("Reslove");
+        PROFILE_BLOCK_CPU("Reslove")
 #ifdef DEAR_IMGUI
         auto dxcmd = cmd->NativeCmdList();
         auto rtv_handle = *_render_windows[0]->_swapchain->TargetCPUHandle(cmd);
@@ -1044,10 +928,7 @@ namespace Ailu::RHI::DX12
                 //if (Application::Get().GetFrameCount() % 60 == 0)
                 Render::RenderingStates::SetGpuLatency(s_timer.GetElapsedSinceLastLocalMark());
             }
-            if (_is_cur_frame_capturing)
-            {
-                EndCapture();
-            }
+            if (_is_cur_frame_capturing) { EndCapture(); }
             {
                 u32 new_pack_size = ctx->_new_backbuffer_size.load();
                 if (new_pack_size != 0u)
@@ -1063,47 +944,39 @@ namespace Ailu::RHI::DX12
         }
 
 #ifdef _DIRECT_WRITE
-            //RenderUI
-            {
-                D2D1_SIZE_F rtSize = m_d2dRenderTargets[m_frameIndex]->GetSize();
-                D2D1_RECT_F textRect = D2D1::RectF(0, 0, rtSize.width, rtSize.height);
-                static const WCHAR text[] = L"11On12";
+        //RenderUI
+        {
+            D2D1_SIZE_F rtSize = m_d2dRenderTargets[m_frameIndex]->GetSize();
+            D2D1_RECT_F textRect = D2D1::RectF(0, 0, rtSize.width, rtSize.height);
+            static const WCHAR text[] = L"11On12";
 
-                // Acquire our wrapped render target resource for the current back buffer.
-                m_d3d11On12Device->AcquireWrappedResources(m_wrappedBackBuffers[m_frameIndex].GetAddressOf(), 1);
+            // Acquire our wrapped render target resource for the current back buffer.
+            m_d3d11On12Device->AcquireWrappedResources(m_wrappedBackBuffers[m_frameIndex].GetAddressOf(), 1);
 
-                // Render text directly to the back buffer.
-                m_d2dDeviceContext->SetTarget(m_d2dRenderTargets[m_frameIndex].Get());
-                m_d2dDeviceContext->BeginDraw();
-                m_d2dDeviceContext->SetTransform(D2D1::Matrix3x2F::Identity());
-                m_d2dDeviceContext->DrawText(
-                        text,
-                        _countof(text) - 1,
-                        m_textFormat.Get(),
-                        &textRect,
-                        m_textBrush.Get());
-                ThrowIfFailed(m_d2dDeviceContext->EndDraw());
+            // Render text directly to the back buffer.
+            m_d2dDeviceContext->SetTarget(m_d2dRenderTargets[m_frameIndex].Get());
+            m_d2dDeviceContext->BeginDraw();
+            m_d2dDeviceContext->SetTransform(D2D1::Matrix3x2F::Identity());
+            m_d2dDeviceContext->DrawText(text, _countof(text) - 1, m_textFormat.Get(), &textRect, m_textBrush.Get());
+            ThrowIfFailed(m_d2dDeviceContext->EndDraw());
 
-                // Release our wrapped render target resource. Releasing
-                // transitions the back buffer resource to the state specified
-                // as the OutState when the wrapped resource was created.
-                m_d3d11On12Device->ReleaseWrappedResources(m_wrappedBackBuffers[m_frameIndex].GetAddressOf(), 1);
+            // Release our wrapped render target resource. Releasing
+            // transitions the back buffer resource to the state specified
+            // as the OutState when the wrapped resource was created.
+            m_d3d11On12Device->ReleaseWrappedResources(m_wrappedBackBuffers[m_frameIndex].GetAddressOf(), 1);
 
-                // Flush to submit the 11 command list to the shared command queue.
-                m_d3d11DeviceContext->Flush();
-            }
+            // Flush to submit the 11 command list to the shared command queue.
+            m_d3d11DeviceContext->Flush();
+        }
 #endif//  _DIRECT_WRITE
-        
+
         if (_frame_count % kResourceCleanupIntervalTick == 0)
         {
             if (_global_tracked_resource.size() > 0)
             {
                 u64 origin_res_num = _global_tracked_resource.size();
                 auto it = _global_tracked_resource.lower_bound(_frame_count);
-                if (it != _global_tracked_resource.end())
-                {
-                    _global_tracked_resource.erase(_global_tracked_resource.begin(), it);
-                }
+                if (it != _global_tracked_resource.end()) { _global_tracked_resource.erase(_global_tracked_resource.begin(), it); }
                 else
                     _global_tracked_resource.clear();
                 origin_res_num -= _global_tracked_resource.size();
@@ -1124,13 +997,13 @@ namespace Ailu::RHI::DX12
         _p_gpu_timer->EndFrame();
         Profiler::Get().CollectGPUTimeData();
 
-// #if defined(TRACY_ENABLE)
-//         if (_tracy_d3d12_ctx)
-//         {
-//             TracyD3D12NewFrame(_tracy_d3d12_ctx);
-//             TracyD3D12Collect(_tracy_d3d12_ctx);
-//         }
-// #endif
+        // #if defined(TRACY_ENABLE)
+        //         if (_tracy_d3d12_ctx)
+        //         {
+        //             TracyD3D12NewFrame(_tracy_d3d12_ctx);
+        //             TracyD3D12Collect(_tracy_d3d12_ctx);
+        //         }
+        // #endif
         //CommandBufferPool::ReleaseAll();
         if (_is_next_frame_capture)
         {
@@ -1171,8 +1044,7 @@ namespace Ailu::RHI::DX12
     }
     void D3DContext::ResizeSwapChainImpl(const u32 width, const u32 height)
     {
-        if (width == _render_windows[_cur_ctx_index]->_width && height == _render_windows[_cur_ctx_index]->_height)
-            return;
+        if (width == _render_windows[_cur_ctx_index]->_width && height == _render_windows[_cur_ctx_index]->_height) return;
         //m_frameIndex = _swapchain->GetCurrentBackBufferIndex();
 #ifdef _DIRECT_WRITE
         m_d2dDeviceContext->SetTarget(nullptr);
@@ -1212,11 +1084,9 @@ namespace Ailu::RHI::DX12
 #pragma warning(disable : 4996)// GetDesktopDpi is deprecated.
         m_d2dFactory->GetDesktopDpi(&dpiX, &dpiY);
 #pragma warning(pop)
-        D2D1_BITMAP_PROPERTIES1 bitmapProperties = D2D1::BitmapProperties1(
-                D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
-                D2D1::PixelFormat(DXGI_FORMAT_UNKNOWN, D2D1_ALPHA_MODE_PREMULTIPLIED),
-                dpiX,
-                dpiY);
+        D2D1_BITMAP_PROPERTIES1 bitmapProperties =
+                D2D1::BitmapProperties1(D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
+                                        D2D1::PixelFormat(DXGI_FORMAT_UNKNOWN, D2D1_ALPHA_MODE_PREMULTIPLIED), dpiX, dpiY);
 
         for (UINT n = 0; n < RenderConstants::kFrameCount; n++)
         {
@@ -1230,19 +1100,12 @@ namespace Ailu::RHI::DX12
             // ReleaseWrappedResources() is called on the 11On12 device, the resource
             // will be transitioned to the PRESENT state.
             D3D11_RESOURCE_FLAGS d3d11Flags = {D3D11_BIND_RENDER_TARGET};
-            ThrowIfFailed(m_d3d11On12Device->CreateWrappedResource(
-                    _color_buffer[n].Get(),
-                    &d3d11Flags,
-                    D3D12_RESOURCE_STATE_RENDER_TARGET,
-                    D3D12_RESOURCE_STATE_PRESENT,
-                    IID_PPV_ARGS(&m_wrappedBackBuffers[n])));
+            ThrowIfFailed(m_d3d11On12Device->CreateWrappedResource(_color_buffer[n].Get(), &d3d11Flags, D3D12_RESOURCE_STATE_RENDER_TARGET,
+                                                                   D3D12_RESOURCE_STATE_PRESENT, IID_PPV_ARGS(&m_wrappedBackBuffers[n])));
             // Create a render target for D2D to draw directly to this back buffer.
             ComPtr<IDXGISurface> surface;
             ThrowIfFailed(m_wrappedBackBuffers[n].As(&surface));
-            ThrowIfFailed(m_d2dDeviceContext->CreateBitmapFromDxgiSurface(
-                    surface.Get(),
-                    &bitmapProperties,
-                    &m_d2dRenderTargets[n]));
+            ThrowIfFailed(m_d2dDeviceContext->CreateBitmapFromDxgiSurface(surface.Get(), &bitmapProperties, &m_d2dRenderTargets[n]));
             //rtvHandle.Offset(1, _rtv_desc_size);
             //ThrowIfFailed(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocators[n])));
         }
@@ -1266,7 +1129,8 @@ namespace Ailu::RHI::DX12
 #endif
         ComPtr<ID3D11Device> d3d11Device;
         ThrowIfFailed(D3D11On12CreateDevice(m_device.Get(), d3d11DeviceFlags, nullptr, 0U,
-                                            reinterpret_cast<IUnknown **>(m_commandQueue.GetAddressOf()), 1U, 0U, &d3d11Device, &m_d3d11DeviceContext, nullptr));
+                                            reinterpret_cast<IUnknown **>(m_commandQueue.GetAddressOf()), 1U, 0U, &d3d11Device,
+                                            &m_d3d11DeviceContext, nullptr));
         ThrowIfFailed(d3d11Device.As(&m_d3d11On12Device));
         // Create D2D/DWrite components.
         {
@@ -1294,10 +1158,7 @@ namespace Ailu::RHI::DX12
             //_state_guard.MakesureResourceState(dxcmd, _p_d3d_res.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
             ExecuteRHICommandBuffer(cmd.get());
             u64 cmd_fence_value = d3dcmd->_fence_value;
-            while (_p_cmd_buffer_fence->GetCompletedValue() < cmd_fence_value)
-            {
-                std::this_thread::yield();
-            }
+            while (_p_cmd_buffer_fence->GetCompletedValue() < cmd_fence_value) { std::this_thread::yield(); }
             D3D12_RANGE readbackBufferRange{0, size};
             u8 *tmp_data = nullptr;
             copy_dst->Map(0, &readbackBufferRange, reinterpret_cast<void **>(&tmp_data));
@@ -1325,10 +1186,7 @@ namespace Ailu::RHI::DX12
         state_guard.MakesureResourceState(dxcmd, old_state);
         ExecuteRHICommandBuffer(cmd.get());
         u64 cmd_fence_value = d3dcmd->_fence_value;
-        while (_p_cmd_buffer_fence->GetCompletedValue() < cmd_fence_value)
-        {
-            std::this_thread::yield();
-        }
+        while (_p_cmd_buffer_fence->GetCompletedValue() < cmd_fence_value) { std::this_thread::yield(); }
         D3D12_RANGE readbackBufferRange{0, size};
         u8 *tmp_data = nullptr;
         copy_dst->Map(0, &readbackBufferRange, reinterpret_cast<void **>(&tmp_data));
@@ -1338,7 +1196,8 @@ namespace Ailu::RHI::DX12
         RHICommandBufferPool::Release(cmd);
     }
 
-    void D3DContext::ReadBackAsync(ID3D12Resource *src, D3DResourceStateGuard &state_guard, u32 size, std::function<void(const u8 *)> callback)
+    void D3DContext::ReadBackAsync(ID3D12Resource *src, D3DResourceStateGuard &state_guard, u32 size,
+                                   std::function<void(const u8 *)> callback)
     {
         auto copy_dst = _readback_pool->Acquire(size, _frame_count);// 已对齐分配
         auto cmd = RHICommandBufferPool::Get("Readback");
@@ -1353,19 +1212,19 @@ namespace Ailu::RHI::DX12
         u64 fence_value = static_cast<D3DCommandBuffer *>(cmd.get())->_fence_value;
 
         auto copy_dst_capture = copy_dst;// 确保 lambda 生命周期
-        JobSystem::Get().Dispatch([this, copy_dst_capture, size, fence_value, callback]()
-                                  {
-                                      while (_p_cmd_buffer_fence->GetCompletedValue() < fence_value)
-                                          std::this_thread::yield();
-                                      D3D12_RANGE range{0, size};
-                                      u8 *raw_data = nullptr;
-                                      copy_dst_capture->Map(0, &range, reinterpret_cast<void **>(const_cast<u8 **>(&raw_data)));
-                                      //u8* copy_data = AL_NEW(u8,size);
-                                      //memcpy(copy_data, raw_data, size);
-                                      callback(raw_data);
-                                      copy_dst_capture->Unmap(0, nullptr);
-                                      //AL_FREE(copy_data);
-                                  });
+        JobSystem::Get().Dispatch(
+                [this, copy_dst_capture, size, fence_value, callback]()
+                {
+                    while (_p_cmd_buffer_fence->GetCompletedValue() < fence_value) std::this_thread::yield();
+                    D3D12_RANGE range{0, size};
+                    u8 *raw_data = nullptr;
+                    copy_dst_capture->Map(0, &range, reinterpret_cast<void **>(const_cast<u8 **>(&raw_data)));
+                    //u8* copy_data = AL_NEW(u8,size);
+                    //memcpy(copy_data, raw_data, size);
+                    callback(raw_data);
+                    copy_dst_capture->Unmap(0, nullptr);
+                    //AL_FREE(copy_data);
+                });
 
         RHICommandBufferPool::Release(cmd);// 无需早于 callback 完成
     }
@@ -1383,18 +1242,17 @@ namespace Ailu::RHI::DX12
             //_state_guard.MakesureResourceState(dxcmd, _p_d3d_res.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
             ExecuteRHICommandBuffer(cmd.get());
             u64 cmd_fence_value = static_cast<D3DCommandBuffer *>(cmd.get())->_fence_value;
-            JobSystem::Get().Dispatch([&]() mutable
-                                      {
-                while (_p_cmd_buffer_fence->GetCompletedValue() < cmd_fence_value)
-                {
-                    std::this_thread::yield();
-                }
-                D3D12_RANGE readbackBufferRange{0, size};
-                u8* data = nullptr;
-                copy_dst->Map(0, &readbackBufferRange, reinterpret_cast<void **>(&data));
-                D3D12_RANGE emptyRange{0, 0};
-                copy_dst->Unmap(0, &emptyRange);
-                callback(data); });
+            JobSystem::Get().Dispatch(
+                    [&]() mutable
+                    {
+                        while (_p_cmd_buffer_fence->GetCompletedValue() < cmd_fence_value) { std::this_thread::yield(); }
+                        D3D12_RANGE readbackBufferRange{0, size};
+                        u8 *data = nullptr;
+                        copy_dst->Map(0, &readbackBufferRange, reinterpret_cast<void **>(&data));
+                        D3D12_RANGE emptyRange{0, 0};
+                        copy_dst->Unmap(0, &emptyRange);
+                        callback(data);
+                    });
             RHICommandBufferPool::Release(cmd);
         }
         else
@@ -1403,15 +1261,9 @@ namespace Ailu::RHI::DX12
         }
     }
 
-    void D3DContext::CreateResource(GpuResource *res)
-    {
-        CreateResource(res, nullptr);
-    }
+    void D3DContext::CreateResource(GpuResource *res) { CreateResource(res, nullptr); }
 
-    void D3DContext::CreateResourceSync(GpuResource *res)
-    {
-        CreateResourceSync(res, nullptr);
-    }
+    void D3DContext::CreateResourceSync(GpuResource *res) { CreateResourceSync(res, nullptr); }
 
     void D3DContext::CreateResource(GpuResource *res, UploadParams *params)
     {
@@ -1472,8 +1324,7 @@ namespace Ailu::RHI::DX12
             if (clear_cmd->_flag & EClearFlag::kDepth)
             {
                 D3D12_CLEAR_FLAGS depth_flag = D3D12_CLEAR_FLAG_DEPTH;
-                if (clear_cmd->_flag & EClearFlag::kStencil)
-                    depth_flag |= D3D12_CLEAR_FLAG_STENCIL;
+                if (clear_cmd->_flag & EClearFlag::kStencil) depth_flag |= D3D12_CLEAR_FLAG_STENCIL;
                 dxcmd->ClearDepthStencilView(*d3dcmd->_depth, depth_flag, clear_cmd->_depth, clear_cmd->_stencil, 0, nullptr);
             }
         }
@@ -1485,7 +1336,8 @@ namespace Ailu::RHI::DX12
             {
                 if (set_cmd->_depth_target != nullptr)
                 {
-                    GraphicsPipelineStateMgr::SetRenderTargetState(EALGFormat::EALGFormat::kALGFormatUNKOWN, set_cmd->_depth_target->PixelFormat(), 0);
+                    GraphicsPipelineStateMgr::SetRenderTargetState(EALGFormat::EALGFormat::kALGFormatUNKOWN,
+                                                                   set_cmd->_depth_target->PixelFormat(), 0);
                     auto drt = static_cast<D3DRenderTexture *>(set_cmd->_depth_target);
                     d3dcmd->_color_count = 0u;
                     d3dcmd->_depth = drt->TargetCPUHandle(d3dcmd, set_cmd->_depth_index);
@@ -1501,15 +1353,20 @@ namespace Ailu::RHI::DX12
             {
                 d3dcmd->_color_count = set_cmd->_color_target_num;
                 bool is_depth_valid = set_cmd->_depth_target != nullptr;
-                d3dcmd->_depth = is_depth_valid ? static_cast<D3DRenderTexture *>(set_cmd->_depth_target)->TargetCPUHandle(d3dcmd, set_cmd->_depth_index) : nullptr;
+                d3dcmd->_depth =
+                        is_depth_valid
+                                ? static_cast<D3DRenderTexture *>(set_cmd->_depth_target)->TargetCPUHandle(d3dcmd, set_cmd->_depth_index)
+                                : nullptr;
                 static D3D12_CPU_DESCRIPTOR_HANDLE handles[8];
                 for (u16 i = 0; i < d3dcmd->_color_count; ++i)
                 {
                     d3dcmd->_scissors[i] = D3DConvertUtils::ToD3DRect(set_cmd->_viewports[i]);
                     d3dcmd->_viewports[i] = D3DConvertUtils::ToD3DViewport(set_cmd->_viewports[i]);
                     EALGFormat::EALGFormat color_format = set_cmd->_color_target[i]->PixelFormat();
-                    GraphicsPipelineStateMgr::SetRenderTargetState(color_format, is_depth_valid ? set_cmd->_depth_target->PixelFormat() : EALGFormat::EALGFormat::kALGFormatUNKOWN, (u8) i);
-                    D3D12_CPU_DESCRIPTOR_HANDLE* rtv;
+                    GraphicsPipelineStateMgr::SetRenderTargetState(
+                            color_format, is_depth_valid ? set_cmd->_depth_target->PixelFormat() : EALGFormat::EALGFormat::kALGFormatUNKOWN,
+                            (u8) i);
+                    D3D12_CPU_DESCRIPTOR_HANDLE *rtv;
                     if (set_cmd->_color_target[i]->IsSwapChain())
                     {
                         auto rt = static_cast<D3DSwapchainTexture *>(set_cmd->_color_target[i]);
@@ -1524,8 +1381,7 @@ namespace Ailu::RHI::DX12
                     d3dcmd->MarkUsedResource(set_cmd->_color_target[i]);
                     handles[i] = *d3dcmd->_colors[i];
                 }
-                if (is_depth_valid)
-                    d3dcmd->MarkUsedResource(set_cmd->_depth_target);
+                if (is_depth_valid) d3dcmd->MarkUsedResource(set_cmd->_depth_target);
                 dxcmd->RSSetScissorRects(set_cmd->_color_target_num, d3dcmd->_scissors.data());
                 dxcmd->RSSetViewports(set_cmd->_color_target_num, d3dcmd->_viewports.data());
                 dxcmd->OMSetRenderTargets(d3dcmd->_color_count, handles, false, d3dcmd->_depth);
@@ -1538,12 +1394,9 @@ namespace Ailu::RHI::DX12
         }
         else if (cmd->GetCmdType() == EGpuCommandType::kScissorRect)
         {
-            auto scissor_cmd = static_cast<CommandScissor*>(cmd);
+            auto scissor_cmd = static_cast<CommandScissor *>(cmd);
             static D3D12_RECT s_d3d_rects[RenderConstants::kMaxMRTNum];
-            for (u32 i = 0; i < scissor_cmd->_num; ++i)
-            {
-                s_d3d_rects[i] = D3DConvertUtils::ToD3DRect(scissor_cmd->_rects[i]);
-            }
+            for (u32 i = 0; i < scissor_cmd->_num; ++i) { s_d3d_rects[i] = D3DConvertUtils::ToD3DRect(scissor_cmd->_rects[i]); }
             dxcmd->RSSetScissorRects(scissor_cmd->_num, s_d3d_rects);
         }
         else if (cmd->GetCmdType() == EGpuCommandType::kResourceUpload)
@@ -1557,7 +1410,7 @@ namespace Ailu::RHI::DX12
                 auto res_type = res->GetResourceType();
                 //对于AS资源，upload完成后会有一个build过程，才能真正使用，所以在这里不加入状态跟踪，等build完成后再加入
                 if (res_type != EGpuResType::kBottomAS && res_type != EGpuResType::kTopAS)
-                    ResourceStateTracker::Get().AddResource(res, _fence_value+1);
+                    ResourceStateTracker::Get().AddResource(res, _fence_value + 1);
             }
         }
         else if (cmd->GetCmdType() == EGpuCommandType::kTransResourceState)
@@ -1568,8 +1421,7 @@ namespace Ailu::RHI::DX12
         else if (cmd->GetCmdType() == EGpuCommandType::kUAVBarrier)
         {
             auto barrier_cmd = static_cast<CommandUAVBarrier *>(cmd);
-            if (barrier_cmd->_res)
-                barrier_cmd->_res->InsertUAVBarrier(cmd_buffer);
+            if (barrier_cmd->_res) barrier_cmd->_res->InsertUAVBarrier(cmd_buffer);
             else
                 cmd_buffer->InsertUAVBarrier();
         }
@@ -1600,26 +1452,32 @@ namespace Ailu::RHI::DX12
                     auto &[name, alloc] = it;
                     if (pso->IsValidPipelineResource(EBindResDescType::kConstBuffer, name))
                     {
-                        auto res = PipelineResource(d3dcmd->_upload_buf.get(), EBindResDescType::kConstBufferRaw, name, PipelineResource::kPriorityCmd);
+                        auto res = PipelineResource(d3dcmd->_upload_buf.get(), EBindResDescType::kConstBufferRaw, name,
+                                                    PipelineResource::kPriorityCmd);
                         res._addi_info._gpu_handle = alloc.GPU;
                         pso->SetPipelineResource(res);
                     }
                 }
                 if (draw_cmd->_material_property_block._data != nullptr && draw_cmd->_material_property_block._size > 0)
                 {
-                    auto res = PipelineResource(d3dcmd->_upload_buf.get(), EBindResDescType::kConstBufferRaw, RenderConstants::kCBufNamePerMaterial, PipelineResource::kPriorityCmd);
-                    auto mat_prop_alloc = d3dcmd->AllocConstBuffer(draw_cmd->_material_property_block._data, draw_cmd->_material_property_block._size);
+                    auto res = PipelineResource(d3dcmd->_upload_buf.get(), EBindResDescType::kConstBufferRaw,
+                                                RenderConstants::kCBufNamePerMaterial, PipelineResource::kPriorityCmd);
+                    auto mat_prop_alloc =
+                            d3dcmd->AllocConstBuffer(draw_cmd->_material_property_block._data, draw_cmd->_material_property_block._size);
                     res._addi_info._gpu_handle = mat_prop_alloc.GPU;
                     pso->SetPipelineResource(res);
                 }
-                
+
                 if (draw_cmd->_per_obj_cb != nullptr)
-                    pso->SetPipelineResource(PipelineResource(draw_cmd->_per_obj_cb, EBindResDescType::kConstBuffer, RenderConstants::kCBufNamePerObject, PipelineResource::kPriorityCmd));
-                
+                    pso->SetPipelineResource(PipelineResource(draw_cmd->_per_obj_cb, EBindResDescType::kConstBuffer,
+                                                              RenderConstants::kCBufNamePerObject, PipelineResource::kPriorityCmd));
+
                 Render::RenderingStates::IncrementDrawCallCount();
                 u32 vertex_count = is_produced ? 3u : draw_cmd->_vb->GetVertexCount() * draw_cmd->_instance_count;//目前只有程序化矩形
                 vertex_count = draw_cmd->_vertex_count > 0 ? draw_cmd->_vertex_count : vertex_count;
-                u32 triangle_count = is_indexed_draw ? draw_cmd->_ib->GetCount() / 3 : draw_cmd->_vb? draw_cmd->_vb->GetVertexCount() / 3 : 0u;
+                u32 triangle_count = is_indexed_draw ? draw_cmd->_ib->GetCount() / 3
+                                     : draw_cmd->_vb ? draw_cmd->_vb->GetVertexCount() / 3
+                                                     : 0u;
                 triangle_count *= draw_cmd->_instance_count;
                 Render::RenderingStates::IncrementTriangleCount(triangle_count);
                 Render::RenderingStates::IncrementVertexCount(vertex_count);
@@ -1629,7 +1487,8 @@ namespace Ailu::RHI::DX12
                 {
                     D3DGPUBuffer *d3d_buf = static_cast<D3DGPUBuffer *>(draw_cmd->_arg_buffer);
                     dxcmd->ExecuteIndirect(is_indexed_draw ? _draw_indexed_cmd_sig.Get() : _draw_cmd_sig.Get(), 1u,
-                                           d3d_buf->NativeResource().As<ID3D12Resource>(), draw_cmd->_arg_offset, d3d_buf->GetCounterBuffer(), 0u);
+                                           d3d_buf->NativeResource().As<ID3D12Resource>(), draw_cmd->_arg_offset,
+                                           d3d_buf->GetCounterBuffer(), 0u);
                 }
                 else
                 {
@@ -1639,7 +1498,8 @@ namespace Ailu::RHI::DX12
                         dxcmd->DrawIndexedInstanced(index_count, draw_cmd->_instance_count, draw_cmd->_index_start, 0, 0);
                     }
                     else
-                        dxcmd->DrawInstanced(draw_cmd->_vb? draw_cmd->_vb->GetVertexCount() : draw_cmd->_vertex_count, draw_cmd->_instance_count, 0, 0);
+                        dxcmd->DrawInstanced(draw_cmd->_vb ? draw_cmd->_vb->GetVertexCount() : draw_cmd->_vertex_count,
+                                             draw_cmd->_instance_count, 0, 0);
                 }
             }
         }
@@ -1653,7 +1513,8 @@ namespace Ailu::RHI::DX12
             auto dst_old_state = dst_d3d_buf->_state_guard.CurState();
             src_d3d_buf->_counter_state_guard.MakesureResourceState(dxcmd, D3D12_RESOURCE_STATE_COPY_SOURCE);
             dst_d3d_buf->_state_guard.MakesureResourceState(dxcmd, D3D12_RESOURCE_STATE_COPY_DEST);
-            dxcmd->CopyBufferRegion(dst_d3d_buf->NativeResource().As<ID3D12Resource>(), cmd_cpc->_dst_offset, src_d3d_buf->GetCounterBuffer(), 0u, sizeof(u32));
+            dxcmd->CopyBufferRegion(dst_d3d_buf->NativeResource().As<ID3D12Resource>(), cmd_cpc->_dst_offset,
+                                    src_d3d_buf->GetCounterBuffer(), 0u, sizeof(u32));
             src_d3d_buf->_counter_state_guard.MakesureResourceState(dxcmd, src_old_state);
             dst_d3d_buf->_state_guard.MakesureResourceState(dxcmd, dst_old_state);
         }
@@ -1687,10 +1548,10 @@ namespace Ailu::RHI::DX12
         {
             auto cmd_profiler = static_cast<CommandProfiler *>(cmd);
 
-// #if defined(TRACY_ENABLE)
-//             static std::stack<std::unique_ptr<tracy::D3D12ZoneScope>> s_tracy_gpu_zone_stack{};
-//             const bool tracy_active = _tracy_d3d12_ctx != nullptr;
-// #endif
+            // #if defined(TRACY_ENABLE)
+            //             static std::stack<std::unique_ptr<tracy::D3D12ZoneScope>> s_tracy_gpu_zone_stack{};
+            //             const bool tracy_active = _tracy_d3d12_ctx != nullptr;
+            // #endif
 
             if (cmd_profiler->_is_start)
             {
@@ -1700,24 +1561,24 @@ namespace Ailu::RHI::DX12
                 Profiler::Get().AddCPUProfilerHierarchy(true, (u32) cmd_profiler->_cpu_index);
                 s_begin_profiler_stack.push(cmd_profiler);
 
-// #if defined(TRACY_ENABLE)
-//                 if (tracy_active)
-//                 {
-//                     // Dynamic-name GPU zone bound to the currently recording command list.
-//                     // This zone spans from BeginProfiler() to EndProfiler() in the command stream.
-//                     const char* file = __FILE__;
-//                     const char* function = __FUNCTION__;
-//                     auto zone = std::make_unique<tracy::D3D12ZoneScope>(
-//                         _tracy_d3d12_ctx,
-//                         (uint32_t)__LINE__,
-//                         file, std::strlen(file),
-//                         function, std::strlen(function),
-//                         cmd_profiler->_name.c_str(), cmd_profiler->_name.size(),
-//                         dxcmd,
-//                         true);
-//                     s_tracy_gpu_zone_stack.push(std::move(zone));
-//                 }
-// #endif
+                // #if defined(TRACY_ENABLE)
+                //                 if (tracy_active)
+                //                 {
+                //                     // Dynamic-name GPU zone bound to the currently recording command list.
+                //                     // This zone spans from BeginProfiler() to EndProfiler() in the command stream.
+                //                     const char* file = __FILE__;
+                //                     const char* function = __FUNCTION__;
+                //                     auto zone = std::make_unique<tracy::D3D12ZoneScope>(
+                //                         _tracy_d3d12_ctx,
+                //                         (uint32_t)__LINE__,
+                //                         file, std::strlen(file),
+                //                         function, std::strlen(function),
+                //                         cmd_profiler->_name.c_str(), cmd_profiler->_name.size(),
+                //                         dxcmd,
+                //                         true);
+                //                     s_tracy_gpu_zone_stack.push(std::move(zone));
+                //                 }
+                // #endif
             }
             else
             {
@@ -1727,13 +1588,13 @@ namespace Ailu::RHI::DX12
                 Profiler::Get().AddCPUProfilerHierarchy(false, (u32) s_begin_profiler_stack.top()->_cpu_index);
                 s_begin_profiler_stack.pop();
 
-// #if defined(TRACY_ENABLE)
-//                 if (tracy_active && !s_tracy_gpu_zone_stack.empty())
-//                 {
-//                     // Destroying the scope writes end timestamp and resolves query data.
-//                     s_tracy_gpu_zone_stack.pop();
-//                 }
-// #endif
+                // #if defined(TRACY_ENABLE)
+                //                 if (tracy_active && !s_tracy_gpu_zone_stack.empty())
+                //                 {
+                //                     // Destroying the scope writes end timestamp and resolves query data.
+                //                     s_tracy_gpu_zone_stack.pop();
+                //                 }
+                // #endif
             }
         }
         else if (cmd->GetCmdType() == EGpuCommandType::kReadBack)
@@ -1748,7 +1609,8 @@ namespace Ailu::RHI::DX12
             auto copy_dst = _readback_pool->Acquire(size, _frame_count);
             D3DGPUBuffer *d3dbuffer = static_cast<D3DGPUBuffer *>(cmd_rb->_res);
             D3DResourceStateGuard *state_guard = cmd_rb->_is_counter_value ? &d3dbuffer->_counter_state_guard : &d3dbuffer->_state_guard;
-            ID3D12Resource *copy_src = cmd_rb->_is_counter_value ? d3dbuffer->GetCounterBuffer() : d3dbuffer->NativeResource().As<ID3D12Resource>();
+            ID3D12Resource *copy_src =
+                    cmd_rb->_is_counter_value ? d3dbuffer->GetCounterBuffer() : d3dbuffer->NativeResource().As<ID3D12Resource>();
             auto old_state = state_guard->CurState();
             state_guard->MakesureResourceState(dxcmd, D3D12_RESOURCE_STATE_COPY_SOURCE);
             dxcmd->CopyBufferRegion(copy_dst.Get(), 0u, copy_src, 0u, size);
@@ -1757,15 +1619,16 @@ namespace Ailu::RHI::DX12
             u64 fence_value = _fence_value + 1;
             auto copy_dst_capture = copy_dst;// 确保 lambda 生命周期
             ReadbackCallback callback = std::move(cmd_rb->_callback);
-            JobSystem::Get().Dispatch([this, copy_dst_capture, size, fence_value, callback]()
-                                      {
-                while (_p_cmd_buffer_fence->GetCompletedValue() < fence_value)
-                    std::this_thread::yield();
-                D3D12_RANGE range{0, size};
-                u8* raw_data = nullptr;
-                copy_dst_capture->Map(0, &range, reinterpret_cast<void **>(const_cast<u8**>(&raw_data)));
-                callback(raw_data,(u32)size);
-                copy_dst_capture->Unmap(0, nullptr); });
+            JobSystem::Get().Dispatch(
+                    [this, copy_dst_capture, size, fence_value, callback]()
+                    {
+                        while (_p_cmd_buffer_fence->GetCompletedValue() < fence_value) std::this_thread::yield();
+                        D3D12_RANGE range{0, size};
+                        u8 *raw_data = nullptr;
+                        copy_dst_capture->Map(0, &range, reinterpret_cast<void **>(const_cast<u8 **>(&raw_data)));
+                        callback(raw_data, (u32) size);
+                        copy_dst_capture->Unmap(0, nullptr);
+                    });
         }
         else if (cmd->GetCmdType() == EGpuCommandType::kPresent)
             PresentImpl(d3dcmd);
@@ -1774,10 +1637,7 @@ namespace Ailu::RHI::DX12
             auto cmd_bas = static_cast<CommandBuildAS *>(cmd);
             if (cmd_bas->_is_blas)
             {
-                if (cmd_bas->_is_update)
-                {
-                    AL_ASSERT_MSG(false,"BLAS update is not supported yet!");
-                }
+                if (cmd_bas->_is_update) { AL_ASSERT_MSG(false, "BLAS update is not supported yet!"); }
                 else
                 {
                     auto blas = static_cast<D3DRayTracingGeometry *>(cmd_bas->_dst);
@@ -1785,7 +1645,8 @@ namespace Ailu::RHI::DX12
                     auto blas_res = blas->_blas_resource.Get();
                     AL_ASSERT(scratch_res != nullptr && blas_res != nullptr);
                     blas->_scratch_state_guard.MakesureResourceState(d3dcmd->NativeCmdList(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-                    blas->_blas_state_guard.MakesureResourceState(d3dcmd->NativeCmdList(), D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE);
+                    blas->_blas_state_guard.MakesureResourceState(d3dcmd->NativeCmdList(),
+                                                                  D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE);
                     D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDesc = {};
                     bottomLevelBuildDesc.Inputs = blas->_inputs;
                     bottomLevelBuildDesc.ScratchAccelerationStructureData = scratch_res->GetGPUVirtualAddress();
@@ -1793,7 +1654,7 @@ namespace Ailu::RHI::DX12
                     auto dxcmd = d3dcmd->NativeCmdList();
                     dxcmd->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
                     blas->_blas_state_guard.InsertTrackedUAVBarrier(dxcmd);
-                    ResourceStateTracker::Get().AddResource(blas, _fence_value+1);
+                    ResourceStateTracker::Get().AddResource(blas, _fence_value + 1);
                     //d3dcmd->InsertUAVBarrier();
                 }
             }
@@ -1803,21 +1664,21 @@ namespace Ailu::RHI::DX12
                 if (tlas->_scratch_resource)
                     tlas->_scratch_state_guard.MakesureResourceState(d3dcmd->NativeCmdList(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
                 if (tlas->_tlas_resource)
-                    tlas->_tlas_state_guard.MakesureResourceState(d3dcmd->NativeCmdList(), D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE);
+                    tlas->_tlas_state_guard.MakesureResourceState(d3dcmd->NativeCmdList(),
+                                                                  D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE);
                 d3dcmd->NativeCmdList()->BuildRaytracingAccelerationStructure(&tlas->GetBuildDesc(cmd_bas->_is_update), 0, nullptr);
-                if (!cmd_bas->_is_update)
-                {
-                    ResourceStateTracker::Get().AddResource(tlas, _fence_value+1);
-                }
+                if (!cmd_bas->_is_update) { ResourceStateTracker::Get().AddResource(tlas, _fence_value + 1); }
             }
         }
         else if (cmd->GetCmdType() == EGpuCommandType::kDispatchRays)
         {
             auto cmd_dr = static_cast<CommandDispatchRays *>(cmd);
             cmd_dr->_shader->SetScene(cmd_dr->_scene);
-            cmd_dr->_shader->DispatchRays(d3dcmd,cmd_dr->_w,cmd_dr->_h,cmd_dr->_depth);
+            cmd_dr->_shader->DispatchRays(d3dcmd, cmd_dr->_w, cmd_dr->_h, cmd_dr->_depth);
         }
-        else {};
+        else
+        {
+        };
     }
     void D3DContext::SubmitGpuCommandSync(GfxCommand *cmd)
     {

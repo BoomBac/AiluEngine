@@ -65,7 +65,7 @@ namespace Ailu
         }
         void LightingSystem::Update(Register &r, f32 delta_time)
         {
-            PROFILE_BLOCK_CPU(LightingSystem_Update)
+            PROFILE_BLOCK_CPU("LightingSystem::Update")
             u32 index = 0;
             if (g_pGfxContext->GetFrameCount() > 5)
             {

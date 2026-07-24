@@ -7,17 +7,17 @@
 //Class TreeView begin...........................
 #define TREEVIEW_GEN_H_59_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_TreeView_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_TreeView_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual Type  *GetType() override;
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::UI{
 class TreeView ;
 }
 template<>
-AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::UI::TreeView>();
+AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::UI::TreeView>();
 //Class TreeView end...........................
 
 #undef CURRENT_FILE_ID

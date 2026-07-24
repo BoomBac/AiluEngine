@@ -1,45 +1,65 @@
 #include "Ailu.h"
 #include "EditorApp.h"
-//#define _DEBUG_MEM_LEAK 1
 
- #ifdef _DEBUG_MEM_LEAK
- #define _CRTDBG_MAP_ALLOC
- #include <crtdbg.h>
- #include <stdlib.h>
- #endif
+#include <shellapi.h>
+
+#pragma comment(lib, "Shell32.lib")
+
+// #define _DEBUG_MEM_LEAK 1
+
+#ifdef _DEBUG_MEM_LEAK
+#define _CRTDBG_MAP_ALLOC
+#include <crtdbg.h>
+#include <stdlib.h>
+#endif
 
 using namespace Ailu;
 
-int WINAPI WinMain(_In_ HINSTANCE hInst, _In_opt_ HINSTANCE hInstPrev, _In_ PSTR cmdline, _In_ int cmdshow)
+int WINAPI WinMain(
+    _In_ HINSTANCE instance,
+    _In_opt_ HINSTANCE previous_instance,
+    _In_ PSTR command_line,
+    _In_ int command_show)
 {
 #ifdef _DEBUG_MEM_LEAK
     _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
-    //_CrtSetBreakAlloc(4627010);
-#endif// _DEBUG_MEM_LEAK
+    // _CrtSetBreakAlloc(4627010);
+#endif
 
-    int argc = 0;
-    LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(),&argc);
-    WString project_file_path = argc > 1? argv[1] : L"";
-
-    if (project_file_path.empty())
+    int argument_count = 0;
+    LPWSTR *arguments = CommandLineToArgvW(GetCommandLineW(), &argument_count);
+    if (arguments == nullptr)
     {
-        MessageBoxW(nullptr,L"No project file specified.",L"Ailu Editor",MB_OK | MB_ICONERROR);
+        MessageBoxW(nullptr, L"Failed to parse command line.", L"Ailu Editor", MB_OK | MB_ICONERROR);
         return 1;
     }
-    ApplicationInitContext ctx;
-    for(auto i = 0; i < argc; i++)
-        ctx._arguments.push_back(argv[i]);
-    ctx._project_file_path = ctx._arguments[1];
-    ctx._require_project = true;
+
+    ApplicationInitContext context;
+    for (int i = 0; i < argument_count; ++i)
+        context._arguments.emplace_back(arguments[i]);
+
+    LocalFree(arguments);
+    arguments = nullptr;
+
+    if (context._arguments.size() <= 1)
+    {
+        MessageBoxW(nullptr, L"No project file specified.", L"Ailu Editor", MB_OK | MB_ICONERROR);
+        return 1;
+    }
+
+    context._project_file_path = context._arguments[1];
+    context._require_project = true;
+
     Editor::EditorApp app;
-    if (app.Initialize(ctx) != 0)
-    {
+    if (app.Initialize(context) != 0)
         return 1;
-    }
+
     app.Tick(16.6f);
     app.Finalize();
+
 #ifdef _DEBUG_MEM_LEAK
-    _CrtDumpMemoryLeaks();// Check for memory leaks
+    _CrtDumpMemoryLeaks();
 #endif
+
     return 0;
 }

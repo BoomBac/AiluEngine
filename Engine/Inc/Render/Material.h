@@ -90,8 +90,9 @@ namespace Ailu::Render
             AL_ASSERT(block_index < _property_blocks.size());
             return &_property_blocks[block_index];
         }
-    protected:
+        std::set<String>& SavedKeyworkds() { return _all_keywords; }
         virtual void Construct(bool first_time);
+    protected:
 
     private:
         struct BindState

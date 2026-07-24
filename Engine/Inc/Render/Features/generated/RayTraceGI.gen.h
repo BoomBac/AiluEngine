@@ -7,17 +7,17 @@
 //Class RayTraceGI begin...........................
 #define RAYTRACEGI_GEN_H_16_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_RayTraceGI_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_RayTraceGI_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual Type  *GetType() override;
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::Render{
 class RayTraceGI ;
 }
 template<>
-AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::Render::RayTraceGI>();
+AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::RayTraceGI>();
 //Class RayTraceGI end...........................
 
 #undef CURRENT_FILE_ID

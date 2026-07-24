@@ -219,7 +219,7 @@ namespace Ailu
 
             auto cmd = CommandBufferPool::Get(_name);
             {
-                PROFILE_BLOCK_GPU(cmd.get(), PickPass);
+                PROFILE_BLOCK_GPU(cmd.get(), "PickPass");
                 ECS::Register &r = SceneMgr::Get().ActiveScene()->GetRegister();
                 cmd->SetRenderTarget(rendering_data._camera_color_target_handle, rendering_data._camera_depth_target_handle);
                 if (auto &selected = Editor::Selection::SelectedEntities(); selected.size() > 0)

@@ -15,7 +15,7 @@
 #include <map>
 #include <stdint.h>
 
-#include "Framework/Common/Asset.h"
+#include "Assets/Asset.h"
 #include "Framework/Common/Reflect.h"
 #include "generated/Texture.gen.h"
 

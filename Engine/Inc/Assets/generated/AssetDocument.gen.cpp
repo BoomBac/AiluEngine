@@ -6,7 +6,7 @@
 #include <Objects/SerializeSpecializations.h>
 #include <Framework/Common/Log.h>
 using namespace Ailu;
-Ailu::Type* Ailu::Z_Construct_AssetHeaderProbeDocument_Type()
+const Ailu::Type* Ailu::Z_Construct_AssetHeaderProbeDocument_Type()
 {
 Ailu::Object::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -48,22 +48,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::AssetHeaderProbeDocument::GetPrivateStaticClass()
+const Ailu::Type* Ailu::AssetHeaderProbeDocument::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_AssetHeaderProbeDocument_Type();
+	static const Ailu::Type* type = Z_Construct_AssetHeaderProbeDocument_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::AssetHeaderProbeDocument>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::AssetHeaderProbeDocument>()
 {
 return Ailu::AssetHeaderProbeDocument::StaticType();
 }
-    Type *Ailu::AssetHeaderProbeDocument::GetType()
+    const Type *Ailu::AssetHeaderProbeDocument::GetType()
 {
 return Ailu::AssetHeaderProbeDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_AssetHeaderProbeDocument(&Ailu::AssetHeaderProbeDocument::StaticType, "Ailu::AssetHeaderProbeDocument");
-Ailu::Type* Ailu::Z_Construct_ShaderAssetDocument_Type()
+const Ailu::Type* Ailu::Z_Construct_ShaderAssetDocument_Type()
 {
 Ailu::Object::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -168,22 +168,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::ShaderAssetDocument::GetPrivateStaticClass()
+const Ailu::Type* Ailu::ShaderAssetDocument::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_ShaderAssetDocument_Type();
+	static const Ailu::Type* type = Z_Construct_ShaderAssetDocument_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::ShaderAssetDocument>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::ShaderAssetDocument>()
 {
 return Ailu::ShaderAssetDocument::StaticType();
 }
-    Type *Ailu::ShaderAssetDocument::GetType()
+    const Type *Ailu::ShaderAssetDocument::GetType()
 {
 return Ailu::ShaderAssetDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_ShaderAssetDocument(&Ailu::ShaderAssetDocument::StaticType, "Ailu::ShaderAssetDocument");
-Ailu::Type* Ailu::Z_Construct_ComputeShaderAssetDocument_Type()
+const Ailu::Type* Ailu::Z_Construct_ComputeShaderAssetDocument_Type()
 {
 Ailu::Object::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -267,22 +267,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::ComputeShaderAssetDocument::GetPrivateStaticClass()
+const Ailu::Type* Ailu::ComputeShaderAssetDocument::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_ComputeShaderAssetDocument_Type();
+	static const Ailu::Type* type = Z_Construct_ComputeShaderAssetDocument_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::ComputeShaderAssetDocument>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::ComputeShaderAssetDocument>()
 {
 return Ailu::ComputeShaderAssetDocument::StaticType();
 }
-    Type *Ailu::ComputeShaderAssetDocument::GetType()
+    const Type *Ailu::ComputeShaderAssetDocument::GetType()
 {
 return Ailu::ComputeShaderAssetDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_ComputeShaderAssetDocument(&Ailu::ComputeShaderAssetDocument::StaticType, "Ailu::ComputeShaderAssetDocument");
-Ailu::Type* Ailu::Z_Construct_Texture2DAssetDocument_Type()
+const Ailu::Type* Ailu::Z_Construct_Texture2DAssetDocument_Type()
 {
 Ailu::Object::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -366,22 +366,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::Texture2DAssetDocument::GetPrivateStaticClass()
+const Ailu::Type* Ailu::Texture2DAssetDocument::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_Texture2DAssetDocument_Type();
+	static const Ailu::Type* type = Z_Construct_Texture2DAssetDocument_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::Texture2DAssetDocument>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::Texture2DAssetDocument>()
 {
 return Ailu::Texture2DAssetDocument::StaticType();
 }
-    Type *Ailu::Texture2DAssetDocument::GetType()
+    const Type *Ailu::Texture2DAssetDocument::GetType()
 {
 return Ailu::Texture2DAssetDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_Texture2DAssetDocument(&Ailu::Texture2DAssetDocument::StaticType, "Ailu::Texture2DAssetDocument");
-Ailu::Type* Ailu::Z_Construct_MeshAssetDocument_Type()
+const Ailu::Type* Ailu::Z_Construct_MeshAssetDocument_Type()
 {
 Ailu::Object::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -486,22 +486,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::MeshAssetDocument::GetPrivateStaticClass()
+const Ailu::Type* Ailu::MeshAssetDocument::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_MeshAssetDocument_Type();
+	static const Ailu::Type* type = Z_Construct_MeshAssetDocument_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::MeshAssetDocument>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::MeshAssetDocument>()
 {
 return Ailu::MeshAssetDocument::StaticType();
 }
-    Type *Ailu::MeshAssetDocument::GetType()
+    const Type *Ailu::MeshAssetDocument::GetType()
 {
 return Ailu::MeshAssetDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_MeshAssetDocument(&Ailu::MeshAssetDocument::StaticType, "Ailu::MeshAssetDocument");
-Ailu::Type* Ailu::Z_Construct_MaterialAssetDocument_Type()
+const Ailu::Type* Ailu::Z_Construct_MaterialAssetDocument_Type()
 {
 Ailu::Object::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -574,7 +574,7 @@ builder_keywords._is_static = false;
 builder_keywords._is_public = true;
 builder_keywords._is_pointer = false;
 builder_keywords._is_ref = false;
-builder_keywords._is_template = false;
+builder_keywords._is_template = true;
 builder_keywords._meta = meta_keywords;
 builder_keywords._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<String>>);
 builder_keywords._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<String>>);
@@ -595,7 +595,7 @@ builder_uint_properties._is_static = false;
 builder_uint_properties._is_public = true;
 builder_uint_properties._is_pointer = false;
 builder_uint_properties._is_ref = false;
-builder_uint_properties._is_template = false;
+builder_uint_properties._is_template = true;
 builder_uint_properties._meta = meta_uint_properties;
 builder_uint_properties._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<AssetNamedUIntProperty>>);
 builder_uint_properties._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<AssetNamedUIntProperty>>);
@@ -616,7 +616,7 @@ builder_float_properties._is_static = false;
 builder_float_properties._is_public = true;
 builder_float_properties._is_pointer = false;
 builder_float_properties._is_ref = false;
-builder_float_properties._is_template = false;
+builder_float_properties._is_template = true;
 builder_float_properties._meta = meta_float_properties;
 builder_float_properties._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<AssetNamedFloatProperty>>);
 builder_float_properties._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<AssetNamedFloatProperty>>);
@@ -637,7 +637,7 @@ builder_vector_properties._is_static = false;
 builder_vector_properties._is_public = true;
 builder_vector_properties._is_pointer = false;
 builder_vector_properties._is_ref = false;
-builder_vector_properties._is_template = false;
+builder_vector_properties._is_template = true;
 builder_vector_properties._meta = meta_vector_properties;
 builder_vector_properties._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<AssetNamedVectorProperty>>);
 builder_vector_properties._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<AssetNamedVectorProperty>>);
@@ -658,7 +658,7 @@ builder_int_vector_properties._is_static = false;
 builder_int_vector_properties._is_public = true;
 builder_int_vector_properties._is_pointer = false;
 builder_int_vector_properties._is_ref = false;
-builder_int_vector_properties._is_template = false;
+builder_int_vector_properties._is_template = true;
 builder_int_vector_properties._meta = meta_int_vector_properties;
 builder_int_vector_properties._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<AssetNamedIntVectorProperty>>);
 builder_int_vector_properties._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<AssetNamedIntVectorProperty>>);
@@ -679,7 +679,7 @@ builder_texture_properties._is_static = false;
 builder_texture_properties._is_public = true;
 builder_texture_properties._is_pointer = false;
 builder_texture_properties._is_ref = false;
-builder_texture_properties._is_template = false;
+builder_texture_properties._is_template = true;
 builder_texture_properties._meta = meta_texture_properties;
 builder_texture_properties._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<AssetTextureBinding>>);
 builder_texture_properties._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<AssetTextureBinding>>);
@@ -690,22 +690,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::MaterialAssetDocument::GetPrivateStaticClass()
+const Ailu::Type* Ailu::MaterialAssetDocument::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_MaterialAssetDocument_Type();
+	static const Ailu::Type* type = Z_Construct_MaterialAssetDocument_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::MaterialAssetDocument>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::MaterialAssetDocument>()
 {
 return Ailu::MaterialAssetDocument::StaticType();
 }
-    Type *Ailu::MaterialAssetDocument::GetType()
+    const Type *Ailu::MaterialAssetDocument::GetType()
 {
 return Ailu::MaterialAssetDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_MaterialAssetDocument(&Ailu::MaterialAssetDocument::StaticType, "Ailu::MaterialAssetDocument");
-Ailu::Type* Ailu::Z_Construct_AnimationClipAssetDocument_Type()
+const Ailu::Type* Ailu::Z_Construct_AnimationClipAssetDocument_Type()
 {
 Ailu::Object::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -883,7 +883,7 @@ builder_tracks._is_static = false;
 builder_tracks._is_public = true;
 builder_tracks._is_pointer = false;
 builder_tracks._is_ref = false;
-builder_tracks._is_template = false;
+builder_tracks._is_template = true;
 builder_tracks._meta = meta_tracks;
 builder_tracks._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<AnimationClipTrackDocument>>);
 builder_tracks._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<AnimationClipTrackDocument>>);
@@ -894,22 +894,184 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::AnimationClipAssetDocument::GetPrivateStaticClass()
+const Ailu::Type* Ailu::AnimationClipAssetDocument::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_AnimationClipAssetDocument_Type();
+	static const Ailu::Type* type = Z_Construct_AnimationClipAssetDocument_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::AnimationClipAssetDocument>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::AnimationClipAssetDocument>()
 {
 return Ailu::AnimationClipAssetDocument::StaticType();
 }
-    Type *Ailu::AnimationClipAssetDocument::GetType()
+    const Type *Ailu::AnimationClipAssetDocument::GetType()
 {
 return Ailu::AnimationClipAssetDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_AnimationClipAssetDocument(&Ailu::AnimationClipAssetDocument::StaticType, "Ailu::AnimationClipAssetDocument");
-Ailu::Type* Ailu::Z_Construct_SceneAssetDocument_Type()
+const Ailu::Type* Ailu::Z_Construct_SpriteAssetDocument_Type()
+{
+Ailu::Object::StaticType();
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "SpriteAssetDocument";
+initializer._size = sizeof(Ailu::SpriteAssetDocument);
+initializer._full_name = "Ailu::SpriteAssetDocument";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu";
+initializer._base_name = "Ailu::Object";
+initializer._constructor = []()->Ailu::SpriteAssetDocument* {return new Ailu::SpriteAssetDocument;};
+Meta meta_header;
+meta_header.Set("Category","");
+meta_header.Set("IsColor",false);
+meta_header.Set("IsRange",false);
+meta_header.Set("IsFloatRange",true);
+meta_header.Set("RangeMin",(f32)0);
+meta_header.Set("RangeMax",(f32)1);
+MemberBuilder builder_header;
+builder_header._name = "_header";
+builder_header._type_name = "Ailu::AssetDocumentHeader";
+builder_header._offset = offsetof(SpriteAssetDocument,_header);
+builder_header._is_const = false;
+builder_header._is_static = false;
+builder_header._is_public = true;
+builder_header._is_pointer = false;
+builder_header._is_ref = false;
+builder_header._is_template = false;
+builder_header._meta = meta_header;
+builder_header._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<AssetDocumentHeader>);
+builder_header._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<AssetDocumentHeader>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_header));
+Meta meta_texture;
+meta_texture.Set("Category","");
+meta_texture.Set("IsColor",false);
+meta_texture.Set("IsRange",false);
+meta_texture.Set("IsFloatRange",true);
+meta_texture.Set("RangeMin",(f32)0);
+meta_texture.Set("RangeMax",(f32)1);
+MemberBuilder builder_texture;
+builder_texture._name = "_texture";
+builder_texture._type_name = "Ailu::Guid";
+builder_texture._offset = offsetof(SpriteAssetDocument,_texture);
+builder_texture._is_const = false;
+builder_texture._is_static = false;
+builder_texture._is_public = true;
+builder_texture._is_pointer = false;
+builder_texture._is_ref = false;
+builder_texture._is_template = false;
+builder_texture._meta = meta_texture;
+builder_texture._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Guid>);
+builder_texture._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Guid>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_texture));
+Meta meta_uv_rect;
+meta_uv_rect.Set("Category","");
+meta_uv_rect.Set("IsColor",false);
+meta_uv_rect.Set("IsRange",false);
+meta_uv_rect.Set("IsFloatRange",true);
+meta_uv_rect.Set("RangeMin",(f32)0);
+meta_uv_rect.Set("RangeMax",(f32)1);
+MemberBuilder builder_uv_rect;
+builder_uv_rect._name = "_uv_rect";
+builder_uv_rect._type_name = "Vector4f";
+builder_uv_rect._offset = offsetof(SpriteAssetDocument,_uv_rect);
+builder_uv_rect._is_const = false;
+builder_uv_rect._is_static = false;
+builder_uv_rect._is_public = true;
+builder_uv_rect._is_pointer = false;
+builder_uv_rect._is_ref = false;
+builder_uv_rect._is_template = false;
+builder_uv_rect._meta = meta_uv_rect;
+builder_uv_rect._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector4f>);
+builder_uv_rect._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector4f>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_uv_rect));
+Meta meta_pivot;
+meta_pivot.Set("Category","");
+meta_pivot.Set("IsColor",false);
+meta_pivot.Set("IsRange",false);
+meta_pivot.Set("IsFloatRange",true);
+meta_pivot.Set("RangeMin",(f32)0);
+meta_pivot.Set("RangeMax",(f32)1);
+MemberBuilder builder_pivot;
+builder_pivot._name = "_pivot";
+builder_pivot._type_name = "Vector2f";
+builder_pivot._offset = offsetof(SpriteAssetDocument,_pivot);
+builder_pivot._is_const = false;
+builder_pivot._is_static = false;
+builder_pivot._is_public = true;
+builder_pivot._is_pointer = false;
+builder_pivot._is_ref = false;
+builder_pivot._is_template = false;
+builder_pivot._meta = meta_pivot;
+builder_pivot._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector2f>);
+builder_pivot._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector2f>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_pivot));
+Meta meta_size;
+meta_size.Set("Category","");
+meta_size.Set("IsColor",false);
+meta_size.Set("IsRange",false);
+meta_size.Set("IsFloatRange",true);
+meta_size.Set("RangeMin",(f32)0);
+meta_size.Set("RangeMax",(f32)1);
+MemberBuilder builder_size;
+builder_size._name = "_size";
+builder_size._type_name = "Vector2f";
+builder_size._offset = offsetof(SpriteAssetDocument,_size);
+builder_size._is_const = false;
+builder_size._is_static = false;
+builder_size._is_public = true;
+builder_size._is_pointer = false;
+builder_size._is_ref = false;
+builder_size._is_template = false;
+builder_size._meta = meta_size;
+builder_size._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector2f>);
+builder_size._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector2f>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_size));
+Meta meta_border;
+meta_border.Set("Category","");
+meta_border.Set("IsColor",false);
+meta_border.Set("IsRange",false);
+meta_border.Set("IsFloatRange",true);
+meta_border.Set("RangeMin",(f32)0);
+meta_border.Set("RangeMax",(f32)1);
+MemberBuilder builder_border;
+builder_border._name = "_border";
+builder_border._type_name = "Vector4f";
+builder_border._offset = offsetof(SpriteAssetDocument,_border);
+builder_border._is_const = false;
+builder_border._is_static = false;
+builder_border._is_public = true;
+builder_border._is_pointer = false;
+builder_border._is_ref = false;
+builder_border._is_template = false;
+builder_border._meta = meta_border;
+builder_border._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector4f>);
+builder_border._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector4f>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_border));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+const Ailu::Type* Ailu::SpriteAssetDocument::GetPrivateStaticClass()
+{
+	static const Ailu::Type* type = Z_Construct_SpriteAssetDocument_Type();
+	return type;
+}
+
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::SpriteAssetDocument>()
+{
+return Ailu::SpriteAssetDocument::StaticType();
+}
+    const Type *Ailu::SpriteAssetDocument::GetType()
+{
+return Ailu::SpriteAssetDocument::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_SpriteAssetDocument(&Ailu::SpriteAssetDocument::StaticType, "Ailu::SpriteAssetDocument");
+const Ailu::Type* Ailu::Z_Construct_SceneAssetDocument_Type()
 {
 Ailu::Object::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -961,7 +1123,7 @@ builder_entities._is_static = false;
 builder_entities._is_public = true;
 builder_entities._is_pointer = false;
 builder_entities._is_ref = false;
-builder_entities._is_template = false;
+builder_entities._is_template = true;
 builder_entities._meta = meta_entities;
 builder_entities._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<SceneEntityDocument>>);
 builder_entities._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<SceneEntityDocument>>);
@@ -972,22 +1134,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::SceneAssetDocument::GetPrivateStaticClass()
+const Ailu::Type* Ailu::SceneAssetDocument::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_SceneAssetDocument_Type();
+	static const Ailu::Type* type = Z_Construct_SceneAssetDocument_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::SceneAssetDocument>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::SceneAssetDocument>()
 {
 return Ailu::SceneAssetDocument::StaticType();
 }
-    Type *Ailu::SceneAssetDocument::GetType()
+    const Type *Ailu::SceneAssetDocument::GetType()
 {
 return Ailu::SceneAssetDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_SceneAssetDocument(&Ailu::SceneAssetDocument::StaticType, "Ailu::SceneAssetDocument");
-Ailu::Type* Ailu::Z_Construct_AssetDocumentHeader_Type()
+const Ailu::Type* Ailu::Z_Construct_AssetDocumentHeader_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -1085,28 +1247,49 @@ builder_asset_name._meta = meta_asset_name;
 builder_asset_name._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<String>);
 builder_asset_name._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<String>);
 initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_asset_name));
+Meta meta_dependencies;
+meta_dependencies.Set("Category","");
+meta_dependencies.Set("IsColor",false);
+meta_dependencies.Set("IsRange",false);
+meta_dependencies.Set("IsFloatRange",true);
+meta_dependencies.Set("RangeMin",(f32)0);
+meta_dependencies.Set("RangeMax",(f32)1);
+MemberBuilder builder_dependencies;
+builder_dependencies._name = "_dependencies";
+builder_dependencies._type_name = "Vector<AssetDependency>";
+builder_dependencies._offset = offsetof(AssetDocumentHeader,_dependencies);
+builder_dependencies._is_const = false;
+builder_dependencies._is_static = false;
+builder_dependencies._is_public = false;
+builder_dependencies._is_pointer = false;
+builder_dependencies._is_ref = false;
+builder_dependencies._is_template = true;
+builder_dependencies._meta = meta_dependencies;
+builder_dependencies._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<AssetDependency>>);
+builder_dependencies._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<AssetDependency>>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_dependencies));
 cur_type = std::make_unique<Ailu::Type>(initializer);
 Ailu::Type::RegisterType(cur_type.get());
 }
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::AssetDocumentHeader::GetPrivateStaticClass()
+const Ailu::Type* Ailu::AssetDocumentHeader::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_AssetDocumentHeader_Type();
+	static const Ailu::Type* type = Z_Construct_AssetDocumentHeader_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::AssetDocumentHeader>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::AssetDocumentHeader>()
 {
 return Ailu::AssetDocumentHeader::StaticType();
 }
-    Type *Ailu::AssetDocumentHeader::GetType()
+    const Type *Ailu::AssetDocumentHeader::GetType()
 {
 return Ailu::AssetDocumentHeader::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_AssetDocumentHeader(&Ailu::AssetDocumentHeader::StaticType, "Ailu::AssetDocumentHeader");
-Ailu::Type* Ailu::Z_Construct_AssetNamedUIntProperty_Type()
+const Ailu::Type* Ailu::Z_Construct_AssetNamedUIntProperty_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -1168,22 +1351,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::AssetNamedUIntProperty::GetPrivateStaticClass()
+const Ailu::Type* Ailu::AssetNamedUIntProperty::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_AssetNamedUIntProperty_Type();
+	static const Ailu::Type* type = Z_Construct_AssetNamedUIntProperty_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::AssetNamedUIntProperty>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::AssetNamedUIntProperty>()
 {
 return Ailu::AssetNamedUIntProperty::StaticType();
 }
-    Type *Ailu::AssetNamedUIntProperty::GetType()
+    const Type *Ailu::AssetNamedUIntProperty::GetType()
 {
 return Ailu::AssetNamedUIntProperty::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_AssetNamedUIntProperty(&Ailu::AssetNamedUIntProperty::StaticType, "Ailu::AssetNamedUIntProperty");
-Ailu::Type* Ailu::Z_Construct_AssetNamedFloatProperty_Type()
+const Ailu::Type* Ailu::Z_Construct_AssetNamedFloatProperty_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -1245,22 +1428,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::AssetNamedFloatProperty::GetPrivateStaticClass()
+const Ailu::Type* Ailu::AssetNamedFloatProperty::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_AssetNamedFloatProperty_Type();
+	static const Ailu::Type* type = Z_Construct_AssetNamedFloatProperty_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::AssetNamedFloatProperty>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::AssetNamedFloatProperty>()
 {
 return Ailu::AssetNamedFloatProperty::StaticType();
 }
-    Type *Ailu::AssetNamedFloatProperty::GetType()
+    const Type *Ailu::AssetNamedFloatProperty::GetType()
 {
 return Ailu::AssetNamedFloatProperty::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_AssetNamedFloatProperty(&Ailu::AssetNamedFloatProperty::StaticType, "Ailu::AssetNamedFloatProperty");
-Ailu::Type* Ailu::Z_Construct_AssetNamedVectorProperty_Type()
+const Ailu::Type* Ailu::Z_Construct_AssetNamedVectorProperty_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -1322,22 +1505,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::AssetNamedVectorProperty::GetPrivateStaticClass()
+const Ailu::Type* Ailu::AssetNamedVectorProperty::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_AssetNamedVectorProperty_Type();
+	static const Ailu::Type* type = Z_Construct_AssetNamedVectorProperty_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::AssetNamedVectorProperty>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::AssetNamedVectorProperty>()
 {
 return Ailu::AssetNamedVectorProperty::StaticType();
 }
-    Type *Ailu::AssetNamedVectorProperty::GetType()
+    const Type *Ailu::AssetNamedVectorProperty::GetType()
 {
 return Ailu::AssetNamedVectorProperty::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_AssetNamedVectorProperty(&Ailu::AssetNamedVectorProperty::StaticType, "Ailu::AssetNamedVectorProperty");
-Ailu::Type* Ailu::Z_Construct_AssetNamedIntVectorProperty_Type()
+const Ailu::Type* Ailu::Z_Construct_AssetNamedIntVectorProperty_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -1399,22 +1582,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::AssetNamedIntVectorProperty::GetPrivateStaticClass()
+const Ailu::Type* Ailu::AssetNamedIntVectorProperty::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_AssetNamedIntVectorProperty_Type();
+	static const Ailu::Type* type = Z_Construct_AssetNamedIntVectorProperty_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::AssetNamedIntVectorProperty>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::AssetNamedIntVectorProperty>()
 {
 return Ailu::AssetNamedIntVectorProperty::StaticType();
 }
-    Type *Ailu::AssetNamedIntVectorProperty::GetType()
+    const Type *Ailu::AssetNamedIntVectorProperty::GetType()
 {
 return Ailu::AssetNamedIntVectorProperty::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_AssetNamedIntVectorProperty(&Ailu::AssetNamedIntVectorProperty::StaticType, "Ailu::AssetNamedIntVectorProperty");
-Ailu::Type* Ailu::Z_Construct_AssetTextureBinding_Type()
+const Ailu::Type* Ailu::Z_Construct_AssetTextureBinding_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -1476,22 +1659,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::AssetTextureBinding::GetPrivateStaticClass()
+const Ailu::Type* Ailu::AssetTextureBinding::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_AssetTextureBinding_Type();
+	static const Ailu::Type* type = Z_Construct_AssetTextureBinding_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::AssetTextureBinding>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::AssetTextureBinding>()
 {
 return Ailu::AssetTextureBinding::StaticType();
 }
-    Type *Ailu::AssetTextureBinding::GetType()
+    const Type *Ailu::AssetTextureBinding::GetType()
 {
 return Ailu::AssetTextureBinding::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_AssetTextureBinding(&Ailu::AssetTextureBinding::StaticType, "Ailu::AssetTextureBinding");
-Ailu::Type* Ailu::Z_Construct_AnimationClipFrameDocument_Type()
+const Ailu::Type* Ailu::Z_Construct_AnimationClipFrameDocument_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -1574,22 +1757,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::AnimationClipFrameDocument::GetPrivateStaticClass()
+const Ailu::Type* Ailu::AnimationClipFrameDocument::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_AnimationClipFrameDocument_Type();
+	static const Ailu::Type* type = Z_Construct_AnimationClipFrameDocument_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::AnimationClipFrameDocument>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::AnimationClipFrameDocument>()
 {
 return Ailu::AnimationClipFrameDocument::StaticType();
 }
-    Type *Ailu::AnimationClipFrameDocument::GetType()
+    const Type *Ailu::AnimationClipFrameDocument::GetType()
 {
 return Ailu::AnimationClipFrameDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_AnimationClipFrameDocument(&Ailu::AnimationClipFrameDocument::StaticType, "Ailu::AnimationClipFrameDocument");
-Ailu::Type* Ailu::Z_Construct_AnimationClipTrackDocument_Type()
+const Ailu::Type* Ailu::Z_Construct_AnimationClipTrackDocument_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -1640,7 +1823,7 @@ builder_frames._is_static = false;
 builder_frames._is_public = true;
 builder_frames._is_pointer = false;
 builder_frames._is_ref = false;
-builder_frames._is_template = false;
+builder_frames._is_template = true;
 builder_frames._meta = meta_frames;
 builder_frames._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<AnimationClipFrameDocument>>);
 builder_frames._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<AnimationClipFrameDocument>>);
@@ -1651,22 +1834,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::AnimationClipTrackDocument::GetPrivateStaticClass()
+const Ailu::Type* Ailu::AnimationClipTrackDocument::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_AnimationClipTrackDocument_Type();
+	static const Ailu::Type* type = Z_Construct_AnimationClipTrackDocument_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::AnimationClipTrackDocument>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::AnimationClipTrackDocument>()
 {
 return Ailu::AnimationClipTrackDocument::StaticType();
 }
-    Type *Ailu::AnimationClipTrackDocument::GetType()
+    const Type *Ailu::AnimationClipTrackDocument::GetType()
 {
 return Ailu::AnimationClipTrackDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_AnimationClipTrackDocument(&Ailu::AnimationClipTrackDocument::StaticType, "Ailu::AnimationClipTrackDocument");
-Ailu::Type* Ailu::Z_Construct_SceneTagComponentDocument_Type()
+const Ailu::Type* Ailu::Z_Construct_SceneTagComponentDocument_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -1728,22 +1911,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::SceneTagComponentDocument::GetPrivateStaticClass()
+const Ailu::Type* Ailu::SceneTagComponentDocument::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_SceneTagComponentDocument_Type();
+	static const Ailu::Type* type = Z_Construct_SceneTagComponentDocument_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::SceneTagComponentDocument>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::SceneTagComponentDocument>()
 {
 return Ailu::SceneTagComponentDocument::StaticType();
 }
-    Type *Ailu::SceneTagComponentDocument::GetType()
+    const Type *Ailu::SceneTagComponentDocument::GetType()
 {
 return Ailu::SceneTagComponentDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_SceneTagComponentDocument(&Ailu::SceneTagComponentDocument::StaticType, "Ailu::SceneTagComponentDocument");
-Ailu::Type* Ailu::Z_Construct_SceneTransformComponentDocument_Type()
+const Ailu::Type* Ailu::Z_Construct_SceneTransformComponentDocument_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -1826,22 +2009,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::SceneTransformComponentDocument::GetPrivateStaticClass()
+const Ailu::Type* Ailu::SceneTransformComponentDocument::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_SceneTransformComponentDocument_Type();
+	static const Ailu::Type* type = Z_Construct_SceneTransformComponentDocument_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::SceneTransformComponentDocument>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::SceneTransformComponentDocument>()
 {
 return Ailu::SceneTransformComponentDocument::StaticType();
 }
-    Type *Ailu::SceneTransformComponentDocument::GetType()
+    const Type *Ailu::SceneTransformComponentDocument::GetType()
 {
 return Ailu::SceneTransformComponentDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_SceneTransformComponentDocument(&Ailu::SceneTransformComponentDocument::StaticType, "Ailu::SceneTransformComponentDocument");
-Ailu::Type* Ailu::Z_Construct_SceneScriptComponentDocument_Type()
+const Ailu::Type* Ailu::Z_Construct_SceneScriptComponentDocument_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -1882,22 +2065,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::SceneScriptComponentDocument::GetPrivateStaticClass()
+const Ailu::Type* Ailu::SceneScriptComponentDocument::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_SceneScriptComponentDocument_Type();
+	static const Ailu::Type* type = Z_Construct_SceneScriptComponentDocument_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::SceneScriptComponentDocument>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::SceneScriptComponentDocument>()
 {
 return Ailu::SceneScriptComponentDocument::StaticType();
 }
-    Type *Ailu::SceneScriptComponentDocument::GetType()
+    const Type *Ailu::SceneScriptComponentDocument::GetType()
 {
 return Ailu::SceneScriptComponentDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_SceneScriptComponentDocument(&Ailu::SceneScriptComponentDocument::StaticType, "Ailu::SceneScriptComponentDocument");
-Ailu::Type* Ailu::Z_Construct_SceneStaticMeshComponentDocument_Type()
+const Ailu::Type* Ailu::Z_Construct_SceneStaticMeshComponentDocument_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -1948,7 +2131,7 @@ builder_material_guids._is_static = false;
 builder_material_guids._is_public = true;
 builder_material_guids._is_pointer = false;
 builder_material_guids._is_ref = false;
-builder_material_guids._is_template = false;
+builder_material_guids._is_template = true;
 builder_material_guids._meta = meta_material_guids;
 builder_material_guids._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<String>>);
 builder_material_guids._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<String>>);
@@ -1959,22 +2142,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::SceneStaticMeshComponentDocument::GetPrivateStaticClass()
+const Ailu::Type* Ailu::SceneStaticMeshComponentDocument::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_SceneStaticMeshComponentDocument_Type();
+	static const Ailu::Type* type = Z_Construct_SceneStaticMeshComponentDocument_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::SceneStaticMeshComponentDocument>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::SceneStaticMeshComponentDocument>()
 {
 return Ailu::SceneStaticMeshComponentDocument::StaticType();
 }
-    Type *Ailu::SceneStaticMeshComponentDocument::GetType()
+    const Type *Ailu::SceneStaticMeshComponentDocument::GetType()
 {
 return Ailu::SceneStaticMeshComponentDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_SceneStaticMeshComponentDocument(&Ailu::SceneStaticMeshComponentDocument::StaticType, "Ailu::SceneStaticMeshComponentDocument");
-Ailu::Type* Ailu::Z_Construct_SceneLightDataDocument_Type()
+const Ailu::Type* Ailu::Z_Construct_SceneLightDataDocument_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -2057,22 +2240,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::SceneLightDataDocument::GetPrivateStaticClass()
+const Ailu::Type* Ailu::SceneLightDataDocument::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_SceneLightDataDocument_Type();
+	static const Ailu::Type* type = Z_Construct_SceneLightDataDocument_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::SceneLightDataDocument>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::SceneLightDataDocument>()
 {
 return Ailu::SceneLightDataDocument::StaticType();
 }
-    Type *Ailu::SceneLightDataDocument::GetType()
+    const Type *Ailu::SceneLightDataDocument::GetType()
 {
 return Ailu::SceneLightDataDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_SceneLightDataDocument(&Ailu::SceneLightDataDocument::StaticType, "Ailu::SceneLightDataDocument");
-Ailu::Type* Ailu::Z_Construct_SceneShadowDataDocument_Type()
+const Ailu::Type* Ailu::Z_Construct_SceneShadowDataDocument_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -2155,22 +2338,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::SceneShadowDataDocument::GetPrivateStaticClass()
+const Ailu::Type* Ailu::SceneShadowDataDocument::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_SceneShadowDataDocument_Type();
+	static const Ailu::Type* type = Z_Construct_SceneShadowDataDocument_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::SceneShadowDataDocument>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::SceneShadowDataDocument>()
 {
 return Ailu::SceneShadowDataDocument::StaticType();
 }
-    Type *Ailu::SceneShadowDataDocument::GetType()
+    const Type *Ailu::SceneShadowDataDocument::GetType()
 {
 return Ailu::SceneShadowDataDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_SceneShadowDataDocument(&Ailu::SceneShadowDataDocument::StaticType, "Ailu::SceneShadowDataDocument");
-Ailu::Type* Ailu::Z_Construct_SceneLightComponentDocument_Type()
+const Ailu::Type* Ailu::Z_Construct_SceneLightComponentDocument_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -2253,22 +2436,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::SceneLightComponentDocument::GetPrivateStaticClass()
+const Ailu::Type* Ailu::SceneLightComponentDocument::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_SceneLightComponentDocument_Type();
+	static const Ailu::Type* type = Z_Construct_SceneLightComponentDocument_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::SceneLightComponentDocument>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::SceneLightComponentDocument>()
 {
 return Ailu::SceneLightComponentDocument::StaticType();
 }
-    Type *Ailu::SceneLightComponentDocument::GetType()
+    const Type *Ailu::SceneLightComponentDocument::GetType()
 {
 return Ailu::SceneLightComponentDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_SceneLightComponentDocument(&Ailu::SceneLightComponentDocument::StaticType, "Ailu::SceneLightComponentDocument");
-Ailu::Type* Ailu::Z_Construct_SceneHierarchyComponentDocument_Type()
+const Ailu::Type* Ailu::Z_Construct_SceneHierarchyComponentDocument_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -2414,22 +2597,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::SceneHierarchyComponentDocument::GetPrivateStaticClass()
+const Ailu::Type* Ailu::SceneHierarchyComponentDocument::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_SceneHierarchyComponentDocument_Type();
+	static const Ailu::Type* type = Z_Construct_SceneHierarchyComponentDocument_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::SceneHierarchyComponentDocument>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::SceneHierarchyComponentDocument>()
 {
 return Ailu::SceneHierarchyComponentDocument::StaticType();
 }
-    Type *Ailu::SceneHierarchyComponentDocument::GetType()
+    const Type *Ailu::SceneHierarchyComponentDocument::GetType()
 {
 return Ailu::SceneHierarchyComponentDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_SceneHierarchyComponentDocument(&Ailu::SceneHierarchyComponentDocument::StaticType, "Ailu::SceneHierarchyComponentDocument");
-Ailu::Type* Ailu::Z_Construct_SceneCameraComponentDocument_Type()
+const Ailu::Type* Ailu::Z_Construct_SceneCameraComponentDocument_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -2575,22 +2758,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::SceneCameraComponentDocument::GetPrivateStaticClass()
+const Ailu::Type* Ailu::SceneCameraComponentDocument::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_SceneCameraComponentDocument_Type();
+	static const Ailu::Type* type = Z_Construct_SceneCameraComponentDocument_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::SceneCameraComponentDocument>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::SceneCameraComponentDocument>()
 {
 return Ailu::SceneCameraComponentDocument::StaticType();
 }
-    Type *Ailu::SceneCameraComponentDocument::GetType()
+    const Type *Ailu::SceneCameraComponentDocument::GetType()
 {
 return Ailu::SceneCameraComponentDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_SceneCameraComponentDocument(&Ailu::SceneCameraComponentDocument::StaticType, "Ailu::SceneCameraComponentDocument");
-Ailu::Type* Ailu::Z_Construct_SceneLightProbeComponentDocument_Type()
+const Ailu::Type* Ailu::Z_Construct_SceneLightProbeComponentDocument_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -2652,22 +2835,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::SceneLightProbeComponentDocument::GetPrivateStaticClass()
+const Ailu::Type* Ailu::SceneLightProbeComponentDocument::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_SceneLightProbeComponentDocument_Type();
+	static const Ailu::Type* type = Z_Construct_SceneLightProbeComponentDocument_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::SceneLightProbeComponentDocument>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::SceneLightProbeComponentDocument>()
 {
 return Ailu::SceneLightProbeComponentDocument::StaticType();
 }
-    Type *Ailu::SceneLightProbeComponentDocument::GetType()
+    const Type *Ailu::SceneLightProbeComponentDocument::GetType()
 {
 return Ailu::SceneLightProbeComponentDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_SceneLightProbeComponentDocument(&Ailu::SceneLightProbeComponentDocument::StaticType, "Ailu::SceneLightProbeComponentDocument");
-Ailu::Type* Ailu::Z_Construct_SceneRigidBodyComponentDocument_Type()
+const Ailu::Type* Ailu::Z_Construct_SceneRigidBodyComponentDocument_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -2708,22 +2891,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::SceneRigidBodyComponentDocument::GetPrivateStaticClass()
+const Ailu::Type* Ailu::SceneRigidBodyComponentDocument::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_SceneRigidBodyComponentDocument_Type();
+	static const Ailu::Type* type = Z_Construct_SceneRigidBodyComponentDocument_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::SceneRigidBodyComponentDocument>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::SceneRigidBodyComponentDocument>()
 {
 return Ailu::SceneRigidBodyComponentDocument::StaticType();
 }
-    Type *Ailu::SceneRigidBodyComponentDocument::GetType()
+    const Type *Ailu::SceneRigidBodyComponentDocument::GetType()
 {
 return Ailu::SceneRigidBodyComponentDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_SceneRigidBodyComponentDocument(&Ailu::SceneRigidBodyComponentDocument::StaticType, "Ailu::SceneRigidBodyComponentDocument");
-Ailu::Type* Ailu::Z_Construct_SceneColliderComponentDocument_Type()
+const Ailu::Type* Ailu::Z_Construct_SceneColliderComponentDocument_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -2827,22 +3010,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::SceneColliderComponentDocument::GetPrivateStaticClass()
+const Ailu::Type* Ailu::SceneColliderComponentDocument::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_SceneColliderComponentDocument_Type();
+	static const Ailu::Type* type = Z_Construct_SceneColliderComponentDocument_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::SceneColliderComponentDocument>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::SceneColliderComponentDocument>()
 {
 return Ailu::SceneColliderComponentDocument::StaticType();
 }
-    Type *Ailu::SceneColliderComponentDocument::GetType()
+    const Type *Ailu::SceneColliderComponentDocument::GetType()
 {
 return Ailu::SceneColliderComponentDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_SceneColliderComponentDocument(&Ailu::SceneColliderComponentDocument::StaticType, "Ailu::SceneColliderComponentDocument");
-Ailu::Type* Ailu::Z_Construct_SceneSkeletonMeshComponentDocument_Type()
+const Ailu::Type* Ailu::Z_Construct_SceneSkeletonMeshComponentDocument_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -2893,7 +3076,7 @@ builder_material_guids._is_static = false;
 builder_material_guids._is_public = true;
 builder_material_guids._is_pointer = false;
 builder_material_guids._is_ref = false;
-builder_material_guids._is_template = false;
+builder_material_guids._is_template = true;
 builder_material_guids._meta = meta_material_guids;
 builder_material_guids._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<String>>);
 builder_material_guids._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<String>>);
@@ -2925,22 +3108,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::SceneSkeletonMeshComponentDocument::GetPrivateStaticClass()
+const Ailu::Type* Ailu::SceneSkeletonMeshComponentDocument::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_SceneSkeletonMeshComponentDocument_Type();
+	static const Ailu::Type* type = Z_Construct_SceneSkeletonMeshComponentDocument_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::SceneSkeletonMeshComponentDocument>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::SceneSkeletonMeshComponentDocument>()
 {
 return Ailu::SceneSkeletonMeshComponentDocument::StaticType();
 }
-    Type *Ailu::SceneSkeletonMeshComponentDocument::GetType()
+    const Type *Ailu::SceneSkeletonMeshComponentDocument::GetType()
 {
 return Ailu::SceneSkeletonMeshComponentDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_SceneSkeletonMeshComponentDocument(&Ailu::SceneSkeletonMeshComponentDocument::StaticType, "Ailu::SceneSkeletonMeshComponentDocument");
-Ailu::Type* Ailu::Z_Construct_SceneVXGIComponentDocument_Type()
+const Ailu::Type* Ailu::Z_Construct_SceneVXGIComponentDocument_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -3002,22 +3185,246 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::SceneVXGIComponentDocument::GetPrivateStaticClass()
+const Ailu::Type* Ailu::SceneVXGIComponentDocument::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_SceneVXGIComponentDocument_Type();
+	static const Ailu::Type* type = Z_Construct_SceneVXGIComponentDocument_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::SceneVXGIComponentDocument>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::SceneVXGIComponentDocument>()
 {
 return Ailu::SceneVXGIComponentDocument::StaticType();
 }
-    Type *Ailu::SceneVXGIComponentDocument::GetType()
+    const Type *Ailu::SceneVXGIComponentDocument::GetType()
 {
 return Ailu::SceneVXGIComponentDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_SceneVXGIComponentDocument(&Ailu::SceneVXGIComponentDocument::StaticType, "Ailu::SceneVXGIComponentDocument");
-Ailu::Type* Ailu::Z_Construct_SceneEntityDocument_Type()
+const Ailu::Type* Ailu::Z_Construct_SceneSpriteRendererComponentDocument_Type()
+{
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "SceneSpriteRendererComponentDocument";
+initializer._size = sizeof(Ailu::SceneSpriteRendererComponentDocument);
+initializer._full_name = "Ailu::SceneSpriteRendererComponentDocument";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu";
+initializer._base_name = "";
+initializer._constructor = []()->Ailu::SceneSpriteRendererComponentDocument* {return new Ailu::SceneSpriteRendererComponentDocument;};
+Meta meta_sprite_guid;
+meta_sprite_guid.Set("Category","");
+meta_sprite_guid.Set("IsColor",false);
+meta_sprite_guid.Set("IsRange",false);
+meta_sprite_guid.Set("IsFloatRange",true);
+meta_sprite_guid.Set("RangeMin",(f32)0);
+meta_sprite_guid.Set("RangeMax",(f32)1);
+MemberBuilder builder_sprite_guid;
+builder_sprite_guid._name = "_sprite_guid";
+builder_sprite_guid._type_name = "String";
+builder_sprite_guid._offset = offsetof(SceneSpriteRendererComponentDocument,_sprite_guid);
+builder_sprite_guid._is_const = false;
+builder_sprite_guid._is_static = false;
+builder_sprite_guid._is_public = true;
+builder_sprite_guid._is_pointer = false;
+builder_sprite_guid._is_ref = false;
+builder_sprite_guid._is_template = false;
+builder_sprite_guid._meta = meta_sprite_guid;
+builder_sprite_guid._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<String>);
+builder_sprite_guid._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<String>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_sprite_guid));
+Meta meta_material_guid;
+meta_material_guid.Set("Category","");
+meta_material_guid.Set("IsColor",false);
+meta_material_guid.Set("IsRange",false);
+meta_material_guid.Set("IsFloatRange",true);
+meta_material_guid.Set("RangeMin",(f32)0);
+meta_material_guid.Set("RangeMax",(f32)1);
+MemberBuilder builder_material_guid;
+builder_material_guid._name = "_material_guid";
+builder_material_guid._type_name = "String";
+builder_material_guid._offset = offsetof(SceneSpriteRendererComponentDocument,_material_guid);
+builder_material_guid._is_const = false;
+builder_material_guid._is_static = false;
+builder_material_guid._is_public = true;
+builder_material_guid._is_pointer = false;
+builder_material_guid._is_ref = false;
+builder_material_guid._is_template = false;
+builder_material_guid._meta = meta_material_guid;
+builder_material_guid._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<String>);
+builder_material_guid._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<String>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_material_guid));
+Meta meta_color;
+meta_color.Set("Category","");
+meta_color.Set("IsColor",false);
+meta_color.Set("IsRange",false);
+meta_color.Set("IsFloatRange",true);
+meta_color.Set("RangeMin",(f32)0);
+meta_color.Set("RangeMax",(f32)1);
+MemberBuilder builder_color;
+builder_color._name = "_color";
+builder_color._type_name = "Vector4f";
+builder_color._offset = offsetof(SceneSpriteRendererComponentDocument,_color);
+builder_color._is_const = false;
+builder_color._is_static = false;
+builder_color._is_public = true;
+builder_color._is_pointer = false;
+builder_color._is_ref = false;
+builder_color._is_template = false;
+builder_color._meta = meta_color;
+builder_color._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector4f>);
+builder_color._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector4f>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_color));
+Meta meta_sorting_layer;
+meta_sorting_layer.Set("Category","");
+meta_sorting_layer.Set("IsColor",false);
+meta_sorting_layer.Set("IsRange",false);
+meta_sorting_layer.Set("IsFloatRange",true);
+meta_sorting_layer.Set("RangeMin",(f32)0);
+meta_sorting_layer.Set("RangeMax",(f32)1);
+MemberBuilder builder_sorting_layer;
+builder_sorting_layer._name = "_sorting_layer";
+builder_sorting_layer._type_name = "i32";
+builder_sorting_layer._offset = offsetof(SceneSpriteRendererComponentDocument,_sorting_layer);
+builder_sorting_layer._is_const = false;
+builder_sorting_layer._is_static = false;
+builder_sorting_layer._is_public = true;
+builder_sorting_layer._is_pointer = false;
+builder_sorting_layer._is_ref = false;
+builder_sorting_layer._is_template = false;
+builder_sorting_layer._meta = meta_sorting_layer;
+builder_sorting_layer._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<i32>);
+builder_sorting_layer._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<i32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_sorting_layer));
+Meta meta_order_in_layer;
+meta_order_in_layer.Set("Category","");
+meta_order_in_layer.Set("IsColor",false);
+meta_order_in_layer.Set("IsRange",false);
+meta_order_in_layer.Set("IsFloatRange",true);
+meta_order_in_layer.Set("RangeMin",(f32)0);
+meta_order_in_layer.Set("RangeMax",(f32)1);
+MemberBuilder builder_order_in_layer;
+builder_order_in_layer._name = "_order_in_layer";
+builder_order_in_layer._type_name = "i32";
+builder_order_in_layer._offset = offsetof(SceneSpriteRendererComponentDocument,_order_in_layer);
+builder_order_in_layer._is_const = false;
+builder_order_in_layer._is_static = false;
+builder_order_in_layer._is_public = true;
+builder_order_in_layer._is_pointer = false;
+builder_order_in_layer._is_ref = false;
+builder_order_in_layer._is_template = false;
+builder_order_in_layer._meta = meta_order_in_layer;
+builder_order_in_layer._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<i32>);
+builder_order_in_layer._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<i32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_order_in_layer));
+Meta meta_blend_mode;
+meta_blend_mode.Set("Category","");
+meta_blend_mode.Set("IsColor",false);
+meta_blend_mode.Set("IsRange",false);
+meta_blend_mode.Set("IsFloatRange",true);
+meta_blend_mode.Set("RangeMin",(f32)0);
+meta_blend_mode.Set("RangeMax",(f32)1);
+MemberBuilder builder_blend_mode;
+builder_blend_mode._name = "_blend_mode";
+builder_blend_mode._type_name = "i32";
+builder_blend_mode._offset = offsetof(SceneSpriteRendererComponentDocument,_blend_mode);
+builder_blend_mode._is_const = false;
+builder_blend_mode._is_static = false;
+builder_blend_mode._is_public = true;
+builder_blend_mode._is_pointer = false;
+builder_blend_mode._is_ref = false;
+builder_blend_mode._is_template = false;
+builder_blend_mode._meta = meta_blend_mode;
+builder_blend_mode._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<i32>);
+builder_blend_mode._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<i32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_blend_mode));
+Meta meta_flip_x;
+meta_flip_x.Set("Category","");
+meta_flip_x.Set("IsColor",false);
+meta_flip_x.Set("IsRange",false);
+meta_flip_x.Set("IsFloatRange",true);
+meta_flip_x.Set("RangeMin",(f32)0);
+meta_flip_x.Set("RangeMax",(f32)1);
+MemberBuilder builder_flip_x;
+builder_flip_x._name = "_flip_x";
+builder_flip_x._type_name = "bool";
+builder_flip_x._offset = offsetof(SceneSpriteRendererComponentDocument,_flip_x);
+builder_flip_x._is_const = false;
+builder_flip_x._is_static = false;
+builder_flip_x._is_public = true;
+builder_flip_x._is_pointer = false;
+builder_flip_x._is_ref = false;
+builder_flip_x._is_template = false;
+builder_flip_x._meta = meta_flip_x;
+builder_flip_x._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_flip_x._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_flip_x));
+Meta meta_flip_y;
+meta_flip_y.Set("Category","");
+meta_flip_y.Set("IsColor",false);
+meta_flip_y.Set("IsRange",false);
+meta_flip_y.Set("IsFloatRange",true);
+meta_flip_y.Set("RangeMin",(f32)0);
+meta_flip_y.Set("RangeMax",(f32)1);
+MemberBuilder builder_flip_y;
+builder_flip_y._name = "_flip_y";
+builder_flip_y._type_name = "bool";
+builder_flip_y._offset = offsetof(SceneSpriteRendererComponentDocument,_flip_y);
+builder_flip_y._is_const = false;
+builder_flip_y._is_static = false;
+builder_flip_y._is_public = true;
+builder_flip_y._is_pointer = false;
+builder_flip_y._is_ref = false;
+builder_flip_y._is_template = false;
+builder_flip_y._meta = meta_flip_y;
+builder_flip_y._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_flip_y._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_flip_y));
+Meta meta_visible;
+meta_visible.Set("Category","");
+meta_visible.Set("IsColor",false);
+meta_visible.Set("IsRange",false);
+meta_visible.Set("IsFloatRange",true);
+meta_visible.Set("RangeMin",(f32)0);
+meta_visible.Set("RangeMax",(f32)1);
+MemberBuilder builder_visible;
+builder_visible._name = "_visible";
+builder_visible._type_name = "bool";
+builder_visible._offset = offsetof(SceneSpriteRendererComponentDocument,_visible);
+builder_visible._is_const = false;
+builder_visible._is_static = false;
+builder_visible._is_public = true;
+builder_visible._is_pointer = false;
+builder_visible._is_ref = false;
+builder_visible._is_template = false;
+builder_visible._meta = meta_visible;
+builder_visible._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_visible._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_visible));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+const Ailu::Type* Ailu::SceneSpriteRendererComponentDocument::GetPrivateStaticClass()
+{
+	static const Ailu::Type* type = Z_Construct_SceneSpriteRendererComponentDocument_Type();
+	return type;
+}
+
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::SceneSpriteRendererComponentDocument>()
+{
+return Ailu::SceneSpriteRendererComponentDocument::StaticType();
+}
+    const Type *Ailu::SceneSpriteRendererComponentDocument::GetType()
+{
+return Ailu::SceneSpriteRendererComponentDocument::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_SceneSpriteRendererComponentDocument(&Ailu::SceneSpriteRendererComponentDocument::StaticType, "Ailu::SceneSpriteRendererComponentDocument");
+const Ailu::Type* Ailu::Z_Construct_SceneEntityDocument_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -3535,23 +3942,65 @@ builder_vxgi_component._meta = meta_vxgi_component;
 builder_vxgi_component._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<SceneVXGIComponentDocument>);
 builder_vxgi_component._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<SceneVXGIComponentDocument>);
 initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_vxgi_component));
+Meta meta_has_sprite_renderer_component;
+meta_has_sprite_renderer_component.Set("Category","");
+meta_has_sprite_renderer_component.Set("IsColor",false);
+meta_has_sprite_renderer_component.Set("IsRange",false);
+meta_has_sprite_renderer_component.Set("IsFloatRange",true);
+meta_has_sprite_renderer_component.Set("RangeMin",(f32)0);
+meta_has_sprite_renderer_component.Set("RangeMax",(f32)1);
+MemberBuilder builder_has_sprite_renderer_component;
+builder_has_sprite_renderer_component._name = "_has_sprite_renderer_component";
+builder_has_sprite_renderer_component._type_name = "bool";
+builder_has_sprite_renderer_component._offset = offsetof(SceneEntityDocument,_has_sprite_renderer_component);
+builder_has_sprite_renderer_component._is_const = false;
+builder_has_sprite_renderer_component._is_static = false;
+builder_has_sprite_renderer_component._is_public = true;
+builder_has_sprite_renderer_component._is_pointer = false;
+builder_has_sprite_renderer_component._is_ref = false;
+builder_has_sprite_renderer_component._is_template = false;
+builder_has_sprite_renderer_component._meta = meta_has_sprite_renderer_component;
+builder_has_sprite_renderer_component._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_has_sprite_renderer_component._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_has_sprite_renderer_component));
+Meta meta_sprite_renderer_component;
+meta_sprite_renderer_component.Set("Category","");
+meta_sprite_renderer_component.Set("IsColor",false);
+meta_sprite_renderer_component.Set("IsRange",false);
+meta_sprite_renderer_component.Set("IsFloatRange",true);
+meta_sprite_renderer_component.Set("RangeMin",(f32)0);
+meta_sprite_renderer_component.Set("RangeMax",(f32)1);
+MemberBuilder builder_sprite_renderer_component;
+builder_sprite_renderer_component._name = "_sprite_renderer_component";
+builder_sprite_renderer_component._type_name = "Ailu::SceneSpriteRendererComponentDocument";
+builder_sprite_renderer_component._offset = offsetof(SceneEntityDocument,_sprite_renderer_component);
+builder_sprite_renderer_component._is_const = false;
+builder_sprite_renderer_component._is_static = false;
+builder_sprite_renderer_component._is_public = true;
+builder_sprite_renderer_component._is_pointer = false;
+builder_sprite_renderer_component._is_ref = false;
+builder_sprite_renderer_component._is_template = false;
+builder_sprite_renderer_component._meta = meta_sprite_renderer_component;
+builder_sprite_renderer_component._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<SceneSpriteRendererComponentDocument>);
+builder_sprite_renderer_component._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<SceneSpriteRendererComponentDocument>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_sprite_renderer_component));
 cur_type = std::make_unique<Ailu::Type>(initializer);
 Ailu::Type::RegisterType(cur_type.get());
 }
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::SceneEntityDocument::GetPrivateStaticClass()
+const Ailu::Type* Ailu::SceneEntityDocument::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_SceneEntityDocument_Type();
+	static const Ailu::Type* type = Z_Construct_SceneEntityDocument_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::SceneEntityDocument>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::SceneEntityDocument>()
 {
 return Ailu::SceneEntityDocument::StaticType();
 }
-    Type *Ailu::SceneEntityDocument::GetType()
+    const Type *Ailu::SceneEntityDocument::GetType()
 {
 return Ailu::SceneEntityDocument::GetPrivateStaticClass();
 }

@@ -6,7 +6,7 @@
 #include <Objects/SerializeSpecializations.h>
 #include <Framework/Common/Log.h>
 using namespace Ailu;
-Ailu::Type* Ailu::UI::Z_Construct_ColorPicker_Type()
+const Ailu::Type* Ailu::UI::Z_Construct_ColorPicker_Type()
 {
 Ailu::UI::UIElement::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -90,17 +90,17 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::UI::ColorPicker::GetPrivateStaticClass()
+const Ailu::Type* Ailu::UI::ColorPicker::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_ColorPicker_Type();
+	static const Ailu::Type* type = Z_Construct_ColorPicker_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::ColorPicker>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::ColorPicker>()
 {
 return Ailu::UI::ColorPicker::StaticType();
 }
-    Type *Ailu::UI::ColorPicker::GetType()
+    const Type *Ailu::UI::ColorPicker::GetType()
 {
 return Ailu::UI::ColorPicker::GetPrivateStaticClass();
 }

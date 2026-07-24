@@ -65,9 +65,21 @@ if (AILU_ENABLE_TRACY)
 endif()
 set_target_properties (Editor PROPERTIES OUTPUT_NAME "Editor")
 # 编译器参数
-if (MSVC)
-    target_compile_options(Editor PUBLIC /MP /wd4819)
+
+if(MSVC)
+    target_compile_options(Editor PRIVATE
+        /MP
+        /wd4819
+        /utf-8
+        $<$<CONFIG:RelWithDebInfo>:/O1>
+        $<$<CONFIG:RelWithDebInfo>:/Ob1>
+        $<$<CONFIG:RelWithDebInfo>:/Zi>
+        $<$<CONFIG:RelWithDebInfo>:/Zo>)
+
+    target_link_options(Editor PRIVATE
+        $<$<CONFIG:RelWithDebInfo>:/DEBUG:FULL>)
 endif()
+
 # 链接库
 # 设置不同配置的库路径
 #target_link_directories(Editor PRIVATE

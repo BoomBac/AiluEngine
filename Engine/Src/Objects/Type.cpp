@@ -93,8 +93,6 @@ namespace Ailu
             if (obs._instance && obs._instance == instance)
                 obs._callback(instance);
         }
-        if (auto obj = dynamic_cast<Object*>(static_cast<Object*>(instance));obj != nullptr)
-            obj->OnPropertyChanged(*this);
     }
 
     void PropertyInfo::NotifyObject(Object *obj, EPropertyChangeSource source) const
@@ -119,8 +117,10 @@ namespace Ailu
         _deserialize_fn(reinterpret_cast<u8 *>(instance) + _offset, ar, &name);
     }
 
-    const Type *Ailu::PropertyInfo::GetType()
+    const Type *Ailu::PropertyInfo::GetType() const
     {
+        if ((_flags & EMemberFlags::kTemplate) || _type_name.find('<') != String::npos)
+            return nullptr;
         if (_type == nullptr)
             _type = Type::Find(_type_name);
         return _type;
@@ -172,7 +172,7 @@ namespace Ailu
         }
     }
 
-    Type *Type::Find(const String &name)
+    const Type *Type::Find(const String &name)
     {
         auto it = s_global_types.find(name);
         if (it == s_global_types.end())
@@ -180,7 +180,7 @@ namespace Ailu
             LOG_WARNING("Type::Find: Type not found: {},try register it...", name);
             if (auto itt = s_global_register.find(name); itt != s_global_register.end())
             {
-                s_global_types[name] = s_global_register[name]();
+                s_global_types[name] = const_cast<Type*>(s_global_register[name]());
                 s_global_register.erase(name);
             }
             else
@@ -224,7 +224,7 @@ namespace Ailu
     {
         return _namespace;
     }
-    Vector<PropertyInfo> &Type::GetProperties()
+    const Vector<PropertyInfo> &Type::GetProperties() const
     {
         return _properties;
     }

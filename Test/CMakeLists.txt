@@ -75,8 +75,13 @@ function(ailu_configure_test_target target_name)
 
     target_link_libraries(${target_name} PRIVATE ${AILU_FBXSDK_LINK_LIB})
 endfunction()
-
 add_executable(Test "Test.cpp" "Test.h")
+if(MSVC)
+    target_compile_options(Test PRIVATE
+        /fsanitize=address
+        /Zi
+    )
+endif()
 set_target_properties(Test PROPERTIES OUTPUT_NAME "Test")
 ailu_configure_test_target(Test)
 

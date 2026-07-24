@@ -7,17 +7,17 @@
 //Class TemporalAA begin...........................
 #define TEMPORALAA_GEN_H_104_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_TemporalAA_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_TemporalAA_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual AILU_API Type  *GetType() override;
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const AILU_API Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::Render{
 class TemporalAA ;
 }
 template<>
-AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::Render::TemporalAA>();
+AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::TemporalAA>();
 //Class TemporalAA end...........................
 
 #undef CURRENT_FILE_ID

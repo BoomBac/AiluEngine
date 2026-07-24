@@ -7,17 +7,17 @@
 //Class DockWindow begin...........................
 #define DOCKWINDOW_GEN_H_60_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_DockWindow_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_DockWindow_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual Type  *GetType() override;
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::Editor{
 class DockWindow ;
 }
 template<>
-class Ailu::Type* Ailu::StaticClass<class Ailu::Editor::DockWindow>();
+const class Ailu::Type* Ailu::StaticClass<class Ailu::Editor::DockWindow>();
 //Class DockWindow end...........................
 
 #undef CURRENT_FILE_ID

@@ -7,49 +7,49 @@
 //Class RenderView begin...........................
 #define RENDERVIEW_GEN_H_27_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_RenderView_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_RenderView_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual Type  *GetType() override;
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::Editor{
 class RenderView ;
 }
 template<>
-class Ailu::Type* Ailu::StaticClass<class Ailu::Editor::RenderView>();
+const class Ailu::Type* Ailu::StaticClass<class Ailu::Editor::RenderView>();
 //Class RenderView end...........................
 
 //Class SceneView begin...........................
 #define RENDERVIEW_GEN_H_41_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_SceneView_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_SceneView_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual Type  *GetType() override;
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::Editor{
 class SceneView ;
 }
 template<>
-class Ailu::Type* Ailu::StaticClass<class Ailu::Editor::SceneView>();
+const class Ailu::Type* Ailu::StaticClass<class Ailu::Editor::SceneView>();
 //Class SceneView end...........................
 
 //Class Texture3DView begin...........................
 #define RENDERVIEW_GEN_H_63_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_Texture3DView_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_Texture3DView_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual Type  *GetType() override;
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::Editor{
 class Texture3DView ;
 }
 template<>
-class Ailu::Type* Ailu::StaticClass<class Ailu::Editor::Texture3DView>();
+const class Ailu::Type* Ailu::StaticClass<class Ailu::Editor::Texture3DView>();
 //Class Texture3DView end...........................
 
 #undef CURRENT_FILE_ID

@@ -139,7 +139,7 @@ namespace Ailu::Render
             //    Application::Get().NotifyRender();
             //    Application::Get().WaitForRender();
             //}
-            PROFILE_BLOCK_CPU(UIRender)
+            PROFILE_BLOCK_CPU("UIRender")
             auto cmd = CommandBufferPool::Get("UI");
             //强制clear一下，backbuffer load action默认为是dont care
             //RenderTexture *backbuffer = RenderTexture::WindowBackBuffer(Application::s_focus_window? Application::s_focus_window : &Application::Get().GetWindow());
@@ -195,7 +195,7 @@ namespace Ailu::Render
     }
     void RenderPipeline::UpdateRenderObject(u32 start, u32 end)
     {
-        PROFILE_BLOCK_CPU(UpdateRenderObject)
+        PROFILE_BLOCK_CPU("UpdateRenderObject")
         const auto &r = SceneMgr::Get().ActiveScene()->GetRegister();
         for (u32 i = start; i < end; i++)
         {
@@ -304,7 +304,7 @@ namespace Ailu::Render
     }
     void RenderPipeline::CullView(ViewEntity &view_entity)
     {
-        CPUProfileBlock  block(std::format("CullView_{}",view_entity._cam_hash));
+        PROFILE_BLOCK_CPU(std::format("CullView_{}",view_entity._cam_hash))
         const auto &cam_vf = view_entity._frustum;
         for (auto &vis_obj: _visiblity_objs)
         {

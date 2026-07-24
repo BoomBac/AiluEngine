@@ -6,7 +6,7 @@
 #include <Objects/SerializeSpecializations.h>
 #include <Framework/Common/Log.h>
 using namespace Ailu;
-Ailu::Type* Ailu::UI::Z_Construct_UIControlVisual_Type()
+const Ailu::Type* Ailu::UI::Z_Construct_UIControlVisual_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -131,22 +131,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::UI::UIControlVisual::GetPrivateStaticClass()
+const Ailu::Type* Ailu::UI::UIControlVisual::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_UIControlVisual_Type();
+	static const Ailu::Type* type = Z_Construct_UIControlVisual_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::UIControlVisual>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::UIControlVisual>()
 {
 return Ailu::UI::UIControlVisual::StaticType();
 }
-    Type *Ailu::UI::UIControlVisual::GetType()
+    const Type *Ailu::UI::UIControlVisual::GetType()
 {
 return Ailu::UI::UIControlVisual::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_UIControlVisual(&Ailu::UI::UIControlVisual::StaticType, "Ailu::UI::UIControlVisual");
-Ailu::Type* Ailu::UI::Z_Construct_UIControlVisualOverride_Type()
+const Ailu::Type* Ailu::UI::Z_Construct_UIControlVisualOverride_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -376,22 +376,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::UI::UIControlVisualOverride::GetPrivateStaticClass()
+const Ailu::Type* Ailu::UI::UIControlVisualOverride::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_UIControlVisualOverride_Type();
+	static const Ailu::Type* type = Z_Construct_UIControlVisualOverride_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::UIControlVisualOverride>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::UIControlVisualOverride>()
 {
 return Ailu::UI::UIControlVisualOverride::StaticType();
 }
-    Type *Ailu::UI::UIControlVisualOverride::GetType()
+    const Type *Ailu::UI::UIControlVisualOverride::GetType()
 {
 return Ailu::UI::UIControlVisualOverride::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_UIControlVisualOverride(&Ailu::UI::UIControlVisualOverride::StaticType, "Ailu::UI::UIControlVisualOverride");
-Ailu::Type* Ailu::UI::Z_Construct_UIButtonStyle_Type()
+const Ailu::Type* Ailu::UI::Z_Construct_UIButtonStyle_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -579,22 +579,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::UI::UIButtonStyle::GetPrivateStaticClass()
+const Ailu::Type* Ailu::UI::UIButtonStyle::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_UIButtonStyle_Type();
+	static const Ailu::Type* type = Z_Construct_UIButtonStyle_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::UIButtonStyle>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::UIButtonStyle>()
 {
 return Ailu::UI::UIButtonStyle::StaticType();
 }
-    Type *Ailu::UI::UIButtonStyle::GetType()
+    const Type *Ailu::UI::UIButtonStyle::GetType()
 {
 return Ailu::UI::UIButtonStyle::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_UIButtonStyle(&Ailu::UI::UIButtonStyle::StaticType, "Ailu::UI::UIButtonStyle");
-Ailu::Type* Ailu::UI::Z_Construct_UIButtonStyleOverride_Type()
+const Ailu::Type* Ailu::UI::Z_Construct_UIButtonStyleOverride_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -803,22 +803,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::UI::UIButtonStyleOverride::GetPrivateStaticClass()
+const Ailu::Type* Ailu::UI::UIButtonStyleOverride::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_UIButtonStyleOverride_Type();
+	static const Ailu::Type* type = Z_Construct_UIButtonStyleOverride_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::UIButtonStyleOverride>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::UIButtonStyleOverride>()
 {
 return Ailu::UI::UIButtonStyleOverride::StaticType();
 }
-    Type *Ailu::UI::UIButtonStyleOverride::GetType()
+    const Type *Ailu::UI::UIButtonStyleOverride::GetType()
 {
 return Ailu::UI::UIButtonStyleOverride::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_UIButtonStyleOverride(&Ailu::UI::UIButtonStyleOverride::StaticType, "Ailu::UI::UIButtonStyleOverride");
-Ailu::Type* Ailu::UI::Z_Construct_UISliderStyle_Type()
+const Ailu::Type* Ailu::UI::Z_Construct_UISliderStyle_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -1195,22 +1195,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::UI::UISliderStyle::GetPrivateStaticClass()
+const Ailu::Type* Ailu::UI::UISliderStyle::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_UISliderStyle_Type();
+	static const Ailu::Type* type = Z_Construct_UISliderStyle_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::UISliderStyle>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::UISliderStyle>()
 {
 return Ailu::UI::UISliderStyle::StaticType();
 }
-    Type *Ailu::UI::UISliderStyle::GetType()
+    const Type *Ailu::UI::UISliderStyle::GetType()
 {
 return Ailu::UI::UISliderStyle::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_UISliderStyle(&Ailu::UI::UISliderStyle::StaticType, "Ailu::UI::UISliderStyle");
-Ailu::Type* Ailu::UI::Z_Construct_UISliderStyleOverride_Type()
+const Ailu::Type* Ailu::UI::Z_Construct_UISliderStyleOverride_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -1608,22 +1608,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::UI::UISliderStyleOverride::GetPrivateStaticClass()
+const Ailu::Type* Ailu::UI::UISliderStyleOverride::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_UISliderStyleOverride_Type();
+	static const Ailu::Type* type = Z_Construct_UISliderStyleOverride_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::UISliderStyleOverride>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::UISliderStyleOverride>()
 {
 return Ailu::UI::UISliderStyleOverride::StaticType();
 }
-    Type *Ailu::UI::UISliderStyleOverride::GetType()
+    const Type *Ailu::UI::UISliderStyleOverride::GetType()
 {
 return Ailu::UI::UISliderStyleOverride::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_UISliderStyleOverride(&Ailu::UI::UISliderStyleOverride::StaticType, "Ailu::UI::UISliderStyleOverride");
-Ailu::Type* Ailu::UI::Z_Construct_UICheckBoxStyle_Type()
+const Ailu::Type* Ailu::UI::Z_Construct_UICheckBoxStyle_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -2021,22 +2021,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::UI::UICheckBoxStyle::GetPrivateStaticClass()
+const Ailu::Type* Ailu::UI::UICheckBoxStyle::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_UICheckBoxStyle_Type();
+	static const Ailu::Type* type = Z_Construct_UICheckBoxStyle_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::UICheckBoxStyle>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::UICheckBoxStyle>()
 {
 return Ailu::UI::UICheckBoxStyle::StaticType();
 }
-    Type *Ailu::UI::UICheckBoxStyle::GetType()
+    const Type *Ailu::UI::UICheckBoxStyle::GetType()
 {
 return Ailu::UI::UICheckBoxStyle::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_UICheckBoxStyle(&Ailu::UI::UICheckBoxStyle::StaticType, "Ailu::UI::UICheckBoxStyle");
-Ailu::Type* Ailu::UI::Z_Construct_UICheckBoxStyleOverride_Type()
+const Ailu::Type* Ailu::UI::Z_Construct_UICheckBoxStyleOverride_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -2455,22 +2455,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::UI::UICheckBoxStyleOverride::GetPrivateStaticClass()
+const Ailu::Type* Ailu::UI::UICheckBoxStyleOverride::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_UICheckBoxStyleOverride_Type();
+	static const Ailu::Type* type = Z_Construct_UICheckBoxStyleOverride_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::UICheckBoxStyleOverride>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::UICheckBoxStyleOverride>()
 {
 return Ailu::UI::UICheckBoxStyleOverride::StaticType();
 }
-    Type *Ailu::UI::UICheckBoxStyleOverride::GetType()
+    const Type *Ailu::UI::UICheckBoxStyleOverride::GetType()
 {
 return Ailu::UI::UICheckBoxStyleOverride::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_UICheckBoxStyleOverride(&Ailu::UI::UICheckBoxStyleOverride::StaticType, "Ailu::UI::UICheckBoxStyleOverride");
-Ailu::Type* Ailu::UI::Z_Construct_UIInputStyle_Type()
+const Ailu::Type* Ailu::UI::Z_Construct_UIInputStyle_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -2784,22 +2784,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::UI::UIInputStyle::GetPrivateStaticClass()
+const Ailu::Type* Ailu::UI::UIInputStyle::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_UIInputStyle_Type();
+	static const Ailu::Type* type = Z_Construct_UIInputStyle_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::UIInputStyle>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::UIInputStyle>()
 {
 return Ailu::UI::UIInputStyle::StaticType();
 }
-    Type *Ailu::UI::UIInputStyle::GetType()
+    const Type *Ailu::UI::UIInputStyle::GetType()
 {
 return Ailu::UI::UIInputStyle::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_UIInputStyle(&Ailu::UI::UIInputStyle::StaticType, "Ailu::UI::UIInputStyle");
-Ailu::Type* Ailu::UI::Z_Construct_UIInputStyleOverride_Type()
+const Ailu::Type* Ailu::UI::Z_Construct_UIInputStyleOverride_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -3134,22 +3134,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::UI::UIInputStyleOverride::GetPrivateStaticClass()
+const Ailu::Type* Ailu::UI::UIInputStyleOverride::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_UIInputStyleOverride_Type();
+	static const Ailu::Type* type = Z_Construct_UIInputStyleOverride_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::UIInputStyleOverride>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::UIInputStyleOverride>()
 {
 return Ailu::UI::UIInputStyleOverride::StaticType();
 }
-    Type *Ailu::UI::UIInputStyleOverride::GetType()
+    const Type *Ailu::UI::UIInputStyleOverride::GetType()
 {
 return Ailu::UI::UIInputStyleOverride::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_UIInputStyleOverride(&Ailu::UI::UIInputStyleOverride::StaticType, "Ailu::UI::UIInputStyleOverride");
-Ailu::Type* Ailu::UI::Z_Construct_UIScrollBarStyle_Type()
+const Ailu::Type* Ailu::UI::Z_Construct_UIScrollBarStyle_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -3694,22 +3694,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::UI::UIScrollBarStyle::GetPrivateStaticClass()
+const Ailu::Type* Ailu::UI::UIScrollBarStyle::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_UIScrollBarStyle_Type();
+	static const Ailu::Type* type = Z_Construct_UIScrollBarStyle_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::UIScrollBarStyle>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::UIScrollBarStyle>()
 {
 return Ailu::UI::UIScrollBarStyle::StaticType();
 }
-    Type *Ailu::UI::UIScrollBarStyle::GetType()
+    const Type *Ailu::UI::UIScrollBarStyle::GetType()
 {
 return Ailu::UI::UIScrollBarStyle::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_UIScrollBarStyle(&Ailu::UI::UIScrollBarStyle::StaticType, "Ailu::UI::UIScrollBarStyle");
-Ailu::Type* Ailu::UI::Z_Construct_UIScrollBarStyleOverride_Type()
+const Ailu::Type* Ailu::UI::Z_Construct_UIScrollBarStyleOverride_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -4275,22 +4275,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::UI::UIScrollBarStyleOverride::GetPrivateStaticClass()
+const Ailu::Type* Ailu::UI::UIScrollBarStyleOverride::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_UIScrollBarStyleOverride_Type();
+	static const Ailu::Type* type = Z_Construct_UIScrollBarStyleOverride_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::UIScrollBarStyleOverride>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::UIScrollBarStyleOverride>()
 {
 return Ailu::UI::UIScrollBarStyleOverride::StaticType();
 }
-    Type *Ailu::UI::UIScrollBarStyleOverride::GetType()
+    const Type *Ailu::UI::UIScrollBarStyleOverride::GetType()
 {
 return Ailu::UI::UIScrollBarStyleOverride::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_UIScrollBarStyleOverride(&Ailu::UI::UIScrollBarStyleOverride::StaticType, "Ailu::UI::UIScrollBarStyleOverride");
-Ailu::Type* Ailu::UI::Z_Construct_UIScrollViewStyle_Type()
+const Ailu::Type* Ailu::UI::Z_Construct_UIScrollViewStyle_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -4562,22 +4562,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::UI::UIScrollViewStyle::GetPrivateStaticClass()
+const Ailu::Type* Ailu::UI::UIScrollViewStyle::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_UIScrollViewStyle_Type();
+	static const Ailu::Type* type = Z_Construct_UIScrollViewStyle_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::UIScrollViewStyle>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::UIScrollViewStyle>()
 {
 return Ailu::UI::UIScrollViewStyle::StaticType();
 }
-    Type *Ailu::UI::UIScrollViewStyle::GetType()
+    const Type *Ailu::UI::UIScrollViewStyle::GetType()
 {
 return Ailu::UI::UIScrollViewStyle::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_UIScrollViewStyle(&Ailu::UI::UIScrollViewStyle::StaticType, "Ailu::UI::UIScrollViewStyle");
-Ailu::Type* Ailu::UI::Z_Construct_UIScrollViewStyleOverride_Type()
+const Ailu::Type* Ailu::UI::Z_Construct_UIScrollViewStyleOverride_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -4870,17 +4870,17 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::UI::UIScrollViewStyleOverride::GetPrivateStaticClass()
+const Ailu::Type* Ailu::UI::UIScrollViewStyleOverride::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_UIScrollViewStyleOverride_Type();
+	static const Ailu::Type* type = Z_Construct_UIScrollViewStyleOverride_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::UIScrollViewStyleOverride>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::UIScrollViewStyleOverride>()
 {
 return Ailu::UI::UIScrollViewStyleOverride::StaticType();
 }
-    Type *Ailu::UI::UIScrollViewStyleOverride::GetType()
+    const Type *Ailu::UI::UIScrollViewStyleOverride::GetType()
 {
 return Ailu::UI::UIScrollViewStyleOverride::GetPrivateStaticClass();
 }

@@ -6,7 +6,7 @@
 #include <Objects/SerializeSpecializations.h>
 #include <Framework/Common/Log.h>
 using namespace Ailu;
-Ailu::Type* Ailu::Render::Z_Construct_Shader_Type()
+const Ailu::Type* Ailu::Render::Z_Construct_Shader_Type()
 {
 Ailu::Object::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -27,22 +27,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::Render::Shader::GetPrivateStaticClass()
+const Ailu::Type* Ailu::Render::Shader::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_Shader_Type();
+	static const Ailu::Type* type = Z_Construct_Shader_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::Render::Shader>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::Render::Shader>()
 {
 return Ailu::Render::Shader::StaticType();
 }
-    Type *Ailu::Render::Shader::GetType()
+    const Type *Ailu::Render::Shader::GetType()
 {
 return Ailu::Render::Shader::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_Shader(&Ailu::Render::Shader::StaticType, "Ailu::Render::Shader");
-Ailu::Type* Ailu::Render::Z_Construct_ComputeShader_Type()
+const Ailu::Type* Ailu::Render::Z_Construct_ComputeShader_Type()
 {
 Ailu::Object::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -63,17 +63,17 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::Render::ComputeShader::GetPrivateStaticClass()
+const Ailu::Type* Ailu::Render::ComputeShader::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_ComputeShader_Type();
+	static const Ailu::Type* type = Z_Construct_ComputeShader_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::Render::ComputeShader>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::Render::ComputeShader>()
 {
 return Ailu::Render::ComputeShader::StaticType();
 }
-    Type *Ailu::Render::ComputeShader::GetType()
+    const Type *Ailu::Render::ComputeShader::GetType()
 {
 return Ailu::Render::ComputeShader::GetPrivateStaticClass();
 }

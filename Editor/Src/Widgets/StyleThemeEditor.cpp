@@ -59,7 +59,7 @@ namespace Ailu
                 if (!ar.IsLoaded())
                     return false;
 
-                Type *type = UI::UITheme::StaticType();
+                const Type *type = UI::UITheme::StaticType();
                 for (auto &prop: type->GetProperties())
                     prop.Deserialize(&g_editor_ui_theme, ar);
                 g_editor_ui_theme.PostDeserialize();
@@ -70,7 +70,7 @@ namespace Ailu
             bool SaveThemeToFile(const Path &path)
             {
                 JsonArchive ar;
-                Type *type = UI::UITheme::StaticType();
+                const Type *type = UI::UITheme::StaticType();
                 for (auto &prop: type->GetProperties())
                     prop.Serialize(&g_editor_ui_theme, ar);
                 ar.Save(path);
@@ -141,7 +141,7 @@ namespace Ailu
                 return true;
             }
 
-            bool DrawEnumField(PropertyInfo &prop, void *instance)
+            bool DrawEnumField(const PropertyInfo &prop, void *instance)
             {
                 const auto *enum_type = static_cast<const Enum *>(prop.GetType());
                 u32 &raw_value = prop.Get<u32>(instance);
@@ -168,10 +168,10 @@ namespace Ailu
                 return changed;
             }
 
-            bool DrawProperties(Type *type, void *instance);
+            bool DrawProperties(const Type *type, void *instance);
 
             template<typename T>
-            bool DrawNestedProperty(PropertyInfo &prop, void *instance)
+            bool DrawNestedProperty(const PropertyInfo &prop, void *instance)
             {
                 T &value = prop.Get<T>(instance);
                 bool changed = false;
@@ -183,7 +183,7 @@ namespace Ailu
                 return changed;
             }
 
-            bool DrawProperty(PropertyInfo &prop, void *instance)
+            bool DrawProperty(const PropertyInfo &prop, void *instance)
             {
                 if (prop.IsConst())
                     return false;
@@ -240,10 +240,10 @@ namespace Ailu
                 return false;
             }
 
-            bool DrawProperties(Type *type, void *instance)
+            bool DrawProperties(const Type *type, void *instance)
             {
                 bool changed = false;
-                for (Type *cur_type = type; cur_type != nullptr; cur_type = cur_type->BaseType())
+                for (auto *cur_type = type; cur_type != nullptr; cur_type = cur_type->BaseType())
                 {
                     for (auto &prop: cur_type->GetProperties())
                     {

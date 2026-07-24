@@ -47,7 +47,7 @@ namespace Ailu
         Vector<std::future<void>> skin_tasks;
         void AnimationSystem::Update(Register &r, f32 delta_time)
         {
-            PROFILE_BLOCK_CPU(AnimationSystem_Update)
+            PROFILE_BLOCK_CPU("AnimationSystem::Update")
             skin_tasks.clear();
             for (auto e: _entities)
             {
@@ -90,7 +90,7 @@ namespace Ailu
                 {
                     bool _is_do_skin = true;
                     {
-                        PROFILE_BLOCK_CPU(AnimClipBake)
+                        PROFILE_BLOCK_CPU("AnimClipBake")
                         bool use_crossfade = false;
                         if (use_crossfade)
                         {
@@ -141,7 +141,7 @@ namespace Ailu
                     {
                         auto vert = reinterpret_cast<Vector3f *>(c->_p_mesh->GetVertexBuffer()->GetStream(0));
                         auto normal = reinterpret_cast<Vector3f *>(c->_p_mesh->GetVertexBuffer()->GetStream(1));
-                        PROFILE_BLOCK_CPU(Skin)
+                        PROFILE_BLOCK_CPU("Skin")
                         u16 batch_num = vert_count / s_vertex_num_per_skin_task + 1;
                         for (u16 i = 0; i < batch_num; i++)
                         {
@@ -177,7 +177,7 @@ namespace Ailu
             u32 index = 0u;
             for (auto &future: skin_tasks)
             {
-                CPUProfileBlock block(std::format("SkinTask_{}", index++));
+                PROFILE_BLOCK_CPU(std::format("SkinTask_{}", index++))
                 future.wait();
             }
         }

@@ -13,6 +13,7 @@
 #include "Render/Features/CommonPasses.h"
 #include "Render/Material.h"
 #include "Render/Mesh.h"
+#include "Render/2D/SpriteRenderData.h"
 
 #include <optional>
 
@@ -30,6 +31,11 @@ using Ailu::Render::SkeletonMesh;
 
 namespace Ailu
 {
+    namespace Render
+    {
+        class Texture2D;
+        class Sprite;
+    }
     /*
     只访问自身字段
     不访问 Registry / World
@@ -361,6 +367,28 @@ namespace Ailu
         };
         Archive &operator<<(Archive &ar, const CVXGI &c);
         Archive &operator>>(Archive &ar, CVXGI &c);
+
+        struct AILU_API SpriteRendererComponent
+        {
+            DECLARE_CLASS(SpriteRendererComponent)
+
+            Render::Sprite* _sprite = nullptr;
+            Ref<Render::Material> _material;
+
+            Color _color = Colors::kWhite;
+
+            i16 _sorting_layer = 0;
+            i32 _order_in_layer = 0;
+
+            Render::ESpriteBlendMode _blend_mode = Render::ESpriteBlendMode::kAlpha;
+
+            bool _flip_x = false;
+            bool _flip_y = false;
+            bool _visible = true;
+        };
+
+        Archive &operator<<(Archive &ar, const SpriteRendererComponent &c);
+        Archive &operator>>(Archive &ar, SpriteRendererComponent &c);
     }// namespace ECS
 };// namespace Ailu
 

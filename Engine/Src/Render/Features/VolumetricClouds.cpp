@@ -222,7 +222,7 @@ namespace Ailu::Render
             _cloud_gen->DisableKeyword("_TILE_RENDER");
         auto cmd = CommandBufferPool::Get(_name);
         {
-            PROFILE_BLOCK_GPU(cmd.get(), VolumetricCloudsPass);
+            PROFILE_BLOCK_GPU(cmd.get(), "VolumetricCloudsPass");
             auto rt_desc = rendering_data._camera_data._camera_color_target_desc;
             auto cur_offset = kOffsetTable[g_pGfxContext->GetFrameCount() % 16];
             RenderTexture* cur_rt = _is_cur_a ? _cloud_rt_a.get() : _cloud_rt_b.get();

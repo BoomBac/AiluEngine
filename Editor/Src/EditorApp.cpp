@@ -137,7 +137,7 @@ namespace Ailu
             //auto work_dir = PathUtils::ExtarctDirectory(Application::GetWorkingPath());
             JsonArchive ar;
             ar.Load(s_editor_config_path);
-            Type *type = EditorConfig::StaticType();
+            const Type *type = EditorConfig::StaticType();
             for (auto &it: type->GetProperties())
                 it.Deserialize(&_editor_config, ar);
             //INIParser parser;
@@ -183,7 +183,7 @@ namespace Ailu
             _editor_config._scene_path = ToChar(ResourceMgr::Get().GetAssetPath(SceneManagement::SceneMgr::Get().ActiveScene()));
 
             JsonArchive ar;
-            Type *type = EditorConfig::StaticType();
+            const Type *type = EditorConfig::StaticType();
             for (auto &it: type->GetProperties())
                 it.Serialize(&_editor_config, ar);
             ar.Save(s_editor_config_path);

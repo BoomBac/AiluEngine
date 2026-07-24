@@ -15,7 +15,7 @@ namespace Ailu
     {
         DECLARE_ENUM(ERenderPassEvent, KBeforeRender = 0, kBeforeShaodwMap = 50, kAfterShadowMap = 100,
                      kBeforeGbuffer = 150, kAfterGbuffer = 200, kBeforeDeferedLighting = 250, kAfterDeferedLighting = 300, kBeforeSkybox = 350, kAfterSkybox = 400,
-                     kBeforeTransparent = 450, kAfterTransparent = 500, kBeforePostprocess = 550, kAfterPostprocess = 600, kAfterRender = 650)
+                     kBeforeTransparent = 450, kBeforeSprite = 460, kAfterSprite = 490, kAfterTransparent = 500, kBeforePostprocess = 550, kAfterPostprocess = 600, kAfterRender = 650)
         class AILU_API IRenderPass
         {
         public:

@@ -6,7 +6,7 @@
 #include <Objects/SerializeSpecializations.h>
 #include <Framework/Common/Log.h>
 using namespace Ailu;
-Ailu::Type* Ailu::Render::Z_Construct_VolumetricFog_Type()
+const Ailu::Type* Ailu::Render::Z_Construct_VolumetricFog_Type()
 {
 Ailu::Render::RenderFeature::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -153,17 +153,17 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::Render::VolumetricFog::GetPrivateStaticClass()
+const Ailu::Type* Ailu::Render::VolumetricFog::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_VolumetricFog_Type();
+	static const Ailu::Type* type = Z_Construct_VolumetricFog_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::Render::VolumetricFog>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::Render::VolumetricFog>()
 {
 return Ailu::Render::VolumetricFog::StaticType();
 }
-    Type *Ailu::Render::VolumetricFog::GetType()
+    const Type *Ailu::Render::VolumetricFog::GetType()
 {
 return Ailu::Render::VolumetricFog::GetPrivateStaticClass();
 }

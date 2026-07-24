@@ -6,7 +6,7 @@
 #include <Objects/SerializeSpecializations.h>
 #include <Framework/Common/Log.h>
 using namespace Ailu;
-Ailu::Type* Ailu::Render::Z_Construct_PostProcessPass_Type()
+const Ailu::Type* Ailu::Render::Z_Construct_PostProcessPass_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -89,17 +89,17 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::Render::PostProcessPass::GetPrivateStaticClass()
+const Ailu::Type* Ailu::Render::PostProcessPass::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_PostProcessPass_Type();
+	static const Ailu::Type* type = Z_Construct_PostProcessPass_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::Render::PostProcessPass>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::Render::PostProcessPass>()
 {
 return Ailu::Render::PostProcessPass::StaticType();
 }
-    Type *Ailu::Render::PostProcessPass::GetType()
+    const Type *Ailu::Render::PostProcessPass::GetType()
 {
 return Ailu::Render::PostProcessPass::GetPrivateStaticClass();
 }

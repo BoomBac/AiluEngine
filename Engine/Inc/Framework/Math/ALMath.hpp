@@ -1322,16 +1322,12 @@ namespace Ailu
         template<template<typename> typename TT, typename T>
         static T CompMin(const TT<T> &v)
         {
-#undef max
             T min_var = std::numeric_limits<T>::max();
             for (u8 i = 0; i < CountOf(v.data); i++)
             {
                 min_var = min(v.data[i], min_var);
             }
             return min_var;
-#ifndef max
-#define max(a, b) (((a) > (b)) ? (a) : (b))
-#endif
         }
 
         template<template<typename> typename TT, typename T>
@@ -2990,15 +2986,15 @@ namespace Ailu
         }// namespace ALHash
     }// namespace Math
 #pragma warning(pop)
-    template<> AILU_API Type* StaticClass<Math::Vector2f>();
-    template<> AILU_API Type* StaticClass<Math::Vector3f>();
-    template<> AILU_API Type* StaticClass<Math::Vector4f>();
-    template<> AILU_API Type* StaticClass<Math::Vector2Int>();
-    template<> AILU_API Type* StaticClass<Math::Vector3Int>();
-    template<> AILU_API Type* StaticClass<Math::Vector4Int>();
-    template<> AILU_API Type *StaticClass<Math::Vector2UInt>();
-    template<> AILU_API Type *StaticClass<Math::Vector3UInt>();
-    template<> AILU_API Type *StaticClass<Math::Vector4UInt>();
+    template<> AILU_API const Type* StaticClass<Math::Vector2f>();
+    template<> AILU_API const Type* StaticClass<Math::Vector3f>();
+    template<> AILU_API const Type* StaticClass<Math::Vector4f>();
+    template<> AILU_API const Type* StaticClass<Math::Vector2Int>();
+    template<> AILU_API const Type* StaticClass<Math::Vector3Int>();
+    template<> AILU_API const Type* StaticClass<Math::Vector4Int>();
+    template<> AILU_API const Type *StaticClass<Math::Vector2UInt>();
+    template<> AILU_API const Type *StaticClass<Math::Vector3UInt>();
+    template<> AILU_API const Type *StaticClass<Math::Vector4UInt>();
 }// namespace Ailu
 using namespace Ailu::Math;
 #endif// __AL_MATH_H__

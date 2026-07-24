@@ -6,5 +6,6 @@
     "MaxRenderObjectPerTask": 0,
     "isMultiThreadRender": false,
     "EnableCpuStateBatchedSubmission": true,
-    "EnableIncrementalGraphicsBinding": true
+    "EnableIncrementalGraphicsBinding": true,
+    "_enable_d3d12_debug_layer": true
 }

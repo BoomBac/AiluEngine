@@ -6,7 +6,7 @@
 #include <Objects/SerializeSpecializations.h>
 #include <Framework/Common/Log.h>
 using namespace Ailu;
-Ailu::Type* Ailu::Z_Construct_AnimationClip_Type()
+const Ailu::Type* Ailu::Z_Construct_AnimationClip_Type()
 {
 Ailu::Object::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -27,17 +27,17 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::AnimationClip::GetPrivateStaticClass()
+const Ailu::Type* Ailu::AnimationClip::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_AnimationClip_Type();
+	static const Ailu::Type* type = Z_Construct_AnimationClip_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::AnimationClip>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::AnimationClip>()
 {
 return Ailu::AnimationClip::StaticType();
 }
-    Type *Ailu::AnimationClip::GetType()
+    const Type *Ailu::AnimationClip::GetType()
 {
 return Ailu::AnimationClip::GetPrivateStaticClass();
 }

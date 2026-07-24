@@ -7,145 +7,145 @@
 //Class Canvas begin...........................
 #define CONTAINER_GEN_H_15_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_Canvas_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_Canvas_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual Type  *GetType() override;
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::UI{
 class Canvas ;
 }
 template<>
-AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::UI::Canvas>();
+AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::UI::Canvas>();
 //Class Canvas end...........................
 
 //Class LinearBox begin...........................
 #define CONTAINER_GEN_H_38_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_LinearBox_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_LinearBox_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual Type  *GetType() override;
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::UI{
 class LinearBox ;
 }
 template<>
-AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::UI::LinearBox>();
+AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::UI::LinearBox>();
 //Class LinearBox end...........................
 
 //Class VerticalBox begin...........................
 #define CONTAINER_GEN_H_68_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_VerticalBox_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_VerticalBox_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual Type  *GetType() override;
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::UI{
 class VerticalBox ;
 }
 template<>
-AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::UI::VerticalBox>();
+AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::UI::VerticalBox>();
 //Class VerticalBox end...........................
 
 //Class HorizontalBox begin...........................
 #define CONTAINER_GEN_H_77_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_HorizontalBox_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_HorizontalBox_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual Type  *GetType() override;
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::UI{
 class HorizontalBox ;
 }
 template<>
-AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::UI::HorizontalBox>();
+AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::UI::HorizontalBox>();
 //Class HorizontalBox end...........................
 
 //Class ScrollView begin...........................
 #define CONTAINER_GEN_H_86_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_ScrollView_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_ScrollView_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual Type  *GetType() override;
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::UI{
 class ScrollView ;
 }
 template<>
-AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::UI::ScrollView>();
+AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::UI::ScrollView>();
 //Class ScrollView end...........................
 
 //Class ListView begin...........................
 #define CONTAINER_GEN_H_130_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_ListView_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_ListView_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual Type  *GetType() override;
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::UI{
 class ListView ;
 }
 template<>
-AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::UI::ListView>();
+AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::UI::ListView>();
 //Class ListView end...........................
 
 //Class Dropdown begin...........................
 #define CONTAINER_GEN_H_156_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_Dropdown_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_Dropdown_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual Type  *GetType() override;
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::UI{
 class Dropdown ;
 }
 template<>
-AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::UI::Dropdown>();
+AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::UI::Dropdown>();
 //Class Dropdown end...........................
 
 //Class CollapsibleView begin...........................
 #define CONTAINER_GEN_H_187_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_CollapsibleView_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_CollapsibleView_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual Type  *GetType() override;
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::UI{
 class CollapsibleView ;
 }
 template<>
-AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::UI::CollapsibleView>();
+AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::UI::CollapsibleView>();
 //Class CollapsibleView end...........................
 
 //Class SplitView begin...........................
 #define CONTAINER_GEN_H_221_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_SplitView_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_SplitView_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual Type  *GetType() override;
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::UI{
 class SplitView ;
 }
 template<>
-AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::UI::SplitView>();
+AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::UI::SplitView>();
 //Class SplitView end...........................
 
 #undef CURRENT_FILE_ID

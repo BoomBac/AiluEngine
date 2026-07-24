@@ -1,6 +1,7 @@
 ﻿#include "Scene/Component.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Render/Gizmo.h"
+#include "Render/2D/Sprite.h"
 #include "pch.h"
 
 namespace Ailu::ECS
@@ -448,6 +449,90 @@ namespace Ailu::ECS
         c._grid_num.FromString(su::Split(buf, ":")[1]);
         ar >> buf;
         c._distance = std::stof(su::Split(buf, ":")[1]);
+        return ar;
+    }
+
+    Archive &operator<<(Archive &ar, const SpriteRendererComponent &c)
+    {
+        ar.IncreaseIndent();
+        ar.InsertIndent();
+        ar << "_sprite:" << (c._sprite ? ResourceMgr::Get().GetLinkedAsset(c._sprite)->GetGuid().ToString() : Guid::EmptyGuid().ToString());
+        ar.NewLine();
+        ar.InsertIndent();
+        ar << "_material:" << (c._material ? ResourceMgr::Get().GetLinkedAsset(c._material.get())->GetGuid().ToString() : Guid::EmptyGuid().ToString());
+        ar.NewLine();
+        ar.InsertIndent();
+        ar << "_color:" << c._color.ToString();
+        ar.NewLine();
+        ar.InsertIndent();
+        ar << "_sorting_layer:" << c._sorting_layer;
+        ar.NewLine();
+        ar.InsertIndent();
+        ar << "_order_in_layer:" << c._order_in_layer;
+        ar.NewLine();
+        ar.InsertIndent();
+        ar << "_blend_mode:" << static_cast<i32>(c._blend_mode);
+        ar.NewLine();
+        ar.InsertIndent();
+        ar << "_flip_x:" << c._flip_x;
+        ar.NewLine();
+        ar.InsertIndent();
+        ar << "_flip_y:" << c._flip_y;
+        ar.NewLine();
+        ar.InsertIndent();
+        ar << "_visible:" << c._visible;
+        ar.DecreaseIndent();
+        ar.NewLine();
+        return ar;
+    }
+    Archive &operator>>(Archive &ar, SpriteRendererComponent &c)
+    {
+        String buf;
+        ar >> buf;
+        AL_ASSERT(su::BeginWith(buf, "_sprite"));
+        {
+            Guid guid(su::Split(buf, ":")[1]);
+            if (guid != Guid::EmptyGuid())
+            {
+                ResourceMgr::Get().Load<Sprite>(guid);
+                c._sprite = ResourceMgr::Get().Get<Sprite>(guid);
+            }
+            else
+            {
+                c._sprite = nullptr;
+            }
+        }
+        ar >> buf;
+        AL_ASSERT(su::BeginWith(buf, "_material"));
+        {
+            Guid guid(su::Split(buf, ":")[1]);
+            if (guid != Guid::EmptyGuid())
+            {
+                ResourceMgr::Get().Load<Material>(guid);
+                c._material = ResourceMgr::Get().GetRef<Material>(guid);
+            }
+        }
+        ar >> buf;
+        AL_ASSERT(su::BeginWith(buf, "_color"));
+        c._color.FromString(su::Split(buf, ":")[1]);
+        ar >> buf;
+        AL_ASSERT(su::BeginWith(buf, "_sorting_layer"));
+        c._sorting_layer = static_cast<i16>(std::stoi(su::Split(buf, ":")[1]));
+        ar >> buf;
+        AL_ASSERT(su::BeginWith(buf, "_order_in_layer"));
+        c._order_in_layer = std::stoi(su::Split(buf, ":")[1]);
+        ar >> buf;
+        AL_ASSERT(su::BeginWith(buf, "_blend_mode"));
+        c._blend_mode = static_cast<Render::ESpriteBlendMode>(std::stoi(su::Split(buf, ":")[1]));
+        ar >> buf;
+        AL_ASSERT(su::BeginWith(buf, "_flip_x"));
+        c._flip_x = static_cast<bool>(std::stoi(su::Split(buf, ":")[1]));
+        ar >> buf;
+        AL_ASSERT(su::BeginWith(buf, "_flip_y"));
+        c._flip_y = static_cast<bool>(std::stoi(su::Split(buf, ":")[1]));
+        ar >> buf;
+        AL_ASSERT(su::BeginWith(buf, "_visible"));
+        c._visible = static_cast<bool>(std::stoi(su::Split(buf, ":")[1]));
         return ar;
     }
 }// namespace Ailu

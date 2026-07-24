@@ -169,9 +169,12 @@ namespace Ailu
         public:
             Border();
             Vector2f MeasureDesiredSize() override;
-            void Thickness(f32 thickness) { _thickness = Vector4f{thickness}; };
-            void Thickness(Vector4f ltrb) { _thickness = ltrb; };
+            void Thickness(f32 thickness);
+            void Thickness(Vector4f ltrb);
             Vector4f Thickness() const { return _thickness; }
+            void CornerRadius(f32 radius);
+            void CornerRadius(Vector4f radius);
+            Vector4f CornerRadius() const { return _corner_radius; }
 
             // ── Style ────────────────────────────────────────────
             UIControlVisualOverride &GetStyleOverride() { return _style_override; }
@@ -183,6 +186,7 @@ namespace Ailu
             void PostDeserialize() override;
             void ResolveStyle(const UIStyleContext &context) override;
             const UIControlVisual *GetVisual(EUIVisualState state) const override;
+            void OnPropertyChanged(const PropertyInfo& prop) override;
         public:
             APROPERTY()
             Color _bg_color = Colors::kGray;
@@ -191,6 +195,8 @@ namespace Ailu
         protected:
             APROPERTY()
             Vector4f _thickness = Vector4f::kZero;
+            APROPERTY()
+            Vector4f _corner_radius = Vector4f::kZero;
         private:
             UIControlVisualOverride _style_override;
             mutable UIControlVisual _resolved_visual;

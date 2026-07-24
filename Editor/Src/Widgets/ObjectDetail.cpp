@@ -1,4 +1,4 @@
-﻿#include "Widgets/ObjectDetail.h"
+#include "Widgets/ObjectDetail.h"
 #include "Common/Selection.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Scene/Scene.h"
@@ -6,6 +6,7 @@
 #include "UI/ColorPicker.h"
 #include "UI/Container.h"
 #include "UI/UIFramework.h"
+#include "Render/2D/Sprite.h"
 
 #include "Objects/JsonArchive.h"
 
@@ -513,6 +514,7 @@ namespace Ailu
                 remove_block(_static_mesh_block);
                 remove_block(_light_probe_block);
                 remove_block(_cam_block);
+                remove_block(_sprite_block);
                 _script_path_block = nullptr;
                 _prev_comp_block = nullptr;
             };
@@ -794,6 +796,10 @@ namespace Ailu
                                 comp->_is_dirty = true;
                             };
                         }
+                        auto toggle = AddCheckBoxRow(content,"UpdateTick",comp->_is_update_every_tick);
+                        toggle->_on_click += [comp](bool is_on){
+                            comp->_is_update_every_tick = is_on;
+                        };
                     }
                 }
                 else
@@ -827,6 +833,157 @@ namespace Ailu
                 else
                 {
                     remove_block(_cam_block);
+                }
+                if (auto comp = r.GetComponent<ECS::SpriteRendererComponent>(selected); comp != nullptr)
+                {
+                    if (_sprite_block == nullptr)
+                    {
+                        remove_block(_sprite_block);
+                        _sprite_block = AddComponentBlock(_vb, "Sprite Renderer");
+                        auto content = _sprite_block->GetContent()->AddChild<UI::VerticalBox>();
+
+                        // Sprite picker
+                        {
+                            String sprite_name = (comp->_sprite != nullptr) ?
+                                comp->_sprite->Name() : "None";
+                            auto btn = AddButtonRow(content, "Sprite", sprite_name);
+                            btn->OnMouseClick() += [comp, btn](UI::UIEvent &e)
+                            {
+                                ShowPopupListView(e._current_target, 200.0f, [comp, btn](const Ref<UI::ListView> &list_view)
+                                                  {
+                                    auto none_item = MakeRef<UI::Text>("None");
+                                    none_item->OnMouseClick() += [comp, btn](UI::UIEvent &)
+                                    {
+                                        comp->_sprite = nullptr;
+                                        btn->SetText("None");
+                                        UIManager::Get()->HidePopup();
+                                        SceneMgr::Get().MarkCurSceneDirty();
+                                    };
+                                    list_view->AddItem(none_item);
+                                    for (auto it = ResourceMgr::Get().ResourceBegin<Render::Sprite>(); it != ResourceMgr::Get().ResourceEnd<Render::Sprite>(); it++)
+                                    {
+                                        const auto &sprite_ref = ResourceMgr::Get().IterToRefPtr<Render::Sprite>(it);
+                                        auto text = MakeRef<UI::Text>(sprite_ref->Name());
+                                        text->OnMouseClick() += [sprite_ref, comp, btn](UI::UIEvent &)
+                                        {
+                                            comp->_sprite = sprite_ref.get();
+                                            btn->SetText(sprite_ref->Name());
+                                            UIManager::Get()->HidePopup();
+                                            SceneMgr::Get().MarkCurSceneDirty();
+                                        };
+                                        list_view->AddItem(text);
+                                    } });
+                            };
+                        }
+
+                        // Material picker
+                        {
+                            auto btn = AddButtonRow(content, "Material", comp->_material != nullptr ? comp->_material->Name() : "Default");
+                            btn->OnMouseClick() += [comp, btn](UI::UIEvent &e)
+                            {
+                                ShowPopupListView(e._current_target, 200.0f, [comp, btn](const Ref<UI::ListView> &list_view)
+                                                  {
+                                    auto none_item = MakeRef<UI::Text>("Default");
+                                    none_item->OnMouseClick() += [comp, btn](UI::UIEvent &)
+                                    {
+                                        comp->_material = nullptr;
+                                        btn->SetText("Default");
+                                        UIManager::Get()->HidePopup();
+                                        SceneMgr::Get().MarkCurSceneDirty();
+                                    };
+                                    list_view->AddItem(none_item);
+                                    for (auto it = ResourceMgr::Get().ResourceBegin<Render::Material>(); it != ResourceMgr::Get().ResourceEnd<Render::Material>(); it++)
+                                    {
+                                        const auto &mat = ResourceMgr::Get().IterToRefPtr<Render::Material>(it);
+                                        auto text = MakeRef<UI::Text>(mat->Name());
+                                        text->OnMouseClick() += [mat, comp, btn](UI::UIEvent &)
+                                        {
+                                            comp->_material = mat;
+                                            btn->SetText(mat->Name());
+                                            UIManager::Get()->HidePopup();
+                                            SceneMgr::Get().MarkCurSceneDirty();
+                                        };
+                                        list_view->AddItem(text);
+                                    } });
+                            };
+                        }
+
+                        // Color
+                        {
+                            auto btn = AddButtonRow(content, "Color", FormatColorButtonText(Vector4f(comp->_color.r, comp->_color.g, comp->_color.b, comp->_color.a), true));
+                            btn->OnMouseClick() += [comp, btn](UI::UIEvent &e)
+                            {
+                                auto color_picker = MakeRef<UI::ColorPicker>(Vector4f(comp->_color.r, comp->_color.g, comp->_color.b, comp->_color.a));
+                                color_picker->Name("SpriteColor");
+                                color_picker->GetSlot()->Size({320.0f, 240.0f});
+                                color_picker->OnValueChanged() += [comp, btn](Vector4f color)
+                                {
+                                    comp->_color = Color(color.x, color.y, color.z, color.w);
+                                    btn->SetText(FormatColorButtonText(color, true));
+                                    SceneMgr::Get().MarkCurSceneDirty();
+                                };
+                                auto abs_rect = e._current_target->GetArrangeRect();
+                                Vector2f show_pos = abs_rect.xy;
+                                show_pos.y += abs_rect.w;
+                                UI::UIManager::Get()->ShowPopupAt(show_pos.x, show_pos.y, color_picker);
+                            };
+                        }
+
+                        // Sorting Layer
+                        {
+                            AddFloatInputRow(content, "Sorting Layer", std::to_string(comp->_sorting_layer), [comp](f32 v)
+                            {
+                                comp->_sorting_layer = static_cast<i16>(v);
+                                SceneMgr::Get().MarkCurSceneDirty();
+                            });
+                        }
+
+                        // Order In Layer
+                        {
+                            AddFloatInputRow(content, "Order In Layer", std::to_string(comp->_order_in_layer), [comp](f32 v)
+                            {
+                                comp->_order_in_layer = static_cast<i32>(v);
+                                SceneMgr::Get().MarkCurSceneDirty();
+                            });
+                        }
+
+                        // Blend Mode
+                        {
+                            auto blend_items = Vector<String>{"Alpha", "Additive", "Multiply", "Opaque"};
+                            auto dropdown = AddDropdownRow(content, "Blend Mode", blend_items);
+                            dropdown->SetSelectedIndex(static_cast<i32>(comp->_blend_mode));
+                            dropdown->_on_selected_changed += [comp](i32 idx)
+                            {
+                                comp->_blend_mode = static_cast<Render::ESpriteBlendMode>(idx);
+                                SceneMgr::Get().MarkCurSceneDirty();
+                            };
+                        }
+
+                        // Flip X
+                        AddCheckBoxRow(content, "Flip X", comp->_flip_x)->_on_click += [comp](bool checked)
+                        {
+                            comp->_flip_x = checked;
+                            SceneMgr::Get().MarkCurSceneDirty();
+                        };
+
+                        // Flip Y
+                        AddCheckBoxRow(content, "Flip Y", comp->_flip_y)->_on_click += [comp](bool checked)
+                        {
+                            comp->_flip_y = checked;
+                            SceneMgr::Get().MarkCurSceneDirty();
+                        };
+
+                        // Visible
+                        AddCheckBoxRow(content, "Visible", comp->_visible)->_on_click += [comp](bool checked)
+                        {
+                            comp->_visible = checked;
+                            SceneMgr::Get().MarkCurSceneDirty();
+                        };
+                    }
+                }
+                else
+                {
+                    remove_block(_sprite_block);
                 }
             }
             else

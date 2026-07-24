@@ -6,7 +6,7 @@
 #include <Objects/SerializeSpecializations.h>
 #include <Framework/Common/Log.h>
 using namespace Ailu;
-Ailu::Type* Ailu::UI::Z_Construct_TreeView_Type()
+const Ailu::Type* Ailu::UI::Z_Construct_TreeView_Type()
 {
 Ailu::UI::ScrollView::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -27,17 +27,17 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::UI::TreeView::GetPrivateStaticClass()
+const Ailu::Type* Ailu::UI::TreeView::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_TreeView_Type();
+	static const Ailu::Type* type = Z_Construct_TreeView_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::TreeView>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::TreeView>()
 {
 return Ailu::UI::TreeView::StaticType();
 }
-    Type *Ailu::UI::TreeView::GetType()
+    const Type *Ailu::UI::TreeView::GetType()
 {
 return Ailu::UI::TreeView::GetPrivateStaticClass();
 }

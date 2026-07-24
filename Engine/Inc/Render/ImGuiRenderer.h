@@ -1,3 +1,4 @@
+#include "GlobalMarco.h"
 #include <set>
 
 namespace Ailu
@@ -6,7 +7,7 @@ namespace Ailu
     {
         class RHICommandBuffer;
         class RenderTexture;
-        class ImGuiRenderer
+        class AILU_API ImGuiRenderer
         {
         public:
             static void Init();

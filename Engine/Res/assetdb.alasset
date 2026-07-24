@@ -434,6 +434,11 @@
       "guid": "fc17adc1-f67a-4a15-a756-09c672438b53",
       "path": "engine://Shaders/hlsl/Compute/volumetric_cloud.alasset",
       "type": "Ailu::Render::ComputeShader"
+    },
+      {
+      "guid": "8029eac3-978a-458c-8a7b-e165f2a2710f",
+      "path": "engine://Shaders/hlsl/default_sprite.alasset",
+      "type": "Ailu::Render::Shader"
     }
   ]
 }

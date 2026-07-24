@@ -48,6 +48,7 @@
 
 #include "Widgets/CommonView.h"
 #include "Widgets/RenderView.h"
+#include "Widgets/ResourceBrowser.h"
 #include "Widgets/StyleThemeEditor.h"
 
 #include "Framework/Parser/TextParser.h"
@@ -163,9 +164,9 @@ namespace Ailu
                 }
             }
 
-            bool DrawReflectedPropertiesByType(Type *type, void *obj, const std::function<bool(const PropertyInfo &)> &filter = {});
+            bool DrawReflectedPropertiesByType(const Type *type, void *obj, const std::function<bool(const PropertyInfo &)> &filter = {});
 
-            bool static DrawMemberProperty(PropertyInfo &prop_info, void *obj)
+            bool static DrawMemberProperty(const PropertyInfo &prop_info, void *obj)
             {
                 bool changed = false;
                 ImGui::PushID(obj);
@@ -471,10 +472,10 @@ namespace Ailu
                 return changed;
             }
 
-            bool DrawReflectedPropertiesByType(Type *type, void *obj, const std::function<bool(const PropertyInfo &)> &filter)
+            bool DrawReflectedPropertiesByType(const Type *type, void *obj, const std::function<bool(const PropertyInfo &)> &filter)
             {
                 bool any_changed = false;
-                for (Type *cur_type = type; cur_type != nullptr; cur_type = cur_type->BaseType())
+                for (const Type *cur_type = type; cur_type != nullptr; cur_type = cur_type->BaseType())
                 {
                     auto &properties = cur_type->GetProperties();
                     if (properties.empty())
@@ -493,7 +494,7 @@ namespace Ailu
             }
 
             template<typename TObject>
-            bool DrawReflectedPropertiesByType(Type *type, TObject &obj, const std::function<bool(const PropertyInfo &)> &filter = {})
+            bool DrawReflectedPropertiesByType(const Type *type, TObject &obj, const std::function<bool(const PropertyInfo &)> &filter = {})
             {
                 return DrawReflectedPropertiesByType(type, static_cast<void *>(&obj), filter);
             }
@@ -710,6 +711,9 @@ namespace Ailu
                 const String widget_name = widget != nullptr ? widget->Name() : String("Unknown");
                 const String parent_name = selected->GetParent() != nullptr ? selected->GetParent()->Name() : String("None");
 
+                bool is_show = selected->IsVisible();
+                ImGui::Checkbox("Show",&is_show);
+                selected->SetVisible(is_show);
                 ImGui::Text("Name: %s", selected->Name().c_str());
                 ImGui::Text("Type: %s", type != nullptr ? type->Name().c_str() : "Unknown");
                 ImGui::Text("Widget: %s", widget_name.c_str());
@@ -1452,7 +1456,7 @@ namespace Ailu
 
             if (_status_left_text)
             {
-                _status_left_text->SetText(std::format("{} | Scene: {} | Selection: {}",
+                _status_left_text->SetText(std::format("{}   Scene: {}   Selection: {}",
                                                        _editor_status_message,
                                                        scene_name,
                                                        selection_name),
@@ -1460,7 +1464,7 @@ namespace Ailu
             }
             if (_status_right_text)
             {
-                _status_right_text->SetText(std::format("FPS: {:.1f} | Frame: {:.2f} ms",
+                _status_right_text->SetText(std::format("FPS: {:.1f}   Frame: {:.2f} ms",
                                                         RenderingStates::GetFrameRate(),
                                                         RenderingStates::GetFrameTime()),
                                             false);
@@ -1495,6 +1499,7 @@ namespace Ailu
             static bool s_show_imguinode = false;
             static bool s_show_ui_reflector = false;
             static bool s_show_style_theme_editor = false;
+            static bool s_show_resource_browser = false;
 
         static void ShowThreadPoolView(bool *is_show)
         {
@@ -1660,6 +1665,7 @@ namespace Ailu
             ImGui::Checkbox("ShowNode", &s_show_imguinode);
             ImGui::Checkbox("ShowUIReflector", &s_show_ui_reflector);
             ImGui::Checkbox("ShowStyleThemeEditor", &s_show_style_theme_editor);
+            ImGui::Checkbox("ShowResourceBrowser", &s_show_resource_browser);
             ImGui::Checkbox("Raytracing Pipeline", &s_raytracing_pipeline);
             RenderPipeline::Get().GetRenderer()->_is_use_raytracing = s_raytracing_pipeline;
             if (ImGui::Button("Capture RDG"))
@@ -1876,6 +1882,8 @@ namespace Ailu
                 UI::UIManager::Get()->SetDebugHighlightTarget(nullptr);
             if (s_show_style_theme_editor)
                 ShowStyleThemeEditorWindow(&s_show_style_theme_editor);
+            if (s_show_resource_browser)
+                ShowResourceBrowserWindow(&s_show_resource_browser);
             s_prifile_wd->Show();
         }
 

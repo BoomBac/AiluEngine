@@ -6,7 +6,7 @@
 #include <Objects/SerializeSpecializations.h>
 #include <Framework/Common/Log.h>
 using namespace Ailu;
-Ailu::Type* Ailu::Editor::Z_Construct_RenderView_Type()
+const Ailu::Type* Ailu::Editor::Z_Construct_RenderView_Type()
 {
 Ailu::Editor::DockWindow::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -27,22 +27,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::Editor::RenderView::GetPrivateStaticClass()
+const Ailu::Type* Ailu::Editor::RenderView::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_RenderView_Type();
+	static const Ailu::Type* type = Z_Construct_RenderView_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::Editor::RenderView>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::Editor::RenderView>()
 {
 return Ailu::Editor::RenderView::StaticType();
 }
-    Type *Ailu::Editor::RenderView::GetType()
+    const Type *Ailu::Editor::RenderView::GetType()
 {
 return Ailu::Editor::RenderView::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_RenderView(&Ailu::Editor::RenderView::StaticType, "Ailu::Editor::RenderView");
-Ailu::Type* Ailu::Editor::Z_Construct_SceneView_Type()
+const Ailu::Type* Ailu::Editor::Z_Construct_SceneView_Type()
 {
 Ailu::Editor::RenderView::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -63,22 +63,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::Editor::SceneView::GetPrivateStaticClass()
+const Ailu::Type* Ailu::Editor::SceneView::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_SceneView_Type();
+	static const Ailu::Type* type = Z_Construct_SceneView_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::Editor::SceneView>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::Editor::SceneView>()
 {
 return Ailu::Editor::SceneView::StaticType();
 }
-    Type *Ailu::Editor::SceneView::GetType()
+    const Type *Ailu::Editor::SceneView::GetType()
 {
 return Ailu::Editor::SceneView::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_SceneView(&Ailu::Editor::SceneView::StaticType, "Ailu::Editor::SceneView");
-Ailu::Type* Ailu::Editor::Z_Construct_Texture3DView_Type()
+const Ailu::Type* Ailu::Editor::Z_Construct_Texture3DView_Type()
 {
 Ailu::Editor::DockWindow::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -99,17 +99,17 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::Editor::Texture3DView::GetPrivateStaticClass()
+const Ailu::Type* Ailu::Editor::Texture3DView::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_Texture3DView_Type();
+	static const Ailu::Type* type = Z_Construct_Texture3DView_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::Editor::Texture3DView>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::Editor::Texture3DView>()
 {
 return Ailu::Editor::Texture3DView::StaticType();
 }
-    Type *Ailu::Editor::Texture3DView::GetType()
+    const Type *Ailu::Editor::Texture3DView::GetType()
 {
 return Ailu::Editor::Texture3DView::GetPrivateStaticClass();
 }

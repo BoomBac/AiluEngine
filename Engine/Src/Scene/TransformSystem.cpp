@@ -92,7 +92,7 @@ namespace Ailu
 
         void TransformSystem::Update(Register &r, f32 delta_time)
         {
-            PROFILE_BLOCK_CPU(TransformSystem_Update)
+            PROFILE_BLOCK_CPU("TransformSystem::Update")
             if (_order_dirty || _observed_hierarchy_revision != r.HierarchyRevision() || _ordered_entities.size() != _entities.size())
                 RebuildOrder(r);
 

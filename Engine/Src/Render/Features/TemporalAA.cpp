@@ -140,7 +140,7 @@ namespace Ailu::Render
         rendering_data._camera->GetProj();
         bool is_compute = true;
         {
-            PROFILE_BLOCK_GPU(cmd.get(),TemporaAA)
+            PROFILE_BLOCK_GPU(cmd.get(),"TemporaAA")
             //GpuProfileBlock b(cmd.get(), cmd->Name());
             if (cur_info._first_tick || cur_info._target_a->Width() != camera_data._camera_color_target_desc._width || cur_info._target_a->Height() != camera_data._camera_color_target_desc._height)
             {

@@ -7,17 +7,17 @@
 //Class ColorPicker begin...........................
 #define COLORPICKER_GEN_H_16_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_ColorPicker_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_ColorPicker_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual Type  *GetType() override;
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::UI{
 class ColorPicker ;
 }
 template<>
-AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::UI::ColorPicker>();
+AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::UI::ColorPicker>();
 //Class ColorPicker end...........................
 
 #undef CURRENT_FILE_ID

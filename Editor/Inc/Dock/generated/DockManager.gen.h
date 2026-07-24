@@ -7,33 +7,33 @@
 //Struct DockNodeData begin...........................
 #define DOCKMANAGER_GEN_H_26_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_DockNodeData_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_DockNodeData_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                Type  *GetType();
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                const Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu::Editor{
 struct DockNodeData ;
 }
 template<>
-class Ailu::Type* Ailu::StaticClass<struct Ailu::Editor::DockNodeData>();
+const class Ailu::Type* Ailu::StaticClass<struct Ailu::Editor::DockNodeData>();
 //Struct DockNodeData end...........................
 
 //Struct DockNodeDataArray begin...........................
 #define DOCKMANAGER_GEN_H_63_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_DockNodeDataArray_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_DockNodeDataArray_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                Type  *GetType();
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                const Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu::Editor{
 struct DockNodeDataArray ;
 }
 template<>
-class Ailu::Type* Ailu::StaticClass<struct Ailu::Editor::DockNodeDataArray>();
+const class Ailu::Type* Ailu::StaticClass<struct Ailu::Editor::DockNodeDataArray>();
 //Struct DockNodeDataArray end...........................
 
 //Enum EDockArea begin...........................

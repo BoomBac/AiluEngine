@@ -7,17 +7,17 @@
 //Class Scene begin...........................
 #define SCENE_GEN_H_59_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_Scene_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_Scene_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                Type  *GetType();
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                const Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu::SceneManagement{
 class Scene ;
 }
 template<>
-AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::SceneManagement::Scene>();
+AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::SceneManagement::Scene>();
 //Class Scene end...........................
 
 #undef CURRENT_FILE_ID

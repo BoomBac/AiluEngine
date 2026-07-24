@@ -7,17 +7,17 @@
 //Class VolumeTexturePreviewPass begin...........................
 #define MISCPASSES_GEN_H_14_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_VolumeTexturePreviewPass_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_VolumeTexturePreviewPass_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                Type  *GetType();
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                const Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu::Render{
 class VolumeTexturePreviewPass ;
 }
 template<>
-AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::Render::VolumeTexturePreviewPass>();
+AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::VolumeTexturePreviewPass>();
 //Class VolumeTexturePreviewPass end...........................
 
 #undef CURRENT_FILE_ID

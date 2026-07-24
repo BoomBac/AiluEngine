@@ -5,18 +5,11 @@
 #include "GlobalMarco.h"
 #include "Objects/Object.h"
 #include "Objects/Type.h"
-#include "generated/Asset.gen.h"
+#include "AssetCommon.h"
+//#include "generated/Asset.gen.h"
 
 namespace Ailu
 {
-    AENUM()
-    enum class EAssetDomain
-    {
-        kEngine,
-        kEditor,
-        kProject,
-        kRuntime
-    };
     class AILU_API Asset : public Object
     {
     public:
@@ -47,14 +40,19 @@ namespace Ailu
     public:
         EAssetDomain _domain = EAssetDomain::kProject;
         WString _asset_path;
-        //with ext
-        WString _name;
         //使用额外的信息来定位资源对象，对于对于fbx文件，使用资源路径和文件内对象的名称来确定一个mesh，对于shader，目前使用vs/ps的入口。
         WString _addi_info;
         WString _external_asset_path;
         const Type *_asset_type = nullptr;
         Ref<Object> _p_obj;
+        struct RuntimeDependency
+        {
+            Guid _guid = Guid::EmptyGuid();
+            EAssetDependencyType _type = EAssetDependencyType::kHard;
+            Asset *_asset = nullptr;
+        };
 
+        Vector<RuntimeDependency> _dependencies;
     private:
         Guid _guid;
     };

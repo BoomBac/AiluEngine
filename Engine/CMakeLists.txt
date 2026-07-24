@@ -192,17 +192,21 @@ if (AILU_LUA_SCRIPTING_ENABLED)
 endif()
 # 宏定义
 target_compile_definitions(Engine PRIVATE
-        AILU_BUILD_DLL
-        ENGINE_EXPORTS
-        _WINDOWS
-        _USRDLL
-        UNICODE
-        _UNICODE
-        FBXSDK_SHARED
-        NOMINMAX
-        _REVERSED_Z
-        DEAR_IMGUI
-        $<$<CONFIG:Debug>:_DEBUG>)
+    AILU_BUILD_DLL
+    ENGINE_EXPORTS
+    _WINDOWS
+    _USRDLL
+    UNICODE
+    _UNICODE
+    FBXSDK_SHARED
+    _REVERSED_Z
+    DEAR_IMGUI
+    $<$<CONFIG:Debug>:_DEBUG>
+    AILU_ENABLE_ASSERTS=$<BOOL:${AILU_ENABLE_ASSERTS}>
+    AILU_ENABLE_ENGINE_PROFILER=$<BOOL:${AILU_ENABLE_ENGINE_PROFILER}>
+    AILU_ENABLE_D3D_DEBUG_LAYER=$<BOOL:${AILU_ENABLE_D3D_DEBUG_LAYER}>
+    AILU_ENABLE_PIX_MARKERS=$<BOOL:${AILU_ENABLE_PIX_MARKERS}>)
+
 target_compile_definitions(Engine PUBLIC AILU_ENABLE_LUA_SCRIPTING=${AILU_LUA_SCRIPTING_ENABLED})
 
 if (AILU_ENABLE_TRACY)
@@ -220,14 +224,23 @@ set_target_properties (Engine PROPERTIES
         LIBRARY_OUTPUT_DIRECTORY "${OUTPUT_ROOT}/$<CONFIG>"
         RUNTIME_OUTPUT_DIRECTORY "${OUTPUT_ROOT}/$<CONFIG>")
 # 编译器参数
-if (MSVC)
-        target_compile_options(Engine PRIVATE /MP /bigobj /utf-8 /wd4819 /wd4251)
-    # Enable RTC checks in Debug
-    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /RTC1")
-    # or: set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /RTCs /RTCu")
+if(MSVC)
+    target_compile_options(Engine PRIVATE
+        /MP
+        /bigobj
+        /wd4819
+        /wd4251
+        /utf-8
+        $<$<CONFIG:RelWithDebInfo>:/O1>
+        $<$<CONFIG:RelWithDebInfo>:/Ob1>
+)
+
+    target_compile_options(Engine PRIVATE
+        $<$<CONFIG:Debug>:/RTC1>)
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
-        target_compile_options(Engine PRIVATE -Winvalid-pch)
+    target_compile_options(Engine PRIVATE -Winvalid-pch)
 endif()
+
 target_precompile_headers(Engine PRIVATE Inc/pch.h)
 # 链接库
 target_link_libraries(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/pix/WinPixEventRuntime.lib;d3d12.lib;dxgi.lib;

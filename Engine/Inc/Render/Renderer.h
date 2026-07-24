@@ -87,7 +87,7 @@ namespace Ailu
             void PrepareLight(const Scene &s);
             void PrepareCamera(const Camera &cam);
             void PrepareMaterial(const Scene& s);
-            void DoRender(const Camera &cam, const Scene &s);
+            void DoRender(const Camera &cam, const Scene &s, RenderTexture *output_target = nullptr, i32 output_view_index = -1);
             void Cull(const Scene &s, const Camera &cam);
             static void StableSort(Vector<RenderPass *> list);
 
@@ -131,6 +131,7 @@ namespace Ailu
             RenderFeature *_raytrace_gi;
             RenderFeature *_rtxdi;
             RenderFeature *_fog;
+        RenderFeature *_sprite;
             u64 _active_camera_hash;
 
             RenderingData _rendering_data;

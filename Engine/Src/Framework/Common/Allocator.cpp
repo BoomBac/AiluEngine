@@ -1,105 +1,30 @@
-
 #include "Framework/Common/Allocator.hpp"
 #include "Framework/Common/Log.h"
 #include "Framework/Math/ALMath.hpp"
 #include "pch.h"
 
-#include <cstdint>
-#include <cstdlib>
-#include <iomanip>
-#include <sstream>
-#include <string>
-#include <ranges>
 
-namespace DebugAlloc
+namespace
 {
-    constexpr uint32_t kGuardPattern = 0xDEADBEEF;
-    constexpr size_t kGuardSize = sizeof(kGuardPattern);
-
-    struct Header
+    void *AlignedAlloc(size_t alignment, size_t size)
     {
-        size_t original_size;
-        size_t aligned_size;
-        size_t alignment;
-        void* raw_ptr;
-    };
-
-    void* DebugAlignedAlloc(size_t size, size_t alignment)
-    {
-        size_t total_size = sizeof(Header) + kGuardSize + size + kGuardSize + alignment;
-        void* raw = std::malloc(total_size);
-        if (!raw) return nullptr;
-
-        uintptr_t raw_addr = reinterpret_cast<uintptr_t>(raw);
-        uintptr_t aligned_start = (raw_addr + sizeof(Header) + kGuardSize + alignment - 1) & ~(alignment - 1);
-        void* user_ptr = reinterpret_cast<void*>(aligned_start);
-
-        Header* header = reinterpret_cast<Header*>(aligned_start - kGuardSize - sizeof(Header));
-        header->original_size = size;
-        header->aligned_size = total_size;
-        header->alignment = alignment;
-        header->raw_ptr = raw;
-
-        // Write guard patterns
-        std::memcpy(reinterpret_cast<void*>(aligned_start - kGuardSize), &kGuardPattern, kGuardSize);
-        std::memcpy(reinterpret_cast<void*>(aligned_start + size), &kGuardPattern, kGuardSize);
-
-        return user_ptr;
-    }
-
-    void CheckMemoryCorruption(void* ptr)
-    {
-        if (!ptr) return;
-
-        uintptr_t addr = reinterpret_cast<uintptr_t>(ptr);
-        Header* header = reinterpret_cast<Header*>(addr - kGuardSize - sizeof(Header));
-
-        uint32_t front_guard = *reinterpret_cast<uint32_t*>(addr - kGuardSize);
-        uint32_t back_guard  = *reinterpret_cast<uint32_t*>(addr + header->original_size);
-
-        if (front_guard != kGuardPattern)
-        {
-            std::fprintf(stderr, "[DebugAlloc] Memory corruption before block at %p!\n", ptr);
-            assert(false);
-        }
-
-        if (back_guard != kGuardPattern)
-        {
-            std::fprintf(stderr, "[DebugAlloc] Memory corruption after block at %p!\n", ptr);
-            assert(false);
-        }
-    }
-
-    void DebugAlignedFree(void* ptr)
-    {
-        if (!ptr) return;
-        CheckMemoryCorruption(ptr);
-
-        uintptr_t addr = reinterpret_cast<uintptr_t>(ptr);
-        Header* header = reinterpret_cast<Header*>(addr - kGuardSize - sizeof(Header));
-        std::free(header->raw_ptr);
-    }
-}
-
-static void *AlignedAlloc(size_t alignment, size_t size)
-{
 #if defined(_MSC_VER)
-    return _aligned_malloc(size, alignment);
-    //return DebugAlloc::DebugAlignedAlloc(size, alignment);
+        return _aligned_malloc(size, alignment);
 #else
-    return std::aligned_alloc(alignment, size);// C++17
+        const size_t aligned_size = (size + alignment - 1u) & ~(alignment - 1u);
+        return std::aligned_alloc(alignment, aligned_size);
 #endif
-}
+    }
 
-static void AlignedFree(void *ptr)
-{
+    void AlignedFree(void *ptr)
+    {
 #if defined(_MSC_VER)
-    //DebugAlloc::DebugAlignedFree(ptr);
-    _aligned_free(ptr);
+        _aligned_free(ptr);
 #else
-    std::free(ptr);
+        std::free(ptr);
 #endif
-}
+    }
+}// namespace
 
 namespace Ailu
 {
@@ -110,368 +35,580 @@ namespace Ailu
         public:
             BinMapper()
             {
-                u32 bin_index = 0;
-                u32 bin_size = 8;// 最小块大小
-                u32 next_threshold = 128;
+                u32 bin_index = 0u;
+                u32 bin_size = 8u;
 
-                for (u32 size = 0; size < _size_to_bin.size(); ++size)
+                _bin_size_list.push_back(bin_size);
+                for (u32 size = 0u; size < _size_to_bin.size(); ++size)
                 {
-                    // 进入新 bin 时记录实际 bin_size
                     while (size > bin_size)
                     {
-                        if (bin_size < next_threshold)
-                            bin_size *= 2;// 8, 16, 32, 64, 128
-                        else if (bin_size < 512)
-                            bin_size += 32;// 160, 192, ...
+                        if (bin_size < 128u) bin_size *= 2u;
+                        else if (bin_size < 512u)
+                            bin_size += 32u;
                         else
-                            bin_size += 64;// 576, 640, ...
+                            bin_size += 64u;
 
                         ++bin_index;
                         _bin_size_list.push_back(bin_size);
                     }
-
-                    // 保证第一个 bin_size 被加入
-                    if (_bin_size_list.empty())
-                        _bin_size_list.push_back(bin_size);
-
                     _size_to_bin[size] = static_cast<u8>(bin_index);
                 }
             }
-
-            // 从大小查 bin 索引
             u32 GetBinIndex(u64 size) const
             {
-                if (size >= _size_to_bin.size())
-                    return 0xFF;
-                return static_cast<u32>(_size_to_bin[size]);
+                if (size >= _size_to_bin.size()) return std::numeric_limits<u32>::max();
+                return static_cast<u32>(_size_to_bin[static_cast<size_t>(size)]);
             }
 
-            // 从 bin 索引查实际大小
             u32 GetBinSizeByIndex(u32 bin_index) const
             {
-                if (bin_index >= _bin_size_list.size())
-                    return 0;
+                AL_ASSERT(bin_index < _bin_size_list.size());
                 return _bin_size_list[bin_index];
             }
 
-            // bin 总数
-            u32 GetBinCount() const
-            {
-                return static_cast<u32>(_bin_size_list.size());
-            }
+            u32 GetBinCount() const { return static_cast<u32>(_bin_size_list.size()); }
 
         private:
-            Array<u8, 4096> _size_to_bin;
+            Array<u8, Allocator::kMaxSmallAllocationSize + 1u> _size_to_bin{};
             Vector<u32> _bin_size_list;
         };
 
-        bool IsPowerOfTwo(u64 value)
+        constexpr bool IsPowerOfTwo(u64 value) { return value != 0u && (value & (value - 1u)) == 0u; }
+
+        uintptr_t AlignAddress(uintptr_t value, u64 alignment) { return (value + alignment - 1u) & ~(alignment - 1u); }
+
+        constexpr u32 kDebugBitsPerWord = static_cast<u32>(sizeof(u64) * 8u);
+
+        u32 GetDebugWordCount(u32 bit_count) { return (bit_count + kDebugBitsPerWord - 1u) / kDebugBitsPerWord; }
+
+        void SetBit(Vector<u64> &bits, u32 bit_index)
         {
-            return (value & (value - 1)) == 0;
+            const u32 word_index = bit_index / kDebugBitsPerWord;
+            const u32 intra_word_index = bit_index % kDebugBitsPerWord;
+            AL_ASSERT(word_index < bits.size());
+            bits[word_index] |= 1ull << intra_word_index;
+        }
+
+        void ClearBit(Vector<u64> &bits, u32 bit_index)
+        {
+            const u32 word_index = bit_index / kDebugBitsPerWord;
+            const u32 intra_word_index = bit_index % kDebugBitsPerWord;
+            AL_ASSERT(word_index < bits.size());
+            bits[word_index] &= ~(1ull << intra_word_index);
+        }
+
+        bool TestBit(const Vector<u64> &bits, u32 bit_index)
+        {
+            const u32 word_index = bit_index / kDebugBitsPerWord;
+            const u32 intra_word_index = bit_index % kDebugBitsPerWord;
+            AL_ASSERT(word_index < bits.size());
+            return (bits[word_index] & (1ull << intra_word_index)) != 0u;
         }
 
         template<typename T>
         std::string PtrToAddress(T *ptr)
         {
             std::ostringstream oss;
-            oss << "0x"
-                << std::hex << std::setw(sizeof(void *) * 2) << std::setfill('0')
-                << reinterpret_cast<uintptr_t>(ptr);
+            oss << "0x" << std::hex << std::setw(sizeof(void *) * 2u) << std::setfill('0') << reinterpret_cast<uintptr_t>(ptr);
             return oss.str();
         }
+
+        Allocator *s_allocator = nullptr;
+        BinMapper s_bin_mapper;
     }// namespace
-    namespace Core
+
+    thread_local Arena *g_thread_arena = nullptr;
+
+    struct FreeBlock
     {
-        static Arena *s_thread_arena;
-        static BinMapper s_bin_mapper;
-#pragma region Page
-        Page::Page(u32 block_size, Bin *bin)
-        {
-            void *page_mem = AlignedAlloc(kPageSize, kPageSize);
-            AL_ASSERT(page_mem != nullptr);
-            _head = new (page_mem) PageHeader;
-            //AL_ASSERT(reinterpret_cast<uintptr_t>(_head) % block_size == 0);
-            _head->_page_index = s_page_index++;
-            _head->_bin = bin;
-            _head->_block_size = block_size;
-            _head->_aligned_head_size = static_cast<u32>(AlignTo(kPageHeaderSize, block_size));
-            _head->_block_count = (kPageSize - _head->_aligned_head_size) / block_size;
-            _head->_used_count.store(0, std::memory_order_relaxed);
-            _head->_next = nullptr;
-            _head->_prev = nullptr;
-            _head->_thread_name = GetThreadName().c_str();
-        }
-        Page::~Page()
-        {
-            LOG_INFO("Destory page with data: {}", PtrToAddress(_head))
-            AlignedFree(reinterpret_cast<void *>(_head));
-        }
-        String Page::Dump() const
-        {
-            std::stringstream ss;
-            ss << "Page:"
-               << "  Page Index:" << _head->_page_index
-               << "  Block Size:" << _head->_block_size
-               << "  Aligned Head Size:" << _head->_aligned_head_size
-               << "  Block Count:" << _head->_block_count
-               << "  Used Count:" << _head->_used_count.load(std::memory_order_relaxed)
-               << "  Next:" << (_head->_next != nullptr ? PtrToAddress(_head->_next) : "nullptr")
-               << "  Prev:" << (_head->_prev != nullptr ? PtrToAddress(_head->_prev) : "nullptr") << std::endl;
-            return ss.str();
-        }
+        FreeBlock *_next = nullptr;
+    };
 
-#pragma endregion
+    struct PageHeader
+    {
+        PageMgr *_owner_page_mgr = nullptr;
+        Bin *_owner_bin = nullptr;
+        Arena *_owner_arena = nullptr;
+        FreeBlock *_free_list = nullptr;
+        PageHeader *_prev = nullptr;
+        PageHeader *_next = nullptr;
+        uintptr_t _block_begin = 0u;
+        uintptr_t _block_end = 0u;
+        u32 _block_size = 0u;
+        u32 _block_count = 0u;
+        u32 _free_count = 0u;
+        EPageState _state = EPageState::kEmpty;
+    };
 
-#pragma region Arena
-        Arena::Arena(Allocator *allocator) : _allocator(_allocator)
+    namespace
+    {
+        u32 GetBlockIndex(const PageHeader *page, const void *ptr)
         {
-            for (u16 i = 0; i < s_bin_mapper.GetBinCount(); i++)
+            AL_ASSERT(page != nullptr);
+            const uintptr_t address = reinterpret_cast<uintptr_t>(ptr);
+            AL_ASSERT(address >= page->_block_begin && address < page->_block_end);
+            AL_ASSERT((address - page->_block_begin) % page->_block_size == 0u);
+            return static_cast<u32>((address - page->_block_begin) / page->_block_size);
+        }
+    }// namespace
+
+    struct Page
+    {
+        static constexpr u64 kPageSize = 65536u;
+
+        static void Initialize(PageHeader *page, u32 block_size)
+        {
+            AL_ASSERT(page != nullptr);
+            AL_ASSERT(block_size >= sizeof(FreeBlock));
+
+            page->_block_size = block_size;
+            const uintptr_t page_begin = reinterpret_cast<uintptr_t>(page);
+            const uintptr_t data_begin = AlignAddress(page_begin + sizeof(PageHeader), block_size);
+            const uintptr_t page_end = page_begin + kPageSize;
+
+            AL_ASSERT(data_begin < page_end);
+            page->_block_count = static_cast<u32>((page_end - data_begin) / block_size);
+            AL_ASSERT(page->_block_count > 0u);
+
+            page->_free_count = page->_block_count;
+            page->_free_list = nullptr;
+            page->_block_begin = data_begin;
+            page->_block_end = data_begin + static_cast<uintptr_t>(page->_block_count) * block_size;
+            page->_state = EPageState::kEmpty;
+
+            for (u32 i = 0u; i < page->_block_count; ++i)
             {
-                _bins.push_back(new Bin(s_bin_mapper.GetBinSizeByIndex(i)));
+                auto *block = reinterpret_cast<FreeBlock *>(data_begin + static_cast<uintptr_t>(i) * block_size);
+                block->_next = page->_free_list;
+                page->_free_list = block;
             }
-        }
-        Arena::~Arena()
-        {
-            for (auto &bin: _bins)
-                DESTORY_PTR(bin);
-        }
-        void *Arena::Allocate(u64 size, u64 align)
-        {
-            u32 bin_index = s_bin_mapper.GetBinIndex(size);
-            u32 bin_size = s_bin_mapper.GetBinSizeByIndex(bin_index);
-            AL_ASSERT(bin_size % (u32) align == 0);
-            return _bins[bin_index]->Allocate(size);
-        }
-        void Arena::Deallocate(void *ptr)
-        {
-            auto head = Page::GetPageHeaderFromPointer(ptr);
-            head->_bin->Deallocate(ptr);
+
+            AL_ASSERT(page->_owner_page_mgr != nullptr);
+            page->_owner_page_mgr->InitializePageDebugInfo(page);
         }
 
-#pragma endregion
-
-#pragma region PageMgr
-        PageMgr::~PageMgr()
+        static bool Owns(const PageHeader *page, const void *ptr)
         {
-            _pages.clear();
+            const uintptr_t address = reinterpret_cast<uintptr_t>(ptr);
+            if (address < page->_block_begin || address >= page->_block_end) return false;
+            return (address - page->_block_begin) % page->_block_size == 0u;
         }
-        Page *PageMgr::AlloctatePage(u64 block_size, Bin *bin)
+
+        static void *Allocate(PageHeader *page)
         {
-            std::lock_guard<std::mutex> lock(_mutex);
-            if (_pages.empty())
-            {
-                _pages.emplace_back((u32) block_size, bin);
-            }
+            AL_ASSERT(page != nullptr && page->_free_list != nullptr && page->_free_count > 0u);
+            FreeBlock *block = page->_free_list;
+            page->_free_list = block->_next;
+            --page->_free_count;
+            page->_owner_page_mgr->MarkBlockAllocated(page, block);
+            return block;
+        }
+
+        static void Deallocate(PageHeader *page, void *ptr)
+        {
+            AL_ASSERT(page != nullptr && ptr != nullptr);
+            AL_ASSERT(page->_free_count < page->_block_count);
+            AL_ASSERT(Owns(page, ptr));
+
+            auto *block = static_cast<FreeBlock *>(ptr);
+            block->_next = page->_free_list;
+            page->_free_list = block;
+            ++page->_free_count;
+            page->_owner_page_mgr->MarkBlockFreed(page, ptr);
+        }
+
+        static PageHeader *GetPageHeaderFromPointer(void *ptr)
+        {
+            static_assert(IsPowerOfTwo(kPageSize));
+            const uintptr_t page_start = reinterpret_cast<uintptr_t>(ptr) & ~(kPageSize - 1u);
+            return reinterpret_cast<PageHeader *>(page_start);
+        }
+
+        static void Validate(const PageHeader *page)
+        {
+            AL_ASSERT(page != nullptr && page->_free_count <= page->_block_count);
+            if (page->_state == EPageState::kEmpty) AL_ASSERT(page->_free_count == page->_block_count);
+            else if (page->_state == EPageState::kPartial)
+                AL_ASSERT(page->_free_count > 0u && page->_free_count < page->_block_count);
             else
-            {
-                Page &cur_back = _pages.back();
-                Page &new_page = _pages.emplace_back((u32) block_size, bin);
-                cur_back._head->_next = new_page._head;
-                new_page._head->_prev = cur_back._head;
-            }
-            auto *page_header = _pages.back()._head;
-            LOG_INFO("[PageMgr::AlloctatePage]: Allocated new page(index: {},addr: {}) with block_size: {},current page num {}", page_header->_page_index, PtrToAddress(page_header), block_size, _pages.size());
+                AL_ASSERT(page->_free_count == 0u);
+        }
+    };
 
-            return &_pages.back();
-        }
-        void PageMgr::DeallocatePage(PageHeader *header)
-        {
-            if (!header)
-                return;
-            std::lock_guard<std::mutex> lock(_mutex);
-            if (_pages.empty())
-                return;
-            LOG_INFO("[PageMgr::DeallocatePage]: Deallocated page(index: {}),current page num {}", header->_page_index, _pages.size());
-            auto it = std::find_if(_pages.begin(), _pages.end(), [header](const Page &p)
-                                        { return p._head == header; 
-                                        });
-            if (it != _pages.end())
-                _pages.erase(it);
-        }
-        String PageMgr::Dump()
-        {
-            std::stringstream ss;
-            ss << "Page Manager Dump:" << std::endl;
-            for (auto &p: _pages)
-            {
-                ss << "Page: " << p.Dump() << std::endl;
-            }
-            return ss.str();
-        }
-#pragma endregion
+    PageMgr::~PageMgr()
+    {
+        std::lock_guard<std::mutex> lock(_mutex);
+        for (PageHeader *page: _pages) AlignedFree(page);
+        _pages.clear();
+    }
 
-#pragma region Bin
-        void *Bin::Allocate(u64 size)
+    PageHeader *PageMgr::AllocatePage(u32 block_size, Bin *owner_bin)
+    {
+        void *memory = AlignedAlloc(Page::kPageSize, Page::kPageSize);
+        AL_ASSERT(memory != nullptr);
+
+        auto *page = new (memory) PageHeader();
+        page->_owner_page_mgr = this;
+        page->_owner_bin = owner_bin;
+        Page::Initialize(page, block_size);
+
+        std::lock_guard<std::mutex> lock(_mutex);
+        _pages.push_back(page);
+        return page;
+    }
+
+    void PageMgr::DeallocatePage(PageHeader *page)
+    {
+        if (page == nullptr) return;
+
+        std::lock_guard<std::mutex> lock(_mutex);
+        auto it = std::find(_pages.begin(), _pages.end(), page);
+        AL_ASSERT(it != _pages.end());
+        _pages.erase(it);
+        _page_debug_infos.erase(page);
+        page->~PageHeader();
+        AlignedFree(page);
+    }
+
+    String PageMgr::Dump()
+    {
+        std::lock_guard<std::mutex> lock(_mutex);
+        std::ostringstream oss;
+        oss << "Page count: " << _pages.size() << '\n';
+        for (const PageHeader *page: _pages)
         {
-            if (size > _block_size)
-                return nullptr;
-            if (_free_list != nullptr)
+            const auto debug_it = _page_debug_infos.find(const_cast<PageHeader *>(page));
+            oss << PtrToAddress(page) << " block_size=" << page->_block_size << " block_count=" << page->_block_count
+                << " free_count=" << page->_free_count;
+            if (debug_it != _page_debug_infos.end())
             {
-                void *result = _free_list;
-                auto *head = Page::GetPageHeaderFromPointer(result);
-                ++head->_used_count;
-                _free_list = _free_list->_next;
-                _used_bytes_ratio += static_cast<f32>(size) / _block_size;
-                _used_bytes_ratio *= 0.5f;
-                //AL_ASSERT(reinterpret_cast<uintptr_t>(_free_list) != 0xdeadc0de00000048);
-                //LOG_INFO("[Bin::Allocate]: Allocated block(size: {}),current used count {},next is {}",size,head->_used_count.load(),PtrToAddress(_free_list));
-                return result;
-            }
-            Page *page = Allocator::Get().GetPageMgr().AlloctatePage(_block_size, this);
-            u8 *block_data = page->Data();
-            for (size_t i = 1; i < page->_head->_block_count; ++i)
-            {
-                auto *block = reinterpret_cast<Block *>(block_data + i * _block_size);
-                block->_next = _free_list;
-                _free_list = block;
-            }
-            _used_bytes_ratio = static_cast<f32>(size) / _block_size;
-            ++page->_head->_used_count;
-            _pages.emplace_back(page->_head);
-            return block_data;
-        }
-        void Bin::Deallocate(void *ptr)
-        {
-            if (ptr == nullptr)
-                return;
-            Block *free_block = reinterpret_cast<Block *>(ptr);
-            free_block->_next = _free_list;
-            _free_list = free_block;
-            auto *head = Page::GetPageHeaderFromPointer(ptr);
-            --head->_used_count;
-            if (head->_used_count == 0)
-            {
-                if (++_empty_page_count >= 4)
+                oss << " allocated_bits=[";
+                for (u32 i = 0u; i < debug_it->second._allocated_bits.size(); ++i)
                 {
-                    auto it = std::ranges::remove_if(_pages.begin(), _pages.end(), [head](PageHeader *page) { return page->_used_count == 0u && page != head; });
-                    for(auto itt = it.begin(); itt != it.end();itt++)
-                    {
-                        Allocator::Get().GetPageMgr().DeallocatePage(*itt);
-                        LOG_INFO("Bin::Deallocate: ptr({})", PtrToAddress(*itt));
-                    }
-                    _pages.erase(it.begin(),it.end());
-                    _empty_page_count = 1u;
+                    if (i != 0u) oss << ',';
+                    oss << "0x" << std::hex << debug_it->second._allocated_bits[i] << std::dec;
                 }
+                oss << "] guard_bits=[";
+                for (u32 i = 0u; i < debug_it->second._guard_bits.size(); ++i)
+                {
+                    if (i != 0u) oss << ',';
+                    oss << "0x" << std::hex << debug_it->second._guard_bits[i] << std::dec;
+                }
+                oss << ']';
             }
+            oss << '\n';
         }
-#pragma endregion
+        return oss.str();
+    }
 
-#pragma region Allocator
-        static Allocator *g_Allocator;
-        void Allocator::Init()
+    void PageMgr::InitializePageDebugInfo(PageHeader *page)
+    {
+        AL_ASSERT(page != nullptr);
+        const u32 word_count = GetDebugWordCount(page->_block_count);
+
+        std::lock_guard<std::mutex> lock(_mutex);
+        PageDebugInfo &debug_info = _page_debug_infos[page];
+        debug_info._page_address = reinterpret_cast<u64>(page);
+        debug_info._block_count = page->_block_count;
+        debug_info._allocated_bits.assign(word_count, 0u);
+        debug_info._guard_bits.assign(word_count, ~0ull);
+        if (!debug_info._guard_bits.empty() && page->_block_count % kDebugBitsPerWord != 0u)
         {
-            if (!g_Allocator)
-            {
-                g_Allocator = new Allocator();
-            }
+            const u32 valid_bit_count = page->_block_count % kDebugBitsPerWord;
+            debug_info._guard_bits.back() = (1ull << valid_bit_count) - 1ull;
         }
-        void Allocator::Shutdown()
+    }
+
+    void PageMgr::MarkBlockAllocated(PageHeader *page, void *ptr)
+    {
+        AL_ASSERT(page != nullptr && ptr != nullptr);
+        const u32 block_index = GetBlockIndex(page, ptr);
+
+        std::lock_guard<std::mutex> lock(_mutex);
+        auto it = _page_debug_infos.find(page);
+        AL_ASSERT(it != _page_debug_infos.end());
+        AL_ASSERT(!TestBit(it->second._allocated_bits, block_index));
+        AL_ASSERT(TestBit(it->second._guard_bits, block_index));
+        SetBit(it->second._allocated_bits, block_index);
+        ClearBit(it->second._guard_bits, block_index);
+    }
+
+    void PageMgr::MarkBlockFreed(PageHeader *page, void *ptr)
+    {
+        AL_ASSERT(page != nullptr && ptr != nullptr);
+        const u32 block_index = GetBlockIndex(page, ptr);
+
+        std::lock_guard<std::mutex> lock(_mutex);
+        auto it = _page_debug_infos.find(page);
+        AL_ASSERT(it != _page_debug_infos.end());
+        AL_ASSERT(TestBit(it->second._allocated_bits, block_index));
+        AL_ASSERT(!TestBit(it->second._guard_bits, block_index));
+        ClearBit(it->second._allocated_bits, block_index);
+        SetBit(it->second._guard_bits, block_index);
+    }
+
+    Bin::Bin(PageMgr *page_mgr, u32 block_size, Arena *arena) : _page_mgr(page_mgr), _block_size(block_size), _arena(arena)
+    { AL_ASSERT(_page_mgr != nullptr && _block_size >= sizeof(FreeBlock)); }
+
+    Bin::~Bin()
+    {
+        ReleasePageList(_partial_pages);
+        ReleasePageList(_full_pages);
+        ReleasePageList(_empty_pages);
+        _empty_page_count = 0u;
+    }
+
+    void *Bin::Allocate()
+    {
+        PageHeader *page = _partial_pages;
+        if (page == nullptr && _empty_pages != nullptr)
         {
-            g_Allocator->PrintLeaks();
-            g_Allocator->_allocations.clear();
-            g_Allocator->_arenas.clear();
-            DESTORY_PTR(g_Allocator);
+            page = _empty_pages;
+            MovePage(page, _empty_pages, _partial_pages);
+            page->_state = EPageState::kPartial;
+            --_empty_page_count;
         }
-        Allocator &Allocator::Get()
+        else if (page == nullptr)
         {
-            if (!g_Allocator)
-                Init();
-            return *g_Allocator;
+            page = CreatePage();
+            PushPage(_partial_pages, page);
+            page->_state = EPageState::kPartial;
         }
-        Arena &Allocator::ThreadArena()
+
+        void *ptr = Page::Allocate(page);
+        if (page->_free_count == 0u)
         {
-            if (!s_thread_arena)
-            {
-                std::lock_guard lock(_arena_mutex);
-                s_thread_arena = new Arena(this);
-                _arenas.push_back(std::unique_ptr<Arena>(s_thread_arena));
-            }
-            return *s_thread_arena;
+            MovePage(page, _partial_pages, _full_pages);
+            page->_state = EPageState::kFull;
         }
-        void *Allocator::Allocate(u64 size, const char *file, const char *function, u16 line, u64 align)
+        Page::Validate(page);
+        return ptr;
+    }
+
+    void Bin::Deallocate(PageHeader *page, void *ptr)
+    {
+        AL_ASSERT(page != nullptr && page->_owner_bin == this);
+        const bool was_full = page->_state == EPageState::kFull;
+        Page::Deallocate(page, ptr);
+
+        if (was_full)
         {
-            std::lock_guard<std::mutex> lock(_mutex);
-            void *data;
-            bool is_sys_alloc = false;
-            size += kAllocHeaderSize;
-            if (size <= kMaxBinSize)
-            {
-                data = ThreadArena().Allocate(size, align);
-            }
-            else
-            {
-                data = AlignedAlloc(align,size);
-                is_sys_alloc = true;
-            }
-            if (data)
-            {
-                //makesure data is aligned
-                AL_ASSERT_MSG(reinterpret_cast<uintptr_t>(data) % align == 0, "Allocator::Allocate: data is not aligned, size: {}, align: {}, ptr: {}", size, align, PtrToAddress(data));
-                AllocHeader *header = reinterpret_cast<AllocHeader *>(data);
-                header->_size_and_flags = AllocHeader::PackAllocSize((u32) size, is_sys_alloc);
-                header->_magic = 0xDEADC0DE;
-                _total_allocated.fetch_add(size);
+            MovePage(page, _full_pages, _partial_pages);
+            page->_state = EPageState::kPartial;
+        }
+
+        if (page->_free_count == page->_block_count)
+        {
+            MovePage(page, _partial_pages, _empty_pages);
+            page->_state = EPageState::kEmpty;
+            ++_empty_page_count;
+            TrimEmptyPages();
+        }
+        else
+        {
+            Page::Validate(page);
+        }
+    }
+
+    void Bin::PushPage(PageHeader *&head, PageHeader *page)
+    {
+        page->_prev = nullptr;
+        page->_next = head;
+        if (head != nullptr) head->_prev = page;
+        head = page;
+    }
+
+    void Bin::RemovePage(PageHeader *&head, PageHeader *page)
+    {
+        if (page->_prev != nullptr) page->_prev->_next = page->_next;
+        else
+            head = page->_next;
+        if (page->_next != nullptr) page->_next->_prev = page->_prev;
+        page->_prev = nullptr;
+        page->_next = nullptr;
+    }
+
+    void Bin::MovePage(PageHeader *page, PageHeader *&from, PageHeader *&to)
+    {
+        RemovePage(from, page);
+        PushPage(to, page);
+    }
+
+    PageHeader *Bin::CreatePage()
+    {
+        auto header = _page_mgr->AllocatePage(_block_size, this);
+        header->_owner_arena = _arena;
+        return header;
+    }
+
+    void Bin::TrimEmptyPages()
+    {
+        while (_empty_page_count > kMaxCachedEmptyPages) ReleaseEmptyPage(_empty_pages);
+    }
+
+    void Bin::ReleaseEmptyPage(PageHeader *page)
+    {
+        AL_ASSERT(page != nullptr && page->_state == EPageState::kEmpty);
+        AL_ASSERT(page->_free_count == page->_block_count);
+        RemovePage(_empty_pages, page);
+        --_empty_page_count;
+        _page_mgr->DeallocatePage(page);
+    }
+
+    void Bin::ReleasePageList(PageHeader *&head)
+    {
+        while (head != nullptr)
+        {
+            PageHeader *page = head;
+            RemovePage(head, page);
+            _page_mgr->DeallocatePage(page);
+        }
+    }
+
+    Arena::Arena(Allocator *allocator) : _allocator(allocator)
+    {
+        AL_ASSERT(_allocator != nullptr);
+        _bins.reserve(s_bin_mapper.GetBinCount());
+        for (u32 i = 0u; i < s_bin_mapper.GetBinCount(); ++i)
+            _bins.push_back(new Bin(&_allocator->GetPageMgr(), s_bin_mapper.GetBinSizeByIndex(i), this));
+    }
+
+    Arena::~Arena()
+    {
+        for (Bin *bin: _bins) delete bin;
+        _bins.clear();
+    }
+
+    void *Arena::Allocate(u64 size, u64 align)
+    {
+        AL_ASSERT(size <= Allocator::kMaxSmallAllocationSize);
+        const u32 bin_index = s_bin_mapper.GetBinIndex(size);
+        AL_ASSERT(bin_index != std::numeric_limits<u32>::max());
+        const u32 block_size = s_bin_mapper.GetBinSizeByIndex(bin_index);
+        AL_ASSERT(block_size >= size);
+        return _bins[bin_index]->Allocate();
+    }
+
+    void Allocator::Init()
+    {
+        if (s_allocator == nullptr) s_allocator = new Allocator();
+    }
+
+    void Allocator::Shutdown()
+    {
+        if (s_allocator == nullptr) return;
+        s_allocator->PrintLeaks();
+        delete s_allocator;
+        s_allocator = nullptr;
+        g_thread_arena = nullptr;
+    }
+
+    Allocator &Allocator::Get()
+    {
+        if (s_allocator == nullptr) Init();
+        return *s_allocator;
+    }
+
+    Arena &Allocator::ThreadArena()
+    {
+        if (g_thread_arena != nullptr) return *g_thread_arena;
+
+        std::lock_guard<std::mutex> lock(_arena_mutex);
+        auto arena = std::make_unique<Arena>(this);
+        g_thread_arena = arena.get();
+        _arenas.push_back(std::move(arena));
+        return *g_thread_arena;
+    }
+
+    void *Allocator::Allocate(u64 size, const char *file, const char *function, u16 line, u64 align, EMemoryTag tag)
+    {
+        AL_ASSERT(size > 0u);
+        AL_ASSERT(IsPowerOfTwo(align));
+        AL_ASSERT(align <= std::numeric_limits<u16>::max());
+        AL_ASSERT(size <= std::numeric_limits<u64>::max() - sizeof(AllocHeader) - (align - 1u));
+
+        std::lock_guard<std::mutex> lock(_mutex);
+        const u64 allocation_size = size + sizeof(AllocHeader) + align - 1u;
+        const bool is_system_allocation = allocation_size > kMaxSmallAllocationSize;
+        void *raw_ptr = is_system_allocation ? AlignedAlloc(std::max<u64>(align, alignof(void *)), allocation_size)
+                                             : ThreadArena().Allocate(allocation_size, align);
+        AL_ASSERT(raw_ptr != nullptr);
+
+        const uintptr_t user_address = AlignAddress(reinterpret_cast<uintptr_t>(raw_ptr) + sizeof(AllocHeader), align);
+        auto *header = reinterpret_cast<AllocHeader *>(user_address - sizeof(AllocHeader));
+        header->_raw_ptr = raw_ptr;
+        header->_requested_size = size;
+        header->_magic = AllocHeader::kMagicAllocated;
+        header->_alignment = static_cast<u16>(align);
+        header->_flags = is_system_allocation ? AllocHeader::kFlagSystem : 0u;
+        header->_tag = tag;
+
+        void *user_ptr = reinterpret_cast<void *>(user_address);
+        AL_ASSERT(reinterpret_cast<uintptr_t>(user_ptr) % align == 0u);
+        _total_allocated.fetch_add(size);
 #ifdef _DEBUG
-                if (!_allocations.contains(data))
-                {
-                    _allocations[data] = AllocationInfo{size, file, function, line};
-                }
-                else
-                    AL_ASSERT(false);
-#endif//_DEBUG
-                return reinterpret_cast<void *>(header + 1);
-            }
-            else
-                AL_ASSERT(false);
-            return nullptr;
-        }
+        _allocations[user_ptr] = AllocationInfo{size, file, function, line, is_system_allocation,tag};
+#endif
+        return user_ptr;
+    }
 
-        void Allocator::Deallocate(void *ptr)
-        {
-            if (!ptr) return;
-            std::lock_guard<std::mutex> lock(_mutex);
-            auto *header = reinterpret_cast<AllocHeader *>(ptr) - 1;
-            AL_ASSERT(header->_magic == 0xDEADC0DE);
+    void Allocator::Deallocate(void *ptr)
+    {
+        if (ptr == nullptr) return;
+
+        std::lock_guard<std::mutex> lock(_mutex);
+        auto *header = reinterpret_cast<AllocHeader *>(reinterpret_cast<uintptr_t>(ptr) - sizeof(AllocHeader));
+        AL_ASSERT(header->_magic == AllocHeader::kMagicAllocated);
+        AL_ASSERT(header->_raw_ptr != nullptr);
+
+        void *raw_ptr = header->_raw_ptr;
+        const u64 requested_size = header->_requested_size;
+        const bool is_system_allocation = header->IsSystemAllocation();
+        header->_magic = AllocHeader::kMagicFreed;
+
 #ifdef _DEBUG
-            void* key = reinterpret_cast<void *>(header);
-            //auto alloc = _allocations[key];
-            if (!_allocations.contains(key))
-            {
-                AL_ASSERT(false);
-            }
-            else
-                _allocations.erase(key);
-#endif//_DEBUG
-            _total_allocated.fetch_sub(AllocHeader::UnpackAllocSize(header->_size_and_flags));
-            if (AllocHeader::IsSysAlloc(header->_size_and_flags))
-                AlignedFree(header);
-            else
-                ThreadArena().Deallocate(header);
-        }
+        const auto it = _allocations.find(ptr);
+        AL_ASSERT(it != _allocations.end());
+        _allocations.erase(it);
+#endif
+        _total_allocated.fetch_sub(requested_size);
 
-
-        void Allocator::PrintAllocatedInfo()
+        if (is_system_allocation)
         {
-            LOG_INFO(_page_mgr.Dump());
+            AlignedFree(raw_ptr);
+            return;
         }
 
-        void Allocator::PrintLeaks()
+        PageHeader *page = Page::GetPageHeaderFromPointer(raw_ptr);
+        AL_ASSERT(Page::Owns(page, raw_ptr));
+        AL_ASSERT(page->_owner_bin != nullptr);
+        page->_owner_bin->Deallocate(page, raw_ptr);
+    }
+
+    void Allocator::PrintLeaks()
+    {
+#ifdef _DEBUG
+        std::lock_guard<std::mutex> lock(_mutex);
+        if (_allocations.empty())
         {
-            std::lock_guard lock(_mutex);
-            if (_allocations.empty())
-            {
-                LOG_INFO("Allocator: No memory leaks detected");
-            }
-            else
-            {
-                LOG_WARNING("Allocator Detected memory leaks:")
-                for (const auto &[ptr, info]: _allocations)
-                {
-                    LOG_INFO("Leak at {},size: {},allocated at {}:{} ({})", ptr, info._size, info._file, info._line, info._function)
-                }
-            }
+            LOG_INFO("No memory leaks detected.");
+            return;
         }
-    }// namespace Core
 
-#pragma endregion
-};// namespace Ailu
+        LOG_WARNING("Detected {} memory leak(s).", _allocations.size());
+        for (const auto &[ptr, info]: _allocations)
+        {
+            LOG_WARNING("Leak {} bytes at {}, {}:{} ({})", info._size, PtrToAddress(ptr), info._file, info._line, info._function);
+        }
+#else
+        LOG_INFO("Memory leak tracking is disabled in this build.");
+#endif
+    }
+
+    void Allocator::PrintAllocatedInfo()
+    {
+        LOG_INFO("Active allocation bytes: {}", TotalAllocated());
+        LOG_INFO("{}", _page_mgr.Dump());
+    }
+}// namespace Ailu

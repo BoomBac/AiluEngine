@@ -7,33 +7,33 @@
 //Class Mesh begin...........................
 #define MESH_GEN_H_28_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_Mesh_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_Mesh_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual Type  *GetType() override;
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::Render{
 class Mesh ;
 }
 template<>
-AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::Render::Mesh>();
+AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::Mesh>();
 //Class Mesh end...........................
 
 //Class SkeletonMesh begin...........................
 #define MESH_GEN_H_178_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_SkeletonMesh_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_SkeletonMesh_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual Type  *GetType() override;
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::Render{
 class SkeletonMesh ;
 }
 template<>
-AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::Render::SkeletonMesh>();
+AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::SkeletonMesh>();
 //Class SkeletonMesh end...........................
 
 #undef CURRENT_FILE_ID

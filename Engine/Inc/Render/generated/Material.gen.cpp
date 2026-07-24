@@ -6,7 +6,7 @@
 #include <Objects/SerializeSpecializations.h>
 #include <Framework/Common/Log.h>
 using namespace Ailu;
-Ailu::Type* Ailu::Render::Z_Construct_Material_Type()
+const Ailu::Type* Ailu::Render::Z_Construct_Material_Type()
 {
 Ailu::Object::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -27,22 +27,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::Render::Material::GetPrivateStaticClass()
+const Ailu::Type* Ailu::Render::Material::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_Material_Type();
+	static const Ailu::Type* type = Z_Construct_Material_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::Render::Material>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::Render::Material>()
 {
 return Ailu::Render::Material::StaticType();
 }
-    Type *Ailu::Render::Material::GetType()
+    const Type *Ailu::Render::Material::GetType()
 {
 return Ailu::Render::Material::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_Material(&Ailu::Render::Material::StaticType, "Ailu::Render::Material");
-Ailu::Type* Ailu::Render::Z_Construct_StandardMaterial_Type()
+const Ailu::Type* Ailu::Render::Z_Construct_StandardMaterial_Type()
 {
 Ailu::Render::Material::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -63,17 +63,17 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::Render::StandardMaterial::GetPrivateStaticClass()
+const Ailu::Type* Ailu::Render::StandardMaterial::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_StandardMaterial_Type();
+	static const Ailu::Type* type = Z_Construct_StandardMaterial_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::Render::StandardMaterial>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::Render::StandardMaterial>()
 {
 return Ailu::Render::StandardMaterial::StaticType();
 }
-    Type *Ailu::Render::StandardMaterial::GetType()
+    const Type *Ailu::Render::StandardMaterial::GetType()
 {
 return Ailu::Render::StandardMaterial::GetPrivateStaticClass();
 }

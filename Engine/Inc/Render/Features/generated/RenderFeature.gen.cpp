@@ -6,7 +6,7 @@
 #include <Objects/SerializeSpecializations.h>
 #include <Framework/Common/Log.h>
 using namespace Ailu;
-Ailu::Type* Ailu::Render::Z_Construct_RenderPass_Type()
+const Ailu::Type* Ailu::Render::Z_Construct_RenderPass_Type()
 {
 Ailu::Object::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -27,17 +27,17 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::Render::RenderPass::GetPrivateStaticClass()
+const Ailu::Type* Ailu::Render::RenderPass::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_RenderPass_Type();
+	static const Ailu::Type* type = Z_Construct_RenderPass_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::Render::RenderPass>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::Render::RenderPass>()
 {
 return Ailu::Render::RenderPass::StaticType();
 }
-    Type *Ailu::Render::RenderPass::GetType()
+    const Type *Ailu::Render::RenderPass::GetType()
 {
 return Ailu::Render::RenderPass::GetPrivateStaticClass();
 }

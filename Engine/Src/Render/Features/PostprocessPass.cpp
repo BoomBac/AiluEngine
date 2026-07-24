@@ -136,7 +136,7 @@ namespace Ailu::Render
         RenderTexture* scene_color = rendering_data._postprocess_input? rendering_data._postprocess_input : 
             g_pRenderTexturePool->Get(rendering_data._camera_color_target_handle);
         {
-            GpuProfileBlock p(cmd.get(), cmd->Name());
+            PROFILE_BLOCK_GPU(cmd.get(), cmd->Name())
             if (_is_use_blur)
             {
                 auto blur_x = cmd->GetTempRT(rendering_data._width, rendering_data._height, "blur_x", ERenderTargetFormat::kDefault, false, false, true);

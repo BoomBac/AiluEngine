@@ -7,17 +7,17 @@
 //Class WorldOutline begin...........................
 #define WORLDOUTLINE_GEN_H_21_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_WorldOutline_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_WorldOutline_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual Type  *GetType() override;
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::Editor{
 class WorldOutline ;
 }
 template<>
-class Ailu::Type* Ailu::StaticClass<class Ailu::Editor::WorldOutline>();
+const class Ailu::Type* Ailu::StaticClass<class Ailu::Editor::WorldOutline>();
 //Class WorldOutline end...........................
 
 #undef CURRENT_FILE_ID

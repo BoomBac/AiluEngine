@@ -7,33 +7,33 @@
 //Class Widget begin...........................
 #define WIDGET_GEN_H_37_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_Widget_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_Widget_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual Type  *GetType() override;
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::UI{
 class Widget ;
 }
 template<>
-AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::UI::Widget>();
+AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::UI::Widget>();
 //Class Widget end...........................
 
 //Struct SlotItemData begin...........................
 #define WIDGET_GEN_H_22_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_SlotItemData_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_SlotItemData_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                AILU_API Type  *GetType();
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                const AILU_API Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu::UI{
 struct SlotItemData ;
 }
 template<>
-AILU_API class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::SlotItemData>();
+AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::SlotItemData>();
 //Struct SlotItemData end...........................
 
 #undef CURRENT_FILE_ID

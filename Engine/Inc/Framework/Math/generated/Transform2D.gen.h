@@ -7,17 +7,17 @@
 //Struct Transform2D begin...........................
 #define TRANSFORM2D_GEN_H_12_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_Transform2D_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_Transform2D_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                Type  *GetType();
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                const Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu::Math{
 struct Transform2D ;
 }
 template<>
-AILU_API class Ailu::Type* Ailu::StaticClass<struct Ailu::Math::Transform2D>();
+AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::Math::Transform2D>();
 //Struct Transform2D end...........................
 
 #undef CURRENT_FILE_ID

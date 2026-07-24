@@ -6,7 +6,7 @@
 #include <Objects/SerializeSpecializations.h>
 #include <Framework/Common/Log.h>
 using namespace Ailu;
-Ailu::Type* Ailu::UI::Z_Construct_UIElement_Type()
+const Ailu::Type* Ailu::UI::Z_Construct_UIElement_Type()
 {
 Ailu::SerializeObject::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -58,7 +58,7 @@ builder_slot_obj._is_static = false;
 builder_slot_obj._is_public = false;
 builder_slot_obj._is_pointer = false;
 builder_slot_obj._is_ref = false;
-builder_slot_obj._is_template = false;
+builder_slot_obj._is_template = true;
 builder_slot_obj._meta = meta_slot_obj;
 builder_slot_obj._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Ref<UISlot>>);
 builder_slot_obj._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Ref<UISlot>>);
@@ -153,17 +153,17 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::UI::UIElement::GetPrivateStaticClass()
+const Ailu::Type* Ailu::UI::UIElement::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_UIElement_Type();
+	static const Ailu::Type* type = Z_Construct_UIElement_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::UIElement>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::UIElement>()
 {
 return Ailu::UI::UIElement::StaticType();
 }
-    Type *Ailu::UI::UIElement::GetType()
+    const Type *Ailu::UI::UIElement::GetType()
 {
 return Ailu::UI::UIElement::GetPrivateStaticClass();
 }

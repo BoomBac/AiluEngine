@@ -1,0 +1,188 @@
+#include "Render/2D/SpriteBatcher.h"
+#include "Framework/Common/ResourceMgr.h"
+#include "Render/CommandBuffer.h"
+#include "Render/PipelineState.h"
+#include "Render/ShaderInterop.h"
+#include "pch.h"
+
+namespace Ailu::Render
+{
+    SpriteBatcher::SpriteBatcher()
+    {
+    }
+
+    SpriteBatcher::~SpriteBatcher()
+    {
+        Shutdown();
+    }
+
+    void SpriteBatcher::Initialize()
+    {
+        CreateStaticGeometry();
+
+        _default_material = MakeRef<Material>(
+            ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/default_sprite.alasset"),
+            "DefaultSpriteMaterial");
+        _default_material->SetTexture("_MainTex", Texture2D::s_p_default_white);
+
+        _per_obj_cb.reset(ConstantBuffer::Create(sizeof(CBufferPerObjectData)));
+        memset(_per_obj_cb->GetData(), 0, sizeof(CBufferPerObjectData));
+
+        _instance_capacity = 256u;
+    }
+
+    void SpriteBatcher::Shutdown()
+    {
+        _vertex_buffer.reset();
+        _index_buffer.reset();
+        _instance_buffer.reset();
+        _per_obj_cb.reset();
+        _default_material.reset();
+        _instance_data.clear();
+        _batches.clear();
+    }
+
+    void SpriteBatcher::CreateStaticGeometry()
+    {
+        // POSITION on stream 0, TEXCOORD on stream 1
+        VertexBufferLayout layout{
+            {"POSITION", EShaderDateType::kFloat2, 0, 0},
+            {"TEXCOORD", EShaderDateType::kFloat2, 1, 0}
+        };
+
+        auto *vb = VertexBuffer::Create(layout, "SpriteUnitQuadVB");
+        vb->SetStream((u8 *)kSpritePositions, sizeof(kSpritePositions), 0, false);
+        vb->SetStream((u8 *)kSpriteUVs, sizeof(kSpriteUVs), 1, false);
+        _vertex_buffer.reset(vb);
+        GraphicsContext::Get().CreateResource(_vertex_buffer.get());
+
+        // Create index buffer
+        auto *ib = IndexBuffer::Create(kSpriteIndices, 6, "SpriteUnitQuadIB", false);
+        _index_buffer.reset(ib);
+        GraphicsContext::Get().CreateResource(_index_buffer.get());
+    }
+
+    void SpriteBatcher::Build(const Vector<SpriteRenderData> &render_data)
+    {
+        _instance_data.clear();
+        _batches.clear();
+
+        if (render_data.empty())
+            return;
+
+        BuildInstanceData(render_data);
+        BuildBatches(render_data);
+
+        // Upload instance data to GPU
+        if (!_instance_data.empty())
+        {
+            _instance_buffer->SetData(reinterpret_cast<const u8 *>(_instance_data.data()),
+                                      static_cast<u32>(_instance_data.size() * sizeof(SpriteInstanceData)));
+        }
+    }
+
+    void SpriteBatcher::Render(CommandBuffer *cmd, RenderTexture *color_target, RenderTexture *depth_target)
+    {
+        if (_batches.empty())
+            return;
+
+        cmd->SetRenderTarget(color_target, depth_target);
+
+        // Bind the instance buffer globally for the shader
+        //Shader::SetGlobalBuffer("g_sprite_instances", _instance_buffer);
+
+        for (const auto &batch : _batches)
+        {
+            if (batch._instance_count == 0)
+                continue;
+
+            Material *mat = batch._key._material != nullptr ? batch._key._material : _default_material.get();
+
+            Texture *tex = batch._key._texture;
+            if (tex != nullptr)
+                mat->SetTexture("_MainTex", tex);
+            mat->SetBuffer("g_sprite_instances", _instance_buffer.get());
+            cmd->DrawIndexedInstanced(_vertex_buffer.get(), _index_buffer.get(),
+                                      nullptr, mat, 0, batch._instance_count, 0, 6);
+        }
+    }
+
+    void SpriteBatcher::Clear()
+    {
+        _instance_data.clear();
+        _batches.clear();
+    }
+
+    void SpriteBatcher::EnsureInstanceCapacity(u32 required_count)
+    {
+        if (_instance_capacity >= required_count && _instance_buffer != nullptr)
+            return;
+
+        u32 new_capacity = std::max(required_count, std::max(256u, _instance_capacity * 2u));
+        _instance_data.reserve(new_capacity);
+        _instance_capacity = new_capacity;
+
+        // Allocate instance buffer
+        BufferDesc desc;
+        desc._element_num = new_capacity;
+        desc._element_size = sizeof(SpriteInstanceData);
+        desc._size = new_capacity * sizeof(SpriteInstanceData);
+        desc._target = EGPUBufferTarget::kStructured;
+        desc._init_state = EResourceState::kCommon;
+        _instance_buffer = GPUBuffer::Create(desc, "SpriteInstanceBuffer");
+        GraphicsContext::Get().CreateResource(_instance_buffer.get());
+    }
+
+    void SpriteBatcher::BuildInstanceData(const Vector<SpriteRenderData> &render_data)
+    {
+        EnsureInstanceCapacity((u32)render_data.size());
+
+        for (const auto &sprite : render_data)
+        {
+            SpriteInstanceData inst;
+            inst._local_to_world = sprite._local_to_world;
+            inst._uv_rect = sprite._uv_rect;
+            inst._color = Vector4f(sprite._color.r, sprite._color.g, sprite._color.b, sprite._color.a);
+            inst._size_pivot = Vector4f(sprite._size.x, sprite._size.y, sprite._pivot.x, sprite._pivot.y);
+            inst._texture_index = 0u;
+            inst._entity_id = sprite._entity_id;
+
+            inst._flags = 0u;
+            if (sprite._flip_x)
+                inst._flags |= kSpriteFlagFlipX;
+            if (sprite._flip_y)
+                inst._flags |= kSpriteFlagFlipY;
+
+            inst._padding = 0u;
+
+            _instance_data.push_back(inst);
+        }
+    }
+
+    void SpriteBatcher::BuildBatches(const Vector<SpriteRenderData> &render_data)
+    {
+        for (u32 i = 0; i < render_data.size(); ++i)
+        {
+            const auto &sprite = render_data[i];
+
+            SpriteBatchKey key;
+            key._material = sprite._material;
+            key._texture = sprite._texture;
+            key._blend_mode = sprite._blend_mode;
+
+            if (_batches.empty() || !(_batches.back()._key == key))
+            {
+                SpriteBatch batch;
+                batch._key = key;
+                batch._instance_offset = i;
+                batch._instance_count = 1u;
+                _batches.push_back(batch);
+            }
+            else
+            {
+                _batches.back()._instance_count++;
+            }
+        }
+    }
+
+}// namespace Ailu::Render

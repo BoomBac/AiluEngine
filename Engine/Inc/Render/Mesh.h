@@ -2,7 +2,7 @@
 #ifndef __MESH_H__
 #define __MESH_H__
 #include "Animation/Skeleton.h"
-#include "Framework/Common/Asset.h"
+#include "Assets/Asset.h"
 #include "Framework/Math/ALMath.hpp"
 #include "Framework/Math/Geometry.h"
 #include "GlobalMarco.h"

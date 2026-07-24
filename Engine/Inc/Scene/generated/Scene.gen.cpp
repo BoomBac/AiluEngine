@@ -6,7 +6,7 @@
 #include <Objects/SerializeSpecializations.h>
 #include <Framework/Common/Log.h>
 using namespace Ailu;
-Ailu::Type* Ailu::SceneManagement::Z_Construct_Scene_Type()
+const Ailu::Type* Ailu::SceneManagement::Z_Construct_Scene_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -26,17 +26,17 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::SceneManagement::Scene::GetPrivateStaticClass()
+const Ailu::Type* Ailu::SceneManagement::Scene::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_Scene_Type();
+	static const Ailu::Type* type = Z_Construct_Scene_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::SceneManagement::Scene>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::SceneManagement::Scene>()
 {
 return Ailu::SceneManagement::Scene::StaticType();
 }
-    Type *Ailu::SceneManagement::Scene::GetType()
+    const Type *Ailu::SceneManagement::Scene::GetType()
 {
 return Ailu::SceneManagement::Scene::GetPrivateStaticClass();
 }

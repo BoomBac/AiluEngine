@@ -7,65 +7,65 @@
 //Class UISlot begin...........................
 #define UISLOT_GEN_H_70_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_UISlot_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_UISlot_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual Type  *GetType() override;
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::UI{
 class UISlot ;
 }
 template<>
-AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::UI::UISlot>();
+AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::UI::UISlot>();
 //Class UISlot end...........................
 
 //Class CanvasSlot begin...........................
 #define UISLOT_GEN_H_92_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_CanvasSlot_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_CanvasSlot_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual Type  *GetType() override;
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::UI{
 class CanvasSlot ;
 }
 template<>
-AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::UI::CanvasSlot>();
+AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::UI::CanvasSlot>();
 //Class CanvasSlot end...........................
 
 //Class LinearSlot begin...........................
 #define UISLOT_GEN_H_115_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_LinearSlot_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_LinearSlot_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual Type  *GetType() override;
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::UI{
 class LinearSlot ;
 }
 template<>
-AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::UI::LinearSlot>();
+AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::UI::LinearSlot>();
 //Class LinearSlot end...........................
 
 //Struct Padding begin...........................
 #define UISLOT_GEN_H_41_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_Padding_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_Padding_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                AILU_API Type  *GetType();
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                const AILU_API Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu::UI{
 struct Padding ;
 }
 template<>
-AILU_API class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::Padding>();
+AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::Padding>();
 //Struct Padding end...........................
 
 //Enum EAlignment begin...........................

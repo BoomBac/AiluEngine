@@ -6,7 +6,7 @@
 #include <Objects/SerializeSpecializations.h>
 #include <Framework/Common/Log.h>
 using namespace Ailu;
-Ailu::Type* Ailu::Editor::Z_Construct_EditorConfig_Type()
+const Ailu::Type* Ailu::Editor::Z_Construct_EditorConfig_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -257,22 +257,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::Editor::EditorConfig::GetPrivateStaticClass()
+const Ailu::Type* Ailu::Editor::EditorConfig::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_EditorConfig_Type();
+	static const Ailu::Type* type = Z_Construct_EditorConfig_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::Editor::EditorConfig>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::Editor::EditorConfig>()
 {
 return Ailu::Editor::EditorConfig::StaticType();
 }
-    Type *Ailu::Editor::EditorConfig::GetType()
+    const Type *Ailu::Editor::EditorConfig::GetType()
 {
 return Ailu::Editor::EditorConfig::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_EditorConfig(&Ailu::Editor::EditorConfig::StaticType, "Ailu::Editor::EditorConfig");
-Ailu::Type* Ailu::Editor::Z_Construct_TestObj_Type()
+const Ailu::Type* Ailu::Editor::Z_Construct_TestObj_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -344,7 +344,7 @@ builder_nums._is_static = false;
 builder_nums._is_public = false;
 builder_nums._is_pointer = false;
 builder_nums._is_ref = false;
-builder_nums._is_template = false;
+builder_nums._is_template = true;
 builder_nums._meta = meta_nums;
 builder_nums._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<u32>>);
 builder_nums._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<u32>>);
@@ -365,7 +365,7 @@ builder_objs._is_static = false;
 builder_objs._is_public = false;
 builder_objs._is_pointer = false;
 builder_objs._is_ref = false;
-builder_objs._is_template = false;
+builder_objs._is_template = true;
 builder_objs._meta = meta_objs;
 builder_objs._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<Object>>);
 builder_objs._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<Object>>);
@@ -439,17 +439,17 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::Editor::TestObj::GetPrivateStaticClass()
+const Ailu::Type* Ailu::Editor::TestObj::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_TestObj_Type();
+	static const Ailu::Type* type = Z_Construct_TestObj_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::Editor::TestObj>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::Editor::TestObj>()
 {
 return Ailu::Editor::TestObj::StaticType();
 }
-    Type *Ailu::Editor::TestObj::GetType()
+    const Type *Ailu::Editor::TestObj::GetType()
 {
 return Ailu::Editor::TestObj::GetPrivateStaticClass();
 }

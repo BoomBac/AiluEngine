@@ -6,7 +6,7 @@
 #include <Objects/SerializeSpecializations.h>
 #include <Framework/Common/Log.h>
 using namespace Ailu;
-Ailu::Type* Ailu::Z_Construct_EngineConfig_Type()
+const Ailu::Type* Ailu::Z_Construct_EngineConfig_Type()
 {
 Ailu::Object::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -189,23 +189,44 @@ builderEnableIncrementalGraphicsBinding._meta = metaEnableIncrementalGraphicsBin
 builderEnableIncrementalGraphicsBinding._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
 builderEnableIncrementalGraphicsBinding._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
 initializer._properties.emplace_back(MemberBuilder::BuildProperty(builderEnableIncrementalGraphicsBinding));
+Meta meta_enable_d3d12_debug_layer;
+meta_enable_d3d12_debug_layer.Set("Category","Debug");
+meta_enable_d3d12_debug_layer.Set("IsColor",false);
+meta_enable_d3d12_debug_layer.Set("IsRange",false);
+meta_enable_d3d12_debug_layer.Set("IsFloatRange",true);
+meta_enable_d3d12_debug_layer.Set("RangeMin",(f32)0);
+meta_enable_d3d12_debug_layer.Set("RangeMax",(f32)1);
+MemberBuilder builder_enable_d3d12_debug_layer;
+builder_enable_d3d12_debug_layer._name = "_enable_d3d12_debug_layer";
+builder_enable_d3d12_debug_layer._type_name = "bool";
+builder_enable_d3d12_debug_layer._offset = offsetof(EngineConfig,_enable_d3d12_debug_layer);
+builder_enable_d3d12_debug_layer._is_const = false;
+builder_enable_d3d12_debug_layer._is_static = false;
+builder_enable_d3d12_debug_layer._is_public = true;
+builder_enable_d3d12_debug_layer._is_pointer = false;
+builder_enable_d3d12_debug_layer._is_ref = false;
+builder_enable_d3d12_debug_layer._is_template = false;
+builder_enable_d3d12_debug_layer._meta = meta_enable_d3d12_debug_layer;
+builder_enable_d3d12_debug_layer._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_enable_d3d12_debug_layer._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_enable_d3d12_debug_layer));
 cur_type = std::make_unique<Ailu::Type>(initializer);
 Ailu::Type::RegisterType(cur_type.get());
 }
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::EngineConfig::GetPrivateStaticClass()
+const Ailu::Type* Ailu::EngineConfig::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_EngineConfig_Type();
+	static const Ailu::Type* type = Z_Construct_EngineConfig_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::EngineConfig>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::EngineConfig>()
 {
 return Ailu::EngineConfig::StaticType();
 }
-    Type *Ailu::EngineConfig::GetType()
+    const Type *Ailu::EngineConfig::GetType()
 {
 return Ailu::EngineConfig::GetPrivateStaticClass();
 }

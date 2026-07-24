@@ -44,7 +44,7 @@ namespace Ailu
             //弹出一个popup widget,位置基于当前窗口左上角，root则会被添加到popup widget的root(canvas)进行显示
             void ShowPopupAt(f32 x, f32 y, Ref<UIElement> root, std::function<void()> on_close = nullptr, Window *win = nullptr);
             void HidePopup();
-            Widget *GetPopupWidget() const { return _popup_widget; }
+            Widget *GetPopupWidget() const;
             UITheme *GetTheme() const { return _theme; }
             void SetTheme(UITheme *theme);
             void Destroy(Ref<UIElement> element);
@@ -69,8 +69,13 @@ namespace Ailu
             UILayer *_ui_layer;
             UIRenderer *_renderer;
             UITheme *_theme = nullptr;
-            Widget *_popup_widget;
-            std::function<void()> _on_popup_close;
+            struct PopupEntry
+            {
+                Ref<Widget> _widget;
+                std::function<void()> _on_close;
+            };
+            Vector<PopupEntry> _popup_stack;
+            Vector<Ref<Widget>> _pending_popup_destroy;
             Vector<Ref<UIElement>> _pending_destroy;
 
             Vector<InteractionZone> _interaction_zones;

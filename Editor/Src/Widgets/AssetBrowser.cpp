@@ -1,25 +1,33 @@
-﻿#include "Widgets/AssetBrowser.h"
+#include "Widgets/AssetBrowser.h"
 #include "Common/EditorPopup.h"
+#include "Editors/SpriteAssetEditor.h"
 #include "Framework/Common/FileManager.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "UI/Basic.h"
 #include "UI/Container.h"
 #include "UI/UIFramework.h"
 #include "UI/UIRenderer.h"
+#include "UI/TextRenderer.h"
 #include "UI/DragDrop.h"
+#include "UI/TreeView.h"
 #include "Objects/JsonArchive.h"
+#include "Project/ProjectManager.h"
 #include "Render/AssetPreviewGenerator.h"
 #include "Framework/Common/Input.h"
+#include "Dock/DockManager.h"
+#include "Render/2D/Sprite.h"
 
+#include <algorithm>
 #include <cctype>
 #include <memory>
+#include <unordered_map>
 
 namespace Ailu
 {
     namespace Editor
     {
         using namespace UI;
-
+        using Render::Sprite;
         namespace
         {
             enum class EImportPopupType : u8
@@ -28,6 +36,215 @@ namespace Ailu
                 kTexture,
                 kMesh
             };
+
+            enum class EAssetBrowserRoot : u8
+            {
+                kProject,
+                kEngine
+            };
+
+            struct AssetBrowserRootDesc
+            {
+                EAssetBrowserRoot _root = EAssetBrowserRoot::kEngine;
+                EAssetDomain _domain = EAssetDomain::kEngine;
+                String _label;
+                fs::path _sys_path;
+            };
+
+            constexpr f32 kIconLabelHeight = 22.0f;
+            constexpr f32 kIconCellMinWidth = 88.0f;
+            constexpr f32 kIconCellGap = 8.0f;
+            constexpr f32 kIconCellPadding = 4.0f;
+            constexpr f32 kListViewIconThreshold = 60.0f;
+            constexpr f32 kListRowHeight = 24.0f;
+            constexpr f32 kListIconSize = 18.0f;
+            constexpr f32 kListTextLeftPadding = 6.0f;
+
+            bool IsListView(f32 icon_size)
+            {
+                return icon_size < kListViewIconThreshold;
+            }
+
+            String FitTextToWidth(const String &text, f32 max_width, f32 font_size)
+            {
+                if (text.empty() || max_width <= 0.0f)
+                    return {};
+                if (UI::TextRenderer::CalculateTextSize(text, font_size).x <= max_width)
+                    return text;
+
+                constexpr const char *kEllipsis = "...";
+                const f32 ellipsis_width = UI::TextRenderer::CalculateTextSize(kEllipsis, font_size).x;
+                if (ellipsis_width > max_width)
+                    return {};
+
+                u64 left = 0u;
+                u64 right = text.size();
+                while (left < right)
+                {
+                    const u64 mid = (left + right + 1u) / 2u;
+                    const String candidate = text.substr(0u, mid) + kEllipsis;
+                    if (UI::TextRenderer::CalculateTextSize(candidate, font_size).x <= max_width)
+                        left = mid;
+                    else
+                        right = mid - 1u;
+                }
+                return text.substr(0u, left) + kEllipsis;
+            }
+
+            WString NormalizeSysPath(const fs::path &path)
+            {
+                return PathUtils::NormalizePathWithoutTrailingSlash(PathUtils::FormatFilePath(path.wstring()));
+            }
+
+            bool IsSameOrChildPath(const fs::path &path, const fs::path &root)
+            {
+                const WString normalized_path = NormalizeSysPath(path);
+                const WString normalized_root = NormalizeSysPath(root);
+                if (normalized_path == normalized_root)
+                    return true;
+
+                const WString root_prefix = PathUtils::NormalizeDirectoryPath(normalized_root);
+                return normalized_path.compare(0, root_prefix.size(), root_prefix) == 0;
+            }
+
+            Vector<AssetBrowserRootDesc> GetAssetBrowserRoots()
+            {
+                Vector<AssetBrowserRootDesc> roots;
+                if (ProjectManager::Get().HasOpenedProject())
+                {
+                    const WString project_asset_root = ProjectManager::Get().CurrentProject().AssetDirectory();
+                    if (!project_asset_root.empty())
+                    {
+                        roots.push_back({EAssetBrowserRoot::kProject, EAssetDomain::kProject, "ProjAssets",
+                                         fs::path(project_asset_root)});
+                    }
+                }
+
+                roots.push_back({EAssetBrowserRoot::kEngine, EAssetDomain::kEngine, "EngineAssets",
+                                 fs::path(ResourceMgr::Get().EngineResRootPath())});
+                return roots;
+            }
+
+            std::optional<AssetBrowserRootDesc> FindRootForPath(const fs::path &path)
+            {
+                for (const auto &root: GetAssetBrowserRoots())
+                {
+                    if (IsSameOrChildPath(path, root._sys_path))
+                        return root;
+                }
+                return std::nullopt;
+            }
+
+            EAssetDomain GetDomainForPath(const fs::path &path)
+            {
+                if (auto root = FindRootForPath(path); root.has_value())
+                    return root->_domain;
+                return EAssetDomain::kEngine;
+            }
+
+            WString GetRelativeAssetDirectory(const fs::path &path)
+            {
+                if (auto root = FindRootForPath(path); root.has_value())
+                {
+                    const WString normalized_path = NormalizeSysPath(path);
+                    const WString normalized_root = NormalizeSysPath(root->_sys_path);
+                    if (normalized_path == normalized_root)
+                        return ResourceMgr::kPathScheme[static_cast<int>(root->_domain)];
+
+                    std::error_code error;
+                    fs::path relative_path = fs::relative(fs::path(normalized_path), fs::path(normalized_root), error);
+                    if (!error)
+                        return ResourceMgr::NormalizeAssetPath(relative_path.wstring(), root->_domain);
+                }
+                return ResourceMgr::NormalizeAssetPath(path.wstring(), GetDomainForPath(path));
+            }
+
+            WString FormatLogicalAssetPath(WString path)
+            {
+                for (auto &ch: path)
+                {
+                    if (ch == L'\\')
+                        ch = L'/';
+                }
+                return path;
+            }
+
+            WString NormalizeLogicalPathWithoutTrailingSlash(const WString &path)
+            {
+                WString normalized = FormatLogicalAssetPath(path);
+                size_t min_size = 0u;
+                for (const auto &scheme: ResourceMgr::kPathScheme)
+                {
+                    if (normalized.starts_with(scheme))
+                    {
+                        min_size = scheme.size();
+                        break;
+                    }
+                }
+                while (normalized.size() > min_size && normalized.back() == L'/')
+                    normalized.pop_back();
+                return normalized;
+            }
+
+            WString NormalizeLogicalDirectoryPath(const WString &path)
+            {
+                WString normalized = FormatLogicalAssetPath(path);
+                if (!normalized.empty() && normalized.back() != L'/')
+                    normalized.push_back(L'/');
+                return normalized;
+            }
+
+            WString ExtractLogicalAssetDirectory(const WString &path)
+            {
+                WString normalized = FormatLogicalAssetPath(path);
+                const size_t slash_pos = normalized.find_last_of(L'/');
+                if (slash_pos == WString::npos)
+                    return L"";
+                for (const auto &scheme: ResourceMgr::kPathScheme)
+                {
+                    if (normalized.starts_with(scheme) && slash_pos < scheme.size())
+                        return scheme;
+                }
+                return normalized.substr(0, slash_pos);
+            }
+
+            WString StripLogicalAssetPathScheme(const WString &path)
+            {
+                WString normalized = FormatLogicalAssetPath(path);
+                for (const auto &scheme: ResourceMgr::kPathScheme)
+                {
+                    if (normalized.starts_with(scheme))
+                        return normalized.substr(scheme.size());
+                }
+                return normalized;
+            }
+
+            String ToLowerCopy(String value)
+            {
+                std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c)
+                {
+                    return static_cast<char>(std::tolower(c));
+                });
+                return value;
+            }
+
+            bool ContainsSearchText(const String &value, const String &search_text)
+            {
+                return search_text.empty() || ToLowerCopy(value).find(search_text) != String::npos;
+            }
+
+            bool IsAssetInDirectory(const WString &asset_directory, const WString &directory, bool recursive)
+            {
+                const WString normalized_asset_directory = NormalizeLogicalPathWithoutTrailingSlash(asset_directory);
+                const WString normalized_directory = NormalizeLogicalPathWithoutTrailingSlash(directory);
+                if (normalized_asset_directory == normalized_directory)
+                    return true;
+                if (!recursive)
+                    return false;
+
+                const WString directory_prefix = normalized_directory.empty() ? WString{} : NormalizeLogicalDirectoryPath(normalized_directory);
+                return directory_prefix.empty() || normalized_asset_directory.compare(0, directory_prefix.size(), directory_prefix) == 0;
+            }
 
             String TrimNameCopy(const String &value)
             {
@@ -57,11 +274,44 @@ namespace Ailu
                 return std::nullopt;
             }
 
+            Ref<Render::Shader> EnsureDefaultMaterialShader()
+            {
+                auto shader = Render::Shader::s_p_defered_standart_lit.lock();
+                if (!shader)
+                {
+                    shader = ResourceMgr::Get().Load<Render::Shader>(L"Shaders/hlsl/defered_standard_lit.alasset");
+                    Render::Shader::s_p_defered_standart_lit = shader;
+                }
+                return shader;
+            }
+
+            Vector<Ref<Render::Shader>> CollectMaterialShaders()
+            {
+                Vector<Ref<Render::Shader>> shaders;
+                auto default_shader = EnsureDefaultMaterialShader();
+                if (default_shader)
+                    shaders.push_back(default_shader);
+
+                for (auto it = ResourceMgr::Get().ResourceBegin<Render::Shader>(); it != ResourceMgr::Get().ResourceEnd<Render::Shader>(); ++it)
+                {
+                    auto shader = ResourceMgr::IterToRefPtr<Render::Shader>(it);
+                    if (!shader)
+                        continue;
+                    const bool already_added = std::any_of(shaders.begin(), shaders.end(), [shader](const Ref<Render::Shader> &item)
+                    {
+                        return item.get() == shader.get();
+                    });
+                    if (!already_added)
+                        shaders.push_back(shader);
+                }
+                return shaders;
+            }
+
             WString AppendChildAssetPath(const WString &directory_asset_path, const WString &file_name)
             {
                 if (directory_asset_path.empty())
                     return file_name;
-                return PathUtils::NormalizeDirectoryPath(directory_asset_path) + file_name;
+                return NormalizeLogicalDirectoryPath(directory_asset_path) + file_name;
             }
 
             bool RewriteAssetHeaderName(const WString &sys_path, const String &new_name)
@@ -98,13 +348,154 @@ namespace Ailu
             }
         }// namespace
 
+        class AssetBrowser::DirectoryTreeDataSource final : public UI::ITreeViewDataSource
+        {
+        public:
+            void Rebuild()
+            {
+                _nodes.clear();
+                _roots.clear();
+                _path_to_id.clear();
+                _next_id = 1u;
+
+                for (const auto &root: GetAssetBrowserRoots())
+                {
+                    if (root._sys_path.empty() || !fs::exists(root._sys_path))
+                        continue;
+
+                    const UI::TreeItemId root_id = AddNode(root._label, root._sys_path, UI::kInvalidTreeItemId, root._domain);
+                    _roots.push_back(root_id);
+                    AddDirectoryChildren(root_id, root._sys_path, root._domain);
+                }
+            }
+
+            Vector<UI::TreeItemId> GetRootItems() const override
+            {
+                return _roots;
+            }
+
+            Vector<UI::TreeItemId> GetChildren(UI::TreeItemId parent) const override
+            {
+                if (const auto it = _nodes.find(parent); it != _nodes.end())
+                    return it->second._children;
+                return {};
+            }
+
+            UI::TreeItemId GetParent(UI::TreeItemId item) const override
+            {
+                if (const auto it = _nodes.find(item); it != _nodes.end())
+                    return it->second._parent;
+                return UI::kInvalidTreeItemId;
+            }
+
+            UI::TreeItemPresentation GetPresentation(UI::TreeItemId item) const override
+            {
+                UI::TreeItemPresentation presentation;
+                if (const auto it = _nodes.find(item); it != _nodes.end())
+                {
+                    presentation._label = it->second._label;
+                    presentation._selectable = true;
+                    presentation._drop_target = true;
+                }
+                return presentation;
+            }
+
+            bool IsValid(UI::TreeItemId item) const override
+            {
+                return _nodes.contains(item);
+            }
+
+            fs::path GetPath(UI::TreeItemId item) const
+            {
+                if (const auto it = _nodes.find(item); it != _nodes.end())
+                    return it->second._path;
+                return {};
+            }
+
+            UI::TreeItemId FindItemByPath(const fs::path &path) const
+            {
+                const WString normalized_path = NormalizeSysPath(path);
+                if (const auto it = _path_to_id.find(normalized_path); it != _path_to_id.end())
+                    return it->second;
+                return UI::kInvalidTreeItemId;
+            }
+
+        private:
+            struct DirectoryNode
+            {
+                UI::TreeItemId _id = UI::kInvalidTreeItemId;
+                UI::TreeItemId _parent = UI::kInvalidTreeItemId;
+                EAssetDomain _domain = EAssetDomain::kEngine;
+                String _label;
+                fs::path _path;
+                Vector<UI::TreeItemId> _children;
+            };
+
+            UI::TreeItemId AddNode(const String &label, const fs::path &path, UI::TreeItemId parent, EAssetDomain domain)
+            {
+                const UI::TreeItemId id = _next_id++;
+                DirectoryNode node;
+                node._id = id;
+                node._parent = parent;
+                node._domain = domain;
+                node._label = label;
+                node._path = path;
+                _path_to_id[NormalizeSysPath(path)] = id;
+                _nodes[id] = std::move(node);
+                if (parent != UI::kInvalidTreeItemId)
+                    _nodes[parent]._children.push_back(id);
+                return id;
+            }
+
+            void AddDirectoryChildren(UI::TreeItemId parent, const fs::path &path, EAssetDomain domain)
+            {
+                Vector<fs::directory_entry> directories;
+                std::error_code error;
+                for (fs::directory_iterator it(path, error); !error && it != fs::directory_iterator(); it.increment(error))
+                {
+                    if (it->is_directory(error))
+                        directories.push_back(*it);
+                }
+
+                std::sort(directories.begin(), directories.end(), [](const fs::directory_entry &lhs, const fs::directory_entry &rhs)
+                {
+                    return lhs.path().filename().wstring() < rhs.path().filename().wstring();
+                });
+
+                for (const auto &directory: directories)
+                {
+                    const UI::TreeItemId child = AddNode(directory.path().filename().string(), directory.path(), parent, domain);
+                    AddDirectoryChildren(child, directory.path(), domain);
+                }
+            }
+
+            UI::TreeItemId _next_id = 1u;
+            Vector<UI::TreeItemId> _roots;
+            std::unordered_map<UI::TreeItemId, DirectoryNode> _nodes;
+            std::unordered_map<WString, UI::TreeItemId> _path_to_id;
+        };
+
         AssetBrowser::AssetBrowser() : DockWindow("Asset Browser")
         {
             _sv = _content_root->AddChild<UI::SplitView>();
             _sv->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
             _sv->SlotPadding() = UI::Padding(_content_root->Thickness());
             _sv->InvalidateLayout();
-            _sv->AddChild<UI::Border>();
+            auto left = _sv->AddChild<UI::VerticalBox>();
+            left->SlotPadding() = UI::Padding(2.0f);
+            left->InvalidateLayout();
+            _directory_tree_data_source = new DirectoryTreeDataSource();
+            _directory_tree = left->AddChild<UI::TreeView>();
+            _directory_tree->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill).CrossAlignment(UI::EAlignment::kFill);
+            _directory_tree->SetDataSource(_directory_tree_data_source);
+            _directory_tree->_row_height = 20.0f;
+            _directory_tree->_on_selection_changed += [this](UI::TreeItemId item)
+            {
+                if (item == UI::kInvalidTreeItemId || _directory_tree_data_source == nullptr)
+                    return;
+                NavigateToPath(_directory_tree_data_source->GetPath(item));
+            };
+
             _right = _sv->AddChild<UI::VerticalBox>();
             _right->SlotPadding() = UI::Padding(2.0f, 2.0f, 0.0f, 0.0f);
             _right->InvalidateLayout();
@@ -113,26 +504,41 @@ namespace Ailu
                 auto t = _content_root->Thickness();
                 _sv->GetSlot()->Size({new_size.x, new_size.y - kTitleBarHeight});
             };
-            _current_path = ResourceMgr::Get().EngineResRootPath();
+            auto roots = GetAssetBrowserRoots();
+            _current_path = roots.empty() ? fs::path(ResourceMgr::Get().EngineResRootPath()) : roots.front()._sys_path;
             auto hb = _right->AddChild<UI::HorizontalBox>();
             hb->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto).CrossAlignment(UI::EAlignment::kFill);
             auto back_btn = hb->AddChild<UI::Button>();
-            back_btn->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFixed).Size({16.0f, 16.0f});
+            back_btn->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFixed).Size({22.0f, 22.0f});
             back_btn->OnMouseClick() += [&](UI::UIEvent& e) 
             {
-                _current_path = _current_path.parent_path();
-                LOG_INFO("AssetBrowser: back to {}", _current_path.string());
-                _is_dirty = true;
+                const fs::path parent_path = _current_path.parent_path();
+                if (auto root = FindRootForPath(_current_path); root.has_value() && IsSameOrChildPath(parent_path, root->_sys_path))
+                    NavigateToPath(parent_path);
             };
             back_btn->SetText("<");
-            _path_title = hb->AddChild<UI::Text>("Current Path");
-            _path_title->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto);
+            _path_bar = hb->AddChild<UI::HorizontalBox>();
+            _path_bar->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed).Size({0.0f, 22.0f}).FillRate(1.0f);
+            _path_title = _path_bar->AddChild<UI::Text>("Current Path");
+            _path_title->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kAuto, UI::ESizePolicy::kFixed).Size({120.0f, 22.0f});
             _path_title->_horizontal_align = EAlignment::kLeft;
+            auto search_label = hb->AddChild<UI::Text>("Search");
+            search_label->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFixed).Size({48.0f, 22.0f});
+            search_label->_horizontal_align = EAlignment::kCenter;
+            _search_input = hb->AddChild<UI::InputBlock>();
+            _search_input->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFixed).Size({180.0f, 22.0f});
+            _search_input->_on_content_changed += [this](String value)
+            {
+                _search_text = ToLowerCopy(std::move(value));
+                _is_dirty = true;
+            };
+            _search_input->SetContent("", false);
             _icon_area = _right->AddChild<UI::ScrollView>();
             _icon_area->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill).CrossAlignment(UI::EAlignment::kFill);
             auto slider = _right->AddChild<UI::Slider>();
             slider->_range = {50.0f, 200.0f};
             slider->SetValue(64.0f);
+            _is_list_view = IsListView(_icon_size);
             _icon_content = _icon_area->AddChild<UI::Canvas>();
             _icon_content->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kAuto, UI::ESizePolicy::kAuto);
             const auto blank_context_handler = [this](UI::UIEvent &e)
@@ -148,8 +554,13 @@ namespace Ailu
             _icon_content->OnMouseDown() += blank_context_handler;
             slider->_on_value_change += [&](f32 value)
             {
+                const bool was_list_view = _is_list_view;
                 _icon_size = value;
-                _is_icon_layout_dirty = true;
+                _is_list_view = IsListView(_icon_size);
+                if (_is_list_view != was_list_view)
+                    _is_dirty = true;
+                else
+                    _is_icon_layout_dirty = true;
             };
             DropHandler handler;
             handler._can_drop = [](const DragPayload &payload) -> bool
@@ -172,6 +583,95 @@ namespace Ailu
                 }
                 QueueImportFiles(dropped_files, e._mouse_position);
             };
+        }
+
+        AssetBrowser::~AssetBrowser()
+        {
+            delete _directory_tree_data_source;
+            _directory_tree_data_source = nullptr;
+        }
+
+        void AssetBrowser::NavigateToPath(const fs::path &path)
+        {
+            if (path.empty() || !fs::exists(path) || !fs::is_directory(path))
+                return;
+
+            fs::path target_path = path;
+            if (!FindRootForPath(target_path).has_value())
+            {
+                auto roots = GetAssetBrowserRoots();
+                target_path = roots.empty() ? fs::path(ResourceMgr::Get().EngineResRootPath()) : roots.front()._sys_path;
+            }
+
+            _current_path = target_path;
+            LOG_INFO("AssetBrowser: navigate to {}", _current_path.string());
+            _is_dirty = true;
+            _is_icon_layout_dirty = true;
+        }
+
+        void AssetBrowser::RefreshDirectoryTree()
+        {
+            if (_directory_tree == nullptr || _directory_tree_data_source == nullptr)
+                return;
+
+            _directory_tree_data_source->Rebuild();
+            _directory_tree->Refresh();
+            const UI::TreeItemId current_item = _directory_tree_data_source->FindItemByPath(_current_path);
+            if (current_item != UI::kInvalidTreeItemId)
+            {
+                _directory_tree->ExpandParents(current_item);
+                _directory_tree->SetSelectedItem(current_item, false);
+            }
+            _is_directory_tree_dirty = false;
+        }
+
+        void AssetBrowser::UpdatePathButtons()
+        {
+            if (_path_bar == nullptr)
+                return;
+
+            _path_bar->ClearChildren();
+            const auto root = FindRootForPath(_current_path);
+            if (!root.has_value())
+            {
+                _path_title = _path_bar->AddChild<UI::Text>(_current_path.string());
+                _path_title->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed).Size({0.0f, 22.0f});
+                _path_title->_horizontal_align = EAlignment::kLeft;
+                return;
+            }
+
+            Vector<std::pair<String, fs::path>> crumbs;
+            crumbs.push_back({root->_label, root->_sys_path});
+            const WString relative_directory = StripLogicalAssetPathScheme(GetRelativeAssetDirectory(_current_path));
+            if (!relative_directory.empty())
+            {
+                fs::path walk_path = root->_sys_path;
+                for (const auto &part: fs::path(relative_directory))
+                {
+                    walk_path /= part;
+                    crumbs.push_back({part.string(), walk_path});
+                }
+            }
+
+            for (size_t i = 0u; i < crumbs.size(); ++i)
+            {
+                auto *button = _path_bar->AddChild<UI::Button>();
+                const f32 button_width = std::max(56.0f, static_cast<f32>(crumbs[i].first.size()) * 8.0f + 20.0f);
+                button->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFixed).Size({button_width, 22.0f});
+                button->SetText(crumbs[i].first);
+                button->OnMouseClick() += [this, target_path = crumbs[i].second](UI::UIEvent &e)
+                {
+                    NavigateToPath(target_path);
+                    e._is_handled = true;
+                };
+
+                if (i + 1u < crumbs.size())
+                {
+                    auto *separator = _path_bar->AddChild<UI::Text>(">");
+                    separator->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFixed).Size({14.0f, 22.0f});
+                    separator->_horizontal_align = EAlignment::kCenter;
+                }
+            }
         }
 
         void AssetBrowser::QueueImportFiles(const Vector<WString> &files, Vector2f popup_pos)
@@ -357,6 +857,9 @@ namespace Ailu
         void AssetBrowser::Update(f32 dt)
         {
             DockWindow::Update(dt);
+            if (_is_directory_tree_dirty)
+                RefreshDirectoryTree();
+
             static auto s_folder_icon = ResourceMgr::Get().Get<Texture2D>(EnginePath::kEngineIconPathW + L"folder.alasset");
             static auto s_file_icon = ResourceMgr::Get().Get<Texture2D>(EnginePath::kEngineIconPathW + L"file.alasset");
             static auto s_mesh_icon = ResourceMgr::Get().Get<Texture2D>(EnginePath::kEngineIconPathW + L"3d.alasset");
@@ -376,44 +879,100 @@ namespace Ailu
                 _last_icon_area_size = parent_size;
                 _is_icon_layout_dirty = true;
             }
-
+            static Render::Sprite* preview_sp = nullptr;
+            // if (preview_sp)
+            // {
+            //     AssetPreviewGenerator::GeneratorSpriteSnapshot(256,256,preview_sp,_asset_preview_icons[preview_sp]);
+            // }
             if (_is_dirty)
             {
                 if (fs::exists(_current_path))
                 {
-                    fs::directory_iterator curdir_it(_current_path);
                     _icon_content->ClearChildren();
-                    //更新当前资产列表
-                    SearchFilterByDirectory filter({PathUtils::ExtractAssetPath(_current_path.wstring())});
+                    const WString current_asset_directory = GetRelativeAssetDirectory(_current_path);
+                    const EAssetDomain current_domain = GetDomainForPath(_current_path);
+                    const bool is_searching = !_search_text.empty();
                     _cur_dir_assets.clear();
-                    _cur_dir_assets = std::move(ResourceMgr::Get().GetAssets(filter));
-                    _path_title->SetText(_current_path.string());
-                    const auto create_icon_group = []() -> std::tuple<Ref<UI::VerticalBox>,UI::Image*,UI::Text*>
+                    for (auto it = ResourceMgr::Get().Begin(); it != ResourceMgr::Get().End(); ++it)
                     {
-                        auto vb = MakeRef<UI::VerticalBox>();
-                        vb->GetSlot()->Size({64.0f, 84.0f});
-                        vb->SlotPadding() = UI::Padding(2.0f);
-                        vb->InvalidateLayout();
-                        auto icon = vb->AddChild<UI::Image>();
-                        icon->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill).CrossAlignment(UI::EAlignment::kFill);
-                        auto text = vb->AddChild<UI::Text>();
-                        text->GetSlotAs<UI::LinearSlot>().CrossAlignment(UI::EAlignment::kFill);
+                        Asset *asset = it->second.get();
+                        if (asset->_domain != current_domain)
+                            continue;
+
+                        const WString asset_directory = ExtractLogicalAssetDirectory(asset->_asset_path);
+                        if (!IsAssetInDirectory(asset_directory, current_asset_directory, is_searching))
+                            continue;
+
+                        const String asset_display_name = asset->_p_obj ? asset->_p_obj->Name() : asset->Name();
+                        if (is_searching && !ContainsSearchText(asset_display_name, _search_text) && !ContainsSearchText(ToChar(asset->_asset_path.c_str()), _search_text))
+                            continue;
+                        _cur_dir_assets.push_back(asset);
+                    }
+                    std::sort(_cur_dir_assets.begin(), _cur_dir_assets.end(), [](const Asset *lhs, const Asset *rhs)
+                    {
+                        return lhs->Name() < rhs->Name();
+                    });
+                    UpdatePathButtons();
+                    const auto create_icon_group = [this](const String &display_name) -> std::tuple<Ref<UI::UIElement>, UI::Image *, UI::Text *>
+                    {
+                        Ref<UI::UIElement> root;
+                        UI::Image *icon = nullptr;
+                        UI::Text *text = nullptr;
+                        if (_is_list_view)
+                        {
+                            auto hb = MakeRef<UI::HorizontalBox>();
+                            hb->SlotPadding() = UI::Padding(2.0f);
+                            hb->InvalidateLayout();
+                            icon = hb->AddChild<UI::Image>();
+                            icon->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFixed)
+                                    .Size({kListIconSize, kListIconSize}).Margin({2.0f, 1.0f, 4.0f, 1.0f});
+                            text = hb->AddChild<UI::Text>();
+                            text->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed)
+                                    .Size({0.0f, kListRowHeight}).FillRate(1.0f).CrossAlignment(UI::EAlignment::kFill);
+                            text->_horizontal_align = UI::EAlignment::kLeft;
+                            root = hb;
+                        }
+                        else
+                        {
+                            auto vb = MakeRef<UI::VerticalBox>();
+                            vb->SlotPadding() = UI::Padding(kIconCellPadding);
+                            vb->InvalidateLayout();
+                            icon = vb->AddChild<UI::Image>();
+                            icon->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFixed)
+                                    .Size({_icon_size, _icon_size}).CrossAlignment(UI::EAlignment::kCenter);
+                            text = vb->AddChild<UI::Text>();
+                            text->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFixed)
+                                    .Size({kIconCellMinWidth, kIconLabelHeight}).CrossAlignment(UI::EAlignment::kCenter);
+                            text->_horizontal_align = UI::EAlignment::kCenter;
+                            root = vb;
+                        }
+                        root->Name(display_name);
+                        text->Name(display_name);
+                        text->SetText(display_name);
                         text->_vertical_align = UI::EAlignment::kCenter;
-                        text->SlotPadding() = UI::Padding(6.0f);
+                        text->SlotPadding() = UI::Padding(kListTextLeftPadding, 0.0f, kListTextLeftPadding, 0.0f);
                         text->InvalidateLayout();
                         text->FontSize(14.0f);
-                        return std::make_tuple(vb, icon, text);
+                        return std::make_tuple(root, icon, text);
                     };
-                    for (auto &dir_it: curdir_it)
+                    Vector<fs::directory_entry> directories;
+                    std::error_code directory_error;
+                    for (fs::directory_iterator dir_it(_current_path, directory_error); !directory_error && dir_it != fs::directory_iterator(); dir_it.increment(directory_error))
                     {
-                        if (!dir_it.is_directory())
-                            continue;
+                        if (dir_it->is_directory(directory_error) && ContainsSearchText(dir_it->path().filename().string(), _search_text))
+                            directories.push_back(*dir_it);
+                    }
+                    std::sort(directories.begin(), directories.end(), [](const fs::directory_entry &lhs, const fs::directory_entry &rhs)
+                    {
+                        return lhs.path().filename().wstring() < rhs.path().filename().wstring();
+                    });
+                    for (auto &dir_it: directories)
+                    {
                         fs::path item_path = dir_it.path();
                         const auto folder_sys_path = item_path.wstring();
-                        auto [vb, icon,text] = create_icon_group();
-                        vb->GetSlot()->Size({_icon_size, _icon_size + 20.0f});
-                        icon->Name(item_path.filename().string().c_str());
-                        text->SetText(item_path.filename().string().c_str());
+                        const String display_name = item_path.filename().string();
+                        auto [vb, icon,text] = create_icon_group(display_name);
+                        icon->Name(display_name);
                         icon->SetTexture(s_folder_icon);
                         vb->OnMouseDown() += [this, folder_sys_path](UI::UIEvent &e)
                         {
@@ -437,8 +996,7 @@ namespace Ailu
                         };
                         icon->OnMouseDoubleClick() += [this, item_path](UI::UIEvent &e)
                         {
-                            _current_path = item_path;
-                            _is_dirty = true;
+                            NavigateToPath(item_path);
                         };
                         //icon->OnMouseDown() += [this, icon](UI::UIEvent &e)
                         //{
@@ -450,11 +1008,10 @@ namespace Ailu
                     }
                     for (auto asset: _cur_dir_assets)
                     {
-                        auto [vb, icon, text] = create_icon_group();
+                        const String display_name = asset->_p_obj ? asset->_p_obj->Name() : asset->Name();
+                        auto [vb, icon, text] = create_icon_group(display_name);
                         Color tint = asset->_p_obj ? Colors::kWhite : Colors::kGray;
-                        vb->GetSlot()->Size({_icon_size, _icon_size + 20.0f});
-                        icon->Name(asset-> Name());
-                        text->SetText(asset->_p_obj ? asset->_p_obj->Name() : asset->Name());
+                        icon->Name(asset->Name());
                         icon->_tint_color = tint;
                         vb->OnMouseDown() += [this, asset](UI::UIEvent &e)
                         {
@@ -468,13 +1025,10 @@ namespace Ailu
                             if (asset->_p_obj)
                             {
                                 auto mesh = asset->As<Render::Mesh>();
-                                if (!_mesh_preview_icons.contains(mesh))
-                                {
                                     Ref<RenderTexture> mesh_icon{nullptr};
                                     AssetPreviewGenerator::GeneratorMeshSnapshot(512u, 512u, mesh, mesh_icon);
-                                    _mesh_preview_icons[mesh] = mesh_icon;
-                                }
-                                icon->SetTexture(_mesh_preview_icons[mesh].get());
+                                    _asset_preview_icons[mesh] = mesh_icon;
+                                icon->SetTexture(_asset_preview_icons[mesh].get());
                             }
                             else
                             icon->SetTexture(s_mesh_icon);
@@ -505,6 +1059,20 @@ namespace Ailu
                             icon->SetTexture(s_animclip_icon);
                         else if (asset->_asset_type == StaticClass<Render::SkeletonMesh>())
                             icon->SetTexture(s_skeleton_icon);
+                        else if (asset->_asset_type == StaticClass<Render::Sprite>())
+                        {
+                            if (asset->_p_obj)
+                            {
+                                auto obj = asset->As<Render::Sprite>();
+                                Ref<RenderTexture> preview_icon{nullptr};
+                                AssetPreviewGenerator::GeneratorSpriteSnapshot(256,256,obj,preview_icon);
+                                _asset_preview_icons[obj] = preview_icon;
+                                preview_sp = obj;
+                                icon->SetTexture(_asset_preview_icons[obj].get());
+                            }
+                            else
+                            icon->SetTexture(s_mesh_icon);
+                        }
                         else {};
                         icon->OnMouseEnter() += [this, icon](UI::UIEvent &e)
                         {
@@ -557,21 +1125,50 @@ namespace Ailu
 
             if (_is_icon_layout_dirty)
             {
-                f32 x = 0.0f, y = 0.0f;
-                u32 num_per_row = (u32) (parent_size.x / _icon_size);
-                if (num_per_row == 0) num_per_row = 1;
+                const f32 cell_width = _is_list_view ? parent_size.x : std::max(kIconCellMinWidth, _icon_size + kIconCellPadding * 2.0f + kIconCellGap);
+                const f32 icon_draw_size = _is_list_view ? kListIconSize : std::max(1.0f, _icon_size);
+                const f32 cell_height = _is_list_view ? kListRowHeight : icon_draw_size + kIconLabelHeight + kIconCellPadding * 2.0f;
+                const f32 label_width = _is_list_view ? std::max(0.0f, parent_size.x - kListIconSize - kListTextLeftPadding * 2.0f - 12.0f) : std::max(0.0f, cell_width - kIconCellPadding * 2.0f);
+                f32 x = 0.0f;
+                f32 y = 0.0f;
+                u32 num_per_row = _is_list_view ? 1u : (u32) (parent_size.x / cell_width);
+                if (num_per_row == 0u)
+                    num_per_row = 1u;
                 for (u32 i = 0; i < (u32) _icon_content->GetChildren().size(); i++)
                 {
                     auto child = _icon_content->ChildAt(i);
-                    child->GetSlotAs<UI::CanvasSlot>().Position({x, y}).Size({_icon_size, _icon_size + 20.0f});
+                    child->GetSlotAs<UI::CanvasSlot>().Position({x, y}).Size({cell_width, cell_height});
+                    if (_is_list_view)
+                    {
+                        if (auto row = child->As<UI::HorizontalBox>())
+                        {
+                            if (auto icon = row->ChildAt(0u); icon != nullptr)
+                                icon->GetSlotAs<UI::LinearSlot>().Size({icon_draw_size, icon_draw_size});
+                            if (auto text = row->ChildAt(1u)->As<UI::Text>(); text != nullptr)
+                            {
+                                text->GetSlotAs<UI::LinearSlot>().Size({label_width, kListRowHeight});
+                                text->SetText(FitTextToWidth(text->Name(), label_width, text->FontSize()));
+                            }
+                        }
+                    }
+                    else if (auto tile = child->As<UI::VerticalBox>())
+                    {
+                        if (auto icon = tile->ChildAt(0u); icon != nullptr)
+                            icon->GetSlotAs<UI::LinearSlot>().Size({icon_draw_size, icon_draw_size});
+                        if (auto text = tile->ChildAt(1u)->As<UI::Text>(); text != nullptr)
+                        {
+                            text->GetSlotAs<UI::LinearSlot>().Size({label_width, kIconLabelHeight});
+                            text->SetText(FitTextToWidth(text->Name(), label_width, text->FontSize()));
+                        }
+                    }
                     if ((i + 1) % num_per_row == 0)
                     {
                         x = 0.0f;
-                        y += _icon_size + 20.0f;
+                        y += cell_height;
                     }
                     else
                     {
-                        x += _icon_size;
+                        x += cell_width;
                     }
                 }
                 _is_icon_layout_dirty = false;
@@ -595,6 +1192,87 @@ namespace Ailu
                     _is_dirty = true;
                 }
             }
+            else if (asset->_asset_type == StaticClass<Render::Sprite>())
+            {
+                if (asset->_p_obj == nullptr)
+                    ResourceMgr::Get().Load<Render::Sprite>(asset->_asset_path);
+
+                if (asset->_p_obj)
+                {
+                    auto editor = MakeRef<SpriteAssetEditor>();
+                    editor->Open(asset->As<Sprite>());
+                    DockManager::Get().AddDock(editor);
+                }
+            }
+        }
+
+        void AssetBrowser::ShowCreateMaterialDialog(Vector2f popup_pos, const fs::path &target_sys_path)
+        {
+            auto material_name = std::make_shared<String>(MakeUniqueEntryName(target_sys_path.wstring(), "NewMaterial", L".alasset", false));
+            auto shaders = std::make_shared<Vector<Ref<Render::Shader>>>(CollectMaterialShaders());
+            auto shader_names = std::make_shared<Vector<String>>();
+            shader_names->reserve(shaders->size());
+            for (const auto &shader: *shaders)
+                shader_names->push_back(shader ? shader->Name() : String("null shader"));
+            if (shader_names->empty())
+                shader_names->push_back("Missing Shader");
+
+            auto selected_shader_index = std::make_shared<i32>(shaders->empty() ? -1 : 0);
+            UI::InputBlock *name_input = nullptr;
+            UI::Dropdown *shader_dropdown = nullptr;
+
+            EditorPopup::ShowDialogAt(popup_pos, "AssetBrowserMaterialCreatePrompt", "Create Material", {300.0f, 134.0f},
+                                      [material_name, shader_names, selected_shader_index, &name_input, &shader_dropdown](UI::VerticalBox *content, UI::Text *)
+                                      {
+                                          UI::HorizontalBox *value_box = nullptr;
+                                          auto *name_row = EditorPopup::AddPropertyRow(content, "name:", &value_box);
+                                          name_row->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed).Size({280.0f, 24.0f});
+                                          name_input = value_box->AddChild<UI::InputBlock>();
+                                          name_input->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed).Size({0.0f, 24.0f});
+                                          name_input->_on_content_changed += [material_name](String value)
+                                          {
+                                              *material_name = std::move(value);
+                                          };
+                                          name_input->SetContent(*material_name, false);
+
+                                          auto *shader_row = EditorPopup::AddPropertyRow(content, "shader:", &value_box);
+                                          shader_row->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed).Size({280.0f, 24.0f});
+                                          shader_dropdown = value_box->AddChild<UI::Dropdown>(*shader_names);
+                                          shader_dropdown->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed).Size({0.0f, 24.0f});
+                                          shader_dropdown->_on_selected_changed += [selected_shader_index](i32 index)
+                                          {
+                                              *selected_shader_index = index;
+                                          };
+                                          shader_dropdown->SetSelectedIndex(*selected_shader_index);
+                                      },
+                                      {
+                                              {"OK", [this, target_sys_path, material_name, shaders, selected_shader_index, name_input]() -> std::optional<String>
+                                               {
+                                                   const String name = TrimNameCopy(*material_name);
+                                                   if (auto error = ValidateEntryName(name); error.has_value())
+                                                   {
+                                                       if (name_input != nullptr)
+                                                           name_input->RequestFocus();
+                                                       return error;
+                                                   }
+                                                   if (*selected_shader_index < 0 || *selected_shader_index >= static_cast<i32>(shaders->size()) || (*shaders)[*selected_shader_index] == nullptr)
+                                                       return String("Shader is required.");
+
+                                                   const fs::path previous_path = _current_path;
+                                                   _current_path = target_sys_path;
+                                                   const bool created = CreateMaterialEntry(name, (*shaders)[*selected_shader_index].get());
+                                                   _current_path = previous_path;
+                                                   if (!created)
+                                                       return String("Material already exists.");
+                                                   return std::nullopt;
+                                               }},
+                                              {"Cancel", []() -> std::optional<String> { return std::nullopt; }}
+                                      },
+                                      [name_input]()
+                                      {
+                                          if (name_input != nullptr)
+                                              name_input->RequestFocus();
+                                      });
         }
 
         void AssetBrowser::ShowBlankAreaContextMenu(Vector2f popup_pos)
@@ -630,17 +1308,7 @@ namespace Ailu
             }});
             actions.push_back({"New Material", [this, popup_pos]()
             {
-                EditorPopup::ShowTextInputAt(popup_pos, "Create Material",
-                                             MakeUniqueEntryName(_current_path.wstring(), "NewMaterial", L".alasset", false),
-                                             [this](const String &input) -> std::optional<String>
-                                             {
-                                                 const String name = TrimNameCopy(input);
-                                                 if (auto error = ValidateEntryName(name); error.has_value())
-                                                     return error;
-                                                 if (!CreateMaterialEntry(name))
-                                                     return String("Material already exists.");
-                                                 return std::nullopt;
-                                             });
+                ShowCreateMaterialDialog(popup_pos, _current_path);
             }});
             actions.push_back({"Refresh", [this]() { _is_dirty = true; }});
             EditorPopup::ShowActionMenuAt(popup_pos, actions);
@@ -665,19 +1333,10 @@ namespace Ailu
                 _current_path = previous_path;
                 return created;
             };
-            const auto create_material_in_target = [this, folder_sys_path](const String &name) -> bool
-            {
-                const fs::path previous_path = _current_path;
-                _current_path = folder_sys_path;
-                const bool created = CreateMaterialEntry(name);
-                _current_path = previous_path;
-                return created;
-            };
             Vector<PopupMenuAction> actions;
             actions.push_back({"Open", [this, folder_sys_path]()
             {
-                _current_path = folder_sys_path;
-                _is_dirty = true;
+                NavigateToPath(folder_sys_path);
             }});
             actions.push_back({"Rename", [this, folder_name, folder_sys_path, popup_pos]()
             {
@@ -725,19 +1384,9 @@ namespace Ailu
                                                  return std::nullopt;
                                              });
             }});
-            actions.push_back({"New Material", [this, popup_pos, folder_sys_path, create_material_in_target]()
+            actions.push_back({"New Material", [this, popup_pos, folder_sys_path]()
             {
-                EditorPopup::ShowTextInputAt(popup_pos, "Create Material",
-                                             MakeUniqueEntryName(folder_sys_path, "NewMaterial", L".alasset", false),
-                                             [create_material_in_target](const String &input) -> std::optional<String>
-                                             {
-                                                 const String name = TrimNameCopy(input);
-                                                 if (auto error = ValidateEntryName(name); error.has_value())
-                                                     return error;
-                                                 if (!create_material_in_target(name))
-                                                     return String("Material already exists.");
-                                                 return std::nullopt;
-                                             });
+                ShowCreateMaterialDialog(popup_pos, folder_sys_path);
             }});
             EditorPopup::ShowActionMenuAt(popup_pos, actions);
         }
@@ -813,6 +1462,7 @@ namespace Ailu
             RewriteAssetHeaderName(new_sys_path, name);
             ResourceMgr::Get().SaveAllUnsavedAssets();
             _is_dirty = true;
+            _is_directory_tree_dirty = true;
             return true;
         }
 
@@ -832,8 +1482,8 @@ namespace Ailu
             if (fs::exists(new_path))
                 return false;
 
-            const WString old_dir_asset_path = PathUtils::NormalizePathWithoutTrailingSlash(PathUtils::ExtractAssetPath(old_path.wstring()));
-            const WString new_dir_asset_path = PathUtils::NormalizePathWithoutTrailingSlash(PathUtils::ExtractAssetPath(new_path.wstring()));
+            const WString old_dir_asset_path = ResourceMgr::NormalizeAssetPath(old_path.wstring(), GetDomainForPath(old_path));
+            const WString new_dir_asset_path = ResourceMgr::NormalizeAssetPath(new_path.wstring(), GetDomainForPath(new_path));
             auto nested_assets = CollectAssetsUnderDirectory(old_dir_asset_path);
 
             std::error_code rename_error;
@@ -844,10 +1494,10 @@ namespace Ailu
                 return false;
             }
 
-            const WString old_prefix = PathUtils::NormalizeDirectoryPath(old_dir_asset_path);
+            const WString old_prefix = NormalizeLogicalDirectoryPath(old_dir_asset_path);
             for (auto *asset: nested_assets)
             {
-                WString asset_path = PathUtils::NormalizePathWithoutTrailingSlash(asset->_asset_path);
+                WString asset_path = NormalizeLogicalPathWithoutTrailingSlash(asset->_asset_path);
                 if (asset_path.compare(0, old_prefix.size(), old_prefix) != 0)
                     continue;
                 WString suffix = asset_path.substr(old_prefix.size());
@@ -879,6 +1529,7 @@ namespace Ailu
             ResourceMgr::Get().Tick(0.0f);
             ResourceMgr::Get().SaveAllUnsavedAssets();
             _is_dirty = true;
+            _is_directory_tree_dirty = true;
         }
 
         void AssetBrowser::DeleteFolderEntry(const WString &folder_sys_path)
@@ -887,7 +1538,7 @@ namespace Ailu
             if (!fs::exists(folder_path) || !fs::is_directory(folder_path))
                 return;
 
-            const WString dir_asset_path = PathUtils::NormalizePathWithoutTrailingSlash(PathUtils::ExtractAssetPath(folder_sys_path));
+            const WString dir_asset_path = ResourceMgr::NormalizeAssetPath(folder_sys_path, GetDomainForPath(folder_sys_path));
             auto assets_to_delete = CollectAssetsUnderDirectory(dir_asset_path);
 
             std::error_code remove_error;
@@ -917,6 +1568,7 @@ namespace Ailu
 
             FileManager::CreateDirectory(new_folder_path.wstring());
             _is_dirty = true;
+            _is_directory_tree_dirty = true;
             return fs::exists(new_folder_path);
         }
 
@@ -940,7 +1592,7 @@ namespace Ailu
             return true;
         }
 
-        bool AssetBrowser::CreateMaterialEntry(const String &name)
+        bool AssetBrowser::CreateMaterialEntry(const String &name, Render::Shader *shader)
         {
             const String trimmed_name = TrimNameCopy(name);
             if (trimmed_name.empty())
@@ -950,16 +1602,14 @@ namespace Ailu
             if (ResourceMgr::Get().GetAsset(asset_path) != nullptr || fs::exists(ResourceMgr::GetResSysPath(asset_path)))
                 return false;
 
-            auto shader = Render::Shader::s_p_defered_standart_lit.lock();
-            if (!shader)
-            {
-                shader = ResourceMgr::Get().Load<Render::Shader>(L"Shaders/hlsl/defered_standard_lit.alasset");
-                Render::Shader::s_p_defered_standart_lit = shader;
-            }
             if (!shader)
                 return false;
 
-            auto material = MakeRef<Render::StandardMaterial>(trimmed_name);
+            Ref<Render::Material> material = nullptr;
+            if (shader == Render::Shader::s_p_defered_standart_lit.lock().get() || shader->Name() == "defered_standard_lit")
+                material = MakeRef<Render::StandardMaterial>(trimmed_name);
+            else
+                material = MakeRef<Render::Material>(shader, trimmed_name);
             ResourceMgr::Get().CreateAsset(asset_path, material);
             ResourceMgr::Get().SaveAllUnsavedAssets();
             _is_dirty = true;
@@ -968,11 +1618,7 @@ namespace Ailu
 
         WString AssetBrowser::CurrentAssetDirectoryPath() const
         {
-            const WString current_path = PathUtils::NormalizePathWithoutTrailingSlash(_current_path.wstring());
-            const WString root_path = PathUtils::NormalizePathWithoutTrailingSlash(ResourceMgr::Get().EngineResRootPath());
-            if (current_path == root_path)
-                return L"";
-            return PathUtils::NormalizePathWithoutTrailingSlash(PathUtils::ExtractAssetPath(current_path));
+            return GetRelativeAssetDirectory(_current_path);
         }
 
         WString AssetBrowser::BuildCurrentAssetPath(const WString &file_name) const
@@ -983,12 +1629,12 @@ namespace Ailu
         Vector<Asset *> AssetBrowser::CollectAssetsUnderDirectory(const WString &directory_asset_path) const
         {
             Vector<Asset *> assets;
-            const WString normalized_dir = PathUtils::NormalizePathWithoutTrailingSlash(directory_asset_path);
-            const WString normalized_prefix = PathUtils::NormalizeDirectoryPath(normalized_dir);
+            const WString normalized_dir = NormalizeLogicalPathWithoutTrailingSlash(directory_asset_path);
+            const WString normalized_prefix = NormalizeLogicalDirectoryPath(normalized_dir);
             for (auto it = ResourceMgr::Get().Begin(); it != ResourceMgr::Get().End(); ++it)
             {
                 Asset *asset = it->second.get();
-                WString asset_path = PathUtils::NormalizePathWithoutTrailingSlash(asset->_asset_path);
+                WString asset_path = NormalizeLogicalPathWithoutTrailingSlash(asset->_asset_path);
                 if (asset_path == normalized_dir || asset_path.compare(0, normalized_prefix.size(), normalized_prefix) == 0)
                     assets.push_back(asset);
             }

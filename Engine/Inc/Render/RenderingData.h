@@ -13,6 +13,11 @@ namespace Ailu::RHI::DX12
     class D3DContext;
 }
 
+namespace Ailu::SceneManagement
+{
+    class Scene;
+}
+
 namespace Ailu::Render
 {
     enum class EShaderingMode : u8
@@ -129,6 +134,7 @@ namespace Ailu::Render
         } _rg_handles;
         CommandBuffer *cmd;
         const CullResult *_cull_results;
+        const SceneManagement::Scene *_scene = nullptr;
         const Camera *_camera;
         CameraData _camera_data;
         VoxelGIData _vxgi_data;

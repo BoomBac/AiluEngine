@@ -6,7 +6,7 @@
 #include <Objects/SerializeSpecializations.h>
 #include <Framework/Common/Log.h>
 using namespace Ailu;
-Ailu::Type* Ailu::UI::Z_Construct_UIBrush_Type()
+const Ailu::Type* Ailu::UI::Z_Construct_UIBrush_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -131,22 +131,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::UI::UIBrush::GetPrivateStaticClass()
+const Ailu::Type* Ailu::UI::UIBrush::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_UIBrush_Type();
+	static const Ailu::Type* type = Z_Construct_UIBrush_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::UIBrush>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::UIBrush>()
 {
 return Ailu::UI::UIBrush::StaticType();
 }
-    Type *Ailu::UI::UIBrush::GetType()
+    const Type *Ailu::UI::UIBrush::GetType()
 {
 return Ailu::UI::UIBrush::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_UIBrush(&Ailu::UI::UIBrush::StaticType, "Ailu::UI::UIBrush");
-Ailu::Type* Ailu::UI::Z_Construct_UIColorTokens_Type()
+const Ailu::Type* Ailu::UI::Z_Construct_UIColorTokens_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -313,22 +313,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::UI::UIColorTokens::GetPrivateStaticClass()
+const Ailu::Type* Ailu::UI::UIColorTokens::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_UIColorTokens_Type();
+	static const Ailu::Type* type = Z_Construct_UIColorTokens_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::UIColorTokens>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::UIColorTokens>()
 {
 return Ailu::UI::UIColorTokens::StaticType();
 }
-    Type *Ailu::UI::UIColorTokens::GetType()
+    const Type *Ailu::UI::UIColorTokens::GetType()
 {
 return Ailu::UI::UIColorTokens::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_UIColorTokens(&Ailu::UI::UIColorTokens::StaticType, "Ailu::UI::UIColorTokens");
-Ailu::Type* Ailu::UI::Z_Construct_UISpacingTokens_Type()
+const Ailu::Type* Ailu::UI::Z_Construct_UISpacingTokens_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -432,22 +432,22 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::UI::UISpacingTokens::GetPrivateStaticClass()
+const Ailu::Type* Ailu::UI::UISpacingTokens::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_UISpacingTokens_Type();
+	static const Ailu::Type* type = Z_Construct_UISpacingTokens_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::UISpacingTokens>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::UISpacingTokens>()
 {
 return Ailu::UI::UISpacingTokens::StaticType();
 }
-    Type *Ailu::UI::UISpacingTokens::GetType()
+    const Type *Ailu::UI::UISpacingTokens::GetType()
 {
 return Ailu::UI::UISpacingTokens::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_UISpacingTokens(&Ailu::UI::UISpacingTokens::StaticType, "Ailu::UI::UISpacingTokens");
-Ailu::Type* Ailu::UI::Z_Construct_UITypographyTokens_Type()
+const Ailu::Type* Ailu::UI::Z_Construct_UITypographyTokens_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -530,17 +530,17 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Ailu::UI::UITypographyTokens::GetPrivateStaticClass()
+const Ailu::Type* Ailu::UI::UITypographyTokens::GetPrivateStaticClass()
 {
-	static Ailu::Type* type = Z_Construct_UITypographyTokens_Type();
+	static const Ailu::Type* type = Z_Construct_UITypographyTokens_Type();
 	return type;
 }
 
-template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::UITypographyTokens>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::UITypographyTokens>()
 {
 return Ailu::UI::UITypographyTokens::StaticType();
 }
-    Type *Ailu::UI::UITypographyTokens::GetType()
+    const Type *Ailu::UI::UITypographyTokens::GetType()
 {
 return Ailu::UI::UITypographyTokens::GetPrivateStaticClass();
 }

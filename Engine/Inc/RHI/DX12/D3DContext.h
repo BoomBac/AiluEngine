@@ -211,6 +211,8 @@ namespace Ailu::RHI::DX12
         //HANDLE m_fenceEvent;
         //std::atomic<u64> _fence_value[Render::RenderConstants::kFrameCount];
         ComPtr<ID3D12Fence> _p_cmd_buffer_fence;
+        HANDLE _p_cmd_buffer_fence_event = nullptr;
+        mutable std::mutex _cmd_fence_mtx;
         std::multimap<u64, ComPtr<ID3D12Resource>> _global_tracked_resource;
         std::mutex _resource_task_lock;
         float m_aspectRatio;

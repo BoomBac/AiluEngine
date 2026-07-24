@@ -7,17 +7,17 @@
 //Class AnimationClip begin...........................
 #define CLIP_GEN_H_16_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_AnimationClip_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_AnimationClip_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual Type  *GetType() override;
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu{
 class AnimationClip ;
 }
 template<>
-AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::AnimationClip>();
+AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::AnimationClip>();
 //Class AnimationClip end...........................
 
 #undef CURRENT_FILE_ID

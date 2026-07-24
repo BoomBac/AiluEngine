@@ -325,7 +325,7 @@ namespace Ailu
 
         bool RenderGraph::Compile()
         {
-            PROFILE_BLOCK_CPU(RenderGraph_Compile)
+            PROFILE_BLOCK_CPU("RenderGraph::Compile")
 
             _sorted_passes.clear();
 
@@ -431,11 +431,11 @@ namespace Ailu
         {
             if (!_is_compiled && !Compile())
                 return;
-            PROFILE_BLOCK_CPU(RenderGraph_Execute)
+            PROFILE_BLOCK_CPU("RenderGraph::Execute")
             for (auto *pass: _sorted_passes)
             {
                 {
-                    CPUProfileBlock cb(pass->_name);
+                    PROFILE_BLOCK_CPU(pass->_name)
                     for (auto &handle: pass->_output_handles)
                     {
                         CreatePhysicalResources(handle);
@@ -463,7 +463,7 @@ namespace Ailu
                         }
                     }
                     {
-                        GpuProfileBlock pass_block(cmd.get(), pass->_name);
+                        PROFILE_BLOCK_GPU(cmd.get(), pass->_name)
                         pass->Execute(*this, cmd.get(), data);
                     }
                     for (const auto &[handle, access]: pass->_output_accesses)
