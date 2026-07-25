@@ -1,3 +1,4 @@
+#include "Framework/Core/Containers/Array.h"
 #include "Framework/Common/Allocator.hpp"
 #include "Framework/Common/Log.h"
 #include "Framework/Math/ALMath.hpp"

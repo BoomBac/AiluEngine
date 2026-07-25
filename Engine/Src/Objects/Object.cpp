@@ -37,7 +37,7 @@ namespace Ailu
 
     void ObjectRegister::Shutdown()
     {
-        DESTORY_PTR(g_pObjectRegister);
+        delete g_pObjectRegister; g_pObjectRegister = nullptr;
     }
 
     ObjectRegister &ObjectRegister::Get()

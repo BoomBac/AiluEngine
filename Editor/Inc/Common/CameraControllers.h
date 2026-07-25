@@ -3,9 +3,14 @@
 #pragma once
 
 #include "Framework/Math/Transform.h"
+#include "Framework/Math/Quaternion.h"
 
 namespace Ailu
 {
+    using Math::Quaternion;
+    using Math::Vector2f;
+    using Math::Vector3f;
+
     class PropertyInfo;
     namespace Render
     {

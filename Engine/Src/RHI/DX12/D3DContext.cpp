@@ -171,7 +171,7 @@ namespace Ailu::RHI::DX12
         {
             _is_stop = true;
             if (_worker_thread->joinable()) _worker_thread->join();
-            DESTORY_PTR(_worker_thread);
+            delete _worker_thread; _worker_thread = nullptr;
             LOG_INFO("Exit RenderThread")
         }
     }
@@ -1148,7 +1148,7 @@ namespace Ailu::RHI::DX12
     {
         if (res->GetResourceType() == EGpuResType::kBuffer)
         {
-            size = ALIGN_TO_256(size);
+            size = AlignTo(size,256);
             auto copy_dst = _readback_pool->Acquire(size, _frame_count);
             auto cmd = RHICommandBufferPool::Get("Readback");
             auto d3dcmd = static_cast<D3DCommandBuffer *>(cmd.get());
@@ -1175,7 +1175,7 @@ namespace Ailu::RHI::DX12
     }
     void D3DContext::ReadBack(ID3D12Resource *res, D3DResourceStateGuard &state_guard, u8 *data, u32 size)
     {
-        size = ALIGN_TO_256(size);
+        size = AlignTo(size,256);
         auto copy_dst = _readback_pool->Acquire(size, _frame_count);
         auto cmd = RHICommandBufferPool::Get("Readback");
         auto d3dcmd = static_cast<D3DCommandBuffer *>(cmd.get());
@@ -1270,7 +1270,7 @@ namespace Ailu::RHI::DX12
         if (res->GetResourceType() == EGpuResType::kGraphicsPSO || res->GetResourceType() == EGpuResType::kRenderTexture)
         {
             res->Upload(this, nullptr, params);
-            DESTORY_PTR(params);
+            delete params; params = nullptr;
             //不需要cmd参与的资源直接将其create fence置为0，否则在实际构建之后进行
             ResourceStateTracker::Get().AddResource(res, 0u);
         }
@@ -1289,7 +1289,7 @@ namespace Ailu::RHI::DX12
         if (res->GetResourceType() == EGpuResType::kGraphicsPSO || res->GetResourceType() == EGpuResType::kRenderTexture)
         {
             res->Upload(this, nullptr, params);
-            DESTORY_PTR(params);
+            delete params; params = nullptr;
             ResourceStateTracker::Get().AddResource(res, 0u);
             return;
         }
@@ -1336,7 +1336,7 @@ namespace Ailu::RHI::DX12
             {
                 if (set_cmd->_depth_target != nullptr)
                 {
-                    GraphicsPipelineStateMgr::SetRenderTargetState(EALGFormat::EALGFormat::kALGFormatUNKOWN,
+                    GraphicsPipelineStateMgr::SetRenderTargetState(EALGFormat::kALGFormatUNKOWN,
                                                                    set_cmd->_depth_target->PixelFormat(), 0);
                     auto drt = static_cast<D3DRenderTexture *>(set_cmd->_depth_target);
                     d3dcmd->_color_count = 0u;
@@ -1362,9 +1362,9 @@ namespace Ailu::RHI::DX12
                 {
                     d3dcmd->_scissors[i] = D3DConvertUtils::ToD3DRect(set_cmd->_viewports[i]);
                     d3dcmd->_viewports[i] = D3DConvertUtils::ToD3DViewport(set_cmd->_viewports[i]);
-                    EALGFormat::EALGFormat color_format = set_cmd->_color_target[i]->PixelFormat();
+                    EALGFormat color_format = set_cmd->_color_target[i]->PixelFormat();
                     GraphicsPipelineStateMgr::SetRenderTargetState(
-                            color_format, is_depth_valid ? set_cmd->_depth_target->PixelFormat() : EALGFormat::EALGFormat::kALGFormatUNKOWN,
+                            color_format, is_depth_valid ? set_cmd->_depth_target->PixelFormat() : EALGFormat::kALGFormatUNKOWN,
                             (u8) i);
                     D3D12_CPU_DESCRIPTOR_HANDLE *rtv;
                     if (set_cmd->_color_target[i]->IsSwapChain())

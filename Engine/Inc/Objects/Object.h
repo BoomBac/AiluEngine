@@ -2,10 +2,14 @@
 #pragma once
 #ifndef __OBJECT_H__
 #define __OBJECT_H__
-#include <set>
-#include <mutex>
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/Containers/Map.h"
+#include "Framework/Core/ReflectionMacros.h"
+#include "Framework/Core/String.h"
 #include "Framework/Math/Guid.h"
 #include "generated/Object.gen.h"
+#include <mutex>
+#include <set>
 
 namespace Ailu
 {

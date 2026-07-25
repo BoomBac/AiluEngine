@@ -92,7 +92,7 @@ namespace Ailu::RHI::DX12
             desc.SemanticIndex = (u32) layout_descs[i]._semantic_index;
             v.push_back(desc);
         }
-        _d3d_pso_desc.NumRenderTargets = _state_desc._rt_state._color_rt[0] == EALGFormat::EALGFormat::kALGFormatUNKOWN ? 0 : _state_desc._rt_state._color_rt_num;
+        _d3d_pso_desc.NumRenderTargets = _state_desc._rt_state._color_rt[0] == EALGFormat::kALGFormatUNKOWN ? 0 : _state_desc._rt_state._color_rt_num;
         if (_state_desc._depth_stencil_state._b_depth_write || _state_desc._depth_stencil_state._depth_test_func != ECompareFunc::kAlways ||
             _state_desc._depth_stencil_state._b_front_stencil)
             _d3d_pso_desc.DSVFormat = ConvertToDXGIFormat(_state_desc._rt_state._depth_rt);
@@ -136,7 +136,7 @@ namespace Ailu::RHI::DX12
         auto d3dcmd = static_cast<D3DCommandBuffer *>(rhi_cmd);
         _p_cmd = d3dcmd->NativeCmdList();
         const bool is_same_pso = d3dcmd->IsGraphicsPSOActive(this);
-        EngineConfig &config = Ailu::g_engine_config;
+        EngineConfig &config = ::Ailu::g_engine_config;
         if (!config.EnableIncrementalGraphicsBinding || !is_same_pso)
         {
             if (_state_desc._depth_stencil_state._b_front_stencil)

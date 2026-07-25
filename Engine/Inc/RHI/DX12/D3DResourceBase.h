@@ -2,7 +2,10 @@
 #ifndef __D3D_UTILS_H__
 #define __D3D_UTILS_H__
 #include "Framework/Common/Log.h"
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/String.h"
+#include "Framework/Core/Containers/Array.h"
+#include "Framework/Common/Assert.h"
 #include "Render/GpuResource.h"
 #include "d3dx12.h"
 #include <mutex>
@@ -141,11 +144,11 @@ namespace Ailu::RHI::DX12
 
     namespace D3DConvertUtils
     {
-        static Ailu::Render::EResourceState ToALResState(D3D12_RESOURCE_STATES state)
+        static ::Ailu::Render::EResourceState ToALResState(D3D12_RESOURCE_STATES state)
         {
-            return (Ailu::Render::EResourceState) state;
+            return (::Ailu::Render::EResourceState) state;
         };
-        static D3D12_RESOURCE_STATES FromALResState(Ailu::Render::EResourceState state)
+        static D3D12_RESOURCE_STATES FromALResState(::Ailu::Render::EResourceState state)
         {
             return (D3D12_RESOURCE_STATES) state;
         };

@@ -88,12 +88,12 @@ namespace Ailu::RHI::DX12
     class D3DCubeMap : public Render::CubeMap
     {
     public:
-        D3DCubeMap(u16 width, bool mipmap_chain = true, ETextureFormat::ETextureFormat format = ETextureFormat::kRGBA32, bool linear = false, bool random_access = false);
+        D3DCubeMap(u16 width, bool mipmap_chain = true, ETextureFormat format = ETextureFormat::kRGBA32, bool linear = false, bool random_access = false);
         ~D3DCubeMap();
         Render::NativeHandle NativeResource() final { return {Render::RendererAPI::ERenderAPI::kDirectX12, _p_d3dres.Get()}; }
-        void CreateView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice = 0) final;
-        TextureHandle GetView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice = 0) const final;
-        void ReleaseView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice = 0) final;
+        void CreateView(ETextureViewType view_type, ECubemapFace face, u16 mipmap, u16 array_slice = 0) final;
+        TextureHandle GetView(ETextureViewType view_type, ECubemapFace face, u16 mipmap, u16 array_slice = 0) const final;
+        void ReleaseView(ETextureViewType view_type, ECubemapFace face, u16 mipmap, u16 array_slice = 0) final;
         void InsertUAVBarrier(RHICommandBuffer* rhi_cmd) final;
 
         private:
@@ -145,16 +145,16 @@ namespace Ailu::RHI::DX12
         TextureHandle GetView(ETextureViewType view_type, u16 mipmap, u16 array_slice = 0) const final;
         void ReleaseView(ETextureViewType view_type, u16 mipmap, u16 array_slice = 0) final;
         //for cube_map(s)
-        void CreateView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice = 0) final;
-        TextureHandle GetView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice = 0) const final;
-        void ReleaseView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice = 0) final;
+        void CreateView(ETextureViewType view_type, ECubemapFace face, u16 mipmap, u16 array_slice = 0) final;
+        TextureHandle GetView(ETextureViewType view_type, ECubemapFace face, u16 mipmap, u16 array_slice = 0) const final;
+        void ReleaseView(ETextureViewType view_type, ECubemapFace face, u16 mipmap, u16 array_slice = 0) final;
         void Name(const String &value) final;
         TextureHandle ColorTexture(u16 view_index = kMainSRVIndex) final;
         TextureHandle DepthTexture(u16 view_index = kMainSRVIndex) final;
         void GenerateMipmap() final;
         void InsertUAVBarrier(RHICommandBuffer* rhi_cmd) final;
-        void *ReadBack(u16 mipmap, u16 array_slice = 0, ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown) final;
-        void ReadBackAsync(std::function<void(void *)> callback, u16 mipmap, u16 array_slice = 0, ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown) final;
+        void *ReadBack(u16 mipmap, u16 array_slice = 0, ECubemapFace face = ECubemapFace::kUnknown) final;
+        void ReadBackAsync(std::function<void(void *)> callback, u16 mipmap, u16 array_slice = 0, ECubemapFace face = ECubemapFace::kUnknown) final;
         D3D12_CPU_DESCRIPTOR_HANDLE *TargetCPUHandle(RHICommandBuffer *cmd, u16 index);
         
     private:

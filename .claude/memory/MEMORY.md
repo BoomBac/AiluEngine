@@ -1,0 +1,1 @@
+- [Windows sed CRLF gotcha](windows-sed-crlf-gotcha.md) — On Windows, `sed -i` destroys CRLF; never run find+sed on all files

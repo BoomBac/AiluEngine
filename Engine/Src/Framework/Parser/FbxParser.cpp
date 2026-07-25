@@ -2,6 +2,7 @@
 #include "Framework/Common/Log.h"
 #include "Framework/Common/ThreadPool.h"
 #include "Framework/Common/Utils.h"
+#include "Framework/Math/MathHash.hpp"
 #include "pch.h"
 //#include "Animation/Skeleton.h"
 #include "Animation/Clip.h"

@@ -20,7 +20,7 @@ namespace Ailu::Render
     }
     VoxelizePass::~VoxelizePass()
     {
-        DESTORY_PTR(_cam_cbuf);
+        delete _cam_cbuf; _cam_cbuf = nullptr;
     }
     void VoxelizePass::Execute(GraphicsContext *context, RenderingData &rendering_data)
     {
@@ -129,7 +129,7 @@ namespace Ailu::Render
         _voxel_debug_mat->SetVector("_GridNum", Vector4Int(_data._grid_num.x, _data._grid_num.y, _data._grid_num.z, 1));
         _voxel_debug_mat->SetVector("_GridSize", Vector4f::kOne * 2.1f);
 
-        //_event = (ERenderPassEvent::ERenderPassEvent)(ERenderPassEvent::kAfterTransparent - 1);//before copy color
+        //_event = (ERenderPassEvent)(ERenderPassEvent::kAfterTransparent - 1);//before copy color
         _event = ERenderPassEvent::kAfterPostprocess;
     }
     VoxelDebugPass::~VoxelDebugPass()

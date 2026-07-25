@@ -31,7 +31,7 @@ namespace Ailu
         }
         TextRenderer::~TextRenderer()
         {
-            DESTORY_PTR(_default_block);
+            delete _default_block; _default_block = nullptr;
         }
         void TextRenderer::DrawText(const String &text, Vector2f pos, f32 font_size, Vector2f scale, Color color, Font *font)
         {

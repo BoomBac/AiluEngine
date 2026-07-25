@@ -5,7 +5,13 @@
 #include "Framework/Common/Log.h"
 #include "Framework/Common/ThreadPool.h"
 #include "Framework/Common/TimeMgr.h"
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/String.h"
+#include "Framework/Core/Containers/Vector.h"
+#include "Framework/Core/Containers/Map.h"
+#include "Framework/Core/Containers/List.h"
+#include "Framework/Core/Containers/Queue.h"
+#include "Framework/Common/Assert.h"
 #include "Render/GraphicsContext.h"
 #include "Render/Material.h"
 #include "pch.h"
@@ -25,6 +31,7 @@ namespace Ailu
 	namespace
 	{
 		ResourceMgr *g_pResourceMgr = nullptr;
+		const WString kEmptyWString;
 
 		std::optional<EMeshLoader> ResolveMeshLoader(const WString &path)
 		{
@@ -269,7 +276,7 @@ namespace Ailu
 
 	void ResourceMgr::Shutdown()
 	{
-		DESTORY_PTR(g_pResourceMgr);
+		delete g_pResourceMgr; g_pResourceMgr = nullptr;
 	}
 
 	ResourceMgr &ResourceMgr::Get()
@@ -332,7 +339,7 @@ namespace Ailu
 	WString ResourceMgr::NormalizeAssetPath(const WString &asset_path, EAssetDomain default_domain)
 	{
 		if (asset_path.empty())
-			return EmptyWString;
+			return kEmptyWString;
 
 		WString path = FormatLogicalPath(asset_path);
 		if (PathUtils::IsSystemPath(path))
@@ -562,7 +569,7 @@ namespace Ailu
 			default_normal->Name("default_normal");
 			default_normal->Apply();
 			RegisterResource(L"Runtime/default_normal", default_normal);
-			DESTORY_PTRARR(default_data);
+			delete[] default_data; default_data = nullptr;
 			Texture::s_p_default_white = default_white.get();
 			Texture::s_p_default_black = default_black.get();
 			Texture::s_p_default_gray = default_gray.get();
@@ -1027,7 +1034,7 @@ namespace Ailu
 		{
 			return _object_to_asset.at(obj->ID())->_asset_path;
 		}
-		return EmptyWString;
+		return kEmptyWString;
 	}
 
 	const Guid &ResourceMgr::GetAssetGuid(Object *obj) const
@@ -1045,7 +1052,7 @@ namespace Ailu
 		{
 			return _asset_db.at(guid)->_asset_path;
 		}
-		return EmptyWString;
+		return kEmptyWString;
 	}
 
 	Asset *ResourceMgr::GetAsset(const WString &asset_path) const

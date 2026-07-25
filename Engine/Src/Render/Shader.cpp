@@ -1,6 +1,7 @@
 #include "pch.h"
 #include <regex>
 
+#include "Framework/Common/Hash.hpp"
 #include "Framework/Common/ResourceMgr.h"
 #include "Framework/Common/Utils.h"
 #include "Framework/Common/SystemInfo.h"
@@ -1033,7 +1034,7 @@ namespace Ailu::Render
         SetTexture(name, texture);
     }
 
-    void ComputeShader::SetTexture(const String &name, RTHandle handle, ECubemapFace::ECubemapFace face, u16 mipmap)
+    void ComputeShader::SetTexture(const String &name, RTHandle handle, ECubemapFace face, u16 mipmap)
      {
         auto texture = g_pRenderTexturePool->Get(handle);
         SetTexture(name, texture,face,mipmap);
@@ -1060,7 +1061,7 @@ namespace Ailu::Render
         }
     }
 
-    void ComputeShader::SetTexture(const String &name, Texture *texture, ECubemapFace::ECubemapFace face, u16 mipmap)
+    void ComputeShader::SetTexture(const String &name, Texture *texture, ECubemapFace face, u16 mipmap)
     {
         u32 sub_res = UINT32_MAX;
         if (face == ECubemapFace::kUnknown)
@@ -1092,7 +1093,7 @@ namespace Ailu::Render
     //    SetTexture(name, tex);
     //}
 
-    //void ComputeShader::SetTexture(const String &name, RDG::RGHandle handle, ECubemapFace::ECubemapFace face, u16 mipmap)
+    //void ComputeShader::SetTexture(const String &name, RDG::RGHandle handle, ECubemapFace face, u16 mipmap)
     //{
     //    auto tex = dynamic_cast<Texture *>(handle._res);
     //    SetTexture(name, tex,face,mipmap);

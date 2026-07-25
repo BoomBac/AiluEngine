@@ -5,7 +5,9 @@
 #ifndef __BLEND_SPACE_H__
 #define __BLEND_SPACE_H__
 
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/Containers/Vector.h"
+#include "Framework/Core/Containers/Array.h"
 #include "Clip.h"
 #include "Pose.h"
 #include "Skeleton.h"

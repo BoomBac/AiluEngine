@@ -1,9 +1,17 @@
 export module core.math.aabb;
 import <string>;
 
-#include "ALMath.hpp"
+#include "Framework/Math/Matrix.hpp"
+#include "Framework/Math/TransformMath.h"
+#include "Framework/Math/VectorMath.hpp"
+#include <limits>
+#include <utility>
 export namespace Ailu
 {
+    using Math::Matrix4x4f;
+    using Math::MultipyVector;
+    using Math::Vector3f;
+
     export class AABB
     {
     public:

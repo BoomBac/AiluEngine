@@ -1,6 +1,6 @@
 #ifndef __CORE_TYPE_H__
 #define __CORE_TYPE_H__
-#include "GlobalMarco.h"
+#include "Framework/Core/String.h"
 #include "RenderConstants.h"
 #include "generated/CoreType.gen.h"
 #include <set>

@@ -3,7 +3,8 @@
         "_format_version": 1,
         "_guid": "d137d2a7-0d2b-40bc-9c76-6d2708923869",
         "_asset_type": "Ailu::Render::Mesh",
-        "_asset_name": "Cube"
+        "_asset_name": "cube",
+        "_dependencies": []
     },
     "_file": "cube.fbx",
     "_inner_file_name": "Cube",

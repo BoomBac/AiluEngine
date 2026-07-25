@@ -3,8 +3,9 @@
         "_format_version": 1,
         "_guid": "0f4943a3-8df4-4917-8730-92c9de6ef6ce",
         "_asset_type": "Ailu::Render::Texture2D",
-        "_asset_name": "blue_noise"
+        "_asset_name": "blue_noise",
+        "_dependencies": []
     },
     "_file": "blue_noise.jpg",
-    "_is_srgb": false
+    "_is_srgb": true
 }

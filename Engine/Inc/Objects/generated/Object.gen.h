@@ -13,6 +13,7 @@
                                 static const Type *StaticType() {return GetPrivateStaticClass();};\
                                 virtual const Type  *GetType();
                             namespace Ailu {class Type;}
+#define OBJECT_GEN_H_21_GENERATED_BODY OBJECT_GEN_H_17_GENERATED_BODY
 namespace Ailu{
 class Object ;
 }

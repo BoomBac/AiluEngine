@@ -12,7 +12,7 @@ using namespace Ailu::Render;
 namespace Ailu
 {
     // 创建一个映射函数，将 DXGI_FORMAT 转换为 ETextureFormat
-    ETextureFormat::ETextureFormat DXGIToETextureFormat(DXGI_FORMAT dxgiFormat)
+    ETextureFormat DXGIToETextureFormat(DXGI_FORMAT dxgiFormat)
     {
         switch (dxgiFormat) {
             case DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM:

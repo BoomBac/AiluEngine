@@ -3,9 +3,12 @@
 #pragma warning(disable : 4251)
 #ifndef __INPUT_H__
 #define __INPUT_H__
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/String.h"
+#include "Framework/Core/Containers/Map.h"
 #include "Framework/Math/ALMath.hpp"
 #include "KeyCode.h"
+#include <bitset>
 #include <mutex>
 #include <tuple>
 

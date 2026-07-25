@@ -28,7 +28,7 @@ namespace Ailu::RHI::DX12
         if (type == D3D12_HEAP_TYPE_UPLOAD)
         {
             auto& d3d_context = static_cast<D3DContext&>(GraphicsContext::Get());
-            size = ALIGN_TO_256(size);
+            size = AlignTo(size);
             _size = size;
             auto res_desc = CD3DX12_RESOURCE_DESC::Buffer(size);
             ThrowIfFailed(d3d_context.GetDevice()->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &res_desc,
@@ -60,7 +60,7 @@ namespace Ailu::RHI::DX12
     }
     void GpuResourceManager::Shutdown()
     {
-        DESTORY_PTR(s_GpuResourceManager);
+        delete s_GpuResourceManager; s_GpuResourceManager = nullptr;
     }
     GpuResourceManager *GpuResourceManager::Get()
     {

@@ -2,8 +2,10 @@
 #ifndef __PIPELINE_STATE_H__
 #define __PIPELINE_STATE_H__
 #include "AlgFormat.h"
+#include "Framework/Common/Hash.hpp"
 #include "Framework/Math/ALMath.hpp"
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/Containers/Vector.h"
 #include "RenderConstants.h"
 #include "CoreType.h"
 #include <mutex>
@@ -193,22 +195,22 @@ namespace Ailu
         }
 
         template<>
-        static u32 HashFunc(const EALGFormat::EALGFormat &obj)
+        static u32 HashFunc(const EALGFormat &obj)
         {
             //separate color and depth hash
             switch (obj)
             {
-                case EALGFormat::EALGFormat::kALGFormatR24G8_TYPELESS:
+                case EALGFormat::kALGFormatR24G8_TYPELESS:
                     return 0;
-                case EALGFormat::EALGFormat::kALGFormatD32_FLOAT:
+                case EALGFormat::kALGFormatD32_FLOAT:
                     return 1;
-                case EALGFormat::EALGFormat::kALGFormatR8G8B8A8_UNORM:
+                case EALGFormat::kALGFormatR8G8B8A8_UNORM:
                     return 0;
-                case EALGFormat::EALGFormat::kALGFormatR32G32B32A32_FLOAT:
+                case EALGFormat::kALGFormatR32G32B32A32_FLOAT:
                     return 1;
-                case EALGFormat::EALGFormat::kALGFormatR32G32B32_FLOAT:
+                case EALGFormat::kALGFormatR32G32B32_FLOAT:
                     return 2;
-                case EALGFormat::EALGFormat::kALGFormatR32_FLOAT:
+                case EALGFormat::kALGFormatR32_FLOAT:
                     return 3;
             }
         }
@@ -279,8 +281,12 @@ namespace Ailu
 
         class VertexBufferLayout
         {
-            DECLARE_PRIVATE_PROPERTY(hash, Hash, u8)
+            public:
+                void Hash(const u8 &value) { _hash = value; }
+                const u8 &Hash() const { return _hash; }
 
+            private:
+                u8 _hash;
         public:
             inline static PipelineStateHash<VertexBufferLayout> _s_hash_obj{};
 
@@ -350,8 +356,12 @@ namespace Ailu
 
         struct RasterizerState
         {
-            DECLARE_PRIVATE_PROPERTY(hash, Hash, u8)
+            public:
+                void Hash(const u8 &value) { _hash = value; }
+                const u8 &Hash() const { return _hash; }
 
+            private:
+                u8 _hash;
         public:
             ECullMode _cull_mode;
             EFillMode _fill_mode;
@@ -384,8 +394,12 @@ namespace Ailu
 
         struct DepthStencilState
         {
-            DECLARE_PRIVATE_PROPERTY(hash, Hash, u8)
+            public:
+                void Hash(const u8 &value) { _hash = value; }
+                const u8 &Hash() const { return _hash; }
 
+            private:
+                u8 _hash;
         public:
             bool _b_depth_write;
             ECompareFunc _depth_test_func;
@@ -437,8 +451,12 @@ namespace Ailu
 
         struct BlendState
         {
-            DECLARE_PRIVATE_PROPERTY(hash, Hash, u8)
+            public:
+                void Hash(const u8 &value) { _hash = value; }
+                const u8 &Hash() const { return _hash; }
 
+            private:
+                u8 _hash;
         public:
             bool _b_enable;
             EBlendFactor _dst_alpha;
@@ -497,14 +515,18 @@ namespace Ailu
 
         struct RenderTargetState
         {
-            DECLARE_PRIVATE_PROPERTY(hash, Hash, u8)
+            public:
+                void Hash(const u8 &value) { _hash = value; }
+                const u8 &Hash() const { return _hash; }
 
+            private:
+                u8 _hash;
         public:
-            static constexpr EALGFormat::EALGFormat kDefaultColorRTFormat = RenderConstants::kColorRange == EColorRange::kLDR ? RenderConstants::kLDRFormat : RenderConstants::kHDRFormat;
-            static constexpr EALGFormat::EALGFormat kDefaultDepthRTFormat = EALGFormat::EALGFormat::kALGFormatD32_FLOAT_S8X24_UINT;
-            EALGFormat::EALGFormat _color_rt[8];
+            static constexpr EALGFormat kDefaultColorRTFormat = RenderConstants::kColorRange == EColorRange::kLDR ? RenderConstants::kLDRFormat : RenderConstants::kHDRFormat;
+            static constexpr EALGFormat kDefaultDepthRTFormat = EALGFormat::kALGFormatD32_FLOAT_S8X24_UINT;
+            EALGFormat _color_rt[8];
             u8 _color_rt_num = 0;
-            EALGFormat::EALGFormat _depth_rt;
+            EALGFormat _depth_rt;
 
         public:
             //static const RenderTargetState& Get(const u8& hash)
@@ -515,7 +537,7 @@ namespace Ailu
 
             RenderTargetState();
 
-            RenderTargetState(const std::initializer_list<EALGFormat::EALGFormat> &color_rt, EALGFormat::EALGFormat depth_rt);
+            RenderTargetState(const std::initializer_list<EALGFormat> &color_rt, EALGFormat depth_rt);
 
             bool operator==(const RenderTargetState &other) const
             {

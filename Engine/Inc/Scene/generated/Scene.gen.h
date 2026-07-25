@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __SCENE_GEN_H__
 //Class Scene begin...........................
-#define SCENE_GEN_H_59_GENERATED_BODY \
+#define SCENE_GEN_H_60_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_Scene_Type();\
                                 static const Type* GetPrivateStaticClass();\

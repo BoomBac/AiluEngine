@@ -3,7 +3,8 @@
         "_format_version": 1,
         "_guid": "60fb44b6-864f-4c6a-b49b-f4b26829b57d",
         "_asset_type": "Ailu::Render::Shader",
-        "_asset_name": "defered_standard_lit"
+        "_asset_name": "defered_standard_lit",
+        "_dependencies": []
     },
     "_file": "defered_standard_lit.hlsl",
     "_vs_entry": "GBufferVSMain",

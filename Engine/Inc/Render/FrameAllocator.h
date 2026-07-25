@@ -2,14 +2,15 @@
 #ifndef AILU_FRAME_ALLOCATOR_H
 #define AILU_FRAME_ALLOCATOR_H
 
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/Containers/Vector.h"
+#include "Framework/Common/NonCopyable.h"
 #include <mutex>
 
 namespace Ailu::Render
 {
-    class FrameAllocator
+    class FrameAllocator : public NonCopyable
     {
-        DISALLOW_COPY_AND_ASSIGN(FrameAllocator)
     public:
         static constexpr u64 kDefaultPageSize = 4 * 1024 * 1024; // 4MB
     public:

@@ -6,7 +6,8 @@
 #include <tuple>
 #include <functional>
 
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/String.h"
 #include "Framework/Events/Event.h"
 
 namespace Ailu

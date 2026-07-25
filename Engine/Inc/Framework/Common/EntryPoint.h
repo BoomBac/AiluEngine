@@ -26,7 +26,7 @@
 //	app->Initialize();
 //	app->Tick(16.6f);
 //	app->Finalize();
-//	DESTORY_PTR(app)
+//	delete app; app = nullptr;
 //}
 //#endif
 

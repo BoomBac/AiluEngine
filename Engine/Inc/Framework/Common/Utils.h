@@ -8,10 +8,15 @@
 
 //#include <stringapiset.h>
 #include <Windows.h>
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/String.h"
+#include "Framework/Core/Containers/Map.h"
+#include "Framework/Core/Containers/Vector.h"
 #include <algorithm>
 #include <numeric>
 #include <fstream>
+#include <limits>
+#include <optional>
 #include <set>
 #include <thread>
 

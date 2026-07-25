@@ -8,6 +8,65 @@ namespace Ailu::ECS
 {
     using namespace Render;
 
+    const String &LightTypeToString(ELightType type)
+    {
+        static const String kDirectional = "kDirectional";
+        static const String kPoint = "kPoint";
+        static const String kSpot = "kSpot";
+        static const String kArea = "kArea";
+        switch (type)
+        {
+            case ELightType::kDirectional:
+                return kDirectional;
+            case ELightType::kPoint:
+                return kPoint;
+            case ELightType::kSpot:
+                return kSpot;
+            case ELightType::kArea:
+                return kArea;
+            default:
+                return kDirectional;
+        }
+    }
+
+    ELightType LightTypeFromString(const String &str)
+    {
+        if (str == "kPoint")
+            return ELightType::kPoint;
+        if (str == "kSpot")
+            return ELightType::kSpot;
+        if (str == "kArea")
+            return ELightType::kArea;
+        return ELightType::kDirectional;
+    }
+
+    const String &ColliderTypeToString(EColliderType type)
+    {
+        static const String kBox = "kBox";
+        static const String kSphere = "kSphere";
+        static const String kCapsule = "kCapsule";
+        switch (type)
+        {
+            case EColliderType::kBox:
+                return kBox;
+            case EColliderType::kSphere:
+                return kSphere;
+            case EColliderType::kCapsule:
+                return kCapsule;
+            default:
+                return kBox;
+        }
+    }
+
+    EColliderType ColliderTypeFromString(const String &str)
+    {
+        if (str == "kSphere")
+            return EColliderType::kSphere;
+        if (str == "kCapsule")
+            return EColliderType::kCapsule;
+        return EColliderType::kBox;
+    }
+
     Archive &operator<<(Archive &ar, const TagComponent &c)
     {
         ar.IncreaseIndent();
@@ -28,6 +87,25 @@ namespace Ailu::ECS
         c._name = su::Split(bufs[0], ":")[1];
         AL_ASSERT(su::BeginWith(bufs[1], "_layer_mask"));
         c._layer_mask = (u32)std::stoul(su::Split(bufs[1], ":")[1]);
+        return ar;
+    }
+
+    Archive &operator<<(Archive &ar, const PersistentIdComponent &c)
+    {
+        ar.IncreaseIndent();
+        ar.InsertIndent();
+        ar << "_guid:" << c._guid.ToString();
+        ar.DecreaseIndent();
+        ar.NewLine();
+        return ar;
+    }
+    Archive &operator>>(Archive &ar, PersistentIdComponent &c)
+    {
+        String buf;
+        ar >> buf;
+        AL_ASSERT(su::BeginWith(buf, "_guid"));
+        String guid_str = su::Split(buf, ":")[1];
+        c._guid = Guid(guid_str);
         return ar;
     }
 
@@ -126,7 +204,7 @@ namespace Ailu::ECS
     {
         ar.IncreaseIndent();
         ar.InsertIndent();
-        ar << "_type:" << ELightType::ToString(c._type);
+        ar << "_type:" << LightTypeToString(c._type);
         ar.NewLine();
         ar.InsertIndent();
         ar << "_light:";
@@ -144,7 +222,7 @@ namespace Ailu::ECS
         String str;
         ar >> str;
         AL_ASSERT(su::BeginWith(str, "_type"));
-        c._type = ELightType::FromString(su::Split(str, ":")[1]);
+        c._type = LightTypeFromString(su::Split(str, ":")[1]);
         ar >> str;
         AL_ASSERT(su::BeginWith(str, "_light"));
         ar >> c._light;
@@ -340,7 +418,7 @@ namespace Ailu::ECS
 
     CLightProbe::CLightProbe()
     {
-        _cubemap = RenderTexture::Create(512, "light probe", Ailu::Render::ERenderTargetFormat::ERenderTargetFormat::kDefaultHDR, true, true, true);
+        _cubemap = RenderTexture::Create(512, "light probe", Ailu::Render::ERenderTargetFormat::kDefaultHDR, true, true, true);
         _pass = MakeRef<CubeMapGenPass>(_cubemap.get());
         _debug_material = nullptr;
     }
@@ -387,7 +465,7 @@ namespace Ailu::ECS
     Archive &operator<<(Archive &ar, const CCollider &c)
     {
         ar.IncreaseIndent();
-        ar << ar.GetIndent() << "_type:" << EColliderType::ToString(c._type) << std::endl;
+        ar << ar.GetIndent() << "_type:" << ColliderTypeToString(c._type) << std::endl;
         ar << ar.GetIndent() << "_is_trigger:" << c._is_trigger << std::endl;
         ar << ar.GetIndent() << "_center:" << c._center.ToString() << std::endl;
         ar << ar.GetIndent() << "_param:" << c._param.ToString() << std::endl;
@@ -399,7 +477,7 @@ namespace Ailu::ECS
         String buf;
         ar >> buf;
         AL_ASSERT(su::BeginWith(buf, "_type"));
-        c._type = EColliderType::FromString(su::Split(buf, ":")[1]);
+        c._type = ColliderTypeFromString(su::Split(buf, ":")[1]);
         ar >> buf;
         c._is_trigger = static_cast<bool>(std::stoi(su::Split(buf, ":")[1]));
         ar >> buf;

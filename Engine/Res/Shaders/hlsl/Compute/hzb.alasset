@@ -3,7 +3,8 @@
         "_format_version": 1,
         "_guid": "92f5350a-f983-4448-93a3-ae0fd06ce1f3",
         "_asset_type": "Ailu::Render::ComputeShader",
-        "_asset_name": "HZB"
+        "_asset_name": "hzb",
+        "_dependencies": []
     },
     "_file": "hzb.hlsl",
     "_kernel": "Noname"

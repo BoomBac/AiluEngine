@@ -1,7 +1,9 @@
 #ifndef __UOLOAD_BUFFER__
 #define __UOLOAD_BUFFER_
 #pragma once
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/String.h"
+#include "Framework/Core/Containers/Vector.h"
 #include <deque>
 #include <memory>
 #include <mutex>

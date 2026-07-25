@@ -1,5 +1,6 @@
 #pragma once
 #include "Framework/Math/Guid.h"
+#include "Framework/Core/ReflectionMacros.h"
 #include "generated/AssetCommon.gen.h"
 
 namespace Ailu

@@ -3,7 +3,8 @@
         "_format_version": 1,
         "_guid": "798c6e92-05f5-43a3-abb0-7007caf7f3dc",
         "_asset_type": "Ailu::Render::Shader",
-        "_asset_name": "transform_gizmo"
+        "_asset_name": "transform_gizmo",
+        "_dependencies": []
     },
     "_file": "transform_gizmo.hlsl",
     "_vs_entry": "VSMain",

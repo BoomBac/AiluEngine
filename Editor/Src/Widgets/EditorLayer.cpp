@@ -63,6 +63,21 @@ namespace Ailu
     {
         namespace
         {
+            const char *ThreadStatusToString(Core::EThreadStatus status)
+            {
+                switch (status)
+                {
+                    case Core::EThreadStatus::kNotStarted:
+                        return "kNotStarted";
+                    case Core::EThreadStatus::kRunning:
+                        return "kRunning";
+                    case Core::EThreadStatus::kIdle:
+                        return "kIdle";
+                    default:
+                        return "kNotStarted";
+                }
+            }
+
             const wchar_t *GetPackagePlayerPresetName()
             {
 #ifdef _DEBUG
@@ -1050,7 +1065,7 @@ namespace Ailu
 
         EditorLayer::~EditorLayer()
         {
-            DESTORY_PTR(s_prifile_wd);
+            delete s_prifile_wd; s_prifile_wd = nullptr;
         }
         UI::Text *g_text = nullptr;
         static void FindFirstText(UI::Widget *w)
@@ -1515,7 +1530,7 @@ namespace Ailu
             {
                 ImGui::Text("Thread %d", i);
                 ImGui::Indent();
-                ImGui::Text("ThreadStatus: %s", Core::EThreadStatus::ToString(Core::ThreadPool::Get().Status(i)));
+                ImGui::Text("ThreadStatus: %s", ThreadStatusToString(Core::ThreadPool::Get().Status(i)));
                 const auto &records = s_foucs_record ? s_foucs_records[i] : Core::ThreadPool::Get().TaskTimeRecord(i);
                 if (records.size() > 0)
                 {

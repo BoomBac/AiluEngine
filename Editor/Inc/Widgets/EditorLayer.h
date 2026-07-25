@@ -4,7 +4,7 @@
 #include "Framework/Events/Layer.h"
 #include "Framework/Events/Event.h"
 #include "Render/PickPass.h"
-#include "Scene/Entity.hpp"
+#include "Scene/Entity.h"
 #include "Dock/DockManager.h"
 
 struct ImFont;

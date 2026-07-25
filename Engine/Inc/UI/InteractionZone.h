@@ -1,6 +1,6 @@
 #ifndef __UI_INTERACTION_ZONE_H__
 #define __UI_INTERACTION_ZONE_H__
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
 #include "Framework/Math/ALMath.hpp"
 
 namespace Ailu

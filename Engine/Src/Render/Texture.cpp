@@ -80,21 +80,20 @@ namespace Ailu::Render
             if (pixel_data == nullptr)
                 return false;
 
-            using namespace EALGFormat;
             switch (texture.PixelFormat())
             {
-            case kALGFormatR8_UNORM:
+            case EALGFormat::kALGFormatR8_UNORM:
             {
                 const float red = static_cast<float>(pixel_data[0]) * (1.0f / 255.0f);
                 color = Color(red, 0.0f, 0.0f, 1.0f);
                 return true;
             }
-            case kALGFormatR8G8_UNORM:
+            case EALGFormat::kALGFormatR8G8_UNORM:
             {
                 color = Color(static_cast<float>(pixel_data[0]) * (1.0f / 255.0f), static_cast<float>(pixel_data[1]) * (1.0f / 255.0f), 0.0f, 1.0f);
                 return true;
             }
-            case kALGFormatR8G8B8A8_UNORM:
+            case EALGFormat::kALGFormatR8G8B8A8_UNORM:
             {
                 color = Color(static_cast<float>(pixel_data[0]) * (1.0f / 255.0f),
                               static_cast<float>(pixel_data[1]) * (1.0f / 255.0f),
@@ -102,7 +101,7 @@ namespace Ailu::Render
                               static_cast<float>(pixel_data[3]) * (1.0f / 255.0f));
                 return true;
             }
-            case kALGFormatR8G8B8A8_UNORM_SRGB:
+            case EALGFormat::kALGFormatR8G8B8A8_UNORM_SRGB:
             {
                 const Vector3f linear_rgb = SRGBToLinear(Vector3f(static_cast<float>(pixel_data[0]) * (1.0f / 255.0f),
                                                                   static_cast<float>(pixel_data[1]) * (1.0f / 255.0f),
@@ -110,7 +109,7 @@ namespace Ailu::Render
                 color = Color(linear_rgb.x, linear_rgb.y, linear_rgb.z, static_cast<float>(pixel_data[3]) * (1.0f / 255.0f));
                 return true;
             }
-            case kALGFormatB8G8R8A8_UNORM:
+            case EALGFormat::kALGFormatB8G8R8A8_UNORM:
             {
                 color = Color(static_cast<float>(pixel_data[2]) * (1.0f / 255.0f),
                               static_cast<float>(pixel_data[1]) * (1.0f / 255.0f),
@@ -118,7 +117,7 @@ namespace Ailu::Render
                               static_cast<float>(pixel_data[3]) * (1.0f / 255.0f));
                 return true;
             }
-            case kALGFormatB8G8R8A8_UNORM_SRGB:
+            case EALGFormat::kALGFormatB8G8R8A8_UNORM_SRGB:
             {
                 const Vector3f linear_rgb = SRGBToLinear(Vector3f(static_cast<float>(pixel_data[2]) * (1.0f / 255.0f),
                                                                   static_cast<float>(pixel_data[1]) * (1.0f / 255.0f),
@@ -126,18 +125,18 @@ namespace Ailu::Render
                 color = Color(linear_rgb.x, linear_rgb.y, linear_rgb.z, static_cast<float>(pixel_data[3]) * (1.0f / 255.0f));
                 return true;
             }
-            case kALGFormatR16_UNORM:
+            case EALGFormat::kALGFormatR16_UNORM:
             {
                 const u16 red = ReadUnaligned<u16>(pixel_data);
                 color = Color(static_cast<float>(red) * (1.0f / 65535.0f), 0.0f, 0.0f, 1.0f);
                 return true;
             }
-            case kALGFormatR16_FLOAT:
+            case EALGFormat::kALGFormatR16_FLOAT:
             {
                 color = Color(HalfToFloat(ReadUnaligned<u16>(pixel_data)), 0.0f, 0.0f, 1.0f);
                 return true;
             }
-            case kALGFormatR16G16_UNORM:
+            case EALGFormat::kALGFormatR16G16_UNORM:
             {
                 color = Color(static_cast<float>(ReadUnaligned<u16>(pixel_data + 0u)) * (1.0f / 65535.0f),
                               static_cast<float>(ReadUnaligned<u16>(pixel_data + sizeof(u16))) * (1.0f / 65535.0f),
@@ -145,7 +144,7 @@ namespace Ailu::Render
                               1.0f);
                 return true;
             }
-            case kALGFormatR16G16_FLOAT:
+            case EALGFormat::kALGFormatR16G16_FLOAT:
             {
                 color = Color(HalfToFloat(ReadUnaligned<u16>(pixel_data + 0u)),
                               HalfToFloat(ReadUnaligned<u16>(pixel_data + sizeof(u16))),
@@ -153,7 +152,7 @@ namespace Ailu::Render
                               1.0f);
                 return true;
             }
-            case kALGFormatR16G16B16A16_UNORM:
+            case EALGFormat::kALGFormatR16G16B16A16_UNORM:
             {
                 color = Color(static_cast<float>(ReadUnaligned<u16>(pixel_data + 0u)) * (1.0f / 65535.0f),
                               static_cast<float>(ReadUnaligned<u16>(pixel_data + sizeof(u16))) * (1.0f / 65535.0f),
@@ -161,7 +160,7 @@ namespace Ailu::Render
                               static_cast<float>(ReadUnaligned<u16>(pixel_data + sizeof(u16) * 3u)) * (1.0f / 65535.0f));
                 return true;
             }
-            case kALGFormatR16G16B16A16_FLOAT:
+            case EALGFormat::kALGFormatR16G16B16A16_FLOAT:
             {
                 color = Color(HalfToFloat(ReadUnaligned<u16>(pixel_data + 0u)),
                               HalfToFloat(ReadUnaligned<u16>(pixel_data + sizeof(u16))),
@@ -169,17 +168,17 @@ namespace Ailu::Render
                               HalfToFloat(ReadUnaligned<u16>(pixel_data + sizeof(u16) * 3u)));
                 return true;
             }
-            case kALGFormatR32_FLOAT:
+            case EALGFormat::kALGFormatR32_FLOAT:
             {
                 color = Color(ReadUnaligned<float>(pixel_data), 0.0f, 0.0f, 1.0f);
                 return true;
             }
-            case kALGFormatR32G32_FLOAT:
+            case EALGFormat::kALGFormatR32G32_FLOAT:
             {
                 color = Color(ReadUnaligned<float>(pixel_data + 0u), ReadUnaligned<float>(pixel_data + sizeof(float)), 0.0f, 1.0f);
                 return true;
             }
-            case kALGFormatR32G32B32_FLOAT:
+            case EALGFormat::kALGFormatR32G32B32_FLOAT:
             {
                 color = Color(ReadUnaligned<float>(pixel_data + 0u),
                               ReadUnaligned<float>(pixel_data + sizeof(float)),
@@ -187,7 +186,7 @@ namespace Ailu::Render
                               1.0f);
                 return true;
             }
-            case kALGFormatR32G32B32A32_FLOAT:
+            case EALGFormat::kALGFormatR32G32B32A32_FLOAT:
             {
                 color = Color(ReadUnaligned<float>(pixel_data + 0u),
                               ReadUnaligned<float>(pixel_data + sizeof(float)),
@@ -195,7 +194,7 @@ namespace Ailu::Render
                               ReadUnaligned<float>(pixel_data + sizeof(float) * 3u));
                 return true;
             }
-            case kALGFormatR10G10B10A2_UNORM:
+            case EALGFormat::kALGFormatR10G10B10A2_UNORM:
             {
                 const u32 packed = ReadUnaligned<u32>(pixel_data);
                 color = Color(static_cast<float>(packed & 0x3FFu) * (1.0f / 1023.0f),
@@ -290,7 +289,7 @@ namespace Ailu::Render
         return in_w <= w && in_h <= h && in_d <= d;
     }
 
-    Texture::Texture() : _mipmap_count(1), _pixel_format(EALGFormat::EALGFormat::kALGFormatUNKOWN), _dimension(ETextureDimension::kUnknown),
+    Texture::Texture() : _mipmap_count(1), _pixel_format(EALGFormat::kALGFormatUNKOWN), _dimension(ETextureDimension::kUnknown),
                          _filter_mode(EFilterMode::kBilinear), _wrap_mode(EWrapMode::kClamp), _is_readble(false), _is_srgb(false), _pixel_size(0), _is_random_access(false)
     {
         _res_type = EGpuResType::kTexture;
@@ -298,7 +297,7 @@ namespace Ailu::Render
     void Texture::Release()
     {
         _pixel_size = 0u;
-        _pixel_format = EALGFormat::EALGFormat::kALGFormatUNKOWN;
+        _pixel_format = EALGFormat::kALGFormatUNKOWN;
         _dimension = ETextureDimension::kUnknown;
         _filter_mode = EFilterMode::kBilinear;
         _wrap_mode = EWrapMode::kClamp;
@@ -310,7 +309,7 @@ namespace Ailu::Render
         _is_ready_for_rendering = false;
         for (size_t i = 0; i < _pixel_data.size(); i++)
         {
-            DESTORY_PTR(_pixel_data[i]);
+            delete _pixel_data[i]; _pixel_data[i] = nullptr;
         }
         _pixel_data.clear();
     }
@@ -323,7 +322,7 @@ namespace Ailu::Render
         u16 idx = _mipmap_count * array_slice + mipmap;
         return (u16) view_type * 10000u + idx;
     }
-    u16 Texture::CalculateViewIndex(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice) const
+    u16 Texture::CalculateViewIndex(ETextureViewType view_type, ECubemapFace face, u16 mipmap, u16 array_slice) const
     {
         if (face == ECubemapFace::kUnknown)
             return CalculateViewIndex(view_type, mipmap, array_slice);
@@ -335,7 +334,7 @@ namespace Ailu::Render
         u16 idx = _mipmap_count * depth_slice + mipmap;
         return idx;
     }
-    u16 Texture::CalculateSubResIndex(ECubemapFace::ECubemapFace face, u16 mipmap, u16 depth_slice) const
+    u16 Texture::CalculateSubResIndex(ECubemapFace face, u16 mipmap, u16 depth_slice) const
     {
         if (face == ECubemapFace::kUnknown)
             return CalculateSubResIndex(mipmap, depth_slice);
@@ -363,7 +362,7 @@ namespace Ailu::Render
         return nullptr;
     }
 
-    Ref<Texture2D> Texture2D::Create(u16 w,u16 h,ETextureFormat::ETextureFormat format,bool is_mip,bool is_random_access)
+    Ref<Texture2D> Texture2D::Create(u16 w,u16 h,ETextureFormat format,bool is_mip,bool is_random_access)
     {
         TextureDesc initializer;
         initializer._width = w;
@@ -543,7 +542,7 @@ namespace Ailu::Render
     //-----------------------------------------------------------------------Texture2DNew----------------------------------------------------------------------------------
 
 #pragma region CubeMap
-    Ref<CubeMap> CubeMap::Create(u16 width, bool mipmap_chain, ETextureFormat::ETextureFormat format, bool linear, bool random_access)
+    Ref<CubeMap> CubeMap::Create(u16 width, bool mipmap_chain, ETextureFormat format, bool linear, bool random_access)
     {
         switch (Renderer::GetAPI())
         {
@@ -560,7 +559,7 @@ namespace Ailu::Render
     }
 
     //-----------------------------------------------------------------------CubeMap----------------------------------------------------------------------------------
-    CubeMap::CubeMap(u16 width, bool mipmap_chain, ETextureFormat::ETextureFormat format, bool linear, bool random_access)
+    CubeMap::CubeMap(u16 width, bool mipmap_chain, ETextureFormat format, bool linear, bool random_access)
         : Texture()
     {
         _width = std::max<u16>(width, 1u);
@@ -590,31 +589,31 @@ namespace Ailu::Render
     {
     }
 
-    Color CubeMap::GetPixel32(ECubemapFace::ECubemapFace face, u16 x, u16 y)
+    Color CubeMap::GetPixel32(ECubemapFace face, u16 x, u16 y)
     {
         return Color();
     }
 
-    Color CubeMap::GetPixel(ECubemapFace::ECubemapFace face, u16 x, u16 y)
+    Color CubeMap::GetPixel(ECubemapFace face, u16 x, u16 y)
     {
         return Color();
     }
 
-    Ptr CubeMap::GetPixelData(ECubemapFace::ECubemapFace face, u16 mipmap)
+    Ptr CubeMap::GetPixelData(ECubemapFace face, u16 mipmap)
     {
         return Ptr();
     }
 
-    void CubeMap::SetPixel(ECubemapFace::ECubemapFace face, u16 x, u16 y, Color color, u16 mipmap)
+    void CubeMap::SetPixel(ECubemapFace face, u16 x, u16 y, Color color, u16 mipmap)
     {
         if (!IsValidMipmap(mipmap) || !Texture::IsValidSize(_width, _width, mipmap, x, y))
             return;
         u16 row_pixel_size = std::get<0>(Texture::CalculateMipSize(_width, _width, mipmap)) * _pixel_size;
-        u16 face_index = face - 1;
+        u16 face_index = static_cast<u16>(face) - 1;
         memcpy(_pixel_data[face_index * _mipmap_count + mipmap] + _pixel_size * x + row_pixel_size * y, color.Data(), sizeof(Color));
     }
 
-    void CubeMap::SetPixel32(ECubemapFace::ECubemapFace face, u16 x, u16 y, Color32 color, u16 mipmap)
+    void CubeMap::SetPixel32(ECubemapFace face, u16 x, u16 y, Color32 color, u16 mipmap)
     {
         Color c = {
                 color.r / 255.f,
@@ -625,11 +624,11 @@ namespace Ailu::Render
         SetPixel(face, x, y, c, mipmap);
     }
 
-    void CubeMap::SetPixelData(ECubemapFace::ECubemapFace face, u8 *data, u16 mipmap, u64 offset)
+    void CubeMap::SetPixelData(ECubemapFace face, u8 *data, u16 mipmap, u64 offset)
     {
         AL_ASSERT(mipmap < _mipmap_count);
         auto [w, h] = (Texture::CalculateMipSize(_width, _width, mipmap));
-        u16 face_index = face - 1;
+        u16 face_index = static_cast<u16>(face) - 1;
         memcpy(_pixel_data[face_index * _mipmap_count + mipmap], data + offset, w * h * _pixel_size);
     }
 #pragma endregion
@@ -671,7 +670,7 @@ namespace Ailu::Render
         for (int i = 0; i < _pixel_data.size(); i++)
         {
             auto [w, h, d] = Texture::CalculateMipSize(_width, _width, _depth, i);
-            u64 row_size = ALIGN_TO_256(w * _pixel_size);
+            u64 row_size = AlignTo(w * _pixel_size,256);
             u64 cur_mipmap_byte_size = row_size * h * d;
             _pixel_data[i] = new u8[cur_mipmap_byte_size];
             memset(_pixel_data[i], 0, cur_mipmap_byte_size);
@@ -683,7 +682,7 @@ namespace Ailu::Render
     {
         for (auto p: _pixel_data)
         {
-            DESTORY_PTRARR(p);
+            delete[] p; p = nullptr;
         }
     }
 
@@ -761,7 +760,7 @@ namespace Ailu::Render
         AL_ASSERT(desc._width <= 4096 && desc._height <= 4096);
         rt_hash.Set(0, 12, desc._width);
         rt_hash.Set(12, 12, desc._height);
-        rt_hash.Set(24, 5, desc._format);
+        rt_hash.Set(24, 5, static_cast<u64>(desc._format));
         rt_hash.Set(29, 1, desc._mip_num > 1);
         rt_hash.Set(30, 1, desc._is_random_access);
         rt_hash.Set(31, 1, desc._is_linear);
@@ -770,7 +769,7 @@ namespace Ailu::Render
         return rt_hash;
     }
     //----------------------------------------------------------RenderTexture---------------------------------------------------------------------
-    Ref<RenderTexture> RenderTexture::Create(u16 width, u16 height, String name, ERenderTargetFormat::ERenderTargetFormat format, bool mipmap_chain, bool linear, bool random_access)
+    Ref<RenderTexture> RenderTexture::Create(u16 width, u16 height, String name, ERenderTargetFormat format, bool mipmap_chain, bool linear, bool random_access)
     {
         switch (Renderer::GetAPI())
         {
@@ -798,7 +797,7 @@ namespace Ailu::Render
         return nullptr;
     }
 
-    Ref<RenderTexture> RenderTexture::Create(u16 width, u16 height, u16 array_slice, String name, ERenderTargetFormat::ERenderTargetFormat format, bool mipmap_chain, bool linear, bool random_access)
+    Ref<RenderTexture> RenderTexture::Create(u16 width, u16 height, u16 array_slice, String name, ERenderTargetFormat format, bool mipmap_chain, bool linear, bool random_access)
     {
         switch (Renderer::GetAPI())
         {
@@ -827,7 +826,7 @@ namespace Ailu::Render
         return nullptr;
     }
 
-    Ref<RenderTexture> RenderTexture::Create(u16 width, String name, ERenderTargetFormat::ERenderTargetFormat format, bool mipmap_chain, bool linear, bool random_access)
+    Ref<RenderTexture> RenderTexture::Create(u16 width, String name, ERenderTargetFormat format, bool mipmap_chain, bool linear, bool random_access)
     {
         switch (Renderer::GetAPI())
         {
@@ -874,7 +873,7 @@ namespace Ailu::Render
         return nullptr;
     }
 
-    Ref<RenderTexture> RenderTexture::Create(u16 width, String name, ERenderTargetFormat::ERenderTargetFormat format, u16 array_slice, bool linear, bool random_access)
+    Ref<RenderTexture> RenderTexture::Create(u16 width, String name, ERenderTargetFormat format, u16 array_slice, bool linear, bool random_access)
     {
         switch (Renderer::GetAPI())
         {
@@ -903,7 +902,7 @@ namespace Ailu::Render
         return nullptr;
     }
 
-    RTHandle RenderTexture::GetTempRT(u16 width, u16 height, String name, ERenderTargetFormat::ERenderTargetFormat format, bool mipmap_chain, bool linear, bool random_access)
+    RTHandle RenderTexture::GetTempRT(u16 width, u16 height, String name, ERenderTargetFormat format, bool mipmap_chain, bool linear, bool random_access)
     {
         TextureDesc desc;
         desc._width = width;
@@ -916,7 +915,7 @@ namespace Ailu::Render
         desc._is_color_target = !desc._is_depth_target;
         return GetTempRT(desc, name);
     }
-    RTHandle RenderTexture::GetTempRT(u16 width, u16 height,String name,ERenderTargetFormat::ERenderTargetFormat format,ELoadStoreAction load_action)
+    RTHandle RenderTexture::GetTempRT(u16 width, u16 height,String name,ERenderTargetFormat format,ELoadStoreAction load_action)
     {
         TextureDesc desc;
         desc._width = width;
@@ -1015,12 +1014,12 @@ namespace Ailu::Render
                     for (u16 k = 0; k < _mipmap_count; k++)
                     {
                         if (_depth_bit > 0)
-                            CreateView(ETextureViewType::kDSV, (ECubemapFace::ECubemapFace) j, k, i);
+                            CreateView(ETextureViewType::kDSV, (ECubemapFace) j, k, i);
                         else
-                            CreateView(ETextureViewType::kRTV, (ECubemapFace::ECubemapFace) j, k, i);
-                        CreateView(ETextureViewType::kSRV, (ECubemapFace::ECubemapFace) j, k, i);
+                            CreateView(ETextureViewType::kRTV, (ECubemapFace) j, k, i);
+                        CreateView(ETextureViewType::kSRV, (ECubemapFace) j, k, i);
                         if (_is_random_access)
-                            CreateView(ETextureViewType::kUAV, (ECubemapFace::ECubemapFace) j, k, i);
+                            CreateView(ETextureViewType::kUAV, (ECubemapFace) j, k, i);
                     }
                 }
             }

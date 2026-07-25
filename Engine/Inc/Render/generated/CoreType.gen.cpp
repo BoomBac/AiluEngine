@@ -14,6 +14,8 @@ if(s_enum_type_EResourceUsage == nullptr)
 {
 EnumInitializer initializer;
 initializer._name = "EResourceUsage";
+initializer._namespace = "Ailu::Render";
+initializer._full_name = "Ailu::Render::EResourceUsage";
 initializer._str_to_enum_lut["kNone"] = 0;
 initializer._str_to_enum_lut["kReadSRV"] = 1;
 initializer._str_to_enum_lut["kWriteUAV"] = 2;
@@ -43,6 +45,8 @@ if(s_enum_type_EResourceState == nullptr)
 {
 EnumInitializer initializer;
 initializer._name = "EResourceState";
+initializer._namespace = "Ailu::Render";
+initializer._full_name = "Ailu::Render::EResourceState";
 initializer._str_to_enum_lut["kCommon"] = 0;
 initializer._str_to_enum_lut["kVertexAndConstantBuffer"] = 1;
 initializer._str_to_enum_lut["kIndexBuffer"] = 2;

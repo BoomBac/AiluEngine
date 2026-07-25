@@ -20,7 +20,7 @@ namespace Ailu::UI
     void UIManager::Shutdown()
     {
         UIRenderer::Shutdown();
-        DESTORY_PTR(g_pUIManager);
+        delete g_pUIManager; g_pUIManager = nullptr;
     }
     UIManager *UIManager::Get()
     {

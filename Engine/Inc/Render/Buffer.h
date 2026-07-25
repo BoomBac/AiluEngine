@@ -3,7 +3,10 @@
 #define __BUFFER_H__
 
 #include "Framework/Common/Allocator.hpp"
-#include "GlobalMarco.h"
+#include "Framework/Common/Hash.hpp"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/String.h"
+#include "Framework/Core/Containers/Vector.h"
 #include "GpuResource.h"
 #include "PipelineState.h"
 #include "Framework/Common/Misc.h"
@@ -92,7 +95,7 @@ namespace Ailu
                 u32 _flags;
             };
 
-            EALGFormat::EALGFormat _format;
+            EALGFormat _format;
             EResourceState _init_state;
             EGPUBufferTarget _target;
             BufferDesc() : _size(0), _element_num(1u), _element_size(0u), _flags(0), _format(EALGFormat::kALGFormatUNKOWN),
@@ -276,7 +279,7 @@ namespace Ailu
                 CombineHashes(h, std::hash<u32>()(desc._size));
                 CombineHashes(h, std::hash<u32>()(desc._element_num));
                 CombineHashes(h, std::hash<u32>()(desc._element_size));
-                CombineHashes(h, std::hash<u32>()(desc._format));
+                CombineHashes(h, std::hash<u32>()(static_cast<u32>(desc._format)));
                 CombineHashes(h, std::hash<u32>()(desc._flags));
                 return h;
             }

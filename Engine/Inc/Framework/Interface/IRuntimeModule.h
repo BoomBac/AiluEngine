@@ -1,7 +1,7 @@
 #pragma once
 #ifndef __IRUNTIME_MODULE_H__
 #define __IRUNTIME_MODULE_H__
-#include "Inc/GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
 
 namespace Ailu
 {

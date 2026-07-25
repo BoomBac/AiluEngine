@@ -43,13 +43,13 @@ namespace Ailu
             //    for (u16 i = 0; i < _test_prefilter_map->MipmapLevel(); i++)
             //    {
             //        auto [cur_w, cur_h] = Texture::CalculateMipSize(_test_prefilter_map->Width(), _test_prefilter_map->Width(), i);
-            //        _test_prefilter_map->SetPixelData((ECubemapFace::ECubemapFace) face, probe_data + offset, i);
+            //        _test_prefilter_map->SetPixelData((ECubemapFace) face, probe_data + offset, i);
             //        offset += cur_w * cur_h * GetPixelByteSize(_test_prefilter_map->PixelFormat());
             //    }
             //}
             //for (u16 face = 1; face <= 6; face++)
             //{
-            //    _test_radiance_map->SetPixelData((ECubemapFace::ECubemapFace) face, probe_data + offset, 0);
+            //    _test_radiance_map->SetPixelData((ECubemapFace) face, probe_data + offset, 0);
             //    offset += head._radiance_size * head._radiance_size * GetPixelByteSize(_test_radiance_map->PixelFormat());
             //}
             //_test_prefilter_map->Name("_test_prefilter_map");
@@ -79,7 +79,7 @@ namespace Ailu
                         cam.Near(1.0f);
                         cam.Far(comp._size);
                         cam._layer_mask = 0;
-                        cam._layer_mask |= ERenderLayer::kDefault;
+                        cam._layer_mask |= static_cast<u32>(ERenderLayer::kDefault);
                         cam.TargetTexture(comp._cubemap.get());
                         auto renderer = Render::RenderPipeline::Get().GetRenderer();
                         renderer->_is_render_light_probe = true;
@@ -97,7 +97,7 @@ namespace Ailu
                         u64 offset = sizeof(LightProbeHeadInfo);
                         for (u16 j = 1; j <= 6; j++)
                         {
-                            auto face = (ECubemapFace::ECubemapFace) j;
+                            auto face = (ECubemapFace) j;
                             for (u16 i = 0; i < out_tex->MipmapLevel() + 1; i++)
                             {
                                 const f32 *data = (f32 *) out_tex->ReadBack(i, 0, face);
@@ -110,7 +110,7 @@ namespace Ailu
                         }
                         for (u16 j = 1; j <= 6; j++)
                         {
-                            auto face = (ECubemapFace::ECubemapFace) j;
+                            auto face = (ECubemapFace) j;
                             const void *data = comp._pass->_radiance_map->ReadBack(0, 0, face);
                             u64 cur_mip_size = comp._pass->_radiance_map->Width() * comp._pass->_radiance_map->Height() * GetPixelByteSize(comp._pass->_radiance_map->PixelFormat());
                             memcpy(probe_data + offset, data, cur_mip_size);
@@ -249,7 +249,7 @@ namespace Ailu
                             {
                                 center = XMVectorAdd(center, corners[j]);
                             }
-                            center = center / 8.0f;
+                            center = XMVectorScale(center, 1.0f / 8.0f);
                             //Gizmo::DrawLine(Vector3f::kZero, XMVecToVec3(center));
 
                             // Compute cascade bounding sphere radius:
@@ -267,10 +267,10 @@ namespace Ailu
                             XMVECTOR vMax = XMVectorAdd(center, vRadius);
                             // Snap cascade to texel grid:
                             const XMVECTOR extent = XMVectorSubtract(vMax, vMin);
-                            const XMVECTOR texelSize = extent / (f32) QuailtySetting::s_cascade_shaodw_map_resolution;
-                            vMin = XMVectorFloor(vMin / texelSize) * texelSize;
-                            vMax = XMVectorFloor(vMax / texelSize) * texelSize;
-                            center = (vMin + vMax) * 0.5f;
+                            const XMVECTOR texelSize = XMVectorScale(extent, 1.0f / static_cast<f32>(QuailtySetting::s_cascade_shaodw_map_resolution));
+                            vMin = XMVectorMultiply(XMVectorFloor(XMVectorDivide(vMin, texelSize)), texelSize);
+                            vMax = XMVectorMultiply(XMVectorFloor(XMVectorDivide(vMax, texelSize)), texelSize);
+                            center = XMVectorScale(XMVectorAdd(vMin, vMax), 0.5f);
 
 
                             XMFLOAT3 _center;

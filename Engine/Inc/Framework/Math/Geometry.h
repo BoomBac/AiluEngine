@@ -1,10 +1,20 @@
 #pragma once
 #ifndef __GEOMETRY_H__
 #define __GEOMETRY_H__
-#include "ALMath.hpp"
+#include "Framework/Core/Containers/Array.h"
+#include "Framework/Math/Matrix.hpp"
+#include "Framework/Math/Vector.hpp"
+#include "Framework/Math/VectorMath.hpp"
 
 namespace Ailu
 {
+    using Math::Distance;
+    using Math::DistanceToRay;
+    using Math::DotProduct;
+    using Math::Matrix4x4f;
+    using Math::Vector2f;
+    using Math::Vector3f;
+
 #undef max
 	struct Plane
 	{

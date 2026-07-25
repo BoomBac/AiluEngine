@@ -3,7 +3,7 @@
 #include "Framework/Common/Log.h"
 #include "pch.h"
 
-#if PLATFORM_WINDOWS
+#if AL_PLATFORM_WINDOWS
 
     #ifndef WIN32_LEAN_AND_MEAN
         #define WIN32_LEAN_AND_MEAN
@@ -210,4 +210,4 @@ namespace Ailu
     }
 }
 
-#endif // PLATFORM_WINDOWS
+#endif // AL_PLATFORM_WINDOWS

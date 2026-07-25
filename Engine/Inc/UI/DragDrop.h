@@ -1,6 +1,10 @@
 #ifndef __DRAGDROP_H__
 #define __DRAGDROP_H__
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/ReflectionMacros.h"
+#include "Framework/Core/String.h"
+#include "Framework/Core/Containers/Map.h"
+#include <optional>
 #include <functional>
 #include "generated/DragDrop.gen.h"
 

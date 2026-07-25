@@ -3,7 +3,8 @@
         "_format_version": 1,
         "_guid": "46601513-96ea-4cc4-86db-0400c8824ec1",
         "_asset_type": "Ailu::Render::Material",
-        "_asset_name": "MAT_Red"
+        "_asset_name": "MAT_Red",
+        "_dependencies": []
     },
     "_shader_guid": "60fb44b6-864f-4c6a-b49b-f4b26829b57d",
     "_keywords": [],

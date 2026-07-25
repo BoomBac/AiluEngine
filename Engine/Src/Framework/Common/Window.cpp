@@ -7,11 +7,11 @@ namespace Ailu
     {
         WindowProps prop(title, width, height);
         prop._flag = flags;
-#ifdef PLATFORM_WINDOWS
+#ifdef AL_PLATFORM_WINDOWS
         return MakeScope<WinWindow>(prop);
 #else
         return nullptr;
-#endif// PLATFORM_WINDOWS
+#endif// AL_PLATFORM_WINDOWS
 
     }
 }

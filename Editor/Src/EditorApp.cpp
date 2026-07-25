@@ -8,6 +8,7 @@
 #include "Framework/Common/ResourceMgr.h"
 #include "Objects/Type.h"
 #include "Render/Camera.h"
+#include "Render/AssetPreviewGenerator.h"
 #include "Render/CommonRenderPipeline.h"
 #include "Render/Renderer.h"
 
@@ -98,8 +99,9 @@ namespace Ailu
         void EditorApp::Finalize()
         {
             SaveEditorConfig();
+            AssetPreviewGenerator::Shutdown();
             delete _p_scene_camera;
-            DESTORY_PTR(g_pCommandMgr);
+            delete g_pCommandMgr; g_pCommandMgr = nullptr;
             _pipeline.release();
             Application::Finalize();
             fs::path p(s_editor_root_path);

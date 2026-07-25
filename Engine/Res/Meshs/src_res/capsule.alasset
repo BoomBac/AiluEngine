@@ -3,7 +3,8 @@
         "_format_version": 1,
         "_guid": "04f85376-b16b-43cc-b53e-e5c236755e53",
         "_asset_type": "Ailu::Render::Mesh",
-        "_asset_name": "Capsule"
+        "_asset_name": "capsule",
+        "_dependencies": []
     },
     "_file": "capsule.fbx",
     "_inner_file_name": "Capsule",

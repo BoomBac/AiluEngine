@@ -18,7 +18,7 @@ namespace Ailu
             _pick_gen = MakeScope<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/pick_buffer.hlsl"), "Runtime/PickGen");
             _select_gen = MakeScope<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/select_buffer.hlsl"), "Runtime/SelectGen");
             _editor_outline = MakeScope<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/editor_outline.hlsl"), "Runtime/EditorOutline");
-            _event = (ERenderPassEvent::ERenderPassEvent)(ERenderPassEvent::kAfterPostprocess - 1);//before gizmo pass
+            _event = static_cast<ERenderPassEvent>(static_cast<u16>(ERenderPassEvent::kAfterPostprocess) - 1u);//before gizmo pass
         }
         PickPass::~PickPass()
         {

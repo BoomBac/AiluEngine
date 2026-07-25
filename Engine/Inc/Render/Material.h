@@ -3,7 +3,13 @@
 #define __MATERIAL_H__
 #include "Buffer.h"
 #include "Framework/Common/Reflect.h"
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/String.h"
+#include "Framework/Core/Containers/Vector.h"
+#include "Framework/Core/Containers/Map.h"
+#include "Framework/Core/Containers/List.h"
+#include "Framework/Core/Containers/Queue.h"
+#include "Framework/Core/Containers/Array.h"
 #include "Objects/Object.h"
 #include "Shader.h"
 #include "Texture.h"
@@ -143,8 +149,21 @@ namespace Ailu::Render
         kNone
     };
 
-    DECLARE_ENUM(EMaterialID, kStandard, kSubsurface, kChecker)
-    DECLARE_ENUM(ESurfaceType, kOpaque, kTransparent, kAlphaTest)
+    AENUM()
+    enum class EMaterialID
+    {
+        kStandard,
+        kSubsurface,
+        kChecker
+    };
+
+    AENUM()
+    enum class ESurfaceType
+    {
+        kOpaque,
+        kTransparent,
+        kAlphaTest
+    };
 
     ACLASS()
     class AILU_API StandardMaterial : public Material
@@ -208,14 +227,14 @@ namespace Ailu::Render
         void SetTexture(ETextureUsage usage, Texture *tex);
         const Texture *MainTex(ETextureUsage usage) const;
         const ShaderPropertyInfo &MainProperty(ETextureUsage usage);
-        const ESurfaceType::ESurfaceType &SurfaceType() const { return _surface; }
-        void SurfaceType(const ESurfaceType::ESurfaceType &value);
-        const EMaterialID::EMaterialID &MaterialID() const { return _material_id; }
-        void MaterialID(const EMaterialID::EMaterialID &value);
+        const ESurfaceType &SurfaceType() const { return _surface; }
+        void SurfaceType(const ESurfaceType &value);
+        const EMaterialID &MaterialID() const { return _material_id; }
+        void MaterialID(const EMaterialID &value);
 
     private:
-        ESurfaceType::ESurfaceType _surface = ESurfaceType::kOpaque;
-        EMaterialID::EMaterialID _material_id = EMaterialID::kStandard;
+        ESurfaceType _surface = ESurfaceType::kOpaque;
+        EMaterialID _material_id = EMaterialID::kStandard;
         u16 _sampler_mask_offset = 0u;
         u16 _material_id_offset = 0u;
     };

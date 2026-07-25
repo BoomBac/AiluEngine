@@ -6,8 +6,14 @@
 
 #include "AlgFormat.h"
 #include "Framework/Common/Container.hpp"
+#include "Framework/Common/Hash.hpp"
 #include "Framework/Math/ALMath.hpp"
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/String.h"
+#include "Framework/Core/Containers/Vector.h"
+#include "Framework/Core/Containers/Map.h"
+#include "Framework/Core/Containers/List.h"
+#include "Framework/Core/Containers/Array.h"
 #include "PipelineState.h"
 #include "CoreType.h"
 #include "Shader.h"
@@ -136,8 +142,8 @@ namespace Ailu::Render
         static void ConfigureRasterizerState(const u8 &hash);  // 41 ~ 43 3
         static void ConfigureDepthStencilState(const u8 &hash);// 44~46 3
         static void ConfigureRenderTarget(const u8 &hash);     // 44~46 3
-        static void SetRenderTargetState(EALGFormat::EALGFormat color_format, EALGFormat::EALGFormat depth_format, u8 color_rt_id = 0);
-        static void SetRenderTargetState(EALGFormat::EALGFormat color_format, u8 color_rt_id = 0);
+        static void SetRenderTargetState(EALGFormat color_format, EALGFormat depth_format, u8 color_rt_id = 0);
+        static void SetRenderTargetState(EALGFormat color_format, u8 color_rt_id = 0);
         //call before cmd->SetRenderTarget
         static void ResetRenderTargetState();
 

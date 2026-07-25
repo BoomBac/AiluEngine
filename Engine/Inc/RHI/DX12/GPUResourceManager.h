@@ -4,7 +4,10 @@
 
 #ifndef AILU_GPURESOURCEMANAGER_H
 #define AILU_GPURESOURCEMANAGER_H
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Common/NonCopyable.h"
+#include "Framework/Core/Containers/Vector.h"
+#include "Framework/Core/Containers/Map.h"
 #include <d3dx12.h>
 #include "Page.h"
 using Microsoft::WRL::ComPtr;
@@ -12,11 +15,10 @@ using Microsoft::WRL::ComPtr;
 namespace Ailu::RHI::DX12
 {
 
-    class GPUResourcePage : public Page
+    class GPUResourcePage : public Page, public NonCopyable
     {
         friend class GpuResourceManager;
     public:
-        DISALLOW_COPY_AND_ASSIGN(GPUResourcePage)
         GPUResourcePage(u16 id, D3D12_HEAP_TYPE type, u32 size);
         GPUResourcePage(GPUResourcePage &&other) noexcept;
     private:

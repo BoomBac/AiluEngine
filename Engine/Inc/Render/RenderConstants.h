@@ -4,10 +4,16 @@
 #include "AlgFormat.h"
 #include "ShaderInterop.h"
 #include <cstdint>
+#include "generated/RenderConstants.gen.h"
 
 namespace Ailu::Render
 {
-    DECLARE_ENUM(EColorRange, kLDR, kHDR)
+    AENUM()
+    enum class EColorRange
+    {
+        kLDR,
+        kHDR
+    };
 
     namespace RenderConstants
     {
@@ -68,10 +74,10 @@ namespace Ailu::Render
         inline const static String kEmssiveTexName = "TexEmssive";
         inline const static String kRoughnessTexName = "TexRoughness";
 
-        inline const static EColorRange::EColorRange kColorRange = EColorRange::kHDR;
-        inline const static EALGFormat::EALGFormat kLDRFormat = EALGFormat::EALGFormat::kALGFormatR8G8B8A8_UNORM;
+        inline const static EColorRange kColorRange = EColorRange::kHDR;
+        inline const static EALGFormat kLDRFormat = EALGFormat::kALGFormatR8G8B8A8_UNORM;
         //swap chain not support hdr 32bit
-        inline const static EALGFormat::EALGFormat kHDRFormat = EALGFormat::EALGFormat::kALGFormatR16G16B16A16_FLOAT;
+        inline const static EALGFormat kHDRFormat = EALGFormat::kALGFormatR16G16B16A16_FLOAT;
 
         inline const static u32 kInvalidBindlessHandle = 0xFFFFFFFF;
     };// namespace RenderConstants

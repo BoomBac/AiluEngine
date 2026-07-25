@@ -3,7 +3,8 @@
         "_format_version": 1,
         "_guid": "acf26f2f-c3dd-4d1c-a1e8-1c3a22bfea7c",
         "_asset_type": "Ailu::Render::Texture2D",
-        "_asset_name": "point_light"
+        "_asset_name": "point_light",
+        "_dependencies": []
     },
     "_file": "point_light.png",
     "_is_srgb": true

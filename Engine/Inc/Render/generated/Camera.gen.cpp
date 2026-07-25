@@ -31,3 +31,27 @@ return s_enum_type_EAntiAliasing.get();
 }
 //Enum EAntiAliasing end...........................
 
+static std::unique_ptr<Ailu::Enum> s_enum_type_ECameraType = nullptr;
+//Enum ECameraType begin...........................
+const Ailu::Enum* Z_Construct_Enum_ECameraType_Type()
+{
+if(s_enum_type_ECameraType == nullptr)
+{
+EnumInitializer initializer;
+initializer._name = "ECameraType";
+initializer._namespace = "Ailu::Render";
+initializer._full_name = "Ailu::Render::ECameraType";
+initializer._str_to_enum_lut["kOrthographic"] = 0;
+initializer._str_to_enum_lut["kPerspective"] = 1;
+s_enum_type_ECameraType = std::make_unique<Ailu::Enum>(initializer);
+Ailu::Enum::RegisterEnum(s_enum_type_ECameraType.get());
+}
+return s_enum_type_ECameraType.get();
+}
+static Ailu::EnumTypeRegister g_register_ECameraType(Z_Construct_Enum_ECameraType_Type);
+template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::ECameraType>()
+{
+return s_enum_type_ECameraType.get();
+}
+//Enum ECameraType end...........................
+

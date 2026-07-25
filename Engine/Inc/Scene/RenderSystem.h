@@ -1,7 +1,7 @@
 #pragma once
 #ifndef __RENDER_SYSTEM_H__
 #define __RENDER_SYSTEM_H__
-#include "Entity.hpp"
+#include "Entity.h"
 #include "Render/Material.h"
 namespace Ailu
 {
@@ -11,12 +11,12 @@ namespace Ailu
         {
             u16 _prefilter_size;
             u16 _radiance_size;
-            EALGFormat::EALGFormat _format;
+            EALGFormat _format;
             u16 _padding;
         };
         class LightingSystem : public System
         {
-            DECLARE_CLASS(LightingSystem)
+            DECLARE_SYSTEM(LightingSystem)
         public:
             LightingSystem();
             void Update(Register &r, f32 delta_time) final;

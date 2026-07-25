@@ -16,24 +16,24 @@ namespace Ailu::Render
     public:
         inline static const u32 kCBufferSize = 1024u;
         static Ref<RayTracingShader> Create(const WString &sys_path,const String& name);
-        FORCEINLINE static void SetGlobalBuffer(const String &name, ConstantBuffer *buf)
+        AL_FORCE_INLINE static void SetGlobalBuffer(const String &name, ConstantBuffer *buf)
         {
             s_global_cbuffer_bind_info[name] = buf;
         };
-        FORCEINLINE static void SetGlobalBuffer(const String &name, GPUBuffer *buf)
+        AL_FORCE_INLINE static void SetGlobalBuffer(const String &name, GPUBuffer *buf)
         {
             s_global_buffer_bind_info[name] = buf;
         };
-        FORCEINLINE static void SetGlobalTexture(const String &name, Texture *texture)
+        AL_FORCE_INLINE static void SetGlobalTexture(const String &name, Texture *texture)
         {
             s_global_textures_bind_info[name] = texture;
         };
         static void SetGlobalTexture(const String &name, RTHandle texture);
-        FORCEINLINE static void SetGlobalFloat(const String &name, f32 value)
+        AL_FORCE_INLINE static void SetGlobalFloat(const String &name, f32 value)
         {
             s_global_floats[name] = value;
         };
-        FORCEINLINE static void SetGlobalInt(const String &name, i32 value)
+        AL_FORCE_INLINE static void SetGlobalInt(const String &name, i32 value)
         {
             s_global_ints[name] = value;
         };
@@ -69,7 +69,7 @@ namespace Ailu::Render
     protected:
         struct RayTracingBindParams
         {
-            ECubemapFace::ECubemapFace _face = ECubemapFace::kUnknown;
+            ECubemapFace _face = ECubemapFace::kUnknown;
             u16 _mipmap = 0u;
             u16 _slice = 0u;
             u32 _sub_res = UINT32_MAX;

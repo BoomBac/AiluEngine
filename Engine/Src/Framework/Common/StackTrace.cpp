@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "Framework/Common/StackTrace.h"
 
-#if defined(PLATFORM_WINDOWS)
+#if defined(AL_PLATFORM_WINDOWS)
     #include <windows.h>
     #include <dbghelp.h>
     #pragma comment(lib, "Dbghelp.lib")
@@ -14,7 +14,7 @@ namespace Ailu
 {
     String StackTrace::Capture(u16 max_frames)
     {
-    #if defined(PLATFORM_WINDOWS)
+    #if defined(AL_PLATFORM_WINDOWS)
         static std::once_flag sym_init_flag;
         std::call_once(sym_init_flag, []() {
             SymInitialize(GetCurrentProcess(), nullptr, TRUE);

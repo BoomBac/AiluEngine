@@ -6,7 +6,7 @@
 #ifndef __PHYSICS_SYSTEM__
 #define __PHYSICS_SYSTEM__
 
-#include "Scene/Entity.hpp"
+#include "Scene/Entity.h"
 #include "Render/Material.h"
 #include "Scene/Component.h"
 #include "Physics/Collision.h"
@@ -16,7 +16,7 @@ namespace Ailu
     {
         class PhysicsSystem : public System
         {
-            DECLARE_CLASS(PhysicsSystem)
+            DECLARE_SYSTEM(PhysicsSystem)
             using CollisionFunc = std::function<ContactData(const CCollider&,const Matrix4x4f&,const CCollider&,const Matrix4x4f&)>;
         public:
             inline static const Vector3f kGravity = Vector3f(0.f, -9.8f, 0.f);

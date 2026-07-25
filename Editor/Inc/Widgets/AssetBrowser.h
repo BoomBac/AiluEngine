@@ -2,6 +2,7 @@
 #define __ASSETBROWSER_H__
 #include "Dock/DockWindow.h"
 #include "generated/AssetBrowser.gen.h"
+#include <filesystem>
 
 namespace Ailu
 {
@@ -43,14 +44,14 @@ namespace Ailu
             void ShowNextImportPopup();
             void ShowImportPopupForFile(const WString &sys_path);
             void AdvanceImportQueue();
-            void NavigateToPath(const fs::path &path);
+            void NavigateToPath(const std::filesystem::path &path);
             void RefreshDirectoryTree();
             void UpdatePathButtons();
             void OpenAsset(Asset *asset);
             void ShowBlankAreaContextMenu(Vector2f popup_pos);
             void ShowFolderContextMenu(const WString &folder_sys_path, Vector2f popup_pos);
             void ShowAssetContextMenu(Asset *asset, Vector2f popup_pos);
-            void ShowCreateMaterialDialog(Vector2f popup_pos, const fs::path &target_sys_path);
+            void ShowCreateMaterialDialog(Vector2f popup_pos, const std::filesystem::path &target_sys_path);
             bool RenameAssetEntry(Asset *asset, const String &new_name);
             bool RenameFolderEntry(const WString &folder_sys_path, const String &new_name);
             void DeleteAssetEntry(Asset *asset);
@@ -83,7 +84,7 @@ namespace Ailu
             bool _is_icon_layout_dirty = true;
             f32 _icon_size = 64.0f;
             UI::UIElement *_hover_item = nullptr;
-            fs::path _current_path;
+            std::filesystem::path _current_path;
             String _search_text;
             DirectoryTreeDataSource *_directory_tree_data_source = nullptr;
             Vector2f _last_icon_area_size = Vector2f::kZero;

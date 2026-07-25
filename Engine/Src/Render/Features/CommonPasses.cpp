@@ -89,7 +89,7 @@ namespace Ailu::Render
         _compiling_shader_pass_id = 1;
         _forward_lit_shader = ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/forwardlit.alasset");
         AL_ASSERT(_forward_lit_shader != nullptr);
-        _event = (ERenderPassEvent::ERenderPassEvent)(ERenderPassEvent::kBeforeTransparent + 25u);
+        _event = static_cast<ERenderPassEvent>(static_cast<u16>(ERenderPassEvent::kBeforeTransparent) + 25u);
     }
     ForwardPass::~ForwardPass()
     {
@@ -198,7 +198,7 @@ namespace Ailu::Render
         _p_mainlight_shadow_map = RenderTexture::Create(shadow_map_size, shadow_map_size, RenderConstants::kMaxCascadeShadowMapSplitNum, RenderResourceName::kMainLightShadowMap, ERenderTargetFormat::kShadowMap);
         _p_addlight_shadow_maps = RenderTexture::Create(shadow_map_size >> 1, shadow_map_size >> 1, RenderConstants::kMaxSpotLightNum + RenderConstants::kMaxAreaLightNum, RenderResourceName::kAddLightShadowMap, ERenderTargetFormat::kShadowMap);
         _p_point_light_shadow_maps = RenderTexture::Create(shadow_map_size >> 1,RenderResourceName::kPointLightShadowMap, ERenderTargetFormat::kShadowMap, RenderConstants::kMaxPointLightNum);
-        _event = (ERenderPassEvent::ERenderPassEvent)(ERenderPassEvent::kBeforeShaodwMap + 25u);
+        _event = static_cast<ERenderPassEvent>(static_cast<u16>(ERenderPassEvent::kBeforeShaodwMap) + 25u);
         _p_mainlight_shadow_map->_store_action = ELoadStoreAction::kClear;
         _p_addlight_shadow_maps->_store_action = ELoadStoreAction::kClear;
         _p_point_light_shadow_maps->_store_action = ELoadStoreAction::kClear;
@@ -310,7 +310,7 @@ namespace Ailu::Render
                     {
                         //j + i * 6 定位到cubearray
                         u16 per_cube_slice_index = j + shadow_data._shadowmap_index * 6;
-                        u16 dsv_rt_index = _p_point_light_shadow_maps->CalculateViewIndex(Texture::ETextureViewType::kDSV, (ECubemapFace::ECubemapFace)(j + 1), 0, shadow_data._shadowmap_index);
+                        u16 dsv_rt_index = _p_point_light_shadow_maps->CalculateViewIndex(Texture::ETextureViewType::kDSV, (ECubemapFace)(j + 1), 0, shadow_data._shadowmap_index);
                         cmd->SetRenderTarget(nullptr, _p_point_light_shadow_maps.get(), 0, dsv_rt_index);
                         cmd->ClearRenderTarget(kZFar, 0u);
                         Vector4f light_pos = rendering_data._point_shadow_data[shadow_data._shadowmap_index]._light_world_pos;
@@ -453,7 +453,7 @@ namespace Ailu::Render
                     {
                         //j + i * 6 定位到cubearray
                         u16 per_cube_slice_index = j + shadow_data._shadowmap_index * 6;
-                        u16 dsv_rt_index = _p_point_light_shadow_maps->CalculateViewIndex(Texture::ETextureViewType::kDSV, (ECubemapFace::ECubemapFace)(j + 1), 0, shadow_data._shadowmap_index);
+                        u16 dsv_rt_index = _p_point_light_shadow_maps->CalculateViewIndex(Texture::ETextureViewType::kDSV, (ECubemapFace)(j + 1), 0, shadow_data._shadowmap_index);
                         cmd->SetRenderTarget(nullptr, _p_point_light_shadow_maps.get(), 0, dsv_rt_index);
                         cmd->ClearRenderTarget(kZFar, 0u);
                         Vector4f light_pos = rendering_data._point_shadow_data[shadow_data._shadowmap_index]._light_world_pos;
@@ -585,7 +585,7 @@ namespace Ailu::Render
                     return;
                 for (u16 i = 0; i < 6; i++)
                 {
-                    u16 rt_index = dst_cubemap->CalculateViewIndex(Texture::ETextureViewType::kRTV, (ECubemapFace::ECubemapFace)(i + 1), 0, 0);
+                    u16 rt_index = dst_cubemap->CalculateViewIndex(Texture::ETextureViewType::kRTV, (ECubemapFace)(i + 1), 0, 0);
                     cmd->SetRenderTarget(dst_cubemap, rt_index);
                     cmd->ClearRenderTarget(Colors::kBlack);
                     cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, _per_camera_cb[i].get());
@@ -622,7 +622,7 @@ namespace Ailu::Render
         _p_filter_material->SetTexture("EnvMap", src_tex);
         for (u16 i = 0; i < 6; i++)
         {
-            u16 rt_index = radiance_map->CalculateViewIndex(Texture::ETextureViewType::kRTV, (ECubemapFace::ECubemapFace)(i + 1), 0, 0);
+            u16 rt_index = radiance_map->CalculateViewIndex(Texture::ETextureViewType::kRTV, (ECubemapFace)(i + 1), 0, 0);
             cmd->SetRenderTarget(radiance_map, rt_index);
             //cmd->ClearRenderTarget(_radiance_map.get(), Colors::kBlack, rt_index);
             cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, _per_camera_cb[i].get());
@@ -651,7 +651,7 @@ namespace Ailu::Render
                 //auto [w, h] = Texture::CalculateMipSize(_prefilter_cubemap->Width(), _prefilter_cubemap->Height(), j);
                 //r.width = w;
                 //r.height = h;
-                u16 rt_index = prefilter_map->CalculateViewIndex(Texture::ETextureViewType::kRTV, (ECubemapFace::ECubemapFace)(i + 1), j, 0);
+                u16 rt_index = prefilter_map->CalculateViewIndex(Texture::ETextureViewType::kRTV, (ECubemapFace)(i + 1), j, 0);
                 //cmd->SetViewport(r);
                 //cmd->SetScissorRect(r);
                 cmd->SetRenderTarget(prefilter_map, rt_index);
@@ -672,7 +672,7 @@ namespace Ailu::Render
             //image tp cubemap
             for (u16 i = 0; i < 6; i++)
             {
-                u16 rt_index = src_tex->CalculateViewIndex(Texture::ETextureViewType::kRTV, (ECubemapFace::ECubemapFace)(i + 1), 0, 0);
+                u16 rt_index = src_tex->CalculateViewIndex(Texture::ETextureViewType::kRTV, (ECubemapFace)(i + 1), 0, 0);
                 cmd->SetRenderTarget(_src_cubemap.get(), rt_index);
                 cmd->ClearRenderTarget(Colors::kBlack);
                 cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, _per_camera_cb[i].get());
@@ -692,7 +692,7 @@ namespace Ailu::Render
         _p_filter_material->SetTexture("EnvMap", src_tex);
         for (u16 i = 0; i < 6; i++)
         {
-            u16 rt_index = _radiance_map->CalculateViewIndex(Texture::ETextureViewType::kRTV, (ECubemapFace::ECubemapFace)(i + 1), 0, 0);
+            u16 rt_index = _radiance_map->CalculateViewIndex(Texture::ETextureViewType::kRTV, (ECubemapFace)(i + 1), 0, 0);
             cmd->SetRenderTarget(_radiance_map.get(), rt_index);
             //cmd->ClearRenderTarget(_radiance_map.get(), Colors::kBlack, rt_index);
             cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, _per_camera_cb[i].get());
@@ -709,7 +709,7 @@ namespace Ailu::Render
                 auto [w, h] = Texture::CalculateMipSize(_prefilter_cubemap->Width(), _prefilter_cubemap->Height(), j);
                 r.width = w;
                 r.height = h;
-                u16 rt_index = _prefilter_cubemap->CalculateViewIndex(Texture::ETextureViewType::kRTV, (ECubemapFace::ECubemapFace)(i + 1), j, 0);
+                u16 rt_index = _prefilter_cubemap->CalculateViewIndex(Texture::ETextureViewType::kRTV, (ECubemapFace)(i + 1), j, 0);
                 cmd->SetViewport(r);
                 cmd->SetRenderTarget(_prefilter_cubemap.get(), rt_index);
                 //cmd->ClearRenderTarget(_prefilter_cubemap.get(), Colors::kBlack, rt_index);
@@ -738,7 +738,7 @@ namespace Ailu::Render
     //-------------------------------------------------------------DeferedGeometryPass-------------------------------------------------------------
     DeferredGeometryPass::DeferredGeometryPass() : RenderPass("DeferedGeometryPass")
     {
-        _event = (ERenderPassEvent::ERenderPassEvent)(ERenderPassEvent::kBeforeGbuffer + 25u);
+        _event = static_cast<ERenderPassEvent>(static_cast<u16>(ERenderPassEvent::kBeforeGbuffer) + 25u);
     }
 
     void Ailu::Render::DeferredGeometryPass::OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data)
@@ -816,7 +816,7 @@ namespace Ailu::Render
     {
         _p_lighting_material = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/deferred_lighting.alasset"), "DeferedGbufferLighting");
         _brdf_lut = ResourceMgr::Get().Load<Texture2D>(L"Textures/ibl_brdf_lut.alasset");
-        _event = (ERenderPassEvent::ERenderPassEvent)(ERenderPassEvent::kBeforeDeferedLighting + 25u);
+        _event = static_cast<ERenderPassEvent>(static_cast<u16>(ERenderPassEvent::kBeforeDeferedLighting) + 25u);
     }
 
     void Ailu::Render::DeferredLightingPass::OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data)
@@ -907,7 +907,7 @@ namespace Ailu::Render
         cmd->Dispatch(_p_lut_gen.get(), mult_scatter_lut_gen_kernel, _mult_scatter_lut_size.x / 16, _mult_scatter_lut_size.y / 16, 1);
         g_pGfxContext->ExecuteCommandBuffer(cmd);
         CommandBufferPool::Release(cmd);
-        _event = (ERenderPassEvent::ERenderPassEvent)(ERenderPassEvent::kBeforeSkybox + 25u);
+        _event = static_cast<ERenderPassEvent>(static_cast<u16>(ERenderPassEvent::kBeforeSkybox) + 25u);
     }
 
     void Ailu::Render::SkyboxPass::OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data)

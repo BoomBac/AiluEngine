@@ -964,7 +964,7 @@ namespace Ailu
         }
         void DockManager::Shutdown()
         {
-            DESTORY_PTR(g_pDockMgr);
+            delete g_pDockMgr; g_pDockMgr = nullptr;
         }
         DockManager &DockManager::Get()
         {

@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __MATERIAL_GEN_H__
 //Class Material begin...........................
-#define MATERIAL_GEN_H_20_GENERATED_BODY \
+#define MATERIAL_GEN_H_26_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_Material_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -21,7 +21,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::Material>
 //Class Material end...........................
 
 //Class StandardMaterial begin...........................
-#define MATERIAL_GEN_H_152_GENERATED_BODY \
+#define MATERIAL_GEN_H_171_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_StandardMaterial_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -35,6 +35,24 @@ class StandardMaterial ;
 template<>
 AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::StandardMaterial>();
 //Class StandardMaterial end...........................
+
+//Enum EMaterialID begin...........................
+const Ailu::Enum* Z_Construct_Enum_EMaterialID_Type();
+namespace Ailu::Render { 
+enum class EMaterialID : i32;
+}
+template<>
+AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::EMaterialID>();
+//Enum EMaterialID end...........................
+
+//Enum ESurfaceType begin...........................
+const Ailu::Enum* Z_Construct_Enum_ESurfaceType_Type();
+namespace Ailu::Render { 
+enum class ESurfaceType : i32;
+}
+template<>
+AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::ESurfaceType>();
+//Enum ESurfaceType end...........................
 
 #undef CURRENT_FILE_ID
 #define CURRENT_FILE_ID MATERIAL_GEN_H

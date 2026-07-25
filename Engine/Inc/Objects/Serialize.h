@@ -1,7 +1,10 @@
 #ifndef __SERIALIZE_H__
 #define __SERIALIZE_H__
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/String.h"
+#include "Framework/Core/ReflectionMacros.h"
 #include "Framework/Common/Log.h"
+#include "Framework/Common/Path.h"
 #include <iostream>
 #include <sstream>
 #include <string>

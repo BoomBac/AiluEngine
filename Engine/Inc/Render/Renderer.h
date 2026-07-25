@@ -6,12 +6,19 @@
 #define __RENDERER_H__
 
 #include "./Features/CommonPasses.h"
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Common/NonCopyable.h"
+#include "Framework/Core/String.h"
+#include "Framework/Core/Containers/Vector.h"
+#include "Framework/Core/Containers/List.h"
+#include "Framework/Core/Containers/Map.h"
+#include "Framework/Core/Containers/Queue.h"
 #include "RendererAPI.h"
 #include "Texture.h"
 #include <functional>
 #include "RenderingData.h"
 #include "Scene/Scene.h"
+#include "generated/Renderer.gen.h"
 
 
 
@@ -19,7 +26,13 @@ namespace Ailu
 {
     namespace Render
     {
-        DECLARE_ENUM(EShadingMode, kLit = 1, kWireframe = 2, kLitWireframe = 3);
+        AENUM()
+        enum class EShadingMode : u8
+        {
+            kLit = 1,
+            kWireframe = 2,
+            kLitWireframe = 3
+        };
         class PostProcessPass;
         class SSAOPass;
         class Camera;
@@ -45,13 +58,12 @@ namespace Ailu
             inline static const String kMotionVectorTex = "_CameraMotionVector";
             inline static const String kMotionVectorDepth = "_CameraMotionDepth";
         };
-        class AILU_API Renderer
+        class AILU_API Renderer : public NonCopyable
         {
             friend class RenderPipeline;
         public:
             using BeforeTickEvent = std::function<void()>;
             using AfterTickEvent = std::function<void()>;
-            DISALLOW_COPY_AND_ASSIGN(Renderer)
         public:
             inline static RendererAPI::ERenderAPI GetAPI() { return RendererAPI::GetAPI(); }
             Renderer();
@@ -74,7 +86,7 @@ namespace Ailu
             const RenderingData &GetRenderingData() const { return _rendering_data; }
             RenderTexture *TargetTexture();
             void AddFeature(RenderFeature *feature) { _features.emplace_back(feature); };
-            void SetShadingMode(EShadingMode::EShadingMode mode) { _mode = mode; }
+            void SetShadingMode(EShadingMode mode) { _mode = mode; }
             void SetupFrameResource(FrameResource* prev_fr,FrameResource *cur_fr) { _prev_fs = prev_fr;_cur_fs = cur_fr; }
             RDG::RenderGraph& GetRenderGraph() { return *_rd_graph; }
         public:
@@ -97,7 +109,7 @@ namespace Ailu
             RenderPipeline *_p_cur_pipeline;
             FrameResource *_cur_fs;
             FrameResource *_prev_fs;
-            EShadingMode::EShadingMode _mode = EShadingMode::kLit;
+            EShadingMode _mode = EShadingMode::kLit;
             RTHandle _camera_color_handle;
             RTHandle _gameview_rt_handle;
             RTHandle _camera_depth_handle;

@@ -1,16 +1,16 @@
 #pragma once
 #ifndef __COMMON_RENDER_PIPELINE_H__
 #define __COMMON_RENDER_PIPELINE_H__
+#include "Framework/Common/NonCopyable.h"
 #include <Render/RenderPipeline.h>
-
 #include "PickPass.h"
+
 namespace Ailu
 {
 	namespace Editor
 	{
-		class CommonRenderPipeline : public Render::RenderPipeline
+		class CommonRenderPipeline : public Render::RenderPipeline, public NonCopyable
 		{
-			DISALLOW_COPY_AND_ASSIGN(CommonRenderPipeline)
 		public:
 			CommonRenderPipeline();
             void Setup() final;

@@ -11,6 +11,8 @@
 
 namespace Ailu
 {
+    namespace fs = std::filesystem;
+
     namespace
     {
         std::optional<fs::path> ResolveScriptPath(const String &path)

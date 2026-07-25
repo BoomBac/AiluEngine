@@ -10,6 +10,8 @@
 
 namespace Ailu
 {
+    namespace fs = std::filesystem;
+
     namespace
     {
         bool IsReloadableChange(FileChangeType type)

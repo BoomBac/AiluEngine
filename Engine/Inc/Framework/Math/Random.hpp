@@ -1,26 +1,32 @@
 #pragma once
 #ifndef __RANDOM__
 #define __RANDOM__
-#include "ALMath.hpp"
+#include "Framework/Core/Types.h"
+#include "Framework/Math/Color.h"
+#include "Framework/Math/VectorMath.hpp"
+#include "Framework/Core/CoreMinimal.h"
 #include <limits>
 #include <random>
 #include <functional>
 
-namespace
-{
-    inline float Fade(float t)
-    {
-        return t * t * t * (t * (t * 6 - 15) + 10);
-    }
-    template<template<typename> class TT>
-    TT<float> Modulo(TT<f32> divident, TT<f32> divisor)
-    {
-        TT<f32> positiveDivident = divident % divisor + divisor;
-        return positiveDivident % divisor;
-    }
-}
 namespace Ailu
 {
+    using namespace Math;
+
+    namespace
+    {
+        inline float Fade(float t)
+        {
+            return t * t * t * (t * (t * 6 - 15) + 10);
+        }
+        template<template<typename> class TT>
+        TT<float> Modulo(TT<f32> divident, TT<f32> divisor)
+        {
+            TT<f32> positiveDivident = divident % divisor + divisor;
+            return positiveDivident % divisor;
+        }
+    }
+
     #undef max
     #undef min
     namespace Random

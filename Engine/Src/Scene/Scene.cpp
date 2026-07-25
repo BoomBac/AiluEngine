@@ -1,6 +1,7 @@
 ﻿#include "Scene/Scene.h"
 #include "Animation/AnimationSystem.h"
 #include "Framework/Common/Application.h"
+#include "Framework/Math/QuaternionMatrix.h"
 #include "Framework/Common/Profiler.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Framework/Script/ScriptSystem.h"
@@ -85,196 +86,10 @@ namespace Ailu::SceneManagement
         return Apply(scene, _old_parent, _old_local_transform);
     }
 
-    void Scene::Serialize(Archive &arch)
-    {
-        u64 index = 0;
-        auto &os = arch.GetOStream();
-        arch << "scene_register:";
-        arch.NewLine();
-        arch.IncreaseIndent();
-        for (auto &tag_comp: _register.View<ECS::TagComponent>())
-        {
-            ECS::Entity e = _register.GetEntity<ECS::TagComponent>(index++);
-            arch << std::format("Entity:{}", e);
-            arch.IncreaseIndent();
-            arch.NewLine();
-            {
-                arch.InsertIndent();
-                arch << "_tag_component:";
-                arch.NewLine();
-                arch << tag_comp;
-            }
-            if (auto c = _register.GetComponent<ECS::TransformComponent>(e); c != nullptr)
-            {
-                arch.InsertIndent();
-                arch << "_transform_component:";
-                arch.NewLine();
-                arch << (*c);
-            }
-            if (auto c = _register.GetComponent<ECS::ScriptComponent>(e); c != nullptr)
-            {
-                arch.InsertIndent();
-                arch << "_script_component:";
-                arch.NewLine();
-                arch << (*c);
-            }
-            if (auto c = _register.GetComponent<ECS::StaticMeshComponent>(e); c != nullptr)
-            {
-                arch.InsertIndent();
-                arch << "_static_mesh_component:";
-                arch.NewLine();
-                arch << (*c);
-            }
-            if (auto c = _register.GetComponent<ECS::LightComponent>(e); c != nullptr)
-            {
-                arch.InsertIndent();
-                arch << "_light_component:";
-                arch.NewLine();
-                arch << (*c);
-            }
-            if (auto c = _register.GetComponent<ECS::CHierarchy>(e); c != nullptr)
-            {
-                arch.InsertIndent();
-                arch << "_hierarchy_component:";
-                arch.NewLine();
-                arch << (*c);
-            }
-            if (auto c = _register.GetComponent<ECS::CCamera>(e); c != nullptr)
-            {
-                arch.InsertIndent();
-                arch << "_camera_component:";
-                arch.NewLine();
-                arch << (*c);
-            }
-            if (auto c = _register.GetComponent<ECS::CLightProbe>(e); c != nullptr)
-            {
-                arch.InsertIndent();
-                arch << "_lightprobe_component:";
-                arch.NewLine();
-                arch << (*c);
-            }
-            if (auto c = _register.GetComponent<ECS::CRigidBody>(e); c != nullptr)
-            {
-                arch.InsertIndent();
-                arch << "_rigidbody_component:";
-                arch.NewLine();
-                arch << (*c);
-            }
-            if (auto c = _register.GetComponent<ECS::CCollider>(e); c != nullptr)
-            {
-                arch.InsertIndent();
-                arch << "_collider_component:";
-                arch.NewLine();
-                arch << (*c);
-            }
-            if (auto c = _register.GetComponent<ECS::CSkeletonMesh>(e); c != nullptr)
-            {
-                arch.InsertIndent();
-                arch << "_skeleton_mesh_component:";
-                arch.NewLine();
-                arch << (*c);
-            }
-            if (auto c = _register.GetComponent<ECS::CVXGI>(e); c != nullptr)
-            {
-                arch.InsertIndent();
-                arch << "_vxgi_component:";
-                arch.NewLine();
-                arch << (*c);
-            }
-            if (auto c = _register.GetComponent<ECS::SpriteRendererComponent>(e); c != nullptr)
-            {
-                arch.InsertIndent();
-                arch << "_sprite_renderer_component:";
-                arch.NewLine();
-                arch << (*c);
-            }
-            arch.DecreaseIndent();
-        }
-    }
-
-    void Scene::Deserialize(Archive &arch)
-    {
-        auto &is = arch.GetIStream();
-        ECS::Entity e = ECS::kInvalidEntity;
-        std::string line;
-        do
-        {
-            std::getline(is, line);
-        } while (line != "scene_register:");
-        AL_ASSERT(line == "scene_register:");
-        while (is.good())
-        {
-            std::getline(is, line);
-            if (line.empty())
-                continue;
-            if (line.find("Entity:") != std::string::npos)
-            {
-                e = _register.Create();
-                std::getline(is, line);
-            }
-            if (su::BeginWith(line, "_tag_component"))
-            {
-                arch >> _register.AddComponent<ECS::TagComponent>(e);
-            }
-            else if (su::BeginWith(line, "_transform_component"))
-            {
-                arch >> _register.AddComponent<ECS::TransformComponent>(e);
-            }
-            else if (su::BeginWith(line, "_script_component"))
-            {
-                arch >> _register.AddComponent<ECS::ScriptComponent>(e);
-            }
-            else if (su::BeginWith(line, "_static_mesh_component"))
-            {
-                arch >> _register.AddComponent<ECS::StaticMeshComponent>(e);
-            }
-            else if (su::BeginWith(line, "_light_component"))
-            {
-                arch >> _register.AddComponent<ECS::LightComponent>(e);
-            }
-            else if (su::BeginWith(line, "_hierarchy_component"))
-            {
-                arch >> _register.AddComponent<ECS::CHierarchy>(e);
-            }
-            else if (su::BeginWith(line, "_camera_component"))
-            {
-                arch >> _register.AddComponent<ECS::CCamera>(e);
-            }
-            else if (su::BeginWith(line, "_lightprobe_component"))
-            {
-                arch >> _register.AddComponent<ECS::CLightProbe>(e);
-            }
-            else if (su::BeginWith(line, "_rigidbody_component"))
-            {
-                arch >> _register.AddComponent<ECS::CRigidBody>(e);
-            }
-            else if (su::BeginWith(line, "_collider_component"))
-            {
-                arch >> _register.AddComponent<ECS::CCollider>(e);
-            }
-            else if (su::BeginWith(line, "_skeleton_mesh_component"))
-            {
-                arch >> _register.AddComponent<ECS::CSkeletonMesh>(e);
-            }
-            else if (su::BeginWith(line, "_vxgi_component"))
-            {
-                arch >> _register.AddComponent<ECS::CVXGI>(e);
-            }
-            else if (su::BeginWith(line, "_sprite_renderer_component"))
-            {
-                arch >> _register.AddComponent<ECS::SpriteRendererComponent>(e);
-            }
-            else
-            {
-                AL_ASSERT_MSG(true, "Unkown Component");
-            };
-        }
-        TouchStructure();
-    }
-
     Scene::Scene(const String &name) : Object(name)
     {
         _register.RegisterComponent<ECS::TagComponent>();
+        _register.RegisterComponent<ECS::PersistentIdComponent>();
         _register.RegisterComponent<ECS::TransformComponent>();
         _register.RegisterComponent<ECS::ScriptComponent>();
         _register.RegisterComponent<ECS::StaticMeshComponent>();
@@ -587,6 +402,7 @@ namespace Ailu::SceneManagement
     ECS::Entity Scene::AddObject(Ref<Mesh> mesh, Ref<Material> mat)
     {
         ECS::Entity obj = _register.Create();
+        _register.AddComponent<ECS::PersistentIdComponent>(obj);
         _register.AddComponent<ECS::TagComponent>(obj, AcquireName());
         _register.AddComponent<ECS::TransformComponent>(obj);
         _register.AddComponent<ECS::CHierarchy>(obj);
@@ -600,6 +416,7 @@ namespace Ailu::SceneManagement
     ECS::Entity Scene::AddObject(Ref<Mesh> mesh, const Vector<Ref<Material>> &mats)
     {
         ECS::Entity obj = _register.Create();
+        _register.AddComponent<ECS::PersistentIdComponent>(obj);
         _register.AddComponent<ECS::TagComponent>(obj, AcquireName());
         _register.AddComponent<ECS::TransformComponent>(obj);
         _register.AddComponent<ECS::CHierarchy>(obj);
@@ -614,6 +431,7 @@ namespace Ailu::SceneManagement
     {
         ECS::Entity obj = _register.Create();
         name = name.empty() ? AcquireName() : name;
+        _register.AddComponent<ECS::PersistentIdComponent>(obj);
         _register.AddComponent<ECS::TagComponent>(obj, name);
         _register.AddComponent<ECS::TransformComponent>(obj);
         _register.AddComponent<ECS::CHierarchy>(obj);
@@ -623,6 +441,7 @@ namespace Ailu::SceneManagement
     ECS::Entity Scene::DuplicateEntity(ECS::Entity e)
     {
         ECS::Entity new_one = _register.Create();
+        _register.AddComponent<ECS::PersistentIdComponent>(new_one);  // new entity gets a new GUID
         auto &tag_comp = _register.AddComponent<ECS::TagComponent>(new_one, *_register.GetComponent<ECS::TagComponent>(e));
         String base_name = tag_comp._name.substr(0, tag_comp._name.find_first_of('(') - 1);
         i32 max_index = 0;
@@ -789,22 +608,14 @@ namespace Ailu::SceneManagement
             const ECS::Entity entity = r.GetEntity<ECS::ScriptComponent>(index++);
             ScriptSystem::Get().UpdateComponent(this, entity, comp, dt);
         }
-        for (auto &it: _register.SystemView())
-        {
-            auto &[type, sys] = it;
-            if (type != ECS::PhysicsSystem::TypeName())
-                continue;
-            sys->Update(_register, dt);
-        }
+        if (auto *physics_system = _register.GetSystem<ECS::PhysicsSystem>())
+            physics_system->Update(_register, dt);
         if (auto *transform_system = _register.GetSystem<ECS::TransformSystem>())
             transform_system->Update(_register, dt);
-        for (auto &it: _register.SystemView())
-        {
-            auto &[type, sys] = it;
-            if (type == ECS::TransformSystem::TypeName() || type == ECS::PhysicsSystem::TypeName())
-                continue;
-            sys->Update(_register, dt);
-        }
+        if (auto *lighting_system = _register.GetSystem<ECS::LightingSystem>())
+            lighting_system->Update(_register, dt);
+        if (auto *animation_system = _register.GetSystem<ECS::AnimationSystem>())
+            animation_system->Update(_register, dt);
         index = 0;
         for (auto &comp: r.View<ECS::StaticMeshComponent>())
         {
@@ -843,6 +654,7 @@ namespace Ailu::SceneManagement
             comp._camera.RecalculateMatrix(true);
         }
         RebuildBVHTree();
+        _register.FlushDestroy();
         DeletePendingEntities();
         if (_dirty)
         {
@@ -1053,7 +865,7 @@ namespace Ailu::SceneManagement
     {
         _p_current = _runtime_scene_src;
         _runtime_scene_src = nullptr;
-        DESTORY_PTR(_runtime_scene);
+        delete _runtime_scene; _runtime_scene = nullptr;
         Application::Get()._is_playing_mode = false;
     }
     void SceneMgr::EnterSimulateMode()

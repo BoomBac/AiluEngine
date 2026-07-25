@@ -5,7 +5,10 @@
 #include "Assets/Asset.h"
 #include "Framework/Math/ALMath.hpp"
 #include "Framework/Math/Geometry.h"
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/String.h"
+#include "Framework/Core/Containers/Vector.h"
+#include "Framework/Core/Containers/Array.h"
 #include "Objects/Object.h"
 #include "Render/Buffer.h"
 #include <string>

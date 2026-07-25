@@ -1,4 +1,5 @@
 #include "Render/RenderGraph/RenderGraph.h"
+#include "Framework/Common/Hash.hpp"
 #include "Render/GraphicsContext.h"
 #include "Render/CommandBuffer.h"
 #include "Render/FrameResource.h"

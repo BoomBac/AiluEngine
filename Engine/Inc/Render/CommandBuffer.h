@@ -133,7 +133,7 @@ namespace Ailu
         void SetViewports(const std::initializer_list<Rect> &viewports);
         void SetScissorRects(const std::initializer_list<Rect> &rects);
 
-        RTHandle GetTempRT(u16 width, u16 height, String name, ERenderTargetFormat::ERenderTargetFormat format, bool mipmap_chain, bool linear, bool random_access);
+        RTHandle GetTempRT(u16 width, u16 height, String name, ERenderTargetFormat format, bool mipmap_chain, bool linear, bool random_access);
         void ReleaseTempRT(RTHandle handle);
 
         void Blit(RTHandle src, RTHandle dst, Material *mat = nullptr, u16 pass_index = 0u);

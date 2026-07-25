@@ -2,7 +2,8 @@
 #ifndef __FILEMGR_H__
 #define __FILEMGR_H__
 #include "Framework/Common/Path.h"
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/String.h"
 
 namespace Ailu
 {

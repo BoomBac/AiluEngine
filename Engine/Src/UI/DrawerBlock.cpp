@@ -36,8 +36,8 @@ namespace Ailu
         DrawerBlock::~DrawerBlock()
         {
             --s_id_gen;
-            DESTORY_PTR(_vbuf);
-            DESTORY_PTR(_ibuf);
+            delete _vbuf; _vbuf = nullptr;
+            delete _ibuf; _ibuf = nullptr;
         }
 
         void DrawerBlock::SubmitVertexData()

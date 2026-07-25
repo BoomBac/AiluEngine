@@ -2,7 +2,8 @@
 #ifndef __SPRITE_BATCHER_H__
 #define __SPRITE_BATCHER_H__
 
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/Containers/Vector.h"
 #include "Render/Buffer.h"
 #include "Render/CommandBuffer.h"
 #include "Render/Material.h"

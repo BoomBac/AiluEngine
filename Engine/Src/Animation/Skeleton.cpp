@@ -9,7 +9,10 @@ namespace Ailu
     Skeleton::~Skeleton()
     {
         for (auto &it: _solvers)
-            DESTORY_PTR(it.second);
+        {
+            delete it.second;
+            it.second = nullptr;
+        }
     }
     Map<String, Solver *> &Skeleton::GetSolvers()
     {

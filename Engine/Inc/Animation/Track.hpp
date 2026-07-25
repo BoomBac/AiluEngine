@@ -5,7 +5,8 @@
 #ifndef AILU_TRACK_HPP
 #define AILU_TRACK_HPP
 #include "Curve.hpp"
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/Containers/Vector.h"
 namespace Ailu
 {
     /*
@@ -53,8 +54,8 @@ namespace Ailu
         Track();
         void Resize(u32 new_size) {_frames.resize(new_size);};
         [[nodiscard]] u32 Size() const {return (u32)_frames.size();};
-        [[nodiscard]] EInterpolationType::EInterpolationType InterpolationType() const {return _interpolation_type;};
-        void SetInterpolation(EInterpolationType::EInterpolationType interp) { _interpolation_type = interp;};
+        [[nodiscard]] EInterpolationType InterpolationType() const {return _interpolation_type;};
+        void SetInterpolation(EInterpolationType interp) { _interpolation_type = interp;};
         f32 GetStartTime();
         f32 GetEndTime();
         T Evaluate(f32 time, bool is_looping);
@@ -72,7 +73,7 @@ namespace Ailu
         T Hermite(float t, const T& p1, const T& s1,const T& p2, const T& s2);
     protected:
         Vector<Frame<N>> _frames;
-        EInterpolationType::EInterpolationType _interpolation_type;
+        EInterpolationType _interpolation_type;
     };
 
     using ScalarTrack = Track<ScalarFrame, 1>;

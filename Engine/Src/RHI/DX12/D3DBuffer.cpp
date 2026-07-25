@@ -128,7 +128,7 @@ namespace Ailu::RHI::DX12
         if (_desc._target & EGPUBufferTarget::kConstant)
         {
             u64 unaligned_size = _mem_size;
-            _mem_size = ALIGN_TO_256(_mem_size);
+            _mem_size = AlignTo(_mem_size,256);
             auto heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
             auto res_desc = CD3DX12_RESOURCE_DESC::Buffer(_mem_size);
             ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &res_desc,

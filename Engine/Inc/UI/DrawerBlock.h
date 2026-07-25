@@ -1,6 +1,7 @@
 #ifndef __DRAWER_BLOCK_H__
 #define __DRAWER_BLOCK_H__
 
+#include "Framework/Common/NonCopyable.h"
 #include "Render/Buffer.h"
 #include "Render/Material.h"
 
@@ -8,13 +9,12 @@ namespace Ailu
 {
     namespace UI
     {
-        struct DrawerBlock
+        struct DrawerBlock : public NonCopyable
         {
         public:
             friend class UIRenderer;
             inline static u32 kMaxVertNum = 1200u;
         public:
-            DISALLOW_COPY_AND_ASSIGN(DrawerBlock)
             DrawerBlock(DrawerBlock &&other) noexcept;
             DrawerBlock &operator=(DrawerBlock &&other) noexcept;
             DrawerBlock(Ref<Render::Material> mat,u32 vert_num = kMaxVertNum);

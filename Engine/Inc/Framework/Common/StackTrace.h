@@ -1,7 +1,8 @@
 #pragma once
 #ifndef __STACK_TRACE__
 #define __STACK_TRACE__
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/String.h"
 
 namespace Ailu
 {

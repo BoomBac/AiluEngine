@@ -9,13 +9,13 @@
 
 namespace Ailu::RHI::DX12
 {
-    using Ailu::Render::BindParams;
-    using Ailu::Render::UploadParams;
-    using Ailu::Render::GraphicsContext;
-    using Ailu::Render::RHICommandBuffer;
+    using ::Ailu::Render::BindParams;
+    using ::Ailu::Render::UploadParams;
+    using ::Ailu::Render::GraphicsContext;
+    using ::Ailu::Render::RHICommandBuffer;
     using Microsoft::WRL::ComPtr;
 
-    class D3DRayTracingScene : public Render::RayTracingScene
+    class D3DRayTracingScene : public ::Ailu::Render::RayTracingScene
     {
         friend class D3DContext;
     public:

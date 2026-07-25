@@ -13,16 +13,20 @@
 #include <thread>
 #include "Framework/Common/Container.hpp"
 #include "Framework/Common/RawEventQueue.h"
+#include "generated/Application.gen.h"
 
 namespace Ailu
 {
     using Render::RenderPipeline;
 
-    DECLARE_ENUM(EApplicationState,
-                 EApplicationState_None,
-                 EApplicationState_Running,
-                 EApplicationState_Pause,
-                 EApplicationState_Exit)
+    AENUM()
+    enum class EApplicationState
+    {
+        EApplicationState_None,
+        EApplicationState_Running,
+        EApplicationState_Pause,
+        EApplicationState_Exit
+    };
     struct AILU_API ApplicationDesc
     {
         u32 _window_width, _window_height;
@@ -153,7 +157,7 @@ namespace Ailu
         u64 GetFrameCount() const {return _frame_count;}
         const Array<ObjectLayer,32>& GetObjectLayers() const {return _object_layers;}
         const ObjectLayer& NameToLayer(const String& name);
-        const EApplicationState::EApplicationState State() const {return _state;}
+        const EApplicationState State() const {return _state;}
         LayerStack &GetLayerStack() { return *_layer_stack; }
         bool _is_playing_mode = false;
         bool _is_simulate_mode = false;
@@ -193,7 +197,7 @@ namespace Ailu
         std::atomic<bool> _is_handling_event;
         std::thread *_p_event_handle_thread;
         Scope<RenderPipeline> _pipeline;
-        EApplicationState::EApplicationState _state = EApplicationState::EApplicationState_None;
+        EApplicationState _state = EApplicationState::EApplicationState_None;
         double _render_lag = 0.0;
         double _update_lag = 0.0;
         Array<ObjectLayer,32> _object_layers;

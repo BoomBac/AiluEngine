@@ -3,10 +3,14 @@
 #define __RENDERING_DATA_H__
 
 #include "Buffer.h"
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/Containers/Vector.h"
+#include "Framework/Core/Containers/Map.h"
+#include "Framework/Core/Containers/Array.h"
 #include "RendererAPI.h"
 #include "Texture.h"
 #include "RenderGraph/RenderGraphFwd.h"
+#include "generated/RenderingData.gen.h"
 
 namespace Ailu::RHI::DX12
 {
@@ -27,7 +31,12 @@ namespace Ailu::Render
         kShaderedWireFrame
     };
 
-    DECLARE_ENUM(ERenderLayer, kDefault = 0x01, kSkyBox = 0x08)
+    AENUM()
+    enum class ERenderLayer : u8
+    {
+        kDefault = 0x01,
+        kSkyBox = 0x08
+    };
 
     struct AILU_API QuailtySetting
     {

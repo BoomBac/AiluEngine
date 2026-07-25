@@ -427,7 +427,7 @@ namespace Ailu
 
         Texture3DView::~Texture3DView()
         {
-            DESTORY_PTR(_pass);
+            delete _pass; _pass = nullptr;
             //Render::RenderPipeline::Get().GetRenderer()->RemoveTaskPass(_pass);
         }
         void Texture3DView::Update(f32 dt)

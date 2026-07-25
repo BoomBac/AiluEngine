@@ -5,7 +5,12 @@
 #include "Framework/Common/FileManager.h"
 #include "Framework/Common/Log.h"
 #include "Framework/Common/ResourceMgr.h"
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/String.h"
+#include "Framework/Core/Containers/Vector.h"
+#include "Framework/Core/Containers/Map.h"
+#include "Framework/Core/Containers/List.h"
+#include "Framework/Common/Assert.h"
 #include "Framework/Interface/IParser.h"
 #include "Framework/Math/Guid.h"
 #include "Framework/Parser/AssetParser.h"
@@ -455,8 +460,8 @@ Scope<Asset> MaterialAssetHandler::Load(const AssetLoadContext &context)
     if (is_standard_mat)
     {
         auto standard_mat = static_cast<StandardMaterial *>(mat.get());
-        standard_mat->SurfaceType((ESurfaceType::ESurfaceType)standard_mat->GetUint("_surface"));
-        standard_mat->MaterialID((EMaterialID::EMaterialID)standard_mat->GetUint("_MaterialID"));
+        standard_mat->SurfaceType((ESurfaceType)standard_mat->GetUint("_surface"));
+        standard_mat->MaterialID((EMaterialID)standard_mat->GetUint("_MaterialID"));
     }
 
     auto asset = MakeScope<Asset>(Guid(doc._header._guid),Material::StaticType(),context._asset_path);
@@ -775,7 +780,7 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
         {
             auto &component = reg.AddComponent<ECS::LightComponent>(entity);
             if (!entity_doc._light_component._type.empty())
-                component._type = ECS::ELightType::FromString(entity_doc._light_component._type);
+                component._type = ECS::LightTypeFromString(entity_doc._light_component._type);
             component._light._light_color = entity_doc._light_component._light._light_color;
             component._light._light_param = entity_doc._light_component._light._light_param;
             component._light._is_two_side = entity_doc._light_component._light._is_two_side;
@@ -787,7 +792,7 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
         {
             auto &component = reg.AddComponent<ECS::CCamera>(entity);
             if (!entity_doc._camera_component._type.empty())
-                component._camera.Type(ECameraType::FromString(entity_doc._camera_component._type));
+                component._camera.Type(CameraTypeFromString(entity_doc._camera_component._type));
             component._camera.Aspect(entity_doc._camera_component._aspect);
             component._camera.Far(entity_doc._camera_component._far_clip);
             component._camera.Near(entity_doc._camera_component._near_clip);
@@ -812,7 +817,7 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
         {
             auto &component = reg.AddComponent<ECS::CCollider>(entity);
             if (!entity_doc._collider_component._type.empty())
-                component._type = ECS::EColliderType::FromString(entity_doc._collider_component._type);
+                component._type = ECS::ColliderTypeFromString(entity_doc._collider_component._type);
             component._is_trigger = entity_doc._collider_component._is_trigger;
             component._center = entity_doc._collider_component._center;
             component._param = entity_doc._collider_component._param;
@@ -944,7 +949,7 @@ bool SceneAssetHandler::Save(const AssetSaveContext &context)
         if (const auto *light = reg.GetComponent<ECS::LightComponent>(entity); light != nullptr)
         {
             entity_doc._has_light_component = true;
-            entity_doc._light_component._type = ECS::ELightType::ToString(light->_type);
+            entity_doc._light_component._type = ECS::LightTypeToString(light->_type);
             entity_doc._light_component._light._light_color = light->_light._light_color;
             entity_doc._light_component._light._light_param = light->_light._light_param;
             entity_doc._light_component._light._is_two_side = light->_light._is_two_side;
@@ -965,7 +970,7 @@ bool SceneAssetHandler::Save(const AssetSaveContext &context)
         if (const auto *camera = reg.GetComponent<ECS::CCamera>(entity); camera != nullptr)
         {
             entity_doc._has_camera_component = true;
-            entity_doc._camera_component._type = ECameraType::ToString(camera->_camera.Type());
+            entity_doc._camera_component._type = CameraTypeToString(camera->_camera.Type());
             entity_doc._camera_component._aspect = camera->_camera.Aspect();
             entity_doc._camera_component._far_clip = camera->_camera.Far();
             entity_doc._camera_component._near_clip = camera->_camera.Near();
@@ -986,7 +991,7 @@ bool SceneAssetHandler::Save(const AssetSaveContext &context)
         if (const auto *collider = reg.GetComponent<ECS::CCollider>(entity); collider != nullptr)
         {
             entity_doc._has_collider_component = true;
-            entity_doc._collider_component._type = ECS::EColliderType::ToString(collider->_type);
+            entity_doc._collider_component._type = ECS::ColliderTypeToString(collider->_type);
             entity_doc._collider_component._is_trigger = collider->_is_trigger;
             entity_doc._collider_component._center = collider->_center;
             entity_doc._collider_component._param = collider->_param;

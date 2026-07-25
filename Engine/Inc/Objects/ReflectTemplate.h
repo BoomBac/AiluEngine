@@ -21,7 +21,7 @@ namespace Ailu
 
 #define IMPL_STATIC_TYPE(x)                         \
     template<>                                      \
-    const Type *StaticClass<x>()                    \
+    inline const Type *StaticClass<x>()             \
     {                                               \
         const static Type *s_type = Type::Find(#x); \
         return s_type;                              \

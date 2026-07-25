@@ -32,7 +32,10 @@ namespace Ailu
     JobSystem::JobPool::~JobPool()
     {
         for(auto& item : _jobs)
-            DESTORY_PTR(item);
+        {
+            delete item;
+            item = nullptr;
+        }
     }
     JobSystem* g_pJobSystem = nullptr;
     void JobSystem::Init(u32 thread_count)
@@ -42,7 +45,7 @@ namespace Ailu
     }
     void JobSystem::Shutdown()
     {
-        DESTORY_PTR(g_pJobSystem);
+        delete g_pJobSystem; g_pJobSystem = nullptr;
     }
     JobSystem& JobSystem::Get()
     {
@@ -105,7 +108,7 @@ namespace Ailu
             if (thread.joinable())
                 thread.join();
         }
-        DESTORY_PTR(_pool);
+        delete _pool; _pool = nullptr;
     }
 
     WaitHandle JobSystem::Dispatch(Job *job)

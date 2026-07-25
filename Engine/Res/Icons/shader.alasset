@@ -3,7 +3,8 @@
         "_format_version": 1,
         "_guid": "352bbe93-08cc-4780-bacf-2eb126bfba98",
         "_asset_type": "Ailu::Render::Texture2D",
-        "_asset_name": "shader"
+        "_asset_name": "shader",
+        "_dependencies": []
     },
     "_file": "shader.png",
     "_is_srgb": true

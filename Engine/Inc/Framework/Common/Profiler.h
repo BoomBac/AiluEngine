@@ -1,8 +1,15 @@
 #pragma once
 #ifndef __PROFILER_H__
 #define __PROFILER_H__
-#include "Container.hpp"
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/Preprocessor.h"
+#include "Framework/Common/NonCopyable.h"
+#include "Framework/Core/String.h"
+#include "Framework/Core/Containers/List.h"
+#include "Framework/Core/Containers/Map.h"
+#include "Framework/Core/Containers/Array.h"
+#include "Framework/Core/Containers/Queue.h"
+#include "Framework/Common/Container.hpp"
 #include "Render/RenderConstants.h"
 #include "TimeMgr.h"
 #include <optional>
@@ -160,10 +167,9 @@ namespace Ailu
     #endif
     };
 
-    class AILU_API CPUProfileBlock
+    class AILU_API CPUProfileBlock : public NonCopyable
     {
     public:
-        DISALLOW_COPY_AND_ASSIGN(CPUProfileBlock)
         explicit CPUProfileBlock(const String &name);
         ~CPUProfileBlock();
     private:
@@ -177,8 +183,8 @@ namespace Ailu
     };
 
 #if AILU_ENABLE_ENGINE_PROFILER || TRACY_ENABLE
-    #define PROFILE_BLOCK_GPU(cmd, block_name) GpuProfileBlock CONTACTW2(gpb_,__LINE__)(cmd,block_name);
-    #define PROFILE_BLOCK_CPU(block_name) CPUProfileBlock CONTACTW2(cpb_,__LINE__)(block_name);
+    #define PROFILE_BLOCK_GPU(cmd, block_name) GpuProfileBlock AL_CONCAT(gpb_,__LINE__)(cmd,block_name);
+    #define PROFILE_BLOCK_CPU(block_name) CPUProfileBlock AL_CONCAT(cpb_,__LINE__)(block_name);
 #else
     #define PROFILE_BLOCK_GPU(cmd, block_name)
     #define PROFILE_BLOCK_CPU(block_name)

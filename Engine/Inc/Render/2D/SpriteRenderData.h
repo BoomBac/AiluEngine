@@ -2,7 +2,8 @@
 #ifndef __SPRITE_RENDER_DATA_H__
 #define __SPRITE_RENDER_DATA_H__
 
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/ReflectionMacros.h"
 #include "Framework/Math/ALMath.hpp"
 #include "Render/Material.h"
 #include "Render/Texture.h"

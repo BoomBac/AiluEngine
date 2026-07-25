@@ -3,7 +3,8 @@
         "_format_version": 1,
         "_guid": "26247411-5cb6-4bf7-a6c4-7c48b9f5caee",
         "_asset_type": "Ailu::Render::Shader",
-        "_asset_name": "default_ui"
+        "_asset_name": "default_ui",
+        "_dependencies": []
     },
     "_file": "default_ui.hlsl",
     "_vs_entry": "VSMain",

@@ -125,7 +125,7 @@ namespace Ailu
 
         WString ToPlatformPath(const WString &sys_path)
         {
-#ifdef PLATFORM_WINDOWS
+#ifdef AL_PLATFORM_WINDOWS
             auto convertedPath = sys_path;
             // 使用循环替换所有的斜杠
             for (size_t i = 0; i < convertedPath.length(); ++i)
@@ -138,7 +138,7 @@ namespace Ailu
             return convertedPath;
 #else
             return sys_path;
-#endif// PLATFORM_WINDOWS
+#endif// AL_PLATFORM_WINDOWS
             return sys_path;
         }
         WString GetFileName(const std::wstring_view filePath, bool include_ext)

@@ -4,7 +4,11 @@
 
 #ifndef AILU_FRAMERESOURCE_H
 #define AILU_FRAMERESOURCE_H
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Common/NonCopyable.h"
+#include "Framework/Core/Containers/Vector.h"
+#include "Framework/Core/Containers/Map.h"
+#include "Framework/Core/Containers/Array.h"
 #include "Objects/Object.h"
 #include "Buffer.h"
 #include "Texture.h"
@@ -12,9 +16,8 @@
 
 namespace Ailu::Render
 {
-    class FrameResource : public Object
+    class FrameResource : public Object, public NonCopyable
     {
-        DISALLOW_COPY_AND_ASSIGN(FrameResource)
     public:
         FrameResource();
         ~FrameResource() override;

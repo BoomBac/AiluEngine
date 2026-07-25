@@ -3,6 +3,7 @@
 #define __D3DGFX_PIPELINE_STATE_H__
 #include <d3dx12.h>
 
+#include "Framework/Common/Hash.hpp"
 #include "Render/GraphicsPipelineStateObject.h"
 
 using Microsoft::WRL::ComPtr;

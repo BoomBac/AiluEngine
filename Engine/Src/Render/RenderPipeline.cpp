@@ -64,7 +64,10 @@ namespace Ailu::Render
     FramePacket::~FramePacket()
     {
         for (auto &it: _cam_cb)
-            DESTORY_PTR(it.second);
+        {
+            delete it.second;
+            it.second = nullptr;
+        }
     }
 #pragma endregion
 

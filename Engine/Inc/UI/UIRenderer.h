@@ -5,7 +5,11 @@
 #ifndef AILU_UIRENDERER_H
 #define AILU_UIRENDERER_H
 #include "Framework/Math/Transform2D.h"
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/String.h"
+#include "Framework/Core/Containers/Vector.h"
+#include "Framework/Core/Containers/Map.h"
+#include "Framework/Core/Containers/Array.h"
 #include "DrawerBlock.h"
 #include "Style/UIStyleBasic.h"
 #include "Style/UIStyles.h"

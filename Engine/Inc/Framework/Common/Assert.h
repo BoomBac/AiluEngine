@@ -5,11 +5,7 @@
 //https://github.com/TheRealMJP/DeferredTexturing/blob/849304047f1cca0f23fe9d0fd201758d77ed3c41/SampleFramework12/v1.01/Assert.h#L110
 #define POW2_ASSERTS_ENABLED
 
-#ifdef AILU_BUILD_DLL
-#define AILU_API __declspec(dllexport)
-#else
-#define AILU_API __declspec(dllimport)
-#endif
+#include "Framework/Platform/Api.h"
 
 namespace Ailu
 {

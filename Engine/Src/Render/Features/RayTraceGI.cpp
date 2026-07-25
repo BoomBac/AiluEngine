@@ -94,7 +94,7 @@ namespace Ailu
             // _kernel_ray_gen = cs->FindKernel("PrimaryRay");
             _kernel_ray_gen = cs->FindKernel("RayGen");
             _kernel_denoise = cs->FindKernel("Denoise");
-            _event = (ERenderPassEvent::ERenderPassEvent)(ERenderPassEvent::kAfterTransparent - 5);//before copy color
+            _event = static_cast<ERenderPassEvent>(static_cast<u16>(ERenderPassEvent::kAfterTransparent) - 5u);//before copy color
             _scene_rt_proxy = MakeScope<SceneRayTracingProxy>();
             _raygen_data.reset(ConstantBuffer::Create(sizeof(RayGenConstantBuffer), "RayTraceGI_RayGenData"));
             BufferDesc desc;

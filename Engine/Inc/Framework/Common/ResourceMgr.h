@@ -4,6 +4,7 @@
 #pragma once
 #ifndef __RESOURCE_MGR_H__
 #define __RESOURCE_MGR_H__
+#include "Framework/Common/NonCopyable.h"
 #include "FileManager.h"
 #include "Assets/Asset.h"
 #include "Framework/Common/Utils.h"
@@ -99,7 +100,7 @@ namespace Ailu
     using AssetPath = WString;
     using SystemPath = WString;
 
-    class AILU_API ResourceMgr
+    class AILU_API ResourceMgr : public NonCopyable
     {
     public:
         struct AssetMountDesc
@@ -157,7 +158,6 @@ namespace Ailu
         static WString NormalizeAssetPath(const WString &asset_path, EAssetDomain default_domain = EAssetDomain::kEngine);
         static EAssetDomain GetAssetPathDomain(const WString &asset_path, EAssetDomain default_domain = EAssetDomain::kEngine);
 
-        DISALLOW_COPY_AND_ASSIGN(ResourceMgr)
         ResourceMgr() = default;
         int Initialize();
         void Finalize();

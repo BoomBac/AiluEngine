@@ -2,6 +2,7 @@
 #ifndef __WIN_WINDOW_H__
 #define __WIN_WINDOW_H__
 #include "Framework/Common/Window.h"
+#include "Framework/Core/Containers/Array.h"
 namespace Ailu
 {
 	class AILU_API WinWindow : public Window

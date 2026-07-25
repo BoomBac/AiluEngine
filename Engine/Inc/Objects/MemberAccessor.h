@@ -1,7 +1,7 @@
 #ifndef __MEMBER_ACCESS_H__
 #define __MEMBER_ACCESS_H__
 #pragma once
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
 namespace Ailu
 {
     class IMemberAccessor

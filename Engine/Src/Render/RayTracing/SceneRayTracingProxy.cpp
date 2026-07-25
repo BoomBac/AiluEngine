@@ -1,5 +1,6 @@
 #include "Render/RayTracing/SceneRayTracingProxy.h"
 #include "Framework/Common/Profiler.h"
+#include "Framework/Math/MathHash.hpp"
 #include "Render/Mesh.h"
 #include "Render/Texture.h"
 #include "pch.h"
@@ -47,7 +48,7 @@ namespace Ailu::Render
             u16 _texture_width = 0u;
             u16 _texture_height = 0u;
             u64 _texture_hash = 0u;
-            EALGFormat::EALGFormat _texture_format = EALGFormat::kALGFormatUNKOWN;
+            EALGFormat _texture_format = EALGFormat::kALGFormatUNKOWN;
             Vector3f _emission = Vector3f::kZero;
 
             bool operator==(const EmissiveTriangleCacheKey &other) const

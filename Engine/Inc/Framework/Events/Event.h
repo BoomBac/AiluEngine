@@ -1,7 +1,8 @@
 #pragma once
 #ifndef __EVENT_H__
 #define __EVENT_H__
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/Containers/Vector.h"
 #include <functional>
 #include <mutex>
 #include <string>
@@ -36,11 +37,11 @@ namespace Ailu
     enum EEventCategory
     {
         kNone = 0,
-        kEventCategoryApplication = BIT(0),
-        kEventCategoryInput = BIT(1),
-        kEventCategoryKeyboard = BIT(2),
-        kEventCategoryMouse = BIT(3),
-        kEventCategoryMouseButton = BIT(4),
+        kEventCategoryApplication = 1 << 1,
+        kEventCategoryInput =       1 << 2,
+        kEventCategoryKeyboard =    1 << 3,
+        kEventCategoryMouse =       1 << 4,
+        kEventCategoryMouseButton = 1 << 5,
     };
 
 #define EVENT_CLASS_TYPE(type)                                                   \

@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __MESH_GEN_H__
 //Class Mesh begin...........................
-#define MESH_GEN_H_28_GENERATED_BODY \
+#define MESH_GEN_H_31_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_Mesh_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -21,7 +21,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::Mesh>();
 //Class Mesh end...........................
 
 //Class SkeletonMesh begin...........................
-#define MESH_GEN_H_178_GENERATED_BODY \
+#define MESH_GEN_H_181_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_SkeletonMesh_Type();\
                                 static const Type* GetPrivateStaticClass();\

@@ -12,6 +12,7 @@
                             public:\
                                 static const Type *StaticType() {return GetPrivateStaticClass();};\
                                 virtual const Type  *GetType() override;
+#define ASSETBROWSER_GEN_H_34_GENERATED_BODY ASSETBROWSER_GEN_H_33_GENERATED_BODY
                             namespace Ailu {class Type;}
 namespace Ailu::Editor{
 class AssetBrowser ;

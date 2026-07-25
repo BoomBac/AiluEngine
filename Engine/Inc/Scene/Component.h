@@ -1,11 +1,15 @@
 #pragma once
 #ifndef __COMPONENT_H__
 #define __COMPONENT_H__
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/String.h"
+#include "Framework/Core/Containers/Vector.h"
+#include "Framework/Core/Containers/Array.h"
 
 #include "Animation/BlendSpace.h"
 #include "Animation/Clip.h"
-#include "Entity.hpp"
+#include "Entity.h"
+#include "Framework/Math/Guid.h"
 #include "Framework/Math/Transform.h"
 #include "Objects/Serialize.h"
 #include "Objects/Type.h"
@@ -47,6 +51,57 @@ namespace Ailu
     */
     namespace ECS
     {
+        using StableComponentTypeId = u64;
+        struct ComponentTypeInfo
+        {
+            ComponentTypeId _runtime_id;
+            String _stable_name;
+        };
+
+        inline ComponentTypeId AllocateComponentTypeId()
+        {
+            static std::atomic<ComponentTypeId> s_next_type_id = 0;
+            return s_next_type_id.fetch_add(1, std::memory_order_relaxed);
+        }
+
+        template<typename T>
+        ComponentTypeId GetComponentTypeId()
+        {
+            static const ComponentTypeId kTypeId = AllocateComponentTypeId();
+            return kTypeId;
+        }
+
+        constexpr u64 HashString(std::string_view value)
+        {
+            u64 hash = 14695981039346656037ull;
+
+            for (char ch : value)
+            {
+                hash ^= static_cast<u8>(ch);
+                hash *= 1099511628211ull;
+            }
+
+            return hash;
+        }
+
+
+#define DECLARE_COMPONENT(name, stable_name)                            \
+public:                                                                 \
+    static ComponentTypeId StaticComponentTypeId()                      \
+    {                                                                   \
+        return GetComponentTypeId<name>();                              \
+    }                                                                   \
+                                                                        \
+    static constexpr StableComponentTypeId StaticStableTypeId()         \
+    {                                                                   \
+        return HashString(stable_name);                                 \
+    }                                                                   \
+                                                                        \
+    static constexpr std::string_view StaticTypeName()                  \
+    {                                                                   \
+        return stable_name;                                             \
+    }
+
         AENUM()
         enum class EMotionVectorType
         {
@@ -56,16 +111,27 @@ namespace Ailu
         };
         struct AILU_API TagComponent
         {
-            DECLARE_CLASS(TagComponent)
+            DECLARE_COMPONENT(TagComponent, "Ailu.ECS.TagComponent")
             String _name;
             u32 _layer_mask;
         };
         Archive &operator<<(Archive &ar, const TagComponent &c);
         Archive &operator>>(Archive &ar, TagComponent &c);
 
+        struct AILU_API PersistentIdComponent
+        {
+            DECLARE_COMPONENT(PersistentIdComponent, "Ailu.ECS.PersistentIdComponent")
+            Guid _guid;
+
+            PersistentIdComponent() : _guid(Guid::Generate()) {}
+            explicit PersistentIdComponent(Guid guid) : _guid(std::move(guid)) {}
+        };
+        Archive &operator<<(Archive &ar, const PersistentIdComponent &c);
+        Archive &operator>>(Archive &ar, PersistentIdComponent &c);
+
         struct AILU_API TransformComponent
         {
-            DECLARE_CLASS(TransformComponent)
+            DECLARE_COMPONENT(TransformComponent, "Ailu.ECS.TransformComponent")
             inline static u64 kInvalidVersion = std::numeric_limits<u64>::max();
             Transform _local_transform;
 
@@ -167,7 +233,7 @@ namespace Ailu
 
         struct AILU_API ScriptComponent
         {
-            DECLARE_CLASS(ScriptComponent)
+            DECLARE_COMPONENT(ScriptComponent, "Ailu.ECS.ScriptComponent")
             String _script_path;
             bool _is_initialized = false;
             String _resolved_script_path;
@@ -232,14 +298,23 @@ namespace Ailu
         Archive &operator<<(Archive &ar, const ShadowData &c);
         Archive &operator>>(Archive &ar, ShadowData &c);
 
-        DECLARE_ENUM(ELightType, kDirectional, kPoint, kSpot, kArea)
+        AENUM()
+        enum class ELightType
+        {
+            kDirectional,
+            kPoint,
+            kSpot,
+            kArea
+        };
+        const String &LightTypeToString(ELightType type);
+        ELightType LightTypeFromString(const String &str);
         struct AILU_API LightComponent
         {
-            DECLARE_CLASS(LightComponent)
+            DECLARE_COMPONENT(LightComponent, "Ailu.ECS.LightComponent")
             inline const static Vector3f kDefaultDirectionalLightDir = Vector3f(0.0f, -1.0f, 0.0f);
             LightData _light;
             ShadowData _shadow;
-            ELightType::ELightType _type;
+            ELightType _type;
             Array<Camera, 6> _shadow_cameras;
             Array<Vector4f, 4> _cascade_shadow_data;
         };
@@ -249,7 +324,7 @@ namespace Ailu
 
         struct AILU_API CCamera
         {
-            DECLARE_CLASS(CCamera)
+            DECLARE_COMPONENT(CCamera, "Ailu.ECS.CCamera")
             Camera _camera;
         };
         Archive &operator<<(Archive &ar, const CCamera &c);
@@ -257,7 +332,7 @@ namespace Ailu
 
         struct AILU_API StaticMeshComponent
         {
-            DECLARE_CLASS(StaticMeshComponent)
+            DECLARE_COMPONENT(StaticMeshComponent, "Ailu.ECS.StaticMeshComponent")
             Ref<Mesh> _p_mesh;
             Vector<Ref<Material>> _p_mats;
             Vector<AABB> _transformed_aabbs;
@@ -269,7 +344,7 @@ namespace Ailu
 
         struct AILU_API CSkeletonMesh
         {
-            DECLARE_CLASS(CSkeletonMesh)
+            DECLARE_COMPONENT(CSkeletonMesh, "Ailu.ECS.CSkeletonMesh")
             Ref<SkeletonMesh> _p_mesh;
             Vector<Ref<Material>> _p_mats;
             Vector<AABB> _transformed_aabbs;
@@ -288,7 +363,7 @@ namespace Ailu
 
         struct AILU_API CHierarchy
         {
-            DECLARE_CLASS(CHierarchy)
+            DECLARE_COMPONENT(CHierarchy, "Ailu.ECS.CHierarchy")
             ECS::Entity _first_child = ECS::kInvalidEntity;
             ECS::Entity _prev_sibling = ECS::kInvalidEntity;
             ECS::Entity _next_sibling = ECS::kInvalidEntity;
@@ -301,7 +376,7 @@ namespace Ailu
 
         struct AILU_API CLightProbe
         {
-            DECLARE_CLASS(CLightProbe)
+            DECLARE_COMPONENT(CLightProbe, "Ailu.ECS.CLightProbe")
             f32 _size = 10.0f;
             bool _is_update_every_tick = false;
             bool _is_dirty = true;
@@ -317,7 +392,7 @@ namespace Ailu
 
         struct CRigidBody
         {
-            DECLARE_CLASS(CRigidBody)
+            DECLARE_COMPONENT(CRigidBody, "Ailu.ECS.CRigidBody")
             f32 _mass = 1.f;
             Vector3f _velocity;
             Vector3f _force;
@@ -328,11 +403,19 @@ namespace Ailu
         Archive &operator<<(Archive &ar, const CRigidBody &c);
         Archive &operator>>(Archive &ar, CRigidBody &c);
 
-        DECLARE_ENUM(EColliderType, kBox, kSphere, kCapsule)
+        AENUM()
+        enum class EColliderType
+        {
+            kBox,
+            kSphere,
+            kCapsule
+        };
+        const String &ColliderTypeToString(EColliderType type);
+        EColliderType ColliderTypeFromString(const String &str);
         struct CCollider
         {
-            DECLARE_CLASS(CCollider)
-            EColliderType::EColliderType _type = EColliderType::kBox;
+            DECLARE_COMPONENT(CCollider, "Ailu.ECS.CCollider")
+            EColliderType _type = EColliderType::kBox;
             bool _is_trigger = true;
             Vector3f _center = Vector3f::kZero;
             /*
@@ -350,7 +433,7 @@ namespace Ailu
 
         struct CVXGI
         {
-            DECLARE_CLASS(CVXGI)
+            DECLARE_COMPONENT(CVXGI, "Ailu.ECS.CVXGI")
             Vector3Int _grid_num = Vector3Int(64, 64, 64);
             f32 _distance = 20.0f;
             //runtime prop
@@ -370,7 +453,7 @@ namespace Ailu
 
         struct AILU_API SpriteRendererComponent
         {
-            DECLARE_CLASS(SpriteRendererComponent)
+            DECLARE_COMPONENT(SpriteRendererComponent, "Ailu.ECS.SpriteRendererComponent")
 
             Render::Sprite* _sprite = nullptr;
             Ref<Render::Material> _material;

@@ -17,7 +17,7 @@ namespace std
     template<>
     struct hash<Ailu::Render::RDG::RGHandle>
     {
-        u64 operator()(const Ailu::Render::RDG::RGHandle &handle) const
+        std::size_t operator()(const Ailu::Render::RDG::RGHandle &handle) const
         {
             return handle._id ^ handle._version;
         }

@@ -1,7 +1,8 @@
 #pragma once
 #ifndef __GUID_H__
 #define __GUID_H__
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/String.h"
 #include <string>
 
 namespace Ailu

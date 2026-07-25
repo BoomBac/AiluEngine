@@ -4,14 +4,14 @@
 #pragma once
 #ifndef __LAYER_H__
 #define __LAYER_H__
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Common/NonCopyable.h"
 #include "Framework/Events/Event.h"
 namespace Ailu
 {
-	class AILU_API Layer
+	class AILU_API Layer : public NonCopyable
 	{
 	public:
-		DISALLOW_COPY_AND_ASSIGN(Layer)
 		Layer(const std::string& name = "Layer");
 		virtual ~Layer();
 		virtual void OnAttach() {}

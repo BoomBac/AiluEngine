@@ -1,7 +1,10 @@
 #pragma once
 #ifndef __DESCRIPTOR_MGR__
 #define __DESCRIPTOR_MGR__
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/Containers/Vector.h"
+#include "Framework/Core/Containers/Map.h"
+#include "Framework/Core/Containers/Queue.h"
 #include <d3dx12.h>
 #include <mutex>
 /*

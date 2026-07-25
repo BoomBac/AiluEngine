@@ -1,6 +1,10 @@
 #ifndef __FILE_WATCHER_H__
 #define __FILE_WATCHER_H__
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/String.h"
+#include "Framework/Core/Containers/Vector.h"
+#include "Framework/Core/Containers/Map.h"
+#include <filesystem>
 #include <functional>
 #include <set>
 
@@ -24,20 +28,20 @@ namespace Ailu
     class AILU_API FileWatchService
     {
     public:
-        void AddDirectory(const fs::path &path);
-        void AddFile(const fs::path &path);
+        void AddDirectory(const std::filesystem::path &path);
+        void AddFile(const std::filesystem::path &path);
         void Clear();
         void Snapshot();
         Vector<FileChangeEvent> PollChanges();
 
     private:
-        void CollectWatchedFiles(std::set<fs::path> &out_files) const;
-        static WString NormalizePath(const fs::path &path);
+        void CollectWatchedFiles(std::set<std::filesystem::path> &out_files) const;
+        static WString NormalizePath(const std::filesystem::path &path);
 
     private:
-        Vector<fs::path> _directories;
-        Vector<fs::path> _files;
-        HashMap<fs::path, fs::file_time_type> _known_files;
+        Vector<std::filesystem::path> _directories;
+        Vector<std::filesystem::path> _files;
+        HashMap<std::filesystem::path, std::filesystem::file_time_type> _known_files;
         bool _has_snapshot = false;
     };
 
@@ -55,7 +59,7 @@ namespace Ailu
         u16 ReloadRayTracingShaderDependencies(const WString &sys_path) const;
         u16 ReloadTextureDependencies(const WString &sys_path) const;
         bool ReloadConfig(const WString &sys_path) const;
-        bool ReloadScript(const fs::path &sys_path) const;
+        bool ReloadScript(const std::filesystem::path &sys_path) const;
 
     private:
         static bool HasExtension(const WString &path, std::initializer_list<WStringView> exts);
@@ -78,7 +82,7 @@ namespace Ailu
 
     private:
         static WString NormalizePath(const WString &path);
-        static WString NormalizeExtension(const fs::path &path);
+        static WString NormalizeExtension(const std::filesystem::path &path);
 
     private:
         ResourceReloadService *_reload_service = nullptr;

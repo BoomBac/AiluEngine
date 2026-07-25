@@ -10,7 +10,9 @@
 #include "Framework/Common/Log.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Framework/Common/Utils.h"
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/Containers/Vector.h"
+#include "Framework/Common/Assert.h"
 #include "RHI/DX12/D3DShaderCompiler.h"
 #include "RHI/DX12/dxhelper.h"
 

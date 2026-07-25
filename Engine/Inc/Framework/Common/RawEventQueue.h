@@ -1,6 +1,8 @@
 #ifndef __RAW_EVENT_QUEUE_H__
 #define __RAW_EVENT_QUEUE_H__
 #include "Container.hpp"
+#include "Framework/Core/Containers/Vector.h"
+#include "Framework/Core/String.h"
 
 namespace Ailu
 {

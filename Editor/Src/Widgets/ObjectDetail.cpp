@@ -607,7 +607,7 @@ namespace Ailu
                         auto light_type_dropdown = AddDropdownRow(content, "Type", items);
                         light_type_dropdown->SetSelectedIndex(static_cast<i32>(comp->_type));
                         light_type_dropdown->_on_selected_changed += [comp](i32 idx){
-                            comp->_type = static_cast<ECS::ELightType::ELightType>(idx);
+                            comp->_type = static_cast<ECS::ELightType>(idx);
                         };
                         {
                             AddFloatSliderRow(content, "Intensity", 0.0f, 100.0f, comp->_light._light_color.a, [=](f32 value)

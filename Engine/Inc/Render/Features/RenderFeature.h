@@ -1,6 +1,7 @@
 #pragma once
 #ifndef __RENDER_PASS__
 #define __RENDER_PASS__
+#include "Framework/Common/NonCopyable.h"
 #include "Objects/Object.h"
 #include "Render/GraphicsContext.h"
 #include "Render/Material.h"
@@ -13,9 +14,26 @@ namespace Ailu
 {
     namespace Render
     {
-        DECLARE_ENUM(ERenderPassEvent, KBeforeRender = 0, kBeforeShaodwMap = 50, kAfterShadowMap = 100,
-                     kBeforeGbuffer = 150, kAfterGbuffer = 200, kBeforeDeferedLighting = 250, kAfterDeferedLighting = 300, kBeforeSkybox = 350, kAfterSkybox = 400,
-                     kBeforeTransparent = 450, kBeforeSprite = 460, kAfterSprite = 490, kAfterTransparent = 500, kBeforePostprocess = 550, kAfterPostprocess = 600, kAfterRender = 650)
+        AENUM()
+        enum class ERenderPassEvent : u16
+        {
+            KBeforeRender = 0,
+            kBeforeShaodwMap = 50,
+            kAfterShadowMap = 100,
+            kBeforeGbuffer = 150,
+            kAfterGbuffer = 200,
+            kBeforeDeferedLighting = 250,
+            kAfterDeferedLighting = 300,
+            kBeforeSkybox = 350,
+            kAfterSkybox = 400,
+            kBeforeTransparent = 450,
+            kBeforeSprite = 460,
+            kAfterSprite = 490,
+            kAfterTransparent = 500,
+            kBeforePostprocess = 550,
+            kAfterPostprocess = 600,
+            kAfterRender = 650
+        };
         class AILU_API IRenderPass
         {
         public:
@@ -33,10 +51,9 @@ namespace Ailu
             virtual const void SetActive(bool is_active) = 0;
         };
         ACLASS()
-        class AILU_API RenderPass : public Object,public IRenderPass
+        class AILU_API RenderPass : public Object, public IRenderPass, public NonCopyable
         {
             GENERATED_BODY();
-            DISALLOW_COPY_AND_ASSIGN(RenderPass)
         public:
             RenderPass() : Object(), _is_active(true) {};
             RenderPass(const String &name) : Object(name), _is_active(true) {};
@@ -50,7 +67,7 @@ namespace Ailu
             virtual const String &GetName() const final { return _name; };
             virtual const bool IsActive() const final { return _is_active; };
             virtual const void SetActive(bool is_active) final { _is_active = is_active; };
-            ERenderPassEvent::ERenderPassEvent _event = ERenderPassEvent::KBeforeRender;
+            ERenderPassEvent _event = ERenderPassEvent::KBeforeRender;
             bool operator<(const RenderPass &other) const { return _event < other._event; }
 
         protected:
@@ -58,9 +75,8 @@ namespace Ailu
         };
 
         class Renderer;
-        class AILU_API RenderFeature : public Object
+        class AILU_API RenderFeature : public Object, public NonCopyable
         {
-            DISALLOW_COPY_AND_ASSIGN(RenderFeature)
         public:
             RenderFeature(const String &name): Object(name){};
             ~RenderFeature() {};

@@ -1,11 +1,14 @@
 #pragma once
 #ifndef __PATH_H__
 #define __PATH_H__
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/String.h"
 #include <filesystem>
 
 namespace Ailu
 {
+    using Path = std::filesystem::path;
+
     namespace EnginePath
     {
         static const String kEngineShaderPath = "Shaders/";

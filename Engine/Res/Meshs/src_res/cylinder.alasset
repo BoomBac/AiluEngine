@@ -3,7 +3,8 @@
         "_format_version": 1,
         "_guid": "0b247b0b-22b8-47e4-b69b-21e2f73133af",
         "_asset_type": "Ailu::Render::Mesh",
-        "_asset_name": "Cylinder"
+        "_asset_name": "cylinder",
+        "_dependencies": []
     },
     "_file": "cylinder.fbx",
     "_inner_file_name": "Cylinder",

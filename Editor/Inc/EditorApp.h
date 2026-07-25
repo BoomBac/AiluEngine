@@ -4,12 +4,25 @@
 
 #include "Framework/Common/Application.h"
 #include "Framework/Common/FileWatcher.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/String.h"
+#include "Framework/Core/Containers/Vector.h"
+#include "Framework/Math/Vector.hpp"
 #include "Widgets/EditorLayer.h"
 #include "generated/EditorApp.gen.h"
+#include <filesystem>
 
 namespace Ailu
 {
-    class Render::Camera;
+    using Math::Vector2f;
+    using Math::Vector2UInt;
+    using Math::Vector3f;
+    using Math::Vector4f;
+
+    namespace Render
+    {
+        class Camera;
+    }
     namespace Editor
     {
         ASTRUCT()
@@ -65,7 +78,7 @@ namespace Ailu
         class FirstPersonCameraController;
         class EditorApp : public Ailu::Application
         {
-            DECLARE_DELEGATE(on_file_changed, const fs::path &);
+            DECLARE_DELEGATE(on_file_changed, const std::filesystem::path &);
 
         public:
             static EditorApp *GetEditor() { return static_cast<EditorApp *>(&Application::Get()); }

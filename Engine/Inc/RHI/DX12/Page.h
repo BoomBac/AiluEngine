@@ -5,14 +5,16 @@
 #ifndef AILU_PAGE_H
 #define AILU_PAGE_H
 
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Common/NonCopyable.h"
+#include "Framework/Core/Containers/Queue.h"
+#include <map>
 
 namespace Ailu::RHI::DX12
 {
-    class Page
+    class Page : public NonCopyable
     {
     public:
-        DISALLOW_COPY_AND_ASSIGN(Page)
         Page(u16 id, u64 size);
         Page(Page&& other) noexcept;
         i64 Allocate(u64 size);

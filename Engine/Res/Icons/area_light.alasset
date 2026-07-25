@@ -3,7 +3,8 @@
         "_format_version": 1,
         "_guid": "1b5c8e8f-c721-4c6a-b678-59ec49f4ebae",
         "_asset_type": "Ailu::Render::Texture2D",
-        "_asset_name": "area_light"
+        "_asset_name": "area_light",
+        "_dependencies": []
     },
     "_file": "area_light.png",
     "_is_srgb": true

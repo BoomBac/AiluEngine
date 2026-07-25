@@ -3,10 +3,11 @@
         "_format_version": 1,
         "_guid": "6abca545-d271-4c76-b214-913472735574",
         "_asset_type": "Ailu::SceneManagement::Scene",
-        "_asset_name": "empty_scene"
+        "_asset_name": "empty_scene",
+        "_dependencies": []
     },
     "_entities": [{
-            "_entity_id": 1,
+            "_entity_id": 4294967297,
             "_tag_component": {
                 "_name": "cube",
                 "_layer_mask": 1
@@ -29,7 +30,7 @@
                 "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0"
             }
         }, {
-            "_entity_id": 2,
+            "_entity_id": 4294967298,
             "_tag_component": {
                 "_name": "directional_light",
                 "_layer_mask": 1
@@ -61,7 +62,7 @@
                 "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0"
             }
         }, {
-            "_entity_id": 3,
+            "_entity_id": 4294967299,
             "_tag_component": {
                 "_name": "new_object_3",
                 "_layer_mask": 0
@@ -84,7 +85,7 @@
                 "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0"
             }
         }, {
-            "_entity_id": 4,
+            "_entity_id": 4294967300,
             "_tag_component": {
                 "_name": "LightProbe_4",
                 "_layer_mask": 1
@@ -107,7 +108,7 @@
                 "_is_update_every_tick": false
             }
         }, {
-            "_entity_id": 5,
+            "_entity_id": 4294967301,
             "_tag_component": {
                 "_name": "spot_light_7",
                 "_layer_mask": 1
@@ -139,7 +140,7 @@
                 "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0"
             }
         }, {
-            "_entity_id": 6,
+            "_entity_id": 4294967302,
             "_tag_component": {
                 "_name": "new_object_10",
                 "_layer_mask": 1
@@ -171,7 +172,7 @@
                 "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0"
             }
         }, {
-            "_entity_id": 7,
+            "_entity_id": 4294967303,
             "_tag_component": {
                 "_name": "sprite_test",
                 "_layer_mask": 1

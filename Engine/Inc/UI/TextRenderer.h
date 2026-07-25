@@ -3,7 +3,8 @@
 //
 #ifndef __TEXTRENDERER_H__
 #define __TEXTRENDERER_H__
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/String.h"
 #include "DrawerBlock.h"
 #include "Render/Font.h"
 

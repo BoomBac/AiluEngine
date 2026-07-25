@@ -4,6 +4,7 @@
 #pragma warning(disable:4251)
 
 //#include <Windows.h>
+#include <chrono>
 #include <format>
 #include <sstream>
 #include <string>
@@ -13,7 +14,6 @@
 #include <string>
 #include <type_traits>
 
-#include "Framework/Interface/IRuntimeModule.h"
 #include "Utils.h"
 #include <source_location>
 
@@ -161,7 +161,7 @@ namespace Ailu
     {
     public:
         //static const const String&& GetLogPath() { return s_out_path; }
-        inline static const String &s_out_path = GET_ENGINE_FULL_PATH(log.txt);
+        inline static const String &s_out_path = "FileAppender_log.txt";
         void Print(const LogMessage &log_msg) override
         {
             std::wofstream out(s_out_path, std::ios_base::app);
@@ -183,7 +183,7 @@ namespace Ailu
     };
 
 
-    class AILU_API LogMgr : public IRuntimeModule
+    class AILU_API LogMgr
     {
     public:
         static void Init();
@@ -191,9 +191,8 @@ namespace Ailu
         static LogMgr& Get();
         LogMgr();
         LogMgr(std::string name, ELogLevel output_level = kLogLevel, TraceLevle output_mark = kTraceLevel);
-        int Initialize() override;
-        void Finalize() override;
-        void Tick(f32 delta_time) override;
+        int Initialize();
+        void Finalize();
         void AddAppender(IAppender *appender);
         void SetOutputLevel(ELogLevel level);
         void SetTraceLevel(TraceLevle trace);

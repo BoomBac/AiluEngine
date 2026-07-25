@@ -1,5 +1,6 @@
 #ifndef __UI_LAYER_H__
 #define __UI_LAYER_H__
+#include "Framework/Core/String.h"
 #include "Framework/Events/Layer.h"
 namespace Ailu
 {

@@ -3,7 +3,8 @@
         "_format_version": 1,
         "_guid": "14af7970-dcc5-461f-af8c-9940c52e4766",
         "_asset_type": "Ailu::Render::ComputeShader",
-        "_asset_name": "voxelize"
+        "_asset_name": "voxelize",
+        "_dependencies": []
     },
     "_file": "voxelize.hlsl",
     "_kernel": "Noname"

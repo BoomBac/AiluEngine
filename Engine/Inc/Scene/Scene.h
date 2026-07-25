@@ -3,9 +3,10 @@
 #define __SCENE_H__
 #include <unordered_set>
 #include "Component.h"
-#include "Entity.hpp"
+#include "Entity.h"
 #include "Framework/Math/Geometry.h"
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Common/NonCopyable.h"
 #include "Objects/Serialize.h"
 #include "generated/Scene.gen.h"
 
@@ -54,13 +55,11 @@ namespace Ailu
         };
 
         ACLASS()
-        class AILU_API Scene final : public Object, public IPersistentable
+        class AILU_API Scene final : public Object
         {
             GENERATED_BODY()
             friend class SceneMgr;
         public:
-            void Serialize(Archive &arch) final;
-            void Deserialize(Archive &arch) final;
             Scene() = default;
             explicit Scene(const String &name);
             ECS::Entity AddObject(String name = "");
@@ -156,14 +155,13 @@ namespace Ailu
             Vector<BVHNode> _tlas_nodes;
         };
 
-        class AILU_API SceneMgr
+        class AILU_API SceneMgr : public NonCopyable
         {
         public:
             static SceneMgr& Get();
             static void Init();
             static void Shutdown();
         public:
-            DISALLOW_COPY_AND_ASSIGN(SceneMgr)
             SceneMgr();
             ~SceneMgr();
             void Tick(f32 delta_time);

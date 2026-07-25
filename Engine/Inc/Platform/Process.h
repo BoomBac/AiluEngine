@@ -2,7 +2,8 @@
 #ifndef __PROCESS_H__
 #define __PROCESS_H__
 
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/String.h"
 
 namespace Ailu
 {

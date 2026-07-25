@@ -3,7 +3,8 @@
         "_format_version": 1,
         "_guid": "324335bf-8def-4583-911a-047863b48455",
         "_asset_type": "Ailu::Render::Shader",
-        "_asset_name": "voxel_drawer"
+        "_asset_name": "voxel_drawer",
+        "_dependencies": []
     },
     "_file": "voxel_drawer.hlsl",
     "_vs_entry": "ForwardVSMain",

@@ -3,6 +3,7 @@
 #pragma once
 #ifndef __IMGUI_LAYER_H__
 #define __IMGUI_LAYER_H__
+#include "Framework/Core/String.h"
 #include "Framework/Events/Layer.h"
 
 namespace Ailu

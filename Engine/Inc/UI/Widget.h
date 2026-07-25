@@ -79,7 +79,7 @@ namespace Ailu
             EVisibility _visibility = EVisibility::kVisible;
         private:
             bool DispatchEvent(UIEvent& e);
-            FORCEINLINE void ResetClickState()
+            AL_FORCE_INLINE void ResetClickState()
             {
                 _last_click_target = nullptr;
                 _last_click_button = -1;

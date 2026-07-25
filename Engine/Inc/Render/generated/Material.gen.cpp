@@ -78,3 +78,53 @@ return Ailu::Render::StandardMaterial::StaticType();
 return Ailu::Render::StandardMaterial::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_StandardMaterial(&Ailu::Render::StandardMaterial::StaticType, "Ailu::Render::StandardMaterial");
+static std::unique_ptr<Ailu::Enum> s_enum_type_EMaterialID = nullptr;
+//Enum EMaterialID begin...........................
+const Ailu::Enum* Z_Construct_Enum_EMaterialID_Type()
+{
+if(s_enum_type_EMaterialID == nullptr)
+{
+EnumInitializer initializer;
+initializer._name = "EMaterialID";
+initializer._namespace = "Ailu::Render";
+initializer._full_name = "Ailu::Render::EMaterialID";
+initializer._str_to_enum_lut["kStandard"] = 0;
+initializer._str_to_enum_lut["kSubsurface"] = 1;
+initializer._str_to_enum_lut["kChecker"] = 2;
+s_enum_type_EMaterialID = std::make_unique<Ailu::Enum>(initializer);
+Ailu::Enum::RegisterEnum(s_enum_type_EMaterialID.get());
+}
+return s_enum_type_EMaterialID.get();
+}
+static Ailu::EnumTypeRegister g_register_EMaterialID(Z_Construct_Enum_EMaterialID_Type);
+template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::EMaterialID>()
+{
+return s_enum_type_EMaterialID.get();
+}
+//Enum EMaterialID end...........................
+
+static std::unique_ptr<Ailu::Enum> s_enum_type_ESurfaceType = nullptr;
+//Enum ESurfaceType begin...........................
+const Ailu::Enum* Z_Construct_Enum_ESurfaceType_Type()
+{
+if(s_enum_type_ESurfaceType == nullptr)
+{
+EnumInitializer initializer;
+initializer._name = "ESurfaceType";
+initializer._namespace = "Ailu::Render";
+initializer._full_name = "Ailu::Render::ESurfaceType";
+initializer._str_to_enum_lut["kOpaque"] = 0;
+initializer._str_to_enum_lut["kTransparent"] = 1;
+initializer._str_to_enum_lut["kAlphaTest"] = 2;
+s_enum_type_ESurfaceType = std::make_unique<Ailu::Enum>(initializer);
+Ailu::Enum::RegisterEnum(s_enum_type_ESurfaceType.get());
+}
+return s_enum_type_ESurfaceType.get();
+}
+static Ailu::EnumTypeRegister g_register_ESurfaceType(Z_Construct_Enum_ESurfaceType_Type);
+template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::ESurfaceType>()
+{
+return s_enum_type_ESurfaceType.get();
+}
+//Enum ESurfaceType end...........................
+

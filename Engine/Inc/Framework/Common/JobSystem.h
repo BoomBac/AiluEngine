@@ -5,7 +5,13 @@
 #ifndef AILU_JOBSYSTEM_H
 #define AILU_JOBSYSTEM_H
 
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Common/NonCopyable.h"
+#include "Framework/Core/String.h"
+#include "Framework/Core/Containers/Vector.h"
+#include "Framework/Core/Containers/Queue.h"
+#include "Framework/Core/Containers/Map.h"
+#include "Framework/Core/Containers/Array.h"
 #include <future>
 #include <set>
 namespace Ailu
@@ -83,10 +89,9 @@ namespace Ailu
         bool operator<(const JobHandle &other) const { return _job_index < other._job_index; }
     };
 
-    class AILU_API WaitHandle
+    class AILU_API WaitHandle : public NonCopyable
     {
     public:
-        DISALLOW_COPY_AND_ASSIGN(WaitHandle)
         explicit WaitHandle(Ref<std::future<void>> future)
             : _future(std::move(future))
         {

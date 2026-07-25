@@ -3,7 +3,8 @@
         "_format_version": 1,
         "_guid": "21ed1f88-ac3b-404c-a296-b16784617df7",
         "_asset_type": "Ailu::Render::ComputeShader",
-        "_asset_name": "cs_mipmap_gen"
+        "_asset_name": "cs_mipmap_gen",
+        "_dependencies": []
     },
     "_file": "cs_mipmap_gen.alcp",
     "_kernel": "Noname"

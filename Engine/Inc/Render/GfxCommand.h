@@ -5,7 +5,9 @@
 #include "Framework/Common/Container.hpp"
 #include "Framework/Common/Log.h"
 #include "Framework/Math/ALMath.hpp"
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/String.h"
+#include "Framework/Core/Containers/Array.h"
 #include "GpuResource.h"
 #include "RenderConstants.h"
 #include <cstddef>
@@ -92,9 +94,9 @@ namespace Ailu::Render
     };
     enum EClearFlag
     {
-        kColor = BIT(0),
-        kDepth = BIT(1),
-        kStencil = BIT(2),
+        kColor = 1 << 0,
+        kDepth = 1 << 1,
+        kStencil = 1 << 2,
         kAll = kColor | kDepth | kStencil
     };
     struct CommandClearTarget : public TypedGfxCommand<EGpuCommandType::kClearTarget>
@@ -153,7 +155,7 @@ namespace Ailu::Render
         UploadParams *_params;
         ~CommandGpuResourceUpload()
         {
-            DESTORY_PTR(_params);
+            delete _params; _params = nullptr;
         }
         void Reset() {
             SafeResetCommand(this);

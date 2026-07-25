@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __RENDERFEATURE_GEN_H__
 //Class RenderPass begin...........................
-#define RENDERFEATURE_GEN_H_38_GENERATED_BODY \
+#define RENDERFEATURE_GEN_H_56_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_RenderPass_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -19,6 +19,15 @@ class RenderPass ;
 template<>
 AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::RenderPass>();
 //Class RenderPass end...........................
+
+//Enum ERenderPassEvent begin...........................
+const Ailu::Enum* Z_Construct_Enum_ERenderPassEvent_Type();
+namespace Ailu::Render { 
+enum class ERenderPassEvent : u16;
+}
+template<>
+AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::ERenderPassEvent>();
+//Enum ERenderPassEvent end...........................
 
 #undef CURRENT_FILE_ID
 #define CURRENT_FILE_ID RENDERFEATURE_GEN_H

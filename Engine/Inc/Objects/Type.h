@@ -4,6 +4,9 @@
 
 #ifndef AILU_TYPE_H
 #define AILU_TYPE_H
+#include "Framework/Common/NonCopyable.h"
+#include "Framework/Core/Containers/Vector.h"
+#include "Framework/Core/Containers/Queue.h"
 #include "Object.h"
 #include "ReflectTemplate.h"
 #include "generated/Type.gen.h"
@@ -171,10 +174,9 @@ namespace Ailu
 
     class PropertyInfo;
     class Object;
-    class AILU_API PropertyObserverHandle
+    class AILU_API PropertyObserverHandle : public NonCopyable
     {
     public:
-        DISALLOW_COPY_AND_ASSIGN(PropertyObserverHandle)
         PropertyObserverHandle() : _prop(nullptr), _inst(nullptr) {}
         PropertyObserverHandle(PropertyInfo* prop, void* inst)
             : _prop(prop), _inst(inst) {}
@@ -585,11 +587,12 @@ namespace Ailu
     DECLARE_STATIC_TYPE(String)
 
 
-    class AILU_API ClassTypeRegister{
-        public:
+    class AILU_API ClassTypeRegister
+    {
+    public:
         ClassTypeRegister(Type::RegisterFunc func, const String &name)
         {
-                Type::s_global_register[name] = func;
+            Type::s_global_register[name] = func;
         }
     };
 
@@ -662,13 +665,14 @@ namespace Ailu
         static const Enum *StaticType() { return nullptr; }
     };
 
-    class AILU_API EnumTypeRegister{
-        public:
-                EnumTypeRegister(Enum::RegisterFunc fn){
-                        Enum::s_registers.push(fn);
-}// namespace Ailu
-}
-;
+    class AILU_API EnumTypeRegister
+    {
+    public:
+        EnumTypeRegister(Enum::RegisterFunc fn)
+        {
+            Enum::s_registers.push(fn);
+        }
+    };
 }// namespace Ailu
 
 

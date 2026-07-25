@@ -12,6 +12,9 @@
                             public:\
                                 static const Type *StaticType() {return GetPrivateStaticClass();};\
                                 const Type  *GetType();
+#define EDITORAPP_GEN_H_19_GENERATED_BODY EDITORAPP_GEN_H_18_GENERATED_BODY
+#define EDITORAPP_GEN_H_26_GENERATED_BODY EDITORAPP_GEN_H_18_GENERATED_BODY
+#define EDITORAPP_GEN_H_31_GENERATED_BODY EDITORAPP_GEN_H_18_GENERATED_BODY
                             namespace Ailu {class Type;}
 namespace Ailu::Editor{
 struct EditorConfig ;
@@ -28,6 +31,9 @@ const class Ailu::Type* Ailu::StaticClass<struct Ailu::Editor::EditorConfig>();
                             public:\
                                 static const Type *StaticType() {return GetPrivateStaticClass();};\
                                 const Type  *GetType();
+#define EDITORAPP_GEN_H_47_GENERATED_BODY EDITORAPP_GEN_H_46_GENERATED_BODY
+#define EDITORAPP_GEN_H_54_GENERATED_BODY EDITORAPP_GEN_H_46_GENERATED_BODY
+#define EDITORAPP_GEN_H_59_GENERATED_BODY EDITORAPP_GEN_H_46_GENERATED_BODY
                             namespace Ailu {class Type;}
 namespace Ailu::Editor{
 struct TestObj ;

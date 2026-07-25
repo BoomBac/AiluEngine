@@ -319,7 +319,7 @@ namespace Ailu::RHI::DX12
 
 #pragma region D3DCubeMap
     //----------------------------------------------------------------------------D3DCubeMap----------------------------------------------------------------------------
-    D3DCubeMap::D3DCubeMap(u16 width, bool mipmap_chain, ETextureFormat::ETextureFormat format, bool linear, bool random_access)
+    D3DCubeMap::D3DCubeMap(u16 width, bool mipmap_chain, ETextureFormat format, bool linear, bool random_access)
         : CubeMap(width, mipmap_chain, format, linear, random_access) {}
 
     D3DCubeMap::~D3DCubeMap() { g_pGfxContext->WaitForFence(_fence_value); }
@@ -393,13 +393,13 @@ namespace Ailu::RHI::DX12
         }
         for (u16 face = 1; face <= 6; face++)
         {
-            if (_is_random_access) CreateView(ETextureViewType::kUAV, (ECubemapFace::ECubemapFace) face, 0);
-            else CreateView(ETextureViewType::kSRV, (ECubemapFace::ECubemapFace) face, 0);
+            if (_is_random_access) CreateView(ETextureViewType::kUAV, (ECubemapFace) face, 0);
+            else CreateView(ETextureViewType::kSRV, (ECubemapFace) face, 0);
         }
         CubeMap::CreateView();
     }
 
-    void D3DCubeMap::CreateView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice)
+    void D3DCubeMap::CreateView(ETextureViewType view_type, ECubemapFace face, u16 mipmap, u16 array_slice)
     {
         if (!_p_d3dres)
         {
@@ -446,14 +446,14 @@ namespace Ailu::RHI::DX12
         _views[view_index] = std::move(view_info);
     }
 
-    TextureHandle D3DCubeMap::GetView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice) const
+    TextureHandle D3DCubeMap::GetView(ETextureViewType view_type, ECubemapFace face, u16 mipmap, u16 array_slice) const
     {
         u16 idx = CalculateViewIndex(view_type, mipmap, array_slice);
         if (_views.contains(idx)) { return D3DDescriptorMgr::Get().GetBindGpuHandle(_views.at(idx)._gpu_alloc).ptr; }
         else return 0;
     }
 
-    void D3DCubeMap::ReleaseView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice)
+    void D3DCubeMap::ReleaseView(ETextureViewType view_type, ECubemapFace face, u16 mipmap, u16 array_slice)
     {
         u16 idx = CalculateViewIndex(view_type, face, mipmap, array_slice);
         _views.erase(idx);
@@ -576,7 +576,7 @@ namespace Ailu::RHI::DX12
                 // 计算当前 Mipmap 的尺寸
                 u64 row_pitch = currentWidth * _pixel_size;
                 u64 slice_pitch = row_pitch * currentHeight;
-                u32 aligned_row_pitch = ALIGN_TO_256(row_pitch);// 行对齐到 256 字节
+                u32 aligned_row_pitch = AlignTo(row_pitch,256);// 行对齐到 256 字节
                 u32 aligned_slice_pitch = aligned_row_pitch * currentHeight;
                 //Color32 color[16];
                 u32 index = 0;
@@ -915,10 +915,10 @@ namespace Ailu::RHI::DX12
             {
                 for (u16 j = 1; j <= 6; j++)
                 {
-                    if (is_for_depth) CreateView(ETextureViewType::kDSV, (ECubemapFace::ECubemapFace) j, 0, i);
-                    else CreateView(ETextureViewType::kRTV, (ECubemapFace::ECubemapFace) j, 0, i);
-                    CreateView(ETextureViewType::kSRV, (ECubemapFace::ECubemapFace) j, 0, i);
-                    if (_is_random_access) CreateView(ETextureViewType::kUAV, (ECubemapFace::ECubemapFace) j, 0, i);
+                    if (is_for_depth) CreateView(ETextureViewType::kDSV, (ECubemapFace) j, 0, i);
+                    else CreateView(ETextureViewType::kRTV, (ECubemapFace) j, 0, i);
+                    CreateView(ETextureViewType::kSRV, (ECubemapFace) j, 0, i);
+                    if (_is_random_access) CreateView(ETextureViewType::kUAV, (ECubemapFace) j, 0, i);
                 }
             }
         }
@@ -1075,7 +1075,7 @@ namespace Ailu::RHI::DX12
         _views.erase(idx);
     }
 
-    void D3DRenderTexture::CreateView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice)
+    void D3DRenderTexture::CreateView(ETextureViewType view_type, ECubemapFace face, u16 mipmap, u16 array_slice)
     {
         if (_dimension == ETextureDimension::kTex2D || _dimension == ETextureDimension::kTex2DArray) return;
         u16 view_index = CalculateViewIndex(view_type, face, mipmap, array_slice);
@@ -1151,14 +1151,14 @@ namespace Ailu::RHI::DX12
         }
     }
 
-    TextureHandle D3DRenderTexture::GetView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice) const
+    TextureHandle D3DRenderTexture::GetView(ETextureViewType view_type, ECubemapFace face, u16 mipmap, u16 array_slice) const
     {
         u16 idx = CalculateViewIndex(view_type, face, mipmap, array_slice);
         if (_views.contains(idx)) { return D3DDescriptorMgr::Get().GetBindGpuHandle(_views.at(idx)._gpu_alloc).ptr; }
         else return 0;
     }
 
-    void D3DRenderTexture::ReleaseView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice)
+    void D3DRenderTexture::ReleaseView(ETextureViewType view_type, ECubemapFace face, u16 mipmap, u16 array_slice)
     {
         u16 idx = CalculateViewIndex(view_type, face, mipmap, array_slice);
         _views.erase(idx);
@@ -1178,11 +1178,11 @@ namespace Ailu::RHI::DX12
             s_mipmap_gen->SetBool("IsSRGB", false);
             auto [mip1w, mip1h] = CalculateMipSize(_width, _height, 1);
             s_mipmap_gen->SetVector("TexelSize", Vector4f(1.0f / (float) mip1w, 1.0f / (float) mip1h, 0.0f, 0.0f));
-            s_mipmap_gen->SetTexture("SrcMip", this, (ECubemapFace::ECubemapFace) i, 0);
-            s_mipmap_gen->SetTexture("OutMip1", this, (ECubemapFace::ECubemapFace) i, 1);
-            s_mipmap_gen->SetTexture("OutMip2", this, (ECubemapFace::ECubemapFace) i, 2);
-            s_mipmap_gen->SetTexture("OutMip3", this, (ECubemapFace::ECubemapFace) i, 3);
-            s_mipmap_gen->SetTexture("OutMip4", this, (ECubemapFace::ECubemapFace) i, 4);
+            s_mipmap_gen->SetTexture("SrcMip", this, (ECubemapFace) i, 0);
+            s_mipmap_gen->SetTexture("OutMip1", this, (ECubemapFace) i, 1);
+            s_mipmap_gen->SetTexture("OutMip2", this, (ECubemapFace) i, 2);
+            s_mipmap_gen->SetTexture("OutMip3", this, (ECubemapFace) i, 3);
+            s_mipmap_gen->SetTexture("OutMip4", this, (ECubemapFace) i, 4);
             //static_cast<D3DComputeShader*>(_p_mipmapgen_cs0.get())->BindImpl(cmd, 32, 32, 1);
             //保证线程数和第一级输出的mipmap像素数一一对应
             cmd->Dispatch(s_mipmap_gen, kernel, mip1w / 8, mip1h / 8, 1);
@@ -1192,11 +1192,11 @@ namespace Ailu::RHI::DX12
             s_mipmap_gen->SetInt("SrcDimension", 0);
             s_mipmap_gen->SetBool("IsSRGB", false);
             s_mipmap_gen->SetVector("TexelSize", Vector4f(1.0f / (float) mip5w, 1.0f / (float) mip5h, 0.0f, 0.0f));
-            s_mipmap_gen->SetTexture("SrcMip", this, (ECubemapFace::ECubemapFace) i, 4);
-            s_mipmap_gen->SetTexture("OutMip1", this, (ECubemapFace::ECubemapFace) i, 5);
-            s_mipmap_gen->SetTexture("OutMip2", this, (ECubemapFace::ECubemapFace) i, 6);
-            s_mipmap_gen->SetTexture("OutMip3", this, (ECubemapFace::ECubemapFace) i, 7);
-            if (_mipmap_count > 6) s_mipmap_gen->SetTexture("OutMip4", this, (ECubemapFace::ECubemapFace) i, 8);
+            s_mipmap_gen->SetTexture("SrcMip", this, (ECubemapFace) i, 4);
+            s_mipmap_gen->SetTexture("OutMip1", this, (ECubemapFace) i, 5);
+            s_mipmap_gen->SetTexture("OutMip2", this, (ECubemapFace) i, 6);
+            s_mipmap_gen->SetTexture("OutMip3", this, (ECubemapFace) i, 7);
+            if (_mipmap_count > 6) s_mipmap_gen->SetTexture("OutMip4", this, (ECubemapFace) i, 8);
             cmd->Dispatch(s_mipmap_gen, kernel, mip5w / 8, mip5h / 8, 1);
             cmd->StateTransition(this, D3DConvertUtils::ToALResState(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
         }
@@ -1205,7 +1205,7 @@ namespace Ailu::RHI::DX12
     }
 
 
-    void *D3DRenderTexture::ReadBack(u16 mipmap, u16 array_slice, ECubemapFace::ECubemapFace face)
+    void *D3DRenderTexture::ReadBack(u16 mipmap, u16 array_slice, ECubemapFace face)
     {
         return nullptr;
         // auto d3d_device = dynamic_cast<D3DContext *>(g_pGfxContext)->GetDevice();
@@ -1269,7 +1269,7 @@ namespace Ailu::RHI::DX12
         // return aligned_out_data;
     }
 
-    void D3DRenderTexture::ReadBackAsync(std::function<void(void *)> callback, u16 mipmap, u16 array_slice, ECubemapFace::ECubemapFace face)
+    void D3DRenderTexture::ReadBackAsync(std::function<void(void *)> callback, u16 mipmap, u16 array_slice, ECubemapFace face)
     {
         // 使用引用捕获，处理异常并确保回调有效
         auto ret = std::async(std::launch::async, [&, callback]()

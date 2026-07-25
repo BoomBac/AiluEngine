@@ -3,7 +3,8 @@
         "_format_version": 1,
         "_guid": "b165a501-5eaa-4e5e-a3c6-3271ea1d9352",
         "_asset_type": "Ailu::Render::Shader",
-        "_asset_name": "sky_atmosphere"
+        "_asset_name": "skybox",
+        "_dependencies": []
     },
     "_file": "sky_atmosphere.hlsl",
     "_vs_entry": "VSMain",

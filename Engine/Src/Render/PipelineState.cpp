@@ -12,11 +12,11 @@ namespace Ailu::Render
 		_depth_rt = kDefaultDepthRTFormat;
 		_hash = _s_hash_obj.GenHash(*this);
 	}
-	RenderTargetState::RenderTargetState(const std::initializer_list<EALGFormat::EALGFormat>& color_rt, EALGFormat::EALGFormat depth_rt)
+	RenderTargetState::RenderTargetState(const std::initializer_list<EALGFormat>& color_rt, EALGFormat depth_rt)
 	{
 		for (auto& f : color_rt)
 			_color_rt[_color_rt_num++] = f;
-		if (_color_rt[0] == EALGFormat::EALGFormat::kALGFormatUNKOWN)
+		if (_color_rt[0] == EALGFormat::kALGFormatUNKOWN)
 			_color_rt_num = 0;
 		_depth_rt = depth_rt;
 		_hash = _s_hash_obj.GenHash(*this);

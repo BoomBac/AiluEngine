@@ -13,6 +13,9 @@
 #pragma region NoiseUtils
 namespace
 {
+    using Ailu::u32;
+    using Ailu::Math::Vector3UInt;
+
     static Vector3UInt FromLinearIndex(u32 id, Vector3UInt dim)
     {
         Vector3UInt index;

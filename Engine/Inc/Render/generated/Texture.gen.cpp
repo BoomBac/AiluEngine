@@ -44,7 +44,6 @@ return Ailu::Render::Texture::GetPrivateStaticClass();
 ClassTypeRegister s_register_Texture(&Ailu::Render::Texture::StaticType, "Ailu::Render::Texture");
 const Ailu::Type* Ailu::Render::Z_Construct_Texture2D_Type()
 {
-Ailu::Render::Texture::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
 {
@@ -55,7 +54,7 @@ initializer._full_name = "Ailu::Render::Texture2D";
 initializer._is_class = true;
 initializer._is_abstract = false;
 initializer._namespace = "Ailu::Render";
-initializer._base_name = "Ailu::Render::Texture";
+initializer._base_name = "";
 initializer._constructor = []()->Ailu::Render::Texture2D* {return new Ailu::Render::Texture2D;};
 cur_type = std::make_unique<Ailu::Type>(initializer);
 Ailu::Type::RegisterType(cur_type.get());
@@ -80,7 +79,6 @@ return Ailu::Render::Texture2D::GetPrivateStaticClass();
 ClassTypeRegister s_register_Texture2D(&Ailu::Render::Texture2D::StaticType, "Ailu::Render::Texture2D");
 const Ailu::Type* Ailu::Render::Z_Construct_Texture3D_Type()
 {
-Ailu::Render::Texture::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
 {
@@ -91,7 +89,7 @@ initializer._full_name = "Ailu::Render::Texture3D";
 initializer._is_class = true;
 initializer._is_abstract = false;
 initializer._namespace = "Ailu::Render";
-initializer._base_name = "Ailu::Render::Texture";
+initializer._base_name = "";
 initializer._constructor = []()->Ailu::Render::Texture3D* {return new Ailu::Render::Texture3D;};
 cur_type = std::make_unique<Ailu::Type>(initializer);
 Ailu::Type::RegisterType(cur_type.get());
@@ -116,7 +114,6 @@ return Ailu::Render::Texture3D::GetPrivateStaticClass();
 ClassTypeRegister s_register_Texture3D(&Ailu::Render::Texture3D::StaticType, "Ailu::Render::Texture3D");
 const Ailu::Type* Ailu::Render::Z_Construct_CubeMap_Type()
 {
-Ailu::Render::Texture::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
 {
@@ -127,7 +124,7 @@ initializer._full_name = "Ailu::Render::CubeMap";
 initializer._is_class = true;
 initializer._is_abstract = false;
 initializer._namespace = "Ailu::Render";
-initializer._base_name = "Ailu::Render::Texture";
+initializer._base_name = "";
 initializer._constructor = []()->Ailu::Render::CubeMap* {return new Ailu::Render::CubeMap;};
 cur_type = std::make_unique<Ailu::Type>(initializer);
 Ailu::Type::RegisterType(cur_type.get());
@@ -152,7 +149,6 @@ return Ailu::Render::CubeMap::GetPrivateStaticClass();
 ClassTypeRegister s_register_CubeMap(&Ailu::Render::CubeMap::StaticType, "Ailu::Render::CubeMap");
 const Ailu::Type* Ailu::Render::Z_Construct_RenderTexture_Type()
 {
-Ailu::Render::Texture::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
 {
@@ -163,7 +159,7 @@ initializer._full_name = "Ailu::Render::RenderTexture";
 initializer._is_class = true;
 initializer._is_abstract = false;
 initializer._namespace = "Ailu::Render";
-initializer._base_name = "Ailu::Render::Texture";
+initializer._base_name = "";
 initializer._constructor = []()->Ailu::Render::RenderTexture* {return new Ailu::Render::RenderTexture;};
 cur_type = std::make_unique<Ailu::Type>(initializer);
 Ailu::Type::RegisterType(cur_type.get());
@@ -186,3 +182,216 @@ return Ailu::Render::RenderTexture::StaticType();
 return Ailu::Render::RenderTexture::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_RenderTexture(&Ailu::Render::RenderTexture::StaticType, "Ailu::Render::RenderTexture");
+static std::unique_ptr<Ailu::Enum> s_enum_type_ETextureDimension = nullptr;
+//Enum ETextureDimension begin...........................
+const Ailu::Enum* Z_Construct_Enum_ETextureDimension_Type()
+{
+if(s_enum_type_ETextureDimension == nullptr)
+{
+EnumInitializer initializer;
+initializer._name = "ETextureDimension";
+initializer._namespace = "Ailu::Render";
+initializer._full_name = "Ailu::Render::ETextureDimension";
+initializer._str_to_enum_lut["kUnknown"] = 0;
+initializer._str_to_enum_lut["kTex2D"] = 1;
+initializer._str_to_enum_lut["kTex3D"] = 2;
+initializer._str_to_enum_lut["kCube"] = 3;
+initializer._str_to_enum_lut["kTex2DArray"] = 4;
+initializer._str_to_enum_lut["kCubeArray"] = 5;
+s_enum_type_ETextureDimension = std::make_unique<Ailu::Enum>(initializer);
+Ailu::Enum::RegisterEnum(s_enum_type_ETextureDimension.get());
+}
+return s_enum_type_ETextureDimension.get();
+}
+static Ailu::EnumTypeRegister g_register_ETextureDimension(Z_Construct_Enum_ETextureDimension_Type);
+template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::ETextureDimension>()
+{
+return s_enum_type_ETextureDimension.get();
+}
+//Enum ETextureDimension end...........................
+
+static std::unique_ptr<Ailu::Enum> s_enum_type_EFilterMode = nullptr;
+//Enum EFilterMode begin...........................
+const Ailu::Enum* Z_Construct_Enum_EFilterMode_Type()
+{
+if(s_enum_type_EFilterMode == nullptr)
+{
+EnumInitializer initializer;
+initializer._name = "EFilterMode";
+initializer._namespace = "Ailu::Render";
+initializer._full_name = "Ailu::Render::EFilterMode";
+initializer._str_to_enum_lut["kPoint"] = 0;
+initializer._str_to_enum_lut["kBilinear"] = 1;
+initializer._str_to_enum_lut["kTrilinear"] = 2;
+s_enum_type_EFilterMode = std::make_unique<Ailu::Enum>(initializer);
+Ailu::Enum::RegisterEnum(s_enum_type_EFilterMode.get());
+}
+return s_enum_type_EFilterMode.get();
+}
+static Ailu::EnumTypeRegister g_register_EFilterMode(Z_Construct_Enum_EFilterMode_Type);
+template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::EFilterMode>()
+{
+return s_enum_type_EFilterMode.get();
+}
+//Enum EFilterMode end...........................
+
+static std::unique_ptr<Ailu::Enum> s_enum_type_EWrapMode = nullptr;
+//Enum EWrapMode begin...........................
+const Ailu::Enum* Z_Construct_Enum_EWrapMode_Type()
+{
+if(s_enum_type_EWrapMode == nullptr)
+{
+EnumInitializer initializer;
+initializer._name = "EWrapMode";
+initializer._namespace = "Ailu::Render";
+initializer._full_name = "Ailu::Render::EWrapMode";
+initializer._str_to_enum_lut["kClamp"] = 0;
+initializer._str_to_enum_lut["kRepeat"] = 1;
+initializer._str_to_enum_lut["kMirror"] = 2;
+s_enum_type_EWrapMode = std::make_unique<Ailu::Enum>(initializer);
+Ailu::Enum::RegisterEnum(s_enum_type_EWrapMode.get());
+}
+return s_enum_type_EWrapMode.get();
+}
+static Ailu::EnumTypeRegister g_register_EWrapMode(Z_Construct_Enum_EWrapMode_Type);
+template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::EWrapMode>()
+{
+return s_enum_type_EWrapMode.get();
+}
+//Enum EWrapMode end...........................
+
+static std::unique_ptr<Ailu::Enum> s_enum_type_ETextureFormat = nullptr;
+//Enum ETextureFormat begin...........................
+const Ailu::Enum* Z_Construct_Enum_ETextureFormat_Type()
+{
+if(s_enum_type_ETextureFormat == nullptr)
+{
+EnumInitializer initializer;
+initializer._name = "ETextureFormat";
+initializer._namespace = "Ailu::Render";
+initializer._full_name = "Ailu::Render::ETextureFormat";
+initializer._str_to_enum_lut["kR8UNorm"] = 0;
+initializer._str_to_enum_lut["kR8UInt"] = 1;
+initializer._str_to_enum_lut["kR8SInt"] = 2;
+initializer._str_to_enum_lut["kRG8UNorm"] = 3;
+initializer._str_to_enum_lut["kRG8UInt"] = 4;
+initializer._str_to_enum_lut["kRG8SInt"] = 5;
+initializer._str_to_enum_lut["kRGBA8UNorm"] = 6;
+initializer._str_to_enum_lut["kRGBA8UNormSRGB"] = 7;
+initializer._str_to_enum_lut["kRGBA8UInt"] = 8;
+initializer._str_to_enum_lut["kRGBA8SInt"] = 9;
+initializer._str_to_enum_lut["kR16Float"] = 10;
+initializer._str_to_enum_lut["kR16UNorm"] = 11;
+initializer._str_to_enum_lut["kR16UInt"] = 12;
+initializer._str_to_enum_lut["kR16SInt"] = 13;
+initializer._str_to_enum_lut["kRG16Float"] = 14;
+initializer._str_to_enum_lut["kRG16UNorm"] = 15;
+initializer._str_to_enum_lut["kRG16UInt"] = 16;
+initializer._str_to_enum_lut["kRG16SInt"] = 17;
+initializer._str_to_enum_lut["kRGBAHalf"] = 18;
+initializer._str_to_enum_lut["kRGBA16UNorm"] = 19;
+initializer._str_to_enum_lut["kRGBA16UInt"] = 20;
+initializer._str_to_enum_lut["kR32Float"] = 21;
+initializer._str_to_enum_lut["kR32UInt"] = 22;
+initializer._str_to_enum_lut["kR32SInt"] = 23;
+initializer._str_to_enum_lut["kRGFloat"] = 24;
+initializer._str_to_enum_lut["kRG32UInt"] = 25;
+initializer._str_to_enum_lut["kRGBAFloat"] = 26;
+initializer._str_to_enum_lut["kRGBA32UInt"] = 27;
+initializer._str_to_enum_lut["kRGBFloat"] = 28;
+initializer._str_to_enum_lut["kR11G11B10"] = 29;
+initializer._str_to_enum_lut["kRGB10A2UNorm"] = 30;
+initializer._str_to_enum_lut["kRGB10A2UInt"] = 31;
+initializer._str_to_enum_lut["kD16UNorm"] = 32;
+initializer._str_to_enum_lut["kD24UNormS8UInt"] = 33;
+initializer._str_to_enum_lut["kD32Float"] = 34;
+initializer._str_to_enum_lut["kD32FloatS8X24"] = 35;
+initializer._str_to_enum_lut["kBC1_UNorm"] = 36;
+initializer._str_to_enum_lut["kBC1_UNorm_SRGB"] = 37;
+initializer._str_to_enum_lut["kBC3_UNorm"] = 38;
+initializer._str_to_enum_lut["kBC3_UNorm_SRGB"] = 39;
+initializer._str_to_enum_lut["kBC4_UNorm"] = 40;
+initializer._str_to_enum_lut["kBC5_UNorm"] = 41;
+initializer._str_to_enum_lut["kBC6H_UF16"] = 42;
+initializer._str_to_enum_lut["kBC6H_SF16"] = 43;
+initializer._str_to_enum_lut["kBC7_UNorm"] = 44;
+initializer._str_to_enum_lut["kBC7_UNorm_SRGB"] = 45;
+initializer._str_to_enum_lut["kRGBA32"] = 46;
+initializer._str_to_enum_lut["kBGRA8UNorm"] = 47;
+initializer._str_to_enum_lut["kBGRA8UNormSRGB"] = 48;
+initializer._str_to_enum_lut["kUnknown"] = 49;
+s_enum_type_ETextureFormat = std::make_unique<Ailu::Enum>(initializer);
+Ailu::Enum::RegisterEnum(s_enum_type_ETextureFormat.get());
+}
+return s_enum_type_ETextureFormat.get();
+}
+static Ailu::EnumTypeRegister g_register_ETextureFormat(Z_Construct_Enum_ETextureFormat_Type);
+template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::ETextureFormat>()
+{
+return s_enum_type_ETextureFormat.get();
+}
+//Enum ETextureFormat end...........................
+
+static std::unique_ptr<Ailu::Enum> s_enum_type_ECubemapFace = nullptr;
+//Enum ECubemapFace begin...........................
+const Ailu::Enum* Z_Construct_Enum_ECubemapFace_Type()
+{
+if(s_enum_type_ECubemapFace == nullptr)
+{
+EnumInitializer initializer;
+initializer._name = "ECubemapFace";
+initializer._namespace = "Ailu::Render";
+initializer._full_name = "Ailu::Render::ECubemapFace";
+initializer._str_to_enum_lut["kUnknown"] = 0;
+initializer._str_to_enum_lut["kPositiveX"] = 1;
+initializer._str_to_enum_lut["kNegativeX"] = 2;
+initializer._str_to_enum_lut["kPositiveY"] = 3;
+initializer._str_to_enum_lut["kNegativeY"] = 4;
+initializer._str_to_enum_lut["kPositiveZ"] = 5;
+initializer._str_to_enum_lut["kNegativeZ"] = 6;
+s_enum_type_ECubemapFace = std::make_unique<Ailu::Enum>(initializer);
+Ailu::Enum::RegisterEnum(s_enum_type_ECubemapFace.get());
+}
+return s_enum_type_ECubemapFace.get();
+}
+static Ailu::EnumTypeRegister g_register_ECubemapFace(Z_Construct_Enum_ECubemapFace_Type);
+template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::ECubemapFace>()
+{
+return s_enum_type_ECubemapFace.get();
+}
+//Enum ECubemapFace end...........................
+
+static std::unique_ptr<Ailu::Enum> s_enum_type_ERenderTargetFormat = nullptr;
+//Enum ERenderTargetFormat begin...........................
+const Ailu::Enum* Z_Construct_Enum_ERenderTargetFormat_Type()
+{
+if(s_enum_type_ERenderTargetFormat == nullptr)
+{
+EnumInitializer initializer;
+initializer._name = "ERenderTargetFormat";
+initializer._namespace = "Ailu::Render";
+initializer._full_name = "Ailu::Render::ERenderTargetFormat";
+initializer._str_to_enum_lut["kUnknown"] = 0;
+initializer._str_to_enum_lut["kDefault"] = 1;
+initializer._str_to_enum_lut["kDefaultHDR"] = 2;
+initializer._str_to_enum_lut["kDepth"] = 3;
+initializer._str_to_enum_lut["kShadowMap"] = 4;
+initializer._str_to_enum_lut["kRGFloat"] = 5;
+initializer._str_to_enum_lut["kRGHalf"] = 6;
+initializer._str_to_enum_lut["kRFloat"] = 7;
+initializer._str_to_enum_lut["kRGBAHalf"] = 8;
+initializer._str_to_enum_lut["kRGBAFloat"] = 9;
+initializer._str_to_enum_lut["kRUint"] = 10;
+initializer._str_to_enum_lut["kRInt"] = 11;
+s_enum_type_ERenderTargetFormat = std::make_unique<Ailu::Enum>(initializer);
+Ailu::Enum::RegisterEnum(s_enum_type_ERenderTargetFormat.get());
+}
+return s_enum_type_ERenderTargetFormat.get();
+}
+static Ailu::EnumTypeRegister g_register_ERenderTargetFormat(Z_Construct_Enum_ERenderTargetFormat_Type);
+template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::ERenderTargetFormat>()
+{
+return s_enum_type_ERenderTargetFormat.get();
+}
+//Enum ERenderTargetFormat end...........................
+

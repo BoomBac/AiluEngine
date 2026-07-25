@@ -1,7 +1,7 @@
 #pragma once
 #ifndef __TRANSFORM_SYSTEM_H__
 #define __TRANSFORM_SYSTEM_H__
-#include "Entity.hpp"
+#include "Entity.h"
 #include <unordered_set>
 
 namespace Ailu
@@ -10,7 +10,7 @@ namespace Ailu
     {
         class TransformSystem : public System
         {
-            DECLARE_CLASS(TransformSystem)
+            DECLARE_SYSTEM(TransformSystem)
         public:
             TransformSystem();
             void Update(Register &r, f32 delta_time) final;

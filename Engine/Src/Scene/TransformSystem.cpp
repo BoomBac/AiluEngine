@@ -38,7 +38,7 @@ namespace Ailu
             u32 child_count = 0u;
             while (child != kInvalidEntity)
             {
-                if (++child_count > ECS::kMaxEntityNum)
+                if (++child_count > 16384u)
                 {
                     LOG_ERROR("TransformSystem::RebuildOrder sibling chain exceeded max entity count at parent {}", entity);
                     break;

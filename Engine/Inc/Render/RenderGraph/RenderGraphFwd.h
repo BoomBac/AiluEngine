@@ -1,6 +1,6 @@
 #ifndef __RENDER_GRAPH_FWD_h__
 #define __RENDER_GRAPH_FWD_h__
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
 
 namespace Ailu::Render::RDG
 {

@@ -3,7 +3,8 @@
         "_format_version": 1,
         "_guid": "fc17adc1-f67a-4a15-a756-09c672438b53",
         "_asset_type": "Ailu::Render::ComputeShader",
-        "_asset_name": "volumetric_cloud"
+        "_asset_name": "volumetric_cloud",
+        "_dependencies": []
     },
     "_file": "volumetric_cloud.hlsl",
     "_kernel": "Noname"

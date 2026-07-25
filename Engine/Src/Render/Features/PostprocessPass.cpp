@@ -20,7 +20,7 @@ namespace Ailu::Render
         {
             _bloom_mats.emplace_back(MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/PostProcess/bloom.alasset"), std::format("bloom_mip_{}", i)));
         }
-        _event = (ERenderPassEvent::ERenderPassEvent)(ERenderPassEvent::kBeforePostprocess + 25);
+        _event = static_cast<ERenderPassEvent>(static_cast<u16>(ERenderPassEvent::kBeforePostprocess) + 25u);
         _nose_tex = ResourceMgr::Get().Get<Texture2D>(L"Textures/noise_medium.png");
         _noise_texel_size = {0.0f, 0.0f,(f32) _nose_tex->Width(), (f32) _nose_tex->Height()};
         _noise_texel_size.x = 1.0f / _noise_texel_size.z;

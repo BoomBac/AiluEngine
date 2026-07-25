@@ -4,11 +4,19 @@
 
 #ifndef AILU_CURVE_HPP
 #define AILU_CURVE_HPP
+#include "Framework/Core/ReflectionMacros.h"
 #include "Framework/Math/ALMath.hpp"
-#include "GlobalMarco.h"
+
+#include "generated/Curve.gen.h"
 namespace Ailu
 {
-    DECLARE_ENUM(EInterpolationType,kConstant,kLinear,kCubic)
+    AENUM()
+    enum class EInterpolationType
+    {
+        kConstant,
+        kLinear,
+        kCubic
+    };
     template<typename T>
     class Bezier
     {

@@ -10,15 +10,15 @@ using Microsoft::WRL::ComPtr;
 
 namespace Ailu::RHI::DX12
 {
-    using Ailu::Render::BindParams;
-    using Ailu::Render::UploadParams;
-    using Ailu::Render::GraphicsContext;
-    using Ailu::Render::RHICommandBuffer;
-    class D3DRayTracingGeometry : public Render::RayTracingGeometry
+    using ::Ailu::Render::BindParams;
+    using ::Ailu::Render::UploadParams;
+    using ::Ailu::Render::GraphicsContext;
+    using ::Ailu::Render::RHICommandBuffer;
+    class D3DRayTracingGeometry : public ::Ailu::Render::RayTracingGeometry
     {
         friend class D3DContext;
     public:
-        D3DRayTracingGeometry(const Render::RayTracingGeometryDesc &desc);
+        D3DRayTracingGeometry(const ::Ailu::Render::RayTracingGeometryDesc &desc);
         ~D3DRayTracingGeometry();
         D3D12_GPU_VIRTUAL_ADDRESS GetBLASGpuAddress() const { return _blas_gpu_address; }
     private:

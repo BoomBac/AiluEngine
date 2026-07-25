@@ -2,7 +2,9 @@
 #ifndef __TAA_H__
 #define __TAA_H__
 #include "RenderFeature.h"
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/Containers/Map.h"
+#include <vector>
 #include "generated/TemporalAA.gen.h"
 
 namespace Ailu::Render

@@ -34,7 +34,7 @@ namespace Ailu::Render
     }
     void CommandBufferPool::Shutdown()
     {
-        DESTORY_PTR(s_pCommandBufferPool);
+        delete s_pCommandBufferPool; s_pCommandBufferPool = nullptr;
     }
 
     Ref<CommandBuffer> CommandBufferPool::Get(const String &name)
@@ -380,7 +380,7 @@ namespace Ailu::Render
             cmd->_num = count;
             _commands.push_back(cmd);
         }
-        RTHandle GetTempRT(u16 width, u16 height, String name, ERenderTargetFormat::ERenderTargetFormat format, bool mipmap_chain, bool linear, bool random_access)
+        RTHandle GetTempRT(u16 width, u16 height, String name, ERenderTargetFormat format, bool mipmap_chain, bool linear, bool random_access)
         {
             return RenderTexture::GetTempRT(width, height, name, format, mipmap_chain, linear, random_access);
         }
@@ -742,7 +742,7 @@ namespace Ailu::Render
     }
     CommandBuffer::~CommandBuffer()
     {
-        DESTORY_PTR(_impl);
+        delete _impl; _impl = nullptr;
     }
     void CommandBuffer::SetRenderGraph(RDG::RenderGraph *render_graph)
     {
@@ -841,7 +841,7 @@ namespace Ailu::Render
     {
        _impl->SetScissorRects(rects);
     }
-    RTHandle CommandBuffer::GetTempRT(u16 width, u16 height, String name, ERenderTargetFormat::ERenderTargetFormat format, bool mipmap_chain, bool linear, bool random_access)
+    RTHandle CommandBuffer::GetTempRT(u16 width, u16 height, String name, ERenderTargetFormat format, bool mipmap_chain, bool linear, bool random_access)
     {
         return _impl->GetTempRT(width, height, name, format, mipmap_chain, linear, random_access);
     }
@@ -1033,7 +1033,7 @@ namespace Ailu::Render
     }
     void RHICommandBufferPool::Shutdown()
     {
-        DESTORY_PTR(s_pRHICommandBufferPool);
+        delete s_pRHICommandBufferPool; s_pRHICommandBufferPool = nullptr;
     }
     Ref<RHICommandBuffer> RHICommandBufferPool::Get(const String &name, ECommandBufferType type)
     {

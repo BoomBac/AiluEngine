@@ -3,7 +3,8 @@
         "_format_version": 1,
         "_guid": "881f94ee-2dbb-48e9-b084-72c9bfb729ea",
         "_asset_type": "Ailu::Render::Texture2D",
-        "_asset_name": "folder"
+        "_asset_name": "folder",
+        "_dependencies": []
     },
     "_file": "folder.png",
     "_is_srgb": true

@@ -5,11 +5,16 @@
 #define __TEXTURE_H__
 
 #include "AlgFormat.h"
+#include "Framework/Common/Hash.hpp"
 #include "Framework/Common/Log.h"
 #include "Framework/Common/Path.h"
 #include "Framework/Common/ThreadPool.h"
 #include "Framework/Math/ALMath.hpp"
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Common/NonCopyable.h"
+#include "Framework/Core/String.h"
+#include "Framework/Core/Containers/Vector.h"
+#include "Framework/Core/Containers/Map.h"
 #include "GpuResource.h"
 #include "CoreType.h"
 #include <map>
@@ -99,143 +104,196 @@ namespace Ailu
             }
         }// namespace TextureUtils
 
-        DECLARE_ENUM(ETextureDimension, kUnknown, kTex2D, kTex3D, kCube, kTex2DArray, kCubeArray)
-        DECLARE_ENUM(EFilterMode, kPoint, kBilinear, kTrilinear)
-        DECLARE_ENUM(EWrapMode, kClamp, kRepeat, kMirror)
-        DECLARE_ENUM(ETextureFormat,
-                     // 8-bit formats
-                     kR8UNorm,// R8_UNORM
-                     kR8UInt, // R8_UINT
-                     kR8SInt, // R8_SINT
+        AENUM()
+        enum class ETextureDimension
+        {
+            kUnknown,
+            kTex2D,
+            kTex3D,
+            kCube,
+            kTex2DArray,
+            kCubeArray
+        };
 
-                     kRG8UNorm,// R8G8_UNORM
-                     kRG8UInt, // R8G8_UINT
-                     kRG8SInt, // R8G8_SINT
+        AENUM()
+        enum class EFilterMode
+        {
+            kPoint,
+            kBilinear,
+            kTrilinear
+        };
 
-                     kRGBA8UNorm,    // R8G8B8A8_UNORM
-                     kRGBA8UNormSRGB,// R8G8B8A8_UNORM_SRGB
-                     kRGBA8UInt,     // R8G8B8A8_UINT
-                     kRGBA8SInt,     // R8G8B8A8_SINT
+        AENUM()
+        enum class EWrapMode
+        {
+            kClamp,
+            kRepeat,
+            kMirror
+        };
 
-                     // 16-bit formats
-                     kR16Float,// R16_FLOAT
-                     kR16UNorm,// R16_UNORM
-                     kR16UInt, // R16_UINT
-                     kR16SInt, // R16_SINT
+        AENUM()
+        enum class ETextureFormat
+        {
+            // 8-bit formats
+            kR8UNorm,// R8_UNORM
+            kR8UInt, // R8_UINT
+            kR8SInt, // R8_SINT
 
-                     kRG16Float,// R16G16_FLOAT
-                     kRG16UNorm,// R16G16_UNORM
-                     kRG16UInt, // R16G16_UINT
-                     kRG16SInt, // R16G16_SINT
+            kRG8UNorm,// R8G8_UNORM
+            kRG8UInt, // R8G8_UINT
+            kRG8SInt, // R8G8_SINT
 
-                     kRGBAHalf,   // R16G16B16A16_FLOAT
-                     kRGBA16UNorm,// R16G16B16A16_UNORM
-                     kRGBA16UInt, // R16G16B16A16_UINT
+            kRGBA8UNorm,    // R8G8B8A8_UNORM
+            kRGBA8UNormSRGB,// R8G8B8A8_UNORM_SRGB
+            kRGBA8UInt,     // R8G8B8A8_UINT
+            kRGBA8SInt,     // R8G8B8A8_SINT
 
-                     // 32-bit float formats
-                     kR32Float,// R32_FLOAT
-                     kR32UInt, // R32_UINT
-                     kR32SInt, // R32_SINT
+            // 16-bit formats
+            kR16Float,// R16_FLOAT
+            kR16UNorm,// R16_UNORM
+            kR16UInt, // R16_UINT
+            kR16SInt, // R16_SINT
 
-                     kRGFloat,   // R32G32_FLOAT
-                     kRG32UInt,  // R32G32_UINT
-                     kRGBAFloat, // R32G32B32A32_FLOAT
-                     kRGBA32UInt,// R32G32B32A32_UINT
-                     kRGBFloat,  // R32G32B32_FLOAT
+            kRG16Float,// R16G16_FLOAT
+            kRG16UNorm,// R16G16_UNORM
+            kRG16UInt, // R16G16_UINT
+            kRG16SInt, // R16G16_SINT
 
-                     // Packed formats
-                     kR11G11B10,   // R11G11B10_FLOAT
-                     kRGB10A2UNorm,// R10G10B10A2_UNORM
-                     kRGB10A2UInt, // R10G10B10A2_UINT
+            kRGBAHalf,   // R16G16B16A16_FLOAT
+            kRGBA16UNorm,// R16G16B16A16_UNORM
+            kRGBA16UInt, // R16G16B16A16_UINT
 
-                     // Depth-stencil formats
-                     kD16UNorm,      // D16_UNORM
-                     kD24UNormS8UInt,// D24_UNORM_S8_UINT
-                     kD32Float,      // D32_FLOAT
-                     kD32FloatS8X24, // D32_FLOAT_S8X24_UINT
+            // 32-bit float formats
+            kR32Float,// R32_FLOAT
+            kR32UInt, // R32_UINT
+            kR32SInt, // R32_SINT
 
-                     // Compressed formats
-                     kBC1_UNorm,     // DXT1
-                     kBC1_UNorm_SRGB,// DXT1 SRGB
-                     kBC3_UNorm,     // DXT5
-                     kBC3_UNorm_SRGB,// DXT5 SRGB
-                     kBC4_UNorm,     // Single-channel compressed
-                     kBC5_UNorm,     // Two-channel compressed
-                     kBC6H_UF16,     // HDR, unsigned float
-                     kBC6H_SF16,     // HDR, signed float
-                     kBC7_UNorm,     // High-quality RGBA compressed
-                     kBC7_UNorm_SRGB,// BC7 + SRGB
+            kRGFloat,   // R32G32_FLOAT
+            kRG32UInt,  // R32G32_UINT
+            kRGBAFloat, // R32G32B32A32_FLOAT
+            kRGBA32UInt,// R32G32B32A32_UINT
+            kRGBFloat,  // R32G32B32_FLOAT
 
-                     // Legacy / platform formats
-                     kRGBA32,        // 32-bit UNORM (R8G8B8A8)
-                     kBGRA8UNorm,    // B8G8R8A8_UNORM
-                     kBGRA8UNormSRGB,// B8G8R8A8_UNORM_SRGB
+            // Packed formats
+            kR11G11B10,   // R11G11B10_FLOAT
+            kRGB10A2UNorm,// R10G10B10A2_UNORM
+            kRGB10A2UInt, // R10G10B10A2_UINT
 
-                     // Special/utility
-                     kUnknown// 未知格式
-        )
-        DECLARE_ENUM(ECubemapFace, kUnknown, kPositiveX, kNegativeX, kPositiveY, kNegativeY, kPositiveZ, kNegativeZ)
-        DECLARE_ENUM(ERenderTargetFormat, kUnknown, kDefault, kDefaultHDR, kDepth, kShadowMap, kRGFloat, kRGHalf, kRFloat, kRGBAHalf, kRGBAFloat, kRUint, kRInt)
+            // Depth-stencil formats
+            kD16UNorm,      // D16_UNORM
+            kD24UNormS8UInt,// D24_UNORM_S8_UINT
+            kD32Float,      // D32_FLOAT
+            kD32FloatS8X24, // D32_FLOAT_S8X24_UINT
 
-        static EALGFormat::EALGFormat ConvertRenderTextureFormatToPixelFormat(ERenderTargetFormat::ERenderTargetFormat format)
+            // Compressed formats
+            kBC1_UNorm,     // DXT1
+            kBC1_UNorm_SRGB,// DXT1 SRGB
+            kBC3_UNorm,     // DXT5
+            kBC3_UNorm_SRGB,// DXT5 SRGB
+            kBC4_UNorm,     // Single-channel compressed
+            kBC5_UNorm,     // Two-channel compressed
+            kBC6H_UF16,     // HDR, unsigned float
+            kBC6H_SF16,     // HDR, signed float
+            kBC7_UNorm,     // High-quality RGBA compressed
+            kBC7_UNorm_SRGB,// BC7 + SRGB
+
+            // Legacy / platform formats
+            kRGBA32,        // 32-bit UNORM (R8G8B8A8)
+            kBGRA8UNorm,    // B8G8R8A8_UNORM
+            kBGRA8UNormSRGB,// B8G8R8A8_UNORM_SRGB
+
+            // Special/utility
+            kUnknown// 未知格式
+        };
+
+        AENUM()
+        enum class ECubemapFace
+        {
+            kUnknown,
+            kPositiveX,
+            kNegativeX,
+            kPositiveY,
+            kNegativeY,
+            kPositiveZ,
+            kNegativeZ
+        };
+
+        AENUM()
+        enum class ERenderTargetFormat
+        {
+            kUnknown,
+            kDefault,
+            kDefaultHDR,
+            kDepth,
+            kShadowMap,
+            kRGFloat,
+            kRGHalf,
+            kRFloat,
+            kRGBAHalf,
+            kRGBAFloat,
+            kRUint,
+            kRInt
+        };
+
+        static EALGFormat ConvertRenderTextureFormatToPixelFormat(ERenderTargetFormat format)
         {
             switch (format)
             {
                 case ERenderTargetFormat::kUnknown:
-                    return EALGFormat::EALGFormat::kALGFormatUNKOWN;
+                    return EALGFormat::kALGFormatUNKOWN;
                 case ERenderTargetFormat::kDefault:
-                    return EALGFormat::EALGFormat::kALGFormatR8G8B8A8_UNORM;
+                    return EALGFormat::kALGFormatR8G8B8A8_UNORM;
                 case ERenderTargetFormat::kDefaultHDR:
-                    return EALGFormat::EALGFormat::kALGFormatR11G11B10_FLOAT;
+                    return EALGFormat::kALGFormatR11G11B10_FLOAT;
                 case ERenderTargetFormat::kDepth:
-                    return EALGFormat::EALGFormat::kALGFormatD32_FLOAT_S8X24_UINT;
+                    return EALGFormat::kALGFormatD32_FLOAT_S8X24_UINT;
                 case ERenderTargetFormat::kShadowMap:
-                    return EALGFormat::EALGFormat::kALGFormatD32_FLOAT;
+                    return EALGFormat::kALGFormatD32_FLOAT;
                 case ERenderTargetFormat::kRGFloat:
-                    return EALGFormat::EALGFormat::kALGFormatR32G32_FLOAT;
+                    return EALGFormat::kALGFormatR32G32_FLOAT;
                 case ERenderTargetFormat::kRGHalf:
-                    return EALGFormat::EALGFormat::kALGFormatR16G16_FLOAT;
+                    return EALGFormat::kALGFormatR16G16_FLOAT;
                 case ERenderTargetFormat::kRFloat:
-                    return EALGFormat::EALGFormat::kALGFormatR32_FLOAT;
+                    return EALGFormat::kALGFormatR32_FLOAT;
                 case ERenderTargetFormat::kRGBAHalf:
-                    return EALGFormat::EALGFormat::kALGFormatR16G16B16A16_FLOAT;
+                    return EALGFormat::kALGFormatR16G16B16A16_FLOAT;
                 case ERenderTargetFormat::kRGBAFloat:
-                    return EALGFormat::EALGFormat::kALGFormatR32G32B32A32_FLOAT;
+                    return EALGFormat::kALGFormatR32G32B32A32_FLOAT;
                 case ERenderTargetFormat::kRInt:
-                    return EALGFormat::EALGFormat::kALGFormatR32_SINT;
+                    return EALGFormat::kALGFormatR32_SINT;
                 case ERenderTargetFormat::kRUint:
-                    return EALGFormat::EALGFormat::kALGFormatR32_UINT;
+                    return EALGFormat::kALGFormatR32_UINT;
                 default:
                     break;
             }
-            return EALGFormat::EALGFormat::kALGFormatUNKOWN;
+            return EALGFormat::kALGFormatUNKOWN;
         }
         
-        static ERenderTargetFormat::ERenderTargetFormat ConvertPixelFormatFormatToRenderTexture(EALGFormat::EALGFormat format)
+        static ERenderTargetFormat ConvertPixelFormatFormatToRenderTexture(EALGFormat format)
         {
             switch (format)
             {
-                case EALGFormat::EALGFormat::kALGFormatR8G8B8A8_UNORM:
+                case EALGFormat::kALGFormatR8G8B8A8_UNORM:
                     return ERenderTargetFormat::kDefault;
-                case EALGFormat::EALGFormat::kALGFormatR11G11B10_FLOAT:
+                case EALGFormat::kALGFormatR11G11B10_FLOAT:
                     return ERenderTargetFormat::kDefaultHDR;
-                case EALGFormat::EALGFormat::kALGFormatD32_FLOAT_S8X24_UINT:
+                case EALGFormat::kALGFormatD32_FLOAT_S8X24_UINT:
                     return ERenderTargetFormat::kDepth;
-                case EALGFormat::EALGFormat::kALGFormatD32_FLOAT:
+                case EALGFormat::kALGFormatD32_FLOAT:
                     return ERenderTargetFormat::kShadowMap;
-                case EALGFormat::EALGFormat::kALGFormatR32G32_FLOAT:
+                case EALGFormat::kALGFormatR32G32_FLOAT:
                     return ERenderTargetFormat::kRGFloat;
-                case EALGFormat::EALGFormat::kALGFormatR16G16_FLOAT:
+                case EALGFormat::kALGFormatR16G16_FLOAT:
                     return ERenderTargetFormat::kRGHalf;
-                case EALGFormat::EALGFormat::kALGFormatR32_FLOAT:
+                case EALGFormat::kALGFormatR32_FLOAT:
                     return ERenderTargetFormat::kRFloat;
-                case EALGFormat::EALGFormat::kALGFormatR16G16B16A16_FLOAT:
+                case EALGFormat::kALGFormatR16G16B16A16_FLOAT:
                     return ERenderTargetFormat::kRGBAHalf;
-                case EALGFormat::EALGFormat::kALGFormatR32G32B32A32_FLOAT:
+                case EALGFormat::kALGFormatR32G32B32A32_FLOAT:
                     return ERenderTargetFormat::kRGBAFloat;
-                case EALGFormat::EALGFormat::kALGFormatR32_SINT:
+                case EALGFormat::kALGFormatR32_SINT:
                     return ERenderTargetFormat::kRInt;
-                case EALGFormat::EALGFormat::kALGFormatR32_UINT:
+                case EALGFormat::kALGFormatR32_UINT:
                     return ERenderTargetFormat::kRUint;
                 default:
                     break;
@@ -243,139 +301,137 @@ namespace Ailu
             return ERenderTargetFormat::kUnknown;
         }
 
-        static EALGFormat::EALGFormat ConvertTextureFormatToPixelFormat(ETextureFormat::ETextureFormat format)
+        static EALGFormat ConvertTextureFormatToPixelFormat(ETextureFormat format)
         {
             if (format == ETextureFormat::kUnknown)
                 return EALGFormat::kALGFormatUNKOWN;
-            using namespace EALGFormat;
-            using namespace ETextureFormat;
             switch (format)
             {
                 // 8-bit formats
-                case kR8UNorm:
-                    return kALGFormatR8_UNORM;
-                case kR8UInt:
-                    return kALGFormatR8_UINT;
-                case kR8SInt:
-                    return kALGFormatR8_SINT;
+                case ETextureFormat::kR8UNorm:
+                    return EALGFormat::kALGFormatR8_UNORM;
+                case ETextureFormat::kR8UInt:
+                    return EALGFormat::kALGFormatR8_UINT;
+                case ETextureFormat::kR8SInt:
+                    return EALGFormat::kALGFormatR8_SINT;
 
-                case kRG8UNorm:
-                    return kALGFormatR8G8_UNORM;
-                case kRG8UInt:
-                    return kALGFormatR8G8_UINT;
-                case kRG8SInt:
-                    return kALGFormatR8G8_SINT;
+                case ETextureFormat::kRG8UNorm:
+                    return EALGFormat::kALGFormatR8G8_UNORM;
+                case ETextureFormat::kRG8UInt:
+                    return EALGFormat::kALGFormatR8G8_UINT;
+                case ETextureFormat::kRG8SInt:
+                    return EALGFormat::kALGFormatR8G8_SINT;
 
-                case kRGBA8UNorm:
-                    return kALGFormatR8G8B8A8_UNORM;
-                case kRGBA8UNormSRGB:
-                    return kALGFormatR8G8B8A8_UNORM_SRGB;
-                case kRGBA8UInt:
-                    return kALGFormatR8G8B8A8_UINT;
-                case kRGBA8SInt:
-                    return kALGFormatR8G8B8A8_SINT;
+                case ETextureFormat::kRGBA8UNorm:
+                    return EALGFormat::kALGFormatR8G8B8A8_UNORM;
+                case ETextureFormat::kRGBA8UNormSRGB:
+                    return EALGFormat::kALGFormatR8G8B8A8_UNORM_SRGB;
+                case ETextureFormat::kRGBA8UInt:
+                    return EALGFormat::kALGFormatR8G8B8A8_UINT;
+                case ETextureFormat::kRGBA8SInt:
+                    return EALGFormat::kALGFormatR8G8B8A8_SINT;
 
                 // 16-bit formats
-                case kR16Float:
-                    return kALGFormatR16_FLOAT;
-                case kR16UNorm:
-                    return kALGFormatR16_UNORM;
-                case kR16UInt:
-                    return kALGFormatR16_UINT;
-                case kR16SInt:
-                    return kALGFormatR16_SINT;
+                case ETextureFormat::kR16Float:
+                    return EALGFormat::kALGFormatR16_FLOAT;
+                case ETextureFormat::kR16UNorm:
+                    return EALGFormat::kALGFormatR16_UNORM;
+                case ETextureFormat::kR16UInt:
+                    return EALGFormat::kALGFormatR16_UINT;
+                case ETextureFormat::kR16SInt:
+                    return EALGFormat::kALGFormatR16_SINT;
 
-                case kRG16Float:
-                    return kALGFormatR16G16_FLOAT;
-                case kRG16UNorm:
-                    return kALGFormatR16G16_UNORM;
-                case kRG16UInt:
-                    return kALGFormatR16G16_UINT;
-                case kRG16SInt:
-                    return kALGFormatR16G16_SINT;
+                case ETextureFormat::kRG16Float:
+                    return EALGFormat::kALGFormatR16G16_FLOAT;
+                case ETextureFormat::kRG16UNorm:
+                    return EALGFormat::kALGFormatR16G16_UNORM;
+                case ETextureFormat::kRG16UInt:
+                    return EALGFormat::kALGFormatR16G16_UINT;
+                case ETextureFormat::kRG16SInt:
+                    return EALGFormat::kALGFormatR16G16_SINT;
 
-                case kRGBAHalf:
-                    return kALGFormatR16G16B16A16_FLOAT;
-                case kRGBA16UNorm:
-                    return kALGFormatR16G16B16A16_UNORM;
-                case kRGBA16UInt:
-                    return kALGFormatR16G16B16A16_UINT;
+                case ETextureFormat::kRGBAHalf:
+                    return EALGFormat::kALGFormatR16G16B16A16_FLOAT;
+                case ETextureFormat::kRGBA16UNorm:
+                    return EALGFormat::kALGFormatR16G16B16A16_UNORM;
+                case ETextureFormat::kRGBA16UInt:
+                    return EALGFormat::kALGFormatR16G16B16A16_UINT;
 
                 // 32-bit float formats
-                case kR32Float:
-                    return kALGFormatR32_FLOAT;
-                case kR32UInt:
-                    return kALGFormatR32_UINT;
-                case kR32SInt:
-                    return kALGFormatR32_SINT;
+                case ETextureFormat::kR32Float:
+                    return EALGFormat::kALGFormatR32_FLOAT;
+                case ETextureFormat::kR32UInt:
+                    return EALGFormat::kALGFormatR32_UINT;
+                case ETextureFormat::kR32SInt:
+                    return EALGFormat::kALGFormatR32_SINT;
 
-                case kRGFloat:
-                    return kALGFormatR32G32_FLOAT;
-                case kRG32UInt:
-                    return kALGFormatR32G32_UINT;
+                case ETextureFormat::kRGFloat:
+                    return EALGFormat::kALGFormatR32G32_FLOAT;
+                case ETextureFormat::kRG32UInt:
+                    return EALGFormat::kALGFormatR32G32_UINT;
 
-                case kRGBAFloat:
-                    return kALGFormatR32G32B32A32_FLOAT;
-                case kRGBA32UInt:
-                    return kALGFormatR32G32B32A32_UINT;
+                case ETextureFormat::kRGBAFloat:
+                    return EALGFormat::kALGFormatR32G32B32A32_FLOAT;
+                case ETextureFormat::kRGBA32UInt:
+                    return EALGFormat::kALGFormatR32G32B32A32_UINT;
 
-                case kRGBFloat:
-                    return kALGFormatR32G32B32_FLOAT;
+                case ETextureFormat::kRGBFloat:
+                    return EALGFormat::kALGFormatR32G32B32_FLOAT;
 
                 // Packed formats
-                case kR11G11B10:
-                    return kALGFormatR11G11B10_FLOAT;
-                case kRGB10A2UNorm:
-                    return kALGFormatR10G10B10A2_UNORM;
-                case kRGB10A2UInt:
-                    return kALGFormatR10G10B10A2_UINT;
+                case ETextureFormat::kR11G11B10:
+                    return EALGFormat::kALGFormatR11G11B10_FLOAT;
+                case ETextureFormat::kRGB10A2UNorm:
+                    return EALGFormat::kALGFormatR10G10B10A2_UNORM;
+                case ETextureFormat::kRGB10A2UInt:
+                    return EALGFormat::kALGFormatR10G10B10A2_UINT;
 
                 // Depth-stencil formats
-                case kD16UNorm:
-                    return kALGFormatD16_UNORM;
-                case kD24UNormS8UInt:
-                    return kALGFormatD24S8_UINT;
-                case kD32Float:
-                    return kALGFormatD32_FLOAT;
-                case kD32FloatS8X24:
-                    return kALGFormatD32_FLOAT_S8X24_UINT;
+                case ETextureFormat::kD16UNorm:
+                    return EALGFormat::kALGFormatD16_UNORM;
+                case ETextureFormat::kD24UNormS8UInt:
+                    return EALGFormat::kALGFormatD24S8_UINT;
+                case ETextureFormat::kD32Float:
+                    return EALGFormat::kALGFormatD32_FLOAT;
+                case ETextureFormat::kD32FloatS8X24:
+                    return EALGFormat::kALGFormatD32_FLOAT_S8X24_UINT;
 
                 // Compressed formats
-                case kBC1_UNorm:
-                    return kALGFormatBC1_UNORM;
-                case kBC1_UNorm_SRGB:
-                    return kALGFormatBC1_UNORM_SRGB;
-                case kBC3_UNorm:
-                    return kALGFormatBC3_UNORM;
-                case kBC3_UNorm_SRGB:
-                    return kALGFormatBC3_UNORM_SRGB;
-                case kBC4_UNorm:
-                    return kALGFormatBC4_UNORM;
-                case kBC5_UNorm:
-                    return kALGFormatBC5_UNORM;
-                case kBC6H_UF16:
-                    return kALGFormatBC6H_UF16;
-                case kBC6H_SF16:
-                    return kALGFormatBC6H_SF16;
-                case kBC7_UNorm:
-                    return kALGFormatBC7_UNORM;
-                case kBC7_UNorm_SRGB:
-                    return kALGFormatBC7_UNORM_SRGB;
+                case ETextureFormat::kBC1_UNorm:
+                    return EALGFormat::kALGFormatBC1_UNORM;
+                case ETextureFormat::kBC1_UNorm_SRGB:
+                    return EALGFormat::kALGFormatBC1_UNORM_SRGB;
+                case ETextureFormat::kBC3_UNorm:
+                    return EALGFormat::kALGFormatBC3_UNORM;
+                case ETextureFormat::kBC3_UNorm_SRGB:
+                    return EALGFormat::kALGFormatBC3_UNORM_SRGB;
+                case ETextureFormat::kBC4_UNorm:
+                    return EALGFormat::kALGFormatBC4_UNORM;
+                case ETextureFormat::kBC5_UNorm:
+                    return EALGFormat::kALGFormatBC5_UNORM;
+                case ETextureFormat::kBC6H_UF16:
+                    return EALGFormat::kALGFormatBC6H_UF16;
+                case ETextureFormat::kBC6H_SF16:
+                    return EALGFormat::kALGFormatBC6H_SF16;
+                case ETextureFormat::kBC7_UNorm:
+                    return EALGFormat::kALGFormatBC7_UNORM;
+                case ETextureFormat::kBC7_UNorm_SRGB:
+                    return EALGFormat::kALGFormatBC7_UNORM_SRGB;
 
                 // Legacy / platform
-                case kRGBA32:
-                    return kALGFormatR8G8B8A8_UNORM;
-                case kBGRA8UNorm:
-                    return kALGFormatB8G8R8A8_UNORM;
-                case kBGRA8UNormSRGB:
-                    return kALGFormatB8G8R8A8_UNORM_SRGB;
+                case ETextureFormat::kRGBA32:
+                    return EALGFormat::kALGFormatR8G8B8A8_UNORM;
+                case ETextureFormat::kBGRA8UNorm:
+                    return EALGFormat::kALGFormatB8G8R8A8_UNORM;
+                case ETextureFormat::kBGRA8UNormSRGB:
+                    return EALGFormat::kALGFormatB8G8R8A8_UNORM_SRGB;
 
                 default:
-                    return kALGFormatUNKOWN;
+                    return EALGFormat::kALGFormatUNKOWN;
             }
         }
 
-        static bool IsDepthFormat(ERenderTargetFormat::ERenderTargetFormat format)
+        static bool IsDepthFormat(ERenderTargetFormat format)
         {
             return ERenderTargetFormat::kShadowMap == format || ERenderTargetFormat::kDepth == format;
         }
@@ -402,8 +458,8 @@ namespace Ailu
                 };
             };
             u16 _depth;
-            EALGFormat::EALGFormat _format;
-            ETextureDimension::ETextureDimension _dimension;
+            EALGFormat _format;
+            ETextureDimension _dimension;
             u16 _mip_num;
             u16 _array_size;
             union
@@ -427,7 +483,7 @@ namespace Ailu
             f32 _clear_depth = kZFar;
             TextureDesc() : _width(4u), _height(4u), _depth(1u), _format(EALGFormat::kALGFormatUNKOWN), _dimension(ETextureDimension::kTex2D),
                             _mip_num(1u), _array_size(0u), _flags(0u), _load(ELoadStoreAction::kClear), _store(ELoadStoreAction::kStore) {}
-            TextureDesc(u16 w, u16 h, ERenderTargetFormat::ERenderTargetFormat rt_format, ETextureDimension::ETextureDimension dimension = ETextureDimension::kTex2D) 
+            TextureDesc(u16 w, u16 h, ERenderTargetFormat rt_format, ETextureDimension dimension = ETextureDimension::kTex2D) 
             : _width(w), _height(h), _depth(1u), _mip_num(1u), _array_size(0u), _flags(0u), _format(ConvertRenderTextureFormatToPixelFormat(rt_format)), _dimension(dimension), _load(ELoadStoreAction::kClear), _store(ELoadStoreAction::kStore)
              {
                  _is_depth_target = IsDepthFormat(rt_format);
@@ -444,13 +500,47 @@ namespace Ailu
         class AILU_API Texture : public GpuResource
         {
             GENERATED_BODY()
-            DECLARE_PROTECTED_PROPERTY(mipmap_count, MipmapLevel, u16)
-            DECLARE_PROTECTED_PROPERTY(is_readble, Readble, bool)
-            DECLARE_PROTECTED_PROPERTY(is_srgb, sRGB, bool)
-            DECLARE_PROTECTED_PROPERTY(dimension, Dimension, ETextureDimension::ETextureDimension)
-            DECLARE_PROTECTED_PROPERTY(filter_mode, FilterMode, EFilterMode::EFilterMode)
-            DECLARE_PROTECTED_PROPERTY(wrap_mode, WrapMode, EWrapMode::EWrapMode)
-            DECLARE_PROTECTED_PROPERTY_RO(pixel_format, PixelFormat, EALGFormat::EALGFormat)
+            public:
+                void MipmapLevel(const u16 &value) { _mipmap_count = value; }
+                const u16 &MipmapLevel() const { return _mipmap_count; }
+
+            protected:
+                u16 _mipmap_count;
+            public:
+                void Readble(const bool &value) { _is_readble = value; }
+                const bool &Readble() const { return _is_readble; }
+
+            protected:
+                bool _is_readble;
+            public:
+                void sRGB(const bool &value) { _is_srgb = value; }
+                const bool &sRGB() const { return _is_srgb; }
+
+            protected:
+                bool _is_srgb;
+            public:
+                void Dimension(const ETextureDimension &value) { _dimension = value; }
+                const ETextureDimension &Dimension() const { return _dimension; }
+
+            protected:
+                ETextureDimension _dimension;
+            public:
+                void FilterMode(const EFilterMode &value) { _filter_mode = value; }
+                const EFilterMode &FilterMode() const { return _filter_mode; }
+
+            protected:
+                EFilterMode _filter_mode;
+            public:
+                void WrapMode(const EWrapMode &value) { _wrap_mode = value; }
+                const EWrapMode &WrapMode() const { return _wrap_mode; }
+
+            protected:
+                EWrapMode _wrap_mode;
+            public:
+                const EALGFormat &PixelFormat() const { return _pixel_format; }
+
+            protected:
+                EALGFormat _pixel_format;
         public:
             enum ETextureViewType
             {
@@ -492,18 +582,18 @@ namespace Ailu
             virtual TextureHandle GetView(ETextureViewType view_type, u16 mipmap, u16 array_slice = 0) const { return 0; };
             virtual void ReleaseView(ETextureViewType view_type, u16 mipmap, u16 array_slice = 0) {};
             //for cube_map(s)
-            virtual void CreateView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice = 0) {};
-            virtual TextureHandle GetView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice = 0) const { return 0; };
-            virtual void ReleaseView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice = 0) {};
+            virtual void CreateView(ETextureViewType view_type, ECubemapFace face, u16 mipmap, u16 array_slice = 0) {};
+            virtual TextureHandle GetView(ETextureViewType view_type, ECubemapFace face, u16 mipmap, u16 array_slice = 0) const { return 0; };
+            virtual void ReleaseView(ETextureViewType view_type, ECubemapFace face, u16 mipmap, u16 array_slice = 0) {};
             //common
             virtual void CreateView() {};
             virtual void GenerateMipmap() {};
             [[nodiscard]] u16 CalculateViewIndex(ETextureViewType view_type, u16 mipmap, u16 array_slice) const;
-            [[nodiscard]] u16 CalculateViewIndex(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice) const;
+            [[nodiscard]] u16 CalculateViewIndex(ETextureViewType view_type, ECubemapFace face, u16 mipmap, u16 array_slice) const;
             //for 2d/2d array/3d
             [[nodiscard]] u16 CalculateSubResIndex(u16 mipmap, u16 depth_slice) const;
             //for cubemap / cubemap array
-            [[nodiscard]] u16 CalculateSubResIndex(ECubemapFace::ECubemapFace face, u16 mipmap, u16 depth_slice) const;
+            [[nodiscard]] u16 CalculateSubResIndex(ECubemapFace face, u16 mipmap, u16 depth_slice) const;
             bool IsRenderTex() const { return _is_render_tex; }
             virtual bool IsValidMipmap(u16 mipmap) const { return mipmap < _pixel_data.size(); };
             u16 Width() const { return _width; }
@@ -529,7 +619,7 @@ namespace Ailu
             GENERATED_BODY()
         public:
             static Ref<Texture2D> Create(const TextureDesc &initializer);
-            static Ref<Texture2D> Create(u16 w, u16 h, ETextureFormat::ETextureFormat format, bool is_mip = false, bool is_random_access = false);
+            static Ref<Texture2D> Create(u16 w, u16 h, ETextureFormat format, bool is_mip = false, bool is_random_access = false);
             Texture2D() = default;
             Texture2D(const TextureDesc &initializer);
             virtual ~Texture2D();
@@ -562,7 +652,11 @@ namespace Ailu
         class AILU_API Texture3D : public Texture
         {
             GENERATED_BODY()
-            DECLARE_PROTECTED_PROPERTY_RO(depth, Depth, u16)
+            public:
+                const u16 &Depth() const { return _depth; }
+
+            protected:
+                u16 _depth;
         public:
             static Ref<Texture3D> Create(const TextureDesc &initializer);
             Texture3D() = default;
@@ -595,22 +689,22 @@ namespace Ailu
         {
             GENERATED_BODY()
         public:
-            static Ref<CubeMap> Create(u16 width, bool mipmap_chain = true, ETextureFormat::ETextureFormat format = ETextureFormat::kRGBA32, bool linear = false, bool random_access = false);
+            static Ref<CubeMap> Create(u16 width, bool mipmap_chain = true, ETextureFormat format = ETextureFormat::kRGBA32, bool linear = false, bool random_access = false);
             CubeMap() = default;
-            CubeMap(u16 width, bool mipmap_chain = true, ETextureFormat::ETextureFormat format = ETextureFormat::kRGBA32, bool linear = false, bool random_access = false);
+            CubeMap(u16 width, bool mipmap_chain = true, ETextureFormat format = ETextureFormat::kRGBA32, bool linear = false, bool random_access = false);
             virtual ~CubeMap();
-            Color GetPixel32(ECubemapFace::ECubemapFace face, u16 x, u16 y);
-            Color GetPixel(ECubemapFace::ECubemapFace face, u16 x, u16 y);
-            Ptr GetPixelData(ECubemapFace::ECubemapFace face, u16 mipmap);
-            void SetPixel(ECubemapFace::ECubemapFace face, u16 x, u16 y, Color color, u16 mipmap);
-            void SetPixel32(ECubemapFace::ECubemapFace face, u16 x, u16 y, Color32 color, u16 mipmap);
-            void SetPixelData(ECubemapFace::ECubemapFace face, u8 *data, u16 mipmap, u64 offset = 0u);
+            Color GetPixel32(ECubemapFace face, u16 x, u16 y);
+            Color GetPixel(ECubemapFace face, u16 x, u16 y);
+            Ptr GetPixelData(ECubemapFace face, u16 mipmap);
+            void SetPixel(ECubemapFace face, u16 x, u16 y, Color color, u16 mipmap);
+            void SetPixel32(ECubemapFace face, u16 x, u16 y, Color32 color, u16 mipmap);
+            void SetPixelData(ECubemapFace face, u8 *data, u16 mipmap, u64 offset = 0u);
 
         protected:
             bool IsValidMipmap(u16 mipmap) const final { return mipmap < _pixel_data.size() / 2u; };
 
         protected:
-            ETextureFormat::ETextureFormat _format;
+            ETextureFormat _format;
         };
 
         enum class ETextureResState : u8
@@ -635,7 +729,11 @@ namespace Ailu
         class AILU_API RenderTexture : public Texture
         {
             GENERATED_BODY()
-            DECLARE_PROTECTED_PROPERTY_RO(depth, Depth, u16)
+            public:
+                const u16 &Depth() const { return _depth; }
+
+            protected:
+                u16 _depth;
         public:
             void DepthBit(const u16 &value) { _depth_bit = value; }
             const u16 &DepthBit() const { return _depth_bit; }
@@ -654,20 +752,20 @@ namespace Ailu
                 return nullptr;
             }
             static u64 TotalGPUMemerySize() { return s_render_texture_gpu_mem_usage; }
-            static RTHandle GetTempRT(u16 width, u16 height, String name = std::format("TempBuffer_{}", s_temp_rt_count++), ERenderTargetFormat::ERenderTargetFormat format = ERenderTargetFormat::kDefault, bool mipmap_chain = false, bool linear = false, bool random_access = false);
+            static RTHandle GetTempRT(u16 width, u16 height, String name = std::format("TempBuffer_{}", s_temp_rt_count++), ERenderTargetFormat format = ERenderTargetFormat::kDefault, bool mipmap_chain = false, bool linear = false, bool random_access = false);
             static RTHandle GetTempRT(const TextureDesc &desc, String name = std::format("TempBuffer_{}", s_temp_rt_count++));
-            static RTHandle GetTempRT(u16 width, u16 height, String name, ERenderTargetFormat::ERenderTargetFormat format, ELoadStoreAction load_action);
+            static RTHandle GetTempRT(u16 width, u16 height, String name, ERenderTargetFormat format, ELoadStoreAction load_action);
             static void ReleaseTempRT(RTHandle handle);
             static void ResetRenderTarget(RenderTexture *rt = nullptr) { s_current_rt = rt; };
-            //virtual TextureHandle GetView(ECubemapFace::ECubemapFace face, u16 mimmap) { return 0; };
+            //virtual TextureHandle GetView(ECubemapFace face, u16 mimmap) { return 0; };
             //当mipmap为0时，访问srv时，返回原图分辨率，也就是mip0，当访问uav时，实际访问的是mipmap1的uav（cubemap）
-            //virtual TextureHandle GetView(u16 mimmap, bool random_access = false, ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown, u16 array_slice = 0) override { return 0; };
-            static Ref<RenderTexture> Create(u16 width, u16 height, String name = "", ERenderTargetFormat::ERenderTargetFormat format = ERenderTargetFormat::kDefault, bool mipmap_chain = false, bool linear = false, bool random_access = false);
-            static Ref<RenderTexture> Create(u16 width, u16 height, u16 array_slice, String name = "", ERenderTargetFormat::ERenderTargetFormat format = ERenderTargetFormat::kDefault, bool mipmap_chain = false, bool linear = false, bool random_access = false);
-            static Ref<RenderTexture> Create(u16 width, String name = "", ERenderTargetFormat::ERenderTargetFormat format = ERenderTargetFormat::kDefault, bool mipmap_chain = false, bool linear = false, bool random_access = false);
+            //virtual TextureHandle GetView(u16 mimmap, bool random_access = false, ECubemapFace face = ECubemapFace::kUnknown, u16 array_slice = 0) override { return 0; };
+            static Ref<RenderTexture> Create(u16 width, u16 height, String name = "", ERenderTargetFormat format = ERenderTargetFormat::kDefault, bool mipmap_chain = false, bool linear = false, bool random_access = false);
+            static Ref<RenderTexture> Create(u16 width, u16 height, u16 array_slice, String name = "", ERenderTargetFormat format = ERenderTargetFormat::kDefault, bool mipmap_chain = false, bool linear = false, bool random_access = false);
+            static Ref<RenderTexture> Create(u16 width, String name = "", ERenderTargetFormat format = ERenderTargetFormat::kDefault, bool mipmap_chain = false, bool linear = false, bool random_access = false);
             static Ref<RenderTexture> Create(const TextureDesc &desc, String name = "");
             //cubemap array not support mipmap
-            static Ref<RenderTexture> Create(u16 width, String name = "", ERenderTargetFormat::ERenderTargetFormat format = ERenderTargetFormat::kDefault, u16 array_slice = 1, bool linear = false, bool random_access = false);
+            static Ref<RenderTexture> Create(u16 width, String name = "", ERenderTargetFormat format = ERenderTargetFormat::kDefault, u16 array_slice = 1, bool linear = false, bool random_access = false);
         public:
             RenderTexture() = default;
             RenderTexture(const TextureDesc &desc);
@@ -675,9 +773,9 @@ namespace Ailu
             void CreateView(ETextureViewType view_type, u16 mipmap, u16 array_slice = 0) override {};
             TextureHandle GetView(ETextureViewType view_type, u16 mipmap, u16 array_slice = 0) const override { return 0; };
             void ReleaseView(ETextureViewType view_type, u16 mipmap, u16 array_slice = 0) override {};
-            void CreateView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice = 0) override {};
-            TextureHandle GetView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice = 0) const override { return 0; };
-            void ReleaseView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice = 0) override {};
+            void CreateView(ETextureViewType view_type, ECubemapFace face, u16 mipmap, u16 array_slice = 0) override {};
+            TextureHandle GetView(ETextureViewType view_type, ECubemapFace face, u16 mipmap, u16 array_slice = 0) const override { return 0; };
+            void ReleaseView(ETextureViewType view_type, ECubemapFace face, u16 mipmap, u16 array_slice = 0) override {};
             void CreateView() override;
             u16 ArraySlice() const { return _slice_num; }
             Vector4f TexelSize() const { return _texel_size; }
@@ -693,8 +791,8 @@ namespace Ailu
             virtual TextureHandle DepthTexture(u16 view_index) { return 0; };
             virtual void GenerateMipmap() override;
             //ret data need to be delete[] by client
-            virtual void *ReadBack(u16 mipmap, u16 array_slice = 0, ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown) { return nullptr; };
-            virtual void ReadBackAsync(std::function<void(void *)> callback, u16 mipmap, u16 array_slice = 0, ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown) {};
+            virtual void *ReadBack(u16 mipmap, u16 array_slice = 0, ECubemapFace face = ECubemapFace::kUnknown) { return nullptr; };
+            virtual void ReadBackAsync(std::function<void(void *)> callback, u16 mipmap, u16 array_slice = 0, ECubemapFace face = ECubemapFace::kUnknown) {};
             bool IsSwapChain() const { return _is_swapchain; }
         private:
             inline static RenderTexture *s_current_rt = nullptr;
@@ -723,7 +821,7 @@ namespace Ailu
         class SwapchainTexture : public RenderTexture
         {
         public:
-            SwapchainTexture(u16 width, u16 height,ERenderTargetFormat::ERenderTargetFormat format)
+            SwapchainTexture(u16 width, u16 height,ERenderTargetFormat format)
                 : RenderTexture(TextureDesc(width,height,format))
             {
                 _name = "BackBuffer";
@@ -758,7 +856,7 @@ namespace Ailu
             u8 _cur_backbuf_index;
         };
 
-        class AILU_API RenderTexturePool
+        class AILU_API RenderTexturePool : public NonCopyable
         {
             struct RTInfo
             {
@@ -769,7 +867,6 @@ namespace Ailu
                 Ref<RenderTexture> _rt;
                 u64 _fence_value = 0;
             };
-            DISALLOW_COPY_AND_ASSIGN(RenderTexturePool)
         public:
             RenderTexturePool() = default;
             ~RenderTexturePool();

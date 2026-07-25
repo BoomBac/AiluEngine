@@ -3,7 +3,8 @@
         "_format_version": 1,
         "_guid": "687dd7a6-c8d4-40f1-8a33-694707d9c423",
         "_asset_type": "Ailu::Render::Texture2D",
-        "_asset_name": "directional_light"
+        "_asset_name": "directional_light",
+        "_dependencies": []
     },
     "_file": "directional_light.png",
     "_is_srgb": true

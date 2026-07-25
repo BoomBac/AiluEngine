@@ -1,7 +1,11 @@
 #pragma once
 #ifndef __FRAME_RESOURCE_H__
 #define __FRAME_RESOURCE_H__
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/String.h"
+#include "Framework/Core/Containers/Array.h"
+#include "Framework/Core/Containers/Map.h"
+#include "Framework/Core/ReflectionMacros.h"
 #include "Objects/Object.h"
 #include "CoreType.h"
 #include "RendererAPI.h"

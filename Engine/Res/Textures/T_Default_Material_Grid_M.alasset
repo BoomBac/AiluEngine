@@ -3,7 +3,8 @@
         "_format_version": 1,
         "_guid": "eb07fa74-875a-467e-bf40-6d14647da7b4",
         "_asset_type": "Ailu::Render::Texture2D",
-        "_asset_name": "T_Default_Material_Grid_M"
+        "_asset_name": "T_Default_Material_Grid_M",
+        "_dependencies": []
     },
     "_file": "T_Default_Material_Grid_M.TGA",
     "_is_srgb": true

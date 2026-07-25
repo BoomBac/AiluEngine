@@ -47,7 +47,7 @@ namespace Ailu::Render
     RTXDIPass::RTXDIPass(ComputeShader *shader) : _compute_shader(shader), RenderPass("RTXDIPass")
     {
         _kernel_ray_gen = _compute_shader ? _compute_shader->FindKernel("RayGen") : static_cast<u16>(-1);
-        _event = static_cast<ERenderPassEvent::ERenderPassEvent>(ERenderPassEvent::kAfterTransparent - 5);
+        _event = static_cast<ERenderPassEvent>(static_cast<u16>(ERenderPassEvent::kAfterTransparent) - 5u);
         _scene_rt_proxy = MakeScope<SceneRayTracingProxy>();
 
         if (_compute_shader)

@@ -3,7 +3,8 @@
         "_format_version": 1,
         "_guid": "7182a502-ba5e-4de5-a517-ed226a6b7805",
         "_asset_type": "Ailu::Render::ComputeShader",
-        "_asset_name": "GpuTerrain"
+        "_asset_name": "gpu_terrain",
+        "_dependencies": []
     },
     "_file": "gpu_terrain.hlsl",
     "_kernel": "Noname"

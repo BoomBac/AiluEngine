@@ -1,9 +1,17 @@
 #include "Framework/Events/Event.h"
-#include "Scene/Entity.hpp"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Math/Color.h"
+#include "Framework/Math/Matrix.hpp"
+#include "Framework/Math/Quaternion.h"
+#include "Scene/Entity.h"
 #include <optional>
 
 namespace Ailu
 {
+    using Math::Color;
+    using Math::Matrix4x4f;
+    using Math::Quaternion;
+
     namespace ECS
     {
         struct TransformComponent;

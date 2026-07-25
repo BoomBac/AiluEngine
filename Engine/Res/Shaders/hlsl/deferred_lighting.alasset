@@ -3,7 +3,8 @@
         "_format_version": 1,
         "_guid": "88038f2b-8b36-4a3e-a271-2ed294a5c54f",
         "_asset_type": "Ailu::Render::Shader",
-        "_asset_name": "deferred_lighting"
+        "_asset_name": "deferred_lighting",
+        "_dependencies": []
     },
     "_file": "deferred_lighting.hlsl",
     "_vs_entry": "FullscreenVSMain",

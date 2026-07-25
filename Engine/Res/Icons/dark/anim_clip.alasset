@@ -3,7 +3,8 @@
         "_format_version": 1,
         "_guid": "3bc80454-31f8-4ad0-a5ab-0d85ca43ca15",
         "_asset_type": "Ailu::Render::Texture2D",
-        "_asset_name": "anim_clip"
+        "_asset_name": "anim_clip",
+        "_dependencies": []
     },
     "_file": "anim_clip.png",
     "_is_srgb": true

@@ -3,7 +3,11 @@
 #ifndef __ALLOCATOR__
 #define __ALLOCATOR__
 
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/String.h"
+#include "Framework/Core/Containers/Vector.h"
+#include "Framework/Core/Containers/Map.h"
+#include "Framework/Common/Assert.h"
 
 #include <atomic>
 #include <limits>

@@ -545,7 +545,7 @@ namespace Ailu::RHI::DX12
 	}
     void D3DDescriptorMgr::Shutdown()
     {
-		DESTORY_PTR(g_DescriptorMgr)
+		delete g_DescriptorMgr; g_DescriptorMgr = nullptr;
     }
     D3DDescriptorMgr &D3DDescriptorMgr::Get()
     {
@@ -558,8 +558,8 @@ namespace Ailu::RHI::DX12
     }
     D3DDescriptorMgr::~D3DDescriptorMgr()
     {
-		DESTORY_PTR(_gpu_alloc);
-		DESTORY_PTR(_cpu_alloc);
+		delete _gpu_alloc; _gpu_alloc = nullptr;
+		delete _cpu_alloc; _cpu_alloc = nullptr;
     }
 #pragma endregion
 }

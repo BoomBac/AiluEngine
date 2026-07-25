@@ -4,7 +4,10 @@
 
 #ifndef AILU_FONT_H
 #define AILU_FONT_H
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/String.h"
+#include "Framework/Core/Containers/Vector.h"
+#include "Framework/Core/Containers/Map.h"
 #include "Texture.h"
 namespace Ailu::Render
 {

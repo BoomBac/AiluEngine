@@ -1,14 +1,22 @@
 #pragma once
 #ifndef __TRANSFORM_H__
 #define __TRANSFORM_H__
-#include "ALMath.hpp"
 #include "Framework/Common/Utils.h"
-#include "GlobalMarco.h"
+#include "Framework/Core/Containers/Array.h"
+#include "Framework/Math/Matrix.hpp"
+#include "Framework/Math/Quaternion.h"
+#include "Framework/Math/Vector.hpp"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Common/Assert.h"
 #include "Objects/Serialize.h"
 
 
 namespace Ailu
 {
+    using Math::Matrix4x4f;
+    using Math::Quaternion;
+    using Math::Vector3f;
+
     //https://www.andre-gaschler.com/rotationconverter/
     struct Transform
     {

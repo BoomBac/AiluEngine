@@ -1,7 +1,8 @@
 #ifndef __DXR_HELPER_H__
 #define __DXR_HELPER_H__
 
-#include "GlobalMarco.h"
+#include <vector>
+#include <unordered_map>
 #include "dxhelper.h"
 #include <d3dx12.h>
 #include <wrl.h>

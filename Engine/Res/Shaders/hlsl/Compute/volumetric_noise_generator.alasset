@@ -3,7 +3,8 @@
         "_format_version": 1,
         "_guid": "10806073-d5d1-45c9-b7c4-bd55d68184e9",
         "_asset_type": "Ailu::Render::ComputeShader",
-        "_asset_name": "volumetric_noise_generator"
+        "_asset_name": "volumetric_noise_generator",
+        "_dependencies": []
     },
     "_file": "volumetric_noise_generator.hlsl",
     "_kernel": "Noname"

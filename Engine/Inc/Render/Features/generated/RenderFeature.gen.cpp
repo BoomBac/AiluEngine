@@ -42,3 +42,41 @@ return Ailu::Render::RenderPass::StaticType();
 return Ailu::Render::RenderPass::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_RenderPass(&Ailu::Render::RenderPass::StaticType, "Ailu::Render::RenderPass");
+static std::unique_ptr<Ailu::Enum> s_enum_type_ERenderPassEvent = nullptr;
+//Enum ERenderPassEvent begin...........................
+const Ailu::Enum* Z_Construct_Enum_ERenderPassEvent_Type()
+{
+if(s_enum_type_ERenderPassEvent == nullptr)
+{
+EnumInitializer initializer;
+initializer._name = "ERenderPassEvent";
+initializer._namespace = "Ailu::Render";
+initializer._full_name = "Ailu::Render::ERenderPassEvent";
+initializer._str_to_enum_lut["KBeforeRender"] = 0;
+initializer._str_to_enum_lut["kBeforeShaodwMap"] = 50;
+initializer._str_to_enum_lut["kAfterShadowMap"] = 100;
+initializer._str_to_enum_lut["kBeforeGbuffer"] = 150;
+initializer._str_to_enum_lut["kAfterGbuffer"] = 200;
+initializer._str_to_enum_lut["kBeforeDeferedLighting"] = 250;
+initializer._str_to_enum_lut["kAfterDeferedLighting"] = 300;
+initializer._str_to_enum_lut["kBeforeSkybox"] = 350;
+initializer._str_to_enum_lut["kAfterSkybox"] = 400;
+initializer._str_to_enum_lut["kBeforeTransparent"] = 450;
+initializer._str_to_enum_lut["kBeforeSprite"] = 460;
+initializer._str_to_enum_lut["kAfterSprite"] = 490;
+initializer._str_to_enum_lut["kAfterTransparent"] = 500;
+initializer._str_to_enum_lut["kBeforePostprocess"] = 550;
+initializer._str_to_enum_lut["kAfterPostprocess"] = 600;
+initializer._str_to_enum_lut["kAfterRender"] = 650;
+s_enum_type_ERenderPassEvent = std::make_unique<Ailu::Enum>(initializer);
+Ailu::Enum::RegisterEnum(s_enum_type_ERenderPassEvent.get());
+}
+return s_enum_type_ERenderPassEvent.get();
+}
+static Ailu::EnumTypeRegister g_register_ERenderPassEvent(Z_Construct_Enum_ERenderPassEvent_Type);
+template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::ERenderPassEvent>()
+{
+return s_enum_type_ERenderPassEvent.get();
+}
+//Enum ERenderPassEvent end...........................
+

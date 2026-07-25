@@ -170,7 +170,7 @@ namespace Ailu::Render
     }
     void GraphicsPipelineStateMgr::Shutdown()
     {
-        DESTORY_PTR(g_pPSOMgr);
+        delete g_pPSOMgr; g_pPSOMgr = nullptr;
     }
 
     GraphicsPipelineStateMgr& GraphicsPipelineStateMgr::Get()
@@ -188,10 +188,10 @@ namespace Ailu::Render
         pso_desc._input_layout = shader->PipelineInputLayout();
         pso_desc._p_vertex_shader = shader;
         pso_desc._p_pixel_shader = shader;
-        pso_desc._rt_state = RenderTargetState{{EALGFormat::EALGFormat::kALGFormatR16G16_FLOAT, EALGFormat::EALGFormat::kALGFormatR8G8B8A8_UNORM,
-                                                EALGFormat::EALGFormat::kALGFormatR8G8B8A8_UNORM, EALGFormat::EALGFormat::kALGFormatR16G16_FLOAT,
-                                                EALGFormat::EALGFormat::kALGFormatR16G16B16A16_FLOAT},
-                                               EALGFormat::EALGFormat::kALGFormatD32_FLOAT_S8X24_UINT};
+        pso_desc._rt_state = RenderTargetState{{EALGFormat::kALGFormatR16G16_FLOAT, EALGFormat::kALGFormatR8G8B8A8_UNORM,
+                                                EALGFormat::kALGFormatR8G8B8A8_UNORM, EALGFormat::kALGFormatR16G16_FLOAT,
+                                                EALGFormat::kALGFormatR16G16B16A16_FLOAT},
+                                               EALGFormat::kALGFormatD32_FLOAT_S8X24_UINT};
         pso_desc._depth_stencil_state = shader->PipelineDepthStencilState();
         auto stand_pso = GraphicsPipelineStateObject::Create(pso_desc);
         g_pGfxContext->CreateResource(stand_pso.get());
@@ -203,7 +203,7 @@ namespace Ailu::Render
         pso_desc._input_layout = shader->PipelineInputLayout();
         pso_desc._p_vertex_shader = shader;
         pso_desc._p_pixel_shader = shader;
-        pso_desc._rt_state = RenderTargetState{{EALGFormat::EALGFormat::kALGFormatR11G11B10_FLOAT}, EALGFormat::EALGFormat::kALGFormatD32_FLOAT_S8X24_UINT};
+        pso_desc._rt_state = RenderTargetState{{EALGFormat::kALGFormatR11G11B10_FLOAT}, EALGFormat::kALGFormatD32_FLOAT_S8X24_UINT};
         pso_desc._depth_stencil_state = shader->PipelineDepthStencilState();
         stand_pso = GraphicsPipelineStateObject::Create(pso_desc);
         g_pGfxContext->CreateResource(stand_pso.get());
@@ -218,7 +218,7 @@ namespace Ailu::Render
             pso_desc._input_layout = shader->PipelineInputLayout(i);
             pso_desc._p_vertex_shader = shader;
             pso_desc._p_pixel_shader = shader;
-            pso_desc._rt_state = RenderTargetState{{EALGFormat::EALGFormat::kALGFormatR11G11B10_FLOAT}, EALGFormat::EALGFormat::kALGFormatUNKOWN};
+            pso_desc._rt_state = RenderTargetState{{EALGFormat::kALGFormatR11G11B10_FLOAT}, EALGFormat::kALGFormatUNKOWN};
             pso_desc._depth_stencil_state = TStaticDepthStencilState<false, ECompareFunc::kAlways>::GetRHI();
             stand_pso = GraphicsPipelineStateObject::Create(pso_desc);
             g_pGfxContext->CreateResource(stand_pso.get(),new UploadParamsGPSO(i,0));
@@ -232,7 +232,7 @@ namespace Ailu::Render
         pso_desc._p_pixel_shader = shader;
         pso_desc._depth_stencil_state = TStaticDepthStencilState<false, ECompareFunc::kLessEqual>::GetRHI();
         pso_desc._raster_state = TStaticRasterizerState<ECullMode::kBack, EFillMode::kWireframe>::GetRHI();
-        pso_desc._rt_state = RenderTargetState{{EALGFormat::EALGFormat::kALGFormatR11G11B10_FLOAT}, EALGFormat::EALGFormat::kALGFormatD32_FLOAT_S8X24_UINT};
+        pso_desc._rt_state = RenderTargetState{{EALGFormat::kALGFormatR11G11B10_FLOAT}, EALGFormat::kALGFormatD32_FLOAT_S8X24_UINT};
         auto wireframe_pso = GraphicsPipelineStateObject::Create(pso_desc);
         g_pGfxContext->CreateResource(wireframe_pso.get());
         AddPSO(std::move(wireframe_pso));
@@ -246,7 +246,7 @@ namespace Ailu::Render
         pso_desc._topology = shader->PipelineTopology();
         pso_desc._p_pixel_shader = shader;
         pso_desc._p_vertex_shader = shader;
-        pso_desc._rt_state = RenderTargetState{{EALGFormat::EALGFormat::kALGFormatR11G11B10_FLOAT}, EALGFormat::EALGFormat::kALGFormatUNKOWN};
+        pso_desc._rt_state = RenderTargetState{{EALGFormat::kALGFormatR11G11B10_FLOAT}, EALGFormat::kALGFormatUNKOWN};
         auto pso = std::move(GraphicsPipelineStateObject::Create(pso_desc));
         g_pGfxContext->CreateResource(pso.get());
         GraphicsPipelineStateMgr::AddPSO(std::move(pso));
@@ -263,7 +263,7 @@ namespace Ailu::Render
             pso_desc._topology = shader->PipelineTopology(i);
             pso_desc._p_pixel_shader = shader;
             pso_desc._p_vertex_shader = shader;
-            pso_desc._rt_state = RenderTargetState{{EALGFormat::EALGFormat::kALGFormatR11G11B10_FLOAT}, EALGFormat::EALGFormat::kALGFormatUNKOWN};
+            pso_desc._rt_state = RenderTargetState{{EALGFormat::kALGFormatR11G11B10_FLOAT}, EALGFormat::kALGFormatUNKOWN};
             pso = std::move(GraphicsPipelineStateObject::Create(pso_desc));
             g_pGfxContext->CreateResource(pso.get(),new UploadParamsGPSO(i,0));
             GraphicsPipelineStateMgr::AddPSO(std::move(pso));
@@ -281,7 +281,7 @@ namespace Ailu::Render
             pso_desc._topology = shader->PipelineTopology(i);
             pso_desc._p_pixel_shader = shader;
             pso_desc._p_vertex_shader = shader;
-            pso_desc._rt_state = RenderTargetState{{EALGFormat::EALGFormat::kALGFormatR11G11B10_FLOAT}, EALGFormat::EALGFormat::kALGFormatD32_FLOAT_S8X24_UINT};
+            pso_desc._rt_state = RenderTargetState{{EALGFormat::kALGFormatR11G11B10_FLOAT}, EALGFormat::kALGFormatD32_FLOAT_S8X24_UINT};
             pso = std::move(GraphicsPipelineStateObject::Create(pso_desc));
             g_pGfxContext->CreateResource(pso.get(),new UploadParamsGPSO(i,0));
             GraphicsPipelineStateMgr::AddPSO(std::move(pso));
@@ -298,7 +298,7 @@ namespace Ailu::Render
             pso_desc._topology = shader->PipelineTopology(i);
             pso_desc._p_pixel_shader = shader;
             pso_desc._p_vertex_shader = shader;
-            pso_desc._rt_state = RenderTargetState{{EALGFormat::EALGFormat::kALGFormatR11G11B10_FLOAT}, EALGFormat::EALGFormat::kALGFormatD32_FLOAT_S8X24_UINT};
+            pso_desc._rt_state = RenderTargetState{{EALGFormat::kALGFormatR11G11B10_FLOAT}, EALGFormat::kALGFormatD32_FLOAT_S8X24_UINT};
             pso = std::move(GraphicsPipelineStateObject::Create(pso_desc));
             g_pGfxContext->CreateResource(pso.get(),new UploadParamsGPSO(i,0));
             GraphicsPipelineStateMgr::AddPSO(std::move(pso));
@@ -516,23 +516,23 @@ namespace Ailu::Render
     {
         g_pPSOMgr->_hash_rt_state = hash;
     }
-    void GraphicsPipelineStateMgr::SetRenderTargetState(EALGFormat::EALGFormat color_format, EALGFormat::EALGFormat depth_format, u8 color_rt_id)
+    void GraphicsPipelineStateMgr::SetRenderTargetState(EALGFormat color_format, EALGFormat depth_format, u8 color_rt_id)
     {
         g_pPSOMgr->_render_target_state._color_rt[color_rt_id] = color_format;
-        g_pPSOMgr->_render_target_state._color_rt_num = color_format == EALGFormat::EALGFormat::kALGFormatUNKOWN ? 0 : static_cast<u8>(color_rt_id + 1u);
+        g_pPSOMgr->_render_target_state._color_rt_num = color_format == EALGFormat::kALGFormatUNKOWN ? 0 : static_cast<u8>(color_rt_id + 1u);
         g_pPSOMgr->_render_target_state._depth_rt = depth_format;
     }
-    void GraphicsPipelineStateMgr::SetRenderTargetState(EALGFormat::EALGFormat color_format, u8 color_rt_id)
+    void GraphicsPipelineStateMgr::SetRenderTargetState(EALGFormat color_format, u8 color_rt_id)
     {
         g_pPSOMgr->_render_target_state._color_rt[color_rt_id] = color_format;
-        g_pPSOMgr->_render_target_state._color_rt_num = color_format == EALGFormat::EALGFormat::kALGFormatUNKOWN ? 0 : static_cast<u8>(color_rt_id + 1u);
+        g_pPSOMgr->_render_target_state._color_rt_num = color_format == EALGFormat::kALGFormatUNKOWN ? 0 : static_cast<u8>(color_rt_id + 1u);
     }
     void GraphicsPipelineStateMgr::ResetRenderTargetState()
     {
         g_pPSOMgr->_render_target_state._color_rt_num = 0;
         for (int i = 0; i < 8; i++)
-            g_pPSOMgr->_render_target_state._color_rt[i] = EALGFormat::EALGFormat::kALGFormatUNKOWN;
-        g_pPSOMgr->_render_target_state._depth_rt = EALGFormat::EALGFormat::kALGFormatUNKOWN;
+            g_pPSOMgr->_render_target_state._color_rt[i] = EALGFormat::kALGFormatUNKOWN;
+        g_pPSOMgr->_render_target_state._depth_rt = EALGFormat::kALGFormatUNKOWN;
     }
     void GraphicsPipelineStateMgr::SubmitBindResource(PipelineResource resource)
     {

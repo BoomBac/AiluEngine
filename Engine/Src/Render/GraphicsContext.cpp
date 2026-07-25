@@ -38,8 +38,8 @@ namespace Ailu::Render
         FrameResourceManager::Shutdown();
         RHI::DX12::GpuResourceManager::Shutdown();
 		CommandPool::Shutdown();
-		DESTORY_PTR(g_pRenderTexturePool);
-		DESTORY_PTR(g_pGfxContext);
+		delete g_pRenderTexturePool; g_pRenderTexturePool = nullptr;
+		delete g_pGfxContext; g_pGfxContext = nullptr;
 	}
     GraphicsContext &GraphicsContext::Get()
     {

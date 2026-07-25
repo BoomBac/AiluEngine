@@ -3,7 +3,8 @@
         "_format_version": 1,
         "_guid": "2ff30e48-6661-479b-a90c-863e606734f6",
         "_asset_type": "Ailu::Render::Mesh",
-        "_asset_name": "Sphere"
+        "_asset_name": "sphere",
+        "_dependencies": []
     },
     "_file": "sphere.fbx",
     "_inner_file_name": "Sphere",

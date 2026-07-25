@@ -22,7 +22,7 @@ namespace Ailu
 
     void TimeMgr::Shutdown()
     {
-        DESTORY_PTR(s_time_mgr);
+        delete s_time_mgr; s_time_mgr = nullptr;
     }
 
     TimeMgr &TimeMgr::Get()

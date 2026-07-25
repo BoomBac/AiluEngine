@@ -1,5 +1,6 @@
 #include "pch.h"
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Common/Assert.h"
 #include "Framework/Math/Guid.h"
 #include "Framework/Common/Log.h"
 

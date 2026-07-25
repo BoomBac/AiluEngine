@@ -3,7 +3,8 @@
         "_format_version": 1,
         "_guid": "8029eac3-978a-458c-8a7b-e165f2a2710f",
         "_asset_type": "Ailu::Render::Shader",
-        "_asset_name": "default_sprite"
+        "_asset_name": "default_sprite",
+        "_dependencies": []
     },
     "_file": "default_sprite.hlsl",
     "_vs_entry": "VSMain",

@@ -13,5 +13,14 @@ template<>
 AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::EAntiAliasing>();
 //Enum EAntiAliasing end...........................
 
+//Enum ECameraType begin...........................
+const Ailu::Enum* Z_Construct_Enum_ECameraType_Type();
+namespace Ailu::Render { 
+enum class ECameraType : i32;
+}
+template<>
+AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::ECameraType>();
+//Enum ECameraType end...........................
+
 #undef CURRENT_FILE_ID
 #define CURRENT_FILE_ID CAMERA_GEN_H

@@ -5,7 +5,8 @@
 #ifndef AILU_CROSSFADE_H
 #define AILU_CROSSFADE_H
 #include "Clip.h"
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/Containers/Vector.h"
 #include "Pose.h"
 namespace Ailu
 {

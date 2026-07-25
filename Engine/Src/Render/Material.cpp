@@ -591,7 +591,7 @@ namespace Ailu::Render
             //处理cbuffer
             if (cbuf_size_per_passes[i] == 0)
                 cbuf_size_per_passes[i] = 256;
-            cbuf_size_per_passes[i] = ALIGN_TO_256(cbuf_size_per_passes[i]);
+            cbuf_size_per_passes[i] = AlignTo(cbuf_size_per_passes[i],256);
             AL_ASSERT(cbuf_size_per_passes[i] <= 256);
             if (first_time)
             {
@@ -608,7 +608,7 @@ namespace Ailu::Render
                 LOG_ERROR("Material: " + _name + " shader cbuf size not equal!");
                 //u8* new_cbuf_data = new u8[cur_shader_cbuf_size];
                 //memcpy(new_cbuf_data, _p_cbuf_cpu, _mat_cbuf_size);
-                //DESTORY_PTRARR(_p_cbuf_cpu);
+                //delete[] _p_cbuf_cpu; _p_cbuf_cpu = nullptr;
                 //_p_cbuf_cpu = new_cbuf_data;
             }
             else {}
@@ -862,12 +862,12 @@ namespace Ailu::Render
                 memset(_property_blocks[_standard_pass_index]._data + _material_id_offset, 0, sizeof(u32));
         }
     }
-    void StandardMaterial::MaterialID(const EMaterialID::EMaterialID &value)
+    void StandardMaterial::MaterialID(const EMaterialID &value)
     {
         _material_id = value;
         _common_uint_property["_MaterialID"] = (u32) _material_id;
     }
-    void StandardMaterial::SurfaceType(const ESurfaceType::ESurfaceType &value)
+    void StandardMaterial::SurfaceType(const ESurfaceType &value)
     {
         if (_surface == value)
             return;
@@ -893,7 +893,7 @@ namespace Ailu::Render
         }
         _p_active_shader->AddMaterialRef(this);
         _surface = value;
-        _common_uint_property[kSurfaceKey] = _surface;
+        _common_uint_property[kSurfaceKey] = static_cast<u32>(_surface);
     }
     void StandardMaterial::SetTexture(const String &name, Texture *texture)
     {
@@ -968,8 +968,8 @@ namespace Ailu::Render
             if (_standard_pass_index != -1)
                 break;
         }
-        _material_id = (EMaterialID::EMaterialID) _common_uint_property["_MaterialID"];
-        _surface = (ESurfaceType::ESurfaceType) _common_uint_property["_surface"];
+        _material_id = (EMaterialID) _common_uint_property["_MaterialID"];
+        _surface = (ESurfaceType) _common_uint_property["_surface"];
     }
     //-------------------------------------------StandardMaterial--------------------------------------------------------
 }// namespace Ailu

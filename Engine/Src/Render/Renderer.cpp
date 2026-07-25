@@ -133,7 +133,7 @@ namespace Ailu::Render
             {
                 for (u16 i = 1; i <= 6; i++)
                 {
-                    auto face = (ECubemapFace::ECubemapFace) i;
+                    auto face = (ECubemapFace) i;
                     Camera &tmp_cam = Camera::GetCubemapGenCamera(cam, face);
                     tmp_cam._is_scene_camera = false;
                     tmp_cam._is_render_shadow = false;
@@ -314,7 +314,7 @@ namespace Ailu::Render
             _fog->SetActive(false);
             _raytrace_gi->SetActive(false);
             _rtxdi->SetActive(false);
-            if (_mode & EShadingMode::kLit)
+            if (static_cast<u32>(_mode) & static_cast<u32>(EShadingMode::kLit))
             {
                 _skybox_pass->Setup(false);
                 _render_passes.emplace_back(_gbuffer_pass.get());
@@ -341,7 +341,7 @@ namespace Ailu::Render
             _fog->SetActive(true);
             //_raytrace_gi->SetActive(false);
             _rtxdi->SetActive(false);
-            if (_mode & EShadingMode::kLit)
+            if (static_cast<u32>(_mode) & static_cast<u32>(EShadingMode::kLit))
             {
                 _skybox_pass->Setup(false);
                 if (cam._is_render_shadow)
@@ -360,9 +360,9 @@ namespace Ailu::Render
             if (_is_hiz_active)
                 _render_passes.emplace_back(_hzb_pass.get());
             //_render_passes.emplace_back(_gui_pass.get());
-            if (_mode & EShadingMode::kWireframe)
+            if (static_cast<u32>(_mode) & static_cast<u32>(EShadingMode::kWireframe))
             {
-                _skybox_pass->Setup(!(_mode & EShadingMode::kLit));
+                _skybox_pass->Setup(!(static_cast<u32>(_mode) & static_cast<u32>(EShadingMode::kLit)));
                 _render_passes.emplace_back(_wireframe_pass.get());
             }
             if (cam._is_render_sky_box)
@@ -392,7 +392,10 @@ namespace Ailu::Render
         {
             PROFILE_BLOCK_CPU("WaitForSys")
             for (auto &sys: s.GetRegister().SystemView())
-                sys.second->WaitFor();
+            {
+                if (sys)
+                    sys->WaitFor();
+            }
         }
         //RENDER GRAPH
         if (_is_use_render_graph)
@@ -904,7 +907,7 @@ namespace Ailu::Render
         }
         else
         {
-            if (cam._layer_mask & ERenderLayer::kDefault)
+            if (cam._layer_mask & static_cast<u32>(ERenderLayer::kDefault))
             {
                 for (auto &pass: _render_passes)
                 {
@@ -917,7 +920,7 @@ namespace Ailu::Render
                     }
                 }
             }
-            else if (cam._layer_mask & ERenderLayer::kSkyBox)
+            else if (cam._layer_mask & static_cast<u32>(ERenderLayer::kSkyBox))
             {
                 PROFILE_BLOCK_CPU(_skybox_pass->GetName())
                 _skybox_pass->BeginPass(_p_context);

@@ -57,8 +57,8 @@ namespace Ailu::Render
     }
     void Gizmo::Shutdown()
     {
-        DESTORY_PTR(s_pInstance->_text_renderer)
-        DESTORY_PTR(s_pInstance);
+        delete s_pInstance->_text_renderer; s_pInstance->_text_renderer = nullptr;
+        delete s_pInstance; s_pInstance = nullptr;
     }
 
     void Gizmo::DrawLine(const Vector3f &from, const Vector3f &to, Color color)

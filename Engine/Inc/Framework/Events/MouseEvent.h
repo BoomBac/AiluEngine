@@ -4,7 +4,7 @@
 
 #include <format>
 
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
 #include "Event.h"
 
 namespace Ailu

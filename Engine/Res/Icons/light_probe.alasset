@@ -3,7 +3,8 @@
         "_format_version": 1,
         "_guid": "012efc02-825c-42e9-b512-35c19e7eb1db",
         "_asset_type": "Ailu::Render::Texture2D",
-        "_asset_name": "light_probe"
+        "_asset_name": "light_probe",
+        "_dependencies": []
     },
     "_file": "light_probe.png",
     "_is_srgb": true

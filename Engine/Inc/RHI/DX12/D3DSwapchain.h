@@ -16,7 +16,7 @@ namespace Ailu
         struct D3DSwapchainInitializer
         {
             DXGI_SWAP_CHAIN_DESC1 _swapchain_desc;
-            EALGFormat::EALGFormat _format;
+            EALGFormat _format;
             ID3D12Device *_device;
             Window* _window;
             ID3D12CommandQueue *_command_queue;

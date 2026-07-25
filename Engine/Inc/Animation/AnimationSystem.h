@@ -6,7 +6,7 @@
 #pragma once
 #ifndef __ANIM_SYS_H__
 #define __ANIM_SYS_H__
-#include "Scene/Entity.hpp"
+#include "Scene/Entity.h"
 #include "Clip.h"
 namespace Ailu
 {
@@ -14,7 +14,7 @@ namespace Ailu
     {
         class AnimationSystem : public System
         {
-            DECLARE_CLASS(AnimationSystem)
+            DECLARE_SYSTEM(AnimationSystem)
         public:
             inline static u32 s_vertex_num_per_skin_task = 2000u;
             void Update(Register &r, f32 delta_time) final;

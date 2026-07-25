@@ -949,7 +949,7 @@ namespace Ailu::RHI::DX12
                     }
                 }
                 AL_ASSERT_MSG(cbuffer_size <= ComputeShader::kCBufferSize, "ComputeBuffer size must be less than 1024");
-                cbuffer_size = ALIGN_TO_256(cbuffer_size);
+                cbuffer_size = AlignTo(cbuffer_size,256);
                 //这里暂时只支持一个cbuffer，以后按需修改
                 auto cbuf_it = std::find_if(cs_ele._temp_bind_res_infos.begin(), cs_ele._temp_bind_res_infos.end(), [this](auto it)
                                             {

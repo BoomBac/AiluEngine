@@ -11,23 +11,24 @@ namespace Ailu
     {
         PhysicsSystem::PhysicsSystem()
         {
-            _collision_matrix[EColliderType::kSphere][EColliderType::kSphere] = [&](const CCollider &a, const Matrix4x4f &ma, const CCollider &b, const Matrix4x4f &mb) -> ContactData {
+            auto collider_index = [](EColliderType type) { return static_cast<u32>(type); };
+            _collision_matrix[collider_index(EColliderType::kSphere)][collider_index(EColliderType::kSphere)] = [&](const CCollider &a, const Matrix4x4f &ma, const CCollider &b, const Matrix4x4f &mb) -> ContactData {
                 return CollisionDetection::Intersect(CCollider::AsShpere(a) * ma, CCollider::AsShpere(b) * mb);};
-            _collision_matrix[EColliderType::kSphere][EColliderType::kBox] = [&](const CCollider &a, const Matrix4x4f &ma, const CCollider &b, const Matrix4x4f &mb) -> ContactData{
+            _collision_matrix[collider_index(EColliderType::kSphere)][collider_index(EColliderType::kBox)] = [&](const CCollider &a, const Matrix4x4f &ma, const CCollider &b, const Matrix4x4f &mb) -> ContactData{
                 return CollisionDetection::Intersect(CCollider::AsShpere(a) * ma, CCollider::AsBox(b) * mb);};
-            _collision_matrix[EColliderType::kSphere][EColliderType::kCapsule] = [&](const CCollider &a, const Matrix4x4f &ma, const CCollider &b, const Matrix4x4f &mb) -> ContactData{
+            _collision_matrix[collider_index(EColliderType::kSphere)][collider_index(EColliderType::kCapsule)] = [&](const CCollider &a, const Matrix4x4f &ma, const CCollider &b, const Matrix4x4f &mb) -> ContactData{
                 return CollisionDetection::Intersect(CCollider::AsShpere(a) * ma, CCollider::AsCapsule(b) * mb);};
-            _collision_matrix[EColliderType::kCapsule][EColliderType::kSphere] = [&](const CCollider &a, const Matrix4x4f &ma, const CCollider &b, const Matrix4x4f &mb) -> ContactData
+            _collision_matrix[collider_index(EColliderType::kCapsule)][collider_index(EColliderType::kSphere)] = [&](const CCollider &a, const Matrix4x4f &ma, const CCollider &b, const Matrix4x4f &mb) -> ContactData
             { return CollisionDetection::Intersect(CCollider::AsCapsule(a) * ma, CCollider::AsShpere(b) * mb); };
-            _collision_matrix[EColliderType::kCapsule][EColliderType::kBox] = [&](const CCollider &a, const Matrix4x4f &ma, const CCollider &b, const Matrix4x4f &mb) -> ContactData
+            _collision_matrix[collider_index(EColliderType::kCapsule)][collider_index(EColliderType::kBox)] = [&](const CCollider &a, const Matrix4x4f &ma, const CCollider &b, const Matrix4x4f &mb) -> ContactData
             { return CollisionDetection::Intersect(CCollider::AsCapsule(a) * ma, CCollider::AsBox(b) * mb); };
-            _collision_matrix[EColliderType::kCapsule][EColliderType::kCapsule] = [&](const CCollider &a, const Matrix4x4f &ma, const CCollider &b, const Matrix4x4f &mb) -> ContactData
+            _collision_matrix[collider_index(EColliderType::kCapsule)][collider_index(EColliderType::kCapsule)] = [&](const CCollider &a, const Matrix4x4f &ma, const CCollider &b, const Matrix4x4f &mb) -> ContactData
             { return CollisionDetection::Intersect(CCollider::AsCapsule(a) * ma, CCollider::AsCapsule(b) * mb); };
-            _collision_matrix[EColliderType::kBox][EColliderType::kSphere] = [&](const CCollider &a, const Matrix4x4f &ma, const CCollider &b, const Matrix4x4f &mb) -> ContactData
+            _collision_matrix[collider_index(EColliderType::kBox)][collider_index(EColliderType::kSphere)] = [&](const CCollider &a, const Matrix4x4f &ma, const CCollider &b, const Matrix4x4f &mb) -> ContactData
             { return CollisionDetection::Intersect(CCollider::AsBox(a) * ma, CCollider::AsShpere(b) * mb); };
-            _collision_matrix[EColliderType::kBox][EColliderType::kBox] = [&](const CCollider &a, const Matrix4x4f &ma, const CCollider &b, const Matrix4x4f &mb) -> ContactData
+            _collision_matrix[collider_index(EColliderType::kBox)][collider_index(EColliderType::kBox)] = [&](const CCollider &a, const Matrix4x4f &ma, const CCollider &b, const Matrix4x4f &mb) -> ContactData
             { return CollisionDetection::Intersect(CCollider::AsBox(a) * ma, CCollider::AsBox(b) * mb); };
-            _collision_matrix[EColliderType::kBox][EColliderType::kCapsule] = [&](const CCollider &a, const Matrix4x4f &ma, const CCollider &b, const Matrix4x4f &mb) -> ContactData
+            _collision_matrix[collider_index(EColliderType::kBox)][collider_index(EColliderType::kCapsule)] = [&](const CCollider &a, const Matrix4x4f &ma, const CCollider &b, const Matrix4x4f &mb) -> ContactData
             { return CollisionDetection::Intersect(CCollider::AsBox(a) * ma, CCollider::AsCapsule(b) * mb); };
         }
         void PhysicsSystem::Update(Register &r, f32 delta_time)
@@ -82,6 +83,7 @@ namespace Ailu
         }
         void PhysicsSystem::ResolveCollision(Register &r, ECS::Entity entity)
         {
+            auto collider_index = [](EColliderType type) { return static_cast<u32>(type); };
             auto transf = r.GetComponent<TransformComponent>(entity);
             if (auto c = r.GetComponent<CCollider>(entity))
             {
@@ -104,7 +106,7 @@ namespace Ailu
                         auto rigid = r.GetComponent<CRigidBody>(entity);
                         if (SqrMagnitude(rigid->_velocity) < 1.f)
                             continue;
-                        if (auto hit_result = _collision_matrix[c->_type][other_c._type](cur_c, cur_m, other_c, other_m); hit_result._is_collision)
+                        if (auto hit_result = _collision_matrix[collider_index(c->_type)][collider_index(other_c._type)](cur_c, cur_m, other_c, other_m); hit_result._is_collision)
                         {
                             _collisions.insert(entity);
                             _collisions.insert(other_enrity);

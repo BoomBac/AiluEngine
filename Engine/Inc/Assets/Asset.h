@@ -2,7 +2,9 @@
 #ifndef __ASSET_H__
 #define __ASSET_H__
 #include "Framework/Math/Guid.h"
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/String.h"
+#include "Framework/Core/Containers/Vector.h"
 #include "Objects/Object.h"
 #include "Objects/Type.h"
 #include "AssetCommon.h"

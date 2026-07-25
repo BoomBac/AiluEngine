@@ -3,7 +3,8 @@
         "_format_version": 1,
         "_guid": "4428ffdf-97de-4732-b74b-240a0bce3872",
         "_asset_type": "Ailu::Render::Texture2D",
-        "_asset_name": "skeleton"
+        "_asset_name": "skeleton",
+        "_dependencies": []
     },
     "_file": "skeleton.png",
     "_is_srgb": true

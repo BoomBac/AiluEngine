@@ -27,13 +27,25 @@ namespace Ailu::Render
     FrameResource::~FrameResource()
     {
         for (auto cb: _obj_cbs)
-            DESTORY_PTR(cb);
+        {
+            delete cb;
+            cb = nullptr;
+        }
         for (auto cb: _camera_cbs)
-            DESTORY_PTR(cb);
+        {
+            delete cb;
+            cb = nullptr;
+        }
         for (auto cb: _mat_cbs)
-            DESTORY_PTR(cb);
+        {
+            delete cb;
+            cb = nullptr;
+        }
         for (auto cb: _scene_cbs)
-            DESTORY_PTR(cb);
+        {
+            delete cb;
+            cb = nullptr;
+        }
     }
     ConstantBuffer *FrameResource::GetObjCB(u32 index)
     {

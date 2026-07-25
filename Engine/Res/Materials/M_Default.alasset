@@ -3,7 +3,8 @@
         "_format_version": 1,
         "_guid": "e3891c79-694a-4968-bb84-49c409a611ce",
         "_asset_type": "Ailu::Render::Material",
-        "_asset_name": "DefaultChecker"
+        "_asset_name": "M_Default",
+        "_dependencies": []
     },
     "_shader_guid": "60fb44b6-864f-4c6a-b49b-f4b26829b57d",
     "_keywords": [],

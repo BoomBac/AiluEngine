@@ -13,7 +13,7 @@
 #include "UI/UILayer.h"
 #include "pch.h"
 #include <Render/Gizmo.h>
-#ifdef PLATFORM_WINDOWS
+#ifdef AL_PLATFORM_WINDOWS
 //WINDOWS marco CSIDL_PROFILE
 #include <Shlobj.h>
 #endif
@@ -40,6 +40,26 @@ using namespace Ailu::Render;
 
 namespace Ailu
 {
+    namespace
+    {
+        const char *ApplicationStateToString(EApplicationState state)
+        {
+            switch (state)
+            {
+                case EApplicationState::EApplicationState_None:
+                    return "EApplicationState_None";
+                case EApplicationState::EApplicationState_Running:
+                    return "EApplicationState_Running";
+                case EApplicationState::EApplicationState_Pause:
+                    return "EApplicationState_Pause";
+                case EApplicationState::EApplicationState_Exit:
+                    return "EApplicationState_Exit";
+                default:
+                    return "EApplicationState_None";
+            }
+        }
+    }
+
 #define BIND_EVENT_HANDLER(f) std::bind(&Application::f, this, std::placeholders::_1)
 
     void Application::LoadEngineConfig()
@@ -60,12 +80,12 @@ namespace Ailu
 
     WString Application::GetWorkingPath()
     {
-#ifdef PLATFORM_WINDOWS
+#ifdef AL_PLATFORM_WINDOWS
         TCHAR path[MAX_PATH];
         GetModuleFileName(NULL, path, MAX_PATH);
         return PathUtils::ExtarctDirectory(WString(path));
 #else
-        AL_ASSERT(PLATFORM_WINDOWS == 1)
+        AL_ASSERT(AL_PLATFORM_WINDOWS == 1)
 #endif// WINDOWS
     }
     WString Application::GetAppCachePath()
@@ -198,7 +218,7 @@ namespace Ailu
         for (auto &it: type->GetProperties())
             it.Serialize(&g_engine_config,ar);
         ar.Save(s_engine_config_path);
-        DESTORY_PTR(_layer_stack);
+        delete _layer_stack; _layer_stack = nullptr;
         UI::UIManager::Shutdown();
         Gizmo::Shutdown();
         SceneManagement::SceneMgr::Shutdown();
@@ -352,7 +372,7 @@ namespace Ailu
     {
         _state = EApplicationState::EApplicationState_Pause;
         TimeMgr::Get().Reset();
-        LOG_WARNING("Application state: {}", EApplicationState::ToString(_state))
+        LOG_WARNING("Application state: {}", ApplicationStateToString(_state))
         return false;
     }
     bool Application::OnWindowResize(WindowResizeEvent &e)
@@ -634,7 +654,7 @@ namespace Ailu
     
     void Application::SetCursorInternal(ECursorType type)
     {
-#if PLATFORM_WINDOWS
+#if AL_PLATFORM_WINDOWS
         static bool s_init = false;
         static HashMap<ECursorType,HCURSOR> s_cursor_map{};
         if (!s_init)
@@ -648,6 +668,6 @@ namespace Ailu
             s_cursor_map[ECursorType::kHand] = LoadCursor(NULL, IDC_HAND);
         }
         ::SetCursor(s_cursor_map[type]);
-#endif// PLATFORM_WINDOWS
+#endif// AL_PLATFORM_WINDOWS
     }
 }// namespace Ailu

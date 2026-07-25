@@ -3,7 +3,8 @@
         "_format_version": 1,
         "_guid": "0c23d3c1-67bc-4fbe-a617-b96e82538e6c",
         "_asset_type": "Ailu::Render::Texture2D",
-        "_asset_name": "weather_map"
+        "_asset_name": "weather_map",
+        "_dependencies": []
     },
     "_file": "weather_map.png",
     "_is_srgb": true

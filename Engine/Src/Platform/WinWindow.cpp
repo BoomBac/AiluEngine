@@ -429,6 +429,9 @@ namespace Ailu
     {
     }
 
+#define HIGH_BIT(x, n) ((x) >> (n))
+#define LOW_BIT(x, n) ((x) & ((1 << (n)) - 1))
+
     LRESULT WinWindow::WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     {
 #ifdef DEAR_IMGUI

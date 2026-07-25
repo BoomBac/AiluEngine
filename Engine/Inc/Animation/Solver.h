@@ -7,7 +7,8 @@
 #ifndef AILU_SOLVER_H
 #define AILU_SOLVER_H
 #include "Framework/Math/Transform.h"
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/Containers/Vector.h"
 /*
  * 逆向动力学
  *
@@ -16,6 +17,8 @@
 
 namespace Ailu
 {
+    using Math::Vector2f;
+
     class AILU_API IConstraint
     {
     public:

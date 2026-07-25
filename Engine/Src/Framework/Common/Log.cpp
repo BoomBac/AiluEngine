@@ -45,7 +45,7 @@ namespace Ailu
     {
         AL_ASSERT(g_LogMgr != nullptr);
         g_LogMgr->Finalize();
-        DESTORY_PTR(g_LogMgr);
+        delete g_LogMgr; g_LogMgr = nullptr;
     }
     LogMgr &LogMgr::Get()
     {
@@ -75,12 +75,10 @@ namespace Ailu
     {
         for (auto &logger: _appenders)
         {
-            DESTORY_PTR(logger);
+            delete logger; logger = nullptr;
         }
     }
-    void LogMgr::Tick(f32 delta_time)
-    {
-    }
+
     LogMgr::LogMgr()
     {
         _name = "DefaultLogMgr";

@@ -2,7 +2,7 @@
 #ifndef __RENDERER_API_H__
 #define __RENDERER_API_H__
 
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
 namespace Ailu::Render
 {
 	class RendererAPI

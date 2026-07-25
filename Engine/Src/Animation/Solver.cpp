@@ -35,7 +35,7 @@ namespace Ailu
         f32 rot_angle;
         Vector3f loc_pos = cur_gt._rotation * cur_gt._position;
         rot_axis = Quaternion::GetAxis(cur_gt._rotation);
-        rot_angle = Quaternion::GetAngle(cur_gt._rotation) * k2Angle;
+        rot_angle = Quaternion::GetAngle(cur_gt._rotation) * Math::k2Angle;
         if (DotProduct(loc_pos, Vector3f::kForward) <= 0)
             rot_angle = -rot_angle;
         if (rot_angle > _limit_max)
@@ -106,7 +106,10 @@ namespace Ailu
         for (auto& c: _constraints)
         {
             for (auto p : c)
-                DESTORY_PTR(p);
+            {
+                delete p;
+                p = nullptr;
+            }
         }
     }
     u16 Solver::Size() const
@@ -124,7 +127,10 @@ namespace Ailu
         for (auto &c: _constraints)
         {
             for (auto p: c)
-                DESTORY_PTR(p);
+            {
+                delete p;
+                p = nullptr;
+            }
         }
         _constraints.clear();
     }

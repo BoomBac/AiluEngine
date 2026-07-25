@@ -3,7 +3,8 @@
         "_format_version": 1,
         "_guid": "0c0c98a5-1f90-4caa-9b72-bc4257ef17ae",
         "_asset_type": "Ailu::Render::Shader",
-        "_asset_name": "texture3d_drawer"
+        "_asset_name": "texture3d_drawer",
+        "_dependencies": []
     },
     "_file": "texture3d_drawer.hlsl",
     "_vs_entry": "VSMain",

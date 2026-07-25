@@ -2,7 +2,7 @@
 #ifndef __GFX_CONTEXT_H__
 #define __GFX_CONTEXT_H__
 #include "GfxCommand.h"
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
 #include "GpuResource.h"
 #include <functional>
 

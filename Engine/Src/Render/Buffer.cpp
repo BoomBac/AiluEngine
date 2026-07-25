@@ -2,7 +2,8 @@
 #include "Render/Buffer.h"
 #include "Render/Renderer.h"
 #include "RHI/DX12/D3DBuffer.h"
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Common/Assert.h"
 
 namespace Ailu::Render
 {
@@ -166,7 +167,7 @@ namespace Ailu::Render
 	}
 	void ConstantBuffer::Release(ConstantBuffer* ptr)
 	{
-		DESTORY_PTR(ptr);
+		delete ptr; ptr = nullptr;
 	}
 	#pragma endregion
 

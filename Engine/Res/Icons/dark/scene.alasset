@@ -3,7 +3,8 @@
         "_format_version": 1,
         "_guid": "094a838b-c1fe-4d9b-a05b-a5df05378c96",
         "_asset_type": "Ailu::Render::Texture2D",
-        "_asset_name": "scene"
+        "_asset_name": "scene",
+        "_dependencies": []
     },
     "_file": "scene.png",
     "_is_srgb": true

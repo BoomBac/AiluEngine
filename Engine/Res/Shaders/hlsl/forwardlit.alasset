@@ -3,7 +3,8 @@
         "_format_version": 1,
         "_guid": "D390A432-7AD9-475D-B1A5-726EB91072FB",
         "_asset_type": "Ailu::Render::Shader",
-        "_asset_name": "forwardlit"
+        "_asset_name": "forwardlit",
+        "_dependencies": []
     },
     "_file": "forwardlit.hlsl",
     "_vs_entry": "ForwardVSMain",

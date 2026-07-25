@@ -2,7 +2,6 @@
 #ifndef __RENDER_QUEUE__
 #define __RENDER_QUEUE__
 
-#include "GlobalMarco.h"
 #include "Material.h"
 #include "Mesh.h"
 

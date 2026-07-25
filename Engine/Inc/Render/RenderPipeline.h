@@ -3,6 +3,7 @@
 #define __RENDER_PIPELINE__
 #include <utility>
 
+#include "Framework/Common/NonCopyable.h"
 #include "Camera.h"
 #include "FrameResource.h"
 #include "Renderer.h"
@@ -27,8 +28,8 @@ namespace Ailu::Render
     struct RenderObject
     {
     public:
-        inline const static u32 kDynamicMask = BIT(1);
-        inline const static u32 kSkinMask    = BIT(2);
+        inline const static u32 kDynamicMask = 1 << 1;
+        inline const static u32 kSkinMask    = 1 << 2;
     public:
         u32 _id;
         ECS::Entity _game_obj_handle;
@@ -117,9 +118,8 @@ namespace Ailu::Render
         HashMap<u64, ConstantBuffer *> _cam_cb;
     };
 
-    class AILU_API RenderPipeline
+    class AILU_API RenderPipeline : public NonCopyable
     {
-        DISALLOW_COPY_AND_ASSIGN(RenderPipeline)
     public:
         static RenderPipeline &Get() { return *s_instance; };
         static void Register(RenderPipeline *pipe) { s_instance = pipe; }

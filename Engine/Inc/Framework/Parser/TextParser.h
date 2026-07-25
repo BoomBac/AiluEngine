@@ -1,6 +1,8 @@
 #ifndef __TEXT_PARSER_H__
 #define __TEXT_PARSER_H__
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/String.h"
+#include "Framework/Core/Containers/Map.h"
 #include "Objects/Type.h"
 
 #pragma warning(disable : 4251)//std库直接暴露为接口dll在客户端上使用时可能会有问题，禁用该编译警告

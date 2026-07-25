@@ -14,9 +14,14 @@
 #include <utility>
 
 #include "TimeMgr.h"
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Common/NonCopyable.h"
+#include "Framework/Core/String.h"
+#include "Framework/Core/Containers/Vector.h"
+#include "Framework/Core/Containers/List.h"
 #include "Framework/Common/Log.h"
 #include "Container.hpp"
+#include "generated/ThreadPool.gen.h"
 
 using std::unique_lock;
 using std::packaged_task;
@@ -29,14 +34,19 @@ namespace Ailu
 {
 	namespace Core
 	{
-		DECLARE_ENUM(EThreadStatus, kNotStarted, kRunning, kIdle);
-		class AILU_API ThreadPool
+		AENUM()
+		enum class EThreadStatus
+		{
+			kNotStarted,
+			kRunning,
+			kIdle
+		};
+		class AILU_API ThreadPool : public NonCopyable
 		{
 		public:
 			static void Init(u8 thread_num, std::string name = "GlobalThreadPool");
 			static void Shutdown();
 			static ThreadPool &Get();
-			DISALLOW_COPY_AND_ASSIGN(ThreadPool);
 			struct Task
 			{
 				String _name;
@@ -63,8 +73,8 @@ namespace Ailu
 				for (auto &record: _task_time_records)
 					record.clear();
 			}
-			const Vector<EThreadStatus::EThreadStatus>& StatusView() const{return _thread_status;}
-			EThreadStatus::EThreadStatus Status(u16 thread_id) const
+			const Vector<EThreadStatus>& StatusView() const{return _thread_status;}
+			EThreadStatus Status(u16 thread_id) const
 			{
 				if (thread_id >= _thread_status.size())
 					return EThreadStatus::kNotStarted;
@@ -160,7 +170,7 @@ namespace Ailu
 			std::mutex _wake_mutex;
 			std::atomic<bool> _b_stopping;
 			LockFreeQueue<Task,256> _tasks;
-			Vector<EThreadStatus::EThreadStatus> _thread_status;
+			Vector<EThreadStatus> _thread_status;
 			std::string _pool_name;
 			Vector<TimeMgr> _timers;
 			Vector<List<std::tuple<String,f32,f32>>> _task_time_records;

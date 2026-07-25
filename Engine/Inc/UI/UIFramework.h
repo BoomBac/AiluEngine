@@ -5,7 +5,9 @@
 #ifndef AILU_UIFRAMEWORK_H
 #define AILU_UIFRAMEWORK_H
 
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/String.h"
+#include "Framework/Core/Containers/Vector.h"
 #include "InteractionZone.h"
 #include <span>
 

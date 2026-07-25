@@ -2,7 +2,7 @@
 #ifndef __SELECTION_H__
 #define __SELECTION_H__
 #include "Objects/Object.h"
-#include "Scene/Entity.hpp"
+#include "Scene/Entity.h"
 #include "Framework/Events/Event.h"
 namespace Ailu
 {

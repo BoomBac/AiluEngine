@@ -1,12 +1,13 @@
 #pragma once
 #ifndef __IPARSER_H__
 #define __IPARSER_H__
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/String.h"
+#include "Framework/Core/Containers/Vector.h"
+#include "Framework/Core/Containers/List.h"
 #include "Animation/Clip.h"
-#include "GlobalMarco.h"
 #include "Render/Mesh.h"
 #include "Render/Texture.h"
-#include <list>
-#include <string>
 
 using Ailu::Render::Mesh;
 using Ailu::Render::Texture2D;
@@ -119,7 +120,7 @@ namespace Ailu
         u16 _width;
         u16 _height;
         Vector<u8*> _data;
-        Render::ETextureFormat::ETextureFormat _format;
+        Render::ETextureFormat _format;
         ~TextureLoadData()
         {
             for (auto &d : _data)

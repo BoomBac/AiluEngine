@@ -10,7 +10,7 @@ namespace Ailu
     void SetThreadName(const String& name)
     {
         std::lock_guard<std::mutex> lock(s_thread_name_mutex);
-#if defined(PLATFORM_WINDOWS)
+#if defined(AL_PLATFORM_WINDOWS)
         SetThreadDescription(GetCurrentThread(), ToWChar(name).c_str());
 #endif
         s_thread_names[std::this_thread::get_id()] = name;

@@ -7,6 +7,28 @@
 
 namespace Ailu::Render
 {
+    const String &CameraTypeToString(ECameraType type)
+    {
+        static const String kOrthographic = "kOrthographic";
+        static const String kPerspective = "kPerspective";
+        switch (type)
+        {
+            case ECameraType::kOrthographic:
+                return kOrthographic;
+            case ECameraType::kPerspective:
+                return kPerspective;
+            default:
+                return kPerspective;
+        }
+    }
+
+    ECameraType CameraTypeFromString(const String &str)
+    {
+        if (str == "kOrthographic")
+            return ECameraType::kOrthographic;
+        return ECameraType::kPerspective;
+    }
+
     struct HaltonSequence
     {
         int count;
@@ -175,7 +197,7 @@ namespace Ailu::Render
     {
     }
 
-    Camera::Camera(float aspect, float near_clip, float far_clip, ECameraType::ECameraType camera_type) : _aspect(aspect), _near_clip(near_clip), _far_clip(far_clip), _camera_type(camera_type), _fov_h(60.0f),
+    Camera::Camera(float aspect, float near_clip, float far_clip, ECameraType camera_type) : _aspect(aspect), _near_clip(near_clip), _far_clip(far_clip), _camera_type(camera_type), _fov_h(60.0f),
                                                                                                           _forward(Vector3f::kForward), _right(Vector3f::kRight), _up(Vector3f::kUp)
     {
         MarkDirty();
@@ -457,7 +479,7 @@ namespace Ailu::Render
         // _vf._planes[4]._distance = -DotProduct(_vf._planes[4]._normal, _far_bottom_left);
         // _vf._planes[5]._distance = -DotProduct(_vf._planes[5]._normal, _far_bottom_right);
     }
-    Camera &Camera::GetCubemapGenCamera(const Camera &base_cam, ECubemapFace::ECubemapFace face)
+    Camera &Camera::GetCubemapGenCamera(const Camera &base_cam, ECubemapFace face)
     {
         static bool s_is_init = false;
         static Camera cameras[6];
@@ -471,7 +493,8 @@ namespace Ailu::Render
             cameras[5].Name("CubemapGenCamera-Z");
             s_is_init = true;
         }
-        Camera &out = cameras[face - 1];
+        const u16 face_index = static_cast<u16>(face) - 1u;
+        Camera &out = cameras[face_index];
         out._layer_mask = base_cam._layer_mask;
         float x = base_cam._position.x, y = base_cam._position.y, z = base_cam._position.z;
         Vector3f center = {x, y, z};
@@ -499,7 +522,7 @@ namespace Ailu::Render
         //BuildViewMatrixLookToLH(view, center, targets[face+1], ups[face+1]);
         out.Position(base_cam._position);
         out.SetLens(90.0, 1.0, base_cam._near_clip, base_cam._far_clip);
-        out.LookTo(Normalize(targets[face - 1]), Normalize(ups[face - 1]));
+        out.LookTo(Normalize(targets[face_index]), Normalize(ups[face_index]));
         return out;
     }
     
@@ -519,7 +542,7 @@ namespace Ailu::Render
     Archive &operator<<(Archive &ar, const Camera &c)
     {
         ar.IncreaseIndent();
-        ar << ar.GetIndent() << "_type:" << ECameraType::ToString(c._camera_type) << std::endl;
+        ar << ar.GetIndent() << "_type:" << CameraTypeToString(c._camera_type) << std::endl;
         ar << ar.GetIndent() << "_aspect:" << c.Aspect() << std::endl;
         ar << ar.GetIndent() << "_far:" << c.Far() << std::endl;
         ar << ar.GetIndent() << "_near:" << c.Near() << std::endl;
@@ -533,7 +556,7 @@ namespace Ailu::Render
         String buf;
         ar >> buf;
         AL_ASSERT(su::BeginWith(buf, "_type"));
-        c._camera_type = ECameraType::FromString(su::Split(buf, ":")[1]);
+        c._camera_type = CameraTypeFromString(su::Split(buf, ":")[1]);
         ar >> buf;
         c._aspect = std::stof(su::Split(buf, ":")[1]);
         ar >> buf;

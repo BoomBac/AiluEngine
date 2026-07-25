@@ -3,7 +3,7 @@
 #define __CAMERA_H__
 #include "Framework/Math/ALMath.hpp"
 #include "Framework/Math/Geometry.h"
-#include "GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
 #include "Objects/Object.h"
 #include "Objects/Serialize.h"
 #include "Render/RenderingData.h"
@@ -21,25 +21,85 @@ namespace Ailu
             kTAA
         };
         class Renderer;
-        DECLARE_ENUM(ECameraType, kOrthographic, kPerspective)
+        AENUM()
+        enum class ECameraType
+        {
+            kOrthographic,
+            kPerspective
+        };
+        const String &CameraTypeToString(ECameraType type);
+        ECameraType CameraTypeFromString(const String &str);
 
         class AILU_API Camera : public Object
         {
             friend struct CCamera;
+            public:
+                void Type(const ECameraType &value) { _camera_type = value; }
+                const ECameraType &Type() const { return _camera_type; }
 
-            DECLARE_PROTECTED_PROPERTY(camera_type, Type, ECameraType::ECameraType)
-            DECLARE_PROTECTED_PROPERTY(aspect, Aspect, float)
-            DECLARE_PROTECTED_PROPERTY(near_clip, Near, float)
-            DECLARE_PROTECTED_PROPERTY(far_clip, Far, float)
-            DECLARE_PROTECTED_PROPERTY(position, Position, Vector3f)
-            DECLARE_PROTECTED_PROPERTY(rotation, Rotation, Quaternion)
-            DECLARE_PROTECTED_PROPERTY(forward, Forward, Vector3f)
-            DECLARE_PROTECTED_PROPERTY(right, Right, Vector3f)
-            DECLARE_PROTECTED_PROPERTY(up, Up, Vector3f)
-            DECLARE_PROTECTED_PROPERTY(fov_h, FovH, float)
+            protected:
+                ECameraType _camera_type;
+            public:
+                void Aspect(const float &value) { _aspect = value; }
+                const float &Aspect() const { return _aspect; }
+
+            protected:
+                float _aspect;
+            public:
+                void Near(const float &value) { _near_clip = value; }
+                const float &Near() const { return _near_clip; }
+
+            protected:
+                float _near_clip;
+            public:
+                void Far(const float &value) { _far_clip = value; }
+                const float &Far() const { return _far_clip; }
+
+            protected:
+                float _far_clip;
+            public:
+                void Position(const Vector3f &value) { _position = value; }
+                const Vector3f &Position() const { return _position; }
+
+            protected:
+                Vector3f _position;
+            public:
+                void Rotation(const Quaternion &value) { _rotation = value; }
+                const Quaternion &Rotation() const { return _rotation; }
+
+            protected:
+                Quaternion _rotation;
+            public:
+                void Forward(const Vector3f &value) { _forward = value; }
+                const Vector3f &Forward() const { return _forward; }
+
+            protected:
+                Vector3f _forward;
+            public:
+                void Right(const Vector3f &value) { _right = value; }
+                const Vector3f &Right() const { return _right; }
+
+            protected:
+                Vector3f _right;
+            public:
+                void Up(const Vector3f &value) { _up = value; }
+                const Vector3f &Up() const { return _up; }
+
+            protected:
+                Vector3f _up;
+            public:
+                void FovH(const float &value) { _fov_h = value; }
+                const float &FovH() const { return _fov_h; }
+
+            protected:
+                float _fov_h;
             //Orthographic only
-            DECLARE_PROTECTED_PROPERTY(size, Size, float)
+            public:
+                void Size(const float &value) { _size = value; }
+                const float &Size() const { return _size; }
 
+            protected:
+                float _size;
         public:
             inline static Camera *sCurrent = nullptr;
             inline static Camera *sSelected = nullptr;
@@ -49,12 +109,12 @@ namespace Ailu
             //when the eye_camera turns, the AABB is recalculated, resulting in shadow jitter
             static AABB GetBoundingAABB(const Camera &eye_cam, f32 start = 0.0f, f32 end = -1.0f);
             static Sphere GetShadowCascadeSphere(const Camera &eye_cam, f32 start = 0.0f, f32 end = -1.0f);
-            static Camera &GetCubemapGenCamera(const Camera &base_cam, ECubemapFace::ECubemapFace face);
+            static Camera &GetCubemapGenCamera(const Camera &base_cam, ECubemapFace face);
 
         public:
             static void CalculateZBUfferAndProjParams(const Camera &cam, Vector4f &zb, Vector4f &proj_params);
             Camera();
-            Camera(float aspect, float near_clip = 10.0f, float far_clip = 10000.0f, ECameraType::ECameraType camera_type = ECameraType::kPerspective);
+            Camera(float aspect, float near_clip = 10.0f, float far_clip = 10000.0f, ECameraType camera_type = ECameraType::kPerspective);
             void RecalculateMatrix(bool force = false);
             void SetLens(float fovh, float aspect, float nz, float fz);
 

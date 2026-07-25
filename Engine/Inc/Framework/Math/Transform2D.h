@@ -1,6 +1,9 @@
 #ifndef __TRANSFORM2D_H__
 #define __TRANSFORM2D_H__
-#include "ALMath.hpp"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/ReflectionMacros.h"
+#include "Framework/Math/Matrix.hpp"
+#include "Framework/Math/VectorMath.hpp"
 #include "generated/Transform2D.gen.h"
 namespace Ailu
 {

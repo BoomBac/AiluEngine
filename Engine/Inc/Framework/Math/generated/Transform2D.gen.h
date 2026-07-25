@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __TRANSFORM2D_GEN_H__
 //Struct Transform2D begin...........................
-#define TRANSFORM2D_GEN_H_12_GENERATED_BODY \
+#define TRANSFORM2D_GEN_H_15_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_Transform2D_Type();\
                                 static const Type* GetPrivateStaticClass();\

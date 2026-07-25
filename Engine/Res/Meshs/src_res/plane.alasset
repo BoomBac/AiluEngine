@@ -3,7 +3,8 @@
         "_format_version": 1,
         "_guid": "c3315e03-1052-4825-98f7-a676beae0615",
         "_asset_type": "Ailu::Render::Mesh",
-        "_asset_name": "Plane"
+        "_asset_name": "plane",
+        "_dependencies": []
     },
     "_file": "plane.fbx",
     "_inner_file_name": "Plane",

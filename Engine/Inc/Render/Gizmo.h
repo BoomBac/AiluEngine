@@ -1,10 +1,20 @@
 #pragma once
 #ifndef __GIZMO_H__
 #define __GIZMO_H__
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/Containers/List.h"
+#include "Framework/Math/Color.h"
 #include "Framework/Math/Geometry.h"
+#include "Framework/Math/MatrixMath.h"
+#include "Framework/Math/Rect.h"
 #undef DrawText
 namespace Ailu
 {
+    using Math::Color;
+    using Math::Rect;
+    using Math::Vector4f;
+    using Math::BuildIdentityMatrix;
+
     namespace UI
     {
         class TextRenderer;
@@ -41,7 +51,7 @@ namespace Ailu
             static void DrawCube(const Vector3f &center, const Vector3f &size, u32 sec_duration, Color color = Gizmo::s_color);
             static void DrawLine(const Vector3f &from, const Vector3f &to, const Color &color_from, const Color &color_to);
             static void DrawGrid(const int &grid_size, const int &grid_spacing, const Vector3f &center, Color color);
-            static void DrawCube(const Vector3f &center, const Vector3f &size, Vector4f color = Colors::kGray);
+            static void DrawCube(const Vector3f &center, const Vector3f &size, Vector4f color = Math::Colors::kGray);
             static void DrawCapsule(const Capsule &capsule, Color color = Gizmo::s_color);
             static void DrawCylinder(const Vector3f &start, Vector3f end, f32 radius, u16 segments = kSegments, Color color = Gizmo::s_color);
 
@@ -60,7 +70,7 @@ namespace Ailu
             explicit Gizmo();
 
         public:
-            inline static Color s_color = Colors::kGray;
+            inline static Color s_color = Math::Colors::kGray;
             inline static u32 kMaxVertexNum = 20000u;
             inline static u32 kMaxDrawTextureNum = 32u;
             inline static const int kSegments = 24;

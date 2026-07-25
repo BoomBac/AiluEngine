@@ -1,4 +1,5 @@
 #include "Framework/Math/Transform.h"
+#include "Framework/Math/QuaternionMatrix.h"
 #include "pch.h"
 
 namespace Ailu
@@ -107,9 +108,9 @@ namespace Ailu
     {
         Transform inv;
         inv._rotation = Quaternion::Inverse(t._rotation);
-        inv._scale.x = fabs(t._scale.x) < kFloatEpsilon ? 0.0f : 1.0f / t._scale.x;
-        inv._scale.y = fabs(t._scale.y) < kFloatEpsilon ? 0.0f : 1.0f / t._scale.y;
-        inv._scale.z = fabs(t._scale.z) < kFloatEpsilon ? 0.0f : 1.0f / t._scale.z;
+        inv._scale.x = fabs(t._scale.x) < Math::kFloatEpsilon ? 0.0f : 1.0f / t._scale.x;
+        inv._scale.y = fabs(t._scale.y) < Math::kFloatEpsilon ? 0.0f : 1.0f / t._scale.y;
+        inv._scale.z = fabs(t._scale.z) < Math::kFloatEpsilon ? 0.0f : 1.0f / t._scale.z;
         Vector3f invTrans = t._position * -1.0f;
         inv._position = inv._rotation * (inv._scale * invTrans);
         return inv;

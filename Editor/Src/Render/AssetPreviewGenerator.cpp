@@ -11,6 +11,11 @@ namespace Ailu
 {
     namespace Editor
     {
+        namespace
+        {
+            Scope<SpriteBatcher> s_sprite_batcher;
+        }
+
         void AssetPreviewGenerator::GeneratorMeshSnapshot(u16 w, u16 h, Render::Mesh *mesh,Ref<Render::RenderTexture> &target)
         {
             if (!mesh)
@@ -70,13 +75,11 @@ namespace Ailu
             if (target == nullptr)
                 target = RenderTexture::Create(w, h, std::format("{}_preview", sprite->Name()));
 
-            // One-time initialization of the sprite batcher (static, shared across calls)
-            static Scope<SpriteBatcher> s_sprite_batcher = []()
+            if (s_sprite_batcher == nullptr)
             {
-                auto batcher = MakeScope<SpriteBatcher>();
-                batcher->Initialize();
-                return batcher;
-            }();
+                s_sprite_batcher = MakeScope<SpriteBatcher>();
+                s_sprite_batcher->Initialize();
+            }
 
             // Build sprite render data matching the runtime rendering path
             SpriteRenderData render_data;
@@ -135,6 +138,11 @@ namespace Ailu
             GraphicsContext::Get().ExecuteCommandBuffer(cmd);
             cmd->ReleaseTempRT(depth);
             CommandBufferPool::Release(cmd);
+        }
+
+        void AssetPreviewGenerator::Shutdown()
+        {
+            s_sprite_batcher.reset();
         }
 
     }// namespace Editor

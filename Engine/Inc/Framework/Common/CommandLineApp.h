@@ -1,7 +1,7 @@
 #ifndef __COMMANDLINE_APP_H___
 #define __COMMANDLINE_APP_H___
 #pragma once
-#include "Inc/GlobalMarco.h"
+#include "Framework/Core/CoreMinimal.h"
 #include "Framework/Interface/IRuntimeModule.h"
 #include <iostream>
 

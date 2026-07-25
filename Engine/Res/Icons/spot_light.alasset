@@ -3,7 +3,8 @@
         "_format_version": 1,
         "_guid": "d7e07be5-55ed-4b47-ad7f-107a64cda4bf",
         "_asset_type": "Ailu::Render::Texture2D",
-        "_asset_name": "spot_light"
+        "_asset_name": "spot_light",
+        "_dependencies": []
     },
     "_file": "spot_light.png",
     "_is_srgb": true

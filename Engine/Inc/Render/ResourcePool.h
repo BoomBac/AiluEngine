@@ -3,6 +3,7 @@
 #define RDGPOOL_H
 
 #include "Framework/Common/Allocator.hpp"
+#include "Framework/Common/Hash.hpp"
 #include "Framework/Common/Log.h"
 
 //#include "Render/Texture.h"

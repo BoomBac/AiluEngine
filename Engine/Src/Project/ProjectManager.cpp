@@ -32,7 +32,7 @@ namespace Ailu
 
     void ProjectManager::Shutdown()
     {
-        DESTORY_PTR(s_project_manager);
+        delete s_project_manager; s_project_manager = nullptr;
     }
 
     ProjectManager &ProjectManager::Get()

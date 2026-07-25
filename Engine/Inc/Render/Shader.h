@@ -353,36 +353,36 @@ namespace Ailu::Render
     public:
         inline static const u32 kCBufferSize = 1024u;
     public:
-        FORCEINLINE static void EnableGlobalKeywords(const String &kw) 
+        AL_FORCE_INLINE static void EnableGlobalKeywords(const String &kw) 
         {
             s_global_active_keywords.insert(kw);
             for(auto& it : s_global_variant_update_map)
                 it.second = true;
         };
-        FORCEINLINE static void DisableGlobalKeywords(const String &kw) 
+        AL_FORCE_INLINE static void DisableGlobalKeywords(const String &kw) 
         {
             s_global_active_keywords.erase(kw);
             for(auto& it : s_global_variant_update_map)
                 it.second = true;
         };
-        FORCEINLINE static void SetGlobalBuffer(const String &name, ConstantBuffer *buf)
+        AL_FORCE_INLINE static void SetGlobalBuffer(const String &name, ConstantBuffer *buf)
         {
             s_global_cbuffer_bind_info[name] = buf;
         };
-        FORCEINLINE static void SetGlobalBuffer(const String &name, GPUBuffer *buf)
+        AL_FORCE_INLINE static void SetGlobalBuffer(const String &name, GPUBuffer *buf)
         {
             s_global_buffer_bind_info[name] = buf;
         };
-        FORCEINLINE static void SetGlobalTexture(const String &name, Texture *texture)
+        AL_FORCE_INLINE static void SetGlobalTexture(const String &name, Texture *texture)
         {
             s_global_textures_bind_info[name] = texture;
         };
         static void SetGlobalTexture(const String &name, RTHandle texture);
-        FORCEINLINE static void SetGlobalFloat(const String &name, f32 value)
+        AL_FORCE_INLINE static void SetGlobalFloat(const String &name, f32 value)
         {
             s_global_floats[name] = value;
         };
-        FORCEINLINE static void SetGlobalInt(const String &name, i32 value)
+        AL_FORCE_INLINE static void SetGlobalInt(const String &name, i32 value)
         {
             s_global_ints[name] = value;
         };
@@ -395,11 +395,11 @@ namespace Ailu::Render
         void SetTexture(const String &name, Texture *texture);
         void SetTexture(u8 bind_slot, Texture *texture);
         void SetTexture(const String &name, RTHandle handle);
-        void SetTexture(const String &name, RTHandle handle, ECubemapFace::ECubemapFace face, u16 mipmap);
+        void SetTexture(const String &name, RTHandle handle, ECubemapFace face, u16 mipmap);
         void SetTexture(const String &name, Texture *texture, u16 mipmap);
-        void SetTexture(const String &name, Texture *texture, ECubemapFace::ECubemapFace face, u16 mipmap);
+        void SetTexture(const String &name, Texture *texture, ECubemapFace face, u16 mipmap);
         //void SetTexture(const String &name, RDG::RGHandle handle);
-        //void SetTexture(const String &name, RDG::RGHandle handle, ECubemapFace::ECubemapFace face, u16 mipmap);
+        //void SetTexture(const String &name, RDG::RGHandle handle, ECubemapFace face, u16 mipmap);
         void SetFloat(const String &name, f32 value);
         void SetFloats(const String& name,Vector<f32> values);
         void SetBool(const String &name, bool value);
@@ -462,7 +462,7 @@ namespace Ailu::Render
     protected:
         struct ComputeBindParams
         {
-            ECubemapFace::ECubemapFace _face;
+            ECubemapFace _face;
             u16 _mipmap;
             //depth or array
             u16 _slice;
