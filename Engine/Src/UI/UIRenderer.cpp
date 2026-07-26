@@ -52,6 +52,16 @@ namespace Ailu
                     AL_DELETE(b);
                 }
             }
+            for (auto &frame_window_blocks: _window_drawer_blocks)
+            {
+                for (auto &it: frame_window_blocks)
+                {
+                    for (auto b: it.second)
+                    {
+                        AL_DELETE(b);
+                    }
+                }
+            }
             AL_DELETE(_text_block);
         }
 
@@ -98,6 +108,20 @@ namespace Ailu
             SubmitBlock(_drawer_blocks[_frame_index][0u],cmd,RenderTexture::s_backbuffer);
             _cur_widget_index = 0u;
             _drawer_blocks[_frame_index][0u]->Flush();
+            auto &window_blocks = _window_drawer_blocks[_frame_index];
+            for (auto &it: window_blocks)
+            {
+                auto *color = RenderTexture::WindowBackBuffer(it.first);
+                for (auto *block: it.second)
+                {
+                    if (!block || block->_nodes.empty())
+                        continue;
+                    if (color)
+                        SubmitBlock(block, cmd, color);
+                    else
+                        block->Flush();
+                }
+            }
             //暂时所有文本都渲染到后备缓冲区
             //TextRenderer::Get()->Render(RenderTexture::s_backbuffer, cmd, _text_block);
             //_text_block->Clear();
@@ -121,6 +145,39 @@ namespace Ailu
         void UIRenderer::DrawQuad(Vector4f rect, Matrix4x4f matrix, const UIBrush& brush, Vector4f corner_radius, f32 depth)
         {
             DrawerBlock *cb = GetAvailableBlock(4u, 6u);
+            AppendQuadToBlock(cb, rect, matrix, brush, corner_radius, depth);
+        }
+
+        void UIRenderer::DrawWindowQuad(Window *window, Vector4f rect, const UIBrush &brush, f32 depth)
+        {
+            DrawWindowQuad(window, rect, brush, Vector4f::kZero, depth);
+        }
+
+        void UIRenderer::DrawWindowQuad(Window *window, Vector4f rect, const UIBrush &brush, Vector4f corner_radius, f32 depth)
+        {
+            if (!window)
+            {
+                DrawQuad(rect, brush, corner_radius, depth);
+                return;
+            }
+            DrawerBlock *cb = GetAvailableWindowBlock(window, 4u, 6u);
+            AppendQuadToBlock(cb, rect, kIdentityMatrix, brush, corner_radius, depth);
+        }
+
+        void UIRenderer::DrawWindowText(Window *window, const String &text, Vector2f pos, f32 font_size, Color color,
+                                        Vector2f scale, Render::Font *font)
+        {
+            if (!window)
+            {
+                DrawText(text, pos, font_size, color, scale, font);
+                return;
+            }
+            _text_renderer->DrawText(text, pos, font_size, scale, color, font, GetAvailableWindowBlock(window, 4u, 6u));
+        }
+
+        void UIRenderer::AppendQuadToBlock(DrawerBlock *cb, Vector4f rect, Matrix4x4f matrix, const UIBrush &brush,
+                                           Vector4f corner_radius, f32 depth)
+        {
             auto color = brush._tint;
             u32 cur_vert_num = cb->CurrentVertNum(), cur_index_num = cb->CurrentIndexNum();
             cb->_pos_buf[cur_vert_num] = {rect.xy, depth};
@@ -343,6 +400,17 @@ namespace Ailu
                 AL_ASSERT_MSG(available_block->CanAppend(vert_num,index_num), "UI DrawerBlock index overflow!");
             }
             return available_block;
+        }
+        DrawerBlock *UIRenderer::GetAvailableWindowBlock(Window *window, u32 vert_num, u32 index_num)
+        {
+            auto &blocks = _window_drawer_blocks[_frame_index][window];
+            for (auto *block: blocks)
+            {
+                if (block->CanAppend(vert_num, index_num))
+                    return block;
+            }
+            blocks.push_back(AL_NEW(DrawerBlock, _default_material, 8092u * 4));
+            return blocks.back();
         }
         void UIRenderer::SubmitBlock(DrawerBlock *b, CommandBuffer *cmd,RenderTexture* color,RenderTexture* depth)
         {

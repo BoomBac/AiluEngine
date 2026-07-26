@@ -465,7 +465,7 @@ namespace Ailu
         return false;
     }
 
-    void Application::OnEvent(Event &e)
+    void Application::UpdatePlatformEventState(Event &e)
     {
         switch (e.GetEventType())
         {
@@ -506,7 +506,13 @@ namespace Ailu
         dispather.Dispatch<WindowResizeEvent>(BIND_EVENT_HANDLER(OnWindowResize));
         dispather.Dispatch<WindowMovedEvent>(BIND_EVENT_HANDLER(OnWindowMove));
         dispather.Dispatch<MouseSetCursorEvent>(BIND_EVENT_HANDLER(OnSetCursor));
+    }
+
+    void Application::OnEvent(Event &e)
+    {
+        UpdatePlatformEventState(e);
 #if defined(SEPARATE_LOGIC_THREAD)
+        EventDispather dispather(e);
         dispather.Dispatch<MouseButtonReleasedEvent>(BIND_EVENT_HANDLER(OnMouseUp));
         dispather.Dispatch<MouseButtonPressedEvent>(BIND_EVENT_HANDLER(OnMouseDown));
         dispather.Dispatch<MouseMovedEvent>(BIND_EVENT_HANDLER(OnMouseMove));

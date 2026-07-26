@@ -142,6 +142,7 @@ namespace Ailu
                 }
                 else if (e._key_code == EKey::kRBUTTON)
                 {
+                    _is_camera_input_active = true;
                     _camera_controller->_is_receive_input = true;
                     SetCursor(NULL);
                 }
@@ -179,6 +180,7 @@ namespace Ailu
                 }
                 else if (e._key_code == EKey::kRBUTTON)
                 {
+                    _is_camera_input_active = false;
                     _camera_controller->_is_receive_input = false;
                     while (::ShowCursor(TRUE) < 0);
                 }
@@ -309,7 +311,9 @@ namespace Ailu
             Camera::sCurrent->FovH(_camera_controller->_camera_fov_h);
             Camera::sCurrent->Near(_camera_controller->_camera_near);
             Camera::sCurrent->Far(_camera_controller->_camera_far);
-            if (Camera::sCurrent && !Input::IsInputBlock())
+            if (!Input::IsKeyDown(EKey::kRBUTTON))
+                _is_camera_input_active = false;
+            if (Camera::sCurrent && !Input::IsInputBlock() && _is_camera_input_active)
             {
                 static Vector2f target_rotation = {0.f, 0.f};
                 static Vector2f pre_mouse_pos;

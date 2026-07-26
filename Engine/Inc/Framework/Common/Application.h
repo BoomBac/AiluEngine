@@ -137,6 +137,7 @@ namespace Ailu
         static WString GetAiluRoot();
         static Application& Get();
         static bool IsMainThread();
+        void UpdatePlatformEventState(Event &e);
         int Initialize() override;
         int Initialize(ApplicationDesc desc,const ApplicationInitContext& init_ctx);
         void Finalize() override;

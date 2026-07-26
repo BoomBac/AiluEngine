@@ -955,6 +955,28 @@ namespace Ailu
             return pos.x >= 0.0f && pos.x <= w && pos.y >= 0.0f && pos.y <= h;
         }
 
+        static Vector2f GlobalToWindowPos(Window *window, Vector2f pos)
+        {
+            if (!window)
+                return pos;
+            auto [x, y] = window->GetClientPosition();
+            return {pos.x - (f32) x, pos.y - (f32) y};
+        }
+
+        static Window *FindDockPreviewWindow(const HashMap<Window *, Vector<Ref<DockNode>>> &float_nodes, Vector2f pos)
+        {
+            Window *focused_window = Application::FocusedWindow();
+            if (IsMouseInWindow(focused_window, pos))
+                return focused_window;
+            for (auto &it: float_nodes)
+            {
+                if (IsMouseInWindow(it.first, pos))
+                    return it.first;
+            }
+            Window *main_window = &Application::Get().GetWindow();
+            return IsMouseInWindow(main_window, pos) ? main_window : nullptr;
+        }
+
 
         static DockManager *g_pDockMgr = nullptr;
         void DockManager::Init()
@@ -1217,24 +1239,48 @@ namespace Ailu
 
         void DockManager::RemoveDock(DockWindow *dock)
         {
-            AL_ASSERT(false);
-            //if (auto it = std::find_if(_docks.begin(), _docks.end(), [&](DockWindow *d) -> bool
-            //                           { return d == dock; });
-            //    it != _docks.end())
-            //{
-            //    UI::UIRenderer::Get()->RemoveWidget(dock->_title_bar.get());
-            //    UI::UIRenderer::Get()->RemoveWidget(dock->_content.get());
-            //    _uiLayer->UnRegisterWidget(dock->_title_bar.get());
-            //    _uiLayer->UnRegisterWidget(dock->_content.get());
-            //    _docks.erase(it);
-            //}
-            ////if (auto it = std::find_if(_float_nodes.begin(), _float_nodes.end(), [&](Ref<DockNode> d) -> bool
-            ////                           { return d->wi == dock; });
-            ////    it != _space._float_windows.end())
-            ////{
-            ////    _space._float_windows.erase(it);
-            ////}
-            ////RemoveDockFromTree(dock, _space._root.get());
+            if (dock == nullptr)
+                return;
+
+            DockNode *node = FindNodeByWindow(dock);
+            if (node == nullptr)
+                return;
+
+            Window *own_window = node->_own_window;
+            UI::UIManager::Get()->UnRegisterWidget(dock->TitleWidget());
+            UI::UIManager::Get()->UnRegisterWidget(dock->ContentWidget());
+            if (_focused_node && _focused_node->ContainsWindow(dock))
+                _focused_node = nullptr;
+
+            if (node->_type == DockNode::EType::kLeaf)
+            {
+                node->_window.reset();
+                if (node->_parent)
+                    node->RemoveNode();
+                else
+                {
+                    TryRemoveFloatNode(node);
+                    std::erase_if(_roots, [node](DockNode *root) -> bool { return root == node; });
+                }
+                MarkDeleteNode(node);
+            }
+            else if (node->_type == DockNode::EType::kTab && node->_tab)
+            {
+                if (node->_tab->RemoveTab(dock))
+                {
+                    node->_tab.reset();
+                    if (node->_parent)
+                        node->RemoveNode();
+                    else
+                    {
+                        TryRemoveFloatNode(node);
+                        std::erase_if(_roots, [node](DockNode *root) -> bool { return root == node; });
+                    }
+                    MarkDeleteNode(node);
+                }
+            }
+
+            CleanupWindowIfEmpty(own_window);
         }
         static void DrawTreeNode(DockNode *node, int depth, int &row)
         {
@@ -1290,20 +1336,29 @@ namespace Ailu
 
             if (_is_any_floating)
             {
-                Vector2f pos = Input::GetMousePos();
+                Vector2f global_pos = Input::GetGlobalMousePos();
                 if (_can_draw_float_preview)
                 {
-                    UI::UIRenderer::Get()->DrawQuad({pos - Vector2f{100.0f, 70.0f}, Vector2f{200.0f, 140.0f}}, ColorBrush(g_editor_style._dock_hint_color));
                     OnWindowFloat();
+                    Window *preview_window = _dock_preview_window ? _dock_preview_window : FindDockPreviewWindow(_float_nodes, global_pos);
+                    if (!preview_window && _floating_preview_node)
+                        preview_window = _floating_preview_node->_own_window;
+                    Vector2f pos = GlobalToWindowPos(preview_window, global_pos);
+                    UI::UIRenderer::Get()->DrawWindowQuad(preview_window,
+                                                           {pos - Vector2f{100.0f, 70.0f}, Vector2f{200.0f, 140.0f}},
+                                                           ColorBrush(g_editor_style._dock_hint_color));
                     if (!Input::IsKeyDown(EKey::kLBUTTON) && _floating_preview_node)
                     {
-                        EndFloatWindow(pos);
+                        Window *drop_window = _dock_quad_hover_node ? _dock_quad_hover_node->_own_window : _dock_preview_window;
+                        if (!drop_window)
+                            drop_window = preview_window;
+                        EndFloatWindow(GlobalToWindowPos(drop_window, global_pos));
                         _can_draw_float_preview = false;
                     }
                 }
                 else
                 {
-                    f32 dx = abs(pos.x - _float_node_start_pos.x), dy = abs(pos.y - _float_node_start_pos.y);
+                    f32 dx = abs(global_pos.x - _float_node_start_pos.x), dy = abs(global_pos.y - _float_node_start_pos.y);
                     if (dx >= 10.0f || dy >= 10.0f)
                     {
                         _can_draw_float_preview = true;
@@ -1388,7 +1443,7 @@ namespace Ailu
                 {
                     _floating_preview_node = source_node;
                 }
-                _float_node_start_pos = Input::GetMousePos(_floating_preview_node->_own_window);
+                _float_node_start_pos = Input::GetGlobalMousePos();
                 _is_float_node_external_window = _floating_preview_node->_own_window != &Application::Get().GetWindow();
                 LOG_INFO("DockManager::BeginFloatWindow: {}{}", w->GetTitle(), _is_floating_whole_node ? " (whole split)" : "");
             }
@@ -1414,7 +1469,7 @@ namespace Ailu
             _is_floating_whole_node = true;
             _floating_preview_node = w;
             _is_float_on_cancel_area = false;
-            _float_node_start_pos = Input::GetMousePos(w->_own_window);
+            _float_node_start_pos = Input::GetGlobalMousePos();
             _is_float_node_external_window = w->_own_window != &Application::Get().GetWindow();
             LOG_INFO("DockManager::BeginFloatNode: {}", _floating_preview_window ? _floating_preview_window->GetTitle() : "composite");
         }
@@ -1423,6 +1478,7 @@ namespace Ailu
         {
             if (!_floating_preview_node)
                 return;
+            Window *source_window = _floating_preview_node->_own_window;
             auto make_node_from_tab_item = [&](const Ref<IDockTabItem> &tab_item) -> Ref<DockNode>
             {
                 if (!tab_item)
@@ -1463,6 +1519,7 @@ namespace Ailu
                 _is_float_on_cancel_area = false;
                 _can_draw_float_preview = false;
                 _is_floating_whole_node = false;
+                CleanupWindowIfEmpty(source_window);
                 LOG_INFO("DockManager::EndFloatWindow: at pos: {}", drop_pos.ToString());
             };
             if (_is_floating_whole_node)
@@ -1639,6 +1696,9 @@ namespace Ailu
             Vector2f size = Vector2f::kZero, start_pos = Vector2f::kZero;
             AL_ASSERT(_floating_preview_node != nullptr);
             _dock_quad_hover_node = nullptr;
+            _dock_preview_window = nullptr;
+            _dock_quad_hover_area = EDockArea::kFloat;
+            _is_float_on_cancel_area = false;
             for (auto &it: _float_nodes)
             {
                 auto &[window, nodes] = it;
@@ -1652,16 +1712,11 @@ namespace Ailu
                         if (_floating_preview_node->_type == DockNode::EType::kSplit &&
                             _floating_preview_node->ContainsNode(_dock_quad_hover_node))
                         {
-                            _dock_quad_hover_node = nullptr;
-                            continue;
-                        }
-                        if (_is_float_node_external_window && _dock_quad_hover_node == _floating_preview_node)
-                        {
-                            _dock_quad_hover_node = nullptr;
-                            continue;
+                            _dock_quad_hover_node = _floating_preview_node;
                         }
                         start_pos = _dock_quad_hover_node->_position;
                         size = _dock_quad_hover_node->_size;
+                        _dock_preview_window = _dock_quad_hover_node->_own_window;
                         break;
                     }
                 }
@@ -1669,22 +1724,29 @@ namespace Ailu
 
             if (_dock_quad_hover_node == nullptr)
             {
-                const Vector4f main_area = MainDockArea();
-                start_pos = main_area.xy;
-                size = main_area.zw;
-                DrawPreviewDockArea(Input::GetMousePos(), size, start_pos);
+                Window *main_window = &Application::Get().GetWindow();
+                if (IsMouseInWindow(main_window, pos))
+                {
+                    const Vector4f main_area = MainDockArea();
+                    start_pos = main_area.xy;
+                    size = main_area.zw;
+                    _dock_preview_window = main_window;
+                    DrawPreviewDockArea(main_window, GlobalToWindowPos(main_window, pos), size, start_pos);
+                }
             }
             else
             {
+                Window *target_window = _dock_quad_hover_node->_own_window;
                 if (_dock_quad_hover_node == _floating_preview_node)
                 {
                     auto size = _dock_quad_hover_node->_size;
                     size.y = DockWindow::kTitleBarHeight * 2.0f;
                     Vector4f rect = {start_pos, size};
-                    const Vector2f lpos = Input::GetMousePos(_dock_quad_hover_node->_own_window);
+                    const Vector2f lpos = GlobalToWindowPos(target_window, pos);
                     if (UI::UIElement::IsPointInside(lpos, rect))
                     {
-                        UI::UIRenderer::Get()->DrawQuad({start_pos, size}, ColorBrush(Vector4f(1.0f, 1.0f, 1.0f, 0.5f)));
+                        UI::UIRenderer::Get()->DrawWindowQuad(target_window, {start_pos, size},
+                                                              ColorBrush(Vector4f(1.0f, 1.0f, 1.0f, 0.5f)));
                         _is_float_on_cancel_area = true;
                     }
                     else
@@ -1696,18 +1758,18 @@ namespace Ailu
                         Vector2f center = pos + size * 0.5f;
                         auto r = UI::UIRenderer::Get();
                         Vector2f text_size = r->CalculateTextSize("Drop to detach");
-                        r->DrawText("Drop to detach", center - text_size * 0.5f);
+                        r->DrawWindowText(target_window, "Drop to detach", center - text_size * 0.5f);
                         _is_float_on_cancel_area = false;
                     }
                 }
                 else
                 {
-                    DrawPreviewDockArea(Input::GetMousePos(), size, start_pos);
+                    DrawPreviewDockArea(target_window, GlobalToWindowPos(target_window, pos), size, start_pos);
                 }
             }
         }
 
-        void DockManager::DrawPreviewDockArea(Vector2f pos, Vector2f w_size, Vector2f start_pos)
+        void DockManager::DrawPreviewDockArea(Window *window, Vector2f pos, Vector2f w_size, Vector2f start_pos)
         {
             auto r = UI::UIRenderer::Get();
             //auto &cur_window = Application::Get().GetWindow();
@@ -1725,7 +1787,7 @@ namespace Ailu
                 Color c = is_hover
                                   ? _dock_quad_hover_color
                                   : _dock_quad_normal_color;
-                r->DrawQuad(rect, ColorBrush(c));
+                r->DrawWindowQuad(window, rect, ColorBrush(c));
                 is_area_changed |= is_hover;
                 return is_hover;
             };
@@ -2027,6 +2089,30 @@ namespace Ailu
                                                { return n == e.get(); });
             }
         }
+        void DockManager::CleanupWindowIfEmpty(Window *window)
+        {
+            if (window == nullptr || window == Application::Get().GetWindowPtr())
+                return;
+
+            auto nodes_it = _float_nodes.find(window);
+            if (nodes_it != _float_nodes.end())
+            {
+                std::erase_if(nodes_it->second, [](const Ref<DockNode> &node) -> bool
+                              { return !node || !node->_is_valid || node->IsEmpty(); });
+                if (!nodes_it->second.empty())
+                    return;
+                _float_nodes.erase(nodes_it);
+            }
+
+            Render::GraphicsContext::Get().UnRegisterWindow(window);
+            auto window_it = std::find_if(_float_windows.begin(), _float_windows.end(), [window](const Scope<Window> &item) -> bool
+                                          { return item.get() == window; });
+            if (window_it != _float_windows.end())
+            {
+                (*window_it)->SetEventHandler([](Event &) {});
+                _float_windows.erase(window_it);
+            }
+        }
         void DockManager::UntrackFloatNode(DockNode *n)
         {
             if (n == nullptr)
@@ -2138,6 +2224,7 @@ namespace Ailu
 
         void DockManager::WindowEventHandler(Event &e)
         {
+            Application::Get().UpdatePlatformEventState(e);
             static Vector2f s_pre_mouse_down_pos = Input::GetGlobalMousePos();
             if (e.GetEventType() == EEventType::kWindowClose)
             {

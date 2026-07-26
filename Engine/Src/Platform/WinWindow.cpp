@@ -185,6 +185,7 @@ namespace Ailu
 
     WinWindow::~WinWindow()
     {
+        Shutdown();
     }
 
     void WinWindow::Init(const WindowProps &prop)
@@ -430,6 +431,12 @@ namespace Ailu
 
     void WinWindow::Shutdown()
     {
+        if (_hwnd == nullptr)
+            return;
+        HWND hwnd = _hwnd;
+        RevokeDragDrop(hwnd);
+        DestroyWindow(hwnd);
+        _hwnd = nullptr;
     }
 
 #define HIGH_BIT(x, n) ((x) >> (n))
@@ -509,7 +516,8 @@ namespace Ailu
                 WindowCloseEvent e(_hwnd);
                 e._window = this;
                 _data.Handler(e);
-                PostQuitMessage(0);
+                if (this == Application::Get().GetWindowPtr())
+                    PostQuitMessage(0);
             }
                 return 0;
             case WM_SETFOCUS:
@@ -657,7 +665,7 @@ namespace Ailu
                 };
                 if (_data._flags & EWindowFlags::kWindow_NoTitleBar)
                 {
-                    Vector2f pos = Input::GetMousePos(this);
+                    Vector2f pos = Input::GetMousePosAccurate(this);
                     if (is_point_inside(pos, {(f32) (_data.Width - _reserver_area[3]), 0.0f, (f32) _reserver_area[3], (f32) _reserver_area[3]}))
                         return HTCLIENT;
                     f32 border = 4.0f;

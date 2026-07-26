@@ -90,7 +90,7 @@ namespace Ailu
             void MarkDeleteNode(DockNode* node);
         private:
             void OnWindowFloat();
-            void DrawPreviewDockArea(Vector2f pos, Vector2f size, Vector2f start_pos = Vector2f::kZero);
+            void DrawPreviewDockArea(Window *window, Vector2f pos, Vector2f size, Vector2f start_pos = Vector2f::kZero);
             void UpdateDockNode(DockNode *node);
             //处理节点move/resize/split size
             void HandleNodeResize();
@@ -98,6 +98,7 @@ namespace Ailu
             void TryRemoveFloatNode(DockNode* n);
             void UntrackFloatNode(DockNode *n);
             void DetachFromTree(DockNode* n);
+            void CleanupWindowIfEmpty(Window *window);
             void WindowEventHandler(Event &e);
             //将docknode 保存为docknodedata用于序列化
             void WriteNodeData(DockNode *n);
@@ -121,6 +122,7 @@ namespace Ailu
             Color _dock_quad_hover_color = {1.0f,1.0f,1.0f,0.8f};
             EDockArea _dock_quad_hover_area = EDockArea::kFloat;
             DockNode *_dock_quad_hover_node = nullptr;
+            Window *_dock_preview_window = nullptr;
             DockNode* _floating_preview_node = nullptr;
             DockNode *_resizing_node = nullptr;
             DockNode *_adj_split_node = nullptr;

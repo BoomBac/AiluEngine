@@ -54,6 +54,7 @@ namespace Ailu
             Vector2UInt _pending_output_size = Vector2UInt::kZero;
             Vector2UInt _committed_output_size = Vector2UInt::kZero;
             f32 _resize_stable_time = 0.0f;
+            bool _is_camera_input_active = false;
             Vector3f _drag_preview_pos;
             Ref<Render::Mesh> _drag_preview_mesh = nullptr;
         };

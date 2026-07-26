@@ -116,17 +116,6 @@ namespace Ailu
             status_bar->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed)
                     .Size(Vector2f(0.0f, kStatusBarHeight));
             BuildStatusBar(status_bar);
-
-            // Wire up the close button to actually close the window
-            auto* close_btn = GetCloseButton();
-            if (close_btn)
-            {
-                close_btn->OnMouseClick() += [this](UI::UIEvent& e) {
-                    UI::UIManager::Get()->UnRegisterWidget(TitleWidget());
-                    UI::UIManager::Get()->UnRegisterWidget(ContentWidget());
-                    Close();
-                };
-            }
         }
 
         SpriteAssetEditor::~SpriteAssetEditor() = default;

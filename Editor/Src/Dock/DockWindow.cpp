@@ -148,6 +148,7 @@ namespace Ailu
             _btn_close->OnMouseClick() += [this](UI::UIEvent &e)
             {
                 LOG_INFO("DockWindow({}) close...", _title->GetText());
+                DockManager::Get().RemoveDock(this);
             };
             _title_widget->AddToWidget(c);
             _content_widget = MakeRef<UI::Widget>();
@@ -183,6 +184,11 @@ namespace Ailu
         }
         DockWindow::~DockWindow()
         {
+            if (auto *ui_mgr = UI::UIManager::Get())
+            {
+                for (auto handle : _resize_zone_handles)
+                    ui_mgr->UnRegisterInteractionZone(handle);
+            }
         }
         void DockWindow::SetRect(Vector4f rect)
         {
@@ -419,6 +425,8 @@ namespace Ailu
             _btn_close->OnMouseClick() += [this](UI::UIEvent &e)
             {
                 LOG_INFO("DockTab close...");
+                if (auto *primary_window = ActivePrimaryWindow())
+                    DockManager::Get().RemoveDock(primary_window);
             };
             UI::UIManager::Get()->RegisterWidget(_tab_bar);
         }

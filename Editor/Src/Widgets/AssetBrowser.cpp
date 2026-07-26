@@ -1,5 +1,6 @@
 #include "Widgets/AssetBrowser.h"
 #include "Common/EditorPopup.h"
+#include "Editors/InputActionAssetEditor.h"
 #include "Editors/SpriteAssetEditor.h"
 #include "Framework/Common/FileManager.h"
 #include "Framework/Common/ResourceMgr.h"
@@ -1215,6 +1216,18 @@ namespace Ailu
                 {
                     auto editor = MakeRef<SpriteAssetEditor>();
                     editor->Open(asset->As<Sprite>());
+                    DockManager::Get().AddDock(editor);
+                }
+            }
+            else if (asset->_asset_type == StaticClass<InputActionAsset>())
+            {
+                if (asset->_p_obj == nullptr)
+                    ResourceMgr::Get().Load<InputActionAsset>(asset->_asset_path);
+
+                if (asset->_p_obj)
+                {
+                    auto editor = MakeRef<InputActionAssetEditor>();
+                    editor->Open(asset->As<InputActionAsset>());
                     DockManager::Get().AddDock(editor);
                 }
             }

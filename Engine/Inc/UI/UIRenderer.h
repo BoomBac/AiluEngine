@@ -18,6 +18,7 @@
 
 namespace Ailu
 {
+    class Window;
     using Render::RTHandle;
     using Render::RenderTexture;
     using Render::Material;
@@ -60,6 +61,10 @@ namespace Ailu
             void DrawQuad(Vector4f rect, const UIBrush& brush, Vector4f corner_radius, f32 depth = 0.0f);
             void DrawQuad(Vector4f rect, Matrix4x4f matrix, const UIBrush& brush, f32 depth = 0.0f);
             void DrawQuad(Vector4f rect, Matrix4x4f matrix, const UIBrush& brush, Vector4f corner_radius, f32 depth = 0.0f);
+            void DrawWindowQuad(Window *window, Vector4f rect, const UIBrush &brush, f32 depth = 0.0f);
+            void DrawWindowQuad(Window *window, Vector4f rect, const UIBrush &brush, Vector4f corner_radius, f32 depth = 0.0f);
+            void DrawWindowText(Window *window, const String &text, Vector2f pos, f32 font_size = 14u, Color color = Colors::kWhite,
+                                Vector2f scale = Vector2f::kOne, Render::Font *font = nullptr);
             void DrawVisual(Vector4f rect, Matrix4x4f matrix, const UIControlVisual &visual);
             void DrawText(const String &text, Vector2f pos, f32 font_size = 14u, Color color = Colors::kWhite,Vector2f scale = Vector2f::kOne, Render::Font *font = nullptr);
             void DrawText(const String &text, Vector2f pos, Matrix4x4f matrix,f32 font_size = 14u, Color color = Colors::kWhite,Vector2f scale = Vector2f::kOne, Render::Font *font = nullptr);
@@ -77,6 +82,9 @@ namespace Ailu
             void DrawDebugPannel();
             Vector<struct DrawerBlock *> &FrameBlocks() {return _drawer_blocks[_frame_index];};
             DrawerBlock *GetAvailableBlock(u32 vert_num,u32 index_num);
+            DrawerBlock *GetAvailableWindowBlock(Window *window, u32 vert_num, u32 index_num);
+            void AppendQuadToBlock(DrawerBlock *block, Vector4f rect, Matrix4x4f matrix, const UIBrush &brush,
+                                   Vector4f corner_radius, f32 depth);
             void SubmitBlock(DrawerBlock *block, CommandBuffer *cmd,RenderTexture* color,RenderTexture* depth = nullptr);
         private:
             inline static const Matrix4x4f kIdentityMatrix = Matrix4x4f::Identity();
@@ -84,6 +92,7 @@ namespace Ailu
             Ref<ConstantBuffer> _obj_cb;
             Scope<TextRenderer> _text_renderer;
             Array<Vector<DrawerBlock *>, Render::RenderConstants::kFrameCount> _drawer_blocks;
+            Array<HashMap<Window *, Vector<DrawerBlock *>>, Render::RenderConstants::kFrameCount> _window_drawer_blocks;
             DrawerBlock *_text_block;
             //暂时每个widget独立一个block,0保留为全局绘制
             u16 _cur_widget_index = 0u;
