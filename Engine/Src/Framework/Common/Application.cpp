@@ -1,4 +1,5 @@
 #include "Framework/Common/Application.h"
+#include "Audio/Audio.h"
 #include "Framework/Common/Allocator.hpp"
 #include "Framework/Common/EngineConfig.h"
 #include "Framework/Common/JobSystem.h"
@@ -134,6 +135,11 @@ namespace Ailu
         return ProjectManager::Get().CurrentProject().RootDirectory();
     }
 
+    void Application::SetProjectRootPath(const WString &project_root_path)
+    {
+        s_project_root_path = PathUtils::NormalizeDirectoryPath(project_root_path);
+    }
+
     WString Application::GetUserHomePath()
     {
         wchar_t userProfile[MAX_PATH];
@@ -218,6 +224,13 @@ namespace Ailu
         ResourceMgr::Init();
         ResourceMgr::Get().Initialize();
         ScriptSystem::Get().Initialize();
+        AudioDeviceConfig audio_config;
+        audio_config._enabled = init_ctx._enable_audio;
+        audio_config._device_name = init_ctx._audio_device_name;
+        audio_config._sample_rate = init_ctx._audio_sample_rate;
+        audio_config._max_voices = init_ctx._audio_max_voices;
+        audio_config._max_streaming_voices = init_ctx._audio_max_streaming_voices;
+        Audio::Initialize(audio_config);
         Gizmo::Initialize();
         UI::UIManager::Init();
         SceneManagement::SceneMgr::Init();
@@ -257,6 +270,7 @@ namespace Ailu
         UI::UIManager::Shutdown();
         Gizmo::Shutdown();
         SceneManagement::SceneMgr::Shutdown();
+        Audio::Shutdown();
         ScriptSystem::Get().Finalize();
         ResourceMgr::Get().Finalize();
         ResourceMgr::Shutdown();
@@ -461,6 +475,8 @@ namespace Ailu
             return false;
         std::lock_guard lock(_drop_files_mtx);
         _drop_files = e.GetDragedFilesPath();
+        _drop_mouse_pos = e.HasPosition() ? Vector2f(e.GetX(), e.GetY()) : Input::GetMousePos(e._window);
+        _has_drop_mouse_pos = true;
         _has_drop_files = true;
         return false;
     }
@@ -642,7 +658,8 @@ namespace Ailu
         if (_has_drop_files)
         {
             std::lock_guard lock(_drop_files_mtx);
-            DragFileEvent e(_drop_files);
+            DragFileEvent e = _has_drop_mouse_pos ? DragFileEvent(_drop_files, _drop_mouse_pos.x, _drop_mouse_pos.y) :
+                                                    DragFileEvent(_drop_files);
             e._window = _p_window.get();
             for (auto it = _layer_stack->end(); it != _layer_stack->begin();)
             {
@@ -651,6 +668,7 @@ namespace Ailu
                     break;
             }
             _drop_files.clear();
+            _has_drop_mouse_pos = false;
             _has_drop_files = false;
         }
 #else

@@ -75,6 +75,7 @@ namespace Ailu::UI
 
     void UIManager::UnRegisterWidget(Widget *w)
     {
+        CleanupWidgetState(w);
         std::erase_if(_widgets, [&](Ref<Widget> e) -> bool
                       { return e.get() == w; });
     }
@@ -295,5 +296,52 @@ namespace Ailu::UI
             old_f->SetFocusedInternal(false);
         if (new_f)
             new_f->SetFocusedInternal(true);
+    }
+
+    bool UIManager::IsElementInWidget(UIElement *element, Widget *widget) const
+    {
+        if (element == nullptr || widget == nullptr || widget->Root() == nullptr)
+            return false;
+        UIElement *node = element;
+        while (node != nullptr)
+        {
+            if (node == widget->Root())
+                return true;
+            node = node->GetParent();
+        }
+        return false;
+    }
+
+    void UIManager::CleanupWidgetState(Widget *widget)
+    {
+        if (widget == nullptr)
+            return;
+
+        if (_pre_hover_widget == widget)
+            _pre_hover_widget = nullptr;
+        if (IsElementInWidget(_capture_target, widget))
+            _capture_target = nullptr;
+        if (IsElementInWidget(_focus_target, widget))
+            _focus_target = nullptr;
+        if (IsElementInWidget(_hover_target, widget))
+            _hover_target = nullptr;
+        if (IsElementInWidget(_debug_highlight_target, widget))
+            _debug_highlight_target = nullptr;
+
+        for (auto &w: _widgets)
+        {
+            if (!w)
+                continue;
+            if (w.get() == widget)
+            {
+                w->_prev_hover_path.clear();
+                w->ResetClickState();
+                continue;
+            }
+            std::erase_if(w->_prev_hover_path, [&](UIElement *element) -> bool
+                          { return IsElementInWidget(element, widget); });
+            if (IsElementInWidget(w->_last_click_target, widget))
+                w->ResetClickState();
+        }
     }
 }// namespace Ailu::UI

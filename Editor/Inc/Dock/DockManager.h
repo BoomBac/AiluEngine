@@ -81,6 +81,7 @@ namespace Ailu
             ~DockManager();
             void AddDock(Ref<DockWindow> dock);
             void RemoveDock(DockWindow *dock);
+            void RequestRemoveDock(DockWindow *dock);
             void Update(f32 dt);
             void SetMainDockArea(Vector2f position, Vector2f size);
 
@@ -142,6 +143,7 @@ namespace Ailu
             u32 _next_serialize_node_id = 0u;
             Vector2f _main_dock_position = Vector2f::kZero;
             Vector2f _main_dock_size = Vector2f::kZero;
+            Vector<DockWindow *> _pending_remove_docks;
         };
     }// namespace Editor
 }// namespace Ailu

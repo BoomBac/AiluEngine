@@ -41,6 +41,7 @@ namespace Ailu
             class DirectoryTreeDataSource;
 
             void QueueImportFiles(const Vector<WString> &files, Vector2f popup_pos);
+            void HandleFileDrop(UI::UIEvent &e);
             void ShowNextImportPopup();
             void ShowImportPopupForFile(const WString &sys_path);
             void AdvanceImportQueue();

@@ -148,7 +148,8 @@ namespace Ailu
             _btn_close->OnMouseClick() += [this](UI::UIEvent &e)
             {
                 LOG_INFO("DockWindow({}) close...", _title->GetText());
-                DockManager::Get().RemoveDock(this);
+                e._is_handled = true;
+                DockManager::Get().RequestRemoveDock(this);
             };
             _title_widget->AddToWidget(c);
             _content_widget = MakeRef<UI::Widget>();
@@ -221,6 +222,7 @@ namespace Ailu
                 _content_widget->SetSize({_size.x, content_height});
                 _content_widget->Root()->GetSlot()->Size(Vector2f(_size.x, content_height));
                 _content_root->GetSlotAs<UI::CanvasSlot>().Size(Vector2f(_size.x, content_height));
+                _content_widget->Root()->InvalidateLayout(true);
                 auto ui_mgr = UI::UIManager::Get();
                 const f32 t = kBorderThickness;
                 const Vector2f &p = _position;
@@ -425,8 +427,9 @@ namespace Ailu
             _btn_close->OnMouseClick() += [this](UI::UIEvent &e)
             {
                 LOG_INFO("DockTab close...");
+                e._is_handled = true;
                 if (auto *primary_window = ActivePrimaryWindow())
-                    DockManager::Get().RemoveDock(primary_window);
+                    DockManager::Get().RequestRemoveDock(primary_window);
             };
             UI::UIManager::Get()->RegisterWidget(_tab_bar);
         }

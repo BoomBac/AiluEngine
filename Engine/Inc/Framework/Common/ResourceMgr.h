@@ -143,6 +143,7 @@ namespace Ailu
         inline const static std::set<String> kLDRImageExt = {".png", ".PNG", ".tga", ".TGA", ".jpg", ".JPG", ".jpg", ".JPEG"};
         inline const static std::set<String> kHDRImageExt = {".exr", ".EXR", ".hdr", ".HDR"};
         inline const static std::set<String> kMeshExt = {".obj", ".OBJ", ".fbx", ".FBX", ".gltf", ".GLTF"};
+        inline const static std::set<String> kAudioExt = {".wav", ".WAV", ".mp3", ".MP3", ".flac", ".FLAC", ".ogg", ".OGG"};
         inline const static Array<WString,3> kPathScheme = {L"engine://",L"editor://",L"project://"};
 
     public:

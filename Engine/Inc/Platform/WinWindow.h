@@ -45,6 +45,7 @@ namespace Ailu
 		WindowData _data;
 		HWND _hwnd;
         bool _is_focused;
+        bool _ole_initialized = false;
         Array<f32, 4u> _reserver_area;
 	};
 }

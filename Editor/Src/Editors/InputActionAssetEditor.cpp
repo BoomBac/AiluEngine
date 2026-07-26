@@ -86,32 +86,33 @@ namespace Ailu
                     .Size(Vector2f(0.0f, kToolbarHeight));
             BuildToolbar(toolbar);
 
-            auto *main_area = root_vb->AddChild<UI::HorizontalBox>();
+            auto *main_area = root_vb->AddChild<UI::SplitView>();
+            main_area->_is_horizontal = true;
+            main_area->SetRatio(kLeftPanelWidth / 1050.0f);
             main_area->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
 
             auto *left_border = main_area->AddChild<UI::Border>();
             left_border->_bg_color = kPanelColor;
-            left_border->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFill)
-                       .Size(Vector2f(kLeftPanelWidth, 0.0f));
             auto *left_scroll = left_border->AddChild<UI::ScrollView>();
             left_scroll->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
             auto *left_vb = left_scroll->AddChild<UI::VerticalBox>();
             left_vb->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto);
             BuildLeftPanel(left_vb);
 
-            auto *center_border = main_area->AddChild<UI::Border>();
+            auto *right_split = main_area->AddChild<UI::SplitView>();
+            right_split->_is_horizontal = true;
+            right_split->SetRatio((1050.0f - kLeftPanelWidth - kRightPanelWidth) / (1050.0f - kLeftPanelWidth));
+
+            auto *center_border = right_split->AddChild<UI::Border>();
             center_border->_bg_color = kCenterColor;
-            center_border->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
             auto *center_scroll = center_border->AddChild<UI::ScrollView>();
             center_scroll->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
             auto *center_vb = center_scroll->AddChild<UI::VerticalBox>();
             center_vb->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto);
             BuildCenterPanel(center_vb);
 
-            auto *right_border = main_area->AddChild<UI::Border>();
+            auto *right_border = right_split->AddChild<UI::Border>();
             right_border->_bg_color = kPanelColor;
-            right_border->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFill)
-                        .Size(Vector2f(kRightPanelWidth, 0.0f));
             auto *right_scroll = right_border->AddChild<UI::ScrollView>();
             right_scroll->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
             auto *right_vb = right_scroll->AddChild<UI::VerticalBox>();

@@ -56,6 +56,10 @@
 //todo remove
 #include "Render/RenderingStates.h"
 
+#include "Audio/Audio.h"
+#include "Audio/AudioClip.h"
+
+
 namespace Ailu
 {
     using namespace Render;
@@ -1869,6 +1873,26 @@ namespace Ailu
                 if (p)
                     p->Start(psi);
             }
+            static Guid s_test_audio_guid = Guid::EmptyGuid();
+
+            if (ImGui::Button("Test Audio"))
+            {
+                if (s_test_audio_guid == Guid::EmptyGuid())
+                {
+                    auto clip = MakeRef<AudioClip>();
+                    clip->_runtime_path = "D:/BaiduNetdisk/module/BrowserEngine/resources/3.wav"; // 支持 wav/mp3/flac，先用 wav 最稳
+                    clip->_load_mode = EAudioLoadMode::kMemory;
+
+                    Asset *asset = ResourceMgr::Get().CreateAsset(L"project://Temp/EditorTestAudio.alasset", clip, true);
+                    s_test_audio_guid = asset->GetGuid();
+                }
+
+                AudioPlayOptions options;
+                options._bus = EAudioBus::kSfx;
+                options._volume = 1.0f;
+                Audio::Play(s_test_audio_guid, options);
+            }
+            
             ImGui::End();
             if (show)
                 ImGui::ShowDemoWindow(&show);

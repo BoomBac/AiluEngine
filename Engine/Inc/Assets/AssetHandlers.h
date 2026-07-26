@@ -76,4 +76,11 @@ namespace Ailu
         Scope<Asset> Load(const AssetLoadContext &context) final;
         bool Save(const AssetSaveContext &context) final;
     };
+
+    class AILU_API AudioClipAssetHandler : public IAssetHandler
+    {
+        const Type *AssetType() const final;
+        Scope<Asset> Load(const AssetLoadContext &context) final;
+        bool Save(const AssetSaveContext &context) final;
+    };
 }

@@ -88,15 +88,25 @@ namespace Ailu
 		{
 
 		};
+        DragFileEvent(Vector<WString>& drag_files, f32 x, f32 y) : _sys_pathes(std::move(drag_files)), _pos_x(x), _pos_y(y),
+                                                                   _has_position(true)
+        {
+        }
 		std::string ToString() const override
 		{
 			return "DragFileEvent";
 		}
 		const Vector<WString>& GetDragedFilesPath() const { return _sys_pathes; }
+        bool HasPosition() const { return _has_position; }
+        f32 GetX() const { return _pos_x; }
+        f32 GetY() const { return _pos_y; }
 		EVENT_CLASS_TYPE(kDragFile)
 		EVENT_CLASS_CATEGORY(kEventCategoryApplication)
 	private:
         Vector<WString> _sys_pathes;
+        f32 _pos_x = 0.0f;
+        f32 _pos_y = 0.0f;
+        bool _has_position = false;
 	};
 
 	class AILU_API WindowMinimizeEvent : public Event

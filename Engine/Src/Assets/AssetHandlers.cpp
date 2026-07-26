@@ -2,6 +2,8 @@
 #include "Animation/Clip.h"
 #include "Animation/TransformTrack.h"
 #include "Assets/AssetDocument.h"
+#include "Audio/AudioClip.h"
+#include "Audio/AudioClipDocument.h"
 #include "Framework/Common/FileManager.h"
 #include "Framework/Common/Log.h"
 #include "Framework/Common/ResourceMgr.h"
@@ -513,6 +515,58 @@ bool SpriteAssetHandler::Save(const AssetSaveContext &context)
     document._border = sprite->_border;
 
     return SaveAssetDocument(context._system_path, document);
+}
+
+// ============================================================
+// AudioClipAssetHandler
+// ============================================================
+
+const Type *AudioClipAssetHandler::AssetType() const
+{
+    return AudioClip::StaticType();
+}
+
+Scope<Asset> AudioClipAssetHandler::Load(const AssetLoadContext &context)
+{
+    AudioClipDocument doc;
+    if (!LoadAssetDocument(context._system_path, doc))
+        return nullptr;
+
+    const WString source_file = ToWChar(doc._source_file);
+    const WString resolved_file = ResolveExternalAssetPath(context._asset_path, source_file);
+        auto clip = MakeRef<AudioClip>();
+        clip->Name(doc._header._asset_name);
+    clip->_load_mode = doc._load_mode;
+    clip->_channel_mode = doc._channel_mode;
+    clip->_force_mono = doc._force_mono;
+    clip->_runtime_path = ToChar(context._resource_mgr->GetResSysPath(resolved_file));
+
+    auto asset = MakeScope<Asset>(Guid(doc._header._guid), AudioClip::StaticType(), context._asset_path);
+    asset->_external_asset_path = source_file;
+    asset->_p_obj = clip;
+    asset->_domain = context._resource_mgr->GetAssetPathDomain(asset->_asset_path);
+    return asset;
+}
+
+bool AudioClipAssetHandler::Save(const AssetSaveContext &context)
+{
+    const AudioClip *clip = context._asset->As<AudioClip>();
+    if (clip == nullptr)
+        return false;
+
+    AudioClipDocument doc;
+    doc._header = MakeAssetDocumentHeader(context._asset);
+    doc._source_file = ToChar(MakeStoredExternalAssetPath(context._asset->_external_asset_path));
+    doc._load_mode = clip->_load_mode;
+    doc._channel_mode = clip->_channel_mode;
+    doc._force_mono = clip->_force_mono;
+
+    if (!SaveAssetDocument(context._system_path, doc))
+    {
+        LOG_ERROR(L"Save audio clip to {} failed!", context._system_path);
+        return false;
+    }
+    return true;
 }
 
 // ============================================================

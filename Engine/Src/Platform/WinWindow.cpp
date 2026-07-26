@@ -31,6 +31,11 @@ namespace
     class MyDropTarget : public IDropTarget
     {
     public:
+        explicit MyDropTarget(std::function<void(Ailu::Vector<Ailu::WString> &, POINTL)> on_drop)
+            : _on_drop(std::move(on_drop))
+        {
+        }
+
         // Implement IUnknown methods
         ULONG STDMETHODCALLTYPE AddRef() override { return 1; }
         ULONG STDMETHODCALLTYPE Release() override { return 1; }
@@ -59,10 +64,42 @@ namespace
             return S_OK;
         }
 
-        HRESULT Drop(IDataObject *, DWORD, POINTL, DWORD *pdwEffect) override
+        HRESULT Drop(IDataObject *data_object, DWORD, POINTL point, DWORD *pdwEffect) override
         {
             Ailu::Input::BlockInput(false);
             *pdwEffect = DROPEFFECT_COPY;
+            if (data_object == nullptr)
+                return S_OK;
+
+            FORMATETC format;
+            format.cfFormat = CF_HDROP;
+            format.ptd = nullptr;
+            format.dwAspect = DVASPECT_CONTENT;
+            format.lindex = -1;
+            format.tymed = TYMED_HGLOBAL;
+
+            STGMEDIUM medium;
+            if (FAILED(data_object->GetData(&format, &medium)))
+                return S_OK;
+
+            HDROP drop = static_cast<HDROP>(GlobalLock(medium.hGlobal));
+            if (drop != nullptr)
+            {
+                const UINT file_count = DragQueryFile(drop, 0xFFFFFFFF, nullptr, 0);
+                Ailu::Vector<Ailu::WString> dragged_files(file_count);
+                for (UINT i = 0; i < file_count; ++i)
+                {
+                    const UINT path_length = DragQueryFile(drop, i, nullptr, 0);
+                    Ailu::WString file_path(path_length + 1u, L'\0');
+                    DragQueryFile(drop, i, file_path.data(), path_length + 1);
+                    file_path.resize(path_length);
+                    dragged_files[i] = std::move(file_path);
+                }
+                if (_on_drop && !dragged_files.empty())
+                    _on_drop(dragged_files, point);
+                GlobalUnlock(medium.hGlobal);
+            }
+            ReleaseStgMedium(&medium);
             return S_OK;
         }
 
@@ -71,6 +108,9 @@ namespace
             *pdwEffect = DROPEFFECT_COPY;
             return S_OK;
         }
+
+    private:
+        std::function<void(Ailu::Vector<Ailu::WString> &, POINTL)> _on_drop;
     };
 }
 
@@ -289,14 +329,36 @@ namespace Ailu
         if (main_win == nullptr)
             Input::SetupPlatformInput(MakeScope<WinInput>(_hwnd));
         DragAcceptFiles(_hwnd, true);
+        ChangeWindowMessageFilterEx(_hwnd, WM_DROPFILES, MSGFLT_ALLOW, nullptr);
+        ChangeWindowMessageFilterEx(_hwnd, WM_COPYDATA, MSGFLT_ALLOW, nullptr);
+        ChangeWindowMessageFilterEx(_hwnd, 0x0049, MSGFLT_ALLOW, nullptr);
         _is_focused = true;
         //关闭输入法
         DisableIME(_hwnd);
         _reserver_area = {0.0f,0.0f,100.0f,20.0f};
         //注册拖动事件，拖动文件时屏蔽输入
-        CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
-        MyDropTarget *target = new MyDropTarget();
-        RegisterDragDrop(_hwnd, target);
+        const HRESULT ole_result = OleInitialize(nullptr);
+        _ole_initialized = SUCCEEDED(ole_result);
+        if (FAILED(ole_result) && ole_result != RPC_E_CHANGED_MODE)
+            LOG_WARNING("WinWindow: OleInitialize failed: 0x{:08X}", static_cast<u32>(ole_result));
+        MyDropTarget *target = new MyDropTarget([this](Vector<WString> &dragged_files, POINTL point)
+        {
+            POINT client_point{point.x, point.y};
+            ScreenToClient(_hwnd, &client_point);
+            LOG_INFO("WinWindow: drop {} file(s) at {}, {}", dragged_files.size(), client_point.x, client_point.y);
+            DragFileEvent e(dragged_files, static_cast<f32>(client_point.x), static_cast<f32>(client_point.y));
+            e._window = this;
+            _data.Handler(e);
+        });
+        const HRESULT register_drop_result = RegisterDragDrop(_hwnd, target);
+        if (FAILED(register_drop_result))
+        {
+            LOG_ERROR("WinWindow: RegisterDragDrop failed: 0x{:08X}", static_cast<u32>(register_drop_result));
+        }
+        else
+        {
+            LOG_INFO("WinWindow: RegisterDragDrop succeeded");
+        }
     }
     void WinWindow::OnUpdate()
     {
@@ -437,6 +499,11 @@ namespace Ailu
         RevokeDragDrop(hwnd);
         DestroyWindow(hwnd);
         _hwnd = nullptr;
+        if (_ole_initialized)
+        {
+            OleUninitialize();
+            _ole_initialized = false;
+        }
     }
 
 #define HIGH_BIT(x, n) ((x) >> (n))
@@ -485,7 +552,9 @@ namespace Ailu
                     draged_files[i] = filePath;
                     delete[] filePath;
                 }
-                DragFileEvent e(draged_files);
+                POINT drop_point{};
+                DragQueryPoint(hDrop, &drop_point);
+                DragFileEvent e(draged_files, static_cast<f32>(drop_point.x), static_cast<f32>(drop_point.y));
                 e._window = this;
                 _data.Handler(e);
 

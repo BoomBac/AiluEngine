@@ -105,8 +105,11 @@ namespace Ailu
                 }
                 else if (e.GetEventType() == EEventType::kDragFile)
                 {
-
-                    ue._drop_files = static_cast<DragFileEvent *>(&e)->GetDragedFilesPath();
+                    auto *drag_file_event = static_cast<DragFileEvent *>(&e);
+                    ue._drop_files = drag_file_event->GetDragedFilesPath();
+                    if (drag_file_event->HasPosition())
+                        ue._mouse_position = Vector2f(drag_file_event->GetX(), drag_file_event->GetY());
+                    LOG_INFO("UILayer: drop files at {}", ue._mouse_position.ToString());
                 }
                 else {}
                 auto &widget = s_mgr->_widgets;

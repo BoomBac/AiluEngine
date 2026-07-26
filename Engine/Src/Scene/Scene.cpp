@@ -1,5 +1,6 @@
 #include "Scene/Scene.h"
 #include "Animation/AnimationSystem.h"
+#include "Audio/AudioSystem.h"
 #include "Framework/Common/Application.h"
 #include "Framework/Math/QuaternionMatrix.h"
 #include "Framework/Common/Profiler.h"
@@ -102,6 +103,8 @@ namespace Ailu::SceneManagement
         _register.RegisterComponent<ECS::CSkeletonMesh>();
         _register.RegisterComponent<ECS::CVXGI>();
         _register.RegisterComponent<ECS::SpriteRendererComponent>();
+        _register.RegisterComponent<ECS::AudioSourceComponent>();
+        _register.RegisterComponent<ECS::AudioListenerComponent>();
         ECS::Signature transf_sig;
         transf_sig.set(_register.GetComponentTypeID<ECS::TransformComponent>(), true);
         _register.RegisterSystem<ECS::TransformSystem>(transf_sig);
@@ -116,6 +119,9 @@ namespace Ailu::SceneManagement
         ECS::Signature anim_sig;
         anim_sig.set(_register.GetComponentTypeID<ECS::CSkeletonMesh>(), true);
         _register.RegisterSystem<ECS::AnimationSystem>(anim_sig);
+        ECS::Signature audio_sig;
+        audio_sig.set(_register.GetComponentTypeID<ECS::TransformComponent>(), true);
+        _register.RegisterSystem<ECS::AudioSystem>(audio_sig);
         _register.RegisterOnComponentAdd<ECS::StaticMeshComponent>([](ECS::Entity entity){ RenderPipeline::Get().OnAddRenderObject(entity);
         });
         _register.RegisterOnComponentAdd<ECS::CSkeletonMesh>([](ECS::Entity entity){ RenderPipeline::Get().OnAddRenderObject(entity);});
@@ -498,6 +504,10 @@ namespace Ailu::SceneManagement
             _register.AddComponent<ECS::CCollider>(new_one, *_register.GetComponent<ECS::CCollider>(e));
         if (_register.HasComponent<ECS::SpriteRendererComponent>(e))
             _register.AddComponent<ECS::SpriteRendererComponent>(new_one, *_register.GetComponent<ECS::SpriteRendererComponent>(e));
+        if (_register.HasComponent<ECS::AudioSourceComponent>(e))
+            _register.AddComponent<ECS::AudioSourceComponent>(new_one, *_register.GetComponent<ECS::AudioSourceComponent>(e));
+        if (_register.HasComponent<ECS::AudioListenerComponent>(e))
+            _register.AddComponent<ECS::AudioListenerComponent>(new_one, *_register.GetComponent<ECS::AudioListenerComponent>(e));
 
         // Reparent to same parent, then restore local transform
         if (source_has_hierarchy && source_parent != ECS::kInvalidEntity)

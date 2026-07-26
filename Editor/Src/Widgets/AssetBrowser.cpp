@@ -1,6 +1,9 @@
 #include "Widgets/AssetBrowser.h"
+#include "Audio/Audio.h"
+#include "Audio/AudioClip.h"
 #include "Common/EditorPopup.h"
 #include "Editors/InputActionAssetEditor.h"
+#include "Editors/AudioClipEditor.h"
 #include "Editors/SpriteAssetEditor.h"
 #include "Framework/Common/FileManager.h"
 #include "Framework/Common/ResourceMgr.h"
@@ -63,6 +66,7 @@ namespace Ailu
             constexpr f32 kListTextLeftPadding = 6.0f;
             Array<Vector<Ref<Render::RenderTexture>>, Render::RenderConstants::kFrameCount> s_retired_asset_preview_icons;
             u16 s_retired_asset_preview_icon_index = 0u;
+            AudioHandle s_audio_preview_handle;
 
             bool IsListView(f32 icon_size)
             {
@@ -350,6 +354,33 @@ namespace Ailu
                     return EImportPopupType::kTexture;
                 return EImportPopupType::kDirect;
             }
+
+            bool PlayAudioClipAsset(Asset *asset)
+            {
+                if (asset == nullptr || asset->_asset_type != StaticClass<AudioClip>())
+                    return false;
+                if (asset->_p_obj == nullptr)
+                    ResourceMgr::Get().Load<AudioClip>(asset->_asset_path);
+                if (asset->_p_obj == nullptr)
+                    return false;
+
+                if (s_audio_preview_handle.IsValid())
+                    Audio::Stop(s_audio_preview_handle);
+
+                AudioPlayOptions options;
+                options._bus = EAudioBus::kUi;
+                options._volume = 1.0f;
+                s_audio_preview_handle = Audio::Play(asset->GetGuid(), options);
+                return s_audio_preview_handle.IsValid();
+            }
+
+            void StopAudioPreview()
+            {
+                if (!s_audio_preview_handle.IsValid())
+                    return;
+                Audio::Stop(s_audio_preview_handle);
+                s_audio_preview_handle = AudioHandle::Invalid();
+            }
         }// namespace
 
         class AssetBrowser::DirectoryTreeDataSource final : public UI::ITreeViewDataSource
@@ -576,17 +607,11 @@ namespace Ailu
                 LOG_INFO("{} drop", StaticEnum<EDragType>()->GetNameByEnum(payload._type));
             };
             _icon_area->SetDropHandler(handler);
-            _icon_area->OnFileDrop() += [this](UI::UIEvent &e)
-            {
-                Vector<WString> dropped_files;
-                dropped_files.reserve(e._drop_files.size());
-                for (auto &f: e._drop_files)
-                {
-                    LOG_INFO(L"Drop file {}",(f));
-                    dropped_files.push_back(f);
-                }
-                QueueImportFiles(dropped_files, e._mouse_position);
-            };
+            const auto file_drop_handler = [this](UI::UIEvent &e) { HandleFileDrop(e); };
+            _content_root->OnFileDrop() += file_drop_handler;
+            _right->OnFileDrop() += file_drop_handler;
+            _icon_area->OnFileDrop() += file_drop_handler;
+            _icon_content->OnFileDrop() += file_drop_handler;
         }
 
         AssetBrowser::~AssetBrowser()
@@ -688,6 +713,22 @@ namespace Ailu
             _pending_import_files.insert(_pending_import_files.end(), files.begin(), files.end());
             if (was_empty)
                 ShowNextImportPopup();
+        }
+
+        void AssetBrowser::HandleFileDrop(UI::UIEvent &e)
+        {
+            if (e._drop_files.empty())
+                return;
+
+            Vector<WString> dropped_files;
+            dropped_files.reserve(e._drop_files.size());
+            for (auto &f: e._drop_files)
+            {
+                LOG_INFO(L"AssetBrowser: drop file {}", f);
+                dropped_files.push_back(f);
+            }
+            QueueImportFiles(dropped_files, e._mouse_position);
+            e._is_handled = true;
         }
 
         void AssetBrowser::ShowNextImportPopup()
@@ -1231,6 +1272,18 @@ namespace Ailu
                     DockManager::Get().AddDock(editor);
                 }
             }
+            else if (asset->_asset_type == StaticClass<AudioClip>())
+            {
+                if (asset->_p_obj == nullptr)
+                    ResourceMgr::Get().Load<AudioClip>(asset->_asset_path);
+
+                if (asset->_p_obj)
+                {
+                    auto editor = MakeRef<AudioClipEditor>();
+                    editor->Open(asset->As<AudioClip>());
+                    DockManager::Get().AddDock(editor);
+                }
+            }
         }
 
         void AssetBrowser::ShowCreateMaterialDialog(Vector2f popup_pos, const fs::path &target_sys_path)
@@ -1461,9 +1514,15 @@ namespace Ailu
 
             const String asset_name = asset->Name();
             Vector<PopupMenuAction> actions;
-            if (asset->_asset_type == StaticClass<SceneManagement::Scene>() || asset->_asset_type == StaticClass<Render::Mesh>())
+            if (asset->_asset_type == StaticClass<SceneManagement::Scene>() || asset->_asset_type == StaticClass<Render::Mesh>() ||
+                asset->_asset_type == StaticClass<AudioClip>())
             {
                 actions.push_back({"Open", [this, asset]() { OpenAsset(asset); }});
+            }
+            if (asset->_asset_type == StaticClass<AudioClip>())
+            {
+                actions.push_back({"Play Audio", [asset]() { PlayAudioClipAsset(asset); }});
+                actions.push_back({"Stop Audio", []() { StopAudioPreview(); }});
             }
             actions.push_back({"Rename", [this, asset_name, asset, popup_pos]()
             {

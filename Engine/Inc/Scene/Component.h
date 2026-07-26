@@ -8,6 +8,7 @@
 
 #include "Animation/BlendSpace.h"
 #include "Animation/Clip.h"
+#include "Audio/AudioHandle.h"
 #include "Entity.h"
 #include "Framework/Math/Guid.h"
 #include "Framework/Math/Transform.h"
@@ -469,6 +470,27 @@ public:                                                                 \
             bool _flip_x = false;
             bool _flip_y = false;
             bool _visible = true;
+        };
+
+        struct AILU_API AudioSourceComponent
+        {
+            DECLARE_COMPONENT(AudioSourceComponent, "Ailu.ECS.AudioSourceComponent")
+            Guid _audio_event;
+            bool _play_on_awake = false;
+            bool _loop = false;
+            bool _spatial = true;
+            f32 _volume = 1.0f;
+            f32 _pitch = 1.0f;
+            f32 _min_distance = 1.0f;
+            f32 _max_distance = 30.0f;
+            f32 _priority = 0.5f;
+            AudioHandle _runtime_handle;
+        };
+
+        struct AILU_API AudioListenerComponent
+        {
+            DECLARE_COMPONENT(AudioListenerComponent, "Ailu.ECS.AudioListenerComponent")
+            bool _enabled = true;
         };
     }// namespace ECS
 };// namespace Ailu

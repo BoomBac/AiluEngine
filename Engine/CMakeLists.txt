@@ -131,6 +131,7 @@ set(IMGUI_BACKENDS ${ENGINE_ROOT_PATH}/Ext/imgui/backends/imgui_impl_dx12.cpp;${
 set(IMGUIZMO_SRC ${ENGINE_ROOT_PATH}/Ext/ImGuizmo/ImGuizmo.cpp)
 set(DDS_LOADER ${ENGINE_ROOT_PATH}/Ext/dds_loader/DDSTextureLoader12.cpp)
 set(HDR_LOADER ${ENGINE_ROOT_PATH}/Ext/miniz.cpp)
+set(MINIAUDIO_SRC ${ENGINE_ROOT_PATH}/Ext/miniaudio/miniaudio.c)
 set(ANIM_MODULE
         Src/Animation/Curve.cpp
         Inc/Animation/Track.hpp
@@ -152,6 +153,7 @@ if (AILU_LUA_SOURCES)
 endif()
 
 set_source_files_properties(IMGUIZMO_SRC PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
+set_source_files_properties(${MINIAUDIO_SRC} PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 # set_source_files_properties(IMGUI_BACKENDS PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 # aux_source_directory (Src engine_src_dir)
 # 为目标添加 include 目录
@@ -165,7 +167,7 @@ set_source_files_properties(IMGUIZMO_SRC PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 #         Ext/imnodes/imnodes.cpp
 #         Src/Render/Font.cpp)
 set(SOURCE_LIST ${PROJECT_SOURCES};${IMGUI_ROOT};${IMPLOT_ROOT};${IMGUI_BACKENDS};${IMGUIZMO_SRC};${RENDER_MODULE};${RHI_DX12};${UI_MODULE};${DDS_LOADER} ${IMGUI_PLOT} ${ANIM_MODULE}
-${HDR_LOADER} ${IMNODE} ${AILU_LUA_SOURCES} "Ext/tracy/public/TracyClient.cpp")
+${HDR_LOADER} ${MINIAUDIO_SRC} ${IMNODE} ${AILU_LUA_SOURCES} "Ext/tracy/public/TracyClient.cpp")
 
 add_library (Engine SHARED ${SOURCE_LIST})
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCE_LIST})

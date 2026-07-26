@@ -981,34 +981,16 @@ namespace Ailu
             };
             OnMouseMove() += [this](UIEvent &e)
             {
-                Vector4f bar_rect = _abs_rect;
-                if (_is_horizontal)
-                {
-                    bar_rect.x += _abs_rect.z * _ratio - kSplitBarThickness * 0.5f;
-                    bar_rect.z = kSplitBarThickness;
-                }
-                else
-                {
-                    bar_rect.y += _abs_rect.w * _ratio - kSplitBarThickness * 0.5f;
-                    bar_rect.w = kSplitBarThickness;
-                }
-                bool is_hover_bar = IsPointInside(e._mouse_position, bar_rect);
+                bool is_hover_bar = IsPointInside(e._mouse_position, CalculateSplitBarRect(true));
                 if (is_hover_bar != _is_hover_bar)
                 {
                     _is_hover_bar = is_hover_bar;
-                    if (_is_hover_bar)
-                    {
-                        // change cursor
-                        if (_is_horizontal)
-                            Application::Get().SetCursor(ECursorType::kSizeEW);
-                        else
-                            Application::Get().SetCursor(ECursorType::kSizeNS);
-                    }
-                    else
-                    {
-                        Application::Get().SetCursor(ECursorType::kArrow);
-                    }
                 }
+                if (_is_hover_bar || _is_dragging_bar)
+                    Application::Get().SetCursor(_is_horizontal ? ECursorType::kSizeEW : ECursorType::kSizeNS,
+                                                 ECursorPriority::kHigh);
+                else
+                    Application::Get().SetCursor(ECursorType::kArrow);
 
                 if (_is_dragging_bar)
                 {
@@ -1029,6 +1011,8 @@ namespace Ailu
                 if (_is_hover_bar)
                 {
                     _is_dragging_bar = true;
+                    Application::Get().SetCursor(_is_horizontal ? ECursorType::kSizeEW : ECursorType::kSizeNS,
+                                                 ECursorPriority::kHigh);
                     e._is_handled = true;
                 }
             };
@@ -1053,6 +1037,15 @@ namespace Ailu
             _ratio = ratio;
             InvalidateLayout();
         }
+        UIElement *SplitView::HitTest(Vector2f pos)
+        {
+            Vector2f local_pos = TransformCoord(_inv_matrix, {pos, 0.0f}).xy;
+            if (!IsPointInside(local_pos))
+                return nullptr;
+            if (IsPointInside(pos, CalculateSplitBarRect(true)))
+                return this;
+            return UIElement::HitTest(pos);
+        }
         void SplitView::RenderImpl(UIRenderer &r)
         {
             r.DrawVisual(_arrange_rect, _matrix, _resolved_visual);
@@ -1060,17 +1053,7 @@ namespace Ailu
             {
                 child->Render(r);
             }
-            Vector4f bar_rect = _content_rect;
-            if (_is_horizontal)
-            {
-                bar_rect.x += _content_rect.z * _ratio - kSplitBarThickness * 0.5f;
-                bar_rect.z = kSplitBarThickness;
-            }
-            else
-            {
-                bar_rect.y += _content_rect.w * _ratio - kSplitBarThickness * 0.5f;
-                bar_rect.w = kSplitBarThickness;
-            }
+            Vector4f bar_rect = CalculateSplitBarRect(false);
             UIBrush bar_brush;
             bar_brush._type = EUIBrushType::kColor;
             bar_brush._tint = _is_hover_bar ? _resolved_visual._content_color : _resolved_visual._border_color;
@@ -1093,6 +1076,21 @@ namespace Ailu
         }
         void SplitView::PostDeserialize()
         {
+        }
+        Vector4f SplitView::CalculateSplitBarRect(bool is_absolute) const
+        {
+            Vector4f bar_rect = is_absolute ? _abs_rect : _content_rect;
+            if (_is_horizontal)
+            {
+                bar_rect.x += bar_rect.z * _ratio - kSplitBarThickness * 0.5f;
+                bar_rect.z = kSplitBarThickness;
+            }
+            else
+            {
+                bar_rect.y += bar_rect.w * _ratio - kSplitBarThickness * 0.5f;
+                bar_rect.w = kSplitBarThickness;
+            }
+            return bar_rect;
         }
         void SplitView::MeasureAndArrange(f32 dt)
         {

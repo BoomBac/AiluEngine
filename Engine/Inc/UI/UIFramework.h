@@ -66,6 +66,8 @@ namespace Ailu
 
         private:
             void ApplyFocusChange(UIElement *old_f, UIElement *new_f);
+            bool IsElementInWidget(UIElement *element, Widget *widget) const;
+            void CleanupWidgetState(Widget *widget);
 
         private:
             UILayer *_ui_layer;

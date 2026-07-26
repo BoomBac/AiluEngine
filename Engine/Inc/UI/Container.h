@@ -220,11 +220,12 @@ namespace Ailu
         {
             GENERATED_BODY()
         public:
-            inline static const f32 kSplitBarThickness = 2.0f;
+            inline static const f32 kSplitBarThickness = 6.0f;
             SplitView();
             void Update(f32 dt) override;
             f32 GetRatio() const { return _ratio; }
             void SetRatio(f32 ratio);
+            UIElement *HitTest(Vector2f pos) override;
 
             // ── Style ────────────────────────────────────────────
             UIControlVisualOverride &GetStyleOverride() { return _style_override; }
@@ -236,6 +237,7 @@ namespace Ailu
             void RenderImpl(UIRenderer &r) override;
             void PostDeserialize() override;
             void MeasureAndArrange(f32 dt) override;
+            Vector4f CalculateSplitBarRect(bool is_absolute) const;
             void ResolveStyle(const UIStyleContext &context) override;
             const UIControlVisual *GetVisual(EUIVisualState state) const override;
         private:

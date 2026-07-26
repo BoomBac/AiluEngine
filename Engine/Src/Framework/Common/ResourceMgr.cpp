@@ -1,5 +1,6 @@
 #include "Framework/Common/ResourceMgr.h"
 #include "Assets/AssetDocument.h"
+#include "Audio/AudioClip.h"
 #include "Framework/Common/FileManager.h"
 #include "Framework/Common/JobSystem.h"
 #include "Framework/Common/Log.h"
@@ -434,6 +435,7 @@ namespace Ailu
 		_lut_global_resources_by_type[AnimationClip::StaticType()] = {};
 		_lut_global_resources_by_type[Sprite::StaticType()] = {};
 		_lut_global_resources_by_type[InputActionAsset::StaticType()] = {};
+		_lut_global_resources_by_type[AudioClip::StaticType()] = {};
 		_asset_domains.emplace_back(AssetMountDesc{
 			EAssetDomain::kEngine,
 			kPathScheme[0],
@@ -468,6 +470,7 @@ namespace Ailu
 		_asset_handler_registry.Register(MakeScope<SceneAssetHandler>());
 		_asset_handler_registry.Register(MakeScope<AnimationClipAssetHandler>());
 		_asset_handler_registry.Register(MakeScope<InputActionAssetHandler>());
+		_asset_handler_registry.Register(MakeScope<AudioClipAssetHandler>());
 		
 		Vector<WString> shader_asset_pathes = {
 				L"Shaders/hlsl/deferred_lighting.alasset",
@@ -1489,6 +1492,8 @@ namespace Ailu
 				return Sprite::StaticType();
 			if (type == InputActionAsset::StaticType())
 				return InputActionAsset::StaticType();
+			if (type == AudioClip::StaticType())
+				return AudioClip::StaticType();
 		}
 		return nullptr;
 	}
@@ -1552,12 +1557,22 @@ namespace Ailu
 			return nullptr;
 		}
 		auto ext = p.extension().string();
-		if (ext.empty() || (!kHDRImageExt.contains(ext) && !kLDRImageExt.contains(ext) && !kMeshExt.contains(ext)))
+		if (ext.empty() || (!kHDRImageExt.contains(ext) && !kLDRImageExt.contains(ext) && !kMeshExt.contains(ext) && !kAudioExt.contains(ext)))
 		{
 			LOG_ERROR(L"Path {} is not a supported file!", sys_path);
 			return nullptr;
 		}
-		if (!IsFileOnDiskUpdated(sys_path))
+		const WString normalized_source_path = NormalizeAssetPath(sys_path, EAssetDomain::kRuntime);
+		bool source_is_asset_path = false;
+		for (const auto &scheme: kPathScheme)
+		{
+			if (normalized_source_path.starts_with(scheme))
+			{
+				source_is_asset_path = true;
+				break;
+			}
+		}
+		if (source_is_asset_path && !IsFileOnDiskUpdated(sys_path))
 		{
 			LOG_WARNING(L"File {} is new,skip load!", sys_path);
 			return nullptr;
@@ -1644,6 +1659,16 @@ namespace Ailu
 			WString imported_asset_path = created_asset_dir;
 			imported_asset_path.append(std::format(L"{}.alasset", ToWChar(tex->Name().c_str())));
 			loaded_objects.push(std::make_tuple(imported_asset_path, tex));
+		}
+		else if (kAudioExt.contains(ext))
+		{
+            auto clip = MakeRef<AudioClip>();
+            clip->Name(ToChar(p.stem().wstring()));
+			clip->_runtime_path = ToChar(ResourceMgr::GetResSysPath(external_asset_path));
+			clip->_load_mode = EAudioLoadMode::kMemory;
+			WString imported_asset_path = created_asset_dir;
+			imported_asset_path.append(std::format(L"{}.alasset", ToWChar(clip->Name().c_str())));
+			loaded_objects.push(std::make_tuple(imported_asset_path, clip));
 		}
 		else
 		{

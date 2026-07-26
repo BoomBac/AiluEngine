@@ -39,6 +39,11 @@ namespace Ailu
         Vector<WString> _arguments;
 
         bool _require_project = true;
+        bool _enable_audio = true;
+        String _audio_device_name;
+        u32 _audio_sample_rate = 48000u;
+        u32 _audio_max_voices = 128u;
+        u32 _audio_max_streaming_voices = 8u;
     };
 
     enum class ECursorType
@@ -130,6 +135,7 @@ namespace Ailu
         /// @return 目录 working_path/cache/
         static WString GetAppCachePath();
         static const WString &GetProjectRootPath();
+        static void SetProjectRootPath(const WString &project_root_path);
         static void SetEngineConfigPath(const WString &engine_config_path);
         /// @brief 获取用户目录，c:/UserName/
         /// @return 用户目录
@@ -139,6 +145,7 @@ namespace Ailu
         static bool IsMainThread();
         void UpdatePlatformEventState(Event &e);
         int Initialize() override;
+        int Initialize(ApplicationDesc desc) { return Initialize(desc, ApplicationInitContext{}); }
         int Initialize(ApplicationDesc desc,const ApplicationInitContext& init_ctx);
         void Finalize() override;
         void Tick(f32 delta_time) override;
@@ -233,6 +240,8 @@ namespace Ailu
         std::atomic<bool> _has_drop_files = false;
         std::mutex _drop_files_mtx;
         Vector<WString> _drop_files;
+        Vector2f _drop_mouse_pos = Vector2f::kZero;
+        bool _has_drop_mouse_pos = false;
     };
 }// namespace Ailu
 

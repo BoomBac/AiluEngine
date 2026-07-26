@@ -1241,6 +1241,7 @@ namespace Ailu
         {
             if (dock == nullptr)
                 return;
+            std::erase(_pending_remove_docks, dock);
 
             DockNode *node = FindNodeByWindow(dock);
             if (node == nullptr)
@@ -1282,6 +1283,16 @@ namespace Ailu
 
             CleanupWindowIfEmpty(own_window);
         }
+
+        void DockManager::RequestRemoveDock(DockWindow *dock)
+        {
+            if (dock == nullptr)
+                return;
+            if (std::find(_pending_remove_docks.begin(), _pending_remove_docks.end(), dock) != _pending_remove_docks.end())
+                return;
+            _pending_remove_docks.push_back(dock);
+        }
+
         static void DrawTreeNode(DockNode *node, int depth, int &row)
         {
             return;
@@ -1320,6 +1331,16 @@ namespace Ailu
 
         void DockManager::Update(f32 dt)
         {
+            if (!_pending_remove_docks.empty())
+            {
+                Vector<DockWindow *> pending_remove_docks = std::move(_pending_remove_docks);
+                _pending_remove_docks.clear();
+                for (DockWindow *dock: pending_remove_docks)
+                {
+                    if (FindNodeByWindow(dock) != nullptr)
+                        RemoveDock(dock);
+                }
+            }
             if (_is_any_float_node_invalid)
             {
                 for (auto& it: _float_nodes)
