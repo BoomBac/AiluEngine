@@ -325,12 +325,30 @@ namespace Ailu
     //----------------------------------------------------------------------------------GpuProfileBlock------------------------------------------------------------------------------
 
     //----------------------------------------------------------------------------------CPUProfileBlock------------------------------------------------------------------------------
+#if defined(TRACY_ENABLE)
+    CPUProfileBlock::CPUProfileBlock(const String &name) : CPUProfileBlock(
+        name,
+        []() -> const tracy::SourceLocationData *
+        {
+            static constexpr tracy::SourceLocationData s_tracy_cpu_profileblock_srcloc{
+                "CPUProfileBlock",
+                "CPUProfileBlock",
+                __FILE__,
+                (uint32_t)__LINE__,
+                0};
+            return &s_tracy_cpu_profileblock_srcloc;
+        }())
+    {
+    }
+
+    CPUProfileBlock::CPUProfileBlock(const String &name, const tracy::SourceLocationData *tracy_source_location)
+#else
     CPUProfileBlock::CPUProfileBlock(const String &name)
+#endif
     {
 #if defined(TRACY_ENABLE)
         _owner_thread_id = std::this_thread::get_id();
-        static const tracy::SourceLocationData tracy_cpu_profileblock_srcloc{ "CPUProfileBlock", "CPUProfileBlock", __FILE__, (uint32_t)__LINE__, 0 };
-        _tracy_zone.emplace(&tracy_cpu_profileblock_srcloc, true);
+        _tracy_zone.emplace(tracy_source_location, true);
         _tracy_zone->Name(name.c_str(), name.size());
 #endif
         //std::lock_guard<std::mutex> lock(_mutex);

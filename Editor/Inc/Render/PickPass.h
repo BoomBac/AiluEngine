@@ -35,11 +35,11 @@ namespace Ailu
             PickFeature();
             ~PickFeature();
             void AddRenderPasses(Renderer &renderer, const RenderingData &rendering_data) final;
-            /// @brief 通过读回来的uint值，前24位为entity id，后8位为submesh id
+            /// @brief 通过读回来的uint值，前24位为entity index，后8位为submesh id
             /// @param x 
             /// @param y 
             /// @param on_value_get 
-            void GetPickID(u16 x, u16 y, std::function<void(u32,u32)> on_value_get) const;
+            void GetPickID(u16 x, u16 y, std::function<void(ECS::Entity,u32)> on_value_get) const;
 
         private:
             PickPass _pick;

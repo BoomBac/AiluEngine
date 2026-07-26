@@ -25,6 +25,7 @@ namespace Ailu::Render
         void Render(CommandBuffer *cmd, RenderTexture *color_target, RenderTexture *depth_target);
 
         void Clear();
+        static Vector<SpriteBatch> BuildBatchesForTesting(const Vector<SpriteRenderData> &render_data);
 
     private:
         void CreateStaticGeometry();

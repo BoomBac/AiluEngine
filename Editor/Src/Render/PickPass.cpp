@@ -524,7 +524,7 @@ namespace Ailu
                 }
             }
         }
-        void PickFeature::GetPickID(u16 x, u16 y, std::function<void(u32,u32)> on_value_get) const
+        void PickFeature::GetPickID(u16 x, u16 y, std::function<void(ECS::Entity,u32)> on_value_get) const
         {
             if (_is_active)
             {
@@ -535,7 +535,14 @@ namespace Ailu
                 _read_pickbuf->SetVector("pixel_pos", Vector4f((f32) x, (f32) y, 0.0f, 0.0f));
                 cmd->Dispatch(_read_pickbuf.get(), kernel, 1, 1, 1);
                 cmd->ReadbackBuffer(_readback_buf.get(), false, 4u, [on_value_get](const u8 *data, u32 size)
-                                    { on_value_get((*(u32 *) data) >> 8, (*(u32 *) data) & 0xFF); });
+                                    {
+                                        const u32 packed = *reinterpret_cast<const u32 *>(data);
+                                        const u32 entity_index = packed >> 8u;
+                                        const u32 submesh_index = packed & 0xFFu;
+                                        auto *scene = SceneMgr::Get().ActiveScene();
+                                        ECS::Entity entity = scene ? scene->GetRegister().GetAliveEntityByIndex(entity_index) : ECS::kInvalidEntity;
+                                        on_value_get(entity, submesh_index);
+                                    });
                 GraphicsContext::Get().ExecuteCommandBuffer(cmd);
                 CommandBufferPool::Release(cmd);
             }

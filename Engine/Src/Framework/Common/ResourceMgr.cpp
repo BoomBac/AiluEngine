@@ -19,6 +19,7 @@
 #include "Objects/JsonArchive.h"
 #include "Objects/Serialize.h"
 #include "Project/ProjectManager.h"
+#include "Input/InputActionAsset.h"
 #include "Render/GraphicsPipelineStateObject.h"
 #include "Render/2D/Sprite.h"
 #include "Assets/AssetHandlers.h"
@@ -432,6 +433,7 @@ namespace Ailu
 		_lut_global_resources_by_type[Scene::StaticType()] = {};
 		_lut_global_resources_by_type[AnimationClip::StaticType()] = {};
 		_lut_global_resources_by_type[Sprite::StaticType()] = {};
+		_lut_global_resources_by_type[InputActionAsset::StaticType()] = {};
 		_asset_domains.emplace_back(AssetMountDesc{
 			EAssetDomain::kEngine,
 			kPathScheme[0],
@@ -465,6 +467,7 @@ namespace Ailu
 		_asset_handler_registry.Register(MakeScope<SkeletonMeshAssetHandler>());
 		_asset_handler_registry.Register(MakeScope<SceneAssetHandler>());
 		_asset_handler_registry.Register(MakeScope<AnimationClipAssetHandler>());
+		_asset_handler_registry.Register(MakeScope<InputActionAssetHandler>());
 		
 		Vector<WString> shader_asset_pathes = {
 				L"Shaders/hlsl/deferred_lighting.alasset",
@@ -911,7 +914,7 @@ namespace Ailu
         //using Loader = std::function<Scope<Asset>(ResourceMgr *, const WString &,const ImportSetting&)>;
         WString sys_path = ResourceMgr::GetResSysPath(normalized_asset_path);
         auto ext = PathUtils::ExtractExt(sys_path);
-        bool is_engine_asset = ext == L".alasset" || L".almap";
+        bool is_engine_asset = ext == L".alasset" || ext == L".almap";
         AL_ASSERT(is_engine_asset);
 		AssetDocumentHeader header;
 		if (!TryLoadAssetDocumentHeader(sys_path,header))
@@ -1484,6 +1487,8 @@ namespace Ailu
 				return AnimationClip::StaticType();
 			if (type == Sprite::StaticType())
 				return Sprite::StaticType();
+			if (type == InputActionAsset::StaticType())
+				return InputActionAsset::StaticType();
 		}
 		return nullptr;
 	}

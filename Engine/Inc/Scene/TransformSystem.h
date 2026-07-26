@@ -14,6 +14,7 @@ namespace Ailu
         public:
             TransformSystem();
             void Update(Register &r, f32 delta_time) final;
+            ESystemPhase GetPhase() const final { return ESystemPhase::kTransform; }
             virtual Ref<System> Clone() final
             {
                 auto copy = MakeRef<TransformSystem>();

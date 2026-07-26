@@ -44,6 +44,7 @@ namespace Ailu
             EnsureSystemVectors(static_cast<u32>(sys_id));
             _systems[sys_id] = MakeRef<T>();
             _sys_signatures[sys_id] = sig;
+            MarkSystemScheduleDirty();
             return static_cast<T *>(_systems[sys_id].get());
         }
 

@@ -119,6 +119,8 @@ namespace Ailu
 #endif// COMPLY
         static constexpr double kMsPerUpdate = 16.66;
         static constexpr double kMsPerRender = 1000.0 / kTargetFrameRate;
+        static constexpr f32 kFixedDeltaTime = 1.0f / 60.0f;
+        static constexpr u32 kMaxFixedStepsPerFrame = 4u;
         inline static double s_target_framecount;
         inline static double s_target_lag = kMsPerRender;
         /// @brief 返回当前exe所在目录
@@ -134,11 +136,13 @@ namespace Ailu
         static WString GetUserHomePath();
         static WString GetAiluRoot();
         static Application& Get();
+        static bool IsMainThread();
         int Initialize() override;
         int Initialize(ApplicationDesc desc,const ApplicationInitContext& init_ctx);
         void Finalize() override;
         void Tick(f32 delta_time) override;
         void ReloadEngineConfig();
+        void SetMultiThreadRendering(bool enabled);
 
         void PushLayer(Layer *layer);
         void PushOverLayer(Layer *layer);
@@ -157,11 +161,11 @@ namespace Ailu
         u64 GetFrameCount() const {return _frame_count;}
         const Array<ObjectLayer,32>& GetObjectLayers() const {return _object_layers;}
         const ObjectLayer& NameToLayer(const String& name);
-        const EApplicationState State() const {return _state;}
+        const EApplicationState State() const {return _state.load();}
         LayerStack &GetLayerStack() { return *_layer_stack; }
         bool _is_playing_mode = false;
         bool _is_simulate_mode = false;
-        bool _is_multi_thread_rendering = false;
+        std::atomic<bool> _is_multi_thread_rendering = false;
         MainThreadDispatcher _dispatcher;
     protected:
         virtual bool OnWindowClose(WindowCloseEvent &e);
@@ -182,6 +186,16 @@ namespace Ailu
         virtual void OnEvent(Event &e);
 
         void LogicLoop();
+        void BeginFrame();
+        void UpdateInputAndEvents(f32 delta_time);
+        void UpdateResources(f32 delta_time);
+        void UpdateLayers(f32 delta_time);
+        void UpdateScenes(f32 delta_time);
+        void PrepareRender();
+        void RenderFrame();
+        void RenderEditor();
+        void PresentFrame();
+        void EndFrame();
         void LoadEngineConfig();
         void BeginCursorFrame();
         void SetCursorInternal(ECursorType type);
@@ -190,6 +204,7 @@ namespace Ailu
         inline static Window *s_focus_window = nullptr;
         inline static WString s_project_root_path;
         inline static WString s_engine_config_path;
+        inline static std::thread::id s_main_thread_id;
 
         LayerStack *_layer_stack;
         ImGUILayer *_p_imgui_layer;
@@ -197,9 +212,10 @@ namespace Ailu
         std::atomic<bool> _is_handling_event;
         std::thread *_p_event_handle_thread;
         Scope<RenderPipeline> _pipeline;
-        EApplicationState _state = EApplicationState::EApplicationState_None;
+        std::atomic<EApplicationState> _state = EApplicationState::EApplicationState_None;
         double _render_lag = 0.0;
         double _update_lag = 0.0;
+        f32 _fixed_accumulator = 0.0f;
         Array<ObjectLayer,32> _object_layers;
         ECursorType _cursor_type = ECursorType::kArrow;
         ECursorPriority _cursor_priority = ECursorPriority::kFallback;
@@ -208,7 +224,7 @@ namespace Ailu
         std::mutex _mutex;
         std::condition_variable _main_wait;
         std::condition_variable _render_wait;
-        bool _render_finished = true;
+        bool _render_finished = false;
         bool _main_finished = false;
         u64 _frame_count = 0u;
         Scope<Core::RawEventQueue> _raw_event_queue;

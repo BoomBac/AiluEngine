@@ -29,6 +29,7 @@
 #include "Render/GraphicsContext.h"
 #include "Render/RenderPipeline.h"
 #include "Project/ProjectManager.h"
+#include <cmath>
 
 #if defined(TRACY_ENABLE)
 #include "tracy/Tracy.hpp"
@@ -69,13 +70,45 @@ namespace Ailu
         const Type *type = EngineConfig::StaticType();
         for (auto &it: type->GetProperties())
             it.Deserialize(&g_engine_config, ar);
-        _is_multi_thread_rendering = g_engine_config.isMultiThreadRender;
     }
 
     void Application::ReloadEngineConfig()
     {
         LoadEngineConfig();
+        SetMultiThreadRendering(g_engine_config.isMultiThreadRender);
         LOG_INFO(L"Reloaded engine config: {}", s_engine_config_path);
+    }
+
+    void Application::SetMultiThreadRendering(bool enabled)
+    {
+        const bool old_enabled = _is_multi_thread_rendering.load();
+        if (old_enabled == enabled)
+            return;
+
+        Render::RenderPipeline *pipeline = Render::RenderPipeline::Instance();
+        if (!enabled && pipeline && pipeline->NeedWaitForRenderThread() && GetFrameCount() > 0u)
+        {
+            NotifyRender();
+            WaitForRender();
+            pipeline->SetRenderThreadFramePending(false);
+        }
+
+        if (g_pGfxContext == nullptr)
+        {
+            _is_multi_thread_rendering.store(enabled);
+            return;
+        }
+
+        if (enabled)
+            g_pGfxContext->SetMultiThreadRendering(true);
+
+        _is_multi_thread_rendering.store(enabled);
+
+        if (!enabled)
+            g_pGfxContext->SetMultiThreadRendering(false);
+
+        if (pipeline)
+            pipeline->SetRenderThreadFramePending(false);
     }
 
     WString Application::GetWorkingPath()
@@ -146,6 +179,7 @@ namespace Ailu
         TimeMgr::Get().Initialize();
         TimeMgr::Get().Mark();
         sp_instance = this;
+        s_main_thread_id = std::this_thread::get_id();
         LogMgr::Get().AddAppender(new FileAppender());
         //Load ini
         {
@@ -163,6 +197,7 @@ namespace Ailu
             ResourceMgr::ConfigEngineResRoot(GetAiluRoot() + L"Engine/Res/");
             ResourceMgr::ConfigEditorResRoot(GetAiluRoot() + L"Editor/Res/");
             LoadEngineConfig();
+            _is_multi_thread_rendering.store(g_engine_config.isMultiThreadRender);
         }
         //LogMgr::Get().AddAppender(new ConsoleAppender());
         _p_window = std::move(WindowFactory::Create(g_engine_config.isMultiThreadRender ? L"AiluEngine -mt" : L"AiluEngine", desc._window_width, desc._window_height));
@@ -193,7 +228,7 @@ namespace Ailu
     #if defined(TRACY_ENABLE)
         tracy::SetThreadName("MainThread");
     #endif
-        _state = EApplicationState::EApplicationState_Running;
+        _state.store(EApplicationState::EApplicationState_Running);
         _render_lag = s_target_lag;
         _update_lag = s_target_lag;
         _is_handling_event.store(true);
@@ -247,29 +282,44 @@ namespace Ailu
 #if defined(TRACY_ENABLE)
             tracy::SetThreadName("LogicThread");
 #endif
-            while (_state == EApplicationState::EApplicationState_Running || _state == EApplicationState::EApplicationState_Pause)
+            while (State() == EApplicationState::EApplicationState_Running || State() == EApplicationState::EApplicationState_Pause)
             {
                 LogicLoop();
             }
             LOG_INFO("Exit Logic Thread"); });
-        while (_state != EApplicationState::EApplicationState_Exit)
+        while (State() != EApplicationState::EApplicationState_Exit)
         {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
-            _p_window->OnUpdate();
-            _dispatcher.PumpTasks();
-            if (_state == EApplicationState::EApplicationState_Pause)
+            {
+                PROFILE_BLOCK_CPU("Application::WindowUpdate")
+                _p_window->OnUpdate();
+            }
+            {
+                PROFILE_BLOCK_CPU("Application::PumpTasks")
+                _dispatcher.PumpTasks();
+            }
+            if (State() == EApplicationState::EApplicationState_Pause)
                 std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }
 
         if (logic_thread.joinable())
             logic_thread.join();
 #else
-        while (_state != EApplicationState::EApplicationState_Exit)
+        while (State() != EApplicationState::EApplicationState_Exit)
         {
-            _p_window->OnUpdate();
-            LogicLoop();
-            _dispatcher.PumpTasks();
-            if (_state == EApplicationState::EApplicationState_Pause)
+            {
+                PROFILE_BLOCK_CPU("Application::WindowUpdate")
+                _p_window->OnUpdate();
+            }
+            {
+                PROFILE_BLOCK_CPU("Application::LogicLoop")
+                LogicLoop();
+            }
+            {
+                PROFILE_BLOCK_CPU("Application::PumpTasks")
+                _dispatcher.PumpTasks();
+            }
+            if (State() == EApplicationState::EApplicationState_Pause)
                 std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }
 #endif
@@ -298,7 +348,7 @@ namespace Ailu
         PROFILE_BLOCK_CPU("Application::WaitForMain")
         std::unique_lock<std::mutex> lock(_mutex);
         _render_wait.wait(lock, [this]
-                          { return _main_finished || _state == EApplicationState::EApplicationState_Exit; });
+                          { return _main_finished || State() == EApplicationState::EApplicationState_Exit; });
         _main_finished = false;
     }
 
@@ -335,13 +385,17 @@ namespace Ailu
     {
         return *sp_instance;
     }
+    bool Application::IsMainThread()
+    {
+        return std::this_thread::get_id() == s_main_thread_id;
+    }
     bool Application::OnWindowClose(WindowCloseEvent &e)
     {
         if (e._window == s_focus_window)
             s_focus_window = nullptr;
         if (e._window == _p_window.get())
         {
-            _state = EApplicationState::EApplicationState_Exit;
+            _state.store(EApplicationState::EApplicationState_Exit);
             _main_finished = true;
             _is_handling_event.store(false);
             NotifyRender();
@@ -365,14 +419,16 @@ namespace Ailu
     {
         s_focus_window = e._window;
         s_target_lag = kMsPerRender;
-        _state = EApplicationState::EApplicationState_Running;
+        _state.store(EApplicationState::EApplicationState_Running);
         return true;
     }
     bool Application::OnWindowMinimize(WindowMinimizeEvent &e)
     {
-        _state = EApplicationState::EApplicationState_Pause;
+        if (e._window != _p_window.get())
+            return false;
+        _state.store(EApplicationState::EApplicationState_Pause);
         TimeMgr::Get().Reset();
-        LOG_WARNING("Application state: {}", ApplicationStateToString(_state))
+        LOG_WARNING("Application state: {}", ApplicationStateToString(State()))
         return false;
     }
     bool Application::OnWindowResize(WindowResizeEvent &e)
@@ -387,6 +443,8 @@ namespace Ailu
     }
     bool Application::OnWindowMove(WindowMovedEvent &e)
     {
+        if (e._window != _p_window.get())
+            return true;
         if (e.IsBegin())
         {
             TimeMgr::Get().Pause();
@@ -518,127 +576,165 @@ namespace Ailu
 #if defined(TRACY_ENABLE)
         ZoneScopedN("Application::LogicLoop");
 #endif
-        f32 delta_time = TimeMgr::s_delta_time;
-        if (_state == EApplicationState::EApplicationState_Pause)
+        const f32 delta_time = TimeMgr::s_delta_time;
+        if (State() == EApplicationState::EApplicationState_Pause)
         {
             std::this_thread::sleep_for(std::chrono::milliseconds(500));
             return;
         }
+        BeginFrame();
+        UpdateInputAndEvents(delta_time);
+        // 处理窗口信息之后，才会进入暂停状态，也就是说暂停状态后的第一帧还是会执行，
+        // 这样会导致计时器会留下最后一个时间戳，再次回到渲染时，会有一个非常大的 lag 使得 update 错误。
+        if (State() == EApplicationState::EApplicationState_Pause || State() == EApplicationState::EApplicationState_Exit)
+            return;
+
+        UpdateResources(delta_time);
+        UpdateLayers(delta_time);
+        UpdateScenes(delta_time);
+        PrepareRender();
+        RenderFrame();
+        RenderEditor();
+        PresentFrame();
+        EndFrame();
+    }
+
+    void Application::BeginFrame()
+    {
+        PROFILE_BLOCK_CPU("Application::BeginFrame")
         _before_update_delegate.Invoke();
-        auto last_mark = TimeMgr::Get().GetElapsedSinceLastMark();
+        const auto last_mark = TimeMgr::Get().GetElapsedSinceLastMark();
         TimeMgr::Get().Tick(last_mark);
         _render_lag += last_mark;
         _update_lag += last_mark;
         Input::BeginFrame();
         BeginCursorFrame();
         TimeMgr::Get().Mark();
-        {
-            PROFILE_BLOCK_CPU("Application::Tick")
-            {
+    }
+
+    void Application::UpdateInputAndEvents(f32 delta_time)
+    {
+        PROFILE_BLOCK_CPU("Application::Input")
 #if defined(TRACY_ENABLE)
-                ZoneScopedN("UI::Update + Events");
+        ZoneScopedN("UI::Update + Events");
 #endif
-                UI::UIManager::Get()->Update(delta_time);
+        UI::UIManager::Get()->Update(delta_time);
 #if defined(SEPARATE_LOGIC_THREAD)
-                PROFILE_BLOCK_CPU(Application_OnEvent)
-                static u8 event_mem[Core::RawEventQueue::MAX_EVENT_SIZE];
-                while (auto e = _raw_event_queue->Pop(event_mem))
-                {
-                    if (e != nullptr)
-                    {
-                        for (auto it = _layer_stack->end(); it != _layer_stack->begin();)
-                        {
-                            (*--it)->OnEvent(*e);
-                            if (e->Handled()) break;
-                        }
-                    }
-                }
-                if (_has_drop_files)
-                {
-                    std::lock_guard lock(_drop_files_mtx);
-                    DragFileEvent e(_drop_files);
-                    e._window = _p_window.get();
-                    for (auto it = _layer_stack->end(); it != _layer_stack->begin();)
-                    {
-                        (*--it)->OnEvent(e);
-                        if (e.Handled()) break;
-                    }
-                    _drop_files.clear();
-                    _has_drop_files = false;
-                }
-#endif// defined
-            }
-            //处理窗口信息之后，才会进入暂停状态，也就是说暂停状态后的第一帧还是会执行，
-            //这样会导致计时器会留下最后一个时间戳，再次回到渲染时，会有一个非常大的lag使得update错误
-            if (_state == EApplicationState::EApplicationState_Pause)
-                return;
-            else if (_state == EApplicationState::EApplicationState_Exit)
-                return;
-            else {};
-            //此时更新已经传入delta_time了，所以不需要多次更新，也就是while(_update_lag >= s_target_lag)
-            //这也是固定频率更新，所以实际上delta_time始终为1
-            //if (_update_lag >= s_target_lag)
+        PROFILE_BLOCK_CPU(Application_OnEvent)
+        static u8 event_mem[Core::RawEventQueue::MAX_EVENT_SIZE];
+        while (auto e = _raw_event_queue->Pop(event_mem))
+        {
+            if (e == nullptr)
+                continue;
+            for (auto it = _layer_stack->end(); it != _layer_stack->begin();)
             {
-                PROFILE_BLOCK_CPU("LayerUpdate")
-#if defined(TRACY_ENABLE)
-                ZoneScopedN("LayerUpdate");
-#endif
-                //if (_update_lag >= s_target_lag)
-                {
-                    ResourceMgr::Get().Tick(delta_time);
-                    for (Layer *layer: *_layer_stack)
-                    {
-                        //layer->OnUpdate((f32)(_update_lag / s_target_lag));
-                        layer->OnUpdate(1.0f);
-                    }
-                    //_update_lag -= s_target_lag;
-                    //_update_lag = std::max<f32>(_update_lag,0.0f);
-                    //_update_lag = last_mark;
-                }
+                (*--it)->OnEvent(*e);
+                if (e->Handled())
+                    break;
             }
-            //if (_render_lag >= s_target_lag)
-            {
-                {
-                    PROFILE_BLOCK_CPU("SceneTick")
-#if defined(TRACY_ENABLE)
-                    ZoneScopedN("SceneTick");
-#endif
-                    SceneManagement::SceneMgr::Get().Tick(delta_time);
-                    ScriptSystem::Get().Tick(delta_time);
-                }
-                {
-                    PROFILE_BLOCK_CPU("RenderScene")
-#if defined(TRACY_ENABLE)
-                    ZoneScopedN("RenderScene");
-#endif
-                    Render::RenderPipeline::Get().Render();
-                }
-#ifdef DEAR_IMGUI
-                {
-                    PROFILE_BLOCK_CPU("RenderImGui")
-#if defined(TRACY_ENABLE)
-                    ZoneScopedN("RenderImGui");
-#endif
-                    _p_imgui_layer->Begin();
-                    for (Layer *layer: *_layer_stack)
-                        layer->OnImguiRender();
-                    _p_imgui_layer->End();
-                }
-#endif// DEAR_IMGUI
-                g_pGfxContext->Present();
-                Render::RenderPipeline::Get().FrameCleanup();
-                _render_lag -= s_target_lag;
-            }
-            //锁帧处理
-            //{
-            //    f64 remaining = s_target_lag - _update_lag;
-            //    if (remaining > 0.0)
-            //    {
-            //        std::this_thread::sleep_for(std::chrono::microseconds((i64) (remaining * 1000.0)));
-            //    }
-            //    _update_lag = 0.0;
-            //}
         }
+        if (_has_drop_files)
+        {
+            std::lock_guard lock(_drop_files_mtx);
+            DragFileEvent e(_drop_files);
+            e._window = _p_window.get();
+            for (auto it = _layer_stack->end(); it != _layer_stack->begin();)
+            {
+                (*--it)->OnEvent(e);
+                if (e.Handled())
+                    break;
+            }
+            _drop_files.clear();
+            _has_drop_files = false;
+        }
+#else
+        (void) delta_time;
+#endif
+    }
+
+    void Application::UpdateResources(f32 delta_time)
+    {
+        PROFILE_BLOCK_CPU("Application::Resources")
+        ResourceMgr::Get().Tick(delta_time);
+    }
+
+    void Application::UpdateLayers(f32 delta_time)
+    {
+        PROFILE_BLOCK_CPU("Application::Layers")
+#if defined(TRACY_ENABLE)
+        ZoneScopedN("LayerUpdate");
+#endif
+        for (Layer *layer: *_layer_stack)
+        {
+            layer->OnUpdate(delta_time);
+        }
+    }
+
+    void Application::UpdateScenes(f32 delta_time)
+    {
+        PROFILE_BLOCK_CPU("Application::Scenes")
+#if defined(TRACY_ENABLE)
+        ZoneScopedN("SceneTick");
+#endif
+        ScriptSystem::Get().Tick(delta_time);
+        _fixed_accumulator += delta_time;
+
+        u32 fixed_step_count = 0u;
+        while (_fixed_accumulator >= kFixedDeltaTime && fixed_step_count < kMaxFixedStepsPerFrame)
+        {
+            SceneManagement::SceneMgr::Get().FixedUpdate(kFixedDeltaTime);
+            _fixed_accumulator -= kFixedDeltaTime;
+            ++fixed_step_count;
+        }
+
+        if (fixed_step_count == kMaxFixedStepsPerFrame && _fixed_accumulator >= kFixedDeltaTime)
+            _fixed_accumulator = std::fmod(_fixed_accumulator, kFixedDeltaTime);
+
+        SceneManagement::SceneMgr::Get().Update(delta_time);
+        const f32 render_alpha = _fixed_accumulator / kFixedDeltaTime;
+        SceneManagement::SceneMgr::Get().LateUpdate(delta_time, render_alpha);
+    }
+
+    void Application::PrepareRender()
+    {
+        PROFILE_BLOCK_CPU("Application::PreRender")
+    }
+
+    void Application::RenderFrame()
+    {
+        PROFILE_BLOCK_CPU("Application::Render")
+#if defined(TRACY_ENABLE)
+        ZoneScopedN("RenderScene");
+#endif
+        Render::RenderPipeline::Get().Render();
+    }
+
+    void Application::RenderEditor()
+    {
+#ifdef DEAR_IMGUI
+        PROFILE_BLOCK_CPU("Application::EditorRender")
+#if defined(TRACY_ENABLE)
+        ZoneScopedN("RenderImGui");
+#endif
+        _p_imgui_layer->Begin();
+        for (Layer *layer: *_layer_stack)
+            layer->OnImguiRender();
+        _p_imgui_layer->End();
+#endif// DEAR_IMGUI
+    }
+
+    void Application::PresentFrame()
+    {
+        PROFILE_BLOCK_CPU("Application::Present")
+        g_pGfxContext->Present();
+        if (_is_multi_thread_rendering.load())
+            Render::RenderPipeline::Get().SetRenderThreadFramePending(true);
+        _render_lag -= s_target_lag;
+    }
+
+    void Application::EndFrame()
+    {
+        PROFILE_BLOCK_CPU("Application::EndFrame")
         _after_update_delegate.Invoke();
 
     #if defined(TRACY_ENABLE)

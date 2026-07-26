@@ -169,7 +169,7 @@ namespace Ailu
                         Vector4f rect = e._current_target->GetArrangeRect();
                         Vector2f local_pos = e._mouse_position - rect.xy;
                         Vector2f render_pos = ViewToRenderPosition(local_pos);
-                        s_editor_layer->_pick.GetPickID((u16) render_pos.x, (u16) render_pos.y, [this, local_pos](u32 closest_entity,u32 submesh_index)
+                        s_editor_layer->_pick.GetPickID((u16) render_pos.x, (u16) render_pos.y, [this, local_pos](ECS::Entity closest_entity,u32 submesh_index)
                         {
                             LOG_INFO("Pick entity: {},subidex: {} on pos {}", closest_entity, submesh_index, local_pos.ToString());
                             Selection::AddAndRemovePreSelection(closest_entity,submesh_index);
@@ -305,6 +305,7 @@ namespace Ailu
         }
         void SceneView::ProcessCameraInput(f32 dt)
         {
+            constexpr f32 kReferenceFrameRate = 60.0f;
             Camera::sCurrent->FovH(_camera_controller->_camera_fov_h);
             Camera::sCurrent->Near(_camera_controller->_camera_near);
             Camera::sCurrent->Far(_camera_controller->_camera_far);
@@ -328,7 +329,8 @@ namespace Ailu
                 _camera_controller->SetTargetRotation(target_rotation.x, target_rotation.y);
                 _camera_controller->Accelerate(Input::IsKeyDown(EKey::kSHIFT));
                 static const f32 move_distance = 1.0f;// 1 m
-                f32 final_move_distance = move_distance * _camera_controller->_cur_move_speed * _camera_controller->_cur_move_speed;
+                f32 final_move_distance = move_distance * _camera_controller->_cur_move_speed * _camera_controller->_cur_move_speed *
+                                          kReferenceFrameRate * dt;
                 Vector3f move_dis{0, 0, 0};
                 if (Input::IsKeyDown(EKey::kW))
                 {
@@ -359,9 +361,9 @@ namespace Ailu
                 //LOG_INFO("{}", target_pos.ToString());
                 _camera_controller->SetTargetPosition(target_pos);
             }
-            f32 lerp_factor = std::clamp(dt * _camera_controller->_lerp_speed_multifactor, 0.0f, 1.0f);
-            lerp_factor = dt * _camera_controller->_lerp_speed_multifactor * _camera_controller->_lerp_speed_multifactor;
-            lerp_factor = std::clamp(lerp_factor, 0.0f, 1.5f);
+            f32 lerp_factor = dt * _camera_controller->_lerp_speed_multifactor * _camera_controller->_lerp_speed_multifactor *
+                              kReferenceFrameRate;
+            lerp_factor = std::clamp(lerp_factor, 0.0f, 1.0f);
             _camera_controller->Interpolate(lerp_factor);
         }
         #pragma endregion

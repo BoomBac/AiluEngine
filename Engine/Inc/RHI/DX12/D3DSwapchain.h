@@ -46,6 +46,7 @@ namespace Ailu
             Vector<ComPtr<ID3D12Resource>> _back_buffers;
             Vector<D3D12_CPU_DESCRIPTOR_HANDLE> _rtvs;
             ID3D12Device *_device;
+            Window *_window;
             Vector<D3DResourceStateGuard*> _state_guard;
         };
 	}

@@ -138,9 +138,17 @@ public:                                                                 \
             Matrix4x4f _local_matrix = Matrix4x4f::Identity();
             Matrix4x4f _world_matrix = Matrix4x4f::Identity();
             Matrix4x4f _prev_world_matrix = Matrix4x4f::Identity();
-            Vector3f _position;
-            Vector3f _scale;
-            Quaternion _rotation;
+            Matrix4x4f _render_world_matrix = Matrix4x4f::Identity();
+            Matrix4x4f _prev_render_world_matrix = Matrix4x4f::Identity();
+            Vector3f _position = Vector3f::kZero;
+            Vector3f _prev_position = Vector3f::kZero;
+            Vector3f _render_position = Vector3f::kZero;
+            Vector3f _scale = Vector3f::kOne;
+            Vector3f _prev_scale = Vector3f::kOne;
+            Vector3f _render_scale = Vector3f::kOne;
+            Quaternion _rotation = Quaternion::Identity();
+            Quaternion _prev_rotation = Quaternion::Identity();
+            Quaternion _render_rotation = Quaternion::Identity();
 
             u64 _local_version = 0u;
             u64 _world_version = 0u;
@@ -200,6 +208,12 @@ public:                                                                 \
                 AL_ASSERT(!_world_dirty);
                 return _world_matrix;
             }
+
+            const Matrix4x4f &GetRenderWorldMatrix() const
+            {
+                AL_ASSERT(!_world_dirty);
+                return _render_world_matrix;
+            }
             //world space
             Vector3f GetPosition() const
             {
@@ -219,6 +233,24 @@ public:                                                                 \
                 return _rotation;
             }
 
+            Vector3f GetRenderPosition() const
+            {
+                AL_ASSERT(!_world_dirty);
+                return _render_position;
+            }
+
+            Vector3f GetRenderScale() const
+            {
+                AL_ASSERT(!_world_dirty);
+                return _render_scale;
+            }
+
+            Quaternion GetRenderRotation() const
+            {
+                AL_ASSERT(!_world_dirty);
+                return _render_rotation;
+            }
+
         private:
             void MarkLocalDirty()
             {
@@ -227,9 +259,6 @@ public:                                                                 \
                 ++_local_version;
             }
         };
-
-        Archive &operator<<(Archive &ar, TransformComponent &c);
-        Archive &operator>>(Archive &ar, TransformComponent &c);
 
         struct AILU_API ScriptComponent
         {
@@ -271,9 +300,6 @@ public:                                                                 \
             }
         };
 
-        Archive &operator<<(Archive &ar, const ScriptComponent &c);
-        Archive &operator>>(Archive &ar, ScriptComponent &c);
-
         struct LightData
         {
             Vector4f _light_pos;
@@ -283,8 +309,6 @@ public:                                                                 \
             Vector3f _area_points[4];
             bool _is_two_side;
         };
-        Archive &operator<<(Archive &ar, const LightData &c);
-        Archive &operator>>(Archive &ar, LightData &c);
 
         struct ShadowData
         {
@@ -294,9 +318,6 @@ public:                                                                 \
             float _padding;
             u16 _shaodwcam_num;
         };
-
-        Archive &operator<<(Archive &ar, const ShadowData &c);
-        Archive &operator>>(Archive &ar, ShadowData &c);
 
         AENUM()
         enum class ELightType
@@ -319,16 +340,11 @@ public:                                                                 \
             Array<Vector4f, 4> _cascade_shadow_data;
         };
 
-        Archive &operator<<(Archive &ar, const LightComponent &c);
-        Archive &operator>>(Archive &ar, LightComponent &c);
-
         struct AILU_API CCamera
         {
             DECLARE_COMPONENT(CCamera, "Ailu.ECS.CCamera")
             Camera _camera;
         };
-        Archive &operator<<(Archive &ar, const CCamera &c);
-        Archive &operator>>(Archive &ar, CCamera &c);
 
         struct AILU_API StaticMeshComponent
         {
@@ -338,9 +354,6 @@ public:                                                                 \
             Vector<AABB> _transformed_aabbs;
             EMotionVectorType _motion_vector_type = EMotionVectorType::kPerObject;
         };
-
-        Archive &operator<<(Archive &ar, const StaticMeshComponent &c);
-        Archive &operator>>(Archive &ar, StaticMeshComponent &c);
 
         struct AILU_API CSkeletonMesh
         {
@@ -358,8 +371,6 @@ public:                                                                 \
             EMotionVectorType _motion_vector_type = EMotionVectorType::kPerObject;
         };
 
-        Archive &operator<<(Archive &ar, const CSkeletonMesh &c);
-        Archive &operator>>(Archive &ar, CSkeletonMesh &c);
 
         struct AILU_API CHierarchy
         {
@@ -371,8 +382,6 @@ public:                                                                 \
             u32 _children_num = 0;
             Matrix4x4f _inv_matrix_attach;
         };
-        Archive &operator<<(Archive &ar, const CHierarchy &c);
-        Archive &operator>>(Archive &ar, CHierarchy &c);
 
         struct AILU_API CLightProbe
         {
@@ -387,8 +396,6 @@ public:                                                                 \
             Material *_debug_material;
             CLightProbe();
         };
-        Archive &operator<<(Archive &ar, const CLightProbe &c);
-        Archive &operator>>(Archive &ar, CLightProbe &c);
 
         struct CRigidBody
         {
@@ -400,8 +407,6 @@ public:                                                                 \
             Vector3f _torque = Vector3f::kZero;          // 力矩
             f32 _inertia = 1.0f;                         // 转动惯量，假设为常量
         };
-        Archive &operator<<(Archive &ar, const CRigidBody &c);
-        Archive &operator>>(Archive &ar, CRigidBody &c);
 
         AENUM()
         enum class EColliderType
@@ -410,8 +415,7 @@ public:                                                                 \
             kSphere,
             kCapsule
         };
-        const String &ColliderTypeToString(EColliderType type);
-        EColliderType ColliderTypeFromString(const String &str);
+
         struct CCollider
         {
             DECLARE_COMPONENT(CCollider, "Ailu.ECS.CCollider")
@@ -428,8 +432,7 @@ public:                                                                 \
             static OBB AsBox(const CCollider &c);
             static Capsule AsCapsule(const CCollider &c);
         };
-        Archive &operator<<(Archive &ar, const CCollider &c);
-        Archive &operator>>(Archive &ar, CCollider &c);
+
 
         struct CVXGI
         {
@@ -448,8 +451,6 @@ public:                                                                 \
             f32 _min_distance = 0.12f;
             f32 _diffuse_cone_angle = 60.0f;
         };
-        Archive &operator<<(Archive &ar, const CVXGI &c);
-        Archive &operator>>(Archive &ar, CVXGI &c);
 
         struct AILU_API SpriteRendererComponent
         {
@@ -469,9 +470,6 @@ public:                                                                 \
             bool _flip_y = false;
             bool _visible = true;
         };
-
-        Archive &operator<<(Archive &ar, const SpriteRendererComponent &c);
-        Archive &operator>>(Archive &ar, SpriteRendererComponent &c);
     }// namespace ECS
 };// namespace Ailu
 

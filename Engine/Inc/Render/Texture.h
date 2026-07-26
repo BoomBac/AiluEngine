@@ -18,6 +18,7 @@
 #include "GpuResource.h"
 #include "CoreType.h"
 #include <map>
+#include <mutex>
 #include <stdint.h>
 
 #include "Assets/Asset.h"
@@ -742,14 +743,35 @@ namespace Ailu
 
         public:
             inline static HashMap<u64, RenderTexture *> s_window_backbuffers;
+            inline static std::mutex s_window_backbuffers_mtx;
             inline static RenderTexture *s_backbuffer;
 
             static RenderTexture *WindowBackBuffer(Window *w)
             {
+                std::lock_guard<std::mutex> lock(s_window_backbuffers_mtx);
                 u64 id = reinterpret_cast<u64>(w);
                 if (s_window_backbuffers.contains(id))
                     return s_window_backbuffers[id];
                 return nullptr;
+            }
+            static Vector<RenderTexture *> WindowBackBuffersSnapshot()
+            {
+                std::lock_guard<std::mutex> lock(s_window_backbuffers_mtx);
+                Vector<RenderTexture *> backbuffers;
+                backbuffers.reserve(s_window_backbuffers.size());
+                for (auto &it: s_window_backbuffers)
+                    backbuffers.push_back(it.second);
+                return backbuffers;
+            }
+            static void RegisterWindowBackBuffer(Window *w, RenderTexture *rt)
+            {
+                std::lock_guard<std::mutex> lock(s_window_backbuffers_mtx);
+                s_window_backbuffers[reinterpret_cast<u64>(w)] = rt;
+            }
+            static void UnregisterWindowBackBuffer(Window *w)
+            {
+                std::lock_guard<std::mutex> lock(s_window_backbuffers_mtx);
+                s_window_backbuffers.erase(reinterpret_cast<u64>(w));
             }
             static u64 TotalGPUMemerySize() { return s_render_texture_gpu_mem_usage; }
             static RTHandle GetTempRT(u16 width, u16 height, String name = std::format("TempBuffer_{}", s_temp_rt_count++), ERenderTargetFormat format = ERenderTargetFormat::kDefault, bool mipmap_chain = false, bool linear = false, bool random_access = false);

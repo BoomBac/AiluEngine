@@ -65,19 +65,19 @@ namespace Ailu::RHI::DX12
     void GpuCommandWorker::RunAsync()
     {
         SetThreadName("RenderThread");
-        while (!_is_stop)
+        while (!_is_stop.load())
         {
             Application::Get().WaitForMain();
             if (Application::Get().State() == EApplicationState::EApplicationState_Exit)
             {
-                _is_stop = true;
+                _is_stop.store(true);
                 break;
             }
             //CPUProfileBlock b("GpuCommandWorker::RunAsync");
             PROFILE_BLOCK_CPU("GpuCommandWorker_RunAsync")
             if (Application::Get().State() == EApplicationState::EApplicationState_Exit)
             {
-                _is_stop = true;
+                _is_stop.store(true);
                 break;
             }
             while (true)
@@ -103,6 +103,8 @@ namespace Ailu::RHI::DX12
                 }
                 else
                 {
+                    if (_is_stop.load())
+                        break;
                     std::this_thread::yield();
                 }
             }
@@ -157,19 +159,23 @@ namespace Ailu::RHI::DX12
             LOG_INFO("Compiled {} shaders, {} compute shaders and {} ray tracing shaders!", compiled_shader_num,
                      compiled_compute_shader_num, compiled_raytracing_shader_num);
         }
-        if (Application::Get()._is_multi_thread_rendering) Application::Get().NotifyMain();
+        Render::RenderPipeline::Get().FrameCleanup();
+        if (Application::Get()._is_multi_thread_rendering.load()) Application::Get().NotifyMain();
         Render::RenderingStates::Reset();
     }
     void GpuCommandWorker::Start()
     {
+        if (_worker_thread != nullptr)
+            return;
+        _is_stop.store(false);
         if (_worker_thread == nullptr) { _worker_thread = new std::thread(&GpuCommandWorker::RunAsync, this); }
-        _is_stop = false;
     }
     void GpuCommandWorker::Stop()
     {
         if (_worker_thread)
         {
-            _is_stop = true;
+            _is_stop.store(true);
+            Application::Get().NotifyRender();
             if (_worker_thread->joinable()) _worker_thread->join();
             delete _worker_thread; _worker_thread = nullptr;
             LOG_INFO("Exit RenderThread")
@@ -525,7 +531,7 @@ namespace Ailu::RHI::DX12
         LoadAssets();
         _readback_pool = MakeScope<ReadbackBufferPool>(m_device.Get());
         _p_gpu_timer = MakeScope<D3DGPUTimer>(m_device.Get(), m_commandQueue.Get(), RenderConstants::kFrameCount);
-        if (Application::Get()._is_multi_thread_rendering) { _cmd_worker->Start(); }
+        if (Application::Get()._is_multi_thread_rendering.load()) { _cmd_worker->Start(); }
         _is_hardware_ray_tracing_supported = IsDirectXRaytracingSupported(_p_adapter.Get());
     }
 
@@ -573,7 +579,11 @@ namespace Ailu::RHI::DX12
     void D3DContext::TrackResource(ComPtr<ID3D12Resource> resource)
     { _global_tracked_resource.insert(std::make_pair(_frame_count, resource)); }
 
-    const u32 D3DContext::CurBackbufIndex() const { return _render_windows[0]->_frame_index; }
+    const u32 D3DContext::CurBackbufIndex() const
+    {
+        std::lock_guard<std::mutex> lock(_render_windows_mtx);
+        return _render_windows[0]->_frame_index;
+    }
 
     void D3DContext::ExecuteCommandBuffer(Ref<CommandBuffer> &cmd) { _cmd_worker->Push(cmd->TakeCommands(), SubmitParams{cmd->Name()}); }
 
@@ -609,6 +619,8 @@ namespace Ailu::RHI::DX12
 
     void D3DContext::Destroy()
     {
+        if (Application::Get()._is_multi_thread_rendering.load()) _cmd_worker->Stop();
+
         // Ensure that the GPU is no longer referencing resources that are about to be
         // cleaned up by the destructor.
         WaitForGpu();
@@ -620,7 +632,6 @@ namespace Ailu::RHI::DX12
         //             _tracy_d3d12_ctx = nullptr;
         //         }
         // #endif
-        if (Application::Get()._is_multi_thread_rendering) _cmd_worker->Stop();
         if (_p_cmd_buffer_fence_event != nullptr)
         {
             CloseHandle(_p_cmd_buffer_fence_event);
@@ -789,7 +800,15 @@ namespace Ailu::RHI::DX12
     {
         Vector<GfxCommand *> cmds{CommandPool::Get().Alloc<CommandPresent>()};
         _cmd_worker->Push(std::move(cmds), SubmitParams{"Present", true});
-        if (!Application::Get()._is_multi_thread_rendering) { _cmd_worker->RunSync(); }
+        if (!Application::Get()._is_multi_thread_rendering.load()) { _cmd_worker->RunSync(); }
+    }
+
+    void D3DContext::SetMultiThreadRendering(bool enabled)
+    {
+        if (enabled)
+            _cmd_worker->Start();
+        else
+            _cmd_worker->Stop();
     }
 
     u64 D3DContext::GetFenceValueGPU()
@@ -802,6 +821,7 @@ namespace Ailu::RHI::DX12
 
     void D3DContext::RegisterWindow(Window *window)
     {
+        std::lock_guard<std::mutex> lock(_render_windows_mtx);
         UINT dxgiFactoryFlags = 0;
 
         ComPtr<IDXGIFactory6> factory;
@@ -854,6 +874,7 @@ namespace Ailu::RHI::DX12
 
     void D3DContext::UnRegisterWindow(Window *window)
     {
+        std::lock_guard<std::mutex> lock(_render_windows_mtx);
         std::erase_if(_render_windows, [&](Scope<RenderWindowCtx> &ctx) -> bool { return ctx->_window == window; });
     }
 
@@ -867,6 +888,7 @@ namespace Ailu::RHI::DX12
 
     void D3DContext::ResizeSwapChain(void *window_handle, const u32 width, const u32 height)
     {
+        std::lock_guard<std::mutex> lock(_render_windows_mtx);
         auto it = std::find_if(_render_windows.begin(), _render_windows.end(),
                                [&](Scope<RenderWindowCtx> &ctx) -> bool { return ctx->_window->GetNativeWindowPtr() == window_handle; });
         if (it != _render_windows.end())
@@ -903,42 +925,45 @@ namespace Ailu::RHI::DX12
     {
         static TimeMgr s_timer;
         PROFILE_BLOCK_CPU("Reslove")
+        {
+            std::lock_guard<std::mutex> lock(_render_windows_mtx);
 #ifdef DEAR_IMGUI
-        auto dxcmd = cmd->NativeCmdList();
-        auto rtv_handle = *_render_windows[0]->_swapchain->TargetCPUHandle(cmd);
-        dxcmd->OMSetRenderTargets(1, &rtv_handle, FALSE, nullptr);
-        //dxcmd->ClearRenderTargetView(rtv_handle, Colors::kBlack, 0, nullptr);
-        ImGuiRenderer::Get().Render(cmd);
+            auto dxcmd = cmd->NativeCmdList();
+            auto rtv_handle = *_render_windows[0]->_swapchain->TargetCPUHandle(cmd);
+            dxcmd->OMSetRenderTargets(1, &rtv_handle, FALSE, nullptr);
+            //dxcmd->ClearRenderTargetView(rtv_handle, Colors::kBlack, 0, nullptr);
+            ImGuiRenderer::Get().Render(cmd);
 #endif// DEAR_IMGUI
-        // Present the frame.
-        for (auto &ctx: _render_windows)
-        {
+            // Present the frame.
+            for (auto &ctx: _render_windows)
+            {
 #ifndef _DIRECT_WRITE
-            ctx->_swapchain->PreparePresent(cmd);
+                ctx->_swapchain->PreparePresent(cmd);
 #endif// !_DIRECT_WRITE
-        }
-        ExecuteRHICommandBuffer(cmd);
-        for (auto &ctx: _render_windows)
-        {
-            ctx->_swapchain->Present();
-            {
-                s_timer.MarkLocal();
-                //WaitForGpu();
-                ctx->MoveToNextFrame(m_commandQueue.Get());
-                //if (Application::Get().GetFrameCount() % 60 == 0)
-                Render::RenderingStates::SetGpuLatency(s_timer.GetElapsedSinceLastLocalMark());
             }
-            if (_is_cur_frame_capturing) { EndCapture(); }
+            ExecuteRHICommandBuffer(cmd);
+            for (auto &ctx: _render_windows)
             {
-                u32 new_pack_size = ctx->_new_backbuffer_size.load();
-                if (new_pack_size != 0u)
+                ctx->_swapchain->Present();
                 {
-                    u32 new_width = (new_pack_size >> 16) & 0xFFFF;
-                    u32 new_height = new_pack_size & 0xFFFF;
-                    ctx->WaitForGpu(m_commandQueue.Get());
-                    ctx->_swapchain->Resize(new_width, new_height);
-                    ctx->WaitForGpu(m_commandQueue.Get());
-                    ctx->_new_backbuffer_size.store(0u);
+                    s_timer.MarkLocal();
+                    //WaitForGpu();
+                    ctx->MoveToNextFrame(m_commandQueue.Get());
+                    //if (Application::Get().GetFrameCount() % 60 == 0)
+                    Render::RenderingStates::SetGpuLatency(s_timer.GetElapsedSinceLastLocalMark());
+                }
+                if (_is_cur_frame_capturing) { EndCapture(); }
+                {
+                    u32 new_pack_size = ctx->_new_backbuffer_size.load();
+                    if (new_pack_size != 0u)
+                    {
+                        u32 new_width = (new_pack_size >> 16) & 0xFFFF;
+                        u32 new_height = new_pack_size & 0xFFFF;
+                        ctx->WaitForGpu(m_commandQueue.Get());
+                        ctx->_swapchain->Resize(new_width, new_height);
+                        ctx->WaitForGpu(m_commandQueue.Get());
+                        ctx->_new_backbuffer_size.store(0u);
+                    }
                 }
             }
         }
@@ -1495,7 +1520,8 @@ namespace Ailu::RHI::DX12
                     if (is_indexed_draw)
                     {
                         const u32 index_count = draw_cmd->_index_num == 0u ? draw_cmd->_ib->GetCount() : draw_cmd->_index_num;
-                        dxcmd->DrawIndexedInstanced(index_count, draw_cmd->_instance_count, draw_cmd->_index_start, 0, 0);
+                        dxcmd->DrawIndexedInstanced(index_count, draw_cmd->_instance_count, draw_cmd->_index_start, 0,
+                                                   draw_cmd->_start_instance);
                     }
                     else
                         dxcmd->DrawInstanced(draw_cmd->_vb ? draw_cmd->_vb->GetVertexCount() : draw_cmd->_vertex_count,

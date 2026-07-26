@@ -114,11 +114,11 @@ namespace Ailu::Render
 
     void RenderPipeline::Render()
     {
-        if (Application::Get()._is_multi_thread_rendering && _is_need_wait_for_render_thread && Application::Get().GetFrameCount() > 0u)
+        if (Application::Get()._is_multi_thread_rendering.load() && NeedWaitForRenderThread() && Application::Get().GetFrameCount() > 0u)
         {
             Application::Get().NotifyRender();
             Application::Get().WaitForRender();
-            _is_need_wait_for_render_thread = false;
+            SetRenderThreadFramePending(false);
         }
         _frame_res_manager->NewFrame();
         Setup();
@@ -146,9 +146,9 @@ namespace Ailu::Render
             auto cmd = CommandBufferPool::Get("UI");
             //强制clear一下，backbuffer load action默认为是dont care
             //RenderTexture *backbuffer = RenderTexture::WindowBackBuffer(Application::s_focus_window? Application::s_focus_window : &Application::Get().GetWindow());
-            for (auto &it: RenderTexture::s_window_backbuffers)
+            for (auto *backbuffer: RenderTexture::WindowBackBuffersSnapshot())
             {
-                cmd->SetRenderTarget(it.second);
+                cmd->SetRenderTarget(backbuffer);
                 cmd->ClearRenderTarget(Colors::kBlack);
             }
             UI::UIRenderer::Get()->Render(cmd.get());
@@ -173,7 +173,7 @@ namespace Ailu::Render
             r->FrameCleanup();
         if (_cur_frame_packet)
             _cur_frame_packet->ClearView();
-        _is_need_wait_for_render_thread = true;
+        SetRenderThreadFramePending(true);
         _frame_res_manager->FrameCleanup();
     }
     void RenderPipeline::OnRenderObjectSubmeshCountChanged(u32 render_obj_id, u16 old_mesh_count, u32 new_mesh_count)

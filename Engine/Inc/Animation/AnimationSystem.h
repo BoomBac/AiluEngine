@@ -18,6 +18,7 @@ namespace Ailu
         public:
             inline static u32 s_vertex_num_per_skin_task = 2000u;
             void Update(Register &r, f32 delta_time) final;
+            ESystemPhase GetPhase() const final { return ESystemPhase::kAnimation; }
             void OnPushEntity(Entity entity) final;
             virtual Ref<System> Clone() final
             {

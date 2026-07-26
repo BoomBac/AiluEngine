@@ -20,6 +20,7 @@ namespace Ailu
         public:
             LightingSystem();
             void Update(Register &r, f32 delta_time) final;
+            ESystemPhase GetPhase() const final { return ESystemPhase::kRenderData; }
             void OnPushEntity(Entity e) final;
             virtual Ref<System> Clone() final
             {

@@ -285,7 +285,8 @@ namespace Ailu
         {
             LOG_WARNING("TitleIcon or AppIcon load failed,please check out the path!")
         }
-        Input::SetupPlatformInput(MakeScope<WinInput>(_hwnd));
+        if (main_win == nullptr)
+            Input::SetupPlatformInput(MakeScope<WinInput>(_hwnd));
         DragAcceptFiles(_hwnd, true);
         _is_focused = true;
         //关闭输入法
@@ -318,7 +319,9 @@ namespace Ailu
         }
 #else
         MSG msg = {};
-        if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+        constexpr u32 kMaxMessagesPerUpdate = 128u;
+        u32 processed_message_count = 0u;
+        while (processed_message_count++ < kMaxMessagesPerUpdate && PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
         {
             TranslateMessage(&msg);
             DispatchMessage(&msg);

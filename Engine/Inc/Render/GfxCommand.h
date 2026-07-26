@@ -123,6 +123,7 @@ namespace Ailu::Render
         u16 _pass_index;
         ConstantBuffer *_per_obj_cb;
         u32 _instance_count;
+        u32 _start_instance;
         u16 _sub_mesh;
         u32 _vertex_count;
         u32 _index_start;

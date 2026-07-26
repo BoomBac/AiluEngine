@@ -1071,6 +1071,105 @@ return Ailu::SpriteAssetDocument::StaticType();
 return Ailu::SpriteAssetDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_SpriteAssetDocument(&Ailu::SpriteAssetDocument::StaticType, "Ailu::SpriteAssetDocument");
+const Ailu::Type* Ailu::Z_Construct_InputActionAssetDocument_Type()
+{
+Ailu::Object::StaticType();
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "InputActionAssetDocument";
+initializer._size = sizeof(Ailu::InputActionAssetDocument);
+initializer._full_name = "Ailu::InputActionAssetDocument";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu";
+initializer._base_name = "Ailu::Object";
+initializer._constructor = []()->Ailu::InputActionAssetDocument* {return new Ailu::InputActionAssetDocument;};
+Meta meta_header;
+meta_header.Set("Category","");
+meta_header.Set("IsColor",false);
+meta_header.Set("IsRange",false);
+meta_header.Set("IsFloatRange",true);
+meta_header.Set("RangeMin",(f32)0);
+meta_header.Set("RangeMax",(f32)1);
+MemberBuilder builder_header;
+builder_header._name = "_header";
+builder_header._type_name = "Ailu::AssetDocumentHeader";
+builder_header._offset = offsetof(InputActionAssetDocument,_header);
+builder_header._is_const = false;
+builder_header._is_static = false;
+builder_header._is_public = true;
+builder_header._is_pointer = false;
+builder_header._is_ref = false;
+builder_header._is_template = false;
+builder_header._meta = meta_header;
+builder_header._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<AssetDocumentHeader>);
+builder_header._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<AssetDocumentHeader>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_header));
+Meta meta_action_maps;
+meta_action_maps.Set("Category","");
+meta_action_maps.Set("IsColor",false);
+meta_action_maps.Set("IsRange",false);
+meta_action_maps.Set("IsFloatRange",true);
+meta_action_maps.Set("RangeMin",(f32)0);
+meta_action_maps.Set("RangeMax",(f32)1);
+MemberBuilder builder_action_maps;
+builder_action_maps._name = "_action_maps";
+builder_action_maps._type_name = "Vector<InputActionMapDocument>";
+builder_action_maps._offset = offsetof(InputActionAssetDocument,_action_maps);
+builder_action_maps._is_const = false;
+builder_action_maps._is_static = false;
+builder_action_maps._is_public = true;
+builder_action_maps._is_pointer = false;
+builder_action_maps._is_ref = false;
+builder_action_maps._is_template = true;
+builder_action_maps._meta = meta_action_maps;
+builder_action_maps._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<InputActionMapDocument>>);
+builder_action_maps._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<InputActionMapDocument>>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_action_maps));
+Meta meta_contexts;
+meta_contexts.Set("Category","");
+meta_contexts.Set("IsColor",false);
+meta_contexts.Set("IsRange",false);
+meta_contexts.Set("IsFloatRange",true);
+meta_contexts.Set("RangeMin",(f32)0);
+meta_contexts.Set("RangeMax",(f32)1);
+MemberBuilder builder_contexts;
+builder_contexts._name = "_contexts";
+builder_contexts._type_name = "Vector<InputContextDocument>";
+builder_contexts._offset = offsetof(InputActionAssetDocument,_contexts);
+builder_contexts._is_const = false;
+builder_contexts._is_static = false;
+builder_contexts._is_public = true;
+builder_contexts._is_pointer = false;
+builder_contexts._is_ref = false;
+builder_contexts._is_template = true;
+builder_contexts._meta = meta_contexts;
+builder_contexts._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<InputContextDocument>>);
+builder_contexts._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<InputContextDocument>>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_contexts));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+const Ailu::Type* Ailu::InputActionAssetDocument::GetPrivateStaticClass()
+{
+	static const Ailu::Type* type = Z_Construct_InputActionAssetDocument_Type();
+	return type;
+}
+
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::InputActionAssetDocument>()
+{
+return Ailu::InputActionAssetDocument::StaticType();
+}
+    const Type *Ailu::InputActionAssetDocument::GetType()
+{
+return Ailu::InputActionAssetDocument::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_InputActionAssetDocument(&Ailu::InputActionAssetDocument::StaticType, "Ailu::InputActionAssetDocument");
 const Ailu::Type* Ailu::Z_Construct_SceneAssetDocument_Type()
 {
 Ailu::Object::StaticType();
@@ -1849,6 +1948,846 @@ return Ailu::AnimationClipTrackDocument::StaticType();
 return Ailu::AnimationClipTrackDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_AnimationClipTrackDocument(&Ailu::AnimationClipTrackDocument::StaticType, "Ailu::AnimationClipTrackDocument");
+const Ailu::Type* Ailu::Z_Construct_InputProcessorDocument_Type()
+{
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "InputProcessorDocument";
+initializer._size = sizeof(Ailu::InputProcessorDocument);
+initializer._full_name = "Ailu::InputProcessorDocument";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu";
+initializer._base_name = "";
+initializer._constructor = []()->Ailu::InputProcessorDocument* {return new Ailu::InputProcessorDocument;};
+Meta meta_type;
+meta_type.Set("Category","");
+meta_type.Set("IsColor",false);
+meta_type.Set("IsRange",false);
+meta_type.Set("IsFloatRange",true);
+meta_type.Set("RangeMin",(f32)0);
+meta_type.Set("RangeMax",(f32)1);
+MemberBuilder builder_type;
+builder_type._name = "_type";
+builder_type._type_name = "String";
+builder_type._offset = offsetof(InputProcessorDocument,_type);
+builder_type._is_const = false;
+builder_type._is_static = false;
+builder_type._is_public = true;
+builder_type._is_pointer = false;
+builder_type._is_ref = false;
+builder_type._is_template = false;
+builder_type._meta = meta_type;
+builder_type._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<String>);
+builder_type._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<String>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_type));
+Meta meta_params;
+meta_params.Set("Category","");
+meta_params.Set("IsColor",false);
+meta_params.Set("IsRange",false);
+meta_params.Set("IsFloatRange",true);
+meta_params.Set("RangeMin",(f32)0);
+meta_params.Set("RangeMax",(f32)1);
+MemberBuilder builder_params;
+builder_params._name = "_params";
+builder_params._type_name = "Vector4f";
+builder_params._offset = offsetof(InputProcessorDocument,_params);
+builder_params._is_const = false;
+builder_params._is_static = false;
+builder_params._is_public = true;
+builder_params._is_pointer = false;
+builder_params._is_ref = false;
+builder_params._is_template = false;
+builder_params._meta = meta_params;
+builder_params._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector4f>);
+builder_params._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector4f>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_params));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+const Ailu::Type* Ailu::InputProcessorDocument::GetPrivateStaticClass()
+{
+	static const Ailu::Type* type = Z_Construct_InputProcessorDocument_Type();
+	return type;
+}
+
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::InputProcessorDocument>()
+{
+return Ailu::InputProcessorDocument::StaticType();
+}
+    const Type *Ailu::InputProcessorDocument::GetType()
+{
+return Ailu::InputProcessorDocument::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_InputProcessorDocument(&Ailu::InputProcessorDocument::StaticType, "Ailu::InputProcessorDocument");
+const Ailu::Type* Ailu::Z_Construct_InputInteractionDocument_Type()
+{
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "InputInteractionDocument";
+initializer._size = sizeof(Ailu::InputInteractionDocument);
+initializer._full_name = "Ailu::InputInteractionDocument";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu";
+initializer._base_name = "";
+initializer._constructor = []()->Ailu::InputInteractionDocument* {return new Ailu::InputInteractionDocument;};
+Meta meta_type;
+meta_type.Set("Category","");
+meta_type.Set("IsColor",false);
+meta_type.Set("IsRange",false);
+meta_type.Set("IsFloatRange",true);
+meta_type.Set("RangeMin",(f32)0);
+meta_type.Set("RangeMax",(f32)1);
+MemberBuilder builder_type;
+builder_type._name = "_type";
+builder_type._type_name = "String";
+builder_type._offset = offsetof(InputInteractionDocument,_type);
+builder_type._is_const = false;
+builder_type._is_static = false;
+builder_type._is_public = true;
+builder_type._is_pointer = false;
+builder_type._is_ref = false;
+builder_type._is_template = false;
+builder_type._meta = meta_type;
+builder_type._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<String>);
+builder_type._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<String>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_type));
+Meta meta_params;
+meta_params.Set("Category","");
+meta_params.Set("IsColor",false);
+meta_params.Set("IsRange",false);
+meta_params.Set("IsFloatRange",true);
+meta_params.Set("RangeMin",(f32)0);
+meta_params.Set("RangeMax",(f32)1);
+MemberBuilder builder_params;
+builder_params._name = "_params";
+builder_params._type_name = "Vector4f";
+builder_params._offset = offsetof(InputInteractionDocument,_params);
+builder_params._is_const = false;
+builder_params._is_static = false;
+builder_params._is_public = true;
+builder_params._is_pointer = false;
+builder_params._is_ref = false;
+builder_params._is_template = false;
+builder_params._meta = meta_params;
+builder_params._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector4f>);
+builder_params._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector4f>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_params));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+const Ailu::Type* Ailu::InputInteractionDocument::GetPrivateStaticClass()
+{
+	static const Ailu::Type* type = Z_Construct_InputInteractionDocument_Type();
+	return type;
+}
+
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::InputInteractionDocument>()
+{
+return Ailu::InputInteractionDocument::StaticType();
+}
+    const Type *Ailu::InputInteractionDocument::GetType()
+{
+return Ailu::InputInteractionDocument::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_InputInteractionDocument(&Ailu::InputInteractionDocument::StaticType, "Ailu::InputInteractionDocument");
+const Ailu::Type* Ailu::Z_Construct_InputBindingDocument_Type()
+{
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "InputBindingDocument";
+initializer._size = sizeof(Ailu::InputBindingDocument);
+initializer._full_name = "Ailu::InputBindingDocument";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu";
+initializer._base_name = "";
+initializer._constructor = []()->Ailu::InputBindingDocument* {return new Ailu::InputBindingDocument;};
+Meta meta_name;
+meta_name.Set("Category","");
+meta_name.Set("IsColor",false);
+meta_name.Set("IsRange",false);
+meta_name.Set("IsFloatRange",true);
+meta_name.Set("RangeMin",(f32)0);
+meta_name.Set("RangeMax",(f32)1);
+MemberBuilder builder_name;
+builder_name._name = "_name";
+builder_name._type_name = "String";
+builder_name._offset = offsetof(InputBindingDocument,_name);
+builder_name._is_const = false;
+builder_name._is_static = false;
+builder_name._is_public = true;
+builder_name._is_pointer = false;
+builder_name._is_ref = false;
+builder_name._is_template = false;
+builder_name._meta = meta_name;
+builder_name._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<String>);
+builder_name._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<String>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_name));
+Meta meta_control_path;
+meta_control_path.Set("Category","");
+meta_control_path.Set("IsColor",false);
+meta_control_path.Set("IsRange",false);
+meta_control_path.Set("IsFloatRange",true);
+meta_control_path.Set("RangeMin",(f32)0);
+meta_control_path.Set("RangeMax",(f32)1);
+MemberBuilder builder_control_path;
+builder_control_path._name = "_control_path";
+builder_control_path._type_name = "String";
+builder_control_path._offset = offsetof(InputBindingDocument,_control_path);
+builder_control_path._is_const = false;
+builder_control_path._is_static = false;
+builder_control_path._is_public = true;
+builder_control_path._is_pointer = false;
+builder_control_path._is_ref = false;
+builder_control_path._is_template = false;
+builder_control_path._meta = meta_control_path;
+builder_control_path._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<String>);
+builder_control_path._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<String>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_control_path));
+Meta meta_groups;
+meta_groups.Set("Category","");
+meta_groups.Set("IsColor",false);
+meta_groups.Set("IsRange",false);
+meta_groups.Set("IsFloatRange",true);
+meta_groups.Set("RangeMin",(f32)0);
+meta_groups.Set("RangeMax",(f32)1);
+MemberBuilder builder_groups;
+builder_groups._name = "_groups";
+builder_groups._type_name = "String";
+builder_groups._offset = offsetof(InputBindingDocument,_groups);
+builder_groups._is_const = false;
+builder_groups._is_static = false;
+builder_groups._is_public = true;
+builder_groups._is_pointer = false;
+builder_groups._is_ref = false;
+builder_groups._is_template = false;
+builder_groups._meta = meta_groups;
+builder_groups._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<String>);
+builder_groups._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<String>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_groups));
+Meta meta_processors;
+meta_processors.Set("Category","");
+meta_processors.Set("IsColor",false);
+meta_processors.Set("IsRange",false);
+meta_processors.Set("IsFloatRange",true);
+meta_processors.Set("RangeMin",(f32)0);
+meta_processors.Set("RangeMax",(f32)1);
+MemberBuilder builder_processors;
+builder_processors._name = "_processors";
+builder_processors._type_name = "Vector<InputProcessorDocument>";
+builder_processors._offset = offsetof(InputBindingDocument,_processors);
+builder_processors._is_const = false;
+builder_processors._is_static = false;
+builder_processors._is_public = true;
+builder_processors._is_pointer = false;
+builder_processors._is_ref = false;
+builder_processors._is_template = true;
+builder_processors._meta = meta_processors;
+builder_processors._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<InputProcessorDocument>>);
+builder_processors._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<InputProcessorDocument>>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_processors));
+Meta meta_interactions;
+meta_interactions.Set("Category","");
+meta_interactions.Set("IsColor",false);
+meta_interactions.Set("IsRange",false);
+meta_interactions.Set("IsFloatRange",true);
+meta_interactions.Set("RangeMin",(f32)0);
+meta_interactions.Set("RangeMax",(f32)1);
+MemberBuilder builder_interactions;
+builder_interactions._name = "_interactions";
+builder_interactions._type_name = "Vector<InputInteractionDocument>";
+builder_interactions._offset = offsetof(InputBindingDocument,_interactions);
+builder_interactions._is_const = false;
+builder_interactions._is_static = false;
+builder_interactions._is_public = true;
+builder_interactions._is_pointer = false;
+builder_interactions._is_ref = false;
+builder_interactions._is_template = true;
+builder_interactions._meta = meta_interactions;
+builder_interactions._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<InputInteractionDocument>>);
+builder_interactions._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<InputInteractionDocument>>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_interactions));
+Meta meta_is_composite;
+meta_is_composite.Set("Category","");
+meta_is_composite.Set("IsColor",false);
+meta_is_composite.Set("IsRange",false);
+meta_is_composite.Set("IsFloatRange",true);
+meta_is_composite.Set("RangeMin",(f32)0);
+meta_is_composite.Set("RangeMax",(f32)1);
+MemberBuilder builder_is_composite;
+builder_is_composite._name = "_is_composite";
+builder_is_composite._type_name = "bool";
+builder_is_composite._offset = offsetof(InputBindingDocument,_is_composite);
+builder_is_composite._is_const = false;
+builder_is_composite._is_static = false;
+builder_is_composite._is_public = true;
+builder_is_composite._is_pointer = false;
+builder_is_composite._is_ref = false;
+builder_is_composite._is_template = false;
+builder_is_composite._meta = meta_is_composite;
+builder_is_composite._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_is_composite._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_is_composite));
+Meta meta_is_part_of_composite;
+meta_is_part_of_composite.Set("Category","");
+meta_is_part_of_composite.Set("IsColor",false);
+meta_is_part_of_composite.Set("IsRange",false);
+meta_is_part_of_composite.Set("IsFloatRange",true);
+meta_is_part_of_composite.Set("RangeMin",(f32)0);
+meta_is_part_of_composite.Set("RangeMax",(f32)1);
+MemberBuilder builder_is_part_of_composite;
+builder_is_part_of_composite._name = "_is_part_of_composite";
+builder_is_part_of_composite._type_name = "bool";
+builder_is_part_of_composite._offset = offsetof(InputBindingDocument,_is_part_of_composite);
+builder_is_part_of_composite._is_const = false;
+builder_is_part_of_composite._is_static = false;
+builder_is_part_of_composite._is_public = true;
+builder_is_part_of_composite._is_pointer = false;
+builder_is_part_of_composite._is_ref = false;
+builder_is_part_of_composite._is_template = false;
+builder_is_part_of_composite._meta = meta_is_part_of_composite;
+builder_is_part_of_composite._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_is_part_of_composite._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_is_part_of_composite));
+Meta meta_composite_part_name;
+meta_composite_part_name.Set("Category","");
+meta_composite_part_name.Set("IsColor",false);
+meta_composite_part_name.Set("IsRange",false);
+meta_composite_part_name.Set("IsFloatRange",true);
+meta_composite_part_name.Set("RangeMin",(f32)0);
+meta_composite_part_name.Set("RangeMax",(f32)1);
+MemberBuilder builder_composite_part_name;
+builder_composite_part_name._name = "_composite_part_name";
+builder_composite_part_name._type_name = "String";
+builder_composite_part_name._offset = offsetof(InputBindingDocument,_composite_part_name);
+builder_composite_part_name._is_const = false;
+builder_composite_part_name._is_static = false;
+builder_composite_part_name._is_public = true;
+builder_composite_part_name._is_pointer = false;
+builder_composite_part_name._is_ref = false;
+builder_composite_part_name._is_template = false;
+builder_composite_part_name._meta = meta_composite_part_name;
+builder_composite_part_name._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<String>);
+builder_composite_part_name._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<String>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_composite_part_name));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+const Ailu::Type* Ailu::InputBindingDocument::GetPrivateStaticClass()
+{
+	static const Ailu::Type* type = Z_Construct_InputBindingDocument_Type();
+	return type;
+}
+
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::InputBindingDocument>()
+{
+return Ailu::InputBindingDocument::StaticType();
+}
+    const Type *Ailu::InputBindingDocument::GetType()
+{
+return Ailu::InputBindingDocument::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_InputBindingDocument(&Ailu::InputBindingDocument::StaticType, "Ailu::InputBindingDocument");
+const Ailu::Type* Ailu::Z_Construct_InputActionDocument_Type()
+{
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "InputActionDocument";
+initializer._size = sizeof(Ailu::InputActionDocument);
+initializer._full_name = "Ailu::InputActionDocument";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu";
+initializer._base_name = "";
+initializer._constructor = []()->Ailu::InputActionDocument* {return new Ailu::InputActionDocument;};
+Meta meta_name;
+meta_name.Set("Category","");
+meta_name.Set("IsColor",false);
+meta_name.Set("IsRange",false);
+meta_name.Set("IsFloatRange",true);
+meta_name.Set("RangeMin",(f32)0);
+meta_name.Set("RangeMax",(f32)1);
+MemberBuilder builder_name;
+builder_name._name = "_name";
+builder_name._type_name = "String";
+builder_name._offset = offsetof(InputActionDocument,_name);
+builder_name._is_const = false;
+builder_name._is_static = false;
+builder_name._is_public = true;
+builder_name._is_pointer = false;
+builder_name._is_ref = false;
+builder_name._is_template = false;
+builder_name._meta = meta_name;
+builder_name._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<String>);
+builder_name._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<String>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_name));
+Meta meta_id;
+meta_id.Set("Category","");
+meta_id.Set("IsColor",false);
+meta_id.Set("IsRange",false);
+meta_id.Set("IsFloatRange",true);
+meta_id.Set("RangeMin",(f32)0);
+meta_id.Set("RangeMax",(f32)1);
+MemberBuilder builder_id;
+builder_id._name = "_id";
+builder_id._type_name = "u32";
+builder_id._offset = offsetof(InputActionDocument,_id);
+builder_id._is_const = false;
+builder_id._is_static = false;
+builder_id._is_public = true;
+builder_id._is_pointer = false;
+builder_id._is_ref = false;
+builder_id._is_template = false;
+builder_id._meta = meta_id;
+builder_id._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<u32>);
+builder_id._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<u32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_id));
+Meta meta_action_type;
+meta_action_type.Set("Category","");
+meta_action_type.Set("IsColor",false);
+meta_action_type.Set("IsRange",false);
+meta_action_type.Set("IsFloatRange",true);
+meta_action_type.Set("RangeMin",(f32)0);
+meta_action_type.Set("RangeMax",(f32)1);
+MemberBuilder builder_action_type;
+builder_action_type._name = "_action_type";
+builder_action_type._type_name = "u8";
+builder_action_type._offset = offsetof(InputActionDocument,_action_type);
+builder_action_type._is_const = false;
+builder_action_type._is_static = false;
+builder_action_type._is_public = true;
+builder_action_type._is_pointer = false;
+builder_action_type._is_ref = false;
+builder_action_type._is_template = false;
+builder_action_type._meta = meta_action_type;
+builder_action_type._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<u8>);
+builder_action_type._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<u8>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_action_type));
+Meta meta_value_type;
+meta_value_type.Set("Category","");
+meta_value_type.Set("IsColor",false);
+meta_value_type.Set("IsRange",false);
+meta_value_type.Set("IsFloatRange",true);
+meta_value_type.Set("RangeMin",(f32)0);
+meta_value_type.Set("RangeMax",(f32)1);
+MemberBuilder builder_value_type;
+builder_value_type._name = "_value_type";
+builder_value_type._type_name = "u8";
+builder_value_type._offset = offsetof(InputActionDocument,_value_type);
+builder_value_type._is_const = false;
+builder_value_type._is_static = false;
+builder_value_type._is_public = true;
+builder_value_type._is_pointer = false;
+builder_value_type._is_ref = false;
+builder_value_type._is_template = false;
+builder_value_type._meta = meta_value_type;
+builder_value_type._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<u8>);
+builder_value_type._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<u8>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_value_type));
+Meta meta_merge_strategy;
+meta_merge_strategy.Set("Category","");
+meta_merge_strategy.Set("IsColor",false);
+meta_merge_strategy.Set("IsRange",false);
+meta_merge_strategy.Set("IsFloatRange",true);
+meta_merge_strategy.Set("RangeMin",(f32)0);
+meta_merge_strategy.Set("RangeMax",(f32)1);
+MemberBuilder builder_merge_strategy;
+builder_merge_strategy._name = "_merge_strategy";
+builder_merge_strategy._type_name = "u8";
+builder_merge_strategy._offset = offsetof(InputActionDocument,_merge_strategy);
+builder_merge_strategy._is_const = false;
+builder_merge_strategy._is_static = false;
+builder_merge_strategy._is_public = true;
+builder_merge_strategy._is_pointer = false;
+builder_merge_strategy._is_ref = false;
+builder_merge_strategy._is_template = false;
+builder_merge_strategy._meta = meta_merge_strategy;
+builder_merge_strategy._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<u8>);
+builder_merge_strategy._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<u8>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_merge_strategy));
+Meta meta_bindings;
+meta_bindings.Set("Category","");
+meta_bindings.Set("IsColor",false);
+meta_bindings.Set("IsRange",false);
+meta_bindings.Set("IsFloatRange",true);
+meta_bindings.Set("RangeMin",(f32)0);
+meta_bindings.Set("RangeMax",(f32)1);
+MemberBuilder builder_bindings;
+builder_bindings._name = "_bindings";
+builder_bindings._type_name = "Vector<InputBindingDocument>";
+builder_bindings._offset = offsetof(InputActionDocument,_bindings);
+builder_bindings._is_const = false;
+builder_bindings._is_static = false;
+builder_bindings._is_public = true;
+builder_bindings._is_pointer = false;
+builder_bindings._is_ref = false;
+builder_bindings._is_template = true;
+builder_bindings._meta = meta_bindings;
+builder_bindings._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<InputBindingDocument>>);
+builder_bindings._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<InputBindingDocument>>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_bindings));
+Meta meta_composite_type;
+meta_composite_type.Set("Category","");
+meta_composite_type.Set("IsColor",false);
+meta_composite_type.Set("IsRange",false);
+meta_composite_type.Set("IsFloatRange",true);
+meta_composite_type.Set("RangeMin",(f32)0);
+meta_composite_type.Set("RangeMax",(f32)1);
+MemberBuilder builder_composite_type;
+builder_composite_type._name = "_composite_type";
+builder_composite_type._type_name = "String";
+builder_composite_type._offset = offsetof(InputActionDocument,_composite_type);
+builder_composite_type._is_const = false;
+builder_composite_type._is_static = false;
+builder_composite_type._is_public = true;
+builder_composite_type._is_pointer = false;
+builder_composite_type._is_ref = false;
+builder_composite_type._is_template = false;
+builder_composite_type._meta = meta_composite_type;
+builder_composite_type._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<String>);
+builder_composite_type._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<String>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_composite_type));
+Meta meta_composite_params;
+meta_composite_params.Set("Category","");
+meta_composite_params.Set("IsColor",false);
+meta_composite_params.Set("IsRange",false);
+meta_composite_params.Set("IsFloatRange",true);
+meta_composite_params.Set("RangeMin",(f32)0);
+meta_composite_params.Set("RangeMax",(f32)1);
+MemberBuilder builder_composite_params;
+builder_composite_params._name = "_composite_params";
+builder_composite_params._type_name = "Vector4f";
+builder_composite_params._offset = offsetof(InputActionDocument,_composite_params);
+builder_composite_params._is_const = false;
+builder_composite_params._is_static = false;
+builder_composite_params._is_public = true;
+builder_composite_params._is_pointer = false;
+builder_composite_params._is_ref = false;
+builder_composite_params._is_template = false;
+builder_composite_params._meta = meta_composite_params;
+builder_composite_params._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector4f>);
+builder_composite_params._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector4f>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_composite_params));
+Meta meta_composite_bindings;
+meta_composite_bindings.Set("Category","");
+meta_composite_bindings.Set("IsColor",false);
+meta_composite_bindings.Set("IsRange",false);
+meta_composite_bindings.Set("IsFloatRange",true);
+meta_composite_bindings.Set("RangeMin",(f32)0);
+meta_composite_bindings.Set("RangeMax",(f32)1);
+MemberBuilder builder_composite_bindings;
+builder_composite_bindings._name = "_composite_bindings";
+builder_composite_bindings._type_name = "Vector<InputBindingDocument>";
+builder_composite_bindings._offset = offsetof(InputActionDocument,_composite_bindings);
+builder_composite_bindings._is_const = false;
+builder_composite_bindings._is_static = false;
+builder_composite_bindings._is_public = true;
+builder_composite_bindings._is_pointer = false;
+builder_composite_bindings._is_ref = false;
+builder_composite_bindings._is_template = true;
+builder_composite_bindings._meta = meta_composite_bindings;
+builder_composite_bindings._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<InputBindingDocument>>);
+builder_composite_bindings._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<InputBindingDocument>>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_composite_bindings));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+const Ailu::Type* Ailu::InputActionDocument::GetPrivateStaticClass()
+{
+	static const Ailu::Type* type = Z_Construct_InputActionDocument_Type();
+	return type;
+}
+
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::InputActionDocument>()
+{
+return Ailu::InputActionDocument::StaticType();
+}
+    const Type *Ailu::InputActionDocument::GetType()
+{
+return Ailu::InputActionDocument::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_InputActionDocument(&Ailu::InputActionDocument::StaticType, "Ailu::InputActionDocument");
+const Ailu::Type* Ailu::Z_Construct_InputActionMapDocument_Type()
+{
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "InputActionMapDocument";
+initializer._size = sizeof(Ailu::InputActionMapDocument);
+initializer._full_name = "Ailu::InputActionMapDocument";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu";
+initializer._base_name = "";
+initializer._constructor = []()->Ailu::InputActionMapDocument* {return new Ailu::InputActionMapDocument;};
+Meta meta_name;
+meta_name.Set("Category","");
+meta_name.Set("IsColor",false);
+meta_name.Set("IsRange",false);
+meta_name.Set("IsFloatRange",true);
+meta_name.Set("RangeMin",(f32)0);
+meta_name.Set("RangeMax",(f32)1);
+MemberBuilder builder_name;
+builder_name._name = "_name";
+builder_name._type_name = "String";
+builder_name._offset = offsetof(InputActionMapDocument,_name);
+builder_name._is_const = false;
+builder_name._is_static = false;
+builder_name._is_public = true;
+builder_name._is_pointer = false;
+builder_name._is_ref = false;
+builder_name._is_template = false;
+builder_name._meta = meta_name;
+builder_name._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<String>);
+builder_name._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<String>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_name));
+Meta meta_id;
+meta_id.Set("Category","");
+meta_id.Set("IsColor",false);
+meta_id.Set("IsRange",false);
+meta_id.Set("IsFloatRange",true);
+meta_id.Set("RangeMin",(f32)0);
+meta_id.Set("RangeMax",(f32)1);
+MemberBuilder builder_id;
+builder_id._name = "_id";
+builder_id._type_name = "u32";
+builder_id._offset = offsetof(InputActionMapDocument,_id);
+builder_id._is_const = false;
+builder_id._is_static = false;
+builder_id._is_public = true;
+builder_id._is_pointer = false;
+builder_id._is_ref = false;
+builder_id._is_template = false;
+builder_id._meta = meta_id;
+builder_id._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<u32>);
+builder_id._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<u32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_id));
+Meta meta_actions;
+meta_actions.Set("Category","");
+meta_actions.Set("IsColor",false);
+meta_actions.Set("IsRange",false);
+meta_actions.Set("IsFloatRange",true);
+meta_actions.Set("RangeMin",(f32)0);
+meta_actions.Set("RangeMax",(f32)1);
+MemberBuilder builder_actions;
+builder_actions._name = "_actions";
+builder_actions._type_name = "Vector<InputActionDocument>";
+builder_actions._offset = offsetof(InputActionMapDocument,_actions);
+builder_actions._is_const = false;
+builder_actions._is_static = false;
+builder_actions._is_public = true;
+builder_actions._is_pointer = false;
+builder_actions._is_ref = false;
+builder_actions._is_template = true;
+builder_actions._meta = meta_actions;
+builder_actions._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<InputActionDocument>>);
+builder_actions._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<InputActionDocument>>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_actions));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+const Ailu::Type* Ailu::InputActionMapDocument::GetPrivateStaticClass()
+{
+	static const Ailu::Type* type = Z_Construct_InputActionMapDocument_Type();
+	return type;
+}
+
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::InputActionMapDocument>()
+{
+return Ailu::InputActionMapDocument::StaticType();
+}
+    const Type *Ailu::InputActionMapDocument::GetType()
+{
+return Ailu::InputActionMapDocument::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_InputActionMapDocument(&Ailu::InputActionMapDocument::StaticType, "Ailu::InputActionMapDocument");
+const Ailu::Type* Ailu::Z_Construct_InputContextDocument_Type()
+{
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "InputContextDocument";
+initializer._size = sizeof(Ailu::InputContextDocument);
+initializer._full_name = "Ailu::InputContextDocument";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu";
+initializer._base_name = "";
+initializer._constructor = []()->Ailu::InputContextDocument* {return new Ailu::InputContextDocument;};
+Meta meta_name;
+meta_name.Set("Category","");
+meta_name.Set("IsColor",false);
+meta_name.Set("IsRange",false);
+meta_name.Set("IsFloatRange",true);
+meta_name.Set("RangeMin",(f32)0);
+meta_name.Set("RangeMax",(f32)1);
+MemberBuilder builder_name;
+builder_name._name = "_name";
+builder_name._type_name = "String";
+builder_name._offset = offsetof(InputContextDocument,_name);
+builder_name._is_const = false;
+builder_name._is_static = false;
+builder_name._is_public = true;
+builder_name._is_pointer = false;
+builder_name._is_ref = false;
+builder_name._is_template = false;
+builder_name._meta = meta_name;
+builder_name._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<String>);
+builder_name._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<String>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_name));
+Meta meta_priority;
+meta_priority.Set("Category","");
+meta_priority.Set("IsColor",false);
+meta_priority.Set("IsRange",false);
+meta_priority.Set("IsFloatRange",true);
+meta_priority.Set("RangeMin",(f32)0);
+meta_priority.Set("RangeMax",(f32)1);
+MemberBuilder builder_priority;
+builder_priority._name = "_priority";
+builder_priority._type_name = "i32";
+builder_priority._offset = offsetof(InputContextDocument,_priority);
+builder_priority._is_const = false;
+builder_priority._is_static = false;
+builder_priority._is_public = true;
+builder_priority._is_pointer = false;
+builder_priority._is_ref = false;
+builder_priority._is_template = false;
+builder_priority._meta = meta_priority;
+builder_priority._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<i32>);
+builder_priority._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<i32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_priority));
+Meta meta_consume_input;
+meta_consume_input.Set("Category","");
+meta_consume_input.Set("IsColor",false);
+meta_consume_input.Set("IsRange",false);
+meta_consume_input.Set("IsFloatRange",true);
+meta_consume_input.Set("RangeMin",(f32)0);
+meta_consume_input.Set("RangeMax",(f32)1);
+MemberBuilder builder_consume_input;
+builder_consume_input._name = "_consume_input";
+builder_consume_input._type_name = "bool";
+builder_consume_input._offset = offsetof(InputContextDocument,_consume_input);
+builder_consume_input._is_const = false;
+builder_consume_input._is_static = false;
+builder_consume_input._is_public = true;
+builder_consume_input._is_pointer = false;
+builder_consume_input._is_ref = false;
+builder_consume_input._is_template = false;
+builder_consume_input._meta = meta_consume_input;
+builder_consume_input._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_consume_input._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_consume_input));
+Meta meta_block_lower_contexts;
+meta_block_lower_contexts.Set("Category","");
+meta_block_lower_contexts.Set("IsColor",false);
+meta_block_lower_contexts.Set("IsRange",false);
+meta_block_lower_contexts.Set("IsFloatRange",true);
+meta_block_lower_contexts.Set("RangeMin",(f32)0);
+meta_block_lower_contexts.Set("RangeMax",(f32)1);
+MemberBuilder builder_block_lower_contexts;
+builder_block_lower_contexts._name = "_block_lower_contexts";
+builder_block_lower_contexts._type_name = "bool";
+builder_block_lower_contexts._offset = offsetof(InputContextDocument,_block_lower_contexts);
+builder_block_lower_contexts._is_const = false;
+builder_block_lower_contexts._is_static = false;
+builder_block_lower_contexts._is_public = true;
+builder_block_lower_contexts._is_pointer = false;
+builder_block_lower_contexts._is_ref = false;
+builder_block_lower_contexts._is_template = false;
+builder_block_lower_contexts._meta = meta_block_lower_contexts;
+builder_block_lower_contexts._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_block_lower_contexts._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_block_lower_contexts));
+Meta meta_active;
+meta_active.Set("Category","");
+meta_active.Set("IsColor",false);
+meta_active.Set("IsRange",false);
+meta_active.Set("IsFloatRange",true);
+meta_active.Set("RangeMin",(f32)0);
+meta_active.Set("RangeMax",(f32)1);
+MemberBuilder builder_active;
+builder_active._name = "_active";
+builder_active._type_name = "bool";
+builder_active._offset = offsetof(InputContextDocument,_active);
+builder_active._is_const = false;
+builder_active._is_static = false;
+builder_active._is_public = true;
+builder_active._is_pointer = false;
+builder_active._is_ref = false;
+builder_active._is_template = false;
+builder_active._meta = meta_active;
+builder_active._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_active._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_active));
+Meta meta_action_map_names;
+meta_action_map_names.Set("Category","");
+meta_action_map_names.Set("IsColor",false);
+meta_action_map_names.Set("IsRange",false);
+meta_action_map_names.Set("IsFloatRange",true);
+meta_action_map_names.Set("RangeMin",(f32)0);
+meta_action_map_names.Set("RangeMax",(f32)1);
+MemberBuilder builder_action_map_names;
+builder_action_map_names._name = "_action_map_names";
+builder_action_map_names._type_name = "Vector<String>";
+builder_action_map_names._offset = offsetof(InputContextDocument,_action_map_names);
+builder_action_map_names._is_const = false;
+builder_action_map_names._is_static = false;
+builder_action_map_names._is_public = true;
+builder_action_map_names._is_pointer = false;
+builder_action_map_names._is_ref = false;
+builder_action_map_names._is_template = true;
+builder_action_map_names._meta = meta_action_map_names;
+builder_action_map_names._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<String>>);
+builder_action_map_names._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<String>>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_action_map_names));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+const Ailu::Type* Ailu::InputContextDocument::GetPrivateStaticClass()
+{
+	static const Ailu::Type* type = Z_Construct_InputContextDocument_Type();
+	return type;
+}
+
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::InputContextDocument>()
+{
+return Ailu::InputContextDocument::StaticType();
+}
+    const Type *Ailu::InputContextDocument::GetType()
+{
+return Ailu::InputContextDocument::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_InputContextDocument(&Ailu::InputContextDocument::StaticType, "Ailu::InputContextDocument");
 const Ailu::Type* Ailu::Z_Construct_SceneTagComponentDocument_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;

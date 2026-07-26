@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __TEXTURE_GEN_H__
 //Class Texture begin...........................
-#define TEXTURE_GEN_H_502_GENERATED_BODY \
+#define TEXTURE_GEN_H_503_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_Texture_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -21,13 +21,13 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::Texture>(
 //Class Texture end...........................
 
 //Class Texture2D begin...........................
-#define TEXTURE_GEN_H_619_GENERATED_BODY \
+#define TEXTURE_GEN_H_620_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_Texture2D_Type();\
                                 static const Type* GetPrivateStaticClass();\
                             public:\
                                 static const Type *StaticType() {return GetPrivateStaticClass();};\
-                                const Type  *GetType();
+                                virtual const Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::Render{
 class Texture2D ;
@@ -37,13 +37,13 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::Texture2D
 //Class Texture2D end...........................
 
 //Class Texture3D begin...........................
-#define TEXTURE_GEN_H_654_GENERATED_BODY \
+#define TEXTURE_GEN_H_655_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_Texture3D_Type();\
                                 static const Type* GetPrivateStaticClass();\
                             public:\
                                 static const Type *StaticType() {return GetPrivateStaticClass();};\
-                                const Type  *GetType();
+                                virtual const Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::Render{
 class Texture3D ;
@@ -53,13 +53,13 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::Texture3D
 //Class Texture3D end...........................
 
 //Class CubeMap begin...........................
-#define TEXTURE_GEN_H_690_GENERATED_BODY \
+#define TEXTURE_GEN_H_691_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_CubeMap_Type();\
                                 static const Type* GetPrivateStaticClass();\
                             public:\
                                 static const Type *StaticType() {return GetPrivateStaticClass();};\
-                                const AILU_API Type  *GetType();
+                                virtual const AILU_API Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::Render{
 class CubeMap ;
@@ -69,13 +69,13 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::CubeMap>(
 //Class CubeMap end...........................
 
 //Class RenderTexture begin...........................
-#define TEXTURE_GEN_H_731_GENERATED_BODY \
+#define TEXTURE_GEN_H_732_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_RenderTexture_Type();\
                                 static const Type* GetPrivateStaticClass();\
                             public:\
                                 static const Type *StaticType() {return GetPrivateStaticClass();};\
-                                const Type  *GetType();
+                                virtual const Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::Render{
 class RenderTexture ;

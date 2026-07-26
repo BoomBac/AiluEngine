@@ -4,6 +4,8 @@
 
 #include <d3dx12.h>
 #include <dxgi1_6.h>
+#include <atomic>
+#include <mutex>
 
 // Tracy GPU profiling (D3D12). This header is lightweight when TRACY_ENABLE is not defined.
 #include "tracy/TracyD3D12.hpp"
@@ -106,7 +108,7 @@ namespace Ailu::RHI::DX12
         Core::ParallelQueue<CommandGroup> _cmd_queue;
         std::thread* _worker_thread;
         Render::GraphicsContext* _ctx;
-        bool _is_stop;
+        std::atomic<bool> _is_stop;
     };
 
     class D3DSwapchainTexture;
@@ -118,6 +120,7 @@ namespace Ailu::RHI::DX12
         ~D3DContext();
         void Init() final;
         void Present() final;
+        void SetMultiThreadRendering(bool enabled) final;
         u64 GetFenceValueGPU() final;
         u64 GetFenceValueCPU() const final;
         void RegisterWindow(Window *window);
@@ -175,6 +178,7 @@ namespace Ailu::RHI::DX12
         inline static constexpr u32 kMaxIndirectDispatchCount = 2048u;
         inline static constexpr u32 kMaxIndirectDrawCount     = 2048u;
         Vector<Scope<RenderWindowCtx>> _render_windows;
+        mutable std::mutex _render_windows_mtx;
         u32 _cur_ctx_index = 0u;
         //u32 _cbv_desc_num = 0u;
         // Pipeline objects.

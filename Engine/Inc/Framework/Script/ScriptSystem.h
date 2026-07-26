@@ -49,7 +49,9 @@ namespace Ailu
         f64 GetGlobalNumber(const String &name, f64 fallback = 0.0) const;
         bool GetGlobalBool(const String &name, bool fallback = false) const;
         void OnScriptFileChanged(const std::filesystem::path &path);
+        void FixedUpdateComponent(SceneManagement::Scene *scene, ECS::Entity entity, ECS::ScriptComponent &component, f32 fixed_delta_time);
         void UpdateComponent(SceneManagement::Scene *scene, ECS::Entity entity, ECS::ScriptComponent &component, f32 delta_time);
+        void LateUpdateComponent(SceneManagement::Scene *scene, ECS::Entity entity, ECS::ScriptComponent &component, f32 delta_time, f32 render_alpha);
         void DestroyComponent(ECS::ScriptComponent &component);
         bool IsEnabled() const;
 
@@ -66,6 +68,10 @@ namespace Ailu
         bool ExecuteChunk(sol::load_result &&chunk, const String &chunk_name);
         void ReportError(const String &source, const sol::error &error) const;
         bool LoadComponentInstance(const String &path, const ScriptEntityHandle &entity, ECS::ScriptComponent &component);
+        bool EnsureComponentReady(SceneManagement::Scene *scene, ECS::Entity entity, ECS::ScriptComponent &component);
+        bool InvokeComponentMethod(ECS::ScriptComponent &component, const String &method_name);
+        bool InvokeComponentMethod(ECS::ScriptComponent &component, const String &method_name, f32 arg0);
+        bool InvokeComponentMethod(ECS::ScriptComponent &component, const String &method_name, f32 arg0, f32 arg1);
 
     private:
         sol::state _lua;
@@ -77,6 +83,8 @@ namespace Ailu
         Queue<std::filesystem::path> _reload_queue;
         bool _is_initialized = false;
         f32 _last_delta_time = 0.0f;
+        f32 _last_fixed_delta_time = 0.0f;
+        f32 _last_render_alpha = 0.0f;
     };
 }
 

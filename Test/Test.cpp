@@ -3,6 +3,9 @@
 #include "Test.h"
 
 #include <Framework/Common/Allocator.hpp>
+#include <Framework/Common/Log.h>
+#include <Input/InputSystem.h>
+#include <Render/2D/SpriteBatcher.h>
 
 #include <algorithm>
 #include <array>
@@ -67,6 +70,37 @@ namespace
     struct alignas(64) Aligned64
     {
         std::array<u8, 64u> _data{};
+    };
+
+    class FakeKeyboardDevice final : public InputDevice
+    {
+    public:
+        FakeKeyboardDevice()
+        {
+            _device_id = 1u;
+            _device_name = "Keyboard";
+
+            InputControlDesc space_desc;
+            space_desc._name = "space";
+            space_desc._value_type = EInputValueType::kButton;
+            space_desc._index = 0u;
+            _control_descs.push_back(space_desc);
+        }
+
+        void SetSpacePressed(bool pressed) { _space_pressed = pressed; }
+        void Poll() override {}
+        EInputDeviceType GetDeviceType() const override { return EInputDeviceType::kKeyboard; }
+        bool IsConnected() const override { return true; }
+
+        InputValue ReadControl(u16 control_index) const override
+        {
+            if (control_index == 0u)
+                return InputValue::MakeButton(_space_pressed);
+            return InputValue{};
+        }
+
+    private:
+        bool _space_pressed = false;
     };
 
     void PrintTestResult(const char *name, bool passed)
@@ -558,10 +592,139 @@ namespace
         return Allocator::Get().TotalAllocated() == before;
     }
 
+    bool TestSpriteBatchOffsetsForMultiTextureAndMaterial()
+    {
+        using namespace Ailu::Render;
+
+        Vector<SpriteRenderData> render_data(5u);
+        auto *material_a = reinterpret_cast<Material *>(static_cast<uintptr_t>(0x1000u));
+        auto *material_b = reinterpret_cast<Material *>(static_cast<uintptr_t>(0x2000u));
+        auto *texture_a = reinterpret_cast<Texture *>(static_cast<uintptr_t>(0x3000u));
+        auto *texture_b = reinterpret_cast<Texture *>(static_cast<uintptr_t>(0x4000u));
+
+        render_data[0]._material = material_a;
+        render_data[0]._texture = texture_a;
+        render_data[1]._material = material_b;
+        render_data[1]._texture = texture_a;
+        render_data[2]._material = material_b;
+        render_data[2]._texture = texture_a;
+        render_data[3]._material = material_b;
+        render_data[3]._texture = texture_b;
+        render_data[4]._material = material_a;
+        render_data[4]._texture = texture_a;
+
+        const auto batches = SpriteBatcher::BuildBatchesForTesting(render_data);
+        if (batches.size() != 4u)
+            return false;
+
+        return batches[0]._instance_offset == 0u && batches[0]._instance_count == 1u &&
+               batches[1]._instance_offset == 1u && batches[1]._instance_count == 2u &&
+               batches[2]._instance_offset == 3u && batches[2]._instance_count == 1u &&
+               batches[3]._instance_offset == 4u && batches[3]._instance_count == 1u;
+    }
+
+    bool TestSpriteBatchOffsetsRemainSplitAfterSorting()
+    {
+        using namespace Ailu::Render;
+
+        Vector<SpriteRenderData> render_data(4u);
+        auto *material = reinterpret_cast<Material *>(static_cast<uintptr_t>(0x5000u));
+        auto *texture_a = reinterpret_cast<Texture *>(static_cast<uintptr_t>(0x6000u));
+        auto *texture_b = reinterpret_cast<Texture *>(static_cast<uintptr_t>(0x7000u));
+
+        render_data[0]._material = material;
+        render_data[0]._texture = texture_a;
+        render_data[1]._material = material;
+        render_data[1]._texture = texture_a;
+        render_data[2]._material = material;
+        render_data[2]._texture = texture_b;
+        render_data[3]._material = material;
+        render_data[3]._texture = texture_b;
+
+        const auto batches = SpriteBatcher::BuildBatchesForTesting(render_data);
+        if (batches.size() != 2u)
+            return false;
+
+        return batches[0]._instance_offset == 0u && batches[0]._instance_count == 2u &&
+               batches[1]._instance_offset == 2u && batches[1]._instance_count == 2u;
+    }
+
+    bool TestInputSystemButtonAction()
+    {
+        InputActionAsset asset("TestInputActions");
+
+        InputAction jump_action("Jump");
+        jump_action.SetId(1001u);
+        jump_action.SetActionType(EInputActionType::kButton);
+        jump_action.SetValueType(EInputValueType::kButton);
+
+        InputBinding jump_binding;
+        jump_binding._name = "KeyboardSpace";
+        jump_binding._control_path = "<Keyboard>/space";
+        jump_action.AddBinding(std::move(jump_binding));
+
+        InputActionMap gameplay_map("Gameplay");
+        gameplay_map.SetId(101u);
+        gameplay_map.AddAction(std::move(jump_action));
+        asset.AddActionMap(std::move(gameplay_map));
+
+        InputContext gameplay_context("Gameplay");
+        gameplay_context.SetPriority(10);
+        gameplay_context.SetConsumeInput(true);
+        gameplay_context.AddActionMap(MakeRef<InputActionMap>("Gameplay"));
+        asset.AddContext(std::move(gameplay_context));
+
+        InputSystem input_system;
+        auto keyboard = MakeScope<FakeKeyboardDevice>();
+        FakeKeyboardDevice *keyboard_ptr = keyboard.get();
+        input_system.RegisterDevice(std::move(keyboard));
+        input_system.LoadAsset(asset);
+        input_system.PushContext("Gameplay");
+
+        if (input_system.FindContext("Gameplay") == nullptr)
+            return false;
+        if (input_system.FindActionById(1001u) == nullptr)
+            return false;
+
+        u32 performed_count = 0u;
+        input_system.AddActionEventListener(
+            [&performed_count](const InputActionEvent &event)
+            {
+                if (event._action != nullptr && event._action->GetName() == "Jump" &&
+                    event._phase == EInputActionPhase::kPerformed)
+                {
+                    ++performed_count;
+                }
+            });
+
+        keyboard_ptr->SetSpacePressed(false);
+        input_system.Update(1.0f / 60.0f);
+        InputAction *jump = input_system.FindAction("Jump");
+        if (jump == nullptr || jump->WasPerformedThisFrame())
+            return false;
+
+        keyboard_ptr->SetSpacePressed(true);
+        input_system.Update(1.0f / 60.0f);
+        if (!jump->WasPerformedThisFrame() || !jump->GetValue().AsButton())
+            return false;
+
+        input_system.Update(1.0f / 60.0f);
+        if (jump->WasPerformedThisFrame())
+            return false;
+
+        keyboard_ptr->SetSpacePressed(false);
+        input_system.Update(1.0f / 60.0f);
+        if (jump->WasPerformedThisFrame())
+            return false;
+
+        return performed_count == 1u;
+    }
+
     void RunAllocatorTests()
     {
         TestResult result;
 
+        LogMgr::Init();
         Allocator::Init();
 
         RunTest(result, "Basic allocation", TestBasicAllocation);
@@ -577,6 +740,11 @@ namespace
         RunTest(result, "Multi-thread allocation", TestMultiThreadAllocation);
         RunTest(result, "Cross-thread free", TestCrossThreadFree);
         RunTest(result, "Allocated byte count", TestAllocatedByteCount);
+        RunTest(result, "Sprite batch offsets with multi texture/material",
+                TestSpriteBatchOffsetsForMultiTextureAndMaterial);
+        RunTest(result, "Sprite batch offsets remain split after sorting",
+                TestSpriteBatchOffsetsRemainSplitAfterSorting);
+        RunTest(result, "InputSystem button action smoke", TestInputSystemButtonAction);
 
         std::cout << "\nAllocator page state:\n";
         std::cout << Allocator::Get().GetPageMgr().Dump() << '\n';
@@ -587,6 +755,7 @@ namespace
         std::cout << "========================================\n";
 
         Allocator::Shutdown();
+        LogMgr::Shutdown();
 
         if (result._failed != 0u)
             std::exit(EXIT_FAILURE);

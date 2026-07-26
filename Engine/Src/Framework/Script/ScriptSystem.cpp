@@ -133,6 +133,8 @@ namespace Ailu
         while (!_reload_queue.empty())
             _reload_queue.pop();
         _last_delta_time = 0.0f;
+        _last_fixed_delta_time = 0.0f;
+        _last_render_alpha = 0.0f;
         _is_initialized = false;
     }
 
@@ -278,6 +280,14 @@ namespace Ailu
         {
             return _last_delta_time;
         });
+        engine.set_function("fixed_delta_time", [this]()
+        {
+            return _last_fixed_delta_time;
+        });
+        engine.set_function("render_alpha", [this]()
+        {
+            return _last_render_alpha;
+        });
     }
 
     bool ScriptSystem::LoadComponentInstance(const String &path, const ScriptEntityHandle &entity, ECS::ScriptComponent &component)
@@ -357,70 +367,155 @@ namespace Ailu
         LOG_ERROR("Lua Error [{}]: {}", source, error.what());
         LOG_ERROR("{}", StackTrace::Capture());
     }
-#endif
 
-    void ScriptSystem::UpdateComponent(SceneManagement::Scene *scene, ECS::Entity entity, ECS::ScriptComponent &component, f32 delta_time)
+    bool ScriptSystem::EnsureComponentReady(SceneManagement::Scene *scene, ECS::Entity entity, ECS::ScriptComponent &component)
     {
         if (scene == nullptr || component._script_path.empty())
-            return;
+            return false;
 
-#if AILU_ENABLE_LUA_SCRIPTING
         const ScriptEntityHandle handle{scene, entity};
         if (!handle.IsValid())
-            return;
+            return false;
 
         const String current_path = component._resolved_script_path;
         const bool needs_reload = !current_path.empty() && _script_versions[current_path] > component._loaded_script_version;
         if (!component._is_initialized || needs_reload)
         {
             if (!LoadComponentInstance(component._script_path, handle, component))
-                return;
+                return false;
 
-            if (!component._instance.has_value())
-                return;
-
-            sol::object init_object = (*component._instance)["OnInit"];
-            if (init_object.valid() && init_object.get_type() == sol::type::function)
+            if (!InvokeComponentMethod(component, "OnInit"))
             {
-                sol::protected_function init = init_object.as<sol::protected_function>();
-                if (_traceback.valid())
-                {
-                    init.set_error_handler(_traceback);
-                }
-                sol::protected_function_result result = init(*component._instance);
-                if (!result.valid())
-                {
-                    sol::error error = result;
-                    ReportError(component._resolved_script_path, error);
-                    component.ResetRuntime();
-                    return;
-                }
+                component.ResetRuntime();
+                return false;
             }
         }
 
+        return component._instance.has_value();
+    }
+
+    bool ScriptSystem::InvokeComponentMethod(ECS::ScriptComponent &component, const String &method_name)
+    {
         if (!component._instance.has_value())
+            return false;
+
+        sol::object object = (*component._instance)[method_name];
+        if (!object.valid() || object.get_type() != sol::type::function)
+            return true;
+
+        sol::protected_function function = object.as<sol::protected_function>();
+        if (_traceback.valid())
+            function.set_error_handler(_traceback);
+        sol::protected_function_result result = function(*component._instance);
+        if (!result.valid())
+        {
+            sol::error error = result;
+            ReportError(component._resolved_script_path.empty() ? component._script_path : component._resolved_script_path, error);
+            return false;
+        }
+
+        return true;
+    }
+
+    bool ScriptSystem::InvokeComponentMethod(ECS::ScriptComponent &component, const String &method_name, f32 arg0)
+    {
+        if (!component._instance.has_value())
+            return false;
+
+        sol::object object = (*component._instance)[method_name];
+        if (!object.valid() || object.get_type() != sol::type::function)
+            return true;
+
+        sol::protected_function function = object.as<sol::protected_function>();
+        if (_traceback.valid())
+            function.set_error_handler(_traceback);
+        sol::protected_function_result result = function(*component._instance, arg0);
+        if (!result.valid())
+        {
+            sol::error error = result;
+            ReportError(component._resolved_script_path.empty() ? component._script_path : component._resolved_script_path, error);
+            return false;
+        }
+        return true;
+    }
+
+    bool ScriptSystem::InvokeComponentMethod(ECS::ScriptComponent &component, const String &method_name, f32 arg0, f32 arg1)
+    {
+        if (!component._instance.has_value())
+            return false;
+
+        sol::object object = (*component._instance)[method_name];
+        if (!object.valid() || object.get_type() != sol::type::function)
+            return true;
+
+        sol::protected_function function = object.as<sol::protected_function>();
+        if (_traceback.valid())
+            function.set_error_handler(_traceback);
+        sol::protected_function_result result = function(*component._instance, arg0, arg1);
+        if (!result.valid())
+        {
+            sol::error error = result;
+            ReportError(component._resolved_script_path.empty() ? component._script_path : component._resolved_script_path, error);
+            return false;
+        }
+        return true;
+    }
+#endif
+
+    void ScriptSystem::FixedUpdateComponent(SceneManagement::Scene *scene, ECS::Entity entity, ECS::ScriptComponent &component, f32 fixed_delta_time)
+    {
+        _last_fixed_delta_time = fixed_delta_time;
+        if (scene == nullptr || component._script_path.empty())
             return;
 
-        sol::object update_object = (*component._instance)["OnUpdate"];
-        if (update_object.valid() && update_object.get_type() == sol::type::function)
-        {
-            sol::protected_function update = update_object.as<sol::protected_function>();
-            if (_traceback.valid())
-            {
-                update.set_error_handler(_traceback);
-            }
-            sol::protected_function_result result = update(*component._instance, delta_time);
-            if (!result.valid())
-            {
-                sol::error error = result;
-                ReportError(component._resolved_script_path.empty() ? component._script_path : component._resolved_script_path, error);
-            }
-        }
+#if AILU_ENABLE_LUA_SCRIPTING
+        if (!EnsureComponentReady(scene, entity, component))
+            return;
+        InvokeComponentMethod(component, "OnFixedUpdate", fixed_delta_time);
+#else
+        (void) scene;
+        (void) entity;
+        (void) component;
+        (void) fixed_delta_time;
+#endif
+    }
+
+    void ScriptSystem::UpdateComponent(SceneManagement::Scene *scene, ECS::Entity entity, ECS::ScriptComponent &component, f32 delta_time)
+    {
+        _last_delta_time = delta_time;
+        if (scene == nullptr || component._script_path.empty())
+            return;
+
+#if AILU_ENABLE_LUA_SCRIPTING
+        if (!EnsureComponentReady(scene, entity, component))
+            return;
+        InvokeComponentMethod(component, "OnUpdate", delta_time);
 #else
         (void) scene;
         (void) entity;
         (void) component;
         (void) delta_time;
+#endif
+    }
+
+    void ScriptSystem::LateUpdateComponent(SceneManagement::Scene *scene, ECS::Entity entity, ECS::ScriptComponent &component, f32 delta_time,
+                                           f32 render_alpha)
+    {
+        _last_delta_time = delta_time;
+        _last_render_alpha = render_alpha;
+        if (scene == nullptr || component._script_path.empty())
+            return;
+
+#if AILU_ENABLE_LUA_SCRIPTING
+        if (!EnsureComponentReady(scene, entity, component))
+            return;
+        InvokeComponentMethod(component, "OnLateUpdate", delta_time, render_alpha);
+#else
+        (void) scene;
+        (void) entity;
+        (void) component;
+        (void) delta_time;
+        (void) render_alpha;
 #endif
     }
 

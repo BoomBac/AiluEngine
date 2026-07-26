@@ -11,6 +11,7 @@
 #include "Framework/Core/Containers/List.h"
 #include "Framework/Core/Containers/Map.h"
 #include "Framework/Common/Assert.h"
+#include <array>
 #include <bitset>
 #include <ranges>
 #include <set>
@@ -38,6 +39,19 @@ namespace Ailu
 
         // --- Type ID for systems (separate from ComponentTypeId in Component.h) ---
         using SystemTypeId = u32;
+        enum class ESystemPhase : u8
+        {
+            kPrePhysics,
+            kPhysics,
+            kPostPhysics,
+            kTransform,
+            kAnimation,
+            kPostAnimation,
+            kGameplay,
+            kRenderData,
+        };
+
+        inline constexpr u32 kSystemPhaseCount = static_cast<u32>(ESystemPhase::kRenderData) + 1u;
 
         inline SystemTypeId AllocateSystemTypeId()
         {
@@ -84,6 +98,9 @@ public:                                                                   \
             virtual void Update(Register &r, f32 delta_time) {};
             virtual void OnPushEntity(Entity entity) {};
             virtual void WaitFor() const {};
+            virtual ESystemPhase GetPhase() const { return ESystemPhase::kGameplay; }
+            virtual i32 GetOrder() const { return 0; }
+            virtual bool IsEnabled() const { return true; }
             virtual Ref<System> Clone()
             {
                 AL_ASSERT(true);
@@ -96,6 +113,13 @@ public:                                                                   \
 
         using CompAddCallback = std::function<void(ECS::Entity)>;
         using CompRemoveCallback = std::function<void(ECS::Entity)>;
+
+        struct SystemEntry
+        {
+            System *_system = nullptr;
+            ESystemPhase _phase = ESystemPhase::kGameplay;
+            i32 _order = 0;
+        };
 
         // Forward declaration
         template<typename T>
@@ -112,6 +136,7 @@ public:                                                                   \
             bool operator==(const Register &other) const;
 
             Entity Create();
+            Entity GetAliveEntityByIndex(u32 index) const;
             bool IsAlive(Entity entity) const;
             void Destory(Entity entity);
             void Destroy(Entity entity);
@@ -181,12 +206,15 @@ public:                                                                   \
             // --- Deferred destruction ---
             void DeferredDestroy(Entity entity);
             void FlushDestroy();
+            void ExecutePhase(ESystemPhase phase, f32 delta_time);
+            void MarkSystemScheduleDirty();
 
             // --- Batch operations ---
             Vector<Entity> CreateBatch(u32 count);
             void DestroyBatch(const Vector<Entity> &entities);
 
         private:
+            void RebuildSystemSchedule();
             void GrowPool(u32 new_capacity);
             void EnsureMgrVector(u32 type_id);
             void EnsureCallbackVectors(u32 type_id);
@@ -210,6 +238,8 @@ public:                                                                   \
             Vector<u32> _entity_generations;
             Queue<u32> _free_indices;
             Vector<Entity> _pending_destroy_queue;
+            Array<Vector<SystemEntry>, kSystemPhaseCount> _system_schedule;
+            bool _system_schedule_dirty = true;
             bool _is_init = false;
         };
 

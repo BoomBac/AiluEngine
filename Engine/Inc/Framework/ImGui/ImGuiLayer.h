@@ -23,6 +23,8 @@ namespace Ailu
 		void Begin();
 		void End();
 	private:
+        void ApplyViewportConfig();
+        bool _is_viewports_active = false;
 	};
 }
 

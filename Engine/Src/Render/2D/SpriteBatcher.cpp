@@ -102,8 +102,8 @@ namespace Ailu::Render
             if (tex != nullptr)
                 mat->SetTexture("_MainTex", tex);
             mat->SetBuffer("g_sprite_instances", _instance_buffer.get());
-            cmd->DrawIndexedInstanced(_vertex_buffer.get(), _index_buffer.get(),
-                                      nullptr, mat, 0, batch._instance_count, 0, 6);
+            cmd->DrawIndexedInstanced(_vertex_buffer.get(), _index_buffer.get(), nullptr, mat, 0, batch._instance_count,
+                                      batch._instance_offset, 0, 6);
         }
     }
 
@@ -161,6 +161,14 @@ namespace Ailu::Render
 
     void SpriteBatcher::BuildBatches(const Vector<SpriteRenderData> &render_data)
     {
+        _batches = BuildBatchesForTesting(render_data);
+    }
+
+    Vector<SpriteBatch> SpriteBatcher::BuildBatchesForTesting(const Vector<SpriteRenderData> &render_data)
+    {
+        Vector<SpriteBatch> batches;
+        batches.reserve(render_data.size());
+
         for (u32 i = 0; i < render_data.size(); ++i)
         {
             const auto &sprite = render_data[i];
@@ -170,19 +178,21 @@ namespace Ailu::Render
             key._texture = sprite._texture;
             key._blend_mode = sprite._blend_mode;
 
-            if (_batches.empty() || !(_batches.back()._key == key))
+            if (batches.empty() || !(batches.back()._key == key))
             {
                 SpriteBatch batch;
                 batch._key = key;
                 batch._instance_offset = i;
                 batch._instance_count = 1u;
-                _batches.push_back(batch);
+                batches.push_back(batch);
             }
             else
             {
-                _batches.back()._instance_count++;
+                batches.back()._instance_count++;
             }
         }
+
+        return batches;
     }
 
 }// namespace Ailu::Render

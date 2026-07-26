@@ -21,6 +21,7 @@ set(AILU_FBXSDK_LINK_LIB
 
 option(AILU_ENABLE_TRACY "Enable Tracy profiler instrumentation" ON)
 option(AILU_TRACY_ON_DEMAND "Tracy connects only when profiler is attached" ON)
+option(AILU_TRACY_PROFILE_CALLSITE_SOURCE_LOCATION "Use call-site source locations for CPU profile blocks" OFF)
 option(AILU_ENABLE_ASSERTS "Enable engine assertions" ON)
 option(AILU_ENABLE_ENGINE_PROFILER "Enable built-in profiler" OFF)
 option(AILU_ENABLE_D3D_DEBUG_LAYER "Enable D3D12 debug layer" OFF)
@@ -38,6 +39,8 @@ if(WIN32)
         WIN32_LEAN_AND_MEAN
     )
 endif()
+
+add_compile_definitions(AILU_TRACY_PROFILE_CALLSITE_SOURCE_LOCATION=$<BOOL:${AILU_TRACY_PROFILE_CALLSITE_SOURCE_LOCATION}>)
 
 function(ailu_collect_reflection_outputs root_dir output_var)
 	file(GLOB_RECURSE candidate_headers CONFIGURE_DEPENDS "${root_dir}/*.h" "${root_dir}/*.hpp")

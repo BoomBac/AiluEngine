@@ -14,6 +14,8 @@
 #include "Framework/Interface/IParser.h"
 #include "Framework/Math/Guid.h"
 #include "Framework/Parser/AssetParser.h"
+#include "Input/InputActionAsset.h"
+#include "Input/InputComposite.h"
 #include "Objects/JsonArchive.h"
 #include "Objects/Type.h"
 #include "Render/2D/Sprite.h"
@@ -169,6 +171,290 @@ namespace
             return ECS::kInvalidEntity;
         const auto it = old_to_new_entities.find(static_cast<ECS::Entity>(legacy_entity_id));
         return it != old_to_new_entities.end() ? it->second : ECS::kInvalidEntity;
+    }
+
+    InputProcessorDocument ToInputProcessorDocument(const InputProcessor *processor)
+    {
+        InputProcessorDocument doc;
+        if (const auto *typed_processor = dynamic_cast<const ScaleProcessor *>(processor))
+        {
+            const Vector3f &scale = typed_processor->GetScale();
+            doc._type = "Scale";
+            doc._params = Vector4f(scale.x, scale.y, scale.z, 0.0f);
+        }
+        else if (const auto *typed_processor = dynamic_cast<const InvertProcessor *>(processor))
+        {
+            doc._type = "Invert";
+            doc._params = Vector4f(typed_processor->GetInvertX() ? 1.0f : 0.0f,
+                                   typed_processor->GetInvertY() ? 1.0f : 0.0f,
+                                   typed_processor->GetInvertZ() ? 1.0f : 0.0f, 0.0f);
+        }
+        else if (const auto *typed_processor = dynamic_cast<const StickDeadZoneProcessor *>(processor))
+        {
+            doc._type = "StickDeadZone";
+            doc._params = Vector4f(typed_processor->GetMinDeadZone(), typed_processor->GetMaxDeadZone(), 0.0f, 0.0f);
+        }
+        else if (const auto *typed_processor = dynamic_cast<const AxisDeadZoneProcessor *>(processor))
+        {
+            doc._type = "AxisDeadZone";
+            doc._params = Vector4f(typed_processor->GetDeadZone(), 0.0f, 0.0f, 0.0f);
+        }
+        else if (dynamic_cast<const NormalizeProcessor *>(processor) != nullptr)
+        {
+            doc._type = "Normalize";
+        }
+        else if (const auto *typed_processor = dynamic_cast<const ClampProcessor *>(processor))
+        {
+            doc._type = "Clamp";
+            doc._params = Vector4f(typed_processor->GetMin(), typed_processor->GetMax(), 0.0f, 0.0f);
+        }
+        else if (const auto *typed_processor = dynamic_cast<const AxisToButtonProcessor *>(processor))
+        {
+            doc._type = "AxisToButton";
+            doc._params = Vector4f(typed_processor->GetThreshold(), 0.0f, 0.0f, 0.0f);
+        }
+        return doc;
+    }
+
+    Scope<InputProcessor> FromInputProcessorDocument(const InputProcessorDocument &doc)
+    {
+        if (doc._type == "Scale")
+            return MakeScope<ScaleProcessor>(Vector3f(doc._params.x, doc._params.y, doc._params.z));
+        if (doc._type == "Invert")
+            return MakeScope<InvertProcessor>(doc._params.x != 0.0f, doc._params.y != 0.0f, doc._params.z != 0.0f);
+        if (doc._type == "StickDeadZone")
+            return MakeScope<StickDeadZoneProcessor>(doc._params.x, doc._params.y);
+        if (doc._type == "AxisDeadZone")
+            return MakeScope<AxisDeadZoneProcessor>(doc._params.x);
+        if (doc._type == "Normalize")
+            return MakeScope<NormalizeProcessor>();
+        if (doc._type == "Clamp")
+            return MakeScope<ClampProcessor>(doc._params.x, doc._params.y);
+        if (doc._type == "AxisToButton")
+            return MakeScope<AxisToButtonProcessor>(doc._params.x);
+        return nullptr;
+    }
+
+    InputInteractionDocument ToInputInteractionDocument(const InputInteraction *interaction)
+    {
+        InputInteractionDocument doc;
+        if (dynamic_cast<const PressInteraction *>(interaction) != nullptr)
+        {
+            doc._type = "Press";
+        }
+        else if (dynamic_cast<const ReleaseInteraction *>(interaction) != nullptr)
+        {
+            doc._type = "Release";
+        }
+        else if (const auto *typed_interaction = dynamic_cast<const HoldInteraction *>(interaction))
+        {
+            doc._type = "Hold";
+            doc._params = Vector4f(typed_interaction->GetDuration(), 0.0f, 0.0f, 0.0f);
+        }
+        else if (const auto *typed_interaction = dynamic_cast<const TapInteraction *>(interaction))
+        {
+            doc._type = "Tap";
+            doc._params = Vector4f(typed_interaction->GetMaxDuration(), 0.0f, 0.0f, 0.0f);
+        }
+        return doc;
+    }
+
+    Scope<InputInteraction> FromInputInteractionDocument(const InputInteractionDocument &doc)
+    {
+        if (doc._type == "Press")
+            return MakeScope<PressInteraction>();
+        if (doc._type == "Release")
+            return MakeScope<ReleaseInteraction>();
+        if (doc._type == "Hold")
+            return MakeScope<HoldInteraction>(doc._params.x);
+        if (doc._type == "Tap")
+            return MakeScope<TapInteraction>(doc._params.x);
+        return nullptr;
+    }
+
+    InputBindingDocument ToInputBindingDocument(const InputBinding &binding)
+    {
+        InputBindingDocument doc;
+        doc._name = binding._name;
+        doc._control_path = binding._control_path;
+        doc._groups = binding._groups;
+        doc._is_composite = binding._is_composite;
+        doc._is_part_of_composite = binding._is_part_of_composite;
+        doc._composite_part_name = binding._composite_part_name;
+        for (const auto &processor : binding._processors)
+        {
+            if (processor)
+            {
+                InputProcessorDocument processor_doc = ToInputProcessorDocument(processor.get());
+                if (!processor_doc._type.empty())
+                    doc._processors.emplace_back(std::move(processor_doc));
+            }
+        }
+        for (const auto &interaction : binding._interactions)
+        {
+            if (interaction)
+            {
+                InputInteractionDocument interaction_doc = ToInputInteractionDocument(interaction.get());
+                if (!interaction_doc._type.empty())
+                    doc._interactions.emplace_back(std::move(interaction_doc));
+            }
+        }
+        return doc;
+    }
+
+    InputBinding FromInputBindingDocument(const InputBindingDocument &doc)
+    {
+        InputBinding binding;
+        binding._name = doc._name;
+        binding._control_path = doc._control_path;
+        binding._groups = doc._groups;
+        binding._is_composite = doc._is_composite;
+        binding._is_part_of_composite = doc._is_part_of_composite;
+        binding._composite_part_name = doc._composite_part_name;
+        for (const auto &processor_doc : doc._processors)
+        {
+            auto processor = FromInputProcessorDocument(processor_doc);
+            if (processor)
+                binding._processors.emplace_back(std::move(processor));
+        }
+        for (const auto &interaction_doc : doc._interactions)
+        {
+            auto interaction = FromInputInteractionDocument(interaction_doc);
+            if (interaction)
+                binding._interactions.emplace_back(std::move(interaction));
+        }
+        return binding;
+    }
+
+    void FillCompositeDocument(const InputAction &action, InputActionDocument &doc)
+    {
+        const auto &composite = action.GetComposite();
+        if (!composite)
+            return;
+
+        if (const auto *axis_2d = dynamic_cast<const Axis2DCompositeBinding *>(composite.get()))
+        {
+            doc._composite_type = "Axis2D";
+            doc._composite_params = Vector4f(axis_2d->_normalize ? 1.0f : 0.0f, 0.0f, 0.0f, 0.0f);
+            doc._composite_bindings = {ToInputBindingDocument(axis_2d->_up), ToInputBindingDocument(axis_2d->_down),
+                                       ToInputBindingDocument(axis_2d->_left), ToInputBindingDocument(axis_2d->_right)};
+        }
+        else if (const auto *axis_1d = dynamic_cast<const Axis1DCompositeBinding *>(composite.get()))
+        {
+            doc._composite_type = "Axis1D";
+            doc._composite_bindings = {ToInputBindingDocument(axis_1d->_positive), ToInputBindingDocument(axis_1d->_negative)};
+        }
+        else if (const auto *button_with_modifier = dynamic_cast<const ButtonWithModifierCompositeBinding *>(composite.get()))
+        {
+            doc._composite_type = "ButtonWithModifier";
+            doc._composite_bindings = {ToInputBindingDocument(button_with_modifier->_modifier),
+                                       ToInputBindingDocument(button_with_modifier->_button)};
+        }
+    }
+
+    Scope<InputCompositeBinding> FromInputCompositeDocument(const InputActionDocument &doc)
+    {
+        if (doc._composite_type == "Axis2D" && doc._composite_bindings.size() >= 4u)
+        {
+            auto composite = MakeScope<Axis2DCompositeBinding>();
+            composite->_normalize = doc._composite_params.x != 0.0f;
+            composite->_up = FromInputBindingDocument(doc._composite_bindings[0]);
+            composite->_down = FromInputBindingDocument(doc._composite_bindings[1]);
+            composite->_left = FromInputBindingDocument(doc._composite_bindings[2]);
+            composite->_right = FromInputBindingDocument(doc._composite_bindings[3]);
+            return composite;
+        }
+        if (doc._composite_type == "Axis1D" && doc._composite_bindings.size() >= 2u)
+        {
+            auto composite = MakeScope<Axis1DCompositeBinding>();
+            composite->_positive = FromInputBindingDocument(doc._composite_bindings[0]);
+            composite->_negative = FromInputBindingDocument(doc._composite_bindings[1]);
+            return composite;
+        }
+        if (doc._composite_type == "ButtonWithModifier" && doc._composite_bindings.size() >= 2u)
+        {
+            auto composite = MakeScope<ButtonWithModifierCompositeBinding>();
+            composite->_modifier = FromInputBindingDocument(doc._composite_bindings[0]);
+            composite->_button = FromInputBindingDocument(doc._composite_bindings[1]);
+            return composite;
+        }
+        return nullptr;
+    }
+
+    InputActionDocument ToInputActionDocument(const InputAction &action)
+    {
+        InputActionDocument doc;
+        doc._name = action.GetName();
+        doc._id = action.GetId();
+        doc._action_type = static_cast<u8>(action.GetActionType());
+        doc._value_type = static_cast<u8>(action.GetValueType());
+        doc._merge_strategy = static_cast<u8>(action.GetMergeStrategy());
+        for (const auto &binding : action.GetBindings())
+            doc._bindings.emplace_back(ToInputBindingDocument(binding));
+        FillCompositeDocument(action, doc);
+        return doc;
+    }
+
+    InputAction FromInputActionDocument(const InputActionDocument &doc)
+    {
+        InputAction action(doc._name);
+        action.SetId(doc._id);
+        action.SetActionType(static_cast<EInputActionType>(doc._action_type));
+        action.SetValueType(static_cast<EInputValueType>(doc._value_type));
+        action.SetMergeStrategy(static_cast<EBindingMergeStrategy>(doc._merge_strategy));
+        for (const auto &binding_doc : doc._bindings)
+            action.AddBinding(FromInputBindingDocument(binding_doc));
+        auto composite = FromInputCompositeDocument(doc);
+        if (composite)
+            action.SetComposite(std::move(composite));
+        return action;
+    }
+
+    InputActionMapDocument ToInputActionMapDocument(const InputActionMap &action_map)
+    {
+        InputActionMapDocument doc;
+        doc._name = action_map.GetName();
+        doc._id = action_map.GetId();
+        for (const auto &action : action_map.GetActions())
+            doc._actions.emplace_back(ToInputActionDocument(action));
+        return doc;
+    }
+
+    InputActionMap FromInputActionMapDocument(const InputActionMapDocument &doc)
+    {
+        InputActionMap action_map(doc._name);
+        action_map.SetId(doc._id);
+        for (const auto &action_doc : doc._actions)
+            action_map.AddAction(FromInputActionDocument(action_doc));
+        return action_map;
+    }
+
+    InputContextDocument ToInputContextDocument(const InputContext &context)
+    {
+        InputContextDocument doc;
+        doc._name = context.GetName();
+        doc._priority = context.GetPriority();
+        doc._consume_input = context.ConsumeInput();
+        doc._block_lower_contexts = context.BlocksLowerContexts();
+        doc._active = context.IsActive();
+        for (const auto &action_map : context.GetActionMaps())
+        {
+            if (action_map)
+                doc._action_map_names.emplace_back(action_map->GetName());
+        }
+        return doc;
+    }
+
+    InputContext FromInputContextDocument(const InputContextDocument &doc)
+    {
+        InputContext context(doc._name);
+        context.SetPriority(doc._priority);
+        context.SetConsumeInput(doc._consume_input);
+        context.SetBlocksLowerContexts(doc._block_lower_contexts);
+        context.SetActive(doc._active);
+        for (const auto &action_map_name : doc._action_map_names)
+            context.AddActionMap(MakeRef<InputActionMap>(action_map_name));
+        return context;
     }
 } // anonymous namespace
 
@@ -780,7 +1066,12 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
         {
             auto &component = reg.AddComponent<ECS::LightComponent>(entity);
             if (!entity_doc._light_component._type.empty())
-                component._type = ECS::LightTypeFromString(entity_doc._light_component._type);
+                if (const Enum *enum_type = StaticEnum<ECS::ELightType>())
+                {
+                    const i32 enum_index = enum_type->GetIndexByName(entity_doc._light_component._type);
+                    if (enum_index != -1)
+                        component._type = static_cast<ECS::ELightType>(enum_index);
+                }
             component._light._light_color = entity_doc._light_component._light._light_color;
             component._light._light_param = entity_doc._light_component._light._light_param;
             component._light._is_two_side = entity_doc._light_component._light._is_two_side;
@@ -817,7 +1108,12 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
         {
             auto &component = reg.AddComponent<ECS::CCollider>(entity);
             if (!entity_doc._collider_component._type.empty())
-                component._type = ECS::ColliderTypeFromString(entity_doc._collider_component._type);
+                    if (const Enum *enum_type = StaticEnum<ECS::EColliderType>())
+                    {
+                        const i32 enum_index = enum_type->GetIndexByName(entity_doc._collider_component._type);
+                        if (enum_index != -1)
+                            component._type = static_cast<ECS::EColliderType>(enum_index);
+                    }
             component._is_trigger = entity_doc._collider_component._is_trigger;
             component._center = entity_doc._collider_component._center;
             component._param = entity_doc._collider_component._param;
@@ -949,7 +1245,8 @@ bool SceneAssetHandler::Save(const AssetSaveContext &context)
         if (const auto *light = reg.GetComponent<ECS::LightComponent>(entity); light != nullptr)
         {
             entity_doc._has_light_component = true;
-            entity_doc._light_component._type = ECS::LightTypeToString(light->_type);
+            if (const Enum *enum_type = StaticEnum<ECS::ELightType>())
+                entity_doc._light_component._type = enum_type->GetNameByEnum(light->_type);
             entity_doc._light_component._light._light_color = light->_light._light_color;
             entity_doc._light_component._light._light_param = light->_light._light_param;
             entity_doc._light_component._light._is_two_side = light->_light._is_two_side;
@@ -991,7 +1288,8 @@ bool SceneAssetHandler::Save(const AssetSaveContext &context)
         if (const auto *collider = reg.GetComponent<ECS::CCollider>(entity); collider != nullptr)
         {
             entity_doc._has_collider_component = true;
-            entity_doc._collider_component._type = ECS::ColliderTypeToString(collider->_type);
+            if (const Enum *enum_type = StaticEnum<ECS::EColliderType>())
+                entity_doc._collider_component._type = enum_type->GetNameByEnum(collider->_type);
             entity_doc._collider_component._is_trigger = collider->_is_trigger;
             entity_doc._collider_component._center = collider->_center;
             entity_doc._collider_component._param = collider->_param;
@@ -1139,6 +1437,55 @@ bool AnimationClipAssetHandler::Save(const AssetSaveContext &context)
         return false;
     }
     LOG_INFO(L"Save animclip to {}", sys_path);
+    return true;
+}
+
+// ============================================================
+// InputActionAssetHandler
+// ============================================================
+
+const Type *InputActionAssetHandler::AssetType() const
+{
+    return InputActionAsset::StaticType();
+}
+
+Scope<Asset> InputActionAssetHandler::Load(const AssetLoadContext &context)
+{
+    InputActionAssetDocument doc;
+    if (!LoadAssetDocument(context._system_path, doc))
+        return nullptr;
+
+    auto input_asset = MakeRef<InputActionAsset>(doc._header._asset_name);
+    for (const auto &action_map_doc : doc._action_maps)
+        input_asset->AddActionMap(FromInputActionMapDocument(action_map_doc));
+    for (const auto &context_doc : doc._contexts)
+        input_asset->AddContext(FromInputContextDocument(context_doc));
+
+    auto asset = MakeScope<Asset>(Guid(doc._header._guid), InputActionAsset::StaticType(), context._asset_path);
+    asset->_p_obj = input_asset;
+    asset->_domain = context._resource_mgr->GetAssetPathDomain(asset->_asset_path);
+    return asset;
+}
+
+bool InputActionAssetHandler::Save(const AssetSaveContext &context)
+{
+    const InputActionAsset *input_asset = context._asset->As<InputActionAsset>();
+    if (input_asset == nullptr)
+        return false;
+
+    InputActionAssetDocument doc;
+    doc._header = MakeAssetDocumentHeader(context._asset);
+    for (const auto &action_map : input_asset->GetActionMaps())
+        doc._action_maps.emplace_back(ToInputActionMapDocument(action_map));
+    for (const auto &input_context : input_asset->GetContexts())
+        doc._contexts.emplace_back(ToInputContextDocument(input_context));
+
+    if (!SaveAssetDocument(context._system_path, doc))
+    {
+        LOG_ERROR(L"Save input action asset failed to {}", context._system_path);
+        return false;
+    }
+    LOG_INFO(L"Save input action asset to {}", context._system_path);
     return true;
 }
 

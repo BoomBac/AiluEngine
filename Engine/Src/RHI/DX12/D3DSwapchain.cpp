@@ -13,6 +13,7 @@ namespace Ailu::RHI::DX12
         : SwapchainTexture((u16) initializer._swapchain_desc.Width, (u16) initializer._swapchain_desc.Height, Render::ConvertPixelFormatFormatToRenderTexture(initializer._format))
     {
         _device = initializer._device;
+        _window = initializer._window;
         _buffer_num = (u16) initializer._swapchain_desc.BufferCount;
         _rtvs = initializer._rtvs;
         _back_buffers.resize(initializer._swapchain_desc.BufferCount);
@@ -33,11 +34,12 @@ namespace Ailu::RHI::DX12
         }
         _load_action = Render::ELoadStoreAction::kNotCare;
         _cur_backbuf_index = _swapchain->GetCurrentBackBufferIndex();
-        s_window_backbuffers[reinterpret_cast<u64>(initializer._window)] = this;
+        RegisterWindowBackBuffer(_window, this);
     }
 
     D3DSwapchainTexture::~D3DSwapchainTexture()
     {
+        UnregisterWindowBackBuffer(_window);
         for (u16 i = 0; i < _buffer_num; i++)
         {
             _back_buffers[i].Reset();

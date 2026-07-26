@@ -3,6 +3,7 @@
 #include "Editors/SpriteAssetEditor.h"
 #include "Framework/Common/FileManager.h"
 #include "Framework/Common/ResourceMgr.h"
+#include "Input/InputActionAsset.h"
 #include "UI/Basic.h"
 #include "UI/Container.h"
 #include "UI/UIFramework.h"
@@ -59,6 +60,8 @@ namespace Ailu
             constexpr f32 kListRowHeight = 24.0f;
             constexpr f32 kListIconSize = 18.0f;
             constexpr f32 kListTextLeftPadding = 6.0f;
+            Array<Vector<Ref<Render::RenderTexture>>, Render::RenderConstants::kFrameCount> s_retired_asset_preview_icons;
+            u16 s_retired_asset_preview_icon_index = 0u;
 
             bool IsListView(f32 icon_size)
             {
@@ -857,6 +860,9 @@ namespace Ailu
         void AssetBrowser::Update(f32 dt)
         {
             DockWindow::Update(dt);
+            s_retired_asset_preview_icons[s_retired_asset_preview_icon_index].clear();
+            s_retired_asset_preview_icon_index =
+                    (s_retired_asset_preview_icon_index + 1u) % Render::RenderConstants::kFrameCount;
             if (_is_directory_tree_dirty)
                 RefreshDirectoryTree();
 
@@ -1025,9 +1031,12 @@ namespace Ailu
                             if (asset->_p_obj)
                             {
                                 auto mesh = asset->As<Render::Mesh>();
+                                if (!_asset_preview_icons.contains(mesh) || _asset_preview_icons[mesh] == nullptr)
+                                {
                                     Ref<RenderTexture> mesh_icon{nullptr};
                                     AssetPreviewGenerator::GeneratorMeshSnapshot(512u, 512u, mesh, mesh_icon);
                                     _asset_preview_icons[mesh] = mesh_icon;
+                                }
                                 icon->SetTexture(_asset_preview_icons[mesh].get());
                             }
                             else
@@ -1066,7 +1075,12 @@ namespace Ailu
                                 auto obj = asset->As<Render::Sprite>();
                                 Ref<RenderTexture> preview_icon{nullptr};
                                 AssetPreviewGenerator::GeneratorSpriteSnapshot(256,256,obj,preview_icon);
-                                _asset_preview_icons[obj] = preview_icon;
+                                if (preview_icon)
+                                {
+                                    if (auto it = _asset_preview_icons.find(obj); it != _asset_preview_icons.end() && it->second)
+                                        s_retired_asset_preview_icons[s_retired_asset_preview_icon_index].push_back(it->second);
+                                    _asset_preview_icons[obj] = preview_icon;
+                                }
                                 preview_sp = obj;
                                 icon->SetTexture(_asset_preview_icons[obj].get());
                             }
@@ -1310,6 +1324,20 @@ namespace Ailu
             {
                 ShowCreateMaterialDialog(popup_pos, _current_path);
             }});
+            actions.push_back({"New Input Action Asset", [this, popup_pos]()
+            {
+                EditorPopup::ShowTextInputAt(popup_pos, "Create Input Action Asset",
+                                             MakeUniqueEntryName(_current_path.wstring(), "NewInputActions", L".alasset", false),
+                                             [this](const String &input) -> std::optional<String>
+                                             {
+                                                 const String name = TrimNameCopy(input);
+                                                 if (auto error = ValidateEntryName(name); error.has_value())
+                                                     return error;
+                                                 if (!CreateInputActionAssetEntry(name))
+                                                     return String("Input Action Asset already exists.");
+                                                 return std::nullopt;
+                                             });
+            }});
             actions.push_back({"Refresh", [this]() { _is_dirty = true; }});
             EditorPopup::ShowActionMenuAt(popup_pos, actions);
         }
@@ -1330,6 +1358,14 @@ namespace Ailu
                 const fs::path previous_path = _current_path;
                 _current_path = folder_sys_path;
                 const bool created = CreateSceneEntry(name);
+                _current_path = previous_path;
+                return created;
+            };
+            const auto create_input_action_asset_in_target = [this, folder_sys_path](const String &name) -> bool
+            {
+                const fs::path previous_path = _current_path;
+                _current_path = folder_sys_path;
+                const bool created = CreateInputActionAssetEntry(name);
                 _current_path = previous_path;
                 return created;
             };
@@ -1387,6 +1423,20 @@ namespace Ailu
             actions.push_back({"New Material", [this, popup_pos, folder_sys_path]()
             {
                 ShowCreateMaterialDialog(popup_pos, folder_sys_path);
+            }});
+            actions.push_back({"New Input Action Asset", [this, popup_pos, folder_sys_path, create_input_action_asset_in_target]()
+            {
+                EditorPopup::ShowTextInputAt(popup_pos, "Create Input Action Asset",
+                                             MakeUniqueEntryName(folder_sys_path, "NewInputActions", L".alasset", false),
+                                             [create_input_action_asset_in_target](const String &input) -> std::optional<String>
+                                             {
+                                                 const String name = TrimNameCopy(input);
+                                                 if (auto error = ValidateEntryName(name); error.has_value())
+                                                     return error;
+                                                 if (!create_input_action_asset_in_target(name))
+                                                     return String("Input Action Asset already exists.");
+                                                 return std::nullopt;
+                                             });
             }});
             EditorPopup::ShowActionMenuAt(popup_pos, actions);
         }
@@ -1611,6 +1661,23 @@ namespace Ailu
             else
                 material = MakeRef<Render::Material>(shader, trimmed_name);
             ResourceMgr::Get().CreateAsset(asset_path, material);
+            ResourceMgr::Get().SaveAllUnsavedAssets();
+            _is_dirty = true;
+            return true;
+        }
+
+        bool AssetBrowser::CreateInputActionAssetEntry(const String &name)
+        {
+            const String trimmed_name = TrimNameCopy(name);
+            if (trimmed_name.empty())
+                return false;
+
+            const WString asset_path = BuildCurrentAssetPath(ToWChar(trimmed_name.c_str()) + WString(L".alasset"));
+            if (ResourceMgr::Get().GetAsset(asset_path) != nullptr || fs::exists(ResourceMgr::GetResSysPath(asset_path)))
+                return false;
+
+            auto input_asset = MakeRef<InputActionAsset>(trimmed_name);
+            ResourceMgr::Get().CreateAsset(asset_path, input_asset);
             ResourceMgr::Get().SaveAllUnsavedAssets();
             _is_dirty = true;
             return true;

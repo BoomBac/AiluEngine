@@ -73,9 +73,9 @@ namespace Ailu
                 {
                     if (comp._is_dirty || comp._is_update_every_tick)
                     {
-                        auto transf = r.GetComponent<CLightProbe, TransformComponent>(index)->_local_transform;
+                        const auto *transform = r.GetComponent<CLightProbe, TransformComponent>(index);
                         Camera cam;
-                        cam.Position(transf._position);
+                        cam.Position(transform->GetRenderPosition());
                         cam.Near(1.0f);
                         cam.Far(comp._size);
                         cam._layer_mask = 0;
@@ -160,7 +160,8 @@ namespace Ailu
             static ObjectLayer shadow_cast_layer = Application::Get().NameToLayer("ShadowCaster");
             for (auto &e: _entities)
             {
-                auto transf = r.GetComponent<TransformComponent>(e)->_local_transform;
+                const auto *transform = r.GetComponent<TransformComponent>(e);
+                const Transform transf(transform->GetRenderPosition(), transform->GetRenderRotation(), transform->GetRenderScale());
                 auto comp = r.GetComponent<LightComponent>(e);
                 comp->_light._light_pos = transf._position;
                 Vector3f light_forward = LightComponent::kDefaultDirectionalLightDir;
@@ -378,7 +379,7 @@ namespace Ailu
                     comp->_light._area_points[2].z = -h;
                     comp->_light._area_points[3].x = -w;
                     comp->_light._area_points[3].z = -h;
-                    auto mat = Transform::ToMatrix(transf);
+                    const auto &mat = transform->GetRenderWorldMatrix();
                     TransformCoord(comp->_light._area_points[0], mat);
                     TransformCoord(comp->_light._area_points[1], mat);
                     TransformCoord(comp->_light._area_points[2], mat);
@@ -425,9 +426,7 @@ namespace Ailu
                         Gizmo::DrawAABB(aabb, Colors::kYellow);
                     }
                     if (vxgi._is_draw_grid)
-                    {
-                        DebugDrawer::DebugWireframe(vxgi, t->GetWorldMatrix(), Colors::kGreen);
-                    }
+                        DebugDrawer::DebugWireframe(vxgi, t->GetRenderWorldMatrix(), Colors::kGreen);
                     Camera::sCurrent->_is_gen_voxel = true;
                 }
                 break;

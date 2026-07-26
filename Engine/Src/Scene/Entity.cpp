@@ -1,6 +1,7 @@
 #include "Scene/Entity.h"
 #include "Scene/Component.h"
 #include "pch.h"
+#include <algorithm>
 
 namespace Ailu
 {
@@ -44,6 +45,7 @@ namespace Ailu
               _entity_signatures(other._entity_signatures),
               _entity_generations(other._entity_generations),
               _free_indices(other._free_indices),
+              _system_schedule_dirty(true),
               _is_init(other._is_init)
         {
             _mgrs.resize(other._mgrs.size());
@@ -72,6 +74,7 @@ namespace Ailu
               _entity_signatures(std::move(other._entity_signatures)),
               _entity_generations(std::move(other._entity_generations)),
               _free_indices(std::move(other._free_indices)),
+              _system_schedule_dirty(true),
               _is_init(other._is_init),
               _on_comp_remove_callback(std::move(other._on_comp_remove_callback)),
               _on_comp_add_callback(std::move(other._on_comp_add_callback))
@@ -106,6 +109,7 @@ namespace Ailu
                 _entity_signatures = other._entity_signatures;
                 _entity_generations = other._entity_generations;
                 _free_indices = other._free_indices;
+                _system_schedule_dirty = true;
                 _is_init = other._is_init;
                 _on_comp_add_callback = other._on_comp_add_callback;
                 _on_comp_remove_callback = other._on_comp_remove_callback;
@@ -125,6 +129,7 @@ namespace Ailu
                 _entity_signatures = std::move(other._entity_signatures);
                 _entity_generations = std::move(other._entity_generations);
                 _free_indices = std::move(other._free_indices);
+                _system_schedule_dirty = true;
                 _is_init = other._is_init;
                 _on_comp_add_callback = std::move(other._on_comp_add_callback);
                 _on_comp_remove_callback = std::move(other._on_comp_remove_callback);
@@ -144,6 +149,7 @@ namespace Ailu
                    _entity_signatures == other._entity_signatures &&
                    _entity_generations == other._entity_generations &&
                    _free_indices == other._free_indices &&
+                   _system_schedule_dirty == other._system_schedule_dirty &&
                    _is_init == other._is_init;
         }
 
@@ -187,6 +193,16 @@ namespace Ailu
                 && _entity_generations[idx] != 0u;
         }
 
+        Entity Register::GetAliveEntityByIndex(u32 index) const
+        {
+            if (index == 0u || index >= static_cast<u32>(_entity_generations.size()) || _entity_generations[index] == 0u ||
+                !_entity_signatures[index].any())
+                return kInvalidEntity;
+
+            Entity entity = MakeEntity(index, _entity_generations[index]);
+            return IsAlive(entity) ? entity : kInvalidEntity;
+        }
+
         void Register::Destory(Entity entity)
         {
             if (!IsAlive(entity))
@@ -212,6 +228,7 @@ namespace Ailu
                 if (_systems[i])
                     _systems[i]->_entities.erase(entity);
             }
+            MarkSystemScheduleDirty();
 
             // Bump generation so old handles become stale
             ++_entity_generations[idx];
@@ -254,6 +271,7 @@ namespace Ailu
         u32 Register::EntityNum() const { return _entity_num; }
         u64 Register::HierarchyRevision() const { return _hierarchy_revision; }
         void Register::TouchHierarchy() { ++_hierarchy_revision; }
+        void Register::MarkSystemScheduleDirty() { _system_schedule_dirty = true; }
 
         // ---------------------------------------------------------------------------
         // Deferred destruction
@@ -272,6 +290,52 @@ namespace Ailu
             for (Entity e: _pending_destroy_queue)
                 Destory(e);
             _pending_destroy_queue.clear();
+        }
+
+        void Register::RebuildSystemSchedule()
+        {
+            for (auto &entries: _system_schedule)
+                entries.clear();
+
+            for (auto &system: _systems)
+            {
+                if (system == nullptr)
+                    continue;
+
+                SystemEntry entry;
+                entry._system = system.get();
+                entry._phase = system->GetPhase();
+                entry._order = system->GetOrder();
+                const u32 phase_index = static_cast<u32>(entry._phase);
+                AL_ASSERT(phase_index < kSystemPhaseCount);
+                _system_schedule[phase_index].emplace_back(entry);
+            }
+
+            for (auto &entries: _system_schedule)
+            {
+                std::stable_sort(entries.begin(), entries.end(), [](const SystemEntry &lhs, const SystemEntry &rhs)
+                {
+                    return lhs._order < rhs._order;
+                });
+            }
+
+            _system_schedule_dirty = false;
+        }
+
+        void Register::ExecutePhase(ESystemPhase phase, f32 delta_time)
+        {
+            if (_system_schedule_dirty)
+                RebuildSystemSchedule();
+
+            const u32 phase_index = static_cast<u32>(phase);
+            AL_ASSERT(phase_index < kSystemPhaseCount);
+            auto &entries = _system_schedule[phase_index];
+            for (const SystemEntry &entry: entries)
+            {
+                if (entry._system == nullptr || !entry._system->IsEnabled())
+                    continue;
+                entry._system->Update(*this, delta_time);
+            }
         }
 
         // ---------------------------------------------------------------------------

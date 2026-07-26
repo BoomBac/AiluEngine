@@ -49,7 +49,11 @@ namespace Ailu
 		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
 		//io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 		io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // Enable Docking
-		io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;       // Enable Multi-Viewport / Platform Windows
+        if (!Application::Get()._is_multi_thread_rendering.load())
+        {
+            io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;   // Enable Multi-Viewport / Platform Windows
+            _is_viewports_active = true;
+        }
 		io.ConfigWindowsMoveFromTitleBarOnly = true;
 		ImGuiStyle& style = ImGui::GetStyle();
 		// Setup Dear ImGui style
@@ -135,12 +139,36 @@ namespace Ailu
 
 	void Ailu::ImGUILayer::Begin()
 	{
+        ApplyViewportConfig();
 		// Start the Dear ImGui frame
 		ImGui_ImplDX12_NewFrame();
 		ImGui_ImplWin32_NewFrame();
+        ApplyViewportConfig();
         ImGui::NewFrame();
         ImGuizmo::BeginFrame();
 	}
+
+    void Ailu::ImGUILayer::ApplyViewportConfig()
+    {
+        ImGuiIO &io = ImGui::GetIO();
+        if (Application::Get()._is_multi_thread_rendering.load())
+        {
+            if (_is_viewports_active)
+            {
+                io.ConfigFlags &= ~ImGuiConfigFlags_ViewportsEnable;
+                ImGui::DestroyPlatformWindows();
+                _is_viewports_active = false;
+            }
+            io.ConfigFlags &= ~ImGuiConfigFlags_ViewportsEnable;
+            return;
+        }
+
+        if (!_is_viewports_active)
+        {
+            io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+            _is_viewports_active = true;
+        }
+    }
 
 	void Ailu::ImGUILayer::End()
 	{

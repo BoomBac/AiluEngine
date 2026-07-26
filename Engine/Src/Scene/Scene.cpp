@@ -1,4 +1,4 @@
-﻿#include "Scene/Scene.h"
+#include "Scene/Scene.h"
 #include "Animation/AnimationSystem.h"
 #include "Framework/Common/Application.h"
 #include "Framework/Math/QuaternionMatrix.h"
@@ -598,69 +598,167 @@ namespace Ailu::SceneManagement
         LOG_WARNING("Scene::Clear: TODO");
     }
 
-    void Scene::Update(f32 dt)
+    void Scene::BeginUpdate()
     {
-        auto &r = _register;
         ProcessSceneCommands();
+    }
+
+    void Scene::BeginLateUpdate()
+    {
+    }
+
+    void Scene::FixedUpdate(f32 fixed_delta_time)
+    {
+        BeginUpdate();
+        UpdateFixedScripts(fixed_delta_time);
+        _register.ExecutePhase(ECS::ESystemPhase::kPrePhysics, fixed_delta_time);
+        _register.ExecutePhase(ECS::ESystemPhase::kPhysics, fixed_delta_time);
+        _register.ExecutePhase(ECS::ESystemPhase::kPostPhysics, fixed_delta_time);
+    }
+
+    void Scene::UpdateFixedScripts(f32 fixed_delta_time)
+    {
+        auto &reg = _register;
         u32 index = 0;
-        for (auto &comp: r.View<ECS::ScriptComponent>())
+        for (auto &component: reg.View<ECS::ScriptComponent>())
         {
-            const ECS::Entity entity = r.GetEntity<ECS::ScriptComponent>(index++);
-            ScriptSystem::Get().UpdateComponent(this, entity, comp, dt);
+            const ECS::Entity entity = reg.GetEntity<ECS::ScriptComponent>(index++);
+            ScriptSystem::Get().FixedUpdateComponent(this, entity, component, fixed_delta_time);
         }
-        if (auto *physics_system = _register.GetSystem<ECS::PhysicsSystem>())
-            physics_system->Update(_register, dt);
-        if (auto *transform_system = _register.GetSystem<ECS::TransformSystem>())
-            transform_system->Update(_register, dt);
-        if (auto *lighting_system = _register.GetSystem<ECS::LightingSystem>())
-            lighting_system->Update(_register, dt);
-        if (auto *animation_system = _register.GetSystem<ECS::AnimationSystem>())
-            animation_system->Update(_register, dt);
-        index = 0;
-        for (auto &comp: r.View<ECS::StaticMeshComponent>())
+    }
+
+    void Scene::UpdateScripts(f32 delta_time)
+    {
+        auto &reg = _register;
+        u32 index = 0;
+        for (auto &component: reg.View<ECS::ScriptComponent>())
         {
-            if (comp._p_mesh)
+            const ECS::Entity entity = reg.GetEntity<ECS::ScriptComponent>(index++);
+            ScriptSystem::Get().UpdateComponent(this, entity, component, delta_time);
+        }
+    }
+
+    void Scene::UpdateLateScripts(f32 delta_time, f32 render_alpha)
+    {
+        auto &reg = _register;
+        u32 index = 0;
+        for (auto &component: reg.View<ECS::ScriptComponent>())
+        {
+            const ECS::Entity entity = reg.GetEntity<ECS::ScriptComponent>(index++);
+            ScriptSystem::Get().LateUpdateComponent(this, entity, component, delta_time, render_alpha);
+        }
+    }
+
+    void Scene::UpdateRenderTransforms(f32 render_alpha)
+    {
+        const f32 clamped_alpha = std::clamp(render_alpha, 0.0f, 1.0f);
+        for (auto &transform: _register.View<ECS::TransformComponent>())
+        {
+            //这里是一个小热点
+            const bool has_history = transform._world_version > 1u;
+            const Transform render_transform = has_history
+                                                   ? Transform::Mix(
+                                                           Transform(transform._prev_position, transform._prev_rotation, transform._prev_scale),
+                                                           Transform(transform._position, transform._rotation, transform._scale),
+                                                           clamped_alpha)
+                                                   : Transform(transform._position, transform._rotation, transform._scale);
+
+            transform._prev_render_world_matrix = transform._render_world_matrix;
+            transform._render_position = render_transform._position;
+            transform._render_rotation = render_transform._rotation;
+            transform._render_scale = render_transform._scale;
+            Transform::ToMatrix(render_transform, transform._render_world_matrix);
+
+            if (!has_history)
+                transform._prev_render_world_matrix = transform._render_world_matrix;
+        }
+    }
+
+    void Scene::UpdateBounds()
+    {
+        auto &reg = _register;
+        u32 index = 0;
+        for (auto &component: reg.View<ECS::StaticMeshComponent>())
+        {
+            if (component._p_mesh)
             {
-                const auto *transf = r.GetComponent<ECS::StaticMeshComponent, ECS::TransformComponent>(index);
-                auto &bound_box = comp._p_mesh->BoundBox();
-                for (int i = 0; i < bound_box.size(); i++)
-                {
-                    comp._transformed_aabbs[i] = bound_box[i] * transf->_world_matrix;
-                }
+                const auto *transform = reg.GetComponent<ECS::StaticMeshComponent, ECS::TransformComponent>(index);
+                auto &bound_box = component._p_mesh->BoundBox();
+                for (i32 i = 0; i < bound_box.size(); ++i)
+                    component._transformed_aabbs[i] = bound_box[i] * transform->GetRenderWorldMatrix();
             }
             ++index;
         }
+
         index = 0;
-        for (auto &comp: r.View<ECS::CSkeletonMesh>())
+        for (auto &component: reg.View<ECS::CSkeletonMesh>())
         {
-            if (comp._p_mesh)
+            if (component._p_mesh)
             {
-                const auto *transf = r.GetComponent<ECS::CSkeletonMesh, ECS::TransformComponent>(index);
-                auto &bound_box = comp._p_mesh->BoundBox();
-                for (int i = 0; i < bound_box.size(); i++)
-                {
-                    comp._transformed_aabbs[i] = bound_box[i] * transf->_world_matrix;
-                }
+                const auto *transform = reg.GetComponent<ECS::CSkeletonMesh, ECS::TransformComponent>(index);
+                auto &bound_box = component._p_mesh->BoundBox();
+                for (i32 i = 0; i < bound_box.size(); ++i)
+                    component._transformed_aabbs[i] = bound_box[i] * transform->GetRenderWorldMatrix();
             }
             ++index;
         }
-        index = 0;
-        for (auto &comp: r.View<ECS::CCamera>())
+    }
+
+    void Scene::UpdateCameras()
+    {
+        auto &reg = _register;
+        u32 index = 0;
+        for (auto &component: reg.View<ECS::CCamera>())
         {
-            auto t = r.GetComponent<ECS::CCamera, ECS::TransformComponent>(index);
-            const auto &wm = t->_world_matrix;
-            comp._camera.Position(Vector3f(wm[3][0], wm[3][1], wm[3][2]));
-            comp._camera.Rotation(Quaternion::FromMat4f(wm));
-            comp._camera.RecalculateMatrix(true);
+            auto transform = reg.GetComponent<ECS::CCamera, ECS::TransformComponent>(index++);
+            const auto &world_matrix = transform->GetWorldMatrix();
+            component._camera.Position(Vector3f(world_matrix[3][0], world_matrix[3][1], world_matrix[3][2]));
+            component._camera.Rotation(Quaternion::FromMat4f(world_matrix));
+            component._camera.RecalculateMatrix(true);
         }
+    }
+
+    void Scene::UpdateAccelerationStructures()
+    {
         RebuildBVHTree();
+    }
+
+    void Scene::UpdateGpuSceneIfNeeded()
+    {
+        if (!_dirty)
+            return;
+
+        UpdateGpuScene();
+        _dirty = false;
+    }
+
+    void Scene::EndUpdate()
+    {
         _register.FlushDestroy();
         DeletePendingEntities();
-        if (_dirty)
-        {
-            UpdateGpuScene();
-            _dirty = false;
-        }
+    }
+
+    void Scene::Update(f32 dt)
+    {
+        BeginUpdate();
+        UpdateScripts(dt);
+        _register.ExecutePhase(ECS::ESystemPhase::kAnimation, dt);
+        _register.ExecutePhase(ECS::ESystemPhase::kGameplay, dt);
+    }
+
+    void Scene::LateUpdate(f32 delta_time, f32 render_alpha)
+    {
+        BeginLateUpdate();
+        UpdateLateScripts(delta_time, render_alpha);
+        _register.ExecutePhase(ECS::ESystemPhase::kTransform, delta_time);
+        _register.ExecutePhase(ECS::ESystemPhase::kPostAnimation, delta_time);
+        UpdateRenderTransforms(render_alpha);
+        UpdateBounds();
+        UpdateCameras();
+        _register.ExecutePhase(ECS::ESystemPhase::kRenderData, delta_time);
+        UpdateAccelerationStructures();
+        EndUpdate();
+        UpdateGpuSceneIfNeeded();
     }
 
     static Vector<LBVHNode> s_temp_tlas_gpu_data;
@@ -812,12 +910,28 @@ namespace Ailu::SceneManagement
     {
         return MakeRef<Scene>(name);
     }
-    void SceneMgr::Tick(f32 delta_time)
+    void SceneMgr::FixedUpdate(f32 fixed_delta_time)
     {
         if (_p_current)
-        {
+            _p_current->FixedUpdate(fixed_delta_time);
+    }
+
+    void SceneMgr::Update(f32 delta_time)
+    {
+        if (_p_current)
             _p_current->Update(delta_time);
-        }
+    }
+
+    void SceneMgr::LateUpdate(f32 delta_time, f32 render_alpha)
+    {
+        if (_p_current)
+            _p_current->LateUpdate(delta_time, render_alpha);
+    }
+
+    void SceneMgr::Tick(f32 delta_time)
+    {
+        Update(delta_time);
+        LateUpdate(delta_time, 0.0f);
     }
 
     Ref<Scene> SceneMgr::OpenScene(const WString &scene_path)

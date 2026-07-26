@@ -14,8 +14,8 @@ if(s_enum_type_ERenderLayer == nullptr)
 {
 EnumInitializer initializer;
 initializer._name = "ERenderLayer";
-initializer._namespace = "Ailu::Render";
-initializer._full_name = "Ailu::Render::ERenderLayer";
+initializer._namespace = "Ailu::RHI::Ailu::Ailu::Render";
+initializer._full_name = "Ailu::RHI::Ailu::Ailu::Render::ERenderLayer";
 initializer._str_to_enum_lut["kDefault"] = 1;
 initializer._str_to_enum_lut["kSkyBox"] = 8;
 s_enum_type_ERenderLayer = std::make_unique<Ailu::Enum>(initializer);
@@ -24,7 +24,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_ERenderLayer.get());
 return s_enum_type_ERenderLayer.get();
 }
 static Ailu::EnumTypeRegister g_register_ERenderLayer(Z_Construct_Enum_ERenderLayer_Type);
-template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::ERenderLayer>()
+template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::RHI::Ailu::Ailu::Render::ERenderLayer>()
 {
 return s_enum_type_ERenderLayer.get();
 }

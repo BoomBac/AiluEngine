@@ -170,7 +170,12 @@ namespace Ailu
     class AILU_API CPUProfileBlock : public NonCopyable
     {
     public:
+#if defined(TRACY_ENABLE)
         explicit CPUProfileBlock(const String &name);
+        explicit CPUProfileBlock(const String &name, const tracy::SourceLocationData *tracy_source_location);
+#else
+        explicit CPUProfileBlock(const String &name);
+#endif
         ~CPUProfileBlock();
     private:
         u32 idx = u32(-1);
@@ -184,7 +189,15 @@ namespace Ailu
 
 #if AILU_ENABLE_ENGINE_PROFILER || TRACY_ENABLE
     #define PROFILE_BLOCK_GPU(cmd, block_name) GpuProfileBlock AL_CONCAT(gpb_,__LINE__)(cmd,block_name);
-    #define PROFILE_BLOCK_CPU(block_name) CPUProfileBlock AL_CONCAT(cpb_,__LINE__)(block_name);
+    #if defined(TRACY_ENABLE) && AILU_TRACY_PROFILE_CALLSITE_SOURCE_LOCATION
+        #define PROFILE_BLOCK_CPU(block_name) \
+            static constexpr tracy::SourceLocationData AL_CONCAT(s_tracy_cpu_profile_location_,TracyLine) { \
+                nullptr, TracyFunction, TracyFile, (uint32_t)TracyLine, 0}; \
+            CPUProfileBlock AL_CONCAT(cpb_,__LINE__)( \
+                block_name, &AL_CONCAT(s_tracy_cpu_profile_location_,TracyLine));
+    #else
+        #define PROFILE_BLOCK_CPU(block_name) CPUProfileBlock AL_CONCAT(cpb_,__LINE__)(block_name);
+    #endif
 #else
     #define PROFILE_BLOCK_GPU(cmd, block_name)
     #define PROFILE_BLOCK_CPU(block_name)

@@ -118,6 +118,19 @@ namespace Ailu
             u32 GetTLASNodeCount() const { return (u32) _tlas_nodes.size(); };
             u32 GetBLASNodeCount() const { return _blas_node_count; };
         private:
+            void BeginUpdate();
+            void BeginLateUpdate();
+            void FixedUpdate(f32 fixed_delta_time);
+            void UpdateFixedScripts(f32 fixed_delta_time);
+            void LateUpdate(f32 delta_time, f32 render_alpha);
+            void UpdateScripts(f32 delta_time);
+            void UpdateLateScripts(f32 delta_time, f32 render_alpha);
+            void UpdateRenderTransforms(f32 render_alpha);
+            void UpdateBounds();
+            void UpdateCameras();
+            void UpdateAccelerationStructures();
+            void UpdateGpuSceneIfNeeded();
+            void EndUpdate();
             void DeletePendingEntities();
             void Clear();
             void Update(f32 dt);
@@ -164,6 +177,9 @@ namespace Ailu
         public:
             SceneMgr();
             ~SceneMgr();
+            void FixedUpdate(f32 fixed_delta_time);
+            void Update(f32 delta_time);
+            void LateUpdate(f32 delta_time, f32 render_alpha);
             void Tick(f32 delta_time);
             void MarkCurSceneDirty() { _p_current->MarkDirty(); };
             Ref<Scene> Create(String name);

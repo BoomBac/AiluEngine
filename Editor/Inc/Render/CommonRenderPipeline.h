@@ -1,7 +1,6 @@
 #pragma once
 #ifndef __COMMON_RENDER_PIPELINE_H__
 #define __COMMON_RENDER_PIPELINE_H__
-#include "Framework/Common/NonCopyable.h"
 #include <Render/RenderPipeline.h>
 #include "PickPass.h"
 
@@ -9,7 +8,7 @@ namespace Ailu
 {
 	namespace Editor
 	{
-		class CommonRenderPipeline : public Render::RenderPipeline, public NonCopyable
+		class CommonRenderPipeline : public Render::RenderPipeline
 		{
 		public:
 			CommonRenderPipeline();

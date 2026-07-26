@@ -5,6 +5,7 @@
 #include "RHI/DX12/DescriptorManager.h"
 #include "RHI/DX12/D3DCommandBuffer.h"
 #include "Framework/Common/Allocator.hpp"
+#include "Framework/Common/Application.h"
 
 namespace Ailu
 {
@@ -57,7 +58,7 @@ namespace Ailu
 
             ImGuiIO &io = ImGui::GetIO();
             // Update and Render additional Platform Windows
-            if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+            if ((io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) && !Application::Get()._is_multi_thread_rendering.load())
             {
                 ImGui::UpdatePlatformWindows();
                 ImGui::RenderPlatformWindowsDefault(nullptr, (void *) dxcmd);

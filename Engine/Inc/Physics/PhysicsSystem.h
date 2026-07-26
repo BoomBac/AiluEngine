@@ -22,6 +22,7 @@ namespace Ailu
             inline static const Vector3f kGravity = Vector3f(0.f, -9.8f, 0.f);
             PhysicsSystem();
             void Update(Register &r, f32 delta_time) final;
+            ESystemPhase GetPhase() const final { return ESystemPhase::kPhysics; }
             Ref<System> Clone() final
             {
                 auto copy = MakeRef<PhysicsSystem>();

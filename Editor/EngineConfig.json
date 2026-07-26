@@ -4,7 +4,7 @@
     "ShadowCaster": 65536,
     "All": 4294967295,
     "MaxRenderObjectPerTask": 0,
-    "isMultiThreadRender": false,
+    "isMultiThreadRender": true,
     "EnableCpuStateBatchedSubmission": true,
     "EnableIncrementalGraphicsBinding": true,
     "_enable_d3d12_debug_layer": true

@@ -37,7 +37,6 @@ namespace Ailu
             {
                 PROFILE_BLOCK_CPU("PhysicsSystem::Update")
                 _collisions.clear();
-                delta_time *= 0.001f;
                 delta_time *= TimeMgr::s_time_scale;
                 for (auto &e: _entities)
                 {

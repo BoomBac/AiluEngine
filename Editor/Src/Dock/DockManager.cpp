@@ -2282,7 +2282,7 @@ namespace Ailu
         }
         Window *DockManager::CreateNewWindow(String title, u16 ww, u16 wh, bool is_sync)
         {
-            if (!is_sync)
+            if (!is_sync && !Application::IsMainThread())
             {
                 std::future<Scope<Window>> w = Application::Get()._dispatcher.Enqueue([&]()
                                                                                       { return WindowFactory::Create(ToWChar(title), ww, wh, EWindowFlags::kWindow_NoTitleBar); });

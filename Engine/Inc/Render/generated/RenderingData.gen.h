@@ -6,11 +6,11 @@
 #define __RENDERINGDATA_GEN_H__
 //Enum ERenderLayer begin...........................
 const Ailu::Enum* Z_Construct_Enum_ERenderLayer_Type();
-namespace Ailu::Render { 
+namespace Ailu::RHI::Ailu::Ailu::Render { 
 enum class ERenderLayer : u8;
 }
 template<>
-AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::ERenderLayer>();
+AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::RHI::Ailu::Ailu::Render::ERenderLayer>();
 //Enum ERenderLayer end...........................
 
 #undef CURRENT_FILE_ID

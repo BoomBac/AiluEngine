@@ -31,6 +31,7 @@ namespace Ailu
             virtual ~GraphicsContext() = default;
             virtual void Init() = 0;
             virtual void Present() = 0;
+            virtual void SetMultiThreadRendering(bool enabled) = 0;
             virtual void RegisterWindow(Window* window) = 0;
             virtual void UnRegisterWindow(Window* window) = 0;
             virtual u64 GetFenceValueGPU() = 0;

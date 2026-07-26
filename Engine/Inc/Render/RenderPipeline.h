@@ -1,6 +1,7 @@
 #pragma once
 #ifndef __RENDER_PIPELINE__
 #define __RENDER_PIPELINE__
+#include <atomic>
 #include <utility>
 
 #include "Framework/Common/NonCopyable.h"
@@ -122,6 +123,7 @@ namespace Ailu::Render
     {
     public:
         static RenderPipeline &Get() { return *s_instance; };
+        static RenderPipeline *Instance() { return s_instance; }
         static void Register(RenderPipeline *pipe) { s_instance = pipe; }
 
         using RenderEvent = std::function<void>();
@@ -134,10 +136,12 @@ namespace Ailu::Render
         RenderTexture *GetTarget(u16 index = 0);
         void FrameCleanup();
         FrameResource *CurFrameResource() { return _cur_frame_res; }
+        bool NeedWaitForRenderThread() const { return _is_need_wait_for_render_thread.load(); }
+        void SetRenderThreadFramePending(bool is_pending) { _is_need_wait_for_render_thread.store(is_pending); }
         //新添加网格组件时mesh不能为空
         void OnAddRenderObject(ECS::Entity e);
     public:
-        bool _is_need_wait_for_render_thread = true;
+        std::atomic<bool> _is_need_wait_for_render_thread = true;
     private:
         void RenderSingleCamera(const Camera &cam, Renderer &renderer);
         void UpdateRenderObject(u32 start,u32 end);

@@ -102,7 +102,14 @@ namespace Ailu
                 if (transform == nullptr)
                     continue;
 
-                transform->_prev_world_matrix = transform->_world_matrix;
+                const bool has_previous_world = transform->_world_version > 0u;
+                if (has_previous_world)
+                {
+                    transform->_prev_world_matrix = transform->_world_matrix;
+                    transform->_prev_position = transform->_position;
+                    transform->_prev_rotation = transform->_rotation;
+                    transform->_prev_scale = transform->_scale;
+                }
                 Transform::ToMatrix(transform->_local_transform, transform->_local_matrix);
 
                 const auto *hier = r.GetComponent<CHierarchy>(entity);
@@ -128,6 +135,19 @@ namespace Ailu
                     transform->_position = transform->_local_transform._position;
                     transform->_rotation = transform->_local_transform._rotation;
                     transform->_scale = transform->_local_transform._scale;
+                }
+
+                if (!has_previous_world)
+                {
+                    transform->_prev_world_matrix = transform->_world_matrix;
+                    transform->_prev_position = transform->_position;
+                    transform->_prev_rotation = transform->_rotation;
+                    transform->_prev_scale = transform->_scale;
+                    transform->_render_world_matrix = transform->_world_matrix;
+                    transform->_prev_render_world_matrix = transform->_world_matrix;
+                    transform->_render_position = transform->_position;
+                    transform->_render_rotation = transform->_rotation;
+                    transform->_render_scale = transform->_scale;
                 }
 
                 ++transform->_local_version;

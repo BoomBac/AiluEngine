@@ -245,6 +245,122 @@ namespace Ailu
         Vector4f _border = Vector4f::kZero;
     };
 
+    ASTRUCT()
+    struct AILU_API InputProcessorDocument
+    {
+        GENERATED_BODY()
+
+        APROPERTY()
+        String _type;
+        APROPERTY()
+        Vector4f _params = Vector4f::kZero;
+    };
+
+    ASTRUCT()
+    struct AILU_API InputInteractionDocument
+    {
+        GENERATED_BODY()
+
+        APROPERTY()
+        String _type;
+        APROPERTY()
+        Vector4f _params = Vector4f::kZero;
+    };
+
+    ASTRUCT()
+    struct AILU_API InputBindingDocument
+    {
+        GENERATED_BODY()
+
+        APROPERTY()
+        String _name;
+        APROPERTY()
+        String _control_path;
+        APROPERTY()
+        String _groups;
+        APROPERTY()
+        Vector<InputProcessorDocument> _processors;
+        APROPERTY()
+        Vector<InputInteractionDocument> _interactions;
+        APROPERTY()
+        bool _is_composite = false;
+        APROPERTY()
+        bool _is_part_of_composite = false;
+        APROPERTY()
+        String _composite_part_name;
+    };
+
+    ASTRUCT()
+    struct AILU_API InputActionDocument
+    {
+        GENERATED_BODY()
+
+        APROPERTY()
+        String _name;
+        APROPERTY()
+        u32 _id = 0u;
+        APROPERTY()
+        u8 _action_type = 0u;
+        APROPERTY()
+        u8 _value_type = 0u;
+        APROPERTY()
+        u8 _merge_strategy = 0u;
+        APROPERTY()
+        Vector<InputBindingDocument> _bindings;
+        APROPERTY()
+        String _composite_type;
+        APROPERTY()
+        Vector4f _composite_params = Vector4f::kZero;
+        APROPERTY()
+        Vector<InputBindingDocument> _composite_bindings;
+    };
+
+    ASTRUCT()
+    struct AILU_API InputActionMapDocument
+    {
+        GENERATED_BODY()
+
+        APROPERTY()
+        String _name;
+        APROPERTY()
+        u32 _id = 0u;
+        APROPERTY()
+        Vector<InputActionDocument> _actions;
+    };
+
+    ASTRUCT()
+    struct AILU_API InputContextDocument
+    {
+        GENERATED_BODY()
+
+        APROPERTY()
+        String _name;
+        APROPERTY()
+        i32 _priority = 0;
+        APROPERTY()
+        bool _consume_input = true;
+        APROPERTY()
+        bool _block_lower_contexts = false;
+        APROPERTY()
+        bool _active = false;
+        APROPERTY()
+        Vector<String> _action_map_names;
+    };
+
+    ACLASS()
+    class AILU_API InputActionAssetDocument : public Object
+    {
+        GENERATED_BODY()
+
+    public:
+        APROPERTY()
+        AssetDocumentHeader _header;
+        APROPERTY()
+        Vector<InputActionMapDocument> _action_maps;
+        APROPERTY()
+        Vector<InputContextDocument> _contexts;
+    };
+
 
     ASTRUCT()
     struct AILU_API SceneTagComponentDocument
