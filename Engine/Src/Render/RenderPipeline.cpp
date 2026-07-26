@@ -7,9 +7,9 @@
 #include "Render/FrameAllocator.h"
 #include "pch.h"
 
-#ifdef _PIX_DEBUG
-#include "Ext/pix/Include/WinPixEventRuntime/pix3.h"
-#endif// _PIX_DEBUG
+//#ifdef _PIX_DEBUG
+//#include "Ext/pix/Include/WinPixEventRuntime/pix3.h"
+//#endif// _PIX_DEBUG
 
 namespace Ailu::Render
 {
@@ -125,13 +125,14 @@ namespace Ailu::Render
         for (auto cam: _cameras)
         {
             cam->SetRenderer(_renderers[0].get());
-#ifdef _PIX_DEBUG
-            PIXBeginEvent(cam->HashCode(), L"DeferedRenderer");
+//#ifdef _PIX_DEBUG
+//            PIXBeginEvent(cam->HashCode(), L"DeferedRenderer");
+//            RenderSingleCamera(*cam, *_renderers[0].get());
+//            PIXEndEvent();
+//#else
+//            RenderSingleCamera(*cam, *_renderers[0].get());
+//#endif
             RenderSingleCamera(*cam, *_renderers[0].get());
-            PIXEndEvent();
-#else
-            RenderSingleCamera(*cam, *_renderers[0].get());
-#endif
             _targets.push_back(_renderers[0]->TargetTexture());
         }
         RenderTexture::ResetRenderTarget();

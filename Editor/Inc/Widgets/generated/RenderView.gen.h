@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __RENDERVIEW_GEN_H__
 //Class RenderView begin...........................
-#define RENDERVIEW_GEN_H_27_GENERATED_BODY \
+#define RENDERVIEW_GEN_H_33_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_RenderView_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -21,7 +21,7 @@ const class Ailu::Type* Ailu::StaticClass<class Ailu::Editor::RenderView>();
 //Class RenderView end...........................
 
 //Class SceneView begin...........................
-#define RENDERVIEW_GEN_H_41_GENERATED_BODY \
+#define RENDERVIEW_GEN_H_55_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_SceneView_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -37,7 +37,7 @@ const class Ailu::Type* Ailu::StaticClass<class Ailu::Editor::SceneView>();
 //Class SceneView end...........................
 
 //Class Texture3DView begin...........................
-#define RENDERVIEW_GEN_H_64_GENERATED_BODY \
+#define RENDERVIEW_GEN_H_104_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_Texture3DView_Type();\
                                 static const Type* GetPrivateStaticClass();\

@@ -8,6 +8,7 @@
 #include "Framework/Common/Log.h"
 #include "Scene/Component.h"
 #include "Scene/Scene.h"
+#include "Scene/SceneCommand.h"
 #include <stack>
 
 namespace Ailu

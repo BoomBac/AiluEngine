@@ -38,6 +38,8 @@
 
 #include "Framework/Common/EngineConfig.h"
 
+//#undef _PIX_DEBUG
+
 #ifdef _PIX_DEBUG
     #define USE_PIX 1
     #include "Ext/pix/Include/WinPixEventRuntime/pix3.h"

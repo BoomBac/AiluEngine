@@ -15,45 +15,11 @@ namespace Ailu
 {
     namespace SceneManagement
     {
-        class Scene;
-
-        class AILU_API ISceneCommand
-        {
-        public:
-            virtual ~ISceneCommand() = default;
-            virtual bool Execute(Scene &scene) = 0;
-            virtual bool Undo(Scene &scene) = 0;
-            virtual const String &ToString() const = 0;
-        };
-
-        class AILU_API ReparentSceneCommand final : public ISceneCommand
-        {
-        public:
-            ReparentSceneCommand(ECS::Entity child, ECS::Entity new_parent, bool keep_world_transform = true);
-            bool Execute(Scene &scene) final;
-            bool Undo(Scene &scene) final;
-            const String &ToString() const final;
-
-        private:
-            bool Apply(Scene &scene, ECS::Entity parent, const Transform &local_transform) const;
-            void CaptureOldState(Scene &scene);
-            void CaptureNewState(Scene &scene);
-
-        private:
-            ECS::Entity _child = ECS::kInvalidEntity;
-            ECS::Entity _new_parent = ECS::kInvalidEntity;
-            ECS::Entity _old_parent = ECS::kInvalidEntity;
-            Transform _old_local_transform;
-            Transform _new_local_transform;
-            bool _keep_world_transform = true;
-            bool _has_executed = false;
-        };
-
         struct LightingData
         {
             f32 _indirect_lighting_intensity = 0.25f;
         };
-
+        class ISceneCommand;
         ACLASS()
         class AILU_API Scene final : public Object
         {

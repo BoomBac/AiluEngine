@@ -8,6 +8,7 @@
 #include "UI/UIFramework.h"
 #include "Render/2D/Sprite.h"
 
+#include "Common/Undo.h"
 #include "Objects/JsonArchive.h"
 
 namespace Ailu
@@ -169,7 +170,10 @@ namespace Ailu
                 return checkbox;
             }
 
-            inline UI::CollapsibleView *AddComponentBlock(UI::UIElement *parent, const String &title)
+            template<typename T>
+            inline UI::CollapsibleView *AddComponentBlock(UI::UIElement *parent, const String &title,
+                                                        UI::CollapsibleView **block_ptr,
+                                                        ECS::Entity entity)
             {
                 auto frame = parent->AddChild<UI::Border>();
                 frame->_bg_color = kComponentBlockBg;
@@ -184,6 +188,53 @@ namespace Ailu
 
                 auto block = frame->AddChild<UI::CollapsibleView>(title);
                 block->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto);
+
+                // Darken header background to distinguish from content area
+                {
+                    auto &header_style = static_cast<UI::LinearBox *>(block->GetHeader())->GetStyleOverride();
+                    UI::UIBrush header_bg;
+                    header_bg._type = UI::EUIBrushType::kColor;
+                    header_bg._tint = Color(0.055f, 0.06f, 0.075f, 1.0f);
+                    header_style.SetBackground(header_bg);
+                }
+
+                // Make title fill horizontal space so the remove button stays on the right
+                if (auto *header_box = static_cast<UI::LinearBox *>(block->GetHeader()))
+                {
+                    if (auto *title_widget = header_box->ChildAt(0))
+                        title_widget->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto);
+                }
+
+                // Add remove button on the right side of header
+                {
+                    auto *header_box = static_cast<UI::LinearBox *>(block->GetHeader());
+                    auto *remove_btn = header_box->AddChild<UI::Button>();
+                    remove_btn->SetText("X");
+                    remove_btn->GetSlotAs<UI::LinearSlot>()
+                            .SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFixed)
+                            .Size({UI::CollapsibleView::s_header_height, UI::CollapsibleView::s_header_height});
+
+                    remove_btn->OnMouseClick() += [parent, frame, block_ptr, entity](UI::UIEvent &e)
+                    {
+                        if (entity != ECS::kInvalidEntity)
+                        {
+                            // 通过 CommandManager 统一管理，支持 undo/redo
+                            auto *scene = SceneMgr::Get().ActiveScene();
+                            g_pCommandMgr->ExecuteCommand(MakeScope<SceneQueuedCommand>(
+                                scene, MakeScope<SceneManagement::RemoveComponentCommand<T>>(entity)));
+                            // 不立即移除 UI，下一帧 Update 检测到组件消失后会自动清理
+                        }
+                        else
+                        {
+                            // 无组件需要移除，直接清理 UI
+                            parent->RemoveChild(frame);
+                            if (block_ptr)
+                                *block_ptr = nullptr;
+                        }
+                        e._is_handled = true;
+                    };
+                }
+
                 return block;
             }
 
@@ -331,150 +382,67 @@ namespace Ailu
             }
         }
 
-        void ObjectDetail::CreateTransformBlock()
+        void CreateTransformBlock(ECS::Entity entity,VerticalBox* vb,CollapsibleView*& transform_block)
         {
-            if (_transform_block != nullptr)
+            if (transform_block != nullptr)
                 return;
 
-            _transform_block = AddComponentBlock(_vb, "Transform");
-            auto transf_block = _transform_block->GetContent()->AddChild<UI::VerticalBox>();
-            _pos_block = AddVec3InputRow(transf_block, "Position", "0000");
-            _rot_block = AddVec3InputRow(transf_block, "Rotation");
-            _scale_block = AddVec3InputRow(transf_block, "Scale");
-            _pos_block[0]->_on_content_changed += [this](String content)
+            transform_block = AddComponentBlock<ECS::TransformComponent>(vb, "Transform", &transform_block, entity);
+            auto transf_block = transform_block->GetContent()->AddChild<UI::VerticalBox>();
+            auto pos_block = AddVec3InputRow(transf_block, "Position", "0000");
+            auto rot_block = AddVec3InputRow(transf_block, "Rotation");
+            auto scale_block = AddVec3InputRow(transf_block, "Scale");
+            for (auto i = 0; i < 3; i++)
             {
-                if (auto selected = Selection::FirstEntity(); selected != ECS::kInvalidEntity)
+                pos_block[i]->_on_content_changed += [entity,i](String content)
                 {
                     auto &r = SceneMgr::Get().ActiveScene()->GetRegister();
-                    if (auto comp = r.GetComponent<ECS::TransformComponent>(selected); comp != nullptr)
+                    if (auto comp = r.GetComponent<ECS::TransformComponent>(entity); comp != nullptr)
                     {
                         if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
-                            comp->_local_transform._position.x = opt.value();
+                            comp->_local_transform._position[i] = opt.value();
                     }
-                }
-            };
-            _pos_block[1]->_on_content_changed += [this](String content)
-            {
-                if (auto selected = Selection::FirstEntity(); selected != ECS::kInvalidEntity)
+                };
+                rot_block[i]->_on_content_changed += [entity,i](String content)
                 {
                     auto &r = SceneMgr::Get().ActiveScene()->GetRegister();
-                    if (auto comp = r.GetComponent<ECS::TransformComponent>(selected); comp != nullptr)
-                    {
-                        if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
-                            comp->_local_transform._position.y = opt.value();
-                    }
-                }
-            };
-            _pos_block[2]->_on_content_changed += [this](String content)
-            {
-                if (auto selected = Selection::FirstEntity(); selected != ECS::kInvalidEntity)
-                {
-                    auto &r = SceneMgr::Get().ActiveScene()->GetRegister();
-                    if (auto comp = r.GetComponent<ECS::TransformComponent>(selected); comp != nullptr)
-                    {
-                        if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
-                            comp->_local_transform._position.z = opt.value();
-                    }
-                }
-            };
-
-            _rot_block[0]->_on_content_changed += [this](String content)
-            {
-                if (auto selected = Selection::FirstEntity(); selected != ECS::kInvalidEntity)
-                {
-                    auto &r = SceneMgr::Get().ActiveScene()->GetRegister();
-                    if (auto comp = r.GetComponent<ECS::TransformComponent>(selected); comp != nullptr)
+                    if (auto comp = r.GetComponent<ECS::TransformComponent>(entity); comp != nullptr)
                     {
                         if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
                         {
                             Vector3f euler = Quaternion::EulerAngles(comp->_local_transform._rotation);
-                            euler.x = opt.value();
+                            euler[i] = opt.value();
                             comp->_local_transform._rotation = Quaternion::EulerAngles(euler);
                         }
                     }
-                }
-            };
-            _rot_block[1]->_on_content_changed += [this](String content)
-            {
-                if (auto selected = Selection::FirstEntity(); selected != ECS::kInvalidEntity)
+                };
+                scale_block[1]->_on_content_changed += [entity,i](String content)
                 {
                     auto &r = SceneMgr::Get().ActiveScene()->GetRegister();
-                    if (auto comp = r.GetComponent<ECS::TransformComponent>(selected); comp != nullptr)
+                    if (auto comp = r.GetComponent<ECS::TransformComponent>(entity); comp != nullptr)
                     {
                         if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
-                        {
-                            Vector3f euler = Quaternion::EulerAngles(comp->_local_transform._rotation);
-                            euler.y = opt.value();
-                            comp->_local_transform._rotation = Quaternion::EulerAngles(euler);
-                        }
+                            comp->_local_transform._scale[i] = opt.value();
                     }
-                }
-            };
-            _rot_block[2]->_on_content_changed += [this](String content)
-            {
-                if (auto selected = Selection::FirstEntity(); selected != ECS::kInvalidEntity)
-                {
-                    auto &r = SceneMgr::Get().ActiveScene()->GetRegister();
-                    if (auto comp = r.GetComponent<ECS::TransformComponent>(selected); comp != nullptr)
-                    {
-                        if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
-                        {
-                            Vector3f euler = Quaternion::EulerAngles(comp->_local_transform._rotation);
-                            euler.z = opt.value();
-                            comp->_local_transform._rotation = Quaternion::EulerAngles(euler);
-                        }
-                    }
-                }
-            };
-
-            _scale_block[0]->_on_content_changed += [this](String content)
-            {
-                if (auto selected = Selection::FirstEntity(); selected != ECS::kInvalidEntity)
-                {
-                    auto &r = SceneMgr::Get().ActiveScene()->GetRegister();
-                    if (auto comp = r.GetComponent<ECS::TransformComponent>(selected); comp != nullptr)
-                    {
-                        if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
-                            comp->_local_transform._scale.x = opt.value();
-                    }
-                }
-            };
-            _scale_block[1]->_on_content_changed += [this](String content)
-            {
-                if (auto selected = Selection::FirstEntity(); selected != ECS::kInvalidEntity)
-                {
-                    auto &r = SceneMgr::Get().ActiveScene()->GetRegister();
-                    if (auto comp = r.GetComponent<ECS::TransformComponent>(selected); comp != nullptr)
-                    {
-                        if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
-                            comp->_local_transform._scale.y = opt.value();
-                    }
-                }
-            };
-            _scale_block[2]->_on_content_changed += [this](String content)
-            {
-                if (auto selected = Selection::FirstEntity(); selected != ECS::kInvalidEntity)
-                {
-                    auto &r = SceneMgr::Get().ActiveScene()->GetRegister();
-                    if (auto comp = r.GetComponent<ECS::TransformComponent>(selected); comp != nullptr)
-                    {
-                        if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
-                            comp->_local_transform._scale.z = opt.value();
-                    }
-                }
-            };
-        }
-
-        void ObjectDetail::RemoveTransformBlock()
-        {
-            if (_transform_block != nullptr)
-            {
-                RemoveComponentBlock(_vb, _transform_block);
-                _transform_block = nullptr;
+                };
             }
-            _pos_block = {};
-            _rot_block = {};
-            _scale_block = {};
+            auto set_block = [&](UI::InputBlock *block, f32 value)
+            {
+                if (!block->IsEditing())
+                    block->SetContent(std::format("{:.2f}", value), false);
+            };
+             auto &r = SceneMgr::Get().ActiveScene()->GetRegister();
+            auto comp = r.GetComponent<ECS::TransformComponent>(entity);
+            set_block(pos_block[0], comp->_local_transform._position.x);
+            set_block(pos_block[1], comp->_local_transform._position.y);
+            set_block(pos_block[2], comp->_local_transform._position.z);
+            Vector3f euler = Quaternion::EulerAngles(comp->_local_transform._rotation);
+            set_block(rot_block[0], euler.x);
+            set_block(rot_block[1], euler.y);
+            set_block(rot_block[2], euler.z);
+            set_block(scale_block[0], comp->_local_transform._scale.x);
+            set_block(scale_block[1], comp->_local_transform._scale.y);
+            set_block(scale_block[2], comp->_local_transform._scale.z);
         }
 
         ObjectDetail::ObjectDetail() : DockWindow("Object Detail")
@@ -508,7 +476,7 @@ namespace Ailu
             };
             auto clear_dynamic_blocks = [&]()
             {
-                RemoveTransformBlock();
+                remove_block(_transform_block);
                 remove_block(_script_block);
                 remove_block(_light_block);
                 remove_block(_static_mesh_block);
@@ -534,33 +502,16 @@ namespace Ailu
                 if (auto comp = r.GetComponent<ECS::TransformComponent>(selected); comp != nullptr)
                 {
                     if (_transform_block == nullptr)
-                        CreateTransformBlock();
-                    auto set_block = [&](UI::InputBlock *block, f32 value)
-                    {
-                        if (!block->IsEditing())
-                            block->SetContent(std::format("{:.2f}", value), false);
-                    };
-                    set_block(_pos_block[0], comp->_local_transform._position.x);
-                    set_block(_pos_block[1], comp->_local_transform._position.y);
-                    set_block(_pos_block[2], comp->_local_transform._position.z);
-                    Vector3f euler = Quaternion::EulerAngles(comp->_local_transform._rotation);
-                    set_block(_rot_block[0], euler.x);
-                    set_block(_rot_block[1], euler.y);
-                    set_block(_rot_block[2], euler.z);
-                    set_block(_scale_block[0], comp->_local_transform._scale.x);
-                    set_block(_scale_block[1], comp->_local_transform._scale.y);
-                    set_block(_scale_block[2], comp->_local_transform._scale.z);
+                        CreateTransformBlock(selected,_vb,_transform_block);
                 }
                 else
-                {
-                    RemoveTransformBlock();
-                }
+                    remove_block(_transform_block);
                 if (auto comp = r.GetComponent<ECS::ScriptComponent>(selected); comp != nullptr)
                 {
                     if (_script_path_block == nullptr)
                     {
                         remove_block(_script_block);
-                        _script_block = AddComponentBlock(_vb, "Script");
+                        _script_block = AddComponentBlock<ECS::ScriptComponent>(_vb, "Script", &_script_block, selected);
                         auto content = _script_block->GetContent()->AddChild<UI::VerticalBox>();
                         _script_path_block = AddTextInputRow(content, "Path", comp->_script_path, [comp](const String &content)
                         {
@@ -579,7 +530,7 @@ namespace Ailu
                 else if (_script_block == nullptr || _script_path_block != nullptr)
                 {
                     remove_block(_script_block);
-                    _script_block = AddComponentBlock(_vb, "Script");
+                    _script_block = AddComponentBlock<ECS::ScriptComponent>(_vb, "Script", &_script_block, ECS::kInvalidEntity);
                     auto content = _script_block->GetContent()->AddChild<UI::VerticalBox>();
                     auto add_btn = AddButtonRow(content, "Component", "Add ScriptComponent");
                     add_btn->OnMouseClick() += [selected](UI::UIEvent &e)
@@ -601,7 +552,7 @@ namespace Ailu
                     if (_light_block == nullptr)
                     {
                         remove_block(_light_block);
-                        _light_block = AddComponentBlock(_vb, "LightComp");
+                        _light_block = AddComponentBlock<ECS::LightComponent>(_vb, "LightComp", &_light_block, selected);
                         auto content = _light_block->GetContent()->AddChild<UI::VerticalBox>();
                         auto items = Vector<String>{"Directional", "Point", "Spot", "Area"};
                         auto light_type_dropdown = AddDropdownRow(content, "Type", items);
@@ -710,7 +661,7 @@ namespace Ailu
                     if (_static_mesh_block == nullptr || _needs_rebuild)
                     {
                         remove_block(_static_mesh_block);
-                        _static_mesh_block = AddComponentBlock(_vb, "StaticMesh");
+                        _static_mesh_block = AddComponentBlock<ECS::StaticMeshComponent>(_vb, "StaticMesh", &_static_mesh_block, selected);
                         auto content = _static_mesh_block->GetContent()->AddChild<UI::VerticalBox>();
                         //mesh
                         {
@@ -786,7 +737,7 @@ namespace Ailu
                     if (_light_probe_block == nullptr)
                     {
                         remove_block(_light_probe_block);
-                        _light_probe_block = AddComponentBlock(_vb, "LightProbe");
+                        _light_probe_block = AddComponentBlock<ECS::CLightProbe>(_vb, "LightProbe", &_light_probe_block, selected);
                         auto content = _light_probe_block->GetContent()->AddChild<UI::VerticalBox>();
                         {
                             auto btn = content->AddChild<UI::Button>();
@@ -811,7 +762,7 @@ namespace Ailu
                     if (_cam_block == nullptr)
                     {
                         remove_block(_cam_block);
-                        _cam_block = AddComponentBlock(_vb, "Camera");
+                        _cam_block = AddComponentBlock<ECS::CCamera>(_vb, "Camera", &_cam_block, selected);
                         auto content = _cam_block->GetContent()->AddChild<UI::VerticalBox>();
                         //camera type
                         auto items = Vector<String>{"Perspective", "Orthographic"};
@@ -839,7 +790,7 @@ namespace Ailu
                     if (_sprite_block == nullptr)
                     {
                         remove_block(_sprite_block);
-                        _sprite_block = AddComponentBlock(_vb, "Sprite Renderer");
+                        _sprite_block = AddComponentBlock<ECS::SpriteRendererComponent>(_vb, "Sprite Renderer", &_sprite_block, selected);
                         auto content = _sprite_block->GetContent()->AddChild<UI::VerticalBox>();
 
                         // Sprite picker

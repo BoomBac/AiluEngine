@@ -48,21 +48,38 @@ namespace Ailu
             font = font ? font : s_default_font;
             AppendText(text, pos, matrix, font_size, scale, color, Vector2f::kZero, font, block);
         }
+        void TextRenderer::DrawTextLayout(const Render::TextLayoutResult &layout, Vector2f pos, f32 font_size, Vector2f scale, Color color, Font *font, DrawerBlock *block)
+        {
+            font = font ? font : s_default_font;
+            AppendTextLayout(layout, pos, kIdentityMatrix, color, font, block);
+        }
+        void TextRenderer::DrawTextLayout(const Render::TextLayoutResult &layout, Vector2f pos, f32 font_size, Vector2f scale, Color color, Matrix4x4f matrix, Font *font, DrawerBlock *block)
+        {
+            font = font ? font : s_default_font;
+            AppendTextLayout(layout, pos, matrix, color, font, block);
+        }
         void TextRenderer::Render(RenderTexture *target, Render::CommandBuffer *cmd)
         {
             Render(target, cmd, _default_block);
-            _default_block->Flush();
+            _default_block->ResetBuildData();
         }
 
         void TextRenderer::AppendText(const String &text, Vector2f pos, Matrix4x4f matrix, f32 font_size, Vector2f scale, Color color, Vector2f padding, Font *font, DrawerBlock *block)
         {
             if (text.empty())
                 return;
-            auto layout = LayoutText(text, pos, font_size, scale, padding, font);
+            auto layout = BuildLayout(text, pos, font_size, font, scale);
+            AppendTextLayout(layout, Vector2f::kZero, matrix, color, font, block);
+        }
+
+        void TextRenderer::AppendTextLayout(const Render::TextLayoutResult &layout, Vector2f pos, Matrix4x4f matrix, Color color, Font *font, DrawerBlock *block)
+        {
+            if (layout._glyphs.empty())
+                return;
             for (auto &g: layout._glyphs)
             {
                 if (!block->CanAppend(4, 6)) break;
-                Vector4f pos_rect = {g._pos.x, g._pos.y, g._size.x, g._size.y};
+                Vector4f pos_rect = {g._pos.x + pos.x, g._pos.y + pos.y, g._size.x, g._size.y};
                 Vector4f uv_rect = {g._uv.x, g._uv.y, g._uv_size.x, g._uv_size.y};
                 u32 v_base = block->CurrentVertNum();
                 u32 i_base = block->CurrentIndexNum();
@@ -117,7 +134,10 @@ namespace Ailu
         {
             if (b->_nodes.empty())
                 return;
-            b->SubmitVertexData();
+            if (auto renderer = UIRenderer::Get(); renderer != nullptr)
+                renderer->MutableStats()._ui_uploaded_bytes += b->SubmitVertexData();
+            else
+                b->SubmitVertexData();
             if (_is_draw_debug_line)
             {
                 // for (u32 i = 0; i < _characters_count; ++i)
@@ -151,7 +171,10 @@ namespace Ailu
         {
             if (_default_block->_nodes.empty())
                 return;
-            _default_block->SubmitVertexData();
+            if (auto renderer = UIRenderer::Get(); renderer != nullptr)
+                renderer->MutableStats()._ui_uploaded_bytes += _default_block->SubmitVertexData();
+            else
+                _default_block->SubmitVertexData();
             Render::CBufferPerObjectData per_obj_data;
             per_obj_data._MatrixWorld = BuildIdentityMatrix();
             memcpy(_default_block->_obj_cb->GetData(), &per_obj_data, Render::RenderConstants::kPerObjectDataSize);
@@ -159,15 +182,25 @@ namespace Ailu
             {
                 cmd->DrawIndexed(_default_block->_vbuf, _default_block->_ibuf, _default_block->_obj_cb, node._mat, 0u, node._index_offset, node._index_num);
             }
-            _default_block->Flush();
+            _default_block->ResetBuildData();
         }
+        Render::TextLayoutResult TextRenderer::BuildLayout(const String &text, Vector2f pos, f32 font_size, Font *font, Vector2f scale)
+        {
+            if (text.empty())
+                return {};
+
+            font = font ? font : s_default_font;
+            if (auto renderer = UIRenderer::Get(); renderer != nullptr)
+                ++renderer->MutableStats()._ui_text_layout_count;
+            return LayoutText(text, pos, font_size, scale, Vector2f::kZero, font);
+        }
+
         Vector2f TextRenderer::CalculateTextSize(const String &text, f32 font_size, Font *font, Vector2f scale)
         {
             if (text.empty())
                 return Vector2f::kZero;
 
-            font = font ? font : s_default_font;
-            return LayoutText(text, Vector2f::kZero, font_size, scale, Vector2f::kZero, font)._size;
+            return BuildLayout(text, Vector2f::kZero, font_size, font, scale)._size;
         }
 
         Vector4f TextRenderer::CalculateTextVisualBounds(const String &text, f32 font_size, Font *font, Vector2f scale)
@@ -175,8 +208,12 @@ namespace Ailu
             if (text.empty())
                 return Vector4f::kZero;
 
-            font = font ? font : s_default_font;
-            const auto layout = LayoutText(text, Vector2f::kZero, font_size, scale, Vector2f::kZero, font);
+            const auto layout = BuildLayout(text, Vector2f::kZero, font_size, font, scale);
+            return CalculateTextVisualBounds(layout);
+        }
+
+        Vector4f TextRenderer::CalculateTextVisualBounds(const Render::TextLayoutResult &layout)
+        {
             if (layout._glyphs.empty())
                 return Vector4f(0.0f, 0.0f, layout._size.x, layout._size.y);
 

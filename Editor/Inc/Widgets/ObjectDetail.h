@@ -24,14 +24,8 @@ namespace Ailu
             void Update(f32 dt) final;
 
         private:
-            void CreateTransformBlock();
-            void RemoveTransformBlock();
-
             UI::ScrollView *_root = nullptr;
             UI::VerticalBox *_vb = nullptr;
-            Array<UI::InputBlock*,3> _pos_block{};
-            Array<UI::InputBlock*,3> _rot_block{};
-            Array<UI::InputBlock*,3> _scale_block{};
             UI::CollapsibleView *_transform_block = nullptr;
             UI::CollapsibleView *_light_block = nullptr;
             UI::CollapsibleView *_static_mesh_block = nullptr;

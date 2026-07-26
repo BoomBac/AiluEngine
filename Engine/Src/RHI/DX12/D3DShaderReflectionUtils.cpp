@@ -251,7 +251,7 @@ namespace Ailu::RHI::DX12::ShaderReflectionUtils
                                           capacity,
                                           bindless_it->second._res_slot,
                                           bindless_it->second._register_space,
-                                          D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE);
+                                          D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
             rootParameters[root_param_index].InitAsDescriptorTable(1, &ranges[root_param_index]);
             bindless_it->second._bind_slot = root_param_index++;
         };
@@ -273,7 +273,7 @@ namespace Ailu::RHI::DX12::ShaderReflectionUtils
                 case Render::EBindResDescType::kAccelerationStructure:
                 {
                     assert_capacity(root_param_index);
-                    ranges[root_param_index].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, desc._res_slot, desc._register_space);
+                    ranges[root_param_index].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, desc._res_slot, desc._register_space, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
                     rootParameters[root_param_index].InitAsDescriptorTable(1, &ranges[root_param_index]);
                     desc._bind_slot = root_param_index++;
                 }
@@ -283,7 +283,7 @@ namespace Ailu::RHI::DX12::ShaderReflectionUtils
                 case Render::EBindResDescType::kRWBuffer:
                 {
                     assert_capacity(root_param_index);
-                    ranges[root_param_index].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, desc._res_slot, desc._register_space);
+                    ranges[root_param_index].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, desc._res_slot, desc._register_space, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
                     rootParameters[root_param_index].InitAsDescriptorTable(1, &ranges[root_param_index]);
                     desc._bind_slot = root_param_index++;
                 }

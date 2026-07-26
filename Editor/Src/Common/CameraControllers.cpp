@@ -130,4 +130,66 @@ namespace Ailu::Editor
             pos *= (_radius / len);
         _cam_pos_prop->Set(_pass, pos, PropertyInfo::EPropertyChangeSource::kUI);
     }
+
+    void CanvasCameraController::Attach(Render::Camera *camera)
+    {
+        _p_camera = camera;
+        if (_p_camera != nullptr)
+        {
+            _direction = _p_camera->Forward();
+            _up = _p_camera->Up();
+        }
+    }
+
+    void CanvasCameraController::SetViewBasis(const Vector3f &direction, const Vector3f &up)
+    {
+        _direction = direction;
+        _up = up;
+        ApplyView();
+    }
+
+    void CanvasCameraController::BeginDrag(const Vector2f &local_pos)
+    {
+        _last_mouse = local_pos;
+        _is_dragging = true;
+    }
+
+    void CanvasCameraController::EndDrag()
+    {
+        _is_dragging = false;
+    }
+
+    void CanvasCameraController::Drag(const Vector2f &local_pos, const Vector2f &view_size)
+    {
+        if (!_is_dragging || _p_camera == nullptr || view_size.y <= 1.0f)
+            return;
+
+        Vector2f delta = local_pos - _last_mouse;
+        _last_mouse = local_pos;
+        f32 world_per_pixel = _p_camera->Size() / view_size.y;
+        Vector3f position = _p_camera->Position();
+        position -= _p_camera->Right() * (delta.x * world_per_pixel);
+        position += _p_camera->Up() * (delta.y * world_per_pixel);
+        _p_camera->Position(position);
+        ApplyView();
+    }
+
+    void CanvasCameraController::Zoom(f32 scroll_delta)
+    {
+        if (_p_camera == nullptr)
+            return;
+
+        f32 size = _p_camera->Size();
+        size *= scroll_delta > 0.0f ? _zoom_factor : 1.0f / _zoom_factor;
+        _p_camera->Size(std::clamp(size, _min_size, _max_size));
+        ApplyView();
+    }
+
+    void CanvasCameraController::ApplyView()
+    {
+        if (_p_camera == nullptr)
+            return;
+        _p_camera->Rotation(Quaternion::LookRotation(_direction, _up));
+        _p_camera->RecalculateMatrix(true);
+    }
 }

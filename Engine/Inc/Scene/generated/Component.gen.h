@@ -13,5 +13,23 @@ template<>
 AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::ECS::EMotionVectorType>();
 //Enum EMotionVectorType end...........................
 
+//Enum ELightType begin...........................
+const Ailu::Enum* Z_Construct_Enum_ELightType_Type();
+namespace Ailu::ECS { 
+enum class ELightType : i32;
+}
+template<>
+AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::ECS::ELightType>();
+//Enum ELightType end...........................
+
+//Enum EColliderType begin...........................
+const Ailu::Enum* Z_Construct_Enum_EColliderType_Type();
+namespace Ailu::ECS { 
+enum class EColliderType : i32;
+}
+template<>
+AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::ECS::EColliderType>();
+//Enum EColliderType end...........................
+
 #undef CURRENT_FILE_ID
 #define CURRENT_FILE_ID COMPONENT_GEN_H

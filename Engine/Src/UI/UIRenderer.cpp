@@ -11,6 +11,9 @@
 #include "UI/DragDrop.h"
 #include <Framework/Common/Allocator.hpp>
 #include <Framework/Common/ResourceMgr.h>
+#include "Render/Shader.h"
+#include "Render/GraphicsContext.h"
+#include <chrono>
 
 namespace Ailu
 {
@@ -18,6 +21,16 @@ namespace Ailu
     {
         using namespace Render;
         static UIRenderer *s_Renderer = nullptr;
+        namespace
+        {
+            constexpr u16 kBackdropBlurDownsample = 1u;
+            using UIClock = std::chrono::high_resolution_clock;
+
+            f32 ElapsedMs(UIClock::time_point start)
+            {
+                return std::chrono::duration<f32, std::milli>(UIClock::now() - start).count();
+            }
+        }
 
         void UIRenderer::Init()
         {
@@ -36,11 +49,13 @@ namespace Ailu
             _obj_cb.reset(ConstantBuffer::Create(Render::RenderConstants::kPerObjectDataSize));
             _default_material = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/default_ui.alasset"), "DefaultUIMaterial");
             _default_material->SetTexture("_MainTex", Render::Texture::s_p_default_white);
+            _backdrop_blur_cs = ComputeShader::Create(ResourceMgr::GetResSysPath(L"Shaders/hlsl/Compute/blur.hlsl"));
             for (auto &frame_blocks: _drawer_blocks)
             {
                 frame_blocks.push_back(AL_NEW(DrawerBlock, _default_material,9600u));
             }
             _text_block = AL_NEW(DrawerBlock,MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/default_text.alasset"), "DefaultTextMaterial"));
+            _popup_backdrop_block = AL_NEW(DrawerBlock, _default_material, 8u);
             _text_renderer = MakeScope<TextRenderer>();
         }
         UIRenderer::~UIRenderer()
@@ -50,6 +65,16 @@ namespace Ailu
                 for (auto b: frame_blocks)
                 {
                     AL_DELETE(b);
+                }
+            }
+            for (auto &entry: _widget_drawer_blocks)
+            {
+                for (auto *block: entry._cpu_blocks)
+                    AL_DELETE(block);
+                for (auto &frame_blocks: entry._blocks)
+                {
+                    for (auto *block: frame_blocks)
+                        AL_DELETE(block);
                 }
             }
             for (auto &frame_window_blocks: _window_drawer_blocks)
@@ -63,64 +88,239 @@ namespace Ailu
                 }
             }
             AL_DELETE(_text_block);
+            AL_DELETE(_popup_backdrop_block);
         }
 
         void UIRenderer::Render(CommandBuffer *cmd)
         {
+            _frame_index = Render::g_pGfxContext != nullptr ? static_cast<u16>(Render::g_pGfxContext->GetFrameCount() % RenderConstants::kFrameCount) : 0u;
+            ResetFrameStats();
+            if (!_drawer_blocks[_frame_index].empty() && _drawer_blocks[_frame_index][0u] != nullptr)
+                _drawer_blocks[_frame_index][0u]->ResetBuildData();
+            for (auto &it: _window_drawer_blocks[_frame_index])
+            {
+                for (auto *block: it.second)
+                {
+                    if (block != nullptr)
+                        block->ResetBuildData();
+                }
+            }
+            for (auto handle: _pending_backdrop_blur_release_handles)
+                cmd->ReleaseTempRT(handle);
+            _pending_backdrop_blur_release_handles.clear();
+            _frame_backdrop_blur_cache.clear();
+
             if (auto selected = UIManager::Get()->GetDebugHighlightTarget(); selected != nullptr && selected->IsVisible())
             {
                 DrawBox(selected->GetArrangeRect().xy, selected->GetArrangeRect().zw, 2.0f, Color(0.1f, 0.85f, 1.0f, 1.0f));
             }
             //DrawDebugPannel();
             const f32 dt = TimeMgr::s_delta_time;
+            UI::UIManager::Get()->EnsurePopupWidgetsOnTop();
             auto& widgets = UI::UIManager::Get()->_widgets;
-            for (auto it = widgets.begin(); it != widgets.end(); it++)
+            Vector<Widget *> visible_widgets;
+            visible_widgets.reserve(widgets.size());
+            for (auto &widget: widgets)
             {
-                auto canvas = it->get();
-                if (canvas->_visibility != EVisibility::kVisible)
-                    continue;
-                canvas->PreUpdate(dt);
+                auto *canvas = widget.get();
+                if (canvas->_visibility == EVisibility::kVisible)
+                    visible_widgets.push_back(canvas);
             }
-            for (auto it = widgets.begin(); it != widgets.end(); it++)
+            for (auto it = _widget_drawer_blocks.begin(); it != _widget_drawer_blocks.end();)
             {
-                auto canvas = it->get();
-                if (canvas->_visibility != EVisibility::kVisible)
+                bool is_alive = false;
+                for (auto &widget: widgets)
+                {
+                    if (widget.get() == it->_widget)
+                    {
+                        is_alive = true;
+                        break;
+                    }
+                }
+                if (is_alive)
+                {
+                    ++it;
                     continue;
+                }
+                for (auto *block: it->_cpu_blocks)
+                    AL_DELETE(block);
+                it->_cpu_blocks.clear();
+                for (auto &frame_blocks: it->_blocks)
+                {
+                    for (auto *block: frame_blocks)
+                        AL_DELETE(block);
+                    frame_blocks.clear();
+                }
+                it = _widget_drawer_blocks.erase(it);
+            }
+            const bool is_debug_reflector_visible = UIManager::Get()->IsDebugReflectorVisible();
+            if (is_debug_reflector_visible)
+            {
+                for (auto *canvas: visible_widgets)
+                {
+                    if (canvas->Root() != nullptr)
+                        canvas->Root()->ClearDebugPaintDirtyRecursive();
+                }
+            }
+            Vector<Widget *> updated_widgets;
+            updated_widgets.reserve(visible_widgets.size());
+            for (auto *canvas: visible_widgets)
+            {
+                canvas->PreUpdate(dt);
+                updated_widgets.push_back(canvas);
+            }
+            for (auto *canvas: visible_widgets)
                 canvas->Update(dt);
+            UI::UIManager::Get()->EnsurePopupWidgetsOnTop();
+            visible_widgets.clear();
+            visible_widgets.reserve(widgets.size());
+            for (auto &widget: widgets)
+            {
+                auto *canvas = widget.get();
+                if (canvas->_visibility == EVisibility::kVisible)
+                    visible_widgets.push_back(canvas);
+            }
+            for (auto *canvas: visible_widgets)
+            {
+                if (std::find(updated_widgets.begin(), updated_widgets.end(), canvas) != updated_widgets.end())
+                    continue;
+                if (is_debug_reflector_visible && canvas->Root() != nullptr)
+                    canvas->Root()->ClearDebugPaintDirtyRecursive();
+                canvas->PreUpdate(dt);
+                canvas->Update(dt);
+                updated_widgets.push_back(canvas);
             }
             DragDropManager::Get().Update();
-            _cur_widget_index = 1u;
-            for (auto it = widgets.begin();it != widgets.end(); it++)
+            struct WidgetSubmitEntry
             {
-                auto canvas = it->get();
-                if (canvas->_visibility != EVisibility::kVisible)
+                Widget *_widget = nullptr;
+                RenderTexture *_color = nullptr;
+                RenderTexture *_depth = nullptr;
+            };
+            Vector<WidgetSubmitEntry> submit_entries;
+            submit_entries.reserve(visible_widgets.size());
+            HashMap<RenderTexture *, RTHandle> composite_target_handles;
+            auto get_submit_color = [&](RenderTexture *color) -> RenderTexture *
+            {
+                if (color == nullptr || !color->IsSwapChain())
+                    return color;
+                if (auto it = composite_target_handles.find(color); it != composite_target_handles.end())
+                    return g_pRenderTexturePool->Get(it->second);
+                RTHandle handle = cmd->GetTempRT(color->Width(), color->Height(), std::format("UI_Composite_{}", composite_target_handles.size()),
+                                                 ERenderTargetFormat::kDefault, false, false, false);
+                _pending_backdrop_blur_release_handles.push_back(handle);
+                composite_target_handles[color] = handle;
+                auto *composite = g_pRenderTexturePool->Get(handle);
+                cmd->SetRenderTarget(composite);
+                cmd->ClearRenderTarget(Colors::kBlack);
+                cmd->SetRenderTargetLoadAction(composite, ELoadStoreAction::kLoad);
+                return composite;
+            };
+            _cur_widget_index = 1u;
+            for (auto *canvas: visible_widgets)
+            {
+                auto *entry = GetWidgetBlockEntry(canvas);
+                auto &cpu_blocks = entry->_cpu_blocks;
+                _cur_widget_blocks = &cpu_blocks;
+                _cur_widget_block_index = 0u;
+                _cur_widget_block = cpu_blocks.empty() ? nullptr : cpu_blocks[0u];
+                bool is_cpu_blocks_empty = true;
+                for (auto *block: cpu_blocks)
+                    is_cpu_blocks_empty = is_cpu_blocks_empty && (block == nullptr || block->_nodes.empty());
+                if (canvas->IsPaintCacheDirty(_frame_index) || is_cpu_blocks_empty)
+                {
+                    for (auto *block: cpu_blocks)
+                    {
+                        if (block != nullptr)
+                            block->ResetBuildData();
+                    }
+                    _cur_widget_block = cpu_blocks.empty() ? nullptr : cpu_blocks[0u];
+                    _cache_build_pending_resource = false;
+                    const auto paint_build_start = UIClock::now();
+                    canvas->Render(*this);
+                    _stats._ui_paint_build_time += ElapsedMs(paint_build_start);
+                    while (!cpu_blocks.empty() && (cpu_blocks.back() == nullptr || cpu_blocks.back()->_nodes.empty()))
+                    {
+                        AL_DELETE(cpu_blocks.back());
+                        cpu_blocks.pop_back();
+                    }
+                    if (is_debug_reflector_visible && canvas->Root() != nullptr)
+                        canvas->Root()->SnapshotPaintDirtyToDebugRecursive();
+                    ++entry->_build_revision;
+                    entry->_gpu_revisions.fill(0u);
+                    if (!_cache_build_pending_resource)
+                    {
+                        for (u16 frame_index = 0u; frame_index < RenderConstants::kFrameCount; ++frame_index)
+                            canvas->ClearPaintInvalidation(frame_index);
+                    }
+                    if (is_debug_reflector_visible)
+                        DrawDirtyStateOverlay(canvas->Root());
+                    ++_stats._ui_cache_miss_count;
+                }
+                else
+                {
+                    if (is_debug_reflector_visible)
+                        DrawDirtyStateOverlay(canvas->Root());
+                    ++_stats._ui_cache_hit_count;
+                }
+                SyncWidgetFrameBlocks(canvas);
+                auto &blocks = GetWidgetFrameBlocks(canvas);
+                bool has_nodes = false;
+                for (auto *block: blocks)
+                    has_nodes = has_nodes || (block != nullptr && !block->_nodes.empty());
+                if (!has_nodes)
+                {
+                    ++_cur_widget_index;
                     continue;
-                canvas->Render(*this);
-                auto b = _drawer_blocks[_frame_index][_cur_widget_index];
-                if (b->_nodes.empty())
-                    continue;
+                }
 
                 auto [color, depth] = canvas->GetOutput();
-                SubmitBlock(b,cmd,color,depth);
+                submit_entries.push_back({canvas, color, depth});
                 ++_cur_widget_index;
             }
+            _cur_widget_block = nullptr;
+            _cur_widget_blocks = nullptr;
+            _cur_widget_block_index = 0u;
+            for (const auto &entry: submit_entries)
+            {
+                if (entry._widget == nullptr || entry._widget->IsPopup())
+                    continue;
+                auto *submit_color = get_submit_color(entry._color);
+                for (auto *block: GetWidgetFrameBlocks(entry._widget))
+                    SubmitBlock(block, cmd, submit_color, entry._depth);
+            }
             //绘制全局gui
-            SubmitBlock(_drawer_blocks[_frame_index][0u],cmd,RenderTexture::s_backbuffer);
+            SubmitBlock(_drawer_blocks[_frame_index][0u], cmd, get_submit_color(RenderTexture::s_backbuffer));
             _cur_widget_index = 0u;
-            _drawer_blocks[_frame_index][0u]->Flush();
             auto &window_blocks = _window_drawer_blocks[_frame_index];
             for (auto &it: window_blocks)
             {
                 auto *color = RenderTexture::WindowBackBuffer(it.first);
+                auto *submit_color = get_submit_color(color);
                 for (auto *block: it.second)
                 {
                     if (!block || block->_nodes.empty())
                         continue;
-                    if (color)
-                        SubmitBlock(block, cmd, color);
+                    if (submit_color)
+                        SubmitBlock(block, cmd, submit_color);
                     else
-                        block->Flush();
+                        block->ResetBuildData();
                 }
+            }
+            for (const auto &entry: submit_entries)
+            {
+                if (entry._widget == nullptr || !entry._widget->IsPopup())
+                    continue;
+                auto *submit_color = get_submit_color(entry._color);
+                SubmitPopupBackdrop(entry._widget, cmd, submit_color, entry._depth);
+                for (auto *block: GetWidgetFrameBlocks(entry._widget))
+                    SubmitBlock(block, cmd, submit_color, entry._depth);
+            }
+            for (auto &it: composite_target_handles)
+            {
+                auto *backbuffer = it.first;
+                if (backbuffer != nullptr)
+                    cmd->Blit(it.second, backbuffer);
             }
             //暂时所有文本都渲染到后备缓冲区
             //TextRenderer::Get()->Render(RenderTexture::s_backbuffer, cmd, _text_block);
@@ -188,10 +388,10 @@ namespace Ailu
             TransformCoord(cb->_pos_buf[cur_vert_num + 1], matrix);
             TransformCoord(cb->_pos_buf[cur_vert_num + 2], matrix);
             TransformCoord(cb->_pos_buf[cur_vert_num + 3], matrix);
-            cb->_uv_buf[cur_vert_num] = {0.f, 0.f};
-            cb->_uv_buf[cur_vert_num + 1] = {1.f, 0.f};
-            cb->_uv_buf[cur_vert_num + 2] = {0.f, 1.f};
-            cb->_uv_buf[cur_vert_num + 3] = {1.f, 1.f};
+            cb->_uv_buf[cur_vert_num] = brush._uv_rect.xy;
+            cb->_uv_buf[cur_vert_num + 1] = {brush._uv_rect.x + brush._uv_rect.z, brush._uv_rect.y};
+            cb->_uv_buf[cur_vert_num + 2] = {brush._uv_rect.x, brush._uv_rect.y + brush._uv_rect.w};
+            cb->_uv_buf[cur_vert_num + 3] = {brush._uv_rect.x + brush._uv_rect.z, brush._uv_rect.y + brush._uv_rect.w};
             cb->_color_buf[cur_vert_num] = color;
             cb->_color_buf[cur_vert_num + 1] = color;
             cb->_color_buf[cur_vert_num + 2] = color;
@@ -210,7 +410,9 @@ namespace Ailu
             cb->_index_buf[cur_index_num + 3] = cur_vert_num + 1u;
             cb->_index_buf[cur_index_num + 4] = cur_vert_num + 3u;
             cb->_index_buf[cur_index_num + 5] = cur_vert_num + 2u;
-            AppendNode(cb, 4u, 6u, _default_material.get());
+            AppendNode(cb, 4u, 6u, _default_material.get(),
+                       brush._texture ? brush._texture : Texture::s_p_default_white,
+                       0.0f, brush._type == EUIBrushType::kBackdropBlur);
         }
 
         void UIRenderer::DrawVisual(Vector4f rect, Matrix4x4f matrix, const UIControlVisual &visual)
@@ -229,6 +431,10 @@ namespace Ailu
         void UIRenderer::DrawText(const String &text, Vector2f pos, Matrix4x4f matrix, f32 font_size, Color color, Vector2f scale, Render::Font *font)
         {
             _text_renderer->DrawText(text, pos, font_size, scale, color, matrix, font, GetAvailableBlock(4u, 6u));
+        }
+        void UIRenderer::DrawTextLayout(const Render::TextLayoutResult &layout, Vector2f pos, Matrix4x4f matrix, f32 font_size, Color color, Vector2f scale, Render::Font *font)
+        {
+            _text_renderer->DrawTextLayout(layout, pos, font_size, scale, color, matrix, font, GetAvailableBlock(4u, 6u));
         }
 
         void UIRenderer::DrawImage(Render::Texture *texture, Vector4f rect, const ImageDrawOptions &opts)
@@ -364,17 +570,132 @@ namespace Ailu
             return _text_renderer->CalculateTextSize(text, font_size, font, scale);
         }
 
-        void UIRenderer::AppendNode(DrawerBlock *block, u32 vert_num, u32 index_num, Render::Material *mat, Render::Texture *tex, f32 msdf_px_range)
+        void UIRenderer::AppendNode(DrawerBlock *block, u32 vert_num, u32 index_num, Render::Material *mat, Render::Texture *tex,
+                                    f32 msdf_px_range, bool is_backdrop_blur)
         {
+            if (mat != nullptr && !mat->IsReadyForDraw())
+                _cache_build_pending_resource = true;
+            if (tex != nullptr && !tex->IsReady())
+                _cache_build_pending_resource = true;
             if (!_scissor_stack.empty())
-                block->AppendNode(vert_num, index_num, mat, tex, _scissor_stack.back(), msdf_px_range);
+                block->AppendNode(vert_num, index_num, mat, tex, _scissor_stack.back(), msdf_px_range, is_backdrop_blur);
             else
-                block->AppendNode(vert_num, index_num, mat, tex, {}, msdf_px_range);
+                block->AppendNode(vert_num, index_num, mat, tex, {}, msdf_px_range, is_backdrop_blur);
+            _stats._ui_generated_vertex_count += vert_num;
+            _stats._ui_generated_index_count += index_num;
+        }
+
+        void UIRenderer::DrawDirtyStateOverlay(UIElement *root)
+        {
+            if (root == nullptr || _drawer_blocks[_frame_index].empty())
+                return;
+            DrawDirtyStateOverlayRecursive(root, _drawer_blocks[_frame_index][0u]);
+        }
+
+        void UIRenderer::DrawDirtyStateOverlayRecursive(UIElement *element, DrawerBlock *block)
+        {
+            if (element == nullptr || block == nullptr || !element->IsVisible())
+                return;
+
+            constexpr f32 kIndicatorSize = 6.0f;
+            constexpr f32 kIndicatorInset = 1.0f;
+            const Vector4f rect = element->GetArrangeRect();
+            if (rect.z >= kIndicatorSize && rect.w >= kIndicatorSize && block->CanAppend(4u, 6u))
+            {
+                UIBrush brush;
+                brush._type = EUIBrushType::kColor;
+                brush._tint = element->IsDebugPaintDirty() ? Color(1.0f, 0.12f, 0.08f, 0.95f) : Color(0.1f, 0.85f, 0.25f, 0.95f);
+                const Vector4f indicator_rect = {rect.x + rect.z - kIndicatorSize - kIndicatorInset, rect.y + kIndicatorInset,
+                                                 kIndicatorSize, kIndicatorSize};
+                AppendQuadToBlock(block, indicator_rect, kIdentityMatrix, brush, Vector4f::kZero, 0.0f);
+            }
+
+            for (const auto &child: element->GetChildren())
+                DrawDirtyStateOverlayRecursive(child.get(), block);
+        }
+
+        UIRenderer::WidgetDrawerBlocks *UIRenderer::GetWidgetBlockEntry(Widget *widget)
+        {
+            AL_ASSERT(widget != nullptr);
+            for (auto &entry: _widget_drawer_blocks)
+            {
+                if (entry._widget != widget)
+                    continue;
+                return &entry;
+            }
+
+            WidgetDrawerBlocks entry;
+            entry._widget = widget;
+            entry._cpu_blocks.push_back(AL_NEW(DrawerBlock, _default_material, 8092u * 4));
+            for (auto &frame_blocks: entry._blocks)
+                frame_blocks.push_back(AL_NEW(DrawerBlock, _default_material, 8092u * 4));
+            _widget_drawer_blocks.push_back(entry);
+            return &_widget_drawer_blocks.back();
+        }
+
+        Vector<DrawerBlock *> &UIRenderer::GetWidgetCpuBlocks(Widget *widget)
+        {
+            return GetWidgetBlockEntry(widget)->_cpu_blocks;
+        }
+
+        Vector<DrawerBlock *> &UIRenderer::GetWidgetFrameBlocks(Widget *widget)
+        {
+            return GetWidgetBlockEntry(widget)->_blocks[_frame_index];
+        }
+
+        void UIRenderer::SyncWidgetFrameBlocks(Widget *widget)
+        {
+            auto *entry = GetWidgetBlockEntry(widget);
+            if (entry == nullptr || _frame_index >= RenderConstants::kFrameCount || entry->_gpu_revisions[_frame_index] == entry->_build_revision)
+                return;
+            auto &source_blocks = entry->_cpu_blocks;
+            auto &target_blocks = entry->_blocks[_frame_index];
+            while (target_blocks.size() < source_blocks.size())
+                target_blocks.push_back(AL_NEW(DrawerBlock, _default_material, 8092u * 4));
+            for (u32 block_index = 0u; block_index < source_blocks.size(); ++block_index)
+            {
+                if (source_blocks[block_index] == nullptr)
+                {
+                    AL_DELETE(target_blocks[block_index]);
+                    target_blocks[block_index] = nullptr;
+                    continue;
+                }
+                if (target_blocks[block_index] == nullptr)
+                    target_blocks[block_index] = AL_NEW(DrawerBlock, _default_material, 8092u * 4);
+                target_blocks[block_index]->CopyBuildDataFrom(*source_blocks[block_index]);
+            }
+            while (target_blocks.size() > source_blocks.size())
+            {
+                AL_DELETE(target_blocks.back());
+                target_blocks.pop_back();
+            }
+            entry->_gpu_revisions[_frame_index] = entry->_build_revision;
         }
 
         DrawerBlock *UIRenderer::GetAvailableBlock(u32 vert_num, u32 index_num)
         {
             DrawerBlock *available_block = nullptr;
+            if (_cur_widget_blocks != nullptr)
+            {
+                if (_cur_widget_block == nullptr)
+                {
+                    _cur_widget_block_index = 0u;
+                    if (_cur_widget_blocks->empty())
+                        _cur_widget_blocks->push_back(AL_NEW(DrawerBlock, _default_material, 8092u * 4));
+                    _cur_widget_block = (*_cur_widget_blocks)[_cur_widget_block_index];
+                }
+                else if (!_cur_widget_block->CanAppend(vert_num, index_num))
+                {
+                    ++_cur_widget_block_index;
+                    if (_cur_widget_block_index >= _cur_widget_blocks->size())
+                    {
+                        _cur_widget_blocks->push_back(AL_NEW(DrawerBlock, _default_material, 8092u * 4));
+                    }
+                    _cur_widget_block = (*_cur_widget_blocks)[_cur_widget_block_index];
+                }
+                AL_ASSERT_MSG(_cur_widget_block->CanAppend(vert_num, index_num), "UI DrawerBlock index overflow!");
+                return _cur_widget_block;
+            }
             auto &frame_block = _drawer_blocks[_frame_index];
             if (frame_block.size() < _cur_widget_index + 1u)
             {
@@ -412,8 +733,79 @@ namespace Ailu
             blocks.push_back(AL_NEW(DrawerBlock, _default_material, 8092u * 4));
             return blocks.back();
         }
+        Render::Texture *UIRenderer::GetOrCreateBackdropBlurTexture(Render::Texture *source, CommandBuffer *cmd)
+        {
+            if (source == nullptr || _backdrop_blur_cs == nullptr)
+                return source;
+            if (auto it = _frame_backdrop_blur_cache.find(source); it != _frame_backdrop_blur_cache.end())
+                return it->second;
+
+            const u16 blur_width = std::max<u16>(1u, static_cast<u16>(source->Width() / kBackdropBlurDownsample));
+            const u16 blur_height = std::max<u16>(1u, static_cast<u16>(source->Height() / kBackdropBlurDownsample));
+            RTHandle downsample = cmd->GetTempRT(blur_width, blur_height, "UI_BackdropBlur_Downsample", ERenderTargetFormat::kDefaultHDR, false, false, true);
+            RTHandle blur_x = cmd->GetTempRT(blur_width, blur_height, "UI_BackdropBlur_X", ERenderTargetFormat::kDefaultHDR, false, false, true);
+            RTHandle blur_y = cmd->GetTempRT(blur_width, blur_height, "UI_BackdropBlur_Y", ERenderTargetFormat::kDefaultHDR, false, false, true);
+            _pending_backdrop_blur_release_handles.push_back(downsample);
+            _pending_backdrop_blur_release_handles.push_back(blur_x);
+            _pending_backdrop_blur_release_handles.push_back(blur_y);
+
+            auto *downsample_rt = g_pRenderTexturePool->Get(downsample);
+            auto *blur_x_rt = g_pRenderTexturePool->Get(blur_x);
+            auto *blur_y_rt = g_pRenderTexturePool->Get(blur_y);
+
+            cmd->StateTransition(downsample_rt, EResourceState::kRenderTarget);
+            cmd->Blit(source, downsample);
+            cmd->StateTransition(downsample_rt, EResourceState::kNonPixelShaderResource);
+            cmd->StateTransition(blur_x_rt, EResourceState::kUnorderedAccess);
+            _backdrop_blur_cs->SetTexture("_SourceTex", downsample);
+            _backdrop_blur_cs->SetTexture("_OutTex", blur_x);
+            u16 kernel = _backdrop_blur_cs->FindKernel("blur_x");
+            auto [group_num_x, group_num_y, group_num_z] = _backdrop_blur_cs->CalculateDispatchNum(kernel, blur_width, blur_height, 1u);
+            cmd->Dispatch(_backdrop_blur_cs.get(), kernel, group_num_x, group_num_y, 1u);
+            cmd->InsertUAVBarrier(blur_x_rt);
+            cmd->StateTransition(blur_x_rt, EResourceState::kNonPixelShaderResource);
+            cmd->StateTransition(blur_y_rt, EResourceState::kUnorderedAccess);
+            _backdrop_blur_cs->SetTexture("_SourceTex", blur_x);
+            _backdrop_blur_cs->SetTexture("_OutTex", blur_y);
+            kernel = _backdrop_blur_cs->FindKernel("blur_y");
+            cmd->Dispatch(_backdrop_blur_cs.get(), kernel, group_num_x, group_num_y, 1u);
+            cmd->InsertUAVBarrier(blur_y_rt);
+            cmd->StateTransition(blur_y_rt, EResourceState::kPixelShaderResource);
+
+            _frame_backdrop_blur_cache[source] = blur_y_rt;
+            return blur_y_rt;
+        }
+
+        void UIRenderer::SubmitPopupBackdrop(Widget *widget, CommandBuffer *cmd, RenderTexture *color, RenderTexture *depth)
+        {
+            if (widget == nullptr || widget->Root() == nullptr || color == nullptr || _popup_backdrop_block == nullptr)
+                return;
+            const Vector4f rect = widget->Root()->GetArrangeRect();
+            if (rect.z <= 1.0f || rect.w <= 1.0f)
+                return;
+
+            _popup_backdrop_block->ResetBuildData();
+            _frame_backdrop_blur_cache.erase(color);
+
+            const f32 w = static_cast<f32>(color->Width());
+            const f32 h = static_cast<f32>(color->Height());
+            UIBrush brush;
+            brush._type = EUIBrushType::kBackdropBlur;
+            brush._texture = color;
+            brush._tint = Color(1.0f, 1.0f, 1.0f, 0.92f);
+            brush._uv_rect = {rect.x / w, rect.y / h, rect.z / w, rect.w / h};
+            AppendQuadToBlock(_popup_backdrop_block, rect, kIdentityMatrix, brush, Vector4f(6.0f), 0.0f);
+            SubmitBlock(_popup_backdrop_block, cmd, color, depth);
+        }
+
         void UIRenderer::SubmitBlock(DrawerBlock *b, CommandBuffer *cmd,RenderTexture* color,RenderTexture* depth)
         {
+            if (color == nullptr)
+                return;
+            if (b == nullptr || b->_nodes.empty())
+                return;
+            if (!b->IsReady())
+                return;
             f32 w = (f32) color->Width();
             f32 h = (f32) color->Height();
             CBufferPerCameraData cb_per_cam;
@@ -428,15 +820,32 @@ namespace Ailu
             per_obj_data._MatrixWorld = BuildIdentityMatrix();
             memcpy(_obj_cb->GetData(), &per_obj_data, RenderConstants::kPerObjectDataSize);
             cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &cb_per_cam, RenderConstants::kPerCameraDataSize);
-            cmd->SetRenderTarget(color, depth);
             Color tint = Colors::kWhite;
             b->_mat->SetVector("_Color", tint);
-            b->SubmitVertexData();
+            for (const auto &node: b->_nodes)
+            {
+                if (node._is_backdrop_blur)
+                    GetOrCreateBackdropBlurTexture(node._main_tex, cmd);
+            }
+            cmd->SetRenderTarget(color, depth);
+            const auto upload_start = UIClock::now();
+            _stats._ui_uploaded_bytes += b->SubmitVertexData();
+            _stats._ui_gpu_upload_time += ElapsedMs(upload_start);
             Rect full_rect(0u, 0u, (u16) w, (u16) h);
             Rect prev_scissor = full_rect;
+            _stats._ui_draw_node_count += b->_nodes.size();
+            const auto submit_start = UIClock::now();
             for (const auto& node: b->_nodes)
             {
-                node._mat->SetTexture("_MainTex", node._main_tex? node._main_tex : Texture::s_p_default_white);
+                Render::Texture *main_tex = node._main_tex;
+                if (node._is_backdrop_blur)
+                {
+                    if (auto it = _frame_backdrop_blur_cache.find(node._main_tex); it != _frame_backdrop_blur_cache.end())
+                        main_tex = it->second;
+                    else
+                        main_tex = GetOrCreateBackdropBlurTexture(node._main_tex, cmd);
+                }
+                node._mat->SetTexture("_MainTex", main_tex ? main_tex : Texture::s_p_default_white);
                 node._mat->SetFloat("_MsdfPxRange", node._msdf_px_range);
                 if (node._is_custom_scissor)
                 {
@@ -449,19 +858,40 @@ namespace Ailu
                         cmd->SetScissorRect(full_rect);
                 }
                 cmd->DrawIndexed(b->_vbuf, b->_ibuf, _obj_cb.get(), node._mat,0u,node._index_offset,node._index_num);
+                ++_stats._ui_draw_call_count;
                 prev_scissor = node._is_custom_scissor ? node._scissor : full_rect;
             }
-            b->Flush();
+            _stats._ui_submit_time += ElapsedMs(submit_start);
         }
 
         void UIRenderer::DrawDebugPannel()
         {
             Vector2f pen = {10.f, 10.f};
             f32 font_size = 14.f;
+            const f32 line_height = _text_renderer->GetDefaultFont()->_line_height * font_size;
+            DrawText(std::format("UI Stats: visit {}, render {}, layout {}, text {}, vert {}, idx {}, upload {}KB, nodes {}, calls {}",
+                                 _stats._ui_element_visit_count,
+                                 _stats._ui_render_impl_count,
+                                 _stats._ui_layout_count,
+                                 _stats._ui_text_layout_count,
+                                 _stats._ui_generated_vertex_count,
+                                 _stats._ui_generated_index_count,
+                                 _stats._ui_uploaded_bytes / 1024u,
+                                 _stats._ui_draw_node_count,
+                                 _stats._ui_draw_call_count),
+                     pen, font_size);
+            pen.y += line_height;
+            DrawText(std::format("UI Time: paint {:.3f}ms, upload {:.3f}ms, submit {:.3f}ms, hit {}, miss {}",
+                                 _stats._ui_paint_build_time,
+                                 _stats._ui_gpu_upload_time,
+                                 _stats._ui_submit_time,
+                                 _stats._ui_cache_hit_count,
+                                 _stats._ui_cache_miss_count),
+                     pen, font_size);
+            pen.y += line_height;
             UIElement *capture = UIManager::Get()->_capture_target;
             if (capture)
             {
-                const f32 line_height = _text_renderer->GetDefaultFont()->_line_height * font_size;
                 auto abs_rect = capture->GetArrangeRect();
                 DrawText(std::format("Name: {},type: {}", capture->Name(), capture->GetType()->Name()), pen, font_size);
                 pen.y += line_height;

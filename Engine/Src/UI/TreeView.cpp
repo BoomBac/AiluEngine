@@ -109,11 +109,19 @@ namespace Ailu
             // Mouse tracking for hover
             OnMouseMove() += [this](UIEvent& e)
             {
-                _hovered_row = FindTreeViewRow(e._target, _content_box);
+                UIElement* hovered_row = FindTreeViewRow(e._target, _content_box);
+                if (_hovered_row != hovered_row)
+                {
+                    _hovered_row = hovered_row;
+                    InvalidatePaint();
+                }
             };
             OnMouseExit() += [this](UIEvent& e)
             {
+                if (_hovered_row == nullptr)
+                    return;
                 _hovered_row = nullptr;
+                InvalidatePaint();
             };
 
             // Click: walk up from target to find the TreeViewRow
@@ -250,6 +258,8 @@ namespace Ailu
             _content_box->ClearChildren();
             if (_data_source)
                 Refresh();
+            else
+                InvalidateHierarchy();
         }
 
         // =========================================================================
@@ -291,6 +301,7 @@ namespace Ailu
                 if (!_is_suppress_selection_notify)
                     _on_selection_changed_delegate.Invoke(kInvalidTreeItemId);
             }
+            InvalidateHierarchy();
         }
 
         void TreeView::CollectVisibleItems(TreeItemId item_id, u32 depth, u32& count,
@@ -411,6 +422,7 @@ namespace Ailu
             if (item == _selected_item) return;
 
             _selected_item = item;
+            InvalidatePaint();
 
             if (notify && !_is_suppress_selection_notify)
                 _on_selection_changed_delegate.Invoke(item);
@@ -587,15 +599,18 @@ namespace Ailu
 
                 TreeItemId id = row->GetItemId();
 
+                Color bg_color = _normal_color;
                 if (id == _selected_item)
-                    row->_bg_color = _selected_color;
+                    bg_color = _selected_color;
                 else if (child.get() == _hovered_row)
-                    row->_bg_color = _hover_color;
-                else
-                    row->_bg_color = _normal_color;
+                    bg_color = _hover_color;
 
-                row->GetStyleOverride().SetBackground(MakeColorBrush(row->_bg_color));
-                row->InvalidateStyle(EStyleInvalidation::kPaintOnly);
+                if (!NearbyEqual(row->_bg_color, bg_color))
+                {
+                    row->_bg_color = bg_color;
+                    row->GetStyleOverride().SetBackground(MakeColorBrush(row->_bg_color));
+                    row->InvalidateStyle(EStyleInvalidation::kPaintOnly);
+                }
             }
 
             ScrollView::RenderImpl(r);

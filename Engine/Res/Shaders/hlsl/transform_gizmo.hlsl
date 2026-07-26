@@ -42,7 +42,7 @@ PSInput VSMain(VSInput v)
 	result.position = TransformWorldToHClipNoJitter(world_pos);
 	result.normal = TransformNormal(v.normal);
 #if defined(_CIRCLE)
-	result.center_pos = float3(_MatrixWorld[0].w,_MatrixWorld[1].w,_MatrixWorld[2].w);
+	result.center_pos = TransformObjectToWorld(float3(0.0, 0.0, 0.0));
 	result.world_pos = world_pos;
 #endif
 	return result;

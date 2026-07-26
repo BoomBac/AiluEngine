@@ -63,6 +63,14 @@ namespace Ailu
                                         (u32) UI::EUIButtonStyleOverride::kDisabled |
                                         (u32) UI::EUIButtonStyleOverride::kPadding;
             }
+
+            bool SetColorIfChanged(Color &dst, const Color &src)
+            {
+                if (NearbyEqual(dst, src))
+                    return false;
+                dst = src;
+                return true;
+            }
         }
 
 #pragma region DockWindow
@@ -242,11 +250,18 @@ namespace Ailu
 
                 _is_dirty = false;
             }
-            _title_bar_root->_bg_color = g_editor_style._window_title_bar_color;
-            _title_bar_root->_border_color = _is_focused ? g_editor_style._window_focus_border_color : g_editor_style._window_border_color;
-            _content_root->_border_color = _is_focused ? g_editor_style._window_focus_border_color : g_editor_style._window_border_color;
-            _content_root->_bg_color = g_editor_style._window_bg_color;
-            _title->_color = g_editor_style._window_title_text_color;
+            bool title_style_changed = false;
+            bool content_style_changed = false;
+            title_style_changed |= SetColorIfChanged(_title_bar_root->_bg_color, g_editor_style._window_title_bar_color);
+            title_style_changed |= SetColorIfChanged(_title_bar_root->_border_color, _is_focused ? g_editor_style._window_focus_border_color : g_editor_style._window_border_color);
+            content_style_changed |= SetColorIfChanged(_content_root->_border_color, _is_focused ? g_editor_style._window_focus_border_color : g_editor_style._window_border_color);
+            content_style_changed |= SetColorIfChanged(_content_root->_bg_color, g_editor_style._window_bg_color);
+            if (SetColorIfChanged(_title->_color, g_editor_style._window_title_text_color))
+                _title->InvalidatePaint();
+            if (title_style_changed)
+                _title_bar_root->InvalidateStyle(UI::EStyleInvalidation::kPaintOnly);
+            if (content_style_changed)
+                _content_root->InvalidateStyle(UI::EStyleInvalidation::kPaintOnly);
         }
 
         bool DockWindow::IsHover(Vector2f pos) const
@@ -259,11 +274,13 @@ namespace Ailu
             _is_title_bar_visible = is_visibility;
             _is_expand_content_when_title_hidden = !is_visibility && is_expand_content;
             _title_widget->_visibility = is_visibility ? UI::EVisibility::kVisible : UI::EVisibility::kHide;
+            _title_widget->InvalidatePaint(UI::EUIInvalidationReason::kVisibility | UI::EUIInvalidationReason::kPaint);
             _is_dirty = true;
         }
         void DockWindow::SetContentVisibility(bool is_visibility)
         {
             _content_widget->_visibility = is_visibility ? UI::EVisibility::kVisible : UI::EVisibility::kHide;
+            _content_widget->InvalidatePaint(UI::EUIInvalidationReason::kVisibility | UI::EUIInvalidationReason::kPaint);
         }
         String DockWindow::GetTitle() const
         {
@@ -275,6 +292,7 @@ namespace Ailu
             _title_widget->Name(std::format("{}_title", title));
             _title->SetText(title);
             _name = title;
+            _title_widget->InvalidatePaint(UI::EUIInvalidationReason::kPaint);
         }
         void DockWindow::SetFocus(bool is_focus)
         {
@@ -503,8 +521,12 @@ namespace Ailu
                 if (!IsActiveTab(e._current_target))
                 {
                     e._current_target->As<UI::Border>()->_bg_color = g_editor_style._tab_hover_bg_color;
+                    e._current_target->InvalidateStyle(UI::EStyleInvalidation::kPaintOnly);
                     if (!e._current_target->GetChildren().empty())
+                    {
                         e._current_target->GetChildren()[0]->As<UI::Text>()->_color = g_editor_style._tab_hover_text_color;
+                        e._current_target->GetChildren()[0]->InvalidatePaint();
+                    }
                 }
             };
             bg->OnMouseExit() += [this](UI::UIEvent &e)
@@ -512,8 +534,12 @@ namespace Ailu
                 if (!IsActiveTab(e._current_target))
                 {
                     e._current_target->As<UI::Border>()->_bg_color = g_editor_style._tab_bg_color;
+                    e._current_target->InvalidateStyle(UI::EStyleInvalidation::kPaintOnly);
                     if (!e._current_target->GetChildren().empty())
+                    {
                         e._current_target->GetChildren()[0]->As<UI::Text>()->_color = g_editor_style._tab_text_color;
+                        e._current_target->GetChildren()[0]->InvalidatePaint();
+                    }
                 }
             };
             OnActiveTabChanged(static_cast<i32>(_tabs.size() - 1u));
@@ -617,7 +643,11 @@ namespace Ailu
                 auto *prev_title_bg = dynamic_cast<UI::Border *>(_tab_titles->GetChildren()[_active_index].get());
                 prev_title_bg->_bg_color = g_editor_style._tab_bg_color;
                 if (!prev_title_bg->GetChildren().empty())
+                {
                     prev_title_bg->GetChildren()[0]->As<UI::Text>()->_color = g_editor_style._tab_text_color;
+                    prev_title_bg->GetChildren()[0]->InvalidatePaint();
+                }
+                prev_title_bg->InvalidateStyle(UI::EStyleInvalidation::kPaintOnly);
                 _tabs[_active_index]->SetTabActive(false);
                 if (auto *previous_window = _tabs[_active_index]->PrimaryWindow())
                     previous_window->ContentWidget()->_on_get_focus -= _content_focus_handle;
@@ -626,7 +656,11 @@ namespace Ailu
             auto *active_title_bg = _tab_titles->GetChildren()[_active_index]->As<UI::Border>();
             active_title_bg->_bg_color = g_editor_style._tab_active_bg_color;
             if (!active_title_bg->GetChildren().empty())
+            {
                 active_title_bg->GetChildren()[0]->As<UI::Text>()->_color = g_editor_style._tab_active_text_color;
+                active_title_bg->GetChildren()[0]->InvalidatePaint();
+            }
+            active_title_bg->InvalidateStyle(UI::EStyleInvalidation::kPaintOnly);
             _tabs[_active_index]->SetTabActive(_is_visible);
             _content_focus_handle = -1;
             if (auto *active_window = _tabs[_active_index]->PrimaryWindow())
@@ -664,6 +698,7 @@ namespace Ailu
         {
             _is_visible = is_visible;
             _tab_bar->_visibility = is_visible ? UI::EVisibility::kVisible : UI::EVisibility::kHide;
+            _tab_bar->InvalidatePaint(UI::EUIInvalidationReason::kVisibility | UI::EUIInvalidationReason::kPaint);
             for (i32 i = 0; i < static_cast<i32>(_tabs.size()); ++i)
             {
                 _tabs[i]->SetTabActive(is_visible && i == _active_index);
@@ -714,8 +749,11 @@ namespace Ailu
             _tab_bar->SetSize({_size.x, DockWindow::kTitleBarHeight});
             _tab_root->GetSlotAs<UI::CanvasSlot>().Size({_size.x, DockWindow::kTitleBarHeight});
             _tab_hb->GetSlot()->Size(_tab_root->GetSlot()->_size);
-            _tab_root->_bg_color = g_editor_style._window_title_bar_color;
-            _tab_root->_border_color = _is_focused ? g_editor_style._window_focus_border_color : g_editor_style._window_border_color;
+            bool tab_style_changed = false;
+            tab_style_changed |= SetColorIfChanged(_tab_root->_bg_color, g_editor_style._window_title_bar_color);
+            tab_style_changed |= SetColorIfChanged(_tab_root->_border_color, _is_focused ? g_editor_style._window_focus_border_color : g_editor_style._window_border_color);
+            if (tab_style_changed)
+                _tab_root->InvalidateStyle(UI::EStyleInvalidation::kPaintOnly);
             if (_tabs.empty())
                 return;
             for (auto &w: _tabs)

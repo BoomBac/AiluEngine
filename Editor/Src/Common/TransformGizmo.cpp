@@ -1,4 +1,5 @@
 #include "Common/TransformGizmo.h"
+#include "Common/Undo.h"
 #include "Framework/Common/Input.h"
 #include "Common/Selection.h"
 #include "Framework/Common/ResourceMgr.h"
@@ -11,6 +12,11 @@ namespace Ailu
 {
     namespace Editor
     {
+        static bool IsTransformChanged(const Transform &lhs, const Transform &rhs)
+        {
+            return lhs._position != rhs._position || lhs._rotation != rhs._rotation || lhs._scale != rhs._scale;
+        }
+
         void TransformGizmo::ClearTarget()
         {
             if (_is_dragging)
@@ -98,6 +104,65 @@ namespace Ailu
                 a._dir = (dot >= 0.0f) ? axis_dir : -axis_dir;
             }
         }
+
+        bool TransformGizmo::Is2DMode() const
+        {
+            return _cam != nullptr && _cam->Type() == Render::ECameraType::kOrthographic;
+        }
+
+        u32 TransformGizmo::Get2DHiddenAxisMask() const
+        {
+            if (!Is2DMode())
+                return 0u;
+
+            Vector3f forward = _cam->Forward();
+            Vector3f abs_forward(std::abs(forward.x), std::abs(forward.y), std::abs(forward.z));
+            if (abs_forward.x >= abs_forward.y && abs_forward.x >= abs_forward.z)
+                return kAxisX;
+            if (abs_forward.y >= abs_forward.x && abs_forward.y >= abs_forward.z)
+                return kAxisY;
+            return kAxisZ;
+        }
+
+        u32 TransformGizmo::Get2DVisibleAxisMask() const
+        {
+            if (!Is2DMode())
+                return kAxisXYZ;
+            return kAxisXYZ & ~Get2DHiddenAxisMask();
+        }
+
+        bool TransformGizmo::IsAxisMaskAvailable(u32 axis_mask) const
+        {
+            if (!Is2DMode())
+                return true;
+            return (axis_mask & Get2DHiddenAxisMask()) == 0u;
+        }
+
+        bool TransformGizmo::IsSnapActive() const
+        {
+            return _snap_enabled || Input::IsKeyDown(EKey::kLCONTROL) || Input::IsKeyDown(EKey::kRCONTROL) ||
+                   Input::IsKeyDown(EKey::kCONTROL);
+        }
+
+        f32 TransformGizmo::SnapFloat(f32 value, f32 step) const
+        {
+            if (step <= 0.0f)
+                return value;
+            return std::round(value / step) * step;
+        }
+
+        Vector3f TransformGizmo::SnapVector(const Vector3f &value, f32 step) const
+        {
+            return Vector3f(SnapFloat(value.x, step), SnapFloat(value.y, step), SnapFloat(value.z, step));
+        }
+
+        static Ray MakeGizmoMouseRay(Render::Camera *cam, Vector2f mouse_pos)
+        {
+            if (cam != nullptr && cam->Type() == Render::ECameraType::kOrthographic)
+                return Ray{cam->ScreenToWorld(mouse_pos, -cam->Near()), cam->Forward()};
+            return Ray{cam->Position(), cam->ScreenToWorld(mouse_pos, 0.0f)};
+        }
+
         TransformGizmo::TransformGizmo()
         {
             auto shader = ResourceMgr::Get().Load<Shader>(L"Shaders/hlsl/transform_gizmo.alasset");
@@ -270,7 +335,8 @@ namespace Ailu
         {
             if (camera.Type() == Render::ECameraType::kOrthographic)
             {
-                return camera.Size() * (desired_pixels / (f32) camera.OutputSize().y);
+                f32 ortho_height = camera.Size() / camera.Aspect();
+                return ortho_height * (desired_pixels / (f32) camera.OutputSize().y);
             }
             else
             {
@@ -295,6 +361,8 @@ namespace Ailu
             u32 result = 0u;
             for (auto &a: _translate_axis)
             {
+                if (!IsAxisMaskAvailable(a._axis))
+                    continue;
                 f32 s, t;
                 Vector3f c1, c2;
                 f32 d = CollisionDetection::ClosestPtSegmentSegment(origin, origin + a._dir * _axis_length * _dis_scale, start, start + dir * Distance(start, origin) * 1.5f, s, t, c1, c2);
@@ -334,16 +402,15 @@ namespace Ailu
         f32 TransformGizmo::ComputeAxisParamS(Vector2f mouse_pos, const Vector3f &origin, const Vector3f &axisDir) const
         {
             // Mouse ray.
-            Vector3f camPos = _cam->Position();
-            Vector3f rayDir = _cam->ScreenToWorld(mouse_pos, 0.0f);
+            Ray ray = MakeGizmoMouseRay(_cam, mouse_pos);
 
             f32 s = 0.0f, t = 0.0f;
             Vector3f c1, c2;
             CollisionDetection::ClosestPtSegmentSegment(
                     origin - axisDir * (kVirualRayLen * 0.5f),
                     origin + axisDir * (kVirualRayLen * 0.5f),
-                    camPos,
-                    camPos + rayDir * kVirualRayLen,
+                    ray._start,
+                    ray._start + ray._dir * kVirualRayLen,
                     s, t, c1, c2);
             // s is usually measured from the first endpoint; with the centered segment it can be diffed directly.
             return s * kVirualRayLen;// _axis_length;
@@ -356,8 +423,20 @@ namespace Ailu
 
             // Lock the current axis.
             _drag_axis = _hover_axis;
-            if (_drag_axis < 0) return;
+            if (_drag_axis == 0u)
+                return;
+            if (_mode == EGizmoMode::kRotate)
+            {
+                if (Is2DMode() && _drag_axis != Get2DHiddenAxisMask())
+                    return;
+            }
+            else if (!IsAxisMaskAvailable(_drag_axis))
+            {
+                return;
+            }
 
+            _drag_start_local_transform = target->_local_transform;
+            _has_drag_start_transform = true;
             _is_dragging = true;
             _mouse_pos = mouse_pos;
             _drag_start_mouse_pos = mouse_pos;
@@ -365,7 +444,7 @@ namespace Ailu
             _drag_axis_num = 0u;
             if (_mode == EGizmoMode::kRotate)
             {
-                _drag_start_hit = CollisionDetection::Intersect(Ray{_cam->Position(), _cam->ScreenToWorld(_mouse_pos)}, s_rotate_plane[_drag_axis>>1])._point;
+                _drag_start_hit = CollisionDetection::Intersect(MakeGizmoMouseRay(_cam, _mouse_pos), s_rotate_plane[_drag_axis>>1])._point;
                 _drag_start_hit = _cur_target_pos + Normalize(_drag_start_hit - _cur_target_pos) * _scaled_axis_length;
                 _drag_start_rot = target->_rotation;
             }
@@ -390,13 +469,13 @@ namespace Ailu
                 if (_drag_axis_num == 2)
                 {
                     s_drag_plane = Plane(_drag_start_pos, CrossProduct(_drag_axis_ctx[0]._drag_axis_dir, _drag_axis_ctx[1]._drag_axis_dir));
-                    Ray ray{_cam->Position(), _cam->ScreenToWorld(_mouse_pos)};
+                    Ray ray = MakeGizmoMouseRay(_cam, _mouse_pos);
                     _drag_start_hit = CollisionDetection::Intersect(ray, s_drag_plane)._point;
                 }
                 else if (_drag_axis_num == 3)//scale all
                 {
                     s_drag_plane = Plane(_drag_start_pos, Normalize(_cam->Position() - _drag_origin));
-                    Ray ray{_cam->Position(), _cam->ScreenToWorld(_mouse_pos)};
+                    Ray ray = MakeGizmoMouseRay(_cam, _mouse_pos);
                     _drag_start_hit = CollisionDetection::Intersect(ray, s_drag_plane)._point;
                     _drag_start_target_delta = _drag_start_mouse_pos - _cam->WorldToScreen(_drag_start_pos);
                 }
@@ -417,8 +496,15 @@ namespace Ailu
 
         void TransformGizmo::EndDrag()
         {
+            auto *target = Target();
+            if (_is_dragging && _has_drag_start_transform && target != nullptr && g_pCommandMgr != nullptr &&
+                IsTransformChanged(_drag_start_local_transform, target->_local_transform))
+            {
+                g_pCommandMgr->ExecuteCommand(MakeScope<TransformCommand>("TransformGizmo", target, _drag_start_local_transform));
+            }
             _is_dragging = false;
             _drag_axis = -1;
+            _has_drag_start_transform = false;
             _drag_scale_factor = Vector3f::kOne;
             _drag_rot = Quaternion::Identity();
         }
@@ -513,7 +599,9 @@ namespace Ailu
                     {
                         for (auto &a: _translate_axis)
                         {
-                            if (a._axis & _hover_axis)
+                            if (!IsAxisMaskAvailable(a._axis))
+                                a._mat->SetVector("_color", kInactiveColor);
+                            else if (a._axis & _hover_axis)
                                 a._mat->SetVector("_color", kHoverColor);
                             else
                                 a._mat->SetVector("_color", kNormalColors[a._index]);
@@ -523,7 +611,10 @@ namespace Ailu
                     {
                         for (u32 i = 0; i < 3; i++)
                         {
-                            if (_hover_axis & (1 << i))
+                            const u32 axis_mask = 1u << i;
+                            if (Is2DMode() && axis_mask != Get2DHiddenAxisMask())
+                                _rotate_rings[i]->SetVector("_color", kInactiveColor);
+                            else if (_hover_axis & axis_mask)
                                 _rotate_rings[i]->SetVector("_color", kHoverColor);
                             else
                                 _rotate_rings[i]->SetVector("_color", kNormalColors[i]);
@@ -545,7 +636,7 @@ namespace Ailu
                         }
                         else if (_drag_axis_num == 2)// Multi-axis movement uses the drag plane.
                         {
-                            Ray ray{_cam->Position(), _cam->ScreenToWorld(mouse_pos)};
+                            Ray ray = MakeGizmoMouseRay(_cam, mouse_pos);
                             Vector3f hit = CollisionDetection::Intersect(ray, s_drag_plane)._point;
                             world_delta = hit - _drag_start_hit;
                             Render::Gizmo::DrawLine(_drag_start_hit, hit, Colors::kYellow);
@@ -555,6 +646,8 @@ namespace Ailu
                             Render::Gizmo::DrawText(std::format("origin: {}", _drag_start_pos.ToString()), p + Vector2f(0.0f, 118 * 10 / 65.0f) * 2.0f, 10u, Colors::kCyan);
                         }
                         else {}
+                        if (IsSnapActive())
+                            world_delta = SnapVector(world_delta, _translate_snap_step);
                         SetTargetWorldPosition(target, _drag_start_pos + world_delta);
                     }
                     else if (_mode == EGizmoMode::kScale)
@@ -572,7 +665,10 @@ namespace Ailu
                             Vector2f p = mouse_pos + Vector2f{20, 20};
                             Render::Gizmo::DrawText(std::format("start_s: {},now s: {}", ctx._drag_start_s,s_now), p, 10u, Colors::kCyan);
                             _drag_scale_factor[_drag_axis >> 1] = delta_s;
-                            target->SetLocalScale(_drag_start_scale * world_scale);
+                            Vector3f target_scale = _drag_start_scale * world_scale;
+                            if (IsSnapActive())
+                                target_scale = _drag_start_scale + SnapVector(target_scale - _drag_start_scale, _scale_snap_step);
+                            target->SetLocalScale(target_scale);
                         }
                         else if (_drag_axis_num == 3)// Uniform scale uses screen-space movement.
                         {
@@ -593,8 +689,8 @@ namespace Ailu
 
                             // Map screen distance to world-space distance.
                             // Compute the world units represented by one screen pixel.
-                            Ray ray0 = Ray{_cam->Position(), _cam->ScreenToWorld(_drag_start_mouse_pos)};
-                            Ray ray1 = Ray{_cam->Position(), _cam->ScreenToWorld(_drag_start_mouse_pos + Vector2f(1, 1))};
+                            Ray ray0 = MakeGizmoMouseRay(_cam, _drag_start_mouse_pos);
+                            Ray ray1 = MakeGizmoMouseRay(_cam, _drag_start_mouse_pos + Vector2f(1, 1));
 
                             // Intersect on the gizmo plane.
                             Vector3f hit0 = CollisionDetection::Intersect(ray0, s_drag_plane)._point;
@@ -613,7 +709,10 @@ namespace Ailu
                             world_scale = Vector3f(s);
 
                             // Apply to target.
-                            target->SetLocalScale(_drag_start_scale + world_scale);
+                            Vector3f target_scale = _drag_start_scale + world_scale;
+                            if (IsSnapActive())
+                                target_scale = _drag_start_scale + SnapVector(target_scale - _drag_start_scale, _scale_snap_step);
+                            target->SetLocalScale(target_scale);
                             _drag_scale_factor = Vector3f::kOne + world_scale;
                             Vector2f p = mouse_pos + Vector2f{20, 20};
                             Render::Gizmo::DrawText(std::format("now s: {}", s), p, 10u, Colors::kCyan);
@@ -627,7 +726,7 @@ namespace Ailu
                     {
                         Vector3f axis = GetAxisDirWorld(_drag_axis >> 1);// Example: X is (1, 0, 0).
                         _drag_current_hit = CollisionDetection::Intersect(
-                                               Ray{_cam->Position(), _cam->ScreenToWorld(_mouse_pos)},
+                                               MakeGizmoMouseRay(_cam, _mouse_pos),
                                                s_rotate_plane[_drag_axis >> 1])
                                                ._point;
                         _drag_current_hit = _cur_target_pos + Normalize(_drag_current_hit - _cur_target_pos) * _scaled_axis_length;
@@ -636,6 +735,8 @@ namespace Ailu
                         f32 cos_theta = std::clamp(DotProduct(v0, v1), -1.0f, 1.0f);
                         f32 sin_theta = DotProduct(CrossProduct(v0, v1), axis);
                         f32 angle = atan2(sin_theta, cos_theta);
+                        if (IsSnapActive())
+                            angle = SnapFloat(angle * k2Angle, _rotate_snap_degrees) * k2Radius;
                         Vector2f p = mouse_pos + Vector2f{20, 20};
                         Render::Gizmo::DrawText(std::format("angle: {}", angle * k2Angle), p, 10u, Colors::kCyan);
                         _drag_rot = Quaternion::AngleAxis(angle * k2Angle, axis);
@@ -653,6 +754,8 @@ namespace Ailu
             {
                 for (auto &axis: _translate_axis)
                 {
+                    if (!IsAxisMaskAvailable(axis._axis))
+                        continue;
                     f32 scale_factor = (_hover_axis & axis._axis) ? 1.2f : 1.0f;
                     Render::Gizmo::DrawMesh(Render::Mesh::s_cylinder.lock().get(),
                                             MakeGizmoCylinder(axis._dir, _cur_target_pos, _scaled_axis_length, _scaled_axis_radius * scale_factor),
@@ -665,18 +768,21 @@ namespace Ailu
                 // s_p_plane is 2x2.
                 const f32 quad_w = _scaled_axis_length * _axis_quad_width_scale;
                 //X->YZ Plane
+                if (IsAxisMaskAvailable(kAxisYZ))
                 {
                     Render::Gizmo::DrawMesh(Render::Mesh::s_plane.lock().get(),
                                             MakeGizmoPlane(_translate_axis[0]._dir, _translate_axis[1]._dir, _translate_axis[2]._dir, _cur_target_pos, quad_w),
                                             _translate_axis[0]._mat.get());
                 }
                 //Y->XZ Plane
+                if (IsAxisMaskAvailable(kAxisXZ))
                 {
                     Render::Gizmo::DrawMesh(Render::Mesh::s_plane.lock().get(),
                                             MakeGizmoPlane(_translate_axis[1]._dir, _translate_axis[0]._dir, _translate_axis[2]._dir, _cur_target_pos, quad_w),
                                             _translate_axis[1]._mat.get());
                 }
                 //Z->XY Plane
+                if (IsAxisMaskAvailable(kAxisXY))
                 {
                     Render::Gizmo::DrawMesh(Render::Mesh::s_plane.lock().get(),
                                             MakeGizmoPlane(_translate_axis[2]._dir, _translate_axis[0]._dir, _translate_axis[1]._dir, _cur_target_pos, quad_w),
@@ -687,6 +793,8 @@ namespace Ailu
             {
                 for (auto &axis: _translate_axis)
                 {
+                    if (!IsAxisMaskAvailable(axis._axis))
+                        continue;
                     f32 cur_axis_length = _scaled_axis_length * _drag_scale_factor[axis._index];
                     f32 scale_factor = (_hover_axis & axis._axis) ? 1.2f : 1.0f;
                     Render::Gizmo::DrawMesh(Render::Mesh::s_cylinder.lock().get(),
@@ -698,24 +806,30 @@ namespace Ailu
                                             axis._mat.get());
                 }
                 const f32 s = _scale_center_obb->_half_axis_length.x * 2.0f;
-                Render::Gizmo::DrawMesh(Render::Mesh::s_cube.lock().get(), MatrixScale(s,s,s)* MatrixTranslation(_cur_target_pos),
-                                        _translate_axis[0]._mat.get());
+                if (!Is2DMode())
+                {
+                    Render::Gizmo::DrawMesh(Render::Mesh::s_cube.lock().get(), MatrixScale(s,s,s)* MatrixTranslation(_cur_target_pos),
+                                            _translate_axis[0]._mat.get());
+                }
             }
             else//if (_mode == EGizmoMode::kRotate)
             {
                 for (auto &axis: _translate_axis)
                 {
+                    if (Is2DMode() && axis._axis != Get2DHiddenAxisMask())
+                        continue;
                     f32 scale_factor = _scaled_axis_length * (_hover_axis & axis._axis ? 1.2f : 1.05f);
                     //Render::Gizmo::DrawCircle(_cur_target_pos, _scaled_axis_length, 36u, _hover_axis & axis._axis ? kHoverColor : kNormalColors[axis._index],MakeCircle(axis._dir));
+                    Vector3f ring_axis = Is2DMode() ? -_cam->Forward() : axis._dir;
                     auto rmat = Quaternion::ToMat4f(_drag_rot);
-                    rmat = MakeCircle(axis._dir) * rmat;
+                    rmat = MakeCircle(ring_axis) * rmat;
                     Render::Gizmo::DrawMesh(Render::Mesh::s_plane.lock().get(),
                                             MatrixScale(scale_factor, scale_factor, scale_factor) * rmat * MatrixTranslation(_cur_target_pos),
                                             _rotate_rings[axis._index].get());
                 }
                 if (_is_dragging)
                 {
-                    Vector3f cur_hit = CollisionDetection::Intersect(Ray{_cam->Position(), _cam->ScreenToWorld(_mouse_pos)}, s_rotate_plane[_drag_axis >> 1])._point;
+                    Vector3f cur_hit = CollisionDetection::Intersect(MakeGizmoMouseRay(_cam, _mouse_pos), s_rotate_plane[_drag_axis >> 1])._point;
                     cur_hit = _cur_target_pos + Normalize(cur_hit - _cur_target_pos) * _scaled_axis_length;
                     Render::Gizmo::DrawLine(_cur_target_pos, _drag_start_hit, kDragingColor);
                     Render::Gizmo::DrawLine(_cur_target_pos, cur_hit, kDragingColor);
@@ -730,18 +844,17 @@ namespace Ailu
             u32 hover = 0u;
             if (_mode == EGizmoMode::kTranslate)
             {
-                auto &cam_pos = cam->Position();
-                hover = PickAxis(cam_pos, cam->ScreenToWorld(pos, 0.0f));
-                Ray r{cam_pos, cam->ScreenToWorld(pos, 0.0f)};
-                if (CollisionDetection::Intersect(r, *_plane_obbs[0])._is_collision)
+                Ray r = MakeGizmoMouseRay(cam, pos);
+                hover = PickAxis(r._start, r._dir);
+                if (IsAxisMaskAvailable(kAxisYZ) && CollisionDetection::Intersect(r, *_plane_obbs[0])._is_collision)
                 {
                     hover |= kAxisYZ;
                 }
-                if (CollisionDetection::Intersect(r, *_plane_obbs[1])._is_collision)
+                if (IsAxisMaskAvailable(kAxisXZ) && CollisionDetection::Intersect(r, *_plane_obbs[1])._is_collision)
                 {
                     hover |= kAxisXZ;
                 }
-                if (CollisionDetection::Intersect(r, *_plane_obbs[2])._is_collision)
+                if (IsAxisMaskAvailable(kAxisXY) && CollisionDetection::Intersect(r, *_plane_obbs[2])._is_collision)
                 {
                     hover |= kAxisXY;
                 }
@@ -751,10 +864,9 @@ namespace Ailu
             }
             else if (_mode == EGizmoMode::kScale)
             {
-                auto &cam_pos = cam->Position();
-                hover = PickAxis(cam_pos, cam->ScreenToWorld(pos, 0.0f));
-                Ray r{cam_pos, cam->ScreenToWorld(pos, 0.0f)};
-                if (CollisionDetection::Intersect(r, *_scale_center_obb)._is_collision)
+                Ray r = MakeGizmoMouseRay(cam, pos);
+                hover = PickAxis(r._start, r._dir);
+                if (!Is2DMode() && CollisionDetection::Intersect(r, *_scale_center_obb)._is_collision)
                 {
                     hover |= kAxisXYZ;
                 }
@@ -764,15 +876,17 @@ namespace Ailu
             }
             else
             {
-                auto &cam_pos = cam->Position();
-                Ray r{cam_pos, cam->ScreenToWorld(pos, 0.0f)};
+                Ray r = MakeGizmoMouseRay(cam, pos);
                 const f32 radius_threshold = _scaled_axis_length * 0.1f;
                 for (u16 i = 0; i < 3; i++)
                 {
+                    const u32 axis_mask = 1u << i;
+                    if (Is2DMode() && axis_mask != Get2DHiddenAxisMask())
+                        continue;
                     if (auto hit_res = CollisionDetection::Intersect(r, s_rotate_plane[i]); hit_res._is_collision == true)
                     {
                         if (abs(Magnitude(hit_res._point - s_rotate_plane[i]._point) - _scaled_axis_length) < radius_threshold)
-                            hover |= 1 << i;
+                            hover |= axis_mask;
                         if (hover)
                             break;
                     }

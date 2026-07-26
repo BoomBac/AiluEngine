@@ -116,8 +116,7 @@ public:                                                                 \
             String _name;
             u32 _layer_mask;
         };
-        Archive &operator<<(Archive &ar, const TagComponent &c);
-        Archive &operator>>(Archive &ar, TagComponent &c);
+
 
         struct AILU_API PersistentIdComponent
         {
@@ -127,8 +126,7 @@ public:                                                                 \
             PersistentIdComponent() : _guid(Guid::Generate()) {}
             explicit PersistentIdComponent(Guid guid) : _guid(std::move(guid)) {}
         };
-        Archive &operator<<(Archive &ar, const PersistentIdComponent &c);
-        Archive &operator>>(Archive &ar, PersistentIdComponent &c);
+
 
         struct AILU_API TransformComponent
         {
@@ -328,8 +326,7 @@ public:                                                                 \
             kSpot,
             kArea
         };
-        const String &LightTypeToString(ELightType type);
-        ELightType LightTypeFromString(const String &str);
+
         struct AILU_API LightComponent
         {
             DECLARE_COMPONENT(LightComponent, "Ailu.ECS.LightComponent")

@@ -1032,6 +1032,45 @@ namespace Ailu::Render
         out[1] = Vector4f(origin.x, origin.y, x_axis_end.x, x_axis_end.y);
         out[2] = Vector4f(origin.x, origin.y, z_axis_end.x, z_axis_end.y);
     }
+
+    static Matrix4x4f GetGridPlaneMatrix(const RenderingData &rendering_data)
+    {
+        Matrix4x4f scale = MatrixScale(1000.0f, 1000.0f, 1000.0f);
+        if (rendering_data._camera == nullptr || rendering_data._camera->Type() != ECameraType::kOrthographic)
+            return scale;
+
+        Vector3f forward = rendering_data._camera->Forward();
+        Vector3f abs_forward(std::abs(forward.x), std::abs(forward.y), std::abs(forward.z));
+        Vector3f grid_position = rendering_data._camera->Position() + forward * std::max(1.0f, rendering_data._camera->Near() + 0.01f);
+        if (abs_forward.x >= abs_forward.y && abs_forward.x >= abs_forward.z)
+            return scale * MatrixRotationZ(k2Radius * 90.0f) * MatrixTranslation(grid_position);
+        if (abs_forward.z >= abs_forward.x && abs_forward.z >= abs_forward.y)
+            return scale * MatrixRotationX(k2Radius * 90.0f) * MatrixTranslation(grid_position);
+        return scale * MatrixTranslation(grid_position);
+    }
+
+    static bool Is2DGridCamera(const RenderingData &rendering_data)
+    {
+        return rendering_data._camera != nullptr && rendering_data._camera->Type() == ECameraType::kOrthographic;
+    }
+
+    static void SetGridPlaneAxisMode(Material *material, const RenderingData &rendering_data)
+    {
+        if (material == nullptr)
+            return;
+
+        f32 axis_mode = 0.0f;// XZ
+        if (Is2DGridCamera(rendering_data))
+        {
+            Vector3f forward = rendering_data._camera->Forward();
+            Vector3f abs_forward(std::abs(forward.x), std::abs(forward.y), std::abs(forward.z));
+            if (abs_forward.z >= abs_forward.x && abs_forward.z >= abs_forward.y)
+                axis_mode = 1.0f;// XY
+            else if (abs_forward.x >= abs_forward.y && abs_forward.x >= abs_forward.z)
+                axis_mode = 2.0f;// YZ
+        }
+        material->SetVector("_grid_axis_mode", Vector4f(axis_mode, 0.0f, 0.0f, 0.0f));
+    }
     using SceneManagement::SceneMgr;
 
     void Ailu::Render::GizmoPass::OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data)
@@ -1056,9 +1095,18 @@ namespace Ailu::Render
                     Gizmo::DrawLine(axis[0].xy, axis[0].zw, Colors::kGreen);
                     Gizmo::DrawLine(axis[1].xy, axis[1].zw, Colors::kRed);
                     Gizmo::DrawLine(axis[2].xy, axis[2].zw, Colors::kBlue);
-                    cmd->SetRenderTarget(rendering_data._rg_handles._color_target, rendering_data._rg_handles._depth_target);
+                    bool is_2d_grid = Is2DGridCamera(rendering_data);
+                    if (is_2d_grid)
+                        cmd->SetRenderTarget(rendering_data._rg_handles._color_target);
+                    else
+                        cmd->SetRenderTarget(rendering_data._rg_handles._color_target, rendering_data._rg_handles._depth_target);
 
+                    Matrix4x4f grid_plane_pos = GetGridPlaneMatrix(rendering_data);
+                    memcpy(_p_cbuffers[0]->GetData(), &grid_plane_pos, sizeof(Matrix4x4f));
+                    SetGridPlaneAxisMode(mat_gird_plane, rendering_data);
                     cmd->DrawMesh(Mesh::s_plane.lock().get(), mat_gird_plane, _p_cbuffers[0].get(), 0, 0, 1);
+                    if (is_2d_grid)
+                        cmd->SetRenderTarget(rendering_data._rg_handles._color_target, rendering_data._rg_handles._depth_target);
                     u16 index = 1;
                     u16 entity_index = 0;
                     for (auto &light_comp: SceneMgr::Get().ActiveScene()->GetRegister().View<ECS::LightComponent>())
@@ -1145,9 +1193,18 @@ namespace Ailu::Render
             PROFILE_BLOCK_GPU(cmd.get(), _name)
             cmd->SetViewport(rendering_data._viewport);
             cmd->SetScissorRect(rendering_data._scissor_rect);
-            cmd->SetRenderTarget(rendering_data._camera_color_target_handle, rendering_data._camera_depth_target_handle);
+            bool is_2d_grid = Is2DGridCamera(rendering_data);
+            if (is_2d_grid)
+                cmd->SetRenderTarget(rendering_data._camera_color_target_handle);
+            else
+                cmd->SetRenderTarget(rendering_data._camera_color_target_handle, rendering_data._camera_depth_target_handle);
 
+            Matrix4x4f grid_plane_pos = GetGridPlaneMatrix(rendering_data);
+            memcpy(_p_cbuffers[0]->GetData(), &grid_plane_pos, sizeof(Matrix4x4f));
+            SetGridPlaneAxisMode(mat_gird_plane, rendering_data);
             cmd->DrawMesh(Mesh::s_plane.lock().get(), mat_gird_plane, _p_cbuffers[0].get(), 0, 0, 1);
+            if (is_2d_grid)
+                cmd->SetRenderTarget(rendering_data._camera_color_target_handle, rendering_data._camera_depth_target_handle);
             u16 index = 1;
             u16 entity_index = 0;
             for (auto &light_comp: SceneMgr::Get().ActiveScene()->GetRegister().View<ECS::LightComponent>())

@@ -103,7 +103,7 @@ namespace Ailu
             _padding = _resolved_style._padding;
             if (_text != nullptr)
             {
-                _text->FontSize(_resolved_style._font_size);
+                _text->FontSize(_resolved_style._font_size, false);
                 if (const UIControlVisual *visual = GetCurrentVisual())
                     _text->_color = visual->_content_color;
             }
@@ -225,14 +225,23 @@ namespace Ailu
             if (_text == text)
                 return;
             _text = text;
+            MarkTextLayoutDirty();
             UpdateTextLayout();
+            InvalidatePaint();
             if (trigger_event)
                 _on_text_change_delegate.Invoke(_text);
         }
-        void Text::UpdateTextLayout()
+        void Text::UpdateTextLayout(bool record_dirty_reason)
         {
-            Vector2f new_size = TextRenderer::CalculateTextSize(_text,_font_size);
-            _text_visual_bounds = TextRenderer::CalculateTextVisualBounds(_text, _font_size);
+            Render::Font *font = TextRenderer::GetDefaultFont();
+            if (!_is_text_layout_dirty && _text_layout_font == font && NearbyEqual(_text_layout_font_size, _font_size))
+                return;
+            _text_layout_cache = TextRenderer::BuildLayout(_text, Vector2f::kZero, _font_size, font);
+            _text_layout_font = font;
+            _text_layout_font_size = _font_size;
+            _is_text_layout_dirty = false;
+            Vector2f new_size = _text_layout_cache._size;
+            _text_visual_bounds = TextRenderer::CalculateTextVisualBounds(_text_layout_cache);
             new_size.x += _padding._l + _padding._r;
             new_size.y += _padding._t + _padding._b;
             Vector2f dv = Abs(new_size - _text_size);
@@ -240,11 +249,23 @@ namespace Ailu
             if (dv.x > tolerance || dv.y > tolerance)
             {
                 _text_size = new_size;
-                InvalidateLayout();
+                if (record_dirty_reason)
+                    InvalidateLayout();
+            }
+        }
+        void Text::MarkTextLayoutDirty(bool record_dirty_reason)
+        {
+            _is_text_layout_dirty = true;
+            if (record_dirty_reason)
+            {
+                _dirty_reasons |= EUIInvalidationReason::kTextLayout | EUIInvalidationReason::kPaint;
+                _debug_dirty_reasons |= EUIInvalidationReason::kTextLayout | EUIInvalidationReason::kPaint;
             }
         }
         void Text::ResolveStyle(const UIStyleContext &context)
         {
+            f32 old_font_size = _font_size;
+            Color old_color = _color;
             if (context._theme)
             {
                 _font_size = context._theme->_typography._normal_font_size;
@@ -258,7 +279,9 @@ namespace Ailu
             _color = _resolved_visual._content_color;
             if (_style_override.HasOverride(EUIControlVisualOverride::kFontSize))
                 _font_size = _style_override._font_size;
-            UpdateTextLayout();
+            if (!NearbyEqual(old_font_size, _font_size))
+                MarkTextLayoutDirty(false);
+            UpdateTextLayout(false);
         }
 
         const UIControlVisual *Text::GetVisual(EUIVisualState state) const
@@ -313,7 +336,8 @@ namespace Ailu
             }
 
             // 绘制文字
-            r.DrawText(_text, aligned_pos,_matrix, _font_size, _color);
+            UpdateTextLayout(false);
+            r.DrawTextLayout(_text_layout_cache, aligned_pos, _matrix, _font_size, _color);
         }
 
         void Text::PostDeserialize()
@@ -325,13 +349,22 @@ namespace Ailu
         {
             UIElement::OnPropertyChanged(prop);
             const String &name = prop.Name();
-            if (name == "_text" || name == "_font_size" || name == "_color" || name == "_horizontal_align" || name == "_vertical_align")
+            if (name == "_text" || name == "_font_size")
+            {
+                MarkTextLayoutDirty();
                 UpdateTextLayout();
+                InvalidatePaint();
+            }
+            else if (name == "_color" || name == "_horizontal_align" || name == "_vertical_align")
+            {
+                InvalidatePaint();
+            }
         }
 
         Vector2f Text::MeasureDesiredSize()
         {
-            Vector2f desired_size = TextRenderer::CalculateTextSize(_text, _font_size);
+            UpdateTextLayout();
+            Vector2f desired_size = _text_layout_cache._size;
             desired_size.x += _padding._l + _padding._r;
             desired_size.y += _padding._t + _padding._b;
             if (GetSizePolicy(this, true) == ESizePolicy::kFixed)
@@ -340,11 +373,18 @@ namespace Ailu
                 desired_size.y = GetSlot()->_size.y;
             return desired_size;
         }
-        void Text::FontSize(f32 size)
+        void Text::FontSize(f32 size, bool record_dirty_reason)
         {
+            if (NearbyEqual(_font_size, size))
+                return;
             _font_size = size;
-            UpdateTextLayout();
-            _on_text_change_delegate.Invoke(_text);
+            MarkTextLayoutDirty(record_dirty_reason);
+            UpdateTextLayout(record_dirty_reason);
+            if (record_dirty_reason)
+            {
+                InvalidatePaint();
+                _on_text_change_delegate.Invoke(_text);
+            }
         }
 #pragma endregion
 
@@ -467,6 +507,7 @@ namespace Ailu
                 return;
             _value = v;
             Clamp(_value,_range.x,_range.y);
+            InvalidatePaint();
             if (trigger_event)
                 _on_value_change_delegate.Invoke(_value);
         }
@@ -477,8 +518,7 @@ namespace Ailu
         {
             OnMouseClick() += [this](UIEvent &e)
             {
-                _is_checked = !_is_checked;
-                _on_click_delegate.Invoke(_is_checked);
+                SetChecked(!_is_checked);
             };
         }
 
@@ -559,6 +599,7 @@ namespace Ailu
             if (_is_checked == is_checked)
                 return;
             _is_checked = is_checked;
+            InvalidatePaint();
             _on_click_delegate.Invoke(_is_checked);
         }
 #pragma endregion
@@ -619,30 +660,30 @@ namespace Ailu
 
         void Border::RenderImpl(UIRenderer &r)
         {
-            Color bg = _resolved_visual._background._tint;
+            const UIBrush &bg = _resolved_visual._background;
             Color border = _resolved_visual._border_color;
             Vector4f corner_radius = _resolved_visual._corner_radius;
             if (corner_radius != Vector4f::kZero)
             {
                 if (_thickness == Vector4f::kZero)
                 {
-                    if (bg.a > 0.0f)
-                        r.DrawQuad(_content_rect, _matrix, ColorBrush(bg), corner_radius);
+                    if (bg._type != EUIBrushType::kNone && bg._tint.a > 0.0f)
+                        r.DrawQuad(_content_rect, _matrix, bg, corner_radius);
                 }
                 else
                 {
                     if (border.a > 0.0f)
                         r.DrawQuad(_arrange_rect, _matrix, ColorBrush(border), corner_radius);
                     Vector4f inner_radius = Max(corner_radius - Vector4f{(_thickness.x + _thickness.y + _thickness.z + _thickness.w) * 0.25f}, Vector4f::kZero);
-                    if (bg.a > 0.0f)
-                        r.DrawQuad(_content_rect, _matrix, ColorBrush(bg), inner_radius);
+                    if (bg._type != EUIBrushType::kNone && bg._tint.a > 0.0f)
+                        r.DrawQuad(_content_rect, _matrix, bg, inner_radius);
                 }
             }
             else
             if (_thickness == Vector4f::kZero)
             {
-                if (bg.a > 0.0f)
-                    r.DrawQuad(_content_rect, _matrix, ColorBrush(bg));
+                if (bg._type != EUIBrushType::kNone && bg._tint.a > 0.0f)
+                    r.DrawQuad(_content_rect, _matrix, bg);
             }
             else
             {
@@ -656,8 +697,8 @@ namespace Ailu
                 f32 innerB = _content_rect.y + _content_rect.w;
 
                 // 背景
-                if (bg.a > 0.0f)
-                    r.DrawQuad(_content_rect, _matrix, ColorBrush(bg));
+                if (bg._type != EUIBrushType::kNone && bg._tint.a > 0.0f)
+                    r.DrawQuad(_content_rect, _matrix, bg);
 
                 if (border.a > 0.0f)
                 {
@@ -711,7 +752,6 @@ namespace Ailu
                 if (slot._size_policy_v == ESizePolicy::kFill)
                     desired_size.y = _content_rect.w;
                 _children[0]->Arrange(_padding._l, _padding._t, desired_size.x, desired_size.y);
-                _children[0]->InvalidateLayout();
             }
         }
         void Border::PostDeserialize()
@@ -984,6 +1024,8 @@ namespace Ailu
                 return;
             _content = content;
             _is_need_recalc_offset_table = true;
+            InvalidateLayout();
+            InvalidatePaint();
             if (trigger_event)
                 _on_content_changed_delegate.Invoke(content);
         }
@@ -1177,10 +1219,18 @@ namespace Ailu
             if (_texture == tex)
                 return;
             _texture = tex;
+            Vector2f old_tex_size = _tex_size;
             if (_texture)
             {
                 _tex_size = {(f32) _texture->Width(), (f32) _texture->Height()};
             }
+            else
+            {
+                _tex_size = Vector2f::kZero;
+            }
+            if (!NearbyEqual(old_tex_size, _tex_size))
+                InvalidateLayout();
+            InvalidatePaint();
         }
         void Image::PostDeserialize()
         {

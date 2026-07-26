@@ -19,7 +19,8 @@ namespace Ailu
             kNone,
             kColor,
             kTexture,
-            kNineSlice
+            kNineSlice,
+            kBackdropBlur
         };
 
         ASTRUCT()

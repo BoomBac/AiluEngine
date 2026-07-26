@@ -15,6 +15,7 @@
 #include "Render/Features/VolumetricClouds.h"
 #include "Render/Features/VolumetricFog.h"
 #include "Render/Gizmo.h"
+#include "Render/GraphicsContext.h"
 #include "Render/RenderingData.h"
 #include "UI/TextRenderer.h"
 //#include <Framework/Common/Application.h>
@@ -136,6 +137,69 @@ namespace Ailu
                 return std::format("{} <{}>", name, type_name);
             }
 
+            String UIInvalidationReasonToString(UI::EUIInvalidationReason reasons)
+            {
+                if (reasons == UI::EUIInvalidationReason::kNone)
+                    return "None";
+
+                String result;
+                auto append_reason = [&](UI::EUIInvalidationReason flag, const char *name)
+                {
+                    if (!UI::HasInvalidation(reasons, flag))
+                        return;
+                    if (!result.empty())
+                        result += " | ";
+                    result += name;
+                };
+                append_reason(UI::EUIInvalidationReason::kPaint, "Paint");
+                append_reason(UI::EUIInvalidationReason::kLayout, "Layout");
+                append_reason(UI::EUIInvalidationReason::kTransform, "Transform");
+                append_reason(UI::EUIInvalidationReason::kHierarchy, "Hierarchy");
+                append_reason(UI::EUIInvalidationReason::kClip, "Clip");
+                append_reason(UI::EUIInvalidationReason::kVisibility, "Visibility");
+                append_reason(UI::EUIInvalidationReason::kTextLayout, "TextLayout");
+                return result.empty() ? String("Unknown") : result;
+            }
+
+            bool HasDirtyDescendant(UI::UIElement *element)
+            {
+                if (element == nullptr)
+                    return false;
+                for (const auto &child: element->GetChildren())
+                {
+                    if (child != nullptr && (child->IsDebugPaintDirty() || HasDirtyDescendant(child.get())))
+                        return true;
+                }
+                return false;
+            }
+
+            bool HasDirtySubtree(UI::UIElement *element)
+            {
+                return element != nullptr && (element->IsDebugPaintDirty() || HasDirtyDescendant(element));
+            }
+
+            void DrawDirtyDescendantReasons(UI::UIElement *element)
+            {
+                if (element == nullptr)
+                    return;
+                for (const auto &child: element->GetChildren())
+                {
+                    if (child == nullptr)
+                        continue;
+                    const bool is_child_dirty = child->IsDebugPaintDirty();
+                    const bool has_dirty_subtree = HasDirtySubtree(child.get());
+                    if (!has_dirty_subtree)
+                        continue;
+                    const String label = BuildUIReflectorElementLabel(child.get());
+                    if (is_child_dirty)
+                    {
+                        const String reasons = UIInvalidationReasonToString(child->GetDebugInvalidationReasons());
+                        ImGui::BulletText("%s: %s", label.c_str(), reasons.c_str());
+                    }
+                    DrawDirtyDescendantReasons(child.get());
+                }
+            }
+
             void DrawUIReflectorElementTree(UI::UIElement *element, UI::UIElement *&selected)
             {
                 if (element == nullptr)
@@ -148,7 +212,13 @@ namespace Ailu
                     flags |= ImGuiTreeNodeFlags_Selected;
                 if (element->GetHierarchyDepth() <= 1u)
                     flags |= ImGuiTreeNodeFlags_DefaultOpen;
-                const String label = BuildUIReflectorElementLabel(element);
+                const bool is_self_dirty = element->IsDebugPaintDirty();
+                const bool is_chain_dirty = !is_self_dirty && HasDirtyDescendant(element);
+                String label = BuildUIReflectorElementLabel(element);
+                if (is_self_dirty)
+                    label += " [DIRTY]";
+                else if (is_chain_dirty)
+                    label += " [CHILD DIRTY]";
                 const bool is_open = ImGui::TreeNodeEx(static_cast<void *>(element), flags, "%s", label.c_str());
                 if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
                     selected = element;
@@ -181,6 +251,35 @@ namespace Ailu
                     DrawUIReflectorElementTree(root, selected);
                     ImGui::TreePop();
                 }
+            }
+
+            void DrawUIReflectorRenderStats()
+            {
+                auto *renderer = UI::UIRenderer::Get();
+                if (renderer == nullptr)
+                    return;
+
+                const auto &stats = renderer->GetFrameStats();
+                if (!ImGui::CollapsingHeader("Render Stats", ImGuiTreeNodeFlags_DefaultOpen))
+                    return;
+
+                ImGui::Text("Element Visit: %llu", static_cast<unsigned long long>(stats._ui_element_visit_count));
+                ImGui::Text("RenderImpl: %llu", static_cast<unsigned long long>(stats._ui_render_impl_count));
+                ImGui::Text("Layout: %llu", static_cast<unsigned long long>(stats._ui_layout_count));
+                ImGui::Text("Text Layout: %llu", static_cast<unsigned long long>(stats._ui_text_layout_count));
+                ImGui::Separator();
+                ImGui::Text("Generated Vertices: %llu", static_cast<unsigned long long>(stats._ui_generated_vertex_count));
+                ImGui::Text("Generated Indices: %llu", static_cast<unsigned long long>(stats._ui_generated_index_count));
+                ImGui::Text("Uploaded: %llu B (%.2f KB)", static_cast<unsigned long long>(stats._ui_uploaded_bytes), stats._ui_uploaded_bytes / 1024.0f);
+                ImGui::Text("Draw Nodes: %llu", static_cast<unsigned long long>(stats._ui_draw_node_count));
+                ImGui::Text("Draw Calls: %llu", static_cast<unsigned long long>(stats._ui_draw_call_count));
+                ImGui::Separator();
+                ImGui::Text("Cache Hit: %llu", static_cast<unsigned long long>(stats._ui_cache_hit_count));
+                ImGui::Text("Cache Miss: %llu", static_cast<unsigned long long>(stats._ui_cache_miss_count));
+                ImGui::Text("Paint Build: %.3f ms", stats._ui_paint_build_time);
+                ImGui::Text("GPU Upload: %.3f ms", stats._ui_gpu_upload_time);
+                ImGui::Text("Submit: %.3f ms", stats._ui_submit_time);
+                ImGui::Separator();
             }
 
             bool DrawReflectedPropertiesByType(const Type *type, void *obj, const std::function<bool(const PropertyInfo &)> &filter = {});
@@ -746,6 +845,42 @@ namespace Ailu
                 ImGui::Text("Focused: %s", selected->IsFocused() ? "true" : "false");
                 ImGui::Separator();
 
+                if (ImGui::CollapsingHeader("Dirty State", ImGuiTreeNodeFlags_DefaultOpen))
+                {
+                    const String element_reasons = UIInvalidationReasonToString(selected->GetDebugInvalidationReasons());
+                    const bool has_dirty_descendant = HasDirtyDescendant(selected);
+                    ImGui::Text("Self Dirty: %s", selected->IsDebugPaintDirty() ? "true" : "false");
+                    ImGui::Text("Self Reasons: %s", element_reasons.c_str());
+                    ImGui::Text("Descendant Dirty: %s", has_dirty_descendant ? "true" : "false");
+                    if (widget != nullptr)
+                    {
+                        const String widget_reasons = UIInvalidationReasonToString(widget->GetPaintCacheDirtyReasons());
+                        const u16 frame_index = Render::g_pGfxContext != nullptr
+                                                    ? static_cast<u16>(Render::g_pGfxContext->GetFrameCount() % Render::RenderConstants::kFrameCount)
+                                                    : 0u;
+                        ImGui::Text("Widget Cache Dirty: %s", widget->IsPaintCacheDirty(frame_index) ? "true" : "false");
+                        ImGui::Text("Widget Reasons: %s", widget_reasons.c_str());
+                        ImGui::Text("Invalidation Count: %llu", static_cast<unsigned long long>(widget->GetInvalidationCount()));
+                        if (auto *source = widget->GetLastInvalidationSource(); source != nullptr)
+                        {
+                            const String source_label = BuildUIReflectorElementLabel(source);
+                            const String source_reasons = UIInvalidationReasonToString(widget->GetLastInvalidationReasons());
+                            ImGui::Text("Last Source: %s", source_label.c_str());
+                            ImGui::Text("Last Source Reasons: %s", source_reasons.c_str());
+                        }
+                        else
+                        {
+                            ImGui::TextUnformatted("Last Source: None");
+                        }
+                    }
+                    if (has_dirty_descendant)
+                    {
+                        ImGui::SeparatorText("Dirty Descendants");
+                        DrawDirtyDescendantReasons(selected);
+                    }
+                }
+                ImGui::Separator();
+
                 auto slot = selected->GetSlot();
                 if (slot != nullptr)
                 {
@@ -801,6 +936,7 @@ namespace Ailu
                 const float tree_width = std::max(220.0f, ImGui::GetContentRegionAvail().x - details_width - ImGui::GetStyle().ItemSpacing.x);
 
                 ImGui::BeginChild("UIReflectorTree", ImVec2(tree_width, 0.0f), ImGuiChildFlags_Border);
+                DrawUIReflectorRenderStats();
                 for (const auto &widget: ui_mgr->_widgets)
                     DrawUIReflectorWidgetTree(widget.get(), selected);
                 ImGui::EndChild();
@@ -1917,6 +2053,7 @@ namespace Ailu
             }
             if (s_show_ui_reflector)
                 ShowUIReflectorWindow(&s_show_ui_reflector);
+            UI::UIManager::Get()->SetDebugReflectorVisible(s_show_ui_reflector);
             if (!s_show_ui_reflector)
                 UI::UIManager::Get()->SetDebugHighlightTarget(nullptr);
             if (s_show_style_theme_editor)

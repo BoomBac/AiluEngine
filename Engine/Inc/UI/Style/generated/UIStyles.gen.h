@@ -11,7 +11,7 @@
                                 static const Type* GetPrivateStaticClass();\
                             public:\
                                 static const Type *StaticType() {return GetPrivateStaticClass();};\
-                                const AILU_API Type  *GetType();
+                                const Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu::UI{
 struct UIControlVisual ;
@@ -27,7 +27,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UIControlVis
                                 static const Type* GetPrivateStaticClass();\
                             public:\
                                 static const Type *StaticType() {return GetPrivateStaticClass();};\
-                                const AILU_API Type  *GetType();
+                                const Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu::UI{
 struct UIControlVisualOverride ;
@@ -43,7 +43,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UIControlVis
                                 static const Type* GetPrivateStaticClass();\
                             public:\
                                 static const Type *StaticType() {return GetPrivateStaticClass();};\
-                                const AILU_API Type  *GetType();
+                                const Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu::UI{
 struct UIButtonStyle ;
@@ -59,7 +59,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UIButtonStyl
                                 static const Type* GetPrivateStaticClass();\
                             public:\
                                 static const Type *StaticType() {return GetPrivateStaticClass();};\
-                                const AILU_API Type  *GetType();
+                                const Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu::UI{
 struct UIButtonStyleOverride ;
@@ -75,7 +75,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UIButtonStyl
                                 static const Type* GetPrivateStaticClass();\
                             public:\
                                 static const Type *StaticType() {return GetPrivateStaticClass();};\
-                                const AILU_API Type  *GetType();
+                                const Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu::UI{
 struct UISliderStyle ;
@@ -91,7 +91,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UISliderStyl
                                 static const Type* GetPrivateStaticClass();\
                             public:\
                                 static const Type *StaticType() {return GetPrivateStaticClass();};\
-                                const AILU_API Type  *GetType();
+                                const Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu::UI{
 struct UISliderStyleOverride ;
@@ -107,7 +107,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UISliderStyl
                                 static const Type* GetPrivateStaticClass();\
                             public:\
                                 static const Type *StaticType() {return GetPrivateStaticClass();};\
-                                const AILU_API Type  *GetType();
+                                const Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu::UI{
 struct UICheckBoxStyle ;
@@ -123,7 +123,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UICheckBoxSt
                                 static const Type* GetPrivateStaticClass();\
                             public:\
                                 static const Type *StaticType() {return GetPrivateStaticClass();};\
-                                const AILU_API Type  *GetType();
+                                const Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu::UI{
 struct UICheckBoxStyleOverride ;
@@ -139,7 +139,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UICheckBoxSt
                                 static const Type* GetPrivateStaticClass();\
                             public:\
                                 static const Type *StaticType() {return GetPrivateStaticClass();};\
-                                const AILU_API Type  *GetType();
+                                const Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu::UI{
 struct UIInputStyle ;
@@ -155,7 +155,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UIInputStyle
                                 static const Type* GetPrivateStaticClass();\
                             public:\
                                 static const Type *StaticType() {return GetPrivateStaticClass();};\
-                                const AILU_API Type  *GetType();
+                                const Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu::UI{
 struct UIInputStyleOverride ;
@@ -171,7 +171,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UIInputStyle
                                 static const Type* GetPrivateStaticClass();\
                             public:\
                                 static const Type *StaticType() {return GetPrivateStaticClass();};\
-                                const AILU_API Type  *GetType();
+                                const Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu::UI{
 struct UIScrollBarStyle ;
@@ -187,7 +187,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UIScrollBarS
                                 static const Type* GetPrivateStaticClass();\
                             public:\
                                 static const Type *StaticType() {return GetPrivateStaticClass();};\
-                                const AILU_API Type  *GetType();
+                                const Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu::UI{
 struct UIScrollBarStyleOverride ;
@@ -203,7 +203,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UIScrollBarS
                                 static const Type* GetPrivateStaticClass();\
                             public:\
                                 static const Type *StaticType() {return GetPrivateStaticClass();};\
-                                const AILU_API Type  *GetType();
+                                const Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu::UI{
 struct UIScrollViewStyle ;
@@ -219,7 +219,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UIScrollView
                                 static const Type* GetPrivateStaticClass();\
                             public:\
                                 static const Type *StaticType() {return GetPrivateStaticClass();};\
-                                const AILU_API Type  *GetType();
+                                const Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu::UI{
 struct UIScrollViewStyleOverride ;

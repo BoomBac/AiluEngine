@@ -52,6 +52,13 @@ namespace Ailu
             void Update(f32 dt);
             void PostUpdate(f32 dt);
             void Render(UIRenderer &r);
+            void InvalidatePaint(EUIInvalidationReason reason, UIElement *source = nullptr);
+            bool IsPaintCacheDirty(u16 frame_index) const;
+            void ClearPaintInvalidation(u16 frame_index);
+            EUIInvalidationReason GetPaintCacheDirtyReasons() const { return _paint_cache_dirty_reasons; }
+            UIElement *GetLastInvalidationSource() const { return _last_invalidation_source; }
+            EUIInvalidationReason GetLastInvalidationReasons() const { return _last_invalidation_reasons; }
+            u64 GetInvalidationCount() const { return _invalidation_count; }
             bool OnEvent(UIEvent& event);
             bool IsHover(Vector2f pos) const;
             std::tuple<Render::RenderTexture *, Render::RenderTexture *> GetOutput() 
@@ -66,6 +73,8 @@ namespace Ailu
             UIElement *Root() { return _root.get(); }
             const Window *Parent() const { return _parent; };
             void SetParent(Window *w) { _parent = w; };
+            bool IsPopup() const { return _is_popup; }
+            void SetPopup(bool is_popup) { _is_popup = is_popup; }
 
             bool operator<(const Widget &other) const { return _sort_order < other._sort_order; }
             bool operator>(const Widget &other) const { return _sort_order > other._sort_order; }
@@ -97,7 +106,13 @@ namespace Ailu
             Render::RenderTexture *_external_color; 
             Render::RenderTexture * _external_depth;
             Ref<UIElement> _root;
+            EUIInvalidationReason _paint_cache_dirty_reasons = EUIInvalidationReason::kPaint;
+            UIElement *_last_invalidation_source = nullptr;
+            EUIInvalidationReason _last_invalidation_reasons = EUIInvalidationReason::kNone;
+            u64 _invalidation_count = 0u;
+            Array<bool, Render::RenderConstants::kFrameCount> _is_paint_cache_frame_valid = {};
             Vector<UIElement*> _prev_hover_path;
+            bool _is_popup = false;
             // 双击检测状态
             std::chrono::steady_clock::time_point _last_click_time{};
             Vector2f _last_click_pos{-FLT_MAX, -FLT_MAX};

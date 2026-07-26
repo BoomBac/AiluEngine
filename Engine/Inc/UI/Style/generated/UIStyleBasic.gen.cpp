@@ -559,6 +559,7 @@ initializer._str_to_enum_lut["kNone"] = 0;
 initializer._str_to_enum_lut["kColor"] = 1;
 initializer._str_to_enum_lut["kTexture"] = 2;
 initializer._str_to_enum_lut["kNineSlice"] = 3;
+initializer._str_to_enum_lut["kBackdropBlur"] = 4;
 s_enum_type_EUIBrushType = std::make_unique<Ailu::Enum>(initializer);
 Ailu::Enum::RegisterEnum(s_enum_type_EUIBrushType.get());
 }

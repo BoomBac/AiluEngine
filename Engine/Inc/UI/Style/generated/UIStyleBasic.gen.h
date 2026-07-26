@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __UISTYLEBASIC_GEN_H__
 //Struct UIBrush begin...........................
-#define UISTYLEBASIC_GEN_H_28_GENERATED_BODY \
+#define UISTYLEBASIC_GEN_H_29_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_UIBrush_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -21,7 +21,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UIBrush>();
 //Struct UIBrush end...........................
 
 //Struct UIColorTokens begin...........................
-#define UISTYLEBASIC_GEN_H_51_GENERATED_BODY \
+#define UISTYLEBASIC_GEN_H_52_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_UIColorTokens_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -37,7 +37,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UIColorToken
 //Struct UIColorTokens end...........................
 
 //Struct UISpacingTokens begin...........................
-#define UISTYLEBASIC_GEN_H_78_GENERATED_BODY \
+#define UISTYLEBASIC_GEN_H_79_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_UISpacingTokens_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -53,7 +53,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UISpacingTok
 //Struct UISpacingTokens end...........................
 
 //Struct UITypographyTokens begin...........................
-#define UISTYLEBASIC_GEN_H_96_GENERATED_BODY \
+#define UISTYLEBASIC_GEN_H_97_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_UITypographyTokens_Type();\
                                 static const Type* GetPrivateStaticClass();\

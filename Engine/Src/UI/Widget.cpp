@@ -70,14 +70,20 @@ namespace Ailu
                 }
                 if (root_type != nullptr)
                     _root.reset(root_type->CreateInstance<UIElement>());
-                _root->Deserialize(ar);
+                if (_root != nullptr)
+                    _root->Deserialize(ar);
                 sar->EndObject();
             }
         }
         void Widget::PostDeserialize()
         {
             if (_root)
+            {
+                _root->SetOwningWidgetRecursive(this);
                 _root->PostDeserialize();
+            }
+            InvalidatePaint(EUIInvalidationReason::kHierarchy | EUIInvalidationReason::kLayout | EUIInvalidationReason::kPaint,
+                            _root.get());
         }
         void Widget::BindOutput(RenderTexture *color, RenderTexture *depth)
         {
@@ -89,10 +95,19 @@ namespace Ailu
         void Widget::AddToWidget(Ref<UIElement> root)
         {
             if (_root)
+            {
                 LOG_WARNING("Widget::AddToWidget: Root() already exists,replace to ()", _root->Name(), root->Name());
+                _root->SetOwningWidgetRecursive(nullptr);
+            }
             _root = root;
-            _root->Translate(_position);
-            _root->Arrange(0.0f, 0.0f, _size.x, _size.y);
+            if (_root != nullptr)
+            {
+                _root->SetOwningWidgetRecursive(this);
+                _root->Translate(_position);
+                _root->Arrange(0.0f, 0.0f, _size.x, _size.y);
+            }
+            InvalidatePaint(EUIInvalidationReason::kHierarchy | EUIInvalidationReason::kLayout | EUIInvalidationReason::kPaint,
+                            _root.get());
         }
 
         void Widget::PreUpdate(f32 dt)
@@ -126,6 +141,31 @@ namespace Ailu
             if (_root)
                 _root->Render(r);
         }
+        void Widget::InvalidatePaint(EUIInvalidationReason reason, UIElement *source)
+        {
+            _paint_cache_dirty_reasons |= reason;
+            _last_invalidation_source = source;
+            _last_invalidation_reasons = reason;
+            ++_invalidation_count;
+            for (auto &is_valid: _is_paint_cache_frame_valid)
+                is_valid = false;
+        }
+        bool Widget::IsPaintCacheDirty(u16 frame_index) const
+        {
+            return frame_index >= Render::RenderConstants::kFrameCount || !_is_paint_cache_frame_valid[frame_index];
+        }
+        void Widget::ClearPaintInvalidation(u16 frame_index)
+        {
+            if (frame_index < Render::RenderConstants::kFrameCount)
+                _is_paint_cache_frame_valid[frame_index] = true;
+            bool is_all_frame_valid = true;
+            for (const auto is_valid: _is_paint_cache_frame_valid)
+                is_all_frame_valid = is_all_frame_valid && is_valid;
+            if (is_all_frame_valid)
+                _paint_cache_dirty_reasons = EUIInvalidationReason::kNone;
+            if (_root != nullptr)
+                _root->ClearPaintDirtyRecursive();
+        }
 
         Vector2f Widget::GetSize() const
         {
@@ -138,6 +178,7 @@ namespace Ailu
             _size = size;
             if (_root)
                 _root->Arrange(0.0f, 0.0f, _size.x, _size.y);
+            InvalidatePaint(EUIInvalidationReason::kLayout | EUIInvalidationReason::kPaint, _root.get());
         }
         void Widget::SetPosition(Vector2f position)
         {
@@ -146,6 +187,7 @@ namespace Ailu
             _position = position;
             if (_root)
                 _root->Translate(position);
+            InvalidatePaint(EUIInvalidationReason::kTransform | EUIInvalidationReason::kPaint, _root.get());
         }
 
         bool Widget::DispatchEvent(UIEvent &e)

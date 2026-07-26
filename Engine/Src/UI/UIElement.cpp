@@ -6,6 +6,7 @@
 #include "UI/UIRenderer.h"
 #include "UI/TextRenderer.h"
 #include "UI/UIFramework.h"
+#include "UI/Widget.h"
 #include "UI/Style/UITheme.h"
 #include <memory>
 
@@ -68,11 +69,12 @@ namespace Ailu
                 {
                     old_parent->_on_child_remove_delegate.Invoke(child.get());
                     old_parent->_children.erase(it);
-                    old_parent->InvalidateLayout();
+                    old_parent->InvalidateHierarchy();
                 }
             }
 
             child->_parent = this;
+            child->SetOwningWidgetRecursive(_owning_widget);
             child->_hierarchy_depth = _hierarchy_depth + 1u;
             Ref<UISlot> new_slot = CreateSlotForChild();
             if (old_slot != nullptr && new_slot != nullptr)
@@ -83,7 +85,7 @@ namespace Ailu
             child->SetSlot(new_slot);
             _children.emplace_back(child);
             _on_child_add_delegate.Invoke(child.get());
-            InvalidateLayout();
+            InvalidateHierarchy();
             return child.get();
         }
         void UIElement::RemoveChild(Ref<UIElement> child)
@@ -95,10 +97,12 @@ namespace Ailu
             {
                 _on_child_remove_delegate.Invoke(it->get());
                 child->_parent = nullptr;
+                child->SetOwningWidgetRecursive(nullptr);
                 child->_hierarchy_depth = 0u;
                 child->SetSlot(nullptr);
                 UI::UIManager::Get()->Destroy(*it);
                 _children.erase(it);
+                InvalidateHierarchy();
             }
         }
         void UIElement::RemoveChild(UIElement *child)
@@ -111,10 +115,12 @@ namespace Ailu
             {
                 _on_child_remove_delegate.Invoke(it->get());
                 (*it)->_parent = nullptr;
+                (*it)->SetOwningWidgetRecursive(nullptr);
                 (*it)->_hierarchy_depth = 0u;
                 (*it)->SetSlot(nullptr);
                 UI::UIManager::Get()->Destroy(*it);
                 _children.erase(it);
+                InvalidateHierarchy();
             }
         }
 
@@ -125,12 +131,14 @@ namespace Ailu
             for (auto &child: _children)
             {
                 child->_parent = nullptr;
+                child->SetOwningWidgetRecursive(nullptr);
                 child->_hierarchy_depth = 0u;
                 child->SetSlot(nullptr);
                 _on_child_remove_delegate.Invoke(child.get());
                 UI::UIManager::Get()->Destroy(child);
             }
             _children.clear();
+            InvalidateHierarchy();
         }
         i32 UIElement::IndexOf(UIElement *child)
         {
@@ -152,25 +160,8 @@ namespace Ailu
         {
             if (!_is_visible)
                 return;
-            if (_is_transf_dirty)
+            auto refresh_abs_rect = [this]()
             {
-                _transform._position = _transition;
-                _transform._scale = _scale;
-                _transform._rotation = _rotation * k2Radius;
-            }
-            if (_is_layout_dirty)
-            {
-                MeasureAndArrange(dt);
-                _is_layout_dirty = false;
-                _matrix = CalculateWorldMatrix();
-                _inv_matrix = MatrixInverse(_matrix);
-                _is_transf_dirty = false;
-            }
-            if (_is_transf_dirty)
-            {
-                _matrix = CalculateWorldMatrix();
-                _inv_matrix = MatrixInverse(_matrix);
-                _is_transf_dirty = false;
                 Vector3f corners[4] = {
                         {_arrange_rect.x, _arrange_rect.y, 1.0f},
                         {_arrange_rect.x + _arrange_rect.z, _arrange_rect.y, 1.0f},
@@ -180,10 +171,35 @@ namespace Ailu
                 TransformCoord(corners[1], _matrix);
                 TransformCoord(corners[2], _matrix);
                 TransformCoord(corners[3], _matrix);
-                _abs_rect = {corners[0].x,
-                             corners[0].y,
-                             corners[1].x - corners[0].x,
-                             corners[3].y - corners[0].y};
+                _abs_rect = {
+                        corners[0].x,
+                        corners[0].y,
+                        corners[1].x - corners[0].x,
+                        corners[3].y - corners[0].y};
+            };
+            if (_is_transf_dirty)
+            {
+                _transform._position = _transition;
+                _transform._scale = _scale;
+                _transform._rotation = _rotation * k2Radius;
+            }
+            if (_is_layout_dirty)
+            {
+                if (auto renderer = UIRenderer::Get(); renderer != nullptr)
+                    ++renderer->MutableStats()._ui_layout_count;
+                MeasureAndArrange(dt);
+                _is_layout_dirty = false;
+                _matrix = CalculateWorldMatrix();
+                _inv_matrix = MatrixInverse(_matrix);
+                _is_transf_dirty = false;
+                refresh_abs_rect();
+            }
+            if (_is_transf_dirty)
+            {
+                _matrix = CalculateWorldMatrix();
+                _inv_matrix = MatrixInverse(_matrix);
+                _is_transf_dirty = false;
+                refresh_abs_rect();
             }
             for (auto &child: _children)
                 child->Update(dt);
@@ -201,7 +217,9 @@ namespace Ailu
         {
             if (!_is_visible)
                 return;
+            ++r.MutableStats()._ui_element_visit_count;
             EnsureStyleResolved();
+            ++r.MutableStats()._ui_render_impl_count;
             RenderImpl(r);
         }
         void UIElement::PreUpdate(f32 dt)
@@ -322,12 +340,16 @@ namespace Ailu
         }
         void UIElement::Arrange(f32 x, f32 y, f32 width, f32 height)
         {
-            _arrange_rect = {x, y, width, height};
-            _content_rect = _arrange_rect;
-            _content_rect.x += _padding._l;
-            _content_rect.y += _padding._t;
-            _content_rect.z -= (_padding._l + _padding._r);
-            _content_rect.w -= (_padding._t + _padding._b);
+            const Vector4f new_arrange_rect = {x, y, width, height};
+            Vector4f new_content_rect = new_arrange_rect;
+            new_content_rect.x += _padding._l;
+            new_content_rect.y += _padding._t;
+            new_content_rect.z -= (_padding._l + _padding._r);
+            new_content_rect.w -= (_padding._t + _padding._b);
+            const bool is_layout_changed = !NearbyEqual(_arrange_rect, new_arrange_rect) || !NearbyEqual(_content_rect, new_content_rect);
+            const bool needs_post_arrange = _is_layout_dirty || is_layout_changed;
+            _arrange_rect = new_arrange_rect;
+            _content_rect = new_content_rect;
             auto mat = CalculateWorldMatrix();
             Vector3f corners[4] = {
                     {_arrange_rect.x, _arrange_rect.y, 1.0f},
@@ -342,8 +364,21 @@ namespace Ailu
                          corners[0].y,
                          corners[1].x - corners[0].x,
                          corners[3].y - corners[0].y};
-            InvalidateLayout(true);
-            PostArrange();
+            if (is_layout_changed)
+            {
+                _paint_dirty = true;
+                _dirty_reasons |= EUIInvalidationReason::kLayout | EUIInvalidationReason::kPaint;
+                _debug_paint_dirty = true;
+                _debug_dirty_reasons |= EUIInvalidationReason::kLayout | EUIInvalidationReason::kPaint;
+                _is_layout_dirty = true;
+                _is_transf_dirty = true;
+                if (_owning_widget != nullptr)
+                    _owning_widget->InvalidatePaint(EUIInvalidationReason::kLayout | EUIInvalidationReason::kPaint, this);
+                for (auto &child: _children)
+                    child->InvalidateLayout(true);
+            }
+            if (needs_post_arrange)
+                PostArrange();
         }
         void UIElement::Arrange(Vector4f rect)
         {
@@ -352,7 +387,10 @@ namespace Ailu
 
         void UIElement::SetVisible(bool visible)
         {
+            if (_is_visible == visible)
+                return;
             _is_visible = visible;
+            InvalidateHierarchy();
         }
         bool UIElement::IsVisible() const
         {
@@ -399,6 +437,7 @@ namespace Ailu
             else if (name == "_visibility")
             {
                 _is_visible = (_visibility == EVisibility::kVisible);
+                InvalidateHierarchy();
             }
         }
         void UIElement::Serialize(FArchive &ar)
@@ -497,6 +536,12 @@ namespace Ailu
         }
         void UIElement::InvalidateLayout(bool propagate_down)
         {
+            _paint_dirty = true;
+            _dirty_reasons |= EUIInvalidationReason::kLayout | EUIInvalidationReason::kPaint;
+            _debug_paint_dirty = true;
+            _debug_dirty_reasons |= EUIInvalidationReason::kLayout | EUIInvalidationReason::kPaint;
+            if (_owning_widget != nullptr)
+                _owning_widget->InvalidatePaint(EUIInvalidationReason::kLayout | EUIInvalidationReason::kPaint, this);
             //这里可以添加停止策略，例如如果父的 size policy 是 Fixed，只需要局部更新，不冒泡。
             if (!_is_layout_dirty)
             {
@@ -515,12 +560,68 @@ namespace Ailu
         }
         void UIElement::InvalidateTransform()
         {
-            if (!_is_transf_dirty)
+            _paint_dirty = true;
+            _dirty_reasons |= EUIInvalidationReason::kTransform | EUIInvalidationReason::kPaint;
+            _debug_paint_dirty = true;
+            _debug_dirty_reasons |= EUIInvalidationReason::kTransform | EUIInvalidationReason::kPaint;
+            if (_owning_widget != nullptr)
+                _owning_widget->InvalidatePaint(EUIInvalidationReason::kTransform | EUIInvalidationReason::kPaint, this);
+            _is_transf_dirty = true;
+            for (auto &c: _children)
+                c->InvalidateTransform();
+        }
+        void UIElement::InvalidatePaint()
+        {
+            _paint_dirty = true;
+            _dirty_reasons |= EUIInvalidationReason::kPaint;
+            _debug_paint_dirty = true;
+            _debug_dirty_reasons |= EUIInvalidationReason::kPaint;
+            if (_owning_widget != nullptr)
+                _owning_widget->InvalidatePaint(EUIInvalidationReason::kPaint, this);
+        }
+        void UIElement::InvalidateHierarchy()
+        {
+            _paint_dirty = true;
+            _dirty_reasons |= EUIInvalidationReason::kHierarchy | EUIInvalidationReason::kLayout | EUIInvalidationReason::kPaint;
+            _debug_paint_dirty = true;
+            _debug_dirty_reasons |= EUIInvalidationReason::kHierarchy | EUIInvalidationReason::kLayout | EUIInvalidationReason::kPaint;
+            if (_owning_widget != nullptr)
             {
-                _is_transf_dirty = true;
-                for (auto &c: _children)
-                    c->InvalidateTransform();
+                _owning_widget->InvalidatePaint(EUIInvalidationReason::kHierarchy | EUIInvalidationReason::kLayout |
+                                                        EUIInvalidationReason::kPaint,
+                                                this);
             }
+            InvalidateLayout();
+        }
+        void UIElement::ClearPaintDirtyRecursive()
+        {
+            _paint_dirty = false;
+            _dirty_reasons = EUIInvalidationReason::kNone;
+            for (auto &child: _children)
+                child->ClearPaintDirtyRecursive();
+        }
+        void UIElement::ClearDebugPaintDirtyRecursive()
+        {
+            _debug_paint_dirty = false;
+            _debug_dirty_reasons = EUIInvalidationReason::kNone;
+            for (auto &child: _children)
+                child->ClearDebugPaintDirtyRecursive();
+        }
+        void UIElement::SnapshotPaintDirtyToDebugRecursive()
+        {
+            if (_paint_dirty)
+            {
+                _debug_paint_dirty = true;
+                _debug_dirty_reasons |= _dirty_reasons;
+            }
+            for (auto &child: _children)
+                child->SnapshotPaintDirtyToDebugRecursive();
+        }
+        void UIElement::SetOwningWidgetRecursive(Widget *widget)
+        {
+            _owning_widget = widget;
+            for (auto &child: _children)
+                child->SetOwningWidgetRecursive(widget);
         }
         // ── 交互状态位域访问器实现 ─────────────────────────────────────
         bool UIElement::IsHovered() const { return (_state_flags & (u32)EUIElementState::kHovered) != 0u; }
@@ -530,12 +631,48 @@ namespace Ailu
         bool UIElement::IsStateVisible() const { return (_state_flags & (u32)EUIElementState::kVisible) != 0u; }
         bool UIElement::WantsMouseEvents() const { return (_state_flags & (u32)EUIElementState::kMouseEvents) != 0u; }
 
-        void UIElement::SetHovered(bool v) { v ? (_state_flags |= (u32)EUIElementState::kHovered) : (_state_flags &= ~(u32)EUIElementState::kHovered); }
-        void UIElement::SetPressed(bool v) { v ? (_state_flags |= (u32)EUIElementState::kPressed) : (_state_flags &= ~(u32)EUIElementState::kPressed); }
-        void UIElement::SetInteractiveEnabled(bool v) { v ? (_state_flags |= (u32)EUIElementState::kEnabled) : (_state_flags &= ~(u32)EUIElementState::kEnabled); }
-        void UIElement::SetStateVisible(bool v) { v ? (_state_flags |= (u32)EUIElementState::kVisible) : (_state_flags &= ~(u32)EUIElementState::kVisible); }
-        void UIElement::SetWantsMouseEvents(bool v) { v ? (_state_flags |= (u32)EUIElementState::kMouseEvents) : (_state_flags &= ~(u32)EUIElementState::kMouseEvents); }
-        void UIElement::SetFocused(bool v) { v ? (_state_flags |= (u32)EUIElementState::kFocused) : (_state_flags &= ~(u32)EUIElementState::kFocused); }
+        void UIElement::SetHovered(bool v)
+        {
+            if (IsHovered() == v)
+                return;
+            v ? (_state_flags |= (u32)EUIElementState::kHovered) : (_state_flags &= ~(u32)EUIElementState::kHovered);
+            InvalidatePaint();
+        }
+        void UIElement::SetPressed(bool v)
+        {
+            if (IsPressed() == v)
+                return;
+            v ? (_state_flags |= (u32)EUIElementState::kPressed) : (_state_flags &= ~(u32)EUIElementState::kPressed);
+            InvalidatePaint();
+        }
+        void UIElement::SetInteractiveEnabled(bool v)
+        {
+            if (IsInteractiveEnabled() == v)
+                return;
+            v ? (_state_flags |= (u32)EUIElementState::kEnabled) : (_state_flags &= ~(u32)EUIElementState::kEnabled);
+            InvalidatePaint();
+        }
+        void UIElement::SetStateVisible(bool v)
+        {
+            if (IsStateVisible() == v)
+                return;
+            v ? (_state_flags |= (u32)EUIElementState::kVisible) : (_state_flags &= ~(u32)EUIElementState::kVisible);
+            InvalidatePaint();
+        }
+        void UIElement::SetWantsMouseEvents(bool v)
+        {
+            if (WantsMouseEvents() == v)
+                return;
+            v ? (_state_flags |= (u32)EUIElementState::kMouseEvents) : (_state_flags &= ~(u32)EUIElementState::kMouseEvents);
+            InvalidatePaint();
+        }
+        void UIElement::SetFocused(bool v)
+        {
+            if (IsFocused() == v)
+                return;
+            v ? (_state_flags |= (u32)EUIElementState::kFocused) : (_state_flags &= ~(u32)EUIElementState::kFocused);
+            InvalidatePaint();
+        }
 
         EUIVisualState UIElement::GetVisualState() const
         {
@@ -583,6 +720,11 @@ namespace Ailu
         {
             _is_style_dirty = true;
             _paint_dirty = true;
+            _dirty_reasons |= EUIInvalidationReason::kPaint;
+            _debug_paint_dirty = true;
+            _debug_dirty_reasons |= EUIInvalidationReason::kPaint;
+            if (_owning_widget != nullptr)
+                _owning_widget->InvalidatePaint(EUIInvalidationReason::kPaint, this);
 
             if (invalidation == EStyleInvalidation::kLayoutAndPaint)
                 InvalidateLayout();

@@ -3,6 +3,7 @@
 #include "UIElement.h"
 #include "UI/Style/UIStyles.h"
 #include "UI/Style/UITheme.h"
+#include "Render/Font.h"
 #include "generated/Basic.gen.h"
 namespace Ailu
 {
@@ -65,7 +66,7 @@ namespace Ailu
             const String &GetText() const { return _text; }
             Vector2f MeasureDesiredSize() override;
             f32 FontSize() const { return _font_size; }
-            void FontSize(f32 size);
+            void FontSize(f32 size, bool record_dirty_reason = true);
 
             // ── Style ────────────────────────────────────────────
             UIControlVisualOverride &GetStyleOverride() { return _style_override; }
@@ -74,7 +75,8 @@ namespace Ailu
             void ResolveStyle(const UIStyleContext &context) override;
             const UIControlVisual *GetVisual(EUIVisualState state) const override;
             void OnPropertyChanged(const PropertyInfo& prop) override;
-            void UpdateTextLayout();
+            void UpdateTextLayout(bool record_dirty_reason = true);
+            void MarkTextLayoutDirty(bool record_dirty_reason = true);
             void RenderImpl(UIRenderer &r) override;
             void PostDeserialize() override;
         public:
@@ -91,6 +93,10 @@ namespace Ailu
             String _text;
             Vector2f _text_size;
             Vector4f _text_visual_bounds;
+            Render::TextLayoutResult _text_layout_cache;
+            Render::Font *_text_layout_font = nullptr;
+            f32 _text_layout_font_size = 0.0f;
+            bool _is_text_layout_dirty = true;
             UIControlVisualOverride _style_override;
             mutable UIControlVisual _resolved_visual;
         };

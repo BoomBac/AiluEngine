@@ -107,6 +107,34 @@ namespace Ailu
         class UITheme;
         struct UIControlVisual;
 
+        enum class EUIInvalidationReason : u32
+        {
+            kNone = 0u,
+            kPaint = 1u << 0u,
+            kLayout = 1u << 1u,
+            kTransform = 1u << 2u,
+            kHierarchy = 1u << 3u,
+            kClip = 1u << 4u,
+            kVisibility = 1u << 5u,
+            kTextLayout = 1u << 6u
+        };
+
+        inline EUIInvalidationReason operator|(EUIInvalidationReason lhs, EUIInvalidationReason rhs)
+        {
+            return static_cast<EUIInvalidationReason>(static_cast<u32>(lhs) | static_cast<u32>(rhs));
+        }
+
+        inline EUIInvalidationReason &operator|=(EUIInvalidationReason &lhs, EUIInvalidationReason rhs)
+        {
+            lhs = lhs | rhs;
+            return lhs;
+        }
+
+        inline bool HasInvalidation(EUIInvalidationReason value, EUIInvalidationReason flag)
+        {
+            return (static_cast<u32>(value) & static_cast<u32>(flag)) != 0u;
+        }
+
         // ── Style 失效范围 ───────────────────────────────────────
         AENUM()
         enum class EStyleInvalidation : u8
@@ -295,8 +323,21 @@ namespace Ailu
             //焦点管理
             void RequestFocus();// 主动请求焦点
             //默认向上传递dirty,true则只标记子元素
+            void InvalidatePaint();
             void InvalidateLayout(bool propagate_down = false);
             void InvalidateTransform();
+            void InvalidateHierarchy();
+            void ClearPaintDirtyRecursive();
+            void ClearDebugPaintDirtyRecursive();
+            void SnapshotPaintDirtyToDebugRecursive();
+            bool IsPaintDirty() const { return _paint_dirty; }
+            bool IsDebugPaintDirty() const { return _debug_paint_dirty; }
+            bool IsLayoutDirty() const { return _is_layout_dirty; }
+            bool IsTransformDirty() const { return _is_transf_dirty; }
+            EUIInvalidationReason GetInvalidationReasons() const { return _dirty_reasons; }
+            EUIInvalidationReason GetDebugInvalidationReasons() const { return _debug_dirty_reasons; }
+            void SetOwningWidgetRecursive(Widget *widget);
+            Widget *GetOwningWidget() const { return _owning_widget; }
             //内边距
             Padding &SlotPadding() { return _padding; }
             Padding SlotPadding() const { return _padding; }
@@ -368,6 +409,7 @@ namespace Ailu
             Vector4f _arrange_rect;//元素最终被布局分配到的rect,局部空间
             Vector4f _abs_rect;    //元素最终被布局分配到的rect,相对于窗口，有旋转的话这个值就是无效的
             UIElement* _parent = nullptr;
+            Widget *_owning_widget = nullptr;
             Vector<Ref<UIElement>> _children;
             u16 _hierarchy_depth = 0u;
             bool _is_visible;
@@ -386,7 +428,10 @@ namespace Ailu
             2. 子节点属性变化，向上标记
             3.paint_dirty之后用来标记缓存顶点数据
             */
-            bool _is_layout_dirty = true, _paint_dirty = true,_is_transf_dirty;
+            bool _is_layout_dirty = true, _paint_dirty = true, _is_transf_dirty = true;
+            EUIInvalidationReason _dirty_reasons = EUIInvalidationReason::kPaint;
+            bool _debug_paint_dirty = false;
+            EUIInvalidationReason _debug_dirty_reasons = EUIInvalidationReason::kNone;
             std::optional<DropHandler> _drop_handler;
             Vector<PropertyObserverHandle> _property_observers;
         };

@@ -933,7 +933,7 @@ namespace Ailu::RHI::DX12
         {
             GpuResource::BindImpl(rhi_cmd, params);
             auto d3dcmd = static_cast<D3DCommandBuffer *>(rhi_cmd);
-            if (!RenderTexture::CanAsShaderResource(this) && !params._is_compute_pipeline)
+            if (!params._is_compute_pipeline && !RenderTexture::CanAsShaderResource(this))
             {
                 LOG_WARNING("D3DRenderTexture::BindImpl: try to use a render texture: {} as rt and srv at the same time!", _name);
                 return;

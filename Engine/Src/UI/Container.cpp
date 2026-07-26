@@ -76,6 +76,20 @@ namespace Ailu
             }
         }
 
+        UIElement *Canvas::HitTest(Vector2f pos)
+        {
+            Vector2f lpos = TransformCoord(_inv_matrix, {pos, 0.0f}).xy;
+            if (!IsPointInside(lpos))
+                return nullptr;
+
+            for (auto it = _children.rbegin(); it != _children.rend(); ++it)
+            {
+                if (auto *hit = (*it)->HitTest(pos))
+                    return hit;
+            }
+            return this;
+        }
+
         void Canvas::MeasureAndArrange(f32 dt)
         {
             for (auto &c: _children)
@@ -440,6 +454,7 @@ namespace Ailu
         {
             OnMouseScroll() += [this](UIEvent &e)
             {
+                Vector2f old_target_offset = _target_offset;
                 if (_is_vertical)
                 {
                     _target_offset.y += e._scroll_delta;
@@ -450,6 +465,8 @@ namespace Ailu
                     _target_offset.x += e._scroll_delta;
                     _target_offset.x = std::clamp(_target_offset.x, _max_offset.x, 0.0f);
                 }
+                if (!NearbyEqual(old_target_offset, _target_offset))
+                    InvalidatePaint();
                 e._is_handled = true;
             };
             OnMouseMove() += [this](UIEvent &e)
@@ -457,9 +474,13 @@ namespace Ailu
                 const Vector2f local_mouse = TransformCoord(_inv_matrix, Vector3f{e._mouse_position, 0.0f}).xy;
                 if (!_is_dragging_bar)
                 {
+                    bool old_is_hover_hbar = _is_hover_hbar;
+                    bool old_is_hover_vbar = _is_hover_vbar;
                     _is_hover_hbar = HasHorizontalBar() && IsPointInside(local_mouse, CalculateHorizontalBarRect());
                     _is_hover_vbar = HasVerticalBar() && IsPointInside(local_mouse, CalculateVerticalBarRect());
                     _is_vertical = !_is_hover_hbar;
+                    if (old_is_hover_hbar != _is_hover_hbar || old_is_hover_vbar != _is_hover_vbar)
+                        InvalidatePaint();
                 }
             };
 
@@ -474,6 +495,7 @@ namespace Ailu
                     _drag_start_offset = _target_offset.y;
                     e._is_handled = true;
                     _scroll_speed *= 100.0f;
+                    InvalidatePaint();
                 }
                 else if (HasHorizontalBar() && IsPointInside(local_mouse, CalculateHorizontalBarRect()))
                 {
@@ -483,6 +505,7 @@ namespace Ailu
                     _drag_start_offset = _target_offset.x;
                     e._is_handled = true;
                     _scroll_speed *= 100.0f;
+                    InvalidatePaint();
                 }
                 else
                 {
@@ -495,20 +518,26 @@ namespace Ailu
                     _is_dragging_bar = false;
                     e._is_handled = true;
                     _scroll_speed *= 0.01f;
+                    InvalidatePaint();
                 }
             };
             OnMouseExit() += [this](UIEvent &e)
             {
                 if (!_is_dragging_bar)
                 {
-                    _is_hover_hbar = false;
-                    _is_hover_vbar = false;
+                    if (_is_hover_hbar || _is_hover_vbar)
+                    {
+                        _is_hover_hbar = false;
+                        _is_hover_vbar = false;
+                        InvalidatePaint();
+                    }
                 }
             };
         }
         void ScrollView::PreUpdate(f32 dt)
         {
             UIElement::PreUpdate(dt);
+            Vector2f old_target_offset = _target_offset;
             if (_is_dragging_bar)
             {
                 auto mpos = Input::GetGlobalMousePosAccurate();
@@ -537,20 +566,35 @@ namespace Ailu
                 }
                 if (!Input::IsKeyDown(EKey::kLBUTTON))
                 {
+                    bool needs_paint = _is_hover_hbar || _is_hover_vbar;
                     _is_hover_hbar = false;
                     _is_hover_vbar = false;
                     if (_is_dragging_bar)
                     {
                         _is_dragging_bar = false;
                         _scroll_speed *= 0.01f;
+                        needs_paint = true;
                     }
+                    if (needs_paint)
+                        InvalidatePaint();
                 }
             }
-            _current_offset = Lerp(_current_offset, _target_offset, std::clamp(dt * _scroll_speed, 0.0f, 1.0f));
-            for (auto &c: _children)
+            constexpr f32 kScrollOffsetSnapEpsilon = 0.05f;
+            Vector2f old_current_offset = _current_offset;
+            Vector2f new_current_offset = Lerp(_current_offset, _target_offset, std::clamp(dt * _scroll_speed, 0.0f, 1.0f));
+            if (std::abs(new_current_offset.x - _target_offset.x) <= kScrollOffsetSnapEpsilon &&
+                std::abs(new_current_offset.y - _target_offset.y) <= kScrollOffsetSnapEpsilon)
             {
-                c->Translate(_current_offset);
+                new_current_offset = _target_offset;
             }
+            if (!NearbyEqual(old_current_offset, new_current_offset))
+            {
+                _current_offset = new_current_offset;
+                for (auto &c: _children)
+                    c->Translate(_current_offset);
+            }
+            if (!NearbyEqual(old_target_offset, _target_offset) || !NearbyEqual(old_current_offset, _current_offset))
+                InvalidatePaint();
         }
 
         void ScrollView::RenderImpl(UIRenderer &r)
@@ -704,21 +748,29 @@ namespace Ailu
             _content_box->GetSlotAs<LinearSlot>().SizePolicy(ESizePolicy::kFill, ESizePolicy::kAuto);
             OnMouseMove() += [this](UIEvent &e)
             {
-                _hovered_item = nullptr;
+                UIElement *hovered_item = nullptr;
                 for (int i = 0; i < _content_box->GetChildren().size(); i++)
                 {
                     auto &child = _content_box->GetChildren()[i];
                     if (child->IsPointInside(e._mouse_position))
                     {
-                        _hovered_item = child.get();
+                        hovered_item = child.get();
                         break;
                     }
+                }
+                if (_hovered_item != hovered_item)
+                {
+                    _hovered_item = hovered_item;
+                    InvalidatePaint();
                 }
             };
 
             OnMouseExit() += [this](UIEvent &e)
             {
+                if (_hovered_item == nullptr)
+                    return;
                 _hovered_item = nullptr;
+                InvalidatePaint();
             };
 
             //OnMouseClick() += [this](UIEvent &e)
@@ -735,13 +787,31 @@ namespace Ailu
         void ListView::AddItem(Ref<UIElement> item)
         {
             _content_box->AddChild(item);
+            InvalidateHierarchy();
         }
         void ListView::ClearItems()
         {
             _content_box->ClearChildren();
+            InvalidateHierarchy();
         }
         void ListView::SizeToContent(bool enable)
         {
+            if (_is_size_to_content == enable)
+                return;
+            _is_size_to_content = enable;
+            InvalidateLayout();
+        }
+        void ListView::SetBackgroundBrush(const UIBrush &brush)
+        {
+            _background_brush = brush;
+            _is_background_brush_set = true;
+            InvalidatePaint();
+        }
+        void ListView::SetBorder(Color color, f32 width)
+        {
+            _border_color = color;
+            _border_width = width;
+            InvalidatePaint();
         }
         Vector2f ListView::MeasureDesiredSize()
         {
@@ -750,7 +820,56 @@ namespace Ailu
 
         void ListView::RenderImpl(UIRenderer &r)
         {
-            ScrollView::RenderImpl(r);
+            if (_background_brush._type != EUIBrushType::kNone && _background_brush._tint.a > 0.0f)
+            {
+                UIBrush background_brush = _background_brush;
+                if (background_brush._type == EUIBrushType::kBackdropBlur && _backdrop_source_rect.z > 1.0f &&
+                    _backdrop_source_rect.w > 1.0f)
+                {
+                    background_brush._uv_rect = {
+                            (_abs_rect.x - _backdrop_source_rect.x) / _backdrop_source_rect.z,
+                            (_abs_rect.y - _backdrop_source_rect.y) / _backdrop_source_rect.w,
+                            _abs_rect.z / _backdrop_source_rect.z,
+                            _abs_rect.w / _backdrop_source_rect.w};
+                }
+                r.DrawQuad(_arrange_rect, _matrix, background_brush, _corner_radius);
+            }
+            if (_border_width > 0.0f && _border_color.a > 0.0f)
+                r.DrawBox(_arrange_rect.xy, _arrange_rect.zw, _matrix, _border_width, _border_color);
+
+            r.PushScissor(_abs_rect);
+            for (auto &child: _children)
+            {
+                child->Render(r);
+            }
+            r.PopScissor();
+
+            if (_content_size.y > _content_rect.w)
+            {
+                _vbar_rect = CalculateVerticalBarRect();
+                const auto &sb_style = _resolved_style._vertical_scrollbar;
+                const UIBrush *thumb = &sb_style._thumb;
+                if (!IsInteractiveEnabled())
+                    thumb = &sb_style._thumb_disabled;
+                else if (_is_dragging_bar && _is_vertical)
+                    thumb = &sb_style._thumb_pressed;
+                else if (_is_hover_vbar)
+                    thumb = &sb_style._thumb_hovered;
+                r.DrawQuad(_vbar_rect, _matrix, *thumb);
+            }
+            if (_content_size.x > _content_rect.z)
+            {
+                _hbar_rect = CalculateHorizontalBarRect();
+                const auto &sb_style = _resolved_style._horizontal_scrollbar;
+                const UIBrush *thumb = &sb_style._thumb;
+                if (!IsInteractiveEnabled())
+                    thumb = &sb_style._thumb_disabled;
+                else if (_is_dragging_bar && !_is_vertical)
+                    thumb = &sb_style._thumb_pressed;
+                else if (_is_hover_hbar)
+                    thumb = &sb_style._thumb_hovered;
+                r.DrawQuad(_hbar_rect, _matrix, *thumb);
+            }
 
             for (auto &c: _content_box->GetChildren())
             {
@@ -780,6 +899,7 @@ namespace Ailu
             _text = _root->AddChild<Text>();
             _text->GetSlotAs<LinearSlot>().SizePolicy(ESizePolicy::kFill, ESizePolicy::kAuto);
             _button = _root->AddChild<Button>();
+            _button->SetText("v");
             _button->GetSlotAs<LinearSlot>().SizePolicy(ESizePolicy::kFixed, ESizePolicy::kFill).Size({20.0f, 20.0f});
             _items = items;
             _button->OnMouseClick() += [this](UIEvent &e)
@@ -814,6 +934,26 @@ namespace Ailu
                 }
                 else
                     list_view->SizeToContent(true);
+                Vector2f popup_size = list_view->MeasureDesiredSize();
+                list_view->GetSlot()->Size(popup_size);
+                UIBrush popup_bg;
+                popup_bg._type = EUIBrushType::kColor;
+                popup_bg._tint = Color(0.06f, 0.07f, 0.09f, 0.78f);
+                if (_popup_backdrop_texture != nullptr && _popup_backdrop_source_rect.z > 1.0f && _popup_backdrop_source_rect.w > 1.0f)
+                {
+                    popup_bg._type = EUIBrushType::kBackdropBlur;
+                    popup_bg._texture = _popup_backdrop_texture;
+                    popup_bg._tint = Color(1.0f, 1.0f, 1.0f, 0.90f);
+                    popup_bg._uv_rect = {
+                            (abs_rect.x - _popup_backdrop_source_rect.x) / _popup_backdrop_source_rect.z,
+                            (abs_rect.y + abs_rect.w - _popup_backdrop_source_rect.y) / _popup_backdrop_source_rect.w,
+                            popup_size.x / _popup_backdrop_source_rect.z,
+                            popup_size.y / _popup_backdrop_source_rect.w};
+                }
+                list_view->SetBackgroundBrush(popup_bg);
+                list_view->SetBackdropSourceRect(_popup_backdrop_source_rect);
+                list_view->SetCornerRadius(Vector4f(4.0f));
+                list_view->SetBorder(Color(1.0f, 1.0f, 1.0f, 0.26f), 1.0f);
                 UIManager::Get()->ShowPopupAt(abs_rect.x, abs_rect.y + abs_rect.w, list_view, [this]()
                                               { _is_dropdown_open = false; });
                 _is_dropdown_open = true;
@@ -827,6 +967,7 @@ namespace Ailu
                 _text->SetText(_items[_selected_index]);
             if (_is_dropdown_open)
                 _is_dropdown_open = false;
+            InvalidatePaint();
         }
 
         String Dropdown::GetSelectedText() const
@@ -834,6 +975,11 @@ namespace Ailu
             if (_selected_index >= 0 && _selected_index < static_cast<i32>(_items.size()))
                 return _items[_selected_index];
             return _items.empty() ? "null" : _items[0];
+        }
+        void Dropdown::SetPopupBackdrop(Render::Texture *texture, const Vector4f &source_rect)
+        {
+            _popup_backdrop_texture = texture;
+            _popup_backdrop_source_rect = source_rect;
         }
         Vector2f Dropdown::MeasureDesiredSize()
         {
@@ -919,6 +1065,8 @@ namespace Ailu
         }
         void CollapsibleView::SetCollapsed(bool collapsed, bool animated)
         {
+            if (_is_collapsed == collapsed && _is_animated == animated)
+                return;
             _is_collapsed = collapsed;
             _is_animated = animated;
             _content->SetVisible(!_is_collapsed);
@@ -1108,11 +1256,6 @@ namespace Ailu
             {
                 _children[0]->Arrange(0.0f, 0.0f, _content_rect.z, _content_rect.w * _ratio);
                 _children[1]->Arrange(0.0f, _content_rect.w * _ratio, _content_rect.z, _content_rect.w * (1.0f - _ratio));
-            }
-            for (auto &c: _children)
-            {
-                c->InvalidateLayout();
-                c->InvalidateTransform();
             }
         }
 #pragma endregion

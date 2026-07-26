@@ -7,6 +7,10 @@
 
 namespace Ailu
 {
+    namespace Render
+    {
+        class Texture;
+    }
     namespace UI
     {
         ACLASS()
@@ -17,6 +21,7 @@ namespace Ailu
             Canvas();
             ~Canvas();
             Vector2f MeasureDesiredSize() override;
+            UIElement *HitTest(Vector2f pos) override;
 
             // ── Style ────────────────────────────────────────────
             UIControlVisualOverride &GetStyleOverride() { return _style_override; }
@@ -137,6 +142,11 @@ namespace Ailu
             void ClearItems();
             void SizeToContent(bool enable);
             bool IsSizeToContent() const { return _is_size_to_content; }
+            void SetBackgroundBrush(const UIBrush &brush);
+            bool HasCustomBackgroundBrush() const { return _is_background_brush_set; }
+            void SetBackdropSourceRect(const Vector4f &source_rect) { _backdrop_source_rect = source_rect; }
+            void SetCornerRadius(const Vector4f &corner_radius) { _corner_radius = corner_radius; }
+            void SetBorder(Color color, f32 width);
             Vector2f MeasureDesiredSize() override;
         protected:
             APROPERTY()
@@ -146,6 +156,12 @@ namespace Ailu
             VerticalBox *_content_box = nullptr;// 用于布局子项
             UIElement *_hovered_item = nullptr;
             UIElement *_selected_item = nullptr;
+            UIBrush _background_brush;
+            bool _is_background_brush_set = false;
+            Vector4f _backdrop_source_rect = Vector4f::kZero;
+            Vector4f _corner_radius = Vector4f(4.0f);
+            Color _border_color = Colors::kTransparent;
+            f32 _border_width = 0.0f;
         };
 
         class Text;
@@ -164,6 +180,7 @@ namespace Ailu
             int GetSelectedIndex() const { return _selected_index; }
             String GetSelectedText() const;
             void SetItems(const Vector<String> &items) { _items = items; }
+            void SetPopupBackdrop(Render::Texture *texture, const Vector4f &source_rect);
             Vector2f MeasureDesiredSize() final;
         private:
             void RenderImpl(UIRenderer &r) final;
@@ -179,6 +196,8 @@ namespace Ailu
             Text *_text;
             Button *_button;
             bool _is_dropdown_open = false;
+            Render::Texture *_popup_backdrop_texture = nullptr;
+            Vector4f _popup_backdrop_source_rect = Vector4f::kZero;
         };
 
         ACLASS()
@@ -197,6 +216,7 @@ namespace Ailu
             Vector2f MeasureDesiredSize() override;
             // 子容器(Canvas)，用于放置用户内容
             UIElement* GetContent() { return _content; }
+            UIElement* GetHeader() { return _header; }
             void SetTitle(const String &title);
             String GetTitle() const;
         private:

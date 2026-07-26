@@ -23,8 +23,10 @@ namespace Ailu
         {
         public:
             inline static u16 kMaxCharacters = 1024u;
+            static Render::TextLayoutResult BuildLayout(const String &text, Vector2f pos, f32 font_size = 14u, Font *font = nullptr, Vector2f scale = Vector2f::kOne);
             static Vector2f CalculateTextSize(const String &text, f32 font_size = 14u, Font *font = nullptr, Vector2f scale = Vector2f::kOne);
             static Vector4f CalculateTextVisualBounds(const String &text, f32 font_size = 14u, Font *font = nullptr, Vector2f scale = Vector2f::kOne);
+            static Vector4f CalculateTextVisualBounds(const Render::TextLayoutResult &layout);
         public:
             static Font *GetDefaultFont() { return s_default_font; };
             TextRenderer();
@@ -39,6 +41,8 @@ namespace Ailu
             /// </summary>
             void DrawText(const String &text, Vector2f pos, f32 font_size, Vector2f scale, Color color, Font *font,DrawerBlock* block);
             void DrawText(const String &text, Vector2f pos, f32 font_size, Vector2f scale, Color color,Matrix4x4f matrix, Font *font,DrawerBlock* block);
+            void DrawTextLayout(const Render::TextLayoutResult &layout, Vector2f pos, f32 font_size, Vector2f scale, Color color, Font *font, DrawerBlock *block);
+            void DrawTextLayout(const Render::TextLayoutResult &layout, Vector2f pos, f32 font_size, Vector2f scale, Color color, Matrix4x4f matrix, Font *font, DrawerBlock *block);
 
             void Render(RenderTexture *target, Render::CommandBuffer *cmd);
             void Render(RenderTexture *target, Render::CommandBuffer *cmd, DrawerBlock *b);
@@ -47,6 +51,7 @@ namespace Ailu
             bool _is_draw_debug_line = true;
         private:
             void AppendText(const String &text, Vector2f pos,Matrix4x4f matrix, f32 font_size, Vector2f scale, Color color, Vector2f padding,Font *font, DrawerBlock *block);
+            void AppendTextLayout(const Render::TextLayoutResult &layout, Vector2f pos, Matrix4x4f matrix, Color color, Font *font, DrawerBlock *block);
         private:
             inline static Font* s_default_font;
             Ref<Render::Material> _bitmap_mat,_msdf_mat;

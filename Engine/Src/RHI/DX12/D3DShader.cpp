@@ -384,7 +384,7 @@ namespace Ailu::RHI::DX12
                 case EBindResDescType::kCubeMap:
                 {
                     ++texture_count;
-                    ranges[root_param_index].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, desc._res_slot, desc._register_space);
+                    ranges[root_param_index].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, desc._res_slot, desc._register_space, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
                     rootParameters[root_param_index].InitAsDescriptorTable(1, &ranges[root_param_index]);
                     desc._bind_slot = root_param_index;
                     ++root_param_index;
@@ -392,7 +392,7 @@ namespace Ailu::RHI::DX12
                 break;
                 case EBindResDescType::kRWBuffer:
                 {
-                    ranges[root_param_index].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, desc._res_slot, desc._register_space);
+                    ranges[root_param_index].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, desc._res_slot, desc._register_space, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
                     rootParameters[root_param_index].InitAsDescriptorTable(1, &ranges[root_param_index]);
                     desc._bind_slot = root_param_index;
                     ++root_param_index;
@@ -400,7 +400,7 @@ namespace Ailu::RHI::DX12
                 break;
                 case EBindResDescType::kBuffer:
                 {
-                    ranges[root_param_index].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, desc._res_slot, desc._register_space);
+                    ranges[root_param_index].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, desc._res_slot, desc._register_space, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
                     rootParameters[root_param_index].InitAsDescriptorTable(1, &ranges[root_param_index]);
                     desc._bind_slot = root_param_index;
                     ++root_param_index;
@@ -848,7 +848,7 @@ namespace Ailu::RHI::DX12
                                           capacity,
                                           bindless_it->second._res_slot,
                                           bindless_it->second._register_space,
-                                          D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE);
+                                          D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
             bindless_it->second._bind_slot = root_param_index;
             has_bindless = true;
             bindless_slot = root_param_index;
@@ -874,14 +874,14 @@ namespace Ailu::RHI::DX12
             if (desc._res_type == EBindResDescType::kTexture2D || desc._res_type == EBindResDescType::kTexture3D)
             {
                 ++texture_count;
-                ranges[root_param_index].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, desc._res_slot, desc._register_space);
+                ranges[root_param_index].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, desc._res_slot, desc._register_space, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
                 rootParameters[root_param_index].InitAsDescriptorTable(1, &ranges[root_param_index]);
                 desc._bind_slot = root_param_index;
                 ++root_param_index;
             }
             else if (desc._res_type == EBindResDescType::kBuffer)
             {
-                ranges[root_param_index].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, desc._res_slot, desc._register_space);
+                ranges[root_param_index].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, desc._res_slot, desc._register_space, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
                 rootParameters[root_param_index].InitAsDescriptorTable(1, &ranges[root_param_index]);
                 desc._bind_slot = root_param_index;
                 ++root_param_index;
@@ -889,14 +889,14 @@ namespace Ailu::RHI::DX12
             else if (desc._res_type == EBindResDescType::kUAVTexture2D || desc._res_type == EBindResDescType::kRWTexture3D)
             {
                 ++texture_count;
-                ranges[root_param_index].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, desc._res_slot, desc._register_space);
+                ranges[root_param_index].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, desc._res_slot, desc._register_space, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
                 rootParameters[root_param_index].InitAsDescriptorTable(1, &ranges[root_param_index]);
                 desc._bind_slot = root_param_index;
                 ++root_param_index;
             }
             else if (desc._res_type == EBindResDescType::kRWBuffer)
             {
-                ranges[root_param_index].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, desc._res_slot, desc._register_space);
+                ranges[root_param_index].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, desc._res_slot, desc._register_space, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
                 rootParameters[root_param_index].InitAsDescriptorTable(1, &ranges[root_param_index]);
                 desc._bind_slot = root_param_index;
                 ++root_param_index;

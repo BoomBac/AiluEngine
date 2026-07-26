@@ -3,6 +3,7 @@
 #include "Framework/Math/Color.h"
 #include "Framework/Math/Matrix.hpp"
 #include "Framework/Math/Quaternion.h"
+#include "Framework/Math/Transform.h"
 #include "Scene/Entity.h"
 #include <optional>
 
@@ -64,6 +65,8 @@ namespace Ailu
             void BeginDrag(Vector2f mouse_pos);
             void EndDrag();
             bool IsDragging() const { return _is_dragging; }
+            void SetSnapEnabled(bool enabled) { _snap_enabled = enabled; }
+            bool IsSnapEnabled() const { return _snap_enabled; }
         private:
             ECS::TransformComponent *Target() const;
             u32 PickAxis(Vector3f start, Vector3f dir) const;
@@ -111,8 +114,14 @@ namespace Ailu
             Vector3f _drag_start_pos;// 按下时target初始位置
             Quaternion _drag_start_rot;// 按下时target初始旋转
             Vector3f _drag_start_scale;// 按下时target初始缩放
+            Transform _drag_start_local_transform;
+            bool _has_drag_start_transform = false;
             Vector3f _drag_scale_factor = Vector3f::kOne;//scale模式下当前缩放，用于临时修改缩放模式下gizmo的轴长度
             f32 _dis_scale = 1.0f;
+            bool _snap_enabled = false;
+            f32 _translate_snap_step = 1.0f;
+            f32 _rotate_snap_degrees = 15.0f;
+            f32 _scale_snap_step = 0.1f;
             Vector3f _cur_target_pos;
             Vector2f _drag_start_mouse_pos;
             Vector2f _drag_start_target_delta;//scale模式按下三轴时，鼠标位置 - target屏幕位置
@@ -131,6 +140,13 @@ namespace Ailu
                 kAxisYZ = kAxisY | kAxisZ,
                 kAxisXYZ = kAxisX | kAxisY | kAxisZ
             };
+            bool Is2DMode() const;
+            u32 Get2DHiddenAxisMask() const;
+            u32 Get2DVisibleAxisMask() const;
+            bool IsAxisMaskAvailable(u32 axis_mask) const;
+            bool IsSnapActive() const;
+            f32 SnapFloat(f32 value, f32 step) const;
+            Vector3f SnapVector(const Vector3f &value, f32 step) const;
 
             struct TranslateAxis
             {

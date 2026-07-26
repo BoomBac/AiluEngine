@@ -11,7 +11,7 @@ namespace Ailu
         // UIControlVisual - base visual state
         // ================================================================
         ASTRUCT()
-        struct UIControlVisual
+        struct AILU_API UIControlVisual
         {
             GENERATED_BODY()
 
@@ -53,7 +53,7 @@ namespace Ailu
         // UIControlVisualOverride - visual property override data
         // ================================================================
         ASTRUCT()
-        struct UIControlVisualOverride
+        struct AILU_API UIControlVisualOverride
         {
             GENERATED_BODY()
         public:
@@ -114,7 +114,7 @@ namespace Ailu
         // UIButtonStyle - button style
         // ================================================================
         ASTRUCT()
-        struct UIButtonStyle
+        struct AILU_API UIButtonStyle
         {
             GENERATED_BODY()
 
@@ -159,7 +159,7 @@ namespace Ailu
         };
 
         ASTRUCT()
-        struct UIButtonStyleOverride
+        struct AILU_API UIButtonStyleOverride
         {
             GENERATED_BODY()
         public:
@@ -206,7 +206,7 @@ namespace Ailu
         // UISliderStyle - slider style
         // ================================================================
         ASTRUCT()
-        struct UISliderStyle
+        struct AILU_API UISliderStyle
         {
             GENERATED_BODY()
 
@@ -287,7 +287,7 @@ namespace Ailu
         };
 
         ASTRUCT()
-        struct UISliderStyleOverride
+        struct AILU_API UISliderStyleOverride
         {
             GENERATED_BODY()
         public:
@@ -362,7 +362,7 @@ namespace Ailu
         // UICheckBoxStyle - checkbox style
         // ================================================================
         ASTRUCT()
-        struct UICheckBoxStyle
+        struct AILU_API UICheckBoxStyle
         {
             GENERATED_BODY()
 
@@ -447,7 +447,7 @@ namespace Ailu
         };
 
         ASTRUCT()
-        struct UICheckBoxStyleOverride
+        struct AILU_API UICheckBoxStyleOverride
         {
             GENERATED_BODY()
         public:
@@ -525,7 +525,7 @@ namespace Ailu
         // UIInputStyle - input style
         // ================================================================
         ASTRUCT()
-        struct UIInputStyle
+        struct AILU_API UIInputStyle
         {
             GENERATED_BODY()
 
@@ -594,7 +594,7 @@ namespace Ailu
         };
 
         ASTRUCT()
-        struct UIInputStyleOverride
+        struct AILU_API UIInputStyleOverride
         {
             GENERATED_BODY()
         public:
@@ -660,7 +660,7 @@ namespace Ailu
         // UIScrollBarStyle - scrollbar style
         // ================================================================
         ASTRUCT()
-        struct UIScrollBarStyle
+        struct AILU_API UIScrollBarStyle
         {
             GENERATED_BODY()
 
@@ -773,7 +773,7 @@ namespace Ailu
         };
 
         ASTRUCT()
-        struct UIScrollBarStyleOverride
+        struct AILU_API UIScrollBarStyleOverride
         {
             GENERATED_BODY()
         public:
@@ -872,7 +872,7 @@ namespace Ailu
         // UIScrollViewStyle - scroll view style
         // ================================================================
         ASTRUCT()
-        struct UIScrollViewStyle
+        struct AILU_API UIScrollViewStyle
         {
             GENERATED_BODY()
 
@@ -933,7 +933,7 @@ namespace Ailu
         };
 
         ASTRUCT()
-        struct UIScrollViewStyleOverride
+        struct AILU_API UIScrollViewStyleOverride
         {
             GENERATED_BODY()
         public:

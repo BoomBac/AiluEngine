@@ -139,6 +139,32 @@ static std::string Trim(std::string_view text)
     return std::string(text.substr(begin, end - begin + 1));
 }
 
+static bool TryParseIncludeTarget(const std::string &line, std::string &target)
+{
+    static const std::regex kIncludeRegex(R"(^\s*#\s*include\s*([<"])([^>"]+)[>"].*)");
+    std::smatch match;
+    if (!std::regex_match(line, match, kIncludeRegex))
+    {
+        return false;
+    }
+    target = match[2].str();
+    return true;
+}
+
+static bool IsGeneratedIncludeTarget(std::string target)
+{
+    for (char &ch: target)
+    {
+        if (ch == '\\')
+            ch = '/';
+    }
+
+    const std::string kGeneratedPrefix = "generated/";
+    const std::string kGeneratedSuffix = ".gen.h";
+    return target.rfind(kGeneratedPrefix, 0) == 0 && target.size() >= kGeneratedSuffix.size() &&
+           target.compare(target.size() - kGeneratedSuffix.size(), kGeneratedSuffix.size(), kGeneratedSuffix) == 0;
+}
+
 class EnumExprParser
 {
 public:
@@ -769,8 +795,10 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                 std::string cur_file_id = path.stem().string();
                 cur_file_id.append("_GEN_H");
                 std::transform(cur_file_id.begin(), cur_file_id.end(), cur_file_id.begin(), ::toupper);
-                std::string line, last_line;
-                bool is_include_start = false, is_include_end = false;
+                std::string line;
+                std::string last_include_target;
+                int last_include_line = 0;
+                bool is_last_include_generated = false;
                 bool has_class_marked = false, has_property_marked = false, has_function_marked = false, has_enum_marked = false, has_struct_marked = false;
                 bool is_cur_access_scope_public = false;
                 bool is_process_class = false;
@@ -785,20 +813,13 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                         ++line_count;
                         continue;
                     }
-                    if (line.find("#include") != std::string::npos) { is_include_start = true; }
-                    else if (is_include_start)
+                    std::string include_target;
+                    if (TryParseIncludeTarget(line, include_target))
                     {
-                        if (!is_include_end)
-                        {
-                            is_include_end = true;
-                            if (last_line.find("gen.h") == std::string::npos)
-                            {
-                                Log(std::format("input file {} is not mark as generated", path.string()));
-                                return;
-                            }
-                        }
+                        last_include_target = include_target;
+                        last_include_line = line_count + 1;
+                        is_last_include_generated = IsGeneratedIncludeTarget(include_target);
                     }
-                    last_line = line;
                     ++line_count;
                     //标记scope
                     if (line.find("public:") != std::string::npos)
@@ -978,6 +999,14 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                 }
                 file.close();
                 if (_classes.empty() && _enums.empty() && _structs.empty()) return;
+                if (!is_last_include_generated)
+                {
+                    Log(std::format("input file {} is not mark as generated, last include line {}: {}",
+                                    path.string(),
+                                    last_include_line,
+                                    last_include_target));
+                    return;
+                }
                 //write gen head file
                 Path out_path = out_dir / path.filename().replace_extension(".gen.h");
                 std::string unique_def = std::format("__{}__", cur_file_id);

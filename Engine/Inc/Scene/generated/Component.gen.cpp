@@ -14,6 +14,8 @@ if(s_enum_type_EMotionVectorType == nullptr)
 {
 EnumInitializer initializer;
 initializer._name = "EMotionVectorType";
+initializer._namespace = "Ailu::ECS";
+initializer._full_name = "Ailu::ECS::EMotionVectorType";
 initializer._str_to_enum_lut["kCameraOnly"] = 0;
 initializer._str_to_enum_lut["kPerObject"] = 1;
 initializer._str_to_enum_lut["kForceZero"] = 2;
@@ -28,4 +30,55 @@ template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::ECS::EMotionVectorType>()
 return s_enum_type_EMotionVectorType.get();
 }
 //Enum EMotionVectorType end...........................
+
+static std::unique_ptr<Ailu::Enum> s_enum_type_ELightType = nullptr;
+//Enum ELightType begin...........................
+const Ailu::Enum* Z_Construct_Enum_ELightType_Type()
+{
+if(s_enum_type_ELightType == nullptr)
+{
+EnumInitializer initializer;
+initializer._name = "ELightType";
+initializer._namespace = "Ailu::ECS";
+initializer._full_name = "Ailu::ECS::ELightType";
+initializer._str_to_enum_lut["kDirectional"] = 0;
+initializer._str_to_enum_lut["kPoint"] = 1;
+initializer._str_to_enum_lut["kSpot"] = 2;
+initializer._str_to_enum_lut["kArea"] = 3;
+s_enum_type_ELightType = std::make_unique<Ailu::Enum>(initializer);
+Ailu::Enum::RegisterEnum(s_enum_type_ELightType.get());
+}
+return s_enum_type_ELightType.get();
+}
+static Ailu::EnumTypeRegister g_register_ELightType(Z_Construct_Enum_ELightType_Type);
+template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::ECS::ELightType>()
+{
+return s_enum_type_ELightType.get();
+}
+//Enum ELightType end...........................
+
+static std::unique_ptr<Ailu::Enum> s_enum_type_EColliderType = nullptr;
+//Enum EColliderType begin...........................
+const Ailu::Enum* Z_Construct_Enum_EColliderType_Type()
+{
+if(s_enum_type_EColliderType == nullptr)
+{
+EnumInitializer initializer;
+initializer._name = "EColliderType";
+initializer._namespace = "Ailu::ECS";
+initializer._full_name = "Ailu::ECS::EColliderType";
+initializer._str_to_enum_lut["kBox"] = 0;
+initializer._str_to_enum_lut["kSphere"] = 1;
+initializer._str_to_enum_lut["kCapsule"] = 2;
+s_enum_type_EColliderType = std::make_unique<Ailu::Enum>(initializer);
+Ailu::Enum::RegisterEnum(s_enum_type_EColliderType.get());
+}
+return s_enum_type_EColliderType.get();
+}
+static Ailu::EnumTypeRegister g_register_EColliderType(Z_Construct_Enum_EColliderType_Type);
+template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::ECS::EColliderType>()
+{
+return s_enum_type_EColliderType.get();
+}
+//Enum EColliderType end...........................
 

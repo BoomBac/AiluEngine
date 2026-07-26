@@ -86,6 +86,32 @@ namespace Ailu
             f32 _min_radius = 0.5f;
             f32 _max_radius = 100.0f;
         };
+
+        class CanvasCameraController : public ICameraController
+        {
+        public:
+            CanvasCameraController() = default;
+
+            void Attach(Render::Camera *camera);
+            void SetViewBasis(const Vector3f &direction, const Vector3f &up);
+            void BeginDrag(const Vector2f &local_pos);
+            void EndDrag();
+            void Drag(const Vector2f &local_pos, const Vector2f &view_size);
+            void Zoom(f32 scroll_delta);
+
+        private:
+            void ApplyView();
+
+        private:
+            Render::Camera *_p_camera = nullptr;
+            Vector3f _direction = Vector3f::kForward;
+            Vector3f _up = Vector3f::kUp;
+            bool _is_dragging = false;
+            Vector2f _last_mouse = Vector2f::kZero;
+            f32 _zoom_factor = 0.9f;
+            f32 _min_size = 0.05f;
+            f32 _max_size = 10000.0f;
+        };
     }
 }
 

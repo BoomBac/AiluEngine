@@ -134,6 +134,26 @@ namespace Ailu::UI
             _widgets[i]->_sort_order = (u32) i;
     }
 
+    void UIManager::EnsurePopupWidgetsOnTop()
+    {
+        if (_popup_stack.empty())
+            return;
+        for (const auto &popup: _popup_stack)
+        {
+            if (!popup._widget)
+                continue;
+            auto it = std::find_if(_widgets.begin(), _widgets.end(), [&](const Ref<Widget> &e) -> bool
+                                   { return e.get() == popup._widget.get(); });
+            if (it == _widgets.end() || it == _widgets.end() - 1)
+                continue;
+            Ref<Widget> current = *it;
+            _widgets.erase(it);
+            _widgets.push_back(current);
+        }
+        for (u64 i = 0; i < _widgets.size(); i++)
+            _widgets[i]->_sort_order = (u32) i;
+    }
+
     void UIManager::SetFocus(UIElement *element)
     {
         if (_focus_target == element)
@@ -162,11 +182,20 @@ namespace Ailu::UI
         Window *target_window = win ? win : &Application::Get().GetWindow();
         auto popup_widget = MakeRef<Widget>();
         popup_widget->Name(std::format("PopupWidget_{}", _popup_stack.size()));
+        popup_widget->SetPopup(true);
+        if (auto *list_view = dynamic_cast<ListView *>(root.get()); list_view != nullptr && !list_view->HasCustomBackgroundBrush())
+        {
+            UIBrush popup_bg;
+            popup_bg._type = EUIBrushType::kColor;
+            popup_bg._tint = Color(0.06f, 0.07f, 0.09f, 0.78f);
+            list_view->SetBackgroundBrush(popup_bg);
+            list_view->SetBorder(Color(1.0f, 1.0f, 1.0f, 0.22f), 1.0f);
+        }
         auto popup_root = MakeRef<Canvas>();
         popup_root->Name(std::format("{}Root", popup_widget->Name()));
         popup_root->AddChild(root);
-        popup_widget->AddToWidget(popup_root);
-        const Vector2f popup_size = popup_root->MeasureDesiredSize();
+        const Vector2f popup_size = root->MeasureDesiredSize();
+        root->GetSlotAs<CanvasSlot>().Position(Vector2f::kZero).Size(popup_size);
         const Vector2f window_size = {(f32) target_window->GetWidth(), (f32) target_window->GetHeight()};
         constexpr f32 kScreenPadding = 4.0f;
         Vector2f popup_pos{x, y};
@@ -177,11 +206,12 @@ namespace Ailu::UI
         popup_pos.x = std::clamp(popup_pos.x, kScreenPadding, std::max(kScreenPadding, window_size.x - popup_size.x - kScreenPadding));
         popup_pos.y = std::clamp(popup_pos.y, kScreenPadding, std::max(kScreenPadding, window_size.y - popup_size.y - kScreenPadding));
 
-        popup_widget->SetPosition(popup_pos);
-        popup_widget->_visibility = EVisibility::kVisible;
         popup_widget->SetParent(target_window);
         popup_widget->BindOutput(RenderTexture::WindowBackBuffer(target_window));
+        popup_widget->SetPosition(popup_pos);
         popup_widget->SetSize(popup_size);
+        popup_widget->AddToWidget(popup_root);
+        popup_widget->_visibility = EVisibility::kVisible;
         RegisterWidget(popup_widget);
         BringToFront(popup_widget.get());
         _popup_stack.push_back({popup_widget, on_close});
