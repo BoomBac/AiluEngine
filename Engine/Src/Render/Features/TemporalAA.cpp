@@ -103,6 +103,7 @@ namespace Ailu::Render
     {
         _origin_camera_cbuf = std::unique_ptr<ConstantBuffer>(ConstantBuffer::Create(RenderConstants::kPerCameraDataSize));
         _taa_gen = ResourceMgr::Get().GetRef<ComputeShader>(L"Shaders/hlsl/Compute/taa.alasset");
+        _taa_kernel = _taa_gen->FindKernel("CSMain");
     }
     void TAAExecutePass::Setup(Matrix4x4f pre_matrix, Matrix4x4f cur_matrix, Material *taa_mat, int camera_hash, Vector2f jitter,Vector4f params,Vector4f quality)
     {
@@ -171,9 +172,8 @@ namespace Ailu::Render
                 _taa_gen->SetFloat("_VarianceClampScale", _params.x);
                 _taa_gen->SetFloat("_Sharpness", _params.y);
                 _taa_gen->SetFloat("_HistoryFactor", _params.z);
-                auto kernel = _taa_gen->FindKernel("CSMain");
-                auto [x,y,z] = _taa_gen->CalculateDispatchNum(kernel,rendering_data._width,rendering_data._height,1);
-                cmd->Dispatch(_taa_gen.get(),kernel,x,y);
+                auto [x,y,z] = _taa_gen->CalculateDispatchNum(_taa_kernel,rendering_data._width,rendering_data._height,1);
+                cmd->Dispatch(_taa_gen.get(),_taa_kernel,x,y);
                 //cmd->Blit(cur_target, rendering_data._camera_color_target_handle);
                 rendering_data._postprocess_input = cur_target;
             }

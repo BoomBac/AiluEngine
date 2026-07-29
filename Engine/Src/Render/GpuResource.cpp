@@ -31,6 +31,13 @@ namespace Ailu::Render
     {
         _fence_value = fence == 0u? GraphicsContext::Get().GetFenceValueCPU() + 1 : fence;
     }
+    bool GpuResource::MarkUsedByCommand(u64 command_epoch)
+    {
+        if (_last_marked_command_epoch == command_epoch)
+            return false;
+        _last_marked_command_epoch = command_epoch;
+        return true;
+    }
     GpuResource::GpuResource()
     {
     }

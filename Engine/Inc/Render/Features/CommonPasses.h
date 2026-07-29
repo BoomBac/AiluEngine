@@ -151,6 +151,9 @@ namespace Ailu
             Ref<Material> _p_skybox_material;
             Scope<ConstantBuffer> _p_cbuffer;
             Ref<ComputeShader> _p_lut_gen;
+            ComputeShaderKernelId _transmittance_lut_gen_kernel = kInvalidComputeShaderKernelId;
+            ComputeShaderKernelId _mult_scatter_lut_gen_kernel = kInvalidComputeShaderKernelId;
+            ComputeShaderKernelId _sky_lut_gen_kernel = kInvalidComputeShaderKernelId;
             bool _is_clear = false;
             Vector2Int _transmittance_lut_size = Vector2Int(256, 64);
             Vector2Int _mult_scatter_lut_size = Vector2Int(32, 32);
@@ -231,6 +234,7 @@ namespace Ailu
             void EndPass(GraphicsContext *context) final;
         private:
             Ref<ComputeShader> _hzb_gen;
+            ComputeShaderKernelId _hzb_kernel = kInvalidComputeShaderKernelId;
         };
 
         class DepthOnlyPass : public RenderPass

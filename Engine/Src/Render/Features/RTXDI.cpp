@@ -46,7 +46,7 @@ namespace Ailu::Render
 
     RTXDIPass::RTXDIPass(ComputeShader *shader) : _compute_shader(shader), RenderPass("RTXDIPass")
     {
-        _kernel_ray_gen = _compute_shader ? _compute_shader->FindKernel("RayGen") : static_cast<u16>(-1);
+        _kernel_ray_gen = _compute_shader ? _compute_shader->FindKernel("RayGen") : kInvalidComputeShaderKernelId;
         _event = static_cast<ERenderPassEvent>(static_cast<u16>(ERenderPassEvent::kAfterTransparent) - 5u);
         _scene_rt_proxy = MakeScope<SceneRayTracingProxy>();
 
@@ -64,7 +64,7 @@ namespace Ailu::Render
 
     void RTXDIPass::OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data)
     {
-        if (_compute_shader == nullptr || _kernel_ray_gen == static_cast<u16>(-1))
+        if (_compute_shader == nullptr || _kernel_ray_gen == kInvalidComputeShaderKernelId)
             return;
         if (!EnsureTarget(rendering_data))
             return;

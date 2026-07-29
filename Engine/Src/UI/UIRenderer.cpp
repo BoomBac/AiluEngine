@@ -50,6 +50,8 @@ namespace Ailu
             _default_material = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/default_ui.alasset"), "DefaultUIMaterial");
             _default_material->SetTexture("_MainTex", Render::Texture::s_p_default_white);
             _backdrop_blur_cs = ComputeShader::Create(ResourceMgr::GetResSysPath(L"Shaders/hlsl/Compute/blur.hlsl"));
+            _backdrop_blur_x_kernel = _backdrop_blur_cs->FindKernel("blur_x");
+            _backdrop_blur_y_kernel = _backdrop_blur_cs->FindKernel("blur_y");
             for (auto &frame_blocks: _drawer_blocks)
             {
                 frame_blocks.push_back(AL_NEW(DrawerBlock, _default_material,9600u));
@@ -759,16 +761,14 @@ namespace Ailu
             cmd->StateTransition(blur_x_rt, EResourceState::kUnorderedAccess);
             _backdrop_blur_cs->SetTexture("_SourceTex", downsample);
             _backdrop_blur_cs->SetTexture("_OutTex", blur_x);
-            u16 kernel = _backdrop_blur_cs->FindKernel("blur_x");
-            auto [group_num_x, group_num_y, group_num_z] = _backdrop_blur_cs->CalculateDispatchNum(kernel, blur_width, blur_height, 1u);
-            cmd->Dispatch(_backdrop_blur_cs.get(), kernel, group_num_x, group_num_y, 1u);
+            auto [group_num_x, group_num_y, group_num_z] = _backdrop_blur_cs->CalculateDispatchNum(_backdrop_blur_x_kernel, blur_width, blur_height, 1u);
+            cmd->Dispatch(_backdrop_blur_cs.get(), _backdrop_blur_x_kernel, group_num_x, group_num_y, 1u);
             cmd->InsertUAVBarrier(blur_x_rt);
             cmd->StateTransition(blur_x_rt, EResourceState::kNonPixelShaderResource);
             cmd->StateTransition(blur_y_rt, EResourceState::kUnorderedAccess);
             _backdrop_blur_cs->SetTexture("_SourceTex", blur_x);
             _backdrop_blur_cs->SetTexture("_OutTex", blur_y);
-            kernel = _backdrop_blur_cs->FindKernel("blur_y");
-            cmd->Dispatch(_backdrop_blur_cs.get(), kernel, group_num_x, group_num_y, 1u);
+            cmd->Dispatch(_backdrop_blur_cs.get(), _backdrop_blur_y_kernel, group_num_x, group_num_y, 1u);
             cmd->InsertUAVBarrier(blur_y_rt);
             cmd->StateTransition(blur_y_rt, EResourceState::kPixelShaderResource);
 

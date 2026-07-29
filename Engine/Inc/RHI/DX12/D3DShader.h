@@ -400,7 +400,7 @@ namespace Ailu::RHI::DX12
         /// @param thread_group_x 
         /// @param thread_group_y 
         /// @param thread_group_z 
-        void Bind(RHICommandBuffer *cmd, u16 kernel) final;
+        void Bind(RHICommandBuffer *cmd, Render::ComputeShaderKernelId kernel) final;
     private:
         bool RHICompileImpl(u16 kernel_index,ShaderVariantHash variant_hash, bool is_load_cache) final;
         void GenerateInternalPSO(u16 kernel_index,ShaderVariantHash variant_hash);

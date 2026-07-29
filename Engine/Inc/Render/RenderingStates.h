@@ -3,69 +3,56 @@
 
 namespace Ailu::Render
 {
+    struct RenderingStatesData
+    {
+        // Counters — accumulated per frame by render thread
+        u32 VertexNum       = 0u;
+        u32 TriangleNum     = 0u;
+        u32 DrawCall        = 0u;
+        u32 DispatchCall    = 0u;
+        u32 GfxPsoBindCount = 0u;
+        u32 GfxResBindCount = 0u;
+        u32 GfxPsoDirtyCount = 0u;
+        u64 DrawCommandCount = 0u;
+        u64 PsoLookupCount = 0u;
+        u64 PsoCacheHitCount = 0u;
+        u64 PsoCacheMissCount = 0u;
+        u64 MaterialCaptureCount = 0u;
+        u64 MaterialBindingResolveCount = 0u;
+        u64 MaterialBindingCacheHitCount = 0u;
+        u64 PipelineResourceSubmitCount = 0u;
+        u64 PipelineResourceOverrideCount = 0u;
+        u64 ActualRootSlotBindCount = 0u;
+        u64 SkippedRootSlotBindCount = 0u;
+        u64 MaterialCBufferUploadCount = 0u;
+        u64 MaterialCBufferUploadBytes = 0u;
+        u64 MaterialCBufferCacheHitCount = 0u;
+        u64 ResourceMarkRequestCount = 0u;
+        u64 UniqueResourceMarkCount = 0u;
+        u32 _flag;
+
+        // Properties — set periodically by render thread
+        f32 GpuLatency      = 0.0f;
+        f32 FrameTime       = 0.0f;
+        f32 FrameRate       = 0.0f;
+    };
+
     struct AILU_API RenderingStates
     {
-        #define DECLARE_STATE_COUNTER(state_name,value_name) \
-            static void Increment##state_name(u32 count = 1u) \
-            { \
-                s_temp_##value_name += count; \
-            } \
-            static u32 Get##state_name() \
-            { \
-                return s_##value_name; \
-            }
-        DECLARE_STATE_COUNTER(DrawCallCount, draw_call)
-        DECLARE_STATE_COUNTER(DispatchCallCount, dispatch_call)
-        DECLARE_STATE_COUNTER(VertexCount, vertex_num)
-        DECLARE_STATE_COUNTER(TriangleCount, triangle_num)
-        DECLARE_STATE_COUNTER(GfxPsoBindCount, gfx_pso_bind_count)
-        DECLARE_STATE_COUNTER(GfxResBindCount, gfx_res_bind_count)
-        
-        #define DECLARE_STATE_PROP(state_name, value_name) \
-            static void Set##state_name(f32 value) \
-            { \
-                s_##value_name = value; \
-            } \
-            static f32 Get##state_name() \
-            { \
-                return s_##value_name; \
-            }
-        DECLARE_STATE_PROP(GpuLatency, gpu_latency)
-        DECLARE_STATE_PROP(FrameTime, frame_time)
-        DECLARE_STATE_PROP(FrameRate, frame_rate)
+        // Render thread writes here (accumulate / set)
+        static RenderingStatesData& RenderData()  { return s_render_data; }
 
+        // Main thread reads here (snapshot from last Reset)
+        static const RenderingStatesData& DisplayData() { return s_display_data; }
+
+        // Called at frame boundary: snapshots render data for display, then zeros counters
         static void Reset()
         {
-            s_vertex_num = s_temp_vertex_num;
-            s_triangle_num = s_temp_triangle_num;
-            s_draw_call = s_temp_draw_call;
-            s_dispatch_call = s_temp_dispatch_call;
-            s_gfx_pso_bind_count = s_temp_gfx_pso_bind_count;
-            s_gfx_res_bind_count = s_temp_gfx_res_bind_count;
-            s_temp_vertex_num = 0u;
-            s_temp_triangle_num = 0u;
-            s_temp_draw_call = 0u;
-            s_temp_dispatch_call = 0u;
-            s_temp_gfx_pso_bind_count = 0u;
-            s_temp_gfx_res_bind_count = 0u;
+            s_display_data = s_render_data;
+            memset(&s_render_data,0,offsetof(RenderingStatesData,_flag));
         }
     private:
-        inline static u32 s_vertex_num = 0u;
-        inline static u32 s_triangle_num = 0u;
-        inline static u32 s_draw_call = 0u;
-        inline static u32 s_dispatch_call = 0u;
-        inline static u32 s_gfx_pso_bind_count = 0u;
-        inline static u32 s_gfx_res_bind_count = 0u;
-        
-        inline static u32 s_temp_vertex_num = 0u;
-        inline static u32 s_temp_triangle_num = 0u;
-        inline static u32 s_temp_draw_call = 0u;
-        inline static u32 s_temp_dispatch_call = 0u;
-        inline static u32 s_temp_gfx_pso_bind_count = 0u;
-        inline static u32 s_temp_gfx_res_bind_count = 0u;
-        
-        inline static f32 s_gpu_latency = 0.0f;
-        inline static f32 s_frame_time = 0.0f;
-        inline static f32 s_frame_rate = 0.0f;
+        inline static RenderingStatesData s_render_data;
+        inline static RenderingStatesData s_display_data;
     };
 }

@@ -263,52 +263,52 @@ namespace Ailu::RHI::DX12
 
     void D3DTexture2D::GenerateMipmap()
     {
-        auto mipmap_gen = ResourceMgr::Get().GetRef<ComputeShader>(L"Shaders/hlsl/Compute/cs_mipmap_gen.alasset");
-        auto kernel = mipmap_gen->FindKernel("MipmapGen2D");
         auto cmd = CommandBufferPool::Get("MipmapGen2D");
-        mipmap_gen->SetInt("SrcMipLevel", 0);
-        mipmap_gen->SetInt("NumMipLevels", 4);
-        mipmap_gen->SetBool("IsSRGB", false);
+        static ComputeShader *s_mipmap_gen = ResourceMgr::Get().Get<ComputeShader>(L"Shaders/hlsl/Compute/cs_mipmap_gen.alasset");
+        static const ComputeShaderKernelId s_mipmap_gen_2d_kernel = s_mipmap_gen->FindKernel("MipmapGen2D");
+        s_mipmap_gen->SetInt("SrcMipLevel", 0);
+        s_mipmap_gen->SetInt("NumMipLevels", 4);
+        s_mipmap_gen->SetBool("IsSRGB", false);
         auto [mip1w, mip1h] = CalculateMipSize(_width, _height, 1);
-        mipmap_gen->SetInt("SrcDimension", GetTextureSizePower2Info(CalculateMipSize(_width, _height, 0)));
-        mipmap_gen->SetVector("TexelSize", Vector4f(1.0f / (float) mip1w, 1.0f / (float) mip1h, 0.0f, 0.0f));
-        mipmap_gen->SetTexture("SrcMip", this, ECubemapFace::kUnknown, 0);
-        mipmap_gen->SetTexture("OutMip1", this, ECubemapFace::kUnknown, 1);
-        mipmap_gen->SetTexture("OutMip2", this, ECubemapFace::kUnknown, 2);
-        mipmap_gen->SetTexture("OutMip3", this, ECubemapFace::kUnknown, 3);
-        mipmap_gen->SetTexture("OutMip4", this, ECubemapFace::kUnknown, 4);
+        s_mipmap_gen->SetInt("SrcDimension", GetTextureSizePower2Info(CalculateMipSize(_width, _height, 0)));
+        s_mipmap_gen->SetVector("TexelSize", Vector4f(1.0f / (float) mip1w, 1.0f / (float) mip1h, 0.0f, 0.0f));
+        s_mipmap_gen->SetTexture("SrcMip", this, ECubemapFace::kUnknown, 0);
+        s_mipmap_gen->SetTexture("OutMip1", this, ECubemapFace::kUnknown, 1);
+        s_mipmap_gen->SetTexture("OutMip2", this, ECubemapFace::kUnknown, 2);
+        s_mipmap_gen->SetTexture("OutMip3", this, ECubemapFace::kUnknown, 3);
+        s_mipmap_gen->SetTexture("OutMip4", this, ECubemapFace::kUnknown, 4);
         //static_cast<D3DComputeShader*>(_p_mipmapgen_cs0.get())->BindImpl(cmd, 32, 32, 1);
         //保证线程数和第一级输出的mipmap像素数一一对应
-        cmd->Dispatch(mipmap_gen.get(), kernel, mip1w / 8, mip1h / 8, 1);
+        cmd->Dispatch(s_mipmap_gen, s_mipmap_gen_2d_kernel, mip1w / 8, mip1h / 8, 1);
         if (_mipmap_count > 5)
         {
             auto [mip5w, mip5h] = CalculateMipSize(_width, _height, 5);
-            mipmap_gen->SetInt("SrcMipLevel", 4);
-            mipmap_gen->SetInt("NumMipLevels", std::min<u16>(_mipmap_count - 5, 4));
-            mipmap_gen->SetInt("SrcDimension", GetTextureSizePower2Info(CalculateMipSize(_width, _height, 4)));
-            mipmap_gen->SetBool("IsSRGB", false);
-            mipmap_gen->SetVector("TexelSize", Vector4f(1.0f / (float) mip5w, 1.0f / (float) mip5h, 0.0f, 0.0f));
-            mipmap_gen->SetTexture("SrcMip", this, ECubemapFace::kUnknown, 4);
-            mipmap_gen->SetTexture("OutMip1", this, ECubemapFace::kUnknown, 5);
-            mipmap_gen->SetTexture("OutMip2", this, ECubemapFace::kUnknown, 6);
-            mipmap_gen->SetTexture("OutMip3", this, ECubemapFace::kUnknown, 7);
-            mipmap_gen->SetTexture("OutMip4", this, ECubemapFace::kUnknown, 8);
-            cmd->Dispatch(mipmap_gen.get(), kernel, std::max(mip5w / 8, 1), std::max(mip5h / 8, 1), 1);
+            s_mipmap_gen->SetInt("SrcMipLevel", 4);
+            s_mipmap_gen->SetInt("NumMipLevels", std::min<u16>(_mipmap_count - 5, 4));
+            s_mipmap_gen->SetInt("SrcDimension", GetTextureSizePower2Info(CalculateMipSize(_width, _height, 4)));
+            s_mipmap_gen->SetBool("IsSRGB", false);
+            s_mipmap_gen->SetVector("TexelSize", Vector4f(1.0f / (float) mip5w, 1.0f / (float) mip5h, 0.0f, 0.0f));
+            s_mipmap_gen->SetTexture("SrcMip", this, ECubemapFace::kUnknown, 4);
+            s_mipmap_gen->SetTexture("OutMip1", this, ECubemapFace::kUnknown, 5);
+            s_mipmap_gen->SetTexture("OutMip2", this, ECubemapFace::kUnknown, 6);
+            s_mipmap_gen->SetTexture("OutMip3", this, ECubemapFace::kUnknown, 7);
+            s_mipmap_gen->SetTexture("OutMip4", this, ECubemapFace::kUnknown, 8);
+            cmd->Dispatch(s_mipmap_gen, s_mipmap_gen_2d_kernel, std::max(mip5w / 8, 1), std::max(mip5h / 8, 1), 1);
         }
         if (_mipmap_count > 9)
         {
             auto [mip9w, mip9h] = CalculateMipSize(_width, _height, 9);
-            mipmap_gen->SetInt("SrcMipLevel", 8);
-            mipmap_gen->SetInt("NumMipLevels", std::min<u16>(_mipmap_count - 9, 4));
-            mipmap_gen->SetInt("SrcDimension", GetTextureSizePower2Info(CalculateMipSize(_width, _height, 8)));
-            mipmap_gen->SetBool("IsSRGB", false);
-            mipmap_gen->SetVector("TexelSize", Vector4f(1.0f / (float) mip9w, 1.0f / (float) mip9h, 0.0f, 0.0f));
-            mipmap_gen->SetTexture("SrcMip", this, ECubemapFace::kUnknown, 8);
-            mipmap_gen->SetTexture("OutMip1", this, ECubemapFace::kUnknown, 9);
-            mipmap_gen->SetTexture("OutMip2", this, ECubemapFace::kUnknown, 10);
-            mipmap_gen->SetTexture("OutMip3", this, ECubemapFace::kUnknown, 11);
-            mipmap_gen->SetTexture("OutMip4", this, ECubemapFace::kUnknown, 12);
-            cmd->Dispatch(mipmap_gen.get(), kernel, std::max(mip9w / 8, 1), std::max(mip9h / 8, 1), 1);
+            s_mipmap_gen->SetInt("SrcMipLevel", 8);
+            s_mipmap_gen->SetInt("NumMipLevels", std::min<u16>(_mipmap_count - 9, 4));
+            s_mipmap_gen->SetInt("SrcDimension", GetTextureSizePower2Info(CalculateMipSize(_width, _height, 8)));
+            s_mipmap_gen->SetBool("IsSRGB", false);
+            s_mipmap_gen->SetVector("TexelSize", Vector4f(1.0f / (float) mip9w, 1.0f / (float) mip9h, 0.0f, 0.0f));
+            s_mipmap_gen->SetTexture("SrcMip", this, ECubemapFace::kUnknown, 8);
+            s_mipmap_gen->SetTexture("OutMip1", this, ECubemapFace::kUnknown, 9);
+            s_mipmap_gen->SetTexture("OutMip2", this, ECubemapFace::kUnknown, 10);
+            s_mipmap_gen->SetTexture("OutMip3", this, ECubemapFace::kUnknown, 11);
+            s_mipmap_gen->SetTexture("OutMip4", this, ECubemapFace::kUnknown, 12);
+            cmd->Dispatch(s_mipmap_gen, s_mipmap_gen_2d_kernel, std::max(mip9w / 8, 1), std::max(mip9h / 8, 1), 1);
         }
         cmd->StateTransition(this, D3DConvertUtils::ToALResState(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
         GraphicsContext::Get().ExecuteCommandBuffer(cmd);
@@ -498,6 +498,7 @@ namespace Ailu::RHI::DX12
             _p_mipmapgen_cs0 = ResourceMgr::Get().GetRef<ComputeShader>(L"Shaders/hlsl/Compute/cs_mipmap_gen.alasset");
             _p_mipmapgen_cs1 = ResourceMgr::Get().GetRef<ComputeShader>(L"Shaders/hlsl/Compute/cs_mipmap_gen.alasset");
         }
+        _mipmap_gen_3d_kernel = _p_mipmapgen_cs0->FindKernel("MipmapGen3D");
     }
 
     D3DTexture3D::~D3DTexture3D() { g_pGfxContext->WaitForFence(_fence_value); }
@@ -726,9 +727,8 @@ namespace Ailu::RHI::DX12
     void D3DTexture3D::GenerateMipmap()
     {
         auto cmd = CommandBufferPool::Get("MipmapGen0");
-        u16 kernel = _p_mipmapgen_cs0->FindKernel("MipmapGen3D");
         u16 thread_num_x, thread_num_y, thread_num_z;
-        _p_mipmapgen_cs0->GetThreadNum(kernel, thread_num_x, thread_num_y, thread_num_z);
+        _p_mipmapgen_cs0->GetThreadNum(_mipmap_gen_3d_kernel, thread_num_x, thread_num_y, thread_num_z);
         _p_mipmapgen_cs0->SetInt("SrcMipLevel", 0);
         _p_mipmapgen_cs0->SetInt("NumMipLevels", 4);
         _p_mipmapgen_cs0->SetInt("SrcDimension", 0);
@@ -741,7 +741,7 @@ namespace Ailu::RHI::DX12
         _p_mipmapgen_cs0->SetTexture("_OutMip3", this, 3);
         _p_mipmapgen_cs0->SetTexture("_OutMip4", this, 4);
         //保证线程数和第一级输出的mipmap像素数一一对应
-        cmd->Dispatch(_p_mipmapgen_cs0.get(), kernel, mip1w / thread_num_x, mip1h / thread_num_y, mip1d / thread_num_z);
+        cmd->Dispatch(_p_mipmapgen_cs0.get(), _mipmap_gen_3d_kernel, mip1w / thread_num_x, mip1h / thread_num_y, mip1d / thread_num_z);
         cmd->InsertUAVBarrier(this);
         if (_mipmap_count > 4)
         {
@@ -756,7 +756,7 @@ namespace Ailu::RHI::DX12
             _p_mipmapgen_cs1->SetTexture("_OutMip2", this, 6);
             _p_mipmapgen_cs1->SetTexture("_OutMip3", this, 7);
             _p_mipmapgen_cs1->SetTexture("_OutMip4", this, 8);
-            cmd->Dispatch(_p_mipmapgen_cs1.get(), kernel, mip5w / thread_num_x, mip5h / thread_num_y, mip5d / thread_num_z);
+            cmd->Dispatch(_p_mipmapgen_cs1.get(), _mipmap_gen_3d_kernel, mip5w / thread_num_x, mip5h / thread_num_y, mip5d / thread_num_z);
             cmd->InsertUAVBarrier(this);
         }
         cmd->StateTransition(this, D3DConvertUtils::ToALResState(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
@@ -1166,10 +1166,10 @@ namespace Ailu::RHI::DX12
 
     void D3DRenderTexture::GenerateMipmap()
     {
-        static ComputeShader *s_mipmap_gen = ResourceMgr::Get().Get<ComputeShader>(L"Shaders/hlsl/Compute/cs_mipmap_gen.alasset");
         auto cmd = CommandBufferPool::Get("MipmapGen");
         cmd->StateTransition(this, D3DConvertUtils::ToALResState(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
-        u16 kernel = s_mipmap_gen->FindKernel("MipmapGen2D");
+        static ComputeShader *s_mipmap_gen = ResourceMgr::Get().Get<ComputeShader>(L"Shaders/hlsl/Compute/cs_mipmap_gen.alasset");
+        static const ComputeShaderKernelId s_mipmap_gen_2d_kernel = s_mipmap_gen->FindKernel("MipmapGen2D");
         for (int i = 1; i < 7; i++)
         {
             s_mipmap_gen->SetInt("SrcMipLevel", 0);
@@ -1185,7 +1185,7 @@ namespace Ailu::RHI::DX12
             s_mipmap_gen->SetTexture("OutMip4", this, (ECubemapFace) i, 4);
             //static_cast<D3DComputeShader*>(_p_mipmapgen_cs0.get())->BindImpl(cmd, 32, 32, 1);
             //保证线程数和第一级输出的mipmap像素数一一对应
-            cmd->Dispatch(s_mipmap_gen, kernel, mip1w / 8, mip1h / 8, 1);
+            cmd->Dispatch(s_mipmap_gen, s_mipmap_gen_2d_kernel, mip1w / 8, mip1h / 8, 1);
             auto [mip5w, mip5h] = CalculateMipSize(_width, _height, 5);
             s_mipmap_gen->SetInt("SrcMipLevel", 4);
             s_mipmap_gen->SetInt("NumMipLevels", std::min<u16>(_mipmap_count - 5, 4));
@@ -1197,7 +1197,7 @@ namespace Ailu::RHI::DX12
             s_mipmap_gen->SetTexture("OutMip2", this, (ECubemapFace) i, 6);
             s_mipmap_gen->SetTexture("OutMip3", this, (ECubemapFace) i, 7);
             if (_mipmap_count > 6) s_mipmap_gen->SetTexture("OutMip4", this, (ECubemapFace) i, 8);
-            cmd->Dispatch(s_mipmap_gen, kernel, mip5w / 8, mip5h / 8, 1);
+            cmd->Dispatch(s_mipmap_gen, s_mipmap_gen_2d_kernel, mip5w / 8, mip5h / 8, 1);
             cmd->StateTransition(this, D3DConvertUtils::ToALResState(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
         }
         GraphicsContext::Get().ExecuteCommandBuffer(cmd);

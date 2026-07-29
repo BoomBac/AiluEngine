@@ -4,9 +4,13 @@
 
 #include "D3DResourceBase.h"
 #include "Render/CommandBuffer.h"
+#include "Render/GpuResource.h"
+#include "Render/RenderingStates.h"
 #include "Render/RenderConstants.h"
 #include "UploadBuffer.h"
 #include <array>
+#include <atomic>
+#include <unordered_map>
 #include <d3dx12.h>
 #include <wrl/client.h>
 
@@ -48,12 +52,23 @@ namespace Ailu
             ID3D12GraphicsCommandList4 *NativeCmdList() { return _p_cmd.Get(); };
             void AllocConstBuffer(const String &name, u32 size, u8 *data);
             UploadBuffer::Allocation AllocConstBuffer(const u8* data, u32 size);
+            UploadBuffer::Allocation AllocCachedConstBuffer(const u8* data, u32 size, bool &cache_hit);
             void Name(const String &name) final;
             void Clear() final;
             void ResetRenderTarget();
             /// @brief 标记当前cmd使用的资源，将当前cmd直接完毕的围栏值写入
             /// @param res
-            void MarkUsedResource(GpuResource *res) { _used_res.insert(res); }
+            void MarkUsedResource(GpuResource *res)
+            {
+                ++Render::RenderingStates::RenderData().ResourceMarkRequestCount;
+                if (res == nullptr)
+                    return;
+                if (res->MarkUsedByCommand(_tracking_epoch))
+                {
+                    _used_resources.emplace_back(res);
+                    ++Render::RenderingStates::RenderData().UniqueResourceMarkCount;
+                }
+            }
             u16 GetDescriptorHeapId() const { return _cur_cbv_heap_id; }
             void SetDescriptorHeapId(u16 id) { _cur_cbv_heap_id = id; };
             void PostExecute();
@@ -95,16 +110,24 @@ namespace Ailu
             HashMap<String, UploadBuffer::Allocation> _allocations;
             //存储临时buffer，不需要名称，即刻返回
             Vector<UploadBuffer::Allocation> _temp_allocs;
+            struct CachedUpload
+            {
+                u32 _size = 0u;
+                UploadBuffer::Allocation _allocation;
+            };
+            std::unordered_map<const u8 *, CachedUpload> _cached_uploads;
             Array<D3D12_CPU_DESCRIPTOR_HANDLE *, Render::RenderConstants::kMaxMRTNum> _colors;
             u16 _color_count;
             D3D12_CPU_DESCRIPTOR_HANDLE *_depth;
             Array<D3D12_VIEWPORT, Render::RenderConstants::kMaxMRTNum> _viewports;
             Array<D3D12_RECT, Render::RenderConstants::kMaxMRTNum> _scissors;
-            std::set<GpuResource *, ObjectPtrCompare> _used_res;
+            Vector<GpuResource *> _used_resources;
             bool _is_cmd_closed;
             i16 _cur_cbv_heap_id;
             u64 _fence_value;
+            u64 _tracking_epoch;
             GraphicsStateCache _graphics_state_cache;
+            inline static std::atomic<u64> s_next_tracking_epoch = 1u;
         };
     }// namespace ::RHI::DX12
 }// namespace Ailu

@@ -494,6 +494,7 @@ namespace Ailu
         PickFeature::PickFeature() : RenderFeature("Pick")
         {
             _read_pickbuf = ComputeShader::Create(ResourceMgr::GetResSysPath(L"Shaders/hlsl/Compute/pick_buffer_reader.hlsl"));
+            _read_pickbuf_kernel = _read_pickbuf->FindKernel("cs_main");
             BufferDesc desc{};
             desc._size = 256;
             desc._is_readable = true;
@@ -529,11 +530,10 @@ namespace Ailu
             if (_is_active)
             {
                 auto cmd = CommandBufferPool::Get("ReadbackPickBuffer");
-                auto kernel = _read_pickbuf->FindKernel("cs_main");
                 _read_pickbuf->SetTexture("_PickBuffer", _pick_buf.get());
                 _read_pickbuf->SetBuffer("_PickResult", _readback_buf.get());
                 _read_pickbuf->SetVector("pixel_pos", Vector4f((f32) x, (f32) y, 0.0f, 0.0f));
-                cmd->Dispatch(_read_pickbuf.get(), kernel, 1, 1, 1);
+                cmd->Dispatch(_read_pickbuf.get(), _read_pickbuf_kernel, 1, 1, 1);
                 cmd->ReadbackBuffer(_readback_buf.get(), false, 4u, [on_value_get](const u8 *data, u32 size)
                                     {
                                         const u32 packed = *reinterpret_cast<const u32 *>(data);

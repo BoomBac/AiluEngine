@@ -13,7 +13,9 @@
 #include "Framework/Core/Containers/Map.h"
 #include "Framework/Core/Containers/Array.h"
 #include <future>
+#include <optional>
 #include <set>
+#include <stdexcept>
 namespace Ailu
 {
     using JobFunction = std::function<void()>;
@@ -22,13 +24,16 @@ namespace Ailu
     class AILU_API Job
     {
     public:
-        Job() : _index(s_global_index++) {};
+        Job() : _index(s_global_index++), _remaining_dependencies(0) {};
+        explicit Job(u32 index) : _index(index), _remaining_dependencies(0) {};
 
         Job(String name, std::function<void()> task)
-            : _index(s_global_index++), _name(std::move(name)), _function(std::move(task)) {};
+            : _index(s_global_index++), _function(std::move(task)), _remaining_dependencies(0), _name(std::move(name)) {};
 
         void Construct(const String &name, JobFunction func)
         {
+            _remaining_dependencies.store(0, std::memory_order_relaxed);
+            _continuations.clear();
             _name = name;
             _function = std::move(func);
             _promise = MakeRef<std::promise<void>>();
@@ -47,7 +52,7 @@ namespace Ailu
             _continuations.emplace_back(dependent);
         }
 
-        void OnComplete();
+        void OnComplete(std::exception_ptr exception = nullptr);
 
         void SetJobSystem(JobSystem *system) { _system = system; }
 
@@ -62,12 +67,18 @@ namespace Ailu
         const u32 Index() const { return _index; }
         Ref<std::future<void>> GetFuture()
         {
+            EnsurePromise();
             return MakeRef<std::future<void>>(_promise->get_future());
         }
         bool IsValid() const { return _function != nullptr; }
 
     private:
         void AddDependency() { _remaining_dependencies.fetch_add(1, std::memory_order_relaxed); }
+        void EnsurePromise()
+        {
+            if (_promise == nullptr)
+                _promise = MakeRef<std::promise<void>>();
+        }
 
     private:
         inline static std::atomic<u32> s_global_index = 0u;
@@ -127,12 +138,13 @@ namespace Ailu
             ~JobPool();
             Job *Fetch();
             void Release(Job *job);
+            bool Contains(Job *job) const;
 
         private:
             Vector<Job *> _jobs;
             Queue<u32> _free_indices;
             Map<Job *, u32> _job_to_index;
-            std::mutex _mutex;
+            mutable std::mutex _mutex;
         };
         class AILU_API LockFreeJobQueue
         {
@@ -150,6 +162,11 @@ namespace Ailu
                 _tail = (_tail + 1) % _capacity;
                 ++_size;
                 return true;
+            }
+            bool Empty() const
+            {
+                std::lock_guard<std::mutex> lock(_mutex);
+                return _size == 0;
             }
 
             bool Dequeue(Job *&job)
@@ -182,9 +199,9 @@ namespace Ailu
             size_t _tail;
             size_t _size;
             size_t _capacity;
-            std::mutex _mutex;
+            mutable std::mutex _mutex;
         };
-        inline static const u32 kMaxJobPoolSize = 128u;
+        inline static const u32 kMaxJobPoolSize = 4096u;
 
     public:
         static void Init(u32 thread_count = std::thread::hardware_concurrency());
@@ -197,6 +214,9 @@ namespace Ailu
         [[nodiscard]] Job *CreateJob(const String &name, Callable &&task, Args &&...args)
         {
             Job *job = _pool->Fetch();
+            AL_ASSERT(job);
+            if (job == nullptr)
+                return nullptr;
             auto fn = std::bind(std::forward<Callable>(task), std::forward<Args>(args)...);
             job->Construct(name, fn);
             job->SetJobSystem(this);
@@ -216,6 +236,14 @@ namespace Ailu
         WaitHandle Dispatch(Callable &&task, Args &&...args)
         {
             Job *job = _pool->Fetch();
+            AL_ASSERT(job);
+            if (job == nullptr)
+            {
+                auto promise = MakeRef<std::promise<void>>();
+                auto future = MakeRef<std::future<void>>(promise->get_future());
+                promise->set_exception(std::make_exception_ptr(std::runtime_error("JobSystem job pool is full")));
+                return WaitHandle(future);
+            }
             auto fn = std::bind(std::forward<Callable>(task), std::forward<Args>(args)...);
             job->Construct("noname", fn);
             return Dispatch(job);
@@ -227,6 +255,8 @@ namespace Ailu
         bool WorkOnce();
         void WorkerThread(size_t index);
         bool TrySteal(Job *&job, size_t current_index);
+        bool HasPendingJob() const;
+        void CompleteJob(Job *job, std::exception_ptr exception);
 
     private:
         std::vector<std::unique_ptr<LockFreeJobQueue>> _queues;

@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __MATERIAL_GEN_H__
 //Class Material begin...........................
-#define MATERIAL_GEN_H_26_GENERATED_BODY \
+#define MATERIAL_GEN_H_30_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_Material_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -21,7 +21,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::Material>
 //Class Material end...........................
 
 //Class StandardMaterial begin...........................
-#define MATERIAL_GEN_H_171_GENERATED_BODY \
+#define MATERIAL_GEN_H_212_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_StandardMaterial_Type();\
                                 static const Type* GetPrivateStaticClass();\

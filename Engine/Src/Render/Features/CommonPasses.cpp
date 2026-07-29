@@ -888,6 +888,9 @@ namespace Ailu::Render
     SkyboxPass::SkyboxPass() : RenderPass("SkyboxPass")
     {
         _p_lut_gen = ComputeShader::Create(ResourceMgr::GetResSysPath(L"Shaders/hlsl/Compute/atmosphere_lut_gen.hlsl"));
+        _transmittance_lut_gen_kernel = _p_lut_gen->FindKernel("TransmittanceGen");
+        _mult_scatter_lut_gen_kernel = _p_lut_gen->FindKernel("MultiScattGen");
+        _sky_lut_gen_kernel = _p_lut_gen->FindKernel("SkyLightGen");
         _p_skybox_material = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/skybox.alasset"), "Skybox");
         Matrix4x4f world_mat;
         MatrixScale(world_mat, 1000000.f, 1000000.f, 1000000.f);
@@ -897,14 +900,12 @@ namespace Ailu::Render
         _ms_lut = RenderTexture::Create(_mult_scatter_lut_size.x, _mult_scatter_lut_size.y, "_MultScatterLUT", ERenderTargetFormat::kRGBAHalf, false, false, true);
 
         auto cmd = CommandBufferPool::Get("SkyLutGen");
-        u16 transmittance_lut_gen_kernel = _p_lut_gen->FindKernel("TransmittanceGen");
-        u16 mult_scatter_lut_gen_kernel = _p_lut_gen->FindKernel("MultiScattGen");
         _p_lut_gen->SetTexture("_TransmittanceLUT", _tlut.get());
-        cmd->Dispatch(_p_lut_gen.get(), transmittance_lut_gen_kernel, _transmittance_lut_size.x / 16, _transmittance_lut_size.y / 16, 1);
+        cmd->Dispatch(_p_lut_gen.get(), _transmittance_lut_gen_kernel, _transmittance_lut_size.x / 16, _transmittance_lut_size.y / 16, 1);
 
         _p_lut_gen->SetTexture("_TexTransmittanceLUT", _tlut.get());
         _p_lut_gen->SetTexture("_MultScatterLUT", _ms_lut.get());
-        cmd->Dispatch(_p_lut_gen.get(), mult_scatter_lut_gen_kernel, _mult_scatter_lut_size.x / 16, _mult_scatter_lut_size.y / 16, 1);
+        cmd->Dispatch(_p_lut_gen.get(), _mult_scatter_lut_gen_kernel, _mult_scatter_lut_size.x / 16, _mult_scatter_lut_size.y / 16, 1);
         g_pGfxContext->ExecuteCommandBuffer(cmd);
         CommandBufferPool::Release(cmd);
         _event = static_cast<ERenderPassEvent>(static_cast<u16>(ERenderPassEvent::kBeforeSkybox) + 25u);
@@ -925,12 +926,11 @@ namespace Ailu::Render
                           sv_lut = builder.Write(sv_lut,EResourceUsage::kWriteUAV);
                       }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data)
                       {
-                            u16 sky_lut_gen_kernel = _p_lut_gen->FindKernel("SkyLightGen");
                             _p_lut_gen->SetTexture("_TexTransmittanceLUT", _tlut.get());
                             _p_lut_gen->SetTexture("_TexMultScatterLUT", _ms_lut.get());
                             _p_lut_gen->SetTexture("_SkyLightLUT", graph.Resolve<RenderTexture>(sv_lut));
                             _p_lut_gen->SetVector("_MainLightPosition", rendering_data._mainlight_world_position);
-                            cmd->Dispatch(_p_lut_gen.get(), sky_lut_gen_kernel, _sky_lut_size.x / 16, _sky_lut_size.y / 16, 1);
+                            cmd->Dispatch(_p_lut_gen.get(), _sky_lut_gen_kernel, _sky_lut_size.x / 16, _sky_lut_size.y / 16, 1);
         });
         graph.AddPass("DrawSkyBox", RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
                       { 
@@ -958,7 +958,6 @@ namespace Ailu::Render
     }
     void SkyboxPass::Execute(GraphicsContext *context, RenderingData &rendering_data)
     {
-        u16 sky_lut_gen_kernel = _p_lut_gen->FindKernel("SkyLightGen");
         auto cmd = CommandBufferPool::Get("SkyboxPass");
         cmd->Clear();
         {
@@ -970,7 +969,7 @@ namespace Ailu::Render
             _p_lut_gen->SetTexture("_TexMultScatterLUT", _ms_lut.get());
             _p_lut_gen->SetTexture("_SkyLightLUT", sv_lut);
             _p_lut_gen->SetVector("_MainLightPosition", rendering_data._mainlight_world_position);
-            cmd->Dispatch(_p_lut_gen.get(), sky_lut_gen_kernel, _sky_lut_size.x / 16, _sky_lut_size.y / 16, 1);
+            cmd->Dispatch(_p_lut_gen.get(), _sky_lut_gen_kernel, _sky_lut_size.x / 16, _sky_lut_size.y / 16, 1);
 
 
             _p_skybox_material->SetTexture("_TexSkyViewLUT", sv_lut);
@@ -1646,6 +1645,7 @@ namespace Ailu::Render
     HZBPass::HZBPass() : RenderPass("HZB")
     {
         _hzb_gen = ResourceMgr::Get().GetRef<ComputeShader>(L"Shaders/hlsl/Compute/hzb.alasset");
+        _hzb_kernel = _hzb_gen->FindKernel("CSMain");
         _event = ERenderPassEvent::kAfterGbuffer;
     }
     HZBPass::~HZBPass()
@@ -1655,7 +1655,6 @@ namespace Ailu::Render
     {
         u16 w = (rendering_data._width + 1) >> 1;
         u16 h = (rendering_data._height + 1) >> 1;
-        auto kernel = _hzb_gen->FindKernel("CSMain");
         u16 mip = Texture::MaxMipmapCount(w, h);
         u16 first_dispatch_mip_num = std::min<u16>(4, mip);
         graph.AddPass("HZB0", RDG::PassDesc{RDG::EPassType::kCompute}, [&](RDG::RenderGraphBuilder &builder)
@@ -1671,8 +1670,8 @@ namespace Ailu::Render
                                 _hzb_gen->SetTexture("_HZ_Buffer_Mip2", graph.Resolve<Texture>(rendering_data._rg_handles._hzb), ECubemapFace::kUnknown, 1);
                                 _hzb_gen->SetTexture("_HZ_Buffer_Mip3", graph.Resolve<Texture>(rendering_data._rg_handles._hzb), ECubemapFace::kUnknown, 2);
                                 _hzb_gen->SetTexture("_HZ_Buffer_Mip4", graph.Resolve<Texture>(rendering_data._rg_handles._hzb), ECubemapFace::kUnknown, 3);
-                                auto [x, y, z] = _hzb_gen->CalculateDispatchNum(kernel, w, h, 1);
-                                cmd->Dispatch(_hzb_gen.get(), kernel, x, y);
+                                auto [x, y, z] = _hzb_gen->CalculateDispatchNum(_hzb_kernel, w, h, 1);
+                                cmd->Dispatch(_hzb_gen.get(), _hzb_kernel, x, y);
                             }
                       });
         if (u16 second_dispatch_mip_num = mip - first_dispatch_mip_num; second_dispatch_mip_num > 0)
@@ -1691,8 +1690,8 @@ namespace Ailu::Render
                                 _hzb_gen->SetTexture("_HZ_Buffer_Mip4", graph.Resolve<Texture>(rendering_data._rg_handles._hzb), ECubemapFace::kUnknown, 7);
                                 //u16 base_w = w, base_h = h;
                                 auto [base_w, base_h] = Texture::CalculateMipSize(w, h, 4);
-                                auto [x, y, z] = _hzb_gen->CalculateDispatchNum(kernel, base_w, base_h, 1);
-                                cmd->Dispatch(_hzb_gen.get(), kernel, x, y);
+                                auto [x, y, z] = _hzb_gen->CalculateDispatchNum(_hzb_kernel, base_w, base_h, 1);
+                                cmd->Dispatch(_hzb_gen.get(), _hzb_kernel, x, y);
                           });
         }
 
@@ -1707,7 +1706,6 @@ namespace Ailu::Render
         cmd->Clear();
         {
             PROFILE_BLOCK_GPU(cmd.get(), "HZB")
-            auto kernel = _hzb_gen->FindKernel("CSMain");
             _hzb_gen->SetTexture("_DepthInput", rendering_data._camera_depth_target_handle);
             u16 mip = Texture::MaxMipmapCount(w, h);
             u16 first_dispatch_mip_num = std::min<u16>(4, mip);
@@ -1717,8 +1715,8 @@ namespace Ailu::Render
                 _hzb_gen->SetTexture("_HZ_Buffer_Mip2", hzb_rt, ECubemapFace::kUnknown, 1);
                 _hzb_gen->SetTexture("_HZ_Buffer_Mip3", hzb_rt, ECubemapFace::kUnknown, 2);
                 _hzb_gen->SetTexture("_HZ_Buffer_Mip4", hzb_rt, ECubemapFace::kUnknown, 3);
-                auto [x, y, z] = _hzb_gen->CalculateDispatchNum(kernel, w, h, 1);
-                cmd->Dispatch(_hzb_gen.get(), kernel, x, y);
+                auto [x, y, z] = _hzb_gen->CalculateDispatchNum(_hzb_kernel, w, h, 1);
+                cmd->Dispatch(_hzb_gen.get(), _hzb_kernel, x, y);
             }
             if (u16 second_dispatch_mip_num = mip - first_dispatch_mip_num; second_dispatch_mip_num > 0)
             {
@@ -1730,8 +1728,8 @@ namespace Ailu::Render
                 _hzb_gen->SetTexture("_HZ_Buffer_Mip4", hzb_rt, ECubemapFace::kUnknown, 7);
                 //u16 base_w = w, base_h = h;
                 auto [base_w, base_h] = Texture::CalculateMipSize(w, h, 4);
-                auto [x, y, z] = _hzb_gen->CalculateDispatchNum(kernel, base_w, base_h, 1);
-                cmd->Dispatch(_hzb_gen.get(), kernel, x, y);
+                auto [x, y, z] = _hzb_gen->CalculateDispatchNum(_hzb_kernel, base_w, base_h, 1);
+                cmd->Dispatch(_hzb_gen.get(), _hzb_kernel, x, y);
             }
         }
         cmd->ReleaseTempRT(hzb_rt);

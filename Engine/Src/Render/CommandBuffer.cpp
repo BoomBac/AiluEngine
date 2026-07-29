@@ -12,6 +12,7 @@
 #include "Render/RenderGraph/RenderGraph.h"
 #include "Render/FrameResource.h"
 #include "Render/FrameAllocator.h"
+#include "Render/RenderingStates.h"
 
 #include "Render/RayTracing/RayTracingScene.h"
 #include "Render/RayTracing/RayTracingGeometry.h"
@@ -99,13 +100,15 @@ namespace Ailu::Render
     private:
         void PushMaterialState(CommandDraw *cmd, bool copy_material_property_block)
         {
-            i16 mat_cbuf_bind_slot = cmd->_mat->PushState(cmd->_pass_index);
-            if (!copy_material_property_block || mat_cbuf_bind_slot < 0)
+            ++RenderingStates::RenderData().MaterialCaptureCount;
+            cmd->_material_draw_state = cmd->_mat->CaptureDrawState(cmd->_pass_index,
+                                                                      FrameResourceManager::Get().GetActiveFrameSlot(),
+                                                                      g_pGfxContext->GetFrameCount(),
+                                                                      *FrameResourceManager::Get().GetActiveFrameAllocator());
+            if (!copy_material_property_block || cmd->_material_draw_state._material_cbuffer_slot < 0)
                 return;
-            auto block = cmd->_mat->GetPropertyBlock(cmd->_pass_index);
-            cmd->_material_property_block._data = FrameResourceManager::Get().GetActiveFrameAllocator()->Allocate<u8>(block->_size);
-            cmd->_material_property_block._size = block->_size;
-            memcpy(cmd->_material_property_block._data, block->_data, block->_size);
+            cmd->_material_property_block._data = const_cast<u8 *>(cmd->_material_draw_state._property_data);
+            cmd->_material_property_block._size = cmd->_material_draw_state._property_size;
         }
 
     public:
@@ -612,26 +615,41 @@ namespace Ailu::Render
             _commands.emplace_back(cmd);
         }
 
-        void Dispatch(ComputeShader *cs, u16 kernel, u16 thread_group_x, u16 thread_group_y)
+        void Dispatch(ComputeShader *cs, ComputeShaderKernelId kernel, u16 thread_group_x, u16 thread_group_y)
         {
             Dispatch(cs, kernel, thread_group_x, thread_group_y, 1u);
         }
-        void Dispatch(ComputeShader *cs, u16 kernel, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z)
+        void Dispatch(ComputeShader *cs, ComputeShaderKernelId kernel, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z)
         {
+            if (cs == nullptr || !cs->IsKernelValid(kernel))
+            {
+                LOG_WARNING("CommandBuffer::Dispatch skipped invalid compute shader kernel");
+                return;
+            }
             auto cmd = CommandPool::Get().Alloc<CommandDispatch>();
             cmd->_cs = cs;
             cmd->_group_num_x = std::max<u16>(1u, thread_group_x);
             cmd->_group_num_y = std::max<u16>(1u, thread_group_y);
             cmd->_group_num_z = std::max<u16>(1u, thread_group_z);
             cmd->_kernel = kernel;
+            cmd->_arg_buffer = nullptr;
+            cmd->_arg_offset = 0u;
             cmd->_cs->PushState(cmd->_kernel);
             _commands.emplace_back(cmd);
         }
-        void Dispatch(ComputeShader *cs, u16 kernel, GPUBuffer *arg_buffer, u16 arg_offset)
+        void Dispatch(ComputeShader *cs, ComputeShaderKernelId kernel, GPUBuffer *arg_buffer, u16 arg_offset)
         {
+            if (cs == nullptr || !cs->IsKernelValid(kernel))
+            {
+                LOG_WARNING("CommandBuffer::DispatchIndirect skipped invalid compute shader kernel");
+                return;
+            }
             auto cmd = CommandPool::Get().Alloc<CommandDispatch>();
             cmd->_cs = cs;
             cmd->_kernel = kernel;
+            cmd->_group_num_x = 1u;
+            cmd->_group_num_y = 1u;
+            cmd->_group_num_z = 1u;
             cmd->_cs->PushState(cmd->_kernel);
             cmd->_arg_buffer = arg_buffer;
             cmd->_arg_offset = arg_offset;
@@ -944,15 +962,15 @@ namespace Ailu::Render
         _impl->DrawProcedural(material, pass_index, vertex_count, instance_count);
     }
 
-    void CommandBuffer::Dispatch(ComputeShader *cs, u16 kernel, u16 thread_group_x, u16 thread_group_y)
+    void CommandBuffer::Dispatch(ComputeShader *cs, ComputeShaderKernelId kernel, u16 thread_group_x, u16 thread_group_y)
     {
         _impl->Dispatch(cs, kernel, thread_group_x, thread_group_y);
     }
-    void CommandBuffer::Dispatch(ComputeShader *cs, u16 kernel, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z)
+    void CommandBuffer::Dispatch(ComputeShader *cs, ComputeShaderKernelId kernel, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z)
     {
         _impl->Dispatch(cs, kernel, thread_group_x, thread_group_y, thread_group_z);
     }
-    void CommandBuffer::Dispatch(ComputeShader *cs, u16 kernel,GPUBuffer* arg_buffer,u16 arg_offset)
+    void CommandBuffer::Dispatch(ComputeShader *cs, ComputeShaderKernelId kernel,GPUBuffer* arg_buffer,u16 arg_offset)
     {
         _impl->Dispatch(cs, kernel, arg_buffer, arg_offset);
     }

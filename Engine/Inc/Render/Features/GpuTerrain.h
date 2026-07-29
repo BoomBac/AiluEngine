@@ -41,6 +41,10 @@ namespace Ailu::Render
     private:
         static const u16 kMaxLOD =5;
         ComputeShader* _terrain_gen;
+        ComputeShaderKernelId _min_max_height_gen_kernel = kInvalidComputeShaderKernelId;
+        ComputeShaderKernelId _quad_tree_processor_kernel = kInvalidComputeShaderKernelId;
+        ComputeShaderKernelId _gen_lod_map_kernel = kInvalidComputeShaderKernelId;
+        ComputeShaderKernelId _gen_patches_kernel = kInvalidComputeShaderKernelId;
         f32* _max_height;
         Mesh* _plane;
         Material* _terrain_mat;

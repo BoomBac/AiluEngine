@@ -40,6 +40,8 @@ namespace Ailu::Render
         _event = ERenderPassEvent::kAfterSkybox;
         _noise_gen = ResourceMgr::Get().Load<ComputeShader>(L"Shaders/hlsl/Compute/volumetric_noise_generator.alasset");
         _cloud_gen = ResourceMgr::Get().Load<ComputeShader>(L"Shaders/hlsl/Compute/volumetric_cloud.alasset");
+        _cloud_main_kernel = _cloud_gen->FindKernel("CloudMain");
+        _cloud_reprojection_kernel = _cloud_gen->FindKernel("CloudReprojection");
         _cloud_gen->EnableKeyword("_QUALITY_HIGH");
         u16 w = 128, h = w, d = w;
         TextureDesc desc;
@@ -151,11 +153,10 @@ namespace Ailu::Render
             _cloud_gen->SetVector("_CloudTex_TexelSize", cur_rt->TexelSize());
             _cloud_gen->SetTexture("_CameraDepthTexture", depth_tex);
             _cloud_gen->SetVector("_pixel_offset", Vector4f((f32) cur_offset.x, (f32) cur_offset.y, 0.f, 0.f));
-            auto kernel = _cloud_gen->FindKernel("CloudMain");
             _cloud_gen->SetTexture("_CloudTex", cur_rt);
             {
-                auto [x, y, z] = _cloud_gen->CalculateDispatchNum(kernel, rt_desc._width >> (_params._is_tile_render ? 2 : 0), rt_desc._height >> (_params._is_tile_render ? 2 : 0), 1);
-                cmd->Dispatch(_cloud_gen.get(), kernel, x, y, 1);
+                auto [x, y, z] = _cloud_gen->CalculateDispatchNum(_cloud_main_kernel, rt_desc._width >> (_params._is_tile_render ? 2 : 0), rt_desc._height >> (_params._is_tile_render ? 2 : 0), 1);
+                cmd->Dispatch(_cloud_gen.get(), _cloud_main_kernel, x, y, 1);
             }
         });
         if (_params._is_tile_render)
@@ -170,9 +171,8 @@ namespace Ailu::Render
             {
                 auto rt_desc = data._camera_data._camera_color_target_desc;
                 _cloud_gen->SetTexture("_CloudHistoryTex", graph.Resolve<RenderTexture>(_cloud_history_handle));
-                auto kernel = _cloud_gen->FindKernel("CloudReprojection");
-                auto [x, y, z] = _cloud_gen->CalculateDispatchNum(kernel, rt_desc._width, rt_desc._height, 1);
-                cmd->Dispatch(_cloud_gen.get(), kernel, x, y, 1);
+                auto [x, y, z] = _cloud_gen->CalculateDispatchNum(_cloud_reprojection_kernel, rt_desc._width, rt_desc._height, 1);
+                cmd->Dispatch(_cloud_gen.get(), _cloud_reprojection_kernel, x, y, 1);
             });
         }
 
@@ -237,20 +237,18 @@ namespace Ailu::Render
             _cloud_gen->SetVector("_CloudTex_TexelSize", cur_rt->TexelSize());
             _cloud_gen->SetTexture("_CameraDepthTexture", rendering_data._camera_depth_tex_handle);
             _cloud_gen->SetVector("_pixel_offset", Vector4f((f32) cur_offset.x, (f32) cur_offset.y, 0.f, 0.f));
-            auto kernel = _cloud_gen->FindKernel("CloudMain");
             _cloud_gen->SetTexture("_CloudTex", cur_rt);
             {
-                auto [x, y, z] = _cloud_gen->CalculateDispatchNum(kernel, rt_desc._width >> (_params._is_tile_render? 2 : 0), rt_desc._height >> (_params._is_tile_render? 2 : 0), 1);
-                cmd->Dispatch(_cloud_gen.get(), kernel, x, y, 1);
+                auto [x, y, z] = _cloud_gen->CalculateDispatchNum(_cloud_main_kernel, rt_desc._width >> (_params._is_tile_render? 2 : 0), rt_desc._height >> (_params._is_tile_render? 2 : 0), 1);
+                cmd->Dispatch(_cloud_gen.get(), _cloud_main_kernel, x, y, 1);
             }
             if (_params._is_tile_render)
             {
                 //re-projection
                 {
                     _cloud_gen->SetTexture("_CloudHistoryTex", history_rt);
-                    kernel = _cloud_gen->FindKernel("CloudReprojection");
-                    auto [x, y, z] = _cloud_gen->CalculateDispatchNum(kernel, rt_desc._width, rt_desc._height, 1);
-                    cmd->Dispatch(_cloud_gen.get(), kernel, x, y, 1);
+                    auto [x, y, z] = _cloud_gen->CalculateDispatchNum(_cloud_reprojection_kernel, rt_desc._width, rt_desc._height, 1);
+                    cmd->Dispatch(_cloud_gen.get(), _cloud_reprojection_kernel, x, y, 1);
                 }
             }
             cmd->SetRenderTargetLoadAction(rendering_data._camera_color_target_handle,ELoadStoreAction::kNotCare);

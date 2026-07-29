@@ -3,7 +3,7 @@
 #define __SSAO_PASS_H__
 #include "RenderFeature.h"
 #include "../Texture.h"
-#include "generated./SSAO.gen.h"
+#include "generated/SSAO.gen.h"
 namespace Ailu::Render
 {
 	class SSAOPass : public RenderPass
@@ -22,12 +22,15 @@ namespace Ailu::Render
 	private:
 		Ref<ComputeShader> _ssao_computer;
 		Ref<Material> _ssao_gen;
+        ComputeShaderKernelId _ssao_gen_kernel = kInvalidComputeShaderKernelId;
+        ComputeShaderKernelId _ssao_blur_x_kernel = kInvalidComputeShaderKernelId;
+        ComputeShaderKernelId _ssao_blur_y_kernel = kInvalidComputeShaderKernelId;
 	};
 
 	ACLASS()
 	class SSAO : public RenderFeature
 	{
-	GENERATED_BODY()
+    GENERATED_BODY()
     public:
 		SSAO();
 		~SSAO();

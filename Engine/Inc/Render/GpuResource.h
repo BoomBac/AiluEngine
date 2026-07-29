@@ -95,6 +95,7 @@ namespace Ailu::Render
         u64 GetSize() const {return _mem_size;}
         u64 GetFenceValue() const {return _fence_value;}
         void Track(u64 fence = 0u);
+        bool MarkUsedByCommand(u64 command_epoch);
         bool IsReferenceByGpu() const;
         EGpuResType GetResourceType() const {return _res_type;}
         bool IsReady();
@@ -107,6 +108,7 @@ namespace Ailu::Render
         inline static u64 s_total_mem_size = 0u;
         u64 _mem_size = 0u;
         u64 _fence_value = 0u;
+        u64 _last_marked_command_epoch = 0u;
         EResourceState _state = EResourceState::kCommon;
         EGpuResType _res_type;
         bool _is_ready_for_rendering = false;

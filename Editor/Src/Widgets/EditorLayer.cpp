@@ -27,6 +27,7 @@
 #include "Framework/Events/MouseEvent.h"
 
 #include "Framework/Common/Profiler.h"
+#include "Framework/Common/MemoryDebugService.h"
 #include "Render/RenderPipeline.h"
 #include "Scene/Scene.h"
 
@@ -48,6 +49,7 @@
 #include "Render/RenderGraph/RenderGraph.h"
 
 #include "Widgets/CommonView.h"
+#include "Widgets/AllocatorDebugPanel.h"
 #include "Widgets/RenderView.h"
 #include "Widgets/ResourceBrowser.h"
 #include "Widgets/StyleThemeEditor.h"
@@ -1619,9 +1621,10 @@ namespace Ailu
             }
             if (_status_right_text)
             {
+                const auto& ds = RenderingStates::DisplayData();
                 _status_right_text->SetText(std::format("FPS: {:.1f}   Frame: {:.2f} ms",
-                                                        RenderingStates::GetFrameRate(),
-                                                        RenderingStates::GetFrameTime()),
+                                                        ds.FrameRate,
+                                                        ds.FrameTime),
                                             false);
             }
 
@@ -1655,6 +1658,7 @@ namespace Ailu
             static bool s_show_ui_reflector = false;
             static bool s_show_style_theme_editor = false;
             static bool s_show_resource_browser = false;
+            static bool s_show_allocator_debug_panel = false;
 
         static void ShowThreadPoolView(bool *is_show)
         {
@@ -1693,6 +1697,7 @@ namespace Ailu
             static bool s_show_undo_view = false;
             static Scope<Process> s_package_player_process;
             static String s_package_player_status = "Idle";
+            MemoryDebugService::Get().Tick(TimeMgr::s_delta_time);
 
             if (s_package_player_process && s_package_player_process->IsValid() && !s_package_player_process->IsRunning())
             {
@@ -1715,15 +1720,56 @@ namespace Ailu
 
             const bool is_packaging_player = s_package_player_process && s_package_player_process->IsValid() && s_package_player_process->IsRunning();
             ImGui::Begin("Common");// Create a window called "Hello, world!" and append into it.
-            ImGui::Text("FrameRate: %.2f", RenderingStates::GetFrameRate());
-            ImGui::Text("FrameTime: %.2f ms", RenderingStates::GetFrameTime());
-            ImGui::Text("GpuLatency: %.2f ms", RenderingStates::GetGpuLatency());
-            ImGui::Text("Draw Call: %d", RenderingStates::GetDrawCallCount());
-            ImGui::Text("Dispatch Call: %d", RenderingStates::GetDispatchCallCount());
-            ImGui::Text("VertCount: %d", RenderingStates::GetVertexCount());
-            ImGui::Text("TriCount: %d", RenderingStates::GetTriangleCount());
-            ImGui::Text("Gfx PSO: %d", RenderingStates::GetGfxPsoBindCount());
-            ImGui::Text("Gfx Res: %d", RenderingStates::GetGfxResBindCount());
+            const auto& ds = RenderingStates::DisplayData();
+            ImGui::Text("FrameRate: %.2f", ds.FrameRate);
+            ImGui::Text("FrameTime: %.2f ms", ds.FrameTime);
+            ImGui::Text("GpuLatency: %.2f ms", ds.GpuLatency);
+            ImGui::Text("Draw Call: %d", ds.DrawCall);
+            ImGui::Text("Dispatch Call: %d", ds.DispatchCall);
+            ImGui::Text("VertCount: %d", ds.VertexNum);
+            ImGui::Text("TriCount: %d", ds.TriangleNum);
+            ImGui::Text("Gfx PSO: %d", ds.GfxPsoBindCount);
+            ImGui::Text("Gfx PSO Dirty: %d", ds.GfxPsoDirtyCount);
+            ImGui::Text("Gfx Res: %d", ds.GfxResBindCount);
+            if (ImGui::CollapsingHeader("Render Submission Stats", ImGuiTreeNodeFlags_DefaultOpen))
+            {
+                auto percent = [](u64 numerator, u64 denominator) -> f32
+                {
+                    return denominator == 0u ? 0.0f : static_cast<f32>(numerator) * 100.0f / static_cast<f32>(denominator);
+                };
+                const u64 pso_total = ds.PsoCacheHitCount + ds.PsoCacheMissCount;
+                const u64 root_slot_total = ds.ActualRootSlotBindCount + ds.SkippedRootSlotBindCount;
+                const u64 material_binding_total = ds.MaterialBindingResolveCount + ds.MaterialBindingCacheHitCount;
+                const u64 material_upload_total = ds.MaterialCBufferUploadCount + ds.MaterialCBufferCacheHitCount;
+
+                ImGui::Text("Draw Commands: %llu", static_cast<unsigned long long>(ds.DrawCommandCount));
+                ImGui::Text("PSO Lookups: %llu", static_cast<unsigned long long>(ds.PsoLookupCount));
+                ImGui::Text("PSO Cache Hit/Miss: %llu / %llu (%.1f%%)", static_cast<unsigned long long>(ds.PsoCacheHitCount),
+                            static_cast<unsigned long long>(ds.PsoCacheMissCount), percent(ds.PsoCacheHitCount, pso_total));
+                ImGui::Text("PSO Dirty: %llu", static_cast<unsigned long long>(ds.GfxPsoDirtyCount));
+                ImGui::Separator();
+                ImGui::Text("Material Capture: %llu", static_cast<unsigned long long>(ds.MaterialCaptureCount));
+                ImGui::Text("Material Binding Resolve/Cache: %llu / %llu (%.1f%% cache)",
+                            static_cast<unsigned long long>(ds.MaterialBindingResolveCount),
+                            static_cast<unsigned long long>(ds.MaterialBindingCacheHitCount),
+                            percent(ds.MaterialBindingCacheHitCount, material_binding_total));
+                ImGui::Text("Material CBuffer Upload/Cache: %llu / %llu (%.1f%% cache)",
+                            static_cast<unsigned long long>(ds.MaterialCBufferUploadCount),
+                            static_cast<unsigned long long>(ds.MaterialCBufferCacheHitCount),
+                            percent(ds.MaterialCBufferCacheHitCount, material_upload_total));
+                ImGui::Text("Material CBuffer Bytes: %llu", static_cast<unsigned long long>(ds.MaterialCBufferUploadBytes));
+                ImGui::Separator();
+                ImGui::Text("Pipeline Resource Submit: %llu", static_cast<unsigned long long>(ds.PipelineResourceSubmitCount));
+                ImGui::Text("Pipeline Resource Override: %llu", static_cast<unsigned long long>(ds.PipelineResourceOverrideCount));
+                ImGui::Text("Root Slot Bind/Skip: %llu / %llu (%.1f%% skip)",
+                            static_cast<unsigned long long>(ds.ActualRootSlotBindCount),
+                            static_cast<unsigned long long>(ds.SkippedRootSlotBindCount),
+                            percent(ds.SkippedRootSlotBindCount, root_slot_total));
+                ImGui::Text("Resource Mark Request/Unique: %llu / %llu (%.1f%% unique)",
+                            static_cast<unsigned long long>(ds.ResourceMarkRequestCount),
+                            static_cast<unsigned long long>(ds.UniqueResourceMarkCount),
+                            percent(ds.UniqueResourceMarkCount, ds.ResourceMarkRequestCount));
+            }
             if (ImGui::CollapsingHeader("Features"))
             {
                 for (auto feature: Render::RenderPipeline::Get().GetRenderer()->GetFeatures())
@@ -1821,6 +1867,7 @@ namespace Ailu
             ImGui::Checkbox("ShowUIReflector", &s_show_ui_reflector);
             ImGui::Checkbox("ShowStyleThemeEditor", &s_show_style_theme_editor);
             ImGui::Checkbox("ShowResourceBrowser", &s_show_resource_browser);
+            ImGui::Checkbox("AllocatorDebug", &s_show_allocator_debug_panel);
             ImGui::Checkbox("Raytracing Pipeline", &s_raytracing_pipeline);
             RenderPipeline::Get().GetRenderer()->_is_use_raytracing = s_raytracing_pipeline;
             if (ImGui::Button("Capture RDG"))
@@ -2060,6 +2107,8 @@ namespace Ailu
                 ShowStyleThemeEditorWindow(&s_show_style_theme_editor);
             if (s_show_resource_browser)
                 ShowResourceBrowserWindow(&s_show_resource_browser);
+            if (s_show_allocator_debug_panel)
+                ShowAllocatorDebugPanelWindow(&s_show_allocator_debug_panel);
             s_prifile_wd->Show();
         }
 

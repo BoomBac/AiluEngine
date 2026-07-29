@@ -50,6 +50,8 @@ namespace Ailu::Render
         Ref<Texture2D> _weather_map;
         Ref<ComputeShader> _noise_gen;
         Ref<ComputeShader> _cloud_gen;
+        ComputeShaderKernelId _cloud_main_kernel = kInvalidComputeShaderKernelId;
+        ComputeShaderKernelId _cloud_reprojection_kernel = kInvalidComputeShaderKernelId;
         Ref<RenderTexture> _cloud_rt_a;
         Ref<RenderTexture> _cloud_rt_b;
         RDG::RGHandle _cloud_cur_handle{};

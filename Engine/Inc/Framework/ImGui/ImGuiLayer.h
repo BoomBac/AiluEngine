@@ -22,9 +22,13 @@ namespace Ailu
 
 		void Begin();
 		void End();
+        bool ShouldBlockEngineInputEvent(const Event &e) const;
 	private:
         void ApplyViewportConfig();
+        void RefreshEngineInputCapture();
         bool _is_viewports_active = false;
+        bool _blocks_engine_mouse_input = false;
+        bool _blocks_engine_keyboard_input = false;
 	};
 }
 

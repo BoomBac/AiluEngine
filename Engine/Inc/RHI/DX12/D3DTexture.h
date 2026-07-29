@@ -129,6 +129,7 @@ namespace Ailu::RHI::DX12
         Ref<ComputeShader> _p_mipmapgen_cs0 = nullptr;
         //gen mipmap for 5~max
         Ref<ComputeShader> _p_mipmapgen_cs1 = nullptr;
+        ComputeShaderKernelId _mipmap_gen_3d_kernel = kInvalidComputeShaderKernelId;
     };
 
     class D3DRenderTexture : public RenderTexture

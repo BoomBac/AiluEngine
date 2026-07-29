@@ -39,6 +39,8 @@ namespace Ailu::Render
         Vector<Ref<Material>> _bloom_mats;
         Vector4f _noise_texel_size;
         Ref<ComputeShader> _cs_blur;
+        ComputeShaderKernelId _blur_x_kernel = kInvalidComputeShaderKernelId;
+        ComputeShaderKernelId _blur_y_kernel = kInvalidComputeShaderKernelId;
     };
 }// namespace Ailu
 

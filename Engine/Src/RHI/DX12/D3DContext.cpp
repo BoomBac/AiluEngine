@@ -63,7 +63,10 @@ namespace Ailu::RHI::DX12
     }
 
     void GpuCommandWorker::Push(Vector<GfxCommand *> &&cmds, SubmitParams &&params)
-    { _cmd_queue.Push(CommandGroup(std::move(cmds), std::move(params))); }
+    {
+        _cmd_queue.Push(CommandGroup(std::move(cmds), std::move(params)));
+        _cmd_wait_cv.notify_one();
+    }
     void GpuCommandWorker::RunAsync()
     {
         SetThreadName("RenderThread");
@@ -107,7 +110,8 @@ namespace Ailu::RHI::DX12
                 {
                     if (_is_stop.load())
                         break;
-                    std::this_thread::yield();
+                    std::unique_lock<std::mutex> lock(_cmd_wait_mutex);
+                    _cmd_wait_cv.wait(lock, [this] { return _is_stop.load() || !_cmd_queue.Empty(); });
                 }
             }
         }
@@ -161,6 +165,7 @@ namespace Ailu::RHI::DX12
             LOG_INFO("Compiled {} shaders, {} compute shaders and {} ray tracing shaders!", compiled_shader_num,
                      compiled_compute_shader_num, compiled_raytracing_shader_num);
         }
+        GraphicsPipelineStateMgr::Get().ProcessPendingShaderCompiles();
         Render::RenderPipeline::Get().FrameCleanup();
         if (Application::Get()._is_multi_thread_rendering.load()) Application::Get().NotifyMain();
         Render::RenderingStates::Reset();
@@ -178,6 +183,7 @@ namespace Ailu::RHI::DX12
         {
             _is_stop.store(true);
             Application::Get().NotifyRender();
+            _cmd_wait_cv.notify_all();
             if (_worker_thread->joinable()) _worker_thread->join();
             delete _worker_thread; _worker_thread = nullptr;
             LOG_INFO("Exit RenderThread")
@@ -952,7 +958,7 @@ namespace Ailu::RHI::DX12
                     //WaitForGpu();
                     ctx->MoveToNextFrame(m_commandQueue.Get());
                     //if (Application::Get().GetFrameCount() % 60 == 0)
-                    Render::RenderingStates::SetGpuLatency(s_timer.GetElapsedSinceLastLocalMark());
+                    Render::RenderingStates::RenderData().GpuLatency = s_timer.GetElapsedSinceLastLocalMark();
                 }
                 if (_is_cur_frame_capturing) { EndCapture(); }
                 {
@@ -1040,8 +1046,9 @@ namespace Ailu::RHI::DX12
         }
         //if (Application::Get().GetFrameCount() % 60 == 0)
         {
-            Render::RenderingStates::SetFrameTime(s_timer.GetElapsedSinceLastLocalMark());
-            Render::RenderingStates::SetFrameRate(1000.0f / Render::RenderingStates::GetFrameTime());
+            auto& rd = Render::RenderingStates::RenderData();
+            rd.FrameTime = s_timer.GetElapsedSinceLastLocalMark();
+            rd.FrameRate = 1000.0f / rd.FrameTime;
         }
         s_timer.MarkLocal();
     }
@@ -1454,15 +1461,31 @@ namespace Ailu::RHI::DX12
         }
         else if (cmd->GetCmdType() == EGpuCommandType::kDraw)
         {
+            ++Render::RenderingStates::RenderData().DrawCommandCount;
             auto draw_cmd = static_cast<CommandDraw *>(cmd);
-            draw_cmd->_mat->Bind(draw_cmd->_pass_index);
+            const auto &material_state = draw_cmd->_material_draw_state;
+            AL_ASSERT(material_state._shader != nullptr);
+            if (!material_state._is_ready)
+                return;
+            material_state._shader->SetCullMode(material_state._cull_mode);
+            material_state._shader->Bind(material_state._pass_index, material_state._variant_hash);
+            for (u16 slot = 0u; slot < 32u; ++slot)
+            {
+                if ((material_state._binding_mask & (1u << slot)) == 0u)
+                    continue;
+                const auto &binding = material_state._bindings[slot];
+                auto resource = PipelineResource(binding._resource, binding._resource_type, binding._slot, binding._priority);
+                resource._addi_info = binding._addi_info;
+                GraphicsPipelineStateMgr::SubmitBindResource(resource);
+            }
             if (auto pso = GraphicsPipelineStateMgr::Get().FindMatchPSO(); pso != nullptr)
             {
-                AL_ASSERT(draw_cmd->_mat->GetShader() == pso->StateDescriptor()._p_vertex_shader);
+                AL_ASSERT(material_state._shader == pso->StateDescriptor()._p_vertex_shader);
                 bool is_indexed_draw = draw_cmd->_ib != nullptr;
                 bool is_instance_draw = draw_cmd->_instance_count > 1;
                 BindParams params;
-                params._params._vb_binder._layout = &draw_cmd->_mat->GetShader()->PipelineInputLayout(draw_cmd->_pass_index);
+                params._params._vb_binder._layout = &material_state._shader->PipelineInputLayout(material_state._pass_index,
+                                                                                                     material_state._variant_hash);
                 bool is_produced = draw_cmd->_vb == nullptr;
                 if (!is_produced && (!d3dcmd->IsVertexBufferActive(draw_cmd->_vb)))
                 {
@@ -1479,7 +1502,7 @@ namespace Ailu::RHI::DX12
                     auto &[name, alloc] = it;
                     if (pso->IsValidPipelineResource(EBindResDescType::kConstBuffer, name))
                     {
-                        auto res = PipelineResource(d3dcmd->_upload_buf.get(), EBindResDescType::kConstBufferRaw, name,
+                        auto res = PipelineResource(d3dcmd->_upload_buf.get(), EBindResDescType::kConstBufferRaw, pso->NameToSlot(name),
                                                     PipelineResource::kPriorityCmd);
                         res._addi_info._gpu_handle = alloc.GPU;
                         pso->SetPipelineResource(res);
@@ -1488,26 +1511,35 @@ namespace Ailu::RHI::DX12
                 if (draw_cmd->_material_property_block._data != nullptr && draw_cmd->_material_property_block._size > 0)
                 {
                     auto res = PipelineResource(d3dcmd->_upload_buf.get(), EBindResDescType::kConstBufferRaw,
-                                                RenderConstants::kCBufNamePerMaterial, PipelineResource::kPriorityCmd);
-                    auto mat_prop_alloc =
-                            d3dcmd->AllocConstBuffer(draw_cmd->_material_property_block._data, draw_cmd->_material_property_block._size);
+                                                pso->NameToSlot(RenderConstants::kCBufNamePerMaterial), PipelineResource::kPriorityCmd);
+                    bool material_cbuffer_cache_hit = false;
+                    auto mat_prop_alloc = d3dcmd->AllocCachedConstBuffer(draw_cmd->_material_property_block._data,
+                                                                            draw_cmd->_material_property_block._size,
+                                                                            material_cbuffer_cache_hit);
                     res._addi_info._gpu_handle = mat_prop_alloc.GPU;
                     pso->SetPipelineResource(res);
+                    if (material_cbuffer_cache_hit)
+                        ++Render::RenderingStates::RenderData().MaterialCBufferCacheHitCount;
+                    else
+                    {
+                        ++Render::RenderingStates::RenderData().MaterialCBufferUploadCount;
+                        Render::RenderingStates::RenderData().MaterialCBufferUploadBytes += draw_cmd->_material_property_block._size;
+                    }
                 }
 
                 if (draw_cmd->_per_obj_cb != nullptr)
                     pso->SetPipelineResource(PipelineResource(draw_cmd->_per_obj_cb, EBindResDescType::kConstBuffer,
-                                                              RenderConstants::kCBufNamePerObject, PipelineResource::kPriorityCmd));
+                                                              pso->NameToSlot(RenderConstants::kCBufNamePerObject), PipelineResource::kPriorityCmd));
 
-                Render::RenderingStates::IncrementDrawCallCount();
+                ++Render::RenderingStates::RenderData().DrawCall;
                 u32 vertex_count = is_produced ? 3u : draw_cmd->_vb->GetVertexCount() * draw_cmd->_instance_count;//目前只有程序化矩形
                 vertex_count = draw_cmd->_vertex_count > 0 ? draw_cmd->_vertex_count : vertex_count;
                 u32 triangle_count = is_indexed_draw ? draw_cmd->_ib->GetCount() / 3
                                      : draw_cmd->_vb ? draw_cmd->_vb->GetVertexCount() / 3
                                                      : 0u;
                 triangle_count *= draw_cmd->_instance_count;
-                Render::RenderingStates::IncrementTriangleCount(triangle_count);
-                Render::RenderingStates::IncrementVertexCount(vertex_count);
+                Render::RenderingStates::RenderData().TriangleNum += triangle_count;
+                Render::RenderingStates::RenderData().VertexNum += vertex_count;
                 pso->Bind(cmd_buffer, params);
                 d3dcmd->MarkUsedResource(pso);
                 if (draw_cmd->_arg_buffer)
@@ -1549,6 +1581,11 @@ namespace Ailu::RHI::DX12
         else if (cmd->GetCmdType() == EGpuCommandType::kDispatch)
         {
             auto cmd_disp = static_cast<CommandDispatch *>(cmd);
+            if (cmd_disp->_cs == nullptr || !cmd_disp->_cs->IsKernelValid(cmd_disp->_kernel))
+            {
+                LOG_WARNING("D3DContext skipped invalid compute dispatch");
+                return;
+            }
             bool is_indirect = cmd_disp->_arg_buffer != nullptr;
             ShaderVariantHash active_variant = cmd_disp->_cs->ActiveVariant(cmd_disp->_kernel);
             cmd_disp->_cs->Bind(d3dcmd, cmd_disp->_kernel);
@@ -1568,9 +1605,18 @@ namespace Ailu::RHI::DX12
             }
             else
             {
+                constexpr u64 kMaxDispatchThreadGroupCount = 4194303u;
+                const u64 total_thread_group_count = static_cast<u64>(cmd_disp->_group_num_x) * cmd_disp->_group_num_y * cmd_disp->_group_num_z;
+                if (total_thread_group_count > kMaxDispatchThreadGroupCount)
+                {
+                    LOG_WARNING("D3DContext skipped oversized dispatch shader({}) kernel({}) group({}, {}, {})", cmd_disp->_cs->Name(),
+                                ComputeShaderKernelRegistry::Get().GetName(cmd_disp->_kernel), cmd_disp->_group_num_x, cmd_disp->_group_num_y,
+                                cmd_disp->_group_num_z);
+                    return;
+                }
                 dxcmd->Dispatch(cmd_disp->_group_num_x, cmd_disp->_group_num_y, cmd_disp->_group_num_z);
             }
-            Render::RenderingStates::IncrementDispatchCallCount();
+            ++Render::RenderingStates::RenderData().DispatchCall;
         }
         else if (cmd->GetCmdType() == EGpuCommandType::kCommandProfiler)
         {

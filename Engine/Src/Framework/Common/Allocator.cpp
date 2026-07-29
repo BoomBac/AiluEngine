@@ -4,6 +4,8 @@
 #include "Framework/Math/ALMath.hpp"
 #include "pch.h"
 
+#include <bit>
+#include <chrono>
 
 namespace
 {
@@ -117,6 +119,42 @@ namespace Ailu
 
         Allocator *s_allocator = nullptr;
         BinMapper s_bin_mapper;
+
+        u64 GetCurrentThreadIdValue()
+        {
+            return static_cast<u64>(std::hash<std::thread::id>{}(std::this_thread::get_id()));
+        }
+
+        f64 GetMemoryDebugTimeSec()
+        {
+            using Clock = std::chrono::steady_clock;
+            static const Clock::time_point s_start_time = Clock::now();
+            return std::chrono::duration<f64>(Clock::now() - s_start_time).count();
+        }
+
+        EAllocatorPageState ToAllocatorPageState(EPageState state)
+        {
+            switch (state)
+            {
+                case EPageState::kPartial: return EAllocatorPageState::kPartial;
+                case EPageState::kFull: return EAllocatorPageState::kFull;
+                case EPageState::kEmpty:
+                default: return EAllocatorPageState::kEmpty;
+            }
+        }
+
+        const char *MemoryTagToCString(EMemoryTag tag)
+        {
+            return MemoryTagToString(tag).data();
+        }
+
+        u64 CountSetBits(const Vector<u64> &bits)
+        {
+            u64 count = 0u;
+            for (u64 word: bits)
+                count += static_cast<u64>(std::popcount(word));
+            return count;
+        }
     }// namespace
 
     thread_local Arena *g_thread_arena = nullptr;
@@ -349,6 +387,111 @@ namespace Ailu
         SetBit(it->second._guard_bits, block_index);
     }
 
+    void PageMgr::CaptureGlobalStats(u64 &page_count, u64 &cached_empty_page_count, u64 &reserved_bytes) const
+    {
+        std::lock_guard<std::mutex> lock(_mutex);
+        page_count = static_cast<u64>(_pages.size());
+        cached_empty_page_count = 0u;
+        for (const PageHeader *page: _pages)
+        {
+            if (page != nullptr && page->_state == EPageState::kEmpty)
+                ++cached_empty_page_count;
+        }
+        reserved_bytes = page_count * Page::kPageSize;
+    }
+
+    void PageMgr::CaptureBinSnapshots(Vector<AllocatorBinSnapshot> &snapshots) const
+    {
+        std::lock_guard<std::mutex> lock(_mutex);
+        snapshots.clear();
+        snapshots.resize(s_bin_mapper.GetBinCount());
+        for (u32 i = 0u; i < snapshots.size(); ++i)
+        {
+            snapshots[i]._bin_index = i;
+            snapshots[i]._block_size = s_bin_mapper.GetBinSizeByIndex(i);
+        }
+
+        for (const PageHeader *page: _pages)
+        {
+            if (page == nullptr)
+                continue;
+            const u32 bin_index = s_bin_mapper.GetBinIndex(page->_block_size);
+            if (bin_index >= snapshots.size())
+                continue;
+
+            AllocatorBinSnapshot &snapshot = snapshots[bin_index];
+            if (page->_state == EPageState::kEmpty)
+                ++snapshot._empty_page_count;
+            else if (page->_state == EPageState::kFull)
+                ++snapshot._full_page_count;
+            else
+                ++snapshot._partial_page_count;
+
+            const u64 used_count = page->_block_count - page->_free_count;
+            snapshot._active_block_count += used_count;
+            snapshot._free_block_count += page->_free_count;
+            snapshot._capacity_bytes += used_count * page->_block_size;
+            snapshot._reserved_bytes += Page::kPageSize;
+            snapshot._page_addresses.push_back(reinterpret_cast<u64>(page));
+        }
+    }
+
+    void PageMgr::AccumulateArenaPageStats(Vector<AllocatorArenaSnapshot> &snapshots) const
+    {
+        std::lock_guard<std::mutex> lock(_mutex);
+        for (const PageHeader *page: _pages)
+        {
+            if (page == nullptr || page->_owner_arena == nullptr)
+                continue;
+            const u32 arena_id = page->_owner_arena->ArenaId();
+            auto it = std::find_if(snapshots.begin(), snapshots.end(), [arena_id](const AllocatorArenaSnapshot &snapshot)
+            {
+                return snapshot._arena_id == arena_id;
+            });
+            if (it == snapshots.end())
+                continue;
+            ++it->_page_count;
+            it->_reserved_bytes += Page::kPageSize;
+        }
+    }
+
+    bool PageMgr::CapturePageSnapshot(u64 page_address, AllocatorPageSnapshot &snapshot) const
+    {
+        std::lock_guard<std::mutex> lock(_mutex);
+        const auto it = std::find_if(_pages.begin(), _pages.end(), [page_address](const PageHeader *page)
+        {
+            return reinterpret_cast<u64>(page) == page_address;
+        });
+        if (it == _pages.end())
+            return false;
+
+        const PageHeader *page = *it;
+        snapshot = AllocatorPageSnapshot{};
+        snapshot._page_address = reinterpret_cast<u64>(page);
+        snapshot._block_begin = static_cast<u64>(page->_block_begin);
+        snapshot._block_end = static_cast<u64>(page->_block_end);
+        snapshot._arena_id = page->_owner_arena != nullptr ? page->_owner_arena->ArenaId() : 0u;
+        snapshot._thread_id = page->_owner_arena != nullptr ? page->_owner_arena->ThreadId() : 0u;
+        snapshot._bin_index = s_bin_mapper.GetBinIndex(page->_block_size);
+        snapshot._block_size = page->_block_size;
+        snapshot._block_count = page->_block_count;
+        snapshot._free_count = page->_free_count;
+        snapshot._used_count = page->_block_count - page->_free_count;
+        snapshot._state = ToAllocatorPageState(page->_state);
+        snapshot._block_states.assign(page->_block_count, EAllocatorBlockState::kFree);
+
+        const auto debug_it = _page_debug_infos.find(const_cast<PageHeader *>(page));
+        if (debug_it != _page_debug_infos.end())
+        {
+            for (u32 i = 0u; i < page->_block_count; ++i)
+            {
+                if (TestBit(debug_it->second._allocated_bits, i))
+                    snapshot._block_states[i] = EAllocatorBlockState::kUsed;
+            }
+        }
+        return true;
+    }
+
     Bin::Bin(PageMgr *page_mgr, u32 block_size, Arena *arena) : _page_mgr(page_mgr), _block_size(block_size), _arena(arena)
     { AL_ASSERT(_page_mgr != nullptr && _block_size >= sizeof(FreeBlock)); }
 
@@ -470,6 +613,7 @@ namespace Ailu
     Arena::Arena(Allocator *allocator) : _allocator(allocator)
     {
         AL_ASSERT(_allocator != nullptr);
+        _thread_id = GetCurrentThreadIdValue();
         _bins.reserve(s_bin_mapper.GetBinCount());
         for (u32 i = 0u; i < s_bin_mapper.GetBinCount(); ++i)
             _bins.push_back(new Bin(&_allocator->GetPageMgr(), s_bin_mapper.GetBinSizeByIndex(i), this));
@@ -489,6 +633,27 @@ namespace Ailu
         const u32 block_size = s_bin_mapper.GetBinSizeByIndex(bin_index);
         AL_ASSERT(block_size >= size);
         return _bins[bin_index]->Allocate();
+    }
+
+    void Arena::CaptureSnapshot(AllocatorArenaSnapshot &snapshot) const
+    {
+        snapshot._arena_id = _arena_id;
+        snapshot._thread_id = _thread_id;
+        snapshot._thread_name = std::format("Thread {}", _thread_id);
+        snapshot._allocation_count = _allocation_count;
+        snapshot._free_count = _free_count;
+        snapshot._local_free_count = _free_count;
+        snapshot._remote_free_count = 0u;
+        snapshot._pending_remote_free_count = 0u;
+        snapshot._page_count = _page_count;
+        snapshot._requested_bytes = _requested_bytes;
+        snapshot._reserved_bytes = _reserved_bytes;
+        snapshot._peak_requested_bytes = _peak_requested_bytes;
+    }
+
+    Allocator::Allocator()
+    {
+        _events.resize(kMemoryDebugEventCapacity);
     }
 
     void Allocator::Init()
@@ -517,6 +682,7 @@ namespace Ailu
 
         std::lock_guard<std::mutex> lock(_arena_mutex);
         auto arena = std::make_unique<Arena>(this);
+        arena->_arena_id = _next_arena_id++;
         g_thread_arena = arena.get();
         _arenas.push_back(std::move(arena));
         return *g_thread_arena;
@@ -532,14 +698,20 @@ namespace Ailu
         std::lock_guard<std::mutex> lock(_mutex);
         const u64 allocation_size = size + sizeof(AllocHeader) + align - 1u;
         const bool is_system_allocation = allocation_size > kMaxSmallAllocationSize;
+        Arena *arena = is_system_allocation ? nullptr : &ThreadArena();
+        const u32 bin_index = is_system_allocation ? kInvalidAllocatorIndex : s_bin_mapper.GetBinIndex(allocation_size);
         void *raw_ptr = is_system_allocation ? AlignedAlloc(std::max<u64>(align, alignof(void *)), allocation_size)
-                                             : ThreadArena().Allocate(allocation_size, align);
+                                             : arena->Allocate(allocation_size, align);
         AL_ASSERT(raw_ptr != nullptr);
 
         const uintptr_t user_address = AlignAddress(reinterpret_cast<uintptr_t>(raw_ptr) + sizeof(AllocHeader), align);
         auto *header = reinterpret_cast<AllocHeader *>(user_address - sizeof(AllocHeader));
         header->_raw_ptr = raw_ptr;
         header->_requested_size = size;
+        header->_actual_size = allocation_size;
+        header->_arena_id = arena != nullptr ? arena->ArenaId() : 0u;
+        header->_bin_index = bin_index;
+        header->_thread_id = GetCurrentThreadIdValue();
         header->_magic = AllocHeader::kMagicAllocated;
         header->_alignment = static_cast<u16>(align);
         header->_flags = is_system_allocation ? AllocHeader::kFlagSystem : 0u;
@@ -547,10 +719,43 @@ namespace Ailu
 
         void *user_ptr = reinterpret_cast<void *>(user_address);
         AL_ASSERT(reinterpret_cast<uintptr_t>(user_ptr) % align == 0u);
-        _total_allocated.fetch_add(size);
+        const u64 new_total = _total_allocated.fetch_add(size) + size;
+        u64 old_peak = _peak_allocated.load();
+        while (new_total > old_peak && !_peak_allocated.compare_exchange_weak(old_peak, new_total)) {}
+        ++_total_allocation_count;
+        if (is_system_allocation)
+        {
+            ++_active_system_allocation_count;
+            _active_system_reserved_bytes += allocation_size;
+        }
+        if (arena != nullptr)
+        {
+            ++arena->_allocation_count;
+            arena->_requested_bytes += size;
+            arena->_reserved_bytes += allocation_size;
+            arena->_peak_requested_bytes = std::max(arena->_peak_requested_bytes, arena->_requested_bytes);
+        }
 #ifdef _DEBUG
-        _allocations[user_ptr] = AllocationInfo{size, file, function, line, is_system_allocation,tag};
+        _allocations[user_ptr] = AllocationInfo{size, allocation_size, header->_arena_id, bin_index, header->_thread_id,
+                                                static_cast<u32>(align), file, function, line, is_system_allocation, tag};
 #endif
+        MemoryDebugEvent event;
+        event._sequence = _next_event_sequence++;
+        event._time_sec = GetMemoryDebugTimeSec();
+        event._type = EMemoryEventType::kAllocate;
+        event._thread_id = header->_thread_id;
+        event._arena_id = header->_arena_id;
+        event._bin_index = bin_index;
+        event._address = reinterpret_cast<u64>(user_ptr);
+        event._raw_address = reinterpret_cast<u64>(raw_ptr);
+        event._requested_size = size;
+        event._actual_size = allocation_size;
+        event._alignment = static_cast<u32>(align);
+        event._file = file;
+        event._function = function;
+        event._tag = MemoryTagToCString(tag);
+        event._line = line;
+        RecordMemoryEvent(event);
         return user_ptr;
     }
 
@@ -565,15 +770,64 @@ namespace Ailu
 
         void *raw_ptr = header->_raw_ptr;
         const u64 requested_size = header->_requested_size;
+        const u64 actual_size = header->_actual_size;
         const bool is_system_allocation = header->IsSystemAllocation();
+        const u32 arena_id = header->_arena_id;
+        const u32 bin_index = header->_bin_index;
+        const u64 thread_id = GetCurrentThreadIdValue();
+        const u32 alignment = header->_alignment;
+        const EMemoryTag tag = header->_tag;
         header->_magic = AllocHeader::kMagicFreed;
 
+        const char *file = nullptr;
+        const char *function = nullptr;
+        u32 line = 0u;
 #ifdef _DEBUG
         const auto it = _allocations.find(ptr);
         AL_ASSERT(it != _allocations.end());
+        file = it->second._file;
+        function = it->second._function;
+        line = it->second._line;
         _allocations.erase(it);
 #endif
         _total_allocated.fetch_sub(requested_size);
+        ++_total_free_count;
+        if (is_system_allocation)
+        {
+            --_active_system_allocation_count;
+            _active_system_reserved_bytes -= std::min(_active_system_reserved_bytes, actual_size);
+        }
+        else
+        {
+            for (auto &arena: _arenas)
+            {
+                if (arena && arena->ArenaId() == arena_id)
+                {
+                    ++arena->_free_count;
+                    arena->_requested_bytes -= std::min(arena->_requested_bytes, requested_size);
+                    arena->_reserved_bytes -= std::min(arena->_reserved_bytes, actual_size);
+                    break;
+                }
+            }
+        }
+
+        MemoryDebugEvent event;
+        event._sequence = _next_event_sequence++;
+        event._time_sec = GetMemoryDebugTimeSec();
+        event._type = EMemoryEventType::kFree;
+        event._thread_id = thread_id;
+        event._arena_id = arena_id;
+        event._bin_index = bin_index;
+        event._address = reinterpret_cast<u64>(ptr);
+        event._raw_address = reinterpret_cast<u64>(raw_ptr);
+        event._requested_size = requested_size;
+        event._actual_size = actual_size;
+        event._alignment = alignment;
+        event._file = file;
+        event._function = function;
+        event._tag = MemoryTagToCString(tag);
+        event._line = line;
+        RecordMemoryEvent(event);
 
         if (is_system_allocation)
         {
@@ -611,5 +865,122 @@ namespace Ailu
     {
         LOG_INFO("Active allocation bytes: {}", TotalAllocated());
         LOG_INFO("{}", _page_mgr.Dump());
+    }
+
+    void Allocator::CaptureGlobalSnapshot(AllocatorGlobalSnapshot &snapshot) const
+    {
+        std::lock_guard<std::mutex> lock(_mutex);
+        snapshot = AllocatorGlobalSnapshot{};
+        snapshot._requested_bytes = _total_allocated.load();
+        snapshot._peak_requested_bytes = _peak_allocated.load();
+        snapshot._active_allocation_count = static_cast<u64>(_allocations.size());
+        snapshot._total_allocation_count = _total_allocation_count;
+        snapshot._total_free_count = _total_free_count;
+        snapshot._system_allocation_count = _active_system_allocation_count;
+        snapshot._dropped_event_count = _dropped_event_count;
+        _page_mgr.CaptureGlobalStats(snapshot._page_count, snapshot._cached_empty_page_count, snapshot._reserved_bytes);
+        snapshot._reserved_bytes += _active_system_reserved_bytes;
+        _peak_reserved_bytes = std::max(_peak_reserved_bytes, snapshot._reserved_bytes);
+        snapshot._peak_reserved_bytes = _peak_reserved_bytes;
+    }
+
+    void Allocator::CaptureBinSnapshots(Vector<AllocatorBinSnapshot> &snapshots) const
+    {
+        std::lock_guard<std::mutex> lock(_mutex);
+        _page_mgr.CaptureBinSnapshots(snapshots);
+#ifdef _DEBUG
+        for (const auto &[ptr, info]: _allocations)
+        {
+            (void) ptr;
+            if (info._bin_index < snapshots.size())
+                snapshots[info._bin_index]._requested_bytes += info._size;
+        }
+#endif
+        for (AllocatorBinSnapshot &snapshot: snapshots)
+        {
+            snapshot._peak_block_count = snapshot._active_block_count;
+            snapshot._alloc_count = snapshot._active_block_count;
+        }
+    }
+
+    void Allocator::CaptureArenaSnapshots(Vector<AllocatorArenaSnapshot> &snapshots) const
+    {
+        std::lock_guard<std::mutex> lock(_mutex);
+        snapshots.clear();
+        snapshots.reserve(_arenas.size());
+        for (const auto &arena: _arenas)
+        {
+            if (arena == nullptr)
+                continue;
+            AllocatorArenaSnapshot snapshot;
+            arena->CaptureSnapshot(snapshot);
+            snapshots.push_back(snapshot);
+        }
+        _page_mgr.AccumulateArenaPageStats(snapshots);
+    }
+
+    bool Allocator::CapturePageSnapshot(u64 page_address, AllocatorPageSnapshot &snapshot) const
+    {
+        std::lock_guard<std::mutex> lock(_mutex);
+        return _page_mgr.CapturePageSnapshot(page_address, snapshot);
+    }
+
+    void Allocator::CaptureActiveAllocations(Vector<AllocatorAllocationSnapshot> &snapshots) const
+    {
+        std::lock_guard<std::mutex> lock(_mutex);
+        snapshots.clear();
+#ifdef _DEBUG
+        snapshots.reserve(_allocations.size());
+        for (const auto &[ptr, info]: _allocations)
+        {
+            AllocatorAllocationSnapshot snapshot;
+            snapshot._address = reinterpret_cast<u64>(ptr);
+            snapshot._requested_size = info._size;
+            snapshot._actual_size = info._actual_size;
+            snapshot._alignment = info._alignment;
+            snapshot._thread_id = info._thread_id;
+            snapshot._arena_id = info._arena_id;
+            snapshot._bin_index = info._bin_index;
+            snapshot._file = info._file;
+            snapshot._function = info._function;
+            snapshot._tag = MemoryTagToCString(info._tag);
+            snapshot._line = info._line;
+            snapshots.push_back(snapshot);
+        }
+#endif
+    }
+
+    void Allocator::CaptureRecentEvents(Vector<MemoryDebugEvent> &events, u32 max_count) const
+    {
+        std::lock_guard<std::mutex> lock(_mutex);
+        events.clear();
+        const u32 copy_count = std::min(max_count, _event_count);
+        events.reserve(copy_count);
+        const u32 first_index = (_event_head + kMemoryDebugEventCapacity - copy_count) % kMemoryDebugEventCapacity;
+        for (u32 i = 0u; i < copy_count; ++i)
+        {
+            const u32 event_index = (first_index + i) % kMemoryDebugEventCapacity;
+            events.push_back(_events[event_index]);
+        }
+    }
+
+    void Allocator::ClearMemoryDebugEvents()
+    {
+        std::lock_guard<std::mutex> lock(_mutex);
+        _event_head = 0u;
+        _event_count = 0u;
+        _dropped_event_count = 0u;
+    }
+
+    void Allocator::RecordMemoryEvent(const MemoryDebugEvent &event)
+    {
+        if (_events.empty())
+            return;
+        if (_event_count == kMemoryDebugEventCapacity)
+            ++_dropped_event_count;
+        else
+            ++_event_count;
+        _events[_event_head] = event;
+        _event_head = (_event_head + 1u) % kMemoryDebugEventCapacity;
     }
 }// namespace Ailu

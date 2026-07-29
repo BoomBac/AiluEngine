@@ -146,8 +146,11 @@ namespace Ailu::Render
             i8 _per_frame_buf_bind_slot = -1;
             i8 _per_pass_buf_bind_slot = -1;
             VertexInputLayout _pipeline_input_layout;
-            std::unordered_map<String, ShaderBindResourceInfo> _bind_res_infos;
+            // Reflection/build-time resource table. Runtime material lookup should use _binding_layout.
+            ShaderReflectionResourceMap _bind_res_infos;
+            Ref<const ShaderBindingLayout> _binding_layout;
             std::set<String> _active_keywords;
+            ShaderHash _shader_hash;
         };
         //pass info
         u16 _index;
@@ -248,7 +251,13 @@ namespace Ailu::Render
         const i8 &GetPerMatBufferBindSlot(u16 pass_index, ShaderVariantHash variant_hash) const { return _passes[pass_index]._variants.at(variant_hash)._per_mat_buf_bind_slot; }
         const i8 &GetPerFrameBufferBindSlot(u16 pass_index, ShaderVariantHash variant_hash) const { return _passes[pass_index]._variants.at(variant_hash)._per_frame_buf_bind_slot; }
         const i8 &GetPerPassBufferBindSlot(u16 pass_index, ShaderVariantHash variant_hash) const { return _passes[pass_index]._variants.at(variant_hash)._per_pass_buf_bind_slot; }
-        const std::unordered_map<String, ShaderBindResourceInfo> &GetBindResInfo(u16 pass_index, ShaderVariantHash variant_hash) { return _passes[pass_index]._variants.at(variant_hash)._bind_res_infos; }
+        const ShaderReflectionResourceMap &GetReflectionBindResInfo(u16 pass_index, ShaderVariantHash variant_hash) const { return _passes[pass_index]._variants.at(variant_hash)._bind_res_infos; }
+        const ShaderReflectionResourceMap &GetBindResInfo(u16 pass_index, ShaderVariantHash variant_hash) const { return GetReflectionBindResInfo(pass_index, variant_hash); }
+        const ShaderBindingLayout *GetBindingLayout(u16 pass_index, ShaderVariantHash variant_hash) const
+        {
+            const auto &layout = _passes[pass_index]._variants.at(variant_hash)._binding_layout;
+            return layout.get();
+        }
 
         const VertexInputLayout &PipelineInputLayout(u16 pass_index = 0, ShaderVariantHash variant_hash = 0) const { return _passes[pass_index]._variants.at(variant_hash)._pipeline_input_layout; };
         const RasterizerState &PipelineRasterizerState(u16 pass_index = 0) const { return _passes[pass_index]._pipeline_raster_state; };
@@ -292,10 +301,13 @@ namespace Ailu::Render
 
     protected:
         virtual bool RHICompileImpl(u16 pass_index, ShaderVariantHash variant_hash, bool is_load_cache);
+        void BuildBindingLayout(u16 pass_index, ShaderVariantHash variant_hash);
 
     protected:
         WString _src_file_path;
         Vector<ShaderPass> _passes;
+        Vector<Ref<const ShaderBindingLayout>> _retired_binding_layouts;
+        u32 _binding_layout_version = 1u;
         std::set<Material *> _reference_mats;
         Vector<Map<ShaderVariantHash, EShaderVariantState>> _variant_state;
         std::atomic<bool> _is_pass_elements_init = false;
@@ -340,7 +352,7 @@ namespace Ailu::Render
                 HashMap<String, ShaderBindResourceInfo> _temp_bind_res_infos{};
                 std::set<String> _active_keywords;
             };
-            u16 _id;
+            ComputeShaderKernelId _id;
             String _name;
             Vector3UInt _thread_num;
             Vector<std::set<String>> _keywords;
@@ -391,7 +403,7 @@ namespace Ailu::Render
         ComputeShader() = default;
         ComputeShader(const WString &sys_path);
         virtual ~ComputeShader() = default;
-        virtual void Bind(RHICommandBuffer *cmd, u16 kernel);
+        virtual void Bind(RHICommandBuffer *cmd, ComputeShaderKernelId kernel);
         void SetTexture(const String &name, Texture *texture);
         void SetTexture(u8 bind_slot, Texture *texture);
         void SetTexture(const String &name, RTHandle handle);
@@ -420,27 +432,23 @@ namespace Ailu::Render
         /// @param kernel 
         /// @param name 
         /// @param buf 
-        void SetBuffer(u16 kernel,const String &name, ConstantBuffer *buf);
+        void SetBuffer(ComputeShaderKernelId kernel,const String &name, ConstantBuffer *buf);
         /// @brief 为指定kernel的对应名称设置buffer
         /// @param kernel 
         /// @param name 
         /// @param buf 
-        void SetBuffer(u16 kernel,const String &name, GPUBuffer *buf);
+        void SetBuffer(ComputeShaderKernelId kernel,const String &name, GPUBuffer *buf);
         void SetMatrix(const String& name,Matrix4x4f mat);
         void SetMatrixArray(const String& name,Vector<Matrix4x4f> matrix_arr);
-        void GetThreadNum(u16 kernel, u16 &x, u16 &y, u16 &z) const;
-        i16 NameToSlot(const String &name, u16 kernel,ShaderVariantHash variant_hash) const;
+        void GetThreadNum(ComputeShaderKernelId kernel, u16 &x, u16 &y, u16 &z) const;
+        i16 NameToSlot(const String &name, ComputeShaderKernelId kernel,ShaderVariantHash variant_hash) const;
         void EnableKeyword(const String &kw);
         void DisableKeyword(const String &kw);
-        std::tuple<u16, u16, u16> CalculateDispatchNum(u16 kernel, u16 task_num_x, u16 task_num_y, u16 task_num_z) const;
-        u16 FindKernel(const String &kernel)
+        std::tuple<u16, u16, u16> CalculateDispatchNum(ComputeShaderKernelId kernel, u16 task_num_x, u16 task_num_y, u16 task_num_z) const;
+        ComputeShaderKernelId FindKernel(const String &kernel) const
         {
-            auto it = std::find_if(_kernels.begin(), _kernels.end(), [&](auto e) -> bool
-                                   { return e._name == kernel; });
-            if (it != _kernels.end())
-                return it->_id;
-            else
-                return (u16) -1;
+            const auto kernel_id = ComputeShaderKernelRegistry::Get().Find(kernel);
+            return IsKernelValid(kernel_id) ? kernel_id : kInvalidComputeShaderKernelId;
         }
         /// @brief 检查所有核的所有变体是否依赖该文件
         /// @param sys_path 系统路径
@@ -449,13 +457,15 @@ namespace Ailu::Render
         /// @brief 预处理shader，必须在compile之前调用！
         bool Preprocess();
         bool Compile(bool is_load_cache = true);
-        ShaderVariantHash ActiveVariant(u16 kernel_index) const { return _kernels[kernel_index]._active_variant; }
-        void PushState(u16 kernel = 0u);
+        ShaderVariantHash ActiveVariant(ComputeShaderKernelId kernel) const { return _kernels[ResolveKernelIndex(kernel)]._active_variant; }
+        bool IsKernelValid(ComputeShaderKernelId kernel) const;
+        void PushState(ComputeShaderKernelId kernel = kInvalidComputeShaderKernelId);
     public:
         std::atomic<bool> _is_compiling = false;
     protected:
         bool Compile(u16 kernel_index, ShaderVariantHash variant_hash, bool is_load_cache = true);
         virtual bool RHICompileImpl(u16 kernel_index,ShaderVariantHash variant_hash, bool is_load_cache);
+        u16 ResolveKernelIndex(ComputeShaderKernelId kernel) const;
 
     private:
 
@@ -472,7 +482,7 @@ namespace Ailu::Render
         };
         struct BindState
         {
-            u16 _kernel;
+            ComputeShaderKernelId _kernel;
             u16 _max_bind_slot;
             ShaderVariantHash _variant_hash;
             Array<GpuResource*,32> _bind_res;
@@ -487,6 +497,7 @@ namespace Ailu::Render
         inline static Map<String, f32> s_global_floats{};
         inline static Map<String, i32> s_global_ints{};
         Vector<KernelElement> _kernels;
+        HashMap<ComputeShaderKernelId, u16> _kernel_id_to_index;
         std::set<String> _local_active_keywords;
         WString _src_file_path;
         Vector<Map<ShaderVariantHash, EShaderVariantState>> _variant_state;

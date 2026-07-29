@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __VOLUMETRICCLOUDS_GEN_H__
 //Class VolumetricClouds begin...........................
-#define VOLUMETRICCLOUDS_GEN_H_62_GENERATED_BODY \
+#define VOLUMETRICCLOUDS_GEN_H_64_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_VolumetricClouds_Type();\
                                 static const Type* GetPrivateStaticClass();\

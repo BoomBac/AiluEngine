@@ -145,7 +145,7 @@ namespace Ailu::RHI::DX12
             _p_cmd->SetPipelineState(_p_plstate.Get());
             _p_cmd->IASetPrimitiveTopology(_d3d_topology);
             d3dcmd->SetGraphicsPSOActive(this);
-            Render::RenderingStates::IncrementGfxPsoBindCount();
+            ++Render::RenderingStates::RenderData().GfxPsoBindCount;
         }
         for (u16 i = 0; i <= _max_slot; i++)
         {
@@ -155,7 +155,8 @@ namespace Ailu::RHI::DX12
             if (!config.EnableIncrementalGraphicsBinding)
             {
                 BindResource(rhi_cmd, _bind_res[i]);
-                Render::RenderingStates::IncrementGfxResBindCount();
+                ++Render::RenderingStates::RenderData().GfxResBindCount;
+                ++Render::RenderingStates::RenderData().ActualRootSlotBindCount;
                 continue;
             }
 
@@ -164,7 +165,12 @@ namespace Ailu::RHI::DX12
             {
                 BindResource(rhi_cmd, _bind_res[i]);
                 d3dcmd->UpdateGraphicsSlot(i, binding_hash);
-                Render::RenderingStates::IncrementGfxResBindCount();
+                ++Render::RenderingStates::RenderData().GfxResBindCount;
+                ++Render::RenderingStates::RenderData().ActualRootSlotBindCount;
+            }
+            else
+            {
+                ++Render::RenderingStates::RenderData().SkippedRootSlotBindCount;
             }
         }
     }
@@ -211,10 +217,23 @@ namespace Ailu::RHI::DX12
             }
             break;
             case EBindResDescType::kTexture2D:
+            case EBindResDescType::kTexture2DArray:
+            case EBindResDescType::kCubeMap:
             {
                 BindParams params;
                 params._is_compute_pipeline = false;
                 params._slot = res._slot;
+                params._params._texture_binder._sub_res = res._addi_info._sub_res;
+                params._params._texture_binder._view_idx = res._addi_info._view_index;
+                res._p_resource->Bind(cmd, params);
+            }
+            break;
+            case EBindResDescType::kUAVTexture2D:
+            {
+                BindParams params;
+                params._is_compute_pipeline = false;
+                params._slot = res._slot;
+                params._is_random_access = true;
                 params._params._texture_binder._sub_res = res._addi_info._sub_res;
                 params._params._texture_binder._view_idx = res._addi_info._view_index;
                 res._p_resource->Bind(cmd, params);
@@ -225,6 +244,17 @@ namespace Ailu::RHI::DX12
                 BindParams params;
                 params._is_compute_pipeline = false;
                 params._slot = res._slot;
+                params._params._texture_binder._sub_res = res._addi_info._sub_res;
+                params._params._texture_binder._view_idx = res._addi_info._view_index;
+                res._p_resource->Bind(cmd, params);
+            }
+            break;
+            case EBindResDescType::kRWTexture3D:
+            {
+                BindParams params;
+                params._is_compute_pipeline = false;
+                params._slot = res._slot;
+                params._is_random_access = true;
                 params._params._texture_binder._sub_res = res._addi_info._sub_res;
                 params._params._texture_binder._view_idx = res._addi_info._view_index;
                 res._p_resource->Bind(cmd, params);

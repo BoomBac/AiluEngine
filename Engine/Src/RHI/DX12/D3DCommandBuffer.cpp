@@ -22,6 +22,8 @@ namespace Ailu::RHI::DX12
         _upload_buf = MakeScope<UploadBuffer>(std::format("CmdUploadBuffer_{}", _id));
         _cur_cbv_heap_id = -1;
         _fence_value = 0u;
+        _tracking_epoch = s_next_tracking_epoch.fetch_add(1u, std::memory_order_relaxed);
+        _used_resources.reserve(64u);
         _is_executed = false;
     }
 
@@ -37,8 +39,10 @@ namespace Ailu::RHI::DX12
         _is_cmd_closed = false;
         _allocations.clear();
         _temp_allocs.clear();
+        _cached_uploads.clear();
         _upload_buf->Reset();
-        _used_res.clear();
+        _used_resources.clear();
+        _tracking_epoch = s_next_tracking_epoch.fetch_add(1u, std::memory_order_relaxed);
         _is_executed = false;
         _graphics_state_cache.Reset();
     }
@@ -75,9 +79,24 @@ namespace Ailu::RHI::DX12
         _temp_allocs.emplace_back(alloc);
         return _temp_allocs.back();
     }
+
+    UploadBuffer::Allocation D3DCommandBuffer::AllocCachedConstBuffer(const u8* data, u32 size, bool &cache_hit)
+    {
+        auto it = _cached_uploads.find(data);
+        if (it != _cached_uploads.end() && it->second._size == size)
+        {
+            cache_hit = true;
+            return it->second._allocation;
+        }
+        cache_hit = false;
+        auto allocation = _upload_buf->Allocate(size, 256);
+        allocation.SetData(data, size);
+        _cached_uploads[data] = CachedUpload{size, allocation};
+        return allocation;
+    }
     void D3DCommandBuffer::PostExecute()
     {
-        for(auto& it : _used_res)
+        for(auto& it : _used_resources)
         {
             it->Track(_fence_value);
         }

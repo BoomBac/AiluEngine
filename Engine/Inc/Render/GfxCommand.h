@@ -8,7 +8,9 @@
 #include "Framework/Core/CoreMinimal.h"
 #include "Framework/Core/String.h"
 #include "Framework/Core/Containers/Array.h"
+#include "CoreType.h"
 #include "GpuResource.h"
+#include "MaterialDrawState.h"
 #include "RenderConstants.h"
 #include <cstddef>
 #include <functional>
@@ -117,6 +119,7 @@ namespace Ailu::Render
             u8* _data;
             u32 _size;
         } _material_property_block;
+        MaterialDrawState _material_draw_state;
         VertexBuffer *_vb;
         IndexBuffer *_ib;
         Material *_mat;
@@ -139,7 +142,7 @@ namespace Ailu::Render
     struct CommandDispatch : public TypedGfxCommand<EGpuCommandType::kDispatch>
     {
         ComputeShader *_cs;
-        u16 _kernel;
+        ComputeShaderKernelId _kernel;
         u16 _group_num_x;
         u16 _group_num_y;
         u16 _group_num_z;

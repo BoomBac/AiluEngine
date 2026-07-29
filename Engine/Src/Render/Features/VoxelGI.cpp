@@ -17,6 +17,7 @@ namespace Ailu::Render
         _voxel_pass_index = _standard_lit_forward->FindPass("VoxelLit");
         _cam_cbuf = ConstantBuffer::Create(sizeof(CBufferPerCameraData), "VoxelCbuf");
         _voxelize_cs = ResourceMgr::Get().GetRef<ComputeShader>(L"Shaders/hlsl/Compute/voxelize.alasset");
+        _fill_texture3d_kernel = _voxelize_cs->FindKernel("FillTexture3D");
     }
     VoxelizePass::~VoxelizePass()
     {
@@ -59,13 +60,12 @@ namespace Ailu::Render
             //write to texture3d
             _voxelize_cs->SetTexture("_VoxelTex", _voxel_tex.get());
             _voxelize_cs->SetBuffer("_VoxelBuffer", _voxel_buf.get());
-            auto kernel = _voxelize_cs->FindKernel("FillTexture3D");
             u16 x, y, z;
-            _voxelize_cs->GetThreadNum(kernel, x, y, z);
+            _voxelize_cs->GetThreadNum(_fill_texture3d_kernel, x, y, z);
             {
                 PROFILE_BLOCK_GPU(cmd.get(), "FillTexture3D")
-                auto [gx,gy,gz] = _voxelize_cs->CalculateDispatchNum(kernel,(u16)_data._grid_num.x,(u16)_data._grid_num.y,(u16)_data._grid_num.z);
-                cmd->Dispatch(_voxelize_cs.get(), kernel,gx,gy,gz);
+                auto [gx,gy,gz] = _voxelize_cs->CalculateDispatchNum(_fill_texture3d_kernel,(u16)_data._grid_num.x,(u16)_data._grid_num.y,(u16)_data._grid_num.z);
+                cmd->Dispatch(_voxelize_cs.get(), _fill_texture3d_kernel,gx,gy,gz);
             }
             //release res
             cmd->ReleaseTempRT(color);

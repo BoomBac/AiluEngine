@@ -146,6 +146,8 @@ namespace Ailu
             u32 _cur_widget_block_index = 0u;
             Ref<Material> _default_material;
             Ref<Render::ComputeShader> _backdrop_blur_cs;
+            Render::ComputeShaderKernelId _backdrop_blur_x_kernel = Render::kInvalidComputeShaderKernelId;
+            Render::ComputeShaderKernelId _backdrop_blur_y_kernel = Render::kInvalidComputeShaderKernelId;
             Vector<RTHandle> _pending_backdrop_blur_release_handles;
             HashMap<Render::Texture *, Render::Texture *> _frame_backdrop_blur_cache;
             bool _cache_build_pending_resource = false;

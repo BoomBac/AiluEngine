@@ -164,9 +164,9 @@ namespace Ailu
         void DrawMeshIndirect(Mesh *mesh,u16 sub_mesh, Material *material ,u16 pass_index,GPUBuffer* arg_buffer,u32 arg_offset = 0u);
         void DrawProceduralIndirect(Material *material, u16 pass_index, GPUBuffer *arg_buffer, u32 arg_offset = 0u);
 
-        void Dispatch(ComputeShader *cs, u16 kernel, u16 thread_group_x, u16 thread_group_y);
-        void Dispatch(ComputeShader *cs, u16 kernel, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z);
-        void Dispatch(ComputeShader *cs, u16 kernel, GPUBuffer *arg_buffer, u16 arg_offset);
+        void Dispatch(ComputeShader *cs, ComputeShaderKernelId kernel, u16 thread_group_x, u16 thread_group_y);
+        void Dispatch(ComputeShader *cs, ComputeShaderKernelId kernel, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z);
+        void Dispatch(ComputeShader *cs, ComputeShaderKernelId kernel, GPUBuffer *arg_buffer, u16 arg_offset);
         void DispatchRays(RayTracingShader *shader, RayTracingScene *scene, u16 width, u16 height, u16 depth = 1u);
 
         void BuildAS(RayTracingScene* scene,bool is_update = false);

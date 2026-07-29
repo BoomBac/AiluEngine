@@ -256,44 +256,42 @@ namespace Ailu::Render
 
     void Shader::Bind(u16 pass_index, ShaderVariantHash variant_hash)
     {
-        GraphicsPipelineStateMgr::ConfigureVertexInputLayout(_passes[pass_index]._variants[variant_hash]._pipeline_input_layout.Hash());
+        const auto& active_variant = _passes[pass_index]._variants[variant_hash];
+        GraphicsPipelineStateMgr::ConfigureVertexInputLayout(active_variant._pipeline_input_layout.Hash());
         GraphicsPipelineStateMgr::ConfigureRasterizerState(_passes[pass_index]._pipeline_raster_state.Hash());
         GraphicsPipelineStateMgr::ConfigureDepthStencilState(_passes[pass_index]._pipeline_ds_state.Hash());
         GraphicsPipelineStateMgr::ConfigureTopology(static_cast<u8>(ALHash::HashFunc(_passes[pass_index]._pipeline_topology)));
         GraphicsPipelineStateMgr::ConfigureBlendState(_passes[pass_index]._pipeline_blend_state.Hash());
-        GraphicsPipelineStateMgr::ConfigureShader(ConstructHash(_id, pass_index, variant_hash));
+        GraphicsPipelineStateMgr::ConfigureShader(this, pass_index, variant_hash, active_variant._shader_hash);
         _topology = _passes[pass_index]._pipeline_topology;
-        // for (auto &it: s_global_textures_bind_info)
-        // {
-        //     auto &pass_bind_res_info = _passes[pass_index]._variants[variant_hash]._bind_res_infos;
-        //     auto tex_it = pass_bind_res_info.find(it.first);
-        //     if (tex_it != pass_bind_res_info.end())
-        //     {
-        //         if (tex_it->second._res_type == EBindResDescType::kCubeMap || tex_it->second._res_type == EBindResDescType::kTexture2DArray || tex_it->second._res_type == EBindResDescType::kTexture2D)
-        //             GraphicsPipelineStateMgr::SubmitBindResource(PipelineResource(it.second, EBindResDescType::kTexture2D, tex_it->second._name, PipelineResource::kPriorityGlobal));
-        //     }
-        // }
-        // for (auto &it: s_global_matrix_bind_info)
-        // {
-        //     throw std::runtime_error("s_global_matrix_bind_info");
-        //     //auto mat_it = _bind_res_infos.find(it.first);
-        //     //if (mat_it != _bind_res_infos.end() && (mat_it->second._res_type & EBindResDescType::kCBufferAttribute))
-        //     //{
-        //     //	auto offset = ShaderBindResourceInfo::GetVariableOffset(mat_it->second);
-        //     //	Matrix4x4f* mat_ptr = std::get<0>(it.second);
-        //     //	u32 mat_num = std::get<1>(it.second);
-        //     //	memcpy(s_p_per_frame_cbuffer->GetData() + offset, mat_ptr, sizeof(Matrix4x4f) * mat_num);
-        //     //}
-        // }
-        // for (auto &it: s_global_buffer_bind_info)
-        // {
-        //     auto &pass_bind_res_info = _passes[pass_index]._variants[variant_hash]._bind_res_infos;
-        //     auto buf_it = pass_bind_res_info.find(it.first);
-        //     if (buf_it != pass_bind_res_info.end())
-        //     {
-        //         GraphicsPipelineStateMgr::SubmitBindResource(PipelineResource(it.second, EBindResDescType::kConstBuffer, buf_it->second._name, PipelineResource::kPriorityGlobal));
-        //     }
-        // }
+    }
+
+    void Shader::BuildBindingLayout(u16 pass_index, ShaderVariantHash variant_hash)
+    {
+        AL_ASSERT(pass_index < _passes.size());
+        auto &variant = _passes[pass_index]._variants.at(variant_hash);
+        if (variant._binding_layout)
+            _retired_binding_layouts.emplace_back(variant._binding_layout);
+        auto layout = MakeRef<ShaderBindingLayout>();
+        layout->Version(_binding_layout_version++);
+        for (const auto &[name, bind_info] : variant._bind_res_infos)
+        {
+            ShaderPropertyBinding binding;
+            binding._property_id = bind_info._property_id == kInvalidShaderPropertyId
+                                       ? ShaderPropertyRegistry::Get().Intern(name)
+                                       : bind_info._property_id;
+            binding._resource_type = bind_info._res_type;
+            binding._bind_slot = bind_info._bind_slot;
+            binding._register_space = bind_info._register_space;
+            binding._bind_flag = bind_info._bind_flag;
+            if (bind_info._res_type & EBindResDescType::kCBufferAttribute)
+            {
+                binding._buffer_offset = ShaderBindResourceInfo::GetVariableOffset(bind_info);
+                binding._buffer_size = ShaderBindResourceInfo::GetVariableSize(bind_info);
+            }
+            layout->Add(binding);
+        }
+        variant._binding_layout = layout;
     }
 
     bool Shader::Compile(u16 pass_id, ShaderVariantHash variant_hash, bool is_load_cache)
@@ -311,6 +309,7 @@ namespace Ailu::Render
             pass._pipeline_raster_state.Hash(PipelineStateHash<RasterizerState>::GenHash(pass._pipeline_raster_state));
             pass._pipeline_blend_state.Hash(PipelineStateHash<BlendState>::GenHash(pass._pipeline_blend_state));
             pass._pipeline_ds_state.Hash(PipelineStateHash<DepthStencilState>::GenHash(pass._pipeline_ds_state));
+            pass._variants[variant_hash]._shader_hash = ConstructHash(_id, pass_id, variant_hash);
             GraphicsPipelineStateMgr::Get().OnShaderCompiled(this, pass_id, variant_hash);
             _variant_state[pass_id][variant_hash] = EShaderVariantState::kReady;
             LOG_INFO("Shader({}) compile success with {}ms", variant_str, TimeMgr::Get().GetElapsedSinceLastMark());
@@ -991,11 +990,11 @@ namespace Ailu::Render
     {
         s_global_textures_bind_info[name] = g_pRenderTexturePool->Get(texture);
     }
-    void ComputeShader::Bind(RHICommandBuffer *cmd, u16 kernel)
+    void ComputeShader::Bind(RHICommandBuffer *cmd, ComputeShaderKernelId kernel)
     {
         if (s_global_variant_update_map[_id])
         {
-            auto &ele = _kernels[kernel];
+            auto &ele = _kernels[ResolveKernelIndex(kernel)];
             ele._active_keywords.clear();
             for (auto &kw: _local_active_keywords)
             {
@@ -1315,10 +1314,10 @@ namespace Ailu::Render
         }
     }
 
-    void ComputeShader::SetBuffer(u16 kernel,const String &name, ConstantBuffer *buf)
+    void ComputeShader::SetBuffer(ComputeShaderKernelId kernel,const String &name, ConstantBuffer *buf)
     {
-        AL_ASSERT(kernel<_kernels.size());
-        auto &cs_ele = _kernels[kernel];
+        const auto kernel_index = ResolveKernelIndex(kernel);
+        auto &cs_ele = _kernels[kernel_index];
         auto &variant = cs_ele._variants[cs_ele._active_variant];
         auto it = variant._bind_res_infos.find(name);
         if (buf != nullptr && it != variant._bind_res_infos.end())
@@ -1328,10 +1327,10 @@ namespace Ailu::Render
             _bind_params[it->second._bind_slot]._is_internal_cbuf = it->second._bind_flag & ShaderBindResourceInfo::kBindFlagInternal;
         }
     }
-    void ComputeShader::SetBuffer(u16 kernel,const String &name, GPUBuffer *buf)
+    void ComputeShader::SetBuffer(ComputeShaderKernelId kernel,const String &name, GPUBuffer *buf)
     {
-        AL_ASSERT(kernel<_kernels.size());
-        auto &cs_ele = _kernels[kernel];
+        const auto kernel_index = ResolveKernelIndex(kernel);
+        auto &cs_ele = _kernels[kernel_index];
         auto &variant = cs_ele._variants[cs_ele._active_variant];
         auto it = variant._bind_res_infos.find(name);
         if (buf != nullptr && it != variant._bind_res_infos.end())
@@ -1367,12 +1366,12 @@ namespace Ailu::Render
         }
     }
 
-    void ComputeShader::GetThreadNum(u16 kernel, u16 &x, u16 &y, u16 &z) const
+    void ComputeShader::GetThreadNum(ComputeShaderKernelId kernel, u16 &x, u16 &y, u16 &z) const
     {
-        AL_ASSERT(kernel < _kernels.size());
-        x = _kernels[kernel]._thread_num.x;
-        y = _kernels[kernel]._thread_num.y;
-        z = _kernels[kernel]._thread_num.z;
+        const auto kernel_index = ResolveKernelIndex(kernel);
+        x = _kernels[kernel_index]._thread_num.x;
+        y = _kernels[kernel_index]._thread_num.y;
+        z = _kernels[kernel_index]._thread_num.z;
     }
 
     bool Ailu::ComputeShader::IsDependencyFile(const WString &sys_path) const
@@ -1405,7 +1404,8 @@ namespace Ailu::Render
         {
             for (auto &v: k._variants)
             {
-                is_succeed &= Compile(k._id, v.first, is_load_cache);
+                const auto kernel_index = ResolveKernelIndex(k._id);
+                is_succeed &= Compile(kernel_index, v.first, is_load_cache);
                 //将之前绑定的资源重新绑定上去
                 if (is_succeed)
                 {
@@ -1422,20 +1422,21 @@ namespace Ailu::Render
         return is_succeed;
     }
     
-    i16 ComputeShader::NameToSlot(const String &name, u16 kernel,ShaderVariantHash variant_hash) const
+    i16 ComputeShader::NameToSlot(const String &name, ComputeShaderKernelId kernel,ShaderVariantHash variant_hash) const
     {
-        AL_ASSERT(kernel < _kernels.size());
-        if (auto it = _kernels[kernel]._variants.at(variant_hash)._bind_res_infos.find(name); it != _kernels[kernel]._variants.at(variant_hash)._bind_res_infos.end())
+        const auto kernel_index = ResolveKernelIndex(kernel);
+        if (auto it = _kernels[kernel_index]._variants.at(variant_hash)._bind_res_infos.find(name); it != _kernels[kernel_index]._variants.at(variant_hash)._bind_res_infos.end())
             return it->second._bind_slot;
         return -1;
     }
-    void ComputeShader::PushState(u16 kernel)
+    void ComputeShader::PushState(ComputeShaderKernelId kernel)
     {
+        const auto kernel_index = ResolveKernelIndex(kernel);
         BindState cur_state;
-        cur_state._kernel = kernel;
-        cur_state._variant_hash = _kernels[kernel]._active_variant;
+        cur_state._kernel = _kernels[kernel_index]._id;
+        cur_state._variant_hash = _kernels[kernel_index]._active_variant;
         cur_state._max_bind_slot = 0u;
-        auto &cs_ele = _kernels[kernel]._variants[cur_state._variant_hash];
+        auto &cs_ele = _kernels[kernel_index]._variants[cur_state._variant_hash];
         memset(cur_state._bind_res.data(),0,sizeof(GpuResource*)*32);
         memset(cur_state._bind_res_priority.data(),0u,sizeof(u16) * 32);
         for (auto &info: cs_ele._bind_res_infos)
@@ -1532,6 +1533,24 @@ namespace Ailu::Render
         return false;
     }
 
+    u16 ComputeShader::ResolveKernelIndex(ComputeShaderKernelId kernel) const
+    {
+        if (kernel == kInvalidComputeShaderKernelId)
+        {
+            AL_ASSERT_MSG(false, "ComputeShader kernel id is invalid!");
+            return 0u;
+        }
+        if (auto it = _kernel_id_to_index.find(kernel); it != _kernel_id_to_index.end())
+            return it->second;
+        AL_ASSERT_MSG(false, "ComputeShader kernel id is not valid on this shader!");
+        return 0u;
+    }
+
+    bool ComputeShader::IsKernelValid(ComputeShaderKernelId kernel) const
+    {
+        return _kernel_id_to_index.contains(kernel);
+    }
+
     bool ComputeShader::Preprocess()
     {
         String data;
@@ -1550,6 +1569,8 @@ namespace Ailu::Render
             }
         }
         _kernels.clear();
+        _variant_state.clear();
+        _kernel_id_to_index.clear();
         HashMap<String, Vector<std::set<String>>> kernels;
         for (auto &line: lines)
         {
@@ -1576,12 +1597,12 @@ namespace Ailu::Render
                 }
             }
         }
-        u16 id = 0u;
         for (auto &it: kernels)
         {
             auto &[kernel_name, keywords] = it;
             KernelElement cur_kernel{};
-            cur_kernel._id = id++;
+            const auto kernel_index = static_cast<u16>(_kernels.size());
+            cur_kernel._id = ComputeShaderKernelRegistry::Get().Intern(kernel_name);
             cur_kernel._name = kernel_name;
             cur_kernel._thread_num = Vector3UInt(8u, 8u, 1u);
             cur_kernel._keywords = keywords;
@@ -1623,6 +1644,7 @@ namespace Ailu::Render
                 cur_kernel_variant_state[vhash] = EShaderVariantState::kNotReady;
             }
             _variant_state.emplace_back(std::move(cur_kernel_variant_state));
+            _kernel_id_to_index[cur_kernel._id] = kernel_index;
             _kernels.emplace_back(std::move(cur_kernel));
         }
         AL_ASSERT(!_kernels.empty());
@@ -1649,12 +1671,12 @@ namespace Ailu::Render
         s_global_variant_update_map[_id] = true;
     }
 
-    std::tuple<u16, u16, u16> ComputeShader::CalculateDispatchNum(u16 kernel, u16 task_num_x, u16 task_num_y, u16 task_num_z) const
+    std::tuple<u16, u16, u16> ComputeShader::CalculateDispatchNum(ComputeShaderKernelId kernel, u16 task_num_x, u16 task_num_y, u16 task_num_z) const
     {
-        AL_ASSERT(kernel < _kernels.size());
-        f32 x = static_cast<f32>(_kernels[kernel]._thread_num.x);
-        f32 y = static_cast<f32>(_kernels[kernel]._thread_num.y);
-        f32 z = static_cast<f32>(_kernels[kernel]._thread_num.z);
+        const auto kernel_index = ResolveKernelIndex(kernel);
+        f32 x = static_cast<f32>(_kernels[kernel_index]._thread_num.x);
+        f32 y = static_cast<f32>(_kernels[kernel_index]._thread_num.y);
+        f32 z = static_cast<f32>(_kernels[kernel_index]._thread_num.z);
         return std::make_tuple((u16) std::ceilf(task_num_x / x), (u16) std::ceilf(task_num_y / y), (u16) std::ceilf(task_num_z / z));
     }
 #pragma endregion

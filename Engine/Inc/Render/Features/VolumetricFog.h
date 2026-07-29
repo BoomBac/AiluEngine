@@ -57,6 +57,8 @@ namespace Ailu
         private:
             ComputeShader* _volumetric_fog;
             ComputeShader* _max_z_cs;
+            ComputeShaderKernelId _light_injection_kernel = kInvalidComputeShaderKernelId;
+            ComputeShaderKernelId _light_integration_kernel = kInvalidComputeShaderKernelId;
             Texture3D* _cur_light_texture;
             Texture3D* _history_light_texture;
             Texture3D* _accum_texture;

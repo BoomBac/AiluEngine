@@ -29,6 +29,9 @@ namespace Ailu::Render
     SSAOPass::SSAOPass() : RenderPass("SSAOPass")
     {
         _ssao_computer = ResourceMgr::Get().GetRef<ComputeShader>(L"Shaders/hlsl/Compute/ssao_cs.alasset");
+        _ssao_gen_kernel = _ssao_computer->FindKernel("SSAOGen");
+        _ssao_blur_x_kernel = _ssao_computer->FindKernel("SSAOBlurX");
+        _ssao_blur_y_kernel = _ssao_computer->FindKernel("SSAOBlurY");
         _ssao_gen = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/ssao.hlsl"), "Runtime/SSAOGen");
         _event = ERenderPassEvent::kBeforeDeferedLighting;
     }
@@ -37,7 +40,7 @@ namespace Ailu::Render
     }
     void SSAOPass::OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data)
     {
-        static Vector4f params;
+        Vector4f params;
         if (_is_half_res)
             params = {1.0f, 1.0f, (f32) (rendering_data._width >> 1), (f32) (rendering_data._height >> 1)};
         else
@@ -75,9 +78,8 @@ namespace Ailu::Render
                 _ssao_computer->SetTexture("_CameraDepthTexture", graph.Resolve<Texture>(data._rg_handles._depth_tex));
                 _ssao_computer->SetTexture("_AOResult", graph.Resolve<Texture>(data._rg_handles._ao_tex));
                 {
-                    auto kernel = _ssao_computer->FindKernel("SSAOGen");
-                    auto [x,y,z] = _ssao_computer->CalculateDispatchNum(kernel,_is_cbr? w >> 1 : w,_is_cbr? h >> 1 : h,1);
-                    cmd->Dispatch(_ssao_computer.get(), kernel, x, y, 1);
+                    auto [x,y,z] = _ssao_computer->CalculateDispatchNum(_ssao_gen_kernel,_is_cbr? w >> 1 : w,_is_cbr? h >> 1 : h,1);
+                    cmd->Dispatch(_ssao_computer.get(), _ssao_gen_kernel, x, y, 1);
                 }
             });
         graph.AddPass("SSAO Blur", RDG::PassDesc(), [&, this](RDG::RenderGraphBuilder &builder)
@@ -85,7 +87,7 @@ namespace Ailu::Render
                         blur_temp = builder.AllocTexture(desc, "AO_BlurTemp");
                         builder.Read(rendering_data._rg_handles._ao_tex);
                         blur_temp = builder.Write(blur_temp); 
-                    }, [w,h, this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
+                    }, [params, w, h, this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
                       { 
                 _ssao_computer->SetVector("_AOScreenParams", params);
                 _ssao_computer->SetVector("_HBAOParams", _ao_params);
@@ -93,18 +95,17 @@ namespace Ailu::Render
                 _ssao_computer->SetFloat("_Space_Sigma", 10.1f);
                 _ssao_computer->SetFloat("_Range_Sigma", 0.31f);
                 {
-                    auto kernel = _ssao_computer->FindKernel("SSAOBlurX");
-                    auto [x,y,z] = _ssao_computer->CalculateDispatchNum(kernel, w, h, 1);
+                    auto [x,y,z] = _ssao_computer->CalculateDispatchNum(_ssao_blur_x_kernel, w, h, 1);
                     _ssao_computer->SetTexture("_SourceTex", graph.Resolve<Texture>(data._rg_handles._ao_tex));
                     _ssao_computer->SetTexture("_DenoiseResult", graph.Resolve<Texture>(blur_temp));
-                    cmd->Dispatch(_ssao_computer.get(), kernel, x, y, 1);
+                    cmd->Dispatch(_ssao_computer.get(), _ssao_blur_x_kernel, x, y, 1);
                 }
             });
         graph.AddPass("SSAO Final", RDG::PassDesc(), [&, this](RDG::RenderGraphBuilder &builder)
                       {
                     builder.Read(blur_temp);
                     rendering_data._rg_handles._ao_tex = builder.Write(rendering_data._rg_handles._ao_tex);
-                     }, [&, this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
+                     }, [params, w, h, this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
                       { 
                 _ssao_computer->SetVector("_AOScreenParams", params);
                 _ssao_computer->SetVector("_HBAOParams", _ao_params);
@@ -112,11 +113,10 @@ namespace Ailu::Render
                 _ssao_computer->SetFloat("_Space_Sigma", 10.1f);
                 _ssao_computer->SetFloat("_Range_Sigma", 0.31f);
                 {
-                    auto kernel = _ssao_computer->FindKernel("SSAOBlurY");
-                    auto [x,y,z] = _ssao_computer->CalculateDispatchNum(kernel, w, h, 1);
+                    auto [x,y,z] = _ssao_computer->CalculateDispatchNum(_ssao_blur_y_kernel, w, h, 1);
                     _ssao_computer->SetTexture("_SourceTex", graph.Resolve<Texture>(blur_temp));
                     _ssao_computer->SetTexture("_DenoiseResult", graph.Resolve<Texture>(data._rg_handles._ao_tex));
-                    cmd->Dispatch(_ssao_computer.get(), kernel, x, y, 1);
+                    cmd->Dispatch(_ssao_computer.get(), _ssao_blur_y_kernel, x, y, 1);
                 }
                 });
         if (_is_debug_mode)
@@ -161,23 +161,20 @@ namespace Ailu::Render
                 _ssao_computer->SetTexture("_CameraDepthTexture", rendering_data._camera_depth_tex_handle);
                 _ssao_computer->SetTexture("_AOResult", ao_result);
                 {
-                    auto kernel = _ssao_computer->FindKernel("SSAOGen");
-                    auto [x,y,z] = _ssao_computer->CalculateDispatchNum(kernel,_is_cbr? w >> 1 : w,_is_cbr? h >> 1 : h,1);
-                    cmd->Dispatch(_ssao_computer.get(), kernel, x, y, 1);
+                    auto [x,y,z] = _ssao_computer->CalculateDispatchNum(_ssao_gen_kernel,_is_cbr? w >> 1 : w,_is_cbr? h >> 1 : h,1);
+                    cmd->Dispatch(_ssao_computer.get(), _ssao_gen_kernel, x, y, 1);
                 }
                 {
-                    auto kernel = _ssao_computer->FindKernel("SSAOBlurX");
-                    auto [x,y,z] = _ssao_computer->CalculateDispatchNum(kernel, w, h, 1);
+                    auto [x,y,z] = _ssao_computer->CalculateDispatchNum(_ssao_blur_x_kernel, w, h, 1);
                     _ssao_computer->SetTexture("_SourceTex", ao_result);
                     _ssao_computer->SetTexture("_DenoiseResult", blur_temp);
-                    cmd->Dispatch(_ssao_computer.get(), kernel, x, y, 1);
+                    cmd->Dispatch(_ssao_computer.get(), _ssao_blur_x_kernel, x, y, 1);
                 }
                 {
-                    auto kernel = _ssao_computer->FindKernel("SSAOBlurY");
-                    auto [x,y,z] = _ssao_computer->CalculateDispatchNum(kernel, w, h, 1);
+                    auto [x,y,z] = _ssao_computer->CalculateDispatchNum(_ssao_blur_y_kernel, w, h, 1);
                     _ssao_computer->SetTexture("_SourceTex", blur_temp);
                     _ssao_computer->SetTexture("_DenoiseResult", ao_result);
-                    cmd->Dispatch(_ssao_computer.get(), kernel, x, y, 1);
+                    cmd->Dispatch(_ssao_computer.get(), _ssao_blur_y_kernel, x, y, 1);
                 }
                 Shader::SetGlobalTexture("_OcclusionTex", ao_result);
                 if (_is_debug_mode)

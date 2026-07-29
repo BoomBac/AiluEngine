@@ -527,6 +527,8 @@ namespace Ailu
     void Application::OnEvent(Event &e)
     {
         UpdatePlatformEventState(e);
+        if (_p_imgui_layer != nullptr && _p_imgui_layer->ShouldBlockEngineInputEvent(e))
+            return;
 #if defined(SEPARATE_LOGIC_THREAD)
         EventDispather dispather(e);
         dispather.Dispatch<MouseButtonReleasedEvent>(BIND_EVENT_HANDLER(OnMouseUp));

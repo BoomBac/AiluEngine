@@ -54,15 +54,16 @@ namespace Ailu
             DockWindow::Update(dt);
             auto [wx, wy] = Application::Get().GetWindow().GetClientPosition();
             Vector2f window_pos = {(f32) wx, (f32) wy};
+            const auto& ds = Render::RenderingStates::DisplayData();
             g_statics_texts[0]->SetText(std::format("MousePos: {}", Input::GetMousePos(Application::FocusedWindow()).ToString()));
             g_statics_texts[1]->SetText(std::format("WinPos: {}", window_pos.ToString()));
-            g_statics_texts[2]->SetText(std::format("FrameRate: {:.2f}", Render::RenderingStates::GetFrameRate()));
-            g_statics_texts[3]->SetText(std::format("FrameTime: {:.2f} ms", Render::RenderingStates::GetFrameTime()));
-            g_statics_texts[4]->SetText(std::format("GpuLatency: {:.2f} ms", Render::RenderingStates::GetGpuLatency()));
-            g_statics_texts[5]->SetText(std::format("Draw Call: {} ", Render::RenderingStates::GetDrawCallCount()));
-            g_statics_texts[6]->SetText(std::format("Dispatch Call: {} ", Render::RenderingStates::GetDispatchCallCount()));
-            g_statics_texts[7]->SetText(std::format("VertCount: {} ", Render::RenderingStates::GetVertexCount()));
-            g_statics_texts[8]->SetText(std::format("TriCount: {} ", Render::RenderingStates::GetTriangleCount()));
+            g_statics_texts[2]->SetText(std::format("FrameRate: {:.2f}", ds.FrameRate));
+            g_statics_texts[3]->SetText(std::format("FrameTime: {:.2f} ms", ds.FrameTime));
+            g_statics_texts[4]->SetText(std::format("GpuLatency: {:.2f} ms", ds.GpuLatency));
+            g_statics_texts[5]->SetText(std::format("Draw Call: {} ", ds.DrawCall));
+            g_statics_texts[6]->SetText(std::format("Dispatch Call: {} ", ds.DispatchCall));
+            g_statics_texts[7]->SetText(std::format("VertCount: {} ", ds.VertexNum));
+            g_statics_texts[8]->SetText(std::format("TriCount: {} ", ds.TriangleNum));
         }
 	}
 }

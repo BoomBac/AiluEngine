@@ -13,6 +13,8 @@
 #include "Objects/Object.h"
 #include "Shader.h"
 #include "Texture.h"
+#include "RenderConstants.h"
+#include "MaterialDrawState.h"
 #include <map>
 #include <unordered_set>
 #include "generated/Material.gen.h"
@@ -20,6 +22,8 @@
 
 namespace Ailu::Render
 {
+    class FrameAllocator;
+
     ACLASS()
     class AILU_API Material : public Object
     {
@@ -43,6 +47,11 @@ namespace Ailu::Render
                     delete[] _data;
             }
         };
+        struct PropertyBlockView
+        {
+            u8 *_data = nullptr;
+            u32 _size = 0u;
+        };
         inline static std::weak_ptr<Material> s_standard_defered_lit;
         inline static std::weak_ptr<Material> s_standard_forward_lit;
         inline static std::weak_ptr<Material> s_checker;
@@ -57,12 +66,19 @@ namespace Ailu::Render
         ~Material();
         void ChangeShader(Shader *shader);
         void SetFloat(const String &name, const float &f);
+        void SetFloat(ShaderPropertyId property_id, const float &f);
         void SetInt(const String &name, i32 value);
+        void SetInt(ShaderPropertyId property_id, i32 value);
         void SetVector(const String &name, const Vector4f &vector);
+        void SetVector(ShaderPropertyId property_id, const Vector4f &vector);
         void SetVector(const String &name, const Vector4Int &vector);
+        void SetVector(ShaderPropertyId property_id, const Vector4Int &vector);
         void SetMatrix(const String &name, const Matrix4x4f &matrix);
+        void SetMatrix(ShaderPropertyId property_id, const Matrix4x4f &matrix);
         void SetBuffer(const String& name,GPUBuffer* buffer);
+        void SetBuffer(ShaderPropertyId property_id, GPUBuffer *buffer);
         float GetFloat(const String &name);
+        float GetFloat(ShaderPropertyId property_id);
         void SetCullMode(ECullMode mode);
         [[nodiscard]] ECullMode GetCullMode() const;
         [[nodiscard]] ShaderVariantHash ActiveVariantHash(u16 pass_index) const;
@@ -70,15 +86,18 @@ namespace Ailu::Render
         [[nodiscard]] u16 RenderQueue() const { return _render_queue; };
         void RenderQueue(u16 new_queue) { _render_queue = new_queue; };
         u32 GetUint(const String &name);
+        u32 GetUint(ShaderPropertyId property_id);
         Vector4f GetVector(const String &name);
+        Vector4f GetVector(ShaderPropertyId property_id);
         void RemoveTexture(const String &name);
         virtual void SetTexture(const String &name, Texture *texture);
+        virtual void SetTexture(ShaderPropertyId property_id, Texture *texture);
         virtual void SetTexture(const String &name, const WString &texture_path);
         virtual void SetTexture(const String &name, RTHandle texture);
         //开启一个关键字并关闭同组的其他关键字
         void EnableKeyword(const String &keyword);
         void DisableKeyword(const String &keyword);
-        virtual void Bind(u16 pass_index = 0);
+        MaterialDrawState CaptureDrawState(u16 pass_index, u32 frame_slot, u64 frame_count, FrameAllocator &allocator);
         [[nodiscard]] Shader *GetShader() const { return _p_shader; };
         bool IsReadyForDraw(u16 pass_index = 0) const;
         List<std::tuple<String, float>> GetAllFloatValue();
@@ -90,12 +109,13 @@ namespace Ailu::Render
         //根据材质存储的关键字和传入shader的关键字，为每个Pass构建合法的关键字序列
         void ConstructKeywords(Shader *shader);
         /// 构造 drawcmd时调用，将当前状态推入队列,返回材质cbuf的绑定槽
-        i16 PushState(u16 pass_index = 0u);
         PropertyBlock* GetPropertyBlock(u16 block_index)
         {
             AL_ASSERT(block_index < _property_blocks.size());
             return &_property_blocks[block_index];
         }
+        PropertyBlockView GetPropertyBlockForFrame(u16 pass_index, u32 frame_slot, u64 frame_count, FrameAllocator &allocator);
+        u32 PropertyVersion() const { return _property_version; }
         std::set<String>& SavedKeyworkds() { return _all_keywords; }
         virtual void Construct(bool first_time);
     protected:
@@ -108,12 +128,30 @@ namespace Ailu::Render
             i16 _cbuf_bind_slot = -1;
             ShaderVariantHash _variant_hash;
             Array<GpuResource*,32> _bind_res;
+            Array<EBindResDescType,32u> _bind_res_type;
             Array<u16,32u> _bind_res_priority;
         };
-        std::mutex _state_mutex;
-        Queue<BindState> _states;
+        struct BindingCacheEntry
+        {
+            u32 _material_version = 0u;
+            u32 _layout_version = 0u;
+            ShaderVariantHash _variant_hash = 0u;
+            BindState _state;
+        };
+        struct FramePropertyBlockCache
+        {
+            u32 _material_version = 0u;
+            u64 _frame_count = static_cast<u64>(-1);
+            PropertyBlockView _block;
+        };
+        Vector<BindingCacheEntry> _binding_cache;
+        Array<Vector<FramePropertyBlockCache>, RenderConstants::kFrameCount + 1u> _frame_property_block_cache;
     private:
         void UpdateBindTexture(u16 pass_index, ShaderVariantHash new_hash);
+    protected:
+        void MarkPropertiesDirty() { ++_property_version; }
+    private:
+        void ResetMaterialCaches();
 
     protected:
         inline static u32 s_total_material_num = 0u;
@@ -131,7 +169,10 @@ namespace Ailu::Render
         Map<String, ShaderPropertyInfo> _properties;
         Vector<ShaderPropertyInfo *> _prop_views;
         Vector<PropertyBlock> _property_blocks;
+        u32 _property_version = 1u;
         Map<String,Texture *> _bind_textures{};
+        Map<ShaderPropertyId, Texture *> _bind_textures_by_id{};
+        Map<ShaderPropertyId, GPUBuffer *> _bind_buffers_by_id{};
         //非shader使用的变量
         Map<String, u32> _common_uint_property;
         Map<String, f32> _common_float_property;
@@ -220,7 +261,6 @@ namespace Ailu::Render
         ~StandardMaterial();
         void MarkTextureUsed(std::initializer_list<ETextureUsage> use_infos, bool b_use);
         bool IsTextureUsed(ETextureUsage use_info);
-        virtual void Bind(u16 pass_index = 0) override;
         virtual void SetTexture(const String &name, Texture *texture);
         virtual void SetTexture(const String &name, const WString &texture_path);
         virtual void SetTexture(const String &name, RTHandle texture);

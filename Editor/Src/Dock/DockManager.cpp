@@ -1870,6 +1870,11 @@ namespace Ailu
 
         void DockManager::HandleNodeResize()
         {
+            if (Input::IsInputBlock())
+            {
+                UpdateResizeMouseCursor(0u);
+                return;
+            }
             if (UI::DragDropManager::Get().GetPayload().has_value())
             {
                 _resizing_node = nullptr;

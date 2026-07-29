@@ -1,9 +1,13 @@
 #ifndef __CORE_TYPE_H__
 #define __CORE_TYPE_H__
 #include "Framework/Core/String.h"
+#include "Framework/Core/SmartPtr.h"
 #include "RenderConstants.h"
 #include "generated/CoreType.gen.h"
+#include <mutex>
 #include <set>
+#include <unordered_map>
+#include <vector>
 
 
 namespace Ailu
@@ -184,6 +188,131 @@ namespace Ailu
             kUnknown
         };
         class GpuResource;
+
+        using ShaderPropertyId = u32;
+        inline constexpr ShaderPropertyId kInvalidShaderPropertyId = 0u;
+
+        class AILU_API ShaderPropertyRegistry
+        {
+        public:
+            static ShaderPropertyRegistry &Get()
+            {
+                static ShaderPropertyRegistry s_registry;
+                return s_registry;
+            }
+
+            ShaderPropertyId Intern(const String &name)
+            {
+                std::lock_guard<std::mutex> lock(_mutex);
+                if (auto it = _name_to_id.find(name); it != _name_to_id.end())
+                    return it->second;
+                const auto id = static_cast<ShaderPropertyId>(_id_to_name.size());
+                _name_to_id[name] = id;
+                _id_to_name.emplace_back(name);
+                return id;
+            }
+
+            const String &GetName(ShaderPropertyId property_id) const
+            {
+                std::lock_guard<std::mutex> lock(_mutex);
+                if (property_id < _id_to_name.size())
+                    return _id_to_name[property_id];
+                return _id_to_name[kInvalidShaderPropertyId];
+            }
+
+        private:
+            ShaderPropertyRegistry()
+            {
+                _id_to_name.emplace_back("");
+            }
+
+            mutable std::mutex _mutex;
+            std::unordered_map<String, ShaderPropertyId> _name_to_id;
+            std::vector<String> _id_to_name;
+        };
+
+        using ComputeShaderKernelId = u16;
+        inline constexpr ComputeShaderKernelId kInvalidComputeShaderKernelId = static_cast<ComputeShaderKernelId>(-1);
+
+        class AILU_API ComputeShaderKernelRegistry
+        {
+        public:
+            static ComputeShaderKernelRegistry &Get()
+            {
+                static ComputeShaderKernelRegistry s_registry;
+                return s_registry;
+            }
+
+            ComputeShaderKernelId Intern(const String &name)
+            {
+                std::lock_guard<std::mutex> lock(_mutex);
+                if (auto it = _name_to_id.find(name); it != _name_to_id.end())
+                    return it->second;
+                AL_ASSERT_MSG(_id_to_name.size() < kInvalidComputeShaderKernelId, "Too many compute shader kernels!");
+                const auto id = static_cast<ComputeShaderKernelId>(_id_to_name.size());
+                _name_to_id[name] = id;
+                _id_to_name.emplace_back(name);
+                return id;
+            }
+
+            ComputeShaderKernelId Find(const String &name) const
+            {
+                std::lock_guard<std::mutex> lock(_mutex);
+                if (auto it = _name_to_id.find(name); it != _name_to_id.end())
+                    return it->second;
+                return kInvalidComputeShaderKernelId;
+            }
+
+            const String &GetName(ComputeShaderKernelId kernel_id) const
+            {
+                std::lock_guard<std::mutex> lock(_mutex);
+                if (kernel_id < _id_to_name.size())
+                    return _id_to_name[kernel_id];
+                return _empty_name;
+            }
+
+        private:
+            mutable std::mutex _mutex;
+            std::unordered_map<String, ComputeShaderKernelId> _name_to_id;
+            std::vector<String> _id_to_name;
+            String _empty_name;
+        };
+
+        struct ShaderPropertyBinding
+        {
+            ShaderPropertyId _property_id = kInvalidShaderPropertyId;
+            EBindResDescType _resource_type = EBindResDescType::kUnknown;
+            i16 _bind_slot = -1;
+            u32 _buffer_offset = 0u;
+            u32 _buffer_size = 0u;
+            u16 _register_space = 0u;
+            u8 _bind_flag = 0u;
+        };
+
+        class AILU_API ShaderBindingLayout
+        {
+        public:
+            u32 Version() const { return _version; }
+            void Version(u32 version) { _version = version; }
+
+            void Add(const ShaderPropertyBinding &binding)
+            {
+                if (binding._property_id == kInvalidShaderPropertyId)
+                    return;
+                _bindings[binding._property_id] = binding;
+            }
+
+            const ShaderPropertyBinding *Find(ShaderPropertyId property_id) const
+            {
+                const auto it = _bindings.find(property_id);
+                return it == _bindings.end() ? nullptr : &it->second;
+            }
+
+        private:
+            u32 _version = 0u;
+            std::unordered_map<ShaderPropertyId, ShaderPropertyBinding> _bindings;
+        };
+
         struct ShaderBindResourceInfo
         {
             inline static const u8 kBindFlagPerObject = 0x01;
@@ -227,7 +356,7 @@ namespace Ailu
             inline static u16 GetVariableOffset(const ShaderBindResourceInfo &info) { return info._cbuf_member_offset >> 16; }
             ShaderBindResourceInfo() = default;
             ShaderBindResourceInfo(EBindResDescType res_type, u32 slot_or_offset, u8 bind_slot, const String &name)
-                : _res_type(res_type), _bind_slot(bind_slot), _name(name)
+                : _res_type(res_type), _bind_slot(bind_slot), _name(name), _property_id(ShaderPropertyRegistry::Get().Intern(name))
             {
                 if (res_type & EBindResDescType::kCBufferAttribute)
                     _cbuf_member_offset = slot_or_offset;
@@ -246,6 +375,7 @@ namespace Ailu
             };
             u8 _bind_slot;
             String _name;
+            ShaderPropertyId _property_id = kInvalidShaderPropertyId;
             GpuResource *_p_res = nullptr;
             ShaderBindResourceInfo *_p_root_cbuf;
             //1 for per obj,2for per mat,4 for per pass,8 for per frame
@@ -272,6 +402,8 @@ namespace Ailu
                 return lhs._name == rhs._name;
             }
         };
+
+        using ShaderReflectionResourceMap = std::unordered_map<String, ShaderBindResourceInfo>;
 
         enum class EShaderPropertyType
         {
@@ -304,6 +436,7 @@ namespace Ailu
             };
             String _value_name;
             String _prop_name;
+            ShaderPropertyId _property_id = kInvalidShaderPropertyId;
             u32 _offset = 0;
             void *_value_ptr = nullptr;
             EShaderPropertyType _type;
@@ -312,7 +445,8 @@ namespace Ailu
             Vector4f _params;
             ShaderPropertyInfo() = default;
             ShaderPropertyInfo(const String &value_name, const String &prop_name, EShaderPropertyType prop_type, const Vector4f &default_value)
-                : _value_name(value_name), _prop_name(prop_name), _type(prop_type), _default_value(default_value), _params(Vector4f::kZero)
+                : _value_name(value_name), _prop_name(prop_name), _property_id(ShaderPropertyRegistry::Get().Intern(value_name)),
+                  _type(prop_type), _default_value(default_value), _params(Vector4f::kZero)
             {
             }
             template<typename T>
@@ -415,6 +549,9 @@ namespace Ailu
                 _is_compute = false;
                 _addi_info = {};
             }
+            bool IsResolved() const { return _name.empty() && _slot < 32; }
+            bool IsNamed() const { return !_name.empty(); }
+
             GpuResource *_p_resource;
             AddiInfo _addi_info;
         };

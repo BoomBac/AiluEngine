@@ -467,6 +467,7 @@ namespace Ailu::RHI::DX12
             _pass_elements[pass_index]._variants[variant_hash]._p_gblob = tmp_p_gblob;
             _pass_elements[pass_index]._variants[variant_hash]._keyword_defines = keyword_defines;
             GenerateInternalPSO(pass_index, variant_hash);
+            BuildBindingLayout(pass_index, variant_hash);
         }
         return succeed;
     }
@@ -614,22 +615,23 @@ namespace Ailu::RHI::DX12
         Compile();
     }
 
-    void D3DComputeShader::Bind(RHICommandBuffer *cmd, u16 kernel)
+    void D3DComputeShader::Bind(RHICommandBuffer *cmd, Render::ComputeShaderKernelId kernel)
     {
-        if (!_is_valid && kernel >= _kernels.size())
+        if (!_is_valid || !IsKernelValid(kernel))
         {
             LOG_WARNING("ComputeShader or kernel id is not valid!");
             return;
         }
+        const auto kernel_index = ResolveKernelIndex(kernel);
         ComputeShader::Bind(cmd, kernel);
         AL_ASSERT(!_bind_state.empty());
         std::unique_lock lock(_state_mutex);
         auto &cur_state = _bind_state.front();
-        if (_variant_state[kernel][cur_state._variant_hash] != EShaderVariantState::kReady)
+        if (_variant_state[kernel_index][cur_state._variant_hash] != EShaderVariantState::kReady)
             return;
         auto d3dcmd = static_cast<D3DCommandBuffer *>(cmd)->NativeCmdList();
-        auto &d3d_ele = _elements[kernel]._variants[cur_state._variant_hash];
-        auto &cs_ele = _kernels[kernel]._variants[cur_state._variant_hash];
+        auto &d3d_ele = _elements[kernel_index]._variants[cur_state._variant_hash];
+        auto &cs_ele = _kernels[kernel_index]._variants[cur_state._variant_hash];
         d3dcmd->SetPipelineState(d3d_ele._pso.Get());
         d3dcmd->SetComputeRootSignature(d3d_ele._p_sig.Get());
         for (u16 i = 0; i <= cur_state._max_bind_slot; i++)

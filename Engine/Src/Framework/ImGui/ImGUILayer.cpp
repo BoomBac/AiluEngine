@@ -10,6 +10,7 @@
 #include "Ext/implot/implot.h"
 #include "Ext/imnodes/imnodes.h"
 #include "Framework/Common/Application.h"
+#include "Framework/Common/Input.h"
 #include "Framework/Common/TimeMgr.h"
 
 
@@ -176,9 +177,31 @@ namespace Ailu
 		ImGuiIO& io = ImGui::GetIO();
 		io.DisplaySize = ImVec2(static_cast<float>(window.GetWidth()), static_cast<float>(window.GetHeight()));
 		//ImGuiWidget::EndFrame();
+        RefreshEngineInputCapture();
 		ImGui::EndFrame();
 		ImGui::Render();
 	}
+
+    bool Ailu::ImGUILayer::ShouldBlockEngineInputEvent(const Event &e) const
+    {
+        if (e.IsInCategory(EEventCategory::kEventCategoryMouse) ||
+            e.IsInCategory(EEventCategory::kEventCategoryMouseButton))
+            return _blocks_engine_mouse_input;
+        if (e.IsInCategory(EEventCategory::kEventCategoryKeyboard))
+            return _blocks_engine_keyboard_input || _blocks_engine_mouse_input;
+        return false;
+    }
+
+    void Ailu::ImGUILayer::RefreshEngineInputCapture()
+    {
+        ImGuiIO &io = ImGui::GetIO();
+        const bool hovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow);
+        const bool item_hovered = ImGui::IsAnyItemHovered();
+        const bool item_active = ImGui::IsAnyItemActive();
+        _blocks_engine_mouse_input = io.WantCaptureMouse || hovered || item_hovered || item_active;
+        _blocks_engine_keyboard_input = io.WantCaptureKeyboard || io.WantTextInput || item_active;
+        Input::BlockInputByImGui(_blocks_engine_mouse_input);
+    }
 }
 
 

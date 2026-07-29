@@ -8,11 +8,13 @@
 #include "Framework/Core/Containers/Vector.h"
 #include "Framework/Core/Containers/Map.h"
 #include "Framework/Common/Assert.h"
+#include "Framework/Common/MemoryDebugTypes.h"
 
 #include <atomic>
 #include <limits>
 #include <memory>
 #include <mutex>
+#include <thread>
 
 namespace Ailu
 {
@@ -46,11 +48,15 @@ namespace Ailu
         void InitializePageDebugInfo(PageHeader *page);
         void MarkBlockAllocated(PageHeader *page, void *ptr);
         void MarkBlockFreed(PageHeader *page, void *ptr);
+        void CaptureGlobalStats(u64 &page_count, u64 &cached_empty_page_count, u64 &reserved_bytes) const;
+        void CaptureBinSnapshots(Vector<AllocatorBinSnapshot> &snapshots) const;
+        void AccumulateArenaPageStats(Vector<AllocatorArenaSnapshot> &snapshots) const;
+        bool CapturePageSnapshot(u64 page_address, AllocatorPageSnapshot &snapshot) const;
 
     private:
         Vector<PageHeader *> _pages;
         HashMap<PageHeader *, PageDebugInfo> _page_debug_infos;
-        std::mutex _mutex;
+        mutable std::mutex _mutex;
     };
     class Arena;
     class Bin
@@ -94,10 +100,22 @@ namespace Ailu
         ~Arena();
 
         void *Allocate(u64 size, u64 align);
+        u32 ArenaId() const { return _arena_id; }
+        u64 ThreadId() const { return _thread_id; }
+        void CaptureSnapshot(AllocatorArenaSnapshot &snapshot) const;
 
     private:
         Allocator *_allocator = nullptr;
         Vector<Bin *> _bins;
+        u32 _arena_id = 0u;
+        u64 _thread_id = 0u;
+        u64 _allocation_count = 0u;
+        u64 _free_count = 0u;
+        u64 _page_count = 0u;
+        u64 _requested_bytes = 0u;
+        u64 _reserved_bytes = 0u;
+        u64 _peak_requested_bytes = 0u;
+        friend class Allocator;
     };
 
     enum class EMemoryTag : u16
@@ -179,15 +197,28 @@ namespace Ailu
         void Deallocate(void *ptr);
         void PrintLeaks();
         void PrintAllocatedInfo();
+        void CaptureGlobalSnapshot(AllocatorGlobalSnapshot &snapshot) const;
+        void CaptureBinSnapshots(Vector<AllocatorBinSnapshot> &snapshots) const;
+        void CaptureArenaSnapshots(Vector<AllocatorArenaSnapshot> &snapshots) const;
+        bool CapturePageSnapshot(u64 page_address, AllocatorPageSnapshot &snapshot) const;
+        void CaptureActiveAllocations(Vector<AllocatorAllocationSnapshot> &snapshots) const;
+        void CaptureRecentEvents(Vector<MemoryDebugEvent> &events, u32 max_count) const;
+        void ClearMemoryDebugEvents();
 
         u64 TotalAllocated() const { return _total_allocated.load(); }
         PageMgr &GetPageMgr() { return _page_mgr; }
 
     private:
+        Allocator();
+
         struct AllocHeader
         {
             void *_raw_ptr = nullptr;
             u64 _requested_size = 0u;
+            u64 _actual_size = 0u;
+            u32 _arena_id = 0u;
+            u32 _bin_index = kInvalidAllocatorIndex;
+            u64 _thread_id = 0u;
             u32 _magic = 0u;
             EMemoryTag _tag = EMemoryTag::kDefault;
             u16 _alignment = 0u;
@@ -203,6 +234,11 @@ namespace Ailu
         struct AllocationInfo
         {
             u64 _size = 0u;
+            u64 _actual_size = 0u;
+            u32 _arena_id = 0u;
+            u32 _bin_index = kInvalidAllocatorIndex;
+            u64 _thread_id = 0u;
+            u32 _alignment = 0u;
             const char *_file = nullptr;
             const char *_function = nullptr;
             u16 _line = 0u;
@@ -210,12 +246,26 @@ namespace Ailu
             EMemoryTag _tag = EMemoryTag::kDefault;
         };
 
+        void RecordMemoryEvent(const MemoryDebugEvent &event);
+
         HashMap<void *, AllocationInfo> _allocations;
-        std::mutex _mutex;
+        mutable std::mutex _mutex;
         std::atomic<u64> _total_allocated = 0u;
+        std::atomic<u64> _peak_allocated = 0u;
+        u64 _total_allocation_count = 0u;
+        u64 _total_free_count = 0u;
+        u64 _active_system_allocation_count = 0u;
+        u64 _active_system_reserved_bytes = 0u;
+        mutable u64 _peak_reserved_bytes = 0u;
+        u64 _dropped_event_count = 0u;
+        u64 _next_event_sequence = 1u;
+        Vector<MemoryDebugEvent> _events;
+        u32 _event_head = 0u;
+        u32 _event_count = 0u;
         PageMgr _page_mgr;
         std::mutex _arena_mutex;
         Vector<std::unique_ptr<Arena>> _arenas;
+        u32 _next_arena_id = 1u;
     };
 
     namespace Memory

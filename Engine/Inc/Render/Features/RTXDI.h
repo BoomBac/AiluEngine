@@ -45,7 +45,7 @@ namespace Ailu::Render
         Scope<SceneRayTracingProxy> _scene_rt_proxy;
         Ref<Texture2D> _output_texture = nullptr;
         RDG::RGHandle _output_handle;
-        u16 _kernel_ray_gen = static_cast<u16>(-1);
+        ComputeShaderKernelId _kernel_ray_gen = kInvalidComputeShaderKernelId;
         Ref<GPUBuffer> _reservoir_a;
         Ref<GPUBuffer> _reservoir_b;
         bool _use_reservoir_a = true;

@@ -114,11 +114,15 @@ namespace Ailu
         }
         inline static bool IsInputBlock()
         {
-            return  s_block_input;
+            return s_block_input || s_imgui_block_input;
         }
         inline static void BlockInput(bool block)
         {
             s_block_input = block;
+        }
+        inline static void BlockInputByImGui(bool block)
+        {
+            s_imgui_block_input = block;
         }
         inline static Vector2f GetMousePosDelta()
         {
@@ -140,6 +144,7 @@ namespace Ailu
         static void NotifyWindowClosed(Window *w);
         inline static Scope<InputPlatform> sp_instance;
         inline static bool s_block_input = false;
+        inline static bool s_imgui_block_input = false;
         inline static std::mutex s_input_state_mutex;
         inline static std::mutex s_mouse_state_mutex;
         inline static Vector2f s_mouse_pos_delta = Vector2f::kZero;

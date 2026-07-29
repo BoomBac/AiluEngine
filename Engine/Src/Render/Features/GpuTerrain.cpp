@@ -90,13 +90,16 @@ namespace Ailu::Render
     {
         _max_height = max_height;
         _terrain_gen =  terrain_gen;
+        _min_max_height_gen_kernel = _terrain_gen->FindKernel("MinMaxHeightGen");
+        _quad_tree_processor_kernel = _terrain_gen->FindKernel("QuadTreeProcessor");
+        _gen_lod_map_kernel = _terrain_gen->FindKernel("GenLODMap");
+        _gen_patches_kernel = _terrain_gen->FindKernel("GenPatches");
         _plane = plane;
         _terrain_mat = terrain_mat;
         DrawIndexedArguments draw_arg{(u32)plane->GetIndicesCount(),1u,0,0u,0u};
         _draw_arg_buf->SetData((const u8*)&draw_arg,sizeof(DrawIndexedArguments));
         
         auto cmd = CommandBufferPool::Get("TerrainPassInit");
-        auto kernel = _terrain_gen->FindKernel("MinMaxHeightGen");
         for (i32 i = 0; i < 9; i++)
         {
             _terrain_gen->SetInt("lod", i);
@@ -110,8 +113,8 @@ namespace Ailu::Render
                 _terrain_gen->SetTexture("HeightMap", _minmax_height.get(), i - 1);
                 _terrain_gen->SetTexture("MinMaxMap", _minmax_height.get(), i);
             }
-            auto [x, y, z] = _terrain_gen->CalculateDispatchNum(kernel, 1280u >> i, 1280u >> i, 1u);
-            cmd->Dispatch(_terrain_gen, kernel, x, y);
+            auto [x, y, z] = _terrain_gen->CalculateDispatchNum(_min_max_height_gen_kernel, 1280u >> i, 1280u >> i, 1u);
+            cmd->Dispatch(_terrain_gen, _min_max_height_gen_kernel, x, y);
         }
         GraphicsContext::Get().ExecuteCommandBuffer(cmd);
         CommandBufferPool::Release(cmd);
@@ -123,11 +126,10 @@ namespace Ailu::Render
         auto cmd = CommandBufferPool::Get("Terrain");
         {
             PROFILE_BLOCK_GPU(cmd.get(), "GpuTerrain");
-            auto kernel = _terrain_gen->FindKernel("QuadTreeProcessor");
             GPUBuffer* src_buf = _src_node_buf.get();
             GPUBuffer *dst_buf = _temp_node_buf.get();
             //四叉树分割
-            _terrain_gen->SetBuffer(kernel, "final_nodes", _final_node_buf.get());
+            _terrain_gen->SetBuffer(_quad_tree_processor_kernel, "final_nodes", _final_node_buf.get());
             _terrain_gen->SetFloat("control_factor",1.0f);
             //_terrain_gen->SetVector("camera_pos",rendering_data._camera->Position());
             _terrain_gen->SetFloat("max_height",*_max_height);
@@ -135,29 +137,27 @@ namespace Ailu::Render
             _terrain_gen->SetVector("camera_pos",_cam->Position());
             for (i32 i = kMaxLOD; i >=0 ;i--)
             {
-                _terrain_gen->SetBuffer(kernel,"src_nodes",src_buf);
-                _terrain_gen->SetBuffer(kernel,"temp_nodes",dst_buf);
+                _terrain_gen->SetBuffer(_quad_tree_processor_kernel,"src_nodes",src_buf);
+                _terrain_gen->SetBuffer(_quad_tree_processor_kernel,"temp_nodes",dst_buf);
                 _terrain_gen->SetInt("cur_lod",i);
                 cmd->CopyCounterValue(src_buf, _disp_args_buf.get(), 0u);
-                cmd->Dispatch(_terrain_gen, kernel, _disp_args_buf.get(), 0u);
+                cmd->Dispatch(_terrain_gen, _quad_tree_processor_kernel, _disp_args_buf.get(), 0u);
                 std::swap(src_buf,dst_buf);
             }
             //lod map
             cmd->CopyCounterValue(_final_node_buf.get(), _disp_args_buf.get(), 0u);
-            kernel = _terrain_gen->FindKernel("GenLODMap");
-            _terrain_gen->SetBuffer(kernel, "_input_final_nodes", _final_node_buf.get());
+            _terrain_gen->SetBuffer(_gen_lod_map_kernel, "_input_final_nodes", _final_node_buf.get());
             _terrain_gen->SetTexture("_LODMap",_lod_map.get());
-            cmd->Dispatch(_terrain_gen, kernel, _disp_args_buf.get(), 0u);
+            cmd->Dispatch(_terrain_gen, _gen_lod_map_kernel, _disp_args_buf.get(), 0u);
             //patch gen
             const auto& vf = _cam->GetViewFrustum()._planes;
             for(u16 i = 0; i < 6; i++)
                 _frustum[i] = Vector4f(vf[i]._normal,vf[i]._distance);
             _terrain_gen->SetVectorArray("_frustum",_frustum.data(),6u);
-            kernel = _terrain_gen->FindKernel("GenPatches");
-            _terrain_gen->SetBuffer(kernel, "_input_final_nodes", _final_node_buf.get());
-            _terrain_gen->SetBuffer(kernel, "_patch_list", _patches_buf.get());
+            _terrain_gen->SetBuffer(_gen_patches_kernel, "_input_final_nodes", _final_node_buf.get());
+            _terrain_gen->SetBuffer(_gen_patches_kernel, "_patch_list", _patches_buf.get());
             _terrain_gen->SetTexture("_InputLODMap",_lod_map.get());
-            cmd->Dispatch(_terrain_gen, kernel, _disp_args_buf.get(), 0u);
+            cmd->Dispatch(_terrain_gen, _gen_patches_kernel, _disp_args_buf.get(), 0u);
             //draw
             cmd->SetRenderTarget(rendering_data._camera_color_target_handle, rendering_data._camera_depth_target_handle);
             _terrain_mat->SetBuffer("PatchList", _patches_buf.get());

@@ -5,6 +5,7 @@
 #include <d3dx12.h>
 #include <dxgi1_6.h>
 #include <atomic>
+#include <condition_variable>
 #include <mutex>
 
 // Tracy GPU profiling (D3D12). This header is lightweight when TRACY_ENABLE is not defined.
@@ -109,6 +110,8 @@ namespace Ailu::RHI::DX12
         std::thread* _worker_thread;
         Render::GraphicsContext* _ctx;
         std::atomic<bool> _is_stop;
+        std::mutex _cmd_wait_mutex;
+        std::condition_variable _cmd_wait_cv;
     };
 
     class D3DSwapchainTexture;
