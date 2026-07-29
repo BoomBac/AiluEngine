@@ -59,6 +59,20 @@ namespace Ailu::Render
     {
         s_total_mem_size += _mem_size;
     }
+    void GpuResource::TrackResourceState(EResourceState new_state, u32 sub_res)
+    {
+        _state = new_state;
+        ResourceStateTracker::Get().UpdateResourceState(this, new_state, sub_res);
+    }
+    EResourceState GpuResource::CurrentResourceState(u32 sub_res) const
+    {
+        return ResourceStateTracker::Get().GetResourceState(const_cast<GpuResource *>(this), sub_res);
+    }
+    bool GpuResource::TryCurrentResourceState(EResourceState &out_state, u32 sub_res) const
+    {
+        out_state = CurrentResourceState(sub_res);
+        return true;
+    }
     bool GpuResource::IsReferenceByGpu() const
     {
         u64 fence_value = GraphicsContext::Get().GetFenceValueGPU();

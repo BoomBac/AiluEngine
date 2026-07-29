@@ -22,12 +22,16 @@ namespace Ailu
         APROPERTY(Category = "Render")
         bool isMultiThreadRender;
         APROPERTY(Category = "Render")
+        bool enable_graphics_job;
+        APROPERTY(Category = "Render")
         bool EnableCpuStateBatchedSubmission;
         APROPERTY(Category = "Render")
         bool EnableIncrementalGraphicsBinding;
         APROPERTY(Category = "Debug")
         bool _enable_d3d12_debug_layer;
+        APROPERTY(Category = "Debug")
+        bool _enable_pix;
     };
-    inline EngineConfig g_engine_config;
+    extern AILU_API EngineConfig g_engine_config;
 }
 #endif  __ENGINE_CONFIG_H__

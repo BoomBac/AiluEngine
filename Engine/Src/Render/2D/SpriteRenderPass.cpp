@@ -40,7 +40,7 @@ namespace Ailu::Render
                 rendering_data._rg_handles._color_target =
                     builder.Write(rendering_data._rg_handles._color_target);
                 // Read depth (optional, for depth testing)
-                builder.Read(rendering_data._rg_handles._depth_target);
+                builder.Read(rendering_data._rg_handles._depth_target, EResourceUsage::kDSV);
             },
             [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
             {

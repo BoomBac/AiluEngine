@@ -104,10 +104,10 @@ namespace Ailu
             {
                 graph.AddPass("Debug Ray", RDG::PassDesc(), [&, this](RDG::RenderGraphBuilder &builder)
                             {
-                    builder.Read(rendering_data._rg_handles._color_target);
-                    builder.Read(rendering_data._rg_handles._depth_target);
+                    builder.Read(rendering_data._rg_handles._color_target, EResourceUsage::kWriteRTV);
+                    builder.Read(rendering_data._rg_handles._depth_target, EResourceUsage::kDSV);
                     rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target);
-                    rendering_data._rg_handles._depth_target = builder.Write(rendering_data._rg_handles._depth_target);
+                    rendering_data._rg_handles._depth_target = builder.Write(rendering_data._rg_handles._depth_target, EResourceUsage::kDSV);
                 }, 
                 [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
                             { 

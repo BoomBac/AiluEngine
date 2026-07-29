@@ -181,6 +181,7 @@ namespace Ailu
         void CopyCounterValue(GPUBuffer *src, GPUBuffer *dst, u32 dst_offset);
 
         void StateTransition(GpuResource *res, EResourceState new_state, u32 sub_res = kTotalSubRes);
+        void ResourceBarrier(GpuResource *res, EResourceState before, EResourceState after, u32 sub_res = kTotalSubRes);
         void InsertUAVBarrier(GpuResource *res = nullptr);
 
         void ReadbackBuffer(GPUBuffer* buffer,bool is_counter,u32 size,ReadbackCallback callback);

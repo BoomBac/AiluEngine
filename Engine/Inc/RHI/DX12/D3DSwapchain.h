@@ -35,6 +35,9 @@ namespace Ailu
             void PreparePresent(RHICommandBuffer *cmd) final;
             void Present() final;
             void StateTranslation(RHICommandBuffer* rhi_cmd,Render::EResourceState new_state,u32 sub_res) final;
+            void TrackResourceState(Render::EResourceState new_state, u32 sub_res = Render::kTotalSubRes) final;
+            Render::EResourceState CurrentResourceState(u32 sub_res = Render::kTotalSubRes) const final;
+            bool TryCurrentResourceState(Render::EResourceState &out_state, u32 sub_res = Render::kTotalSubRes) const final;
             D3D12_CPU_DESCRIPTOR_HANDLE *TargetCPUHandle(RHICommandBuffer *cmd);
             u8 GetCurrentBackBufferIndex() final
             { 

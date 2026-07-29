@@ -180,7 +180,7 @@ namespace Ailu::Render
         graph.AddPass("VolumetricClouds_Compose", RDG::PassDesc(), [&, this](RDG::RenderGraphBuilder &builder)
         {
             builder.Read(_cloud_cur_handle);
-            builder.Read(rendering_data._rg_handles._color_target);
+            builder.Read(rendering_data._rg_handles._color_target, EResourceUsage::kWriteRTV);
             rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target);
         }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
         {

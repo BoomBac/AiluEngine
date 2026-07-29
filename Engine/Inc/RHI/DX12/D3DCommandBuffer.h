@@ -16,6 +16,11 @@
 
 namespace Ailu
 {
+    namespace Render
+    {
+        struct CommandProfiler;
+    }
+
     using Microsoft::WRL::ComPtr;
     using Render::RHICommandBuffer;
     using Render::ECommandBufferType;
@@ -26,6 +31,48 @@ namespace Ailu
         class D3DCommandBuffer : public RHICommandBuffer
         {
             friend class D3DContext;
+
+            struct CommandBufferStatistics
+            {
+                u32 _vertex_num = 0u;
+                u32 _triangle_num = 0u;
+                u32 _draw_call = 0u;
+                u32 _dispatch_call = 0u;
+                u64 _draw_command_count = 0u;
+                u64 _material_cbuffer_upload_count = 0u;
+                u64 _material_cbuffer_upload_bytes = 0u;
+                u64 _material_cbuffer_cache_hit_count = 0u;
+                u64 _resource_mark_request_count = 0u;
+                u64 _unique_resource_mark_count = 0u;
+
+                void Reset()
+                {
+                    _vertex_num = 0u;
+                    _triangle_num = 0u;
+                    _draw_call = 0u;
+                    _dispatch_call = 0u;
+                    _draw_command_count = 0u;
+                    _material_cbuffer_upload_count = 0u;
+                    _material_cbuffer_upload_bytes = 0u;
+                    _material_cbuffer_cache_hit_count = 0u;
+                    _resource_mark_request_count = 0u;
+                    _unique_resource_mark_count = 0u;
+                }
+
+                void MergeTo(Render::RenderingStatesData &data) const
+                {
+                    data.VertexNum += _vertex_num;
+                    data.TriangleNum += _triangle_num;
+                    data.DrawCall += _draw_call;
+                    data.DispatchCall += _dispatch_call;
+                    data.DrawCommandCount += _draw_command_count;
+                    data.MaterialCBufferUploadCount += _material_cbuffer_upload_count;
+                    data.MaterialCBufferUploadBytes += _material_cbuffer_upload_bytes;
+                    data.MaterialCBufferCacheHitCount += _material_cbuffer_cache_hit_count;
+                    data.ResourceMarkRequestCount += _resource_mark_request_count;
+                    data.UniqueResourceMarkCount += _unique_resource_mark_count;
+                }
+            };
 
             struct GraphicsStateCache
             {
@@ -60,13 +107,13 @@ namespace Ailu
             /// @param res
             void MarkUsedResource(GpuResource *res)
             {
-                ++Render::RenderingStates::RenderData().ResourceMarkRequestCount;
+                ++_statistics._resource_mark_request_count;
                 if (res == nullptr)
                     return;
                 if (res->MarkUsedByCommand(_tracking_epoch))
                 {
                     _used_resources.emplace_back(res);
-                    ++Render::RenderingStates::RenderData().UniqueResourceMarkCount;
+                    ++_statistics._unique_resource_mark_count;
                 }
             }
             u16 GetDescriptorHeapId() const { return _cur_cbv_heap_id; }
@@ -97,9 +144,22 @@ namespace Ailu
                 _graphics_state_cache._slot_hashes[slot] = binding_hash;
             }
             void ResetGraphicsStateCache() { _graphics_state_cache.Reset(); }
+            CommandBufferStatistics &Statistics() { return _statistics; }
+            void PushProfiler(Render::CommandProfiler *profiler) { _profiler_stack.emplace_back(profiler); }
+            Render::CommandProfiler *TopProfiler()
+            {
+                return _profiler_stack.empty() ? nullptr : _profiler_stack.back();
+            }
+            void PopProfiler()
+            {
+                if (!_profiler_stack.empty())
+                    _profiler_stack.pop_back();
+            }
+            bool ProfilerStackEmpty() const { return _profiler_stack.empty(); }
 
         private:
             void Close();
+            void MarkSubmitted(u64 fence_value);
 
         private:
             D3D12_COMMAND_LIST_TYPE _dx_cmd_type;
@@ -123,10 +183,13 @@ namespace Ailu
             Array<D3D12_RECT, Render::RenderConstants::kMaxMRTNum> _scissors;
             Vector<GpuResource *> _used_resources;
             bool _is_cmd_closed;
+            bool _is_submitted;
             i16 _cur_cbv_heap_id;
             u64 _fence_value;
             u64 _tracking_epoch;
             GraphicsStateCache _graphics_state_cache;
+            CommandBufferStatistics _statistics;
+            Vector<Render::CommandProfiler *> _profiler_stack;
             inline static std::atomic<u64> s_next_tracking_epoch = 1u;
         };
     }// namespace ::RHI::DX12

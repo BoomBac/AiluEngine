@@ -299,7 +299,7 @@ namespace Ailu
             graph.AddPass("Debug GI", RDG::PassDesc(), [&, this](RDG::RenderGraphBuilder &builder)
                           {
                     builder.Read(_cur_target_handle);
-                    builder.Read(rendering_data._rg_handles._color_target);
+                    builder.Read(rendering_data._rg_handles._color_target, EResourceUsage::kWriteRTV);
                     rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target); 
                     }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
                 { 
@@ -309,8 +309,8 @@ namespace Ailu
             {
                 graph.AddPass("Debug Ray", RDG::PassDesc(), [&, this](RDG::RenderGraphBuilder &builder)
                               {
-                        builder.Read(rendering_data._rg_handles._color_target);
-                        builder.Read(rendering_data._rg_handles._depth_target);
+                        builder.Read(rendering_data._rg_handles._color_target, EResourceUsage::kWriteRTV);
+                        builder.Read(rendering_data._rg_handles._depth_target, EResourceUsage::kDSV);
                         rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target);
                         rendering_data._rg_handles._depth_target = builder.Write(rendering_data._rg_handles._depth_target,EResourceUsage::kDSV);
                     }, 

@@ -29,6 +29,13 @@ namespace Ailu::Render
         u64 MaterialCBufferCacheHitCount = 0u;
         u64 ResourceMarkRequestCount = 0u;
         u64 UniqueResourceMarkCount = 0u;
+        u32 CommandGroupCount = 0u;
+        u32 CommandListCount = 0u;
+        u32 CommandSubmitCount = 0u;
+        u32 CommandFenceSignalCount = 0u;
+        u32 LastCommandSubmissionIndex = 0u;
+        f32 CommandRecordingTimeMs = 0.0f;
+        f32 CommandSubmissionTimeMs = 0.0f;
         u32 _flag;
 
         // Properties — set periodically by render thread

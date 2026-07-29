@@ -72,8 +72,10 @@ namespace Ailu::RHI::DX12
         {
             Vector<GfxCommand *> _cmds;
             SubmitParams _params;
+            u32 _submission_index = 0u;
             CommandGroup() = default;
-            CommandGroup(Vector<GfxCommand *>&& cmds,SubmitParams&& params) : _cmds(std::move(cmds)), _params(std::move(params)){}
+            CommandGroup(Vector<GfxCommand *>&& cmds,SubmitParams&& params,u32 submission_index)
+                : _cmds(std::move(cmds)), _params(std::move(params)), _submission_index(submission_index){}
             ~CommandGroup()
             {
                 for(auto& c : _cmds)
@@ -86,8 +88,10 @@ namespace Ailu::RHI::DX12
                     Render::CommandPool::Get().DeAlloc(c);
                 _cmds.clear();
                 _params = other._params;
+                _submission_index = other._submission_index;
                 _cmds = std::move(other._cmds);
                 other._params = SubmitParams{};
+                other._submission_index = 0u;
                 other._cmds.clear();
                 return *this;
             }
@@ -97,11 +101,15 @@ namespace Ailu::RHI::DX12
                     Render::CommandPool::Get().DeAlloc(c);
                 _cmds.clear();
                 _params = other._params;
+                _submission_index = other._submission_index;
                 _cmds = std::move(other._cmds);
                 other._params = SubmitParams{};
+                other._submission_index = 0u;
                 other._cmds.clear();
             }
         };
+        void RecordCommandGroup(CommandGroup& group,Ref<RHICommandBuffer>& cmd);
+        void SubmitRecordedCommandBuffers(Vector<Ref<RHICommandBuffer>>& cmds);
         void RunAsync();
         void EndFrame();
     private:
@@ -110,6 +118,7 @@ namespace Ailu::RHI::DX12
         std::thread* _worker_thread;
         Render::GraphicsContext* _ctx;
         std::atomic<bool> _is_stop;
+        std::atomic<u32> _next_submission_index = 0u;
         std::mutex _cmd_wait_mutex;
         std::condition_variable _cmd_wait_cv;
     };
@@ -154,6 +163,7 @@ namespace Ailu::RHI::DX12
         void ExecuteCommandBuffer(Ref<CommandBuffer>& cmd) final;
         void ExecuteCommandBufferSync(Ref<CommandBuffer> &cmd) final;
         void ExecuteRHICommandBuffer(RHICommandBuffer* cmd) final;
+        u64 ExecuteRHICommandBuffers(const Vector<RHICommandBuffer *> &cmds) final;
         void WaitForGpu() final;
         void CreateResourceSync(GpuResource* res) final;
         void CreateResourceSync(GpuResource* res,UploadParams* params) final;

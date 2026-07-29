@@ -1743,6 +1743,14 @@ namespace Ailu
                 const u64 material_upload_total = ds.MaterialCBufferUploadCount + ds.MaterialCBufferCacheHitCount;
 
                 ImGui::Text("Draw Commands: %llu", static_cast<unsigned long long>(ds.DrawCommandCount));
+                ImGui::Text("Command Groups: %u", ds.CommandGroupCount);
+                ImGui::Text("Command Lists: %u", ds.CommandListCount);
+                ImGui::Text("Command Submits: %u", ds.CommandSubmitCount);
+                ImGui::Text("Command Fence Signals: %u", ds.CommandFenceSignalCount);
+                ImGui::Text("Last Submission Index: %u", ds.LastCommandSubmissionIndex);
+                ImGui::Text("Command Recording: %.3f ms", ds.CommandRecordingTimeMs);
+                ImGui::Text("Command Submission: %.3f ms", ds.CommandSubmissionTimeMs);
+                ImGui::Separator();
                 ImGui::Text("PSO Lookups: %llu", static_cast<unsigned long long>(ds.PsoLookupCount));
                 ImGui::Text("PSO Cache Hit/Miss: %llu / %llu (%.1f%%)", static_cast<unsigned long long>(ds.PsoCacheHitCount),
                             static_cast<unsigned long long>(ds.PsoCacheMissCount), percent(ds.PsoCacheHitCount, pso_total));
@@ -1846,11 +1854,15 @@ namespace Ailu
             ImGui::SliderFloat("Game Time Scale:", &TimeMgr::s_time_scale, 0.0f, 2.0f, "%.2f");
             ImGui::SliderFloat("ShadowDistance m", &QuailtySetting::s_main_light_shaodw_distance, 0.f, 100.0f, "%.2f");
 
-            static bool s_state_batching = g_engine_config.EnableCpuStateBatchedSubmission;
-            if (ImGui::Checkbox("State Batching", &s_state_batching))
+            bool enable_graphics_job = g_engine_config.enable_graphics_job;
+            if (ImGui::Checkbox("Enable Graphics Job", &enable_graphics_job))
+                g_engine_config.enable_graphics_job = enable_graphics_job;
+
+            bool state_batching = g_engine_config.EnableCpuStateBatchedSubmission && g_engine_config.EnableIncrementalGraphicsBinding;
+            if (ImGui::Checkbox("State Batching", &state_batching))
             {
-                g_engine_config.EnableCpuStateBatchedSubmission = s_state_batching;
-                g_engine_config.EnableIncrementalGraphicsBinding = s_state_batching;
+                g_engine_config.EnableCpuStateBatchedSubmission = state_batching;
+                g_engine_config.EnableIncrementalGraphicsBinding = state_batching;
             }
 
             //g_pRenderer->_shadow_distance = shadow_dis_m * 100.0f;

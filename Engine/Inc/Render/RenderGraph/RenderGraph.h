@@ -38,7 +38,29 @@ namespace Ailu::Render::RDG
         ELoadStoreAction _store = ELoadStoreAction::kStore;
         ClearValue _clear_value = ClearValue::Color(0.0f, 0.0f, 0.0f, 0.0f);
         u32 _mip_level = 0u;
+        u32 _mip_count = 1u;
         u32 _array_slice = 0u;
+        u32 _array_slice_count = 1u;
+        bool _all_sub_resources = true;
+
+        static ResourceAccess All(EResourceUsage usage)
+        {
+            ResourceAccess access;
+            access._usage = usage;
+            return access;
+        }
+
+        static ResourceAccess MipRange(EResourceUsage usage, u32 mip_level, u32 mip_count, u32 array_slice = 0u, u32 array_slice_count = 1u)
+        {
+            ResourceAccess access;
+            access._usage = usage;
+            access._mip_level = mip_level;
+            access._mip_count = mip_count;
+            access._array_slice = array_slice;
+            access._array_slice_count = array_slice_count;
+            access._all_sub_resources = false;
+            return access;
+        }
 
         bool isWrite() const
         {
@@ -54,11 +76,35 @@ namespace Ailu::Render::RDG
         }
     };
 
+    struct ResourceAccessRecord
+    {
+        RGHandle _handle;
+        ResourceAccess _access;
+    };
+
     class RenderGraphBuilder;
     class RenderGraph;
+    class RenderPass;
 
     using SetupFunction = std::function<void(RenderGraphBuilder &builder)>;
     using ExecuteFunction = std::function<void(RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)>;
+
+    struct CompiledResourceBarrier
+    {
+        GpuResource *_resource = nullptr;
+        EResourceState _before = EResourceState::kCommon;
+        EResourceState _after = EResourceState::kCommon;
+        u32 _sub_resource = kTotalSubRes;
+    };
+
+    struct CompiledRenderPass
+    {
+        RenderPass *_pass = nullptr;
+        Vector<CompiledResourceBarrier> _pre_barriers;
+        Vector<CompiledResourceBarrier> _post_barriers;
+        u32 _submission_index = 0u;
+        bool _allow_parallel_recording = true;
+    };
 
     class AILU_API RenderPass
     {
@@ -72,6 +118,8 @@ namespace Ailu::Render::RDG
                 pass->_output_handles.clear();
                 pass->_input_accesses.clear();
                 pass->_output_accesses.clear();
+                pass->_input_access_records.clear();
+                pass->_output_access_records.clear();
                 pass->_callback = nullptr;
                 pass->_name = "noname";
             }
@@ -110,6 +158,8 @@ namespace Ailu::Render::RDG
         Vector<RGHandle> _output_handles;// 输出资源句柄
         HashMap<RGHandle, ResourceAccess> _input_accesses;
         HashMap<RGHandle, ResourceAccess> _output_accesses;
+        Vector<ResourceAccessRecord> _input_access_records;
+        Vector<ResourceAccessRecord> _output_access_records;
         ExecuteFunction _callback;
     };
 
@@ -128,6 +178,7 @@ namespace Ailu::Render::RDG
         RGHandle CreateResource(const TextureDesc &desc, const String &name);
         RGHandle CreateResource(const BufferDesc &desc, const String &name);
         RGHandle Import(GpuResource *external);
+        RGHandle Import(GpuResource *external, EResourceState initial_state);
         GpuResource *Export(RGHandle handle);
 
         RGHandle GetTexture(const String &name);
@@ -166,6 +217,10 @@ namespace Ailu::Render::RDG
         void CreatePhysicalResources(RGHandle handle);
         Texture *CreatePhysicsTexture(RGHandle handle);
         GPUBuffer *CreatePhysicsBuffer(RGHandle handle);
+        bool CompileResourceBarriers();
+        EResourceState InitialResourceState(const ResourceNode &node) const;
+        Vector<u32> ResolveBarrierSubResources(RGHandle handle, const ResourceAccess &access) const;
+        Vector<u32> ResolveAllBarrierSubResources(const ResourceNode &node) const;
 
         ResourceNode *GetResourceNode(RGHandle handle)
         {
@@ -201,12 +256,19 @@ namespace Ailu::Render::RDG
                 _is_tex = true;
                 _is_render_output = ((bool) desc._is_color_target) | ((bool) desc._is_depth_target);
                 _is_external = false;
+                if (desc._is_depth_target)
+                    _initial_state = EResourceState::kDepthWrite;
+                else if (desc._is_color_target)
+                    _initial_state = EResourceState::kRenderTarget;
+                else
+                    _initial_state = EResourceState::kCommon;
             };
             ResourceNode(const BufferDesc &desc, StringView name) :_buffer_desc(desc), _name(name), _is_transient(true)
             {
                 _is_tex = false;
                 _is_render_output = false;
                 _is_external = false;
+                _initial_state = desc._init_state;
             };
             GpuResource* GetResource() const
             {
@@ -245,12 +307,14 @@ namespace Ailu::Render::RDG
             };
             bool _is_allocated = false;//是否创建了物理资源
             RGHandle *_handle_ptr = nullptr;
+            EResourceState _initial_state = EResourceState::kCommon;
             Vector<ResourceVersion> _versions;
         };
         inline static std::atomic<u32> s_next_handle_id = 0u;
         std::mutex _mutex;
         Vector<RenderPass *> _passes;
         Vector<RenderPass *> _sorted_passes;
+        Vector<CompiledRenderPass> _compiled_passes;
         //存储所有临时资源，重新编译前清空，setup阶段就分配的句柄，execute阶段直接根据句柄创建或者获取物理资源
         HashMap<String, RGHandle> _transient_tex_handles;
         HashMap<String, RGHandle> _transient_buffer_handles;
@@ -281,6 +345,7 @@ namespace Ailu::Render::RDG
                 ver._consumers.push_back(_pass);
 
                 _pass->Read(handle);
+                _pass->_input_access_records.push_back({handle, accessor});
                 if (auto it = _pass->_input_accesses.find(handle); it != _pass->_input_accesses.end())
                 {
                     it->second._usage = it->second._usage | accessor._usage;
@@ -288,7 +353,10 @@ namespace Ailu::Render::RDG
                     it->second._store = accessor._store;
                     it->second._clear_value = accessor._clear_value;
                     it->second._mip_level = accessor._mip_level;
+                    it->second._mip_count = accessor._mip_count;
                     it->second._array_slice = accessor._array_slice;
+                    it->second._array_slice_count = accessor._array_slice_count;
+                    it->second._all_sub_resources = it->second._all_sub_resources && accessor._all_sub_resources;
                 }
                 else
                 {
@@ -310,6 +378,7 @@ namespace Ailu::Render::RDG
                 ver._handle = new_handle;
                 ver._producer = _pass;
                 _pass->Write(new_handle);
+                _pass->_output_access_records.push_back({new_handle, accessor});
                 if (auto it = _pass->_output_accesses.find(new_handle); it != _pass->_output_accesses.end())
                 {
                     it->second._usage = it->second._usage | accessor._usage;
@@ -317,7 +386,10 @@ namespace Ailu::Render::RDG
                     it->second._store = accessor._store;
                     it->second._clear_value = accessor._clear_value;
                     it->second._mip_level = accessor._mip_level;
+                    it->second._mip_count = accessor._mip_count;
                     it->second._array_slice = accessor._array_slice;
+                    it->second._array_slice_count = accessor._array_slice_count;
+                    it->second._all_sub_resources = it->second._all_sub_resources && accessor._all_sub_resources;
                 }
                 else
                 {
@@ -336,11 +408,22 @@ namespace Ailu::Render::RDG
             Read(handle, accessor);
         }
 
+        void ReadRange(RGHandle handle, EResourceUsage usage, u32 mip_level, u32 mip_count, u32 array_slice = 0u, u32 array_slice_count = 1u)
+        {
+            Read(handle, ResourceAccess::MipRange(usage, mip_level, mip_count, array_slice, array_slice_count));
+        }
+
         [[nodiscard]] RGHandle Write(RGHandle handle, EResourceUsage usage = EResourceUsage::kWriteRTV)
         {
             ResourceAccess accessor;
             accessor._usage = usage;
             return Write(handle, accessor);
+        }
+
+        [[nodiscard]] RGHandle WriteRange(RGHandle handle, EResourceUsage usage, u32 mip_level, u32 mip_count,
+                                          u32 array_slice = 0u, u32 array_slice_count = 1u)
+        {
+            return Write(handle, ResourceAccess::MipRange(usage, mip_level, mip_count, array_slice, array_slice_count));
         }
 
         RGHandle GetTexture(const String &name)

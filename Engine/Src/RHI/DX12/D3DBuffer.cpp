@@ -26,6 +26,25 @@ namespace Ailu::RHI::DX12
             //LOG_INFO("D3D12 resource created: name={}, ptr={}", name, static_cast<const void*>(resource));
         }
 
+        inline bool TryCurrentResourceStateFromGuard(const D3DResourceStateGuard &state_guard, EResourceState &out_state, u32 sub_res)
+        {
+            const u32 d3d_sub_res = sub_res == Render::kTotalSubRes ? D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES : sub_res;
+            D3D12_RESOURCE_STATES state = D3D12_RESOURCE_STATE_COMMON;
+            if (!state_guard.TryCurState(state, d3d_sub_res))
+                return false;
+            out_state = D3DConvertUtils::ToALResState(state);
+            return true;
+        }
+
+        inline EResourceState CurrentResourceStateFromGuard(const GpuResource *resource,
+                                                            const D3DResourceStateGuard &state_guard, u32 sub_res)
+        {
+            EResourceState state = EResourceState::kCommon;
+            if (TryCurrentResourceStateFromGuard(state_guard, state, sub_res))
+                return state;
+            return resource->GpuResource::CurrentResourceState(sub_res);
+        }
+
         inline D3D12_SHADER_RESOURCE_VIEW_DESC CreateRawBufferSrvDesc(u64 byte_size)
         {
             AL_ASSERT_MSG((byte_size % sizeof(u32)) == 0u, "Bindless ByteAddressBuffer requires 4-byte aligned size");
@@ -258,7 +277,27 @@ namespace Ailu::RHI::DX12
     {
         auto cmd = dynamic_cast<D3DCommandBuffer *>(rhi_cmd)->NativeCmdList();
         _state_guard.MakesureResourceState(cmd, D3DConvertUtils::FromALResState(new_state), sub_res);
-        _state = new_state;
+        GpuResource::TrackResourceState(new_state, sub_res);
+    }
+
+    void D3DGPUBuffer::TrackResourceState(EResourceState new_state, u32 sub_res)
+    {
+        _state_guard.TrackResourceState(D3DConvertUtils::FromALResState(new_state), sub_res);
+        GpuResource::TrackResourceState(new_state, sub_res);
+    }
+
+    EResourceState D3DGPUBuffer::CurrentResourceState(u32 sub_res) const
+    {
+        return CurrentResourceStateFromGuard(this, _state_guard, sub_res);
+    }
+
+    bool D3DGPUBuffer::TryCurrentResourceState(EResourceState &out_state, u32 sub_res) const
+    {
+        if (TryCurrentResourceStateFromGuard(_state_guard, out_state, sub_res))
+            return true;
+        if (sub_res == Render::kTotalSubRes)
+            return false;
+        return GpuResource::TryCurrentResourceState(out_state, sub_res);
     }
 
     void D3DGPUBuffer::InsertUAVBarrier(RHICommandBuffer *rhi_cmd)

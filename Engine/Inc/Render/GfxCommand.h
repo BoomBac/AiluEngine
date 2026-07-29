@@ -39,6 +39,7 @@ namespace Ailu::Render
         kDispatch,
         kResourceUpload,
         kTransResourceState,
+        kResourceBarrier,
         kUAVBarrier,
         kAllocConstBuffer,
         kCommandProfiler,
@@ -172,6 +173,19 @@ namespace Ailu::Render
         u32 _sub_res;
         CommandTranslateState() : _res(nullptr), _new_state(EResourceState::kCommon), _sub_res(UINT32_MAX) {}
         CommandTranslateState(GpuResource *res, EResourceState new_state, u32 sub_res = UINT32_MAX) : _res(res), _new_state(new_state), _sub_res(sub_res) {}
+        void Reset() {
+            SafeResetCommand(this);
+        }
+    };
+    struct CommandResourceBarrier : public TypedGfxCommand<EGpuCommandType::kResourceBarrier>
+    {
+        GpuResource *_res;
+        EResourceState _before;
+        EResourceState _after;
+        u32 _sub_res;
+        CommandResourceBarrier() : _res(nullptr), _before(EResourceState::kCommon), _after(EResourceState::kCommon), _sub_res(kTotalSubRes) {}
+        CommandResourceBarrier(GpuResource *res, EResourceState before, EResourceState after, u32 sub_res = kTotalSubRes)
+            : _res(res), _before(before), _after(after), _sub_res(sub_res) {}
         void Reset() {
             SafeResetCommand(this);
         }
@@ -315,6 +329,7 @@ namespace Ailu::Render
         MaxCommandValue(sizeof(CommandDispatch),
         MaxCommandValue(sizeof(CommandGpuResourceUpload),
         MaxCommandValue(sizeof(CommandTranslateState),
+        MaxCommandValue(sizeof(CommandResourceBarrier),
         MaxCommandValue(sizeof(CommandUAVBarrier),
         MaxCommandValue(sizeof(CommandCustom),
         MaxCommandValue(sizeof(CommandAllocConstBuffer),
@@ -323,7 +338,7 @@ namespace Ailu::Render
         MaxCommandValue(sizeof(CommandPresent),
         MaxCommandValue(sizeof(CommandScissor),
         MaxCommandValue(sizeof(CommandDispatchRays),
-        MaxCommandValue(sizeof(CommandReadBack), sizeof(CommandBuildAS))))))))))))))));
+        MaxCommandValue(sizeof(CommandReadBack), sizeof(CommandBuildAS)))))))))))))))));
 
     inline constexpr size_t kCommandPayloadAlign = MaxCommandValue(alignof(CommandSetTarget),
         MaxCommandValue(alignof(CommandClearTarget),
@@ -331,6 +346,7 @@ namespace Ailu::Render
         MaxCommandValue(alignof(CommandDispatch),
         MaxCommandValue(alignof(CommandGpuResourceUpload),
         MaxCommandValue(alignof(CommandTranslateState),
+        MaxCommandValue(alignof(CommandResourceBarrier),
         MaxCommandValue(alignof(CommandUAVBarrier),
         MaxCommandValue(alignof(CommandCustom),
         MaxCommandValue(alignof(CommandAllocConstBuffer),
@@ -339,7 +355,7 @@ namespace Ailu::Render
         MaxCommandValue(alignof(CommandPresent),
         MaxCommandValue(alignof(CommandScissor), 
         MaxCommandValue(alignof(CommandDispatchRays), 
-        MaxCommandValue(alignof(CommandReadBack), alignof(CommandBuildAS))))))))))))))));
+        MaxCommandValue(alignof(CommandReadBack), alignof(CommandBuildAS)))))))))))))))));
 
     struct alignas(kCommandPayloadAlign) CommandPayload
     {

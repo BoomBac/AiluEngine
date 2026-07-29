@@ -57,6 +57,24 @@ namespace Ailu::RHI::DX12
             return GetSubresourceState(sub_res);
         }
 
+        [[nodiscard]] bool TryCurState(D3D12_RESOURCE_STATES &out_state,
+                                       u32 sub_res = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES) const
+        {
+            std::scoped_lock lock(_mutex);
+
+            if (sub_res == D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES)
+            {
+                if (!_is_state_uniform)
+                    return false;
+                out_state = _uniform_state;
+                return true;
+            }
+
+            AL_ASSERT(sub_res < _sub_res_num);
+            out_state = GetSubresourceState(sub_res);
+            return true;
+        }
+
         [[nodiscard]] bool IsStateUniform() const
         {
             std::scoped_lock lock(_mutex);
@@ -142,6 +160,25 @@ namespace Ailu::RHI::DX12
 
             AL_ASSERT(sub_res < _sub_res_num);
             MakesureSingleSubresourceState(cmd, target_state, sub_res);
+        }
+
+        void TrackResourceState(D3D12_RESOURCE_STATES target_state, u32 sub_res = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES)
+        {
+            std::scoped_lock lock(_mutex);
+            AL_ASSERT(_resource != nullptr);
+            AL_ASSERT(_sub_res_num > 0u);
+
+            if (sub_res == D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES || _sub_res_num == 1u)
+            {
+                SetUniformState(target_state);
+                return;
+            }
+
+            AL_ASSERT(sub_res < _sub_res_num);
+            if (_is_state_uniform)
+                ExpandUniformStates();
+            _subresource_states[sub_res] = target_state;
+            TryCollapseUniformStates();
         }
 
     private:

@@ -118,7 +118,7 @@ namespace Ailu::Render
         graph.AddPass("RTXDI Composite", RDG::PassDesc(), [&, this](RDG::RenderGraphBuilder &builder)
         {
             builder.Read(_output_handle);
-            builder.Read(rendering_data._rg_handles._color_target);
+            builder.Read(rendering_data._rg_handles._color_target, EResourceUsage::kWriteRTV);
             rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target);
         },
         [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)

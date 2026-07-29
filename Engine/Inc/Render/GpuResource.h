@@ -88,6 +88,9 @@ namespace Ailu::Render
         };
         virtual void InsertUAVBarrier(RHICommandBuffer* rhi_cmd) {AL_ASSERT(true);};
         virtual NativeHandle NativeResource() {AL_ASSERT(true); return {};}
+        virtual void TrackResourceState(EResourceState new_state, u32 sub_res = kTotalSubRes);
+        virtual EResourceState CurrentResourceState(u32 sub_res = kTotalSubRes) const;
+        virtual bool TryCurrentResourceState(EResourceState &out_state, u32 sub_res = kTotalSubRes) const;
         void Apply();
         void ApplySync();
         void Upload(GraphicsContext* ctx,RHICommandBuffer* rhi_cmd,UploadParams* params);

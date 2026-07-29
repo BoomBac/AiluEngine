@@ -73,6 +73,7 @@ namespace Ailu
             //return mb byte/1024/1024
             virtual f32 TotalGPUMemeryUsage() = 0;
             virtual void ExecuteRHICommandBuffer(RHICommandBuffer *cmd) = 0;
+            virtual u64 ExecuteRHICommandBuffers(const Vector<RHICommandBuffer *> &cmds) = 0;
 
             virtual bool IsHardwareRayTracingSupported() const = 0;
 

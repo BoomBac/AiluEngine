@@ -99,8 +99,8 @@ namespace Ailu::Render
     {
         graph.AddPass(_name, RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
                       { 
-                          builder.Read(rendering_data._rg_handles._color_target);
-                          builder.Read(rendering_data._rg_handles._depth_target);
+                          builder.Read(rendering_data._rg_handles._color_target, EResourceUsage::kWriteRTV);
+                          builder.Read(rendering_data._rg_handles._depth_target, EResourceUsage::kDSV);
                           rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target);
                           rendering_data._rg_handles._depth_target = builder.Write(rendering_data._rg_handles._depth_target,EResourceUsage::kDSV);
                       }, 
@@ -906,7 +906,7 @@ namespace Ailu::Render
         _p_lut_gen->SetTexture("_TexTransmittanceLUT", _tlut.get());
         _p_lut_gen->SetTexture("_MultScatterLUT", _ms_lut.get());
         cmd->Dispatch(_p_lut_gen.get(), _mult_scatter_lut_gen_kernel, _mult_scatter_lut_size.x / 16, _mult_scatter_lut_size.y / 16, 1);
-        g_pGfxContext->ExecuteCommandBuffer(cmd);
+        g_pGfxContext->ExecuteCommandBufferSync(cmd);
         CommandBufferPool::Release(cmd);
         _event = static_cast<ERenderPassEvent>(static_cast<u16>(ERenderPassEvent::kBeforeSkybox) + 25u);
     }
@@ -936,8 +936,8 @@ namespace Ailu::Render
                       { 
                           builder.Read(s_tlut);
                           builder.Read(sv_lut);
-                          builder.Read(rendering_data._rg_handles._color_target);
-                          builder.Read(rendering_data._rg_handles._depth_target);
+                          builder.Read(rendering_data._rg_handles._color_target, EResourceUsage::kWriteRTV);
+                          builder.Read(rendering_data._rg_handles._depth_target, EResourceUsage::kDSV);
                           rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target);
                           rendering_data._rg_handles._depth_target = builder.Write(rendering_data._rg_handles._depth_target,EResourceUsage::kDSV);
                       }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data)
@@ -1083,8 +1083,8 @@ namespace Ailu::Render
         static auto mat_lightprobe = ResourceMgr::Get().Get<Material>(L"Runtime/Material/LightProbeBillboard");
         graph.AddPass(_name, RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
                 { 
-                    builder.Read(rendering_data._rg_handles._color_target);
-                    builder.Read(rendering_data._rg_handles._depth_target);
+                    builder.Read(rendering_data._rg_handles._color_target, EResourceUsage::kWriteRTV);
+                    builder.Read(rendering_data._rg_handles._depth_target, EResourceUsage::kDSV);
                     rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target);
                     rendering_data._rg_handles._depth_target = builder.Write(rendering_data._rg_handles._depth_target,EResourceUsage::kDSV);
                 },[this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data)
@@ -1387,8 +1387,8 @@ namespace Ailu::Render
     {
         graph.AddPass(_name, RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
                       { 
-                    builder.Read(rendering_data._rg_handles._color_target);
-                    builder.Read(rendering_data._rg_handles._depth_target);
+                    builder.Read(rendering_data._rg_handles._color_target, EResourceUsage::kWriteRTV);
+                    builder.Read(rendering_data._rg_handles._depth_target, EResourceUsage::kDSV);
                     rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target);
                     rendering_data._rg_handles._depth_target = builder.Write(rendering_data._rg_handles._depth_target,EResourceUsage::kDSV);
                       }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data)
@@ -1658,9 +1658,10 @@ namespace Ailu::Render
         u16 mip = Texture::MaxMipmapCount(w, h);
         u16 first_dispatch_mip_num = std::min<u16>(4, mip);
         graph.AddPass("HZB0", RDG::PassDesc{RDG::EPassType::kCompute}, [&](RDG::RenderGraphBuilder &builder)
-                      { 
-                          builder.Read(rendering_data._rg_handles._depth_tex);
-                          rendering_data._rg_handles._hzb = builder.Write(rendering_data._rg_handles._hzb,EResourceUsage::kWriteUAV); 
+                          { 
+                              builder.Read(rendering_data._rg_handles._depth_tex);
+                          rendering_data._rg_handles._hzb = builder.WriteRange(rendering_data._rg_handles._hzb, EResourceUsage::kWriteUAV,
+                                                                               0u, first_dispatch_mip_num);
                       }, [=](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data)
                       {
                             _hzb_gen->SetTexture("_DepthInput", graph.Resolve<Texture>(rendering_data._rg_handles._depth_tex));
@@ -1678,8 +1679,9 @@ namespace Ailu::Render
         {
             graph.AddPass("HZB1", RDG::PassDesc{RDG::EPassType::kCompute}, [&](RDG::RenderGraphBuilder &builder)
                           { 
-                              builder.Read(rendering_data._rg_handles._hzb); 
-                              rendering_data._rg_handles._hzb = builder.Write(rendering_data._rg_handles._hzb);
+                              builder.ReadRange(rendering_data._rg_handles._hzb, EResourceUsage::kReadSRV, first_dispatch_mip_num - 1u, 1u);
+                              rendering_data._rg_handles._hzb = builder.WriteRange(rendering_data._rg_handles._hzb, EResourceUsage::kWriteUAV,
+                                                                                   first_dispatch_mip_num, std::min<u16>(4u, second_dispatch_mip_num));
                           }, [=](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data)
                           {
                                 _hzb_gen->SetInt("NumMipLevels", second_dispatch_mip_num);

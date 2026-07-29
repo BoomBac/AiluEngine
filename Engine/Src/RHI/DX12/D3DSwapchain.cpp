@@ -9,6 +9,29 @@
 
 namespace Ailu::RHI::DX12
 {
+    namespace
+    {
+        inline bool TryCurrentResourceStateFromGuard(const D3DResourceStateGuard &state_guard, Render::EResourceState &out_state,
+                                                     u32 sub_res)
+        {
+            const u32 d3d_sub_res = sub_res == Render::kTotalSubRes ? D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES : sub_res;
+            D3D12_RESOURCE_STATES state = D3D12_RESOURCE_STATE_COMMON;
+            if (!state_guard.TryCurState(state, d3d_sub_res))
+                return false;
+            out_state = D3DConvertUtils::ToALResState(state);
+            return true;
+        }
+
+        inline Render::EResourceState CurrentResourceStateFromGuard(const Render::GpuResource *resource,
+                                                                    const D3DResourceStateGuard &state_guard, u32 sub_res)
+        {
+            Render::EResourceState state = Render::EResourceState::kCommon;
+            if (TryCurrentResourceStateFromGuard(state_guard, state, sub_res))
+                return state;
+            return resource->GpuResource::CurrentResourceState(sub_res);
+        }
+    }
+
     D3DSwapchainTexture::D3DSwapchainTexture(D3DSwapchainInitializer &initializer) 
         : SwapchainTexture((u16) initializer._swapchain_desc.Width, (u16) initializer._swapchain_desc.Height, Render::ConvertPixelFormatFormatToRenderTexture(initializer._format))
     {
@@ -50,6 +73,7 @@ namespace Ailu::RHI::DX12
     void D3DSwapchainTexture::PreparePresent(RHICommandBuffer *cmd)
     {
         _state_guard[_cur_backbuf_index]->MakesureResourceState(static_cast<D3DCommandBuffer *>(cmd)->NativeCmdList(), D3D12_RESOURCE_STATE_PRESENT);
+        GpuResource::TrackResourceState(Render::EResourceState::kPresent);
     }
 
     void D3DSwapchainTexture::Present()
@@ -61,12 +85,34 @@ namespace Ailu::RHI::DX12
     void D3DSwapchainTexture::StateTranslation(RHICommandBuffer *rhi_cmd, Render::EResourceState new_state, u32 sub_res)
     {
         _state_guard[_cur_backbuf_index]->MakesureResourceState(static_cast<D3DCommandBuffer *>(rhi_cmd)->NativeCmdList(), D3DConvertUtils::FromALResState(new_state));
+        GpuResource::TrackResourceState(new_state, sub_res);
+    }
+
+    void D3DSwapchainTexture::TrackResourceState(Render::EResourceState new_state, u32 sub_res)
+    {
+        _state_guard[_cur_backbuf_index]->TrackResourceState(D3DConvertUtils::FromALResState(new_state), sub_res);
+        GpuResource::TrackResourceState(new_state, sub_res);
+    }
+
+    Render::EResourceState D3DSwapchainTexture::CurrentResourceState(u32 sub_res) const
+    {
+        return CurrentResourceStateFromGuard(this, *_state_guard[_cur_backbuf_index], sub_res);
+    }
+
+    bool D3DSwapchainTexture::TryCurrentResourceState(Render::EResourceState &out_state, u32 sub_res) const
+    {
+        if (TryCurrentResourceStateFromGuard(*_state_guard[_cur_backbuf_index], out_state, sub_res))
+            return true;
+        if (sub_res == Render::kTotalSubRes)
+            return false;
+        return GpuResource::TryCurrentResourceState(out_state, sub_res);
     }
 
 
     D3D12_CPU_DESCRIPTOR_HANDLE *D3DSwapchainTexture::TargetCPUHandle(RHICommandBuffer *cmd)
     {
         _state_guard[_cur_backbuf_index]->MakesureResourceState(static_cast<D3DCommandBuffer *>(cmd)->NativeCmdList(), D3D12_RESOURCE_STATE_RENDER_TARGET);
+        GpuResource::TrackResourceState(Render::EResourceState::kRenderTarget);
         RenderTexture::ResetRenderTarget(this);
         return &_rtvs[_cur_backbuf_index];
     }

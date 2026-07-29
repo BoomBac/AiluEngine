@@ -22,6 +22,8 @@ namespace Ailu::Render
             return "kResourceUpload";
         case EGpuCommandType::kTransResourceState:
             return "kTransResourceState";
+        case EGpuCommandType::kResourceBarrier:
+            return "kResourceBarrier";
         case EGpuCommandType::kUAVBarrier:
             return "kUAVBarrier";
         case EGpuCommandType::kAllocConstBuffer:
@@ -64,6 +66,9 @@ namespace Ailu::Render
             break;
         case EGpuCommandType::kTransResourceState:
             static_cast<CommandTranslateState *>(cmd)->~CommandTranslateState();
+            break;
+        case EGpuCommandType::kResourceBarrier:
+            static_cast<CommandResourceBarrier *>(cmd)->~CommandResourceBarrier();
             break;
         case EGpuCommandType::kUAVBarrier:
             static_cast<CommandUAVBarrier *>(cmd)->~CommandUAVBarrier();

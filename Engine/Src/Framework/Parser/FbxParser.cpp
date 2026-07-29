@@ -1157,11 +1157,7 @@ namespace Ailu
                 auto hash0 = v3hash(n), hash1 = v2hash(uv);
                 auto vertex_hash = Math::ALHash::CombineHashes(hash0, hash1);
                 vertex_hash = Math::ALHash::CombineHashes(vertex_hash, v3hash(p));
-                auto it = vertex_map.find(vertex_hash);
-                if (_cur_file_sys_path.find(L"cube") != std::wstring::npos)
-                {
-                    LOG_INFO("vertex count{}, normal hash {},uv hash {},vert hash {}", i, hash0, hash1, vertex_hash);
-                }
+                auto it = vertex_map.find(vertex_hash); 
                 if (it == vertex_map.end())
                 {
                     vertex_map[vertex_hash] = cur_index_count;

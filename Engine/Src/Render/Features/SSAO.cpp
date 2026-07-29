@@ -86,7 +86,7 @@ namespace Ailu::Render
                     {
                         blur_temp = builder.AllocTexture(desc, "AO_BlurTemp");
                         builder.Read(rendering_data._rg_handles._ao_tex);
-                        blur_temp = builder.Write(blur_temp); 
+                        blur_temp = builder.Write(blur_temp, EResourceUsage::kWriteUAV); 
                     }, [params, w, h, this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
                       { 
                 _ssao_computer->SetVector("_AOScreenParams", params);
@@ -104,7 +104,7 @@ namespace Ailu::Render
         graph.AddPass("SSAO Final", RDG::PassDesc(), [&, this](RDG::RenderGraphBuilder &builder)
                       {
                     builder.Read(blur_temp);
-                    rendering_data._rg_handles._ao_tex = builder.Write(rendering_data._rg_handles._ao_tex);
+                    rendering_data._rg_handles._ao_tex = builder.Write(rendering_data._rg_handles._ao_tex, EResourceUsage::kWriteUAV);
                      }, [params, w, h, this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
                       { 
                 _ssao_computer->SetVector("_AOScreenParams", params);

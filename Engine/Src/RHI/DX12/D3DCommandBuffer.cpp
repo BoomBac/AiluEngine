@@ -16,9 +16,12 @@ namespace Ailu::RHI::DX12
     {
         _dx_cmd_type = (D3D12_COMMAND_LIST_TYPE)type;
         auto dev = dynamic_cast<D3DContext*>(g_pGfxContext)->GetDevice();
-        ThrowIfFailed(dev->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(_p_alloc.GetAddressOf())));
-        ThrowIfFailed(dev->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, _p_alloc.Get(), nullptr, IID_PPV_ARGS(_p_cmd.GetAddressOf())));
-        _is_cmd_closed = false;
+        ThrowIfFailed(dev->CreateCommandAllocator(_dx_cmd_type, IID_PPV_ARGS(_p_alloc.GetAddressOf())));
+        ThrowIfFailed(dev->CreateCommandList(0, _dx_cmd_type, _p_alloc.Get(), nullptr,
+                                             IID_PPV_ARGS(_p_cmd.GetAddressOf())));
+        ThrowIfFailed(_p_cmd->Close());
+        _is_cmd_closed = true;
+        _is_submitted = false;
         _upload_buf = MakeScope<UploadBuffer>(std::format("CmdUploadBuffer_{}", _id));
         _cur_cbv_heap_id = -1;
         _fence_value = 0u;
@@ -29,12 +32,9 @@ namespace Ailu::RHI::DX12
 
     void D3DCommandBuffer::Clear()
     {
-        if (_is_cmd_closed)
-        {
-            ThrowIfFailed(_p_alloc->Reset());
-            ThrowIfFailed(_p_cmd->Reset(_p_alloc.Get(), nullptr));
-            _is_cmd_closed = false;
-        }
+        AL_ASSERT(IsReady());
+        ThrowIfFailed(_p_alloc->Reset());
+        ThrowIfFailed(_p_cmd->Reset(_p_alloc.Get(), nullptr));
         _cur_cbv_heap_id = -1;
         _is_cmd_closed = false;
         _allocations.clear();
@@ -43,8 +43,12 @@ namespace Ailu::RHI::DX12
         _upload_buf->Reset();
         _used_resources.clear();
         _tracking_epoch = s_next_tracking_epoch.fetch_add(1u, std::memory_order_relaxed);
+        _fence_value = 0u;
+        _is_submitted = false;
         _is_executed = false;
         _graphics_state_cache.Reset();
+        _statistics.Reset();
+        _profiler_stack.clear();
     }
 
     void D3DCommandBuffer::Close()
@@ -100,7 +104,14 @@ namespace Ailu::RHI::DX12
         {
             it->Track(_fence_value);
         }
+        _statistics.MergeTo(Render::RenderingStates::RenderData());
         _is_executed = true;
+    }
+
+    void D3DCommandBuffer::MarkSubmitted(u64 fence_value)
+    {
+        _fence_value = fence_value;
+        _is_submitted = true;
     }
 
     void D3DCommandBuffer::InsertUAVBarrier()
@@ -136,6 +147,8 @@ namespace Ailu::RHI::DX12
     }
     bool D3DCommandBuffer::IsReady() const
     {
-        return GraphicsContext::Get().GetFenceValueGPU() > _fence_value;
+        if (!_is_submitted)
+            return true;
+        return GraphicsContext::Get().GetFenceValueGPU() >= _fence_value;
     }
 }// namespace Ailu::RHI::DX12

@@ -708,6 +708,18 @@ namespace Ailu::Render
             _commands.emplace_back(cmd);
         }
 
+        void ResourceBarrier(GpuResource *res, EResourceState before, EResourceState after, u32 sub_res)
+        {
+            if (res == nullptr || before == after)
+                return;
+            auto cmd = CommandPool::Get().Alloc<CommandResourceBarrier>();
+            cmd->_res = res;
+            cmd->_before = before;
+            cmd->_after = after;
+            cmd->_sub_res = sub_res;
+            _commands.emplace_back(cmd);
+        }
+
         void InsertUAVBarrier(GpuResource *res)
         {
             auto cmd = CommandPool::Get().Alloc<CommandUAVBarrier>();
@@ -1001,6 +1013,11 @@ namespace Ailu::Render
     void CommandBuffer::StateTransition(GpuResource* res,EResourceState new_state,u32 sub_res)
     {
         _impl->StateTransition(res, new_state, sub_res);
+    }
+
+    void CommandBuffer::ResourceBarrier(GpuResource *res, EResourceState before, EResourceState after, u32 sub_res)
+    {
+        _impl->ResourceBarrier(res, before, after, sub_res);
     }
 
     void CommandBuffer::InsertUAVBarrier(GpuResource *res)
