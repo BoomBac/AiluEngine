@@ -16,6 +16,7 @@
 #include "Framework/Interface/IParser.h"
 #include "Framework/Math/Guid.h"
 #include "Framework/Parser/AssetParser.h"
+#include "Graph/GraphAsset.h"
 #include "Input/InputActionAsset.h"
 #include "Input/InputComposite.h"
 #include "Objects/JsonArchive.h"
@@ -1540,6 +1541,56 @@ bool InputActionAssetHandler::Save(const AssetSaveContext &context)
         return false;
     }
     LOG_INFO(L"Save input action asset to {}", context._system_path);
+    return true;
+}
+
+// ============================================================
+// GraphAssetHandler
+// ============================================================
+
+const Type *GraphAssetHandler::AssetType() const
+{
+    return GraphAsset::StaticType();
+}
+
+Scope<Asset> GraphAssetHandler::Load(const AssetLoadContext &context)
+{
+    GraphAssetDocument doc;
+    if (!LoadAssetDocument(context._system_path, doc))
+        return nullptr;
+
+    auto graph = MakeRef<GraphAsset>(doc._header._asset_name);
+    graph->SchemaType(doc._schema_type.empty() ? "FlowGraphSchema" : doc._schema_type);
+    graph->MutableNodes() = doc._nodes;
+    graph->MutableLinks() = doc._links;
+    graph->MutableComments() = doc._comments;
+
+    auto asset = MakeScope<Asset>(Guid(doc._header._guid), GraphAsset::StaticType(), context._asset_path);
+    asset->_p_obj = graph;
+    asset->_domain = context._resource_mgr->GetAssetPathDomain(asset->_asset_path);
+    return asset;
+}
+
+bool GraphAssetHandler::Save(const AssetSaveContext &context)
+{
+    const GraphAsset *graph = context._asset->As<GraphAsset>();
+    if (graph == nullptr)
+        return false;
+
+    GraphAssetDocument doc;
+    doc._header = MakeAssetDocumentHeader(context._asset);
+    doc._version = graph->Version();
+    doc._schema_type = graph->SchemaType();
+    doc._nodes = graph->Nodes();
+    doc._links = graph->Links();
+    doc._comments = graph->Comments();
+
+    if (!SaveAssetDocument(context._system_path, doc))
+    {
+        LOG_ERROR(L"Save graph asset failed to {}", context._system_path);
+        return false;
+    }
+    LOG_INFO(L"Save graph asset to {}", context._system_path);
     return true;
 }
 

@@ -74,9 +74,29 @@ namespace Ailu
                 }
                 return false;
             };
+            auto find_hover_widget = [&]() -> Widget *
+            {
+                auto &widget = s_mgr->_widgets;
+                for (i32 i = (i32) widget.size() - 1; i >= 0; i--)
+                {
+                    auto w = widget[i].get();
+                    if (w->_visibility != EVisibility::kVisible || w->_is_receive_event == false ||
+                        w->Parent() != e._window)
+                        continue;
+                    if (w->IsHover(ue._mouse_position))
+                        return w;
+                }
+                return nullptr;
+            };
+            Widget *top_hover_widget = find_hover_widget();
             bool is_in_zone = false;
             for (const auto &zone: s_mgr->GetInteractionZones())
             {
+                if (zone._rect.z <= 0.0f || zone._rect.w <= 0.0f)
+                    continue;
+                if (zone._owner != nullptr && top_hover_widget != nullptr &&
+                    zone._owner != top_hover_widget)
+                    continue;
                 if (UIElement::IsPointInside(ue._mouse_position, zone._rect))
                 {
                     is_in_zone = true;

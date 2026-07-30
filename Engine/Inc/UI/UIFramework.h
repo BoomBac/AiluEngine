@@ -55,7 +55,7 @@ namespace Ailu
             void Destroy(Ref<UIElement> element);
             void OnElementDestroying(UIElement *element);
             [[nodiscard]] std::span<const InteractionZone> GetInteractionZones() const noexcept { return _interaction_zones; };
-            ZoneHandle RegisterInteractionZone(Vector4f rect);
+            ZoneHandle RegisterInteractionZone(Vector4f rect, Widget *owner = nullptr);
             void UnRegisterInteractionZone(ZoneHandle handle);
             void UpdateInteractionZone(ZoneHandle handle, Vector4f rect);
         public:

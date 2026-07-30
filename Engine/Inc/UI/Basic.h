@@ -25,6 +25,7 @@ namespace Ailu
             Button();
             explicit Button(const String &text);
             Vector2f MeasureDesiredSize() override;
+            UIElement *HitTest(Vector2f pos) override;
             void SetText(const String &text, bool trigger_event = true);
             String GetText() const;
             void SetTexture(Render::Texture *tex);
@@ -234,10 +235,12 @@ namespace Ailu
             void FillCursorOffsetTable();
             u32 IndexFromMouseX(f32 x);
             void ClearSelection(){_select_start = _select_end = _cursor_pos;}
+            void KeepCursorVisible();
             void CommitEdit(bool is_finish_edit = true);
         private:
             inline static f32 kCursorXOffset = 4.0f;
             inline static f32 kCursorWidth = 2.0f;
+            inline static constexpr f32 kCaretHoldDuration = 0.65f;
             APROPERTY()
             String _content;
             u32 _cursor_pos = 0u;  // 光标位置
@@ -250,6 +253,7 @@ namespace Ailu
             f32 _drag_start_x = 0.0f;
             bool _is_numeric = false;        // 当前文本是否为纯数值
             f32 _cursor_timer = 0.0f;   // 闪烁计时
+            f32 _cursor_hold_timer = 0.0f;
             f32 _blink_interval = 0.5f; // 闪烁周期
             Vector<f32> _cursor_offsets;
             Vector2f _text_rect_size;

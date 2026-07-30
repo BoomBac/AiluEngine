@@ -1170,6 +1170,168 @@ return Ailu::InputActionAssetDocument::StaticType();
 return Ailu::InputActionAssetDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_InputActionAssetDocument(&Ailu::InputActionAssetDocument::StaticType, "Ailu::InputActionAssetDocument");
+const Ailu::Type* Ailu::Z_Construct_GraphAssetDocument_Type()
+{
+Ailu::Object::StaticType();
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "GraphAssetDocument";
+initializer._size = sizeof(Ailu::GraphAssetDocument);
+initializer._full_name = "Ailu::GraphAssetDocument";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu";
+initializer._base_name = "Ailu::Object";
+initializer._constructor = []()->Ailu::GraphAssetDocument* {return new Ailu::GraphAssetDocument;};
+Meta meta_header;
+meta_header.Set("Category","");
+meta_header.Set("IsColor",false);
+meta_header.Set("IsRange",false);
+meta_header.Set("IsFloatRange",true);
+meta_header.Set("RangeMin",(f32)0);
+meta_header.Set("RangeMax",(f32)1);
+MemberBuilder builder_header;
+builder_header._name = "_header";
+builder_header._type_name = "Ailu::AssetDocumentHeader";
+builder_header._offset = offsetof(GraphAssetDocument,_header);
+builder_header._is_const = false;
+builder_header._is_static = false;
+builder_header._is_public = true;
+builder_header._is_pointer = false;
+builder_header._is_ref = false;
+builder_header._is_template = false;
+builder_header._meta = meta_header;
+builder_header._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<AssetDocumentHeader>);
+builder_header._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<AssetDocumentHeader>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_header));
+Meta meta_version;
+meta_version.Set("Category","");
+meta_version.Set("IsColor",false);
+meta_version.Set("IsRange",false);
+meta_version.Set("IsFloatRange",true);
+meta_version.Set("RangeMin",(f32)0);
+meta_version.Set("RangeMax",(f32)1);
+MemberBuilder builder_version;
+builder_version._name = "_version";
+builder_version._type_name = "u32";
+builder_version._offset = offsetof(GraphAssetDocument,_version);
+builder_version._is_const = false;
+builder_version._is_static = false;
+builder_version._is_public = true;
+builder_version._is_pointer = false;
+builder_version._is_ref = false;
+builder_version._is_template = false;
+builder_version._meta = meta_version;
+builder_version._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<u32>);
+builder_version._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<u32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_version));
+Meta meta_schema_type;
+meta_schema_type.Set("Category","");
+meta_schema_type.Set("IsColor",false);
+meta_schema_type.Set("IsRange",false);
+meta_schema_type.Set("IsFloatRange",true);
+meta_schema_type.Set("RangeMin",(f32)0);
+meta_schema_type.Set("RangeMax",(f32)1);
+MemberBuilder builder_schema_type;
+builder_schema_type._name = "_schema_type";
+builder_schema_type._type_name = "String";
+builder_schema_type._offset = offsetof(GraphAssetDocument,_schema_type);
+builder_schema_type._is_const = false;
+builder_schema_type._is_static = false;
+builder_schema_type._is_public = true;
+builder_schema_type._is_pointer = false;
+builder_schema_type._is_ref = false;
+builder_schema_type._is_template = false;
+builder_schema_type._meta = meta_schema_type;
+builder_schema_type._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<String>);
+builder_schema_type._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<String>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_schema_type));
+Meta meta_nodes;
+meta_nodes.Set("Category","");
+meta_nodes.Set("IsColor",false);
+meta_nodes.Set("IsRange",false);
+meta_nodes.Set("IsFloatRange",true);
+meta_nodes.Set("RangeMin",(f32)0);
+meta_nodes.Set("RangeMax",(f32)1);
+MemberBuilder builder_nodes;
+builder_nodes._name = "_nodes";
+builder_nodes._type_name = "Vector<GraphNodeData>";
+builder_nodes._offset = offsetof(GraphAssetDocument,_nodes);
+builder_nodes._is_const = false;
+builder_nodes._is_static = false;
+builder_nodes._is_public = true;
+builder_nodes._is_pointer = false;
+builder_nodes._is_ref = false;
+builder_nodes._is_template = true;
+builder_nodes._meta = meta_nodes;
+builder_nodes._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<GraphNodeData>>);
+builder_nodes._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<GraphNodeData>>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_nodes));
+Meta meta_links;
+meta_links.Set("Category","");
+meta_links.Set("IsColor",false);
+meta_links.Set("IsRange",false);
+meta_links.Set("IsFloatRange",true);
+meta_links.Set("RangeMin",(f32)0);
+meta_links.Set("RangeMax",(f32)1);
+MemberBuilder builder_links;
+builder_links._name = "_links";
+builder_links._type_name = "Vector<GraphLinkData>";
+builder_links._offset = offsetof(GraphAssetDocument,_links);
+builder_links._is_const = false;
+builder_links._is_static = false;
+builder_links._is_public = true;
+builder_links._is_pointer = false;
+builder_links._is_ref = false;
+builder_links._is_template = true;
+builder_links._meta = meta_links;
+builder_links._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<GraphLinkData>>);
+builder_links._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<GraphLinkData>>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_links));
+Meta meta_comments;
+meta_comments.Set("Category","");
+meta_comments.Set("IsColor",false);
+meta_comments.Set("IsRange",false);
+meta_comments.Set("IsFloatRange",true);
+meta_comments.Set("RangeMin",(f32)0);
+meta_comments.Set("RangeMax",(f32)1);
+MemberBuilder builder_comments;
+builder_comments._name = "_comments";
+builder_comments._type_name = "Vector<GraphCommentData>";
+builder_comments._offset = offsetof(GraphAssetDocument,_comments);
+builder_comments._is_const = false;
+builder_comments._is_static = false;
+builder_comments._is_public = true;
+builder_comments._is_pointer = false;
+builder_comments._is_ref = false;
+builder_comments._is_template = true;
+builder_comments._meta = meta_comments;
+builder_comments._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<GraphCommentData>>);
+builder_comments._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<GraphCommentData>>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_comments));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+const Ailu::Type* Ailu::GraphAssetDocument::GetPrivateStaticClass()
+{
+	static const Ailu::Type* type = Z_Construct_GraphAssetDocument_Type();
+	return type;
+}
+
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::GraphAssetDocument>()
+{
+return Ailu::GraphAssetDocument::StaticType();
+}
+    const Type *Ailu::GraphAssetDocument::GetType()
+{
+return Ailu::GraphAssetDocument::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_GraphAssetDocument(&Ailu::GraphAssetDocument::StaticType, "Ailu::GraphAssetDocument");
 const Ailu::Type* Ailu::Z_Construct_SceneAssetDocument_Type()
 {
 Ailu::Object::StaticType();

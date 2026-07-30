@@ -157,7 +157,7 @@ namespace Ailu
             {
                 LOG_INFO("DockWindow({}) close...", _title->GetText());
                 e._is_handled = true;
-                DockManager::Get().RequestRemoveDock(this);
+                RequestClose();
             };
             _title_widget->AddToWidget(c);
             _content_widget = MakeRef<UI::Widget>();
@@ -186,10 +186,14 @@ namespace Ailu
                 SetFocus(false);
             };
             SetTitle(title);
-            _resize_zone_handles.push_back(UI::UIManager::Get()->RegisterInteractionZone(Vector4f::kZero));
-            _resize_zone_handles.push_back(UI::UIManager::Get()->RegisterInteractionZone(Vector4f::kZero));
-            _resize_zone_handles.push_back(UI::UIManager::Get()->RegisterInteractionZone(Vector4f::kZero));
-            _resize_zone_handles.push_back(UI::UIManager::Get()->RegisterInteractionZone(Vector4f::kZero));
+            _resize_zone_handles.push_back(UI::UIManager::Get()->RegisterInteractionZone(Vector4f::kZero,
+                                                                                         _title_widget.get()));
+            _resize_zone_handles.push_back(UI::UIManager::Get()->RegisterInteractionZone(Vector4f::kZero,
+                                                                                         _content_widget.get()));
+            _resize_zone_handles.push_back(UI::UIManager::Get()->RegisterInteractionZone(Vector4f::kZero,
+                                                                                         _content_widget.get()));
+            _resize_zone_handles.push_back(UI::UIManager::Get()->RegisterInteractionZone(Vector4f::kZero,
+                                                                                         _content_widget.get()));
         }
         DockWindow::~DockWindow()
         {
@@ -198,6 +202,11 @@ namespace Ailu
                 for (auto handle : _resize_zone_handles)
                     ui_mgr->UnRegisterInteractionZone(handle);
             }
+        }
+
+        void DockWindow::RequestClose()
+        {
+            DockManager::Get().RequestRemoveDock(this);
         }
         void DockWindow::SetRect(Vector4f rect)
         {
@@ -235,18 +244,26 @@ namespace Ailu
                 const f32 t = kBorderThickness;
                 const Vector2f &p = _position;
                 const Vector2f &s = _size;
-                ui_mgr->UpdateInteractionZone(
-                        _resize_zone_handles[0],
-                        Vector4f(p.x - t, p.y - t, s.x + t * 2.0f, t));// Top
-                ui_mgr->UpdateInteractionZone(
-                        _resize_zone_handles[1],
-                        Vector4f(p.x - t, p.y + s.y, s.x + t * 2.0f, t));// Bottom
-                ui_mgr->UpdateInteractionZone(
-                        _resize_zone_handles[2],
-                        Vector4f(p.x - t, p.y, t, s.y));// Left
-                ui_mgr->UpdateInteractionZone(
-                        _resize_zone_handles[3],
-                        Vector4f(p.x + s.x, p.y, t, s.y));// Right
+                if ((_flags & EDockWindowFlag::kNoResize) != 0u)
+                {
+                    for (auto handle : _resize_zone_handles)
+                        ui_mgr->UpdateInteractionZone(handle, Vector4f::kZero);
+                }
+                else
+                {
+                    ui_mgr->UpdateInteractionZone(
+                            _resize_zone_handles[0],
+                            Vector4f(p.x - t, p.y - t, s.x + t * 2.0f, t * 2.0f));// Top
+                    ui_mgr->UpdateInteractionZone(
+                            _resize_zone_handles[1],
+                            Vector4f(p.x - t, p.y + s.y - t, s.x + t * 2.0f, t * 2.0f));// Bottom
+                    ui_mgr->UpdateInteractionZone(
+                            _resize_zone_handles[2],
+                            Vector4f(p.x - t, p.y, t * 2.0f, s.y));// Left
+                    ui_mgr->UpdateInteractionZone(
+                            _resize_zone_handles[3],
+                            Vector4f(p.x + s.x - t, p.y, t * 2.0f, s.y));// Right
+                }
 
                 _is_dirty = false;
             }
@@ -307,6 +324,11 @@ namespace Ailu
                 _on_lost_focus_delegate.Invoke(this);
         };
 
+        void DockWindow::InvalidateDockState()
+        {
+            _is_dirty = true;
+        }
+
         void DockWindow::SetTabActive(bool is_active)
         {
             SetTitleBarVisibility(false);
@@ -330,20 +352,20 @@ namespace Ailu
 
         u32 DockWindow::HoverEdge(Vector2f pos) const
         {
-            // 首先检查鼠标是否在窗口范围内
-            if (pos.x < _position.x - kBorderThickness || pos.x > _position.x + _size.x + kBorderThickness ||
-                pos.y < _position.y - kBorderThickness || pos.y > _position.y + _size.y + kBorderThickness)
+            const f32 t = kBorderThickness;
+            if (pos.x < _position.x - t || pos.x > _position.x + _size.x + t ||
+                pos.y < _position.y - t || pos.y > _position.y + _size.y + t)
                 return 0;
 
             u32 resize_dir = 0;
-            // 判断边缘
-            if (pos.x <= _position.x && pos.x >= _position.x - kBorderThickness)
+            if (pos.x >= _position.x - t && pos.x <= _position.x + t)
                 resize_dir |= 1;// 左
-            if (pos.x <= _position.x + _size.x + kBorderThickness && pos.x >= _position.x + _size.x)
+            if (pos.x >= _position.x + _size.x - t && pos.x <= _position.x + _size.x + t)
                 resize_dir |= 4;// 右
-            if (pos.y <= _position.y && pos.y >= _position.y - kBorderThickness && (pos.x - _position.x) < (_size.x - kTitleBarHeight))
+            if (pos.y >= _position.y - t && pos.y <= _position.y + t &&
+                (pos.x - _position.x) < (_size.x - kTitleBarHeight))
                 resize_dir |= 2;// 上
-            if (pos.y >= _position.y + _size.y && pos.y <= _position.y + _size.y + kBorderThickness)
+            if (pos.y >= _position.y + _size.y - t && pos.y <= _position.y + _size.y + t)
                 resize_dir |= 8;// 下
             return resize_dir;
         }

@@ -2,15 +2,38 @@
 #include "UI/UIFramework.h"
 #include "UI/UIElement.h"
 #include "UI/UIRenderer.h"
+#include "UI/Widget.h"
 #include "Framework/Common/Input.h"
 #include "Framework/Common/Application.h"
 
 namespace Ailu
 {
-	namespace UI
+    namespace UI
     {
         static Scope<DragDropManager> s_DragDropMgr = nullptr;
         static Vector2f s_start_mouse_pos;
+        namespace
+        {
+            UIElement *FindDragHoverTarget(Vector2f mouse_pos)
+            {
+                auto *ui_mgr = UI::UIManager::Get();
+                auto *focused_window = Application::FocusedWindow();
+                for (auto it = ui_mgr->_widgets.rbegin(); it != ui_mgr->_widgets.rend(); ++it)
+                {
+                    Widget *widget = it->get();
+                    if (widget == nullptr || widget->_visibility != EVisibility::kVisible || !widget->_is_receive_event)
+                        continue;
+                    if (focused_window != nullptr && widget->Parent() != focused_window)
+                        continue;
+                    if (!widget->IsHover(mouse_pos) || widget->Root() == nullptr)
+                        continue;
+                    if (auto *target = widget->Root()->HitTest(mouse_pos); target != nullptr)
+                        return target;
+                }
+                return ui_mgr->_hover_target;
+            }
+        }
+
         DragDropManager &DragDropManager::Get()
         {
             if (!s_DragDropMgr)
@@ -56,8 +79,7 @@ namespace Ailu
             Input::BlockInput(true);
             auto mp = Input::GetMousePos(Application::FocusedWindow());
             UI::UIRenderer::Get()->DrawText(std::format("{} draging...",_display_name), mp, 9u);
-            auto ui_mgr = UI::UIManager::Get();
-            UIElement *hover = ui_mgr->_hover_target;
+            UIElement *hover = FindDragHoverTarget(mp);
             DropHandler *handle = nullptr;
             UIElement *drop_target = nullptr;
             // Walk up parent chain to find a DropHandler (child elements like Text

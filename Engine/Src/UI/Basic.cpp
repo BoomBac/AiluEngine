@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "UI/Basic.h"
+#include "UI/UIFramework.h"
 #include "UI/UIRenderer.h"
 #include "UI/TextRenderer.h"
 #include "Framework/Common/Application.h"
@@ -70,9 +71,21 @@ namespace Ailu
         Vector2f Button::MeasureDesiredSize()
         {
             EnsureStyleResolved();
-            if (GetSizePolicy(this, true) == ESizePolicy::kFixed)
-                return GetSlot()->_size;
-            return _resolved_style._min_size;
+            Vector2f desired_size = _resolved_style._min_size;
+            if (auto *slot = GetLinearSlot(this); slot != nullptr)
+            {
+                if (slot->_size_policy_h == ESizePolicy::kFixed)
+                    desired_size.x = slot->_size.x;
+                if (slot->_size_policy_v == ESizePolicy::kFixed)
+                    desired_size.y = slot->_size.y;
+            }
+            return desired_size;
+        }
+
+        UIElement *Button::HitTest(Vector2f pos)
+        {
+            Vector2f local_pos = TransformCoord(_inv_matrix, Vector3f{pos, 0.0f}).xy;
+            return IsPointInside(local_pos) ? this : nullptr;
         }
 
         void Button::SetStyleId(const UIStyleId &id)
@@ -790,15 +803,30 @@ namespace Ailu
             _on_focus_gained += [this]()
             {
                 FillCursorOffsetTable();
+                KeepCursorVisible();
             };
             SetContent(content);
             OnKeyDown() += [this](UIEvent &e)
             {
                 if (!IsFocused())
                     return;
+                const bool is_ctrl_down = Input::IsKeyDown(EKey::kCONTROL) || Input::IsKeyDown(EKey::kLCONTROL) ||
+                                          Input::IsKeyDown(EKey::kRCONTROL);
+                const bool is_shift_down = Input::IsKeyDown(EKey::kSHIFT) || Input::IsKeyDown(EKey::kLSHIFT) ||
+                                           Input::IsKeyDown(EKey::kRSHIFT);
+                const bool is_alt_down = Input::IsKeyDown(EKey::kALT);
                 auto has_selection = (_select_start != _select_end);
                 auto sb = std::min(_select_start, _select_end);
                 auto se = std::max<u32>(_select_start, _select_end);
+
+                if (is_ctrl_down && e._key_code == EKey::kA)
+                {
+                    _select_start = 0u;
+                    _select_end = (u32) _content.size();
+                    _cursor_pos = _select_end;
+                    KeepCursorVisible();
+                    return;
+                }
 
                 if (e._key_code == EKey::kBACK)
                 {
@@ -846,7 +874,15 @@ namespace Ailu
                 {
                     if (!_is_editing)
                         return;
-                    if (has_selection)
+                    if (is_alt_down && is_shift_down)
+                    {
+                        if (!has_selection)
+                            _select_start = _cursor_pos;
+                        if (_cursor_pos > 0)
+                            _cursor_pos--;
+                        _select_end = _cursor_pos;
+                    }
+                    else if (has_selection)
                     {
                         // 光标跳到选区起点，并清除选区
                         _cursor_pos = sb;
@@ -861,7 +897,15 @@ namespace Ailu
                 {
                     if (!_is_editing)
                         return;
-                    if (has_selection)
+                    if (is_alt_down && is_shift_down)
+                    {
+                        if (!has_selection)
+                            _select_start = _cursor_pos;
+                        if (_cursor_pos < _content.size())
+                            _cursor_pos++;
+                        _select_end = _cursor_pos;
+                    }
+                    else if (has_selection)
                     {
                         _cursor_pos = se;
                         ClearSelection();
@@ -876,7 +920,11 @@ namespace Ailu
                     CommitEdit();
                     _is_selecting = false;
                     _is_drag_adjusting = false;
+                    _cursor_visible = false;
+                    _cursor_timer = 0.0f;
+                    UIManager::Get()->ClearFocus(this);
                     Application::Get().SetCursor(ECursorType::kArrow);
+                    InvalidatePaint();
                 }
                 else
                 {
@@ -900,6 +948,7 @@ namespace Ailu
                 }
 
                 _cursor_pos = std::clamp<u32>(_cursor_pos, 0, (u32) _content.size());
+                KeepCursorVisible();
             };
 
             OnMouseDown() += [this](UIEvent &e)
@@ -919,14 +968,17 @@ namespace Ailu
                     _select_start = IndexFromMouseX(e._mouse_position.x);
                     _select_end = _select_start;
                     _cursor_pos = _select_end;
-                    _cursor_visible = true;
+                    KeepCursorVisible();
                 }
                 _is_editing = true;
             };
             OnMouseClick() += [this](UIEvent &e)
             {
                 if (e._key_code == EKey::kLBUTTON)
+                {
                     _cursor_pos = _select_end;
+                    KeepCursorVisible();
+                }
             };
             OnMouseUp() += [this](UIEvent &e)
             {
@@ -935,14 +987,20 @@ namespace Ailu
                     _is_selecting = false;
                     _is_drag_adjusting = false;
                     Application::Get().SetCursor(ECursorType::kArrow);
+                    KeepCursorVisible();
                 }
             };
             OnMouseMove() += [this](UIEvent &e)
             {
                 if (_is_selecting)// 鼠标左键按下中
                 {
-                    _select_end = IndexFromMouseX(e._mouse_position.x);
-                    // 这里可以触发 UI 重绘，让选区高亮
+                    const u32 select_end = IndexFromMouseX(e._mouse_position.x);
+                    if (_select_end != select_end)
+                    {
+                        _select_end = select_end;
+                        _cursor_pos = _select_end;
+                        KeepCursorVisible();
+                    }
                 }
                 if (abs(e._mouse_position.x - _abs_rect.x - _abs_rect.z) < 6.0f && _is_numeric)
                 {
@@ -961,11 +1019,17 @@ namespace Ailu
                     _select_end = (u32) _content.size();
                     _cursor_pos = _select_end;
                     _is_selecting = false;
+                    KeepCursorVisible();
                 }
             };
             _on_focus_lost += [this]()
             {
                 CommitEdit();
+                _is_selecting = false;
+                _cursor_visible = false;
+                _cursor_timer = 0.0f;
+                _cursor_hold_timer = 0.0f;
+                InvalidatePaint();
             };
             _is_selecting = false;
         }
@@ -983,17 +1047,36 @@ namespace Ailu
             }
             if (IsFocused())// 只有获得焦点才需要闪烁
             {
-                _cursor_timer += dt;
-                if (_cursor_timer >= _blink_interval)// 比如 0.5 秒
+                if (_cursor_hold_timer > 0.0f)
                 {
-                    _cursor_visible = !_cursor_visible;// 翻转显示状态
+                    _cursor_hold_timer = std::max(0.0f, _cursor_hold_timer - dt);
                     _cursor_timer = 0.0f;
+                    if (!_cursor_visible)
+                    {
+                        _cursor_visible = true;
+                        InvalidatePaint();
+                    }
+                }
+                else
+                {
+                    _cursor_timer += dt;
+                    if (_cursor_timer >= _blink_interval)// 比如 0.5 秒
+                    {
+                        _cursor_visible = !_cursor_visible;// 翻转显示状态
+                        _cursor_timer = 0.0f;
+                        InvalidatePaint();
+                    }
                 }
             }
             else
             {
-                _cursor_visible = false;// 失去焦点时隐藏光标
+                if (_cursor_visible)
+                {
+                    _cursor_visible = false;// 失去焦点时隐藏光标
+                    InvalidatePaint();
+                }
                 _cursor_timer = 0.0f;
+                _cursor_hold_timer = 0.0f;
             }
             if (_is_drag_adjusting)
             {
@@ -1036,21 +1119,30 @@ namespace Ailu
             const f32 font_height = _resolved_style._font_size;
             if (visual)
                 r.DrawVisual(_arrange_rect, _matrix, *visual);
+            const auto text_layout = TextRenderer::BuildLayout(_content, Vector2f::kZero, font_height);
+            const Vector4f text_visual_bounds = TextRenderer::CalculateTextVisualBounds(text_layout);
+            const f32 visual_height = text_visual_bounds.w > 0.0f ? text_visual_bounds.w : font_height;
+            const f32 line_y = _content_rect.y + (_content_rect.w - visual_height) * 0.5f;
+            const f32 caret_height = std::min(_content_rect.w, std::max(font_height, visual_height));
+            const f32 caret_y = _content_rect.y + (_content_rect.w - caret_height) * 0.5f;
+            const Vector2f text_pos = {_content_rect.x, line_y - text_visual_bounds.y};
             if (IsFocused() && _select_start != _select_end)
             {
-                f32 start_offset = _select_start == 0u? 0.0f :_cursor_offsets [_select_start];
-                f32 end_offset = _select_end == 0u ? 0.0f : _cursor_offsets[_select_end];
+                const u32 select_start = std::min(_select_start, _select_end);
+                const u32 select_end = std::max(_select_start, _select_end);
+                f32 start_offset = select_start == 0u ? 0.0f : _cursor_offsets[select_start];
+                f32 end_offset = select_end == 0u ? 0.0f : _cursor_offsets[select_end];
                 UIBrush selection;
                 selection._tint = _resolved_style._selection_color;
-                r.DrawQuad({_content_rect.x + start_offset, _content_rect.y,end_offset - start_offset, _content_rect.w}, _matrix, selection);
+                r.DrawQuad({_content_rect.x + start_offset, caret_y, end_offset - start_offset, caret_height}, _matrix, selection);
             }
-            r.DrawText(_content, _content_rect.xy,_matrix, font_height, visual ? visual->_content_color : Colors::kWhite);
-            auto text_size = r.CalculateTextSize(_content, (u16) font_height);
-            //r.DrawBox(_content_rect.xy, text_size, 1.0f, Colors::kRed);
+            r.DrawTextLayout(text_layout, text_pos, _matrix, font_height, visual ? visual->_content_color : Colors::kWhite);
             UIBrush caret;
-            caret._tint = Color(_resolved_style._caret_color.x, _resolved_style._caret_color.y, _resolved_style._caret_color.z, (f32) _cursor_visible);
+            caret._tint = Color(_resolved_style._caret_color.x, _resolved_style._caret_color.y, _resolved_style._caret_color.z,
+                                (f32) _cursor_visible);
             if (IsFocused() && !_is_selecting)
-                r.DrawQuad({_content_rect.x + (_cursor_pos == 0u ? 1.0f : _cursor_offsets[_cursor_pos]), _content_rect.y,_resolved_style._caret_width, font_height}, _matrix, caret);
+                r.DrawQuad({_content_rect.x + (_cursor_pos == 0u ? 1.0f : _cursor_offsets[_cursor_pos]), caret_y,
+                            _resolved_style._caret_width, caret_height}, _matrix, caret);
         }
         void InputBlock::FillCursorOffsetTable()
         {
@@ -1059,6 +1151,7 @@ namespace Ailu
                 _cursor_offsets = {1.0f};
                 _text_rect_size = {0.0f,0.0f};
                 _is_numeric = true;
+                _is_need_recalc_offset_table = false;
                 return;
             }
             if (_content_rect.w <= 4.0)
@@ -1074,10 +1167,8 @@ namespace Ailu
             for (u64 i = 0; i < _content.size(); i++)
             {
                 Vector2f size = TextRenderer::CalculateTextSize(_content.substr(0u, i + 1), (u16)font_height);
-                _cursor_offsets.push_back(size.x - 1.0f);
+                _cursor_offsets.push_back(size.x + 1.0f);
             }
-            if (_cursor_offsets.size() > 1)
-                _cursor_offsets[0] = _cursor_offsets[1] * 0.5f;
             _text_rect_size = TextRenderer::CalculateTextSize(_content, (u16) font_height);
             _is_numeric = StringUtils::IsNumeric(_content);
             _select_start = _select_end = _cursor_pos;
@@ -1085,17 +1176,18 @@ namespace Ailu
         }
         u32 InputBlock::IndexFromMouseX(f32 x)
         {
-            f32 localX = x - _abs_rect.x;
+            const f32 scale_x = std::max(std::abs(_scale.x), 0.0001f);
+            f32 local_x = (x - GetContentRect().x) / scale_x;
 
             if (_cursor_offsets.empty())
                 return 0u;
             // 先处理边界，避免越界访问
-            if (localX <= _cursor_offsets.front())
+            if (local_x <= _cursor_offsets.front())
                 return 0u;
-            if (localX >= _cursor_offsets.back())
+            if (local_x >= _cursor_offsets.back())
                 return static_cast<u32>(_cursor_offsets.size() - 1u);
             // 找到第一个 >= localX 的位置（右候选）
-            auto it = std::lower_bound(_cursor_offsets.begin(), _cursor_offsets.end(), localX);
+            auto it = std::lower_bound(_cursor_offsets.begin(), _cursor_offsets.end(), local_x);
             u64 hi = static_cast<u64>(std::distance(_cursor_offsets.begin(), it));
 
             // safety: 如果 it == begin 已处理，it == end 已处理
@@ -1106,13 +1198,21 @@ namespace Ailu
 
             // 选离鼠标最近的索引；相等时选择左边（<=），
             // 如果想偏向右边，把 <= 改成 <。
-            return ((localX - left) <= (right - localX)) ? static_cast<u32>(lo) : static_cast<u32>(hi);
+            return ((local_x - left) <= (right - local_x)) ? static_cast<u32>(lo) : static_cast<u32>(hi);
         }
 
         void InputBlock::CommitEdit(bool is_finish_edit)
         {
             _is_editing = !is_finish_edit;
             LOG_INFO("Committed edit({}): {}",_name, _content);
+        }
+
+        void InputBlock::KeepCursorVisible()
+        {
+            _cursor_visible = true;
+            _cursor_timer = 0.0f;
+            _cursor_hold_timer = kCaretHoldDuration;
+            InvalidatePaint();
         }
 
         Vector2f InputBlock::MeasureDesiredSize()

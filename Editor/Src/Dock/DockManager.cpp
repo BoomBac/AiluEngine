@@ -176,6 +176,33 @@ namespace Ailu
                     return false;
                 return (_left && _left->ContainsNode(node)) || (_right && _right->ContainsNode(node));
             }
+            bool ContainsWidget(UI::Widget *widget) const
+            {
+                if (widget == nullptr)
+                    return false;
+                if (_type == EType::kLeaf)
+                {
+                    return _window && (_window->TitleWidget() == widget || _window->ContentWidget() == widget);
+                }
+                if (_type == EType::kTab)
+                {
+                    if (_tab && _tab->TitleWidget() == widget)
+                        return true;
+                    if (_tab)
+                    {
+                        for (const auto &tab_item : *_tab)
+                        {
+                            if (DockWindow *window = tab_item->PrimaryWindow())
+                            {
+                                if (window->TitleWidget() == widget || window->ContentWidget() == widget)
+                                    return true;
+                            }
+                        }
+                    }
+                    return false;
+                }
+                return (_left && _left->ContainsWidget(widget)) || (_right && _right->ContainsWidget(widget));
+            }
             void UpdateLayout(f32 dt)
             {
                 auto inset_panel_rect = [](Vector2f position, Vector2f size) -> Vector4f
@@ -189,6 +216,15 @@ namespace Ailu
                 {
                     if (!_window)
                         return;
+                    const bool is_docked = _parent != nullptr || (_flags & EDockWindowFlag::kFullSize) != 0u;
+                    const u32 docked_flags = EDockWindowFlag::kNoMove | EDockWindowFlag::kNoResize;
+                    const u32 old_flags = _window->_flags;
+                    if (is_docked)
+                        _window->_flags |= docked_flags;
+                    else
+                        _window->_flags &= ~docked_flags;
+                    if (_window->_flags != old_flags)
+                        _window->InvalidateDockState();
                     _window->SetRect(inset_panel_rect(_position, _size));
                 }
                 else if (_type == EType::kSplit)
@@ -585,6 +621,7 @@ namespace Ailu
                     window->_flags |= kDockedFlags;
                 else
                     window->_flags &= ~kDockedFlags;
+                window->InvalidateDockState();
             };
             if (_type == EType::kLeaf)
             {
@@ -963,6 +1000,23 @@ namespace Ailu
             return {pos.x - (f32) x, pos.y - (f32) y};
         }
 
+        static UI::Widget *FindTopHoverWidget(Window *window, Vector2f local_pos)
+        {
+            auto &widgets = UI::UIManager::Get()->_widgets;
+            for (i32 index = static_cast<i32>(widgets.size()) - 1; index >= 0; --index)
+            {
+                UI::Widget *widget = widgets[index].get();
+                if (widget->_visibility != UI::EVisibility::kVisible || !widget->_is_receive_event ||
+                    widget->Parent() != window)
+                {
+                    continue;
+                }
+                if (widget->IsHover(local_pos))
+                    return widget;
+            }
+            return nullptr;
+        }
+
         static Window *FindDockPreviewWindow(const HashMap<Window *, Vector<Ref<DockNode>>> &float_nodes, Vector2f pos)
         {
             Window *focused_window = Application::FocusedWindow();
@@ -983,9 +1037,18 @@ namespace Ailu
         {
             AL_ASSERT(g_pDockMgr == nullptr);
             g_pDockMgr = new DockManager();
+            if (UI::UIRenderer::Get() != nullptr)
+            {
+                UI::UIRenderer::Get()->SetOverlayDrawCallback([]()
+                {
+                    DockManager::Get().DrawFloatingPreview();
+                });
+            }
         }
         void DockManager::Shutdown()
         {
+            if (UI::UIRenderer::Get() != nullptr)
+                UI::UIRenderer::Get()->SetOverlayDrawCallback(nullptr);
             delete g_pDockMgr; g_pDockMgr = nullptr;
         }
         DockManager &DockManager::Get()
@@ -1360,14 +1423,10 @@ namespace Ailu
                 Vector2f global_pos = Input::GetGlobalMousePos();
                 if (_can_draw_float_preview)
                 {
-                    OnWindowFloat();
+                    OnWindowFloat(false);
                     Window *preview_window = _dock_preview_window ? _dock_preview_window : FindDockPreviewWindow(_float_nodes, global_pos);
                     if (!preview_window && _floating_preview_node)
                         preview_window = _floating_preview_node->_own_window;
-                    Vector2f pos = GlobalToWindowPos(preview_window, global_pos);
-                    UI::UIRenderer::Get()->DrawWindowQuad(preview_window,
-                                                           {pos - Vector2f{100.0f, 70.0f}, Vector2f{200.0f, 140.0f}},
-                                                           ColorBrush(g_editor_style._dock_hint_color));
                     if (!Input::IsKeyDown(EKey::kLBUTTON) && _floating_preview_node)
                     {
                         Window *drop_window = _dock_quad_hover_node ? _dock_quad_hover_node->_own_window : _dock_preview_window;
@@ -1710,7 +1769,21 @@ namespace Ailu
             }
         };
 
-        void DockManager::OnWindowFloat()
+        void DockManager::DrawFloatingPreview()
+        {
+            if (!_is_any_floating || !_can_draw_float_preview || _floating_preview_node == nullptr)
+                return;
+            const Vector2f global_pos = Input::GetGlobalMousePos();
+            OnWindowFloat(true);
+            Window *preview_window = _dock_preview_window ? _dock_preview_window : FindDockPreviewWindow(_float_nodes, global_pos);
+            if (!preview_window && _floating_preview_node)
+                preview_window = _floating_preview_node->_own_window;
+            const Vector2f pos = GlobalToWindowPos(preview_window, global_pos);
+            UI::UIRenderer::Get()->DrawWindowQuad(preview_window, {pos - Vector2f{100.0f, 70.0f}, Vector2f{200.0f, 140.0f}},
+                                                  ColorBrush(g_editor_style._dock_hint_color));
+        }
+
+        void DockManager::OnWindowFloat(bool draw_preview)
         {
             Vector2f pos = Input::GetGlobalMousePos();
             //Vector2f pos = Input::GetMousePos();
@@ -1752,7 +1825,7 @@ namespace Ailu
                     start_pos = main_area.xy;
                     size = main_area.zw;
                     _dock_preview_window = main_window;
-                    DrawPreviewDockArea(main_window, GlobalToWindowPos(main_window, pos), size, start_pos);
+                    DrawPreviewDockArea(main_window, GlobalToWindowPos(main_window, pos), size, start_pos, draw_preview);
                 }
             }
             else
@@ -1766,8 +1839,9 @@ namespace Ailu
                     const Vector2f lpos = GlobalToWindowPos(target_window, pos);
                     if (UI::UIElement::IsPointInside(lpos, rect))
                     {
-                        UI::UIRenderer::Get()->DrawWindowQuad(target_window, {start_pos, size},
-                                                              ColorBrush(Vector4f(1.0f, 1.0f, 1.0f, 0.5f)));
+                        if (draw_preview)
+                            UI::UIRenderer::Get()->DrawWindowQuad(target_window, {start_pos, size},
+                                                                  ColorBrush(Vector4f(1.0f, 1.0f, 1.0f, 0.5f)));
                         _is_float_on_cancel_area = true;
                     }
                     else
@@ -1777,20 +1851,23 @@ namespace Ailu
                         Vector2f pos = _dock_quad_hover_node->_position;
                         pos.y += DockWindow::kTitleBarHeight * 2.0f;
                         Vector2f center = pos + size * 0.5f;
-                        auto r = UI::UIRenderer::Get();
-                        Vector2f text_size = r->CalculateTextSize("Drop to detach");
-                        r->DrawWindowText(target_window, "Drop to detach", center - text_size * 0.5f);
+                        if (draw_preview)
+                        {
+                            auto r = UI::UIRenderer::Get();
+                            Vector2f text_size = r->CalculateTextSize("Drop to detach");
+                            r->DrawWindowText(target_window, "Drop to detach", center - text_size * 0.5f);
+                        }
                         _is_float_on_cancel_area = false;
                     }
                 }
                 else
                 {
-                    DrawPreviewDockArea(target_window, GlobalToWindowPos(target_window, pos), size, start_pos);
+                    DrawPreviewDockArea(target_window, GlobalToWindowPos(target_window, pos), size, start_pos, draw_preview);
                 }
             }
         }
 
-        void DockManager::DrawPreviewDockArea(Window *window, Vector2f pos, Vector2f w_size, Vector2f start_pos)
+        void DockManager::DrawPreviewDockArea(Window *window, Vector2f pos, Vector2f w_size, Vector2f start_pos, bool draw_preview)
         {
             auto r = UI::UIRenderer::Get();
             //auto &cur_window = Application::Get().GetWindow();
@@ -1808,7 +1885,8 @@ namespace Ailu
                 Color c = is_hover
                                   ? _dock_quad_hover_color
                                   : _dock_quad_normal_color;
-                r->DrawWindowQuad(window, rect, ColorBrush(c));
+                if (draw_preview)
+                    r->DrawWindowQuad(window, rect, ColorBrush(c));
                 is_area_changed |= is_hover;
                 return is_hover;
             };
@@ -1870,10 +1948,45 @@ namespace Ailu
 
         void DockManager::HandleNodeResize()
         {
-            if (Input::IsInputBlock())
+            const Vector2f mouse_global_pos = Input::GetGlobalMousePos();
+            auto find_resize_edge = [&](DockNode **out) -> u32
             {
-                UpdateResizeMouseCursor(0u);
-                return;
+                u32 resize_dir = 0u;
+                for (auto &it: _float_nodes)
+                {
+                    auto &[window, nodes] = it;
+                    if (Application::FocusedWindow() != window)
+                        continue;
+                    for (auto &n: nodes)
+                    {
+                        if (!n || !n->_is_valid)
+                            continue;
+                        if (n->_flags & EDockWindowFlag::kFullSize)
+                            continue;
+                        if (n->_flags & EDockWindowFlag::kNoResize)
+                            continue;
+                        Vector2f pos = GlobalToWindowPos(window, mouse_global_pos);
+                        UI::Widget *top_hover_widget = FindTopHoverWidget(window, pos);
+                        if (top_hover_widget != nullptr && !n->ContainsWidget(top_hover_widget))
+                            continue;
+                        if (IsFocusedNodeBlockingInteraction(n.get(), _focused_node, pos))
+                            continue;
+                        resize_dir = n->HoverEdge(pos, out);
+                        if (resize_dir != 0u)
+                            return resize_dir;
+                    }
+                }
+                return 0u;
+            };
+
+            if (Input::IsInputBlock() && _resizing_node == nullptr)
+            {
+                DockNode *edge_hover_node = nullptr;
+                if (find_resize_edge(&edge_hover_node) == 0u)
+                {
+                    UpdateResizeMouseCursor(0u);
+                    return;
+                }
             }
             if (UI::DragDropManager::Get().GetPayload().has_value())
             {
@@ -1883,10 +1996,10 @@ namespace Ailu
                 _resizing_edge_dir = 0u;
                 return;
             }
-            bool can_resize = _adj_split_node == nullptr && _drag_move_node == nullptr && UI::UIManager::Get()->_capture_target == nullptr;
+            bool can_resize = _adj_split_node == nullptr && _drag_move_node == nullptr &&
+                              UI::UIManager::Get()->_capture_target == nullptr;
             bool can_adjust_split = _resizing_node == nullptr && _drag_move_node == nullptr;
             bool can_drag_move = _resizing_node == nullptr && _adj_split_node == nullptr;
-            const Vector2f mouse_global_pos = Input::GetGlobalMousePos();
             if (can_resize)
             {
                 if (_resizing_node)
@@ -1917,28 +2030,7 @@ namespace Ailu
                 {
                     static DockNode *s_last_edge_hover_node = nullptr;
                     DockNode *edge_hover_node = nullptr;
-                    _resizing_edge_dir = 0u;
-                    for (auto &it: _float_nodes)
-                    {
-                        auto &[window, nodes] = it;
-                        if (Application::FocusedWindow() != window)
-                            continue;
-                        for (auto &n: nodes)
-                        {
-                            if (!n || !n->_is_valid)
-                                continue;
-                            if (n->_flags & EDockWindowFlag::kFullSize)
-                                continue;
-                            if (n->_flags & EDockWindowFlag::kNoResize)
-                                continue;
-                            Vector2f pos = Input::GetMousePos(window);
-                            if (IsFocusedNodeBlockingInteraction(n.get(), _focused_node, pos))
-                                continue;
-                            _resizing_edge_dir = n->HoverEdge(pos, &edge_hover_node);
-                            if (_resizing_edge_dir != 0u)
-                                break;
-                        }
-                    }
+                    _resizing_edge_dir = find_resize_edge(&edge_hover_node);
                     UpdateResizeMouseCursor(_resizing_edge_dir);
                     if (edge_hover_node != s_last_edge_hover_node)
                     {
@@ -1995,7 +2087,10 @@ namespace Ailu
                             if (!n || !n->_is_valid)
                                 continue;
                             DockNode *tmp = nullptr;
-                            Vector2f pos = Input::GetMousePos(window);
+                            Vector2f pos = GlobalToWindowPos(window, mouse_global_pos);
+                            UI::Widget *top_hover_widget = FindTopHoverWidget(window, pos);
+                            if (top_hover_widget != nullptr && !n->ContainsWidget(top_hover_widget))
+                                continue;
                             if (IsFocusedNodeBlockingInteraction(n.get(), _focused_node, pos))
                                 continue;
                             FindHoverSplitNode(n, pos, &tmp);

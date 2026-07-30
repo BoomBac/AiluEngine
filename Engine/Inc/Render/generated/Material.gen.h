@@ -21,7 +21,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::Material>
 //Class Material end...........................
 
 //Class StandardMaterial begin...........................
-#define MATERIAL_GEN_H_212_GENERATED_BODY \
+#define MATERIAL_GEN_H_213_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_StandardMaterial_Type();\
                                 static const Type* GetPrivateStaticClass();\

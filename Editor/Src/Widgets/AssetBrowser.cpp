@@ -2,9 +2,13 @@
 #include "Audio/Audio.h"
 #include "Audio/AudioClip.h"
 #include "Common/EditorPopup.h"
+#include "Graph/GraphAsset.h"
+#include "Graph/GraphDocument.h"
+#include "Graph/GraphEditorWindow.h"
 #include "Editors/InputActionAssetEditor.h"
 #include "Editors/AudioClipEditor.h"
 #include "Editors/SpriteAssetEditor.h"
+#include "Widgets/AssetEditorRegistry.h"
 #include "Framework/Common/FileManager.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Input/InputActionAsset.h"
@@ -315,6 +319,28 @@ namespace Ailu
                 return shaders;
             }
 
+            void RegisterAssetEditors()
+            {
+                static bool s_is_registered = false;
+                if (s_is_registered)
+                    return;
+                s_is_registered = true;
+                AssetEditorRegistry::Get().RegisterEditor(StaticClass<GraphAsset>(), [](Asset *asset) -> Ref<DockWindow>
+                {
+                    if (asset == nullptr)
+                        return nullptr;
+                    if (asset->_p_obj == nullptr)
+                        ResourceMgr::Get().Load<GraphAsset>(asset->_asset_path);
+                    if (auto *graph = asset->As<GraphAsset>(); graph != nullptr)
+                    {
+                        auto editor = MakeRef<GraphEditorWindow>();
+                        editor->Open(graph);
+                        return editor;
+                    }
+                    return nullptr;
+                });
+            }
+
             WString AppendChildAssetPath(const WString &directory_asset_path, const WString &file_name)
             {
                 if (directory_asset_path.empty())
@@ -512,6 +538,7 @@ namespace Ailu
 
         AssetBrowser::AssetBrowser() : DockWindow("Asset Browser")
         {
+            RegisterAssetEditors();
             _sv = _content_root->AddChild<UI::SplitView>();
             _sv->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
             _sv->SlotPadding() = UI::Padding(_content_root->Thickness());
@@ -917,6 +944,7 @@ namespace Ailu
             static auto s_material_icon = ResourceMgr::Get().Get<Texture2D>(EnginePath::kEngineIconPathW + L"dark/material.alasset");
             static auto s_animclip_icon = ResourceMgr::Get().Get<Texture2D>(EnginePath::kEngineIconPathW + L"dark/anim_clip.alasset");
             static auto s_skeleton_icon = ResourceMgr::Get().Get<Texture2D>(EnginePath::kEngineIconPathW + L"dark/skeleton.alasset");
+            static auto s_graph_icon = ResourceMgr::Get().Get<Texture2D>(EnginePath::kEngineIconPathW + L"shader.alasset");
 
             Vector2f parent_size = _icon_area->GetContentRect().zw;
             if (parent_size.x <= 0.0f || parent_size.y <= 0.0f)
@@ -1110,6 +1138,8 @@ namespace Ailu
                             icon->SetTexture(s_animclip_icon);
                         else if (asset->_asset_type == StaticClass<Render::SkeletonMesh>())
                             icon->SetTexture(s_skeleton_icon);
+                        else if (asset->_asset_type == StaticClass<GraphAsset>())
+                            icon->SetTexture(s_graph_icon);
                         else if (asset->_asset_type == StaticClass<Render::Sprite>())
                         {
                             if (asset->_p_obj)
@@ -1235,6 +1265,13 @@ namespace Ailu
         {
             if (asset == nullptr)
                 return;
+
+            if (auto editor = AssetEditorRegistry::Get().CreateEditor(asset); editor != nullptr)
+            {
+                DockManager::Get().AddDock(editor);
+                _is_dirty = true;
+                return;
+            }
 
             if (asset->_asset_type == StaticClass<SceneManagement::Scene>())
             {
@@ -1404,6 +1441,20 @@ namespace Ailu
                                                  return std::nullopt;
                                              });
             }});
+            actions.push_back({"New Flow Graph", [this, popup_pos]()
+            {
+                EditorPopup::ShowTextInputAt(popup_pos, "Create Flow Graph",
+                                             MakeUniqueEntryName(_current_path.wstring(), "NewFlowGraph", L".alasset", false),
+                                             [this](const String &input) -> std::optional<String>
+                                             {
+                                                 const String name = TrimNameCopy(input);
+                                                 if (auto error = ValidateEntryName(name); error.has_value())
+                                                     return error;
+                                                 if (!CreateFlowGraphEntry(name))
+                                                     return String("Flow Graph already exists.");
+                                                 return std::nullopt;
+                                             });
+            }});
             actions.push_back({"Refresh", [this]() { _is_dirty = true; }});
             EditorPopup::ShowActionMenuAt(popup_pos, actions);
         }
@@ -1432,6 +1483,14 @@ namespace Ailu
                 const fs::path previous_path = _current_path;
                 _current_path = folder_sys_path;
                 const bool created = CreateInputActionAssetEntry(name);
+                _current_path = previous_path;
+                return created;
+            };
+            const auto create_flow_graph_in_target = [this, folder_sys_path](const String &name) -> bool
+            {
+                const fs::path previous_path = _current_path;
+                _current_path = folder_sys_path;
+                const bool created = CreateFlowGraphEntry(name);
                 _current_path = previous_path;
                 return created;
             };
@@ -1504,6 +1563,20 @@ namespace Ailu
                                                  return std::nullopt;
                                              });
             }});
+            actions.push_back({"New Flow Graph", [this, popup_pos, folder_sys_path, create_flow_graph_in_target]()
+            {
+                EditorPopup::ShowTextInputAt(popup_pos, "Create Flow Graph",
+                                             MakeUniqueEntryName(folder_sys_path, "NewFlowGraph", L".alasset", false),
+                                             [create_flow_graph_in_target](const String &input) -> std::optional<String>
+                                             {
+                                                 const String name = TrimNameCopy(input);
+                                                 if (auto error = ValidateEntryName(name); error.has_value())
+                                                     return error;
+                                                 if (!create_flow_graph_in_target(name))
+                                                     return String("Flow Graph already exists.");
+                                                 return std::nullopt;
+                                             });
+            }});
             EditorPopup::ShowActionMenuAt(popup_pos, actions);
         }
 
@@ -1514,8 +1587,9 @@ namespace Ailu
 
             const String asset_name = asset->Name();
             Vector<PopupMenuAction> actions;
-            if (asset->_asset_type == StaticClass<SceneManagement::Scene>() || asset->_asset_type == StaticClass<Render::Mesh>() ||
-                asset->_asset_type == StaticClass<AudioClip>())
+            if (AssetEditorRegistry::Get().HasEditor(asset->_asset_type) ||
+                asset->_asset_type == StaticClass<SceneManagement::Scene>() ||
+                asset->_asset_type == StaticClass<Render::Mesh>() || asset->_asset_type == StaticClass<AudioClip>())
             {
                 actions.push_back({"Open", [this, asset]() { OpenAsset(asset); }});
             }
@@ -1750,6 +1824,29 @@ namespace Ailu
 
             auto input_asset = MakeRef<InputActionAsset>(trimmed_name);
             ResourceMgr::Get().CreateAsset(asset_path, input_asset);
+            ResourceMgr::Get().SaveAllUnsavedAssets();
+            _is_dirty = true;
+            return true;
+        }
+
+        bool AssetBrowser::CreateFlowGraphEntry(const String &name)
+        {
+            const String trimmed_name = TrimNameCopy(name);
+            if (trimmed_name.empty())
+                return false;
+
+            const WString asset_path = BuildCurrentAssetPath(ToWChar(trimmed_name.c_str()) + WString(L".alasset"));
+            if (ResourceMgr::Get().GetAsset(asset_path) != nullptr || fs::exists(ResourceMgr::GetResSysPath(asset_path)))
+                return false;
+
+            auto graph = MakeRef<GraphAsset>(trimmed_name);
+            graph->SchemaType("FlowGraphSchema");
+            GraphDocument document;
+            if (!document.Open(graph.get()))
+                return false;
+            document.AddNode("Flow.Entry", {80.0f, 120.0f});
+            document.Apply();
+            ResourceMgr::Get().CreateAsset(asset_path, graph);
             ResourceMgr::Get().SaveAllUnsavedAssets();
             _is_dirty = true;
             return true;

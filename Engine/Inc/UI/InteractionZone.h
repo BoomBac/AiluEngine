@@ -7,6 +7,8 @@ namespace Ailu
 {
     namespace UI
     {
+        class Widget;
+
         struct ZoneHandle
         {
             u32 _index;
@@ -17,6 +19,7 @@ namespace Ailu
         {
             Vector4f _rect;
             u32 _generation;
+            Widget *_owner = nullptr;
         };
     } // namespace UI
 } // namespace Ailu

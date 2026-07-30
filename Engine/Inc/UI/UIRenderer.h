@@ -13,6 +13,8 @@
 #include "DrawerBlock.h"
 #include "Style/UIStyleBasic.h"
 #include "Style/UIStyles.h"
+#include <functional>
+#include <utility>
 
 #undef DrawText
 
@@ -78,6 +80,8 @@ namespace Ailu
             UIRenderer();
             ~UIRenderer();
             void Render(CommandBuffer* cmd);
+            using OverlayDrawCallback = std::function<void()>;
+            void SetOverlayDrawCallback(OverlayDrawCallback callback) { _overlay_draw_callback = std::move(callback); }
             void DrawQuad(Vector4f rect, const UIBrush& brush, f32 depth = 0.0f);
             void DrawQuad(Vector4f rect, const UIBrush& brush, Vector4f corner_radius, f32 depth = 0.0f);
             void DrawQuad(Vector4f rect, Matrix4x4f matrix, const UIBrush& brush, f32 depth = 0.0f);
@@ -93,6 +97,8 @@ namespace Ailu
             void DrawImage(Render::Texture *texture, Vector4f rect, const ImageDrawOptions &opts = {});
             void DrawLine(Vector2f a, Vector2f b, f32 thickness = 1.0f, Color color = Colors::kWhite, f32 depth = 0.0f);
             void DrawLine(Vector2f a, Vector2f b, Matrix4x4f matrix,f32 thickness = 1.0f, Color color = Colors::kWhite, f32 depth = 0.0f);
+            void DrawBezier(Vector2f start, Vector2f start_tangent, Vector2f end_tangent, Vector2f end,
+                            f32 thickness = 1.0f, Color color = Colors::kWhite, f32 depth = 0.0f, u32 segments = 24u);
             void DrawBox(Vector2f pos, Vector2f size, f32 thickness = 1.0f, Color color = Colors::kWhite, f32 depth = 0.0f);
             void DrawBox(Vector2f pos, Vector2f size, Matrix4x4f matrix, f32 thickness = 1.0f, Color color = Colors::kWhite, f32 depth = 0.0f);
             void PushScissor(Vector4f scissor);
@@ -148,6 +154,7 @@ namespace Ailu
             Ref<Render::ComputeShader> _backdrop_blur_cs;
             Render::ComputeShaderKernelId _backdrop_blur_x_kernel = Render::kInvalidComputeShaderKernelId;
             Render::ComputeShaderKernelId _backdrop_blur_y_kernel = Render::kInvalidComputeShaderKernelId;
+            OverlayDrawCallback _overlay_draw_callback;
             Vector<RTHandle> _pending_backdrop_blur_release_handles;
             HashMap<Render::Texture *, Render::Texture *> _frame_backdrop_blur_cache;
             bool _cache_build_pending_resource = false;

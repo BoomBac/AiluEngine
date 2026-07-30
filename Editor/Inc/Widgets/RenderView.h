@@ -95,7 +95,7 @@ namespace Ailu
             bool _is_camera_input_active = false;
             Vector2f _camera_input_last_mouse_pos = Vector2f::kZero;
             bool _has_camera_input_last_mouse_pos = false;
-            Vector3f _drag_preview_pos;
+            Vector3f _drag_preview_pos = Vector3f::kZero;
             Ref<Render::Mesh> _drag_preview_mesh = nullptr;
         };
         ACLASS()

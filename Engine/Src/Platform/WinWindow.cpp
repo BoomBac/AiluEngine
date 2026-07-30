@@ -562,6 +562,7 @@ namespace Ailu
             }
                 return 0;
             case WM_KEYDOWN:
+            case WM_SYSKEYDOWN:
             {
                 KeyPressedEvent e(static_cast<u8>(wParam), lParam & 0xFFFF);
                 e._window = this;
@@ -570,6 +571,7 @@ namespace Ailu
             }
                 return 0;
             case WM_KEYUP:
+            case WM_SYSKEYUP:
             {
                 KeyReleasedEvent e(wParam);
                 e._window = this;

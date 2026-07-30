@@ -333,7 +333,8 @@ namespace Ailu
                     LOG_ERROR(" SerializerWrapper::Serialize(object: {}) : enum_type is nullptr", name ? *name : "noname");
                     return;
                 }
-                u32 id = *reinterpret_cast<u32 *>(data);
+                using UnderlyingType = std::underlying_type_t<T>;
+                const u32 id = static_cast<u32>(static_cast<UnderlyingType>(*reinterpret_cast<T *>(data)));
                 ar << enum_type->GetNameByIndex(id);
             }
             else if constexpr (std::is_fundamental_v<T>)
@@ -389,8 +390,10 @@ namespace Ailu
                 if (idx == -1)
                 {
                     LOG_ERROR("Enum {} not found in {}", enum_name, enum_type->Name());
+                    if (sar && name) sar->EndObject();
+                    return;
                 }
-                reinterpret_cast<u32 *>(data)[0] = idx;
+                *reinterpret_cast<T *>(data) = static_cast<T>(idx);
             }
             else if constexpr (std::is_fundamental_v<T>)
             {

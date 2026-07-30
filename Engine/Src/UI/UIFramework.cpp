@@ -284,7 +284,7 @@ namespace Ailu::UI
             }
         }
     }
-    ZoneHandle UIManager::RegisterInteractionZone(Vector4f rect)
+    ZoneHandle UIManager::RegisterInteractionZone(Vector4f rect, Widget *owner)
     {
         u32 index;
         if (!_free_indices.empty())
@@ -292,11 +292,12 @@ namespace Ailu::UI
             index = _free_indices.back();
             _free_indices.pop_back();
             _interaction_zones[index]._rect = rect;
+            _interaction_zones[index]._owner = owner;
         }
         else
         {
             index = (u32)_interaction_zones.size();
-            _interaction_zones.push_back({rect, 0});
+            _interaction_zones.push_back({rect, 0, owner});
         }
 
         return {index, _interaction_zones[index]._generation};

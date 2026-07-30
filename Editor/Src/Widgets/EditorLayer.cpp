@@ -61,6 +61,7 @@
 
 #include "Audio/Audio.h"
 #include "Audio/AudioClip.h"
+#include "Graph/GraphEditorWindow.h"
 
 
 namespace Ailu
@@ -1419,6 +1420,12 @@ namespace Ailu
         void EditorLayer::OnUpdate(f32 dt)
         {
             UpdateEditorChrome(dt);
+            static bool s_opened_graph_editor = false;
+            if (!s_opened_graph_editor)
+            {
+                DockManager::Get().AddDock(MakeRef<GraphEditorWindow>());
+                s_opened_graph_editor = true;
+            }
             DockManager::Get().Update(dt);
             //Gizmo::DrawLine(Vector2f::kZero, Vector2f{200, 200}, Colors::kRed);
             //LOG_INFO("--------------------------------------");

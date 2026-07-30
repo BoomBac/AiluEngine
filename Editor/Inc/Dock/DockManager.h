@@ -88,10 +88,12 @@ namespace Ailu
             void BeginFloatWindow(DockWindow* w);
             void BeginFloatNode(DockNode* w);
             void EndFloatWindow(Vector2f drop_pos);
+            void DrawFloatingPreview();
             void MarkDeleteNode(DockNode* node);
         private:
-            void OnWindowFloat();
-            void DrawPreviewDockArea(Window *window, Vector2f pos, Vector2f size, Vector2f start_pos = Vector2f::kZero);
+            void OnWindowFloat(bool draw_preview);
+            void DrawPreviewDockArea(Window *window, Vector2f pos, Vector2f size, Vector2f start_pos = Vector2f::kZero,
+                                     bool draw_preview = true);
             void UpdateDockNode(DockNode *node);
             //处理节点move/resize/split size
             void HandleNodeResize();

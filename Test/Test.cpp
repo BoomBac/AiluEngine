@@ -4,6 +4,7 @@
 
 #include <Framework/Common/Allocator.hpp>
 #include <Framework/Common/Log.h>
+#include <Graph/GraphDocument.h>
 #include <Input/InputSystem.h>
 #include <Render/2D/SpriteBatcher.h>
 
@@ -720,6 +721,291 @@ namespace
         return performed_count == 1u;
     }
 
+    bool TestGraphDocumentAddLinkAndReplaceInput()
+    {
+        GraphAsset asset("GraphDocumentTest");
+        GraphDocument document;
+        if (!document.Open(&asset))
+            return false;
+
+        const Guid entry_id = document.AddNode("Flow.Entry", {0.0f, 0.0f});
+        const Guid branch_id = document.AddNode("Flow.Branch", {240.0f, 0.0f});
+        const Guid print_id = document.AddNode("Flow.Print", {480.0f, 0.0f});
+        const Guid sequence_id = document.AddNode("Flow.Sequence", {-240.0f, 0.0f});
+        if (entry_id == Guid::EmptyGuid() || branch_id == Guid::EmptyGuid() || print_id == Guid::EmptyGuid() ||
+            sequence_id == Guid::EmptyGuid())
+        {
+            return false;
+        }
+
+        const GraphNodeData *entry = document.FindNode(entry_id);
+        const GraphNodeData *branch = document.FindNode(branch_id);
+        const GraphNodeData *print = document.FindNode(print_id);
+        const GraphNodeData *sequence = document.FindNode(sequence_id);
+        if (entry == nullptr || branch == nullptr || print == nullptr || sequence == nullptr)
+            return false;
+
+        const Guid entry_then = entry->_pins[0]._id;
+        const Guid branch_exec = branch->_pins[0]._id;
+        const Guid branch_true = branch->_pins[2]._id;
+        const Guid print_exec = print->_pins[0]._id;
+        const Guid sequence_then = sequence->_pins[1]._id;
+
+        const Guid entry_to_branch = document.AddLink(entry_then, branch_exec);
+        const Guid branch_to_print = document.AddLink(branch_true, print_exec);
+        if (entry_to_branch == Guid::EmptyGuid() || branch_to_print == Guid::EmptyGuid() ||
+            document.Links().size() != 2u)
+            return false;
+
+        const GraphConnectionResponse replace_response = document.CanConnect(sequence_then, branch_exec);
+        if (replace_response._action != EGraphConnectionAction::kReplaceInput)
+            return false;
+
+        const Guid sequence_to_branch = document.AddLink(sequence_then, branch_exec);
+        if (sequence_to_branch == Guid::EmptyGuid() || document.Links().size() != 2u)
+            return false;
+
+        for (const GraphLinkData &link : document.Links())
+        {
+            if (link._id == entry_to_branch)
+                return false;
+            if (link._input_pin == branch_exec && link._output_pin != sequence_then)
+                return false;
+        }
+        return document.IsDirty();
+    }
+
+    bool TestGraphDocumentRejectsInvalidConnection()
+    {
+        GraphAsset asset("GraphInvalidConnectionTest");
+        GraphDocument document;
+        document.Open(&asset);
+
+        const Guid branch_id = document.AddNode("Flow.Branch", {0.0f, 0.0f});
+        const Guid literal_id = document.AddNode("Literal.Float", {240.0f, 0.0f});
+        const GraphNodeData *branch = document.FindNode(branch_id);
+        const GraphNodeData *literal = document.FindNode(literal_id);
+        if (branch == nullptr || literal == nullptr)
+            return false;
+
+        const GraphPinData &condition = branch->_pins[1];
+        const GraphPinData &float_value = literal->_pins[0];
+        const GraphConnectionResponse response = document.CanConnect(float_value._id, condition._id);
+        if (response._action != EGraphConnectionAction::kDisallow)
+            return false;
+        return document.AddLink(float_value._id, condition._id) == Guid::EmptyGuid() && document.Links().empty();
+    }
+
+    bool TestGraphDocumentRemoveNodeCleansLinks()
+    {
+        GraphAsset asset("GraphRemoveNodeTest");
+        GraphDocument document;
+        document.Open(&asset);
+
+        const Guid entry_id = document.AddNode("Flow.Entry", {0.0f, 0.0f});
+        const Guid branch_id = document.AddNode("Flow.Branch", {240.0f, 0.0f});
+        const GraphNodeData *entry = document.FindNode(entry_id);
+        const GraphNodeData *branch = document.FindNode(branch_id);
+        if (entry == nullptr || branch == nullptr)
+            return false;
+
+        const Guid link_id = document.AddLink(entry->_pins[0]._id, branch->_pins[0]._id);
+        if (link_id == Guid::EmptyGuid() || document.Links().size() != 1u)
+            return false;
+
+        const std::array<Guid, 1u> remove_ids = {branch_id};
+        if (!document.RemoveNodes(remove_ids))
+            return false;
+        return document.FindNode(branch_id) == nullptr && document.Links().empty();
+    }
+
+    bool TestGraphDocumentRemoveLinks()
+    {
+        GraphAsset asset("GraphRemoveLinkTest");
+        GraphDocument document;
+        document.Open(&asset);
+
+        const Guid entry_id = document.AddNode("Flow.Entry", {0.0f, 0.0f});
+        const Guid print_id = document.AddNode("Flow.Print", {240.0f, 0.0f});
+        const GraphNodeData *entry = document.FindNode(entry_id);
+        const GraphNodeData *print = document.FindNode(print_id);
+        if (entry == nullptr || print == nullptr)
+            return false;
+
+        const Guid link_id = document.AddLink(entry->_pins[0]._id, print->_pins[0]._id);
+        if (link_id == Guid::EmptyGuid() || document.FindLink(link_id) == nullptr)
+            return false;
+
+        const std::array<Guid, 1u> remove_ids = {link_id};
+        return document.RemoveLinks(remove_ids) && document.FindLink(link_id) == nullptr && document.Links().empty();
+    }
+
+    bool TestGraphDocumentSetNodePositions()
+    {
+        GraphAsset asset("GraphMoveNodeTest");
+        GraphDocument document;
+        document.Open(&asset);
+
+        const Guid entry_id = document.AddNode("Flow.Entry", {0.0f, 0.0f});
+        const Guid print_id = document.AddNode("Flow.Print", {240.0f, 0.0f});
+        const std::array<GraphNodePosition, 2u> positions = {{{entry_id, {16.0f, 32.0f}},
+                                                              {print_id, {304.0f, 48.0f}}}};
+        if (!document.SetNodePositions(positions))
+            return false;
+
+        const GraphNodeData *entry = document.FindNode(entry_id);
+        const GraphNodeData *print = document.FindNode(print_id);
+        if (entry == nullptr || print == nullptr)
+            return false;
+        return entry->_position == Vector2f(16.0f, 32.0f) && print->_position == Vector2f(304.0f, 48.0f) &&
+               document.IsDirty();
+    }
+
+    bool TestGraphCommandStackUndoRedo()
+    {
+        GraphAsset asset("GraphCommandStackTest");
+        GraphDocument document;
+        document.Open(&asset);
+
+        auto add_entry = MakeScope<AddGraphNodeCommand>("Flow.Entry", Vector2f(0.0f, 0.0f));
+        AddGraphNodeCommand *add_entry_ptr = add_entry.get();
+        if (!document.Commands().Execute(std::move(add_entry)))
+            return false;
+        const Guid entry_id = add_entry_ptr->NodeId();
+        if (entry_id == Guid::EmptyGuid() || document.FindNode(entry_id) == nullptr || !document.Commands().CanUndo())
+            return false;
+
+        document.Commands().Undo();
+        if (document.FindNode(entry_id) != nullptr || !document.Commands().CanRedo())
+            return false;
+        document.Commands().Redo();
+        if (document.FindNode(entry_id) == nullptr)
+            return false;
+
+        auto add_print = MakeScope<AddGraphNodeCommand>("Flow.Print", Vector2f(240.0f, 0.0f));
+        AddGraphNodeCommand *add_print_ptr = add_print.get();
+        if (!document.Commands().Execute(std::move(add_print)))
+            return false;
+        const Guid print_id = add_print_ptr->NodeId();
+        const GraphNodeData *entry = document.FindNode(entry_id);
+        const GraphNodeData *print = document.FindNode(print_id);
+        if (entry == nullptr || print == nullptr)
+            return false;
+
+        if (!document.Commands().Execute(MakeScope<AddGraphLinkCommand>(entry->_pins[0]._id, print->_pins[0]._id)) ||
+            document.Links().size() != 1u)
+        {
+            return false;
+        }
+        document.Commands().Undo();
+        if (!document.Links().empty())
+            return false;
+        document.Commands().Redo();
+        if (document.Links().size() != 1u)
+            return false;
+
+        Vector<GraphNodePosition> start_positions = {{entry_id, {0.0f, 0.0f}}};
+        Vector<GraphNodePosition> target_positions = {{entry_id, {64.0f, 32.0f}}};
+        if (!document.Commands().Execute(MakeScope<MoveGraphNodesCommand>(start_positions, target_positions)))
+            return false;
+        if (document.FindNode(entry_id)->_position != Vector2f(64.0f, 32.0f))
+            return false;
+        document.Commands().Undo();
+        if (document.FindNode(entry_id)->_position != Vector2f(0.0f, 0.0f))
+            return false;
+        document.Commands().Redo();
+        if (document.FindNode(entry_id)->_position != Vector2f(64.0f, 32.0f))
+            return false;
+
+        Vector<Guid> remove_nodes = {print_id};
+        if (!document.Commands().Execute(MakeScope<RemoveGraphNodesCommand>(remove_nodes)))
+            return false;
+        if (document.FindNode(print_id) != nullptr || !document.Links().empty())
+            return false;
+        document.Commands().Undo();
+        return document.FindNode(print_id) != nullptr && document.Links().size() == 1u;
+    }
+
+    bool TestGraphPasteCommandRemapsGuids()
+    {
+        GraphAsset asset("GraphPasteCommandTest");
+        GraphDocument document;
+        document.Open(&asset);
+
+        const Guid entry_id = document.AddNode("Flow.Entry", {0.0f, 0.0f});
+        const Guid print_id = document.AddNode("Flow.Print", {240.0f, 0.0f});
+        const GraphNodeData *entry = document.FindNode(entry_id);
+        const GraphNodeData *print = document.FindNode(print_id);
+        if (entry == nullptr || print == nullptr)
+            return false;
+
+        GraphNodeData pasted_entry = *entry;
+        GraphNodeData pasted_print = *print;
+        const Guid old_entry_pin = pasted_entry._pins[0]._id;
+        const Guid old_print_pin = pasted_print._pins[0]._id;
+        pasted_entry._id = Guid::Generate();
+        pasted_print._id = Guid::Generate();
+        for (GraphPinData &pin : pasted_entry._pins)
+            pin._id = Guid::Generate();
+        for (GraphPinData &pin : pasted_print._pins)
+            pin._id = Guid::Generate();
+        pasted_entry._position += Vector2f(32.0f, 32.0f);
+        pasted_print._position += Vector2f(32.0f, 32.0f);
+
+        GraphLinkData pasted_link;
+        pasted_link._id = Guid::Generate();
+        pasted_link._output_pin = pasted_entry._pins[0]._id;
+        pasted_link._input_pin = pasted_print._pins[0]._id;
+        Vector<GraphNodeData> pasted_nodes = {pasted_entry, pasted_print};
+        Vector<GraphLinkData> pasted_links = {pasted_link};
+
+        auto paste_command = MakeScope<PasteGraphElementsCommand>(pasted_nodes, pasted_links);
+        PasteGraphElementsCommand *paste_command_ptr = paste_command.get();
+        if (!document.Commands().Execute(std::move(paste_command)))
+            return false;
+        if (paste_command_ptr->PastedNodeIds().size() != 2u || paste_command_ptr->PastedLinkIds().size() != 1u)
+            return false;
+        if (document.FindNode(pasted_entry._id) == nullptr || document.FindNode(pasted_print._id) == nullptr)
+            return false;
+
+        const GraphLinkData *link = document.FindLink(pasted_link._id);
+        if (link == nullptr || link->_output_pin == old_entry_pin || link->_input_pin == old_print_pin)
+            return false;
+        if (!(link->_output_pin == pasted_entry._pins[0]._id) || !(link->_input_pin == pasted_print._pins[0]._id))
+            return false;
+
+        document.Commands().Undo();
+        if (document.FindNode(pasted_entry._id) != nullptr || document.FindLink(pasted_link._id) != nullptr)
+            return false;
+        document.Commands().Redo();
+        return document.FindNode(pasted_entry._id) != nullptr && document.FindLink(pasted_link._id) != nullptr;
+    }
+
+    bool TestGraphValidationFindsDuplicateIds()
+    {
+        GraphAsset asset("GraphValidationTest");
+        GraphNodeData first;
+        GraphNodeData second;
+        first._id = Guid::Generate();
+        second._id = first._id;
+        first._node_type = "Flow.Entry";
+        second._node_type = "Flow.Entry";
+        first._flags = GraphFlag(EGraphNodeFlag::kEntryNode);
+        second._flags = GraphFlag(EGraphNodeFlag::kEntryNode);
+        asset.MutableNodes().push_back(first);
+        asset.MutableNodes().push_back(second);
+
+        GraphDocument document;
+        document.Open(&asset);
+        bool found_duplicate_node = false;
+        for (const GraphValidationMessage &message : document.ValidationMessages())
+        {
+            if (message._severity == EGraphValidationSeverity::kError && message._message == "Duplicate node id.")
+                found_duplicate_node = true;
+        }
+        return found_duplicate_node;
+    }
+
     void RunAllocatorTests()
     {
         TestResult result;
@@ -745,6 +1031,14 @@ namespace
         RunTest(result, "Sprite batch offsets remain split after sorting",
                 TestSpriteBatchOffsetsRemainSplitAfterSorting);
         RunTest(result, "InputSystem button action smoke", TestInputSystemButtonAction);
+        RunTest(result, "GraphDocument add link and replace input", TestGraphDocumentAddLinkAndReplaceInput);
+        RunTest(result, "GraphDocument rejects invalid connection", TestGraphDocumentRejectsInvalidConnection);
+        RunTest(result, "GraphDocument remove node cleans links", TestGraphDocumentRemoveNodeCleansLinks);
+        RunTest(result, "GraphDocument remove links", TestGraphDocumentRemoveLinks);
+        RunTest(result, "GraphDocument set node positions", TestGraphDocumentSetNodePositions);
+        RunTest(result, "GraphCommandStack undo redo", TestGraphCommandStackUndoRedo);
+        RunTest(result, "Graph paste command remaps guids", TestGraphPasteCommandRemapsGuids);
+        RunTest(result, "GraphValidation finds duplicate ids", TestGraphValidationFindsDuplicateIds);
 
         std::cout << "\nAllocator page state:\n";
         std::cout << Allocator::Get().GetPageMgr().Dump() << '\n';

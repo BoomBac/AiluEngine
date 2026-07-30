@@ -4,6 +4,7 @@
 
 #include "Framework/Math/Guid.h"
 #include "Framework/Math/ALMath.hpp"
+#include "Graph/GraphTypes.h"
 #include "Objects/JsonArchive.h"
 #include "Objects/Object.h"
 #include "AssetCommon.h"
@@ -723,6 +724,26 @@ namespace Ailu
         bool _has_sprite_renderer_component = false;
         APROPERTY()
         SceneSpriteRendererComponentDocument _sprite_renderer_component;
+    };
+
+    ACLASS()
+    class AILU_API GraphAssetDocument : public Object
+    {
+        GENERATED_BODY()
+
+    public:
+        APROPERTY()
+        AssetDocumentHeader _header;
+        APROPERTY()
+        u32 _version = 1u;
+        APROPERTY()
+        String _schema_type;
+        APROPERTY()
+        Vector<GraphNodeData> _nodes;
+        APROPERTY()
+        Vector<GraphLinkData> _links;
+        APROPERTY()
+        Vector<GraphCommentData> _comments;
     };
 
     ACLASS()

@@ -81,6 +81,7 @@ namespace Ailu
             void SetTitle(String title);
             void SetFocus(bool is_focus);
             bool IsFocus() const { return _is_focused; }
+            void InvalidateDockState();
             /// <summary>
             /// 获取鼠标悬浮边缘情况
             /// </summary>
@@ -103,6 +104,7 @@ namespace Ailu
             bool ContainsWindow(DockWindow *w) const override { return this == w; }
             DockWindow *PrimaryWindow() const override { return const_cast<DockWindow *>(this); }
             void AttachToWindow(Window *w) override;
+            virtual void RequestClose();
             virtual void SaveDockLayoutState(JsonArchive &ar) {}
             virtual void LoadDockLayoutState(JsonArchive &ar) {}
             virtual void OnDockLayoutLoaded() {}

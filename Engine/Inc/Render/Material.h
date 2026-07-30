@@ -136,6 +136,7 @@ namespace Ailu::Render
             u32 _material_version = 0u;
             u32 _layout_version = 0u;
             ShaderVariantHash _variant_hash = 0u;
+            u64 _global_res_vesion = 0u;
             BindState _state;
         };
         struct FramePropertyBlockCache

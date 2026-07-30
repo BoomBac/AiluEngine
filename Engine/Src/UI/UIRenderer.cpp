@@ -283,6 +283,9 @@ namespace Ailu
             _cur_widget_block = nullptr;
             _cur_widget_blocks = nullptr;
             _cur_widget_block_index = 0u;
+            _cur_widget_index = 0u;
+            if (_overlay_draw_callback)
+                _overlay_draw_callback();
             for (const auto &entry: submit_entries)
             {
                 if (entry._widget == nullptr || entry._widget->IsPopup())
@@ -293,7 +296,6 @@ namespace Ailu
             }
             //绘制全局gui
             SubmitBlock(_drawer_blocks[_frame_index][0u], cmd, get_submit_color(RenderTexture::s_backbuffer));
-            _cur_widget_index = 0u;
             auto &window_blocks = _window_drawer_blocks[_frame_index];
             for (auto &it: window_blocks)
             {
@@ -484,6 +486,8 @@ namespace Ailu
         }
         void UIRenderer::DrawLine(Vector2f a, Vector2f b, Matrix4x4f matrix, f32 thickness, Color color, f32 depth)
         {
+            if (Magnitude(b - a) <= 0.001f)
+                return;
             // 线方向
             Vector2f dir = Normalize(b - a);
             // 法线（垂直方向）
@@ -536,6 +540,27 @@ namespace Ailu
             cb->_index_buf[i + 4] = v + 3;
             cb->_index_buf[i + 5] = v + 2;
             AppendNode(cb, 4u, 6u, _default_material.get());
+        }
+
+        void UIRenderer::DrawBezier(Vector2f start, Vector2f start_tangent, Vector2f end_tangent, Vector2f end,
+                                    f32 thickness, Color color, f32 depth, u32 segments)
+        {
+            segments = std::max(1u, segments);
+            auto sample = [&](f32 t)
+            {
+                const f32 inv_t = 1.0f - t;
+                return start * (inv_t * inv_t * inv_t) + start_tangent * (3.0f * inv_t * inv_t * t) +
+                       end_tangent * (3.0f * inv_t * t * t) + end * (t * t * t);
+            };
+
+            Vector2f previous = start;
+            for (u32 segment_index = 1u; segment_index <= segments; ++segment_index)
+            {
+                const f32 t = static_cast<f32>(segment_index) / static_cast<f32>(segments);
+                Vector2f current = sample(t);
+                DrawLine(previous, current, thickness, color, depth);
+                previous = current;
+            }
         }
         void UIRenderer::DrawBox(Vector2f pos, Vector2f size, f32 thickness, Color color, f32 depth)
         {

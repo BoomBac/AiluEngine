@@ -13,6 +13,7 @@
 #include "Framework/Core/Containers/List.h"
 #include "Framework/Core/Containers/Queue.h"
 #include "Framework/Common/Assert.h"
+#include "Graph/GraphAsset.h"
 #include "Render/GraphicsContext.h"
 #include "Render/Material.h"
 #include "pch.h"
@@ -436,6 +437,7 @@ namespace Ailu
 		_lut_global_resources_by_type[Sprite::StaticType()] = {};
 		_lut_global_resources_by_type[InputActionAsset::StaticType()] = {};
 		_lut_global_resources_by_type[AudioClip::StaticType()] = {};
+		_lut_global_resources_by_type[GraphAsset::StaticType()] = {};
 		_asset_domains.emplace_back(AssetMountDesc{
 			EAssetDomain::kEngine,
 			kPathScheme[0],
@@ -471,6 +473,7 @@ namespace Ailu
 		_asset_handler_registry.Register(MakeScope<AnimationClipAssetHandler>());
 		_asset_handler_registry.Register(MakeScope<InputActionAssetHandler>());
 		_asset_handler_registry.Register(MakeScope<AudioClipAssetHandler>());
+		_asset_handler_registry.Register(MakeScope<GraphAssetHandler>());
 		
 		Vector<WString> shader_asset_pathes = {
 				L"Shaders/hlsl/deferred_lighting.alasset",
@@ -1494,6 +1497,8 @@ namespace Ailu
 				return InputActionAsset::StaticType();
 			if (type == AudioClip::StaticType())
 				return AudioClip::StaticType();
+			if (type == GraphAsset::StaticType())
+				return GraphAsset::StaticType();
 		}
 		return nullptr;
 	}
