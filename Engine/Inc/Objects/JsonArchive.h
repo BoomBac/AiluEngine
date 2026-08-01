@@ -100,6 +100,94 @@ namespace Ailu
         bool IsLoading() const { return _is_loading; };
         bool IsLoaded() const { return _is_loaded; };
 
+        template<typename T>
+        FArchive &operator<<(const T &obj)
+        {
+            using ValueType = std::remove_cvref_t<T>;
+            if constexpr (std::is_same_v<ValueType, u8> || std::is_same_v<ValueType, u16> ||
+                          std::is_same_v<ValueType, u32> || std::is_same_v<ValueType, u64>)
+            {
+                return *this << static_cast<u64>(obj);
+            }
+            else if constexpr (std::is_same_v<ValueType, i8> || std::is_same_v<ValueType, i16> ||
+                               std::is_same_v<ValueType, i32> || std::is_same_v<ValueType, i64>)
+            {
+                return *this << static_cast<i64>(obj);
+            }
+            else if constexpr (std::is_same_v<ValueType, f32> || std::is_same_v<ValueType, f64>)
+            {
+                return *this << static_cast<f64>(obj);
+            }
+            else if constexpr (std::is_same_v<ValueType, bool> || std::is_same_v<ValueType, String>)
+            {
+                return *this << obj;
+            }
+            else if constexpr (std::is_base_of_v<Object, ValueType>)
+            {
+                return *this << static_cast<Object &>(const_cast<ValueType &>(obj));
+            }
+            else if constexpr (requires(ValueType &value) { value.GetType(); })
+            {
+                ValueType &value = const_cast<ValueType &>(obj);
+                for (const auto &property: value.GetType()->GetProperties())
+                    property.Serialize(&value, *this);
+                return *this;
+            }
+            else
+            {
+                static_assert(std::is_base_of_v<Object, ValueType> || requires(ValueType &value) { value.GetType(); },
+                              "JsonArchive only supports reflected types and primitive types");
+            }
+        }
+
+        template<typename T>
+        FArchive &operator>>(T &obj)
+        {
+            using ValueType = std::remove_cvref_t<T>;
+            if constexpr (std::is_same_v<ValueType, u8> || std::is_same_v<ValueType, u16> ||
+                          std::is_same_v<ValueType, u32> || std::is_same_v<ValueType, u64>)
+            {
+                u64 value;
+                *this >> value;
+                obj = static_cast<ValueType>(value);
+                return *this;
+            }
+            else if constexpr (std::is_same_v<ValueType, i8> || std::is_same_v<ValueType, i16> ||
+                               std::is_same_v<ValueType, i32> || std::is_same_v<ValueType, i64>)
+            {
+                i64 value;
+                *this >> value;
+                obj = static_cast<ValueType>(value);
+                return *this;
+            }
+            else if constexpr (std::is_same_v<ValueType, f32> || std::is_same_v<ValueType, f64>)
+            {
+                f64 value;
+                *this >> value;
+                obj = static_cast<ValueType>(value);
+                return *this;
+            }
+            else if constexpr (std::is_same_v<ValueType, bool> || std::is_same_v<ValueType, String>)
+            {
+                return *this >> obj;
+            }
+            else if constexpr (std::is_base_of_v<Object, ValueType>)
+            {
+                return *this >> static_cast<Object &>(obj);
+            }
+            else if constexpr (requires(ValueType &value) { value.GetType(); })
+            {
+                for (const auto &property: obj.GetType()->GetProperties())
+                    property.Deserialize(&obj, *this);
+                return *this;
+            }
+            else
+            {
+                static_assert(std::is_base_of_v<Object, ValueType> || requires(ValueType &value) { value.GetType(); },
+                              "JsonArchive only supports reflected types and primitive types");
+            }
+        }
+
         FArchive &operator<<(const u8 &obj) final { return *this << (u64) obj; }
         FArchive &operator<<(const u16 &obj) final { return *this << (u64) obj; }
         FArchive &operator<<(const u32 &obj) final { return *this << (u64) obj; }

@@ -49,6 +49,8 @@ namespace Ailu
             _obj_cb.reset(ConstantBuffer::Create(Render::RenderConstants::kPerObjectDataSize));
             _default_material = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/default_ui.alasset"), "DefaultUIMaterial");
             _default_material->SetTexture("_MainTex", Render::Texture::s_p_default_white);
+            _shadow_material = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/ui_shadow.alasset"), "UIShadowMaterial");
+            _shadow_material->SetFloat("_ShadowSpread", 16.0f);
             _backdrop_blur_cs = ComputeShader::Create(ResourceMgr::GetResSysPath(L"Shaders/hlsl/Compute/blur.hlsl"));
             _backdrop_blur_x_kernel = _backdrop_blur_cs->FindKernel("blur_x");
             _backdrop_blur_y_kernel = _backdrop_blur_cs->FindKernel("blur_y");
@@ -368,6 +370,18 @@ namespace Ailu
             AppendQuadToBlock(cb, rect, kIdentityMatrix, brush, corner_radius, depth);
         }
 
+        void UIRenderer::DrawWindowShadow(Window *window, Vector4f rect, Color color, Vector4f corner_radius)
+        {
+            if (window == nullptr || _shadow_material == nullptr)
+                return;
+
+            UIBrush brush;
+            brush._type = EUIBrushType::kColor;
+            brush._tint = color;
+            auto *block = GetAvailableWindowBlock(window, 4u, 6u, _shadow_material.get());
+            AppendQuadToBlock(block, rect, kIdentityMatrix, brush, corner_radius, 0.0f, _shadow_material.get());
+        }
+
         void UIRenderer::DrawWindowText(Window *window, const String &text, Vector2f pos, f32 font_size, Color color,
                                         Vector2f scale, Render::Font *font)
         {
@@ -380,7 +394,8 @@ namespace Ailu
         }
 
         void UIRenderer::AppendQuadToBlock(DrawerBlock *cb, Vector4f rect, Matrix4x4f matrix, const UIBrush &brush,
-                                           Vector4f corner_radius, f32 depth)
+                                           Vector4f corner_radius, f32 depth, Render::Material *material,
+                                           Vector4f border_thickness)
         {
             auto color = brush._tint;
             u32 cur_vert_num = cb->CurrentVertNum(), cur_index_num = cb->CurrentIndexNum();
@@ -408,13 +423,17 @@ namespace Ailu
             cb->_corner_radius_buf[cur_vert_num + 1] = corner_radius;
             cb->_corner_radius_buf[cur_vert_num + 2] = corner_radius;
             cb->_corner_radius_buf[cur_vert_num + 3] = corner_radius;
+            cb->_border_thickness_buf[cur_vert_num] = border_thickness;
+            cb->_border_thickness_buf[cur_vert_num + 1] = border_thickness;
+            cb->_border_thickness_buf[cur_vert_num + 2] = border_thickness;
+            cb->_border_thickness_buf[cur_vert_num + 3] = border_thickness;
             cb->_index_buf[cur_index_num] = cur_vert_num + 0u;
             cb->_index_buf[cur_index_num + 1] = cur_vert_num + 1u;
             cb->_index_buf[cur_index_num + 2] = cur_vert_num + 2u;
             cb->_index_buf[cur_index_num + 3] = cur_vert_num + 1u;
             cb->_index_buf[cur_index_num + 4] = cur_vert_num + 3u;
             cb->_index_buf[cur_index_num + 5] = cur_vert_num + 2u;
-            AppendNode(cb, 4u, 6u, _default_material.get(),
+            AppendNode(cb, 4u, 6u, material != nullptr ? material : _default_material.get(),
                        brush._texture ? brush._texture : Texture::s_p_default_white,
                        0.0f, brush._type == EUIBrushType::kBackdropBlur);
         }
@@ -423,8 +442,9 @@ namespace Ailu
         {
             if (visual._background._type != EUIBrushType::kNone && visual._background._tint.a > 0.0f)
                 DrawQuad(rect, matrix, visual._background, visual._corner_radius);
-            if (visual._border_width > 0.0f && visual._border_color.a > 0.0f)
-                DrawBox(rect.xy, rect.zw, matrix, visual._border_width, visual._border_color);
+            if ((visual._border_width.x > 0.0f || visual._border_width.y > 0.0f ||
+                 visual._border_width.z > 0.0f || visual._border_width.w > 0.0f) && visual._border_color.a > 0.0f)
+                DrawBorder(rect, matrix, visual._border_width, visual._corner_radius, visual._border_color);
         }
 
         void UIRenderer::DrawText(const String &text, Vector2f pos, f32 font_size, Color color,Vector2f scale, Render::Font *font)
@@ -471,6 +491,10 @@ namespace Ailu
             cb->_corner_radius_buf[cur_vert_num + 1] = Vector4f::kZero;
             cb->_corner_radius_buf[cur_vert_num + 2] = Vector4f::kZero;
             cb->_corner_radius_buf[cur_vert_num + 3] = Vector4f::kZero;
+            cb->_border_thickness_buf[cur_vert_num] = Vector4f::kZero;
+            cb->_border_thickness_buf[cur_vert_num + 1] = Vector4f::kZero;
+            cb->_border_thickness_buf[cur_vert_num + 2] = Vector4f::kZero;
+            cb->_border_thickness_buf[cur_vert_num + 3] = Vector4f::kZero;
             cb->_index_buf[cur_index_num] = cur_vert_num + 0u;
             cb->_index_buf[cur_index_num + 1] = cur_vert_num + 1u;
             cb->_index_buf[cur_index_num + 2] = cur_vert_num + 2u;
@@ -532,6 +556,10 @@ namespace Ailu
             cb->_corner_radius_buf[v + 1] = Vector4f::kZero;
             cb->_corner_radius_buf[v + 2] = Vector4f::kZero;
             cb->_corner_radius_buf[v + 3] = Vector4f::kZero;
+            cb->_border_thickness_buf[v + 0] = Vector4f::kZero;
+            cb->_border_thickness_buf[v + 1] = Vector4f::kZero;
+            cb->_border_thickness_buf[v + 2] = Vector4f::kZero;
+            cb->_border_thickness_buf[v + 3] = Vector4f::kZero;
 
             cb->_index_buf[i + 0] = v + 0;
             cb->_index_buf[i + 1] = v + 1;
@@ -578,6 +606,19 @@ namespace Ailu
             DrawLine(p1, p2, matrix,thickness, color, depth);// right
             DrawLine(p2, p3, matrix,thickness, color, depth);// bottom
             DrawLine(p3, p0, matrix,thickness, color, depth);// left
+        }
+
+        void UIRenderer::DrawBorder(Vector4f rect, Matrix4x4f matrix, Vector4f thickness, Vector4f corner_radius,
+                                    Color color, f32 depth)
+        {
+            if ((thickness.x <= 0.0f && thickness.y <= 0.0f && thickness.z <= 0.0f && thickness.w <= 0.0f) ||
+                color.a <= 0.0f)
+                return;
+            UIBrush brush;
+            brush._type = EUIBrushType::kColor;
+            brush._tint = color;
+            DrawerBlock *cb = GetAvailableBlock(4u, 6u);
+            AppendQuadToBlock(cb, rect, matrix, brush, corner_radius, depth, nullptr, thickness);
         }
 
         void UIRenderer::PushScissor(Vector4f scissor)
@@ -749,15 +790,18 @@ namespace Ailu
             }
             return available_block;
         }
-        DrawerBlock *UIRenderer::GetAvailableWindowBlock(Window *window, u32 vert_num, u32 index_num)
+        DrawerBlock *UIRenderer::GetAvailableWindowBlock(Window *window, u32 vert_num, u32 index_num, Render::Material *material)
         {
+            if (material == nullptr)
+                material = _default_material.get();
             auto &blocks = _window_drawer_blocks[_frame_index][window];
             for (auto *block: blocks)
             {
-                if (block->CanAppend(vert_num, index_num))
+                if (block->_mat.get() == material && block->CanAppend(vert_num, index_num))
                     return block;
             }
-            blocks.push_back(AL_NEW(DrawerBlock, _default_material, 8092u * 4));
+            Ref<Material> block_material = material == _shadow_material.get() ? _shadow_material : _default_material;
+            blocks.push_back(AL_NEW(DrawerBlock, block_material, 8092u * 4));
             return blocks.back();
         }
         Render::Texture *UIRenderer::GetOrCreateBackdropBlurTexture(Render::Texture *source, CommandBuffer *cmd)
@@ -847,6 +891,8 @@ namespace Ailu
             cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &cb_per_cam, RenderConstants::kPerCameraDataSize);
             Color tint = Colors::kWhite;
             b->_mat->SetVector("_Color", tint);
+            if (b->_mat.get() == _shadow_material.get())
+                b->_mat->SetFloat("_ShadowSpread", 16.0f);
             for (const auto &node: b->_nodes)
             {
                 if (node._is_backdrop_blur)

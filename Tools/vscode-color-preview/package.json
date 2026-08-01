@@ -1,0 +1,17 @@
+{
+    "name": "json-color-preview",
+    "displayName": "JSON Color Preview",
+    "description": "Display color swatches and pickers next to [r,g,b,a] arrays in JSON files where the key contains 'color'.",
+    "version": "1.0.0",
+    "publisher": "ailu",
+    "engines": {
+        "vscode": "^1.74.0"
+    },
+    "categories": ["Other"],
+    "activationEvents": [
+        "onLanguage:json",
+        "onLanguage:jsonc"
+    ],
+    "main": "./extension.js",
+    "contributes": {}
+}

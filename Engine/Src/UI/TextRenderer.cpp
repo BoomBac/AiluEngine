@@ -114,6 +114,10 @@ namespace Ailu
                 block->_corner_radius_buf[v_base + 1] = Vector4f::kZero;
                 block->_corner_radius_buf[v_base + 2] = Vector4f::kZero;
                 block->_corner_radius_buf[v_base + 3] = Vector4f::kZero;
+                block->_border_thickness_buf[v_base] = Vector4f::kZero;
+                block->_border_thickness_buf[v_base + 1] = Vector4f::kZero;
+                block->_border_thickness_buf[v_base + 2] = Vector4f::kZero;
+                block->_border_thickness_buf[v_base + 3] = Vector4f::kZero;
                 block->_index_buf[i_base] = v_base;
                 block->_index_buf[i_base + 1] = v_base + 1;
                 block->_index_buf[i_base + 2] = v_base + 2;

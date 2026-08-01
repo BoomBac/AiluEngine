@@ -147,11 +147,14 @@ namespace Ailu
             void SetBackdropSourceRect(const Vector4f &source_rect) { _backdrop_source_rect = source_rect; }
             void SetCornerRadius(const Vector4f &corner_radius) { _corner_radius = corner_radius; }
             void SetBorder(Color color, f32 width);
+            void SetStyleId(const UIStyleId &id);
+            const UIStyleId &GetStyleId() const { return _style_id; }
             Vector2f MeasureDesiredSize() override;
         protected:
             APROPERTY()
             bool _is_size_to_content = false;// If true, the list will resize to fit its content
             void RenderImpl(UIRenderer &r) final override;
+            void ResolveStyle(const UIStyleContext &context) override;
         private:
             VerticalBox *_content_box = nullptr;// 用于布局子项
             UIElement *_hovered_item = nullptr;
@@ -162,6 +165,8 @@ namespace Ailu
             Vector4f _corner_radius = Vector4f(4.0f);
             Color _border_color = Colors::kTransparent;
             f32 _border_width = 0.0f;
+            UIStyleId _style_id;
+            UIListViewStyle _resolved_list_style;
         };
 
         class Text;
@@ -267,6 +272,7 @@ namespace Ailu
             bool _is_hover_bar = false;
             UIControlVisualOverride _style_override;
             mutable UIControlVisual _resolved_visual;
+            UISplitViewStyle _resolved_split_view_style;
         };
     }
 }// namespace Ailu

@@ -5,6 +5,7 @@
 #include "Inc/Render/FrameResource.h"
 #include "Inc/Render/GraphicsContext.h"
 #include "Inc/Render/FrameAllocator.h"
+#include "RHI/DX12/UploadBuffer.h"
 
 namespace Ailu::Render
 {
@@ -156,7 +157,28 @@ namespace Ailu::Render
         const u64 cur_frame = gfx.GetFrameCount();
         _active_allocator = _frame_allocators[_active_slot].get();
         _active_allocator->NewFrame(cur_frame);
+        // 帧上传缓冲区随帧槽位复用：此时该槽位的上一帧GPU工作已完成，可安全重置
+        ResetFrameUpload(_active_slot);
     }
+    FrameUploadAllocation FrameResourceManager::AllocFrameUpload(u32 size, u32 alignment)
+    {
+        if (_frame_upload_buffers[_active_slot] == nullptr)
+            _frame_upload_buffers[_active_slot] = MakeScope<RHI::DX12::UploadBuffer>(std::format("FrameUploadBuffer_{}", _active_slot));
+        auto *upload_buf = static_cast<RHI::DX12::UploadBuffer *>(_frame_upload_buffers[_active_slot].get());
+        auto alloc = upload_buf->Allocate(size, alignment);
+        FrameUploadAllocation out;
+        out._buffer = upload_buf;
+        out._cpu_ptr = alloc.CPU;
+        out._gpu_handle = alloc.GPU;
+        return out;
+    }
+
+    void FrameResourceManager::ResetFrameUpload(u32 frame_slot)
+    {
+        if (_frame_upload_buffers[frame_slot])
+            static_cast<RHI::DX12::UploadBuffer *>(_frame_upload_buffers[frame_slot].get())->Reset();
+    }
+
     void FrameResourceManager::FrameCleanup()
     {
         const u64 cur_frame = GraphicsContext::Get().GetFrameCount();

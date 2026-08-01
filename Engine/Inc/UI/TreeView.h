@@ -89,9 +89,17 @@ namespace Ailu
             void SetCanDropCallback(TreeCanDropCallback callback) { _can_drop_callback = std::move(callback); }
             void SetDropCallback(TreeDropCallback callback) { _drop_callback = std::move(callback); }
 
+            // ── Style ────────────────────────────────────────────
+            void SetStyleId(const UIStyleId &id);
+            const UIStyleId &GetStyleId() const { return _style_id; }
+            UITreeViewStyleOverride &GetStyleOverride() { return _style_override; }
+            const Padding &GetStylePadding() const { return _padding; }
+            f32 GetStyleFontSize() const { return _font_size; }
+
             f32 _row_height = 22.0f;
             f32 _indent_width = 16.0f;
             f32 _expand_button_width = 16.0f;
+            f32 _font_size = 14.0f;
             Color _normal_color = Color(0.15f, 0.15f, 0.2f, 1.0f);
             Color _hover_color = Color(0.2f, 0.2f, 0.4f, 1.0f);
             Color _selected_color = Color(0.3f, 0.3f, 0.6f, 1.0f);
@@ -101,6 +109,7 @@ namespace Ailu
             void RenderImpl(UIRenderer& r) override;
 
         private:
+            void ResolveStyle(const UIStyleContext &context) override;
             void RebuildRows();
             void CollectVisibleItems(TreeItemId parent_id, u32 depth, u32& count,
                                      std::unordered_set<TreeItemId>& visited);
@@ -131,6 +140,10 @@ namespace Ailu
             bool _is_drag_started = false;
 
             bool _is_suppress_selection_notify = false;
+
+            UIStyleId _style_id;
+            UITreeViewStyleOverride _style_override;
+            UITreeViewStyle _resolved_style;
         };
     }// namespace UI
 }// namespace Ailu

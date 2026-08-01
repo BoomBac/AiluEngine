@@ -354,7 +354,7 @@ namespace Ailu::RHI::DX12
     public:
         D3DShader(const WString &sys_path);
         ~D3DShader();
-        void Bind(u16 pass_index, ShaderVariantHash variant_hash) final;
+        void Bind(Render::RHICommandBuffer *cmd, u16 pass_index, ShaderVariantHash variant_hash) final;
         void *GetByteCode(EShaderType type, u16 pass_index, ShaderVariantHash variant_hash) final;
         ID3D12RootSignature *GetSignature(u16 pass_index, ShaderVariantHash variant_hash);
         Vector<CD3DX12_ROOT_PARAMETER1>& GetRootParameters(u16 pass_index, ShaderVariantHash variant_hash);
@@ -401,6 +401,8 @@ namespace Ailu::RHI::DX12
         /// @param thread_group_y 
         /// @param thread_group_z 
         void Bind(RHICommandBuffer *cmd, Render::ComputeShaderKernelId kernel) final;
+        void Bind(RHICommandBuffer *cmd, Render::ComputeShaderKernelId kernel,
+                  const Render::ComputeDispatchSnapshot &snapshot) final;
     private:
         bool RHICompileImpl(u16 kernel_index,ShaderVariantHash variant_hash, bool is_load_cache) final;
         void GenerateInternalPSO(u16 kernel_index,ShaderVariantHash variant_hash);

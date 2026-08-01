@@ -10,6 +10,7 @@
 
 #include "Common/Undo.h"
 #include "Objects/JsonArchive.h"
+#include <cctype>
 
 namespace Ailu
 {
@@ -28,6 +29,58 @@ namespace Ailu
             inline const Color kComponentBlockBorder = Color(0.22f, 0.245f, 0.30f, 1.0f);
             inline constexpr f32 kPropLabelFill = 1.0f;
             inline constexpr f32 kPropValueFill = 3.0f;
+
+            struct ComponentMenuItem
+            {
+                String _name;
+                std::function<bool(ECS::Register &, ECS::Entity)> _is_added;
+                std::function<void(ECS::Register &, ECS::Entity)> _add;
+            };
+
+            inline String ToLower(String value)
+            {
+                for (char &ch : value)
+                    ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+                return value;
+            }
+
+            inline Vector<ComponentMenuItem> GetComponentMenuItems()
+            {
+                return {
+                    {"Tag", [](auto &r, auto e) { return r.HasComponent<ECS::TagComponent>(e); },
+                     [](auto &r, auto e) { r.AddComponent<ECS::TagComponent>(e); }},
+                    {"Persistent ID", [](auto &r, auto e) { return r.HasComponent<ECS::PersistentIdComponent>(e); },
+                     [](auto &r, auto e) { r.AddComponent<ECS::PersistentIdComponent>(e); }},
+                    {"Transform", [](auto &r, auto e) { return r.HasComponent<ECS::TransformComponent>(e); },
+                     [](auto &r, auto e) { r.AddComponent<ECS::TransformComponent>(e); }},
+                    {"Script", [](auto &r, auto e) { return r.HasComponent<ECS::ScriptComponent>(e); },
+                     [](auto &r, auto e) { r.AddComponent<ECS::ScriptComponent>(e); }},
+                    {"Static Mesh", [](auto &r, auto e) { return r.HasComponent<ECS::StaticMeshComponent>(e); },
+                     [](auto &r, auto e) { r.AddComponent<ECS::StaticMeshComponent>(e); }},
+                    {"Light", [](auto &r, auto e) { return r.HasComponent<ECS::LightComponent>(e); },
+                     [](auto &r, auto e) { r.AddComponent<ECS::LightComponent>(e); }},
+                    {"Camera", [](auto &r, auto e) { return r.HasComponent<ECS::CCamera>(e); },
+                     [](auto &r, auto e) { r.AddComponent<ECS::CCamera>(e); }},
+                    {"Hierarchy", [](auto &r, auto e) { return r.HasComponent<ECS::CHierarchy>(e); },
+                     [](auto &r, auto e) { r.AddComponent<ECS::CHierarchy>(e); }},
+                    {"Light Probe", [](auto &r, auto e) { return r.HasComponent<ECS::CLightProbe>(e); },
+                     [](auto &r, auto e) { r.AddComponent<ECS::CLightProbe>(e); }},
+                    {"Rigid Body", [](auto &r, auto e) { return r.HasComponent<ECS::CRigidBody>(e); },
+                     [](auto &r, auto e) { r.AddComponent<ECS::CRigidBody>(e); }},
+                    {"Collider", [](auto &r, auto e) { return r.HasComponent<ECS::CCollider>(e); },
+                     [](auto &r, auto e) { r.AddComponent<ECS::CCollider>(e); }},
+                    {"Skeleton Mesh", [](auto &r, auto e) { return r.HasComponent<ECS::CSkeletonMesh>(e); },
+                     [](auto &r, auto e) { r.AddComponent<ECS::CSkeletonMesh>(e); }},
+                    {"VXGI", [](auto &r, auto e) { return r.HasComponent<ECS::CVXGI>(e); },
+                     [](auto &r, auto e) { r.AddComponent<ECS::CVXGI>(e); }},
+                    {"Sprite Renderer", [](auto &r, auto e) { return r.HasComponent<ECS::SpriteRendererComponent>(e); },
+                     [](auto &r, auto e) { r.AddComponent<ECS::SpriteRendererComponent>(e); }},
+                    {"Audio Source", [](auto &r, auto e) { return r.HasComponent<ECS::AudioSourceComponent>(e); },
+                     [](auto &r, auto e) { r.AddComponent<ECS::AudioSourceComponent>(e); }},
+                    {"Audio Listener", [](auto &r, auto e) { return r.HasComponent<ECS::AudioListenerComponent>(e); },
+                     [](auto &r, auto e) { r.AddComponent<ECS::AudioListenerComponent>(e); }},
+                };
+            }
 
             inline String FormatColorButtonText(const Vector4f &color, bool include_alpha = false)
             {
@@ -452,7 +505,19 @@ namespace Ailu
             _vb = _root->AddChild<UI::VerticalBox>();
             _vb->SlotPadding() = UI::Padding(4.0f, 6.0f, 0.0f, 0.0f);
             _vb->InvalidateLayout();
-            _vb->AddChild<UI::Text>("Name");
+            auto name_row = _vb->AddChild<UI::HorizontalBox>();
+            _name_text = name_row->AddChild<UI::Text>("Name");
+            _name_text->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto);
+            _add_component_button = name_row->AddChild<UI::Button>();
+            _add_component_button->SetText("+");
+            _add_component_button->GetSlotAs<UI::LinearSlot>()
+                    .SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFixed)
+                    .Size({UI::CollapsibleView::s_header_height, UI::CollapsibleView::s_header_height});
+            _add_component_button->OnMouseClick() += [this](UI::UIEvent &e)
+            {
+                ShowAddComponentPopup(e._current_target);
+                e._is_handled = true;
+            };
             _vb->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto);
 
             Selection::on_selection_changed += [this]()
@@ -466,6 +531,70 @@ namespace Ailu
             ar << *_content_widget;
             ar.Save("ObjectDetailLayout.json");
         }
+
+        void ObjectDetail::ShowAddComponentPopup(UI::UIElement *anchor)
+        {
+            const ECS::Entity selected = Selection::FirstEntity();
+            auto *scene = SceneMgr::Get().ActiveScene();
+            if (selected == ECS::kInvalidEntity || scene == nullptr || anchor == nullptr)
+                return;
+
+            auto popup = MakeRef<UI::VerticalBox>();
+            popup->Name("AddComponentPopup");
+            popup->SlotPadding() = UI::Padding(4.0f);
+
+            auto search = popup->AddChild<UI::InputBlock>("Search components...");
+            search->GetSlotAs<UI::LinearSlot>()
+                    .SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFixed)
+                    .Size({300.0f, 28.0f});
+
+            auto list_view = popup->AddChild<UI::ListView>();
+            list_view->GetSlotAs<UI::LinearSlot>()
+                    .SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFixed)
+                    .Size({300.0f, 240.0f});
+            list_view->SetViewportHeight(240.0f);
+
+            const auto items = GetComponentMenuItems();
+            auto populate = std::make_shared<std::function<void(const String &)>>();
+            *populate = [list_view, items, selected, scene](const String &query)
+            {
+                list_view->ClearItems();
+                const String lowered_query = ToLower(query);
+                auto &scene_register = scene->GetRegister();
+                for (const auto &item : items)
+                {
+                    if (item._is_added(scene_register, selected) ||
+                        ToLower(item._name).find(lowered_query) == String::npos)
+                        continue;
+
+                    auto item_text = MakeRef<UI::Text>(item._name);
+                    item_text->OnMouseClick() += [item, selected, scene](UI::UIEvent &e)
+                    {
+                        auto &scene_register = scene->GetRegister();
+                        if (!item._is_added(scene_register, selected))
+                        {
+                            item._add(scene_register, selected);
+                            SceneMgr::Get().MarkCurSceneDirty();
+                        }
+                        UI::UIManager::Get()->HidePopup();
+                        e._is_handled = true;
+                    };
+                    list_view->AddItem(item_text);
+                }
+            };
+            search->_on_content_changed += [populate](String query)
+            {
+                (*populate)(query);
+            };
+            (*populate)(String{});
+
+            const auto abs_rect = anchor->GetArrangeRect();
+            popup->GetSlot()->Size({308.0f, 280.0f});
+            Vector2f show_pos = abs_rect.xy;
+            show_pos.y += abs_rect.w;
+            UI::UIManager::Get()->ShowPopupAt(show_pos.x, show_pos.y, popup);
+        }
+
         void ObjectDetail::Update(f32 dt)
         {
             DockWindow::Update(dt);
@@ -497,7 +626,7 @@ namespace Ailu
                 auto &r = SceneMgr::Get().ActiveScene()->GetRegister();
                 if (auto comp = r.GetComponent<ECS::TagComponent>(selected); comp != nullptr)
                 {
-                    _vb->ChildAt(0)->As<UI::Text>()->SetText(comp->_name);
+                    _name_text->SetText(comp->_name);
                 }
                 if (auto comp = r.GetComponent<ECS::TransformComponent>(selected); comp != nullptr)
                 {
@@ -939,7 +1068,7 @@ namespace Ailu
             }
             else
             {
-                _vb->ChildAt(0)->As<UI::Text>()->SetText("Name: (No Selection)");
+                _name_text->SetText("Name: (No Selection)");
                 clear_dynamic_blocks();
                 _needs_rebuild = true;
             }

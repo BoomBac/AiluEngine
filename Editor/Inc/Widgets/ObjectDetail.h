@@ -11,6 +11,8 @@ namespace Ailu
         class ScrollView;
         class InputBlock;
         class CollapsibleView;
+        class Button;
+        class Text;
     }// namespace UI
     namespace Editor
     {
@@ -35,7 +37,11 @@ namespace Ailu
             UI::CollapsibleView *_script_block = nullptr;
             UI::InputBlock *_script_path_block = nullptr;
             UI::UIElement *_prev_comp_block = nullptr;
+            UI::Text *_name_text = nullptr;
+            UI::Button *_add_component_button = nullptr;
             bool _needs_rebuild = true;
+
+            void ShowAddComponentPopup(UI::UIElement *anchor);
         };
     }// namespace Editor
 }// namespace Ailu

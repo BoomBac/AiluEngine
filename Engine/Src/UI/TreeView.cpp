@@ -28,21 +28,23 @@ namespace Ailu
                     hb->GetSlotAs<LinearSlot>().SizePolicy(ESizePolicy::kFill, ESizePolicy::kAuto);
 
                     // Indent via left margin on the horizontal box
-                    f32 indent = depth * tree->_indent_width + 4.0f;
-                    hb->GetSlotAs<LinearSlot>().Margin(Padding(indent, 0.0f, 0.0f, 0.0f));
+                    const Padding &padding = tree->GetStylePadding();
+                    f32 indent = depth * tree->_indent_width + padding._l;
+                    hb->GetSlotAs<LinearSlot>().Margin(Padding(indent, padding._t, padding._r, padding._b));
 
                     // Expand button
                     if (_has_children)
                     {
                         _expand_btn = hb->AddChild<Text>(expanded ? "v" : ">");
                         _expand_btn->GetSlotAs<LinearSlot>().Size({tree->_expand_button_width, tree->_row_height}).SizePolicy(ESizePolicy::kFixed, ESizePolicy::kFixed);
-                        _expand_btn->_color = Colors::kGray;
+                        _expand_btn->FontSize(tree->GetStyleFontSize(), false);
                         _expand_btn->GetSlotAs<LinearSlot>().Margin(Padding(0.0f, 0.0f, 2.0f, 0.0f));
                     }
                     else
                     {
                         // Spacer for alignment with items that have expand buttons
                         auto* spacer = hb->AddChild<Text>(" ");
+                        spacer->FontSize(tree->GetStyleFontSize(), false);
                         spacer->GetSlotAs<LinearSlot>().Size({tree->_expand_button_width, tree->_row_height}).SizePolicy(ESizePolicy::kFixed, ESizePolicy::kFixed)
                                 .Margin(Padding(0.0f, 0.0f, 2.0f, 0.0f));
                     }
@@ -60,6 +62,7 @@ namespace Ailu
                     _label = hb->AddChild<Text>(pres._label);
                     _label->GetSlotAs<LinearSlot>().SizePolicy(ESizePolicy::kFill, ESizePolicy::kAuto);
                     _label->_color = pres._text_color;
+                    _label->FontSize(tree->GetStyleFontSize(), false);
                 }
 
                 TreeItemId GetItemId() const { return _item_id; }
@@ -224,7 +227,6 @@ namespace Ailu
                 _empty_drop_handler->GetSlotAs<LinearSlot>().SizePolicy(ESizePolicy::kFill, ESizePolicy::kFill);
             }
             _empty_drop_handler->Thickness(0.0f);
-            _empty_drop_handler->_bg_color = Color(0.0f, 0.0f, 0.0f, 0.0f);
             {
                 DropHandler dh;
                 dh._can_drop = [this](const DragPayload& p) -> bool
@@ -243,6 +245,58 @@ namespace Ailu
                 };
                 _empty_drop_handler->SetDropHandler(dh);
             }
+        }
+
+        void TreeView::SetStyleId(const UIStyleId &id)
+        {
+            if (_style_id == id)
+                return;
+            _style_id = id;
+            InvalidateStyle();
+        }
+
+        void TreeView::ResolveStyle(const UIStyleContext &context)
+        {
+            ScrollView::ResolveStyle(context);
+            UITreeViewStyle resolved_style;
+            if (context._theme)
+            {
+                const UITreeViewStyle *theme_style = context._theme->FindTreeViewStyle(_style_id);
+                resolved_style = theme_style != nullptr ? *theme_style : context._theme->_tree_view_style;
+            }
+            else
+            {
+                static UITheme s_default_theme = UITheme::DefaultDark();
+                resolved_style = s_default_theme._tree_view_style;
+            }
+            _style_override.ApplyTo(resolved_style);
+
+            const bool style_changed = _row_height != resolved_style._row_height ||
+                                       _indent_width != resolved_style._indent_width ||
+                                       _expand_button_width != resolved_style._expand_button_width ||
+                                       _normal_color != resolved_style._normal_color ||
+                                       _hover_color != resolved_style._hover_color ||
+                                       _selected_color != resolved_style._selected_color ||
+                                       _selected_unfocused_color != resolved_style._selected_unfocused_color ||
+                                       _padding._l != resolved_style._padding._l ||
+                                       _padding._t != resolved_style._padding._t ||
+                                       _padding._r != resolved_style._padding._r ||
+                                       _padding._b != resolved_style._padding._b ||
+                                       _font_size != resolved_style._font_size;
+            _resolved_style = resolved_style;
+            _row_height = resolved_style._row_height;
+            _indent_width = resolved_style._indent_width;
+            _expand_button_width = resolved_style._expand_button_width;
+            _normal_color = resolved_style._normal_color;
+            _hover_color = resolved_style._hover_color;
+            _selected_color = resolved_style._selected_color;
+            _selected_unfocused_color = resolved_style._selected_unfocused_color;
+            _padding = resolved_style._padding;
+            _font_size = resolved_style._font_size;
+            _content_box->GetSlotAs<LinearSlot>().Margin(_padding);
+
+            if (style_changed && _data_source != nullptr)
+                Refresh();
         }
 
         // =========================================================================
@@ -383,7 +437,6 @@ namespace Ailu
                 _empty_drop_handler = border.get();
                 _empty_drop_handler_ref = std::move(border);
                 _empty_drop_handler->Thickness(0.0f);
-                _empty_drop_handler->_bg_color = Color(0.0f, 0.0f, 0.0f, 0.0f);
                 {
                     DropHandler dh;
                     dh._can_drop = [this](const DragPayload& p) -> bool
@@ -601,7 +654,7 @@ namespace Ailu
 
                 Color bg_color = _normal_color;
                 if (id == _selected_item)
-                    bg_color = _selected_color;
+                    bg_color = IsFocused() ? _selected_color : _selected_unfocused_color;
                 else if (child.get() == _hovered_row)
                     bg_color = _hover_color;
 

@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __COLORPICKER_GEN_H__
 //Class ColorPicker begin...........................
-#define COLORPICKER_GEN_H_16_GENERATED_BODY \
+#define COLORPICKER_GEN_H_17_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_ColorPicker_Type();\
                                 static const Type* GetPrivateStaticClass();\

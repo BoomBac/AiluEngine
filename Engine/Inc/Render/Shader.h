@@ -7,6 +7,7 @@
 #include "PipelineState.h"
 #include "Texture.h"
 #include "CoreType.h"
+#include "MaterialDrawState.h"
 #include <map>
 #include <set>
 #include <string>
@@ -16,6 +17,8 @@
 
 namespace Ailu::Render
 {
+    class RHICommandBuffer;
+
     struct ShaderCommand
     {
         inline static const String kName = "name";
@@ -98,6 +101,49 @@ namespace Ailu::Render
             inline static const String kOn = "On";
         } kConservativeValue;
     };
+
+    struct GlobalResourceBinding
+    {
+        GpuResource *_resource = nullptr;
+    };
+
+    class ShaderGlobalResourceRegistry
+    {
+    public:
+        void SetTexture(ShaderPropertyId property_id, Texture *texture)
+        {
+            SetResource(property_id, texture);
+        }
+
+        void SetBuffer(ShaderPropertyId property_id, GpuResource *buffer)
+        {
+            SetResource(property_id, buffer);
+        }
+
+        u64 Version() const { return _binding_version; }
+        u64 LayoutVersion() const { return _layout_version; }
+        u64 BindingVersion() const { return _binding_version; }
+        const HashMap<ShaderPropertyId, GlobalResourceBinding> &Resources() const { return _resources; }
+
+    private:
+        void SetResource(ShaderPropertyId property_id, GpuResource *resource)
+        {
+            const bool is_new_resource_id = !_resources.contains(property_id);
+            auto &binding = _resources[property_id];
+            if (!is_new_resource_id && binding._resource == resource)
+                return;
+
+            binding._resource = resource;
+            if (is_new_resource_id)
+                ++_layout_version;
+            ++_binding_version;
+        }
+
+        HashMap<ShaderPropertyId, GlobalResourceBinding> _resources;
+        u64 _layout_version = 1u;
+        u64 _binding_version = 1u;
+    };
+
 
     using ShaderHash = u64;
     using ShaderVariantHash = u32;
@@ -224,10 +270,11 @@ namespace Ailu::Render
 
         //0 is normal, 4001 is compiling, 4000 is error,same with render queue id
         static u32 GetShaderState(Shader *shader, u16 pass_index, ShaderVariantHash variant_hash);
+        static const ShaderGlobalResourceRegistry &GlobalResourceRegistry() { return s_global_res_registry; }
         Shader() = default;
         Shader(const WString &sys_path);
         virtual ~Shader() = default;
-        virtual void Bind(u16 pass_index, ShaderVariantHash variant_hash);
+        virtual void Bind(RHICommandBuffer *cmd, u16 pass_index, ShaderVariantHash variant_hash);
         //call this before compile
         virtual bool PreProcessShader();
         virtual bool Compile(u16 pass_id, ShaderVariantHash variant_hash, bool is_load_cache = true);
@@ -284,16 +331,14 @@ namespace Ailu::Render
             AL_ASSERT(pass_index < _passes.size());
             return std::tie(_passes[pass_index]._vert_entry, _passes[pass_index]._pixel_entry);
         }
-        EShaderVariantState GetVariantState(u16 pass_index, ShaderVariantHash hash)
+        EShaderVariantState GetVariantState(u16 pass_index, ShaderVariantHash hash) const
         {
             AL_ASSERT(pass_index < _variant_state.size());
-            auto &info = _variant_state[pass_index];
-            if (info.contains(hash))
-                return info[hash];
-            else
-            {
-                AL_ASSERT(false);
-            }
+            const auto &info = _variant_state[pass_index];
+            const auto it = info.find(hash);
+            if (it != info.end())
+                return it->second;
+            AL_ASSERT(false);
             return EShaderVariantState::kNotReady;
         }
     public:
@@ -319,10 +364,9 @@ namespace Ailu::Render
         //void ExtractValidShaderProperty(u16 pass_index,ShaderVariantHash variant_hash);
     private:
         inline static std::atomic<u16> s_global_shader_unique_id = 0u;
-        inline static std::map<String, Texture *> s_global_textures_bind_info{};
         inline static std::map<String, std::tuple<Matrix4x4f *, u32>> s_global_matrix_bind_info{};
-        inline static Map<String, ConstantBuffer *> s_global_buffer_bind_info{};
         inline static std::set<Shader *> s_all_shaders{};
+        inline static ShaderGlobalResourceRegistry s_global_res_registry;
         static std::set<String> s_predefined_macros;
     };
 
@@ -330,6 +374,21 @@ namespace Ailu::Render
     class AILU_API ComputeShader : public Object
     {
         GENERATED_BODY()
+        struct ComputeBindParams
+        {
+            ECubemapFace _face;
+            u16 _mipmap;
+            // depth or array
+            u16 _slice;
+            u32 _sub_res;
+            u16 _view_index = (u16)-1;
+            bool _is_internal_cbuf = false;
+        };
+        struct ComputeResourceBinding
+        {
+            GpuResource *_resource = nullptr;
+            ComputeBindParams _params{};
+        };
         struct KernelElement
         {
             static bool IsKernelKeyword(const KernelElement &ker, const String &kw)
@@ -404,6 +463,8 @@ namespace Ailu::Render
         ComputeShader(const WString &sys_path);
         virtual ~ComputeShader() = default;
         virtual void Bind(RHICommandBuffer *cmd, ComputeShaderKernelId kernel);
+        virtual void Bind(RHICommandBuffer *cmd, ComputeShaderKernelId kernel, const ComputeDispatchSnapshot &snapshot)
+        { Bind(cmd, kernel); }
         void SetTexture(const String &name, Texture *texture);
         void SetTexture(u8 bind_slot, Texture *texture);
         void SetTexture(const String &name, RTHandle handle);
@@ -457,29 +518,25 @@ namespace Ailu::Render
         /// @brief 预处理shader，必须在compile之前调用！
         bool Preprocess();
         bool Compile(bool is_load_cache = true);
-        ShaderVariantHash ActiveVariant(ComputeShaderKernelId kernel) const { return _kernels[ResolveKernelIndex(kernel)]._active_variant; }
+        ShaderVariantHash ActiveVariant(ComputeShaderKernelId kernel) const { return ResolveActiveVariant(kernel); }
         bool IsKernelValid(ComputeShaderKernelId kernel) const;
         void PushState(ComputeShaderKernelId kernel = kInvalidComputeShaderKernelId);
+        void CaptureDispatchState(ComputeShaderKernelId kernel, ComputeDispatchSnapshot &snapshot,
+                                  const HashMap<ShaderPropertyId, CommandResourceBinding> *command_resources = nullptr);
     public:
         std::atomic<bool> _is_compiling = false;
     protected:
         bool Compile(u16 kernel_index, ShaderVariantHash variant_hash, bool is_load_cache = true);
         virtual bool RHICompileImpl(u16 kernel_index,ShaderVariantHash variant_hash, bool is_load_cache);
         u16 ResolveKernelIndex(ComputeShaderKernelId kernel) const;
+        ShaderVariantHash ResolveActiveVariant(ComputeShaderKernelId kernel) const;
+        void SetResourceBinding(ComputeShaderKernelId kernel, ShaderPropertyId property_id, GpuResource *resource,
+                                const ComputeBindParams &params);
+        const ComputeResourceBinding *FindResourceBinding(ComputeShaderKernelId kernel, ShaderPropertyId property_id) const;
 
     private:
 
     protected:
-        struct ComputeBindParams
-        {
-            ECubemapFace _face;
-            u16 _mipmap;
-            //depth or array
-            u16 _slice;
-            u32 _sub_res;
-            u16 _view_index = (u16)-1;
-            bool _is_internal_cbuf = false;
-        };
         struct BindState
         {
             ComputeShaderKernelId _kernel;
@@ -498,6 +555,7 @@ namespace Ailu::Render
         inline static Map<String, i32> s_global_ints{};
         Vector<KernelElement> _kernels;
         HashMap<ComputeShaderKernelId, u16> _kernel_id_to_index;
+        HashMap<ComputeShaderKernelId, HashMap<ShaderPropertyId, ComputeResourceBinding>> _resource_bindings;
         std::set<String> _local_active_keywords;
         WString _src_file_path;
         Vector<Map<ShaderVariantHash, EShaderVariantState>> _variant_state;

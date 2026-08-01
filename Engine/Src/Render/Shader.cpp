@@ -6,6 +6,7 @@
 #include "Framework/Common/Utils.h"
 #include "Framework/Common/SystemInfo.h"
 #include "RHI/DX12/D3DShader.h"
+#include "Render/CommandBuffer.h"
 #include "Render/GraphicsContext.h"
 #include "Render/GraphicsPipelineStateObject.h"
 #include "Render/RenderQueue.h"
@@ -254,15 +255,16 @@ namespace Ailu::Render
         s_all_shaders.insert(this);
     }
 
-    void Shader::Bind(u16 pass_index, ShaderVariantHash variant_hash)
+    void Shader::Bind(RHICommandBuffer *cmd, u16 pass_index, ShaderVariantHash variant_hash)
     {
         const auto& active_variant = _passes[pass_index]._variants[variant_hash];
-        GraphicsPipelineStateMgr::ConfigureVertexInputLayout(active_variant._pipeline_input_layout.Hash());
-        GraphicsPipelineStateMgr::ConfigureRasterizerState(_passes[pass_index]._pipeline_raster_state.Hash());
-        GraphicsPipelineStateMgr::ConfigureDepthStencilState(_passes[pass_index]._pipeline_ds_state.Hash());
-        GraphicsPipelineStateMgr::ConfigureTopology(static_cast<u8>(ALHash::HashFunc(_passes[pass_index]._pipeline_topology)));
-        GraphicsPipelineStateMgr::ConfigureBlendState(_passes[pass_index]._pipeline_blend_state.Hash());
-        GraphicsPipelineStateMgr::ConfigureShader(this, pass_index, variant_hash, active_variant._shader_hash);
+        auto &recording_context = cmd->RecordingContext();
+        recording_context.ConfigureVertexInputLayout(active_variant._pipeline_input_layout.Hash());
+        recording_context.ConfigureRasterizerState(_passes[pass_index]._pipeline_raster_state.Hash());
+        recording_context.ConfigureDepthStencilState(_passes[pass_index]._pipeline_ds_state.Hash());
+        recording_context.ConfigureTopology(static_cast<u8>(ALHash::HashFunc(_passes[pass_index]._pipeline_topology)));
+        recording_context.ConfigureBlendState(_passes[pass_index]._pipeline_blend_state.Hash());
+        recording_context.ConfigureShader(this, pass_index, variant_hash, active_variant._shader_hash);
         _topology = _passes[pass_index]._pipeline_topology;
     }
 
@@ -343,10 +345,8 @@ namespace Ailu::Render
 
     void Shader::SetGlobalTexture(const String &name, Texture *texture)
     {
-        if (!s_global_textures_bind_info.contains(name))
-            s_global_textures_bind_info.insert(std::make_pair(name, texture));
-        else
-            s_global_textures_bind_info[name] = texture;
+        auto id = ShaderPropertyRegistry::Get().Intern(name);
+        s_global_res_registry.SetTexture(id,texture);
     }
     void Shader::SetGlobalTexture(const String &name, RTHandle handle)
     {
@@ -421,10 +421,8 @@ namespace Ailu::Render
     }
     void Shader::SetGlobalBuffer(const String &name, ConstantBuffer *buffer)
     {
-        if (!s_global_buffer_bind_info.contains(name))
-            s_global_buffer_bind_info.insert(std::make_pair(name, buffer));
-        else
-            s_global_buffer_bind_info[name] = buffer;
+        auto id = ShaderPropertyRegistry::Get().Intern(name);
+        s_global_res_registry.SetBuffer(id,buffer);
     }
 
 
@@ -992,37 +990,25 @@ namespace Ailu::Render
     }
     void ComputeShader::Bind(RHICommandBuffer *cmd, ComputeShaderKernelId kernel)
     {
-        if (s_global_variant_update_map[_id])
-        {
-            auto &ele = _kernels[ResolveKernelIndex(kernel)];
-            ele._active_keywords.clear();
-            for (auto &kw: _local_active_keywords)
-            {
-                if (KernelElement::IsKernelKeyword(ele, kw))
-                    ele._active_keywords.insert(kw);
-            }
-            for (auto &kw: s_global_active_keywords)
-            {
-                if (KernelElement::IsKernelKeyword(ele, kw))
-                    ele._active_keywords.insert(kw);
-            }
-            ele._active_variant = ele._variant_mgr.GetVariantHash(ele._active_keywords);
-        }
     }
 
     void ComputeShader::SetTexture(const String &name, Texture *texture)
     {
+        if (texture == nullptr)
+            return;
+        u16 depth_slice = static_cast<u16>(-1);
+        if (texture->Dimension() == ETextureDimension::kTex3D)
+            depth_slice = dynamic_cast<Texture3D *>(texture)->Depth();
+        const ComputeBindParams params{ECubemapFace::kUnknown, 0u, depth_slice, UINT32_MAX, Texture::kMainSRVIndex};
         for (auto &cs_ele: _kernels)
         {
-            auto &variant = cs_ele._variants[cs_ele._active_variant];
-            auto it = variant._bind_res_infos.find(name);
-            if (texture != nullptr && it != variant._bind_res_infos.end())
+            for (const auto &[variant_hash, variant] : cs_ele._variants)
             {
-                it->second._p_res = texture;
-                u16 depth_slice = -1;
-                if (texture->Dimension() == ETextureDimension::kTex3D)
-                    depth_slice = dynamic_cast<Texture3D *>(texture)->Depth();
-                _bind_params[it->second._bind_slot] = ComputeBindParams{ECubemapFace::kUnknown, 0, depth_slice, UINT32_MAX, Texture::kMainSRVIndex};
+                if (variant._bind_res_infos.contains(name))
+                {
+                    SetResourceBinding(cs_ele._id, ShaderPropertyRegistry::Get().Intern(name), texture, params);
+                    break;
+                }
             }
         }
     }
@@ -1041,20 +1027,22 @@ namespace Ailu::Render
 
     void ComputeShader::SetTexture(u8 bind_slot, Texture *texture)
     {
-        if (texture != nullptr)
+        if (texture == nullptr)
+            return;
+        u16 depth_slice = static_cast<u16>(-1);
+        if (texture->Dimension() == ETextureDimension::kTex3D)
+            depth_slice = dynamic_cast<Texture3D *>(texture)->Depth();
+        const ComputeBindParams params{ECubemapFace::kUnknown, 0u, depth_slice, UINT32_MAX, Texture::kMainSRVIndex};
+        for (auto &cs_ele: _kernels)
         {
-            for (auto &cs_ele: _kernels)
+            for (const auto &[variant_hash, variant] : cs_ele._variants)
             {
-                auto &variant = cs_ele._variants[cs_ele._active_variant];
                 auto rit = std::find_if(variant._bind_res_infos.begin(), variant._bind_res_infos.end(), [=](const auto &it)
                                         { return it.second._bind_slot == bind_slot; });
                 if (rit != variant._bind_res_infos.end())
                 {
-                    rit->second._p_res = texture;
-                    u16 depth_slice = -1;
-                    if (texture->Dimension() == ETextureDimension::kTex3D)
-                        depth_slice = dynamic_cast<Texture3D *>(texture)->Depth();
-                    _bind_params[rit->second._bind_slot] = ComputeBindParams{ECubemapFace::kUnknown, 0, depth_slice, UINT32_MAX, Texture::kMainSRVIndex};
+                    SetResourceBinding(cs_ele._id, rit->second._property_id, texture, params);
+                    break;
                 }
             }
         }
@@ -1070,16 +1058,18 @@ namespace Ailu::Render
         bool is_set = false;
         for (auto &cs_ele: _kernels)
         {
-            auto &variant = cs_ele._variants[cs_ele._active_variant];
-            auto it = variant._bind_res_infos.find(name);
-            if (texture && it != variant._bind_res_infos.end())
+            for (const auto &[variant_hash, variant] : cs_ele._variants)
             {
-                it->second._p_res = texture;
-                u16 depth_slice = -1;
-                if (texture->Dimension() == ETextureDimension::kTex3D)
-                    depth_slice = dynamic_cast<Texture3D *>(texture)->Depth();
-                _bind_params[it->second._bind_slot] = ComputeBindParams{face, mipmap, depth_slice, sub_res};
-                is_set = true;
+                if (variant._bind_res_infos.contains(name))
+                {
+                    u16 depth_slice = static_cast<u16>(-1);
+                    if (texture->Dimension() == ETextureDimension::kTex3D)
+                        depth_slice = dynamic_cast<Texture3D *>(texture)->Depth();
+                    SetResourceBinding(cs_ele._id, ShaderPropertyRegistry::Get().Intern(name), texture,
+                                       ComputeBindParams{face, mipmap, depth_slice, sub_res});
+                    is_set = true;
+                    break;
+                }
             }
         }
         if (!is_set)
@@ -1287,57 +1277,71 @@ namespace Ailu::Render
 
     void ComputeShader::SetBuffer(const String &name, ConstantBuffer *buf)
     {
+        if (buf == nullptr)
+            return;
         for (auto &cs_ele: _kernels)
         {
-            auto &variant = cs_ele._variants[cs_ele._active_variant];
-            auto it = variant._bind_res_infos.find(name);
-            if (buf != nullptr && it != variant._bind_res_infos.end())
+            for (const auto &[variant_hash, variant] : cs_ele._variants)
             {
-                it->second._p_res = buf;
-                _bind_params[it->second._bind_slot] = ComputeBindParams{ECubemapFace::kUnknown, 0, 0, UINT32_MAX, 0};
-                _bind_params[it->second._bind_slot]._is_internal_cbuf = it->second._bind_flag & ShaderBindResourceInfo::kBindFlagInternal;
+                if (variant._bind_res_infos.contains(name))
+                {
+                    ComputeBindParams params{};
+                    params._is_internal_cbuf = variant._bind_res_infos.at(name)._bind_flag & ShaderBindResourceInfo::kBindFlagInternal;
+                    SetResourceBinding(cs_ele._id, ShaderPropertyRegistry::Get().Intern(name), buf, params);
+                    break;
+                }
             }
         }
     }
     void ComputeShader::SetBuffer(const String &name, GPUBuffer *buf)
     {
+        if (buf == nullptr)
+            return;
         for (auto &cs_ele: _kernels)
         {
-            auto &variant = cs_ele._variants[cs_ele._active_variant];
-            auto it = variant._bind_res_infos.find(name);
-            if (buf != nullptr && it != variant._bind_res_infos.end())
+            for (const auto &[variant_hash, variant] : cs_ele._variants)
             {
-                it->second._p_res = buf;
-                _bind_params[it->second._bind_slot] = ComputeBindParams{ECubemapFace::kUnknown, 0, 0, UINT32_MAX, 0};
-                _bind_params[it->second._bind_slot]._is_internal_cbuf = it->second._bind_flag & ShaderBindResourceInfo::kBindFlagInternal;
+                if (variant._bind_res_infos.contains(name))
+                {
+                    ComputeBindParams params{};
+                    params._is_internal_cbuf = variant._bind_res_infos.at(name)._bind_flag & ShaderBindResourceInfo::kBindFlagInternal;
+                    SetResourceBinding(cs_ele._id, ShaderPropertyRegistry::Get().Intern(name), buf, params);
+                    break;
+                }
             }
         }
     }
 
     void ComputeShader::SetBuffer(ComputeShaderKernelId kernel,const String &name, ConstantBuffer *buf)
     {
-        const auto kernel_index = ResolveKernelIndex(kernel);
-        auto &cs_ele = _kernels[kernel_index];
-        auto &variant = cs_ele._variants[cs_ele._active_variant];
-        auto it = variant._bind_res_infos.find(name);
-        if (buf != nullptr && it != variant._bind_res_infos.end())
+        if (buf == nullptr || !IsKernelValid(kernel))
+            return;
+        const auto &cs_ele = _kernels[ResolveKernelIndex(kernel)];
+        for (const auto &[variant_hash, variant] : cs_ele._variants)
         {
-            it->second._p_res = buf;
-            _bind_params[it->second._bind_slot] = ComputeBindParams{ECubemapFace::kUnknown, 0, 0, UINT32_MAX, 0};
-            _bind_params[it->second._bind_slot]._is_internal_cbuf = it->second._bind_flag & ShaderBindResourceInfo::kBindFlagInternal;
+            if (variant._bind_res_infos.contains(name))
+            {
+                ComputeBindParams params{};
+                params._is_internal_cbuf = variant._bind_res_infos.at(name)._bind_flag & ShaderBindResourceInfo::kBindFlagInternal;
+                SetResourceBinding(kernel, ShaderPropertyRegistry::Get().Intern(name), buf, params);
+                break;
+            }
         }
     }
     void ComputeShader::SetBuffer(ComputeShaderKernelId kernel,const String &name, GPUBuffer *buf)
     {
-        const auto kernel_index = ResolveKernelIndex(kernel);
-        auto &cs_ele = _kernels[kernel_index];
-        auto &variant = cs_ele._variants[cs_ele._active_variant];
-        auto it = variant._bind_res_infos.find(name);
-        if (buf != nullptr && it != variant._bind_res_infos.end())
+        if (buf == nullptr || !IsKernelValid(kernel))
+            return;
+        const auto &cs_ele = _kernels[ResolveKernelIndex(kernel)];
+        for (const auto &[variant_hash, variant] : cs_ele._variants)
         {
-            it->second._p_res = buf;
-            _bind_params[it->second._bind_slot] = ComputeBindParams{ECubemapFace::kUnknown, 0, 0, UINT32_MAX, 0};
-            _bind_params[it->second._bind_slot]._is_internal_cbuf = it->second._bind_flag & ShaderBindResourceInfo::kBindFlagInternal;
+            if (variant._bind_res_infos.contains(name))
+            {
+                ComputeBindParams params{};
+                params._is_internal_cbuf = variant._bind_res_infos.at(name)._bind_flag & ShaderBindResourceInfo::kBindFlagInternal;
+                SetResourceBinding(kernel, ShaderPropertyRegistry::Get().Intern(name), buf, params);
+                break;
+            }
         }
     }
 
@@ -1387,8 +1391,6 @@ namespace Ailu::Render
         }
         return false;
     }
-    HashMap<String, ShaderBindResourceInfo> s_old_bind_infos;
-
     bool ComputeShader::Compile(bool is_load_cache)
     {
         _is_compiling.store(true);
@@ -1406,16 +1408,6 @@ namespace Ailu::Render
             {
                 const auto kernel_index = ResolveKernelIndex(k._id);
                 is_succeed &= Compile(kernel_index, v.first, is_load_cache);
-                //将之前绑定的资源重新绑定上去
-                if (is_succeed)
-                {
-                    for (auto &it: v.second._bind_res_infos)
-                    {
-                        auto &[name, info] = it;
-                        if (s_old_bind_infos.contains(name) && s_old_bind_infos[name]._p_res != nullptr)
-                            info._p_res = s_old_bind_infos[name]._p_res;
-                    }
-                }
             }
         }
         _is_compiling.store(false);
@@ -1434,7 +1426,7 @@ namespace Ailu::Render
         const auto kernel_index = ResolveKernelIndex(kernel);
         BindState cur_state;
         cur_state._kernel = _kernels[kernel_index]._id;
-        cur_state._variant_hash = _kernels[kernel_index]._active_variant;
+        cur_state._variant_hash = ResolveActiveVariant(kernel);
         cur_state._max_bind_slot = 0u;
         auto &cs_ele = _kernels[kernel_index]._variants[cur_state._variant_hash];
         memset(cur_state._bind_res.data(),0,sizeof(GpuResource*)*32);
@@ -1451,12 +1443,10 @@ namespace Ailu::Render
                 cur_state._bind_params[bind_info._bind_slot]._is_internal_cbuf = true;
                 cur_state._bind_res_priority[bind_info._bind_slot] = PipelineResource::kPriorityLocal;
             }
-            else
+            else if (const auto *binding = FindResourceBinding(kernel, bind_info._property_id); binding != nullptr && binding->_resource != nullptr)
             {
-                if (bind_info._p_res == nullptr)
-                    continue;
-                cur_state._bind_res[bind_info._bind_slot] = bind_info._p_res;
-                cur_state._bind_params[bind_info._bind_slot] = _bind_params[bind_info._bind_slot];
+                cur_state._bind_res[bind_info._bind_slot] = binding->_resource;
+                cur_state._bind_params[bind_info._bind_slot] = binding->_params;
                 cur_state._bind_res_priority[bind_info._bind_slot] = PipelineResource::kPriorityLocal;
             }
             cur_state._max_bind_slot = std::max<u16>(cur_state._max_bind_slot,bind_info._bind_slot);
@@ -1519,6 +1509,156 @@ namespace Ailu::Render
         _bind_state.push(cur_state);
     }
 
+    void ComputeShader::CaptureDispatchState(ComputeShaderKernelId kernel, ComputeDispatchSnapshot &snapshot,
+                                              const HashMap<ShaderPropertyId, CommandResourceBinding> *command_resources)
+    {
+        snapshot = ComputeDispatchSnapshot{};
+        if (!IsKernelValid(kernel))
+            return;
+        const auto kernel_index = ResolveKernelIndex(kernel);
+        const auto variant_hash = ResolveActiveVariant(kernel);
+        const auto &kernel_variant = _kernels[kernel_index]._variants[variant_hash];
+        memcpy(snapshot._cbuf_data.data(), _cbuf_data, sizeof(_cbuf_data));
+        for (const auto &[name, value] : s_global_floats)
+        {
+            if (const auto it = kernel_variant._bind_res_infos.find(name); it != kernel_variant._bind_res_infos.end()
+                && it->second._res_type & EBindResDescType::kCBufferFloat)
+                memcpy(snapshot._cbuf_data.data() + ShaderBindResourceInfo::GetVariableOffset(it->second), &value, sizeof(value));
+        }
+        for (const auto &[name, value] : s_global_ints)
+        {
+            if (const auto it = kernel_variant._bind_res_infos.find(name); it != kernel_variant._bind_res_infos.end())
+            {
+                const auto offset = ShaderBindResourceInfo::GetVariableOffset(it->second);
+                if (it->second._res_type & EBindResDescType::kCBufferInt)
+                    memcpy(snapshot._cbuf_data.data() + offset, &value, sizeof(value));
+                else if (it->second._res_type & EBindResDescType::kCBufferUInt)
+                {
+                    const u32 uint_value = static_cast<u32>(value);
+                    memcpy(snapshot._cbuf_data.data() + offset, &uint_value, sizeof(uint_value));
+                }
+            }
+        }
+        Array<ComputeBindingSnapshotEntry, 32> captured{};
+        u16 captured_count = 0u;
+        auto find_captured = [&](u16 slot) -> ComputeBindingSnapshotEntry *
+        {
+            for (u16 i = 0u; i < captured_count; ++i)
+            {
+                if (captured[i]._slot == slot)
+                    return &captured[i];
+            }
+            return nullptr;
+        };
+
+        auto apply_resource = [&](u16 slot, GpuResource *resource, EBindResDescType resource_type, u16 priority,
+                                  const ComputeBindParams &params)
+        {
+            if (resource == nullptr || slot >= 32u)
+                return;
+            auto *entry = find_captured(slot);
+            if (entry == nullptr)
+            {
+                AL_ASSERT(captured_count < captured.size());
+                if (captured_count >= captured.size())
+                    return;
+                entry = &captured[captured_count++];
+                entry->_slot = slot;
+            }
+            if (entry->_resource != nullptr && entry->_priority > priority)
+                return;
+            entry->_resource = resource;
+            entry->_resource_type = resource_type;
+            entry->_priority = priority;
+            entry->_face = static_cast<u16>(params._face);
+            entry->_mipmap = params._mipmap;
+            entry->_slice = params._slice;
+            entry->_view_index = params._view_index;
+            entry->_sub_res = params._sub_res;
+            entry->_is_internal_cbuf = params._is_internal_cbuf;
+        };
+
+        for (const auto &[name, bind_info] : kernel_variant._bind_res_infos)
+        {
+            const u16 slot = bind_info._bind_slot;
+            if (bind_info._res_type == EBindResDescType::kConstBuffer
+                && bind_info._bind_flag & ShaderBindResourceInfo::kBindFlagInternal)
+            {
+                auto *cb = ConstBufferPool::Acquire(bind_info._cbuf_size);
+                cb->SetData(snapshot._cbuf_data.data());
+                ComputeBindParams params{};
+                params._is_internal_cbuf = true;
+                apply_resource(slot, cb, bind_info._res_type, PipelineResource::kPriorityLocal, params);
+            }
+            else if (const auto *binding = FindResourceBinding(kernel, bind_info._property_id); binding != nullptr && binding->_resource != nullptr)
+            {
+                apply_resource(slot, binding->_resource, bind_info._res_type, PipelineResource::kPriorityLocal, binding->_params);
+            }
+        }
+
+        auto apply_global_resource = [&](const String &name, GpuResource *resource, const ComputeBindParams &params)
+        {
+            if (resource == nullptr)
+                return;
+            const auto *bind_info = kernel_variant._bind_res_infos.contains(name)
+                ? &kernel_variant._bind_res_infos.at(name) : nullptr;
+            if (bind_info != nullptr)
+                apply_resource(bind_info->_bind_slot, resource, bind_info->_res_type, PipelineResource::kPriorityGlobal, params);
+        };
+
+        for (const auto &[name, resource] : s_global_cbuffer_bind_info)
+            apply_global_resource(name, resource, ComputeBindParams{});
+        for (const auto &[name, resource] : s_global_buffer_bind_info)
+            apply_global_resource(name, resource, ComputeBindParams{});
+        for (const auto &[name, resource] : s_global_textures_bind_info)
+        {
+            if (resource == nullptr)
+                continue;
+            u16 depth_slice = static_cast<u16>(-1);
+            if (resource->Dimension() == ETextureDimension::kTex3D)
+                depth_slice = dynamic_cast<Texture3D *>(resource)->Depth();
+            apply_global_resource(name, resource,
+                                  ComputeBindParams{ECubemapFace::kUnknown, 0u, depth_slice, UINT32_MAX, Texture::kMainSRVIndex});
+        }
+
+        if (command_resources != nullptr)
+        {
+            for (const auto &[property_id, command_binding] : *command_resources)
+            {
+                if (command_binding._resource == nullptr)
+                    continue;
+                const auto &name = ShaderPropertyRegistry::Get().GetName(property_id);
+                auto bind_it = kernel_variant._bind_res_infos.find(name);
+                if (bind_it == kernel_variant._bind_res_infos.end())
+                    continue;
+                const auto &bind_info = bind_it->second;
+                auto *entry = find_captured(bind_info._bind_slot);
+                if (entry == nullptr)
+                {
+                    AL_ASSERT(captured_count < captured.size());
+                    entry = &captured[captured_count++];
+                    entry->_slot = bind_info._bind_slot;
+                }
+                entry->_resource = command_binding._resource;
+                entry->_resource_type = command_binding._resource_type == EBindResDescType::kConstBufferRaw
+                    ? EBindResDescType::kConstBufferRaw : bind_info._res_type;
+                entry->_priority = PipelineResource::kPriorityCmd;
+                entry->_face = static_cast<u16>(ECubemapFace::kUnknown);
+                entry->_mipmap = 0u;
+                entry->_slice = 0u;
+                entry->_view_index = Texture::kMainSRVIndex;
+                entry->_sub_res = UINT32_MAX;
+                entry->_is_internal_cbuf = false;
+                entry->_addi_info = command_binding._addi_info;
+            }
+        }
+        for (u16 i = 0u; i < captured_count; ++i)
+            snapshot._entries[i] = captured[i];
+        snapshot._entry_count = captured_count;
+        snapshot._variant_hash = variant_hash;
+        snapshot._is_ready = _variant_state[kernel_index][variant_hash] == EShaderVariantState::kReady;
+    }
+
 
     bool ComputeShader::Compile(u16 kernel_index, ShaderVariantHash variant_hash, bool is_load_cache)
     {
@@ -1546,6 +1686,66 @@ namespace Ailu::Render
         return 0u;
     }
 
+    ShaderVariantHash ComputeShader::ResolveActiveVariant(ComputeShaderKernelId kernel) const
+    {
+        const auto kernel_index = ResolveKernelIndex(kernel);
+        const auto &element = _kernels[kernel_index];
+        std::set<String> active_keywords;
+        for (const auto &keyword : _local_active_keywords)
+        {
+            if (KernelElement::IsKernelKeyword(element, keyword))
+                active_keywords.insert(keyword);
+        }
+        for (const auto &keyword : s_global_active_keywords)
+        {
+            if (KernelElement::IsKernelKeyword(element, keyword))
+                active_keywords.insert(keyword);
+        }
+        return element._variant_mgr.GetVariantHash(active_keywords);
+    }
+
+    void ComputeShader::SetResourceBinding(ComputeShaderKernelId kernel, ShaderPropertyId property_id, GpuResource *resource,
+                                            const ComputeBindParams &params)
+    {
+        if (!IsKernelValid(kernel))
+            return;
+        auto &binding = _resource_bindings[kernel][property_id];
+        binding._resource = resource;
+        binding._params = params;
+        const auto &element = _kernels[ResolveKernelIndex(kernel)];
+        for (const auto &[variant_hash, variant] : element._variants)
+        {
+            const auto bind_it = std::find_if(variant._bind_res_infos.begin(), variant._bind_res_infos.end(),
+                                              [property_id](const auto &item)
+                                              { return item.second._property_id == property_id; });
+            if (bind_it == variant._bind_res_infos.end())
+                continue;
+            const bool is_uav = bind_it->second._res_type == EBindResDescType::kUAVTexture2D
+                || bind_it->second._res_type == EBindResDescType::kRWTexture3D;
+            if (!is_uav && binding._params._view_index != (u16)-1)
+                break;
+            const auto view_type = is_uav ? Texture::ETextureViewType::kUAV : Texture::ETextureViewType::kSRV;
+            auto *texture = static_cast<Texture *>(resource);
+            if (texture->Dimension() == ETextureDimension::kTex3D)
+                binding._params._view_index = texture->CalculateViewIndex(view_type, binding._params._mipmap,
+                                                                           binding._params._slice);
+            else
+                binding._params._view_index = texture->CalculateViewIndex(view_type, binding._params._face,
+                                                                           binding._params._mipmap, 0u);
+            break;
+        }
+    }
+
+    const ComputeShader::ComputeResourceBinding *ComputeShader::FindResourceBinding(ComputeShaderKernelId kernel,
+                                                                                     ShaderPropertyId property_id) const
+    {
+        const auto kernel_it = _resource_bindings.find(kernel);
+        if (kernel_it == _resource_bindings.end())
+            return nullptr;
+        const auto binding_it = kernel_it->second.find(property_id);
+        return binding_it == kernel_it->second.end() ? nullptr : &binding_it->second;
+    }
+
     bool ComputeShader::IsKernelValid(ComputeShaderKernelId kernel) const
     {
         return _kernel_id_to_index.contains(kernel);
@@ -1556,18 +1756,6 @@ namespace Ailu::Render
         String data;
         FileManager::ReadFile(_src_file_path, data);
         auto lines = su::Split(data, "\n");
-        s_old_bind_infos.clear();
-        for (auto &k: _kernels)
-        {
-            for (auto &v: k._variants)
-            {
-                for (auto &it: v.second._bind_res_infos)
-                {
-                    auto &[name, info] = it;
-                    s_old_bind_infos.insert(std::make_pair(name, info));
-                }
-            }
-        }
         _kernels.clear();
         _variant_state.clear();
         _kernel_id_to_index.clear();

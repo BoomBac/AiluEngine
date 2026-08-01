@@ -76,6 +76,7 @@ namespace Ailu
             static DockManager &Get();
             using NodeTravelFunc = bool(DockNode *);
             friend struct DockNode;
+            friend class DockWindow;
         public:
             DockManager();
             ~DockManager();
@@ -88,8 +89,10 @@ namespace Ailu
             void BeginFloatWindow(DockWindow* w);
             void BeginFloatNode(DockNode* w);
             void EndFloatWindow(Vector2f drop_pos);
+            void DrawFloatingShadow();
             void DrawFloatingPreview();
             void MarkDeleteNode(DockNode* node);
+            bool IsFocused(DockWindow *w) const;
         private:
             void OnWindowFloat(bool draw_preview);
             void DrawPreviewDockArea(Window *window, Vector2f pos, Vector2f size, Vector2f start_pos = Vector2f::kZero,

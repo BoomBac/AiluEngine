@@ -62,7 +62,7 @@ namespace Ailu
             virtual void BeginPass(GraphicsContext *context) override {};
             virtual void EndPass(GraphicsContext *context) override
             {
-                RenderTexture::ResetRenderTarget();
+
             };
             virtual const String &GetName() const final { return _name; };
             virtual const bool IsActive() const final { return _is_active; };

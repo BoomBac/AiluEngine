@@ -100,6 +100,7 @@ namespace Ailu
             bool _is_text_layout_dirty = true;
             UIControlVisualOverride _style_override;
             mutable UIControlVisual _resolved_visual;
+            UIStyleId _style_id;
         };
 
         ACLASS()
@@ -185,6 +186,8 @@ namespace Ailu
 
             // ── Style ────────────────────────────────────────────
             UIControlVisualOverride &GetStyleOverride() { return _style_override; }
+            void SetStyleId(const UIStyleId &id);
+            const UIStyleId &GetStyleId() const { return _style_id; }
 
         private:
             Ref<UISlot> CreateSlotForChild() override;
@@ -207,6 +210,7 @@ namespace Ailu
         private:
             UIControlVisualOverride _style_override;
             mutable UIControlVisual _resolved_visual;
+            UIStyleId _style_id;
         };
 
         ACLASS()

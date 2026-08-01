@@ -14,6 +14,7 @@ namespace Ailu
             desc_list.emplace_back(RenderConstants::kSemanticColor, EShaderDateType::kFloat4, 2);
             desc_list.emplace_back(RenderConstants::kSemanticTexcoord, EShaderDateType::kFloat4, 3, 1);
             desc_list.emplace_back(RenderConstants::kSemanticTexcoord, EShaderDateType::kFloat4, 4, 2);
+            desc_list.emplace_back(RenderConstants::kSemanticTexcoord, EShaderDateType::kFloat4, 5, 3);
             _vbuf = VertexBuffer::Create(desc_list, std::format("block({})_vbuf", s_id_gen));
             _ibuf = IndexBuffer::Create(nullptr, vert_num, std::format("block({})_ibuf", s_id_gen), true);
             _obj_cb = ConstantBuffer::Create(RenderConstants::kPerObjectDataSize);
@@ -22,12 +23,14 @@ namespace Ailu
             _vbuf->SetStream(nullptr, vert_num * sizeof(Vector4f), 2, true);
             _vbuf->SetStream(nullptr, vert_num * sizeof(Vector4f), 3, true);
             _vbuf->SetStream(nullptr, vert_num * sizeof(Vector4f), 4, true);
+            _vbuf->SetStream(nullptr, vert_num * sizeof(Vector4f), 5, true);
             //_ibuf->SetData((u8*)indices,6);
             _pos_buf.resize(vert_num);
             _uv_buf.resize(vert_num);
             _color_buf.resize(vert_num);
             _rect_buf.resize(vert_num);
             _corner_radius_buf.resize(vert_num);
+            _border_thickness_buf.resize(vert_num);
             _index_buf.resize(vert_num);
             GraphicsContext::Get().CreateResourceSync(_vbuf);
             GraphicsContext::Get().CreateResourceSync(_ibuf);
@@ -53,6 +56,7 @@ namespace Ailu
                 memcpy(_color_buf.data(), other._color_buf.data(), _cur_vert_num * sizeof(Color));
                 memcpy(_rect_buf.data(), other._rect_buf.data(), _cur_vert_num * sizeof(Vector4f));
                 memcpy(_corner_radius_buf.data(), other._corner_radius_buf.data(), _cur_vert_num * sizeof(Vector4f));
+                memcpy(_border_thickness_buf.data(), other._border_thickness_buf.data(), _cur_vert_num * sizeof(Vector4f));
             }
             if (_cur_index_num > 0u)
                 memcpy(_index_buf.data(), other._index_buf.data(), _cur_index_num * sizeof(u32));
@@ -70,15 +74,17 @@ namespace Ailu
             const u64 color_bytes = _cur_vert_num * sizeof(Vector4f);
             const u64 rect_bytes = _cur_vert_num * sizeof(Vector4f);
             const u64 corner_radius_bytes = _cur_vert_num * sizeof(Vector4f);
+            const u64 border_thickness_bytes = _cur_vert_num * sizeof(Vector4f);
             const u64 index_bytes = _cur_index_num * sizeof(u32);
             _vbuf->SetData((u8 *)_pos_buf.data(), static_cast<u32>(pos_bytes), 0u, 0u);
             _vbuf->SetData((u8 *)_uv_buf.data(), static_cast<u32>(uv_bytes), 1u, 0u);
             _vbuf->SetData((u8 *)_color_buf.data(), static_cast<u32>(color_bytes), 2u, 0u);
             _vbuf->SetData((u8 *)_rect_buf.data(), static_cast<u32>(rect_bytes), 3u, 0u);
             _vbuf->SetData((u8 *)_corner_radius_buf.data(), static_cast<u32>(corner_radius_bytes), 4u, 0u);
+            _vbuf->SetData((u8 *)_border_thickness_buf.data(), static_cast<u32>(border_thickness_bytes), 5u, 0u);
             _ibuf->SetData((u8 *)_index_buf.data(), static_cast<u32>(index_bytes));
             _gpu_dirty = false;
-            return pos_bytes + uv_bytes + color_bytes + rect_bytes + corner_radius_bytes + index_bytes;
+            return pos_bytes + uv_bytes + color_bytes + rect_bytes + corner_radius_bytes + border_thickness_bytes + index_bytes;
         }
 
         DrawerBlock::DrawerBlock(DrawerBlock &&other) noexcept

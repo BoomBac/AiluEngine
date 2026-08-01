@@ -577,9 +577,9 @@ namespace Ailu::RHI::DX12
         //    LoadAdditionalShaderReflection(p, pass_index, variant_hash);
     }
 
-    void D3DShader::Bind(u16 pass_index, ShaderVariantHash variant_hash)
+    void D3DShader::Bind(RHICommandBuffer *cmd, u16 pass_index, ShaderVariantHash variant_hash)
     {
-        Shader::Bind(pass_index, variant_hash);
+        Shader::Bind(cmd, pass_index, variant_hash);
     }
 
     void *D3DShader::GetByteCode(EShaderType type, u16 pass_index, ShaderVariantHash variant_hash)
@@ -728,6 +728,83 @@ namespace Ailu::RHI::DX12
             d3dcmd->SetComputeRootDescriptorTable(d3d_ele._bindless_rw_buffer_slot, bindless_uav_base);
         _bind_state.pop();
         //d3dcmd->Dispatch(thread_group_x, thread_group_y, thread_group_z);
+    }
+
+    void D3DComputeShader::Bind(RHICommandBuffer *cmd, Render::ComputeShaderKernelId kernel,
+                                const Render::ComputeDispatchSnapshot &snapshot)
+    {
+        if (!_is_valid || !IsKernelValid(kernel) || !snapshot._is_ready)
+            return;
+        const auto kernel_index = ResolveKernelIndex(kernel);
+        auto d3dcmd = static_cast<D3DCommandBuffer *>(cmd);
+        auto native_cmd = d3dcmd->NativeCmdList();
+        auto &d3d_ele = _elements[kernel_index]._variants[snapshot._variant_hash];
+        auto &cs_ele = _kernels[kernel_index]._variants[snapshot._variant_hash];
+        native_cmd->SetPipelineState(d3d_ele._pso.Get());
+        native_cmd->SetComputeRootSignature(d3d_ele._p_sig.Get());
+        for (u16 i = 0u; i < snapshot._entry_count; ++i)
+        {
+            const auto &entry = snapshot._entries[i];
+            if (entry._resource == nullptr)
+                continue;
+            d3dcmd->MarkUsedResource(entry._resource);
+            BindParams params;
+            params._is_compute_pipeline = true;
+            params._slot = entry._slot;
+            params._is_random_access = entry._resource_type == EBindResDescType::kRWBuffer;
+            if (entry._resource_type == EBindResDescType::kConstBufferRaw)
+            {
+                native_cmd->SetComputeRootConstantBufferView(entry._slot, entry._addi_info._gpu_handle);
+            }
+            else if (entry._resource_type == EBindResDescType::kTexture2D)
+            {
+                auto tex = static_cast<Texture *>(entry._resource);
+                params._params._texture_binder._sub_res = entry._sub_res;
+                params._params._texture_binder._view_idx = entry._view_index;
+                tex->Bind(cmd, params);
+            }
+            else if (entry._resource_type == EBindResDescType::kUAVTexture2D)
+            {
+                auto tex = static_cast<Texture *>(entry._resource);
+                params._params._texture_binder._sub_res = entry._sub_res;
+                params._params._texture_binder._view_idx = entry._view_index;
+                tex->Bind(cmd, params);
+            }
+            else if (entry._resource_type == EBindResDescType::kTexture3D)
+            {
+                auto tex = static_cast<Texture3D *>(entry._resource);
+                params._params._texture_binder._sub_res = entry._sub_res;
+                params._params._texture_binder._view_idx = entry._view_index;
+                tex->Bind(cmd, params);
+            }
+            else if (entry._resource_type == EBindResDescType::kRWTexture3D)
+            {
+                auto tex = static_cast<Texture3D *>(entry._resource);
+                params._params._texture_binder._sub_res = entry._sub_res;
+                params._params._texture_binder._view_idx = entry._view_index;
+                tex->Bind(cmd, params);
+            }
+            else if (entry._resource_type == EBindResDescType::kRWBuffer || entry._resource_type == EBindResDescType::kBuffer
+                     || entry._resource_type == EBindResDescType::kConstBuffer)
+            {
+                entry._resource->Bind(cmd, params);
+            }
+            else
+            {
+                LOG_WARNING("D3DComputeShader skipped unsupported snapshot binding type {} at slot {}",
+                            static_cast<u32>(entry._resource_type), entry._slot);
+            }
+        }
+        const auto bindless_srv_base = D3DDescriptorMgr::Get().GetBindlessSRVBaseGpuHandle();
+        const auto bindless_uav_base = D3DDescriptorMgr::Get().GetBindlessUAVBaseGpuHandle();
+        if (d3d_ele._has_bindless_texture2d)
+            native_cmd->SetComputeRootDescriptorTable(d3d_ele._bindless_texture_slot, bindless_srv_base);
+        if (d3d_ele._has_bindless_buffer)
+            native_cmd->SetComputeRootDescriptorTable(d3d_ele._bindless_buffer_slot, bindless_srv_base);
+        if (d3d_ele._has_bindless_rw_texture2d)
+            native_cmd->SetComputeRootDescriptorTable(d3d_ele._bindless_rw_texture_slot, bindless_uav_base);
+        if (d3d_ele._has_bindless_rw_buffer)
+            native_cmd->SetComputeRootDescriptorTable(d3d_ele._bindless_rw_buffer_slot, bindless_uav_base);
     }
 
 

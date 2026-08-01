@@ -1,5 +1,6 @@
 #include "Widgets/EditorLayer.h"
 #include "Common/Selection.h"
+#include "Common/EditorStyle.h"
 #include "Ext/imgui/imgui.h"
 #include "Ext/imgui/imgui_internal.h"
 
@@ -497,10 +498,10 @@ namespace Ailu
                     else if (prop_info.TypeName() == "Color")
                     {
                         Color old_value = prop_info.Get<Color>(obj);
-                        Color new_value = old_value;
-                        if (ImGui::ColorEdit4(prop_info.Name().c_str(), new_value.data, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR))
+                        Color srgb_value = old_value.ToSrgb();
+                        if (ImGui::ColorEdit4(prop_info.Name().c_str(), srgb_value.data, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR))
                         {
-                            prop_info.Set<Color>(obj, new_value);
+                            prop_info.Set<Color>(obj, Color::FromSrgb(srgb_value));
                             changed = true;
                         }
                     }
@@ -510,9 +511,10 @@ namespace Ailu
                         Vector4f new_value = old_value;
                         if (meta_info.GetBool("IsColor"))
                         {
-                            if (ImGui::ColorEdit4(prop_info.Name().c_str(), new_value.data, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR))
+                            Color srgb_value = Color(new_value).ToSrgb();
+                            if (ImGui::ColorEdit4(prop_info.Name().c_str(), srgb_value.data, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR))
                             {
-                                prop_info.Set<Vector4f>(obj, new_value);
+                                prop_info.Set<Vector4f>(obj, Color::FromSrgb(srgb_value));
                                 changed = true;
                             }
                         }
@@ -1225,8 +1227,6 @@ namespace Ailu
 
         namespace
         {
-            constexpr f32 kEditorToolbarHeight = 34.0f;
-            constexpr f32 kEditorStatusBarHeight = 24.0f;
 
             UI::Button *AddToolbarButton(UI::HorizontalBox *toolbar, const String &text, f32 width)
             {
@@ -1235,6 +1235,14 @@ namespace Ailu
                         .Size({width, 26.0f})
                         .Margin({4.0f, 4.0f, 0.0f, 4.0f});
                 return button;
+            }
+
+            bool SetColorIfChanged(Color &dst, const Color &src)
+            {
+                if (dst == src)
+                    return false;
+                dst = src;
+                return true;
             }
 
             void ResizeWidgetRoot(const Ref<UI::Widget> &widget, Vector2f position, Vector2f size)
@@ -1420,12 +1428,12 @@ namespace Ailu
         void EditorLayer::OnUpdate(f32 dt)
         {
             UpdateEditorChrome(dt);
-            static bool s_opened_graph_editor = false;
-            if (!s_opened_graph_editor)
-            {
-                DockManager::Get().AddDock(MakeRef<GraphEditorWindow>());
-                s_opened_graph_editor = true;
-            }
+            // static bool s_opened_graph_editor = false;
+            // if (!s_opened_graph_editor)
+            // {
+            //     DockManager::Get().AddDock(MakeRef<GraphEditorWindow>());
+            //     s_opened_graph_editor = true;
+            // }
             DockManager::Get().Update(dt);
             //Gizmo::DrawLine(Vector2f::kZero, Vector2f{200, 200}, Colors::kRed);
             //LOG_INFO("--------------------------------------");
@@ -1495,8 +1503,8 @@ namespace Ailu
             _toolbar_widget = MakeRef<UI::Widget>();
             _toolbar_widget->Name("EditorToolbar");
             auto toolbar_border = MakeRef<UI::Border>();
-            toolbar_border->_bg_color = Color(0.18f, 0.19f, 0.21f, 1.0f);
-            toolbar_border->_border_color = Color(0.34f, 0.36f, 0.40f, 1.0f);
+            toolbar_border->_bg_color = g_editor_style._toolbar_bg_color;
+            toolbar_border->_border_color = g_editor_style._toolbar_border_color;
             toolbar_border->Thickness({0.0f, 0.0f, 0.0f, 1.0f});
             auto *toolbar = toolbar_border->AddChild<UI::HorizontalBox>();
             toolbar->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
@@ -1556,14 +1564,15 @@ namespace Ailu
             title->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kAuto, UI::ESizePolicy::kFill)
                     .Margin({0.0f, 0.0f, 10.0f, 0.0f});
             _toolbar_widget->AddToWidget(toolbar_border);
+            _toolbar_border = toolbar_border.get();
             UI::UIManager::Get()->RegisterWidget(_toolbar_widget);
 
             _status_bar_widget = MakeRef<UI::Widget>();
             _status_bar_widget->Name("EditorStatusBar");
             _status_bar_widget->_is_receive_event = false;
             auto status_border = MakeRef<UI::Border>();
-            status_border->_bg_color = Color(0.16f, 0.17f, 0.18f, 1.0f);
-            status_border->_border_color = Color(0.34f, 0.36f, 0.40f, 1.0f);
+            status_border->_bg_color = g_editor_style._status_bar_bg_color;
+            status_border->_border_color = g_editor_style._toolbar_border_color;
             status_border->Thickness({0.0f, 1.0f, 0.0f, 0.0f});
             auto *status = status_border->AddChild<UI::HorizontalBox>();
             status->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
@@ -1589,10 +1598,10 @@ namespace Ailu
             (void) dt;
             auto &window = Application::Get().GetWindow();
             const Vector2f window_size{(f32) window.GetWidth(), (f32) window.GetHeight()};
-            const f32 dock_height = std::max(0.0f, window_size.y - kEditorToolbarHeight - kEditorStatusBarHeight);
-            ResizeWidgetRoot(_toolbar_widget, Vector2f::kZero, {window_size.x, kEditorToolbarHeight});
-            ResizeWidgetRoot(_status_bar_widget, {0.0f, kEditorToolbarHeight + dock_height}, {window_size.x, kEditorStatusBarHeight});
-            DockManager::Get().SetMainDockArea({0.0f, kEditorToolbarHeight}, {window_size.x, dock_height});
+            const f32 dock_height = std::max(0.0f, window_size.y - g_editor_style._toolbar_height - g_editor_style._status_bar_height);
+            ResizeWidgetRoot(_toolbar_widget, Vector2f::kZero, {window_size.x, g_editor_style._toolbar_height});
+            ResizeWidgetRoot(_status_bar_widget, {0.0f, g_editor_style._toolbar_height + dock_height}, {window_size.x, g_editor_style._status_bar_height});
+            DockManager::Get().SetMainDockArea({0.0f, g_editor_style._toolbar_height}, {window_size.x, dock_height});
 
             auto *scene = SceneMgr::Get().ActiveScene();
             const String scene_name = scene ? scene->Name() : String("No Scene");
@@ -1612,10 +1621,26 @@ namespace Ailu
             {
                 _was_playing = is_playing;
                 if (is_playing)
-                    _status_bar_border->_bg_color = Color(0.85f, 0.45f, 0.10f, 1.0f);
+                    _status_bar_border->_bg_color = g_editor_style._status_bar_play_bg_color;
                 else
-                    _status_bar_border->_bg_color = Color(0.16f, 0.17f, 0.18f, 1.0f);
+                    _status_bar_border->_bg_color = g_editor_style._status_bar_bg_color;
                 _status_bar_border->InvalidateStyle();
+            }
+
+            // Sync toolbar & status bar colors from EditorStyle every frame
+            if (_toolbar_border)
+            {
+                bool toolbar_changed = false;
+                toolbar_changed |= SetColorIfChanged(_toolbar_border->_bg_color, g_editor_style._toolbar_bg_color);
+                toolbar_changed |= SetColorIfChanged(_toolbar_border->_border_color, g_editor_style._toolbar_border_color);
+                if (toolbar_changed)
+                    _toolbar_border->InvalidateStyle();
+            }
+            if (_status_bar_border)
+            {
+                if (!is_playing)
+                    SetColorIfChanged(_status_bar_border->_bg_color, g_editor_style._status_bar_bg_color);
+                _status_bar_border->_border_color = g_editor_style._toolbar_border_color;
             }
 
             if (_status_left_text)
@@ -1636,8 +1661,6 @@ namespace Ailu
             }
 
             auto *ui_mgr = UI::UIManager::Get();
-            if (_toolbar_widget)
-                ui_mgr->BringToFrontSilently(_toolbar_widget.get());
             if (_status_bar_widget)
                 ui_mgr->BringToFrontSilently(_status_bar_widget.get());
         }

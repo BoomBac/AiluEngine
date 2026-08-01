@@ -183,14 +183,6 @@ namespace Ailu::UI
         auto popup_widget = MakeRef<Widget>();
         popup_widget->Name(std::format("PopupWidget_{}", _popup_stack.size()));
         popup_widget->SetPopup(true);
-        if (auto *list_view = dynamic_cast<ListView *>(root.get()); list_view != nullptr && !list_view->HasCustomBackgroundBrush())
-        {
-            UIBrush popup_bg;
-            popup_bg._type = EUIBrushType::kColor;
-            popup_bg._tint = Color(0.06f, 0.07f, 0.09f, 0.78f);
-            list_view->SetBackgroundBrush(popup_bg);
-            list_view->SetBorder(Color(1.0f, 1.0f, 1.0f, 0.22f), 1.0f);
-        }
         auto popup_root = MakeRef<Canvas>();
         popup_root->Name(std::format("{}Root", popup_widget->Name()));
         popup_root->AddChild(root);

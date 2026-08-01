@@ -102,7 +102,6 @@ namespace Ailu::RHI::DX12
         D3DGraphicsPipelineState(const GraphicsPipelineStateInitializer &initializer);
         ~D3DGraphicsPipelineState();
         Render::NativeHandle NativeResource() final { return {Render::RendererAPI::ERenderAPI::kDirectX12, _p_plstate.Get()}; }
-        void SetTopology(ETopology topology) final;
 
     private:
         void BindImpl(RHICommandBuffer *rhi_cmd, const BindParams& params) final;
@@ -114,7 +113,6 @@ namespace Ailu::RHI::DX12
         D3D_PRIMITIVE_TOPOLOGY _d3d_topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
         ComPtr<ID3D12PipelineState> _p_plstate;
         ComPtr<ID3D12RootSignature> _p_sig;
-        ID3D12GraphicsCommandList *_p_cmd;
         Vector<CD3DX12_ROOT_PARAMETER1> _root_parameters;
     };
 }// namespace Ailu::RHI::DX12

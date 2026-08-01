@@ -359,7 +359,6 @@ namespace Ailu
 
     void Application::WaitForMain()
     {
-        PROFILE_BLOCK_CPU("Application::WaitForMain")
         std::unique_lock<std::mutex> lock(_mutex);
         _render_wait.wait(lock, [this]
                           { return _main_finished || State() == EApplicationState::EApplicationState_Exit; });
@@ -762,6 +761,9 @@ namespace Ailu
     {
         PROFILE_BLOCK_CPU("Application::EndFrame")
         _after_update_delegate.Invoke();
+
+        if (_is_multi_thread_rendering.load())
+            NotifyRender();
 
     #if defined(TRACY_ENABLE)
         FrameMark;

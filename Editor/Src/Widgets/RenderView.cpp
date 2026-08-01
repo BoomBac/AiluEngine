@@ -66,7 +66,7 @@ namespace Ailu
                 UIControlVisual visual;
                 visual._background = MakeSceneToolbarBrush(background);
                 visual._border_color = border;
-                visual._border_width = 1.0f;
+                visual._border_width = Vector4f(1.0f);
                 visual._content_color = text;
                 visual._corner_radius = Vector4f(4.0f);
                 return visual;
@@ -235,23 +235,6 @@ namespace Ailu
             _source->OnMouseMove() += [this](UI::UIEvent &e) {
                 Vector4f rect = e._current_target->GetArrangeRect();
                 _mouse_pos = e._mouse_position - rect.xy;
-                if (DragDropManager::Get().IsDragging(EDragType::kMesh))
-                {
-                    auto &payload = DragDropManager::Get().GetPayload();
-                    _drag_preview_mesh = reinterpret_cast<Asset*>(payload->_data)->AsRef<Render::Mesh>();
-                    Ray ray{Camera::sCurrent->Position(), Camera::sCurrent->ScreenToWorld(ViewToRenderPosition(_mouse_pos))};
-                    if (auto hit = SceneMgr::Get().ActiveScene()->Pick(ray); hit != ECS::kInvalidEntity)
-                    {
-                        auto &box = SceneMgr::Get().ActiveScene()->GetRegister().GetComponent<ECS::StaticMeshComponent>(hit)->_transformed_aabbs[0];
-                        Vector3f p = box.Center();
-                        p.y += box.GetHalfAxisLength().y;
-                        Plane plane{p, Vector3f::kUp};
-                        _drag_preview_pos = CollisionDetection::Intersect(ray, plane)._point;
-                        _drag_preview_pos.y += _drag_preview_mesh->BoundBox()[0].GetHalfAxisLength().y;
-                    }
-                }
-                else
-                    _drag_preview_mesh = nullptr;
             };
             // 新增：按下开始拖拽
             _source->OnMouseDown() += [this](UI::UIEvent &e)
@@ -382,13 +365,20 @@ namespace Ailu
             handler._on_drop = [this](const DragPayload &payload, f32 x, f32 y)
             {
                 LOG_INFO("SceneView {} drop", StaticEnum<EDragType>()->GetNameByEnum(payload._type));
+                if (payload._type != EDragType::kMesh || payload._data == nullptr)
+                    return;
+                auto *asset = static_cast<Asset *>(payload._data);
+                auto mesh = asset->AsRef<Render::Mesh>();
+                if (mesh == nullptr || SceneMgr::Get().ActiveScene() == nullptr)
+                    return;
+                _drag_preview_mesh = mesh;
                 Vector<Ref<Render::Material>> mats;
-                for (u16 i = 0; i < _drag_preview_mesh->SubmeshCount(); i++)
+                for (u16 i = 0; i < mesh->SubmeshCount(); i++)
                 {
-                    auto mat = ResourceMgr::Get().GetEmbeddedMaterial(_drag_preview_mesh.get(), i);
+                    auto mat = ResourceMgr::Get().GetEmbeddedMaterial(mesh.get(), i);
                     mats.push_back(mat? mat : Render::Material::s_checker.lock());
                 }
-                auto new_entity = SceneMgr::Get().ActiveScene()->AddObject(_drag_preview_mesh, mats);
+                auto new_entity = SceneMgr::Get().ActiveScene()->AddObject(mesh, mats);
                 SceneMgr::Get().ActiveScene()->GetRegister().GetComponent<ECS::TransformComponent>(new_entity)->_local_transform._position = _drag_preview_pos;
             };
             _source->SetDropHandler(handler);
@@ -398,6 +388,7 @@ namespace Ailu
             RenderView::Update(dt);
             UpdateCameraOutputSize(dt);
             SetSource(s_renderer->TargetTexture());
+            UpdateDragPreview();
             UpdateSceneToolbarBackdrop();
             if (Render::Camera::sCurrent)
             {
@@ -413,6 +404,49 @@ namespace Ailu
                 Render::Gizmo::DrawMesh(_drag_preview_mesh.get(), MatrixTranslation(_drag_preview_pos), Render::Material::s_standard_forward_lit.lock().get());
             }
             ProcessCameraInput(dt);
+        }
+        void SceneView::UpdateDragPreview()
+        {
+            if (!DragDropManager::Get().IsDragging(EDragType::kMesh))
+            {
+                _drag_preview_mesh = nullptr;
+                return;
+            }
+
+            const auto &payload = DragDropManager::Get().GetPayload();
+            auto *asset = payload && payload->_data != nullptr ? static_cast<Asset *>(payload->_data) : nullptr;
+            _drag_preview_mesh = asset != nullptr ? asset->AsRef<Render::Mesh>() : nullptr;
+            if (_drag_preview_mesh == nullptr || Camera::sCurrent == nullptr)
+                return;
+
+            const Vector4f rect = _source->GetArrangeRect();
+            _mouse_pos = Input::GetMousePos(Application::FocusedWindow()) - rect.xy;
+            const Ray ray{Camera::sCurrent->Position(), Camera::sCurrent->ScreenToWorld(ViewToRenderPosition(_mouse_pos))};
+            Vector3f position = Vector3f::kZero;
+            bool has_position = false;
+            auto *scene = SceneMgr::Get().ActiveScene();
+            if (scene != nullptr)
+            {
+                const auto hit = scene->Pick(ray);
+                if (hit != ECS::kInvalidEntity)
+                {
+                    auto *static_mesh = scene->GetRegister().GetComponent<ECS::StaticMeshComponent>(hit);
+                    if (static_mesh != nullptr && !static_mesh->_transformed_aabbs.empty())
+                    {
+                        const auto &box = static_mesh->_transformed_aabbs[0];
+                        const Vector3f p = box.Center() + Vector3f(0.0f, box.GetHalfAxisLength().y, 0.0f);
+                        has_position = Plane{p, Vector3f::kUp}.Intersect(ray._start, ray._dir, position);
+                    }
+                }
+            }
+            if (!has_position)
+            {
+                has_position = Plane{Vector3f::kZero, Vector3f::kUp}.Intersect(ray._start, ray._dir, position);
+                if (!has_position)
+                    position = ray._start + ray._dir * 10.0f;
+            }
+            position.y += _drag_preview_mesh->BoundBox()[0].GetHalfAxisLength().y;
+            _drag_preview_pos = position;
         }
         void SceneView::BuildSceneToolbar()
         {

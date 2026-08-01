@@ -37,7 +37,7 @@ const class Ailu::Type* Ailu::StaticClass<class Ailu::Editor::SceneView>();
 //Class SceneView end...........................
 
 //Class Texture3DView begin...........................
-#define RENDERVIEW_GEN_H_104_GENERATED_BODY \
+#define RENDERVIEW_GEN_H_105_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_Texture3DView_Type();\
                                 static const Type* GetPrivateStaticClass();\

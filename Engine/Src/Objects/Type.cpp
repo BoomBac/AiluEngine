@@ -10,6 +10,8 @@
 
 namespace Ailu
 {
+    using namespace Math;
+
     static bool IsEnumType(const String &type_name)
     {
         bool is_enum = su::BeginWith(type_name, "E");
@@ -396,4 +398,14 @@ namespace Ailu
     IMPL_STATIC_TYPE(f64)
     IMPL_STATIC_TYPE(bool)
     IMPL_STATIC_TYPE(String)
+    IMPL_STATIC_TYPE(Vector2f)
+    IMPL_STATIC_TYPE(Vector3f)
+    IMPL_STATIC_TYPE(Vector4f)
+    IMPL_STATIC_TYPE(Vector2Int)
+    IMPL_STATIC_TYPE(Vector3Int)
+    IMPL_STATIC_TYPE(Vector4Int)
+    IMPL_STATIC_TYPE(Vector2UInt)
+    IMPL_STATIC_TYPE(Vector3UInt)
+    IMPL_STATIC_TYPE(Vector4UInt)
+    IMPL_STATIC_TYPE(Color)
 }// namespace Ailu

@@ -112,26 +112,6 @@ namespace Ailu::Render
     bool GraphicsPipelineStateObject::IsValidPipelineResource(const EBindResDescType &res_type, const String &name) const
     { return IsValidPipelineResource(res_type, NameToSlot(name)); }
 
-    void GraphicsPipelineStateObject::ResetPipelineResources()
-    {
-        _bind_res_signature = 0u;
-        _max_slot = 0u;
-    }
-
-    void GraphicsPipelineStateObject::SetPipelineResource(const PipelineResource &pipeline_res)
-    {
-        AL_ASSERT(pipeline_res.IsResolved());
-        AL_ASSERT(pipeline_res._slot < 32 && pipeline_res._slot >= 0);
-        bool is_exist = _bind_res_signature & (1 << pipeline_res._slot);
-        if (!is_exist) _bind_res[pipeline_res._slot]._priority = 0u;
-        _bind_res_signature |= (1 << pipeline_res._slot);
-        if (pipeline_res._priority >= _bind_res[pipeline_res._slot]._priority)
-        {
-            _bind_res[pipeline_res._slot] = pipeline_res;
-            _bind_res[pipeline_res._slot]._slot = pipeline_res._slot;
-        }
-        _max_slot = std::max<u16>(_max_slot, (u16) pipeline_res._slot);
-    }
 //------------------------------------------------------------------------------GraphicsPipelineStateObject---------------------------------------------------------------------------------
 #pragma endregion
 
@@ -151,6 +131,29 @@ namespace Ailu::Render
     }
 
     GraphicsPipelineStateMgr &GraphicsPipelineStateMgr::Get() { return *g_pPSOMgr; }
+
+    GraphicsPipelineStateObject *GraphicsPipelineStateMgr::FindReadyPSO(const PSOHash &hash)
+    {
+        std::lock_guard<std::mutex> lock(_pso_lock);
+        auto it = _pso_library.find(hash);
+        return it != _pso_library.end() && it->second->IsReady() ? it->second.get() : nullptr;
+    }
+
+    void GraphicsPipelineStateMgr::RequestPSOCreation(const PSOCreateRequest &request)
+    {
+        while (_pso_create_queue.Full())
+            std::this_thread::yield();
+        _pso_create_queue.Push(request);
+    }
+
+    void GraphicsPipelineStateMgr::ProcessPendingPSOCreationRequests()
+    {
+        while (!_pso_create_queue.Empty())
+        {
+            if (auto request = _pso_create_queue.Pop(); request.has_value())
+                CreatePSO(request.value());
+        }
+    }
 
     void GraphicsPipelineStateMgr::BuildPSOCache()
     {
@@ -296,13 +299,12 @@ namespace Ailu::Render
         {
             LOG_INFO("Compiled {} shaders!", compiled_shader_num);
             UpdateAllPSOObject();
-            _current_pso = nullptr;
-            _is_pso_dirty = true;
         }
     }
 
     void GraphicsPipelineStateMgr::AddPSO(Scope<GraphicsPipelineStateObject> p_gpso)
     {
+        std::lock_guard<std::mutex> lock(g_pPSOMgr->_pso_lock);
         auto it = g_pPSOMgr->_pso_library.find(p_gpso->Hash());
         if (it != g_pPSOMgr->_pso_library.end()) { g_pPSOMgr->_pso_library[p_gpso->Hash()] = std::move(p_gpso); }
         else
@@ -310,58 +312,6 @@ namespace Ailu::Render
             LOG_INFO("Add Pso id: {} to library!", p_gpso->Name());
             g_pPSOMgr->_pso_library.insert(std::make_pair(p_gpso->Hash(), std::move(p_gpso)));
         }
-    }
-
-    GraphicsPipelineStateObject *GraphicsPipelineStateMgr::FindMatchPSO()
-    {
-        ++RenderingStates::RenderData().PsoLookupCount;
-        if (_is_pso_dirty) 
-        {
-            ++RenderingStates::RenderData().GfxPsoDirtyCount;
-            GraphicsPipelineStateObject::ConstructPSOHash(g_pPSOMgr->_cur_pos_hash, g_pPSOMgr->_hash_input_layout, g_pPSOMgr->_hash_shader,
-                                                        g_pPSOMgr->_hash_blend_state, g_pPSOMgr->_hash_raster_state,
-                                                        g_pPSOMgr->_hash_depth_stencil_state, g_pPSOMgr->_hash_rt_state);
-            _current_pso = GetOrCreate(g_pPSOMgr->_cur_pos_hash);
-            _is_pso_dirty = _current_pso == nullptr;
-        }
-        else if (_current_pso != nullptr && _current_pso->IsReady())
-        {
-            ++RenderingStates::RenderData().PsoCacheHitCount;
-        }
-        else
-        {
-            ++RenderingStates::RenderData().PsoCacheMissCount;
-        }
-        if (_current_pso != nullptr && _current_pso->IsReady())
-        {
-            GraphicsPipelineStateObject *pso = _current_pso;
-            //AL_ASSERT(pso->StateDescriptor()._p_vertex_shader == new_shader);
-            pso->SetTopology(_current_shader->GetTopology());
-            pso->SetStencilRef(_current_shader->_stencil_ref);
-            pso->ResetPipelineResources();
-
-            for (auto& it : _unresolved_pipeline_res)
-            {
-                const auto& rb = it.second;
-                bool valid_res = pso->IsValidPipelineResource(rb._res_type, rb._name);
-                if (!valid_res)
-                    continue;
-                auto copy = PipelineResource(rb._p_resource, rb._res_type, pso->NameToSlot(rb._name), rb._priority, rb._is_compute);
-                copy._addi_info = rb._addi_info;
-                if (g_pPSOMgr->_pending_bindings.Submit(copy))
-                    ++RenderingStates::RenderData().PipelineResourceOverrideCount;
-            }     
-            for (i16 slot = 0; slot <= _pending_bindings._max_slot; ++slot)
-            {
-                if (!(_pending_bindings._mask & (1 << slot)))
-                    continue;
-
-                pso->SetPipelineResource(_pending_bindings._resources[slot]);
-            }
-        }
-        _unresolved_pipeline_res.clear();
-        _pending_bindings.Reset();
-        return _current_pso;
     }
 
     void GraphicsPipelineStateMgr::ProcessCompiledShader(const ShaderCompiledInfo &info)
@@ -379,9 +329,16 @@ namespace Ailu::Render
         u64 new_pso_shader_hash = Shader::ConstructHash(shader->ID(), pass_id, variant_hash);
         //更新库中pso的筛选条件：
         //- pass_name一致即可
-        for (auto &pso: g_pPSOMgr->_pso_library)
+        Vector<PSOHash> pso_hashes;
         {
-            GraphicsPipelineStateObject::ExtractPSOHash(pso.first, input_layout, shader_hash, blend_state, raster_state, ds_state,
+            std::lock_guard<std::mutex> lock(g_pPSOMgr->_pso_lock);
+            pso_hashes.reserve(g_pPSOMgr->_pso_library.size());
+            for (auto &pso: g_pPSOMgr->_pso_library)
+                pso_hashes.emplace_back(pso.first);
+        }
+        for (auto &pso_hash: pso_hashes)
+        {
+            GraphicsPipelineStateObject::ExtractPSOHash(pso_hash, input_layout, shader_hash, blend_state, raster_state, ds_state,
                                                         rt_state);
             //这里还需要处理关键字组的增删导致的hash相同但实际关键字序列不同的情况，暂时没做
             if (shader_hash == new_pso_shader_hash)
@@ -412,153 +369,181 @@ namespace Ailu::Render
         }
     }
 
-    GraphicsPipelineStateObject *GraphicsPipelineStateMgr::GetOrCreate(PSOHash hash)
+    GraphicsPipelineStateObject *GraphicsPipelineStateMgr::CreatePSO(const PSOCreateRequest &request)
     {
-        auto it = g_pPSOMgr->_pso_library.find(hash);
+        if (auto pso = FindReadyPSO(request._hash); pso != nullptr)
+            return pso;
+        const PSOHash &hash = request._hash;
+        Shader *shader = request._shader;
+        const u16 pass_index = request._pass_index;
+        const ShaderVariantHash variant_hash = request._variant_hash;
         u8 input_layout, blend_state, raster_state, ds_state, rt_state;
         u64 shader_hash;
         GraphicsPipelineStateObject::ExtractPSOHash(hash, input_layout, shader_hash, blend_state, raster_state, ds_state, rt_state);
-        u16 pass_index = _current_pass_index;
-        ShaderVariantHash variant_hash = _current_variant_hash;
         GraphicsPipelineStateObject *matched_pso = nullptr;
-        auto new_shader = _current_shader;
-        if (it != g_pPSOMgr->_pso_library.end())
+        auto new_shader = shader;
+        auto variant_state = new_shader->GetVariantState(pass_index, variant_hash);
+        if (variant_state == EShaderVariantState::kReady)
         {
-            if (it->second->IsReady())
-            {
-                matched_pso = it->second.get();
-                ++RenderingStates::RenderData().PsoCacheHitCount;
-            }
-            else
-            {
-                ++RenderingStates::RenderData().PsoCacheMissCount;
-            }
-        }
-        else
-        {
-            ++RenderingStates::RenderData().PsoCacheMissCount;
-            auto variant_state = new_shader->GetVariantState(pass_index, variant_hash);
-            if (variant_state == EShaderVariantState::kReady)
-            {
-                GraphicsPipelineStateInitializer new_desc;
-                new_desc._input_layout = VertexInputLayout::_s_hash_obj.Get(input_layout);
-                new_desc._blend_state = BlendState::_s_hash_obj.Get(blend_state);
-                new_desc._raster_state = RasterizerState::_s_hash_obj.Get(raster_state);
-                new_desc._depth_stencil_state = DepthStencilState::_s_hash_obj.Get(ds_state);
-                new_desc._topology = new_shader->GetTopology();
-                new_desc._p_pixel_shader = new_shader;
-                new_desc._p_vertex_shader = new_shader;
-                new_desc._rt_state = RenderTargetState::_s_hash_obj.Get(rt_state);
-                auto pso = std::move(GraphicsPipelineStateObject::Create(new_desc));
-
-                // GraphicsPipelineStateObject::ExtractPSOHash(pso->Hash(), input_layout, shader_hash, blend_state, raster_state, ds_state,
-                //                                             rt_state);
-                // LOG_WARNING("New Pso name:[{}], Input Layout: {}, Shader: {}, Blend State: {}, Raster State: {}, DepthBit Stencil State: {}, Render Target State: {}",
-                //             pso->Name(), (u32) input_layout, shader_hash, (u32) blend_state, (u32) raster_state, (u32) ds_state, (u32) rt_state);
-                g_pGfxContext->CreateResource(pso.get(), new UploadParamsGPSO(pass_index, variant_hash));
-                matched_pso = pso.get();
-                GraphicsPipelineStateMgr::AddPSO(std::move(pso));
-            }
+            GraphicsPipelineStateInitializer new_desc;
+            new_desc._input_layout = VertexInputLayout::_s_hash_obj.Get(input_layout);
+            new_desc._blend_state = BlendState::_s_hash_obj.Get(blend_state);
+            new_desc._raster_state = RasterizerState::_s_hash_obj.Get(raster_state);
+            new_desc._depth_stencil_state = DepthStencilState::_s_hash_obj.Get(ds_state);
+            new_desc._topology = new_shader->GetTopology();
+            new_desc._p_pixel_shader = new_shader;
+            new_desc._p_vertex_shader = new_shader;
+            new_desc._rt_state = RenderTargetState::_s_hash_obj.Get(rt_state);
+            auto pso = std::move(GraphicsPipelineStateObject::Create(new_desc));
+            g_pGfxContext->CreateResource(pso.get(), new UploadParamsGPSO(pass_index, variant_hash));
+            matched_pso = pso.get();
+            GraphicsPipelineStateMgr::AddPSO(std::move(pso));
         }
         return matched_pso;
     }
 
-    void GraphicsPipelineStateMgr::ConfigureShader(Shader *shader, u16 pass_index, ShaderVariantHash variant_hash, const u64 &shader_hash)
+    void CommandRecordingContext::Clear()
     {
-        if (shader_hash == g_pPSOMgr->_hash_shader && shader == g_pPSOMgr->_current_shader &&
-            pass_index == g_pPSOMgr->_current_pass_index && variant_hash == g_pPSOMgr->_current_variant_hash)
-            return;
-        g_pPSOMgr->_hash_shader = shader_hash;
-        g_pPSOMgr->_current_shader = shader;
-        g_pPSOMgr->_current_pass_index = pass_index;
-        g_pPSOMgr->_current_variant_hash = variant_hash;
-        g_pPSOMgr->_is_pso_dirty = true;
+        _render_target_state = RenderTargetState{};
+        _cur_pos_hash = PSOHash{};
+        _hash_shader = 0u;
+        _hash_input_layout = 0u;
+        _hash_topology = 0u;
+        _hash_blend_state = 0u;
+        _hash_raster_state = 0u;
+        _hash_depth_stencil_state = 0u;
+        _hash_rt_state = 0u;
+        _current_pso = nullptr;
+        MarkPSODirty();
+        _current_shader = nullptr;
+        _current_pass_index = 0u;
+        _current_variant_hash = 0u;
+        _resolved_bind_res.clear();
+        memset(&_rendering_states_data, 0, sizeof(CommandRenderingStatesData));
+        _stencil_ref = 0u;
+        _current_topology = ETopology::kTriangle;
     }
 
-    void GraphicsPipelineStateMgr::ConfigureShader(Shader *shader, const u64 &shader_hash)
+    GraphicsPipelineStateObject *CommandRecordingContext::FindMatchPSO()
     {
-        ConfigureShader(shader, g_pPSOMgr->_current_pass_index, g_pPSOMgr->_current_variant_hash, shader_hash);
-    }
-
-    void GraphicsPipelineStateMgr::ConfigureVertexInputLayout(const u8 &hash)
-    {
-        if (hash == g_pPSOMgr->_hash_input_layout) return;
-        g_pPSOMgr->_hash_input_layout = hash;
-        g_pPSOMgr->_is_pso_dirty = true;
-    }
-    void GraphicsPipelineStateMgr::ConfigureTopology(const u8 &hash)
-    {
-        // if (hash == g_pPSOMgr->_hash_topology) return;
-        // g_pPSOMgr->_hash_topology = hash;
-        // g_pPSOMgr->_is_pso_dirty = true;
-    }
-    void GraphicsPipelineStateMgr::ConfigureBlendState(const u8 &hash)
-    {
-        if (hash == g_pPSOMgr->_hash_blend_state) return;
-        g_pPSOMgr->_hash_blend_state = hash;
-        g_pPSOMgr->_is_pso_dirty = true;
-    }
-    void GraphicsPipelineStateMgr::ConfigureRasterizerState(const u8 &hash)
-    {
-        if (hash == g_pPSOMgr->_hash_raster_state) return;
-        g_pPSOMgr->_hash_raster_state = hash;
-        g_pPSOMgr->_is_pso_dirty = true;
-    }
-    void GraphicsPipelineStateMgr::ConfigureDepthStencilState(const u8 &hash)
-    {
-        if (hash == g_pPSOMgr->_hash_depth_stencil_state) return;
-        g_pPSOMgr->_hash_depth_stencil_state = hash;
-        g_pPSOMgr->_is_pso_dirty = true;
-    }
-
-    void GraphicsPipelineStateMgr::SetRenderTargetState(EALGFormat color_format, EALGFormat depth_format, u8 color_rt_id)
-    {
-        g_pPSOMgr->_render_target_state._color_rt[color_rt_id] = color_format;
-        g_pPSOMgr->_render_target_state._color_rt_num =
-                color_format == EALGFormat::kALGFormatUNKOWN ? 0 : static_cast<u8>(color_rt_id + 1u);
-        g_pPSOMgr->_render_target_state._depth_rt = depth_format;
-        auto cur_rt_hash = RenderTargetState::_s_hash_obj.GenHash(g_pPSOMgr->_render_target_state);
-        if (cur_rt_hash != g_pPSOMgr->_hash_rt_state) 
-            g_pPSOMgr->_is_pso_dirty = true;
-        g_pPSOMgr->_hash_rt_state = cur_rt_hash;
-    }
-    void GraphicsPipelineStateMgr::SetRenderTargetState(EALGFormat color_format, u8 color_rt_id)
-    {
-        g_pPSOMgr->_render_target_state._color_rt[color_rt_id] = color_format;
-        g_pPSOMgr->_render_target_state._color_rt_num =
-                color_format == EALGFormat::kALGFormatUNKOWN ? 0 : static_cast<u8>(color_rt_id + 1u);
-        auto cur_rt_hash = RenderTargetState::_s_hash_obj.GenHash(g_pPSOMgr->_render_target_state);
-        if (cur_rt_hash != g_pPSOMgr->_hash_rt_state) 
-            g_pPSOMgr->_is_pso_dirty = true;
-        g_pPSOMgr->_hash_rt_state = cur_rt_hash;
-    }
-    void GraphicsPipelineStateMgr::ResetRenderTargetState()
-    {
-        g_pPSOMgr->_render_target_state._color_rt_num = 0;
-        for (int i = 0; i < 8; i++) g_pPSOMgr->_render_target_state._color_rt[i] = EALGFormat::kALGFormatUNKOWN;
-        g_pPSOMgr->_render_target_state._depth_rt = EALGFormat::kALGFormatUNKOWN;
-        auto cur_rt_hash = RenderTargetState::_s_hash_obj.GenHash(g_pPSOMgr->_render_target_state);
-        if (cur_rt_hash != g_pPSOMgr->_hash_rt_state)
-            g_pPSOMgr->_is_pso_dirty = true;
-        g_pPSOMgr->_hash_rt_state = cur_rt_hash;
-    }
-    void GraphicsPipelineStateMgr::SubmitBindResource(const PipelineResource& resource) 
-    { 
-        ++RenderingStates::RenderData().PipelineResourceSubmitCount;
-        if (resource.IsResolved())
+        ++_rendering_states_data.PsoLookupCount;
+        if (_is_pso_dirty)
         {
-            if (g_pPSOMgr->_pending_bindings.Submit(resource))
-                ++RenderingStates::RenderData().PipelineResourceOverrideCount;
-            return;
+            ++_rendering_states_data.GfxPsoDirtyCount;
+            GraphicsPipelineStateObject::ConstructPSOHash(_cur_pos_hash, _hash_input_layout, _hash_shader, _hash_blend_state,
+                                                          _hash_raster_state, _hash_depth_stencil_state, _hash_rt_state);
+            _current_pso = GraphicsPipelineStateMgr::Get().FindReadyPSO(_cur_pos_hash);
+            if (_current_pso == nullptr)
+            {
+                if (!_pso_request_submitted)
+                {
+                    GraphicsPipelineStateMgr::Get().RequestPSOCreation(
+                        PSOCreateRequest{_cur_pos_hash, _current_shader, _current_pass_index, _current_variant_hash});
+                    LOG_WARNING("PSO miss during command recording: shader={}, pass={}, variant={}", _current_shader->Name(),
+                                _current_pass_index, _current_variant_hash);
+                    _pso_request_submitted = true;
+                }
+            }
+            _is_pso_dirty = _current_pso == nullptr;
         }
-        AL_ASSERT(resource.IsNamed());
-        g_pPSOMgr->_unresolved_pipeline_res[resource._name] = resource;
+        else if (_current_pso != nullptr && _current_pso->IsReady())
+        {
+            ++_rendering_states_data.PsoCacheHitCount;
+        }
+        else
+        {
+            ++_rendering_states_data.PsoCacheMissCount;
+        }
+        _current_topology = _current_shader->GetTopology();
+        _stencil_ref = _current_shader->_stencil_ref;
+        return _current_pso;
+    }
+
+    void CommandRecordingContext::ConfigureShader(Shader *shader, u16 pass_index, ShaderVariantHash variant_hash, const u64 &shader_hash)
+    {
+        if (shader_hash == _hash_shader && shader == _current_shader && pass_index == _current_pass_index &&
+            variant_hash == _current_variant_hash)
+            return;
+        _hash_shader = shader_hash;
+        _current_shader = shader;
+        _current_pass_index = pass_index;
+        _current_variant_hash = variant_hash;
+        MarkPSODirty();
+    }
+
+    void CommandRecordingContext::ConfigureShader(Shader *shader, const u64 &shader_hash)
+    {
+        ConfigureShader(shader, _current_pass_index, _current_variant_hash, shader_hash);
+    }
+
+    void CommandRecordingContext::ConfigureVertexInputLayout(const u8 &hash)
+    {
+        if (hash == _hash_input_layout) return;
+        _hash_input_layout = hash;
+        MarkPSODirty();
+    }
+    void CommandRecordingContext::ConfigureTopology(const u8 &hash)
+    {
+        // if (hash == _hash_topology) return;
+        // _hash_topology = hash;
+        // _is_pso_dirty = true;
+    }
+    void CommandRecordingContext::ConfigureBlendState(const u8 &hash)
+    {
+        if (hash == _hash_blend_state) return;
+        _hash_blend_state = hash;
+        MarkPSODirty();
+    }
+    void CommandRecordingContext::ConfigureRasterizerState(const u8 &hash)
+    {
+        if (hash == _hash_raster_state) return;
+        _hash_raster_state = hash;
+        MarkPSODirty();
+    }
+    void CommandRecordingContext::ConfigureDepthStencilState(const u8 &hash)
+    {
+        if (hash == _hash_depth_stencil_state) return;
+        _hash_depth_stencil_state = hash;
+        MarkPSODirty();
+    }
+
+    void CommandRecordingContext::SetRenderTargetState(EALGFormat color_format, EALGFormat depth_format, u8 color_rt_id)
+    {
+        _render_target_state._color_rt[color_rt_id] = color_format;
+        _render_target_state._color_rt_num =
+                color_format == EALGFormat::kALGFormatUNKOWN ? 0 : static_cast<u8>(color_rt_id + 1u);
+        _render_target_state._depth_rt = depth_format;
+        auto cur_rt_hash = RenderTargetState::_s_hash_obj.GenHash(_render_target_state);
+        if (cur_rt_hash != _hash_rt_state) 
+            MarkPSODirty();
+        _hash_rt_state = cur_rt_hash;
+    }
+    void CommandRecordingContext::SetRenderTargetState(EALGFormat color_format, u8 color_rt_id)
+    {
+        _render_target_state._color_rt[color_rt_id] = color_format;
+        _render_target_state._color_rt_num =
+                color_format == EALGFormat::kALGFormatUNKOWN ? 0 : static_cast<u8>(color_rt_id + 1u);
+        auto cur_rt_hash = RenderTargetState::_s_hash_obj.GenHash(_render_target_state);
+        if (cur_rt_hash != _hash_rt_state) 
+            MarkPSODirty();
+        _hash_rt_state = cur_rt_hash;
+    }
+    void CommandRecordingContext::ResetRenderTargetState()
+    {
+        _render_target_state._color_rt_num = 0;
+        for (int i = 0; i < 8; i++) _render_target_state._color_rt[i] = EALGFormat::kALGFormatUNKOWN;
+        _render_target_state._depth_rt = EALGFormat::kALGFormatUNKOWN;
+        auto cur_rt_hash = RenderTargetState::_s_hash_obj.GenHash(_render_target_state);
+        if (cur_rt_hash != _hash_rt_state)
+            MarkPSODirty();
+        _hash_rt_state = cur_rt_hash;
     }
 
     void GraphicsPipelineStateMgr::UpdateAllPSOObject()
     {
         if (!g_pPSOMgr->_update_pso.empty())
         {
+            std::lock_guard<std::mutex> lock(g_pPSOMgr->_pso_lock);
             Vector<Scope<GraphicsPipelineStateObject>> temp;
             for (auto &it: g_pPSOMgr->_update_pso)
             {
@@ -566,12 +551,12 @@ namespace Ailu::Render
                 if (g_pPSOMgr->_pso_library.contains(hash))
                 {
                     auto exist_pso = g_pPSOMgr->_pso_library[hash].get();
-                    if (!exist_pso->IsReferenceByGpu()) AddPSO(std::move(it));
+                    if (!exist_pso->IsReferenceByGpu()) g_pPSOMgr->_pso_library[hash] = std::move(it);
                     else
                         temp.push_back(std::move(it));
                 }
                 else
-                    AddPSO(std::move(it));
+                    g_pPSOMgr->_pso_library.insert(std::make_pair(hash, std::move(it)));
             }
             g_pPSOMgr->_update_pso = std::move(temp);
         }

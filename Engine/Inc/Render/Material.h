@@ -15,6 +15,7 @@
 #include "Texture.h"
 #include "RenderConstants.h"
 #include "MaterialDrawState.h"
+#include "RenderingStates.h"
 #include <map>
 #include <unordered_set>
 #include "generated/Material.gen.h"
@@ -23,6 +24,7 @@
 namespace Ailu::Render
 {
     class FrameAllocator;
+    struct FrameUploadAllocation;
 
     ACLASS()
     class AILU_API Material : public Object
@@ -51,6 +53,8 @@ namespace Ailu::Render
         {
             u8 *_data = nullptr;
             u32 _size = 0u;
+            GpuResource *_upload_buffer = nullptr;// 帧上传缓冲区，用于烘焙进binding snapshot并做资源追踪
+            u64 _gpu_handle = 0u;                  // GPU虚拟地址
         };
         inline static std::weak_ptr<Material> s_standard_defered_lit;
         inline static std::weak_ptr<Material> s_standard_forward_lit;
@@ -97,7 +101,9 @@ namespace Ailu::Render
         //开启一个关键字并关闭同组的其他关键字
         void EnableKeyword(const String &keyword);
         void DisableKeyword(const String &keyword);
-        MaterialDrawState CaptureDrawState(u16 pass_index, u32 frame_slot, u64 frame_count, FrameAllocator &allocator);
+        MaterialDrawState CaptureDrawState(u16 pass_index, u32 frame_slot, u64 frame_count, FrameAllocator &allocator,
+                                           const HashMap<ShaderPropertyId, CommandResourceBinding> *command_resources = nullptr,
+                                           CommandRenderingStatesData *statistics = nullptr);
         [[nodiscard]] Shader *GetShader() const { return _p_shader; };
         bool IsReadyForDraw(u16 pass_index = 0) const;
         List<std::tuple<String, float>> GetAllFloatValue();
@@ -114,8 +120,9 @@ namespace Ailu::Render
             AL_ASSERT(block_index < _property_blocks.size());
             return &_property_blocks[block_index];
         }
-        PropertyBlockView GetPropertyBlockForFrame(u16 pass_index, u32 frame_slot, u64 frame_count, FrameAllocator &allocator);
-        u32 PropertyVersion() const { return _property_version; }
+        PropertyBlockView GetPropertyBlockForFrame(u16 pass_index, u32 frame_slot, u64 frame_count, FrameAllocator &allocator,
+                                                   bool upload_to_gpu, CommandRenderingStatesData *statistics = nullptr);
+        u32 PropertyVersion() const { return _property_data_version + _resource_binding_version; }
         std::set<String>& SavedKeyworkds() { return _all_keywords; }
         virtual void Construct(bool first_time);
     protected:
@@ -126,22 +133,31 @@ namespace Ailu::Render
             u16 _pass_index = 0;
             u16 _max_bind_slot = 0;
             i16 _cbuf_bind_slot = -1;
+            bool _is_ready = false;
             ShaderVariantHash _variant_hash;
             Array<GpuResource*,32> _bind_res;
             Array<EBindResDescType,32u> _bind_res_type;
             Array<u16,32u> _bind_res_priority;
         };
+        struct ResolvedResourceBinding
+        {
+            ShaderPropertyId _property_id = kInvalidShaderPropertyId;
+            u8 _bind_slot = 0u;
+            EBindResDescType _resource_type = EBindResDescType::kUnknown;
+        };
         struct BindingCacheEntry
         {
-            u32 _material_version = 0u;
+            u32 _resource_binding_version = 0u;
             u32 _layout_version = 0u;
             ShaderVariantHash _variant_hash = 0u;
-            u64 _global_res_vesion = 0u;
+            u64 _global_res_layout_version = 0u;
+            u64 _global_res_binding_version = 0u;
+            Vector<ResolvedResourceBinding> _global_res_bindings;
             BindState _state;
         };
         struct FramePropertyBlockCache
         {
-            u32 _material_version = 0u;
+            u32 _property_data_version = 0u;
             u64 _frame_count = static_cast<u64>(-1);
             PropertyBlockView _block;
         };
@@ -150,7 +166,13 @@ namespace Ailu::Render
     private:
         void UpdateBindTexture(u16 pass_index, ShaderVariantHash new_hash);
     protected:
-        void MarkPropertiesDirty() { ++_property_version; }
+        void MarkPropertyDataDirty() { ++_property_data_version; }
+        void MarkResourceBindingsDirty() { ++_resource_binding_version; }
+        void MarkPropertiesDirty()
+        {
+            MarkPropertyDataDirty();
+            MarkResourceBindingsDirty();
+        }
     private:
         void ResetMaterialCaches();
 
@@ -170,13 +192,14 @@ namespace Ailu::Render
         Map<String, ShaderPropertyInfo> _properties;
         Vector<ShaderPropertyInfo *> _prop_views;
         Vector<PropertyBlock> _property_blocks;
-        u32 _property_version = 1u;
-        Map<String,Texture *> _bind_textures{};
+        u32 _property_data_version = 1u;
+        u32 _resource_binding_version = 1u;
         Map<ShaderPropertyId, Texture *> _bind_textures_by_id{};
         Map<ShaderPropertyId, GPUBuffer *> _bind_buffers_by_id{};
         //非shader使用的变量
         Map<String, u32> _common_uint_property;
         Map<String, f32> _common_float_property;
+        ECullMode _cull_mode = ECullMode::kBack;
     };
 
     enum class ETextureUsage : u8

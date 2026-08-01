@@ -1,0 +1,12 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "7c6d2a84-3f37-4e8f-9c47-8b7fb3a2e2a1",
+        "_asset_type": "Ailu::Render::Shader",
+        "_asset_name": "ui_shadow",
+        "_dependencies": []
+    },
+    "_file": "ui_shadow.hlsl",
+    "_vs_entry": "VSMain",
+    "_ps_entry": "PSMain"
+}

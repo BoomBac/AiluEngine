@@ -19,16 +19,34 @@ namespace Ailu
             UIBrush _background;
 
             APROPERTY()
-            Color _content_color = Colors::kWhite;
+            Color _content_color = Colors::kWhite; // Runtime linear; JSON serialization stores sRGB.
 
             APROPERTY()
             Color _border_color = Colors::kTransparent;
 
             APROPERTY()
-            f32 _border_width = 0.0f;
+            Vector4f _border_width = Vector4f::kZero;
 
             APROPERTY()
             Vector4f _corner_radius = Vector4f::kZero;
+        };
+
+        ASTRUCT()
+        struct AILU_API UIElementVisualStyle
+        {
+            GENERATED_BODY()
+
+            APROPERTY()
+            UIControlVisual _visual;
+        };
+
+        ASTRUCT()
+        struct AILU_API UIBorderStyle
+        {
+            GENERATED_BODY()
+
+            APROPERTY()
+            UIControlVisual _visual;
         };
 
         // ================================================================
@@ -63,6 +81,7 @@ namespace Ailu
             void SetContentColor(const Color &c);
             void SetBorderColor(const Color &c);
             void SetBorderWidth(f32 w);
+            void SetBorderWidth(const Vector4f &w);
             void SetCornerRadius(const Vector4f &r);
             void SetCornerRadius(f32 uniform);
             void SetOpacity(f32 o);
@@ -95,7 +114,7 @@ namespace Ailu
             Color _border_color = Colors::kTransparent;
 
             APROPERTY()
-            f32 _border_width = 0.0f;
+            Vector4f _border_width = Vector4f::kZero;
 
             APROPERTY()
             Vector4f _corner_radius = Vector4f::kZero;
@@ -657,6 +676,68 @@ namespace Ailu
         };
 
         // ================================================================
+        // UIListViewStyle - list/popup visual style
+        // ================================================================
+        ASTRUCT()
+        struct AILU_API UIListViewStyle
+        {
+            GENERATED_BODY()
+
+            APROPERTY()
+            UIBrush _background;
+
+            APROPERTY()
+            Color _item_text_color = Colors::kWhite;
+
+            APROPERTY()
+            Color _item_hovered_color = Color(0.2f, 0.2f, 0.4f, 0.5f);
+
+            APROPERTY()
+            Color _item_selected_color = Color(0.3f, 0.3f, 0.6f, 0.8f);
+
+            APROPERTY()
+            Color _border_color = Colors::kTransparent;
+
+            APROPERTY()
+            f32 _border_width = 0.0f;
+
+            APROPERTY()
+            Vector4f _corner_radius = Vector4f(4.0f);
+        };
+
+        ASTRUCT()
+        struct AILU_API UISplitViewStyle
+        {
+            GENERATED_BODY()
+
+            APROPERTY()
+            UIControlVisual _visual;
+            APROPERTY()
+            Color _divider_color = Colors::kTransparent;
+            APROPERTY()
+            Color _divider_hovered_color = Colors::kTransparent;
+        };
+
+        ASTRUCT()
+        struct AILU_API UIColorPickerStyle
+        {
+            GENERATED_BODY()
+
+            APROPERTY()
+            Color _background_color = Colors::kTransparent;
+            APROPERTY()
+            Color _border_color = Colors::kTransparent;
+            APROPERTY()
+            Color _handle_color = Colors::kWhite;
+            APROPERTY()
+            Color _label_color = Colors::kWhite;
+            APROPERTY()
+            Color _checker_light_color = Color(0.72f, 0.72f, 0.72f, 1.0f);
+            APROPERTY()
+            Color _checker_dark_color = Color(0.42f, 0.42f, 0.42f, 1.0f);
+        };
+
+        // ================================================================
         // UIScrollBarStyle - scrollbar style
         // ================================================================
         ASTRUCT()
@@ -987,6 +1068,104 @@ namespace Ailu
             bool _reserve_horizontal_scrollbar_space = false;
             APROPERTY()
             bool _reserve_vertical_scrollbar_space = false;
+        };
+
+        // ================================================================
+        // UITreeViewStyle - tree view style
+        // ================================================================
+        ASTRUCT()
+        struct AILU_API UITreeViewStyle
+        {
+            GENERATED_BODY()
+
+            APROPERTY()
+            f32 _row_height = 22.0f;
+
+            APROPERTY()
+            f32 _indent_width = 16.0f;
+
+            APROPERTY()
+            f32 _expand_button_width = 16.0f;
+
+            APROPERTY()
+            Color _normal_color = Color(0.15f, 0.15f, 0.2f, 1.0f);
+
+            APROPERTY()
+            Color _hover_color = Color(0.2f, 0.2f, 0.4f, 1.0f);
+
+            APROPERTY()
+            Color _selected_color = Color(0.3f, 0.3f, 0.6f, 1.0f);
+
+            APROPERTY()
+            Color _selected_unfocused_color = Color(0.2f, 0.2f, 0.35f, 1.0f);
+
+            APROPERTY()
+            Padding _padding = Padding(2.0f, 1.0f, 2.0f, 1.0f);
+
+            APROPERTY()
+            f32 _font_size = 14.0f;
+        };
+
+        // UITreeViewStyle override
+        AENUM()
+        enum class EUITreeViewStyleOverride : u32
+        {
+            kNone = 0u,
+            kRowHeight = 1u << 0u,
+            kIndentWidth = 1u << 1u,
+            kExpandButtonWidth = 1u << 2u,
+            kNormalColor = 1u << 3u,
+            kHoverColor = 1u << 4u,
+            kSelectedColor = 1u << 5u,
+            kSelectedUnfocusedColor = 1u << 6u,
+            kPadding = 1u << 7u,
+            kFontSize = 1u << 8u,
+        };
+
+        ASTRUCT()
+        struct AILU_API UITreeViewStyleOverride
+        {
+            GENERATED_BODY()
+        public:
+            void SetRowHeight(f32 h);
+            void SetIndentWidth(f32 w);
+            void SetExpandButtonWidth(f32 w);
+            void SetNormalColor(const Color &c);
+            void SetHoverColor(const Color &c);
+            void SetSelectedColor(const Color &c);
+            void SetSelectedUnfocusedColor(const Color &c);
+            void SetPadding(const Padding &p);
+            void SetFontSize(f32 s);
+
+            void ClearOverride(EUITreeViewStyleOverride flag);
+            void ClearAllOverrides();
+            bool HasOverride(EUITreeViewStyleOverride flag) const;
+            u32 GetOverrideMask() const { return _override_mask; }
+
+            void ApplyTo(UITreeViewStyle &style) const;
+
+        public:
+            APROPERTY()
+            u32 _override_mask = 0u;
+
+            APROPERTY()
+            f32 _row_height = 22.0f;
+            APROPERTY()
+            f32 _indent_width = 16.0f;
+            APROPERTY()
+            f32 _expand_button_width = 16.0f;
+            APROPERTY()
+            Color _normal_color = Color(0.15f, 0.15f, 0.2f, 1.0f);
+            APROPERTY()
+            Color _hover_color = Color(0.2f, 0.2f, 0.4f, 1.0f);
+            APROPERTY()
+            Color _selected_color = Color(0.3f, 0.3f, 0.6f, 1.0f);
+            APROPERTY()
+            Color _selected_unfocused_color = Color(0.2f, 0.2f, 0.35f, 1.0f);
+            APROPERTY()
+            Padding _padding = Padding(2.0f, 1.0f, 2.0f, 1.0f);
+            APROPERTY()
+            f32 _font_size = 14.0f;
         };
 
     }// namespace UI

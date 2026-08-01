@@ -3,6 +3,7 @@
 #define __COMMAND_BUFFER__
 
 #include "Framework/Math/ALMath.hpp"
+#include "GraphicsPipelineStateObject.h"
 #include "Material.h"
 #include "Mesh.h"
 #include "RendererAPI.h"
@@ -55,9 +56,12 @@ namespace Ailu
         virtual void InsertUAVBarrier() {}
         [[nodiscard]] ECommandBufferType GetCommandBufferType() const { return _cmd_type; }
         [[nodiscard]] bool IsExecuted() const { return _is_executed; }
+        CommandRecordingContext &RecordingContext() { return _recording_context; }
+        const CommandRecordingContext &RecordingContext() const { return _recording_context; }
 
     protected:
-        bool _is_executed;
+        bool _is_executed = false;
+        CommandRecordingContext _recording_context;
 
     private:
         ECommandBufferType _cmd_type;
@@ -188,6 +192,7 @@ namespace Ailu
 
         // Move-out the internal command list for submission.
         Vector<GfxCommand *> TakeCommands();
+        CommandRenderingStatesData TakeRenderingStatesData();
         // Read-only access to internal commands (for synchronous processing).
         const Vector<GfxCommand *> &GetCommands() const;
 

@@ -778,7 +778,6 @@ namespace Ailu
             static RTHandle GetTempRT(const TextureDesc &desc, String name = std::format("TempBuffer_{}", s_temp_rt_count++));
             static RTHandle GetTempRT(u16 width, u16 height, String name, ERenderTargetFormat format, ELoadStoreAction load_action);
             static void ReleaseTempRT(RTHandle handle);
-            static void ResetRenderTarget(RenderTexture *rt = nullptr) { s_current_rt = rt; };
             //virtual TextureHandle GetView(ECubemapFace face, u16 mimmap) { return 0; };
             //当mipmap为0时，访问srv时，返回原图分辨率，也就是mip0，当访问uav时，实际访问的是mipmap1的uav（cubemap）
             //virtual TextureHandle GetView(u16 mimmap, bool random_access = false, ECubemapFace face = ECubemapFace::kUnknown, u16 array_slice = 0) override { return 0; };
@@ -817,18 +816,6 @@ namespace Ailu
             virtual void ReadBackAsync(std::function<void(void *)> callback, u16 mipmap, u16 array_slice = 0, ECubemapFace face = ECubemapFace::kUnknown) {};
             bool IsSwapChain() const { return _is_swapchain; }
         private:
-            inline static RenderTexture *s_current_rt = nullptr;
-
-        protected:
-            static bool CanAsShaderResource(RenderTexture *rt)
-            {
-                bool ret = s_current_rt ? rt != s_current_rt : true;
-                if (!ret)
-                {
-                    LOG_WARNING("{} used as srv and rtv same time!", rt->Name());
-                }
-                return ret;
-            }
 
         protected:
             inline static u64 s_render_texture_gpu_mem_usage = 0u;

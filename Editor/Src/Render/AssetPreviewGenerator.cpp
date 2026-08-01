@@ -32,6 +32,7 @@ namespace Ailu
                     ERenderTargetFormat::kDepth, false, false, false);
 
             cmd->SetRenderTargetLoadAction(depth, ELoadStoreAction::kClear);
+            cmd->SetRenderTargetLoadAction(target.get(), ELoadStoreAction::kClear);
             cmd->SetRenderTarget(target.get(), g_pRenderTexturePool->Get(depth));
 
             const auto &aabb = mesh->BoundBox()[0];
@@ -46,20 +47,35 @@ namespace Ailu
 
             f32 distance = radius * tanf(fov * 0.5f) * 1.2f;// 稍留边距
             Vector3f viewDir = Normalize(Vector3f(-1, -1, -1));
-            Vector3f cameraPos = center - viewDir * distance;
+            // The mesh is translated by -center below, so build the camera in the same
+            // centered coordinate system rather than leaving it in the asset's original space.
+            Vector3f cameraPos = -viewDir * distance;
             Vector3f up(0, 1, 0);
             Matrix4x4f view, proj;
             BuildViewMatrixLookToLH(view, cameraPos, viewDir, up);
             BuildPerspectiveFovLHMatrix(proj, fov, aspect, nearPlane, farPlane);
-            CBufferPerCameraData data;
+            CBufferPerCameraData data{};
             data._MatrixV = view;
             data._MatrixP = proj;
             data._MatrixVP = view * proj;
+            data._MatrixVP_NoJitter = data._MatrixVP;
             data._CameraPos = Vector4f(cameraPos, 1.0f);
+            data._ScreenParams = Vector4f(1.0f / f32(target->Width()), 1.0f / f32(target->Height()),
+                                          f32(target->Width()), f32(target->Height()));
+            CBufferPerSceneData scene_data{};
+            scene_data._DirectionalLights[0]._LightDir = Normalize(Vector3f(-0.45f, -1.0f, -0.65f));
+            scene_data._DirectionalLights[0]._LightColor = Vector3f(1.0f, 1.0f, 1.0f);
+            scene_data._DirectionalLights[0]._shadowmap_index = -1;
+            scene_data._ActiveLightCount.x = 1.0f;
+            cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerScene, &scene_data, sizeof(scene_data));
+            cmd->SetGlobalTexture("_OcclusionTex", Texture::s_p_default_white);
             cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &data, sizeof(data));
+            const Matrix4x4f world_matrix = MatrixTranslation(Vector3f(-center.x, -center.y, -center.z));
             for (u16 i = 0; i < mesh->SubmeshCount(); i++)
-                cmd->DrawMesh(mesh, Material::s_standard_forward_lit.lock().get(), BuildIdentityMatrix(), i);
-            GraphicsContext::Get().ExecuteCommandBuffer(cmd);
+                cmd->DrawMesh(mesh, Material::s_standard_forward_lit.lock().get(), world_matrix, i);
+            // The generated texture may be replaced immediately by AssetBrowser.  Submit
+            // synchronously so the old render target cannot be destroyed before execution.
+            GraphicsContext::Get().ExecuteCommandBufferSync(cmd);
             cmd->ReleaseTempRT(depth);
             CommandBufferPool::Release(cmd);
         }
@@ -135,7 +151,9 @@ namespace Ailu
             cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &data, sizeof(data));
             s_sprite_batcher->Render(cmd.get(), target.get(), g_pRenderTexturePool->Get(depth));
 
-            GraphicsContext::Get().ExecuteCommandBuffer(cmd);
+            // The generated texture may be replaced immediately by AssetBrowser.  Submit
+            // synchronously so the old render target cannot be destroyed before execution.
+            GraphicsContext::Get().ExecuteCommandBufferSync(cmd);
             cmd->ReleaseTempRT(depth);
             CommandBufferPool::Release(cmd);
         }

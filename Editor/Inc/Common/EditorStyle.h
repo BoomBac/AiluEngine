@@ -14,7 +14,7 @@ namespace Ailu
             GENERATED_BODY()
             // ----------------- 窗口 -----------------
             APROPERTY()
-            Color _window_bg_color;// 窗口背景色
+            Color _window_bg_color;// 窗口背景色；运行时线性空间，JSON 使用 sRGB
 
             APROPERTY()
             Color _window_title_bar_color;// 标题栏背景色
@@ -78,6 +78,28 @@ namespace Ailu
 
             APROPERTY()
             f32 _dock_hint_border_thickness = 2.0f;
+
+
+            // ----------------- 工具栏 -----------------
+            APROPERTY()
+            f32 _toolbar_height = 34.0f;
+
+            APROPERTY()
+            Color _toolbar_bg_color;// 工具栏背景色
+
+            APROPERTY()
+            Color _toolbar_border_color;// 工具栏底部边框色
+
+
+            // ----------------- 状态栏 -----------------
+            APROPERTY()
+            f32 _status_bar_height = 24.0f;
+
+            APROPERTY()
+            Color _status_bar_bg_color;// 状态栏背景色
+
+            APROPERTY()
+            Color _status_bar_play_bg_color;// 运行中状态栏背景色
         };
         static EditorStyle DefaultDark()
         {
@@ -109,6 +131,16 @@ namespace Ailu
             s._dock_hint_color = Color(0.31f, 0.55f, 1.0f, 0.3f);
             s._dock_hint_border_color = Color(0.31f, 0.55f, 1.0f, 0.8f);
             s._dock_hint_border_thickness = 2.0f;
+
+            // 工具栏
+            s._toolbar_height = 34.0f;
+            s._toolbar_bg_color = Color(0.18f, 0.19f, 0.21f, 1.0f);
+            s._toolbar_border_color = Color(0.34f, 0.36f, 0.40f, 1.0f);
+
+            // 状态栏
+            s._status_bar_height = 24.0f;
+            s._status_bar_bg_color = Color(0.16f, 0.17f, 0.18f, 1.0f);
+            s._status_bar_play_bg_color = Color(0.85f, 0.45f, 0.10f, 1.0f);
 
             return s;
         }
@@ -143,6 +175,16 @@ namespace Ailu
             s._dock_hint_color = Color(0.31f, 0.55f, 1.0f, 0.25f);
             s._dock_hint_border_color = Color(0.31f, 0.55f, 1.0f, 0.7f);
             s._dock_hint_border_thickness = 2.0f;
+
+            // 工具栏
+            s._toolbar_height = 34.0f;
+            s._toolbar_bg_color = Color(0.78f, 0.80f, 0.82f, 1.0f);
+            s._toolbar_border_color = Color(0.60f, 0.62f, 0.64f, 1.0f);
+
+            // 状态栏
+            s._status_bar_height = 24.0f;
+            s._status_bar_bg_color = Color(0.73f, 0.75f, 0.77f, 1.0f);
+            s._status_bar_play_bg_color = Color(0.92f, 0.55f, 0.18f, 1.0f);
 
             return s;
         }

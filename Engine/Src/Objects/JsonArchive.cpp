@@ -357,6 +357,7 @@ namespace Ailu
             char *buffer = new char[65536];
             rapidjson::FileWriteStream os(fp, buffer, sizeof(buffer));
             rapidjson::PrettyWriter<rapidjson::FileWriteStream> writer(os);
+            writer.SetMaxDecimalPlaces(4);
             writer.SetFormatOptions(rapidjson::kFormatSingleLineArray);
             doc.Accept(writer);
             fclose(fp);
@@ -371,6 +372,7 @@ namespace Ailu
             ToRapidJsonValue(root, doc, doc.GetAllocator());
             rapidjson::StringBuffer buffer;
             rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(buffer);
+            writer.SetMaxDecimalPlaces(4);
             writer.SetFormatOptions(rapidjson::kFormatSingleLineArray);
             doc.Accept(writer);
             return String(buffer.GetString(), buffer.GetSize());

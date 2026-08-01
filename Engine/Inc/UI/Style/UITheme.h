@@ -36,6 +36,24 @@ namespace Ailu
             const UIInputStyle *FindInputStyle(const UIStyleId &style_id) const;
             void SetInputStyle(const UIStyleId &style_id, const UIInputStyle &style);
 
+            const UIListViewStyle *FindListViewStyle(const UIStyleId &style_id) const;
+            void SetListViewStyle(const UIStyleId &style_id, const UIListViewStyle &style);
+
+            const UIElementVisualStyle *FindElementVisualStyle(const UIStyleId &style_id) const;
+            void SetElementVisualStyle(const UIStyleId &style_id, const UIElementVisualStyle &style);
+
+            const UIBorderStyle *FindBorderStyle(const UIStyleId &style_id) const;
+            void SetBorderStyle(const UIStyleId &style_id, const UIBorderStyle &style);
+
+            const UISplitViewStyle *FindSplitViewStyle(const UIStyleId &style_id) const;
+            void SetSplitViewStyle(const UIStyleId &style_id, const UISplitViewStyle &style);
+
+            const UIColorPickerStyle *FindColorPickerStyle(const UIStyleId &style_id) const;
+            void SetColorPickerStyle(const UIStyleId &style_id, const UIColorPickerStyle &style);
+
+            const UITreeViewStyle *FindTreeViewStyle(const UIStyleId &style_id) const;
+            void SetTreeViewStyle(const UIStyleId &style_id, const UITreeViewStyle &style);
+
         public:
             APROPERTY()
             UIColorTokens _colors;
@@ -59,7 +77,25 @@ namespace Ailu
             UIInputStyle _input_style;
 
             APROPERTY()
+            UIListViewStyle _list_view_style;
+
+            APROPERTY()
+            UIElementVisualStyle _element_visual_style;
+
+            APROPERTY()
+            UIBorderStyle _border_style;
+
+            APROPERTY()
+            UISplitViewStyle _split_view_style;
+
+            APROPERTY()
+            UIColorPickerStyle _color_picker_style;
+
+            APROPERTY()
             UIScrollViewStyle _scroll_view_style;
+
+            APROPERTY()
+            UITreeViewStyle _tree_view_style;
 
         private:
             explicit UITheme(bool init_default);
@@ -76,6 +112,24 @@ namespace Ailu
 
             APROPERTY()
             HashMap<UIStyleId, UIInputStyle> _input_styles;
+
+            APROPERTY()
+            HashMap<UIStyleId, UIListViewStyle> _list_view_styles;
+
+            APROPERTY()
+            HashMap<UIStyleId, UIElementVisualStyle> _element_visual_styles;
+
+            APROPERTY()
+            HashMap<UIStyleId, UIBorderStyle> _border_styles;
+
+            APROPERTY()
+            HashMap<UIStyleId, UISplitViewStyle> _split_view_styles;
+
+            APROPERTY()
+            HashMap<UIStyleId, UIColorPickerStyle> _color_picker_styles;
+
+            APROPERTY()
+            HashMap<UIStyleId, UITreeViewStyle> _tree_view_styles;
 
             u64 _revision = 1u;
         };

@@ -186,6 +186,7 @@ namespace Ailu
             u8 *GetStream(u8 index) { return _stream_data[index]._data; };
             void SetLayout(VertexBufferLayout layout) { _buffer_layout = std::move(layout); };
             [[nodiscard]] const VertexBufferLayout &GetLayout() const { return _buffer_layout; };
+            [[nodiscard]] u64 GetViewVersion() const { return _view_version; }
             u32 GetVertexCount() const { return _vertices_count; };
             [[nodiscard]] i32 GetBindlessSRVIndex(u8 stream_index = 0u) const { return stream_index < _bindless_srv_indices.size() ? _bindless_srv_indices[stream_index] : -1; }
 
@@ -202,6 +203,7 @@ namespace Ailu
             Vector<StreamData> _stream_data;
             std::map<std::pair<String, u8>, u8> _buffer_layout_indexer;
             Vector<i32> _bindless_srv_indices;
+            u64 _view_version = 0u;
         };
 
         class IndexBuffer : public GpuResource
@@ -216,6 +218,7 @@ namespace Ailu
             u8 *GetData() { return _data; };
             void SetData(u8 *data, u32 size);
             virtual void Resize(u32 new_size) = 0;
+            [[nodiscard]] u64 GetViewVersion() const { return _view_version; }
             [[nodiscard]] i32 GetBindlessSRVIndex() const { return _bindless_srv_index; }
 
         protected:
@@ -224,6 +227,7 @@ namespace Ailu
             bool _is_dynamic;
             u8 *_data = nullptr;
             i32 _bindless_srv_index = -1;
+            u64 _view_version = 0u;
         };
 
         class ConstantBuffer : public GpuResource

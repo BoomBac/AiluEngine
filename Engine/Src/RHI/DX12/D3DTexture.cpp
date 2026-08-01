@@ -83,7 +83,8 @@ namespace Ailu::RHI::DX12
         GpuResource::UploadImpl(ctx, rhi_cmd, params);
         auto d3d_ctx = dynamic_cast<D3DContext *>(ctx);
         auto p_device = d3d_ctx->GetDevice();
-        auto p_cmdlist = static_cast<D3DCommandBuffer *>(rhi_cmd)->NativeCmdList();
+        auto d3dcmd = static_cast<D3DCommandBuffer *>(rhi_cmd);
+        auto p_cmdlist = d3dcmd->NativeCmdList();
         //ComPtr<ID3D12Resource> pTextureGPU;
 
         D3D12_RESOURCE_DESC textureDesc{};
@@ -133,7 +134,8 @@ namespace Ailu::RHI::DX12
                 subres_datas.emplace_back(subdata);
             }
             UpdateSubresources(p_cmdlist, _p_d3dres.Get(), pTextureUpload.Get(), 0, 0, subresourceCount, subres_datas.data());
-            _state_guard.MakesureResourceState(p_cmdlist, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+            d3dcmd->EnsureResourceState(_state_guard, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE |
+                                                    D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
             _state = D3DConvertUtils::ToALResState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
             d3d_ctx->TrackResource(pTextureUpload);
         }
@@ -191,7 +193,7 @@ namespace Ailu::RHI::DX12
     void D3DTexture2D::StateTranslation(RHICommandBuffer* rhi_cmd,EResourceState new_state,u32 sub_res)
     {
         auto d3dcmd = static_cast<D3DCommandBuffer *>(rhi_cmd);
-        _state_guard.MakesureResourceState(d3dcmd->NativeCmdList(), D3DConvertUtils::FromALResState(new_state), sub_res);
+        d3dcmd->EnsureResourceState(_state_guard, D3DConvertUtils::FromALResState(new_state), sub_res);
         GpuResource::TrackResourceState(new_state, sub_res);
     }
 
@@ -226,14 +228,14 @@ namespace Ailu::RHI::DX12
             if (view_type == ETextureViewType::kSRV)
             {
                 const auto state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-                _state_guard.MakesureResourceState(d3dcmd->NativeCmdList(), state, bp._sub_res);
+                d3dcmd->EnsureResourceState(_state_guard, state, bp._sub_res);
                 GpuResource::TrackResourceState(D3DConvertUtils::ToALResState(state), bp._sub_res);
                 if (params._is_compute_pipeline) _views[bp._view_idx]._gpu_alloc.CommitDescriptorsForDispatch(d3dcmd, params._slot);
                 else _views[bp._view_idx]._gpu_alloc.CommitDescriptorsForDraw(d3dcmd, params._slot);
             }
             else if (view_type == ETextureViewType::kUAV)
             {
-                _state_guard.MakesureResourceState(d3dcmd->NativeCmdList(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, bp._sub_res);
+                d3dcmd->EnsureResourceState(_state_guard, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, bp._sub_res);
                 GpuResource::TrackResourceState(EResourceState::kUnorderedAccess, bp._sub_res);
                 _views[bp._view_idx]._gpu_alloc.CommitDescriptorsForDispatch(d3dcmd, params._slot);
             }
@@ -304,7 +306,8 @@ namespace Ailu::RHI::DX12
 
     void D3DTexture2D::InsertUAVBarrier(RHICommandBuffer *rhi_cmd)
     {
-        _state_guard.InsertTrackedUAVBarrier(static_cast<D3DCommandBuffer *>(rhi_cmd)->NativeCmdList());
+        auto d3dcmd = static_cast<D3DCommandBuffer *>(rhi_cmd);
+        d3dcmd->InsertUAVBarrier(_state_guard.NativeResource());
     }
 
     void D3DTexture2D::GenerateMipmap()
@@ -375,7 +378,8 @@ namespace Ailu::RHI::DX12
         GpuResource::UploadImpl(ctx, rhi_cmd, params);
         auto d3d_ctx = dynamic_cast<D3DContext *>(ctx);
         auto p_device = d3d_ctx->GetDevice();
-        auto p_cmdlist = dynamic_cast<D3DCommandBuffer *>(rhi_cmd)->NativeCmdList();
+        auto d3dcmd = dynamic_cast<D3DCommandBuffer *>(rhi_cmd);
+        auto p_cmdlist = d3dcmd->NativeCmdList();
         //ComPtr<ID3D12Resource> pTextureGPU;
         ComPtr<ID3D12Resource> pTextureUpload;
         D3D12_RESOURCE_DESC textureDesc{};
@@ -414,7 +418,8 @@ namespace Ailu::RHI::DX12
         }
         _state_guard = std::move(D3DResourceStateGuard(_p_d3dres.Get(), init_state,CalculateSubResourceNum(p_device,textureDesc)));
         UpdateSubresources(p_cmdlist, _p_d3dres.Get(), pTextureUpload.Get(), 0, 0, subresourceCount, cubemap_datas.data());
-        _state_guard.MakesureResourceState(p_cmdlist, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+        d3dcmd->EnsureResourceState(_state_guard, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE |
+                                                D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
         _state = D3DConvertUtils::ToALResState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
         d3d_ctx->TrackResource(pTextureUpload);
         //Main srv
@@ -517,14 +522,14 @@ namespace Ailu::RHI::DX12
             if (view_type == ETextureViewType::kSRV)
             {
                 const auto state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-                _state_guard.MakesureResourceState(d3dcmd->NativeCmdList(), state, bp._sub_res);
+                d3dcmd->EnsureResourceState(_state_guard, state, bp._sub_res);
                 GpuResource::TrackResourceState(D3DConvertUtils::ToALResState(state), bp._sub_res);
                 if (params._is_compute_pipeline) _views[bp._view_idx]._gpu_alloc.CommitDescriptorsForDispatch(d3dcmd, params._slot);
                 else _views[bp._view_idx]._gpu_alloc.CommitDescriptorsForDraw(d3dcmd, params._slot);
             }
             else if (view_type == ETextureViewType::kUAV)
             {
-                _state_guard.MakesureResourceState(d3dcmd->NativeCmdList(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, bp._sub_res);
+                d3dcmd->EnsureResourceState(_state_guard, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, bp._sub_res);
                 GpuResource::TrackResourceState(EResourceState::kUnorderedAccess, bp._sub_res);
                 _views[bp._view_idx]._gpu_alloc.CommitDescriptorsForDispatch(d3dcmd, params._slot);
             }
@@ -534,7 +539,8 @@ namespace Ailu::RHI::DX12
 
     void D3DCubeMap::InsertUAVBarrier(RHICommandBuffer *rhi_cmd)
     {
-        _state_guard.InsertTrackedUAVBarrier(static_cast<D3DCommandBuffer *>(rhi_cmd)->NativeCmdList());
+        auto d3dcmd = static_cast<D3DCommandBuffer *>(rhi_cmd);
+        d3dcmd->InsertUAVBarrier(_state_guard.NativeResource());
     }
 
     void D3DCubeMap::TrackResourceState(EResourceState new_state, u32 sub_res)
@@ -578,7 +584,8 @@ namespace Ailu::RHI::DX12
         GpuResource::UploadImpl(ctx, rhi_cmd, params);
         auto d3d_ctx = dynamic_cast<D3DContext *>(ctx);
         auto p_device = d3d_ctx->GetDevice();
-        auto p_cmdlist = dynamic_cast<D3DCommandBuffer *>(rhi_cmd)->NativeCmdList();
+        auto d3dcmd = dynamic_cast<D3DCommandBuffer *>(rhi_cmd);
+        auto p_cmdlist = d3dcmd->NativeCmdList();
         //ComPtr<ID3D12Resource> pTextureGPU;
 
         D3D12_RESOURCE_DESC textureDesc{};
@@ -689,7 +696,8 @@ namespace Ailu::RHI::DX12
                 currentDepth = std::max(1u, currentDepth / 2);
             }
             uploadBuffer->Unmap(0, nullptr);
-            _state_guard.MakesureResourceState(p_cmdlist, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+            d3dcmd->EnsureResourceState(_state_guard, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE |
+                                                    D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
             _state = D3DConvertUtils::ToALResState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
             d3d_ctx->TrackResource(uploadBuffer);
         }
@@ -726,14 +734,14 @@ namespace Ailu::RHI::DX12
             if (view_type == ETextureViewType::kSRV)
             {
                 const auto state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-                _state_guard.MakesureResourceState(d3dcmd->NativeCmdList(), state, bp._sub_res);
+                d3dcmd->EnsureResourceState(_state_guard, state, bp._sub_res);
                 GpuResource::TrackResourceState(D3DConvertUtils::ToALResState(state), bp._sub_res);
                 if (params._is_compute_pipeline) _views[bp._view_idx]._gpu_alloc.CommitDescriptorsForDispatch(d3dcmd, params._slot);
                 else _views[bp._view_idx]._gpu_alloc.CommitDescriptorsForDraw(d3dcmd, params._slot);
             }
             else if (view_type == ETextureViewType::kUAV)
             {
-                _state_guard.MakesureResourceState(d3dcmd->NativeCmdList(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, bp._sub_res);
+                d3dcmd->EnsureResourceState(_state_guard, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, bp._sub_res);
                 GpuResource::TrackResourceState(EResourceState::kUnorderedAccess, bp._sub_res);
                 _views[bp._view_idx]._gpu_alloc.CommitDescriptorsForDispatch(d3dcmd, params._slot);
             }
@@ -850,7 +858,8 @@ namespace Ailu::RHI::DX12
 
     void D3DTexture3D::StateTranslation(RHICommandBuffer *rhi_cmd, EResourceState new_state, u32 sub_res) 
     { 
-        _state_guard.MakesureResourceState(static_cast<D3DCommandBuffer *>(rhi_cmd)->NativeCmdList(), D3DConvertUtils::FromALResState(new_state), sub_res);
+        auto d3dcmd = static_cast<D3DCommandBuffer *>(rhi_cmd);
+        d3dcmd->EnsureResourceState(_state_guard, D3DConvertUtils::FromALResState(new_state), sub_res);
         GpuResource::TrackResourceState(new_state, sub_res);
     }
 
@@ -876,7 +885,8 @@ namespace Ailu::RHI::DX12
 
     void D3DTexture3D::InsertUAVBarrier(RHICommandBuffer *rhi_cmd)
     {
-        _state_guard.InsertTrackedUAVBarrier(static_cast<D3DCommandBuffer *>(rhi_cmd)->NativeCmdList());
+        auto d3dcmd = static_cast<D3DCommandBuffer *>(rhi_cmd);
+        d3dcmd->InsertUAVBarrier(_state_guard.NativeResource());
     }
     //----------------------------------------------------------------------------D3D3DTexture-----------------------------------------------------------------------------
 #pragma endregion
@@ -1029,25 +1039,25 @@ namespace Ailu::RHI::DX12
         const auto &bp = params._params._texture_binder;
         if (_views.contains(bp._view_idx))
         {
-            GpuResource::BindImpl(rhi_cmd, params);
             auto d3dcmd = static_cast<D3DCommandBuffer *>(rhi_cmd);
-            if (!params._is_compute_pipeline && !RenderTexture::CanAsShaderResource(this))
+            if (!params._is_compute_pipeline && d3dcmd->IsActiveRenderTarget(this))
             {
                 LOG_WARNING("D3DRenderTexture::BindImpl: try to use a render texture: {} as rt and srv at the same time!", _name);
                 return;
             }
+            GpuResource::BindImpl(rhi_cmd, params);
             auto view_type = _views[bp._view_idx]._view_type;
             if (view_type == ETextureViewType::kSRV)
             {
                 const auto state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-                _state_guard.MakesureResourceState(d3dcmd->NativeCmdList(), state, bp._sub_res);
+                d3dcmd->EnsureResourceState(_state_guard, state, bp._sub_res);
                 GpuResource::TrackResourceState(D3DConvertUtils::ToALResState(state), bp._sub_res);
                 if (params._is_compute_pipeline) _views[bp._view_idx]._gpu_alloc.CommitDescriptorsForDispatch(d3dcmd, params._slot);
                 else _views[bp._view_idx]._gpu_alloc.CommitDescriptorsForDraw(d3dcmd, params._slot);
             }
             else if (view_type == ETextureViewType::kUAV)
             {
-                _state_guard.MakesureResourceState(d3dcmd->NativeCmdList(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, bp._sub_res);
+                d3dcmd->EnsureResourceState(_state_guard, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, bp._sub_res);
                 GpuResource::TrackResourceState(EResourceState::kUnorderedAccess, bp._sub_res);
                 _views[bp._view_idx]._gpu_alloc.CommitDescriptorsForDispatch(d3dcmd, params._slot);
             }
@@ -1397,12 +1407,14 @@ namespace Ailu::RHI::DX12
 
     void D3DRenderTexture::InsertUAVBarrier(RHICommandBuffer *rhi_cmd)
     {
-        _state_guard.InsertTrackedUAVBarrier(static_cast<D3DCommandBuffer *>(rhi_cmd)->NativeCmdList());
+        auto d3dcmd = static_cast<D3DCommandBuffer *>(rhi_cmd);
+        d3dcmd->InsertUAVBarrier(_state_guard.NativeResource());
     }
 
     void D3DRenderTexture::StateTranslation(RHICommandBuffer *rhi_cmd, EResourceState new_state, u32 sub_res) 
     { 
-        _state_guard.MakesureResourceState(static_cast<D3DCommandBuffer *>(rhi_cmd)->NativeCmdList(), D3DConvertUtils::FromALResState(new_state), sub_res);
+        auto d3dcmd = static_cast<D3DCommandBuffer *>(rhi_cmd);
+        d3dcmd->EnsureResourceState(_state_guard, D3DConvertUtils::FromALResState(new_state), sub_res);
         GpuResource::TrackResourceState(new_state, sub_res);
     }
 
@@ -1428,7 +1440,7 @@ namespace Ailu::RHI::DX12
 
     TextureHandle D3DRenderTexture::ColorTexture(u16 view_index)
     {
-        if (/*!CanAsShaderResource(this) || */ !_views.contains(view_index)) return 0;
+        if (!_views.contains(view_index)) return 0;
 #if defined(DEAR_IMGUI)
         ImGuiRenderer::Get().RecordImguiUsedTexture(this);
 #endif
@@ -1437,7 +1449,7 @@ namespace Ailu::RHI::DX12
 
     TextureHandle D3DRenderTexture::DepthTexture(u16 view_index)
     {
-        if (!CanAsShaderResource(this) || !_views.contains(view_index)) return 0;
+        if (!_views.contains(view_index)) return 0;
 #if defined(DEAR_IMGUI)
         ImGuiRenderer::Get().RecordImguiUsedTexture(this);
 #endif
@@ -1450,9 +1462,9 @@ namespace Ailu::RHI::DX12
         if (index == 0) { index = _depth_bit > 0 ? kMainDSVIndex : kMainRTVIndex; }
         if (!_views.contains(index)) return nullptr;
         const auto state = _depth_bit > 0 ? D3D12_RESOURCE_STATE_DEPTH_WRITE : D3D12_RESOURCE_STATE_RENDER_TARGET;
-        _state_guard.MakesureResourceState(static_cast<D3DCommandBuffer *>(cmd)->NativeCmdList(), state);
+        auto d3dcmd = static_cast<D3DCommandBuffer *>(cmd);
+        d3dcmd->EnsureResourceState(_state_guard, state);
         GpuResource::TrackResourceState(D3DConvertUtils::ToALResState(state));
-        RenderTexture::ResetRenderTarget(this);
         return &_views[index]._cpu_handle;
     }
 #pragma endregion

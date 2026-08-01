@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __OBJECTDETAIL_GEN_H__
 //Class ObjectDetail begin...........................
-#define OBJECTDETAIL_GEN_H_20_GENERATED_BODY \
+#define OBJECTDETAIL_GEN_H_22_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_ObjectDetail_Type();\
                                 static const Type* GetPrivateStaticClass();\

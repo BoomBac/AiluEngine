@@ -7,7 +7,40 @@ namespace Ailu
 #pragma warning(disable : 4244)
     namespace Math
     {
-        using Color = Vector4D<float>;
+        struct Color : Vector4D<f32>
+        {
+            using Base = Vector4D<f32>;
+            using Base::Base;
+
+            Color() : Base() {}
+            Color(const Base &value) : Base(value) {}
+
+            Color &operator=(const Base &value)
+            {
+                Base::operator=(value);
+                return *this;
+            }
+
+            static f32 SrgbToLinear(f32 value)
+            {
+                return value <= 0.04045f ? value / 12.92f : std::pow((value + 0.055f) / 1.055f, 2.4f);
+            }
+
+            static f32 LinearToSrgb(f32 value)
+            {
+                return value <= 0.0031308f ? value * 12.92f : 1.055f * std::pow(value, 1.0f / 2.4f) - 0.055f;
+            }
+
+            Color ToSrgb() const
+            {
+                return {LinearToSrgb(r), LinearToSrgb(g), LinearToSrgb(b), a};
+            }
+
+            static Color FromSrgb(const Color &value)
+            {
+                return {SrgbToLinear(value.r), SrgbToLinear(value.g), SrgbToLinear(value.b), value.a};
+            }
+        };
         using Color32 = Vector4D<u8>;
         namespace Colors
         {
@@ -32,7 +65,9 @@ namespace Ailu
             static const Color kBeige = {0.96f, 0.96f, 0.86f, 1.0f};
             static const Color kTurquoise = {0.25f, 0.88f, 0.82f, 1.0f};
             static const Color kTransparent = {0.0f, 0.0f, 0.0f, 0.0f};
+
         }// namespace Colors
+
     }
 #pragma warning(pop)
 }

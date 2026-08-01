@@ -26,7 +26,7 @@
         }],
     "_float_properties": [{
             "_name": "_AlphaCulloff",
-            "_value": 0.6019999980926514
+            "_value": 0.6018
         }, {
             "_name": "_Anisotropy",
             "_value": 0.0
@@ -35,7 +35,7 @@
             "_value": 0.0
         }, {
             "_name": "_MaterialID",
-            "_value": 2.802596928649634e-45
+            "_value": 0.0
         }, {
             "_name": "_MetallicValue",
             "_value": 0.0
@@ -44,7 +44,7 @@
             "_value": 0.0
         }, {
             "_name": "_SamplerMask",
-            "_value": 4.203895392974451e-45
+            "_value": 0.0
         }, {
             "_name": "_Transmission",
             "_value": 0.0

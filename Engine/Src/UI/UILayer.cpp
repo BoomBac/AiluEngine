@@ -94,11 +94,13 @@ namespace Ailu
             {
                 if (zone._rect.z <= 0.0f || zone._rect.w <= 0.0f)
                     continue;
-                if (zone._owner != nullptr && top_hover_widget != nullptr &&
-                    zone._owner != top_hover_widget)
-                    continue;
                 if (UIElement::IsPointInside(ue._mouse_position, zone._rect))
                 {
+                    // Resize zones are intentionally outside their owner widget. Only reject an
+                    // overlapping zone when the pointer is still inside another widget's content.
+                    if (zone._owner != nullptr && top_hover_widget != nullptr && zone._owner != top_hover_widget &&
+                        zone._owner->IsHover(ue._mouse_position))
+                        continue;
                     is_in_zone = true;
                     break;
                 }

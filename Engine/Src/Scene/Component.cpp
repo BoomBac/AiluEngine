@@ -6,6 +6,24 @@
 
 namespace Ailu::ECS
 {
+    ComponentTypeId RegisterComponentType(StringView stable_name)
+    {
+        static std::mutex s_component_type_mutex;
+        static std::unordered_map<String, ComponentTypeId> s_component_type_ids;
+        static ComponentTypeId s_next_component_type_id = 0;
+
+        std::lock_guard lock(s_component_type_mutex);
+        const auto [it, inserted] = s_component_type_ids.emplace(String(stable_name), s_next_component_type_id);
+        if (inserted)
+        {
+            ++s_next_component_type_id;
+        }
+        return it->second;
+    }
+}
+
+namespace Ailu::ECS
+{
     using namespace Render;
     CLightProbe::CLightProbe()
     {

@@ -24,35 +24,35 @@
             "_background": { "_type": "kColor", "_tint": [0.13, 0.14, 0.16, 1.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] },
             "_content_color": [0.92, 0.94, 0.96, 1.0],
             "_border_color": [0.28, 0.31, 0.35, 1.0],
-            "_border_width": 1.0,
+            "_border_width": [1.0, 1.0, 1.0, 1.0],
             "_corner_radius": [3.0, 3.0, 3.0, 3.0]
         },
         "_hovered": {
             "_background": { "_type": "kColor", "_tint": [0.18, 0.20, 0.23, 1.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] },
             "_content_color": [0.92, 0.94, 0.96, 1.0],
             "_border_color": [0.18, 0.52, 0.86, 1.0],
-            "_border_width": 1.0,
+            "_border_width": [1.0, 1.0, 1.0, 1.0],
             "_corner_radius": [3.0, 3.0, 3.0, 3.0]
         },
         "_pressed": {
             "_background": { "_type": "kColor", "_tint": [0.09, 0.10, 0.12, 1.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] },
             "_content_color": [0.92, 0.94, 0.96, 1.0],
             "_border_color": [0.18, 0.52, 0.86, 1.0],
-            "_border_width": 1.0,
+            "_border_width": [1.0, 1.0, 1.0, 1.0],
             "_corner_radius": [3.0, 3.0, 3.0, 3.0]
         },
         "_focused": {
             "_background": { "_type": "kColor", "_tint": [0.18, 0.20, 0.23, 1.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] },
             "_content_color": [0.92, 0.94, 0.96, 1.0],
             "_border_color": [0.18, 0.52, 0.86, 1.0],
-            "_border_width": 1.0,
+            "_border_width": [1.0, 1.0, 1.0, 1.0],
             "_corner_radius": [3.0, 3.0, 3.0, 3.0]
         },
         "_disabled": {
             "_background": { "_type": "kColor", "_tint": [0.13, 0.14, 0.16, 1.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] },
             "_content_color": [0.50, 0.54, 0.58, 1.0],
             "_border_color": [0.28, 0.31, 0.35, 1.0],
-            "_border_width": 1.0,
+            "_border_width": [1.0, 1.0, 1.0, 1.0],
             "_corner_radius": [3.0, 3.0, 3.0, 3.0]
         },
         "_padding": [6.0, 3.0, 6.0, 3.0],
@@ -64,35 +64,35 @@
             "_background": { "_type": "kColor", "_tint": [0.0, 0.0, 0.0, 0.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] },
             "_content_color": [0.92, 0.94, 0.96, 1.0],
             "_border_color": [0.0, 0.0, 0.0, 0.0],
-            "_border_width": 0.0,
+            "_border_width": [0.0, 0.0, 0.0, 0.0],
             "_corner_radius": [3.0, 3.0, 3.0, 3.0]
         },
         "_hovered": {
             "_background": { "_type": "kColor", "_tint": [0.0, 0.0, 0.0, 0.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] },
             "_content_color": [0.92, 0.94, 0.96, 1.0],
             "_border_color": [0.0, 0.0, 0.0, 0.0],
-            "_border_width": 0.0,
+            "_border_width": [0.0, 0.0, 0.0, 0.0],
             "_corner_radius": [3.0, 3.0, 3.0, 3.0]
         },
         "_pressed": {
             "_background": { "_type": "kColor", "_tint": [0.0, 0.0, 0.0, 0.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] },
             "_content_color": [0.92, 0.94, 0.96, 1.0],
             "_border_color": [0.0, 0.0, 0.0, 0.0],
-            "_border_width": 0.0,
+            "_border_width": [0.0, 0.0, 0.0, 0.0],
             "_corner_radius": [3.0, 3.0, 3.0, 3.0]
         },
         "_focused": {
             "_background": { "_type": "kColor", "_tint": [0.0, 0.0, 0.0, 0.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] },
             "_content_color": [0.92, 0.94, 0.96, 1.0],
             "_border_color": [0.0, 0.0, 0.0, 0.0],
-            "_border_width": 0.0,
+            "_border_width": [0.0, 0.0, 0.0, 0.0],
             "_corner_radius": [3.0, 3.0, 3.0, 3.0]
         },
         "_disabled": {
             "_background": { "_type": "kColor", "_tint": [0.0, 0.0, 0.0, 0.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] },
             "_content_color": [0.50, 0.54, 0.58, 1.0],
             "_border_color": [0.0, 0.0, 0.0, 0.0],
-            "_border_width": 0.0,
+            "_border_width": [0.0, 0.0, 0.0, 0.0],
             "_corner_radius": [3.0, 3.0, 3.0, 3.0]
         },
         "_track_background": { "_type": "kColor", "_tint": [0.09, 0.10, 0.12, 1.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] },
@@ -113,35 +113,35 @@
             "_background": { "_type": "kColor", "_tint": [0.0, 0.0, 0.0, 0.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] },
             "_content_color": [0.92, 0.94, 0.96, 1.0],
             "_border_color": [0.0, 0.0, 0.0, 0.0],
-            "_border_width": 0.0,
+            "_border_width": [0.0, 0.0, 0.0, 0.0],
             "_corner_radius": [3.0, 3.0, 3.0, 3.0]
         },
         "_hovered": {
             "_background": { "_type": "kColor", "_tint": [0.0, 0.0, 0.0, 0.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] },
             "_content_color": [0.92, 0.94, 0.96, 1.0],
             "_border_color": [0.0, 0.0, 0.0, 0.0],
-            "_border_width": 0.0,
+            "_border_width": [0.0, 0.0, 0.0, 0.0],
             "_corner_radius": [3.0, 3.0, 3.0, 3.0]
         },
         "_pressed": {
             "_background": { "_type": "kColor", "_tint": [0.0, 0.0, 0.0, 0.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] },
             "_content_color": [0.92, 0.94, 0.96, 1.0],
             "_border_color": [0.0, 0.0, 0.0, 0.0],
-            "_border_width": 0.0,
+            "_border_width": [0.0, 0.0, 0.0, 0.0],
             "_corner_radius": [3.0, 3.0, 3.0, 3.0]
         },
         "_focused": {
             "_background": { "_type": "kColor", "_tint": [0.0, 0.0, 0.0, 0.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] },
             "_content_color": [0.92, 0.94, 0.96, 1.0],
             "_border_color": [0.0, 0.0, 0.0, 0.0],
-            "_border_width": 0.0,
+            "_border_width": [0.0, 0.0, 0.0, 0.0],
             "_corner_radius": [3.0, 3.0, 3.0, 3.0]
         },
         "_disabled": {
             "_background": { "_type": "kColor", "_tint": [0.0, 0.0, 0.0, 0.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] },
             "_content_color": [0.50, 0.54, 0.58, 1.0],
             "_border_color": [0.0, 0.0, 0.0, 0.0],
-            "_border_width": 0.0,
+            "_border_width": [0.0, 0.0, 0.0, 0.0],
             "_corner_radius": [3.0, 3.0, 3.0, 3.0]
         },
         "_unchecked": { "_type": "kColor", "_tint": [0.13, 0.14, 0.16, 1.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] },
@@ -150,7 +150,7 @@
         "_checked": { "_type": "kColor", "_tint": [0.18, 0.52, 0.86, 1.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] },
         "_checked_hovered": { "_type": "kColor", "_tint": [0.18, 0.52, 0.86, 1.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] },
         "_checked_pressed": { "_type": "kColor", "_tint": [0.18, 0.52, 0.86, 1.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] },
-        "_indeterminate": { "_type": "kColor", "_tint": [0.13, 0.14, 0.16, 1.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] },
+        "_indeterminate": { "_type": "kColor", "_tint": [0.13, 0.14, 0.16, 1.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] },
         "_disabled_mark": { "_type": "kColor", "_tint": [0.50, 0.54, 0.58, 1.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] },
         "_mark_color": [0.92, 0.94, 0.96, 1.0],
         "_box_size": [16.0, 16.0],
@@ -163,42 +163,42 @@
             "_background": { "_type": "kColor", "_tint": [0.13, 0.14, 0.16, 1.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] },
             "_content_color": [0.92, 0.94, 0.96, 1.0],
             "_border_color": [0.28, 0.31, 0.35, 1.0],
-            "_border_width": 1.0,
+            "_border_width": [1.0, 1.0, 1.0, 1.0],
             "_corner_radius": [3.0, 3.0, 3.0, 3.0]
         },
         "_hovered": {
             "_background": { "_type": "kColor", "_tint": [0.18, 0.20, 0.23, 1.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] },
             "_content_color": [0.92, 0.94, 0.96, 1.0],
             "_border_color": [0.28, 0.31, 0.35, 1.0],
-            "_border_width": 1.0,
+            "_border_width": [1.0, 1.0, 1.0, 1.0],
             "_corner_radius": [3.0, 3.0, 3.0, 3.0]
         },
         "_focused": {
             "_background": { "_type": "kColor", "_tint": [0.18, 0.20, 0.23, 1.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] },
             "_content_color": [0.92, 0.94, 0.96, 1.0],
             "_border_color": [0.18, 0.52, 0.86, 1.0],
-            "_border_width": 1.0,
+            "_border_width": [1.0, 1.0, 1.0, 1.0],
             "_corner_radius": [3.0, 3.0, 3.0, 3.0]
         },
         "_read_only": {
             "_background": { "_type": "kColor", "_tint": [0.13, 0.14, 0.16, 1.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] },
             "_content_color": [0.50, 0.54, 0.58, 1.0],
             "_border_color": [0.28, 0.31, 0.35, 1.0],
-            "_border_width": 1.0,
+            "_border_width": [1.0, 1.0, 1.0, 1.0],
             "_corner_radius": [3.0, 3.0, 3.0, 3.0]
         },
         "_disabled": {
             "_background": { "_type": "kColor", "_tint": [0.13, 0.14, 0.16, 1.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] },
             "_content_color": [0.50, 0.54, 0.58, 1.0],
             "_border_color": [0.28, 0.31, 0.35, 1.0],
-            "_border_width": 1.0,
+            "_border_width": [1.0, 1.0, 1.0, 1.0],
             "_corner_radius": [3.0, 3.0, 3.0, 3.0]
         },
         "_invalid": {
             "_background": { "_type": "kColor", "_tint": [0.13, 0.14, 0.16, 1.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] },
             "_content_color": [0.92, 0.94, 0.96, 1.0],
             "_border_color": [1.0, 0.0, 0.0, 1.0],
-            "_border_width": 1.0,
+            "_border_width": [1.0, 1.0, 1.0, 1.0],
             "_corner_radius": [3.0, 3.0, 3.0, 3.0]
         },
         "_placeholder_color": [0.50, 0.54, 0.58, 1.0],
@@ -210,40 +210,53 @@
         "_caret_width": 1.0,
         "_selection_corner_radius": 0.0
     },
+    "_list_view_style": {
+        "_background": { "_type": "kColor", "_tint": [0.13, 0.14, 0.16, 1.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] },
+        "_item_text_color": [0.92, 0.94, 0.96, 1.0],
+        "_item_hovered_color": [0.18, 0.20, 0.23, 0.85],
+        "_item_selected_color": [0.18, 0.52, 0.86, 0.85],
+        "_border_color": [0.28, 0.31, 0.35, 1.0],
+        "_border_width": 1.0,
+        "_corner_radius": [4.0, 4.0, 4.0, 4.0]
+    },
+    "_element_visual_style": { "_visual": { "_background": { "_type": "kColor", "_tint": [0.0, 0.0, 0.0, 0.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] }, "_content_color": [0.92, 0.94, 0.96, 1.0], "_border_color": [0.0, 0.0, 0.0, 0.0], "_border_width": [0.0, 0.0, 0.0, 0.0], "_corner_radius": [0.0, 0.0, 0.0, 0.0] } },
+    "_border_style": { "_visual": { "_background": { "_type": "kColor", "_tint": [0.13, 0.14, 0.16, 1.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] }, "_content_color": [0.92, 0.94, 0.96, 1.0], "_border_color": [0.28, 0.31, 0.35, 1.0], "_border_width": [1.0, 1.0, 1.0, 1.0], "_corner_radius": [0.0, 0.0, 0.0, 0.0] } },
+    "_split_view_style": { "_visual": { "_background": { "_type": "kColor", "_tint": [0.0, 0.0, 0.0, 0.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] }, "_content_color": [0.92, 0.94, 0.96, 1.0], "_border_color": [0.0, 0.0, 0.0, 0.0], "_border_width": [0.0, 0.0, 0.0, 0.0], "_corner_radius": [0.0, 0.0, 0.0, 0.0] }, "_divider_color": [0.28, 0.31, 0.35, 1.0], "_divider_hovered_color": [0.18, 0.52, 0.86, 1.0] },
+    "_color_picker_style": { "_background_color": [0.13, 0.14, 0.16, 1.0], "_border_color": [0.28, 0.31, 0.35, 1.0], "_handle_color": [0.92, 0.94, 0.96, 1.0], "_label_color": [0.92, 0.94, 0.96, 1.0], "_checker_light_color": [0.18, 0.20, 0.23, 1.0], "_checker_dark_color": [0.13, 0.14, 0.16, 1.0] },
     "_scroll_view_style": {
         "_normal": {
             "_background": { "_type": "kColor", "_tint": [0.13, 0.14, 0.16, 1.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] },
             "_content_color": [0.92, 0.94, 0.96, 1.0],
             "_border_color": [0.0, 0.0, 0.0, 0.0],
-            "_border_width": 0.0,
+            "_border_width": [0.0, 0.0, 0.0, 0.0],
             "_corner_radius": [3.0, 3.0, 3.0, 3.0]
         },
         "_hovered": {
             "_background": { "_type": "kColor", "_tint": [0.13, 0.14, 0.16, 1.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] },
             "_content_color": [0.92, 0.94, 0.96, 1.0],
             "_border_color": [0.0, 0.0, 0.0, 0.0],
-            "_border_width": 0.0,
+            "_border_width": [0.0, 0.0, 0.0, 0.0],
             "_corner_radius": [3.0, 3.0, 3.0, 3.0]
         },
         "_focused": {
             "_background": { "_type": "kColor", "_tint": [0.13, 0.14, 0.16, 1.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] },
             "_content_color": [0.92, 0.94, 0.96, 1.0],
             "_border_color": [0.0, 0.0, 0.0, 0.0],
-            "_border_width": 0.0,
+            "_border_width": [0.0, 0.0, 0.0, 0.0],
             "_corner_radius": [3.0, 3.0, 3.0, 3.0]
         },
         "_disabled": {
             "_background": { "_type": "kColor", "_tint": [0.13, 0.14, 0.16, 1.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] },
             "_content_color": [0.50, 0.54, 0.58, 1.0],
             "_border_color": [0.0, 0.0, 0.0, 0.0],
-            "_border_width": 0.0,
+            "_border_width": [0.0, 0.0, 0.0, 0.0],
             "_corner_radius": [3.0, 3.0, 3.0, 3.0]
         },
         "_horizontal_scrollbar": {
-            "_normal": { "_background": { "_type": "kColor", "_tint": [0.0, 0.0, 0.0, 0.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] }, "_content_color": [0.92, 0.94, 0.96, 1.0], "_border_color": [0.0, 0.0, 0.0, 0.0], "_border_width": 0.0, "_corner_radius": [0.0, 0.0, 0.0, 0.0] },
-            "_hovered": { "_background": { "_type": "kColor", "_tint": [0.0, 0.0, 0.0, 0.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] }, "_content_color": [0.92, 0.94, 0.96, 1.0], "_border_color": [0.0, 0.0, 0.0, 0.0], "_border_width": 0.0, "_corner_radius": [0.0, 0.0, 0.0, 0.0] },
-            "_focused": { "_background": { "_type": "kColor", "_tint": [0.0, 0.0, 0.0, 0.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] }, "_content_color": [0.92, 0.94, 0.96, 1.0], "_border_color": [0.0, 0.0, 0.0, 0.0], "_border_width": 0.0, "_corner_radius": [0.0, 0.0, 0.0, 0.0] },
-            "_disabled": { "_background": { "_type": "kColor", "_tint": [0.0, 0.0, 0.0, 0.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] }, "_content_color": [0.50, 0.54, 0.58, 1.0], "_border_color": [0.0, 0.0, 0.0, 0.0], "_border_width": 0.0, "_corner_radius": [0.0, 0.0, 0.0, 0.0] },
+            "_normal": { "_background": { "_type": "kColor", "_tint": [0.0, 0.0, 0.0, 0.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] }, "_content_color": [0.92, 0.94, 0.96, 1.0], "_border_color": [0.0, 0.0, 0.0, 0.0], "_border_width": [0.0, 0.0, 0.0, 0.0], "_corner_radius": [0.0, 0.0, 0.0, 0.0] },
+            "_hovered": { "_background": { "_type": "kColor", "_tint": [0.0, 0.0, 0.0, 0.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] }, "_content_color": [0.92, 0.94, 0.96, 1.0], "_border_color": [0.0, 0.0, 0.0, 0.0], "_border_width": [0.0, 0.0, 0.0, 0.0], "_corner_radius": [0.0, 0.0, 0.0, 0.0] },
+            "_focused": { "_background": { "_type": "kColor", "_tint": [0.0, 0.0, 0.0, 0.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] }, "_content_color": [0.92, 0.94, 0.96, 1.0], "_border_color": [0.0, 0.0, 0.0, 0.0], "_border_width": [0.0, 0.0, 0.0, 0.0], "_corner_radius": [0.0, 0.0, 0.0, 0.0] },
+            "_disabled": { "_background": { "_type": "kColor", "_tint": [0.0, 0.0, 0.0, 0.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] }, "_content_color": [0.50, 0.54, 0.58, 1.0], "_border_color": [0.0, 0.0, 0.0, 0.0], "_border_width": [0.0, 0.0, 0.0, 0.0], "_corner_radius": [0.0, 0.0, 0.0, 0.0] },
             "_track": { "_type": "kColor", "_tint": [0.0, 0.0, 0.0, 0.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] },
             "_track_hovered": { "_type": "kColor", "_tint": [0.0, 0.0, 0.0, 0.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] },
             "_track_disabled": { "_type": "kColor", "_tint": [0.0, 0.0, 0.0, 0.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] },
@@ -267,10 +280,10 @@
             "_padding": [0.0, 0.0, 0.0, 0.0]
         },
         "_vertical_scrollbar": {
-            "_normal": { "_background": { "_type": "kColor", "_tint": [0.0, 0.0, 0.0, 0.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] }, "_content_color": [0.92, 0.94, 0.96, 1.0], "_border_color": [0.0, 0.0, 0.0, 0.0], "_border_width": 0.0, "_corner_radius": [0.0, 0.0, 0.0, 0.0] },
-            "_hovered": { "_background": { "_type": "kColor", "_tint": [0.0, 0.0, 0.0, 0.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] }, "_content_color": [0.92, 0.94, 0.96, 1.0], "_border_color": [0.0, 0.0, 0.0, 0.0], "_border_width": 0.0, "_corner_radius": [0.0, 0.0, 0.0, 0.0] },
-            "_focused": { "_background": { "_type": "kColor", "_tint": [0.0, 0.0, 0.0, 0.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] }, "_content_color": [0.92, 0.94, 0.96, 1.0], "_border_color": [0.0, 0.0, 0.0, 0.0], "_border_width": 0.0, "_corner_radius": [0.0, 0.0, 0.0, 0.0] },
-            "_disabled": { "_background": { "_type": "kColor", "_tint": [0.0, 0.0, 0.0, 0.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] }, "_content_color": [0.50, 0.54, 0.58, 1.0], "_border_color": [0.0, 0.0, 0.0, 0.0], "_border_width": 0.0, "_corner_radius": [0.0, 0.0, 0.0, 0.0] },
+            "_normal": { "_background": { "_type": "kColor", "_tint": [0.0, 0.0, 0.0, 0.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] }, "_content_color": [0.92, 0.94, 0.96, 1.0], "_border_color": [0.0, 0.0, 0.0, 0.0], "_border_width": [0.0, 0.0, 0.0, 0.0], "_corner_radius": [0.0, 0.0, 0.0, 0.0] },
+            "_hovered": { "_background": { "_type": "kColor", "_tint": [0.0, 0.0, 0.0, 0.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] }, "_content_color": [0.92, 0.94, 0.96, 1.0], "_border_color": [0.0, 0.0, 0.0, 0.0], "_border_width": [0.0, 0.0, 0.0, 0.0], "_corner_radius": [0.0, 0.0, 0.0, 0.0] },
+            "_focused": { "_background": { "_type": "kColor", "_tint": [0.0, 0.0, 0.0, 0.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] }, "_content_color": [0.92, 0.94, 0.96, 1.0], "_border_color": [0.0, 0.0, 0.0, 0.0], "_border_width": [0.0, 0.0, 0.0, 0.0], "_corner_radius": [0.0, 0.0, 0.0, 0.0] },
+            "_disabled": { "_background": { "_type": "kColor", "_tint": [0.0, 0.0, 0.0, 0.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] }, "_content_color": [0.50, 0.54, 0.58, 1.0], "_border_color": [0.0, 0.0, 0.0, 0.0], "_border_width": [0.0, 0.0, 0.0, 0.0], "_corner_radius": [0.0, 0.0, 0.0, 0.0] },
             "_track": { "_type": "kColor", "_tint": [0.0, 0.0, 0.0, 0.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] },
             "_track_hovered": { "_type": "kColor", "_tint": [0.0, 0.0, 0.0, 0.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] },
             "_track_disabled": { "_type": "kColor", "_tint": [0.0, 0.0, 0.0, 0.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] },
@@ -303,5 +316,21 @@
     "_button_styles": {},
     "_slider_styles": {},
     "_check_box_styles": {},
-    "_input_styles": {}
+    "_input_styles": {},
+    "_list_view_styles": { "DropdownPopup": { "_background": { "_type": "kColor", "_tint": [0.13, 0.14, 0.16, 1.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] }, "_item_text_color": [0.92, 0.94, 0.96, 1.0], "_item_hovered_color": [0.18, 0.20, 0.23, 0.85], "_item_selected_color": [0.18, 0.52, 0.86, 0.85], "_border_color": [0.28, 0.31, 0.35, 1.0], "_border_width": 1.0, "_corner_radius": [4.0, 4.0, 4.0, 4.0] } },
+    "_tree_view_style": {
+        "_row_height": 22.0,
+        "_indent_width": 16.0,
+        "_expand_button_width": 16.0,
+        "_normal_color": [0.13, 0.14, 0.16, 1.0],
+        "_hover_color": [0.20, 0.22, 0.28, 1.0],
+        "_selected_color": [0.18, 0.52, 0.86, 0.45],
+        "_selected_unfocused_color": [0.28, 0.31, 0.35, 0.45],
+        "_padding": [2.0, 1.0, 2.0, 1.0],
+        "_font_size": 14.0
+    },
+    "_tree_view_styles": {},
+    "_element_visual_styles": {},
+    "_split_view_styles": {},
+    "_color_picker_styles": {}
 }

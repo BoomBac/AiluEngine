@@ -106,6 +106,11 @@
       "type": "Ailu::Render::Shader"
     },
     {
+      "guid": "7c6d2a84-3f37-4e8f-9c47-8b7fb3a2e2a1",
+      "path": "engine://Shaders/hlsl/ui_shadow.alasset",
+      "type": "Ailu::Render::Shader"
+    },
+    {
       "guid": "266fceb5-389b-4a08-892c-1e9b2f58d83f",
       "path": "engine://Shaders/hlsl/default_text.alasset",
       "type": "Ailu::Render::Shader"

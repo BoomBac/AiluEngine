@@ -12,6 +12,11 @@ namespace Ailu
         using Render::Texture2D;
         using Render::TextureDesc;
 
+        void ColorPicker::ResolveStyle(const UIStyleContext &context)
+        {
+            _resolved_style = context._theme ? context._theme->_color_picker_style : UIColorPickerStyle{};
+        }
+
         static constexpr u16 SV_RES = 256;
         static constexpr u16 HUE_RES = 256;
         static constexpr u16 CHECK_RES = 8;
@@ -179,7 +184,7 @@ namespace Ailu
 
         ColorPicker::ColorPicker(const String &name) : ColorPicker() { _name = name; }
 
-        ColorPicker::ColorPicker(Vector4f old_color) : ColorPicker("ColorPicker")
+        ColorPicker::ColorPicker(Color old_color) : ColorPicker("ColorPicker")
         {
             _old_color = old_color;
             SyncStateFromRGBA(old_color);
@@ -266,7 +271,7 @@ namespace Ailu
 
         void ColorPicker::RenderImpl(UIRenderer &r)
         {
-            r.DrawQuad(_arrange_rect, _matrix, ColorBrush(Colors::kBlack));
+            r.DrawQuad(_arrange_rect, _matrix, ColorBrush(_resolved_style._background_color));
             // SV box
             if (_tex_sv)
             {
@@ -277,7 +282,7 @@ namespace Ailu
             }
             else
             {
-                r.DrawQuad(_rect_sv, _matrix, ColorBrush(Colors::kBlack));
+                r.DrawQuad(_rect_sv, _matrix, ColorBrush(_resolved_style._background_color));
             }
 
 
@@ -332,8 +337,8 @@ namespace Ailu
                     r.DrawQuad({_rect_hdr.x + _rect_hdr.z * t0, _rect_hdr.y, _rect_hdr.z * (t1 - t0), _rect_hdr.w}, _matrix,
                                ColorBrush({preview_rgb.x, preview_rgb.y, preview_rgb.z, 1.0f}));
                 }
-                r.DrawBox(_rect_hdr.xy, _rect_hdr.zw, _matrix, 1.0f, Colors::kWhite);
-                r.DrawText(std::format("HDR {:.2f}x", _hdr_intensity), {_rect_hdr.x + 4.0f, _rect_hdr.y + 1.0f}, _matrix, 12.0f, Colors::kWhite);
+                r.DrawBox(_rect_hdr.xy, _rect_hdr.zw, _matrix, 1.0f, _resolved_style._border_color);
+                r.DrawText(std::format("HDR {:.2f}x", _hdr_intensity), {_rect_hdr.x + 4.0f, _rect_hdr.y + 1.0f}, _matrix, 12.0f, _resolved_style._label_color);
             }
 
             // Preview: left old (not tracked), right current
@@ -343,13 +348,15 @@ namespace Ailu
                 // Two halves
                 Vector4f left = {pr.x, pr.y, pr.z * 0.5f, pr.w};
                 Vector4f right = {pr.x + pr.z * 0.5f, pr.y, pr.z * 0.5f, pr.w};
-                Vector3f old_preview = ToneMapPreview({_old_color.x, _old_color.y, _old_color.z});
-                Vector3f new_preview = ToneMapPreview(_rgba);
+                Color old_srgb = _old_color.ToSrgb();
+                Color new_srgb = {_rgba.x, _rgba.y, _rgba.z, _alpha};
+                Vector3f old_preview = ToneMapPreview({old_srgb.x, old_srgb.y, old_srgb.z});
+                Vector3f new_preview = ToneMapPreview({new_srgb.x, new_srgb.y, new_srgb.z});
                 r.DrawQuad(left, _matrix, ColorBrush({old_preview.x, old_preview.y, old_preview.z, std::clamp(_old_color.w, 0.0f, 1.0f)}));
                 r.DrawQuad(right, _matrix, ColorBrush({new_preview.x, new_preview.y, new_preview.z, _alpha}));
-                r.DrawBox(pr.xy, pr.zw, _matrix, 1.0f, Colors::kWhite);
-                r.DrawText("Old", {left.x + 4.0f, left.y + 4.0f}, _matrix, 12.0f, Colors::kWhite);
-                r.DrawText(std::format("New {:.2f}x", _hdr_intensity), {right.x + 4.0f, right.y + 4.0f}, _matrix, 12.0f, Colors::kWhite);
+                r.DrawBox(pr.xy, pr.zw, _matrix, 1.0f, _resolved_style._border_color);
+                r.DrawText("Old", {left.x + 4.0f, left.y + 4.0f}, _matrix, 12.0f, _resolved_style._label_color);
+                r.DrawText(std::format("New {:.2f}x", _hdr_intensity), {right.x + 4.0f, right.y + 4.0f}, _matrix, 12.0f, _resolved_style._label_color);
             }
 
             for (u32 i = 0; i < _channel_inputs.size(); ++i)
@@ -357,7 +364,7 @@ namespace Ailu
                 static const Array<String, 4> kLabels = {"R", "G", "B", "A"};
                 if (_channel_inputs[i] == nullptr)
                     continue;
-                r.DrawText(kLabels[i], {_rect_inputs.x - 14.0f, _rect_inputs.y + i * 26.0f + 2.0f}, _matrix, 12.0f, Colors::kWhite);
+                r.DrawText(kLabels[i], {_rect_inputs.x - 14.0f, _rect_inputs.y + i * 26.0f + 2.0f}, _matrix, 12.0f, _resolved_style._label_color);
                 _channel_inputs[i]->Render(r);
             }
 
@@ -366,28 +373,28 @@ namespace Ailu
             if (_rect_sv.z > 0 && _rect_sv.w > 0)
             {
                 Vector2f hp = {_rect_sv.x + _hsv.y * _rect_sv.z, _rect_sv.y + (1.0f - _hsv.z) * _rect_sv.w};
-                r.DrawBox(hp - Vector2f{4, 4}, {8, 8}, _matrix, 3.f, Colors::kWhite);
+                r.DrawBox(hp - Vector2f{4, 4}, {8, 8}, _matrix, 3.f, _resolved_style._handle_color);
             }
             // Hue handle
             if (_rect_hue.z > 0)
             {
                 f32 hx = _rect_hue.x + _hsv.x * _rect_hue.z;
-                r.DrawLine({hx, _rect_hue.y}, {hx, _rect_hue.y + _rect_hue.w}, _matrix, 4.0f, Colors::kWhite);
+                r.DrawLine({hx, _rect_hue.y}, {hx, _rect_hue.y + _rect_hue.w}, _matrix, 4.0f, _resolved_style._handle_color);
             }
             // Alpha handle
             if (_show_alpha && _rect_alpha.z > 0)
             {
                 f32 ax = _rect_alpha.x + _alpha * _rect_alpha.z;
-                r.DrawLine({ax, _rect_alpha.y}, {ax, _rect_alpha.y + _rect_alpha.w}, _matrix, 4.0f, Colors::kWhite);
+                r.DrawLine({ax, _rect_alpha.y}, {ax, _rect_alpha.y + _rect_alpha.w}, _matrix, 4.0f, _resolved_style._handle_color);
             }
             if (_show_hdr && _rect_hdr.z > 0)
             {
                 f32 hdr_x = _rect_hdr.x + NormalizedFromHdrIntensity(_hdr_intensity) * _rect_hdr.z;
-                r.DrawLine({hdr_x, _rect_hdr.y}, {hdr_x, _rect_hdr.y + _rect_hdr.w}, _matrix, 4.0f, Colors::kWhite);
+                r.DrawLine({hdr_x, _rect_hdr.y}, {hdr_x, _rect_hdr.y + _rect_hdr.w}, _matrix, 4.0f, _resolved_style._handle_color);
             }
         }
 
-        void ColorPicker::SetColorRGBA(Vector4f rgba)
+        void ColorPicker::SetColorRGBA(Color rgba)
         {
             SyncStateFromRGBA(rgba);
             NotifyValueChanged();
@@ -418,13 +425,14 @@ namespace Ailu
             _rgba = HsvToRgb(_hsv) * _hdr_intensity;
         }
 
-        void ColorPicker::SyncStateFromRGBA(Vector4f rgba)
+        void ColorPicker::SyncStateFromRGBA(Color rgba)
         {
-            Vector3f rgb = {std::max(rgba.x, 0.0f), std::max(rgba.y, 0.0f), std::max(rgba.z, 0.0f)};
+            Color srgb = rgba.ToSrgb();
+            Vector3f rgb = {std::max(srgb.x, 0.0f), std::max(srgb.y, 0.0f), std::max(srgb.z, 0.0f)};
             _hdr_intensity = std::clamp(std::max({1.0f, rgb.x, rgb.y, rgb.z}), 1.0f, kHdrMaxIntensity);
             Vector3f normalized_rgb = _hdr_intensity > 0.0f ? rgb / _hdr_intensity : Vector3f::kZero;
             _hsv = RgbToHsv(normalized_rgb);
-            _alpha = std::clamp(rgba.w, 0.0f, 1.0f);
+            _alpha = std::clamp(rgba.a, 0.0f, 1.0f);
             SyncRgbFromState();
         }
 

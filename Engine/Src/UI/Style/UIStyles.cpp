@@ -31,6 +31,11 @@ namespace Ailu
         }
         void UIControlVisualOverride::SetBorderWidth(f32 w)
         {
+            _border_width = Vector4f(w);
+            _override_mask |= (u32)EUIControlVisualOverride::kBorderWidth;
+        }
+        void UIControlVisualOverride::SetBorderWidth(const Vector4f &w)
+        {
             _border_width = w;
             _override_mask |= (u32)EUIControlVisualOverride::kBorderWidth;
         }
@@ -352,6 +357,37 @@ namespace Ailu
             if (HasOverride(EUIScrollViewStyleOverride::kHorizontalMouseWheelScrollDelta))   style._horizontal_mouse_wheel_scroll_delta = _horizontal_mouse_wheel_scroll_delta;
             if (HasOverride(EUIScrollViewStyleOverride::kReserveHorizontalScrollbarSpace))   style._reserve_horizontal_scrollbar_space = _reserve_horizontal_scrollbar_space;
             if (HasOverride(EUIScrollViewStyleOverride::kReserveVerticalScrollbarSpace))     style._reserve_vertical_scrollbar_space = _reserve_vertical_scrollbar_space;
+        }
+
+        // ================================================================
+        // UITreeViewStyleOverride
+        // ================================================================
+
+        void UITreeViewStyleOverride::SetRowHeight(f32 h) { _row_height = h; _override_mask |= (u32)EUITreeViewStyleOverride::kRowHeight; }
+        void UITreeViewStyleOverride::SetIndentWidth(f32 w) { _indent_width = w; _override_mask |= (u32)EUITreeViewStyleOverride::kIndentWidth; }
+        void UITreeViewStyleOverride::SetExpandButtonWidth(f32 w) { _expand_button_width = w; _override_mask |= (u32)EUITreeViewStyleOverride::kExpandButtonWidth; }
+        void UITreeViewStyleOverride::SetNormalColor(const Color &c) { _normal_color = c; _override_mask |= (u32)EUITreeViewStyleOverride::kNormalColor; }
+        void UITreeViewStyleOverride::SetHoverColor(const Color &c) { _hover_color = c; _override_mask |= (u32)EUITreeViewStyleOverride::kHoverColor; }
+        void UITreeViewStyleOverride::SetSelectedColor(const Color &c) { _selected_color = c; _override_mask |= (u32)EUITreeViewStyleOverride::kSelectedColor; }
+        void UITreeViewStyleOverride::SetSelectedUnfocusedColor(const Color &c) { _selected_unfocused_color = c; _override_mask |= (u32)EUITreeViewStyleOverride::kSelectedUnfocusedColor; }
+        void UITreeViewStyleOverride::SetPadding(const Padding &p) { _padding = p; _override_mask |= (u32)EUITreeViewStyleOverride::kPadding; }
+        void UITreeViewStyleOverride::SetFontSize(f32 s) { _font_size = s; _override_mask |= (u32)EUITreeViewStyleOverride::kFontSize; }
+
+        void UITreeViewStyleOverride::ClearOverride(EUITreeViewStyleOverride flag) { _override_mask &= ~(u32)flag; }
+        void UITreeViewStyleOverride::ClearAllOverrides() { _override_mask = 0u; }
+        bool UITreeViewStyleOverride::HasOverride(EUITreeViewStyleOverride flag) const { return (_override_mask & (u32)flag) != 0u; }
+
+        void UITreeViewStyleOverride::ApplyTo(UITreeViewStyle &style) const
+        {
+            if (HasOverride(EUITreeViewStyleOverride::kRowHeight))                style._row_height = _row_height;
+            if (HasOverride(EUITreeViewStyleOverride::kIndentWidth))              style._indent_width = _indent_width;
+            if (HasOverride(EUITreeViewStyleOverride::kExpandButtonWidth))        style._expand_button_width = _expand_button_width;
+            if (HasOverride(EUITreeViewStyleOverride::kNormalColor))              style._normal_color = _normal_color;
+            if (HasOverride(EUITreeViewStyleOverride::kHoverColor))               style._hover_color = _hover_color;
+            if (HasOverride(EUITreeViewStyleOverride::kSelectedColor))            style._selected_color = _selected_color;
+            if (HasOverride(EUITreeViewStyleOverride::kSelectedUnfocusedColor))   style._selected_unfocused_color = _selected_unfocused_color;
+            if (HasOverride(EUITreeViewStyleOverride::kPadding))                  style._padding = _padding;
+            if (HasOverride(EUITreeViewStyleOverride::kFontSize))                 style._font_size = _font_size;
         }
 
     }// namespace UI

@@ -1,5 +1,6 @@
 #include "Widgets/StyleThemeEditor.h"
 
+#include "Common/EditorStyle.h"
 #include "EditorApp.h"
 #include "Ext/imgui/imgui.h"
 #include "Objects/JsonArchive.h"
@@ -10,6 +11,7 @@
 #include "UI/Widget.h"
 
 #include <algorithm>
+#include <cmath>
 #include <filesystem>
 
 namespace Ailu
@@ -71,8 +73,32 @@ namespace Ailu
             {
                 JsonArchive ar;
                 const Type *type = UI::UITheme::StaticType();
+                UI::UITheme theme_for_file = g_editor_ui_theme;
                 for (auto &prop: type->GetProperties())
-                    prop.Serialize(&g_editor_ui_theme, ar);
+                    prop.Serialize(&theme_for_file, ar);
+                ar.Save(path);
+                return std::filesystem::exists(path);
+            }
+
+            bool LoadEditorStyleFromFile(const Path &path)
+            {
+                JsonArchive ar;
+                ar.Load(path);
+                if (!ar.IsLoaded())
+                    return false;
+
+                const Type *type = EditorStyle::StaticType();
+                for (auto &prop: type->GetProperties())
+                    prop.Deserialize(&g_editor_style, ar);
+                return true;
+            }
+
+            bool SaveEditorStyleToFile(const Path &path)
+            {
+                JsonArchive ar;
+                const Type *type = EditorStyle::StaticType();
+                for (auto &prop: type->GetProperties())
+                    prop.Serialize(&g_editor_style, ar);
                 ar.Save(path);
                 return std::filesystem::exists(path);
             }
@@ -80,8 +106,10 @@ namespace Ailu
             bool DrawColorField(const char *label, Color &value)
             {
                 Color old_value = value;
-                if (!ImGui::ColorEdit4(label, value.data, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR))
+                Color srgb_value = value.ToSrgb();
+                if (!ImGui::ColorEdit4(label, srgb_value.data, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR))
                     return false;
+                value = Color::FromSrgb(srgb_value);
                 return old_value != value;
             }
 
@@ -200,12 +228,10 @@ namespace Ailu
                     return DrawStringField(prop.Name().c_str(), prop.Get<String>(instance));
                 if (prop_type == StaticClass<Vector2f>())
                     return DrawVector2Field(prop.Name().c_str(), prop.Get<Vector2f>(instance));
-                if (prop.TypeName() == "Color")
+                if (prop_type == StaticClass<Color>())
                     return DrawColorField(prop.Name().c_str(), prop.Get<Color>(instance));
                 if (prop_type == StaticClass<Vector4f>())
                 {
-                    if (prop.MetaInfo().GetBool("IsColor"))
-                        return DrawColorField(prop.Name().c_str(), prop.Get<Color>(instance));
                     return DrawVector4Field(prop.Name().c_str(), prop.Get<Vector4f>(instance));
                 }
                 if (prop_type == StaticClass<UI::Padding>())
@@ -235,6 +261,18 @@ namespace Ailu
                     return DrawNestedProperty<UI::UIScrollBarStyle>(prop, instance);
                 if (prop_type == StaticClass<UI::UIScrollViewStyle>())
                     return DrawNestedProperty<UI::UIScrollViewStyle>(prop, instance);
+                if (prop_type == StaticClass<UI::UIListViewStyle>())
+                    return DrawNestedProperty<UI::UIListViewStyle>(prop, instance);
+                if (prop_type == StaticClass<UI::UITreeViewStyle>())
+                    return DrawNestedProperty<UI::UITreeViewStyle>(prop, instance);
+                if (prop_type == StaticClass<UI::UIElementVisualStyle>())
+                    return DrawNestedProperty<UI::UIElementVisualStyle>(prop, instance);
+                if (prop_type == StaticClass<UI::UIBorderStyle>())
+                    return DrawNestedProperty<UI::UIBorderStyle>(prop, instance);
+                if (prop_type == StaticClass<UI::UISplitViewStyle>())
+                    return DrawNestedProperty<UI::UISplitViewStyle>(prop, instance);
+                if (prop_type == StaticClass<UI::UIColorPickerStyle>())
+                    return DrawNestedProperty<UI::UIColorPickerStyle>(prop, instance);
 
                 ImGui::TextDisabled("%s: %s", prop.Name().c_str(), prop.TypeName().c_str());
                 return false;
@@ -261,7 +299,10 @@ namespace Ailu
             if (is_show == nullptr || !*is_show)
                 return;
 
+            enum class EEditMode : u32 { kUITheme, kEditorStyle };
+            static EEditMode s_edit_mode = EEditMode::kUITheme;
             static Path s_theme_path = DefaultThemePath();
+            static Path s_editor_style_path = Path(EditorApp::GetEditorRootPath()) / L"Res/UI/EditorStyle.json";
             static char s_path_buffer[512] = {};
             static bool s_path_initialized = false;
             static String s_status;
@@ -277,48 +318,107 @@ namespace Ailu
                 return;
             }
 
-            if (ImGui::InputText("Theme Json", s_path_buffer, sizeof(s_path_buffer), ImGuiInputTextFlags_EnterReturnsTrue))
-                s_theme_path = Path(s_path_buffer);
+            const char *kModeNames[] = {"UI Theme", "Editor Style"};
+            if (ImGui::BeginCombo("Edit Mode", kModeNames[(u32)s_edit_mode]))
+            {
+                for (u32 i = 0; i < 2; ++i)
+                {
+                    if (ImGui::Selectable(kModeNames[i], i == (u32)s_edit_mode))
+                    {
+                        s_edit_mode = (EEditMode)i;
+                        s_status.clear();
+                        CopyPathToBuffer(s_edit_mode == EEditMode::kUITheme ? s_theme_path : s_editor_style_path, s_path_buffer);
+                    }
+                }
+                ImGui::EndCombo();
+            }
 
-            if (ImGui::Button("Dark"))
+            if (ImGui::InputText("Json Path", s_path_buffer, sizeof(s_path_buffer),
+                ImGuiInputTextFlags_EnterReturnsTrue))
             {
-                s_theme_path = Path(EditorApp::GetEditorRootPath()) / L"Res/UI/UITheme_Dark.json";
-                CopyPathToBuffer(s_theme_path, s_path_buffer);
-                s_status = LoadThemeFromFile(s_theme_path) ? "loaded" : "load failed";
+                if (s_edit_mode == EEditMode::kUITheme)
+                    s_theme_path = Path(s_path_buffer);
+                else
+                    s_editor_style_path = Path(s_path_buffer);
             }
-            ImGui::SameLine();
-            if (ImGui::Button("Light"))
+
+            if (s_edit_mode == EEditMode::kUITheme)
             {
-                s_theme_path = Path(EditorApp::GetEditorRootPath()) / L"Res/UI/UITheme_Light.json";
-                CopyPathToBuffer(s_theme_path, s_path_buffer);
-                s_status = LoadThemeFromFile(s_theme_path) ? "loaded" : "load failed";
+                if (ImGui::Button("Dark"))
+                {
+                    s_theme_path = Path(EditorApp::GetEditorRootPath()) / L"Res/UI/UITheme_Dark.json";
+                    CopyPathToBuffer(s_theme_path, s_path_buffer);
+                    s_status = LoadThemeFromFile(s_theme_path) ? "loaded" : "load failed";
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Light"))
+                {
+                    s_theme_path = Path(EditorApp::GetEditorRootPath()) / L"Res/UI/UITheme_Light.json";
+                    CopyPathToBuffer(s_theme_path, s_path_buffer);
+                    s_status = LoadThemeFromFile(s_theme_path) ? "loaded" : "load failed";
+                }
+                ImGui::SameLine();
             }
-            ImGui::SameLine();
+
             if (ImGui::Button("Load"))
             {
-                s_theme_path = Path(s_path_buffer);
-                s_status = LoadThemeFromFile(s_theme_path) ? "loaded" : "load failed";
+                Path load_path(s_path_buffer);
+                if (s_edit_mode == EEditMode::kUITheme)
+                {
+                    s_theme_path = load_path;
+                    s_status = LoadThemeFromFile(s_theme_path) ? "loaded" : "load failed";
+                }
+                else
+                {
+                    s_editor_style_path = load_path;
+                    s_status = LoadEditorStyleFromFile(s_editor_style_path) ? "loaded" : "load failed";
+                }
             }
             ImGui::SameLine();
             if (ImGui::Button("Save"))
             {
-                s_theme_path = Path(s_path_buffer);
-                s_status = SaveThemeToFile(s_theme_path) ? "saved" : "save failed";
+                Path save_path(s_path_buffer);
+                if (s_edit_mode == EEditMode::kUITheme)
+                {
+                    s_theme_path = save_path;
+                    s_status = SaveThemeToFile(s_theme_path) ? "saved" : "save failed";
+                }
+                else
+                {
+                    s_editor_style_path = save_path;
+                    s_status = SaveEditorStyleToFile(s_editor_style_path) ? "saved" : "save failed";
+                }
             }
             ImGui::SameLine();
             if (ImGui::Button("Apply"))
             {
-                ApplyThemeChange();
-                s_status = "applied";
+                if (s_edit_mode == EEditMode::kUITheme)
+                {
+                    ApplyThemeChange();
+                    s_status = "applied";
+                }
+                else
+                {
+                    s_status = "applied (live)";
+                }
             }
             if (!s_status.empty())
                 ImGui::SameLine(), ImGui::TextUnformatted(s_status.c_str());
 
             ImGui::Separator();
-            if (DrawProperties(UI::UITheme::StaticType(), &g_editor_ui_theme))
+
+            if (s_edit_mode == EEditMode::kUITheme)
             {
-                ApplyThemeChange();
-                s_status = "modified";
+                if (DrawProperties(UI::UITheme::StaticType(), &g_editor_ui_theme))
+                {
+                    ApplyThemeChange();
+                    s_status = "modified";
+                }
+            }
+            else
+            {
+                if (DrawProperties(EditorStyle::StaticType(), &g_editor_style))
+                    s_status = "modified";
             }
 
             ImGui::End();

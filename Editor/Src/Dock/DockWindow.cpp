@@ -43,7 +43,7 @@ namespace Ailu
                     visual._background._tint = bg;
                     visual._content_color = text;
                     visual._border_color = Colors::kTransparent;
-                    visual._border_width = 0.0f;
+                    visual._border_width = Vector4f::kZero;
                     visual._corner_radius = corner_radius;
                     return visual;
                 };
@@ -76,20 +76,19 @@ namespace Ailu
 #pragma region DockWindow
         u32 DockWindow::HoverEdge(Vector2f position, Vector2f size, Vector2f pos, f32 thickness)
         {
-            // 首先检查鼠标是否在窗口范围内
-            if (pos.x < position.x || pos.x > position.x + size.x ||
-                pos.y < position.y || pos.y > position.y + size.y)
+            // Resize 命中区只保留窗口外侧，避免抢占内容区（例如 ScrollView 的滚动条）。
+            if (pos.x < position.x - thickness || pos.x > position.x + size.x + thickness ||
+                pos.y < position.y - thickness || pos.y > position.y + size.y + thickness)
                 return 0;
 
             u32 resize_dir = 0;
-            // 判断边缘
-            if (pos.x >= position.x && pos.x <= position.x + thickness)
+            if (pos.x >= position.x - thickness && pos.x < position.x)
                 resize_dir |= 1;// 左
-            if (pos.x >= position.x + size.x - thickness && pos.x <= position.x + size.x)
+            if (pos.x > position.x + size.x && pos.x <= position.x + size.x + thickness)
                 resize_dir |= 4;// 右
-            if (pos.y >= position.y && pos.y <= position.y + thickness)
+            if (pos.y >= position.y - thickness && pos.y < position.y)
                 resize_dir |= 2;// 上
-            if (pos.y >= position.y + size.y - thickness && pos.y <= position.y + size.y)
+            if (pos.y > position.y + size.y && pos.y <= position.y + size.y + thickness)
                 resize_dir |= 8;// 下
             return resize_dir;
         }
@@ -251,32 +250,29 @@ namespace Ailu
                 }
                 else
                 {
-                    ui_mgr->UpdateInteractionZone(
-                            _resize_zone_handles[0],
-                            Vector4f(p.x - t, p.y - t, s.x + t * 2.0f, t * 2.0f));// Top
-                    ui_mgr->UpdateInteractionZone(
-                            _resize_zone_handles[1],
-                            Vector4f(p.x - t, p.y + s.y - t, s.x + t * 2.0f, t * 2.0f));// Bottom
-                    ui_mgr->UpdateInteractionZone(
-                            _resize_zone_handles[2],
-                            Vector4f(p.x - t, p.y, t * 2.0f, s.y));// Left
-                    ui_mgr->UpdateInteractionZone(
-                            _resize_zone_handles[3],
-                            Vector4f(p.x + s.x - t, p.y, t * 2.0f, s.y));// Right
+                    ui_mgr->UpdateInteractionZone(_resize_zone_handles[0], Vector4f(p.x, p.y - t, s.x, t));// Top
+                    ui_mgr->UpdateInteractionZone(_resize_zone_handles[1], Vector4f(p.x, p.y + s.y, s.x, t));// Bottom
+                    ui_mgr->UpdateInteractionZone(_resize_zone_handles[2], Vector4f(p.x - t, p.y, t, s.y));// Left
+                    ui_mgr->UpdateInteractionZone(_resize_zone_handles[3], Vector4f(p.x + s.x, p.y, t, s.y));// Right
                 }
 
                 _is_dirty = false;
             }
             bool title_style_changed = false;
             bool content_style_changed = false;
+            const bool is_focused = DockManager::Get().IsFocused(this);
             title_style_changed |= SetColorIfChanged(_title_bar_root->_bg_color, g_editor_style._window_title_bar_color);
-            title_style_changed |= SetColorIfChanged(_title_bar_root->_border_color, _is_focused ? g_editor_style._window_focus_border_color : g_editor_style._window_border_color);
-            content_style_changed |= SetColorIfChanged(_content_root->_border_color, _is_focused ? g_editor_style._window_focus_border_color : g_editor_style._window_border_color);
+            title_style_changed |= SetColorIfChanged(_title_drag_area->_bg_color, g_editor_style._window_title_bar_color);
+            title_style_changed |= SetColorIfChanged(_title_bar_root->_border_color, is_focused ? g_editor_style._window_focus_border_color : g_editor_style._window_border_color);
+            content_style_changed |= SetColorIfChanged(_content_root->_border_color, is_focused ? g_editor_style._window_focus_border_color : g_editor_style._window_border_color);
             content_style_changed |= SetColorIfChanged(_content_root->_bg_color, g_editor_style._window_bg_color);
             if (SetColorIfChanged(_title->_color, g_editor_style._window_title_text_color))
                 _title->InvalidatePaint();
             if (title_style_changed)
+            {
                 _title_bar_root->InvalidateStyle(UI::EStyleInvalidation::kPaintOnly);
+                _title_drag_area->InvalidateStyle(UI::EStyleInvalidation::kPaintOnly);
+            }
             if (content_style_changed)
                 _content_root->InvalidateStyle(UI::EStyleInvalidation::kPaintOnly);
         }
@@ -318,6 +314,7 @@ namespace Ailu
             _is_focused = is_focus;
             if (is_focus)
             {
+                DockManager::Get().RequestFocus(this);
                 UI::UIManager::Get()->BringToFront(_content_widget.get());//事件会自动将title_widget带到前面
             }
             else
@@ -352,22 +349,7 @@ namespace Ailu
 
         u32 DockWindow::HoverEdge(Vector2f pos) const
         {
-            const f32 t = kBorderThickness;
-            if (pos.x < _position.x - t || pos.x > _position.x + _size.x + t ||
-                pos.y < _position.y - t || pos.y > _position.y + _size.y + t)
-                return 0;
-
-            u32 resize_dir = 0;
-            if (pos.x >= _position.x - t && pos.x <= _position.x + t)
-                resize_dir |= 1;// 左
-            if (pos.x >= _position.x + _size.x - t && pos.x <= _position.x + _size.x + t)
-                resize_dir |= 4;// 右
-            if (pos.y >= _position.y - t && pos.y <= _position.y + t &&
-                (pos.x - _position.x) < (_size.x - kTitleBarHeight))
-                resize_dir |= 2;// 上
-            if (pos.y >= _position.y + _size.y - t && pos.y <= _position.y + _size.y + t)
-                resize_dir |= 8;// 下
-            return resize_dir;
+            return HoverEdge(_position, _size, pos, kBorderThickness);
         }
 
         Vector4f DockWindow::DragArea() const
@@ -397,14 +379,13 @@ namespace Ailu
         {
             _resize_dir = 0;
 
-            // 判断边缘
-            if (mouse_pos.x >= _position.x && mouse_pos.x <= _position.x + kBorderThickness)
+            if (mouse_pos.x >= _position.x - kBorderThickness && mouse_pos.x < _position.x)
                 _resize_dir |= 1;// 左
-            if (mouse_pos.x >= _position.x + _size.x - kBorderThickness && mouse_pos.x <= _position.x + _size.x)
+            if (mouse_pos.x > _position.x + _size.x && mouse_pos.x <= _position.x + _size.x + kBorderThickness)
                 _resize_dir |= 4;// 右
-            if (mouse_pos.y >= _position.y && mouse_pos.y <= _position.y + kBorderThickness)
+            if (mouse_pos.y >= _position.y - kBorderThickness && mouse_pos.y < _position.y)
                 _resize_dir |= 2;// 上
-            if (mouse_pos.y >= _position.y + _size.y - kBorderThickness && mouse_pos.y <= _position.y + _size.y)
+            if (mouse_pos.y > _position.y + _size.y && mouse_pos.y <= _position.y + _size.y + kBorderThickness)
                 _resize_dir |= 8;// 下
 
             _is_resizing = is_mouse_down && _resize_dir != 0;
@@ -671,6 +652,7 @@ namespace Ailu
                 }
                 prev_title_bg->InvalidateStyle(UI::EStyleInvalidation::kPaintOnly);
                 _tabs[_active_index]->SetTabActive(false);
+                _tabs[_active_index]->SetFocus(false);
                 if (auto *previous_window = _tabs[_active_index]->PrimaryWindow())
                     previous_window->ContentWidget()->_on_get_focus -= _content_focus_handle;
             }
@@ -772,8 +754,10 @@ namespace Ailu
             _tab_root->GetSlotAs<UI::CanvasSlot>().Size({_size.x, DockWindow::kTitleBarHeight});
             _tab_hb->GetSlot()->Size(_tab_root->GetSlot()->_size);
             bool tab_style_changed = false;
+            DockWindow *active_window = ActivePrimaryWindow();
+            const bool is_focused = active_window != nullptr && DockManager::Get().IsFocused(active_window);
             tab_style_changed |= SetColorIfChanged(_tab_root->_bg_color, g_editor_style._window_title_bar_color);
-            tab_style_changed |= SetColorIfChanged(_tab_root->_border_color, _is_focused ? g_editor_style._window_focus_border_color : g_editor_style._window_border_color);
+            tab_style_changed |= SetColorIfChanged(_tab_root->_border_color, is_focused ? g_editor_style._window_focus_border_color : g_editor_style._window_border_color);
             if (tab_style_changed)
                 _tab_root->InvalidateStyle(UI::EStyleInvalidation::kPaintOnly);
             if (_tabs.empty())

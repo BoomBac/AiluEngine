@@ -4,20 +4,58 @@
 
 #include "CoreType.h"
 #include "PipelineState.h"
-#include "Framework/Core/Containers/Array.h"
 #include <type_traits>
 
 namespace Ailu::Render
 {
     class Shader;
 
-    struct MaterialDrawBinding
+    struct PipelineBindingSnapshotEntry
     {
         GpuResource *_resource = nullptr;
         EBindResDescType _resource_type = EBindResDescType::kUnknown;
         u16 _slot = 0u;
         u16 _priority = 0u;
         PipelineResource::AddiInfo _addi_info;
+    };
+
+    struct CommandResourceBinding
+    {
+        GpuResource *_resource = nullptr;
+        EBindResDescType _resource_type = EBindResDescType::kUnknown;
+        PipelineResource::AddiInfo _addi_info;
+    };
+
+    struct PipelineBindingSnapshot
+    {
+        const PipelineBindingSnapshotEntry *_entries = nullptr;
+        u16 _entry_count = 0u;
+        u16 _max_slot = 0u;
+        u32 _binding_mask = 0u;
+    };
+
+    struct ComputeBindingSnapshotEntry
+    {
+        GpuResource *_resource = nullptr;
+        EBindResDescType _resource_type = EBindResDescType::kUnknown;
+        u16 _slot = 0u;
+        u16 _priority = 0u;
+        u16 _face = 0u;
+        u16 _mipmap = 0u;
+        u16 _slice = 0u;
+        u16 _view_index = (u16) -1;
+        u32 _sub_res = UINT32_MAX;
+        bool _is_internal_cbuf = false;
+        PipelineResource::AddiInfo _addi_info;
+    };
+
+    struct ComputeDispatchSnapshot
+    {
+        Array<ComputeBindingSnapshotEntry, 32> _entries{};
+        Array<u8, 1024> _cbuf_data{};
+        u16 _entry_count = 0u;
+        u32 _variant_hash = 0u;
+        bool _is_ready = false;
     };
 
     struct MaterialDrawState
@@ -28,12 +66,9 @@ namespace Ailu::Render
         u32 _variant_hash = 0u;
         bool _is_ready = false;
         u64 _pipeline_shader_hash = 0u;
-        u32 _binding_mask = 0u;
-        Array<MaterialDrawBinding, 32u> _bindings;
-        const u8 *_property_data = nullptr;
-        u32 _property_size = 0u;
+        u8 _raster_state_hash = 0u;
+        PipelineBindingSnapshot _bindings;
         u32 _material_version = 0u;
-        i16 _material_cbuffer_slot = -1;
         ECullMode _cull_mode = ECullMode::kBack;
     };
 

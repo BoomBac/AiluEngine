@@ -9,113 +9,12 @@
     "_entities": [{
             "_entity_id": 4294967297,
             "_tag_component": {
-                "_name": "cube",
-                "_layer_mask": 1
-            },
-            "_transform_component": {
-                "_position": [0.0, 4.419328689575195, 2.079547882080078],
-                "_rotation": [0.0, 6.755127657243065e-8, 0.0, 1.0],
-                "_scale": [1.0, 1.0, 1.0]
-            },
-            "_static_mesh_component": {
-                "_mesh_guid": "7baa598b-7eb4-478d-91ae-bf758da25d3b",
-                "_material_guids": ["46601513-96ea-4cc4-86db-0400c8824ec1"]
-            },
-            "_hierarchy_component": {
-                "_first_child": 0,
-                "_prev_sibling": 0,
-                "_next_sibling": 0,
-                "_parent": 0,
-                "_children_num": 0,
-                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0"
-            }
-        }, {
-            "_entity_id": 4294967298,
-            "_tag_component": {
-                "_name": "directional_light",
-                "_layer_mask": 1
-            },
-            "_transform_component": {
-                "_position": [14.517980575561523, 3.078702926635742, 8.78703498840332],
-                "_rotation": [0.3606869876384735, -0.18537156283855438, 0.0733824148774147, 0.9111297130584717],
-                "_scale": [0.9998319745063782, 0.9998660087585449, 0.9998360276222229]
-            },
-            "_light_component": {
-                "_type": "",
-                "_light": {
-                    "_light_color": [1.0, 1.0, 1.0, 1.0],
-                    "_light_param": [10.0, 4.900000095367432, 5.0, 0.26499998569488525],
-                    "_is_two_side": false
-                },
-                "_shadow": {
-                    "_is_cast_shadow": true,
-                    "_constant_bias": 0.24300000071525574,
-                    "_slope_bias": 0.21400000154972076
-                }
-            },
-            "_hierarchy_component": {
-                "_first_child": 0,
-                "_prev_sibling": 0,
-                "_next_sibling": 0,
-                "_parent": 0,
-                "_children_num": 0,
-                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0"
-            }
-        }, {
-            "_entity_id": 4294967299,
-            "_tag_component": {
-                "_name": "new_object_3",
-                "_layer_mask": 0
-            },
-            "_transform_component": {
-                "_position": [0.0, -0.21875, 0.0],
-                "_rotation": [0.0, 6.799999852091787e-8, 0.0, 1.0],
-                "_scale": [14.933902740478516, 14.933902740478516, 14.933902740478516]
-            },
-            "_static_mesh_component": {
-                "_mesh_guid": "c3315e03-1052-4825-98f7-a676beae0615",
-                "_material_guids": ["4f6e2fa4-c9af-4800-9ff9-70874abfbd50"]
-            },
-            "_hierarchy_component": {
-                "_first_child": 0,
-                "_prev_sibling": 0,
-                "_next_sibling": 0,
-                "_parent": 0,
-                "_children_num": 0,
-                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0"
-            }
-        }, {
-            "_entity_id": 4294967300,
-            "_tag_component": {
-                "_name": "LightProbe_4",
-                "_layer_mask": 1
-            },
-            "_transform_component": {
-                "_position": [21.469730377197266, 7.310354232788086, 0.0],
-                "_rotation": [0.0, -5.165801653106428e-8, 0.0, 1.0],
-                "_scale": [1.0, 1.0, 1.0]
-            },
-            "_hierarchy_component": {
-                "_first_child": 0,
-                "_prev_sibling": 0,
-                "_next_sibling": 0,
-                "_parent": 0,
-                "_children_num": 0,
-                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0"
-            },
-            "_lightprobe_component": {
-                "_size": 9.0,
-                "_is_update_every_tick": false
-            }
-        }, {
-            "_entity_id": 4294967303,
-            "_tag_component": {
                 "_name": "sprite_test",
                 "_layer_mask": 1
             },
             "_transform_component": {
-                "_position": [4.314676761627197, 3.5541651248931885, -1.1920928955078125e-7],
-                "_rotation": [0.0, -5.165801653106428e-8, 0.0, 1.0],
+                "_position": [4.3145, 3.5541, -0.0],
+                "_rotation": [0.0, -0.0, 0.0, 1.0],
                 "_scale": [1.0, 1.0, 1.0]
             },
             "_hierarchy_component": {
@@ -136,6 +35,107 @@
                 "_flip_x": false,
                 "_flip_y": false,
                 "_visible": true
+            }
+        }, {
+            "_entity_id": 4294967298,
+            "_tag_component": {
+                "_name": "directional_light",
+                "_layer_mask": 1
+            },
+            "_transform_component": {
+                "_position": [14.5179, 3.0787, 8.7869],
+                "_rotation": [0.3605, -0.1852, 0.0732, 0.911],
+                "_scale": [0.9998, 0.9998, 0.9998]
+            },
+            "_light_component": {
+                "_type": "kDirectional",
+                "_light": {
+                    "_light_color": [1.0, 1.0, 1.0, 1.0],
+                    "_light_param": [10.0, 4.9, 5.0, 0.2648],
+                    "_is_two_side": false
+                },
+                "_shadow": {
+                    "_is_cast_shadow": true,
+                    "_constant_bias": 0.243,
+                    "_slope_bias": 0.214
+                }
+            },
+            "_hierarchy_component": {
+                "_first_child": 0,
+                "_prev_sibling": 0,
+                "_next_sibling": 0,
+                "_parent": 0,
+                "_children_num": 0,
+                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0"
+            }
+        }, {
+            "_entity_id": 4294967299,
+            "_tag_component": {
+                "_name": "new_object_3",
+                "_layer_mask": 0
+            },
+            "_transform_component": {
+                "_position": [0.0, -0.2187, 0.0],
+                "_rotation": [0.0, 0.0, 0.0, 1.0],
+                "_scale": [14.9338, 14.9338, 14.9338]
+            },
+            "_static_mesh_component": {
+                "_mesh_guid": "c3315e03-1052-4825-98f7-a676beae0615",
+                "_material_guids": ["4f6e2fa4-c9af-4800-9ff9-70874abfbd50"]
+            },
+            "_hierarchy_component": {
+                "_first_child": 0,
+                "_prev_sibling": 0,
+                "_next_sibling": 0,
+                "_parent": 0,
+                "_children_num": 0,
+                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0"
+            }
+        }, {
+            "_entity_id": 4294967300,
+            "_tag_component": {
+                "_name": "LightProbe_4",
+                "_layer_mask": 1
+            },
+            "_transform_component": {
+                "_position": [21.4696, 7.3102, 0.0],
+                "_rotation": [0.0, -0.0, 0.0, 1.0],
+                "_scale": [1.0, 1.0, 1.0]
+            },
+            "_hierarchy_component": {
+                "_first_child": 0,
+                "_prev_sibling": 0,
+                "_next_sibling": 0,
+                "_parent": 0,
+                "_children_num": 0,
+                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0"
+            },
+            "_lightprobe_component": {
+                "_size": 9.0,
+                "_is_update_every_tick": false
+            }
+        }, {
+            "_entity_id": 4294967301,
+            "_tag_component": {
+                "_name": "new_object_5",
+                "_layer_mask": 0
+            },
+            "_transform_component": {
+                "_position": [-0.4292, 0.3293, 3.0698],
+                "_rotation": [0.0, -0.0, 0.0, 1.0],
+                "_scale": [1.0, 1.0, 1.0]
+            },
+            "_static_mesh_component": {
+                "_mesh_guid": "05027d6c-b9f3-4e05-aa86-e62a2067e69a",
+                "_material_guids": ["e3891c79-694a-4968-bb84-49c409a611ce"]
+            },
+            "_hierarchy_component": {
+                "_first_child": 0,
+                "_prev_sibling": 0,
+                "_next_sibling": 0,
+                "_parent": 0,
+                "_children_num": 0,
+                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0"
             }
         }]
 }

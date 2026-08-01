@@ -88,6 +88,7 @@ namespace Ailu
             void DrawQuad(Vector4f rect, Matrix4x4f matrix, const UIBrush& brush, Vector4f corner_radius, f32 depth = 0.0f);
             void DrawWindowQuad(Window *window, Vector4f rect, const UIBrush &brush, f32 depth = 0.0f);
             void DrawWindowQuad(Window *window, Vector4f rect, const UIBrush &brush, Vector4f corner_radius, f32 depth = 0.0f);
+            void DrawWindowShadow(Window *window, Vector4f rect, Color color, Vector4f corner_radius);
             void DrawWindowText(Window *window, const String &text, Vector2f pos, f32 font_size = 14u, Color color = Colors::kWhite,
                                 Vector2f scale = Vector2f::kOne, Render::Font *font = nullptr);
             void DrawVisual(Vector4f rect, Matrix4x4f matrix, const UIControlVisual &visual);
@@ -101,6 +102,8 @@ namespace Ailu
                             f32 thickness = 1.0f, Color color = Colors::kWhite, f32 depth = 0.0f, u32 segments = 24u);
             void DrawBox(Vector2f pos, Vector2f size, f32 thickness = 1.0f, Color color = Colors::kWhite, f32 depth = 0.0f);
             void DrawBox(Vector2f pos, Vector2f size, Matrix4x4f matrix, f32 thickness = 1.0f, Color color = Colors::kWhite, f32 depth = 0.0f);
+            void DrawBorder(Vector4f rect, Matrix4x4f matrix, Vector4f thickness, Vector4f corner_radius,
+                           Color color = Colors::kWhite, f32 depth = 0.0f);
             void PushScissor(Vector4f scissor);
             void PopScissor();
             Vector2f CalculateTextSize(const String &text, u16 font_size = 14u, Vector2f scale = Vector2f::kOne, Render::Font *font = nullptr);
@@ -119,11 +122,12 @@ namespace Ailu
             Vector<DrawerBlock *> &GetWidgetFrameBlocks(Widget *widget);
             void SyncWidgetFrameBlocks(Widget *widget);
             DrawerBlock *GetAvailableBlock(u32 vert_num,u32 index_num);
-            DrawerBlock *GetAvailableWindowBlock(Window *window, u32 vert_num, u32 index_num);
+            DrawerBlock *GetAvailableWindowBlock(Window *window, u32 vert_num, u32 index_num, Render::Material *material = nullptr);
             void DrawDirtyStateOverlay(UIElement *root);
             void DrawDirtyStateOverlayRecursive(UIElement *element, DrawerBlock *block);
             void AppendQuadToBlock(DrawerBlock *block, Vector4f rect, Matrix4x4f matrix, const UIBrush &brush,
-                                   Vector4f corner_radius, f32 depth);
+                                   Vector4f corner_radius, f32 depth, Render::Material *material = nullptr,
+                                   Vector4f border_thickness = Vector4f::kZero);
             Render::Texture *GetOrCreateBackdropBlurTexture(Render::Texture *source, CommandBuffer *cmd);
             void SubmitPopupBackdrop(Widget *widget, CommandBuffer *cmd, RenderTexture *color, RenderTexture *depth);
             void SubmitBlock(DrawerBlock *block, CommandBuffer *cmd,RenderTexture* color,RenderTexture* depth = nullptr);
@@ -151,6 +155,7 @@ namespace Ailu
             Vector<DrawerBlock *> *_cur_widget_blocks = nullptr;
             u32 _cur_widget_block_index = 0u;
             Ref<Material> _default_material;
+            Ref<Material> _shadow_material;
             Ref<Render::ComputeShader> _backdrop_blur_cs;
             Render::ComputeShaderKernelId _backdrop_blur_x_kernel = Render::kInvalidComputeShaderKernelId;
             Render::ComputeShaderKernelId _backdrop_blur_y_kernel = Render::kInvalidComputeShaderKernelId;

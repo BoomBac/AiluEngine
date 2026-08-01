@@ -892,6 +892,7 @@ namespace Ailu::Render
         _mult_scatter_lut_gen_kernel = _p_lut_gen->FindKernel("MultiScattGen");
         _sky_lut_gen_kernel = _p_lut_gen->FindKernel("SkyLightGen");
         _p_skybox_material = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/skybox.alasset"), "Skybox");
+        _p_skybox_material->SetCullMode(ECullMode::kFront);
         Matrix4x4f world_mat;
         MatrixScale(world_mat, 1000000.f, 1000000.f, 1000000.f);
         _p_cbuffer.reset(ConstantBuffer::Create(RenderConstants::kPerObjectDataSize));

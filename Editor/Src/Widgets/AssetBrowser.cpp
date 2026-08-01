@@ -1101,10 +1101,12 @@ namespace Ailu
                             if (asset->_p_obj)
                             {
                                 auto mesh = asset->As<Render::Mesh>();
-                                if (!_asset_preview_icons.contains(mesh) || _asset_preview_icons[mesh] == nullptr)
+                                Ref<RenderTexture> mesh_icon{nullptr};
+                                AssetPreviewGenerator::GeneratorMeshSnapshot(512u, 512u, mesh, mesh_icon);
+                                if (mesh_icon)
                                 {
-                                    Ref<RenderTexture> mesh_icon{nullptr};
-                                    AssetPreviewGenerator::GeneratorMeshSnapshot(512u, 512u, mesh, mesh_icon);
+                                    if (auto it = _asset_preview_icons.find(mesh); it != _asset_preview_icons.end() && it->second)
+                                        s_retired_asset_preview_icons[s_retired_asset_preview_icon_index].push_back(it->second);
                                     _asset_preview_icons[mesh] = mesh_icon;
                                 }
                                 icon->SetTexture(_asset_preview_icons[mesh].get());

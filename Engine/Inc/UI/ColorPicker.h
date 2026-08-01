@@ -2,6 +2,7 @@
 #define AILU_UI_COLOR_PICKER_H
 
 #include "UIElement.h"
+#include "UI/Style/UIStyles.h"
 #include "Render/Texture.h"
 #include "generated/ColorPicker.gen.h"
 
@@ -14,18 +15,18 @@ ACLASS()
 class AILU_API ColorPicker : public UIElement 
 {
     GENERATED_BODY()
-    DECLARE_DELEGATE(on_value_changed, Vector4f);
+    DECLARE_DELEGATE(on_value_changed, Color);
 public:
     ColorPicker();
     explicit ColorPicker(const String& name);
-    explicit ColorPicker(Vector4f old_color);
+    explicit ColorPicker(Color old_color);
 
     Vector2f MeasureDesiredSize() override;
     void Update(f32 dt) override;
     UIElement *HitTest(Vector2f pos) override;
 
-    Vector4f GetColorRGBA() const { return {_rgba.x, _rgba.y, _rgba.z, _alpha}; }
-    void SetColorRGBA(Vector4f rgba);
+    Color GetColorRGBA() const { return Color::FromSrgb({_rgba.x, _rgba.y, _rgba.z, _alpha}); }
+    void SetColorRGBA(Color rgba);
 
     Vector4f GetColorHSVA() const { return {_hsv.x, _hsv.y, _hsv.z, _alpha}; }
     void SetColorHSVA(Vector4f hsva);
@@ -38,11 +39,12 @@ public:
     bool GetShowHDR() const { return _show_hdr; }
 
 private:
+    void ResolveStyle(const UIStyleContext &context) override;
     void RenderImpl(UIRenderer& r) override;
     void RebuildSVTexture();
     void EnsureStaticTextures();
     void SyncRgbFromState();
-    void SyncStateFromRGBA(Vector4f rgba);
+    void SyncStateFromRGBA(Color rgba);
     void SyncStateFromHSVA(Vector4f hsva);
     void SyncInputFields();
     void NotifyValueChanged();
@@ -74,7 +76,7 @@ private:
     Vector4f _rect_preview{0,0,0,0};
     Vector4f _rect_inputs{0,0,0,0};
 
-    Vector4f _old_color = Colors::kWhite;
+    Color _old_color = Colors::kWhite;
 
     // Dragging flags
     bool _drag_sv = false;
@@ -98,6 +100,7 @@ private:
 
     // Cached last hue to rebuild SV
     f32 _last_h_for_sv = -1.0f;
+    UIColorPickerStyle _resolved_style;
 };
 
 } // namespace UI

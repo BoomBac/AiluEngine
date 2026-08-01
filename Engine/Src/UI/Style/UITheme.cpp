@@ -1,5 +1,7 @@
 #include "UI/Style/UITheme.h"
 
+#include <cmath>
+
 namespace Ailu
 {
     namespace UI
@@ -20,7 +22,7 @@ namespace Ailu
                 visual._background = ColorBrush(background);
                 visual._content_color = content;
                 visual._border_color = border;
-                visual._border_width = border_width;
+                visual._border_width = Vector4f(border_width);
                 visual._corner_radius = Vector4f(3.0f);
                 return visual;
             }
@@ -82,6 +84,27 @@ namespace Ailu
                 theme._input_style._padding = s._control_padding;
                 theme._input_style._font_size = t._normal_font_size;
 
+                theme._list_view_style._background = ColorBrush(c._surface);
+                theme._list_view_style._item_text_color = c._text_primary;
+                theme._list_view_style._item_hovered_color = Color(c._surface_hovered.x, c._surface_hovered.y,
+                                                                     c._surface_hovered.z, 0.85f);
+                theme._list_view_style._item_selected_color = Color(c._accent.x, c._accent.y, c._accent.z, 0.85f);
+                theme._list_view_style._border_color = c._border;
+                theme._list_view_style._border_width = 1.0f;
+                theme._list_view_style._corner_radius = Vector4f(4.0f);
+
+                theme._element_visual_style._visual = Visual(Colors::kTransparent, c._text_primary);
+                theme._border_style._visual = Visual(c._surface, c._border, c._border, 1.0f);
+                theme._split_view_style._visual = theme._element_visual_style._visual;
+                theme._split_view_style._divider_color = c._border;
+                theme._split_view_style._divider_hovered_color = c._accent;
+                theme._color_picker_style._background_color = c._surface;
+                theme._color_picker_style._border_color = c._border;
+                theme._color_picker_style._handle_color = c._text_primary;
+                theme._color_picker_style._label_color = c._text_primary;
+                theme._color_picker_style._checker_light_color = c._surface_hovered;
+                theme._color_picker_style._checker_dark_color = c._surface_pressed;
+
                 theme._scroll_view_style._normal = Visual(c._surface, c._text_primary);
                 theme._scroll_view_style._hovered = theme._scroll_view_style._normal;
                 theme._scroll_view_style._focused = theme._scroll_view_style._normal;
@@ -99,6 +122,7 @@ namespace Ailu
                 primary._pressed._background = ColorBrush(Color((std::max)(c._accent.x - 0.08f, 0.0f), (std::max)(c._accent.y - 0.08f, 0.0f), (std::max)(c._accent.z - 0.08f, 0.0f), c._accent.w));
                 theme.SetButtonStyle("Primary", primary);
             }
+
         }
 
         UITheme::UITheme()
@@ -204,6 +228,102 @@ namespace Ailu
             BumpRevision();
         }
 
+        const UIListViewStyle *UITheme::FindListViewStyle(const UIStyleId &style_id) const
+        {
+            if (style_id.empty())
+                return nullptr;
+            auto it = _list_view_styles.find(style_id);
+            return it == _list_view_styles.end() ? nullptr : &it->second;
+        }
+
+        void UITheme::SetListViewStyle(const UIStyleId &style_id, const UIListViewStyle &style)
+        {
+            if (style_id.empty())
+                return;
+            _list_view_styles[style_id] = style;
+            BumpRevision();
+        }
+
+        const UIElementVisualStyle *UITheme::FindElementVisualStyle(const UIStyleId &style_id) const
+        {
+            if (style_id.empty())
+                return nullptr;
+            auto it = _element_visual_styles.find(style_id);
+            return it == _element_visual_styles.end() ? nullptr : &it->second;
+        }
+
+        void UITheme::SetElementVisualStyle(const UIStyleId &style_id, const UIElementVisualStyle &style)
+        {
+            if (style_id.empty())
+                return;
+            _element_visual_styles[style_id] = style;
+            BumpRevision();
+        }
+
+        const UIBorderStyle *UITheme::FindBorderStyle(const UIStyleId &style_id) const
+        {
+            if (style_id.empty())
+                return nullptr;
+            auto it = _border_styles.find(style_id);
+            return it == _border_styles.end() ? nullptr : &it->second;
+        }
+
+        void UITheme::SetBorderStyle(const UIStyleId &style_id, const UIBorderStyle &style)
+        {
+            if (style_id.empty())
+                return;
+            _border_styles[style_id] = style;
+            BumpRevision();
+        }
+
+        const UISplitViewStyle *UITheme::FindSplitViewStyle(const UIStyleId &style_id) const
+        {
+            if (style_id.empty())
+                return nullptr;
+            auto it = _split_view_styles.find(style_id);
+            return it == _split_view_styles.end() ? nullptr : &it->second;
+        }
+
+        void UITheme::SetSplitViewStyle(const UIStyleId &style_id, const UISplitViewStyle &style)
+        {
+            if (style_id.empty())
+                return;
+            _split_view_styles[style_id] = style;
+            BumpRevision();
+        }
+
+        const UIColorPickerStyle *UITheme::FindColorPickerStyle(const UIStyleId &style_id) const
+        {
+            if (style_id.empty())
+                return nullptr;
+            auto it = _color_picker_styles.find(style_id);
+            return it == _color_picker_styles.end() ? nullptr : &it->second;
+        }
+
+        void UITheme::SetColorPickerStyle(const UIStyleId &style_id, const UIColorPickerStyle &style)
+        {
+            if (style_id.empty())
+                return;
+            _color_picker_styles[style_id] = style;
+            BumpRevision();
+        }
+
+        const UITreeViewStyle *UITheme::FindTreeViewStyle(const UIStyleId &style_id) const
+        {
+            if (style_id.empty())
+                return nullptr;
+            auto it = _tree_view_styles.find(style_id);
+            return it == _tree_view_styles.end() ? nullptr : &it->second;
+        }
+
+        void UITheme::SetTreeViewStyle(const UIStyleId &style_id, const UITreeViewStyle &style)
+        {
+            if (style_id.empty())
+                return;
+            _tree_view_styles[style_id] = style;
+            BumpRevision();
+        }
+
         void UITheme::PostDeserialize()
         {
             // Named style variants (like "Primary" button) are derived from
@@ -232,5 +352,6 @@ namespace Ailu
 
             BumpRevision();
         }
+
     } // namespace UI
 } // namespace Ailu

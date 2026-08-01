@@ -486,6 +486,7 @@ namespace Ailu
 				L"Shaders/hlsl/PostProcess/bloom.alasset",
 				L"Shaders/hlsl/forwardlit.alasset",
 				L"Shaders/hlsl/default_ui.alasset",
+				L"Shaders/hlsl/ui_shadow.alasset",
 				L"Shaders/hlsl/default_text.alasset",
 				L"Shaders/hlsl/voxel_drawer.alasset",
 				L"Shaders/hlsl/texture3d_drawer.alasset",

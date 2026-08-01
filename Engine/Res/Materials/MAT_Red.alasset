@@ -26,10 +26,10 @@
             "_value": 0.0
         }, {
             "_name": "_Anisotropy",
-            "_value": 0.34414100646972656
+            "_value": 0.3441
         }, {
             "_name": "_IOR",
-            "_value": 1.4500000476837158
+            "_value": 1.45
         }, {
             "_name": "_MaterialID",
             "_value": 0.0
@@ -38,7 +38,7 @@
             "_value": 0.0
         }, {
             "_name": "_RoughnessValue",
-            "_value": 0.07118858397006989
+            "_value": 0.0711
         }, {
             "_name": "_SamplerMask",
             "_value": 0.0

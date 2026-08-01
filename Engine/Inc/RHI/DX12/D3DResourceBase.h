@@ -87,6 +87,41 @@ namespace Ailu::RHI::DX12
             return _sub_res_num;
         }
 
+        [[nodiscard]] ID3D12Resource* NativeResource() const
+        {
+            std::scoped_lock lock(_mutex);
+            return _resource;
+        }
+
+        void SnapshotStates(Vector<D3D12_RESOURCE_STATES>& out_states) const
+        {
+            std::scoped_lock lock(_mutex);
+            AL_ASSERT(_resource != nullptr);
+            AL_ASSERT(_sub_res_num > 0u);
+
+            if (_is_state_uniform)
+            {
+                out_states.assign(_sub_res_num, _uniform_state);
+                return;
+            }
+
+            out_states = _subresource_states;
+        }
+
+        void SetStateFromSnapshot(const Vector<D3D12_RESOURCE_STATES>& states)
+        {
+            std::scoped_lock lock(_mutex);
+            AL_ASSERT(_resource != nullptr);
+            AL_ASSERT(states.size() == _sub_res_num);
+
+            if (states.empty()) return;
+            _subresource_states = states;
+            _is_state_uniform = false;
+            TryCollapseUniformStates();
+            if (!_is_state_uniform)
+                _uniform_state = D3D12_RESOURCE_STATE_COMMON;
+        }
+
         static String DebugObjectName(ID3D12Resource *resource)
         {
             if (resource == nullptr) return "null";
@@ -134,34 +169,6 @@ namespace Ailu::RHI::DX12
             cmd->ResourceBarrier(1u, &barrier);
         }
 
-        void InsertTrackedUAVBarrier(ID3D12GraphicsCommandList *cmd)
-        {
-            AL_ASSERT(cmd != nullptr);
-
-            std::scoped_lock lock(_mutex);
-            InsertUAVBarrier(cmd, _resource);
-        }
-
-        void MakesureResourceState(ID3D12GraphicsCommandList *cmd, D3D12_RESOURCE_STATES target_state,
-                                   u32 sub_res = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES)
-        {
-            AL_ASSERT(cmd != nullptr);
-
-            std::scoped_lock lock(_mutex);
-
-            AL_ASSERT(_resource != nullptr);
-            AL_ASSERT(_sub_res_num > 0u);
-
-            if (sub_res == D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES)
-            {
-                MakesureAllSubresourcesState(cmd, target_state);
-                return;
-            }
-
-            AL_ASSERT(sub_res < _sub_res_num);
-            MakesureSingleSubresourceState(cmd, target_state, sub_res);
-        }
-
         void TrackResourceState(D3D12_RESOURCE_STATES target_state, u32 sub_res = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES)
         {
             std::scoped_lock lock(_mutex);
@@ -190,68 +197,6 @@ namespace Ailu::RHI::DX12
 
             AL_ASSERT(_subresource_states.size() == _sub_res_num);
             return _subresource_states[sub_res];
-        }
-
-        void MakesureAllSubresourcesState(ID3D12GraphicsCommandList *cmd, D3D12_RESOURCE_STATES target_state)
-        {
-            if (_is_state_uniform)
-            {
-                if (_uniform_state == target_state) return;
-
-                const D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(_resource, _uniform_state, target_state,
-                                                                                            D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
-
-                cmd->ResourceBarrier(1u, &barrier);
-                SetUniformState(target_state);
-                return;
-            }
-
-            Vector<D3D12_RESOURCE_BARRIER> barriers;
-            barriers.reserve(_sub_res_num);
-
-            for (u32 i = 0u; i < _sub_res_num; ++i)
-            {
-                const D3D12_RESOURCE_STATES current_state = _subresource_states[i];
-
-                if (current_state == target_state) continue;
-
-                barriers.emplace_back(CD3DX12_RESOURCE_BARRIER::Transition(_resource, current_state, target_state, i));
-            }
-
-            if (!barriers.empty()) cmd->ResourceBarrier(static_cast<UINT>(barriers.size()), barriers.data());
-
-            SetUniformState(target_state);
-        }
-
-        void MakesureSingleSubresourceState(ID3D12GraphicsCommandList *cmd, D3D12_RESOURCE_STATES target_state, u32 sub_res)
-        {
-            if (_is_state_uniform)
-            {
-                if (_uniform_state == target_state) return;
-
-                if (_sub_res_num == 1u)
-                {
-                    const D3D12_RESOURCE_BARRIER barrier =
-                            CD3DX12_RESOURCE_BARRIER::Transition(_resource, _uniform_state, target_state, sub_res);
-
-                    cmd->ResourceBarrier(1u, &barrier);
-                    SetUniformState(target_state);
-                    return;
-                }
-
-                ExpandUniformStates();
-            }
-
-            const D3D12_RESOURCE_STATES current_state = _subresource_states[sub_res];
-
-            if (current_state == target_state) return;
-
-            const D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(_resource, current_state, target_state, sub_res);
-
-            cmd->ResourceBarrier(1u, &barrier);
-            _subresource_states[sub_res] = target_state;
-
-            TryCollapseUniformStates();
         }
 
         void ExpandUniformStates()

@@ -30,6 +30,7 @@
 #include "DescriptorManager.h"
 #include "UploadBuffer.h"
 #include "Render/RenderPipeline.h"
+#include "Render/RenderingStates.h"
 #include "Render/Shader.h"
 #include "Render/RayTracing/RayTracingShader.h"
 
@@ -51,6 +52,7 @@ namespace Ailu::RHI::DX12
     {
         String _name;
         bool _is_end_frame = false;
+        Render::CommandRenderingStatesData _rendering_states_data;
     };
     class GpuCommandWorker
     {
@@ -87,7 +89,7 @@ namespace Ailu::RHI::DX12
                 for(auto& c : _cmds)
                     Render::CommandPool::Get().DeAlloc(c);
                 _cmds.clear();
-                _params = other._params;
+                _params = std::move(other._params);
                 _submission_index = other._submission_index;
                 _cmds = std::move(other._cmds);
                 other._params = SubmitParams{};
@@ -100,7 +102,7 @@ namespace Ailu::RHI::DX12
                 for(auto& c : _cmds)
                     Render::CommandPool::Get().DeAlloc(c);
                 _cmds.clear();
-                _params = other._params;
+                _params = std::move(other._params);
                 _submission_index = other._submission_index;
                 _cmds = std::move(other._cmds);
                 other._params = SubmitParams{};
@@ -109,6 +111,8 @@ namespace Ailu::RHI::DX12
             }
         };
         void RecordCommandGroup(CommandGroup& group,Ref<RHICommandBuffer>& cmd);
+        u32 EstimateRecordCost(const CommandGroup& group) const;
+        bool HasResourceUpload(const CommandGroup& group) const;
         void SubmitRecordedCommandBuffers(Vector<Ref<RHICommandBuffer>>& cmds);
         void RunAsync();
         void EndFrame();
@@ -237,6 +241,12 @@ namespace Ailu::RHI::DX12
         bool _is_cur_frame_capturing = false;
         WString _cur_capture_name;
         Scope<GpuCommandWorker> _cmd_worker;
+        struct ScheduledResourceState
+        {
+            D3DResourceStateGuard *_global_state = nullptr;
+            Vector<D3D12_RESOURCE_STATES> _states;
+        };
+        HashMap<ID3D12Resource *, ScheduledResourceState> _scheduled_resource_states;
         //command signature
         ComPtr<ID3D12CommandSignature> _dispatch_cmd_sig;
         ComPtr<ID3D12CommandSignature> _draw_cmd_sig;

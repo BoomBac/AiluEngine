@@ -419,6 +419,13 @@ namespace Ailu::Render
         }
         for (auto& r: s_pInstance->_mesh_renderers)
         {
+            CBufferPerSceneData preview_scene_data{};
+            preview_scene_data._DirectionalLights[0]._LightDir = Normalize(Vector3f(-0.45f, -1.0f, -0.65f));
+            preview_scene_data._DirectionalLights[0]._LightColor = Vector3f(1.0f, 1.0f, 1.0f);
+            preview_scene_data._DirectionalLights[0]._shadowmap_index = -1;
+            preview_scene_data._ActiveLightCount.x = 1.0f;
+            cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerScene, &preview_scene_data, sizeof(preview_scene_data));
+            cmd->SetGlobalTexture("_OcclusionTex", Texture::s_p_default_white);
             for (u16 i = 0; i < r._mesh->SubmeshCount(); ++i)
             {
                 cmd->DrawMesh(r._mesh, r._material, r._matrix, i);

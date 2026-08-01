@@ -134,45 +134,42 @@ namespace Ailu::RHI::DX12
             return;
         }
         auto d3dcmd = static_cast<D3DCommandBuffer *>(rhi_cmd);
-        _p_cmd = d3dcmd->NativeCmdList();
+        auto native_cmd = d3dcmd->NativeCmdList();
         const bool is_same_pso = d3dcmd->IsGraphicsPSOActive(this);
-        EngineConfig &config = ::Ailu::g_engine_config;
-        if (!config.EnableIncrementalGraphicsBinding || !is_same_pso)
+        auto& recording_ctx = d3dcmd->RecordingContext();
+        if (!is_same_pso)
         {
             if (_state_desc._depth_stencil_state._b_front_stencil)
-                _p_cmd->OMSetStencilRef(_state_desc._depth_stencil_state._stencil_ref_value);
-            _p_cmd->SetGraphicsRootSignature(_p_sig.Get());
-            _p_cmd->SetPipelineState(_p_plstate.Get());
-            _p_cmd->IASetPrimitiveTopology(_d3d_topology);
+                native_cmd->OMSetStencilRef(_state_desc._depth_stencil_state._stencil_ref_value);
+            native_cmd->SetGraphicsRootSignature(_p_sig.Get());
+            native_cmd->SetPipelineState(_p_plstate.Get());
+            native_cmd->IASetPrimitiveTopology(_d3d_topology);
             d3dcmd->SetGraphicsPSOActive(this);
-            ++Render::RenderingStates::RenderData().GfxPsoBindCount;
+            recording_ctx.RenderingStatesData().GfxPsoBindCount++;
         }
-        for (u16 i = 0; i <= _max_slot; i++)
+        u32 resolved_slot_mask = 0u;
+        for (auto& res : recording_ctx.ResolvedBindResources())
         {
-            if ((_bind_res_signature & (1 << i)) == 0u)
+            const u16 slot = res._slot;
+            if (slot >= 32u)
                 continue;
-
-            if (!config.EnableIncrementalGraphicsBinding)
+            resolved_slot_mask |= 1u << slot;
+            const u64 binding_hash = BuildBindingHash(res);
+            if (!d3dcmd->IsGraphicsSlotUpToDate(slot, binding_hash))
             {
-                BindResource(rhi_cmd, _bind_res[i]);
-                ++Render::RenderingStates::RenderData().GfxResBindCount;
-                ++Render::RenderingStates::RenderData().ActualRootSlotBindCount;
-                continue;
-            }
-
-            const u64 binding_hash = BuildBindingHash(_bind_res[i]);
-            if (!d3dcmd->IsGraphicsSlotUpToDate(i, binding_hash))
-            {
-                BindResource(rhi_cmd, _bind_res[i]);
-                d3dcmd->UpdateGraphicsSlot(i, binding_hash);
-                ++Render::RenderingStates::RenderData().GfxResBindCount;
-                ++Render::RenderingStates::RenderData().ActualRootSlotBindCount;
+                BindResource(rhi_cmd, res);
+                d3dcmd->UpdateGraphicsSlot(slot, binding_hash);
+                ++recording_ctx.RenderingStatesData().GfxResBindCount;
+                ++recording_ctx.RenderingStatesData().ActualRootSlotBindCount;
             }
             else
             {
-                ++Render::RenderingStates::RenderData().SkippedRootSlotBindCount;
+                ++recording_ctx.RenderingStatesData().SkippedRootSlotBindCount;
             }
         }
+        // A draw may intentionally omit optional bindings that were used by the previous draw
+        // with the same PSO. Those root slots remain valid until the PSO changes, where the cache
+        // is reset by SetGraphicsPSOActive().
     }
 
     void D3DGraphicsPipelineState::BindResource(RHICommandBuffer *cmd, const PipelineResource &res)
@@ -267,10 +264,5 @@ namespace Ailu::RHI::DX12
             default:
                 break;
         }
-    }
-    void D3DGraphicsPipelineState::SetTopology(ETopology topology)
-    {
-        GraphicsPipelineStateObject::SetTopology(topology);
-        _d3d_topology = D3DConvertUtils::ConvertToDXTopology(_state_desc._topology);
     }
 }// namespace Ailu::RHI::DX12

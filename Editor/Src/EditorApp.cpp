@@ -75,18 +75,20 @@ namespace Ailu
             LoadEditorResource();
             ResourceMgr::Get().MigrateLegacyAssetDocuments();
             g_editor_style = DefaultDark();
+            {
+                JsonArchive ar;
+                fs::path theme_path = fs::path(s_editor_root_path) / L"Res/UI/EditorStyle.json";
+                ar.Load(theme_path);
+                if (ar.IsLoaded())
+                    ar >> g_editor_style;
+            }
             g_editor_ui_theme = UI::UITheme::DefaultDark();
             {
                 JsonArchive ar;
                 fs::path theme_path = fs::path(s_editor_root_path) / L"Res/UI/UITheme_Dark.json";
                 ar.Load(theme_path);
                 if (ar.IsLoaded())
-                {
-                    auto t = UI::UITheme::StaticType();
-                    for (auto &p: t->GetProperties())
-                        p.Deserialize(&g_editor_ui_theme, ar);
-                    g_editor_ui_theme.PostDeserialize();
-                }
+                    ar >> g_editor_ui_theme;
                 UI::UIManager::Get()->SetTheme(&g_editor_ui_theme);
             }
             _p_editor_layer = new EditorLayer();

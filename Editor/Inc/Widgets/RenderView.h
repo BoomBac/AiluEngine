@@ -62,6 +62,7 @@ namespace Ailu
             void UpdateSceneToolbarLayout();
             void UpdateSceneToolbarBackdrop();
             void UpdateSceneToolbarState();
+            void UpdateDragPreview();
             void SetSceneCamera2DOrthographic();
             void SetSceneCamera2DOrthographic(ESceneView2DOrientation orientation);
             void SetSceneCameraPerspective();

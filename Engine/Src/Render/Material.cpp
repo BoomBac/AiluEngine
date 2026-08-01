@@ -2,6 +2,7 @@
 #include "Assets/Asset.h"
 #include "Framework/Common/Log.h"
 #include "Framework/Common/ResourceMgr.h"
+#include "Render/GraphicsContext.h"
 #include "Render/GraphicsPipelineStateObject.h"
 #include "Render/FrameAllocator.h"
 #include "Render/FrameResource.h"
@@ -36,7 +37,6 @@ namespace Ailu::Render
             _property_blocks.back()._size = buffer_size;
             memcpy(_property_blocks.back()._data, cbuf._data, buffer_size);
         }
-        _bind_textures = other._bind_textures;
         _bind_textures_by_id = other._bind_textures_by_id;
         _bind_buffers_by_id = other._bind_buffers_by_id;
         return *this;
@@ -52,8 +52,6 @@ namespace Ailu::Render
         _mat_cbuf_per_pass_size = other._mat_cbuf_per_pass_size;
         _property_blocks = std::move(other._property_blocks);
         other._property_blocks.clear();
-        _bind_textures = std::move(other._bind_textures);
-        other._bind_textures.clear();
         _bind_textures_by_id = std::move(other._bind_textures_by_id);
         other._bind_textures_by_id.clear();
         _bind_buffers_by_id = std::move(other._bind_buffers_by_id);
@@ -76,7 +74,6 @@ namespace Ailu::Render
             _property_blocks.back()._size = buffer_size;
             memcpy(_property_blocks.back()._data, cbuf._data, buffer_size);
         }
-        _bind_textures = other._bind_textures;
         _bind_textures_by_id = other._bind_textures_by_id;
         _bind_buffers_by_id = other._bind_buffers_by_id;
     }
@@ -88,8 +85,6 @@ namespace Ailu::Render
         _mat_cbuf_per_pass_size = other._mat_cbuf_per_pass_size;
         _property_blocks = std::move(other._property_blocks);
         other._property_blocks.clear();
-        _bind_textures = std::move(other._bind_textures);
-        other._bind_textures.clear();
         _bind_textures_by_id = std::move(other._bind_textures_by_id);
         other._bind_textures_by_id.clear();
         _bind_buffers_by_id = std::move(other._bind_buffers_by_id);
@@ -100,109 +95,148 @@ namespace Ailu::Render
     {
         --s_total_material_num;
     }
-    MaterialDrawState Material::CaptureDrawState(u16 pass_index, u32 frame_slot, u64 frame_count, FrameAllocator &allocator)
+    MaterialDrawState Material::CaptureDrawState(u16 pass_index, u32 frame_slot, u64 frame_count, FrameAllocator &allocator,
+                                                 const HashMap<ShaderPropertyId, CommandResourceBinding> *command_resources,
+                                                 CommandRenderingStatesData *statistics)
     {
         AL_ASSERT(pass_index < _pass_variants.size());
         const auto variant_hash = _pass_variants[pass_index]._variant_hash;
-        auto &bind_infos = _p_active_shader->_passes[pass_index]._variants[variant_hash]._bind_res_infos;
         const ShaderBindingLayout *binding_layout = _p_active_shader->GetBindingLayout(pass_index, variant_hash);
         if (_binding_cache.size() != _pass_variants.size())
             _binding_cache.resize(_pass_variants.size());
         auto &cache = _binding_cache[pass_index];
         const u32 layout_version = binding_layout == nullptr ? 0u : binding_layout->Version();
         BindState cur_state;
-        if (cache._material_version == _property_version && cache._layout_version == layout_version && cache._variant_hash == variant_hash)
+        const auto &global_res_registry = Shader::GlobalResourceRegistry();
+        if (cache._resource_binding_version == _resource_binding_version && cache._layout_version == layout_version && cache._variant_hash == variant_hash
+            && cache._global_res_layout_version == global_res_registry.LayoutVersion()
+            && cache._global_res_binding_version == global_res_registry.BindingVersion())
         {
-            ++RenderingStates::RenderData().MaterialBindingCacheHitCount;
+            if (statistics != nullptr) ++statistics->MaterialBindingCacheHitCount;
             cur_state = cache._state;
         }
         else
         {
-            ++RenderingStates::RenderData().MaterialBindingResolveCount;
-            cur_state._pass_index = pass_index;
-            cur_state._max_bind_slot = 0u;
-            cur_state._variant_hash = variant_hash;
-            memset(cur_state._bind_res.data(), 0, sizeof(GpuResource *) * 32);
-            cur_state._bind_res_type.fill(EBindResDescType::kUnknown);
-            memset(cur_state._bind_res_priority.data(), 0u, sizeof(u16) * 32);
-            auto apply_local_resource = [&](ShaderPropertyId property_id, GpuResource *resource)
+            auto apply_resolved_resource = [&](const ResolvedResourceBinding &binding, GpuResource *resource, u16 priority)
             {
-                if (binding_layout == nullptr || resource == nullptr)
+                if (resource == nullptr)
                     return;
+                if (cur_state._bind_res_priority[binding._bind_slot] > priority)
+                    return;
+                cur_state._bind_res[binding._bind_slot] = resource;
+                cur_state._bind_res_type[binding._bind_slot] = binding._resource_type;
+                cur_state._bind_res_priority[binding._bind_slot] = priority;
+                cur_state._max_bind_slot = std::max<u16>(cur_state._max_bind_slot, binding._bind_slot);
+            };
+            auto clear_resolved_global_resource = [&](const ResolvedResourceBinding &binding)
+            {
+                if (cur_state._bind_res_priority[binding._bind_slot] > PipelineResource::kPriorityGlobal)
+                    return;
+                cur_state._bind_res[binding._bind_slot] = nullptr;
+                cur_state._bind_res_type[binding._bind_slot] = EBindResDescType::kUnknown;
+                cur_state._bind_res_priority[binding._bind_slot] = 0u;
+            };
+            auto resolve_resource = [&](ShaderPropertyId property_id, ResolvedResourceBinding &out_binding)
+            {
+                if (binding_layout == nullptr)
+                    return false;
                 const auto *binding = binding_layout->Find(property_id);
                 if (binding == nullptr || binding->_bind_slot < 0 || binding->_bind_slot >= 32)
-                    return;
-                const u8 slot = static_cast<u8>(binding->_bind_slot);
-                cur_state._bind_res[slot] = resource;
-                cur_state._bind_res_type[slot] = binding->_resource_type;
-                cur_state._bind_res_priority[slot] = PipelineResource::kPriorityLocal;
-                cur_state._max_bind_slot = std::max<u16>(cur_state._max_bind_slot, slot);
+                    return false;
+                out_binding._property_id = property_id;
+                out_binding._bind_slot = static_cast<u8>(binding->_bind_slot);
+                out_binding._resource_type = binding->_resource_type;
+                return true;
             };
-            for (const auto &[property_id, texture] : _bind_textures_by_id)
-                apply_local_resource(property_id, texture);
-            for (const auto &[property_id, buffer] : _bind_buffers_by_id)
-                apply_local_resource(property_id, buffer);
-            for (auto it = _bind_textures.begin(); it != _bind_textures.end(); ++it)
+            auto apply_resource = [&](ShaderPropertyId property_id, GpuResource *resource, u16 priority)
             {
-                if (const auto &bind_it = bind_infos.find(it->first); bind_it != bind_infos.end())
+                ResolvedResourceBinding resolved_binding;
+                if (!resolve_resource(property_id, resolved_binding))
+                    return;
+                apply_resolved_resource(resolved_binding, resource, priority);
+            };
+            auto apply_global_bindings = [&]()
+            {
+                for (const auto &resolved_binding : cache._global_res_bindings)
                 {
-                    const u8 slot = bind_it->second._bind_slot;
-                    AL_ASSERT(slot < 32);
-                    if (it->second != nullptr)
+                    clear_resolved_global_resource(resolved_binding);
+                    const auto it = global_res_registry.Resources().find(resolved_binding._property_id);
+                    if (it != global_res_registry.Resources().end())
+                        apply_resolved_resource(resolved_binding, it->second._resource, PipelineResource::kPriorityGlobal);
+                }
+            };
+
+            const bool needs_full_rebuild = cache._resource_binding_version != _resource_binding_version || cache._layout_version != layout_version
+                || cache._variant_hash != variant_hash || cache._global_res_layout_version != global_res_registry.LayoutVersion();
+            if (needs_full_rebuild)
+            {
+                if (statistics != nullptr) ++statistics->MaterialBindingResolveCount;
+                cur_state._pass_index = pass_index;
+                cur_state._max_bind_slot = 0u;
+                cur_state._variant_hash = variant_hash;
+                memset(cur_state._bind_res.data(), 0, sizeof(GpuResource *) * 32);
+                cur_state._bind_res_type.fill(EBindResDescType::kUnknown);
+                memset(cur_state._bind_res_priority.data(), 0u, sizeof(u16) * 32);
+                for (const auto &[property_id, texture] : _bind_textures_by_id)
+                    apply_resource(property_id, texture, PipelineResource::kPriorityLocal);
+                for (const auto &[property_id, buffer] : _bind_buffers_by_id)
+                    apply_resource(property_id, buffer, PipelineResource::kPriorityLocal);
+                if (cache._layout_version != layout_version || cache._variant_hash != variant_hash
+                    || cache._global_res_layout_version != global_res_registry.LayoutVersion())
+                {
+                    cache._global_res_bindings.clear();
+                    for (const auto &it : global_res_registry.Resources())
                     {
-                        cur_state._bind_res[slot] = it->second;
-                        cur_state._bind_res_type[slot] = bind_it->second._res_type;
-                        cur_state._bind_res_priority[slot] = PipelineResource::kPriorityLocal;
-                        cur_state._max_bind_slot = std::max<u16>(cur_state._max_bind_slot, slot);
+                        ResolvedResourceBinding resolved_binding;
+                        if (resolve_resource(it.first, resolved_binding))
+                            cache._global_res_bindings.emplace_back(resolved_binding);
                     }
                 }
+                apply_global_bindings();
             }
-            for (const auto &it : bind_infos)
+            else
             {
-                if (it.second._bind_slot >= 32 || it.second._p_res == nullptr)
-                    continue;
-                cur_state._bind_res[it.second._bind_slot] = it.second._p_res;
-                cur_state._bind_res_type[it.second._bind_slot] = it.second._res_type;
-                cur_state._bind_res_priority[it.second._bind_slot] = PipelineResource::kPriorityLocal;
-                cur_state._max_bind_slot = std::max<u16>(cur_state._max_bind_slot, it.second._bind_slot);
+                cur_state = cache._state;
+                apply_global_bindings();
             }
             cur_state._cbuf_bind_slot = _p_active_shader->_passes[pass_index]._variants[variant_hash]._per_mat_buf_bind_slot;
-            cache._material_version = _property_version;
+            cache._resource_binding_version = _resource_binding_version;
             cache._layout_version = layout_version;
             cache._variant_hash = variant_hash;
+            cache._global_res_layout_version = global_res_registry.LayoutVersion();
+            cache._global_res_binding_version = global_res_registry.BindingVersion();
             cache._state = cur_state;
         }
-        for (const auto &it : Shader::s_global_textures_bind_info)
+
+        // CommandBuffer资源属于当前draw，不能写入材质的跨命令缓存。
+        if (command_resources != nullptr && binding_layout != nullptr)
         {
-            const auto &bind_it = bind_infos.find(it.first);
-            if (bind_it == bind_infos.end())
-                continue;
-            const auto type = bind_it->second._res_type;
-            if (type != EBindResDescType::kCubeMap && type != EBindResDescType::kTexture2DArray &&
-                type != EBindResDescType::kTexture2D && type != EBindResDescType::kTexture3D)
-                continue;
-            AL_ASSERT(bind_it->second._bind_slot < 32);
-            const u8 slot = bind_it->second._bind_slot;
-            if (cur_state._bind_res_priority[slot] <= PipelineResource::kPriorityGlobal)
+            for (const auto &[property_id, command_binding] : *command_resources)
             {
-                cur_state._bind_res[slot] = it.second;
-                cur_state._bind_res_type[slot] = bind_it->second._res_type;
-                cur_state._bind_res_priority[slot] = PipelineResource::kPriorityGlobal;
-                cur_state._max_bind_slot = std::max<u16>(cur_state._max_bind_slot, slot);
+                const auto *binding = binding_layout->Find(property_id);
+                if (binding == nullptr || binding->_bind_slot < 0 || binding->_bind_slot >= 32)
+                    continue;
+                if (cur_state._bind_res_priority[binding->_bind_slot] > PipelineResource::kPriorityCmd)
+                    continue;
+                if (command_binding._resource == nullptr)
+                    continue;
+                if (cur_state._bind_res[binding->_bind_slot] != nullptr && statistics != nullptr)
+                    ++statistics->PipelineResourceOverrideCount;
+                cur_state._bind_res[binding->_bind_slot] = command_binding._resource;
+                cur_state._bind_res_type[binding->_bind_slot] = binding->_resource_type;
+                cur_state._bind_res_priority[binding->_bind_slot] = PipelineResource::kPriorityCmd;
+                cur_state._max_bind_slot = std::max<u16>(cur_state._max_bind_slot, static_cast<u16>(binding->_bind_slot));
             }
         }
-        for (const auto &it : Shader::s_global_buffer_bind_info)
+
+        // _is_ready: kReady is terminal — once true, cached permanently.
+        // If false, re-check in case variant transitioned from compiling → ready.
+        if (!cur_state._is_ready)
         {
-            const auto &bind_it = bind_infos.find(it.first);
-            if (bind_it == bind_infos.end() || bind_it->second._bind_slot >= 32)
-                continue;
-            const u8 slot = bind_it->second._bind_slot;
-            if (cur_state._bind_res_priority[slot] <= PipelineResource::kPriorityGlobal)
+            if (_p_active_shader->GetVariantState(pass_index, variant_hash) == EShaderVariantState::kReady)
             {
-                cur_state._bind_res[slot] = it.second;
-                cur_state._bind_res_type[slot] = bind_it->second._res_type;
-                cur_state._bind_res_priority[slot] = PipelineResource::kPriorityGlobal;
-                cur_state._max_bind_slot = std::max<u16>(cur_state._max_bind_slot, slot);
+                cur_state._is_ready = true;
+                _binding_cache[pass_index]._state._is_ready = true;
             }
         }
 
@@ -211,38 +245,121 @@ namespace Ailu::Render
         draw_state._binding_layout = binding_layout;
         draw_state._pass_index = pass_index;
         draw_state._variant_hash = variant_hash;
-        draw_state._is_ready = _p_active_shader->GetVariantState(pass_index, variant_hash) == EShaderVariantState::kReady;
+        draw_state._is_ready = cur_state._is_ready;
         draw_state._pipeline_shader_hash = _p_active_shader->_passes[pass_index]._variants[variant_hash]._shader_hash;
-        draw_state._material_version = _property_version;
-        draw_state._material_cbuffer_slot = cur_state._cbuf_bind_slot;
-        draw_state._cull_mode = static_cast<ECullMode>(_common_uint_property[kCullModeKey]);
+        RasterizerState raster_state = _p_active_shader->PipelineRasterizerState(pass_index);
+        raster_state._cull_mode = _cull_mode;
+        raster_state.Hash(RasterizerState::_s_hash_obj.GenHash(raster_state));
+        draw_state._raster_state_hash = raster_state.Hash();
+        draw_state._material_version = PropertyVersion();
+        draw_state._cull_mode = _cull_mode;
+        auto is_command_cbuffer_slot = [&](u16 slot)
+        {
+            if (command_resources == nullptr || binding_layout == nullptr)
+                return false;
+            for (const auto &[property_id, command_binding] : *command_resources)
+            {
+                if (command_binding._resource_type != EBindResDescType::kConstBuffer
+                    && command_binding._resource_type != EBindResDescType::kConstBufferRaw)
+                    continue;
+                if (command_binding._addi_info._gpu_handle == 0u)
+                    continue;
+                const auto *binding = binding_layout->Find(property_id);
+                if (binding != nullptr && binding->_bind_slot == slot)
+                    return true;
+            }
+            return false;
+        };
+        u16 entry_count = 0u;
         for (u16 slot = 0u; slot <= cur_state._max_bind_slot; ++slot)
         {
             GpuResource *res = cur_state._bind_res[slot];
-            if (res == nullptr)
+            if (res == nullptr || is_command_cbuffer_slot(slot))
                 continue;
-            auto &binding = draw_state._bindings[slot];
-            auto res_type = cur_state._bind_res_type[slot];
-            if (res_type == EBindResDescType::kUnknown)
+            ++entry_count;
+        }
+        // 录制阶段通过SetGlobalBuffer设置的命名const buffer也烘焙进snapshot，
+        // 使RHI draw路径无需再遍历_allocations，只回放_bindings即可
+        u16 cbuf_entry_count = 0u;
+        if (command_resources != nullptr && binding_layout != nullptr)
+        {
+            for (const auto &[property_id, command_binding] : *command_resources)
             {
-                if (res->GetResourceType() == EGpuResType::kTexture || res->GetResourceType() == EGpuResType::kRenderTexture)
-                    res_type = static_cast<Texture *>(res)->Dimension() == ETextureDimension::kTex3D ? EBindResDescType::kTexture3D : EBindResDescType::kTexture2D;
-                else if (res->GetResourceType() == EGpuResType::kConstBuffer)
-                    res_type = EBindResDescType::kConstBuffer;
-                else if (res->GetResourceType() == EGpuResType::kBuffer)
-                    res_type = EBindResDescType::kBuffer;
-                else
-                    AL_ASSERT_MSG(false, "Unknown resource type");
+                if (command_binding._resource_type != EBindResDescType::kConstBuffer
+                    && command_binding._resource_type != EBindResDescType::kConstBufferRaw)
+                    continue;
+                if (command_binding._addi_info._gpu_handle == 0u)
+                    continue;
+                const auto *binding = binding_layout->Find(property_id);
+                if (binding == nullptr || binding->_bind_slot < 0 || binding->_bind_slot >= 32)
+                    continue;
+                if (binding->_resource_type != EBindResDescType::kConstBuffer
+                    && binding->_resource_type != EBindResDescType::kConstBufferRaw)
+                    continue;
+                ++cbuf_entry_count;
             }
+        }
+        // 将材质属性块(raw cbuffer)烘焙进snapshot，RHI draw路径只回放snapshot即可，
+        // 无需在D3DContext再单独上传/绑定per-material cbuffer
+        const bool has_mat_slot = cur_state._cbuf_bind_slot >= 0;
+        const auto block = GetPropertyBlockForFrame(pass_index, frame_slot, frame_count, allocator, has_mat_slot, statistics);
+        const bool has_material_block = has_mat_slot && block._size > 0u && block._gpu_handle != 0u;
+        auto *entries = allocator.Allocate<PipelineBindingSnapshotEntry>(entry_count + cbuf_entry_count + (has_material_block ? 1u : 0u));
+        draw_state._bindings._entries = entries;
+        draw_state._bindings._entry_count = static_cast<u16>(entry_count + cbuf_entry_count + (has_material_block ? 1u : 0u));
+        u16 entry_index = 0u;
+        for (u16 slot = 0u; slot <= cur_state._max_bind_slot; ++slot)
+        {
+            GpuResource *res = cur_state._bind_res[slot];
+            if (res == nullptr || is_command_cbuffer_slot(slot))
+                continue;
+            auto &binding = entries[entry_index++];
+            auto res_type = cur_state._bind_res_type[slot];
+            AL_ASSERT_MSG(res_type != EBindResDescType::kUnknown, "Unknown resource type");
             binding._resource = res;
             binding._resource_type = res_type;
             binding._slot = slot;
             binding._priority = cur_state._bind_res_priority[slot];
-            draw_state._binding_mask |= 1u << slot;
+            binding._addi_info = {};
+            draw_state._bindings._max_slot = slot;
+            draw_state._bindings._binding_mask |= 1u << slot;
         }
-        const auto block = GetPropertyBlockForFrame(pass_index, frame_slot, frame_count, allocator);
-        draw_state._property_data = block._data;
-        draw_state._property_size = block._size;
+        if (command_resources != nullptr && binding_layout != nullptr)
+        {
+            for (const auto &[property_id, command_binding] : *command_resources)
+            {
+                if (command_binding._resource_type != EBindResDescType::kConstBuffer
+                    && command_binding._resource_type != EBindResDescType::kConstBufferRaw)
+                    continue;
+                if (command_binding._addi_info._gpu_handle == 0u)
+                    continue;
+                const auto *binding = binding_layout->Find(property_id);
+                if (binding == nullptr || binding->_bind_slot < 0 || binding->_bind_slot >= 32)
+                    continue;
+                if (binding->_resource_type != EBindResDescType::kConstBuffer
+                    && binding->_resource_type != EBindResDescType::kConstBufferRaw)
+                    continue;
+                auto &cbuf_binding = entries[entry_index++];
+                cbuf_binding._resource = command_binding._resource;
+                cbuf_binding._resource_type = command_binding._resource_type;
+                cbuf_binding._slot = static_cast<u16>(binding->_bind_slot);
+                cbuf_binding._priority = PipelineResource::kPriorityCmd;
+                cbuf_binding._addi_info = command_binding._addi_info;
+                draw_state._bindings._max_slot = std::max(draw_state._bindings._max_slot, cbuf_binding._slot);
+                draw_state._bindings._binding_mask |= 1u << cbuf_binding._slot;
+            }
+        }
+        if (has_material_block)
+        {
+            auto &mat_binding = entries[entry_index++];
+            mat_binding._resource = block._upload_buffer;
+            mat_binding._resource_type = EBindResDescType::kConstBufferRaw;
+            mat_binding._slot = static_cast<u16>(cur_state._cbuf_bind_slot);
+            mat_binding._priority = PipelineResource::kPriorityCmd;
+            mat_binding._addi_info._gpu_handle = block._gpu_handle;
+            draw_state._bindings._max_slot = std::max(draw_state._bindings._max_slot, mat_binding._slot);
+            draw_state._bindings._binding_mask |= 1u << mat_binding._slot;
+        }
         return draw_state;
     }
 
@@ -270,14 +387,23 @@ namespace Ailu::Render
 
     void Material::SetFloat(ShaderPropertyId property_id, const float &f)
     {
+        bool is_changed = false;
         for (u16 pass_index = 0u; pass_index < _p_shader->_passes.size(); ++pass_index)
         {
             const auto *layout = _p_shader->GetBindingLayout(pass_index, _pass_variants[pass_index]._variant_hash);
             const auto *binding = layout == nullptr ? nullptr : layout->Find(property_id);
             if (binding != nullptr && binding->_resource_type & EBindResDescType::kCBufferFloat)
-                memcpy(_property_blocks[pass_index]._data + binding->_buffer_offset, &f, sizeof(f));
+            {
+                u8 *dst = _property_blocks[pass_index]._data + binding->_buffer_offset;
+                if (memcmp(dst, &f, sizeof(f)) != 0)
+                {
+                    memcpy(dst, &f, sizeof(f));
+                    is_changed = true;
+                }
+            }
         }
-        MarkPropertiesDirty();
+        if (is_changed)
+            MarkPropertyDataDirty();
     }
 
     void Material::SetInt(const String &name, i32 value)
@@ -288,6 +414,7 @@ namespace Ailu::Render
 
     void Material::SetInt(ShaderPropertyId property_id, i32 value)
     {
+        bool is_changed = false;
         for (u16 pass_index = 0u; pass_index < _p_shader->_passes.size(); ++pass_index)
         {
             const auto *layout = _p_shader->GetBindingLayout(pass_index, _pass_variants[pass_index]._variant_hash);
@@ -295,14 +422,27 @@ namespace Ailu::Render
             if (binding == nullptr)
                 continue;
             if (binding->_resource_type & EBindResDescType::kCBufferInt)
-                memcpy(_property_blocks[pass_index]._data + binding->_buffer_offset, &value, sizeof(value));
+            {
+                u8 *dst = _property_blocks[pass_index]._data + binding->_buffer_offset;
+                if (memcmp(dst, &value, sizeof(value)) != 0)
+                {
+                    memcpy(dst, &value, sizeof(value));
+                    is_changed = true;
+                }
+            }
             else if (binding->_resource_type & EBindResDescType::kCBufferUInt)
             {
                 const u32 tmp = static_cast<u32>(value);
-                memcpy(_property_blocks[pass_index]._data + binding->_buffer_offset, &tmp, sizeof(tmp));
+                u8 *dst = _property_blocks[pass_index]._data + binding->_buffer_offset;
+                if (memcmp(dst, &tmp, sizeof(tmp)) != 0)
+                {
+                    memcpy(dst, &tmp, sizeof(tmp));
+                    is_changed = true;
+                }
             }
         }
-        MarkPropertiesDirty();
+        if (is_changed)
+            MarkPropertyDataDirty();
     }
 
     void Material::SetVector(const String &name, const Vector4f &vector)
@@ -312,14 +452,23 @@ namespace Ailu::Render
 
     void Material::SetVector(ShaderPropertyId property_id, const Vector4f &vector)
     {
+        bool is_changed = false;
         for (u16 pass_index = 0u; pass_index < _p_shader->_passes.size(); ++pass_index)
         {
             const auto *layout = _p_shader->GetBindingLayout(pass_index, _pass_variants[pass_index]._variant_hash);
             const auto *binding = layout == nullptr ? nullptr : layout->Find(property_id);
             if (binding != nullptr && binding->_resource_type & EBindResDescType::kCBufferFloats)
-                memcpy(_property_blocks[pass_index]._data + binding->_buffer_offset, &vector, binding->_buffer_size);
+            {
+                u8 *dst = _property_blocks[pass_index]._data + binding->_buffer_offset;
+                if (memcmp(dst, &vector, binding->_buffer_size) != 0)
+                {
+                    memcpy(dst, &vector, binding->_buffer_size);
+                    is_changed = true;
+                }
+            }
         }
-        MarkPropertiesDirty();
+        if (is_changed)
+            MarkPropertyDataDirty();
     }
 
     void Material::SetVector(const String &name, const Vector4Int &vector)
@@ -335,14 +484,23 @@ namespace Ailu::Render
 
     void Material::SetMatrix(ShaderPropertyId property_id, const Matrix4x4f &matrix)
     {
+        bool is_changed = false;
         for (u16 pass_index = 0u; pass_index < _p_shader->_passes.size(); ++pass_index)
         {
             const auto *layout = _p_shader->GetBindingLayout(pass_index, _pass_variants[pass_index]._variant_hash);
             const auto *binding = layout == nullptr ? nullptr : layout->Find(property_id);
             if (binding != nullptr && binding->_resource_type & EBindResDescType::kCBufferMatrix)
-                memcpy(_property_blocks[pass_index]._data + binding->_buffer_offset, &matrix, sizeof(matrix));
+            {
+                u8 *dst = _property_blocks[pass_index]._data + binding->_buffer_offset;
+                if (memcmp(dst, &matrix, sizeof(matrix)) != 0)
+                {
+                    memcpy(dst, &matrix, sizeof(matrix));
+                    is_changed = true;
+                }
+            }
         }
-        MarkPropertiesDirty();
+        if (is_changed)
+            MarkPropertyDataDirty();
     }
 
     float Material::GetFloat(const String &name)
@@ -364,10 +522,11 @@ namespace Ailu::Render
     void Material::SetCullMode(ECullMode mode)
     {
         _common_uint_property[kCullModeKey] = (u32) mode;
+        _cull_mode = mode;
     }
     ECullMode Material::GetCullMode() const
     {
-        return (ECullMode) _common_uint_property.at(kCullModeKey);
+        return _cull_mode;
     };
 
     ShaderVariantHash Material::ActiveVariantHash(u16 pass_index) const
@@ -429,19 +588,21 @@ namespace Ailu::Render
 
     void Material::SetTexture(ShaderPropertyId property_id, Texture *texture)
     {
+        if (auto it = _bind_textures_by_id.find(property_id); it != _bind_textures_by_id.end() && it->second == texture)
+            return;
         _bind_textures_by_id[property_id] = texture;
         const auto &name = ShaderPropertyRegistry::Get().GetName(property_id);
         if (!name.empty())
         {
-            _bind_textures[name] = texture;
             if (_properties.find(name) != _properties.end())
                 _properties[name]._value_ptr = reinterpret_cast<void *>(texture);
         }
-        MarkPropertiesDirty();
+        MarkResourceBindingsDirty();
     }
 
     void Material::SetVector(ShaderPropertyId property_id, const Vector4Int &vector)
     {
+        bool is_changed = false;
         for (u16 pass_index = 0u; pass_index < _p_shader->_passes.size(); ++pass_index)
         {
             const auto *layout = _p_shader->GetBindingLayout(pass_index, _pass_variants[pass_index]._variant_hash);
@@ -451,12 +612,25 @@ namespace Ailu::Render
             if (binding->_resource_type & EBindResDescType::kCBufferUInts)
             {
                 Vector4UInt vector_uint = {(u32) vector.x, (u32) vector.y, (u32) vector.z, (u32) vector.w};
-                memcpy(_property_blocks[pass_index]._data + binding->_buffer_offset, &vector_uint, binding->_buffer_size);
+                u8 *dst = _property_blocks[pass_index]._data + binding->_buffer_offset;
+                if (memcmp(dst, &vector_uint, binding->_buffer_size) != 0)
+                {
+                    memcpy(dst, &vector_uint, binding->_buffer_size);
+                    is_changed = true;
+                }
             }
             else if (binding->_resource_type & EBindResDescType::kCBufferInts)
-                memcpy(_property_blocks[pass_index]._data + binding->_buffer_offset, &vector, binding->_buffer_size);
+            {
+                u8 *dst = _property_blocks[pass_index]._data + binding->_buffer_offset;
+                if (memcmp(dst, &vector, binding->_buffer_size) != 0)
+                {
+                    memcpy(dst, &vector, binding->_buffer_size);
+                    is_changed = true;
+                }
+            }
         }
-        MarkPropertiesDirty();
+        if (is_changed)
+            MarkPropertyDataDirty();
     }
 
     void Material::SetTexture(const String &name, const WString &texture_path)
@@ -483,8 +657,10 @@ namespace Ailu::Render
 
     void Material::SetBuffer(ShaderPropertyId property_id, GPUBuffer *buffer)
     {
+        if (auto it = _bind_buffers_by_id.find(property_id); it != _bind_buffers_by_id.end() && it->second == buffer)
+            return;
         _bind_buffers_by_id[property_id] = buffer;
-        MarkPropertiesDirty();
+        MarkResourceBindingsDirty();
     }
 
     void Material::EnableKeyword(const String &keyword)
@@ -509,7 +685,7 @@ namespace Ailu::Render
             }
             ++pass_index;
         }
-        MarkPropertiesDirty();
+        MarkResourceBindingsDirty();
     }
 
     void Material::DisableKeyword(const String &keyword)
@@ -531,15 +707,16 @@ namespace Ailu::Render
             _all_keywords.erase(keyword);
             ++pass_index;
         }
-        MarkPropertiesDirty();
+        MarkResourceBindingsDirty();
     }
 
     void Material::RemoveTexture(const String &name)
     {
-        if (_bind_textures.contains(name))
-            _bind_textures[name] = nullptr;
-        _bind_textures_by_id[ShaderPropertyRegistry::Get().Intern(name)] = nullptr;
-        MarkPropertiesDirty();
+        ShaderPropertyId property_id = ShaderPropertyRegistry::Get().Intern(name);
+        if (auto it = _bind_textures_by_id.find(property_id); it != _bind_textures_by_id.end() && it->second == nullptr)
+            return;
+        _bind_textures_by_id[property_id] = nullptr;
+        MarkResourceBindingsDirty();
     }
 
     List<std::tuple<String, float>> Material::GetAllFloatValue()
@@ -673,7 +850,8 @@ namespace Ailu::Render
     void Material::Construct(bool first_time)
     {
         AL_ASSERT(_p_shader->PassCount() != 0);
-        _common_uint_property["_cull"] = (u32) _p_shader->GetCullMode();
+        _common_uint_property[kCullModeKey] = (u32) _p_shader->GetCullMode();
+        _cull_mode = _p_shader->GetCullMode();
         ConstructKeywords(_p_shader);
         static u8 s_unused_shader_prop_buf[256]{0};
         u16 unused_shader_prop_buf_offset = 0u;
@@ -743,7 +921,7 @@ namespace Ailu::Render
                     _properties.insert(std::make_pair(prop_info._value_name, cur_prop));
                     if (!first_time)
                     {
-                        if (auto it = _bind_textures.find(prop_info._value_name); it != _bind_textures.end())
+                        if (auto it = _bind_textures_by_id.find(prop_info._property_id); it != _bind_textures_by_id.end())
                         {
                             _properties[prop_info._value_name]._value_ptr = it->second;
                             _bind_textures_by_id[prop_info._property_id] = it->second;
@@ -840,7 +1018,8 @@ namespace Ailu::Render
     }
 
     Material::PropertyBlockView Material::GetPropertyBlockForFrame(u16 pass_index, u32 frame_slot, u64 frame_count,
-                                                                    FrameAllocator &allocator)
+                                                                    FrameAllocator &allocator, bool upload_to_gpu,
+                                                                    CommandRenderingStatesData *statistics)
     {
         AL_ASSERT(pass_index < _property_blocks.size());
         AL_ASSERT(frame_slot < _frame_property_block_cache.size());
@@ -848,15 +1027,32 @@ namespace Ailu::Render
         if (frame_cache.size() != _property_blocks.size())
             frame_cache.resize(_property_blocks.size());
         auto &cache = frame_cache[pass_index];
-        if (cache._material_version == _property_version && cache._frame_count == frame_count && cache._block._data != nullptr)
+        if (cache._property_data_version == _property_data_version && cache._frame_count == frame_count && cache._block._data != nullptr)
         {
+            // 帧内块缓存命中，复用已上传的GPU handle，无需重复上传
+            if (upload_to_gpu && cache._block._size > 0u && cache._block._gpu_handle != 0u)
+                if (statistics != nullptr) ++statistics->MaterialCBufferCacheHitCount;
             return cache._block;
         }
         auto &block = _property_blocks[pass_index];
         cache._block._data = allocator.Allocate<u8>(block._size);
         cache._block._size = block._size;
         memcpy(cache._block._data, block._data, block._size);
-        cache._material_version = _property_version;
+        if (upload_to_gpu && block._size > 0u)
+        {
+            // 直接烘焙进binding snapshot，RHI draw路径无需再单独上传/绑定per-material cbuffer
+            auto upload = FrameResourceManager::Get().AllocFrameUpload(block._size, 256u);
+            if (upload._cpu_ptr != nullptr)
+                memcpy(upload._cpu_ptr, block._data, block._size);
+            cache._block._upload_buffer = upload._buffer;
+            cache._block._gpu_handle = upload._gpu_handle;
+            if (statistics != nullptr)
+            {
+                ++statistics->MaterialCBufferUploadCount;
+                statistics->MaterialCBufferUploadBytes += block._size;
+            }
+        }
+        cache._property_data_version = _property_data_version;
         cache._frame_count = frame_count;
         return cache._block;
     }
@@ -900,12 +1096,14 @@ namespace Ailu::Render
     {
         //40 根据shader中MaterialBuf计算，可能会有变动
         u32 *sampler_mask = reinterpret_cast<u32 *>(_property_blocks[_standard_pass_index]._data + _sampler_mask_offset);
+        const u32 old_sampler_mask = *sampler_mask;
         //*sampler_mask = 0;
         for (auto &usage: use_infos)
         {
             MarkTextureUsedHelper(*sampler_mask, usage, b_use);
         }
-        MarkPropertiesDirty();
+        if (*sampler_mask != old_sampler_mask)
+            MarkPropertyDataDirty();
     }
 
     bool StandardMaterial::IsTextureUsed(ETextureUsage use_info)
@@ -930,6 +1128,8 @@ namespace Ailu::Render
     }
     void StandardMaterial::MaterialID(const EMaterialID &value)
     {
+        if (_material_id == value)
+            return;
         _material_id = value;
         _common_uint_property["_MaterialID"] = (u32) _material_id;
         if (_material_id_offset != 0)
@@ -937,7 +1137,7 @@ namespace Ailu::Render
             u32 id = _material_id == EMaterialID::kChecker ? static_cast<u32>(_material_id) : 0u;
             memcpy(_property_blocks[_standard_pass_index]._data + _material_id_offset, &id, sizeof(u32));
         }
-        MarkPropertiesDirty();
+        MarkPropertyDataDirty();
     }
     void StandardMaterial::SurfaceType(const ESurfaceType &value)
     {
@@ -966,6 +1166,7 @@ namespace Ailu::Render
         _p_active_shader->AddMaterialRef(this);
         _surface = value;
         _common_uint_property[kSurfaceKey] = static_cast<u32>(_surface);
+        MarkResourceBindingsDirty();
     }
     void StandardMaterial::SetTexture(const String &name, Texture *texture)
     {

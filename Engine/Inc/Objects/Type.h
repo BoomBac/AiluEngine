@@ -7,6 +7,8 @@
 #include "Framework/Common/NonCopyable.h"
 #include "Framework/Core/Containers/Vector.h"
 #include "Framework/Core/Containers/Queue.h"
+#include "Framework/Math/Vector.hpp"
+#include "Framework/Math/Color.h"
 #include "Object.h"
 #include "ReflectTemplate.h"
 #include "generated/Type.gen.h"
@@ -585,6 +587,16 @@ namespace Ailu
     DECLARE_STATIC_TYPE(f64)
     DECLARE_STATIC_TYPE(bool)
     DECLARE_STATIC_TYPE(String)
+    DECLARE_STATIC_TYPE(Math::Vector2f)
+    DECLARE_STATIC_TYPE(Math::Vector3f)
+    DECLARE_STATIC_TYPE(Math::Vector4f)
+    DECLARE_STATIC_TYPE(Math::Vector2Int)
+    DECLARE_STATIC_TYPE(Math::Vector3Int)
+    DECLARE_STATIC_TYPE(Math::Vector4Int)
+    DECLARE_STATIC_TYPE(Math::Vector2UInt)
+    DECLARE_STATIC_TYPE(Math::Vector3UInt)
+    DECLARE_STATIC_TYPE(Math::Vector4UInt)
+    DECLARE_STATIC_TYPE(Math::Color)
 
 
     class AILU_API ClassTypeRegister

@@ -191,7 +191,7 @@ namespace Ailu::RHI::DX12
                     _counter_state_guard = std::move(D3DResourceStateGuard(_counter_buffer.Get(), D3D12_RESOURCE_STATE_COMMON, 1u));
                     d3dcmd->UploadDataToBuffer(&_counter, sizeof(u32), _counter_buffer.Get(), _counter_state_guard);
                     if (_desc._target & EGPUBufferTarget::kIndirectArguments)
-                        _counter_state_guard.MakesureResourceState(d3dcmd->NativeCmdList(), D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT);
+                        d3dcmd->EnsureResourceState(_counter_state_guard, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT);
                 }
                 if (_desc._is_create_uav)
                 {
@@ -275,8 +275,8 @@ namespace Ailu::RHI::DX12
     }
     void D3DGPUBuffer::StateTranslation(RHICommandBuffer *rhi_cmd, EResourceState new_state, u32 sub_res)
     {
-        auto cmd = dynamic_cast<D3DCommandBuffer *>(rhi_cmd)->NativeCmdList();
-        _state_guard.MakesureResourceState(cmd, D3DConvertUtils::FromALResState(new_state), sub_res);
+        auto d3dcmd = dynamic_cast<D3DCommandBuffer *>(rhi_cmd);
+        d3dcmd->EnsureResourceState(_state_guard, D3DConvertUtils::FromALResState(new_state), sub_res);
         GpuResource::TrackResourceState(new_state, sub_res);
     }
 
@@ -302,7 +302,8 @@ namespace Ailu::RHI::DX12
 
     void D3DGPUBuffer::InsertUAVBarrier(RHICommandBuffer *rhi_cmd)
     {
-        _state_guard.InsertTrackedUAVBarrier(dynamic_cast<D3DCommandBuffer *>(rhi_cmd)->NativeCmdList());
+        auto d3dcmd = dynamic_cast<D3DCommandBuffer *>(rhi_cmd);
+        d3dcmd->InsertUAVBarrier(_state_guard.NativeResource());
     }
 
     void D3DGPUBuffer::OnDataChanged()
@@ -514,6 +515,7 @@ namespace Ailu::RHI::DX12
             ReleaseBindlessSrvIndex(_bindless_srv_indices[stream_index]);
             CreateBindlessBufferSrv(d3d_dev, _vertex_buffers[stream_index].Get(), _stream_data[i]._size, _bindless_srv_indices[stream_index]);
         }
+        ++_view_version;
     }
 
     void D3DVertexBuffer::Name(const String &name)
@@ -578,6 +580,7 @@ namespace Ailu::RHI::DX12
 
         ReleaseBindlessSrvIndex(_bindless_srv_index);
         CreateBindlessBufferSrv(d3d_conetxt->GetDevice(), _index_buf.Get(), _mem_size, _bindless_srv_index);
+        ++_view_version;
     }
     void D3DIndexBuffer::BindImpl(RHICommandBuffer *rhi_cmd, const BindParams& params)
     {

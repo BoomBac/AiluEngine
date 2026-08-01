@@ -112,9 +112,7 @@ namespace Ailu
 
         void Canvas::ResolveStyle(const UIStyleContext &context)
         {
-            _resolved_visual._background = UIBrush{};
-            _resolved_visual._background._type = EUIBrushType::kColor;
-            _resolved_visual._background._tint = Colors::kTransparent;
+            _resolved_visual = context._theme ? context._theme->_element_visual_style._visual : UIControlVisual{};
             _style_override.ApplyTo(_resolved_visual);
         }
 
@@ -185,9 +183,7 @@ namespace Ailu
 
         void LinearBox::ResolveStyle(const UIStyleContext &context)
         {
-            _resolved_visual._background = UIBrush{};
-            _resolved_visual._background._type = EUIBrushType::kColor;
-            _resolved_visual._background._tint = Colors::kTransparent;
+            _resolved_visual = context._theme ? context._theme->_element_visual_style._visual : UIControlVisual{};
             _style_override.ApplyTo(_resolved_visual);
         }
 
@@ -813,6 +809,33 @@ namespace Ailu
             _border_width = width;
             InvalidatePaint();
         }
+        void ListView::SetStyleId(const UIStyleId &id)
+        {
+            if (_style_id == id)
+                return;
+            _style_id = id;
+            InvalidateStyle();
+        }
+        void ListView::ResolveStyle(const UIStyleContext &context)
+        {
+            ScrollView::ResolveStyle(context);
+            if (context._theme)
+            {
+                _resolved_list_style = context._theme->_list_view_style;
+                if (const auto *named_style = context._theme->FindListViewStyle(_style_id))
+                    _resolved_list_style = *named_style;
+            }
+            else
+            {
+                static UITheme s_default_theme = UITheme::DefaultDark();
+                _resolved_list_style = s_default_theme._list_view_style;
+            }
+            if (!_is_background_brush_set)
+                _background_brush = _resolved_list_style._background;
+            _corner_radius = _resolved_list_style._corner_radius;
+            _border_color = _resolved_list_style._border_color;
+            _border_width = _resolved_list_style._border_width;
+        }
         Vector2f ListView::MeasureDesiredSize()
         {
             return ScrollView::MeasureDesiredSize();
@@ -840,6 +863,8 @@ namespace Ailu
             r.PushScissor(_abs_rect);
             for (auto &child: _children)
             {
+                if (auto *text = child->As<Text>())
+                    text->_color = _resolved_list_style._item_text_color;
                 child->Render(r);
             }
             r.PopScissor();
@@ -876,12 +901,12 @@ namespace Ailu
                 // hover 高亮
                 if (c.get() == _hovered_item)
                 {
-                    r.DrawQuad(c->GetArrangeRect(), _matrix, ColorBrush({0.2f, 0.2f, 0.4f, 0.5f}));
+                    r.DrawQuad(c->GetArrangeRect(), _matrix, ColorBrush(_resolved_list_style._item_hovered_color));
                 }
                 // selected 高亮
                 if (c.get() == _selected_item)
                 {
-                    r.DrawQuad(c->GetArrangeRect(), _matrix, ColorBrush({0.3f, 0.3f, 0.6f, 0.8f}));
+                    r.DrawQuad(c->GetArrangeRect(), _matrix, ColorBrush(_resolved_list_style._item_selected_color));
                 }
             }
         }
@@ -936,24 +961,9 @@ namespace Ailu
                     list_view->SizeToContent(true);
                 Vector2f popup_size = list_view->MeasureDesiredSize();
                 list_view->GetSlot()->Size(popup_size);
-                UIBrush popup_bg;
-                popup_bg._type = EUIBrushType::kColor;
-                popup_bg._tint = Color(0.06f, 0.07f, 0.09f, 0.78f);
+                list_view->SetStyleId("DropdownPopup");
                 if (_popup_backdrop_texture != nullptr && _popup_backdrop_source_rect.z > 1.0f && _popup_backdrop_source_rect.w > 1.0f)
-                {
-                    popup_bg._type = EUIBrushType::kBackdropBlur;
-                    popup_bg._texture = _popup_backdrop_texture;
-                    popup_bg._tint = Color(1.0f, 1.0f, 1.0f, 0.90f);
-                    popup_bg._uv_rect = {
-                            (abs_rect.x - _popup_backdrop_source_rect.x) / _popup_backdrop_source_rect.z,
-                            (abs_rect.y + abs_rect.w - _popup_backdrop_source_rect.y) / _popup_backdrop_source_rect.w,
-                            popup_size.x / _popup_backdrop_source_rect.z,
-                            popup_size.y / _popup_backdrop_source_rect.w};
-                }
-                list_view->SetBackgroundBrush(popup_bg);
-                list_view->SetBackdropSourceRect(_popup_backdrop_source_rect);
-                list_view->SetCornerRadius(Vector4f(4.0f));
-                list_view->SetBorder(Color(1.0f, 1.0f, 1.0f, 0.26f), 1.0f);
+                    list_view->SetBackdropSourceRect(_popup_backdrop_source_rect);
                 UIManager::Get()->ShowPopupAt(abs_rect.x, abs_rect.y + abs_rect.w, list_view, [this]()
                                               { _is_dropdown_open = false; });
                 _is_dropdown_open = true;
@@ -1053,8 +1063,6 @@ namespace Ailu
                 LOG_INFO("CollapsibleView: collapsed {}", _is_collapsed);
             };
             auto content = AddChild<Border>();
-            content->_bg_color = Color(0.0f, 0.0f, 0.0f, 0.0f);
-            content->_border_color = Color(0.0f, 0.0f, 0.0f, 0.0f);
             _content = content;
         }
         void CollapsibleView::Update(f32 dt)
@@ -1204,17 +1212,15 @@ namespace Ailu
             Vector4f bar_rect = CalculateSplitBarRect(false);
             UIBrush bar_brush;
             bar_brush._type = EUIBrushType::kColor;
-            bar_brush._tint = _is_hover_bar ? _resolved_visual._content_color : _resolved_visual._border_color;
+            bar_brush._tint = _is_hover_bar ? _resolved_split_view_style._divider_hovered_color :
+                                               _resolved_split_view_style._divider_color;
             r.DrawQuad(bar_rect, _matrix, bar_brush);
         }
 
         void SplitView::ResolveStyle(const UIStyleContext &context)
         {
-            _resolved_visual._background = UIBrush{};
-            _resolved_visual._background._type = EUIBrushType::kColor;
-            _resolved_visual._background._tint = Colors::kTransparent;
-            _resolved_visual._content_color = Colors::kWhite;
-            _resolved_visual._border_color = Color(0.8f, 0.8f, 0.9f, 0.6f);
+            _resolved_split_view_style = context._theme ? context._theme->_split_view_style : UISplitViewStyle{};
+            _resolved_visual = _resolved_split_view_style._visual;
             _style_override.ApplyTo(_resolved_visual);
         }
 

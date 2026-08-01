@@ -500,6 +500,37 @@ namespace Ailu
     };
 
     template<>
+    struct AILU_API SerializerWrapper<Color>
+    {
+        static void Serialize(void *data, FArchive &ar, const String *name = nullptr)
+        {
+            DATA_CHECK_S(Color)
+            auto &value = *static_cast<Color *>(data);
+            if (dynamic_cast<JsonArchive *>(&ar) != nullptr)
+            {
+                Color srgb = value.ToSrgb();
+                SerializerWrapper<Vector4f>::Serialize(static_cast<Vector4f *>(&srgb), ar, name);
+                return;
+            }
+            SerializerWrapper<Vector4f>::Serialize(static_cast<Vector4f *>(&value), ar, name);
+        }
+
+        static void Deserialize(void *data, FArchive &ar, const String *name = nullptr)
+        {
+            DATA_CHECK_DS(Color)
+            auto &value = *static_cast<Color *>(data);
+            if (dynamic_cast<JsonArchive *>(&ar) != nullptr)
+            {
+                Vector4f srgb;
+                SerializerWrapper<Vector4f>::Deserialize(&srgb, ar, name);
+                value = Color::FromSrgb(Color(srgb));
+                return;
+            }
+            SerializerWrapper<Vector4f>::Deserialize(static_cast<Vector4f *>(&value), ar, name);
+        }
+    };
+
+    template<>
     struct AILU_API SerializerWrapper<Quaternion>
     {
         static void Serialize(void *data, FArchive &ar, const String *name = nullptr)

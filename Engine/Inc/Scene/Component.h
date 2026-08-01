@@ -59,16 +59,12 @@ namespace Ailu
             String _stable_name;
         };
 
-        inline ComponentTypeId AllocateComponentTypeId()
-        {
-            static std::atomic<ComponentTypeId> s_next_type_id = 0;
-            return s_next_type_id.fetch_add(1, std::memory_order_relaxed);
-        }
+        AILU_API ComponentTypeId RegisterComponentType(StringView stable_name);
 
         template<typename T>
         ComponentTypeId GetComponentTypeId()
         {
-            static const ComponentTypeId kTypeId = AllocateComponentTypeId();
+            static const ComponentTypeId kTypeId = RegisterComponentType(T::StaticTypeName());
             return kTypeId;
         }
 
@@ -303,7 +299,7 @@ public:                                                                 \
         {
             Vector4f _light_pos;
             Vector4f _light_dir;
-            Color _light_color;
+            Color _light_color; // Runtime linear; JSON serialization stores sRGB.
             Vector4f _light_param;
             Vector3f _area_points[4];
             bool _is_two_side;
@@ -457,7 +453,7 @@ public:                                                                 \
             Render::Sprite* _sprite = nullptr;
             Ref<Render::Material> _material;
 
-            Color _color = Colors::kWhite;
+            Color _color = Colors::kWhite; // Runtime linear; JSON serialization stores sRGB.
 
             i16 _sorting_layer = 0;
             i32 _order_in_layer = 0;

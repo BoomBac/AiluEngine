@@ -21,6 +21,7 @@
 namespace Ailu::Render
 {
     class RenderTexture;
+    class RHICommandBuffer;
     class VertexBuffer;
     class IndexBuffer;
     class GraphicsPipelineStateObject;
@@ -115,11 +116,6 @@ namespace Ailu::Render
     };
     struct CommandDraw : public TypedGfxCommand<EGpuCommandType::kDraw>
     {
-        struct
-        {
-            u8* _data;
-            u32 _size;
-        } _material_property_block;
         MaterialDrawState _material_draw_state;
         VertexBuffer *_vb;
         IndexBuffer *_ib;
@@ -144,6 +140,7 @@ namespace Ailu::Render
     {
         ComputeShader *_cs;
         ComputeShaderKernelId _kernel;
+        ComputeDispatchSnapshot _bindings;
         u16 _group_num_x;
         u16 _group_num_y;
         u16 _group_num_z;
@@ -232,7 +229,7 @@ namespace Ailu::Render
 
     struct CommandCustom : public TypedGfxCommand<EGpuCommandType::kCustom>
     {
-        std::function<void()> _func;
+        std::function<void(RHICommandBuffer *)> _func;
         void Reset() {
             SafeResetCommand(this);
         }
@@ -240,15 +237,10 @@ namespace Ailu::Render
     struct CommandAllocConstBuffer : public TypedGfxCommand<EGpuCommandType::kAllocConstBuffer>
     {
         char _name[64];
-        u8 *_data;
+        u64 _gpu_handle;
         u32 _size;
         i16 _kernel;
-        ~CommandAllocConstBuffer()
-        {
-            AL_FREE(_data);
-        }
         void Reset() {
-            AL_FREE(_data);
             SafeResetCommand(this);
         }
     };

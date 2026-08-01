@@ -15,6 +15,7 @@
 #include "Framework/Core/Containers/List.h"
 #include "Framework/Core/Containers/Array.h"
 #include "PipelineState.h"
+#include "RenderingStates.h"
 #include "CoreType.h"
 #include "Shader.h"
 #include "Texture.h"
@@ -67,7 +68,15 @@ namespace Ailu::Render
         ShaderVariantHash _variant_hash;
         UploadParamsGPSO(u16 pass_index, ShaderVariantHash variant_hash) : _pass_index(pass_index), _variant_hash(variant_hash) {}
     };
+
     using PSOHash = ALHash::Hash<128>;
+    struct PSOCreateRequest
+    {
+        PSOHash _hash;
+        Shader *_shader = nullptr;
+        u16 _pass_index = 0u;
+        ShaderVariantHash _variant_hash = 0u;
+    };
     class CommandBuffer;
     class GraphicsPipelineStateObject : public GpuResource
     {
@@ -97,20 +106,13 @@ namespace Ailu::Render
 
         GraphicsPipelineStateObject(const GraphicsPipelineStateInitializer &initializer);
         virtual ~GraphicsPipelineStateObject() = default;
-        /// 填充已经验证的管线资源
-        void ResetPipelineResources();
-        //已经解析完毕的资源
-        void SetPipelineResource(const PipelineResource &pipeline_res);
         bool IsValidPipelineResource(const EBindResDescType &res_type, i16 slot) const;
         bool IsValidPipelineResource(const EBindResDescType &res_type, const String &name) const;
         const PSOHash &Hash() const { return _hash; };
         const String &SlotToName(u8 slot) const;
         const i16 NameToSlot(const String &name) const;
-        virtual void SetTopology(ETopology topology) { _state_desc._topology = topology; };
-        void SetStencilRef(u8 ref) { _state_desc._depth_stencil_state._stencil_ref_value; };
         const GraphicsPipelineStateInitializer &StateDescriptor() const { return _state_desc; };
         u32 GetBindResourceSignature() const { return _bind_res_signature; };
-        const Array<PipelineResource, 32> &GetBindResource(u16 index = 0) const { return _bind_res; };
 
     protected:
         u8 _per_frame_cbuf_bind_slot = 255u;
@@ -124,37 +126,24 @@ namespace Ailu::Render
         u8 _stencil_ref = 0u;
         u32 _bind_res_signature = 0u;
         u16 _max_slot = 0u;
-        Array<PipelineResource, 32> _bind_res;
     };
 
     class AILU_API GraphicsPipelineStateMgr
     {
+        friend class CommandRecordingContext;
+
     public:
         static void Init();
         static void Shutdown();
         static GraphicsPipelineStateMgr &Get();
         static void BuildPSOCache();
         static void AddPSO(Scope<GraphicsPipelineStateObject> p_gpso);
-        static void ConfigureShader(Shader* shader, u16 pass_index, ShaderVariantHash variant_hash, const u64 &shader_hash);
-        static void ConfigureShader(Shader* shader,const u64 &shader_hash);
-        static void ConfigureVertexInputLayout(const u8 &hash);//0~3 4
-        static void ConfigureTopology(const u8 &hash);         //36~37 2
-        static void ConfigureBlendState(const u8 &hash);       // 38~40 3
-        static void ConfigureRasterizerState(const u8 &hash);  // 41 ~ 43 3
-        static void ConfigureDepthStencilState(const u8 &hash);// 44~46 3
-        //static void ConfigureRenderTarget(const u8 &hash);     // 44~46 3
-        static void SetRenderTargetState(EALGFormat color_format, EALGFormat depth_format, u8 color_rt_id = 0);
-        static void SetRenderTargetState(EALGFormat color_format, u8 color_rt_id = 0);
-        //call before cmd->SetRenderTarget
-        static void ResetRenderTargetState();
-
-        //static void SubmitBindResource(GpuResource *res, const EBindResDescType &res_type, u8 slot, u16 priority);
-        //static void SubmitBindResource(GpuResource *res, const EBindResDescType &res_type, const String &name, u16 priority);
-        static void SubmitBindResource(const PipelineResource& resource);
         static void UpdateAllPSOObject();
         GraphicsPipelineStateMgr();
         ~GraphicsPipelineStateMgr();
-        GraphicsPipelineStateObject *FindMatchPSO();
+        GraphicsPipelineStateObject *FindReadyPSO(const PSOHash &hash);
+        void RequestPSOCreation(const PSOCreateRequest &request);
+        void ProcessPendingPSOCreationRequests();
         void ProcessPendingShaderCompiles();
         void OnShaderCompiled(Shader *shader, u16 pass_id, ShaderVariantHash variant_hash)
         {
@@ -174,39 +163,7 @@ namespace Ailu::Render
             ShaderVariantHash _variant_hash;
         };
         void ProcessCompiledShader(const ShaderCompiledInfo &info);
-        GraphicsPipelineStateObject* GetOrCreate(PSOHash hash);
-    private:
-        struct PendingPipelineBindings
-        {
-            Array<PipelineResource, 32> _resources;
-            u32 _mask = 0u;
-            u16 _max_slot = 0u;
-
-            void Reset()
-            {
-                _mask = 0u;
-                _max_slot = 0u;
-            }
-
-            bool Submit(const PipelineResource& resource)
-            {
-                AL_ASSERT(resource._slot < 32u);
-
-                const u16 slot = resource._slot;
-                const u32 slot_mask = 1u << slot;
-                const bool is_override = (_mask & slot_mask) != 0u && resource._priority >= _resources[slot]._priority;
-
-                if ((_mask & slot_mask) == 0u || resource._priority >= _resources[slot]._priority)
-                {
-                    _resources[slot] = resource;
-                    _resources[slot]._slot = slot;
-                }
-
-                _mask |= slot_mask;
-                _max_slot = std::max(_max_slot, slot);
-                return is_override;
-            }
-        };
+        GraphicsPipelineStateObject *CreatePSO(const PSOCreateRequest &request);
 
         Scope<GraphicsPipelineStateObject> _gizmo_line_pso;
         Scope<GraphicsPipelineStateObject> _gizmo_tex_pso;
@@ -214,23 +171,59 @@ namespace Ailu::Render
         std::mutex _pso_lock;
         HashMap<PSOHash, Scope<GraphicsPipelineStateObject>, PSOHash::HashFunc> _pso_library{};
         u32 s_reserved_pso_id = 32u;
-        PendingPipelineBindings _pending_bindings;
-        RenderTargetState _render_target_state;
         Core::LockFreeQueue<ShaderCompiledInfo, 256> _shader_compiled_queue;
+        Core::LockFreeQueue<PSOCreateRequest, 1024> _pso_create_queue;
+    };
+
+    class AILU_API CommandRecordingContext
+    {
+    public:
+        void Clear();
+        void ConfigureShader(Shader* shader, u16 pass_index, ShaderVariantHash variant_hash, const u64 &shader_hash);
+        void ConfigureShader(Shader* shader, const u64 &shader_hash);
+        void ConfigureVertexInputLayout(const u8 &hash);
+        void ConfigureTopology(const u8 &hash);
+        void ConfigureBlendState(const u8 &hash);
+        void ConfigureRasterizerState(const u8 &hash);
+        void ConfigureDepthStencilState(const u8 &hash);
+        void SetRenderTargetState(EALGFormat color_format, EALGFormat depth_format, u8 color_rt_id = 0);
+        void SetRenderTargetState(EALGFormat color_format, u8 color_rt_id = 0);
+        void ResetRenderTargetState();
+        void SubmitBindResource(const PipelineResource& resource)
+        {
+            ++_rendering_states_data.PipelineResourceSubmitCount;
+            _resolved_bind_res.emplace_back(resource);
+        };
+        GraphicsPipelineStateObject *FindMatchPSO();
+        CommandRenderingStatesData& RenderingStatesData() { return _rendering_states_data; }
+        void AccumulateRenderingStatesData(const CommandRenderingStatesData &data) { _rendering_states_data.Accumulate(data); }
+        const Vector<PipelineResource>& ResolvedBindResources() { return _resolved_bind_res; }
+        void ClearResolvedBindResources() { _resolved_bind_res.clear(); }
+    private:
+        void MarkPSODirty()
+        {
+            _is_pso_dirty = true;
+            _pso_request_submitted = false;
+        }
+        Vector<PipelineResource> _resolved_bind_res;
+        RenderTargetState _render_target_state;
         PSOHash _cur_pos_hash{};
-        u64 _hash_shader;            // 4~35 32
-        u8 _hash_input_layout;       //0~3 4
-        u8 _hash_topology;           //36~37 2
-        u8 _hash_blend_state;        // 38~40 3
-        u8 _hash_raster_state;       // 41 ~ 43 3
-        u8 _hash_depth_stencil_state;// 44~46 3
-        u8 _hash_rt_state;           // 44~46 3
+        u64 _hash_shader = 0u;            // 4~35 32
+        u8 _hash_input_layout = 0u;       //0~3 4
+        u8 _hash_topology = 0u;           //36~37 2
+        u8 _hash_blend_state = 0u;        // 38~40 3
+        u8 _hash_raster_state = 0u;       // 41 ~ 43 3
+        u8 _hash_depth_stencil_state = 0u;// 44~46 3
+        u8 _hash_rt_state = 0u;           // 44~46 3
         GraphicsPipelineStateObject* _current_pso = nullptr;
-        HashMap<String,PipelineResource> _unresolved_pipeline_res;
+        ETopology _current_topology = ETopology::kTriangle;
+        u8 _stencil_ref = 0u;
         bool _is_pso_dirty = true;
+        bool _pso_request_submitted = false;
         Shader* _current_shader = nullptr;
         u16 _current_pass_index = 0u;
         ShaderVariantHash _current_variant_hash = 0u;
+        CommandRenderingStatesData _rendering_states_data;
     };
 }// namespace Ailu
 

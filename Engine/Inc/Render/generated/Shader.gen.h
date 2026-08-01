@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __SHADER_GEN_H__
 //Class Shader begin...........................
-#define SHADER_GEN_H_185_GENERATED_BODY \
+#define SHADER_GEN_H_231_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_Shader_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -21,7 +21,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::Shader>()
 //Class Shader end...........................
 
 //Class ComputeShader begin...........................
-#define SHADER_GEN_H_332_GENERATED_BODY \
+#define SHADER_GEN_H_376_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_ComputeShader_Type();\
                                 static const Type* GetPrivateStaticClass();\

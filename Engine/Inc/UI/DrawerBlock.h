@@ -70,6 +70,7 @@ namespace Ailu
             Vector<Color> _color_buf;
             Vector<Vector4f> _rect_buf;
             Vector<Vector4f> _corner_radius_buf;
+            Vector<Vector4f> _border_thickness_buf;
             Vector<u32> _index_buf;
             u32 _max_vert_num = 0u;
             struct DrawNode

@@ -67,8 +67,10 @@ namespace Ailu
             bool DrawColorField(const char *label, Color &value)
             {
                 Color old_value = value;
-                if (!ImGui::ColorEdit4(label, value.data, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR))
+                Color srgb_value = value.ToSrgb();
+                if (!ImGui::ColorEdit4(label, srgb_value.data, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR))
                     return false;
+                value = Color::FromSrgb(srgb_value);
                 return old_value != value;
             }
 

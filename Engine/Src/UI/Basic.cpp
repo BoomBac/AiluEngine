@@ -659,11 +659,32 @@ namespace Ailu
 
         void Border::ResolveStyle(const UIStyleContext &context)
         {
-            _resolved_visual._background = ColorBrush(_bg_color);
-            _resolved_visual._border_color = _border_color;
-            _resolved_visual._border_width = (_thickness.x + _thickness.y + _thickness.z + _thickness.w) * 0.25f;
-            _resolved_visual._corner_radius = _corner_radius;
+            if (context._theme)
+            {
+                const UIBorderStyle *style = _style_id.empty() ? &context._theme->_border_style :
+                    context._theme->FindBorderStyle(_style_id);
+                if (style != nullptr)
+                    _resolved_visual = style->_visual;
+                else
+                    _resolved_visual = context._theme->_border_style._visual;
+            }
+            else
+            {
+                _resolved_visual._background = ColorBrush(_bg_color);
+                _resolved_visual._border_color = _border_color;
+                _resolved_visual._border_width = _thickness;
+                _resolved_visual._corner_radius = _corner_radius;
+            }
             _style_override.ApplyTo(_resolved_visual);
+            SlotPadding() = Padding(_resolved_visual._border_width);
+        }
+
+        void Border::SetStyleId(const UIStyleId &id)
+        {
+            if (_style_id == id)
+                return;
+            _style_id = id;
+            InvalidateStyle();
         }
 
         const UIControlVisual *Border::GetVisual(EUIVisualState state) const
@@ -676,59 +697,19 @@ namespace Ailu
             const UIBrush &bg = _resolved_visual._background;
             Color border = _resolved_visual._border_color;
             Vector4f corner_radius = _resolved_visual._corner_radius;
-            if (corner_radius != Vector4f::kZero)
+            const Vector4f thickness = _resolved_visual._border_width;
+            const bool has_thickness = thickness.x > 0.0f || thickness.y > 0.0f || thickness.z > 0.0f || thickness.w > 0.0f;
+            if (has_thickness)
             {
-                if (_thickness == Vector4f::kZero)
-                {
-                    if (bg._type != EUIBrushType::kNone && bg._tint.a > 0.0f)
-                        r.DrawQuad(_content_rect, _matrix, bg, corner_radius);
-                }
-                else
-                {
-                    if (border.a > 0.0f)
-                        r.DrawQuad(_arrange_rect, _matrix, ColorBrush(border), corner_radius);
-                    Vector4f inner_radius = Max(corner_radius - Vector4f{(_thickness.x + _thickness.y + _thickness.z + _thickness.w) * 0.25f}, Vector4f::kZero);
-                    if (bg._type != EUIBrushType::kNone && bg._tint.a > 0.0f)
-                        r.DrawQuad(_content_rect, _matrix, bg, inner_radius);
-                }
-            }
-            else
-            if (_thickness == Vector4f::kZero)
-            {
+                r.DrawBorder(_arrange_rect, _matrix, thickness, corner_radius, border);
+                Vector4f inner_radius = Max(corner_radius - Vector4f{
+                    std::max(thickness.x, thickness.y), std::max(thickness.y, thickness.z),
+                    std::max(thickness.z, thickness.w), std::max(thickness.w, thickness.x)}, Vector4f::kZero);
                 if (bg._type != EUIBrushType::kNone && bg._tint.a > 0.0f)
-                    r.DrawQuad(_content_rect, _matrix, bg);
+                    r.DrawQuad(_content_rect, _matrix, bg, inner_radius);
             }
-            else
-            {
-                f32 outerL = _arrange_rect.x;
-                f32 outerT = _arrange_rect.y;
-                f32 outerR = _arrange_rect.x + _arrange_rect.z;
-                f32 outerB = _arrange_rect.y + _arrange_rect.w;
-                f32 innerL = _content_rect.x;
-                f32 innerT = _content_rect.y;
-                f32 innerR = _content_rect.x + _content_rect.z;
-                f32 innerB = _content_rect.y + _content_rect.w;
-
-                // 背景
-                if (bg._type != EUIBrushType::kNone && bg._tint.a > 0.0f)
-                    r.DrawQuad(_content_rect, _matrix, bg);
-
-                if (border.a > 0.0f)
-                {
-                    // top 边
-                    if (_thickness.y > 0)
-                        r.DrawQuad({outerL, outerT, outerR - outerL, innerT - outerT}, _matrix, ColorBrush(border));
-                    // bottom 边
-                    if (_thickness.w > 0)
-                        r.DrawQuad({outerL, innerB, outerR - outerL, outerB - innerB}, _matrix, ColorBrush(border));
-                    // left 边
-                    if (_thickness.x > 0)
-                        r.DrawQuad({outerL, innerT, innerL - outerL, innerB - innerT}, _matrix, ColorBrush(border));
-                    // right 边
-                    if (_thickness.z > 0)
-                        r.DrawQuad({innerR, innerT, outerR - innerR, innerB - innerT}, _matrix, ColorBrush(border));
-                }
-            }
+            else if (bg._type != EUIBrushType::kNone && bg._tint.a > 0.0f)
+                r.DrawQuad(_content_rect, _matrix, bg, corner_radius);
 
             if (!_children.empty())
                 _children[0]->Render(r);

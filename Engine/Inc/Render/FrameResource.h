@@ -16,6 +16,13 @@
 
 namespace Ailu::Render
 {
+    /// @brief 录制线程可用的帧作用域上传内存。数据在录制阶段写入GPU upload heap，GPU地址可在录制阶段获取。
+    struct FrameUploadAllocation
+    {
+        GpuResource *_buffer = nullptr;// 所属的上传缓冲区(GpuResource)，用于烘焙进binding snapshot
+        void *_cpu_ptr = nullptr;      // CPU可写指针
+        u64 _gpu_handle = 0u;          // GPU虚拟地址
+    };
     class FrameResource : public Object, public NonCopyable
     {
     public:
@@ -65,11 +72,17 @@ namespace Ailu::Render
         FrameAllocator* GetActiveFrameAllocator() const { return _active_allocator; }
         u32 GetActiveFrameSlot() const { return _active_slot; }
         u32 GetPreviousFrameSlot() const { return _prev_slot; }
+        /// @brief 录制线程从当前帧槽位的上传缓冲区分配内存，返回CPU/GPU地址（可在录制阶段使用GPU句柄）
+        FrameUploadAllocation AllocFrameUpload(u32 size, u32 alignment = 256u);
+        /// @brief 在帧槽位(fence等待后)重置该槽位的上传缓冲区
+        void ResetFrameUpload(u32 frame_slot);
     private:
         TexturePool _texture_pool;
         BufferPool _buffer_pool;
         Array<Scope<FrameAllocator>, kFrameResourceSlotCount> _frame_allocators{};
         Array<u64, kFrameResourceSlotCount> _frame_slot_fence_values{};
+        // 帧作用域的GPU上传缓冲区，按帧槽位双/三缓冲，随槽位fence复用
+        Array<Scope<GpuResource>, kFrameResourceSlotCount> _frame_upload_buffers{};
         FrameAllocator* _active_allocator = nullptr;
         u32 _active_slot = 0u;
         u32 _prev_slot = 0u;

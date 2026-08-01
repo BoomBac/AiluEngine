@@ -98,17 +98,32 @@ namespace Ailu::Render
         ~Impl() = default;
 
     private:
-        void PushMaterialState(CommandDraw *cmd, bool copy_material_property_block)
+        void PushMaterialState(CommandDraw *cmd)
         {
-            ++RenderingStates::RenderData().MaterialCaptureCount;
+            ++_rendering_states_data.MaterialCaptureCount;
+            const ShaderPropertyId per_obj_id = ShaderPropertyRegistry::Get().Intern(RenderConstants::kCBufNamePerObject);
+            if (cmd->_per_obj_cb != nullptr)
+            {
+                // 将per-object cbuffer烘焙进command_resources，CaptureDrawState会写入binding snapshot，
+                // RHI draw路径只回放snapshot，无需在D3DContext再单独绑定
+                auto &binding = _command_resources[per_obj_id];
+                binding._resource = cmd->_per_obj_cb;
+                binding._resource_type = EBindResDescType::kConstBuffer;
+                binding._addi_info = {};
+            }
+            else
+            {
+                // 本draw未提供per-object cbuffer；若command_resources里残留的是上一个per_obj_cb draw烘焙的
+                // ConstantBuffer，则移除，避免串到本次draw（SetGlobalBuffer烘焙的raw upload不在此列）
+                auto it = _command_resources.find(per_obj_id);
+                if (it != _command_resources.end() && it->second._resource_type == EBindResDescType::kConstBuffer)
+                    _command_resources.erase(it);
+            }
             cmd->_material_draw_state = cmd->_mat->CaptureDrawState(cmd->_pass_index,
                                                                       FrameResourceManager::Get().GetActiveFrameSlot(),
                                                                       g_pGfxContext->GetFrameCount(),
-                                                                      *FrameResourceManager::Get().GetActiveFrameAllocator());
-            if (!copy_material_property_block || cmd->_material_draw_state._material_cbuffer_slot < 0)
-                return;
-            cmd->_material_property_block._data = const_cast<u8 *>(cmd->_material_draw_state._property_data);
-            cmd->_material_property_block._size = cmd->_material_draw_state._property_size;
+                                                                      *FrameResourceManager::Get().GetActiveFrameAllocator(),
+                                                                      &_command_resources, &_rendering_states_data);
         }
 
     public:
@@ -124,6 +139,8 @@ namespace Ailu::Render
                     CommandPool::Get().DeAlloc(cmd);
             }
             _commands.clear();
+            _command_resources.clear();
+            _rendering_states_data.Reset();
         }
         void ClearRenderTarget(Color color, f32 depth, u8 stencil)
         {
@@ -306,7 +323,7 @@ namespace Ailu::Render
             cmd->_mat = mat;
             cmd->_pass_index = pass_index;
             cmd->_instance_count = 1u;
-            PushMaterialState(cmd, true);
+            PushMaterialState(cmd);
             cmd->_index_start = index_start;
             cmd->_index_num = index_num;
             _commands.push_back(cmd);
@@ -320,7 +337,7 @@ namespace Ailu::Render
             cmd->_mat = mat;
             cmd->_pass_index = pass_index;
             cmd->_instance_count = instance_count;
-            PushMaterialState(cmd, true);
+            PushMaterialState(cmd);
             _commands.push_back(cmd);
         }
         void DrawIndexedInstanced(VertexBuffer *vb, IndexBuffer *ib, ConstantBuffer *per_obj_cb, Material *mat,
@@ -335,7 +352,7 @@ namespace Ailu::Render
             cmd->_pass_index = pass_index;
             cmd->_instance_count = instance_count;
             cmd->_start_instance = start_instance;
-            PushMaterialState(cmd, true);
+            PushMaterialState(cmd);
             cmd->_index_start = index_start;
             cmd->_index_num = index_num;
             _commands.push_back(cmd);
@@ -439,49 +456,42 @@ namespace Ailu::Render
             cmd->_instance_count = 1u;
             cmd->_sub_mesh = 0u;
             cmd->_pass_index = pass_index;
-            PushMaterialState(cmd, true);
+            PushMaterialState(cmd);
             _commands.emplace_back(cmd);
         }
         void SetGlobalBuffer(const String &name, void *data, u64 data_size)
         {
-            auto cmd = CommandPool::Get().Alloc<CommandAllocConstBuffer>();
-            cmd->_data = AL_ALLOC(u8, data_size);
-            cmd->_size = (u32) data_size;
-            memcpy(cmd->_data, data, data_size);
-            memcpy(cmd->_name, name.c_str(), name.length() + 1);
-            cmd->_kernel = -1;
-            _commands.emplace_back(cmd);
+            auto alloc = FrameResourceManager::Get().AllocFrameUpload((u32) data_size, 256u);
+            if (alloc._cpu_ptr != nullptr && data_size > 0u)
+                memcpy(alloc._cpu_ptr, data, data_size);
+            auto &binding = _command_resources[ShaderPropertyRegistry::Get().Intern(name)];
+            binding._resource = alloc._buffer;
+            binding._resource_type = EBindResDescType::kConstBufferRaw;
+            binding._addi_info = {};
+            binding._addi_info._gpu_handle = alloc._gpu_handle;
         };
         void SetGlobalBuffer(const String &name, ConstantBuffer *buffer)
         {
-            auto cmd = CommandPool::Get().Alloc<CommandCustom>();
-            cmd->_func = [=]()
-            {
-                PipelineResource resource = PipelineResource(buffer, EBindResDescType::kConstBuffer, name, PipelineResource::kPriorityCmd);
-                GraphicsPipelineStateMgr::SubmitBindResource(resource);
-            };
-            _commands.emplace_back(cmd);
+            auto &binding = _command_resources[ShaderPropertyRegistry::Get().Intern(name)];
+            binding._resource = buffer;
+            binding._resource_type = EBindResDescType::kConstBuffer;
+            binding._addi_info = {};
         }
         void SetGlobalBuffer(const String &name, GPUBuffer *buffer)
         {
-            auto cmd = CommandPool::Get().Alloc<CommandCustom>();
-            cmd->_func = [=]()
-            {
-                PipelineResource resource = PipelineResource(buffer, buffer->IsRandomAccess() ? EBindResDescType::kRWBuffer : EBindResDescType::kBuffer, name, PipelineResource::kPriorityCmd);
-                GraphicsPipelineStateMgr::SubmitBindResource(resource);
-            };
-            _commands.emplace_back(cmd);
+            auto &binding = _command_resources[ShaderPropertyRegistry::Get().Intern(name)];
+            binding._resource = buffer;
+            binding._resource_type = buffer != nullptr && buffer->IsRandomAccess()
+                ? EBindResDescType::kRWBuffer : EBindResDescType::kBuffer;
+            binding._addi_info = {};
         }
 
         void SetGlobalTexture(const String &name, Texture *tex)
         {
-            auto cmd = CommandPool::Get().Alloc<CommandCustom>();
-            cmd->_func = [=]()
-            {
-                PipelineResource resource = PipelineResource(tex, EBindResDescType::kTexture2D, name, PipelineResource::kPriorityCmd);
-                GraphicsPipelineStateMgr::SubmitBindResource(resource);
-            };
-            _commands.emplace_back(cmd);
+            auto &binding = _command_resources[ShaderPropertyRegistry::Get().Intern(name)];
+            binding._resource = tex;
+            binding._resource_type = EBindResDescType::kTexture2D;
+            binding._addi_info = {};
         }
         void SetGlobalTexture(const String &name, RTHandle handle)
         {
@@ -501,7 +511,7 @@ namespace Ailu::Render
             cmd->_instance_count = instance_count;
             cmd->_sub_mesh = sub_mesh;
             cmd->_pass_index = 0u;
-            PushMaterialState(cmd, true);
+            PushMaterialState(cmd);
             _commands.emplace_back(cmd);
         }
         void DrawMesh(Mesh *mesh, Material *material, ConstantBuffer *per_obj_cb, u32 instance_count)
@@ -514,7 +524,7 @@ namespace Ailu::Render
             cmd->_instance_count = instance_count;
             cmd->_sub_mesh = 0u;
             cmd->_pass_index = 0u;
-            PushMaterialState(cmd, true);
+            PushMaterialState(cmd);
             _commands.emplace_back(cmd);
         }
         void DrawMesh(Mesh *mesh, Material *material, ConstantBuffer *per_obj_cb, u16 sub_mesh, u32 instance_count)
@@ -527,7 +537,7 @@ namespace Ailu::Render
             cmd->_instance_count = instance_count;
             cmd->_sub_mesh = sub_mesh;
             cmd->_pass_index = 0u;
-            PushMaterialState(cmd, true);
+            PushMaterialState(cmd);
             _commands.emplace_back(cmd);
         }
         void DrawMesh(Mesh *mesh, Material *material, ConstantBuffer *per_obj_cb, u16 sub_mesh, u16 pass_index, u32 instance_count)
@@ -540,7 +550,7 @@ namespace Ailu::Render
             cmd->_instance_count = instance_count;
             cmd->_sub_mesh = sub_mesh;
             cmd->_pass_index = pass_index;
-            PushMaterialState(cmd, true);
+            PushMaterialState(cmd);
             _commands.emplace_back(cmd);
         }
         void DrawMesh(Mesh *mesh, Material *material, const Matrix4x4f &world_mat, u16 sub_mesh, u16 pass_index, u32 instance_count)
@@ -557,7 +567,7 @@ namespace Ailu::Render
             cmd->_instance_count = instance_count;
             cmd->_sub_mesh = sub_mesh;
             cmd->_pass_index = pass_index;
-            PushMaterialState(cmd, true);
+            PushMaterialState(cmd);
             _commands.emplace_back(cmd);
         }
         void DrawMesh(Mesh *mesh, Material *material, const CBufferPerObjectData &per_obj_data, u16 sub_mesh, u16 pass_index, u32 instance_count)
@@ -570,7 +580,7 @@ namespace Ailu::Render
             cmd->_instance_count = instance_count;
             cmd->_sub_mesh = sub_mesh;
             cmd->_pass_index = pass_index;
-            PushMaterialState(cmd, true);
+            PushMaterialState(cmd);
             _commands.emplace_back(cmd);
         }
         void DrawMeshIndirect(Mesh *mesh, u16 sub_mesh, Material *material, u16 pass_index, GPUBuffer *arg_buffer, u32 arg_offset)
@@ -583,7 +593,7 @@ namespace Ailu::Render
             cmd->_pass_index = pass_index;
             cmd->_arg_buffer = arg_buffer;
             cmd->_arg_offset = arg_offset;
-            PushMaterialState(cmd, true);
+            PushMaterialState(cmd);
             _commands.emplace_back(cmd);
         }
 
@@ -597,7 +607,7 @@ namespace Ailu::Render
             cmd->_pass_index = pass_index;
             cmd->_vertex_count = vertex_count;
             cmd->_instance_count = instance_count;
-            PushMaterialState(cmd, true);
+            PushMaterialState(cmd);
             _commands.emplace_back(cmd);
         }
 
@@ -611,7 +621,7 @@ namespace Ailu::Render
             cmd->_pass_index = pass_index;
             cmd->_arg_buffer = arg_buffer;
             cmd->_arg_offset = arg_offset;
-            PushMaterialState(cmd, true);
+            PushMaterialState(cmd);
             _commands.emplace_back(cmd);
         }
 
@@ -634,7 +644,7 @@ namespace Ailu::Render
             cmd->_kernel = kernel;
             cmd->_arg_buffer = nullptr;
             cmd->_arg_offset = 0u;
-            cmd->_cs->PushState(cmd->_kernel);
+            cmd->_cs->CaptureDispatchState(cmd->_kernel, cmd->_bindings, &_command_resources);
             _commands.emplace_back(cmd);
         }
         void Dispatch(ComputeShader *cs, ComputeShaderKernelId kernel, GPUBuffer *arg_buffer, u16 arg_offset)
@@ -650,7 +660,7 @@ namespace Ailu::Render
             cmd->_group_num_x = 1u;
             cmd->_group_num_y = 1u;
             cmd->_group_num_z = 1u;
-            cmd->_cs->PushState(cmd->_kernel);
+            cmd->_cs->CaptureDispatchState(cmd->_kernel, cmd->_bindings, &_command_resources);
             cmd->_arg_buffer = arg_buffer;
             cmd->_arg_offset = arg_offset;
             _commands.emplace_back(cmd);
@@ -765,6 +775,9 @@ namespace Ailu::Render
         Vector<GfxCommand *> _commands;
         Array<Rect, RenderConstants::kMaxMRTNum> _viewports;
         RDG::RenderGraph *_render_graph = nullptr;
+        // CommandBuffer局部资源，以kPriorityCmd烘焙进draw state snapshot
+        HashMap<ShaderPropertyId, CommandResourceBinding> _command_resources;
+        CommandRenderingStatesData _rendering_states_data;
     };
 
 
@@ -1048,6 +1061,13 @@ namespace Ailu::Render
     Vector<GfxCommand *> CommandBuffer::TakeCommands()
     {
         return std::move(_impl->_commands);
+    }
+
+    CommandRenderingStatesData CommandBuffer::TakeRenderingStatesData()
+    {
+        auto data = _impl->_rendering_states_data;
+        _impl->_rendering_states_data.Reset();
+        return data;
     }
 
     const Vector<GfxCommand *> &CommandBuffer::GetCommands() const

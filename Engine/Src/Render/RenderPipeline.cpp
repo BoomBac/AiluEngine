@@ -116,7 +116,6 @@ namespace Ailu::Render
     {
         if (Application::Get()._is_multi_thread_rendering.load() && NeedWaitForRenderThread() && Application::Get().GetFrameCount() > 0u)
         {
-            Application::Get().NotifyRender();
             Application::Get().WaitForRender();
             SetRenderThreadFramePending(false);
         }
@@ -135,7 +134,6 @@ namespace Ailu::Render
             RenderSingleCamera(*cam, *_renderers[0].get());
             _targets.push_back(_renderers[0]->TargetTexture());
         }
-        RenderTexture::ResetRenderTarget();
         
         {
             //if (Application::Get()._is_multi_thread_rendering)
