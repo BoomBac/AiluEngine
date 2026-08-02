@@ -13,13 +13,32 @@ namespace Ailu
             struct Params
             {
                 virtual ~Params() = default;
+                std::function<void(PropertyInfo *)> _on_value_changed;
             };
-        public:
-            static Ref<UIElement> BuildPropertyElement(const String &label, PropertyInfo *property, void* instance,Params* params = nullptr);
+            using Builder = std::function<Ref<UIElement>(const String &, PropertyInfo *, void *, Params *)>;
+
+            static Ref<UIElement> BuildPropertyElement(const String &label, PropertyInfo *property, void *instance, Params *params = nullptr);
+            static void RegisterBuilder(const Type *type, Builder builder);
+
+            template<typename TValue>
+            static void RegisterBuilder(Builder builder)
+            {
+                RegisterBuilder(StaticClass<TValue>(), std::move(builder));
+            }
+
+            template<typename TValue>
+            static void SetPropertyValue(PropertyInfo *property, void *instance, const TValue &value, Params *params)
+            {
+                property->Set<TValue>(instance, value, PropertyInfo::EPropertyChangeSource::kUI);
+                if (params != nullptr && params->_on_value_changed)
+                    params->_on_value_changed(property);
+            }
+
         private:
             static void InitBuilders();
+
         private:
-            inline static HashMap<const Type*, std::function<Ref<UIElement>(const String &, PropertyInfo*, void*,Params*)>> s_builders;
+            inline static HashMap<const Type *, Builder> s_builders;
             inline static bool s_is_init = false;
         };
         

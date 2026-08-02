@@ -54,6 +54,10 @@ namespace Ailu
 
             auto list_view = MakeRef<UI::ListView>();
             list_view->Name("EditorPopupMenu");
+            UI::UIBrush transparent_brush;
+            transparent_brush._type = UI::EUIBrushType::kColor;
+            transparent_brush._tint = Colors::kTransparent;
+            list_view->SetBackgroundBrush(transparent_brush);
             const f32 popup_height = std::min(kRowHeight * static_cast<f32>(actions.size()), kMaxHeight);
             list_view->GetSlot()->Size({kMenuWidth, popup_height});
             list_view->SetViewportHeight(popup_height);

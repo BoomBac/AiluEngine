@@ -16,10 +16,11 @@ namespace Ailu::RHI::DX12
     struct D3DResourceStateGuard
     {
     public:
-        D3DResourceStateGuard() = default;
+        D3DResourceStateGuard() : _instance_id(s_next_instance_id.fetch_add(1u, std::memory_order_relaxed)) {}
 
         D3DResourceStateGuard(ID3D12Resource *resource, D3D12_RESOURCE_STATES initial_state, u32 subres_num)
-            : _resource(resource), _uniform_state(initial_state), _sub_res_num(subres_num), _is_state_uniform(true)
+            : _instance_id(s_next_instance_id.fetch_add(1u, std::memory_order_relaxed)), _resource(resource),
+              _uniform_state(initial_state), _sub_res_num(subres_num), _is_state_uniform(true)
         {
             AL_ASSERT(_resource != nullptr);
             AL_ASSERT(_sub_res_num > 0u);
@@ -92,6 +93,8 @@ namespace Ailu::RHI::DX12
             std::scoped_lock lock(_mutex);
             return _resource;
         }
+
+        [[nodiscard]] u64 InstanceId() const { return _instance_id; }
 
         void SnapshotStates(Vector<D3D12_RESOURCE_STATES>& out_states) const
         {
@@ -234,12 +237,14 @@ namespace Ailu::RHI::DX12
         void MoveFrom(D3DResourceStateGuard &other)
         {
             _subresource_states = std::move(other._subresource_states);
+            _instance_id = other._instance_id;
             _resource = other._resource;
             _uniform_state = other._uniform_state;
             _sub_res_num = other._sub_res_num;
             _is_state_uniform = other._is_state_uniform;
 
             other._subresource_states.clear();
+            other._instance_id = 0u;
             other._resource = nullptr;
             other._uniform_state = D3D12_RESOURCE_STATE_COMMON;
             other._sub_res_num = 0u;
@@ -248,6 +253,8 @@ namespace Ailu::RHI::DX12
 
     private:
         Vector<D3D12_RESOURCE_STATES> _subresource_states;
+        inline static std::atomic<u64> s_next_instance_id = 1u;
+        u64 _instance_id = 0u;
         ID3D12Resource *_resource = nullptr;
         D3D12_RESOURCE_STATES _uniform_state = D3D12_RESOURCE_STATE_COMMON;
         mutable std::mutex _mutex;

@@ -936,6 +936,10 @@ namespace Ailu
                     return;
                 }
                 auto list_view = MakeRef<ListView>();
+                UIBrush transparent_brush;
+                transparent_brush._type = EUIBrushType::kColor;
+                transparent_brush._tint = Colors::kTransparent;
+                list_view->SetBackgroundBrush(transparent_brush);
                 list_view->SetSlot(MakeRef<LinearSlot>());
                 list_view->GetSlotAs<LinearSlot>().SizePolicy(ESizePolicy::kFixed, ESizePolicy::kAuto);
                 list_view->Name(std::format("Dropdown_{}", _name));

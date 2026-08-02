@@ -246,7 +246,7 @@ namespace Ailu::RHI::DX12
             D3DResourceStateGuard *_global_state = nullptr;
             Vector<D3D12_RESOURCE_STATES> _states;
         };
-        HashMap<ID3D12Resource *, ScheduledResourceState> _scheduled_resource_states;
+        HashMap<u64, ScheduledResourceState> _scheduled_resource_states;
         //command signature
         ComPtr<ID3D12CommandSignature> _dispatch_cmd_sig;
         ComPtr<ID3D12CommandSignature> _draw_cmd_sig;

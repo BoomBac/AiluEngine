@@ -811,15 +811,16 @@ namespace Ailu::RHI::DX12
                 D3DCommandBuffer *reconcile_d3dcmd = nullptr;
                 for (const auto& snapshot: snapshots)
                 {
-                    auto state_it = _scheduled_resource_states.find(snapshot._resource);
+                    auto state_it = _scheduled_resource_states.find(snapshot._resource_instance_id);
                     if (state_it == _scheduled_resource_states.end() ||
-                        state_it->second._global_state != snapshot._global_state)
+                        state_it->second._global_state != snapshot._global_state ||
+                        state_it->second._states.size() != snapshot._initial_states.size())
                     {
                         ScheduledResourceState scheduled_state;
                         scheduled_state._global_state = snapshot._global_state;
                         scheduled_state._states = snapshot._initial_states;
-                        _scheduled_resource_states.insert_or_assign(snapshot._resource, std::move(scheduled_state));
-                        state_it = _scheduled_resource_states.find(snapshot._resource);
+                        _scheduled_resource_states.insert_or_assign(snapshot._resource_instance_id, std::move(scheduled_state));
+                        state_it = _scheduled_resource_states.find(snapshot._resource_instance_id);
                     }
 
                     auto& scheduled_states = state_it->second._states;

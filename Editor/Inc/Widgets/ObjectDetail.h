@@ -1,7 +1,11 @@
 #ifndef __COMMON_VIEW__
 #define __COMMON_VIEW__
 #include "Dock/DockWindow.h"
+#include "Inspector/ComponentEditorRegistry.h"
+#include "Inspector/ReflectedPropertyPanel.h"
+#include "Inspector/IComponentEditor.h"
 #include "generated/ObjectDetail.gen.h"
+
 namespace Ailu
 {
     namespace UI
@@ -16,6 +20,14 @@ namespace Ailu
     }// namespace UI
     namespace Editor
     {
+        struct ObjectDetailComponentEntry
+        {
+            const ComponentEditorInfo *_component_info = nullptr;
+            UI::CollapsibleView *_block = nullptr;
+            Scope<IComponentEditor> _custom_editor;
+            Scope<ReflectedPropertyPanel> _reflected_panel;
+        };
+
         ACLASS()
         class ObjectDetail : public DockWindow
         {
@@ -26,22 +38,20 @@ namespace Ailu
             void Update(f32 dt) final;
 
         private:
+            void Rebuild(ECS::Entity entity);
+            void ClearComponentEntries();
+            void BuildComponentEntry(const ComponentEditorInfo &info, ECS::Entity entity);
+            UI::CollapsibleView *CreateComponentBlock(const ComponentEditorInfo &info, ECS::Entity entity, bool allow_remove);
+            ComponentEditorContext BuildContext(const ComponentEditorInfo &info, UI::CollapsibleView *block);
+            void ShowAddComponentPopup(UI::UIElement *anchor);
+
             UI::ScrollView *_root = nullptr;
             UI::VerticalBox *_vb = nullptr;
-            UI::CollapsibleView *_transform_block = nullptr;
-            UI::CollapsibleView *_light_block = nullptr;
-            UI::CollapsibleView *_static_mesh_block = nullptr;
-            UI::CollapsibleView *_light_probe_block = nullptr;
-            UI::CollapsibleView *_cam_block = nullptr;
-            UI::CollapsibleView *_sprite_block = nullptr;
-            UI::CollapsibleView *_script_block = nullptr;
-            UI::InputBlock *_script_path_block = nullptr;
-            UI::UIElement *_prev_comp_block = nullptr;
             UI::Text *_name_text = nullptr;
             UI::Button *_add_component_button = nullptr;
+            ECS::Entity _selected_entity = ECS::kInvalidEntity;
             bool _needs_rebuild = true;
-
-            void ShowAddComponentPopup(UI::UIElement *anchor);
+            Vector<ObjectDetailComponentEntry> _component_entries;
         };
     }// namespace Editor
 }// namespace Ailu

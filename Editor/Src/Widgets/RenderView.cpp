@@ -474,8 +474,8 @@ namespace Ailu
                 SetSceneCamera2DOrthographic(_scene_2d_orientation);
                 e._is_handled = true;
             };
-
             _dropdown_2d_orientation = _scene_toolbar->AddChild<UI::Dropdown>(Vector<String>{"XY", "-X", "-Y", "-Z"});
+
             _dropdown_2d_orientation->GetSlotAs<UI::LinearSlot>()
                     .SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFill)
                     .Size({kSceneToolbarDropdownWidth, 24.0f})

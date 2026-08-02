@@ -22,6 +22,7 @@ namespace Ailu::Render
         {
             _bloom_mats.emplace_back(MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/PostProcess/bloom.alasset"), std::format("bloom_mip_{}", i)));
         }
+        _bloom_compose_mat = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/PostProcess/bloom.alasset"), "BloomCompose");
         _event = static_cast<ERenderPassEvent>(static_cast<u16>(ERenderPassEvent::kBeforePostprocess) + 25u);
         _nose_tex = ResourceMgr::Get().Get<Texture2D>(L"Textures/noise_medium.png");
         _noise_texel_size = {0.0f, 0.0f,(f32) _nose_tex->Width(), (f32) _nose_tex->Height()};
@@ -108,9 +109,10 @@ namespace Ailu::Render
 
             //_bloom_mats[0]->SetVector("_NoiseTex_TexelSize", _noise_texel_size);
             //_bloom_mats[0]->SetTexture("_NoiseTex", _nose_tex);
-            _bloom_mats[0]->SetTexture("_SourceTex", graph.Resolve<Texture>(final_input));
-            _bloom_mats[0]->SetTexture("_BloomTex", graph.Resolve<Texture>(bloom_mips[0]));
-            cmd->DrawFullScreenQuad(_bloom_mats[0].get(), 3);
+            _bloom_compose_mat->SetVector("_SampleParams", Vector4f(0.0f, 0.0f, 0.0f, _bloom_intensity));
+            _bloom_compose_mat->SetTexture("_SourceTex", graph.Resolve<Texture>(final_input));
+            _bloom_compose_mat->SetTexture("_BloomTex", graph.Resolve<Texture>(bloom_mips[0]));
+            cmd->DrawFullScreenQuad(_bloom_compose_mat.get(), 3);
         });
     }
     void PostProcessPass::Execute(GraphicsContext *context, RenderingData &rendering_data)

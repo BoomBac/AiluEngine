@@ -102,6 +102,7 @@ namespace Ailu
                                        D3D12_RESOURCE_STATES after_state, u32 sub_res);
             struct ResourceStateSnapshot
             {
+                u64 _resource_instance_id = 0u;
                 ID3D12Resource* _resource = nullptr;
                 D3DResourceStateGuard* _global_state = nullptr;
                 Vector<D3D12_RESOURCE_STATES> _initial_states;
@@ -205,6 +206,7 @@ namespace Ailu
         private:
             struct LocalResourceState
             {
+                ID3D12Resource* _resource = nullptr;
                 D3DResourceStateGuard* _global_state = nullptr;
                 Vector<D3D12_RESOURCE_STATES> _initial_states;
                 Vector<D3D12_RESOURCE_STATES> _states;
@@ -233,7 +235,7 @@ namespace Ailu
             CommandBufferStatistics _statistics;
             Vector<Render::CommandProfiler *> _profiler_stack;
             std::unordered_set<GpuResource *> _active_render_targets;
-            std::unordered_map<ID3D12Resource *, LocalResourceState> _local_resource_states;
+            std::unordered_map<u64, LocalResourceState> _local_resource_states;
             Vector<std::function<void(u64)>> _post_submit_callbacks;
         };
     }// namespace ::RHI::DX12

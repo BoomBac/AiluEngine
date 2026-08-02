@@ -140,14 +140,16 @@ namespace Ailu::RHI::DX12
         if (resource == nullptr)
             return;
 
-        auto it = _local_resource_states.find(resource);
+        const u64 resource_instance_id = state_guard.InstanceId();
+        auto it = _local_resource_states.find(resource_instance_id);
         if (it == _local_resource_states.end())
         {
             LocalResourceState local_state;
+            local_state._resource = resource;
             local_state._global_state = &state_guard;
             state_guard.SnapshotStates(local_state._states);
             local_state._initial_states = local_state._states;
-            it = _local_resource_states.emplace(resource, std::move(local_state)).first;
+            it = _local_resource_states.emplace(resource_instance_id, std::move(local_state)).first;
         }
 
         auto& states = it->second._states;
@@ -202,10 +204,11 @@ namespace Ailu::RHI::DX12
     {
         out_snapshots.clear();
         out_snapshots.reserve(_local_resource_states.size());
-        for (const auto& [resource, local_state] : _local_resource_states)
+        for (const auto& [resource_instance_id, local_state] : _local_resource_states)
         {
             ResourceStateSnapshot snapshot;
-            snapshot._resource = resource;
+            snapshot._resource_instance_id = resource_instance_id;
+            snapshot._resource = local_state._resource;
             snapshot._global_state = local_state._global_state;
             snapshot._initial_states = local_state._initial_states;
             snapshot._final_states = local_state._states;
@@ -215,9 +218,9 @@ namespace Ailu::RHI::DX12
 
     void D3DCommandBuffer::CommitResourceStates()
     {
-        for (auto& [resource, local_state] : _local_resource_states)
+        for (auto& [resource_instance_id, local_state] : _local_resource_states)
         {
-            (void) resource;
+            (void) resource_instance_id;
             if (local_state._global_state != nullptr)
                 local_state._global_state->SetStateFromSnapshot(local_state._states);
         }

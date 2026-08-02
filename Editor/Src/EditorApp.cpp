@@ -2,6 +2,8 @@
 #include "Common/Undo.h"
 #include "Widgets/InputLayer.h"
 #include "Widgets/RenderView.h"
+#include "Inspector/ComponentEditorRegistry.h"
+#include "Inspector/ComponentEditorRegistration.h"
 
 #include "Framework/Common/FileManager.h"
 #include "Framework/Common/JobSystem.h"
@@ -91,6 +93,7 @@ namespace Ailu
                     ar >> g_editor_ui_theme;
                 UI::UIManager::Get()->SetTheme(&g_editor_ui_theme);
             }
+            RegisterComponentEditors();
             _p_editor_layer = new EditorLayer();
             PushLayer(_p_editor_layer);
             _is_playing_mode = false;

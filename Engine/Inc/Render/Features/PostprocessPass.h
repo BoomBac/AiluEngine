@@ -37,6 +37,7 @@ namespace Ailu::Render
         u16 _bloom_iterator_count = 6;
         Texture2D *_nose_tex;
         Vector<Ref<Material>> _bloom_mats;
+        Ref<Material> _bloom_compose_mat;
         Vector4f _noise_texel_size;
         Ref<ComputeShader> _cs_blur;
         ComputeShaderKernelId _blur_x_kernel = kInvalidComputeShaderKernelId;
