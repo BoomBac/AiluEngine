@@ -14,6 +14,26 @@
 
 namespace Ailu
 {
+    enum class InputChannel : u8
+    {
+        kMouse = 1u << 0u,
+        kKeyboard = 1u << 1u,
+        kText = 1u << 2u,
+        kGamepad = 1u << 3u
+    };
+
+    class AILU_API InputRouteState
+    {
+    public:
+        static InputRouteState &Get();
+        void BeginFrame();
+        void Consume(InputChannel channel);
+        bool IsConsumed(InputChannel channel) const;
+
+    private:
+        u8 _consumed_channels = 0u;
+    };
+
     class Window;
     class InputPlatform
     {
@@ -112,18 +132,6 @@ namespace Ailu
         {
             return sp_instance->GetGlobalMousePos();
         }
-        inline static bool IsInputBlock()
-        {
-            return s_block_input || s_imgui_block_input;
-        }
-        inline static void BlockInput(bool block)
-        {
-            s_block_input = block;
-        }
-        inline static void BlockInputByImGui(bool block)
-        {
-            s_imgui_block_input = block;
-        }
         inline static Vector2f GetMousePosDelta()
         {
             return s_mouse_pos_delta;
@@ -143,8 +151,6 @@ namespace Ailu
         static void NotifyFocusLost();
         static void NotifyWindowClosed(Window *w);
         inline static Scope<InputPlatform> sp_instance;
-        inline static bool s_block_input = false;
-        inline static bool s_imgui_block_input = false;
         inline static std::mutex s_input_state_mutex;
         inline static std::mutex s_mouse_state_mutex;
         inline static Vector2f s_mouse_pos_delta = Vector2f::kZero;

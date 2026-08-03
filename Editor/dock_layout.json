@@ -5,14 +5,14 @@
             "_parent_id": 4294967295,
             "_type": 0,
             "_is_vertical_split": true,
-            "_split_ratio": 0.7633466124534607,
+            "_split_ratio": 0.7424,
             "_title": "null",
             "_window_id": 0,
             "_tab_id": "",
             "_window_position": [-858993472.0, -858993472.0],
-            "_window_size": [1798.0, 956.0],
+            "_window_size": [1491.0, 801.0],
             "_position": [0.0, 34.0],
-            "_size": [1798.0, 898.0],
+            "_size": [1491.0, 743.0],
             "_flags": 16,
             "_window_state": ""
         }, {
@@ -21,14 +21,14 @@
             "_parent_id": 0,
             "_type": 0,
             "_is_vertical_split": false,
-            "_split_ratio": 0.6366459727287292,
+            "_split_ratio": 0.6366,
             "_title": "null",
             "_window_id": 0,
             "_tab_id": "",
             "_window_position": [-858993472.0, -858993472.0],
-            "_window_size": [1798.0, 956.0],
+            "_window_size": [1491.0, 801.0],
             "_position": [0.0, 34.0],
-            "_size": [1372.4971923828125, 898.0],
+            "_size": [1107.0, 743.0],
             "_flags": 0,
             "_window_state": ""
         }, {
@@ -37,14 +37,14 @@
             "_parent_id": 4,
             "_type": 0,
             "_is_vertical_split": true,
-            "_split_ratio": 0.2199999988079071,
+            "_split_ratio": 0.2199,
             "_title": "null",
             "_window_id": 0,
             "_tab_id": "",
             "_window_position": [-858993472.0, -858993472.0],
-            "_window_size": [1798.0, 956.0],
+            "_window_size": [1491.0, 801.0],
             "_position": [0.0, 34.0],
-            "_size": [1372.4971923828125, 571.7080688476563],
+            "_size": [1107.0, 473.0279],
             "_flags": 0,
             "_window_state": ""
         }, {
@@ -58,9 +58,9 @@
             "_window_id": 0,
             "_tab_id": "",
             "_window_position": [-858993472.0, -858993472.0],
-            "_window_size": [1798.0, 956.0],
+            "_window_size": [1491.0, 801.0],
             "_position": [0.0, 34.0],
-            "_size": [301.9493713378906, 571.7080688476563],
+            "_size": [243.5399, 473.0279],
             "_flags": 0,
             "_window_state": ""
         }, {
@@ -74,9 +74,9 @@
             "_window_id": 0,
             "_tab_id": "",
             "_window_position": [-858993472.0, -858993472.0],
-            "_window_size": [1798.0, 956.0],
-            "_position": [301.9493713378906, 34.0],
-            "_size": [1070.5478515625, 571.7080688476563],
+            "_window_size": [1491.0, 801.0],
+            "_position": [243.5399, 34.0],
+            "_size": [863.46, 473.0279],
             "_flags": 0,
             "_window_state": ""
         }, {
@@ -90,11 +90,11 @@
             "_window_id": 0,
             "_tab_id": "",
             "_window_position": [-858993472.0, -858993472.0],
-            "_window_size": [1798.0, 956.0],
-            "_position": [0.0, 605.7080688476563],
-            "_size": [1372.4971923828125, 326.29193115234375],
+            "_window_size": [1491.0, 801.0],
+            "_position": [0.0, 507.0279],
+            "_size": [1107.0, 269.972],
             "_flags": 0,
-            "_window_state": "{\n    \"_split_ratio\": 0.21278825402259827\n}"
+            "_window_state": "{\n    \"_split_ratio\": 0.2127\n}"
         }, {
             "_type_id": "Ailu::Editor::ObjectDetail",
             "_id": 2,
@@ -106,9 +106,9 @@
             "_window_id": 0,
             "_tab_id": "",
             "_window_position": [-858993472.0, -858993472.0],
-            "_window_size": [1798.0, 956.0],
-            "_position": [1372.4971923828125, 34.0],
-            "_size": [425.5028076171875, 898.0],
+            "_window_size": [1491.0, 801.0],
+            "_position": [1107.0, 34.0],
+            "_size": [384.0, 743.0],
             "_flags": 0,
             "_window_state": ""
         }]

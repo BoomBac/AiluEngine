@@ -106,7 +106,7 @@
                                 "_hash": 959,
                                 "_children": [{
                                         "_type_name": "Ailu::UI::Text",
-                                        "_color": [0.9200000166893005, 0.9399999976158142, 0.9599999785423279, 1.0],
+                                        "_color": [0.92, 0.9399, 0.9599, 1.0],
                                         "_horizontal_align": "kCenter",
                                         "_vertical_align": "kCenter",
                                         "_font_size": 14.0,
@@ -136,7 +136,7 @@
                                     }]
                             }, {
                                 "_type_name": "Ailu::UI::Text",
-                                "_color": [1.0, 1.0, 1.0, 1.0],
+                                "_color": [0.9999, 0.9999, 0.9999, 1.0],
                                 "_horizontal_align": "kCenter",
                                 "_vertical_align": "kCenter",
                                 "_font_size": 14.0,
@@ -150,7 +150,7 @@
                                     "_fill_rate": 1.0,
                                     "_cross_align": "kFill",
                                     "_margin": [0.0, 0.0, 0.0, 0.0],
-                                    "_size": [108.33845520019531, 16.369230270385742],
+                                    "_size": [108.3384, 16.3692],
                                     "_name": "object_7101",
                                     "_id": 3435973836,
                                     "_hash": 0
@@ -240,7 +240,7 @@
                                         "_hash": 958,
                                         "_children": [{
                                                 "_type_name": "Ailu::UI::Text",
-                                                "_color": [1.0, 1.0, 1.0, 1.0],
+                                                "_color": [0.9999, 0.9999, 0.9999, 1.0],
                                                 "_horizontal_align": "kLeft",
                                                 "_vertical_align": "kCenter",
                                                 "_font_size": 14.0,
@@ -254,7 +254,7 @@
                                                     "_fill_rate": 1.0,
                                                     "_cross_align": "kCenter",
                                                     "_margin": [0.0, 0.0, 0.0, 0.0],
-                                                    "_size": [108.33845520019531, 16.369230270385742],
+                                                    "_size": [108.3384, 16.3692],
                                                     "_name": "object_7119",
                                                     "_id": 3435973836,
                                                     "_hash": 0
@@ -341,7 +341,7 @@
                                                         "_hash": 959,
                                                         "_children": [{
                                                                 "_type_name": "Ailu::UI::Text",
-                                                                "_color": [1.0, 1.0, 1.0, 1.0],
+                                                                "_color": [0.9999, 0.9999, 0.9999, 1.0],
                                                                 "_horizontal_align": "kCenter",
                                                                 "_vertical_align": "kCenter",
                                                                 "_font_size": 14.0,
@@ -371,7 +371,7 @@
                                                             }]
                                                     }, {
                                                         "_type_name": "Ailu::UI::Text",
-                                                        "_color": [1.0, 1.0, 1.0, 1.0],
+                                                        "_color": [0.9999, 0.9999, 0.9999, 1.0],
                                                         "_horizontal_align": "kCenter",
                                                         "_vertical_align": "kBottom",
                                                         "_font_size": 14.0,
@@ -385,7 +385,7 @@
                                                             "_fill_rate": 1.0,
                                                             "_cross_align": "kFill",
                                                             "_margin": [0.0, 0.0, 0.0, 0.0],
-                                                            "_size": [108.33845520019531, 16.369230270385742],
+                                                            "_size": [108.3384, 16.3692],
                                                             "_name": "object_7131",
                                                             "_id": 3435973836,
                                                             "_hash": 0
@@ -452,7 +452,7 @@
                                 "_hash": 959,
                                 "_children": [{
                                         "_type_name": "Ailu::UI::Text",
-                                        "_color": [0.9200000166893005, 0.9399999976158142, 0.9599999785423279, 1.0],
+                                        "_color": [0.92, 0.9399, 0.9599, 1.0],
                                         "_horizontal_align": "kCenter",
                                         "_vertical_align": "kCenter",
                                         "_font_size": 14.0,
@@ -482,7 +482,7 @@
                                     }]
                             }, {
                                 "_type_name": "Ailu::UI::Image",
-                                "_tint_color": [1.0, 1.0, 1.0, 1.0],
+                                "_tint_color": [0.9999, 0.9999, 0.9999, 1.0],
                                 "_texture_guid": "0f4943a3-8df4-4917-8730-92c9de6ef6ce",
                                 "_visibility": "kVisible",
                                 "_slot_obj": {

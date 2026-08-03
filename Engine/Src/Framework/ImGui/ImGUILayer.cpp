@@ -184,11 +184,6 @@ namespace Ailu
 
     bool Ailu::ImGUILayer::ShouldBlockEngineInputEvent(const Event &e) const
     {
-        if (e.IsInCategory(EEventCategory::kEventCategoryMouse) ||
-            e.IsInCategory(EEventCategory::kEventCategoryMouseButton))
-            return _blocks_engine_mouse_input;
-        if (e.IsInCategory(EEventCategory::kEventCategoryKeyboard))
-            return _blocks_engine_keyboard_input || _blocks_engine_mouse_input;
         return false;
     }
 
@@ -200,7 +195,12 @@ namespace Ailu
         const bool item_active = ImGui::IsAnyItemActive();
         _blocks_engine_mouse_input = io.WantCaptureMouse || hovered || item_hovered || item_active;
         _blocks_engine_keyboard_input = io.WantCaptureKeyboard || io.WantTextInput || item_active;
-        Input::BlockInputByImGui(_blocks_engine_mouse_input);
+        if (_blocks_engine_mouse_input)
+            InputRouteState::Get().Consume(InputChannel::kMouse);
+        if (_blocks_engine_keyboard_input)
+            InputRouteState::Get().Consume(InputChannel::kKeyboard);
+        if (io.WantTextInput)
+            InputRouteState::Get().Consume(InputChannel::kText);
     }
 }
 

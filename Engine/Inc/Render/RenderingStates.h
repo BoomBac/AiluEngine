@@ -17,6 +17,8 @@ namespace Ailu::Render
         u64 PsoLookupCount = 0u;
         u64 PsoCacheHitCount = 0u;
         u64 PsoCacheMissCount = 0u;
+        u64 VbBindCacheHitCount = 0u;
+        u64 VbBindCacheMissCount = 0u;
         u64 MaterialCaptureCount = 0u;
         u64 MaterialBindingResolveCount = 0u;
         u64 MaterialBindingCacheHitCount = 0u;
@@ -57,6 +59,8 @@ namespace Ailu::Render
         u64 PsoLookupCount = 0u;
         u64 PsoCacheHitCount = 0u;
         u64 PsoCacheMissCount = 0u;
+        u64 VbBindCacheHitCount = 0u;
+        u64 VbBindCacheMissCount = 0u;
         u64 MaterialCaptureCount = 0u;
         u64 MaterialBindingResolveCount = 0u;
         u64 MaterialBindingCacheHitCount = 0u;
@@ -93,6 +97,8 @@ namespace Ailu::Render
             PsoLookupCount += other.PsoLookupCount;
             PsoCacheHitCount += other.PsoCacheHitCount;
             PsoCacheMissCount += other.PsoCacheMissCount;
+            VbBindCacheHitCount += other.VbBindCacheHitCount;
+            VbBindCacheMissCount += other.VbBindCacheMissCount;
             MaterialCaptureCount += other.MaterialCaptureCount;
             MaterialBindingResolveCount += other.MaterialBindingResolveCount;
             MaterialBindingCacheHitCount += other.MaterialBindingCacheHitCount;
@@ -128,6 +134,8 @@ namespace Ailu::Render
             data.PsoLookupCount += PsoLookupCount;
             data.PsoCacheHitCount += PsoCacheHitCount;
             data.PsoCacheMissCount += PsoCacheMissCount;
+            data.VbBindCacheHitCount += VbBindCacheHitCount;
+            data.VbBindCacheMissCount += VbBindCacheMissCount;
             data.MaterialCaptureCount += MaterialCaptureCount;
             data.MaterialBindingResolveCount += MaterialBindingResolveCount;
             data.MaterialBindingCacheHitCount += MaterialBindingCacheHitCount;

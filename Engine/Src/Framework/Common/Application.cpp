@@ -209,6 +209,8 @@ namespace Ailu
         _p_window = std::move(WindowFactory::Create(g_engine_config.isMultiThreadRender ? L"AiluEngine -mt" : L"AiluEngine", desc._window_width, desc._window_height));
         _p_window->SetEventHandler(BIND_EVENT_HANDLER(OnEvent));
         s_focus_window = _p_window.get();
+        _input_system = MakeScope<InputSystem>();
+        _win_input_backend.Initialize(*_input_system, _p_window.get());
         _layer_stack = new LayerStack();
         //PushLayer(new UI::UILayer());
 #ifdef DEAR_IMGUI
@@ -266,6 +268,8 @@ namespace Ailu
         for (auto &it: type->GetProperties())
             it.Serialize(&g_engine_config,ar);
         ar.Save(s_engine_config_path);
+        _win_input_backend.Shutdown(*_input_system);
+        _input_system.reset();
         delete _layer_stack; _layer_stack = nullptr;
         UI::UIManager::Shutdown();
         Gizmo::Shutdown();
@@ -526,8 +530,6 @@ namespace Ailu
     void Application::OnEvent(Event &e)
     {
         UpdatePlatformEventState(e);
-        if (_p_imgui_layer != nullptr && _p_imgui_layer->ShouldBlockEngineInputEvent(e))
-            return;
 #if defined(SEPARATE_LOGIC_THREAD)
         EventDispather dispather(e);
         dispather.Dispatch<MouseButtonReleasedEvent>(BIND_EVENT_HANDLER(OnMouseUp));
@@ -641,6 +643,7 @@ namespace Ailu
 #if defined(TRACY_ENABLE)
         ZoneScopedN("UI::Update + Events");
 #endif
+        _input_system->Update(delta_time);
         UI::UIManager::Get()->Update(delta_time);
 #if defined(SEPARATE_LOGIC_THREAD)
         PROFILE_BLOCK_CPU(Application_OnEvent)

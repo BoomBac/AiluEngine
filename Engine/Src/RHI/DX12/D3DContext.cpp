@@ -1782,11 +1782,17 @@ namespace Ailu::RHI::DX12
                 BindParams params;
                 params._params._vb_binder._layout = &material_state._shader->PipelineInputLayout(material_state._pass_index,
                                                                                                      material_state._variant_hash);
+                pso->Bind(cmd_buffer, params);
                 bool is_produced = draw_cmd->_vb == nullptr;
                 const void *layout = params._params._vb_binder._layout;
                 const u64 vb_view_version = draw_cmd->_vb == nullptr ? 0u : draw_cmd->_vb->GetViewVersion();
-                if (!is_produced && (!d3dcmd->IsVertexBufferActive(draw_cmd->_vb, layout, vb_view_version)))
+                if (!is_produced && d3dcmd->IsVertexBufferActive(draw_cmd->_vb, layout, vb_view_version))
                 {
+                    ++d3dcmd->Statistics()._vb_bind_cache_hit_count;
+                }
+                else if (!is_produced)
+                {
+                    ++d3dcmd->Statistics()._vb_bind_cache_miss_count;
                     draw_cmd->_vb->Bind(d3dcmd, params);
                     d3dcmd->SetVertexBufferActive(draw_cmd->_vb, layout, vb_view_version);
                 }
@@ -1805,7 +1811,6 @@ namespace Ailu::RHI::DX12
                 triangle_count *= draw_cmd->_instance_count;
                 d3dcmd->Statistics()._triangle_num += triangle_count;
                 d3dcmd->Statistics()._vertex_num += vertex_count;
-                pso->Bind(cmd_buffer, params);
                 d3dcmd->MarkUsedResource(pso);
                 if (draw_cmd->_arg_buffer)
                 {

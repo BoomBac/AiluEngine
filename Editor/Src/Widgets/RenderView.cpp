@@ -691,7 +691,7 @@ namespace Ailu
                     _is_camera_input_active = false;
                     _canvas_camera_controller.EndDrag();
                 }
-                if (Camera::sCurrent && !Input::IsInputBlock() && _is_camera_input_active)
+                if (Camera::sCurrent && !InputRouteState::Get().IsConsumed(InputChannel::kMouse) && _is_camera_input_active)
                     _canvas_camera_controller.Drag(_mouse_pos, _view_size);
                 return;
             }
@@ -703,7 +703,7 @@ namespace Ailu
                 _is_camera_input_active = false;
                 _has_camera_input_last_mouse_pos = false;
             }
-            if (Camera::sCurrent && !Input::IsInputBlock() && _is_camera_input_active)
+            if (Camera::sCurrent && !InputRouteState::Get().IsConsumed(InputChannel::kMouse) && _is_camera_input_active)
             {
                 Vector2f target_rotation = _camera_controller->_rotation;
                 auto cur_mouse_pos = Input::GetGlobalMousePosAccurate();

@@ -3,6 +3,27 @@
 
 namespace Ailu
 {
+    InputRouteState &InputRouteState::Get()
+    {
+        static InputRouteState s_route_state;
+        return s_route_state;
+    }
+
+    void InputRouteState::BeginFrame()
+    {
+        _consumed_channels = 0u;
+    }
+
+    void InputRouteState::Consume(InputChannel channel)
+    {
+        _consumed_channels |= static_cast<u8>(channel);
+    }
+
+    bool InputRouteState::IsConsumed(InputChannel channel) const
+    {
+        return (_consumed_channels & static_cast<u8>(channel)) != 0u;
+    }
+
     void Input::NotifyKeyPressed(EKey keycode)
     {
         const auto key_index = static_cast<u32>(keycode);
@@ -59,6 +80,7 @@ namespace Ailu
 
     void Input::BeginFrame()
     {
+        InputRouteState::Get().BeginFrame();
         {
             std::lock_guard lock(s_input_state_mutex);
             s_pre_key_state = s_cur_key_state;

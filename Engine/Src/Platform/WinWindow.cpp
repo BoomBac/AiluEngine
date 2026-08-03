@@ -53,20 +53,17 @@ namespace
 
         HRESULT DragEnter(IDataObject *, DWORD, POINTL, DWORD *pdwEffect) override
         {
-            Ailu::Input::BlockInput(true);
             *pdwEffect = DROPEFFECT_COPY;
             return S_OK;
         }
 
         HRESULT DragLeave() override
         {
-            Ailu::Input::BlockInput(false);
             return S_OK;
         }
 
         HRESULT Drop(IDataObject *data_object, DWORD, POINTL point, DWORD *pdwEffect) override
         {
-            Ailu::Input::BlockInput(false);
             *pdwEffect = DROPEFFECT_COPY;
             if (data_object == nullptr)
                 return S_OK;

@@ -43,6 +43,8 @@ namespace Ailu
                 u64 _draw_command_count = 0u;
                 u64 _resource_mark_request_count = 0u;
                 u64 _unique_resource_mark_count = 0u;
+                u64 _vb_bind_cache_hit_count = 0u;
+                u64 _vb_bind_cache_miss_count = 0u;
 
                 void Reset()
                 {
@@ -53,6 +55,8 @@ namespace Ailu
                     _draw_command_count = 0u;
                     _resource_mark_request_count = 0u;
                     _unique_resource_mark_count = 0u;
+                    _vb_bind_cache_hit_count = 0u;
+                    _vb_bind_cache_miss_count = 0u;
                 }
 
                 void MergeTo(Render::RenderingStatesData &data) const
@@ -64,6 +68,8 @@ namespace Ailu
                     data.DrawCommandCount += _draw_command_count;
                     data.ResourceMarkRequestCount += _resource_mark_request_count;
                     data.UniqueResourceMarkCount += _unique_resource_mark_count;
+                    data.VbBindCacheHitCount += _vb_bind_cache_hit_count;
+                    data.VbBindCacheMissCount += _vb_bind_cache_miss_count;
                 }
             };
 

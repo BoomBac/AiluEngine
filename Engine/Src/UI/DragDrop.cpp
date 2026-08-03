@@ -76,7 +76,6 @@ namespace Ailu
                 _is_drag_start = true;
             if (!_is_drag_start)
                 return;
-            Input::BlockInput(true);
             auto mp = Input::GetMousePos(Application::FocusedWindow());
             UI::UIRenderer::Get()->DrawText(std::format("{} draging...",_display_name), mp, 9u);
             UIElement *hover = FindDragHoverTarget(mp);
@@ -104,7 +103,6 @@ namespace Ailu
                 if (_hover_target)
                     _hover_target->_on_drop(*_payload, mp.x, mp.y);
                 EndDrag();
-                Input::BlockInput(false);
             }
         }
     }// namespace UI

@@ -13,6 +13,8 @@
 #include <thread>
 #include "Framework/Common/Container.hpp"
 #include "Framework/Common/RawEventQueue.h"
+#include "Input/InputSystem.h"
+#include "Platform/WinInputBackend.h"
 #include "generated/Application.gen.h"
 
 namespace Ailu
@@ -164,6 +166,7 @@ namespace Ailu
 
         [[nodiscard]] Window &GetWindow() { return *_p_window; }
         Window *GetWindowPtr() { return _p_window.get(); }
+        InputSystem &GetInputSystem() { return *_input_system; }
         /// @brief 返回逻辑帧
         /// @return 
         u64 GetFrameCount() const {return _frame_count;}
@@ -217,6 +220,8 @@ namespace Ailu
         LayerStack *_layer_stack;
         ImGUILayer *_p_imgui_layer;
         Scope<Window> _p_window = nullptr;
+        Scope<InputSystem> _input_system;
+        WinInputBackend _win_input_backend;
         std::atomic<bool> _is_handling_event;
         std::thread *_p_event_handle_thread;
         Scope<RenderPipeline> _pipeline;

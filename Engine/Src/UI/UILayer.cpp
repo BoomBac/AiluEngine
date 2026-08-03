@@ -56,7 +56,10 @@ namespace Ailu
             ue._type = EventToUIEvent(e);
             ue._mouse_position = Input::GetMousePos(e._window);
             ue._mouse_delta = Input::GetMousePosDelta();
+            const bool is_keyboard_event = (e.GetCategoryFlags() & EEventCategory::kEventCategoryKeyboard) != 0;
+            const InputChannel route_channel = is_keyboard_event ? InputChannel::kKeyboard : InputChannel::kMouse;
             UIElement *capture_target = s_mgr->_capture_target;
+            Widget *modal_widget = s_mgr->GetPopupWidget();
             const bool has_capture = s_mgr->_capture_target != nullptr;
             const bool is_capture_sensitive_mouse_event = has_capture &&
                                                          (ue._type == UI::UIEvent::EType::kMouseMove ||
@@ -81,13 +84,48 @@ namespace Ailu
                 {
                     auto w = widget[i].get();
                     if (w->_visibility != EVisibility::kVisible || w->_is_receive_event == false ||
-                        w->Parent() != e._window)
+                        w->Parent() != e._window || (modal_widget != nullptr && w != modal_widget))
                         continue;
                     if (w->IsHover(ue._mouse_position))
                         return w;
                 }
                 return nullptr;
             };
+            auto dispatch_widget = [&](Widget *widget) -> bool
+            {
+                if (widget == nullptr)
+                    return false;
+                widget->OnEvent(ue);
+                if (ue._is_handled)
+                {
+                    e.SetHandled();
+                    InputRouteState::Get().Consume(route_channel);
+                }
+                return ue._is_handled;
+            };
+            if (is_keyboard_event)
+            {
+                UIElement *focused = s_mgr->_focus_target;
+                if (focused != nullptr)
+                {
+                    for (i32 i = (i32) s_mgr->_widgets.size() - 1; i >= 0; --i)
+                    {
+                        Widget *widget = s_mgr->_widgets[i].get();
+                        if (widget->_visibility != EVisibility::kVisible || widget->_is_receive_event == false ||
+                            widget->Parent() != e._window || (modal_widget != nullptr && widget != modal_widget))
+                            continue;
+                        UIElement *node = focused;
+                        while (node != nullptr && node != widget->Root())
+                            node = node->GetParent();
+                        if (node == widget->Root())
+                        {
+                            dispatch_widget(widget);
+                            break;
+                        }
+                    }
+                }
+                return;
+            }
             Widget *top_hover_widget = find_hover_widget();
             bool is_in_zone = false;
             for (const auto &zone: s_mgr->GetInteractionZones())
@@ -105,7 +143,6 @@ namespace Ailu
                     break;
                 }
             }
-            Input::BlockInput(false);
             if (!is_in_zone)
             {
                 if (e.GetCategoryFlags() & EEventCategory::kEventCategoryKeyboard)
@@ -140,14 +177,16 @@ namespace Ailu
                     auto w = widget[i].get();
                     if (w->_visibility != EVisibility::kVisible || w->_is_receive_event == false || w->Parent() != e._window)
                         continue;
+                    if (modal_widget != nullptr && w != modal_widget)
+                        continue;
                     if (is_capture_sensitive_mouse_event && is_capture_owner_widget(w))
                     {
-                        w->OnEvent(ue);
+                        dispatch_widget(w);
                         break;
                     }
                     if (w->IsHover(ue._mouse_position))//上层已经生成了事件，下次就不再响应
                     {
-                        w->OnEvent(ue);
+                        dispatch_widget(w);
                         cur_hover_widget = w;
                         break;
                     }
@@ -163,9 +202,11 @@ namespace Ailu
                         auto w = widget[i].get();
                         if (w->_visibility != EVisibility::kVisible || w->_is_receive_event == false || w->Parent() != e._window)
                             continue;
+                        if (modal_widget != nullptr && w != modal_widget)
+                            continue;
                         if (is_capture_owner_widget(w))
                         {
-                            w->OnEvent(ue);
+                            dispatch_widget(w);
                             break;
                         }
                     }
@@ -175,13 +216,24 @@ namespace Ailu
                     auto w = widget[i].get();
                     if (w->_visibility != EVisibility::kVisible || w->_is_receive_event == false || w->Parent() != e._window)
                         continue;
+                    if (modal_widget != nullptr && w != modal_widget)
+                        continue;
                     if (w->IsHover(ue._mouse_position))//上层已经生成了事件，下次就不再响应
                     {
                         cur_hover_widget = w;
                         break;
                     }
                 }
-                Input::BlockInput(cur_hover_widget != nullptr);
+            }
+            if (capture_target != nullptr && is_capture_sensitive_mouse_event)
+            {
+                e.SetHandled();
+                InputRouteState::Get().Consume(InputChannel::kMouse);
+            }
+            else if (modal_widget != nullptr && !e.Handled())
+            {
+                e.SetHandled();
+                InputRouteState::Get().Consume(InputChannel::kMouse);
             }
             if (s_mgr->_pre_hover_widget)
             {

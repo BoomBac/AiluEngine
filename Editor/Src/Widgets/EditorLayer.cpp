@@ -1768,6 +1768,7 @@ namespace Ailu
                     return denominator == 0u ? 0.0f : static_cast<f32>(numerator) * 100.0f / static_cast<f32>(denominator);
                 };
                 const u64 pso_total = ds.PsoCacheHitCount + ds.PsoCacheMissCount;
+                const u64 vb_bind_total = ds.VbBindCacheHitCount + ds.VbBindCacheMissCount;
                 const u64 root_slot_total = ds.ActualRootSlotBindCount + ds.SkippedRootSlotBindCount;
                 const u64 material_binding_total = ds.MaterialBindingResolveCount + ds.MaterialBindingCacheHitCount;
                 const u64 material_upload_total = ds.MaterialCBufferUploadCount + ds.MaterialCBufferCacheHitCount;
@@ -1785,6 +1786,10 @@ namespace Ailu
                 ImGui::Text("PSO Cache Hit/Miss: %llu / %llu (%.1f%%)", static_cast<unsigned long long>(ds.PsoCacheHitCount),
                             static_cast<unsigned long long>(ds.PsoCacheMissCount), percent(ds.PsoCacheHitCount, pso_total));
                 ImGui::Text("PSO Dirty: %llu", static_cast<unsigned long long>(ds.GfxPsoDirtyCount));
+                ImGui::Text("VB Bind Cache Hit/Miss: %llu / %llu (%.1f%% hit)",
+                            static_cast<unsigned long long>(ds.VbBindCacheHitCount),
+                            static_cast<unsigned long long>(ds.VbBindCacheMissCount),
+                            percent(ds.VbBindCacheHitCount, vb_bind_total));
                 ImGui::Separator();
                 ImGui::Text("Material Capture: %llu", static_cast<unsigned long long>(ds.MaterialCaptureCount));
                 ImGui::Text("Material Binding Resolve/Cache: %llu / %llu (%.1f%% cache)",
