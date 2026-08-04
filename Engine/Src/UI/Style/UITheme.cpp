@@ -116,6 +116,30 @@ namespace Ailu
                 theme._scroll_view_style._horizontal_scrollbar._thumb_pressed = ColorBrush(c._accent);
                 theme._scroll_view_style._vertical_scrollbar = theme._scroll_view_style._horizontal_scrollbar;
 
+                theme._tree_view_style._row_height = 22.0f;
+                theme._tree_view_style._indent_width = 16.0f;
+                theme._tree_view_style._expand_button_width = 16.0f;
+                theme._tree_view_style._normal_color = c._surface;
+                theme._tree_view_style._hover_color = c._surface_hovered;
+                theme._tree_view_style._selected_color = Color(c._accent.x, c._accent.y, c._accent.z, 0.45f);
+                theme._tree_view_style._selected_unfocused_color = Color(c._border.x, c._border.y, c._border.z, 0.45f);
+                theme._tree_view_style._padding = Padding(2.0f, 1.0f, 2.0f, 1.0f);
+                theme._tree_view_style._font_size = t._normal_font_size;
+
+                theme._table_style._background = Visual(c._surface, c._text_primary, c._border, 1.0f);
+                theme._table_style._header = Visual(Color((std::min)(c._surface.x + 0.04f, 1.0f), (std::min)(c._surface.y + 0.04f, 1.0f), (std::min)(c._surface.z + 0.04f, 1.0f), 1.0f), c._text_primary, c._border, 1.0f);
+                theme._table_style._row = Visual(Colors::kTransparent, c._text_primary, c._border, 1.0f);
+                theme._table_style._row_hovered = Visual(c._surface_hovered, c._text_primary, c._border, 1.0f);
+                theme._table_style._row_selected = Visual(Color(c._accent.x, c._accent.y, c._accent.z, 0.30f), c._text_primary, c._border, 1.0f);
+                theme._table_style._cell = Visual(Colors::kTransparent, c._text_primary);
+                theme._table_style._row_height = 20.0f;
+                theme._table_style._header_height = 22.0f;
+                theme._table_style._border_width = 1.0f;
+                theme._table_style._column_separator_width = 1.0f;
+                theme._table_style._column_separator_color = c._border;
+                theme._table_style._font_size = t._normal_font_size;
+                theme._table_style._cell_padding = Padding(4.0f, 1.0f, 4.0f, 1.0f);
+
                 UIButtonStyle primary = theme._button_style;
                 primary._normal._background = ColorBrush(c._accent);
                 primary._hovered._background = ColorBrush(Color((std::min)(c._accent.x + 0.08f, 1.0f), (std::min)(c._accent.y + 0.08f, 1.0f), (std::min)(c._accent.z + 0.08f, 1.0f), c._accent.w));
@@ -321,6 +345,22 @@ namespace Ailu
             if (style_id.empty())
                 return;
             _tree_view_styles[style_id] = style;
+            BumpRevision();
+        }
+
+        const UITableStyle *UITheme::FindTableStyle(const UIStyleId &style_id) const
+        {
+            if (style_id.empty())
+                return nullptr;
+            auto it = _table_styles.find(style_id);
+            return it == _table_styles.end() ? nullptr : &it->second;
+        }
+
+        void UITheme::SetTableStyle(const UIStyleId &style_id, const UITableStyle &style)
+        {
+            if (style_id.empty())
+                return;
+            _table_styles[style_id] = style;
             BumpRevision();
         }
 

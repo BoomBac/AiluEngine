@@ -78,6 +78,7 @@ namespace Ailu
             void SetExpanded(TreeItemId item, bool expanded);
             bool IsExpanded(TreeItemId item) const;
             void ToggleExpanded(TreeItemId item);
+            void SetExpandOnRowClick(bool enabled) { _expand_on_row_click = enabled; }
             void ExpandAll();
             void CollapseAll();
             void ClearExpansionState();
@@ -133,6 +134,7 @@ namespace Ailu
             TreeCanDragCallback _can_drag_callback;
             TreeCanDropCallback _can_drop_callback;
             TreeDropCallback _drop_callback;
+            bool _expand_on_row_click = false;
 
             // Drag initiation tracking
             TreeItemId _drag_pending_item = kInvalidTreeItemId;

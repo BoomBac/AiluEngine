@@ -503,6 +503,7 @@ namespace Ailu::Render
         void SetMatrixArray(const String& name,Vector<Matrix4x4f> matrix_arr);
         void GetThreadNum(ComputeShaderKernelId kernel, u16 &x, u16 &y, u16 &z) const;
         i16 NameToSlot(const String &name, ComputeShaderKernelId kernel,ShaderVariantHash variant_hash) const;
+        String SlotToName(ComputeShaderKernelId kernel, u16 slot) const;
         void EnableKeyword(const String &kw);
         void DisableKeyword(const String &kw);
         std::tuple<u16, u16, u16> CalculateDispatchNum(ComputeShaderKernelId kernel, u16 task_num_x, u16 task_num_y, u16 task_num_z) const;

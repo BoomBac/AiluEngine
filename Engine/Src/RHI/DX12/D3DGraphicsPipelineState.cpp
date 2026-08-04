@@ -6,7 +6,9 @@
 #include "RHI/DX12/dxhelper.h"
 #include "Render/RenderingStates.h"
 #include "Framework/Common/EngineConfig.h"
-//#include "RHI/DX12/UploadBuffer.h"
+#if AILU_ENABLE_FRAME_DEBUGGER
+#include "Render/FrameDebugger/FrameCaptureWriter.h"
+#endif
 #include "pch.h"
 using namespace Ailu::Render;
 
@@ -147,6 +149,18 @@ namespace Ailu::RHI::DX12
             d3dcmd->SetGraphicsPSOActive(this);
             recording_ctx.RenderingStatesData().GfxPsoBindCount++;
         }
+#if AILU_ENABLE_FRAME_DEBUGGER
+        auto *capture_writer = rhi_cmd->CaptureWriter();
+        if (capture_writer && !is_same_pso)
+        {
+            auto &cap_cache = capture_writer->StateCache();
+            cap_cache._pso_invalidated_slot_mask = cap_cache._valid_slot_mask;
+            cap_cache._valid_slot_mask = 0u;
+            cap_cache._pso_ever_bound = false;
+        }
+        if (capture_writer)
+            capture_writer->StateCache()._pso_ever_bound = true;
+#endif
         u32 resolved_slot_mask = 0u;
         for (auto& res : recording_ctx.ResolvedBindResources())
         {
@@ -155,6 +169,78 @@ namespace Ailu::RHI::DX12
                 continue;
             resolved_slot_mask |= 1u << slot;
             const u64 binding_hash = BuildBindingHash(res);
+#if AILU_ENABLE_FRAME_DEBUGGER
+            if (capture_writer)
+            {
+                auto cap_type = Render::FrameDebugger::ECaptureObjectType::kUnknown;
+                switch (res._res_type) {
+                case EBindResDescType::kConstBuffer: case EBindResDescType::kConstBufferRaw: cap_type = Render::FrameDebugger::ECaptureObjectType::kConstantBuffer; break;
+                case EBindResDescType::kTexture2D: case EBindResDescType::kTexture2DArray: case EBindResDescType::kCubeMap:
+                case EBindResDescType::kUAVTexture2D: case EBindResDescType::kTexture3D: case EBindResDescType::kRWTexture3D:
+                    cap_type = Render::FrameDebugger::ECaptureObjectType::kTexture; break;
+                case EBindResDescType::kBuffer: case EBindResDescType::kRWBuffer: cap_type = Render::FrameDebugger::ECaptureObjectType::kBuffer; break;
+                default: break;
+                }
+                Render::FrameDebugger::PipelineBindingKey key;
+                const String resource_name = res._p_resource != nullptr ? res._p_resource->Name() : res._name;
+                key._resource_id = capture_writer->RegisterObject(res._p_resource, cap_type, capture_writer->InternString(resource_name));
+                key._resource_type = (u32)res._res_type;
+                key._gpu_handle = res._addi_info._gpu_handle;
+                key._native_resource = (u64)res._addi_info._native_res_ptr;
+                key._view_index = res._addi_info._view_index;
+                key._sub_resource = res._addi_info._sub_res;
+                key._slot = slot;
+                key._descriptor_heap_id = d3dcmd->GetDescriptorHeapId();
+
+                auto &cap_cache = capture_writer->StateCache();
+                Render::FrameDebugger::PipelineBindingCapture binding_cap;
+                binding_cap._slot = slot;
+                binding_cap._source = (u8)Render::FrameDebugger::EBindingSource::kUnknown;
+                if (res._priority == PipelineResource::kPriorityGlobal)
+                    binding_cap._source = (u8)Render::FrameDebugger::EBindingSource::kGlobal;
+                else if (res._priority == PipelineResource::kPriorityCmd)
+                    binding_cap._source = (u8)Render::FrameDebugger::EBindingSource::kCommand;
+                else if (res._priority == PipelineResource::kPriorityLocal)
+                    binding_cap._source = (u8)Render::FrameDebugger::EBindingSource::kMaterial;
+                binding_cap._key = key;
+                const auto name_it = _bind_res_name_lut.find(slot);
+                if (name_it != _bind_res_name_lut.end())
+                    binding_cap._slot_name = capture_writer->InternString(name_it->second);
+                const auto type_it = _bind_res_desc_type_lut.find(slot);
+                if (type_it != _bind_res_desc_type_lut.end())
+                    binding_cap._shader_resource_type = (u32)type_it->second;
+                const bool is_slot_valid = (cap_cache._valid_slot_mask & (1u << slot)) != 0u;
+                const bool is_slot_up_to_date = d3dcmd->IsGraphicsSlotUpToDate(slot, binding_hash);
+                binding_cap._cache_result = is_slot_up_to_date ? (u8)Render::FrameDebugger::EBindingCacheResult::kSkipped
+                                                                : (u8)Render::FrameDebugger::EBindingCacheResult::kBound;
+                if (!is_slot_valid)
+                    binding_cap._invalid_reasons = (cap_cache._pso_invalidated_slot_mask & (1u << slot)) != 0u
+                        ? (u32)Render::FrameDebugger::EBindingInvalidReason::kPsoChanged
+                        : (u32)Render::FrameDebugger::EBindingInvalidReason::kSlotUninitialized;
+                else if (!is_slot_up_to_date)
+                {
+                    const auto &old_key = cap_cache._slot_keys[slot];
+                    if (old_key._resource_id != key._resource_id)
+                        binding_cap._invalid_reasons |= (u32)Render::FrameDebugger::EBindingInvalidReason::kResourceChanged;
+                    if (old_key._resource_type != key._resource_type)
+                        binding_cap._invalid_reasons |= (u32)Render::FrameDebugger::EBindingInvalidReason::kResourceTypeChanged;
+                    if (old_key._gpu_handle != key._gpu_handle)
+                        binding_cap._invalid_reasons |= (u32)Render::FrameDebugger::EBindingInvalidReason::kGpuAddressChanged;
+                    if (old_key._native_resource != key._native_resource)
+                        binding_cap._invalid_reasons |= (u32)Render::FrameDebugger::EBindingInvalidReason::kNativeResourceChanged;
+                    if (old_key._view_index != key._view_index)
+                        binding_cap._invalid_reasons |= (u32)Render::FrameDebugger::EBindingInvalidReason::kViewIndexChanged;
+                    if (old_key._sub_resource != key._sub_resource)
+                        binding_cap._invalid_reasons |= (u32)Render::FrameDebugger::EBindingInvalidReason::kSubResourceChanged;
+                    if (old_key._descriptor_heap_id != key._descriptor_heap_id)
+                        binding_cap._invalid_reasons |= (u32)Render::FrameDebugger::EBindingInvalidReason::kDescriptorHeapChanged;
+                }
+                capture_writer->RecordBinding(binding_cap);
+                cap_cache._slot_keys[slot] = key;
+                cap_cache._slot_last_event_ids[slot] = capture_writer->CurrentDrawEventId();
+                cap_cache._valid_slot_mask |= (1u << slot);
+            }
+#endif
             if (!d3dcmd->IsGraphicsSlotUpToDate(slot, binding_hash))
             {
                 BindResource(rhi_cmd, res);
@@ -170,6 +256,48 @@ namespace Ailu::RHI::DX12
         // A draw may intentionally omit optional bindings that were used by the previous draw
         // with the same PSO. Those root slots remain valid until the PSO changes, where the cache
         // is reset by SetGraphicsPSOActive().
+#if AILU_ENABLE_FRAME_DEBUGGER
+        if (capture_writer)
+        {
+            const auto &cap_cache = capture_writer->StateCache();
+            for (u16 slot = 0u; slot < 32u; ++slot)
+            {
+                const bool slot_resolved = (resolved_slot_mask & (1u << slot)) != 0u;
+                if ((cap_cache._valid_slot_mask & (1u << slot)) != 0u && !slot_resolved)
+                {
+                    Render::FrameDebugger::PipelineBindingCapture binding_cap;
+                    binding_cap._slot = slot;
+                    binding_cap._source = (u8)Render::FrameDebugger::EBindingSource::kInherited;
+                    binding_cap._cache_result = (u8)Render::FrameDebugger::EBindingCacheResult::kInherited;
+                    binding_cap._key = cap_cache._slot_keys[slot];
+                    binding_cap._inherited_from_event = cap_cache._slot_last_event_ids[slot];
+                    const auto name_it = _bind_res_name_lut.find(slot);
+                    if (name_it != _bind_res_name_lut.end())
+                        binding_cap._slot_name = capture_writer->InternString(name_it->second);
+                    const auto type_it = _bind_res_desc_type_lut.find(slot);
+                    if (type_it != _bind_res_desc_type_lut.end())
+                        binding_cap._shader_resource_type = (u32)type_it->second;
+                    capture_writer->RecordBinding(binding_cap);
+                }
+                // PSO 声明了该 slot 但当前 draw 未提交、也没有继承值 → required but unbound。
+                else if (!slot_resolved && _bind_res_desc_type_lut.count(slot) != 0u)
+                {
+                    Render::FrameDebugger::PipelineBindingCapture binding_cap;
+                    binding_cap._slot = slot;
+                    binding_cap._source = (u8)Render::FrameDebugger::EBindingSource::kUnknown;
+                    binding_cap._cache_result = (u8)Render::FrameDebugger::EBindingCacheResult::kUnbound;
+                    binding_cap._is_required = true;
+                    const auto name_it = _bind_res_name_lut.find(slot);
+                    if (name_it != _bind_res_name_lut.end())
+                        binding_cap._slot_name = capture_writer->InternString(name_it->second);
+                    const auto type_it = _bind_res_desc_type_lut.find(slot);
+                    if (type_it != _bind_res_desc_type_lut.end())
+                        binding_cap._shader_resource_type = (u32)type_it->second;
+                    capture_writer->RecordBinding(binding_cap);
+                }
+            }
+        }
+#endif
     }
 
     void D3DGraphicsPipelineState::BindResource(RHICommandBuffer *cmd, const PipelineResource &res)

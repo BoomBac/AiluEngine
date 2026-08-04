@@ -64,6 +64,7 @@ namespace Ailu
             DECLARE_DELEGATE(on_lost_focus, DockWindow*);
         public:
             inline static const f32 kTitleBarHeight = 20.0f;
+            inline static const f32 kTitleContentOverlap = 1.0f;// 消除独立标题/内容 Widget 共享边缘的绘制接缝
             inline static const f32 kBorderThickness = 5.0f;// 边缘可拖拽区域
             inline static const Vector2f kMinSize = {100.0f, 100.0f};// 最小窗口大小
             u32 _resize_dir = 0;// 1:left, 2:right, 4:top, 8:bottom

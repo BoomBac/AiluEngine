@@ -18,6 +18,13 @@
 #include "Render/Material.h"
 #include "Render/RenderingData.h"
 #include "Render/RenderingStates.h"
+#if AILU_ENABLE_FRAME_DEBUGGER
+#include "Render/FrameDebugger/FrameCaptureService.h"
+#include "Render/FrameDebugger/FrameCaptureSession.h"
+#include "Render/FrameDebugger/FrameCaptureWriter.h"
+#include "Render/FrameDebugger/FrameCaptureTypes.h"
+#include "Render/RenderGraph/RenderGraph.h"
+#endif
 #include "pch.h"
 #include <cstring>
 #include <dxgidebug.h>
@@ -66,18 +73,115 @@ namespace Ailu::RHI::DX12
         _cmd_wait_cv.notify_one();
     }
 
+#if AILU_ENABLE_FRAME_DEBUGGER
+    namespace
+    {
+        FrameDebugger::ECaptureObjectType CaptureObjectTypeForResource(GpuResource *res)
+        {
+            if (res != nullptr && dynamic_cast<Texture *>(res) != nullptr)
+                return FrameDebugger::ECaptureObjectType::kTexture;
+            return FrameDebugger::ECaptureObjectType::kBuffer;
+        }
+
+        // 把 RenderGraph compiled pass 的元数据解析为不可变捕获数据。该函数运行在命令录制线程，
+        // 元数据（RenderGraph/CompiledRenderPass 指针）在整个 Capture 帧内保持有效，不写入最终 FrameCapture。
+        u32 RecordRenderGraphPassCapture(FrameDebugger::FrameCaptureWriter &writer,
+                                         const FrameDebugger::CapturePassMetadata &meta)
+        {
+            if (meta._compiled_pass == nullptr)
+                return FrameDebugger::kInvalidFrameEventId;
+            const auto *compiled_pass = meta._compiled_pass;
+            auto *graph = meta._render_graph;
+            if (compiled_pass == nullptr || graph == nullptr || compiled_pass->_pass == nullptr)
+                return FrameDebugger::kInvalidFrameEventId;
+            const auto *pass = compiled_pass->_pass;
+
+            FrameDebugger::RenderGraphPassCapture pass_cap;
+            pass_cap._name = writer.InternString(pass->_name);
+            pass_cap._pass_type = (u8) pass->_type;
+            pass_cap._submission_index = compiled_pass->_submission_index;
+            pass_cap._allow_parallel_recording = compiled_pass->_allow_parallel_recording;
+
+            const auto record_access = [&](const RDG::ResourceAccessRecord &record)
+            {
+                auto *res = graph->Resolve<GpuResource>(record._handle);
+                FrameDebugger::RenderGraphResourceAccessCapture access_cap;
+                access_cap._resource_id = writer.RegisterObject(res, CaptureObjectTypeForResource(res),
+                                                                writer.InternString(res != nullptr ? res->Name() : ""));
+                access_cap._resource_name = writer.InternString(res != nullptr ? res->Name() : "");
+                access_cap._handle_id = record._handle._id;
+                access_cap._handle_version = record._handle._version;
+                access_cap._usage = (u32) record._access._usage;
+                access_cap._load_action = (u8) record._access._load;
+                access_cap._store_action = (u8) record._access._store;
+                access_cap._mip_level = record._access._mip_level;
+                access_cap._mip_count = record._access._mip_count;
+                access_cap._array_slice = record._access._array_slice;
+                access_cap._array_slice_count = record._access._array_slice_count;
+                access_cap._all_sub_resources = record._access._all_sub_resources;
+                writer.RecordRenderGraphResourceAccess(access_cap);
+            };
+            pass_cap._input_range_begin = writer.RGResourceAccessDataIndex();
+            for (const auto &record: pass->_input_access_records)
+                record_access(record);
+            pass_cap._input_count = (u16) (writer.RGResourceAccessDataIndex() - pass_cap._input_range_begin);
+
+            pass_cap._output_range_begin = writer.RGResourceAccessDataIndex();
+            for (const auto &record: pass->_output_access_records)
+                record_access(record);
+            pass_cap._output_count = (u16) (writer.RGResourceAccessDataIndex() - pass_cap._output_range_begin);
+
+            // Pre/post barriers 以事件形式由 D3DContext::ProcessGpuCommand 记录，这里不重复写入，
+            // 避免 barrier 数组和统计被双倍计数。
+
+            return writer.RecordRenderGraphPassEvent(pass_cap);
+        }
+    } // namespace
+#endif
+
     void GpuCommandWorker::RecordCommandGroup(CommandGroup& group,Ref<RHICommandBuffer>& cmd)
     {
         PROFILE_BLOCK_CPU(std::format("RecordCommandGroup_{}", group._params._name))
         auto begin_time = std::chrono::high_resolution_clock::now();
         auto d3dcmd = static_cast<D3DCommandBuffer *>(cmd.get());
         const bool emit_pix_event = g_engine_config._enable_pix && !group._params._is_end_frame && !group._params._name.empty();
-        if (emit_pix_event)
-            PIXBeginEvent(d3dcmd->NativeCmdList(), 0u, group._params._name.c_str());
-        for (auto *task: group._cmds)
-            _ctx->ProcessGpuCommand(task, cmd.get());
-        if (emit_pix_event)
-            PIXEndEvent(d3dcmd->NativeCmdList());
+
+#if AILU_ENABLE_FRAME_DEBUGGER
+        Render::FrameDebugger::FrameCaptureSession *capture_session = Render::FrameDebugger::FrameCaptureService::ActiveSession();
+        Render::FrameDebugger::FrameCaptureWriter *capture_writer = nullptr;
+        if (capture_session)
+        {
+            capture_writer = capture_session->CreateWriter(group._submission_index, group._params._name);
+        }
+        // Command buffers are pooled. Always overwrite the previous frame's writer so a non-capture frame cannot
+        // dereference a writer that was released when the preceding capture session was finalized.
+        cmd->SetCaptureWriter(capture_writer);
+
+        if (capture_writer)
+        {
+            u32 parent_event_id = RecordRenderGraphPassCapture(*capture_writer, group._params._capture_pass_metadata);
+            if (emit_pix_event) PIXBeginEvent(d3dcmd->NativeCmdList(), 0u, group._params._name.c_str());
+            u32 cg_event = capture_writer->BeginEvent(Render::FrameDebugger::EFrameEventType::kCommandGroup,
+                                                       capture_writer->InternString(group._params._name), parent_event_id);
+            capture_writer->SetCurrentParentEventId(cg_event);
+            for (auto *task: group._cmds)
+            {
+                capture_writer->IncrementCommandIndex();
+                capture_writer->ResetSubEventIndex();
+                _ctx->ProcessGpuCommand(task, cmd.get());
+            }
+            capture_writer->EndEvent(cg_event, Render::FrameDebugger::EFrameEventExecutionResult::kExecuted);
+            capture_writer->SetCurrentParentEventId(Render::FrameDebugger::kInvalidFrameEventId);
+            if (emit_pix_event) PIXEndEvent(d3dcmd->NativeCmdList());
+        }
+        else
+#endif
+        {
+            if (emit_pix_event) PIXBeginEvent(d3dcmd->NativeCmdList(), 0u, group._params._name.c_str());
+            for (auto *task: group._cmds)
+                _ctx->ProcessGpuCommand(task, cmd.get());
+            if (emit_pix_event) PIXEndEvent(d3dcmd->NativeCmdList());
+        }
         auto end_time = std::chrono::high_resolution_clock::now();
         f32 elapsed_ms = std::chrono::duration<f32, std::milli>(end_time - begin_time).count();
         auto &stats = d3dcmd->RecordingContext().RenderingStatesData();
@@ -145,6 +249,9 @@ namespace Ailu::RHI::DX12
                 PROFILE_BLOCK_CPU("GpuCommandWorker_WaitForMain");
                 Application::Get().WaitForMain();
             }
+#if AILU_ENABLE_FRAME_DEBUGGER
+            Render::FrameDebugger::FrameCaptureService::BeginFrame(_ctx->GetFrameCount());
+#endif
             {
                 PROFILE_BLOCK_CPU("GpuCommandWorker_ProcessPSO");
                 GraphicsPipelineStateMgr::Get().ProcessPendingPSOCreationRequests();
@@ -318,6 +425,9 @@ namespace Ailu::RHI::DX12
         Render::RenderPipeline::Get().FrameCleanup();
         Render::RenderingStates::Reset();
         _next_submission_index.store(0u, std::memory_order_relaxed);
+#if AILU_ENABLE_FRAME_DEBUGGER
+        Render::FrameDebugger::FrameCaptureService::FinalizeFrame();
+#endif
         if (Application::Get()._is_multi_thread_rendering.load()) Application::Get().NotifyMain();
     }
     void GpuCommandWorker::Start()
@@ -772,6 +882,9 @@ namespace Ailu::RHI::DX12
     {
         SubmitParams params{cmd->Name()};
         params._rendering_states_data = cmd->TakeRenderingStatesData();
+#if AILU_ENABLE_FRAME_DEBUGGER
+        params._capture_pass_metadata = cmd->CapturePassMetadata();
+#endif
         _cmd_worker->Push(cmd->TakeCommands(), std::move(params));
     }
 
@@ -1742,11 +1855,40 @@ namespace Ailu::RHI::DX12
             auto barrier_cmd = static_cast<CommandResourceBarrier *>(cmd);
             if (barrier_cmd->_res == nullptr || barrier_cmd->_before == barrier_cmd->_after)
                 return;
+#if AILU_ENABLE_FRAME_DEBUGGER
+            auto *capture_writer = cmd_buffer->CaptureWriter();
+            if (capture_writer)
+            {
+                Render::FrameDebugger::ResourceBarrierCapture barrier_cap;
+                barrier_cap._resource_id = capture_writer->RegisterObject(barrier_cmd->_res, CaptureObjectTypeForResource(barrier_cmd->_res),
+                                                                          capture_writer->InternString(barrier_cmd->_res->Name()));
+                barrier_cap._resource_name = capture_writer->InternString(barrier_cmd->_res->Name());
+                barrier_cap._before = (u32) barrier_cmd->_before;
+                barrier_cap._after = (u32) barrier_cmd->_after;
+                barrier_cap._sub_resource = barrier_cmd->_sub_res;
+                capture_writer->RecordBarrierEvent(barrier_cap);
+            }
+#endif
             barrier_cmd->_res->StateTranslation(cmd_buffer, barrier_cmd->_after, barrier_cmd->_sub_res);
         }
         else if (cmd->GetCmdType() == EGpuCommandType::kUAVBarrier)
         {
             auto barrier_cmd = static_cast<CommandUAVBarrier *>(cmd);
+#if AILU_ENABLE_FRAME_DEBUGGER
+            auto *capture_writer = cmd_buffer->CaptureWriter();
+            if (capture_writer)
+            {
+                Render::FrameDebugger::ResourceBarrierCapture barrier_cap;
+                barrier_cap._is_uav = true;
+                if (barrier_cmd->_res != nullptr)
+                {
+                    barrier_cap._resource_id = capture_writer->RegisterObject(barrier_cmd->_res, CaptureObjectTypeForResource(barrier_cmd->_res),
+                                                                              capture_writer->InternString(barrier_cmd->_res->Name()));
+                    barrier_cap._resource_name = capture_writer->InternString(barrier_cmd->_res->Name());
+                }
+                capture_writer->RecordBarrierEvent(barrier_cap);
+            }
+#endif
             if (barrier_cmd->_res) barrier_cmd->_res->InsertUAVBarrier(cmd_buffer);
             else
                 cmd_buffer->InsertUAVBarrier();
@@ -1757,8 +1899,44 @@ namespace Ailu::RHI::DX12
             auto draw_cmd = static_cast<CommandDraw *>(cmd);
             const auto &material_state = draw_cmd->_material_draw_state;
             AL_ASSERT(material_state._shader != nullptr);
+
+#if AILU_ENABLE_FRAME_DEBUGGER
+            auto *capture_writer = cmd_buffer->CaptureWriter();
+            u32 draw_event_id = 0u;
+            Render::FrameDebugger::DrawEventCapture draw_cap;
+            if (capture_writer)
+            {
+                draw_cap._pass_index = draw_cmd->_pass_index;
+                draw_cap._sub_mesh = draw_cmd->_sub_mesh;
+                draw_cap._variant_hash = material_state._variant_hash;
+                draw_cap._vertex_count = draw_cmd->_vertex_count;
+                draw_cap._index_count = draw_cmd->_index_num;
+                draw_cap._index_start = draw_cmd->_index_start;
+                draw_cap._instance_count = draw_cmd->_instance_count;
+                draw_cap._start_instance = draw_cmd->_start_instance;
+                draw_cap._argument_offset = draw_cmd->_arg_offset;
+                draw_cap._is_indexed = (draw_cmd->_ib != nullptr);
+                draw_cap._is_indirect = (draw_cmd->_arg_buffer != nullptr);
+                draw_cap._is_procedural = (draw_cmd->_vb == nullptr);
+                draw_cap._material_binding_invalid_reasons = material_state._material_binding_invalid_reasons;
+                draw_cap._material_binding_result = material_state._material_binding_result;
+            }
+#endif
+
             if (!material_state._is_ready)
+            {
+#if AILU_ENABLE_FRAME_DEBUGGER
+                if (capture_writer)
+                {
+                    auto mat_name = capture_writer->InternString("");  // placeholder, resolved later
+                    auto mat_id = capture_writer->RegisterObject(draw_cmd->_mat, Render::FrameDebugger::ECaptureObjectType::kMaterial, 0u);
+                    auto shader_id = capture_writer->RegisterObject((void *)material_state._shader, Render::FrameDebugger::ECaptureObjectType::kShader, 0u);
+                    draw_event_id = capture_writer->RecordDrawEvent(draw_cap, mat_id, shader_id);
+                    capture_writer->SetEventResult(draw_event_id, Render::FrameDebugger::EFrameEventExecutionResult::kSkippedShaderNotReady);
+                }
+#endif
                 return;
+            }
             d3dcmd->MarkUsedResource(draw_cmd->_vb);
             d3dcmd->MarkUsedResource(draw_cmd->_ib);
             d3dcmd->MarkUsedResource(draw_cmd->_per_obj_cb);
@@ -1774,14 +1952,70 @@ namespace Ailu::RHI::DX12
                 cmd_buffer->RecordingContext().SubmitBindResource(resource);
             }
             auto pso = cmd_buffer->RecordingContext().FindMatchPSO();
+#if AILU_ENABLE_FRAME_DEBUGGER
+            if (capture_writer)
+            {
+                draw_cap._pso_dirty_reasons = (u32)cmd_buffer->RecordingContext().TakePsoDirtyReasons();
+                draw_cap._pso_lookup_result = pso == nullptr ? (u8)Render::FrameDebugger::EPsoLookupResult::kCreationRequested :
+                    (draw_cap._pso_dirty_reasons == 0u ? (u8)Render::FrameDebugger::EPsoLookupResult::kCacheHit :
+                                                        (u8)Render::FrameDebugger::EPsoLookupResult::kCacheMiss);
+                draw_cap._pso_bind_reason = pso == nullptr ? (u8)Render::FrameDebugger::EPsoBindReason::kCacheHit :
+                    (d3dcmd->IsGraphicsPSOActive(pso) ? (u8)Render::FrameDebugger::EPsoBindReason::kCacheHit :
+                                                          (u8)Render::FrameDebugger::EPsoBindReason::kPsoObjectChanged);
+                Render::FrameDebugger::PsoLookupCapture pso_lookup;
+                pso_lookup._dirty_reasons = draw_cap._pso_dirty_reasons;
+                pso_lookup._pso_lookup_result = draw_cap._pso_lookup_result;
+                pso_lookup._pso_bind_reason = draw_cap._pso_bind_reason;
+                capture_writer->RecordPsoLookup(pso_lookup);
+
+                Render::FrameDebugger::MaterialBindingCapture material_binding;
+                material_binding._result = material_state._material_binding_result;
+                material_binding._invalid_reasons = material_state._material_binding_invalid_reasons;
+                material_binding._material_resource_version = material_state._material_version;
+                material_binding._layout_version = material_state._binding_layout_version;
+                material_binding._variant_hash = material_state._variant_hash;
+                material_binding._global_layout_version = material_state._global_layout_version;
+                material_binding._global_binding_version = material_state._global_binding_version;
+                capture_writer->RecordMaterialBinding(material_binding);
+            }
+#endif
             if (pso != nullptr)
             {
+#if AILU_ENABLE_FRAME_DEBUGGER
+                if (capture_writer)
+                {
+                    auto mat_id = capture_writer->RegisterObject(draw_cmd->_mat, Render::FrameDebugger::ECaptureObjectType::kMaterial,
+                                                                  capture_writer->InternString(draw_cmd->_mat->Name()));
+                    auto shader_id = capture_writer->RegisterObject((void *)material_state._shader, Render::FrameDebugger::ECaptureObjectType::kShader,
+                                                                     capture_writer->InternString(material_state._shader->Name()));
+                    auto pso_id = capture_writer->RegisterObject(pso, Render::FrameDebugger::ECaptureObjectType::kGraphicsPso, 0u);
+                    draw_cap._pso_id = pso_id;
+                    // CommandDraw uses zero as "use the complete bound buffer". Capture the same resolved values
+                    // used by the actual draw path; indexed draws still have a meaningful vertex-buffer count.
+                    if (draw_cap._vertex_count == 0u && draw_cmd->_vb)
+                        draw_cap._vertex_count = draw_cmd->_vb->GetVertexCount();
+                    if (draw_cap._is_indexed && draw_cap._index_count == 0u)
+                        draw_cap._index_count = draw_cmd->_ib->GetCount();
+                    if (draw_cmd->_vb)
+                    {
+                        auto vb_id = capture_writer->RegisterObject(draw_cmd->_vb, Render::FrameDebugger::ECaptureObjectType::kVertexBuffer, 0u);
+                        draw_cap._vertex_buffer_id = vb_id;
+                    }
+                    if (draw_cmd->_ib)
+                    {
+                        auto ib_id = capture_writer->RegisterObject(draw_cmd->_ib, Render::FrameDebugger::ECaptureObjectType::kIndexBuffer, 0u);
+                        draw_cap._index_buffer_id = ib_id;
+                    }
+                    draw_event_id = capture_writer->RecordDrawEvent(draw_cap, mat_id, shader_id);
+                    capture_writer->SetCurrentDrawEventId(draw_event_id);
+                }
+#endif
                 AL_ASSERT(material_state._shader == pso->StateDescriptor()._p_vertex_shader);
                 bool is_indexed_draw = draw_cmd->_ib != nullptr;
                 bool is_instance_draw = draw_cmd->_instance_count > 1;
                 BindParams params;
                 params._params._vb_binder._layout = &material_state._shader->PipelineInputLayout(material_state._pass_index,
-                                                                                                     material_state._variant_hash);
+                                                                                                      material_state._variant_hash);
                 pso->Bind(cmd_buffer, params);
                 bool is_produced = draw_cmd->_vb == nullptr;
                 const void *layout = params._params._vb_binder._layout;
@@ -1789,17 +2023,78 @@ namespace Ailu::RHI::DX12
                 if (!is_produced && d3dcmd->IsVertexBufferActive(draw_cmd->_vb, layout, vb_view_version))
                 {
                     ++d3dcmd->Statistics()._vb_bind_cache_hit_count;
+#if AILU_ENABLE_FRAME_DEBUGGER
+                    if (capture_writer)
+                    {
+                        Render::FrameDebugger::GeometryBindingCapture geo;
+                        geo._vertex_buffer_bound = true;
+                        geo._vertex_buffer_reasons = 0u;
+                        geo._vertex_buffer_view_version = vb_view_version;
+                        geo._input_layout_id = (u64)layout;
+                        capture_writer->RecordGeometryBinding(geo);
+                    }
+#endif
                 }
                 else if (!is_produced)
                 {
                     ++d3dcmd->Statistics()._vb_bind_cache_miss_count;
+                    const auto &previous_graphics_state = d3dcmd->_graphics_state_cache;
+                    const void *previous_vb = previous_graphics_state._vb;
+                    const void *previous_vb_layout = previous_graphics_state._vb_layout;
+                    const u64 previous_vb_view_version = previous_graphics_state._vb_view_version;
                     draw_cmd->_vb->Bind(d3dcmd, params);
+#if AILU_ENABLE_FRAME_DEBUGGER
+                    if (capture_writer)
+                    {
+                        u32 vb_reasons = 0u;
+                        if (previous_vb == nullptr)
+                            vb_reasons |= (u32) Render::FrameDebugger::EGeometryBindingInvalidReason::kFirstBind;
+                        else
+                        {
+                            if (previous_vb != draw_cmd->_vb)
+                                vb_reasons |= (u32) Render::FrameDebugger::EGeometryBindingInvalidReason::kBufferChanged;
+                            if (previous_vb_layout != layout)
+                                vb_reasons |= (u32) Render::FrameDebugger::EGeometryBindingInvalidReason::kInputLayoutChanged;
+                            if (previous_vb_view_version != vb_view_version)
+                                vb_reasons |= (u32) Render::FrameDebugger::EGeometryBindingInvalidReason::kViewVersionChanged;
+                        }
+                        Render::FrameDebugger::GeometryBindingCapture geo;
+                        geo._vertex_buffer_bound = true;
+                        geo._vertex_buffer_reasons = vb_reasons;
+                        geo._vertex_buffer_view_version = vb_view_version;
+                        geo._input_layout_id = (u64) layout;
+                        capture_writer->RecordGeometryBinding(geo);
+                    }
+#endif
                     d3dcmd->SetVertexBufferActive(draw_cmd->_vb, layout, vb_view_version);
                 }
                 const u64 ib_view_version = draw_cmd->_ib == nullptr ? 0u : draw_cmd->_ib->GetViewVersion();
                 if (is_indexed_draw && (!d3dcmd->IsIndexBufferActive(draw_cmd->_ib, ib_view_version)))
                 {
+                    const auto &previous_graphics_state = d3dcmd->_graphics_state_cache;
+                    const void *previous_ib = previous_graphics_state._ib;
+                    const u64 previous_ib_view_version = previous_graphics_state._ib_view_version;
                     draw_cmd->_ib->Bind(d3dcmd, params);
+#if AILU_ENABLE_FRAME_DEBUGGER
+                    if (capture_writer)
+                    {
+                        u32 ib_reasons = 0u;
+                        if (previous_ib == nullptr)
+                            ib_reasons |= (u32) Render::FrameDebugger::EGeometryBindingInvalidReason::kFirstBind;
+                        else
+                        {
+                            if (previous_ib != draw_cmd->_ib)
+                                ib_reasons |= (u32) Render::FrameDebugger::EGeometryBindingInvalidReason::kBufferChanged;
+                            if (previous_ib_view_version != ib_view_version)
+                                ib_reasons |= (u32) Render::FrameDebugger::EGeometryBindingInvalidReason::kViewVersionChanged;
+                        }
+                        Render::FrameDebugger::GeometryBindingCapture geo;
+                        geo._index_buffer_bound = true;
+                        geo._index_buffer_reasons = ib_reasons;
+                        geo._index_buffer_view_version = ib_view_version;
+                        capture_writer->RecordGeometryBinding(geo);
+                    }
+#endif
                     d3dcmd->SetIndexBufferActive(draw_cmd->_ib, ib_view_version);
                 }
                 ++d3dcmd->Statistics()._draw_call;
@@ -1831,7 +2126,25 @@ namespace Ailu::RHI::DX12
                         dxcmd->DrawInstanced(draw_cmd->_vb ? draw_cmd->_vb->GetVertexCount() : draw_cmd->_vertex_count,
                                              draw_cmd->_instance_count, 0, 0);
                 }
+#if AILU_ENABLE_FRAME_DEBUGGER
+                if (capture_writer)
+                {
+                    capture_writer->FinalizeLastDrawBindingRange();
+                    capture_writer->SetEventResult(draw_event_id, Render::FrameDebugger::EFrameEventExecutionResult::kExecuted);
+                    capture_writer->SetCurrentDrawEventId(Render::FrameDebugger::kInvalidFrameEventId);
+                }
+#endif
             }
+#if AILU_ENABLE_FRAME_DEBUGGER
+            else if (capture_writer)
+            {
+                auto mat_name = capture_writer->InternString("");
+                auto mat_id = capture_writer->RegisterObject(draw_cmd->_mat, Render::FrameDebugger::ECaptureObjectType::kMaterial, 0u);
+                auto shader_id = capture_writer->RegisterObject((void *)material_state._shader, Render::FrameDebugger::ECaptureObjectType::kShader, 0u);
+                draw_event_id = capture_writer->RecordDrawEvent(draw_cap, mat_id, shader_id);
+                capture_writer->SetEventResult(draw_event_id, Render::FrameDebugger::EFrameEventExecutionResult::kSkippedPsoNotReady);
+            }
+#endif
             cmd_buffer->RecordingContext().ClearResolvedBindResources();
         }
         else if (cmd->GetCmdType() == EGpuCommandType::kCopyCounter)
@@ -1852,9 +2165,66 @@ namespace Ailu::RHI::DX12
         else if (cmd->GetCmdType() == EGpuCommandType::kDispatch)
         {
             auto cmd_disp = static_cast<CommandDispatch *>(cmd);
+#if AILU_ENABLE_FRAME_DEBUGGER
+            auto *capture_writer = cmd_buffer->CaptureWriter();
+            const auto record_dispatch = [&](Render::FrameDebugger::EFrameEventExecutionResult result)
+            {
+                Render::FrameDebugger::DispatchEventCapture disp_cap;
+                if (cmd_disp->_cs != nullptr)
+                {
+                    disp_cap._compute_shader_id = capture_writer->RegisterObject(cmd_disp->_cs,
+                                                                                 Render::FrameDebugger::ECaptureObjectType::kComputeShader,
+                                                                                 capture_writer->InternString(cmd_disp->_cs->Name()));
+                    disp_cap._kernel_name = capture_writer->InternString(ComputeShaderKernelRegistry::Get().GetName(cmd_disp->_kernel));
+                }
+                disp_cap._group_num_x = cmd_disp->_group_num_x;
+                disp_cap._group_num_y = cmd_disp->_group_num_y;
+                disp_cap._group_num_z = cmd_disp->_group_num_z;
+                disp_cap._is_indirect = cmd_disp->_arg_buffer != nullptr;
+                disp_cap._argument_offset = cmd_disp->_arg_offset;
+                if (result == Render::FrameDebugger::EFrameEventExecutionResult::kExecuted)
+                {
+                    disp_cap._binding_range_begin = capture_writer->BindingDataIndex();
+                    u16 binding_count = 0u;
+                    for (u16 i = 0u; i < cmd_disp->_bindings._entry_count && i < 32u; ++i)
+                    {
+                        const auto &entry = cmd_disp->_bindings._entries[i];
+                        if (entry._resource == nullptr)
+                            continue;
+                        Render::FrameDebugger::PipelineBindingCapture binding_cap;
+                        binding_cap._slot = entry._slot;
+                        binding_cap._source = (u8)Render::FrameDebugger::EBindingSource::kShader;
+                        if (entry._priority == PipelineResource::kPriorityGlobal)
+                            binding_cap._source = (u8)Render::FrameDebugger::EBindingSource::kGlobal;
+                        else if (entry._priority == PipelineResource::kPriorityCmd)
+                            binding_cap._source = (u8)Render::FrameDebugger::EBindingSource::kCommand;
+                        binding_cap._cache_result = (u8)Render::FrameDebugger::EBindingCacheResult::kBound;
+                        binding_cap._shader_resource_type = (u32) entry._resource_type;
+                        binding_cap._slot_name = capture_writer->InternString(cmd_disp->_cs->SlotToName(cmd_disp->_kernel, entry._slot));
+                        binding_cap._key._resource_id = capture_writer->RegisterObject(entry._resource, CaptureObjectTypeForResource(entry._resource),
+                                                                                       capture_writer->InternString(entry._resource->Name()));
+                        binding_cap._key._resource_type = (u32) entry._resource_type;
+                        binding_cap._key._gpu_handle = entry._addi_info._gpu_handle;
+                        binding_cap._key._native_resource = (u64) entry._addi_info._native_res_ptr;
+                        binding_cap._key._view_index = entry._addi_info._view_index;
+                        binding_cap._key._sub_resource = entry._addi_info._sub_res;
+                        binding_cap._key._slot = entry._slot;
+                        capture_writer->RecordBinding(binding_cap);
+                        ++binding_count;
+                    }
+                    disp_cap._binding_count = binding_count;
+                }
+                u32 event_id = capture_writer->RecordDispatchEvent(disp_cap);
+                capture_writer->SetEventResult(event_id, result);
+            };
+#endif
             if (cmd_disp->_cs == nullptr || !cmd_disp->_cs->IsKernelValid(cmd_disp->_kernel))
             {
                 LOG_WARNING("D3DContext skipped invalid compute dispatch");
+#if AILU_ENABLE_FRAME_DEBUGGER
+                if (capture_writer)
+                    record_dispatch(Render::FrameDebugger::EFrameEventExecutionResult::kSkippedInvalidDispatch);
+#endif
                 return;
             }
             bool is_indirect = cmd_disp->_arg_buffer != nullptr;
@@ -1862,6 +2232,10 @@ namespace Ailu::RHI::DX12
             {
                 LOG_WARNING("D3DContext skipped compute dispatch with unavailable snapshot: shader({}) kernel({})",
                             cmd_disp->_cs->Name(), ComputeShaderKernelRegistry::Get().GetName(cmd_disp->_kernel));
+#if AILU_ENABLE_FRAME_DEBUGGER
+                if (capture_writer)
+                    record_dispatch(Render::FrameDebugger::EFrameEventExecutionResult::kSkippedInvalidResource);
+#endif
                 return;
             }
             cmd_disp->_cs->Bind(d3dcmd, cmd_disp->_kernel, cmd_disp->_bindings);
@@ -1881,11 +2255,19 @@ namespace Ailu::RHI::DX12
                     LOG_WARNING("D3DContext skipped oversized dispatch shader({}) kernel({}) group({}, {}, {})", cmd_disp->_cs->Name(),
                                 ComputeShaderKernelRegistry::Get().GetName(cmd_disp->_kernel), cmd_disp->_group_num_x, cmd_disp->_group_num_y,
                                 cmd_disp->_group_num_z);
+#if AILU_ENABLE_FRAME_DEBUGGER
+                    if (capture_writer)
+                        record_dispatch(Render::FrameDebugger::EFrameEventExecutionResult::kSkippedInvalidDispatch);
+#endif
                     return;
                 }
                 dxcmd->Dispatch(cmd_disp->_group_num_x, cmd_disp->_group_num_y, cmd_disp->_group_num_z);
             }
             ++d3dcmd->Statistics()._dispatch_call;
+#if AILU_ENABLE_FRAME_DEBUGGER
+            if (capture_writer)
+                record_dispatch(Render::FrameDebugger::EFrameEventExecutionResult::kExecuted);
+#endif
         }
         else if (cmd->GetCmdType() == EGpuCommandType::kCommandProfiler)
         {

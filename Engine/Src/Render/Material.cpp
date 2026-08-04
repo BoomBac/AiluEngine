@@ -108,6 +108,18 @@ namespace Ailu::Render
         const u32 layout_version = binding_layout == nullptr ? 0u : binding_layout->Version();
         BindState cur_state;
         const auto &global_res_registry = Shader::GlobalResourceRegistry();
+        u32 material_binding_invalid_reasons = 0u;
+        if (cache._resource_binding_version != _resource_binding_version)
+            material_binding_invalid_reasons |= 1u << 0u;
+        if (cache._layout_version != layout_version)
+            material_binding_invalid_reasons |= 1u << 1u;
+        if (cache._variant_hash != variant_hash)
+            material_binding_invalid_reasons |= 1u << 2u;
+        if (cache._global_res_layout_version != global_res_registry.LayoutVersion())
+            material_binding_invalid_reasons |= 1u << 3u;
+        if (cache._global_res_binding_version != global_res_registry.BindingVersion())
+            material_binding_invalid_reasons |= 1u << 4u;
+        const bool is_material_cache_hit = material_binding_invalid_reasons == 0u;
         if (cache._resource_binding_version == _resource_binding_version && cache._layout_version == layout_version && cache._variant_hash == variant_hash
             && cache._global_res_layout_version == global_res_registry.LayoutVersion()
             && cache._global_res_binding_version == global_res_registry.BindingVersion())
@@ -252,6 +264,12 @@ namespace Ailu::Render
         raster_state.Hash(RasterizerState::_s_hash_obj.GenHash(raster_state));
         draw_state._raster_state_hash = raster_state.Hash();
         draw_state._material_version = PropertyVersion();
+        draw_state._material_binding_invalid_reasons = material_binding_invalid_reasons;
+        draw_state._material_binding_result = is_material_cache_hit ? 0u :
+            ((material_binding_invalid_reasons & ((1u << 0u) | (1u << 1u) | (1u << 2u) | (1u << 3u))) != 0u ? 2u : 1u);
+        draw_state._binding_layout_version = layout_version;
+        draw_state._global_layout_version = global_res_registry.LayoutVersion();
+        draw_state._global_binding_version = global_res_registry.BindingVersion();
         draw_state._cull_mode = _cull_mode;
         auto is_command_cbuffer_slot = [&](u16 slot)
         {

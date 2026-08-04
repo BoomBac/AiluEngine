@@ -4,6 +4,10 @@
 #include "Render/CommandBuffer.h"
 #include "Render/FrameResource.h"
 #include "Framework/Common/Profiler.h"
+#if AILU_ENABLE_FRAME_DEBUGGER
+#include "Render/FrameDebugger/FrameCaptureService.h"
+#include "Render/FrameDebugger/FrameCaptureTypes.h"
+#endif
 
 #include "Framework/Common/FileManager.h"
 
@@ -686,6 +690,15 @@ namespace Ailu
                     }
                     auto cmd = CommandBufferPool::Get(pass->_name);
                     cmd->SetRenderGraph(this);
+#if AILU_ENABLE_FRAME_DEBUGGER
+                    if (FrameDebugger::FrameCaptureService::ActiveSession() != nullptr)
+                    {
+                        FrameDebugger::CapturePassMetadata pass_meta;
+                        pass_meta._render_graph = this;
+                        pass_meta._compiled_pass = &compiled_pass;
+                        cmd->SetCapturePassMetadata(pass_meta);
+                    }
+#endif
                     for (const auto &barrier: compiled_pass._pre_barriers)
                     {
                         cmd->ResourceBarrier(barrier._resource, barrier._before, barrier._after, barrier._sub_resource);

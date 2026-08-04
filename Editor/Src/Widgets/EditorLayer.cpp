@@ -38,6 +38,7 @@
 #include "UI/UILayer.h"
 #include "UI/UIRenderer.h"
 #include "UI/Widget.h"
+#include "Widgets/FrameDebuggerWindow.h"
 
 #include "Objects/JsonArchive.h"
 
@@ -2123,6 +2124,10 @@ namespace Ailu
                 Audio::Play(s_test_audio_guid, options);
             }
             
+            if (ImGui::Button("Frame Debugger"))
+            {
+                DockManager::Get().AddDock(MakeRef<FrameDebuggerWindow>());
+            }
             ImGui::End();
             if (show)
                 ImGui::ShowDemoWindow(&show);

@@ -12,6 +12,11 @@
 #include <tuple>
 #include "Render/RenderGraph/RenderGraphFwd.h"
 
+#if AILU_ENABLE_FRAME_DEBUGGER
+#include "Render/FrameDebugger/FrameCaptureTypes.h"
+#endif
+
+namespace Ailu::Render::FrameDebugger { class FrameCaptureWriter; }
 
 namespace Ailu
 {
@@ -59,9 +64,17 @@ namespace Ailu
         CommandRecordingContext &RecordingContext() { return _recording_context; }
         const CommandRecordingContext &RecordingContext() const { return _recording_context; }
 
+#if AILU_ENABLE_FRAME_DEBUGGER
+        void SetCaptureWriter(Render::FrameDebugger::FrameCaptureWriter *writer) { _capture_writer = writer; }
+        Render::FrameDebugger::FrameCaptureWriter *CaptureWriter() const { return _capture_writer; }
+#endif
+
     protected:
         bool _is_executed = false;
         CommandRecordingContext _recording_context;
+#if AILU_ENABLE_FRAME_DEBUGGER
+        Render::FrameDebugger::FrameCaptureWriter *_capture_writer = nullptr;
+#endif
 
     private:
         ECommandBufferType _cmd_type;
@@ -96,6 +109,10 @@ namespace Ailu
         CommandBuffer(String name);
         ~CommandBuffer() override;
         void SetRenderGraph(RDG::RenderGraph *render_graph);
+#if AILU_ENABLE_FRAME_DEBUGGER
+        void SetCapturePassMetadata(const Render::FrameDebugger::CapturePassMetadata &metadata) { _capture_pass_metadata = metadata; }
+        const Render::FrameDebugger::CapturePassMetadata &CapturePassMetadata() const { return _capture_pass_metadata; }
+#endif
         void Clear();
         void ClearRenderTarget(Color color, f32 depth, u8 stencil);
         void ClearRenderTarget(Color c);
@@ -199,6 +216,9 @@ namespace Ailu
     private:
         struct Impl;
         Impl *_impl;
+#if AILU_ENABLE_FRAME_DEBUGGER
+        Render::FrameDebugger::CapturePassMetadata _capture_pass_metadata;
+#endif
     };
 
     class AILU_API CommandBufferPool

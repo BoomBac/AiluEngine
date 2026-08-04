@@ -2,6 +2,7 @@
 
 #define _SIMD
 #define _PIX_DEBUG
+#define AILU_ENABLE_FRAME_DEBUGGER 1
 
 #include "Framework/Platform/Platform.h"
 #include "Framework/Platform/Compiler.h"

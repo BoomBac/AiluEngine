@@ -34,6 +34,10 @@
 #include "Render/Shader.h"
 #include "Render/RayTracing/RayTracingShader.h"
 
+#if AILU_ENABLE_FRAME_DEBUGGER
+#include "Render/FrameDebugger/FrameCaptureTypes.h"
+#endif
+
 using Microsoft::WRL::ComPtr;
 using Ailu::Render::RenderPipeline;
 using Ailu::Render::GpuResource;
@@ -53,6 +57,9 @@ namespace Ailu::RHI::DX12
         String _name;
         bool _is_end_frame = false;
         Render::CommandRenderingStatesData _rendering_states_data;
+#if AILU_ENABLE_FRAME_DEBUGGER
+        Render::FrameDebugger::CapturePassMetadata _capture_pass_metadata;
+#endif
     };
     class GpuCommandWorker
     {

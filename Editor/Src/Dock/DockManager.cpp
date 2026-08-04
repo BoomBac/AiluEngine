@@ -1485,14 +1485,9 @@ namespace Ailu
 
         void DockManager::BeginFloatWindow(DockWindow *w)
         {
-            if (_floating_preview_node || _resizing_edge_dir)
+            if (w == nullptr || _floating_preview_node != nullptr || _resizing_node != nullptr)
                 return;
             DockNode *source_node = nullptr;
-            _floating_preview_window = w;
-            _is_any_floating = true;
-            _is_floating_whole_node = false;
-            _floating_preview_node = nullptr;
-            _is_float_on_cancel_area = false;
             for (auto &it: _float_nodes)
             {
                 auto &[window, nodes] = it;
@@ -1505,25 +1500,28 @@ namespace Ailu
                 if (source_node)
                     break;
             }
-            if (source_node)
+            if (source_node == nullptr)
             {
-                if (DockNode *whole_node = ResolveWholeNodeTitleDragTarget(source_node))
-                {
-                    _floating_preview_node = whole_node;
-                    _is_floating_whole_node = true;
-                }
-                else
-                {
-                    _floating_preview_node = source_node;
-                }
-                _float_node_start_pos = Input::GetGlobalMousePos();
-                _is_float_node_external_window = _floating_preview_node->_own_window != &Application::Get().GetWindow();
-                LOG_INFO("DockManager::BeginFloatWindow: {}{}", w->GetTitle(), _is_floating_whole_node ? " (whole split)" : "");
+                LOG_ERROR("DockManager::BeginFloatWindow: window not belong to any node!");
+                return;
+            }
+
+            _floating_preview_window = w;
+            _is_any_floating = true;
+            _is_floating_whole_node = false;
+            _is_float_on_cancel_area = false;
+            if (DockNode *whole_node = ResolveWholeNodeTitleDragTarget(source_node))
+            {
+                _floating_preview_node = whole_node;
+                _is_floating_whole_node = true;
             }
             else
             {
-                LOG_ERROR("DockManager::BeginFloatWindow: window not belong to any node!");
+                _floating_preview_node = source_node;
             }
+            _float_node_start_pos = Input::GetGlobalMousePos();
+            _is_float_node_external_window = _floating_preview_node->_own_window != &Application::Get().GetWindow();
+            LOG_INFO("DockManager::BeginFloatWindow: {}{}", w->GetTitle(), _is_floating_whole_node ? " (whole split)" : "");
         }
 
         void DockManager::BeginFloatNode(DockNode *w)
@@ -1550,7 +1548,14 @@ namespace Ailu
         void DockManager::EndFloatWindow(Vector2f drop_pos)
         {
             if (!_floating_preview_node)
+            {
+                _floating_preview_window = nullptr;
+                _is_any_floating = false;
+                _is_float_on_cancel_area = false;
+                _can_draw_float_preview = false;
+                _is_floating_whole_node = false;
                 return;
+            }
             Window *source_window = _floating_preview_node->_own_window;
             auto make_node_from_tab_item = [&](const Ref<IDockTabItem> &tab_item) -> Ref<DockNode>
             {
@@ -2010,6 +2015,7 @@ namespace Ailu
             {
                 if (hover_resize_dir == 0u)
                 {
+                    _resizing_edge_dir = 0u;
                     UpdateResizeMouseCursor(0u);
                     return;
                 }

@@ -1,6 +1,7 @@
 #pragma once
 #include "Objects/Serialize.h"
 #include "UIStyles.h"
+#include "UI/Table/UITableStyle.h"
 #include "generated/UITheme.gen.h"
 
 namespace Ailu
@@ -54,6 +55,9 @@ namespace Ailu
             const UITreeViewStyle *FindTreeViewStyle(const UIStyleId &style_id) const;
             void SetTreeViewStyle(const UIStyleId &style_id, const UITreeViewStyle &style);
 
+            const UITableStyle *FindTableStyle(const UIStyleId &style_id) const;
+            void SetTableStyle(const UIStyleId &style_id, const UITableStyle &style);
+
         public:
             APROPERTY()
             UIColorTokens _colors;
@@ -97,6 +101,9 @@ namespace Ailu
             APROPERTY()
             UITreeViewStyle _tree_view_style;
 
+            APROPERTY()
+            UITableStyle _table_style;
+
         private:
             explicit UITheme(bool init_default);
 
@@ -130,6 +137,9 @@ namespace Ailu
 
             APROPERTY()
             HashMap<UIStyleId, UITreeViewStyle> _tree_view_styles;
+
+            APROPERTY()
+            HashMap<UIStyleId, UITableStyle> _table_styles;
 
             u64 _revision = 1u;
         };

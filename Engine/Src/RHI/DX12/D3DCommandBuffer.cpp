@@ -48,6 +48,9 @@ namespace Ailu::RHI::DX12
         _fence_value = 0u;
         _is_submitted = false;
         _is_executed = false;
+#if AILU_ENABLE_FRAME_DEBUGGER
+        SetCaptureWriter(nullptr);
+#endif
         _graphics_state_cache.Reset();
         _recording_context.Clear();
         _statistics.Reset();

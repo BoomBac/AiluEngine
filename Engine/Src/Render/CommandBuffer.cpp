@@ -796,6 +796,9 @@ namespace Ailu::Render
     }
     void CommandBuffer::Clear()
     {
+#if AILU_ENABLE_FRAME_DEBUGGER
+        _capture_pass_metadata = {};
+#endif
         _impl->Clear();
     }
     void CommandBuffer::ClearRenderTarget(Color color, f32 depth, u8 stencil)

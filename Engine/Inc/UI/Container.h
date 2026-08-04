@@ -95,6 +95,7 @@ namespace Ailu
             void PreUpdate(f32 dt) override;
             void SetViewportHeight(f32 height) { GetSlot()->Size({GetSlot()->_size.x, height}); }
             void SetViewportWidth(f32 w) { GetSlot()->Size({w, GetSlot()->_size.y}); }
+            void ResetScrollOffset() { _current_offset = Vector2f::kZero; _target_offset = Vector2f::kZero; InvalidateLayout(); }
             Vector2f MeasureDesiredSize() override;
             UIElement *HitTest(Vector2f pos) override;
 

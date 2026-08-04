@@ -69,6 +69,11 @@ namespace Ailu::Render
         u8 _raster_state_hash = 0u;
         PipelineBindingSnapshot _bindings;
         u32 _material_version = 0u;
+        u32 _material_binding_invalid_reasons = 0u;
+        u8 _material_binding_result = 0u;
+        u32 _binding_layout_version = 0u;
+        u32 _global_layout_version = 0u;
+        u32 _global_binding_version = 0u;
         ECullMode _cull_mode = ECullMode::kBack;
     };
 

@@ -146,7 +146,15 @@ namespace Ailu
             for (auto &c: _children)
             {
                 const auto &margin = c->GetSlot()->_margin;
+                const auto &slot = c->GetSlotAs<LinearSlot>();
                 Vector2f child_size = c->MeasureDesiredSize();
+
+                // Keep desired-size calculation consistent with MeasureAndArrange. In particular, a vertical
+                // container with fixed-height rows must report those fixed heights to a parent ScrollView.
+                if (_orientation == EOrientation::kVertical && slot._size_policy_v == ESizePolicy::kFixed)
+                    child_size.y = std::max(0.0f, slot._size.y);
+                else if (_orientation == EOrientation::kHorizontal && slot._size_policy_h == ESizePolicy::kFixed)
+                    child_size.x = std::max(0.0f, slot._size.x);
 
                 if (_orientation == EOrientation::kVertical)
                 {
@@ -679,7 +687,9 @@ namespace Ailu
                 c->Translate(_current_offset);
                 c->MeasureAndArrange(dt);
             }
-            _max_offset = Min(Vector2f::kZero, _arrange_rect.zw - _content_size);
+            _max_offset = Min(Vector2f::kZero, _content_rect.zw - _content_size);
+            _target_offset = Max(_max_offset, Min(Vector2f::kZero, _target_offset));
+            _current_offset = Max(_max_offset, Min(Vector2f::kZero, _current_offset));
         }
         void ScrollView::PostArrange()
         {
@@ -1259,13 +1269,17 @@ namespace Ailu
             }
             if (_is_horizontal)
             {
-                _children[0]->Arrange(0.0f, 0.0f, _content_rect.z * _ratio, _content_rect.w);
-                _children[1]->Arrange(_content_rect.z * _ratio, 0.0f, _content_rect.z * (1.0f - _ratio), _content_rect.w);
+                const f32 split_pos = _content_rect.z * _ratio;
+                const f32 half_bar = kSplitBarThickness * 0.5f;
+                _children[0]->Arrange(0.0f, 0.0f, std::max(0.0f, split_pos - half_bar), _content_rect.w);
+                _children[1]->Arrange(split_pos + half_bar, 0.0f, std::max(0.0f, _content_rect.z - split_pos - half_bar), _content_rect.w);
             }
             else
             {
-                _children[0]->Arrange(0.0f, 0.0f, _content_rect.z, _content_rect.w * _ratio);
-                _children[1]->Arrange(0.0f, _content_rect.w * _ratio, _content_rect.z, _content_rect.w * (1.0f - _ratio));
+                const f32 split_pos = _content_rect.w * _ratio;
+                const f32 half_bar = kSplitBarThickness * 0.5f;
+                _children[0]->Arrange(0.0f, 0.0f, _content_rect.z, std::max(0.0f, split_pos - half_bar));
+                _children[1]->Arrange(0.0f, split_pos + half_bar, _content_rect.z, std::max(0.0f, _content_rect.w - split_pos - half_bar));
             }
         }
 #pragma endregion

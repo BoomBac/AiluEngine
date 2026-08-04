@@ -1,6 +1,1 @@
-"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-"abcdefghijklmnopqrstuvwxyz"
-"0123456789"
-",.!?;:()[]{}<>+-=_"
-'\\'
-"@#$%^&* "
+[0x20, 0x7E]

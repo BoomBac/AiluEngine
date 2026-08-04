@@ -67,6 +67,7 @@ namespace Ailu
 
                 TreeItemId GetItemId() const { return _item_id; }
                 u32 GetDepth() const { return _depth; }
+                bool HasChildren() const { return _has_children; }
                 Text* GetExpandButton() const { return _expand_btn; }
                 Text* GetLabel() const { return _label; }
 
@@ -144,6 +145,8 @@ namespace Ailu
                         return;
                     }
                     OnRowClicked(row->GetItemId());
+                    if (_expand_on_row_click && row->HasChildren())
+                        ToggleExpanded(row->GetItemId());
                     e._is_handled = true;
                 }
             };

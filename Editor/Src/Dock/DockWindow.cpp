@@ -29,9 +29,28 @@ namespace Ailu
 
             void SetBorderCornerRadius(UI::Border *border, Vector4f radius)
             {
+                border->GetStyleOverride().SetCornerRadius(radius);
+            }
+
+            bool ApplyDockBorderStyle(UI::Border *border, Color background, Color border_color, Vector4f corner_radius)
+            {
                 auto &style_override = border->GetStyleOverride();
-                style_override._corner_radius = radius;
-                style_override._override_mask |= (u32) UI::EUIControlVisualOverride::kCornerRadius;
+                const bool changed = !style_override.HasOverride(UI::EUIControlVisualOverride::kBackground) ||
+                                     !style_override.HasOverride(UI::EUIControlVisualOverride::kBorderColor) ||
+                                     !style_override.HasOverride(UI::EUIControlVisualOverride::kCornerRadius) ||
+                                     !NearbyEqual(style_override._background._tint, background) ||
+                                     !NearbyEqual(style_override._border_color, border_color) ||
+                                     !NearbyEqual(style_override._corner_radius, corner_radius);
+                if (!changed)
+                    return false;
+
+                UI::UIBrush background_brush;
+                background_brush._type = UI::EUIBrushType::kColor;
+                background_brush._tint = background;
+                style_override.SetBackground(background_brush);
+                style_override.SetBorderColor(border_color);
+                style_override.SetCornerRadius(corner_radius);
+                return true;
             }
 
             void ConfigureDockCloseButton(UI::Button *button, f32 radius)
@@ -104,7 +123,11 @@ namespace Ailu
             _title_bar_root = c->AddChild<UI::Border>();
             _title_bar_root->GetSlotAs<UI::CanvasSlot>().Size(Vector2f(size.x, kTitleBarHeight));
             _title_bar_root->Thickness({1.0f, 1.0f, 1.0f, 0.0f});
-            SetBorderCornerRadius(_title_bar_root, TopRadius(g_editor_style._window_corner_radius));
+            // The theme's generic Border style has a uniform border. Override the shared edge explicitly so
+            // the title bar and content meet without an extra one-pixel border/padding gap.
+            _title_bar_root->GetStyleOverride().SetBorderWidth({1.0f, 1.0f, 1.0f, 0.0f});
+            ApplyDockBorderStyle(_title_bar_root, g_editor_style._window_title_bar_color, g_editor_style._window_border_color,
+                                 TopRadius(g_editor_style._window_corner_radius));
             auto hb = _title_bar_root->AddChild<UI::HorizontalBox>();
             hb->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
             _title = hb->AddChild<UI::Text>();
@@ -123,6 +146,8 @@ namespace Ailu
             _title_drag_area = hb->AddChild<UI::Border>();
             _title_drag_area->Thickness(0.0f);
             _title_drag_area->_bg_color = g_editor_style._window_title_bar_color;
+            _title_drag_area->GetStyleOverride().SetBorderWidth(0.0f);
+            ApplyDockBorderStyle(_title_drag_area, g_editor_style._window_title_bar_color, Colors::kTransparent, Vector4f::kZero);
             _title_drag_area->GetSlotAs<UI::LinearSlot>().Size({300.0f, kTitleBarHeight}).SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
             _title_drag_area->OnMouseDown() += [&](UI::UIEvent &e)
             {
@@ -143,7 +168,7 @@ namespace Ailu
                     return;
                 if (_is_dragging)
                 {
-                    _position = e._mouse_position + _drag_start_offset;
+                    SetPosition(e._mouse_position + _drag_start_offset);
                 }
             };
             //_title_drag_area->SetVisible(false);
@@ -160,15 +185,18 @@ namespace Ailu
             };
             _title_widget->AddToWidget(c);
             _content_widget = MakeRef<UI::Widget>();
-            _content_widget->SetPosition(_position + Vector2f(0.0f, kTitleBarHeight));
+            const f32 initial_content_offset_y = kTitleBarHeight - kTitleContentOverlap;
+            _content_widget->SetPosition(_position + Vector2f(0.0f, initial_content_offset_y));
             c = MakeRef<UI::Canvas>();
-            c->GetSlot()->Size(Vector2f(size.x, size.y - kTitleBarHeight));
+            c->GetSlot()->Size(Vector2f(size.x, size.y - initial_content_offset_y));
             _content_root = c->AddChild<UI::Border>();
             _content_root->Thickness({1.0f,0.0f,1.0f,1.0f});
+            _content_root->GetStyleOverride().SetBorderWidth({1.0f, 0.0f, 1.0f, 1.0f});
             _content_root->_border_color = g_editor_style._window_border_color;
             _content_root->_bg_color = g_editor_style._window_bg_color;
-            SetBorderCornerRadius(_content_root, BottomRadius(g_editor_style._window_corner_radius));
-            _content_root->GetSlotAs<UI::CanvasSlot>().Size(Vector2f(size.x, size.y - kTitleBarHeight));
+            ApplyDockBorderStyle(_content_root, g_editor_style._window_bg_color, g_editor_style._window_border_color,
+                                 BottomRadius(g_editor_style._window_corner_radius));
+            _content_root->GetSlotAs<UI::CanvasSlot>().Size(Vector2f(size.x, size.y - initial_content_offset_y));
             _content_widget->AddToWidget(c);
             _content_widget->_on_get_focus += [this]()
             {
@@ -220,7 +248,7 @@ namespace Ailu
             if (_is_dirty)
             {
                 const f32 content_offset_y = (_is_title_bar_visible || !_is_expand_content_when_title_hidden)
-                                                 ? kTitleBarHeight
+                                                 ? kTitleBarHeight - kTitleContentOverlap
                                                  : 0.0f;
                 const f32 content_height = std::max(0.0f, _size.y - content_offset_y);
                 _title_widget->SetPosition(_position);
@@ -266,10 +294,19 @@ namespace Ailu
             title_style_changed |= SetColorIfChanged(_title_bar_root->_border_color, is_focused ? g_editor_style._window_focus_border_color : g_editor_style._window_border_color);
             content_style_changed |= SetColorIfChanged(_content_root->_border_color, is_focused ? g_editor_style._window_focus_border_color : g_editor_style._window_border_color);
             content_style_changed |= SetColorIfChanged(_content_root->_bg_color, g_editor_style._window_bg_color);
+            title_style_changed |= ApplyDockBorderStyle(_title_bar_root, g_editor_style._window_title_bar_color,
+                                                        is_focused ? g_editor_style._window_focus_border_color : g_editor_style._window_border_color,
+                                                        TopRadius(g_editor_style._window_corner_radius));
+            title_style_changed |= ApplyDockBorderStyle(_title_drag_area, g_editor_style._window_title_bar_color,
+                                                        Colors::kTransparent, Vector4f::kZero);
+            content_style_changed |= ApplyDockBorderStyle(_content_root, g_editor_style._window_bg_color,
+                                                          is_focused ? g_editor_style._window_focus_border_color : g_editor_style._window_border_color,
+                                                          BottomRadius(g_editor_style._window_corner_radius));
             if (SetColorIfChanged(_title->_color, g_editor_style._window_title_text_color))
                 _title->InvalidatePaint();
             if (title_style_changed)
             {
+                ConfigureDockCloseButton(_btn_close, g_editor_style._window_corner_radius);
                 _title_bar_root->InvalidateStyle(UI::EStyleInvalidation::kPaintOnly);
                 _title_drag_area->InvalidateStyle(UI::EStyleInvalidation::kPaintOnly);
             }
@@ -410,7 +447,9 @@ namespace Ailu
             _tab_root->Thickness({1.0f, 1.0f, 1.0f, 0.0f});
             _tab_root->_bg_color = g_editor_style._window_title_bar_color;
             _tab_root->_border_color = g_editor_style._window_border_color;
-            SetBorderCornerRadius(_tab_root, TopRadius(g_editor_style._window_corner_radius));
+            _tab_root->GetStyleOverride().SetBorderWidth({1.0f, 1.0f, 1.0f, 0.0f});
+            ApplyDockBorderStyle(_tab_root, g_editor_style._window_title_bar_color, g_editor_style._window_border_color,
+                                 TopRadius(g_editor_style._window_corner_radius));
             _tab_root->GetSlotAs<UI::CanvasSlot>().Size(_size);
             _tab_hb = _tab_root->AddChild<UI::HorizontalBox>();
             {
@@ -430,6 +469,8 @@ namespace Ailu
             _drag_area = _tab_hb->AddChild<UI::Border>();
             _drag_area->Thickness(0.0f);
             _drag_area->_bg_color = g_editor_style._window_title_bar_color;
+            _drag_area->GetStyleOverride().SetBorderWidth(0.0f);
+            ApplyDockBorderStyle(_drag_area, g_editor_style._window_title_bar_color, Colors::kTransparent, Vector4f::kZero);
             _drag_area->GetSlotAs<UI::LinearSlot>().Size({300.0f, DockWindow::kTitleBarHeight})
                     .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed);
             _drag_area->SetVisible(false);
@@ -488,7 +529,8 @@ namespace Ailu
             auto bg = _tab_titles->AddChild<UI::Border>();
             bg->_bg_color = g_editor_style._tab_bg_color;
             bg->_border_color = Colors::kTransparent;
-            SetBorderCornerRadius(bg, Vector4f(4.0f, 4.0f, 0.0f, 0.0f));
+            bg->GetStyleOverride().SetBorderWidth(0.0f);
+            ApplyDockBorderStyle(bg, g_editor_style._tab_bg_color, Colors::kTransparent, Vector4f(4.0f, 4.0f, 0.0f, 0.0f));
             const f32 tab_width = std::max(80.0f, UI::UIRenderer::Get()->CalculateTextSize(item->GetTitle()).x + DockWindow::kTitleBarHeight * 1.5f);
             bg->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kAuto, UI::ESizePolicy::kFill).Size({tab_width, DockWindow::kTitleBarHeight});
             auto *title = bg->AddChild<UI::Text>();
@@ -523,8 +565,11 @@ namespace Ailu
             {
                 if (!IsActiveTab(e._current_target))
                 {
-                    e._current_target->As<UI::Border>()->_bg_color = g_editor_style._tab_hover_bg_color;
-                    e._current_target->InvalidateStyle(UI::EStyleInvalidation::kPaintOnly);
+                    auto *hovered_bg = e._current_target->As<UI::Border>();
+                    hovered_bg->_bg_color = g_editor_style._tab_hover_bg_color;
+                    ApplyDockBorderStyle(hovered_bg, g_editor_style._tab_hover_bg_color, Colors::kTransparent,
+                                         Vector4f(4.0f, 4.0f, 0.0f, 0.0f));
+                    hovered_bg->InvalidateStyle(UI::EStyleInvalidation::kPaintOnly);
                     if (!e._current_target->GetChildren().empty())
                     {
                         e._current_target->GetChildren()[0]->As<UI::Text>()->_color = g_editor_style._tab_hover_text_color;
@@ -536,8 +581,11 @@ namespace Ailu
             {
                 if (!IsActiveTab(e._current_target))
                 {
-                    e._current_target->As<UI::Border>()->_bg_color = g_editor_style._tab_bg_color;
-                    e._current_target->InvalidateStyle(UI::EStyleInvalidation::kPaintOnly);
+                    auto *normal_bg = e._current_target->As<UI::Border>();
+                    normal_bg->_bg_color = g_editor_style._tab_bg_color;
+                    ApplyDockBorderStyle(normal_bg, g_editor_style._tab_bg_color, Colors::kTransparent,
+                                         Vector4f(4.0f, 4.0f, 0.0f, 0.0f));
+                    normal_bg->InvalidateStyle(UI::EStyleInvalidation::kPaintOnly);
                     if (!e._current_target->GetChildren().empty())
                     {
                         e._current_target->GetChildren()[0]->As<UI::Text>()->_color = g_editor_style._tab_text_color;
@@ -645,6 +693,8 @@ namespace Ailu
             {
                 auto *prev_title_bg = dynamic_cast<UI::Border *>(_tab_titles->GetChildren()[_active_index].get());
                 prev_title_bg->_bg_color = g_editor_style._tab_bg_color;
+                ApplyDockBorderStyle(prev_title_bg, g_editor_style._tab_bg_color, Colors::kTransparent,
+                                     Vector4f(4.0f, 4.0f, 0.0f, 0.0f));
                 if (!prev_title_bg->GetChildren().empty())
                 {
                     prev_title_bg->GetChildren()[0]->As<UI::Text>()->_color = g_editor_style._tab_text_color;
@@ -659,6 +709,8 @@ namespace Ailu
             _active_index = new_index;
             auto *active_title_bg = _tab_titles->GetChildren()[_active_index]->As<UI::Border>();
             active_title_bg->_bg_color = g_editor_style._tab_active_bg_color;
+            ApplyDockBorderStyle(active_title_bg, g_editor_style._tab_active_bg_color, Colors::kTransparent,
+                                 Vector4f(4.0f, 4.0f, 0.0f, 0.0f));
             if (!active_title_bg->GetChildren().empty())
             {
                 active_title_bg->GetChildren()[0]->As<UI::Text>()->_color = g_editor_style._tab_active_text_color;
@@ -758,10 +810,33 @@ namespace Ailu
             const bool is_focused = active_window != nullptr && DockManager::Get().IsFocused(active_window);
             tab_style_changed |= SetColorIfChanged(_tab_root->_bg_color, g_editor_style._window_title_bar_color);
             tab_style_changed |= SetColorIfChanged(_tab_root->_border_color, is_focused ? g_editor_style._window_focus_border_color : g_editor_style._window_border_color);
+            tab_style_changed |= ApplyDockBorderStyle(_tab_root, g_editor_style._window_title_bar_color,
+                                                      is_focused ? g_editor_style._window_focus_border_color : g_editor_style._window_border_color,
+                                                      TopRadius(g_editor_style._window_corner_radius));
+            tab_style_changed |= ApplyDockBorderStyle(_drag_area, g_editor_style._window_title_bar_color,
+                                                      Colors::kTransparent, Vector4f::kZero);
             if (tab_style_changed)
+            {
+                ConfigureDockCloseButton(_btn_close, g_editor_style._window_corner_radius);
                 _tab_root->InvalidateStyle(UI::EStyleInvalidation::kPaintOnly);
+                _drag_area->InvalidateStyle(UI::EStyleInvalidation::kPaintOnly);
+            }
             if (_tabs.empty())
                 return;
+            for (i32 i = 0; i < static_cast<i32>(_tab_titles->GetChildren().size()); ++i)
+            {
+                auto *tab_bg = _tab_titles->GetChildren()[i]->As<UI::Border>();
+                const bool is_active = i == _active_index;
+                const Color bg_color = is_active ? g_editor_style._tab_active_bg_color : g_editor_style._tab_bg_color;
+                if (ApplyDockBorderStyle(tab_bg, bg_color, Colors::kTransparent, Vector4f(4.0f, 4.0f, 0.0f, 0.0f)))
+                    tab_bg->InvalidateStyle(UI::EStyleInvalidation::kPaintOnly);
+                if (!tab_bg->GetChildren().empty())
+                {
+                    auto *tab_text = tab_bg->GetChildren()[0]->As<UI::Text>();
+                    if (SetColorIfChanged(tab_text->_color, is_active ? g_editor_style._tab_active_text_color : g_editor_style._tab_text_color))
+                        tab_text->InvalidatePaint();
+                }
+            }
             for (auto &w: _tabs)
             {
                 w->SetRect({_position.x, _position.y, _size.x, _size.y});

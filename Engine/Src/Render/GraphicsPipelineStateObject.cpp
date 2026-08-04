@@ -464,12 +464,17 @@ namespace Ailu::Render
         if (shader_hash == _hash_shader && shader == _current_shader && pass_index == _current_pass_index &&
             variant_hash == _current_variant_hash)
             return;
+        FrameDebugger::EPsoDirtyReason reason = FrameDebugger::EPsoDirtyReason::kNone;
+        if (shader_hash != _hash_shader || shader != _current_shader) reason = reason | FrameDebugger::EPsoDirtyReason::kShaderChanged;
+        if (pass_index != _current_pass_index) reason = reason | FrameDebugger::EPsoDirtyReason::kShaderPassChanged;
+        if (variant_hash != _current_variant_hash) reason = reason | FrameDebugger::EPsoDirtyReason::kShaderVariantChanged;
         _hash_shader = shader_hash;
         _current_shader = shader;
         _current_pass_index = pass_index;
         _current_variant_hash = variant_hash;
-        MarkPSODirty();
+        MarkPSODirty(reason);
     }
+
 
     void CommandRecordingContext::ConfigureShader(Shader *shader, const u64 &shader_hash)
     {
@@ -480,7 +485,7 @@ namespace Ailu::Render
     {
         if (hash == _hash_input_layout) return;
         _hash_input_layout = hash;
-        MarkPSODirty();
+        MarkPSODirty(FrameDebugger::EPsoDirtyReason::kVertexLayoutChanged);
     }
     void CommandRecordingContext::ConfigureTopology(const u8 &hash)
     {
@@ -492,19 +497,19 @@ namespace Ailu::Render
     {
         if (hash == _hash_blend_state) return;
         _hash_blend_state = hash;
-        MarkPSODirty();
+        MarkPSODirty(FrameDebugger::EPsoDirtyReason::kBlendStateChanged);
     }
     void CommandRecordingContext::ConfigureRasterizerState(const u8 &hash)
     {
         if (hash == _hash_raster_state) return;
         _hash_raster_state = hash;
-        MarkPSODirty();
+        MarkPSODirty(FrameDebugger::EPsoDirtyReason::kRasterizerStateChanged);
     }
     void CommandRecordingContext::ConfigureDepthStencilState(const u8 &hash)
     {
         if (hash == _hash_depth_stencil_state) return;
         _hash_depth_stencil_state = hash;
-        MarkPSODirty();
+        MarkPSODirty(FrameDebugger::EPsoDirtyReason::kDepthStencilStateChanged);
     }
 
     void CommandRecordingContext::SetRenderTargetState(EALGFormat color_format, EALGFormat depth_format, u8 color_rt_id)
@@ -515,7 +520,7 @@ namespace Ailu::Render
         _render_target_state._depth_rt = depth_format;
         auto cur_rt_hash = RenderTargetState::_s_hash_obj.GenHash(_render_target_state);
         if (cur_rt_hash != _hash_rt_state) 
-            MarkPSODirty();
+            MarkPSODirty(FrameDebugger::EPsoDirtyReason::kRenderTargetStateChanged);
         _hash_rt_state = cur_rt_hash;
     }
     void CommandRecordingContext::SetRenderTargetState(EALGFormat color_format, u8 color_rt_id)
@@ -525,7 +530,7 @@ namespace Ailu::Render
                 color_format == EALGFormat::kALGFormatUNKOWN ? 0 : static_cast<u8>(color_rt_id + 1u);
         auto cur_rt_hash = RenderTargetState::_s_hash_obj.GenHash(_render_target_state);
         if (cur_rt_hash != _hash_rt_state) 
-            MarkPSODirty();
+            MarkPSODirty(FrameDebugger::EPsoDirtyReason::kRenderTargetStateChanged);
         _hash_rt_state = cur_rt_hash;
     }
     void CommandRecordingContext::ResetRenderTargetState()
@@ -535,7 +540,7 @@ namespace Ailu::Render
         _render_target_state._depth_rt = EALGFormat::kALGFormatUNKOWN;
         auto cur_rt_hash = RenderTargetState::_s_hash_obj.GenHash(_render_target_state);
         if (cur_rt_hash != _hash_rt_state)
-            MarkPSODirty();
+            MarkPSODirty(FrameDebugger::EPsoDirtyReason::kRenderTargetStateChanged);
         _hash_rt_state = cur_rt_hash;
     }
 

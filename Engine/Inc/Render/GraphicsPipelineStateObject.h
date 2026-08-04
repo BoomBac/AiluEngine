@@ -19,12 +19,15 @@
 #include "CoreType.h"
 #include "Shader.h"
 #include "Texture.h"
+#include "Render/FrameDebugger/FrameCaptureReason.h"
 
 
 //ref
 //https://zhuanlan.zhihu.com/p/582020846
 //https://alpqr.github.io/qtrhi/qrhigraphicspipeline.html#CompareOp-enum
 //https://learn.microsoft.com/en-us/windows/win32/direct3d12/managing-graphics-pipeline-state-in-direct3d-12
+
+namespace Ailu::Render::FrameDebugger { class FrameCaptureWriter; }
 
 namespace Ailu::Render
 {
@@ -205,6 +208,31 @@ namespace Ailu::Render
             _is_pso_dirty = true;
             _pso_request_submitted = false;
         }
+#if AILU_ENABLE_FRAME_DEBUGGER
+        FrameDebugger::EPsoDirtyReason _capture_pso_dirty_reasons = FrameDebugger::EPsoDirtyReason::kNone;
+        FrameDebugger::FrameCaptureWriter *_capture_writer = nullptr;
+    public:
+        void SetCaptureWriter(FrameDebugger::FrameCaptureWriter *writer) { _capture_writer = writer; }
+#endif
+
+    public:
+        void MarkPSODirty(FrameDebugger::EPsoDirtyReason reason)
+        {
+            _is_pso_dirty = true;
+            _pso_request_submitted = false;
+#if AILU_ENABLE_FRAME_DEBUGGER
+            _capture_pso_dirty_reasons = _capture_pso_dirty_reasons | reason;
+#endif
+        }
+
+#if AILU_ENABLE_FRAME_DEBUGGER
+        FrameDebugger::EPsoDirtyReason TakePsoDirtyReasons()
+        {
+            FrameDebugger::EPsoDirtyReason r = _capture_pso_dirty_reasons;
+            _capture_pso_dirty_reasons = FrameDebugger::EPsoDirtyReason::kNone;
+            return r;
+        }
+#endif
         Vector<PipelineResource> _resolved_bind_res;
         RenderTargetState _render_target_state;
         PSOHash _cur_pos_hash{};

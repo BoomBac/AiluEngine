@@ -330,6 +330,20 @@
         "_font_size": 14.0
     },
     "_tree_view_styles": {},
+    "_table_style": {
+        "_background": { "_background": { "_type": "kColor", "_tint": [0.94, 0.95, 0.96, 1.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] }, "_content_color": [0.12, 0.14, 0.16, 1.0], "_border_color": [0.68, 0.72, 0.76, 1.0], "_border_width": [1.0, 1.0, 1.0, 1.0], "_corner_radius": [3.0, 3.0, 3.0, 3.0] },
+        "_header": { "_background": { "_type": "kColor", "_tint": [0.98, 0.98, 0.98, 1.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] }, "_content_color": [0.12, 0.14, 0.16, 1.0], "_border_color": [0.68, 0.72, 0.76, 1.0], "_border_width": [1.0, 1.0, 1.0, 1.0], "_corner_radius": [3.0, 3.0, 3.0, 3.0] },
+        "_row": { "_background": { "_type": "kColor", "_tint": [0.0, 0.0, 0.0, 0.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] }, "_content_color": [0.12, 0.14, 0.16, 1.0], "_border_color": [0.68, 0.72, 0.76, 1.0], "_border_width": [1.0, 1.0, 1.0, 1.0], "_corner_radius": [3.0, 3.0, 3.0, 3.0] },
+        "_row_hovered": { "_background": { "_type": "kColor", "_tint": [0.88, 0.91, 0.94, 1.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] }, "_content_color": [0.12, 0.14, 0.16, 1.0], "_border_color": [0.68, 0.72, 0.76, 1.0], "_border_width": [1.0, 1.0, 1.0, 1.0], "_corner_radius": [3.0, 3.0, 3.0, 3.0] },
+        "_row_selected": { "_background": { "_type": "kColor", "_tint": [0.10, 0.42, 0.76, 0.30], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] }, "_content_color": [0.12, 0.14, 0.16, 1.0], "_border_color": [0.68, 0.72, 0.76, 1.0], "_border_width": [1.0, 1.0, 1.0, 1.0], "_corner_radius": [3.0, 3.0, 3.0, 3.0] },
+        "_cell": { "_background": { "_type": "kColor", "_tint": [0.0, 0.0, 0.0, 0.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] }, "_content_color": [0.12, 0.14, 0.16, 1.0], "_border_color": [0.0, 0.0, 0.0, 0.0], "_border_width": [0.0, 0.0, 0.0, 0.0], "_corner_radius": [0.0, 0.0, 0.0, 0.0] },
+        "_row_height": 20.0,
+        "_header_height": 22.0,
+        "_border_width": 1.0,
+        "_font_size": 14.0,
+        "_cell_padding": [4.0, 1.0, 4.0, 1.0]
+    },
+    "_table_styles": {},
     "_element_visual_styles": {},
     "_split_view_styles": {},
     "_color_picker_styles": {}

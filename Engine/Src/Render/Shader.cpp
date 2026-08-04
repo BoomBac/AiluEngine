@@ -1421,6 +1421,22 @@ namespace Ailu::Render
             return it->second._bind_slot;
         return -1;
     }
+    String ComputeShader::SlotToName(ComputeShaderKernelId kernel, u16 slot) const
+    {
+        const auto kernel_index = ResolveKernelIndex(kernel);
+        if (kernel_index >= _kernels.size())
+            return "";
+        const auto variant_hash = ResolveActiveVariant(kernel);
+        const auto variant_it = _kernels[kernel_index]._variants.find(variant_hash);
+        if (variant_it == _kernels[kernel_index]._variants.end())
+            return "";
+        for (const auto &[name, info] : variant_it->second._bind_res_infos)
+        {
+            if (info._bind_slot == (i16)slot)
+                return name;
+        }
+        return "";
+    }
     void ComputeShader::PushState(ComputeShaderKernelId kernel)
     {
         const auto kernel_index = ResolveKernelIndex(kernel);
