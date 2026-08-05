@@ -659,7 +659,7 @@ meta_color.Set("RangeMin",(f32)0);
 meta_color.Set("RangeMax",(f32)1);
 MemberBuilder builder_color;
 builder_color._name = "_color";
-builder_color._type_name = "Color";
+builder_color._type_name = "Ailu::Math::Color";
 builder_color._offset = offsetof(GraphCommentData,_color);
 builder_color._is_const = false;
 builder_color._is_static = false;

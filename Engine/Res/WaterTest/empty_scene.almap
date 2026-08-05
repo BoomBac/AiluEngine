@@ -6,38 +6,9 @@
         "_asset_name": "empty_scene",
         "_dependencies": []
     },
+    "_scene_format_version": 2,
     "_entities": [{
-            "_entity_id": 4294967297,
-            "_tag_component": {
-                "_name": "sprite_test",
-                "_layer_mask": 1
-            },
-            "_transform_component": {
-                "_position": [4.3144, 3.5541, -0.0],
-                "_rotation": [0.0, -0.0, 0.0, 1.0],
-                "_scale": [1.0, 1.0, 1.0]
-            },
-            "_hierarchy_component": {
-                "_first_child": 0,
-                "_prev_sibling": 0,
-                "_next_sibling": 0,
-                "_parent": 0,
-                "_children_num": 0,
-                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0"
-            },
-            "_sprite_renderer_component": {
-                "_sprite_guid": "e9bfde03-b5ab-4282-be2b-8fdc88f873ad",
-                "_material_guid": "",
-                "_color": [1.0, 1.0, 1.0, 1.0],
-                "_sorting_layer": 0,
-                "_order_in_layer": 0,
-                "_blend_mode": 0,
-                "_flip_x": false,
-                "_flip_y": false,
-                "_visible": true
-            }
-        }, {
-            "_entity_id": 4294967298,
+            "_entity_guid": "09740016-4a70-441e-b6d6-3a476a65f6a9",
             "_tag_component": {
                 "_name": "directional_light",
                 "_layer_mask": 1
@@ -61,38 +32,39 @@
                 }
             },
             "_hierarchy_component": {
-                "_first_child": 0,
-                "_prev_sibling": 0,
-                "_next_sibling": 0,
-                "_parent": 0,
-                "_children_num": 0,
+                "_parent_guid": "null",
+                "_sibling_index": 0,
                 "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0"
             }
         }, {
-            "_entity_id": 4294967299,
+            "_entity_guid": "407291e5-544f-43e2-9c04-3c50d9e3f786",
             "_tag_component": {
-                "_name": "new_object_3",
-                "_layer_mask": 0
+                "_name": "sprite_test",
+                "_layer_mask": 1
             },
             "_transform_component": {
-                "_position": [0.0, -0.2187, 0.0],
+                "_position": [4.3144, 3.5541, -0.0],
                 "_rotation": [0.0, -0.0, 0.0, 1.0],
-                "_scale": [14.9337, 14.9337, 14.9337]
-            },
-            "_static_mesh_component": {
-                "_mesh_guid": "c3315e03-1052-4825-98f7-a676beae0615",
-                "_material_guids": ["4f6e2fa4-c9af-4800-9ff9-70874abfbd50"]
+                "_scale": [1.0, 1.0, 1.0]
             },
             "_hierarchy_component": {
-                "_first_child": 0,
-                "_prev_sibling": 0,
-                "_next_sibling": 0,
-                "_parent": 0,
-                "_children_num": 0,
+                "_parent_guid": "null",
+                "_sibling_index": 0,
                 "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0"
+            },
+            "_sprite_renderer_component": {
+                "_sprite_guid": "e9bfde03-b5ab-4282-be2b-8fdc88f873ad",
+                "_material_guid": "",
+                "_color": [1.0, 1.0, 1.0, 1.0],
+                "_sorting_layer": 0,
+                "_order_in_layer": 0,
+                "_blend_mode": 0,
+                "_flip_x": false,
+                "_flip_y": false,
+                "_visible": true
             }
         }, {
-            "_entity_id": 4294967300,
+            "_entity_guid": "55409c26-3026-4a3c-baaf-a5db3ebb3e94",
             "_tag_component": {
                 "_name": "LightProbe_4",
                 "_layer_mask": 1
@@ -103,11 +75,8 @@
                 "_scale": [1.0, 1.0, 1.0]
             },
             "_hierarchy_component": {
-                "_first_child": 0,
-                "_prev_sibling": 0,
-                "_next_sibling": 0,
-                "_parent": 0,
-                "_children_num": 0,
+                "_parent_guid": "null",
+                "_sibling_index": 0,
                 "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0"
             },
             "_lightprobe_component": {
@@ -115,13 +84,33 @@
                 "_is_update_every_tick": false
             }
         }, {
-            "_entity_id": 4294967303,
+            "_entity_guid": "bf006622-eae6-4445-a5bb-3cc6dc3d3b18",
+            "_tag_component": {
+                "_name": "new_object_3",
+                "_layer_mask": 0
+            },
+            "_transform_component": {
+                "_position": [0.0, -0.2187, 0.0],
+                "_rotation": [0.0, -0.0, 0.0, 1.0],
+                "_scale": [14.9336, 14.9336, 14.9336]
+            },
+            "_static_mesh_component": {
+                "_mesh_guid": "c3315e03-1052-4825-98f7-a676beae0615",
+                "_material_guids": ["4f6e2fa4-c9af-4800-9ff9-70874abfbd50"]
+            },
+            "_hierarchy_component": {
+                "_parent_guid": "null",
+                "_sibling_index": 0,
+                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0"
+            }
+        }, {
+            "_entity_guid": "c2f41a5e-6e03-4273-a6ef-c6e44ffbaf97",
             "_tag_component": {
                 "_name": "new_object_5",
                 "_layer_mask": 0
             },
             "_transform_component": {
-                "_position": [-1.1983, 1.0637, 1.3005],
+                "_position": [-1.1983, 1.0636, 1.3005],
                 "_rotation": [0.0, 0.0, 0.0, 1.0],
                 "_scale": [1.0, 1.0, 1.0]
             },
@@ -130,11 +119,8 @@
                 "_material_guids": ["e3891c79-694a-4968-bb84-49c409a611ce"]
             },
             "_hierarchy_component": {
-                "_first_child": 0,
-                "_prev_sibling": 0,
-                "_next_sibling": 0,
-                "_parent": 0,
-                "_children_num": 0,
+                "_parent_guid": "null",
+                "_sibling_index": 0,
                 "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0"
             }
         }]

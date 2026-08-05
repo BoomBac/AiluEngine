@@ -1,4 +1,5 @@
 ﻿#include "EditorApp.h"
+#include "Common/Selection.h"
 #include "Common/Undo.h"
 #include "Widgets/InputLayer.h"
 #include "Widgets/RenderView.h"
@@ -72,6 +73,7 @@ namespace Ailu
             _pipeline.reset(new CommonRenderPipeline());
             Render::RenderPipeline::Register(_pipeline.get());
             {
+                Selection::RemoveSlection();
                 SceneManagement::SceneMgr::Get().OpenScene(_opened_scene_path);
             }
             LoadEditorResource();

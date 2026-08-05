@@ -1530,6 +1530,8 @@ namespace Ailu
             {
                 if (!Application::Get()._is_playing_mode)
                 {
+                    // 运行时副本是新的 Scene 实例，清理旧句柄避免误选中另一 Scene 的实体。
+                    Selection::RemoveSlection();
                     SceneMgr::Get().EnterPlayMode();
                     _editor_status_message = "Play mode";
                     LOG_INFO("EditorToolbar: enter play mode");
@@ -1550,6 +1552,7 @@ namespace Ailu
             {
                 if (Application::Get()._is_playing_mode)
                 {
+                    Selection::RemoveSlection();
                     SceneMgr::Get().ExitPlayMode();
                     _editor_status_message = "Edit mode";
                     LOG_INFO("EditorToolbar: exit play mode");

@@ -84,6 +84,163 @@ namespace Ailu::SceneManagement
         return _register.IsAlive(entity);
     }
 
+    // =========================================================================
+    // Entity GUID identity
+    // =========================================================================
+    ECS::Entity Scene::FindEntity(const Guid &guid) const
+    {
+        if (guid.IsEmpty())
+            return ECS::kInvalidEntity;
+        const auto it = _guid_to_entity.find(guid);
+        if (it == _guid_to_entity.end())
+            return ECS::kInvalidEntity;
+        const ECS::Entity entity = it->second;
+        if (!_register.IsAlive(entity))
+            return ECS::kInvalidEntity;
+        return entity;
+    }
+
+    const Guid &Scene::GetEntityGuid(ECS::Entity entity) const
+    {
+        if (entity == ECS::kInvalidEntity || !_register.IsAlive(entity))
+            return Guid::EmptyGuid();
+        const auto *id_comp = _register.GetComponent<ECS::PersistentIdComponent>(entity);
+        return id_comp ? id_comp->_guid : Guid::EmptyGuid();
+    }
+
+    bool Scene::HasEntityGuid(const Guid &guid) const
+    {
+        return _guid_to_entity.contains(guid);
+    }
+
+    bool Scene::ValidateEntityGuidIndex() const
+    {
+        bool is_valid = true;
+        for (const auto &[guid, entity] : _guid_to_entity)
+        {
+            if (!_register.IsAlive(entity))
+            {
+                LOG_ERROR("ValidateEntityGuidIndex: entry for guid {} points to dead entity {}", guid.ToString(), entity);
+                is_valid = false;
+                continue;
+            }
+            const auto *id_comp = _register.GetComponent<ECS::PersistentIdComponent>(entity);
+            if (id_comp == nullptr)
+            {
+                LOG_ERROR("ValidateEntityGuidIndex: entity {} has no PersistentIdComponent but is indexed", entity);
+                is_valid = false;
+                continue;
+            }
+            if (!(id_comp->_guid == guid))
+            {
+                LOG_ERROR("ValidateEntityGuidIndex: entity {} guid {} mismatches index key {}", entity, id_comp->_guid.ToString(), guid.ToString());
+                is_valid = false;
+            }
+        }
+        u32 index = 0u;
+        for (const auto &id_comp : _register.View<ECS::PersistentIdComponent>())
+        {
+            const ECS::Entity entity = _register.GetEntity<ECS::PersistentIdComponent>(index++);
+            if (!_guid_to_entity.contains(id_comp._guid))
+            {
+                LOG_ERROR("ValidateEntityGuidIndex: entity {} guid {} is not indexed", entity, id_comp._guid.ToString());
+                is_valid = false;
+            }
+        }
+        return is_valid;
+    }
+
+    Guid Scene::GenerateUniqueEntityGuid() const
+    {
+        Guid guid = Guid::Generate();
+        while (_guid_to_entity.contains(guid))
+        {
+            LOG_WARNING("GenerateUniqueEntityGuid: guid collision {}, regenerating", guid.ToString());
+            guid = Guid::Generate();
+        }
+        return guid;
+    }
+
+    bool Scene::RegisterEntityGuid(ECS::Entity entity, const Guid &guid)
+    {
+        if (guid.IsEmpty())
+        {
+            LOG_ERROR("RegisterEntityGuid: refused to register empty guid for entity {}", entity);
+            return false;
+        }
+        if (!_register.IsAlive(entity))
+        {
+            LOG_ERROR("RegisterEntityGuid: refused to register guid {} for dead entity {}", guid.ToString(), entity);
+            return false;
+        }
+        const auto it = _guid_to_entity.find(guid);
+        if (it != _guid_to_entity.end() && it->second != entity)
+        {
+            LOG_ERROR("RegisterEntityGuid: guid {} already used by entity {}, refuse to register entity {}", guid.ToString(), it->second, entity);
+            return false;
+        }
+        _guid_to_entity[guid] = entity;
+        return true;
+    }
+
+    void Scene::UnregisterEntityGuid(ECS::Entity entity)
+    {
+        const auto *id_comp = _register.GetComponent<ECS::PersistentIdComponent>(entity);
+        if (id_comp == nullptr)
+            return;
+        const auto it = _guid_to_entity.find(id_comp->_guid);
+        if (it != _guid_to_entity.end() && it->second == entity)
+            _guid_to_entity.erase(it);
+    }
+
+    void Scene::RebuildEntityGuidIndex()
+    {
+        _guid_to_entity.clear();
+        u32 index = 0u;
+        for (const auto &id_comp : _register.View<ECS::PersistentIdComponent>())
+        {
+            const ECS::Entity entity = _register.GetEntity<ECS::PersistentIdComponent>(index++);
+            if (id_comp._guid.IsEmpty())
+                continue;
+            if (!_guid_to_entity.emplace(id_comp._guid, entity).second)
+                LOG_ERROR("RebuildEntityGuidIndex: duplicate guid {} detected, entity {} dropped", id_comp._guid.ToString(), entity);
+        }
+    }
+
+    bool Scene::EnsureValidEntityIdentities()
+    {
+        bool repaired = false;
+        // 以 TagComponent 视图近似“所有场景实体”：CreateEntityInternal 会同时添加 Tag 与 PersistentId。
+        u32 index = 0u;
+        Vector<ECS::Entity> entities;
+        for (const auto &tag : _register.View<ECS::TagComponent>())
+        {
+            entities.push_back(_register.GetEntity<ECS::TagComponent>(index++));
+        }
+        for (ECS::Entity entity : entities)
+        {
+            auto *id_comp = _register.GetComponent<ECS::PersistentIdComponent>(entity);
+            if (id_comp == nullptr || id_comp->_guid.IsEmpty())
+            {
+                Guid new_guid = GenerateUniqueEntityGuid();
+                if (id_comp == nullptr)
+                {
+                    _register.AddComponent<ECS::PersistentIdComponent>(entity, new_guid);
+                }
+                else
+                {
+                    id_comp->_guid = new_guid;
+                }
+                LOG_ERROR("EnsureValidEntityIdentities: entity {} had missing/empty guid, generated {}", entity, new_guid.ToString());
+                repaired = true;
+            }
+        }
+        RebuildEntityGuidIndex();
+        if (repaired)
+            return ValidateEntityGuidIndex();
+        return true;
+    }
+
     bool Scene::IsDescendantOf(ECS::Entity entity, ECS::Entity potential_ancestor) const
     {
         if (entity == ECS::kInvalidEntity || potential_ancestor == ECS::kInvalidEntity)
@@ -339,13 +496,26 @@ namespace Ailu::SceneManagement
         return _register.EntityView<ECS::CHierarchy>();
     }
 
+    ECS::Entity Scene::CreateEntityInternal(String name, const Guid &requested_guid)
+    {
+        ECS::Entity entity = _register.Create();
+        const Guid guid = requested_guid.IsValid() ? requested_guid : GenerateUniqueEntityGuid();
+        _register.AddComponent<ECS::PersistentIdComponent>(entity, guid);
+        if (!RegisterEntityGuid(entity, guid))
+        {
+            LOG_ERROR("CreateEntityInternal: failed to register guid {} for entity {}", guid.ToString(), entity);
+        }
+        if (name.empty())
+            name = AcquireName();
+        _register.AddComponent<ECS::TagComponent>(entity, name);
+        _register.AddComponent<ECS::TransformComponent>(entity);
+        _register.AddComponent<ECS::CHierarchy>(entity);
+        return entity;
+    }
+
     ECS::Entity Scene::AddObject(Ref<Mesh> mesh, Ref<Material> mat)
     {
-        ECS::Entity obj = _register.Create();
-        _register.AddComponent<ECS::PersistentIdComponent>(obj);
-        _register.AddComponent<ECS::TagComponent>(obj, AcquireName());
-        _register.AddComponent<ECS::TransformComponent>(obj);
-        _register.AddComponent<ECS::CHierarchy>(obj);
+        ECS::Entity obj = CreateEntityInternal("", Guid::EmptyGuid());
         auto &comp = _register.AddComponent<ECS::StaticMeshComponent>(obj);
         comp._p_mesh = mesh ? mesh : Mesh::s_plane.lock();
         comp._transformed_aabbs.resize(comp._p_mesh->SubmeshCount() + 1);
@@ -355,11 +525,7 @@ namespace Ailu::SceneManagement
     }
     ECS::Entity Scene::AddObject(Ref<Mesh> mesh, const Vector<Ref<Material>> &mats)
     {
-        ECS::Entity obj = _register.Create();
-        _register.AddComponent<ECS::PersistentIdComponent>(obj);
-        _register.AddComponent<ECS::TagComponent>(obj, AcquireName());
-        _register.AddComponent<ECS::TransformComponent>(obj);
-        _register.AddComponent<ECS::CHierarchy>(obj);
+        ECS::Entity obj = CreateEntityInternal("", Guid::EmptyGuid());
         auto &comp = _register.AddComponent<ECS::StaticMeshComponent>(obj);
         comp._p_mesh = mesh ? mesh : Mesh::s_plane.lock();
         comp._transformed_aabbs.resize(comp._p_mesh->SubmeshCount() + 1);
@@ -369,21 +535,19 @@ namespace Ailu::SceneManagement
     }
     ECS::Entity Scene::AddObject(String name)
     {
-        ECS::Entity obj = _register.Create();
-        name = name.empty() ? AcquireName() : name;
-        _register.AddComponent<ECS::PersistentIdComponent>(obj);
-        _register.AddComponent<ECS::TagComponent>(obj, name);
-        _register.AddComponent<ECS::TransformComponent>(obj);
-        _register.AddComponent<ECS::CHierarchy>(obj);
-        TouchStructure();
-        return obj;
+        return CreateEntityInternal(std::move(name), Guid::EmptyGuid());
+    }
+    ECS::Entity Scene::AddObject(String name, const Guid &requested_guid)
+    {
+        return CreateEntityInternal(std::move(name), requested_guid);
     }
     ECS::Entity Scene::DuplicateEntity(ECS::Entity e)
     {
-        ECS::Entity new_one = _register.Create();
-        _register.AddComponent<ECS::PersistentIdComponent>(new_one);  // new entity gets a new GUID
-        auto &tag_comp = _register.AddComponent<ECS::TagComponent>(new_one, *_register.GetComponent<ECS::TagComponent>(e));
-        String base_name = tag_comp._name.substr(0, tag_comp._name.find_first_of('(') - 1);
+        ECS::Entity new_one = CreateEntityInternal("", Guid::EmptyGuid());
+        if (const auto *src_tag = _register.GetComponent<ECS::TagComponent>(e))
+            *_register.GetComponent<ECS::TagComponent>(new_one) = *src_tag;
+        auto *tag_comp = _register.GetComponent<ECS::TagComponent>(new_one);
+        String base_name = tag_comp->_name.substr(0, tag_comp->_name.find_first_of('(') - 1);
         i32 max_index = 0;
         std::regex name_pattern(base_name + R"(\((\d+)\))");// 匹配 A(*) 的正则表达式
         for (const auto &tag: _register.View<ECS::TagComponent>())
@@ -395,7 +559,7 @@ namespace Ailu::SceneManagement
                 max_index = std::max(max_index, index);
             }
         }
-        tag_comp._name += "(" + std::to_string(max_index + 1) + ")";
+        tag_comp->_name += "(" + std::to_string(max_index + 1) + ")";
 
         // Save source local transform before copying
         Vector3f source_local_pos = Vector3f::kZero;
@@ -415,11 +579,8 @@ namespace Ailu::SceneManagement
             source_parent = _register.GetComponent<ECS::CHierarchy>(e)->_parent;
         }
 
-        _register.AddComponent<ECS::TransformComponent>(new_one, *_register.GetComponent<ECS::TransformComponent>(e));
-
-        // Add default CHierarchy (no sibling/child fields copied)
-        if (source_has_hierarchy)
-            _register.AddComponent<ECS::CHierarchy>(new_one);
+        if (const auto *src_transf = _register.GetComponent<ECS::TransformComponent>(e))
+            *_register.GetComponent<ECS::TransformComponent>(new_one) = *src_transf;
 
         // Copy business components
         if (_register.HasComponent<ECS::ScriptComponent>(e))
@@ -530,6 +691,7 @@ namespace Ailu::SceneManagement
             {
                 ScriptSystem::Get().DestroyComponent(*script_comp);
             }
+            UnregisterEntityGuid(actor);
             _register.Destory(actor);
         }
 
@@ -539,7 +701,20 @@ namespace Ailu::SceneManagement
 
     void Scene::Clear()
     {
-        LOG_WARNING("Scene::Clear: TODO");
+        Vector<ECS::Entity> entities;
+        u32 index = 0u;
+        for (const auto &id_comp : _register.View<ECS::PersistentIdComponent>())
+        {
+            entities.push_back(_register.GetEntity<ECS::PersistentIdComponent>(index++));
+        }
+        for (ECS::Entity entity : entities)
+        {
+            UnregisterEntityGuid(entity);
+            _register.Destory(entity);
+        }
+        _guid_to_entity.clear();
+        _pending_delete_entities.clear();
+        TouchStructure();
     }
 
     void Scene::BeginUpdate()
@@ -915,6 +1090,7 @@ namespace Ailu::SceneManagement
         auto name = _runtime_scene->Name();
         name.append("_copy");
         _runtime_scene->Name(name);
+        _runtime_scene->RebuildEntityGuidIndex();
         _runtime_scene_src = _p_current;
         _p_current = _runtime_scene;
     }

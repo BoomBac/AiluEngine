@@ -2,6 +2,7 @@
 #include "Audio/Audio.h"
 #include "Audio/AudioClip.h"
 #include "Common/EditorPopup.h"
+#include "Common/Selection.h"
 #include "Graph/GraphAsset.h"
 #include "Graph/GraphDocument.h"
 #include "Graph/GraphEditorWindow.h"
@@ -1277,6 +1278,8 @@ namespace Ailu
 
             if (asset->_asset_type == StaticClass<SceneManagement::Scene>())
             {
+                // 切换场景前清理 Selection，避免另一 Scene 中相同运行时句柄被误认为原对象。
+                Selection::RemoveSlection();
                 SceneManagement::SceneMgr::Get().OpenScene(asset->_asset_path);
             }
             else if (asset->_asset_type == StaticClass<Render::Mesh>())

@@ -4,8 +4,14 @@
 #include "Objects/Object.h"
 #include "Scene/Entity.h"
 #include "Framework/Events/Event.h"
+#include "Framework/Math/Guid.h"
 namespace Ailu
 {
+    namespace SceneManagement
+    {
+        class Scene;
+        class SceneMgr;
+    }
     namespace Editor
     {
         class Selection
@@ -111,6 +117,9 @@ namespace Ailu
                     return ECS::kInvalidEntity;
                 return s_selected_entities.front();
             }
+            /// @brief 调试辅助：返回当前选中的第一个 Entity 的持久 GUID。
+            /// 每次通过 Active Scene 查询，不在 Selection 中维护第二份真值。
+            static Guid FirstEntityGuid();
             static void Active(bool can_select) { s_can_select = can_select; }
             static bool IsActive() { return s_can_select; }
 

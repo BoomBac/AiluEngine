@@ -11,11 +11,6 @@ namespace Ailu
         const String kEmptyCommandName;
     }
 
-    size_t GraphGuidHasher::operator()(const Guid &guid) const
-    {
-        return std::hash<String>{}(guid.ToString());
-    }
-
     GraphCommandStack::GraphCommandStack(GraphDocument *document) : _document(document)
     {
     }

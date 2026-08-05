@@ -53,4 +53,23 @@ namespace Ailu
     {
         return _guid == other;
     }
+    bool Guid::IsEmpty() const
+    {
+        if (_guid.empty())
+            return true;
+        String trimmed = _guid;
+        size_t start = trimmed.find_first_not_of(" \t\r\n");
+        if (start == String::npos)
+            return true;
+        size_t end = trimmed.find_last_not_of(" \t\r\n");
+        return trimmed.compare(start, end - start + 1, "null") == 0;
+    }
+    bool Guid::IsValid() const
+    {
+        return !IsEmpty();
+    }
+    size_t GuidHasher::operator()(const Guid &guid) const noexcept
+    {
+        return std::hash<String>{}(guid.ToString());
+    }
 }

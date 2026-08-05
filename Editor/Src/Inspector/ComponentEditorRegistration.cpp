@@ -8,6 +8,7 @@
 #include "Inspector/ComponentEditors/LightProbeComponentEditor.h"
 #include "Inspector/ComponentEditors/RigidBodyComponentEditor.h"
 #include "Inspector/ComponentEditors/ColliderComponentEditor.h"
+#include "Inspector/ComponentEditors/PersistentIdComponentEditor.h"
 #include "Scene/Component.h"
 
 namespace Ailu
@@ -46,7 +47,7 @@ namespace Ailu
 
             registry.Register<ECS::TagComponent>("Tag", "Core", 10, false, false);
 
-            registry.Register<ECS::PersistentIdComponent>("Persistent ID", "Core", 20, false, false);
+            registry.RegisterCustom<ECS::PersistentIdComponent, PersistentIdComponentEditor>("Persistent ID", "Core", 20, false, false);
 
             registry.Register<ECS::CHierarchy>("Hierarchy", "Core", 30, false, false);
         }

@@ -30,6 +30,7 @@
 #include "Render/Texture.h"
 #include "Scene/Scene.h"
 
+#include <algorithm>
 #include <map>
 #include <sstream>
 
@@ -52,9 +53,17 @@ bool SaveAssetDocument(const WString &sys_path, TDocument &document)
         return false;
     }
     JsonArchive ar;
-    for (auto &prop : type->GetProperties())
+    if constexpr (Serializable<TDocument>)
     {
-        prop.Serialize(&document, ar);
+        // 文档类自定义 Serialize 优先（例如 SceneAssetDocument 需显式写出场景格式版本）。
+        document.Serialize(ar);
+    }
+    else
+    {
+        for (auto &prop : type->GetProperties())
+        {
+            prop.Serialize(&document, ar);
+        }
     }
     ar.Save(sys_path);
     return true;
@@ -73,9 +82,17 @@ bool LoadAssetDocument(const WString &sys_path, TDocument &document)
         LOG_ERROR(L"Load asset document from {} failed, document type is nullptr", sys_path);
         return false;
     }
-    for (auto &prop : type->GetProperties())
+    if constexpr (Deserializable<TDocument>)
     {
-        prop.Deserialize(&document, ar);
+        // 文档类自定义 Deserialize 优先（例如 SceneAssetDocument 需守卫缺失的场景格式版本字段）。
+        document.Deserialize(ar);
+    }
+    else
+    {
+        for (auto &prop : type->GetProperties())
+        {
+            prop.Deserialize(&document, ar);
+        }
     }
     return true;
 }
@@ -166,14 +183,6 @@ namespace
         {
             out_guids.emplace_back(GetLinkedAssetGuidString(material.get()));
         }
-    }
-
-    ECS::Entity RemapSceneEntityId(const HashMap<ECS::Entity, ECS::Entity> &old_to_new_entities, u64 legacy_entity_id)
-    {
-        if (legacy_entity_id == ECS::kInvalidEntity)
-            return ECS::kInvalidEntity;
-        const auto it = old_to_new_entities.find(static_cast<ECS::Entity>(legacy_entity_id));
-        return it != old_to_new_entities.end() ? it->second : ECS::kInvalidEntity;
     }
 
     InputProcessorDocument ToInputProcessorDocument(const InputProcessor *processor)
@@ -1036,19 +1045,55 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
         : ToChar(PathUtils::GetFileName(context._asset_path).c_str());
 
     Ref<Scene> loaded_scene = MakeRef<Scene>(scene_name);
+    loaded_scene->SetAssetGuid(Guid(doc._header._guid));
     auto &reg = loaded_scene->GetRegister();
+
+    const bool is_v2 = doc._scene_format_version >= SceneAssetDocument::kCurrentSceneFormatVersion;
+
+    // First pass: create entities and build identity index.
+    // 与 doc._entities 保持索引对齐，避免重复计算修复后的 GUID。
+    Vector<ECS::Entity> created_entities;
+    created_entities.reserve(doc._entities.size());
+
+    // 修复后的 Guid -> 运行时 Entity；同时用于 V2 重复 GUID 检测与层级重建。
+    HashMap<Guid, ECS::Entity, GuidHasher> guid_to_entity;
+    guid_to_entity.reserve(doc._entities.size());
+    // V1 旧场景：legacy entity id -> 新运行时 Entity。
     HashMap<ECS::Entity, ECS::Entity> old_to_new_entities;
     old_to_new_entities.reserve(doc._entities.size());
 
-    // First pass: create entities and tag components
     for (const auto &entity_doc : doc._entities)
     {
-        ECS::Entity new_entity = reg.Create();
-        old_to_new_entities.emplace(static_cast<ECS::Entity>(entity_doc._entity_id), new_entity);
+        Guid guid = entity_doc._entity_guid;
+        bool generated = false;
+        if (guid.IsEmpty())
+        {
+            LOG_WARNING("Scene load: entity '{}' has empty guid, generating a new one", entity_doc._tag_component._name);
+            generated = true;
+        }
+        else if (guid_to_entity.contains(guid))
+        {
+            LOG_ERROR("Scene load: duplicate guid {} for entity '{}', generating a new one", guid.ToString(), entity_doc._tag_component._name);
+            generated = true;
+        }
 
-        auto &tag = reg.AddComponent<ECS::TagComponent>(new_entity);
-        tag._name = entity_doc._tag_component._name;
-        tag._layer_mask = entity_doc._tag_component._layer_mask;
+        ECS::Entity new_entity = loaded_scene->AddObject(entity_doc._tag_component._name, generated ? Guid::EmptyGuid() : guid);
+        if (generated)
+        {
+            guid = loaded_scene->GetEntityGuid(new_entity);
+        }
+        if (auto *tag = reg.GetComponent<ECS::TagComponent>(new_entity))
+        {
+            tag->_layer_mask = entity_doc._tag_component._layer_mask;
+        }
+
+        created_entities.emplace_back(new_entity);
+        guid_to_entity.emplace(guid, new_entity);
+
+        if (!is_v2)
+        {
+            old_to_new_entities.emplace(static_cast<ECS::Entity>(entity_doc._entity_id), new_entity);
+        }
     }
 
     // Helper to load material refs
@@ -1082,19 +1127,20 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
     };
 
     // Second pass: add all other components
-    for (const auto &entity_doc : doc._entities)
+    for (u32 doc_index = 0u; doc_index < doc._entities.size(); ++doc_index)
     {
-        const auto entity_it = old_to_new_entities.find(static_cast<ECS::Entity>(entity_doc._entity_id));
-        if (entity_it == old_to_new_entities.end())
-            continue;
-        const ECS::Entity entity = entity_it->second;
+        const auto &entity_doc = doc._entities[doc_index];
+        const ECS::Entity entity = created_entities[doc_index];
 
         if (entity_doc._has_transform_component)
         {
-            auto &component = reg.AddComponent<ECS::TransformComponent>(entity);
-            component._local_transform._position = entity_doc._transform_component._position;
-            component._local_transform._rotation = entity_doc._transform_component._rotation;
-            component._local_transform._scale = entity_doc._transform_component._scale;
+            // CreateEntityInternal 已预置默认 TransformComponent，这里只覆盖文件中的本地变换。
+            auto *component = reg.GetComponent<ECS::TransformComponent>(entity);
+            if (component == nullptr)
+                component = &reg.AddComponent<ECS::TransformComponent>(entity);
+            component->_local_transform._position = entity_doc._transform_component._position;
+            component->_local_transform._rotation = entity_doc._transform_component._rotation;
+            component->_local_transform._scale = entity_doc._transform_component._scale;
         }
         if (entity_doc._has_script_component)
         {
@@ -1226,30 +1272,123 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
         }
     }
 
-    // Third pass: add hierarchy components with remapped entity IDs
-    for (const auto &entity_doc : doc._entities)
+    // Third pass: rebuild hierarchy through Scene API.
+    // 统一收集每个实体的父 GUID 与兄弟顺序，按父分组稳定排序后调用 Reparent，不直接写 CHierarchy 链表字段。
+    struct HierarchyIntent
     {
-        if (!entity_doc._has_hierarchy_component)
-            continue;
+        ECS::Entity entity;
+        Guid _parent_guid;
+        u32 _sibling_index = 0u;
+        const SceneHierarchyComponentDocument *_doc = nullptr;
+    };
 
-        const auto entity_it = old_to_new_entities.find(static_cast<ECS::Entity>(entity_doc._entity_id));
-        if (entity_it == old_to_new_entities.end())
-            continue;
-        const ECS::Entity entity = entity_it->second;
-
-        auto &component = reg.AddComponent<ECS::CHierarchy>(entity);
-        component._first_child = RemapSceneEntityId(old_to_new_entities, entity_doc._hierarchy_component._first_child);
-        component._prev_sibling = RemapSceneEntityId(old_to_new_entities, entity_doc._hierarchy_component._prev_sibling);
-        component._next_sibling = RemapSceneEntityId(old_to_new_entities, entity_doc._hierarchy_component._next_sibling);
-        component._parent = RemapSceneEntityId(old_to_new_entities, entity_doc._hierarchy_component._parent);
-        component._children_num = entity_doc._hierarchy_component._children_num;
-        if (!entity_doc._hierarchy_component._inv_matrix_attach.empty())
+    Vector<HierarchyIntent> hierarchy_intents;
+    if (is_v2)
+    {
+        for (u32 doc_index = 0u; doc_index < doc._entities.size(); ++doc_index)
         {
-            component._inv_matrix_attach.FromString(entity_doc._hierarchy_component._inv_matrix_attach);
+            const auto &entity_doc = doc._entities[doc_index];
+            if (!entity_doc._has_hierarchy_component)
+                continue;
+            hierarchy_intents.push_back({created_entities[doc_index], entity_doc._hierarchy_component._parent_guid,
+                                        entity_doc._hierarchy_component._sibling_index, &entity_doc._hierarchy_component});
+        }
+    }
+    else
+    {
+        // V1 迁移：按 legacy _parent 解析父节点，并从 first_child -> next_sibling 链推导 sibling index。
+        HashMap<u64, u32> legacy_id_to_doc_index;
+        for (u32 i = 0u; i < doc._entities.size(); ++i)
+            legacy_id_to_doc_index.emplace(doc._entities[i]._entity_id, i);
+
+        HashMap<u64, u32> sibling_index_by_legacy_id;
+        for (u32 doc_index = 0u; doc_index < doc._entities.size(); ++doc_index)
+        {
+            const auto &entity_doc = doc._entities[doc_index];
+            if (!entity_doc._has_hierarchy_component)
+                continue;
+            u64 cursor = entity_doc._hierarchy_component._first_child;
+            u32 idx = 0u;
+            u32 guard = 0u;
+            while (cursor != ECS::kInvalidEntity && guard <= doc._entities.size())
+            {
+                sibling_index_by_legacy_id[cursor] = idx++;
+                const auto child_it = legacy_id_to_doc_index.find(cursor);
+                if (child_it == legacy_id_to_doc_index.end())
+                    break;
+                const auto &child_doc = doc._entities[child_it->second];
+                if (!child_doc._has_hierarchy_component)
+                    break;
+                cursor = child_doc._hierarchy_component._next_sibling;
+                ++guard;
+            }
+        }
+
+        for (u32 doc_index = 0u; doc_index < doc._entities.size(); ++doc_index)
+        {
+            const auto &entity_doc = doc._entities[doc_index];
+            if (!entity_doc._has_hierarchy_component)
+                continue;
+            Guid parent_guid;
+            if (entity_doc._hierarchy_component._parent != ECS::kInvalidEntity)
+            {
+                const auto parent_it = old_to_new_entities.find(static_cast<ECS::Entity>(entity_doc._hierarchy_component._parent));
+                if (parent_it != old_to_new_entities.end())
+                    parent_guid = loaded_scene->GetEntityGuid(parent_it->second);
+            }
+            u32 sibling_index = 0u;
+            const auto sidx_it = sibling_index_by_legacy_id.find(entity_doc._entity_id);
+            if (sidx_it != sibling_index_by_legacy_id.end())
+                sibling_index = sidx_it->second;
+            hierarchy_intents.push_back({created_entities[doc_index], parent_guid, sibling_index, &entity_doc._hierarchy_component});
         }
     }
 
-    loaded_scene->MarkDirty();
+    // 统一挂接：分组、稳定排序、逐节点 Reparent。
+    HashMap<Guid, Vector<HierarchyIntent *>, GuidHasher> children_by_parent;
+    for (auto &intent : hierarchy_intents)
+        children_by_parent[intent._parent_guid].push_back(&intent);
+
+    auto reparent_intent = [&](ECS::Entity child, ECS::Entity parent, const SceneHierarchyComponentDocument &hier_doc)
+    {
+        if (child == parent)
+        {
+            LOG_ERROR("Scene load: entity {} referenced as its own parent, keep as root", child);
+            return;
+        }
+        if (!loaded_scene->Reparent(child, parent, false))
+        {
+            LOG_ERROR("Scene load: Reparent entity {} under {} failed (cycle or invalid), degraded to root", child, parent);
+            return;
+        }
+        if (!hier_doc._inv_matrix_attach.empty())
+        {
+            if (auto *hier = reg.GetComponent<ECS::CHierarchy>(child))
+                hier->_inv_matrix_attach.FromString(hier_doc._inv_matrix_attach);
+        }
+    };
+
+    for (auto &[parent_guid, children] : children_by_parent)
+    {
+        if (parent_guid.IsEmpty())
+            continue;// 根节点保持根
+        const auto parent_it = guid_to_entity.find(parent_guid);
+        if (parent_it == guid_to_entity.end())
+        {
+            LOG_ERROR("Scene load: parent guid {} not found, degrading its children to root", parent_guid.ToString());
+            continue;
+        }
+        const ECS::Entity parent = parent_it->second;
+        std::stable_sort(children.begin(), children.end(),
+                         [](const HierarchyIntent *a, const HierarchyIntent *b) { return a->_sibling_index < b->_sibling_index; });
+        for (const HierarchyIntent *intent : children)
+            reparent_intent(intent->entity, parent, *intent->_doc);
+    }
+
+    // V1 迁移只在内存中升级，标记 Dirty 使下一次保存自动转为 V2。
+    if (!is_v2)
+        loaded_scene->MarkDirty();
+
     auto asset = MakeScope<Asset>(Guid(doc._header._guid),Scene::StaticType(),context._asset_path);
     asset->_asset_path = context._asset_path;
     asset->_asset_type = Scene::StaticType();
@@ -1264,10 +1403,42 @@ bool SceneAssetHandler::Save(const AssetSaveContext &context)
     auto sys_path = context._system_path;
     SceneAssetDocument doc;
     doc._header = MakeAssetDocumentHeader(context._asset);
+    doc._scene_format_version = SceneAssetDocument::kCurrentSceneFormatVersion;
+
+    // 保存前校验身份索引；Release 发现缺失时修复，Debug 额外触发断言。
+    const bool index_valid = scene->ValidateEntityGuidIndex();
+    if (!index_valid)
+    {
+        LOG_ERROR("SceneAssetHandler::Save: entity guid index invalid for scene '{}', repairing", scene->Name());
+        POW2_ASSERT(index_valid);
+        scene->EnsureValidEntityIdentities();
+    }
 
     const ECS::Register &reg = scene->GetRegister();
     const auto &tag_view = reg.View<ECS::TagComponent>();
     doc._entities.reserve(tag_view.size());
+
+    // 预先按当前兄弟链顺序计算每个实体的 sibling index。
+    HashMap<ECS::Entity, u32> entity_sibling_index;
+    for (u64 index = 0u; index < tag_view.size(); ++index)
+    {
+        const ECS::Entity parent = reg.GetEntity<ECS::TagComponent>(index);
+        const auto *parent_hier = reg.GetComponent<ECS::CHierarchy>(parent);
+        if (parent_hier == nullptr || parent_hier->_first_child == ECS::kInvalidEntity)
+            continue;
+        ECS::Entity cursor = parent_hier->_first_child;
+        u32 sibling_idx = 0u;
+        u32 guard = 0u;
+        while (cursor != ECS::kInvalidEntity && guard <= tag_view.size())
+        {
+            entity_sibling_index[cursor] = sibling_idx++;
+            const auto *cursor_hier = reg.GetComponent<ECS::CHierarchy>(cursor);
+            if (cursor_hier == nullptr)
+                break;
+            cursor = cursor_hier->_next_sibling;
+            ++guard;
+        }
+    }
 
     for (u64 index = 0u; index < tag_view.size(); ++index)
     {
@@ -1275,7 +1446,7 @@ bool SceneAssetHandler::Save(const AssetSaveContext &context)
         const ECS::TagComponent &tag = tag_view[index];
 
         SceneEntityDocument entity_doc;
-        entity_doc._entity_id = entity;
+        entity_doc._entity_guid = scene->GetEntityGuid(entity);
         entity_doc._tag_component._name = tag._name;
         entity_doc._tag_component._layer_mask = tag._layer_mask;
 
@@ -1312,11 +1483,9 @@ bool SceneAssetHandler::Save(const AssetSaveContext &context)
         if (const auto *hierarchy = reg.GetComponent<ECS::CHierarchy>(entity); hierarchy != nullptr)
         {
             entity_doc._has_hierarchy_component = true;
-            entity_doc._hierarchy_component._first_child = hierarchy->_first_child;
-            entity_doc._hierarchy_component._prev_sibling = hierarchy->_prev_sibling;
-            entity_doc._hierarchy_component._next_sibling = hierarchy->_next_sibling;
-            entity_doc._hierarchy_component._parent = hierarchy->_parent;
-            entity_doc._hierarchy_component._children_num = hierarchy->_children_num;
+            entity_doc._hierarchy_component._parent_guid = scene->GetEntityGuid(hierarchy->_parent);
+            const auto sibling_it = entity_sibling_index.find(entity);
+            entity_doc._hierarchy_component._sibling_index = sibling_it != entity_sibling_index.end() ? sibling_it->second : 0u;
             entity_doc._hierarchy_component._inv_matrix_attach = hierarchy->_inv_matrix_attach.ToString();
         }
         if (const auto *camera = reg.GetComponent<ECS::CCamera>(entity); camera != nullptr)
@@ -1377,6 +1546,11 @@ bool SceneAssetHandler::Save(const AssetSaveContext &context)
         }
         doc._entities.emplace_back(std::move(entity_doc));
     }
+
+    // 按 GUID 字符串排序，减少 ECS dense storage 调整导致的无意义文件 diff。
+    std::sort(doc._entities.begin(), doc._entities.end(),
+              [](const SceneEntityDocument &a, const SceneEntityDocument &b)
+              { return a._entity_guid.ToString() < b._entity_guid.ToString(); });
 
     if (!SaveAssetDocument(sys_path, doc))
     {

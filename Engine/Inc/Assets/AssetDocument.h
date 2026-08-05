@@ -7,6 +7,7 @@
 #include "Graph/GraphTypes.h"
 #include "Objects/JsonArchive.h"
 #include "Objects/Object.h"
+#include "Objects/SerializeSpecializations.h"
 #include "AssetCommon.h"
 #include "generated/AssetDocument.gen.h"
 
@@ -451,6 +452,47 @@ namespace Ailu
     {
         GENERATED_BODY()
 
+        inline static const String kParentGuid = "_parent_guid";
+        inline static const String kSiblingIndex = "_sibling_index";
+        inline static const String kFirstChild = "_first_child";
+        inline static const String kPrevSibling = "_prev_sibling";
+        inline static const String kNextSibling = "_next_sibling";
+        inline static const String kParent = "_parent";
+        inline static const String kChildrenNum = "_children_num";
+        inline static const String kInvMatrixAttach = "_inv_matrix_attach";
+
+        void Serialize(FArchive &ar)
+        {
+            SerializerWrapper<Guid>::Serialize(&_parent_guid, ar, &kParentGuid);
+            SerializerWrapper<u32>::Serialize(&_sibling_index, ar, &kSiblingIndex);
+            SerializerWrapper<String>::Serialize(&_inv_matrix_attach, ar, &kInvMatrixAttach);
+        }
+
+        void Deserialize(FArchive &ar)
+        {
+            auto *json_ar = dynamic_cast<JsonArchive *>(&ar);
+            const bool is_v2 = json_ar != nullptr && json_ar->HasField(kParentGuid);
+            if (is_v2)
+            {
+                SerializerWrapper<Guid>::Deserialize(&_parent_guid, ar, &kParentGuid);
+                SerializerWrapper<u32>::Deserialize(&_sibling_index, ar, &kSiblingIndex);
+                SerializerWrapper<String>::Deserialize(&_inv_matrix_attach, ar, &kInvMatrixAttach);
+            }
+            else
+            {
+                SerializerWrapper<u64>::Deserialize(&_first_child, ar, &kFirstChild);
+                SerializerWrapper<u64>::Deserialize(&_prev_sibling, ar, &kPrevSibling);
+                SerializerWrapper<u64>::Deserialize(&_next_sibling, ar, &kNextSibling);
+                SerializerWrapper<u64>::Deserialize(&_parent, ar, &kParent);
+                SerializerWrapper<u32>::Deserialize(&_children_num, ar, &kChildrenNum);
+                SerializerWrapper<String>::Deserialize(&_inv_matrix_attach, ar, &kInvMatrixAttach);
+            }
+        }
+
+        APROPERTY()
+        Guid _parent_guid;
+        APROPERTY()
+        u32 _sibling_index = 0u;
         APROPERTY()
         u64 _first_child = 0u;
         APROPERTY()
@@ -574,6 +616,7 @@ namespace Ailu
         GENERATED_BODY()
 
         inline static const String kEntityId = "_entity_id";
+        inline static const String kEntityGuid = "_entity_guid";
         inline static const String kTagComponent = "_tag_component";
         inline static const String kHasTransformComponent = "_has_transform_component";
         inline static const String kTransformComponent = "_transform_component";
@@ -602,7 +645,7 @@ namespace Ailu
 
         void Serialize(FArchive &ar)
         {
-            SerializerWrapper<u64>::Serialize(&_entity_id, ar, &kEntityId);
+            SerializerWrapper<Guid>::Serialize(&_entity_guid, ar, &kEntityGuid);
             SerializerWrapper<SceneTagComponentDocument>::Serialize(&_tag_component, ar, &kTagComponent);
 
             if (_has_transform_component)
@@ -633,10 +676,18 @@ namespace Ailu
 
         void Deserialize(FArchive &ar)
         {
-            SerializerWrapper<u64>::Deserialize(&_entity_id, ar, &kEntityId);
+            auto *json_ar = dynamic_cast<JsonArchive *>(&ar);
+            const bool is_v2 = json_ar != nullptr && json_ar->HasField(kEntityGuid);
+            if (is_v2)
+            {
+                SerializerWrapper<Guid>::Deserialize(&_entity_guid, ar, &kEntityGuid);
+            }
+            else
+            {
+                SerializerWrapper<u64>::Deserialize(&_entity_id, ar, &kEntityId);
+            }
             SerializerWrapper<SceneTagComponentDocument>::Deserialize(&_tag_component, ar, &kTagComponent);
 
-            auto *json_ar = dynamic_cast<JsonArchive *>(&ar);
             auto deserialize_component = [&](bool &has_component, auto &component, const String &legacy_flag_name, const String &component_name)
             {
                 using ComponentType = std::remove_reference_t<decltype(component)>;
@@ -674,6 +725,8 @@ namespace Ailu
 
         APROPERTY()
         u64 _entity_id = 0u;
+        APROPERTY()
+        Guid _entity_guid;
         APROPERTY()
         SceneTagComponentDocument _tag_component;
         APROPERTY()
@@ -752,8 +805,33 @@ namespace Ailu
         GENERATED_BODY()
 
     public:
+        inline static constexpr u32 kCurrentSceneFormatVersion = 2u;
+        inline static const String kHeader = "_header";
+        inline static const String kSceneFormatVersion = "_scene_format_version";
+        inline static const String kEntities = "_entities";
+
+        void Serialize(FArchive &ar)
+        {
+            SerializerWrapper<AssetDocumentHeader>::Serialize(&_header, ar, &kHeader);
+            SerializerWrapper<u32>::Serialize(&_scene_format_version, ar, &kSceneFormatVersion);
+            SerializerWrapper<Vector<SceneEntityDocument>>::Serialize(&_entities, ar, &kEntities);
+        }
+
+        void Deserialize(FArchive &ar)
+        {
+            auto *json_ar = dynamic_cast<JsonArchive *>(&ar);
+            SerializerWrapper<AssetDocumentHeader>::Deserialize(&_header, ar, &kHeader);
+            // 旧场景缺失该字段：保持默认 1u，自然进入 V1 迁移路径。
+            // 必须用 HasField 守卫，因为 JsonArchive 对缺失的标量字段会写入未初始化值而非保留默认值。
+            if (json_ar == nullptr || json_ar->HasField(kSceneFormatVersion))
+                SerializerWrapper<u32>::Deserialize(&_scene_format_version, ar, &kSceneFormatVersion);
+            SerializerWrapper<Vector<SceneEntityDocument>>::Deserialize(&_entities, ar, &kEntities);
+        }
+
         APROPERTY()
         AssetDocumentHeader _header;
+        APROPERTY()
+        u32 _scene_format_version = 1u;
         APROPERTY()
         Vector<SceneEntityDocument> _entities;
     };

@@ -12,6 +12,7 @@
 #include "UI/Basic.h"
 #include "UI/Container.h"
 #include "UI/UIFramework.h"
+#include "Ext/imgui/imgui.h"
 
 namespace Ailu
 {
@@ -338,6 +339,11 @@ namespace Ailu
             actions.push_back({"Duplicate", [scene, entity]()
             {
                 scene->DuplicateEntity(entity);
+            }});
+
+            actions.push_back({"Copy Entity GUID", [scene, entity]()
+            {
+                ImGui::SetClipboardText(scene->GetEntityGuid(entity).ToString().c_str());
             }});
 
             actions.push_back({"Create Empty Child", [scene, entity]()

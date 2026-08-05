@@ -4,9 +4,14 @@
 
 #include <Framework/Common/Allocator.hpp>
 #include <Framework/Common/Log.h>
+#include <Framework/Math/Guid.h>
+#include <Assets/AssetDocument.h>
 #include <Graph/GraphDocument.h>
 #include <Input/InputSystem.h>
+#include <Objects/JsonArchive.h>
+#include <Objects/Type.h>
 #include <Render/2D/SpriteBatcher.h>
+#include <Scene/EntityReference.h>
 
 #include <algorithm>
 #include <array>
@@ -1006,12 +1011,277 @@ namespace
         return found_duplicate_node;
     }
 
-    void RunAllocatorTests()
+    // =========================================================================
+    // Entity GUID 基础单元测试（无 GPU 依赖，headless 可运行）
+    // 覆盖任务包 1：Guid 有效性判断与通用哈希器。
+    // =========================================================================
+    bool TestGuidIsEmptyIsValid()
+    {
+        // 空字符串与 "null"（含空白修饰）都应被识别为空 GUID。
+        if (!Guid::EmptyGuid().IsEmpty()) return false;
+        if (Guid::EmptyGuid().IsValid()) return false;
+        if (!Guid("").IsEmpty()) return false;
+        if (!Guid("null").IsEmpty()) return false;
+        if (!Guid("  null  ").IsEmpty()) return false;
+        if (Guid("").IsValid()) return false;
+
+        // 生成 GUID 非空且有效。
+        Guid g = Guid::Generate();
+        if (g.IsEmpty()) return false;
+        if (!g.IsValid()) return false;
+        if (g == Guid::EmptyGuid()) return false;
+
+        // 不同生成的 GUID 不应相等。
+        Guid g2 = Guid::Generate();
+        if (g == g2) return false;
+        return true;
+    }
+
+    bool TestGuidHasher()
+    {
+        GuidHasher hasher;
+        Guid a = Guid::Generate();
+        // 同一 GUID 哈希稳定。
+        if (hasher(a) != hasher(a)) return false;
+        // 从同一字符串构造的 GUID 哈希一致。
+        Guid b(a.ToString());
+        if (hasher(a) != hasher(b)) return false;
+        // 空 GUID 也应有稳定哈希（不抛异常）。
+        GuidHasher empty_hasher;
+        (void)empty_hasher(Guid::EmptyGuid());
+        return true;
+    }
+
+    // =========================================================================
+    // SceneAssetDocument 文档级测试（无需 GPU）。
+    // 覆盖任务包 4：V2 场景文档自定义序列化往返 + V1 旧格式兼容反序列化。
+    // =========================================================================
+    void SerializeDocumentToJson(JsonArchive &ar, SceneAssetDocument &doc)
+    {
+        // 与修复后的 SaveAssetDocument 一致：优先使用文档类自定义 Serialize。
+        doc.Serialize(ar);
+    }
+    void DeserializeDocumentFromJson(JsonArchive &ar, SceneAssetDocument &doc)
+    {
+        // 与修复后的 LoadAssetDocument 一致：优先使用文档类自定义 Deserialize。
+        doc.Deserialize(ar);
+    }
+
+    bool TestSceneDocumentV2Roundtrip()
+    {
+        SceneAssetDocument doc;
+        doc._header._guid = "doc-guid";
+        doc._header._asset_type = "Scene";
+        doc._header._asset_name = "test_scene";
+        doc._scene_format_version = SceneAssetDocument::kCurrentSceneFormatVersion;
+
+        // 全部用索引/局部变量访问，不保存跨 std::vector 扩容的引用。
+        const Guid e0_guid = Guid::Generate();
+        const Guid e1_guid = Guid::Generate();
+        const Vector3f e0_position{1.0f, 2.0f, 3.0f};
+        const String e1_inv_matrix = "1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1";
+
+        SceneEntityDocument e0;
+        e0._entity_guid = e0_guid;
+        e0._tag_component._name = "Root";
+        e0._tag_component._layer_mask = 7u;
+        e0._has_transform_component = true;
+        e0._transform_component._position = e0_position;
+        e0._has_hierarchy_component = true;
+        e0._hierarchy_component._parent_guid = Guid::EmptyGuid();
+        e0._hierarchy_component._sibling_index = 0u;
+        doc._entities.push_back(std::move(e0));
+
+        SceneEntityDocument e1;
+        e1._entity_guid = e1_guid;
+        e1._tag_component._name = "Child";
+        e1._has_hierarchy_component = true;
+        e1._hierarchy_component._parent_guid = e0_guid;
+        e1._hierarchy_component._sibling_index = 0u;
+        e1._hierarchy_component._inv_matrix_attach = e1_inv_matrix;
+        doc._entities.push_back(std::move(e1));
+
+        JsonArchive ar;
+        SerializeDocumentToJson(ar, doc);
+        String json = ar.SaveToString();
+
+        // V2 格式不得包含运行时句柄 `_entity_id`。
+        if (json.find("_entity_id") != String::npos)
+            return false;
+
+        JsonArchive ar2;
+        if (!ar2.LoadFromString(json))
+            return false;
+        SceneAssetDocument doc2;
+        DeserializeDocumentFromJson(ar2, doc2);
+
+        if (doc2._scene_format_version != doc._scene_format_version)
+        {
+            std::cout << "version mismatch: " << doc2._scene_format_version << " vs " << doc._scene_format_version << "\n";
+            return false;
+        }
+        if (doc2._entities.size() != 2u)
+        {
+            std::cout << "entity count mismatch: " << doc2._entities.size() << "\n";
+            return false;
+        }
+        const SceneEntityDocument &r0 = doc2._entities[0];
+        const SceneEntityDocument &r1 = doc2._entities[1];
+        if (!(r0._entity_guid == e0_guid))
+        {
+            std::cout << "e0 guid mismatch: '" << r0._entity_guid.ToString() << "' vs '" << e0_guid.ToString() << "'\n";
+            return false;
+        }
+        if (r0._tag_component._name != "Root" || r0._tag_component._layer_mask != 7u)
+        {
+            std::cout << "e0 tag mismatch\n";
+            return false;
+        }
+        if (!(r0._transform_component._position == e0_position))
+        {
+            std::cout << "e0 transform mismatch\n";
+            return false;
+        }
+        if (!r0._hierarchy_component._parent_guid.IsEmpty())
+        {
+            std::cout << "e0 parent_guid not empty\n";
+            return false;
+        }
+        if (!(r1._hierarchy_component._parent_guid == e0_guid))
+        {
+            std::cout << "e1 parent_guid mismatch: '" << r1._hierarchy_component._parent_guid.ToString() << "' vs '" << e0_guid.ToString() << "'\n";
+            return false;
+        }
+        if (r1._hierarchy_component._sibling_index != 0u)
+        {
+            std::cout << "e1 sibling_index mismatch\n";
+            return false;
+        }
+        if (r1._hierarchy_component._inv_matrix_attach != e1_inv_matrix)
+        {
+            std::cout << "e1 inv_matrix mismatch\n";
+            return false;
+        }
+        return true;
+    }
+
+    bool TestSceneDocumentV1LegacyDeserialize()
+    {
+        // 模拟旧 V1 场景文档：使用 `_entity_id` 与层级链表字段，无 `_entity_guid`/`_parent_guid`。
+        const String v1_json = R"({
+            "_header": {"_guid": "v1-doc", "_asset_type": "Scene", "_asset_name": "legacy"},
+            "_entities": [
+                {
+                    "_entity_id": 0,
+                    "_tag_component": {"_name": "Root", "_layer_mask": 0},
+                    "_has_hierarchy_component": true,
+                    "_hierarchy_component": {"_first_child": 1, "_prev_sibling": 0, "_next_sibling": 0, "_parent": 0, "_children_num": 1, "_inv_matrix_attach": ""}
+                },
+                {
+                    "_entity_id": 1,
+                    "_tag_component": {"_name": "Child", "_layer_mask": 0},
+                    "_has_hierarchy_component": true,
+                    "_hierarchy_component": {"_first_child": 0, "_prev_sibling": 0, "_next_sibling": 0, "_parent": 0, "_children_num": 0, "_inv_matrix_attach": ""}
+                }
+            ]
+        })";
+
+        JsonArchive ar;
+        if (!ar.LoadFromString(v1_json))
+            return false;
+        SceneAssetDocument doc;
+        DeserializeDocumentFromJson(ar, doc);
+
+        // 版本缺失默认 1u，进入 V1 迁移路径。
+        if (doc._scene_format_version != 1u)
+            return false;
+        if (doc._entities.size() != 2u)
+            return false;
+        // legacy 字段被读入，V2 GUID 字段为空。
+        if (doc._entities[0]._entity_id != 0u)
+            return false;
+        if (!doc._entities[0]._entity_guid.IsEmpty())
+            return false;
+        if (doc._entities[0]._hierarchy_component._first_child != 1u)
+            return false;
+        if (doc._entities[1]._hierarchy_component._parent != 0u)
+            return false;
+        return true;
+    }
+
+    // =========================================================================
+    // EntityReference 持久引用测试（无需 GPU）。
+    // 覆盖任务包 8：IsValid 语义 + GUID 序列化往返（不出现运行时 Entity 数值）。
+    // =========================================================================
+    bool TestEntityReferenceIsValid()
+    {
+        EntityReference ref;
+        if (ref.IsValid())
+            return false;
+        ref._entity_guid = Guid::Generate();
+        if (!ref.IsValid())
+            return false;
+        ref._entity_guid = Guid::EmptyGuid();
+        if (ref.IsValid())
+            return false;
+        // 只有 entity_guid 有效即视为有效引用（同场景引用允许 scene_guid 为空）。
+        ref._scene_guid = Guid::Generate();
+        ref._entity_guid = Guid::Generate();
+        if (!ref.IsValid())
+            return false;
+        return true;
+    }
+
+    bool TestEntityReferenceSerializationRoundtrip()
+    {
+        EntityReference ref;
+        ref._scene_guid = Guid::Generate();
+        ref._entity_guid = Guid::Generate();
+
+        String name = "_ref";
+        JsonArchive ar;
+        SerializerWrapper<EntityReference>::Serialize(&ref, ar, &name);
+        String json = ar.SaveToString();
+
+        // 引用数据不得包含运行时 Entity 数值（只含两个 GUID 字段）。
+        if (json.find("_entity_id") != String::npos)
+            return false;
+
+        JsonArchive ar2;
+        if (!ar2.LoadFromString(json))
+            return false;
+        EntityReference out;
+        SerializerWrapper<EntityReference>::Deserialize(&out, ar2, &name);
+        if (!(out._scene_guid == ref._scene_guid))
+            return false;
+        if (!(out._entity_guid == ref._entity_guid))
+            return false;
+        return true;
+    }
+
+    void RunEntityGuidUnitTests()
     {
         TestResult result;
 
-        LogMgr::Init();
-        Allocator::Init();
+        RunTest(result, "Guid::IsEmpty/IsValid", TestGuidIsEmptyIsValid);
+        RunTest(result, "GuidHasher stable", TestGuidHasher);
+        RunTest(result, "SceneDocument V2 roundtrip", TestSceneDocumentV2Roundtrip);
+        RunTest(result, "SceneDocument V1 legacy deserialize", TestSceneDocumentV1LegacyDeserialize);
+        RunTest(result, "EntityReference IsValid", TestEntityReferenceIsValid);
+        RunTest(result, "EntityReference serialization roundtrip", TestEntityReferenceSerializationRoundtrip);
+
+        std::cout << "========================================\n";
+        std::cout << "Entity GUID unit tests passed: " << result._passed << '\n';
+        std::cout << "Entity GUID unit tests failed: " << result._failed << '\n';
+        std::cout << "========================================\n";
+
+        if (result._failed != 0u)
+            std::exit(EXIT_FAILURE);
+    }
+
+    void RunAllocatorTests()
+    {
+        TestResult result;
 
         RunTest(result, "Basic allocation", TestBasicAllocation);
         RunTest(result, "Object constructor/destructor", TestObjectLifecycle);
@@ -1058,6 +1328,11 @@ namespace
 
 int main(int argc, char **argv)
 {
-    RunAllocatorTests();
+    // 统一初始化日志与分配器：文档反序列化路径中的 LOG_* 需要 LogMgr 就绪。
+    LogMgr::Init();
+    Allocator::Init();
+
+    RunEntityGuidUnitTests();
+    RunAllocatorTests();// 内部负责 Shutdown
     return EXIT_SUCCESS;
 }

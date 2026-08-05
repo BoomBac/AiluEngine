@@ -8,11 +8,6 @@
 
 namespace Ailu
 {
-    struct AILU_API GraphGuidHasher
-    {
-        size_t operator()(const Guid &guid) const;
-    };
-
     struct AILU_API GraphDocumentSnapshot
     {
         Vector<GraphNodeData> _nodes;
@@ -153,9 +148,9 @@ namespace Ailu
         Vector<GraphNodeData> _editing_nodes;
         Vector<GraphLinkData> _editing_links;
         Vector<GraphCommentData> _editing_comments;
-        HashMap<Guid, u32, GraphGuidHasher> _node_index;
-        HashMap<Guid, std::pair<u32, u32>, GraphGuidHasher> _pin_index;
-        HashMap<Guid, u32, GraphGuidHasher> _link_index;
+        HashMap<Guid, u32, GuidHasher> _node_index;
+        HashMap<Guid, std::pair<u32, u32>, GuidHasher> _pin_index;
+        HashMap<Guid, u32, GuidHasher> _link_index;
         Scope<IGraphSchema> _schema;
         GraphCommandStack _command_stack;
         Vector<GraphValidationMessage> _validation_messages;

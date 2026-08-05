@@ -5,7 +5,9 @@
 #include "Component.h"
 #include "Entity.h"
 #include "Framework/Math/Geometry.h"
+#include "Framework/Math/Guid.h"
 #include "Framework/Core/CoreMinimal.h"
+#include "Framework/Core/Containers/Map.h"
 #include "Framework/Common/NonCopyable.h"
 #include "Objects/Serialize.h"
 #include "generated/Scene.gen.h"
@@ -31,6 +33,7 @@ namespace Ailu
             ECS::Entity AddObject(String name = "");
             ECS::Entity AddObject(Ref<Mesh> mesh, Ref<Material> mat);
             ECS::Entity AddObject(Ref<Mesh> mesh, const Vector<Ref<Material>>& mats);
+            ECS::Entity AddObject(String name, const Guid &requested_guid);
             ECS::Entity DuplicateEntity(ECS::Entity e);
             void RemoveObject(ECS::Entity entity);
 
@@ -41,6 +44,19 @@ namespace Ailu
             bool Detach(ECS::Entity child, bool keep_world_transform = true);
             bool RenameEntity(ECS::Entity entity, const String& new_name);
             u64 StructureRevision() const { return _structure_revision; }
+
+            // --- Entity GUID identity API ---
+            ECS::Entity FindEntity(const Guid &guid) const;
+            const Guid &GetEntityGuid(ECS::Entity entity) const;
+            bool HasEntityGuid(const Guid &guid) const;
+            bool ValidateEntityGuidIndex() const;
+            // 修复身份数据：为缺失/空 PersistentIdComponent 的 Entity 生成 GUID 并重建索引。
+            // 仅用于保存前修复异常数据，不修改正常 Entity 的 GUID。
+            bool EnsureValidEntityIdentities();
+
+            // 场景自身的 Asset GUID（从场景文件 _header._guid 解析），用于跨场景持久引用校验。
+            const Guid &AssetGuid() const { return _asset_guid; }
+            void SetAssetGuid(const Guid &guid) { _asset_guid = guid; }
 
             // --- Compatibility wrappers ---
             void Attach(ECS::Entity current, ECS::Entity parent) { Reparent(current, parent); }
@@ -110,6 +126,13 @@ namespace Ailu
             bool LinkAsLastChild(ECS::Entity entity, ECS::Entity parent);
             void CollectSubtreePostOrder(ECS::Entity root, Vector<ECS::Entity>& result) const;
 
+            // --- Entity GUID identity helpers ---
+            Guid GenerateUniqueEntityGuid() const;
+            bool RegisterEntityGuid(ECS::Entity entity, const Guid &guid);
+            void UnregisterEntityGuid(ECS::Entity entity);
+            void RebuildEntityGuidIndex();
+            ECS::Entity CreateEntityInternal(String name, const Guid &requested_guid);
+
         private:
             struct QueuedSceneCommand
             {
@@ -132,6 +155,8 @@ namespace Ailu
             HashMap<u64, Vector2UInt> _bvh_nodes_range;
             HashMap<u64, u32> _mesh_bvh_node_triangle_offset;//按 entity/submesh 记录三角形数据在 buffer 中的偏移
             Vector<BVHNode> _tlas_nodes;
+            HashMap<Guid, ECS::Entity, GuidHasher> _guid_to_entity;
+            Guid _asset_guid;
         };
 
         class AILU_API SceneMgr : public NonCopyable

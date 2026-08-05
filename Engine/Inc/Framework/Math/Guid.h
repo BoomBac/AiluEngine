@@ -19,10 +19,18 @@ namespace Ailu
         bool operator<(const Guid& other) const { return _guid < other._guid; }
         static const Guid& EmptyGuid() { return kEmptyGuid; }
 
+        [[nodiscard]] bool IsEmpty() const;
+        [[nodiscard]] bool IsValid() const;
+
     private:
         std::string _guid;
 
         static const Guid kEmptyGuid;
+    };
+
+    struct AILU_API GuidHasher
+    {
+        size_t operator()(const Guid &guid) const noexcept;
     };
 }
 

@@ -48,7 +48,7 @@ namespace Ailu
         if (document.Asset() != nullptr && document.Asset()->SchemaType() == "FlowGraphSchema" && entry_node_count != 1u)
             AddMessage(messages, EGraphValidationSeverity::kError, "Flow graph must contain exactly one entry node.");
 
-        HashMap<Guid, u32, GraphGuidHasher> input_link_counts;
+        HashMap<Guid, u32, GuidHasher> input_link_counts;
         for (const GraphLinkData &link : document.Links())
         {
             if (link._id == Guid::EmptyGuid())
