@@ -60,6 +60,8 @@ namespace Ailu
         };
 
         AILU_API ComponentTypeId RegisterComponentType(StringView stable_name);
+        // Reverse lookup: runtime ComponentTypeId -> stable type name.
+        AILU_API StringView GetComponentStableName(ComponentTypeId type_id);
 
         template<typename T>
         ComponentTypeId GetComponentTypeId()

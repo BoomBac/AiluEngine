@@ -22,6 +22,12 @@ namespace Ailu
             auto pos_block = Editor::AddVec3InputRow(context._content, "Position", "0000");
             auto rot_block = Editor::AddVec3InputRow(context._content, "Rotation");
             auto scale_block = Editor::AddVec3InputRow(context._content, "Scale");
+            for (u32 i = 0; i < 3; ++i)
+            {
+                _position_blocks[i] = pos_block[i];
+                _rotation_blocks[i] = rot_block[i];
+                _scale_blocks[i] = scale_block[i];
+            }
 
             for (auto i = 0; i < 3; i++)
             {
@@ -58,25 +64,30 @@ namespace Ailu
                 };
             }
 
-            auto set_block = [](InputBlock *block, f32 value)
-            {
-                if (!block->IsEditing())
-                    block->SetContent(std::format("{:.2f}", value), false);
-            };
+            Refresh(context);
+        }
 
-            comp = r.GetComponent<ECS::TransformComponent>(entity);
+        void TransformComponentEditor::Refresh(ComponentEditorContext &context)
+        {
+            auto *comp = context.GetComponent<ECS::TransformComponent>();
             if (comp == nullptr)
                 return;
-            set_block(pos_block[0], comp->_local_transform._position.x);
-            set_block(pos_block[1], comp->_local_transform._position.y);
-            set_block(pos_block[2], comp->_local_transform._position.z);
-            Vector3f euler = Quaternion::EulerAngles(comp->_local_transform._rotation);
-            set_block(rot_block[0], euler.x);
-            set_block(rot_block[1], euler.y);
-            set_block(rot_block[2], euler.z);
-            set_block(scale_block[0], comp->_local_transform._scale.x);
-            set_block(scale_block[1], comp->_local_transform._scale.y);
-            set_block(scale_block[2], comp->_local_transform._scale.z);
+
+            const auto set_block = [](InputBlock *block, f32 value)
+            {
+                if (block != nullptr && !block->IsEditing())
+                    block->SetContent(std::format("{:.2f}", value), false);
+            };
+            set_block(_position_blocks[0], comp->_local_transform._position.x);
+            set_block(_position_blocks[1], comp->_local_transform._position.y);
+            set_block(_position_blocks[2], comp->_local_transform._position.z);
+            const Vector3f euler = Quaternion::EulerAngles(comp->_local_transform._rotation);
+            set_block(_rotation_blocks[0], euler.x);
+            set_block(_rotation_blocks[1], euler.y);
+            set_block(_rotation_blocks[2], euler.z);
+            set_block(_scale_blocks[0], comp->_local_transform._scale.x);
+            set_block(_scale_blocks[1], comp->_local_transform._scale.y);
+            set_block(_scale_blocks[2], comp->_local_transform._scale.z);
         }
     }// namespace Editor
 }// namespace Ailu

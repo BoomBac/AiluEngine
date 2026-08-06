@@ -19,7 +19,7 @@
                 "_scale": [0.9998, 0.9998, 0.9998]
             },
             "_light_component": {
-                "_type": "kDirectional",
+                "_type": "kSpot",
                 "_light": {
                     "_light_color": [1.0, 1.0, 1.0, 1.0],
                     "_light_param": [10.0, 4.9, 5.0, 0.2648],

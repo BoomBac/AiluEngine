@@ -76,6 +76,7 @@ namespace Ailu::SceneManagement
     void Scene::TouchStructure()
     {
         ++_structure_revision;
+        ++_edit_revision;
         MarkDirty();
     }
 
@@ -106,6 +107,14 @@ namespace Ailu::SceneManagement
             return Guid::EmptyGuid();
         const auto *id_comp = _register.GetComponent<ECS::PersistentIdComponent>(entity);
         return id_comp ? id_comp->_guid : Guid::EmptyGuid();
+    }
+
+    const Guid *Scene::FindEntityGuid(ECS::Entity entity) const
+    {
+        if (entity == ECS::kInvalidEntity || !_register.IsAlive(entity))
+            return nullptr;
+        const auto *id_comp = _register.GetComponent<ECS::PersistentIdComponent>(entity);
+        return id_comp ? &id_comp->_guid : nullptr;
     }
 
     bool Scene::HasEntityGuid(const Guid &guid) const

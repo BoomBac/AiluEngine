@@ -1,4 +1,15 @@
-﻿#include "EditorApp.h"
+#include "EditorApp.h"
+#include "Automation/AIAssistant.h"
+#include "Automation/AutomationAdapter.h"
+#include "Automation/AutomationAssetService.h"
+#include "Automation/AutomationDestructiveService.h"
+#include "Automation/AutomationPipeServer.h"
+#include "Automation/AutomationReadModel.h"
+#include "Automation/AutomationReflectionService.h"
+#include "Automation/AutomationSceneService.h"
+#include "Automation/AutomationService.h"
+#include "Automation/AutomationSession.h"
+#include "Automation/AutomationWriteService.h"
 #include "Common/Selection.h"
 #include "Common/Undo.h"
 #include "Widgets/InputLayer.h"
@@ -96,6 +107,34 @@ namespace Ailu
                 UI::UIManager::Get()->SetTheme(&g_editor_ui_theme);
             }
             RegisterComponentEditors();
+            _automation_service = MakeScope<EditorAutomationService>();
+            _automation_service->Initialize();
+            {
+                RegisterDefaultComponentDescriptors();
+                AutomationAdapterRegistry::Get().Initialize();
+                AutomationSceneService::Register(_automation_service->Registry());
+                AutomationAssetService::Register(_automation_service->Registry());
+                AutomationReflectionService::Register(_automation_service->Registry());
+                AutomationWriteService::Register(_automation_service->Registry());
+                AutomationDestructiveService::Register(_automation_service->Registry());
+            }
+            {
+                // Built-in AI assistant: talks to the automation services in-process.
+                AIAssistantService::Get().SetRegistry(&_automation_service->Registry());
+                AIAssistantService::Get().SetProvider(MakeScope<DemoAIProvider>());
+            }
+            _pipe_server = MakeScope<AutomationPipeServer>();
+            _pipe_server->Initialize(*_automation_service);
+            if (ProjectManager::Get().HasOpenedProject())
+            {
+                AutomationSessionInfo session_info;
+                session_info._pid = GetCurrentProcessId();
+                session_info._session_id = _pipe_server->SessionId();
+                session_info._pipe_name = _pipe_server->PipeName();
+                session_info._project_path = ToChar(ProjectManager::Get().CurrentProject().RootDirectory());
+                session_info._editor_version = "0.1.0";
+                AutomationSession::Save(ProjectManager::Get().CurrentProject().RootDirectory(), session_info);
+            }
             _p_editor_layer = new EditorLayer();
             PushLayer(_p_editor_layer);
             _is_playing_mode = false;
@@ -107,6 +146,10 @@ namespace Ailu
         {
             SaveEditorConfig();
             AssetPreviewGenerator::Shutdown();
+            if (_pipe_server)
+                _pipe_server->Finalize();
+            if (_automation_service)
+                _automation_service->Finalize();
             delete _p_scene_camera;
             delete g_pCommandMgr; g_pCommandMgr = nullptr;
             _pipeline.release();
@@ -128,6 +171,8 @@ namespace Ailu
         }
         void EditorApp::Tick(f32 delta_time)
         {
+            // Application::Tick enters the main loop and does not return, so the
+            // automation service is drained per frame from EditorLayer::OnUpdate.
             Application::Tick(delta_time);
         }
         bool EditorApp::OnGetFocus(WindowFocusEvent &e)

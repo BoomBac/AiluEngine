@@ -76,6 +76,8 @@ namespace Ailu
         class InputLayer;
         class SceneLayer;
         class FirstPersonCameraController;
+        class EditorAutomationService;
+        class AutomationPipeServer;
         class EditorApp : public Ailu::Application
         {
             DECLARE_DELEGATE(on_file_changed, const std::filesystem::path &);
@@ -96,6 +98,7 @@ namespace Ailu
             void Tick(f32 delta_time) final;
             FirstPersonCameraController &GetSceneCameraController() { return *_camera_controller; }
             Camera *GetSceneCamera() { return _p_scene_camera; }
+            EditorAutomationService *GetAutomationService() { return _automation_service.get(); }
         private:
             bool OnGetFocus(WindowFocusEvent &e) final;
             bool OnLostFocus(WindowLostFocusEvent &e) final;
@@ -119,6 +122,8 @@ namespace Ailu
             FileWatchService _file_watch_service;
             FileChangeDispatcher _file_change_dispatcher;
             ResourceReloadService _resource_reload_service;
+            Scope<EditorAutomationService> _automation_service;
+            Scope<AutomationPipeServer> _pipe_server;
             bool _is_resource_reload_configured = false;
         };// namespace Editor
     }// namespace Editor

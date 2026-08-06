@@ -36,6 +36,7 @@ namespace Ailu
             if (_root)
                 _root.reset();
             _prev_hover_path.clear();
+            ResetClickState();
             if (UIManager::Get()->_pre_hover_widget == this)
             {
                 UIManager::Get()->_pre_hover_widget = nullptr;

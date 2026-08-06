@@ -1,6 +1,7 @@
 ﻿project (Test)
 set(TEST_ROOT_PATH ${CMAKE_SOURCE_DIR}/Test)
 set(ENGINE_ROOT_PATH ${CMAKE_SOURCE_DIR}/Engine)
+set(EDITOR_ROOT_PATH ${CMAKE_SOURCE_DIR}/Editor)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${AiluBuildPath}/out/test/bin/x64)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${AiluBuildPath}/out/test/bin/x64/debug)
@@ -32,6 +33,7 @@ add_source_files_recursive(${TEST_ROOT_PATH}/Src)
 function(ailu_configure_test_target target_name)
     target_include_directories(${target_name} PUBLIC ${TEST_ROOT_PATH}/)
     target_include_directories(${target_name} PUBLIC ${TEST_ROOT_PATH}/Inc)
+    target_include_directories(${target_name} PUBLIC ${EDITOR_ROOT_PATH}/Inc)
     target_include_directories(${target_name} PUBLIC ${ENGINE_ROOT_PATH}/Ext)
     target_include_directories(${target_name} PUBLIC ${ENGINE_ROOT_PATH})
     target_include_directories(${target_name} PUBLIC ${ENGINE_ROOT_PATH}/Inc)
@@ -75,13 +77,25 @@ function(ailu_configure_test_target target_name)
 
     target_link_libraries(${target_name} PRIVATE ${AILU_FBXSDK_LINK_LIB})
 endfunction()
-add_executable(Test "Test.cpp" "Test.h")
-if(MSVC)
-    target_compile_options(Test PRIVATE
-        /fsanitize=address
-        /Zi
-    )
-endif()
+add_executable(Test
+    "Test.cpp"
+    "Test.h"
+    "Src/TestAutomationCore.cpp"
+    "Src/TestAutomationReadModel.cpp"
+    "Src/TestAutomationAdapter.cpp"
+    "Src/TestAutomationTransport.cpp"
+    "Src/TestAutomationCommand.cpp"
+    "Src/TestAIAssistant.cpp"
+    "${CMAKE_SOURCE_DIR}/Editor/Src/Automation/AutomationTypes.cpp"
+    "${CMAKE_SOURCE_DIR}/Editor/Src/Automation/AutomationRegistry.cpp"
+    "${CMAKE_SOURCE_DIR}/Editor/Src/Automation/AutomationService.cpp"
+    "${CMAKE_SOURCE_DIR}/Editor/Src/Automation/AutomationReadModel.cpp"
+    "${CMAKE_SOURCE_DIR}/Editor/Src/Automation/AutomationAdapter.cpp"
+    "${CMAKE_SOURCE_DIR}/Editor/Src/Automation/AutomationJson.cpp"
+    "${CMAKE_SOURCE_DIR}/Editor/Src/Automation/AutomationSession.cpp"
+    "${CMAKE_SOURCE_DIR}/Editor/Src/Automation/AutomationPipeServer.cpp"
+    "${CMAKE_SOURCE_DIR}/Editor/Src/Automation/AutomationCommand.cpp"
+    "${CMAKE_SOURCE_DIR}/Editor/Src/Automation/AIAssistant.cpp")
 set_target_properties(Test PROPERTIES OUTPUT_NAME "Test")
 ailu_configure_test_target(Test)
 

@@ -72,6 +72,8 @@ namespace Ailu
             virtual ~IComponentManager() = default;
             virtual void EntityDestroyed(Entity entity) = 0;
             virtual Ref<IComponentManager> Clone() = 0;
+            // Type-erased component instance access; nullptr when the entity lacks the component.
+            virtual void *GetComponentPtr(Entity entity) = 0;
         };
 
         const static u16 kSignatureNum = 128u;
@@ -212,6 +214,12 @@ public:                                                                   \
             // --- Batch operations ---
             Vector<Entity> CreateBatch(u32 count);
             void DestroyBatch(const Vector<Entity> &entities);
+
+            // --- Generic component queries (runtime ComponentTypeId based) ---
+            // Used by generic tools / automation; no compile-time type needed.
+            bool HasComponentType(Entity entity, ComponentTypeId type_id) const;
+            void *GetComponentInstance(Entity entity, ComponentTypeId type_id) const;
+            Vector<ComponentTypeId> GetEntityComponentTypes(Entity entity) const;
 
         private:
             void RebuildSystemSchedule();

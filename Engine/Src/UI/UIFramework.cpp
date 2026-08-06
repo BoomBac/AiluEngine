@@ -267,13 +267,9 @@ namespace Ailu::UI
             _debug_highlight_target = nullptr;
         for (auto &w: _widgets)
         {
-            if (auto it = std::find_if(w->_prev_hover_path.begin(), w->_prev_hover_path.end(), [&](UIElement *e)
-                                       { return e == element; });
-                it != w->_prev_hover_path.end())
-            {
-                w->_prev_hover_path.erase(it, w->_prev_hover_path.end());
-                break;
-            }
+            std::erase(w->_prev_hover_path, element);
+            if (w->_last_click_target == element)
+                w->ResetClickState();
         }
     }
     ZoneHandle UIManager::RegisterInteractionZone(Vector4f rect, Widget *owner)

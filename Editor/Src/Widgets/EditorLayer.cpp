@@ -1,6 +1,9 @@
 #include "Widgets/EditorLayer.h"
+#include "Automation/AutomationService.h"
+#include "Widgets/AIAssistantWindow.h"
 #include "Common/Selection.h"
 #include "Common/EditorStyle.h"
+#include "EditorApp.h"
 #include "Ext/imgui/imgui.h"
 #include "Ext/imgui/imgui_internal.h"
 
@@ -1292,6 +1295,8 @@ namespace Ailu
             };
 
             BuildEditorChrome();
+
+            //DockManager::Get().AddDock(MakeRef<AIAssistantWindow>());
         }
 
         void EditorLayer::OnDetach()
@@ -1428,6 +1433,9 @@ namespace Ailu
         std::once_flag flag;
         void EditorLayer::OnUpdate(f32 dt)
         {
+            // Drain pending automation requests on the editor main thread.
+            if (auto *automation = EditorApp::GetEditor()->GetAutomationService())
+                automation->Tick();
             UpdateEditorChrome(dt);
             // static bool s_opened_graph_editor = false;
             // if (!s_opened_graph_editor)

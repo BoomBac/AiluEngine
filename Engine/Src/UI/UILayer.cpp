@@ -58,12 +58,16 @@ namespace Ailu
             ue._mouse_delta = Input::GetMousePosDelta();
             const bool is_keyboard_event = (e.GetCategoryFlags() & EEventCategory::kEventCategoryKeyboard) != 0;
             const InputChannel route_channel = is_keyboard_event ? InputChannel::kKeyboard : InputChannel::kMouse;
+            if (e.GetEventType() == EEventType::kKeyPressed)
+                ue._key_code = dynamic_cast<KeyEvent *>(&e)->GetKeyCode();
+            else if (e.GetEventType() == EEventType::kKeyReleased)
+                ue._key_code = dynamic_cast<KeyReleasedEvent *>(&e)->GetKeyCode();
             UIElement *capture_target = s_mgr->_capture_target;
             Widget *modal_widget = s_mgr->GetPopupWidget();
             const bool has_capture = s_mgr->_capture_target != nullptr;
-            const bool is_capture_sensitive_mouse_event = has_capture &&
-                                                         (ue._type == UI::UIEvent::EType::kMouseMove ||
-                                                          ue._type == UI::UIEvent::EType::kMouseUp);
+            bool is_capture_sensitive_mouse_event = has_capture &&
+                                                    (ue._type == UI::UIEvent::EType::kMouseMove ||
+                                                     ue._type == UI::UIEvent::EType::kMouseUp);
             const auto is_capture_owner_widget = [capture_target](Widget *w)
             {
                 if (!capture_target || !w || !w->Root())
@@ -156,6 +160,12 @@ namespace Ailu
                     if (ue._key_code != EKey::kRBUTTON && top_popup != nullptr && !top_popup->IsHover(ue._mouse_position))
                     {
                         s_mgr->HidePopup();
+                        // HidePopup clears the manager's capture target. Do not use the stale
+                        // snapshot below, otherwise is_capture_owner_widget() may call GetParent()
+                        // on an element that is already pending destruction.
+                        capture_target = nullptr;
+                        is_capture_sensitive_mouse_event = false;
+                        modal_widget = s_mgr->GetPopupWidget();
                     }
                 }
                 else if (e.GetEventType() == EEventType::kMouseScroll)

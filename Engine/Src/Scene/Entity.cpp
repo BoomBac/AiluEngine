@@ -269,6 +269,32 @@ namespace Ailu
         // ---------------------------------------------------------------------------
 
         u32 Register::EntityNum() const { return _entity_num; }
+
+        bool Register::HasComponentType(Entity entity, ComponentTypeId type_id) const
+        {
+            return GetComponentInstance(entity, type_id) != nullptr;
+        }
+
+        void *Register::GetComponentInstance(Entity entity, ComponentTypeId type_id) const
+        {
+            if (!IsAlive(entity) || type_id >= static_cast<u32>(_mgrs.size()))
+                return nullptr;
+            const auto &mgr = _mgrs[type_id];
+            return mgr ? mgr->GetComponentPtr(entity) : nullptr;
+        }
+
+        Vector<ComponentTypeId> Register::GetEntityComponentTypes(Entity entity) const
+        {
+            Vector<ComponentTypeId> result;
+            if (!IsAlive(entity))
+                return result;
+            for (u32 type_id = 0u; type_id < static_cast<u32>(_mgrs.size()); ++type_id)
+            {
+                if (_mgrs[type_id] && _mgrs[type_id]->GetComponentPtr(entity) != nullptr)
+                    result.push_back(type_id);
+            }
+            return result;
+        }
         u64 Register::HierarchyRevision() const { return _hierarchy_revision; }
         void Register::TouchHierarchy() { ++_hierarchy_revision; }
         void Register::MarkSystemScheduleDirty() { _system_schedule_dirty = true; }

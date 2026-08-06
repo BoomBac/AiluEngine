@@ -204,6 +204,7 @@ namespace Ailu
             kScript,
             kDeserialize,
             kUndo,
+            kAutomation,
         };
 
         using Observer = std::function<void(void* instance)>;

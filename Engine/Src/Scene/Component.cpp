@@ -6,19 +6,33 @@
 
 namespace Ailu::ECS
 {
+    namespace
+    {
+        std::mutex s_component_type_mutex;
+        std::unordered_map<String, ComponentTypeId> s_component_type_ids;
+        // Indexed by ComponentTypeId (ids are assigned sequentially from 0).
+        Vector<String> s_component_type_names;
+        ComponentTypeId s_next_component_type_id = 0;
+    }
+
     ComponentTypeId RegisterComponentType(StringView stable_name)
     {
-        static std::mutex s_component_type_mutex;
-        static std::unordered_map<String, ComponentTypeId> s_component_type_ids;
-        static ComponentTypeId s_next_component_type_id = 0;
-
         std::lock_guard lock(s_component_type_mutex);
         const auto [it, inserted] = s_component_type_ids.emplace(String(stable_name), s_next_component_type_id);
         if (inserted)
         {
+            s_component_type_names.emplace_back(stable_name);
             ++s_next_component_type_id;
         }
         return it->second;
+    }
+
+    StringView GetComponentStableName(ComponentTypeId type_id)
+    {
+        std::lock_guard lock(s_component_type_mutex);
+        if (type_id < s_component_type_names.size())
+            return s_component_type_names[type_id];
+        return {};
     }
 }
 

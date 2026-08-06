@@ -4,6 +4,7 @@
 
 #include <Framework/Common/Allocator.hpp>
 #include <Framework/Common/Log.h>
+#include <Framework/Common/TimeMgr.h>
 #include <Framework/Math/Guid.h>
 #include <Assets/AssetDocument.h>
 #include <Graph/GraphDocument.h>
@@ -28,6 +29,55 @@
 #include <vector>
 
 using namespace Ailu;
+
+namespace Ailu::Editor::AutomationCoreTests
+{
+    bool TestAutomationValuePrimitives();
+    bool TestAutomationValueArrayObject();
+    bool TestAutomationValueEquality();
+    bool TestAutomationRegistry();
+    bool TestAutomationServiceSubmitTick();
+}
+
+namespace Ailu::Editor::AutomationReadModelTests
+{
+    bool TestTypeNameNormalization();
+    bool TestValueConversions();
+    bool TestComponentStableName();
+    bool TestComponentDescriptorRead();
+}
+
+namespace Ailu::Editor::AutomationAdapterTests
+{
+    bool TestAdapterResolve();
+    bool TestAdapterDescribeComponent();
+    bool TestAdapterReadComponent();
+}
+
+namespace Ailu::Editor::AutomationTransportTests
+{
+    bool TestJsonRoundtrip();
+    bool TestRequestResultJson();
+    bool TestSessionFile();
+    bool TestPipeRoundTrip();
+}
+
+namespace Ailu::Editor::AutomationCommandTests
+{
+    bool TestCommandManagerLifecycle();
+    bool TestCommandEventNotification();
+    bool TestSetPropertyCommandValidation();
+    bool TestAdapterWriteComponent();
+    bool TestValueConversions();
+    bool TestPermissionGate();
+}
+
+namespace Ailu::Editor::AIAssistantTests
+{
+    bool TestAILoopReadAndPreview();
+    bool TestAIReject();
+    bool TestAIImmediateFinishForReadOnly();
+}
 
 namespace
 {
@@ -135,6 +185,7 @@ namespace
         }
 
         PrintTestResult(name, passed);
+        std::cout << std::flush;
 
         if (passed)
             ++result._passed;
@@ -1279,6 +1330,97 @@ namespace
             std::exit(EXIT_FAILURE);
     }
 
+    void RunAutomationCoreTests()
+    {
+        using namespace Ailu::Editor::AutomationCoreTests;
+        TestResult result;
+        RunTest(result, "AutomationValue primitives", TestAutomationValuePrimitives);
+        RunTest(result, "AutomationValue array/object", TestAutomationValueArrayObject);
+        RunTest(result, "AutomationValue equality", TestAutomationValueEquality);
+        RunTest(result, "AutomationRegistry register/invoke", TestAutomationRegistry);
+        RunTest(result, "AutomationService submit/tick", TestAutomationServiceSubmitTick);
+
+        std::cout << "========================================\n";
+        std::cout << "Automation core tests passed: " << result._passed << '\n';
+        std::cout << "Automation core tests failed: " << result._failed << '\n';
+        std::cout << "========================================\n";
+    }
+
+    void RunAutomationReadModelTests()
+    {
+        using namespace Ailu::Editor::AutomationReadModelTests;
+        TestResult result;
+        RunTest(result, "Type name normalization", TestTypeNameNormalization);
+        RunTest(result, "Value conversions", TestValueConversions);
+        RunTest(result, "Component stable name", TestComponentStableName);
+        RunTest(result, "Component descriptor read", TestComponentDescriptorRead);
+
+        std::cout << "========================================\n";
+        std::cout << "Automation read-model tests passed: " << result._passed << '\n';
+        std::cout << "Automation read-model tests failed: " << result._failed << '\n';
+        std::cout << "========================================\n";
+    }
+
+    void RunAutomationAdapterTests()
+    {
+        using namespace Ailu::Editor::AutomationAdapterTests;
+        TestResult result;
+        RunTest(result, "Adapter resolve", TestAdapterResolve);
+        RunTest(result, "Adapter describe component", TestAdapterDescribeComponent);
+        RunTest(result, "Adapter read component", TestAdapterReadComponent);
+
+        std::cout << "========================================\n";
+        std::cout << "Automation adapter tests passed: " << result._passed << '\n';
+        std::cout << "Automation adapter tests failed: " << result._failed << '\n';
+        std::cout << "========================================\n";
+    }
+
+    void RunAutomationTransportTests()
+    {
+        using namespace Ailu::Editor::AutomationTransportTests;
+        TestResult result;
+        RunTest(result, "AutomationJson roundtrip", TestJsonRoundtrip);
+        RunTest(result, "Request/Result JSON", TestRequestResultJson);
+        RunTest(result, "Session file", TestSessionFile);
+        RunTest(result, "Named pipe round trip", TestPipeRoundTrip);
+
+        std::cout << "========================================\n";
+        std::cout << "Automation transport tests passed: " << result._passed << '\n';
+        std::cout << "Automation transport tests failed: " << result._failed << '\n';
+        std::cout << "========================================\n";
+    }
+
+    void RunAutomationCommandTests()
+    {
+        using namespace Ailu::Editor::AutomationCommandTests;
+        TestResult result;
+        RunTest(result, "Command manager lifecycle", TestCommandManagerLifecycle);
+        RunTest(result, "Command event notification", TestCommandEventNotification);
+        RunTest(result, "SetProperty validation", TestSetPropertyCommandValidation);
+        RunTest(result, "Adapter write component", TestAdapterWriteComponent);
+        RunTest(result, "Value conversions", TestValueConversions);
+        RunTest(result, "Permission gate", TestPermissionGate);
+
+        std::cout << "========================================\n";
+        std::cout << "Automation command tests passed: " << result._passed << '\n';
+        std::cout << "Automation command tests failed: " << result._failed << '\n';
+        std::cout << "========================================\n";
+    }
+
+    void RunAIAssistantTests()
+    {
+        using namespace Ailu::Editor::AIAssistantTests;
+        TestResult result;
+        RunTest(result, "AI loop read+preview+apply", TestAILoopReadAndPreview);
+        RunTest(result, "AI reject", TestAIReject);
+        RunTest(result, "AI immediate finish (read-only)", TestAIImmediateFinishForReadOnly);
+
+        std::cout << "========================================\n";
+        std::cout << "AI assistant tests passed: " << result._passed << '\n';
+        std::cout << "AI assistant tests failed: " << result._failed << '\n';
+        std::cout << "========================================\n";
+    }
+
     void RunAllocatorTests()
     {
         TestResult result;
@@ -1331,7 +1473,15 @@ int main(int argc, char **argv)
     // 统一初始化日志与分配器：文档反序列化路径中的 LOG_* 需要 LogMgr 就绪。
     LogMgr::Init();
     Allocator::Init();
+    // DEBUG 构建下部分引擎系统（如 SceneMgr 构造的 TIMER_BLOCK）依赖 TimeMgr。
+    TimeMgr::Init();
 
+    RunAutomationCoreTests();
+    RunAutomationReadModelTests();
+    RunAutomationAdapterTests();
+    RunAutomationTransportTests();
+    RunAutomationCommandTests();
+    RunAIAssistantTests();
     RunEntityGuidUnitTests();
     RunAllocatorTests();// 内部负责 Shutdown
     return EXIT_SUCCESS;

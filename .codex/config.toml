@@ -1,0 +1,5 @@
+[mcp_servers.ailu]
+  command = "dotnet"
+  args = ["C:/Users/BoomBac/OneDrive/AiluEngine/Tools/AiluMcpServer/bin/Release/net8.0/AiluMcpServer.dll","--project", "C:/Users/BoomBac/OneDrive/AiluTestProj/empty.json"]
+  enabled = true
+  supports_parallel_tool_calls = true

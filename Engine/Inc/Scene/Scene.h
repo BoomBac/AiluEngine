@@ -45,9 +45,20 @@ namespace Ailu
             bool RenameEntity(ECS::Entity entity, const String& new_name);
             u64 StructureRevision() const { return _structure_revision; }
 
+            // --- Edit revision ---
+            // 任意用户可观察修改（属性编辑）时递增；结构修改由 TouchStructure 同时递增。
+            u64 EditRevision() const { return _edit_revision; }
+            void MarkEdited() { ++_edit_revision; MarkDirty(); }
+            // 结构级修改（组件增删等）：Structure Revision + Edit Revision + Dirty。
+            void MarkStructureChanged() { TouchStructure(); }
+            // 供事务整体调整：整组只算一次 Edit Revision（方案第 21 节）。
+            void SetEditRevision(u64 revision) { _edit_revision = revision; }
+
             // --- Entity GUID identity API ---
             ECS::Entity FindEntity(const Guid &guid) const;
             const Guid &GetEntityGuid(ECS::Entity entity) const;
+            // 返回实体持久 GUID 指针；实体无效或缺少 PersistentIdComponent 时返回 nullptr。
+            const Guid *FindEntityGuid(ECS::Entity entity) const;
             bool HasEntityGuid(const Guid &guid) const;
             bool ValidateEntityGuidIndex() const;
             // 修复身份数据：为缺失/空 PersistentIdComponent 的 Entity 生成 GUID 并重建索引。
@@ -143,6 +154,7 @@ namespace Ailu
         private:
             bool _dirty = true;
             u64 _structure_revision = 1u;
+            u64 _edit_revision = 1u;
             u16 _total_renderable_count = 0u;
             ECS::Register _register;
             std::unordered_set<ECS::Entity> _pending_delete_entities;
