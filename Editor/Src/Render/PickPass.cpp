@@ -1,4 +1,4 @@
-﻿#include "Render/PickPass.h"
+#include "Render/PickPass.h"
 #include "Common/Selection.h"
 #include "Framework/Common/Profiler.h"
 #include "Render/CommandBuffer.h"

@@ -15,11 +15,11 @@
             },
             "_transform_component": {
                 "_position": [14.5179, 3.0787, 8.7868],
-                "_rotation": [0.3605, -0.1852, 0.0732, 0.911],
+                "_rotation": [0.3604, -0.1851, 0.0731, 0.9112],
                 "_scale": [0.9998, 0.9998, 0.9998]
             },
             "_light_component": {
-                "_type": "kSpot",
+                "_type": "kDirectional",
                 "_light": {
                     "_light_color": [1.0, 1.0, 1.0, 1.0],
                     "_light_param": [10.0, 4.9, 5.0, 0.2648],
@@ -110,8 +110,8 @@
                 "_layer_mask": 0
             },
             "_transform_component": {
-                "_position": [-1.1983, 1.0636, 1.3005],
-                "_rotation": [0.0, 0.0, 0.0, 1.0],
+                "_position": [-1.1983, 1.0635, 1.3005],
+                "_rotation": [0.0, -0.0, 0.0, 1.0],
                 "_scale": [1.0, 1.0, 1.0]
             },
             "_static_mesh_component": {

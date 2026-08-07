@@ -308,6 +308,7 @@ namespace Ailu
         while (State() != EApplicationState::EApplicationState_Exit)
         {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            InputRouteState::Get().BeginFrame();
             {
                 PROFILE_BLOCK_CPU("Application::WindowUpdate")
                 _p_window->OnUpdate();
@@ -325,6 +326,7 @@ namespace Ailu
 #else
         while (State() != EApplicationState::EApplicationState_Exit)
         {
+            InputRouteState::Get().BeginFrame();
             {
                 PROFILE_BLOCK_CPU("Application::WindowUpdate")
                 _p_window->OnUpdate();
@@ -539,6 +541,11 @@ namespace Ailu
         dispather.Dispatch<KeyPressedEvent>(BIND_EVENT_HANDLER(OnKeyDown));
         dispather.Dispatch<KeyReleasedEvent>(BIND_EVENT_HANDLER(OnKeyUp));
 #else
+        if (_p_imgui_layer != nullptr && _p_imgui_layer->ShouldBlockEngineInputEvent(e))
+        {
+            e.SetHandled();
+            return;
+        }
         for (auto it = _layer_stack->end(); it != _layer_stack->begin();)
         {
             (*--it)->OnEvent(e);
@@ -652,6 +659,11 @@ namespace Ailu
         {
             if (e == nullptr)
                 continue;
+            if (_p_imgui_layer != nullptr && _p_imgui_layer->ShouldBlockEngineInputEvent(*e))
+            {
+                e->SetHandled();
+                continue;
+            }
             for (auto it = _layer_stack->end(); it != _layer_stack->begin();)
             {
                 (*--it)->OnEvent(*e);

@@ -22,6 +22,13 @@ namespace Ailu
         kGamepad = 1u << 3u
     };
 
+    enum class EInputOwner : u8
+    {
+        kNone,
+        kImGui,
+        kEngine
+    };
+
     class AILU_API InputRouteState
     {
     public:
@@ -29,9 +36,20 @@ namespace Ailu
         void BeginFrame();
         void Consume(InputChannel channel);
         bool IsConsumed(InputChannel channel) const;
+        void SetOwner(InputChannel channel, EInputOwner owner);
+        void ClearOwner(InputChannel channel, EInputOwner owner = EInputOwner::kNone);
+        EInputOwner GetOwner(InputChannel channel) const;
+        bool IsOwnedBy(InputChannel channel, EInputOwner owner) const;
 
     private:
+        EInputOwner &_GetOwner(InputChannel channel);
+        const EInputOwner &_GetOwner(InputChannel channel) const;
+
         u8 _consumed_channels = 0u;
+        EInputOwner _mouse_owner = EInputOwner::kNone;
+        EInputOwner _keyboard_owner = EInputOwner::kNone;
+        EInputOwner _text_owner = EInputOwner::kNone;
+        EInputOwner _gamepad_owner = EInputOwner::kNone;
     };
 
     class Window;

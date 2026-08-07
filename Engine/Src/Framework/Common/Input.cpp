@@ -24,6 +24,45 @@ namespace Ailu
         return (_consumed_channels & static_cast<u8>(channel)) != 0u;
     }
 
+    void InputRouteState::SetOwner(InputChannel channel, EInputOwner owner)
+    {
+        _GetOwner(channel) = owner;
+    }
+
+    void InputRouteState::ClearOwner(InputChannel channel, EInputOwner owner)
+    {
+        EInputOwner &current_owner = _GetOwner(channel);
+        if (owner == EInputOwner::kNone || current_owner == owner)
+            current_owner = EInputOwner::kNone;
+    }
+
+    EInputOwner InputRouteState::GetOwner(InputChannel channel) const
+    {
+        return _GetOwner(channel);
+    }
+
+    bool InputRouteState::IsOwnedBy(InputChannel channel, EInputOwner owner) const
+    {
+        return GetOwner(channel) == owner;
+    }
+
+    EInputOwner &InputRouteState::_GetOwner(InputChannel channel)
+    {
+        switch (channel)
+        {
+            case InputChannel::kMouse: return _mouse_owner;
+            case InputChannel::kKeyboard: return _keyboard_owner;
+            case InputChannel::kText: return _text_owner;
+            case InputChannel::kGamepad: return _gamepad_owner;
+        }
+        return _mouse_owner;
+    }
+
+    const EInputOwner &InputRouteState::_GetOwner(InputChannel channel) const
+    {
+        return const_cast<InputRouteState *>(this)->_GetOwner(channel);
+    }
+
     void Input::NotifyKeyPressed(EKey keycode)
     {
         const auto key_index = static_cast<u32>(keycode);
@@ -80,7 +119,6 @@ namespace Ailu
 
     void Input::BeginFrame()
     {
-        InputRouteState::Get().BeginFrame();
         {
             std::lock_guard lock(s_input_state_mutex);
             s_pre_key_state = s_cur_key_state;

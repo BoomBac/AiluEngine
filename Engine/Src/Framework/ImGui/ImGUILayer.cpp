@@ -182,9 +182,69 @@ namespace Ailu
 		ImGui::Render();
 	}
 
-    bool Ailu::ImGUILayer::ShouldBlockEngineInputEvent(const Event &e) const
+    bool Ailu::ImGUILayer::ShouldBlockEngineInputEvent(const Event &e)
     {
-        return false;
+        auto &route_state = InputRouteState::Get();
+        const auto consume = [&route_state](InputChannel channel)
+        {
+            route_state.Consume(channel);
+            return true;
+        };
+
+        switch (e.GetEventType())
+        {
+            case EEventType::kWindowLostFocus:
+                route_state.ClearOwner(InputChannel::kMouse);
+                route_state.ClearOwner(InputChannel::kKeyboard);
+                route_state.ClearOwner(InputChannel::kText);
+                return false;
+            case EEventType::kMouseButtonPressed:
+                if (_blocks_engine_mouse_input)
+                {
+                    route_state.SetOwner(InputChannel::kMouse, EInputOwner::kImGui);
+                    return consume(InputChannel::kMouse);
+                }
+                route_state.SetOwner(InputChannel::kMouse, EInputOwner::kEngine);
+                return false;
+            case EEventType::kMouseMoved:
+            case EEventType::kMouseScroll:
+                if (route_state.IsOwnedBy(InputChannel::kMouse, EInputOwner::kEngine))
+                    return false;
+                if (_blocks_engine_mouse_input || route_state.IsOwnedBy(InputChannel::kMouse, EInputOwner::kImGui))
+                    return consume(InputChannel::kMouse);
+                return false;
+            case EEventType::kMouseButtonReleased:
+            {
+                const bool is_imgui_owner = route_state.IsOwnedBy(InputChannel::kMouse, EInputOwner::kImGui);
+                const bool is_engine_owner = route_state.IsOwnedBy(InputChannel::kMouse, EInputOwner::kEngine);
+                if (is_engine_owner)
+                {
+                    route_state.ClearOwner(InputChannel::kMouse);
+                    return false;
+                }
+                if (is_imgui_owner)
+                {
+                    route_state.ClearOwner(InputChannel::kMouse);
+                    return consume(InputChannel::kMouse);
+                }
+                return _blocks_engine_mouse_input && consume(InputChannel::kMouse);
+            }
+            case EEventType::kKeyPressed:
+                if (_blocks_engine_keyboard_input)
+                {
+                    route_state.SetOwner(InputChannel::kKeyboard, EInputOwner::kImGui);
+                    if (ImGui::GetIO().WantTextInput)
+                        route_state.SetOwner(InputChannel::kText, EInputOwner::kImGui);
+                    return consume(InputChannel::kKeyboard);
+                }
+                return route_state.IsOwnedBy(InputChannel::kKeyboard, EInputOwner::kImGui) && consume(InputChannel::kKeyboard);
+            case EEventType::kKeyReleased:
+                if (_blocks_engine_keyboard_input || route_state.IsOwnedBy(InputChannel::kKeyboard, EInputOwner::kImGui))
+                    return consume(InputChannel::kKeyboard);
+                return false;
+            default:
+                return false;
+        }
     }
 
     void Ailu::ImGUILayer::RefreshEngineInputCapture()
@@ -195,12 +255,10 @@ namespace Ailu
         const bool item_active = ImGui::IsAnyItemActive();
         _blocks_engine_mouse_input = io.WantCaptureMouse || hovered || item_hovered || item_active;
         _blocks_engine_keyboard_input = io.WantCaptureKeyboard || io.WantTextInput || item_active;
-        if (_blocks_engine_mouse_input)
-            InputRouteState::Get().Consume(InputChannel::kMouse);
-        if (_blocks_engine_keyboard_input)
-            InputRouteState::Get().Consume(InputChannel::kKeyboard);
-        if (io.WantTextInput)
-            InputRouteState::Get().Consume(InputChannel::kText);
+        if (!_blocks_engine_keyboard_input)
+            InputRouteState::Get().ClearOwner(InputChannel::kKeyboard, EInputOwner::kImGui);
+        if (!io.WantTextInput)
+            InputRouteState::Get().ClearOwner(InputChannel::kText, EInputOwner::kImGui);
     }
 }
 

@@ -22,7 +22,7 @@ namespace Ailu
 
 		void Begin();
 		void End();
-        bool ShouldBlockEngineInputEvent(const Event &e) const;
+        bool ShouldBlockEngineInputEvent(const Event &e);
 	private:
         void ApplyViewportConfig();
         void RefreshEngineInputCapture();

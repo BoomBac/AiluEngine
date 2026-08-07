@@ -2011,7 +2011,7 @@ namespace Ailu
 
             DockNode *hover_edge_node = nullptr;
             const u32 hover_resize_dir = find_resize_edge(&hover_edge_node);
-            if (InputRouteState::Get().IsConsumed(InputChannel::kMouse) && _resizing_node == nullptr)
+            if (InputRouteState::Get().IsOwnedBy(InputChannel::kMouse, EInputOwner::kImGui) && _resizing_node == nullptr)
             {
                 if (hover_resize_dir == 0u)
                 {

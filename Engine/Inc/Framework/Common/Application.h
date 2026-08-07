@@ -218,7 +218,7 @@ namespace Ailu
         inline static std::thread::id s_main_thread_id;
 
         LayerStack *_layer_stack;
-        ImGUILayer *_p_imgui_layer;
+        ImGUILayer *_p_imgui_layer = nullptr;
         Scope<Window> _p_window = nullptr;
         Scope<InputSystem> _input_system;
         WinInputBackend _win_input_backend;
