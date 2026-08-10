@@ -282,6 +282,84 @@ return Ailu::ComputeShaderAssetDocument::StaticType();
 return Ailu::ComputeShaderAssetDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_ComputeShaderAssetDocument(&Ailu::ComputeShaderAssetDocument::StaticType, "Ailu::ComputeShaderAssetDocument");
+const Ailu::Type* Ailu::Z_Construct_ScriptAssetDocument_Type()
+{
+Ailu::Object::StaticType();
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "ScriptAssetDocument";
+initializer._size = sizeof(Ailu::ScriptAssetDocument);
+initializer._full_name = "Ailu::ScriptAssetDocument";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu";
+initializer._base_name = "Ailu::Object";
+initializer._constructor = []()->Ailu::ScriptAssetDocument* {return new Ailu::ScriptAssetDocument;};
+Meta meta_header;
+meta_header.Set("Category","");
+meta_header.Set("IsColor",false);
+meta_header.Set("IsRange",false);
+meta_header.Set("IsFloatRange",true);
+meta_header.Set("RangeMin",(f32)0);
+meta_header.Set("RangeMax",(f32)1);
+MemberBuilder builder_header;
+builder_header._name = "_header";
+builder_header._type_name = "Ailu::AssetDocumentHeader";
+builder_header._offset = offsetof(ScriptAssetDocument,_header);
+builder_header._is_const = false;
+builder_header._is_static = false;
+builder_header._is_public = true;
+builder_header._is_pointer = false;
+builder_header._is_ref = false;
+builder_header._is_template = false;
+builder_header._meta = meta_header;
+builder_header._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<AssetDocumentHeader>);
+builder_header._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<AssetDocumentHeader>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_header));
+Meta meta_file;
+meta_file.Set("Category","");
+meta_file.Set("IsColor",false);
+meta_file.Set("IsRange",false);
+meta_file.Set("IsFloatRange",true);
+meta_file.Set("RangeMin",(f32)0);
+meta_file.Set("RangeMax",(f32)1);
+MemberBuilder builder_file;
+builder_file._name = "_file";
+builder_file._type_name = "String";
+builder_file._offset = offsetof(ScriptAssetDocument,_file);
+builder_file._is_const = false;
+builder_file._is_static = false;
+builder_file._is_public = true;
+builder_file._is_pointer = false;
+builder_file._is_ref = false;
+builder_file._is_template = false;
+builder_file._meta = meta_file;
+builder_file._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<String>);
+builder_file._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<String>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_file));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+const Ailu::Type* Ailu::ScriptAssetDocument::GetPrivateStaticClass()
+{
+	static const Ailu::Type* type = Z_Construct_ScriptAssetDocument_Type();
+	return type;
+}
+
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::ScriptAssetDocument>()
+{
+return Ailu::ScriptAssetDocument::StaticType();
+}
+    const Type *Ailu::ScriptAssetDocument::GetType()
+{
+return Ailu::ScriptAssetDocument::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_ScriptAssetDocument(&Ailu::ScriptAssetDocument::StaticType, "Ailu::ScriptAssetDocument");
 const Ailu::Type* Ailu::Z_Construct_Texture2DAssetDocument_Type()
 {
 Ailu::Object::StaticType();
@@ -3160,27 +3238,48 @@ initializer._is_abstract = false;
 initializer._namespace = "Ailu";
 initializer._base_name = "";
 initializer._constructor = []()->Ailu::SceneScriptComponentDocument* {return new Ailu::SceneScriptComponentDocument;};
-Meta meta_script_path;
-meta_script_path.Set("Category","");
-meta_script_path.Set("IsColor",false);
-meta_script_path.Set("IsRange",false);
-meta_script_path.Set("IsFloatRange",true);
-meta_script_path.Set("RangeMin",(f32)0);
-meta_script_path.Set("RangeMax",(f32)1);
-MemberBuilder builder_script_path;
-builder_script_path._name = "_script_path";
-builder_script_path._type_name = "String";
-builder_script_path._offset = offsetof(SceneScriptComponentDocument,_script_path);
-builder_script_path._is_const = false;
-builder_script_path._is_static = false;
-builder_script_path._is_public = true;
-builder_script_path._is_pointer = false;
-builder_script_path._is_ref = false;
-builder_script_path._is_template = false;
-builder_script_path._meta = meta_script_path;
-builder_script_path._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<String>);
-builder_script_path._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<String>);
-initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_script_path));
+Meta meta_script_asset;
+meta_script_asset.Set("Category","");
+meta_script_asset.Set("IsColor",false);
+meta_script_asset.Set("IsRange",false);
+meta_script_asset.Set("IsFloatRange",true);
+meta_script_asset.Set("RangeMin",(f32)0);
+meta_script_asset.Set("RangeMax",(f32)1);
+MemberBuilder builder_script_asset;
+builder_script_asset._name = "_script_asset";
+builder_script_asset._type_name = "Ailu::Guid";
+builder_script_asset._offset = offsetof(SceneScriptComponentDocument,_script_asset);
+builder_script_asset._is_const = false;
+builder_script_asset._is_static = false;
+builder_script_asset._is_public = true;
+builder_script_asset._is_pointer = false;
+builder_script_asset._is_ref = false;
+builder_script_asset._is_template = false;
+builder_script_asset._meta = meta_script_asset;
+builder_script_asset._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Guid>);
+builder_script_asset._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Guid>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_script_asset));
+Meta meta_properties;
+meta_properties.Set("Category","");
+meta_properties.Set("IsColor",false);
+meta_properties.Set("IsRange",false);
+meta_properties.Set("IsFloatRange",true);
+meta_properties.Set("RangeMin",(f32)0);
+meta_properties.Set("RangeMax",(f32)1);
+MemberBuilder builder_properties;
+builder_properties._name = "_properties";
+builder_properties._type_name = "Vector<ECS::ScriptPropertyData>";
+builder_properties._offset = offsetof(SceneScriptComponentDocument,_properties);
+builder_properties._is_const = false;
+builder_properties._is_static = false;
+builder_properties._is_public = true;
+builder_properties._is_pointer = false;
+builder_properties._is_ref = false;
+builder_properties._is_template = true;
+builder_properties._meta = meta_properties;
+builder_properties._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<ECS::ScriptPropertyData>>);
+builder_properties._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<ECS::ScriptPropertyData>>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_properties));
 cur_type = std::make_unique<Ailu::Type>(initializer);
 Ailu::Type::RegisterType(cur_type.get());
 }

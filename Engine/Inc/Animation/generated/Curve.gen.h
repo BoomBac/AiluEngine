@@ -6,7 +6,7 @@
 #define __CURVE_GEN_H__
 //Enum EInterpolationType begin...........................
 const Ailu::Enum* Z_Construct_Enum_EInterpolationType_Type();
-namespace Ailu { 
+namespace Ailu {
 enum class EInterpolationType : i32;
 }
 template<>

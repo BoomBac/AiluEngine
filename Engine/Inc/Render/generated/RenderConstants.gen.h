@@ -6,7 +6,7 @@
 #define __RENDERCONSTANTS_GEN_H__
 //Enum EColorRange begin...........................
 const Ailu::Enum* Z_Construct_Enum_EColorRange_Type();
-namespace Ailu::Render { 
+namespace Ailu::Render {
 enum class EColorRange : i32;
 }
 template<>

@@ -107,6 +107,8 @@ namespace Ailu
                 {
                     auto* tag = _scene->GetRegister().GetComponent<ECS::TagComponent>(entity);
                     result._label = tag && !tag->_name.empty() ? tag->_name : "<Unnamed>";
+                    if (!_scene->IsEntityEnabled(entity))
+                        result._text_color = Color(0.42f, 0.45f, 0.52f, 1.0f);
                 }
                 else
                 {
@@ -256,6 +258,7 @@ namespace Ailu
                 _data_source->SetScene(scene);
                 _tree_view->SetDataSource(scene ? _data_source.get() : nullptr);
                 _observed_structure_revision = scene ? scene->StructureRevision() : 0;
+                _observed_edit_revision = scene ? scene->EditRevision() : 0;
                 if (scene)
                 {
                     _scene_title->SetText(scene->Name());
@@ -269,9 +272,11 @@ namespace Ailu
             else if (scene)
             {
                 u64 rev = scene->StructureRevision();
-                if (rev != _observed_structure_revision)
+                u64 edit_rev = scene->EditRevision();
+                if (rev != _observed_structure_revision || edit_rev != _observed_edit_revision)
                 {
                     _observed_structure_revision = rev;
+                    _observed_edit_revision = edit_rev;
                     _tree_view->Refresh();
                 }
             }

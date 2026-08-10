@@ -62,6 +62,7 @@ namespace Ailu
                     _label = hb->AddChild<Text>(pres._label);
                     _label->GetSlotAs<LinearSlot>().SizePolicy(ESizePolicy::kFill, ESizePolicy::kAuto);
                     _label->_color = pres._text_color;
+                    _label->GetStyleOverride().SetContentColor(pres._text_color);
                     _label->FontSize(tree->GetStyleFontSize(), false);
                 }
 

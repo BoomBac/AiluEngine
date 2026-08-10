@@ -6,7 +6,7 @@
 #define __RENDERER_GEN_H__
 //Enum EShadingMode begin...........................
 const Ailu::Enum* Z_Construct_Enum_EShadingMode_Type();
-namespace Ailu::Render { 
+namespace Ailu::Render {
 enum class EShadingMode : u8;
 }
 template<>

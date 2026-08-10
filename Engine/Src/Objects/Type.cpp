@@ -381,7 +381,7 @@ namespace Ailu
         MAKE_BASE_TYPE(Vector2UInt);
         MAKE_BASE_TYPE(Vector3UInt);
         MAKE_BASE_TYPE(Vector4UInt);
-        MAKE_BASE_TYPE(Color);
+        MAKE_BASE_TYPE(Ailu::Math::Color);
         for (auto *type: all_base_types)
             s_global_types[type->FullName()] = type;
     }
@@ -407,5 +407,5 @@ namespace Ailu
     IMPL_STATIC_TYPE(Vector2UInt)
     IMPL_STATIC_TYPE(Vector3UInt)
     IMPL_STATIC_TYPE(Vector4UInt)
-    IMPL_STATIC_TYPE(Color)
+    IMPL_STATIC_TYPE(Ailu::Math::Color)
 }// namespace Ailu

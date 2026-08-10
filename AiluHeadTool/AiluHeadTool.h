@@ -24,6 +24,7 @@ public:
         bool _is_range = false;
         bool _is_float_range = true;
         bool _is_color = false;
+        bool _is_script = false;
         void Reset()
         {
             _category = "";
@@ -32,6 +33,7 @@ public:
             _is_range = false;
             _is_float_range = true;
             _is_color = false;
+            _is_script = false;
         }
     };
 
@@ -50,8 +52,10 @@ public:
         bool _is_const = false;
         bool _is_virtual = false;
         bool _is_function = false;
+        bool _is_script = false;
         std::string _return_type;
         std::vector<std::string> _params;
+        std::vector<std::string> _param_names;
         int _offset = 0u;
         PropertyMeta _meta;
     };

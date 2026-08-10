@@ -41,6 +41,7 @@ namespace Ailu
 
             SceneManagement::Scene* _observed_scene = nullptr;
             u64 _observed_structure_revision = 0;
+            u64 _observed_edit_revision = 0;
             u64 _observed_selection_revision = 0;
         };
     }// namespace Editor

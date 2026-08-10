@@ -15,7 +15,7 @@ namespace Ailu::ECS
         for (auto &component: r.View<AudioListenerComponent>())
         {
             const Entity entity = r.GetEntity<AudioListenerComponent>(listener_index++);
-            if (!component._enabled)
+            if (!r.IsEntityEnabled(entity) || !r.IsComponentEnabled<AudioListenerComponent>(entity))
                 continue;
             const auto *transform = r.GetComponent<TransformComponent>(entity);
             if (transform == nullptr)
@@ -36,6 +36,8 @@ namespace Ailu::ECS
             {
                 (void) camera;
                 const Entity entity = r.GetEntity<CCamera>(camera_index++);
+                if (!r.IsEntityEnabled(entity) || !r.IsComponentEnabled<CCamera>(entity))
+                    continue;
                 const auto *transform = r.GetComponent<TransformComponent>(entity);
                 if (transform == nullptr)
                     continue;
@@ -54,6 +56,8 @@ namespace Ailu::ECS
         for (auto &source: r.View<AudioSourceComponent>())
         {
             const Entity entity = r.GetEntity<AudioSourceComponent>(source_index++);
+            if (!r.IsEntityEnabled(entity) || !r.IsComponentEnabled<AudioSourceComponent>(entity))
+                continue;
             const auto *transform = r.GetComponent<TransformComponent>(entity);
             const Vector3f position = transform != nullptr ? transform->_position : Vector3f::kZero;
 

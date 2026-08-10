@@ -29,7 +29,8 @@ namespace Ailu
             friend class SceneMgr;
         public:
             Scene() = default;
-            explicit Scene(const String &name);
+            explicit Scene(const String &name, bool create_render_resources = true);
+            ~Scene();
             ECS::Entity AddObject(String name = "");
             ECS::Entity AddObject(Ref<Mesh> mesh, Ref<Material> mat);
             ECS::Entity AddObject(Ref<Mesh> mesh, const Vector<Ref<Material>>& mats);
@@ -39,6 +40,8 @@ namespace Ailu
 
             // --- Hierarchy API (new) ---
             bool IsValidEntity(ECS::Entity entity) const;
+            bool IsEntityEnabled(ECS::Entity entity) const;
+            bool SetEntityEnabled(ECS::Entity entity, bool enabled);
             bool IsDescendantOf(ECS::Entity entity, ECS::Entity potential_ancestor) const;
             bool Reparent(ECS::Entity child, ECS::Entity new_parent, bool keep_world_transform = true);
             bool Detach(ECS::Entity child, bool keep_world_transform = true);
@@ -133,6 +136,7 @@ namespace Ailu
 
             // --- Hierarchy helpers ---
             void TouchStructure();
+            void RefreshEntityEnabledInHierarchy(ECS::Entity entity, bool parent_enabled);
             bool UnlinkFromParent(ECS::Entity entity);
             bool LinkAsLastChild(ECS::Entity entity, ECS::Entity parent);
             void CollectSubtreePostOrder(ECS::Entity root, Vector<ECS::Entity>& result) const;

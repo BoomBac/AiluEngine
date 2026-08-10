@@ -27,7 +27,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::Texture>(
                                 static const Type* GetPrivateStaticClass();\
                             public:\
                                 static const Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual const Type  *GetType() override;
+                                const Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu::Render{
 class Texture2D ;
@@ -43,7 +43,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::Texture2D
                                 static const Type* GetPrivateStaticClass();\
                             public:\
                                 static const Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual const Type  *GetType() override;
+                                const Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu::Render{
 class Texture3D ;
@@ -59,7 +59,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::Texture3D
                                 static const Type* GetPrivateStaticClass();\
                             public:\
                                 static const Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual const AILU_API Type  *GetType() override;
+                                const AILU_API Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu::Render{
 class CubeMap ;
@@ -75,7 +75,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::CubeMap>(
                                 static const Type* GetPrivateStaticClass();\
                             public:\
                                 static const Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual const Type  *GetType() override;
+                                const Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu::Render{
 class RenderTexture ;
@@ -86,7 +86,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::RenderTex
 
 //Enum ETextureDimension begin...........................
 const Ailu::Enum* Z_Construct_Enum_ETextureDimension_Type();
-namespace Ailu::Render { 
+namespace Ailu::Render {
 enum class ETextureDimension : i32;
 }
 template<>
@@ -95,7 +95,7 @@ AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::ETextureDimension>();
 
 //Enum EFilterMode begin...........................
 const Ailu::Enum* Z_Construct_Enum_EFilterMode_Type();
-namespace Ailu::Render { 
+namespace Ailu::Render {
 enum class EFilterMode : i32;
 }
 template<>
@@ -104,7 +104,7 @@ AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::EFilterMode>();
 
 //Enum EWrapMode begin...........................
 const Ailu::Enum* Z_Construct_Enum_EWrapMode_Type();
-namespace Ailu::Render { 
+namespace Ailu::Render {
 enum class EWrapMode : i32;
 }
 template<>
@@ -113,7 +113,7 @@ AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::EWrapMode>();
 
 //Enum ETextureFormat begin...........................
 const Ailu::Enum* Z_Construct_Enum_ETextureFormat_Type();
-namespace Ailu::Render { 
+namespace Ailu::Render {
 enum class ETextureFormat : i32;
 }
 template<>
@@ -122,7 +122,7 @@ AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::ETextureFormat>();
 
 //Enum ECubemapFace begin...........................
 const Ailu::Enum* Z_Construct_Enum_ECubemapFace_Type();
-namespace Ailu::Render { 
+namespace Ailu::Render {
 enum class ECubemapFace : i32;
 }
 template<>
@@ -131,7 +131,7 @@ AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::ECubemapFace>();
 
 //Enum ERenderTargetFormat begin...........................
 const Ailu::Enum* Z_Construct_Enum_ERenderTargetFormat_Type();
-namespace Ailu::Render { 
+namespace Ailu::Render {
 enum class ERenderTargetFormat : i32;
 }
 template<>

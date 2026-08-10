@@ -95,7 +95,8 @@ namespace Ailu::Render
 
             ++entity_index;
 
-            if (!transform || !sprite_renderer._visible)
+            if (!scene.IsEntityEnabled(entity) || !registry.IsComponentEnabled<ECS::SpriteRendererComponent>(entity) || !transform ||
+                !sprite_renderer._visible)
                 continue;
 
             // Sprite pointer is stored directly on the component

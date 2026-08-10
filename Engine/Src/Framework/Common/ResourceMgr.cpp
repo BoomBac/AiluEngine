@@ -1,5 +1,6 @@
 #include "Framework/Common/ResourceMgr.h"
 #include "Assets/AssetDocument.h"
+#include "Assets/ScriptAsset.h"
 #include "Audio/AudioClip.h"
 #include "Framework/Common/FileManager.h"
 #include "Framework/Common/JobSystem.h"
@@ -438,6 +439,7 @@ namespace Ailu
 		_lut_global_resources_by_type[InputActionAsset::StaticType()] = {};
 		_lut_global_resources_by_type[AudioClip::StaticType()] = {};
 		_lut_global_resources_by_type[GraphAsset::StaticType()] = {};
+		_lut_global_resources_by_type[ScriptAsset::StaticType()] = {};
 		_asset_domains.emplace_back(AssetMountDesc{
 			EAssetDomain::kEngine,
 			kPathScheme[0],
@@ -463,6 +465,7 @@ namespace Ailu
 		LoadAssetDB(_asset_domains[1]);
 		LoadAssetDB(_asset_domains[2]);
 		_asset_handler_registry.Register(MakeScope<SpriteAssetHandler>());
+		_asset_handler_registry.Register(MakeScope<ScriptAssetHandler>());
 		_asset_handler_registry.Register(MakeScope<ShaderAssetHandler>());
 		_asset_handler_registry.Register(MakeScope<ComputeShaderAssetHandler>());
 		_asset_handler_registry.Register(MakeScope<TextureAssetHandler>());
@@ -1500,6 +1503,8 @@ namespace Ailu
 				return AudioClip::StaticType();
 			if (type == GraphAsset::StaticType())
 				return GraphAsset::StaticType();
+			if (type == ScriptAsset::StaticType())
+				return ScriptAsset::StaticType();
 		}
 		return nullptr;
 	}

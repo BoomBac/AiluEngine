@@ -61,6 +61,23 @@ namespace Ailu
             {
                 if (auto *title_widget = header_box->ChildAt(0))
                     title_widget->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto);
+
+                if (info._is_enableable && info._is_enabled && info._set_enabled)
+                {
+                    auto *enabled_checkbox = header_box->AddChild<UI::CheckBox>();
+                    enabled_checkbox->SetChecked(info._is_enabled(SceneMgr::Get().ActiveScene()->GetRegister(), entity));
+                    enabled_checkbox->GetSlotAs<UI::LinearSlot>()
+                            .SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFixed)
+                            .Size({UI::CollapsibleView::s_header_height, UI::CollapsibleView::s_header_height});
+                    enabled_checkbox->_on_click += [&info, entity](bool checked)
+                    {
+                        auto *scene = SceneMgr::Get().ActiveScene();
+                        if (scene == nullptr)
+                            return;
+                        info._set_enabled(scene->GetRegister(), entity, checked);
+                        scene->MarkEdited();
+                    };
+                }
             }
 
             if (allow_remove && info._allow_remove)
@@ -119,6 +136,16 @@ namespace Ailu
             auto name_row = _vb->AddChild<UI::HorizontalBox>();
             _name_text = name_row->AddChild<UI::Text>("Name");
             _name_text->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto);
+            _entity_enabled_checkbox = name_row->AddChild<UI::CheckBox>();
+            _entity_enabled_checkbox->GetSlotAs<UI::LinearSlot>()
+                    .SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFixed)
+                    .Size({UI::CollapsibleView::s_header_height, UI::CollapsibleView::s_header_height});
+            _entity_enabled_checkbox->_on_click += [this](bool checked)
+            {
+                auto *scene = SceneMgr::Get().ActiveScene();
+                if (scene != nullptr && _selected_entity != ECS::kInvalidEntity)
+                    scene->SetEntityEnabled(_selected_entity, checked);
+            };
             _add_component_button = name_row->AddChild<UI::Button>();
             _add_component_button->SetText("+");
             _add_component_button->GetSlotAs<UI::LinearSlot>()
@@ -269,6 +296,8 @@ namespace Ailu
             auto *scene = SceneMgr::Get().ActiveScene();
             if (scene == nullptr)
                 return;
+
+            _entity_enabled_checkbox->SetChecked(scene->IsEntityEnabled(entity));
 
             auto &registry = scene->GetRegister();
 

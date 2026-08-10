@@ -6,7 +6,7 @@
 #define __ALGFORMAT_GEN_H__
 //Enum EALGFormat begin...........................
 const Ailu::Enum* Z_Construct_Enum_EALGFormat_Type();
-namespace Ailu { 
+namespace Ailu {
 enum class EALGFormat : u16;
 }
 template<>

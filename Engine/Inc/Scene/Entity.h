@@ -169,6 +169,12 @@ public:                                                                   \
             void RemoveComponent(Entity entity);
 
             template<typename T>
+            bool IsComponentEnabled(Entity entity) const;
+
+            template<typename T>
+            void SetComponentEnabled(Entity entity, bool enabled);
+
+            template<typename T>
             T *GetComponent(u64 entity);
 
             template<typename T>
@@ -204,6 +210,7 @@ public:                                                                   \
             u32 EntityNum() const;
             u64 HierarchyRevision() const;
             void TouchHierarchy();
+            bool IsEntityEnabled(Entity entity) const;
 
             // --- Deferred destruction ---
             void DeferredDestroy(Entity entity);
@@ -243,6 +250,7 @@ public:                                                                   \
             u32 _entity_num = 0u;
             u64 _hierarchy_revision = 1u;
             Vector<Signature> _entity_signatures;
+            std::unordered_map<Entity, Signature> _disabled_components;
             Vector<u32> _entity_generations;
             Queue<u32> _free_indices;
             Vector<Entity> _pending_destroy_queue;

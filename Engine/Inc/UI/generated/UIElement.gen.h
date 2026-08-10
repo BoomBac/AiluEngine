@@ -22,7 +22,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::UI::UIElement>();
 
 //Enum EVisibility begin...........................
 const Ailu::Enum* Z_Construct_Enum_EVisibility_Type();
-namespace Ailu::UI { 
+namespace Ailu::UI {
 enum class EVisibility : i32;
 }
 template<>
@@ -31,7 +31,7 @@ AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::UI::EVisibility>();
 
 //Enum EStyleInvalidation begin...........................
 const Ailu::Enum* Z_Construct_Enum_EStyleInvalidation_Type();
-namespace Ailu::UI { 
+namespace Ailu::UI {
 enum class EStyleInvalidation : u8;
 }
 template<>
@@ -40,7 +40,7 @@ AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::UI::EStyleInvalidation>();
 
 //Enum EUIElementState begin...........................
 const Ailu::Enum* Z_Construct_Enum_EUIElementState_Type();
-namespace Ailu::UI { 
+namespace Ailu::UI {
 enum class EUIElementState : u32;
 }
 template<>
@@ -49,7 +49,7 @@ AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::UI::EUIElementState>();
 
 //Enum EUIVisualState begin...........................
 const Ailu::Enum* Z_Construct_Enum_EUIVisualState_Type();
-namespace Ailu::UI { 
+namespace Ailu::UI {
 enum class EUIVisualState : i32;
 }
 template<>

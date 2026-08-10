@@ -9,6 +9,7 @@
 #include "Objects/Object.h"
 #include "Objects/SerializeSpecializations.h"
 #include "AssetCommon.h"
+#include "Scene/Component.h"
 #include "generated/AssetDocument.gen.h"
 
 namespace Ailu
@@ -123,6 +124,18 @@ namespace Ailu
         String _file;
         APROPERTY()
         String _kernel;
+    };
+
+    ACLASS()
+    class AILU_API ScriptAssetDocument : public Object
+    {
+        GENERATED_BODY()
+
+    public:
+        APROPERTY()
+        AssetDocumentHeader _header;
+        APROPERTY()
+        String _file;
     };
 
     ACLASS()
@@ -394,7 +407,9 @@ namespace Ailu
         GENERATED_BODY()
 
         APROPERTY()
-        String _script_path;
+        Guid _script_asset = Guid::EmptyGuid();
+        APROPERTY()
+        Vector<ECS::ScriptPropertyData> _properties;
     };
 
     ASTRUCT()
@@ -460,23 +475,28 @@ namespace Ailu
         inline static const String kParent = "_parent";
         inline static const String kChildrenNum = "_children_num";
         inline static const String kInvMatrixAttach = "_inv_matrix_attach";
+        inline static const String kEnabled = "_enabled";
 
         void Serialize(FArchive &ar)
         {
             SerializerWrapper<Guid>::Serialize(&_parent_guid, ar, &kParentGuid);
             SerializerWrapper<u32>::Serialize(&_sibling_index, ar, &kSiblingIndex);
             SerializerWrapper<String>::Serialize(&_inv_matrix_attach, ar, &kInvMatrixAttach);
+            SerializerWrapper<bool>::Serialize(&_enabled, ar, &kEnabled);
         }
 
         void Deserialize(FArchive &ar)
         {
             auto *json_ar = dynamic_cast<JsonArchive *>(&ar);
             const bool is_v2 = json_ar != nullptr && json_ar->HasField(kParentGuid);
+            const bool has_enabled = json_ar != nullptr && json_ar->HasField(kEnabled);
             if (is_v2)
             {
                 SerializerWrapper<Guid>::Deserialize(&_parent_guid, ar, &kParentGuid);
                 SerializerWrapper<u32>::Deserialize(&_sibling_index, ar, &kSiblingIndex);
                 SerializerWrapper<String>::Deserialize(&_inv_matrix_attach, ar, &kInvMatrixAttach);
+                if (has_enabled)
+                    SerializerWrapper<bool>::Deserialize(&_enabled, ar, &kEnabled);
             }
             else
             {
@@ -505,6 +525,7 @@ namespace Ailu
         u32 _children_num = 0u;
         APROPERTY()
         String _inv_matrix_attach;
+        bool _enabled = true;
     };
 
     ASTRUCT()
@@ -642,11 +663,13 @@ namespace Ailu
         inline static const String kSpriteRendererComponent = "_sprite_renderer_component";
         inline static const String kHasVxgiComponent = "_has_vxgi_component";
         inline static const String kVxgiComponent = "_vxgi_component";
+        inline static const String kDisabledComponents = "_disabled_components";
 
         void Serialize(FArchive &ar)
         {
             SerializerWrapper<Guid>::Serialize(&_entity_guid, ar, &kEntityGuid);
             SerializerWrapper<SceneTagComponentDocument>::Serialize(&_tag_component, ar, &kTagComponent);
+            SerializerWrapper<Vector<String>>::Serialize(&_disabled_components, ar, &kDisabledComponents);
 
             if (_has_transform_component)
                 SerializerWrapper<SceneTransformComponentDocument>::Serialize(&_transform_component, ar, &kTransformComponent);
@@ -687,6 +710,8 @@ namespace Ailu
                 SerializerWrapper<u64>::Deserialize(&_entity_id, ar, &kEntityId);
             }
             SerializerWrapper<SceneTagComponentDocument>::Deserialize(&_tag_component, ar, &kTagComponent);
+            if (json_ar != nullptr && json_ar->HasField(kDisabledComponents))
+                SerializerWrapper<Vector<String>>::Deserialize(&_disabled_components, ar, &kDisabledComponents);
 
             auto deserialize_component = [&](bool &has_component, auto &component, const String &legacy_flag_name, const String &component_name)
             {
@@ -729,6 +754,7 @@ namespace Ailu
         Guid _entity_guid;
         APROPERTY()
         SceneTagComponentDocument _tag_component;
+        Vector<String> _disabled_components;
         APROPERTY()
         bool _has_transform_component = false;
         APROPERTY()

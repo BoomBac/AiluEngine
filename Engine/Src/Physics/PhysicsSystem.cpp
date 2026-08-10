@@ -40,6 +40,9 @@ namespace Ailu
                 delta_time *= TimeMgr::s_time_scale;
                 for (auto &e: _entities)
                 {
+                    if (!r.IsEntityEnabled(e) || !r.IsComponentEnabled<CRigidBody>(e) ||
+                        !r.IsComponentEnabled<CCollider>(e))
+                        continue;
                     Intergate(r, e, delta_time);
                     ResolveCollision(r, e);
                 }
@@ -86,6 +89,8 @@ namespace Ailu
             auto transf = r.GetComponent<TransformComponent>(entity);
             if (auto c = r.GetComponent<CCollider>(entity))
             {
+                if (!r.IsComponentEnabled<CCollider>(entity))
+                    return;
                 u32 index = 0u;
                 f32 restitution = 0.6f;// 恢复系数
                 if (_collisions.contains(entity))
@@ -96,6 +101,8 @@ namespace Ailu
                 for (auto &other_c: r.View<CCollider>())
                 {
                     auto other_enrity = r.GetEntity<CCollider>(index++);
+                    if (!r.IsEntityEnabled(other_enrity) || !r.IsComponentEnabled<CCollider>(other_enrity))
+                        continue;
                     if (other_enrity == entity)
                         return;
                     else

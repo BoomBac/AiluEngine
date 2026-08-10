@@ -1,6 +1,7 @@
 #include "Widgets/AssetBrowser.h"
 #include "Audio/Audio.h"
 #include "Audio/AudioClip.h"
+#include "Assets/ScriptAsset.h"
 #include "Common/EditorPopup.h"
 #include "Common/Selection.h"
 #include "Graph/GraphAsset.h"
@@ -1181,14 +1182,14 @@ namespace Ailu
                             OpenAsset(asset);
                         };
                         _icon_content->AddChild(vb);
-                        if (asset->_asset_type == StaticClass<Render::Mesh>())
+                        if (asset->_asset_type == StaticClass<Render::Mesh>() || asset->_asset_type == ScriptAsset::StaticType())
                         {
-                            icon->OnMouseDown() += [this, icon, asset](UI::UIEvent &e)
+                            icon->OnMouseDown() += [this, icon, asset, display_name](UI::UIEvent &e)
                             {
                                 _is_dragging = false;
                                 _drag_start_pos = e._mouse_position;
                             };
-                            icon->OnMouseMove() += [this, icon, asset](UI::UIEvent &e)
+                            icon->OnMouseMove() += [this, icon, asset, display_name](UI::UIEvent &e)
                             {
                                 if (Input::IsKeyDown(EKey::kLBUTTON))
                                 {
@@ -1198,8 +1199,9 @@ namespace Ailu
                                         if (dist > kDragThreshold)
                                         {
                                             _is_dragging = true;
-                                            auto payload = DragPayload{EDragType::kMesh, asset};
-                                            DragDropManager::Get().BeginDrag(payload, "mesh");
+                                            const EDragType drag_type = asset->_asset_type == ScriptAsset::StaticType() ? EDragType::kScript : EDragType::kMesh;
+                                            auto payload = DragPayload{drag_type, asset};
+                                            DragDropManager::Get().BeginDrag(payload, display_name);
                                         }
                                     }
                                 }
@@ -1460,6 +1462,20 @@ namespace Ailu
                                                  return std::nullopt;
                                              });
             }});
+            actions.push_back({"New Script", [this, popup_pos]()
+            {
+                EditorPopup::ShowTextInputAt(popup_pos, "Create Script",
+                                             MakeUniqueEntryName(_current_path.wstring(), "NewScript", L".lua", false),
+                                             [this](const String &input) -> std::optional<String>
+                                             {
+                                                 const String name = TrimNameCopy(input);
+                                                 if (auto error = ValidateEntryName(name); error.has_value())
+                                                     return error;
+                                                 if (!CreateScriptEntry(name))
+                                                     return String("Script already exists.");
+                                                 return std::nullopt;
+                                             });
+            }});
             actions.push_back({"Refresh", [this]() { _is_dirty = true; }});
             EditorPopup::ShowActionMenuAt(popup_pos, actions);
         }
@@ -1565,6 +1581,24 @@ namespace Ailu
                                                      return error;
                                                  if (!create_input_action_asset_in_target(name))
                                                      return String("Input Action Asset already exists.");
+                                                 return std::nullopt;
+                                             });
+            }});
+            actions.push_back({"New Script", [this, popup_pos, folder_sys_path]()
+            {
+                EditorPopup::ShowTextInputAt(popup_pos, "Create Script",
+                                             MakeUniqueEntryName(folder_sys_path, "NewScript", L".lua", false),
+                                             [this, folder_sys_path](const String &input) -> std::optional<String>
+                                             {
+                                                 const String name = TrimNameCopy(input);
+                                                 if (auto error = ValidateEntryName(name); error.has_value())
+                                                     return error;
+                                                 const fs::path previous_path = _current_path;
+                                                 _current_path = folder_sys_path;
+                                                 const bool created = CreateScriptEntry(name);
+                                                 _current_path = previous_path;
+                                                 if (!created)
+                                                     return String("Script already exists.");
                                                  return std::nullopt;
                                              });
             }});
@@ -1857,6 +1891,52 @@ namespace Ailu
             return true;
         }
 
+        bool AssetBrowser::CreateScriptEntry(const String &name)
+        {
+            const String trimmed_name = TrimNameCopy(name);
+            if (trimmed_name.empty())
+                return false;
+
+            const WString lua_file_name = ToWChar(trimmed_name.c_str()) + WString(L".lua");
+            const WString asset_file_name = ToWChar(trimmed_name.c_str()) + WString(L".alasset");
+            const WString lua_asset_path = BuildCurrentAssetPath(lua_file_name);
+            const WString asset_path = BuildCurrentAssetPath(asset_file_name);
+            const WString lua_sys_path = ResourceMgr::GetResSysPath(lua_asset_path);
+            if (ResourceMgr::Get().GetAsset(asset_path) != nullptr || fs::exists(ResourceMgr::GetResSysPath(asset_path)) || fs::exists(lua_sys_path))
+                return false;
+
+            const String script_template = R"(local script = {}
+
+function script:OnInit()
+end
+
+function script:OnFixedUpdate(fixed_delta_time)
+end
+
+function script:OnUpdate(delta_time)
+end
+
+function script:OnLateUpdate(delta_time, render_alpha)
+end
+
+function script:OnDestroy()
+end
+
+function script:OnReload()
+end
+
+return script
+)";
+            if (!FileManager::WriteFile(lua_sys_path, false, script_template))
+                return false;
+            auto script_asset = MakeRef<ScriptAsset>(ToChar(lua_sys_path));
+            script_asset->Name(trimmed_name);
+            if (ResourceMgr::Get().CreateAsset(asset_path, script_asset) == nullptr)
+                return false;
+            ResourceMgr::Get().SaveAllUnsavedAssets();
+            _is_dirty = true;
+            return true;
+        }
         WString AssetBrowser::CurrentAssetDirectoryPath() const
         {
             return GetRelativeAssetDirectory(_current_path);

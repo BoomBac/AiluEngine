@@ -53,8 +53,11 @@ namespace Ailu
             i32 _order = 0;
             bool _allow_add = true;
             bool _allow_remove = true;
+            bool _is_enableable = true;
 
             std::function<bool(ECS::Register &, ECS::Entity)> _has_component;
+            std::function<bool(ECS::Register &, ECS::Entity)> _is_enabled;
+            std::function<void(ECS::Register &, ECS::Entity, bool)> _set_enabled;
             std::function<void *(ECS::Register &, ECS::Entity)> _get_component;
             std::function<void(ECS::Register &, ECS::Entity)> _add_component;
             std::function<void(ECS::Register &, ECS::Entity)> _remove_component;
@@ -67,10 +70,12 @@ namespace Ailu
             static ComponentEditorRegistry &Get();
 
             template<typename TComponent>
-            void Register(String display_name, String category = "General", i32 order = 0, bool allow_add = true, bool allow_remove = true);
+            void Register(String display_name, String category = "General", i32 order = 0, bool allow_add = true,
+                          bool allow_remove = true, bool is_enableable = true);
 
             template<typename TComponent, typename TEditor>
-            void RegisterCustom(String display_name, String category = "General", i32 order = 0, bool allow_add = true, bool allow_remove = true);
+            void RegisterCustom(String display_name, String category = "General", i32 order = 0, bool allow_add = true,
+                                bool allow_remove = true, bool is_enableable = true);
 
             const Vector<ComponentEditorInfo> &Components() const { return _components; }
             const ComponentEditorInfo *Find(ECS::ComponentTypeId component_type) const;
@@ -83,7 +88,8 @@ namespace Ailu
         };
 
         template<typename TComponent>
-        void ComponentEditorRegistry::Register(String display_name, String category, i32 order, bool allow_add, bool allow_remove)
+        void ComponentEditorRegistry::Register(String display_name, String category, i32 order, bool allow_add, bool allow_remove,
+                                               bool is_enableable)
         {
             ComponentEditorInfo info;
             info._component_type = TComponent::StaticComponentTypeId();
@@ -93,10 +99,21 @@ namespace Ailu
             info._order = order;
             info._allow_add = allow_add;
             info._allow_remove = allow_remove;
+            info._is_enableable = is_enableable;
 
             info._has_component = [](ECS::Register &registry, ECS::Entity entity)
             {
                 return registry.HasComponent<TComponent>(entity);
+            };
+
+            info._is_enabled = [](ECS::Register &registry, ECS::Entity entity)
+            {
+                return registry.IsComponentEnabled<TComponent>(entity);
+            };
+
+            info._set_enabled = [](ECS::Register &registry, ECS::Entity entity, bool enabled)
+            {
+                registry.SetComponentEnabled<TComponent>(entity, enabled);
             };
 
             info._get_component = [](ECS::Register &registry, ECS::Entity entity) -> void *
@@ -118,7 +135,8 @@ namespace Ailu
         }
 
         template<typename TComponent, typename TEditor>
-        void ComponentEditorRegistry::RegisterCustom(String display_name, String category, i32 order, bool allow_add, bool allow_remove)
+        void ComponentEditorRegistry::RegisterCustom(String display_name, String category, i32 order, bool allow_add, bool allow_remove,
+                                                     bool is_enableable)
         {
             ComponentEditorInfo info;
             info._component_type = TComponent::StaticComponentTypeId();
@@ -128,10 +146,21 @@ namespace Ailu
             info._order = order;
             info._allow_add = allow_add;
             info._allow_remove = allow_remove;
+            info._is_enableable = is_enableable;
 
             info._has_component = [](ECS::Register &registry, ECS::Entity entity)
             {
                 return registry.HasComponent<TComponent>(entity);
+            };
+
+            info._is_enabled = [](ECS::Register &registry, ECS::Entity entity)
+            {
+                return registry.IsComponentEnabled<TComponent>(entity);
+            };
+
+            info._set_enabled = [](ECS::Register &registry, ECS::Entity entity, bool enabled)
+            {
+                registry.SetComponentEnabled<TComponent>(entity, enabled);
             };
 
             info._get_component = [](ECS::Register &registry, ECS::Entity entity) -> void *

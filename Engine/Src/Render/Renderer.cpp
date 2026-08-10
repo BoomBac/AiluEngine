@@ -414,8 +414,12 @@ namespace Ailu::Render
     void Renderer::EndScene(const Scene &s)
     {
         u16 obj_index = 0;
+        u64 entity_index = 0u;
         for (auto &static_mesh: s.GetRegister().View<ECS::StaticMeshComponent>())
         {
+            const ECS::Entity entity = s.GetRegister().GetEntity<ECS::StaticMeshComponent>(entity_index++);
+            if (!s.IsEntityEnabled(entity) || !s.GetRegister().IsComponentEnabled<ECS::StaticMeshComponent>(entity))
+                continue;
             if (static_mesh._p_mesh)
             {
                 auto &aabbs = static_mesh._transformed_aabbs;
@@ -489,13 +493,18 @@ namespace Ailu::Render
 
         for (auto &static_mesh: s.GetRegister().View<ECS::StaticMeshComponent>())
         {
+            const auto entity = r.GetEntity<ECS::StaticMeshComponent>(entity_index);
+            if (!s.IsEntityEnabled(entity) || !r.IsComponentEnabled<ECS::StaticMeshComponent>(entity))
+            {
+                ++entity_index;
+                continue;
+            }
             if (static_mesh._p_mesh)
             {
                 auto &aabbs = static_mesh._transformed_aabbs;
                 Vector3f center;
                 u16 submesh_count = static_mesh._p_mesh->SubmeshCount();
                 auto &materials = static_mesh._p_mats;
-                auto entity = r.GetEntity<ECS::StaticMeshComponent>(entity_index);
                 const auto &transf_comp = r.GetComponent<ECS::StaticMeshComponent, ECS::TransformComponent>(entity_index);
                 const auto &render_world_matrix = transf_comp->GetRenderWorldMatrix();
                 auto world_to_local = MatrixInverse(render_world_matrix);
@@ -554,6 +563,12 @@ namespace Ailu::Render
         entity_index = 0u;
         for (auto &static_mesh: s.GetRegister().View<ECS::CSkeletonMesh>())
         {
+            const auto entity = r.GetEntity<ECS::CSkeletonMesh>(entity_index);
+            if (!s.IsEntityEnabled(entity) || !r.IsComponentEnabled<ECS::CSkeletonMesh>(entity))
+            {
+                ++entity_index;
+                continue;
+            }
             if (static_mesh._p_mesh)
             {
                 auto &aabbs = static_mesh._transformed_aabbs;
@@ -932,6 +947,12 @@ namespace Ailu::Render
     template<typename T>
     void static CullObject(T &comp, const ViewFrustum &vf, CullResult &cur_cam_cull_results, u16 &scene_render_obj_index, const u64 &entity_index, const Camera &cam, const Scene &s)
     {
+        using ComponentType = std::remove_cvref_t<T>;
+        const auto &registry = s.GetRegister();
+        const ECS::Entity entity = registry.GetEntity<ComponentType>(entity_index);
+        if (!s.IsEntityEnabled(entity) || !registry.IsComponentEnabled<ComponentType>(entity))
+            return;
+
         if (comp._p_mesh)
         {
             auto &aabbs = comp._transformed_aabbs;
@@ -961,7 +982,6 @@ namespace Ailu::Render
                                 cur_cam_cull_results.insert(std::make_pair(queue_id, Vector<RenderableObjectData>()));
                             }
                         }
-                        auto e = s.GetRegister().GetEntity<ECS::StaticMeshComponent>(entity_index);
                         cur_cam_cull_results[queue_id].emplace_back(RenderableObjectData{
                                 scene_render_obj_index,
                                 dis,
@@ -969,7 +989,7 @@ namespace Ailu::Render
                                 1,
                                 comp._p_mesh.get(),
                                 used_mat,
-                                &s.GetRegister().GetComponent<ECS::TransformComponent>(e)->_render_world_matrix});
+                                &registry.GetComponent<ECS::TransformComponent>(entity)->_render_world_matrix});
                     }
                 }
                 ++scene_render_obj_index;

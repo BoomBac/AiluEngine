@@ -21,7 +21,7 @@ using namespace Ailu::Render;
 namespace Ailu::SceneManagement
 {
     #pragma region Scene----------------------------------------------------------------------------
-    Scene::Scene(const String &name) : Object(name)
+    Scene::Scene(const String &name, bool create_render_resources) : Object(name)
     {
         _register.RegisterComponent<ECS::TagComponent>();
         _register.RegisterComponent<ECS::PersistentIdComponent>();
@@ -39,6 +39,9 @@ namespace Ailu::SceneManagement
         _register.RegisterComponent<ECS::SpriteRendererComponent>();
         _register.RegisterComponent<ECS::AudioSourceComponent>();
         _register.RegisterComponent<ECS::AudioListenerComponent>();
+        if (!create_render_resources)
+            return;
+
         ECS::Signature transf_sig;
         transf_sig.set(_register.GetComponentTypeID<ECS::TransformComponent>(), true);
         _register.RegisterSystem<ECS::TransformSystem>(transf_sig);
@@ -59,15 +62,23 @@ namespace Ailu::SceneManagement
         _register.RegisterOnComponentAdd<ECS::StaticMeshComponent>([](ECS::Entity entity){ RenderPipeline::Get().OnAddRenderObject(entity);
         });
         _register.RegisterOnComponentAdd<ECS::CSkeletonMesh>([](ECS::Entity entity){ RenderPipeline::Get().OnAddRenderObject(entity);});
-        BufferDesc buf_desc;
-        buf_desc._is_random_write = false;
-        buf_desc._target = EGPUBufferTarget::kStructured | EGPUBufferTarget::kConstant;
-        buf_desc._size = buf_desc._element_size * buf_desc._element_num;
-        buf_desc._element_num = 2000;
-        buf_desc._element_size = sizeof(LBVHNode);
-        buf_desc._size = buf_desc._element_size * buf_desc._element_num;
-        _tlas_buffer = GPUBuffer::Create(buf_desc);
-        _tlas_buffer->Name(std::format("{}_tlas_buffer", Name()));
+        if (create_render_resources)
+        {
+            BufferDesc buf_desc;
+            buf_desc._is_random_write = false;
+            buf_desc._target = EGPUBufferTarget::kStructured | EGPUBufferTarget::kConstant;
+            buf_desc._size = buf_desc._element_size * buf_desc._element_num;
+            buf_desc._element_num = 2000;
+            buf_desc._element_size = sizeof(LBVHNode);
+            buf_desc._size = buf_desc._element_size * buf_desc._element_num;
+            _tlas_buffer = GPUBuffer::Create(buf_desc);
+            _tlas_buffer->Name(std::format("{}_tlas_buffer", Name()));
+        }
+    }
+
+    Scene::~Scene()
+    {
+        Clear();
     }
 
     // =========================================================================
@@ -285,6 +296,41 @@ namespace Ailu::SceneManagement
         return false;
     }
 
+    bool Scene::IsEntityEnabled(ECS::Entity entity) const
+    {
+        return _register.IsEntityEnabled(entity);
+    }
+
+    void Scene::RefreshEntityEnabledInHierarchy(ECS::Entity entity, bool parent_enabled)
+    {
+        auto *hierarchy = _register.GetComponent<ECS::CHierarchy>(entity);
+        if (hierarchy == nullptr)
+            return;
+
+        hierarchy->_enabled_in_hierarchy = parent_enabled && hierarchy->_enabled;
+        ECS::Entity child = hierarchy->_first_child;
+        while (child != ECS::kInvalidEntity)
+        {
+            const auto *child_hierarchy = _register.GetComponent<ECS::CHierarchy>(child);
+            const ECS::Entity next = child_hierarchy != nullptr ? child_hierarchy->_next_sibling : ECS::kInvalidEntity;
+            RefreshEntityEnabledInHierarchy(child, hierarchy->_enabled_in_hierarchy);
+            child = next;
+        }
+    }
+
+    bool Scene::SetEntityEnabled(ECS::Entity entity, bool enabled)
+    {
+        auto *hierarchy = _register.GetComponent<ECS::CHierarchy>(entity);
+        if (hierarchy == nullptr || hierarchy->_enabled == enabled)
+            return false;
+
+        hierarchy->_enabled = enabled;
+        const bool parent_enabled = hierarchy->_parent == ECS::kInvalidEntity || IsEntityEnabled(hierarchy->_parent);
+        RefreshEntityEnabledInHierarchy(entity, parent_enabled);
+        MarkEdited();
+        return true;
+    }
+
     bool Scene::UnlinkFromParent(ECS::Entity entity)
     {
         auto *child_hier = _register.GetComponent<ECS::CHierarchy>(entity);
@@ -453,6 +499,8 @@ namespace Ailu::SceneManagement
             child_transf->_world_dirty = true;
         }
 
+        const bool parent_enabled = new_parent == ECS::kInvalidEntity || IsEntityEnabled(new_parent);
+        RefreshEntityEnabledInHierarchy(child, parent_enabled);
         TouchStructure();
         return true;
     }
@@ -698,7 +746,7 @@ namespace Ailu::SceneManagement
                 continue;
             if (auto *script_comp = _register.GetComponent<ECS::ScriptComponent>(actor))
             {
-                ScriptSystem::Get().DestroyComponent(*script_comp);
+                ScriptSystem::Get().DestroyComponent(this, actor, *script_comp);
             }
             UnregisterEntityGuid(actor);
             _register.Destory(actor);
@@ -718,6 +766,8 @@ namespace Ailu::SceneManagement
         }
         for (ECS::Entity entity : entities)
         {
+            if (auto *script_comp = _register.GetComponent<ECS::ScriptComponent>(entity))
+                ScriptSystem::Get().DestroyComponent(this, entity, *script_comp);
             UnregisterEntityGuid(entity);
             _register.Destory(entity);
         }
@@ -808,6 +858,12 @@ namespace Ailu::SceneManagement
         u32 index = 0;
         for (auto &component: reg.View<ECS::StaticMeshComponent>())
         {
+            const ECS::Entity entity = reg.GetEntity<ECS::StaticMeshComponent>(index);
+            if (!IsEntityEnabled(entity) || !reg.IsComponentEnabled<ECS::StaticMeshComponent>(entity))
+            {
+                ++index;
+                continue;
+            }
             if (component._p_mesh)
             {
                 const auto *transform = reg.GetComponent<ECS::StaticMeshComponent, ECS::TransformComponent>(index);
@@ -821,6 +877,12 @@ namespace Ailu::SceneManagement
         index = 0;
         for (auto &component: reg.View<ECS::CSkeletonMesh>())
         {
+            const ECS::Entity entity = reg.GetEntity<ECS::CSkeletonMesh>(index);
+            if (!IsEntityEnabled(entity) || !reg.IsComponentEnabled<ECS::CSkeletonMesh>(entity))
+            {
+                ++index;
+                continue;
+            }
             if (component._p_mesh)
             {
                 const auto *transform = reg.GetComponent<ECS::CSkeletonMesh, ECS::TransformComponent>(index);
@@ -838,7 +900,10 @@ namespace Ailu::SceneManagement
         u32 index = 0;
         for (auto &component: reg.View<ECS::CCamera>())
         {
+            const ECS::Entity entity = reg.GetEntity<ECS::CCamera>(index);
             auto transform = reg.GetComponent<ECS::CCamera, ECS::TransformComponent>(index++);
+            if (!IsEntityEnabled(entity) || !reg.IsComponentEnabled<ECS::CCamera>(entity))
+                continue;
             const auto &world_matrix = transform->GetWorldMatrix();
             component._camera.Position(Vector3f(world_matrix[3][0], world_matrix[3][1], world_matrix[3][2]));
             component._camera.Rotation(Quaternion::FromMat4f(world_matrix));
@@ -898,6 +963,9 @@ namespace Ailu::SceneManagement
         Vector<AABB> aabbs;
         for (auto &comp: _register.View<ECS::StaticMeshComponent>())
         {
+            const ECS::Entity entity = _register.GetEntity<ECS::StaticMeshComponent>(index++);
+            if (!IsEntityEnabled(entity) || !_register.IsComponentEnabled<ECS::StaticMeshComponent>(entity))
+                continue;
             if (comp._p_mesh)
             {
                 auto &bound_box = comp._transformed_aabbs;
@@ -929,14 +997,20 @@ namespace Ailu::SceneManagement
         u64 mesh_bvh_node_count = 0u;
         _bvh_nodes_range.clear();
         _mesh_bvh_node_triangle_offset.clear();
+        u64 entity_idx = 0u;
         for (auto& c: _register.View<ECS::StaticMeshComponent>())
         {
+            const ECS::Entity entity = _register.GetEntity<ECS::StaticMeshComponent>(entity_idx++);
+            if (!IsEntityEnabled(entity) || !_register.IsComponentEnabled<ECS::StaticMeshComponent>(entity))
+                continue;
+            if (c._p_mesh == nullptr)
+                continue;
             _triangle_count += c._p_mesh->GetTriangleCount();
             mesh_bvh_node_count += c._p_mesh->GetBVHNodes().size();
         }
         if (_triangle_count > 0)
         {
-            u64 entity_idx = 0u;
+            entity_idx = 0u;
             Vector<Render::TriangleData> triangles;
             triangles.reserve(_triangle_count);
             Vector<BVHNode> mesh_bvh_nodes;
@@ -945,6 +1019,8 @@ namespace Ailu::SceneManagement
             for (auto &c: _register.View<ECS::StaticMeshComponent>())
             {
                 auto current_entity = _register.GetEntity<ECS::StaticMeshComponent>(entity_idx++);
+                if (!IsEntityEnabled(current_entity) || !_register.IsComponentEnabled<ECS::StaticMeshComponent>(current_entity))
+                    continue;
                 auto *mesh = c._p_mesh.get();
                 if (mesh == nullptr)
                     continue;

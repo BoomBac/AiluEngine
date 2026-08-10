@@ -6,7 +6,7 @@
 #define __APPLICATION_GEN_H__
 //Enum EApplicationState begin...........................
 const Ailu::Enum* Z_Construct_Enum_EApplicationState_Type();
-namespace Ailu { 
+namespace Ailu {
 enum class EApplicationState : i32;
 }
 template<>

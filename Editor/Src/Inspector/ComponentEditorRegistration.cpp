@@ -19,7 +19,7 @@ namespace Ailu
         {
             auto &registry = ComponentEditorRegistry::Get();
 
-            registry.RegisterCustom<ECS::TransformComponent, TransformComponentEditor>("Transform", "Core", 0, false, false);
+            registry.RegisterCustom<ECS::TransformComponent, TransformComponentEditor>("Transform", "Core", 0, false, false, false);
 
             registry.RegisterCustom<ECS::ScriptComponent, ScriptComponentEditor>("Script", "Scripting", 100);
 
@@ -45,11 +45,11 @@ namespace Ailu
 
             registry.Register<ECS::AudioListenerComponent>("Audio Listener", "Audio", 410);
 
-            registry.Register<ECS::TagComponent>("Tag", "Core", 10, false, false);
+            registry.Register<ECS::TagComponent>("Tag", "Core", 10, false, false, false);
 
-            registry.RegisterCustom<ECS::PersistentIdComponent, PersistentIdComponentEditor>("Persistent ID", "Core", 20, false, false);
+            registry.RegisterCustom<ECS::PersistentIdComponent, PersistentIdComponentEditor>("Persistent ID", "Core", 20, false, false, false);
 
-            registry.Register<ECS::CHierarchy>("Hierarchy", "Core", 30, false, false);
+            registry.Register<ECS::CHierarchy>("Hierarchy", "Core", 30, false, false, false);
         }
     }// namespace Editor
 }// namespace Ailu

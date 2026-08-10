@@ -70,7 +70,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::GraphCommentData
 
 //Enum EGraphPinDirection begin...........................
 const Ailu::Enum* Z_Construct_Enum_EGraphPinDirection_Type();
-namespace Ailu { 
+namespace Ailu {
 enum class EGraphPinDirection : u8;
 }
 template<>
@@ -79,7 +79,7 @@ AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::EGraphPinDirection>();
 
 //Enum EGraphPinKind begin...........................
 const Ailu::Enum* Z_Construct_Enum_EGraphPinKind_Type();
-namespace Ailu { 
+namespace Ailu {
 enum class EGraphPinKind : u8;
 }
 template<>
@@ -88,7 +88,7 @@ AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::EGraphPinKind>();
 
 //Enum EGraphNodeFlag begin...........................
 const Ailu::Enum* Z_Construct_Enum_EGraphNodeFlag_Type();
-namespace Ailu { 
+namespace Ailu {
 enum class EGraphNodeFlag : u32;
 }
 template<>
@@ -97,7 +97,7 @@ AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::EGraphNodeFlag>();
 
 //Enum EGraphLinkFlag begin...........................
 const Ailu::Enum* Z_Construct_Enum_EGraphLinkFlag_Type();
-namespace Ailu { 
+namespace Ailu {
 enum class EGraphLinkFlag : u32;
 }
 template<>

@@ -6,7 +6,7 @@
 #define __THREADPOOL_GEN_H__
 //Enum EThreadStatus begin...........................
 const Ailu::Enum* Z_Construct_Enum_EThreadStatus_Type();
-namespace Ailu::Core { 
+namespace Ailu::Core {
 enum class EThreadStatus : i32;
 }
 template<>

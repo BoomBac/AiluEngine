@@ -70,7 +70,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::Padding>();
 
 //Enum EAlignment begin...........................
 const Ailu::Enum* Z_Construct_Enum_EAlignment_Type();
-namespace Ailu::UI { 
+namespace Ailu::UI {
 enum class EAlignment : i32;
 }
 template<>
@@ -79,7 +79,7 @@ AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::UI::EAlignment>();
 
 //Enum ESizePolicy begin...........................
 const Ailu::Enum* Z_Construct_Enum_ESizePolicy_Type();
-namespace Ailu::UI { 
+namespace Ailu::UI {
 enum class ESizePolicy : i32;
 }
 template<>

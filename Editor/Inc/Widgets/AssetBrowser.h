@@ -62,6 +62,7 @@ namespace Ailu
             bool CreateMaterialEntry(const String &name, Render::Shader *shader);
             bool CreateInputActionAssetEntry(const String &name);
             bool CreateFlowGraphEntry(const String &name);
+            bool CreateScriptEntry(const String &name);
             WString CurrentAssetDirectoryPath() const;
             WString BuildCurrentAssetPath(const WString &file_name) const;
             Vector<Asset *> CollectAssetsUnderDirectory(const WString &directory_asset_path) const;

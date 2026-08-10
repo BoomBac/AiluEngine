@@ -6,6 +6,230 @@
 #include <Objects/SerializeSpecializations.h>
 #include <Framework/Common/Log.h>
 using namespace Ailu;
+const Ailu::Type* Ailu::ECS::Z_Construct_ScriptPropertyData_Type()
+{
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "ScriptPropertyData";
+initializer._size = sizeof(Ailu::ECS::ScriptPropertyData);
+initializer._full_name = "Ailu::ECS::ScriptPropertyData";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu::ECS";
+initializer._base_name = "";
+initializer._constructor = []()->Ailu::ECS::ScriptPropertyData* {return new Ailu::ECS::ScriptPropertyData;};
+Meta meta_name;
+meta_name.Set("Category","");
+meta_name.Set("IsColor",false);
+meta_name.Set("IsRange",false);
+meta_name.Set("IsFloatRange",true);
+meta_name.Set("RangeMin",(f32)0);
+meta_name.Set("RangeMax",(f32)1);
+MemberBuilder builder_name;
+builder_name._name = "_name";
+builder_name._type_name = "String";
+builder_name._offset = offsetof(ScriptPropertyData,_name);
+builder_name._is_const = false;
+builder_name._is_static = false;
+builder_name._is_public = false;
+builder_name._is_pointer = false;
+builder_name._is_ref = false;
+builder_name._is_template = false;
+builder_name._meta = meta_name;
+builder_name._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<String>);
+builder_name._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<String>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_name));
+Meta meta_type;
+meta_type.Set("Category","");
+meta_type.Set("IsColor",false);
+meta_type.Set("IsRange",false);
+meta_type.Set("IsFloatRange",true);
+meta_type.Set("RangeMin",(f32)0);
+meta_type.Set("RangeMax",(f32)1);
+MemberBuilder builder_type;
+builder_type._name = "_type";
+builder_type._type_name = "Ailu::ECS::EScriptPropertyType";
+builder_type._offset = offsetof(ScriptPropertyData,_type);
+builder_type._is_const = false;
+builder_type._is_static = false;
+builder_type._is_public = false;
+builder_type._is_pointer = false;
+builder_type._is_ref = false;
+builder_type._is_template = false;
+builder_type._meta = meta_type;
+builder_type._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<EScriptPropertyType>);
+builder_type._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<EScriptPropertyType>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_type));
+Meta meta_bool_value;
+meta_bool_value.Set("Category","");
+meta_bool_value.Set("IsColor",false);
+meta_bool_value.Set("IsRange",false);
+meta_bool_value.Set("IsFloatRange",true);
+meta_bool_value.Set("RangeMin",(f32)0);
+meta_bool_value.Set("RangeMax",(f32)1);
+MemberBuilder builder_bool_value;
+builder_bool_value._name = "_bool_value";
+builder_bool_value._type_name = "bool";
+builder_bool_value._offset = offsetof(ScriptPropertyData,_bool_value);
+builder_bool_value._is_const = false;
+builder_bool_value._is_static = false;
+builder_bool_value._is_public = false;
+builder_bool_value._is_pointer = false;
+builder_bool_value._is_ref = false;
+builder_bool_value._is_template = false;
+builder_bool_value._meta = meta_bool_value;
+builder_bool_value._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_bool_value._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_bool_value));
+Meta meta_int_value;
+meta_int_value.Set("Category","");
+meta_int_value.Set("IsColor",false);
+meta_int_value.Set("IsRange",false);
+meta_int_value.Set("IsFloatRange",true);
+meta_int_value.Set("RangeMin",(f32)0);
+meta_int_value.Set("RangeMax",(f32)1);
+MemberBuilder builder_int_value;
+builder_int_value._name = "_int_value";
+builder_int_value._type_name = "i32";
+builder_int_value._offset = offsetof(ScriptPropertyData,_int_value);
+builder_int_value._is_const = false;
+builder_int_value._is_static = false;
+builder_int_value._is_public = false;
+builder_int_value._is_pointer = false;
+builder_int_value._is_ref = false;
+builder_int_value._is_template = false;
+builder_int_value._meta = meta_int_value;
+builder_int_value._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<i32>);
+builder_int_value._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<i32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_int_value));
+Meta meta_float_value;
+meta_float_value.Set("Category","");
+meta_float_value.Set("IsColor",false);
+meta_float_value.Set("IsRange",false);
+meta_float_value.Set("IsFloatRange",true);
+meta_float_value.Set("RangeMin",(f32)0);
+meta_float_value.Set("RangeMax",(f32)1);
+MemberBuilder builder_float_value;
+builder_float_value._name = "_float_value";
+builder_float_value._type_name = "f32";
+builder_float_value._offset = offsetof(ScriptPropertyData,_float_value);
+builder_float_value._is_const = false;
+builder_float_value._is_static = false;
+builder_float_value._is_public = false;
+builder_float_value._is_pointer = false;
+builder_float_value._is_ref = false;
+builder_float_value._is_template = false;
+builder_float_value._meta = meta_float_value;
+builder_float_value._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_float_value._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_float_value));
+Meta meta_string_value;
+meta_string_value.Set("Category","");
+meta_string_value.Set("IsColor",false);
+meta_string_value.Set("IsRange",false);
+meta_string_value.Set("IsFloatRange",true);
+meta_string_value.Set("RangeMin",(f32)0);
+meta_string_value.Set("RangeMax",(f32)1);
+MemberBuilder builder_string_value;
+builder_string_value._name = "_string_value";
+builder_string_value._type_name = "String";
+builder_string_value._offset = offsetof(ScriptPropertyData,_string_value);
+builder_string_value._is_const = false;
+builder_string_value._is_static = false;
+builder_string_value._is_public = false;
+builder_string_value._is_pointer = false;
+builder_string_value._is_ref = false;
+builder_string_value._is_template = false;
+builder_string_value._meta = meta_string_value;
+builder_string_value._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<String>);
+builder_string_value._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<String>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_string_value));
+Meta meta_vector_value;
+meta_vector_value.Set("Category","");
+meta_vector_value.Set("IsColor",false);
+meta_vector_value.Set("IsRange",false);
+meta_vector_value.Set("IsFloatRange",true);
+meta_vector_value.Set("RangeMin",(f32)0);
+meta_vector_value.Set("RangeMax",(f32)1);
+MemberBuilder builder_vector_value;
+builder_vector_value._name = "_vector_value";
+builder_vector_value._type_name = "Vector4f";
+builder_vector_value._offset = offsetof(ScriptPropertyData,_vector_value);
+builder_vector_value._is_const = false;
+builder_vector_value._is_static = false;
+builder_vector_value._is_public = false;
+builder_vector_value._is_pointer = false;
+builder_vector_value._is_ref = false;
+builder_vector_value._is_template = false;
+builder_vector_value._meta = meta_vector_value;
+builder_vector_value._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector4f>);
+builder_vector_value._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector4f>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_vector_value));
+Meta meta_guid_value;
+meta_guid_value.Set("Category","");
+meta_guid_value.Set("IsColor",false);
+meta_guid_value.Set("IsRange",false);
+meta_guid_value.Set("IsFloatRange",true);
+meta_guid_value.Set("RangeMin",(f32)0);
+meta_guid_value.Set("RangeMax",(f32)1);
+MemberBuilder builder_guid_value;
+builder_guid_value._name = "_guid_value";
+builder_guid_value._type_name = "Ailu::Guid";
+builder_guid_value._offset = offsetof(ScriptPropertyData,_guid_value);
+builder_guid_value._is_const = false;
+builder_guid_value._is_static = false;
+builder_guid_value._is_public = false;
+builder_guid_value._is_pointer = false;
+builder_guid_value._is_ref = false;
+builder_guid_value._is_template = false;
+builder_guid_value._meta = meta_guid_value;
+builder_guid_value._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Guid>);
+builder_guid_value._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Guid>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_guid_value));
+Meta meta_is_orphan;
+meta_is_orphan.Set("Category","");
+meta_is_orphan.Set("IsColor",false);
+meta_is_orphan.Set("IsRange",false);
+meta_is_orphan.Set("IsFloatRange",true);
+meta_is_orphan.Set("RangeMin",(f32)0);
+meta_is_orphan.Set("RangeMax",(f32)1);
+MemberBuilder builder_is_orphan;
+builder_is_orphan._name = "_is_orphan";
+builder_is_orphan._type_name = "bool";
+builder_is_orphan._offset = offsetof(ScriptPropertyData,_is_orphan);
+builder_is_orphan._is_const = false;
+builder_is_orphan._is_static = false;
+builder_is_orphan._is_public = false;
+builder_is_orphan._is_pointer = false;
+builder_is_orphan._is_ref = false;
+builder_is_orphan._is_template = false;
+builder_is_orphan._meta = meta_is_orphan;
+builder_is_orphan._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_is_orphan._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_is_orphan));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+const Ailu::Type* Ailu::ECS::ScriptPropertyData::GetPrivateStaticClass()
+{
+	static const Ailu::Type* type = Z_Construct_ScriptPropertyData_Type();
+	return type;
+}
+
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::ECS::ScriptPropertyData>()
+{
+return Ailu::ECS::ScriptPropertyData::StaticType();
+}
+    const Type *Ailu::ECS::ScriptPropertyData::GetType()
+{
+return Ailu::ECS::ScriptPropertyData::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_ScriptPropertyData(&Ailu::ECS::ScriptPropertyData::StaticType, "Ailu::ECS::ScriptPropertyData");
 static std::unique_ptr<Ailu::Enum> s_enum_type_EMotionVectorType = nullptr;
 //Enum EMotionVectorType begin...........................
 const Ailu::Enum* Z_Construct_Enum_EMotionVectorType_Type()
@@ -30,6 +254,38 @@ template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::ECS::EMotionVectorType>()
 return s_enum_type_EMotionVectorType.get();
 }
 //Enum EMotionVectorType end...........................
+
+static std::unique_ptr<Ailu::Enum> s_enum_type_EScriptPropertyType = nullptr;
+//Enum EScriptPropertyType begin...........................
+const Ailu::Enum* Z_Construct_Enum_EScriptPropertyType_Type()
+{
+if(s_enum_type_EScriptPropertyType == nullptr)
+{
+EnumInitializer initializer;
+initializer._name = "EScriptPropertyType";
+initializer._namespace = "Ailu::ECS";
+initializer._full_name = "Ailu::ECS::EScriptPropertyType";
+initializer._str_to_enum_lut["kBool"] = 0;
+initializer._str_to_enum_lut["kInt"] = 1;
+initializer._str_to_enum_lut["kFloat"] = 2;
+initializer._str_to_enum_lut["kString"] = 3;
+initializer._str_to_enum_lut["kVector2"] = 4;
+initializer._str_to_enum_lut["kVector3"] = 5;
+initializer._str_to_enum_lut["kVector4"] = 6;
+initializer._str_to_enum_lut["kColor"] = 7;
+initializer._str_to_enum_lut["kEntity"] = 8;
+initializer._str_to_enum_lut["kAsset"] = 9;
+s_enum_type_EScriptPropertyType = std::make_unique<Ailu::Enum>(initializer);
+Ailu::Enum::RegisterEnum(s_enum_type_EScriptPropertyType.get());
+}
+return s_enum_type_EScriptPropertyType.get();
+}
+static Ailu::EnumTypeRegister g_register_EScriptPropertyType(Z_Construct_Enum_EScriptPropertyType_Type);
+template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::ECS::EScriptPropertyType>()
+{
+return s_enum_type_EScriptPropertyType.get();
+}
+//Enum EScriptPropertyType end...........................
 
 static std::unique_ptr<Ailu::Enum> s_enum_type_ELightType = nullptr;
 //Enum ELightType begin...........................

@@ -6,7 +6,7 @@
 #define __DRAGDROP_GEN_H__
 //Enum EDragType begin...........................
 const Ailu::Enum* Z_Construct_Enum_EDragType_Type();
-namespace Ailu::UI { 
+namespace Ailu::UI {
 enum class EDragType : u32;
 }
 template<>

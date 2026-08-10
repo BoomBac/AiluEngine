@@ -50,7 +50,6 @@ namespace Ailu
             Ref<UI::Widget> _status_bar_widget = nullptr;
             UI::Border *_toolbar_border = nullptr;
             UI::Border *_status_bar_border = nullptr;
-            bool _was_playing = false;
             UI::Text *_status_left_text = nullptr;
             UI::Text *_status_right_text = nullptr;
             String _editor_status_message = "Ready";

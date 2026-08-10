@@ -20,12 +20,6 @@
 #include "Render/Mesh.h"
 #include "Render/2D/SpriteRenderData.h"
 
-#include <optional>
-
-#if AILU_ENABLE_LUA_SCRIPTING
-#include <sol/sol.hpp>
-#endif
-
 #include "generated/Component.gen.h"
 
 using Ailu::Render::Camera;
@@ -257,44 +251,54 @@ public:                                                                 \
             }
         };
 
+        AENUM()
+        enum class EScriptPropertyType : u8
+        {
+            kBool,
+            kInt,
+            kFloat,
+            kString,
+            kVector2,
+            kVector3,
+            kVector4,
+            kColor,
+            kEntity,
+            kAsset
+        };
+
+        ASTRUCT()
+        struct AILU_API ScriptPropertyData
+        {
+            GENERATED_BODY()
+
+            APROPERTY()
+            String _name;
+            APROPERTY()
+            EScriptPropertyType _type = EScriptPropertyType::kFloat;
+            APROPERTY()
+            bool _bool_value = false;
+            APROPERTY()
+            i32 _int_value = 0;
+            APROPERTY()
+            f32 _float_value = 0.0f;
+            APROPERTY()
+            String _string_value;
+            APROPERTY()
+            Vector4f _vector_value = Vector4f::kZero;
+            APROPERTY()
+            Guid _guid_value = Guid::EmptyGuid();
+            APROPERTY()
+            bool _is_orphan = false;
+        };
+
         struct AILU_API ScriptComponent
         {
             DECLARE_COMPONENT(ScriptComponent, "Ailu.ECS.ScriptComponent")
-            String _script_path;
-            bool _is_initialized = false;
-            String _resolved_script_path;
-            u32 _loaded_script_version = 0u;
-#if AILU_ENABLE_LUA_SCRIPTING
-            std::optional<sol::table> _instance;
-#endif
+            Guid _script_asset = Guid::EmptyGuid();
+            Vector<ScriptPropertyData> _properties;
 
             ScriptComponent() = default;
-            explicit ScriptComponent(String script_path) : _script_path(std::move(script_path)) {}
-            ScriptComponent(const ScriptComponent &other)
-                : _script_path(other._script_path)
-            {
-            }
-            ScriptComponent &operator=(const ScriptComponent &other)
-            {
-                if (this != &other)
-                {
-                    _script_path = other._script_path;
-                    ResetRuntime();
-                }
-                return *this;
-            }
-            ScriptComponent(ScriptComponent &&other) noexcept = default;
-            ScriptComponent &operator=(ScriptComponent &&other) noexcept = default;
-
-            void ResetRuntime()
-            {
-                _is_initialized = false;
-                _resolved_script_path.clear();
-                _loaded_script_version = 0u;
-#if AILU_ENABLE_LUA_SCRIPTING
-                _instance.reset();
-#endif
-            }
+            explicit ScriptComponent(Guid script_asset) : _script_asset(std::move(script_asset)) {}
         };
 
         struct LightData
@@ -377,6 +381,8 @@ public:                                                                 \
             ECS::Entity _parent = ECS::kInvalidEntity;
             u32 _children_num = 0;
             Matrix4x4f _inv_matrix_attach;
+            bool _enabled = true;
+            bool _enabled_in_hierarchy = true;
         };
 
         struct AILU_API CLightProbe
@@ -485,7 +491,6 @@ public:                                                                 \
         struct AILU_API AudioListenerComponent
         {
             DECLARE_COMPONENT(AudioListenerComponent, "Ailu.ECS.AudioListenerComponent")
-            bool _enabled = true;
         };
     }// namespace ECS
 };// namespace Ailu

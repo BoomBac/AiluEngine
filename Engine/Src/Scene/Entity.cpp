@@ -228,6 +228,7 @@ namespace Ailu
                 if (_systems[i])
                     _systems[i]->_entities.erase(entity);
             }
+            _disabled_components.erase(entity);
             MarkSystemScheduleDirty();
 
             // Bump generation so old handles become stale
@@ -297,6 +298,11 @@ namespace Ailu
         }
         u64 Register::HierarchyRevision() const { return _hierarchy_revision; }
         void Register::TouchHierarchy() { ++_hierarchy_revision; }
+        bool Register::IsEntityEnabled(Entity entity) const
+        {
+            const auto *hierarchy = GetComponent<CHierarchy>(entity);
+            return hierarchy != nullptr && hierarchy->_enabled_in_hierarchy;
+        }
         void Register::MarkSystemScheduleDirty() { _system_schedule_dirty = true; }
 
         // ---------------------------------------------------------------------------

@@ -38,7 +38,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UITableStyle
 
 //Enum EUITableStyleOverride begin...........................
 const Ailu::Enum* Z_Construct_Enum_EUITableStyleOverride_Type();
-namespace Ailu::UI { 
+namespace Ailu::UI {
 enum class EUITableStyleOverride : u32;
 }
 template<>

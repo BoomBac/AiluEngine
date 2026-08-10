@@ -2,6 +2,7 @@
 #include "Animation/Clip.h"
 #include "Animation/TransformTrack.h"
 #include "Assets/AssetDocument.h"
+#include "Assets/ScriptAsset.h"
 #include "Audio/AudioClip.h"
 #include "Audio/AudioClipDocument.h"
 #include "Framework/Common/FileManager.h"
@@ -38,6 +39,55 @@ namespace Ailu
 {
 using namespace Render;
 using namespace SceneManagement;
+
+namespace
+{
+    WString ResolveExternalAssetPath(const WString &asset_path, const WString &stored_external_path);
+    WString MakeStoredExternalAssetPath(const WString &external_asset_path);
+}
+
+template<typename TDocument>
+bool SaveAssetDocument(const WString &sys_path, TDocument &document);
+template<typename TDocument>
+bool LoadAssetDocument(const WString &sys_path, TDocument &document);
+AssetDocumentHeader MakeAssetDocumentHeader(const Asset *asset);
+
+// ============================================================
+// ScriptAssetHandler
+// ============================================================
+
+const Type *ScriptAssetHandler::AssetType() const
+{
+    return ScriptAsset::StaticType();
+}
+
+Scope<Asset> ScriptAssetHandler::Load(const AssetLoadContext &context)
+{
+    ScriptAssetDocument document;
+    if (!LoadAssetDocument(context._system_path, document))
+        return nullptr;
+
+    const WString source_file = ResolveExternalAssetPath(context._asset_path, ToWChar(document._file));
+    const EAssetDomain asset_domain = context._resource_mgr->GetAssetPathDomain(context._asset_path);
+    auto script_asset = MakeRef<ScriptAsset>(ToChar(ResourceMgr::NormalizeAssetPath(source_file, asset_domain)));
+    script_asset->Name(document._header._asset_name);
+    auto asset = MakeScope<Asset>(Guid(document._header._guid), ScriptAsset::StaticType(), context._asset_path);
+    asset->_p_obj = script_asset;
+    asset->_domain = context._resource_mgr->GetAssetPathDomain(asset->_asset_path);
+    return asset;
+}
+
+bool ScriptAssetHandler::Save(const AssetSaveContext &context)
+{
+    const ScriptAsset *script_asset = context._asset->As<ScriptAsset>();
+    if (script_asset == nullptr)
+        return false;
+
+    ScriptAssetDocument document;
+    document._header = MakeAssetDocumentHeader(context._asset);
+    document._file = ToChar(PathUtils::GetFileName(ToWChar(script_asset->SourceFile()), true));
+    return SaveAssetDocument(context._system_path, document);
+}
 
 // ============================================================
 // Helper function templates (implementations)
@@ -1126,6 +1176,12 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
         }
     };
 
+    auto is_component_disabled = [](const SceneEntityDocument &entity_doc, StringView component_name)
+    {
+        return std::find(entity_doc._disabled_components.begin(), entity_doc._disabled_components.end(), component_name) !=
+               entity_doc._disabled_components.end();
+    };
+
     // Second pass: add all other components
     for (u32 doc_index = 0u; doc_index < doc._entities.size(); ++doc_index)
     {
@@ -1145,12 +1201,14 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
         if (entity_doc._has_script_component)
         {
             auto &component = reg.AddComponent<ECS::ScriptComponent>(entity);
-            component._script_path = entity_doc._script_component._script_path;
-            component.ResetRuntime();
+            reg.SetComponentEnabled<ECS::ScriptComponent>(entity, !is_component_disabled(entity_doc, "ScriptComponent"));
+            component._script_asset = entity_doc._script_component._script_asset;
+            component._properties = entity_doc._script_component._properties;
         }
         if (entity_doc._has_static_mesh_component)
         {
             auto &component = reg.AddComponent<ECS::StaticMeshComponent>(entity);
+            reg.SetComponentEnabled<ECS::StaticMeshComponent>(entity, !is_component_disabled(entity_doc, "StaticMeshComponent"));
             if (!entity_doc._static_mesh_component._mesh_guid.empty())
             {
                 const Guid mesh_guid(entity_doc._static_mesh_component._mesh_guid);
@@ -1166,6 +1224,7 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
         if (entity_doc._has_light_component)
         {
             auto &component = reg.AddComponent<ECS::LightComponent>(entity);
+            reg.SetComponentEnabled<ECS::LightComponent>(entity, !is_component_disabled(entity_doc, "LightComponent"));
             if (!entity_doc._light_component._type.empty())
                 if (const Enum *enum_type = StaticEnum<ECS::ELightType>())
                 {
@@ -1183,6 +1242,7 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
         if (entity_doc._has_camera_component)
         {
             auto &component = reg.AddComponent<ECS::CCamera>(entity);
+            reg.SetComponentEnabled<ECS::CCamera>(entity, !is_component_disabled(entity_doc, "CCamera"));
             if (!entity_doc._camera_component._type.empty())
                 component._camera.Type(CameraTypeFromString(entity_doc._camera_component._type));
             component._camera.Aspect(entity_doc._camera_component._aspect);
@@ -1196,6 +1256,7 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
         if (entity_doc._has_lightprobe_component)
         {
             auto &component = reg.AddComponent<ECS::CLightProbe>(entity);
+            reg.SetComponentEnabled<ECS::CLightProbe>(entity, !is_component_disabled(entity_doc, "CLightProbe"));
             component._size = entity_doc._lightprobe_component._size;
             component._is_update_every_tick = entity_doc._lightprobe_component._is_update_every_tick;
             component._is_dirty = true;
@@ -1203,11 +1264,13 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
         if (entity_doc._has_rigidbody_component)
         {
             auto &component = reg.AddComponent<ECS::CRigidBody>(entity);
+            reg.SetComponentEnabled<ECS::CRigidBody>(entity, !is_component_disabled(entity_doc, "CRigidBody"));
             component._mass = entity_doc._rigidbody_component._mass;
         }
         if (entity_doc._has_collider_component)
         {
             auto &component = reg.AddComponent<ECS::CCollider>(entity);
+            reg.SetComponentEnabled<ECS::CCollider>(entity, !is_component_disabled(entity_doc, "CCollider"));
             if (!entity_doc._collider_component._type.empty())
                     if (const Enum *enum_type = StaticEnum<ECS::EColliderType>())
                     {
@@ -1222,6 +1285,7 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
         if (entity_doc._has_skeleton_mesh_component)
         {
             auto &component = reg.AddComponent<ECS::CSkeletonMesh>(entity);
+            reg.SetComponentEnabled<ECS::CSkeletonMesh>(entity, !is_component_disabled(entity_doc, "CSkeletonMesh"));
             if (!entity_doc._skeleton_mesh_component._mesh_guid.empty())
             {
                 const Guid mesh_guid(entity_doc._skeleton_mesh_component._mesh_guid);
@@ -1243,12 +1307,15 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
         if (entity_doc._has_vxgi_component)
         {
             auto &component = reg.AddComponent<ECS::CVXGI>(entity);
+            reg.SetComponentEnabled<ECS::CVXGI>(entity, !is_component_disabled(entity_doc, "CVXGI"));
             component._grid_num = entity_doc._vxgi_component._grid_num;
             component._distance = entity_doc._vxgi_component._distance;
         }
         if (entity_doc._has_sprite_renderer_component)
         {
             auto &component = reg.AddComponent<ECS::SpriteRendererComponent>(entity);
+            reg.SetComponentEnabled<ECS::SpriteRendererComponent>(entity,
+                                                                  !is_component_disabled(entity_doc, "SpriteRendererComponent"));
             if (!entity_doc._sprite_renderer_component._sprite_guid.empty())
             {
                 const Guid sprite_guid(entity_doc._sprite_renderer_component._sprite_guid);
@@ -1385,6 +1452,13 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
             reparent_intent(intent->entity, parent, *intent->_doc);
     }
 
+    for (u32 doc_index = 0u; doc_index < doc._entities.size(); ++doc_index)
+    {
+        const auto &entity_doc = doc._entities[doc_index];
+        if (entity_doc._has_hierarchy_component && !entity_doc._hierarchy_component._enabled)
+            loaded_scene->SetEntityEnabled(created_entities[doc_index], false);
+    }
+
     // V1 迁移只在内存中升级，标记 Dirty 使下一次保存自动转为 V2。
     if (!is_v2)
         loaded_scene->MarkDirty();
@@ -1460,17 +1534,21 @@ bool SceneAssetHandler::Save(const AssetSaveContext &context)
         if (const auto *script = reg.GetComponent<ECS::ScriptComponent>(entity); script != nullptr)
         {
             entity_doc._has_script_component = true;
-            entity_doc._script_component._script_path = script->_script_path;
+            if (!reg.IsComponentEnabled<ECS::ScriptComponent>(entity)) entity_doc._disabled_components.emplace_back("ScriptComponent");
+            entity_doc._script_component._script_asset = script->_script_asset;
+            entity_doc._script_component._properties = script->_properties;
         }
         if (const auto *static_mesh = reg.GetComponent<ECS::StaticMeshComponent>(entity); static_mesh != nullptr)
         {
             entity_doc._has_static_mesh_component = true;
+            if (!reg.IsComponentEnabled<ECS::StaticMeshComponent>(entity)) entity_doc._disabled_components.emplace_back("StaticMeshComponent");
             entity_doc._static_mesh_component._mesh_guid = GetLinkedAssetGuidString(static_mesh->_p_mesh.get());
             FillMaterialGuidList(static_mesh->_p_mats, entity_doc._static_mesh_component._material_guids);
         }
         if (const auto *light = reg.GetComponent<ECS::LightComponent>(entity); light != nullptr)
         {
             entity_doc._has_light_component = true;
+            if (!reg.IsComponentEnabled<ECS::LightComponent>(entity)) entity_doc._disabled_components.emplace_back("LightComponent");
             if (const Enum *enum_type = StaticEnum<ECS::ELightType>())
                 entity_doc._light_component._type = enum_type->GetNameByEnum(light->_type);
             entity_doc._light_component._light._light_color = light->_light._light_color;
@@ -1483,6 +1561,7 @@ bool SceneAssetHandler::Save(const AssetSaveContext &context)
         if (const auto *hierarchy = reg.GetComponent<ECS::CHierarchy>(entity); hierarchy != nullptr)
         {
             entity_doc._has_hierarchy_component = true;
+            entity_doc._hierarchy_component._enabled = hierarchy->_enabled;
             entity_doc._hierarchy_component._parent_guid = scene->GetEntityGuid(hierarchy->_parent);
             const auto sibling_it = entity_sibling_index.find(entity);
             entity_doc._hierarchy_component._sibling_index = sibling_it != entity_sibling_index.end() ? sibling_it->second : 0u;
@@ -1491,6 +1570,7 @@ bool SceneAssetHandler::Save(const AssetSaveContext &context)
         if (const auto *camera = reg.GetComponent<ECS::CCamera>(entity); camera != nullptr)
         {
             entity_doc._has_camera_component = true;
+            if (!reg.IsComponentEnabled<ECS::CCamera>(entity)) entity_doc._disabled_components.emplace_back("CCamera");
             entity_doc._camera_component._type = CameraTypeToString(camera->_camera.Type());
             entity_doc._camera_component._aspect = camera->_camera.Aspect();
             entity_doc._camera_component._far_clip = camera->_camera.Far();
@@ -1501,17 +1581,20 @@ bool SceneAssetHandler::Save(const AssetSaveContext &context)
         if (const auto *lightprobe = reg.GetComponent<ECS::CLightProbe>(entity); lightprobe != nullptr)
         {
             entity_doc._has_lightprobe_component = true;
+            if (!reg.IsComponentEnabled<ECS::CLightProbe>(entity)) entity_doc._disabled_components.emplace_back("CLightProbe");
             entity_doc._lightprobe_component._size = lightprobe->_size;
             entity_doc._lightprobe_component._is_update_every_tick = lightprobe->_is_update_every_tick;
         }
         if (const auto *rigidbody = reg.GetComponent<ECS::CRigidBody>(entity); rigidbody != nullptr)
         {
             entity_doc._has_rigidbody_component = true;
+            if (!reg.IsComponentEnabled<ECS::CRigidBody>(entity)) entity_doc._disabled_components.emplace_back("CRigidBody");
             entity_doc._rigidbody_component._mass = rigidbody->_mass;
         }
         if (const auto *collider = reg.GetComponent<ECS::CCollider>(entity); collider != nullptr)
         {
             entity_doc._has_collider_component = true;
+            if (!reg.IsComponentEnabled<ECS::CCollider>(entity)) entity_doc._disabled_components.emplace_back("CCollider");
             if (const Enum *enum_type = StaticEnum<ECS::EColliderType>())
                 entity_doc._collider_component._type = enum_type->GetNameByEnum(collider->_type);
             entity_doc._collider_component._is_trigger = collider->_is_trigger;
@@ -1521,6 +1604,7 @@ bool SceneAssetHandler::Save(const AssetSaveContext &context)
         if (const auto *skeleton_mesh = reg.GetComponent<ECS::CSkeletonMesh>(entity); skeleton_mesh != nullptr)
         {
             entity_doc._has_skeleton_mesh_component = true;
+            if (!reg.IsComponentEnabled<ECS::CSkeletonMesh>(entity)) entity_doc._disabled_components.emplace_back("CSkeletonMesh");
             entity_doc._skeleton_mesh_component._mesh_guid = GetLinkedAssetGuidString(skeleton_mesh->_p_mesh.get());
             FillMaterialGuidList(skeleton_mesh->_p_mats, entity_doc._skeleton_mesh_component._material_guids);
             entity_doc._skeleton_mesh_component._anim_clip_guid = GetLinkedAssetGuidString(skeleton_mesh->_anim_clip.get());
@@ -1528,12 +1612,14 @@ bool SceneAssetHandler::Save(const AssetSaveContext &context)
         if (const auto *vxgi = reg.GetComponent<ECS::CVXGI>(entity); vxgi != nullptr)
         {
             entity_doc._has_vxgi_component = true;
+            if (!reg.IsComponentEnabled<ECS::CVXGI>(entity)) entity_doc._disabled_components.emplace_back("CVXGI");
             entity_doc._vxgi_component._grid_num = vxgi->_grid_num;
             entity_doc._vxgi_component._distance = vxgi->_distance;
         }
         if (const auto *sprite = reg.GetComponent<ECS::SpriteRendererComponent>(entity); sprite != nullptr)
         {
             entity_doc._has_sprite_renderer_component = true;
+            if (!reg.IsComponentEnabled<ECS::SpriteRendererComponent>(entity)) entity_doc._disabled_components.emplace_back("SpriteRendererComponent");
             entity_doc._sprite_renderer_component._sprite_guid = GetLinkedAssetGuidString(sprite->_sprite);
             entity_doc._sprite_renderer_component._material_guid = GetLinkedAssetGuidString(sprite->_material.get());
             entity_doc._sprite_renderer_component._color = Vector4f(sprite->_color.r, sprite->_color.g, sprite->_color.b, sprite->_color.a);

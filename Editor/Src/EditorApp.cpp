@@ -344,6 +344,7 @@ namespace Ailu
             _file_watch_service.AddDirectory(ResourceMgr::EngineResRootPath() + EnginePath::kEngineShaderPathW);
             _file_watch_service.AddDirectory(ResourceMgr::EngineResRootPath() + EnginePath::kEngineTexturePathW);
             _file_watch_service.AddDirectory(ResourceMgr::EngineResRootPath() + EnginePath::kEngineScriptPathW);
+            _file_watch_service.AddDirectory(ResourceMgr::ProjectRootPath() + L"/Assets");
             _file_watch_service.AddDirectory(s_editor_root_path + L"/Res/UI/");
             _file_watch_service.AddFile(s_editor_root_path + L"/EngineConfig.json");
             _file_watch_service.Snapshot();

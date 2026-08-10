@@ -71,9 +71,13 @@ namespace Ailu
             {
                 for (auto &comp: r.View<CLightProbe>())
                 {
+                    const u32 probe_index = index++;
+                    const Entity entity = r.GetEntity<CLightProbe>(probe_index);
+                    if (!r.IsEntityEnabled(entity) || !r.IsComponentEnabled<CLightProbe>(entity))
+                        continue;
                     if (comp._is_dirty || comp._is_update_every_tick)
                     {
-                        const auto *transform = r.GetComponent<CLightProbe, TransformComponent>(index);
+                        const auto *transform = r.GetComponent<CLightProbe, TransformComponent>(probe_index);
                         Camera cam;
                         cam.Position(transform->GetRenderPosition());
                         cam.Near(1.0f);
@@ -160,6 +164,8 @@ namespace Ailu
             static ObjectLayer shadow_cast_layer = Application::Get().NameToLayer("ShadowCaster");
             for (auto &e: _entities)
             {
+                if (!r.IsEntityEnabled(e) || !r.IsComponentEnabled<LightComponent>(e))
+                    continue;
                 const auto *transform = r.GetComponent<TransformComponent>(e);
                 const Transform transf(transform->GetRenderPosition(), transform->GetRenderRotation(), transform->GetRenderScale());
                 auto comp = r.GetComponent<LightComponent>(e);

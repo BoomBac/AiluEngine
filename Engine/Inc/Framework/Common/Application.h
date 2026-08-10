@@ -144,6 +144,7 @@ namespace Ailu
         static WString GetUserHomePath();
         static WString GetAiluRoot();
         static Application& Get();
+        static Application *Instance() { return sp_instance; }
         static bool IsMainThread();
         void UpdatePlatformEventState(Event &e);
         int Initialize() override;
@@ -167,6 +168,7 @@ namespace Ailu
         [[nodiscard]] Window &GetWindow() { return *_p_window; }
         Window *GetWindowPtr() { return _p_window.get(); }
         InputSystem &GetInputSystem() { return *_input_system; }
+        InputSystem *GetInputSystemPtr() { return _input_system.get(); }
         /// @brief 返回逻辑帧
         /// @return 
         u64 GetFrameCount() const {return _frame_count;}

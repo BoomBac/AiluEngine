@@ -70,7 +70,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UITypography
 
 //Enum EUIBrushType begin...........................
 const Ailu::Enum* Z_Construct_Enum_EUIBrushType_Type();
-namespace Ailu::UI { 
+namespace Ailu::UI {
 enum class EUIBrushType : i32;
 }
 template<>

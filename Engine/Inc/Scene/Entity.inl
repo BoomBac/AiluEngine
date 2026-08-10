@@ -90,12 +90,38 @@ namespace Ailu
             }
             static_cast<ComponentManager<T> *>(_mgrs[type_id].get())->Remove(entity);
             _entity_signatures[idx].set(type_id, false);
+            if (const auto disabled_iter = _disabled_components.find(entity); disabled_iter != _disabled_components.end())
+            {
+                disabled_iter->second.set(type_id, false);
+                if (disabled_iter->second.none())
+                    _disabled_components.erase(disabled_iter);
+            }
             if (static_cast<u32>(type_id) < static_cast<u32>(_on_comp_remove_callback.size()))
             {
                 for (auto &f: _on_comp_remove_callback[type_id])
                     f(entity);
             }
             EntitySignatureChanged(entity);
+        }
+
+        template<typename T>
+        bool Register::IsComponentEnabled(Entity entity) const
+        {
+            if (!HasComponent<T>(entity))
+                return false;
+            const auto disabled_iter = _disabled_components.find(entity);
+            return disabled_iter == _disabled_components.end() || !disabled_iter->second.test(T::StaticComponentTypeId());
+        }
+
+        template<typename T>
+        void Register::SetComponentEnabled(Entity entity, bool enabled)
+        {
+            if (!HasComponent<T>(entity))
+                return;
+            Signature &disabled = _disabled_components[entity];
+            disabled.set(T::StaticComponentTypeId(), !enabled);
+            if (disabled.none())
+                _disabled_components.erase(entity);
         }
 
         template<typename T>

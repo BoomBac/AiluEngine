@@ -15,7 +15,7 @@
             },
             "_transform_component": {
                 "_position": [14.5179, 3.0787, 8.7868],
-                "_rotation": [0.3604, -0.1851, 0.0731, 0.9112],
+                "_rotation": [0.3603, -0.1851, 0.0731, 0.911],
                 "_scale": [0.9998, 0.9998, 0.9998]
             },
             "_light_component": {
@@ -46,6 +46,60 @@
                 "_position": [4.3144, 3.5541, -0.0],
                 "_rotation": [0.0, -0.0, 0.0, 1.0],
                 "_scale": [1.0, 1.0, 1.0]
+            },
+            "_script_component": {
+                "_script_asset": "960e8aa2-1d70-4bfa-9cad-6311564e3069",
+                "_properties": [{
+                        "_name": "can_jump",
+                        "_type": "kBool",
+                        "_bool_value": true,
+                        "_int_value": 0,
+                        "_float_value": 0.0,
+                        "_string_value": "",
+                        "_vector_value": [0.0, 0.0, 0.0, 0.0],
+                        "_guid_value": "null",
+                        "_is_orphan": true
+                    }, {
+                        "_name": "title",
+                        "_type": "kString",
+                        "_bool_value": false,
+                        "_int_value": 0,
+                        "_float_value": 0.0,
+                        "_string_value": "Player_AAA",
+                        "_vector_value": [0.0, 0.0, 0.0, 0.0],
+                        "_guid_value": "null",
+                        "_is_orphan": true
+                    }, {
+                        "_name": "target",
+                        "_type": "kEntity",
+                        "_bool_value": false,
+                        "_int_value": 0,
+                        "_float_value": 0.0,
+                        "_string_value": "",
+                        "_vector_value": [0.0, 0.0, 0.0, 0.0],
+                        "_guid_value": "null",
+                        "_is_orphan": true
+                    }, {
+                        "_name": "linked_asset",
+                        "_type": "kAsset",
+                        "_bool_value": false,
+                        "_int_value": 0,
+                        "_float_value": 0.0,
+                        "_string_value": "",
+                        "_vector_value": [0.0, 0.0, 0.0, 0.0],
+                        "_guid_value": "null",
+                        "_is_orphan": true
+                    }, {
+                        "_name": "speed",
+                        "_type": "kFloat",
+                        "_bool_value": false,
+                        "_int_value": 0,
+                        "_float_value": 3.0,
+                        "_string_value": "",
+                        "_vector_value": [0.0, 0.0, 0.0, 0.0],
+                        "_guid_value": "null",
+                        "_is_orphan": true
+                    }]
             },
             "_hierarchy_component": {
                 "_parent_guid": "null",

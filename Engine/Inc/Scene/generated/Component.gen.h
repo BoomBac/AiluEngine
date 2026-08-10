@@ -4,18 +4,43 @@
 #endif 
 #include "Objects/ReflectTemplate.h"
 #define __COMPONENT_GEN_H__
+//Struct ScriptPropertyData begin...........................
+#define COMPONENT_GEN_H_272_GENERATED_BODY \
+                            private: \
+                                friend const Type* Z_Construct_ScriptPropertyData_Type();\
+                                static const Type* GetPrivateStaticClass();\
+                            public:\
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                const Type  *GetType();
+                            namespace Ailu {class Type;}
+namespace Ailu::ECS{
+struct ScriptPropertyData ;
+}
+template<>
+AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::ECS::ScriptPropertyData>();
+//Struct ScriptPropertyData end...........................
+
 //Enum EMotionVectorType begin...........................
 const Ailu::Enum* Z_Construct_Enum_EMotionVectorType_Type();
-namespace Ailu::ECS { 
+namespace Ailu::ECS {
 enum class EMotionVectorType : i32;
 }
 template<>
 AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::ECS::EMotionVectorType>();
 //Enum EMotionVectorType end...........................
 
+//Enum EScriptPropertyType begin...........................
+const Ailu::Enum* Z_Construct_Enum_EScriptPropertyType_Type();
+namespace Ailu::ECS {
+enum class EScriptPropertyType : u8;
+}
+template<>
+AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::ECS::EScriptPropertyType>();
+//Enum EScriptPropertyType end...........................
+
 //Enum ELightType begin...........................
 const Ailu::Enum* Z_Construct_Enum_ELightType_Type();
-namespace Ailu::ECS { 
+namespace Ailu::ECS {
 enum class ELightType : i32;
 }
 template<>
@@ -24,7 +49,7 @@ AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::ECS::ELightType>();
 
 //Enum EColliderType begin...........................
 const Ailu::Enum* Z_Construct_Enum_EColliderType_Type();
-namespace Ailu::ECS { 
+namespace Ailu::ECS {
 enum class EColliderType : i32;
 }
 template<>

@@ -16,6 +16,7 @@ namespace Ailu
         class InputBlock;
         class CollapsibleView;
         class Button;
+        class CheckBox;
         class Text;
     }// namespace UI
     namespace Editor
@@ -48,6 +49,7 @@ namespace Ailu
             UI::ScrollView *_root = nullptr;
             UI::VerticalBox *_vb = nullptr;
             UI::Text *_name_text = nullptr;
+            UI::CheckBox *_entity_enabled_checkbox = nullptr;
             UI::Button *_add_component_button = nullptr;
             ECS::Entity _selected_entity = ECS::kInvalidEntity;
             bool _needs_rebuild = true;

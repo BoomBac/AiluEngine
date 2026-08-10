@@ -1308,7 +1308,6 @@ namespace Ailu
             _toolbar_widget.reset();
             _status_bar_widget.reset();
             _status_bar_border = nullptr;
-            _was_playing = false;
             _status_left_text = nullptr;
             _status_right_text = nullptr;
             DockManager::Shutdown();
@@ -1627,17 +1626,7 @@ namespace Ailu
                     selection_name = "Entity";
             }
 
-            // Update status bar background color based on play mode (VS Code-style)
             const bool is_playing = Application::Get()._is_playing_mode;
-            if (_status_bar_border && _was_playing != is_playing)
-            {
-                _was_playing = is_playing;
-                if (is_playing)
-                    _status_bar_border->_bg_color = g_editor_style._status_bar_play_bg_color;
-                else
-                    _status_bar_border->_bg_color = g_editor_style._status_bar_bg_color;
-                _status_bar_border->InvalidateStyle();
-            }
 
             // Sync toolbar & status bar colors from EditorStyle every frame
             if (_toolbar_border)
@@ -1650,8 +1639,15 @@ namespace Ailu
             }
             if (_status_bar_border)
             {
-                if (!is_playing)
-                    SetColorIfChanged(_status_bar_border->_bg_color, g_editor_style._status_bar_bg_color);
+                const Color status_bar_bg_color = is_playing ? g_editor_style._status_bar_play_bg_color : g_editor_style._status_bar_bg_color;
+                if (SetColorIfChanged(_status_bar_border->_bg_color, status_bar_bg_color))
+                {
+                    UI::UIBrush background_brush;
+                    background_brush._type = UI::EUIBrushType::kColor;
+                    background_brush._tint = status_bar_bg_color;
+                    _status_bar_border->GetStyleOverride().SetBackground(background_brush);
+                    _status_bar_border->InvalidateStyle(UI::EStyleInvalidation::kPaintOnly);
+                }
                 _status_bar_border->_border_color = g_editor_style._toolbar_border_color;
             }
 

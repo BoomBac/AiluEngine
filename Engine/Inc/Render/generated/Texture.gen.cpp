@@ -44,7 +44,6 @@ return Ailu::Render::Texture::GetPrivateStaticClass();
 ClassTypeRegister s_register_Texture(&Ailu::Render::Texture::StaticType, "Ailu::Render::Texture");
 const Ailu::Type* Ailu::Render::Z_Construct_Texture2D_Type()
 {
-Ailu::Render::Texture::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
 {
@@ -55,7 +54,7 @@ initializer._full_name = "Ailu::Render::Texture2D";
 initializer._is_class = true;
 initializer._is_abstract = false;
 initializer._namespace = "Ailu::Render";
-initializer._base_name = "Ailu::Render::Texture";
+initializer._base_name = "";
 initializer._constructor = []()->Ailu::Render::Texture2D* {return new Ailu::Render::Texture2D;};
 cur_type = std::make_unique<Ailu::Type>(initializer);
 Ailu::Type::RegisterType(cur_type.get());
@@ -80,7 +79,6 @@ return Ailu::Render::Texture2D::GetPrivateStaticClass();
 ClassTypeRegister s_register_Texture2D(&Ailu::Render::Texture2D::StaticType, "Ailu::Render::Texture2D");
 const Ailu::Type* Ailu::Render::Z_Construct_Texture3D_Type()
 {
-Ailu::Render::Texture::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
 {
@@ -91,7 +89,7 @@ initializer._full_name = "Ailu::Render::Texture3D";
 initializer._is_class = true;
 initializer._is_abstract = false;
 initializer._namespace = "Ailu::Render";
-initializer._base_name = "Ailu::Render::Texture";
+initializer._base_name = "";
 initializer._constructor = []()->Ailu::Render::Texture3D* {return new Ailu::Render::Texture3D;};
 cur_type = std::make_unique<Ailu::Type>(initializer);
 Ailu::Type::RegisterType(cur_type.get());
@@ -116,7 +114,6 @@ return Ailu::Render::Texture3D::GetPrivateStaticClass();
 ClassTypeRegister s_register_Texture3D(&Ailu::Render::Texture3D::StaticType, "Ailu::Render::Texture3D");
 const Ailu::Type* Ailu::Render::Z_Construct_CubeMap_Type()
 {
-Ailu::Render::Texture::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
 {
@@ -127,7 +124,7 @@ initializer._full_name = "Ailu::Render::CubeMap";
 initializer._is_class = true;
 initializer._is_abstract = false;
 initializer._namespace = "Ailu::Render";
-initializer._base_name = "Ailu::Render::Texture";
+initializer._base_name = "";
 initializer._constructor = []()->Ailu::Render::CubeMap* {return new Ailu::Render::CubeMap;};
 cur_type = std::make_unique<Ailu::Type>(initializer);
 Ailu::Type::RegisterType(cur_type.get());
@@ -152,7 +149,6 @@ return Ailu::Render::CubeMap::GetPrivateStaticClass();
 ClassTypeRegister s_register_CubeMap(&Ailu::Render::CubeMap::StaticType, "Ailu::Render::CubeMap");
 const Ailu::Type* Ailu::Render::Z_Construct_RenderTexture_Type()
 {
-Ailu::Render::Texture::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
 {
@@ -163,7 +159,7 @@ initializer._full_name = "Ailu::Render::RenderTexture";
 initializer._is_class = true;
 initializer._is_abstract = false;
 initializer._namespace = "Ailu::Render";
-initializer._base_name = "Ailu::Render::Texture";
+initializer._base_name = "";
 initializer._constructor = []()->Ailu::Render::RenderTexture* {return new Ailu::Render::RenderTexture;};
 cur_type = std::make_unique<Ailu::Type>(initializer);
 Ailu::Type::RegisterType(cur_type.get());
