@@ -10,6 +10,9 @@ namespace Ailu
         {
         public:
             void Build(ComponentEditorContext &context) override;
+            bool NeedsRebuild(const ComponentEditorContext &context) const override;
+        private:
+            int _cached_type = -1;
         };
     }// namespace Editor
 }// namespace Ailu

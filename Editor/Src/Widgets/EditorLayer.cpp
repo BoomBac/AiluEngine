@@ -499,7 +499,7 @@ namespace Ailu
                             changed = true;
                         }
                     }
-                    else if (prop_info.TypeName() == "Color")
+                    else if (prop_info.GetType() == StaticClass<Color>())
                     {
                         Color old_value = prop_info.Get<Color>(obj);
                         Color srgb_value = old_value.ToSrgb();
@@ -1540,6 +1540,7 @@ namespace Ailu
                     // 运行时副本是新的 Scene 实例，清理旧句柄避免误选中另一 Scene 的实体。
                     Selection::RemoveSlection();
                     SceneMgr::Get().EnterPlayMode();
+                    DockManager::Get().ActivateDock(GameView::StaticType()->FullName());
                     _editor_status_message = "Play mode";
                     LOG_INFO("EditorToolbar: enter play mode");
                 }
@@ -1561,6 +1562,7 @@ namespace Ailu
                 {
                     Selection::RemoveSlection();
                     SceneMgr::Get().ExitPlayMode();
+                    DockManager::Get().ActivateDock(SceneView::StaticType()->FullName());
                     _editor_status_message = "Edit mode";
                     LOG_INFO("EditorToolbar: exit play mode");
                 }

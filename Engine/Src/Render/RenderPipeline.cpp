@@ -108,8 +108,23 @@ namespace Ailu::Render
         _targets.clear();
         _cameras.clear();
         _cameras.emplace_back(Camera::sCurrent);
+        if (_preview_camera != nullptr && _preview_target != nullptr)
+        {
+            _preview_camera->TargetTexture(_preview_target);
+            _cameras.emplace_back(_preview_camera);
+        }
         for (auto &r: _renderers)
             r->SetupFrameResource(&_frame_res[prev_slot], _cur_frame_res);
+    }
+
+    void RenderPipeline::SetPreviewCamera(Camera *camera, RenderTexture *target)
+    {
+        if (_preview_camera != nullptr && _preview_camera != camera)
+            _preview_camera->TargetTexture(nullptr);
+        _preview_camera = camera;
+        _preview_target = target;
+        if (_preview_camera != nullptr)
+            _preview_camera->TargetTexture(_preview_target);
     }
 
     void RenderPipeline::Render()
@@ -118,11 +133,14 @@ namespace Ailu::Render
         {
             Application::Get().WaitForRender();
             SetRenderThreadFramePending(false);
+            SceneManagement::SceneMgr::Get().ReleaseRetiredRuntimeScene();
         }
         _frame_res_manager->NewFrame();
         Setup();
+        Camera *previous_selected_camera = Camera::sSelected;
         for (auto cam: _cameras)
         {
+            Camera::sSelected = cam;
             cam->SetRenderer(_renderers[0].get());
 //#ifdef _PIX_DEBUG
 //            PIXBeginEvent(cam->HashCode(), L"DeferedRenderer");
@@ -134,6 +152,7 @@ namespace Ailu::Render
             RenderSingleCamera(*cam, *_renderers[0].get());
             _targets.push_back(_renderers[0]->TargetTexture());
         }
+        Camera::sSelected = previous_selected_camera;
         
         {
             //if (Application::Get()._is_multi_thread_rendering)

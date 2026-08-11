@@ -20,10 +20,18 @@
 #include "Framework/Core/String.h"
 #include "Framework/Core/SmartPtr.h"
 #include "Framework/Core/Containers/Vector.h"
-#include <functional>
+#include "Framework/Core/Delegate.h"
 
 namespace Ailu
 {
+    enum class EInputActionEventType : u8
+    {
+        kStarted,
+        kPerformed,
+        kCanceled,
+        kValueChanged
+    };
+
     // ========================================================================
     //  InputActionEvent – dispatched when an action phase changes
     // ========================================================================
@@ -32,6 +40,7 @@ namespace Ailu
         class InputAction *_action = nullptr;
         InputValue _value;
         EInputActionPhase _phase = EInputActionPhase::kWaiting;
+        EInputActionEventType _type = EInputActionEventType::kPerformed;
         f64 _time = 0.0;
     };
 
@@ -51,14 +60,14 @@ namespace Ailu
     class AILU_API InputAction
     {
     public:
-        using EventCallback = std::function<void(const InputActionEvent &)>;
+        DECLARE_DELEGATE(on_action, const InputActionEvent &);
 
         InputAction() = default;
         explicit InputAction(const String &name) : _name(name) {}
         InputAction(const InputAction &other);
-        InputAction(InputAction &&other) noexcept = default;
+        InputAction(InputAction &&other) noexcept;
         InputAction &operator=(const InputAction &other);
-        InputAction &operator=(InputAction &&other) noexcept = default;
+        InputAction &operator=(InputAction &&other) noexcept;
 
         // --- Lifecycle ---
         void Enable();
@@ -112,10 +121,6 @@ namespace Ailu
         }
         [[nodiscard]] bool IsComposite() const { return _composite != nullptr; }
 
-        // --- Event callbacks ---
-        void AddListener(const EventCallback &callback) { _listeners.push_back(callback); }
-        void ClearListeners() { _listeners.clear(); }
-
         // --- Default interaction fallback ---
         void SetDefaultInteraction(Scope<InputInteraction> interaction)
         {
@@ -155,8 +160,6 @@ namespace Ailu
         bool _started_this_frame = false;
         bool _performed_this_frame = false;
         bool _canceled_this_frame = false;
-
-        Vector<EventCallback> _listeners;
     };
 
 } // namespace Ailu

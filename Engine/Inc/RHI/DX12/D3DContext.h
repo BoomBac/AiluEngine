@@ -32,6 +32,7 @@
 #include "Render/RenderPipeline.h"
 #include "Render/RenderingStates.h"
 #include "Render/Shader.h"
+#include "Render/Texture.h"
 #include "Render/RayTracing/RayTracingShader.h"
 
 #if AILU_ENABLE_FRAME_DEBUGGER
@@ -56,6 +57,7 @@ namespace Ailu::RHI::DX12
     {
         String _name;
         bool _is_end_frame = false;
+        Vector<Render::RTHandle> _released_temp_rts;
         Render::CommandRenderingStatesData _rendering_states_data;
 #if AILU_ENABLE_FRAME_DEBUGGER
         Render::FrameDebugger::CapturePassMetadata _capture_pass_metadata;

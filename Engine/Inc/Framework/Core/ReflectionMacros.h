@@ -6,6 +6,7 @@
 #define APROPERTY(...)
 #define AFIELD(...)
 #define AFUNCTION(...)
+#define AEVENT(...)
 
 #define BODY_MACRO_COMBINE_INNER(A, B, C, D) A##B##C##D
 #define BODY_MACRO_COMBINE(A, B, C, D) BODY_MACRO_COMBINE_INNER(A, B, C, D)

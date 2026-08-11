@@ -6,7 +6,7 @@
 #define AILU_UIELEMENT_H
 
 #include "Framework/Math/Transform2D.h"
-#include "Framework/Events/Event.h"
+#include "Framework/Core/Delegate.h"
 #include "Objects/Serialize.h"
 #include <Render/RendererAPI.h>
 #include "Framework/Common/Allocator.hpp"

@@ -718,7 +718,7 @@ static void GenerateClassTypeInfo(const AiluHeadTool::ClassInfo &class_info,
             //file << std::format("{}._accessor = MakeScope<OffsetPropertyAccessor>({}._offset);", bd_name) << std::endl;
             file << std::format("initializer._functions.emplace_back(MemberBuilder::BuildFunction({}));", bd_name) << std::endl;
         }
-        else
+        else if (!mem._is_event)
         {
             std::string cur_meta = "meta" + mem._name;
             file << "Meta " << cur_meta << ";" << std::endl;
@@ -813,13 +813,48 @@ static void GenerateEnumTypeInfo(const AiluHeadTool::EnumInfo &enum_info, std::o
     file << std::endl;
 }
 
+static void ParserEventAnnotation(const std::string &line, bool &is_script, int &key_index, std::string &key_name)
+{
+    std::regex pattern(R"(AEVENT\s*\(\s*([^,)]*)\s*(?:,\s*KeyIndex\s*=\s*(\d+))?\s*(?:,\s*KeyName\s*=\s*(\w+))?\s*\))");
+    std::smatch matches;
+    if (!std::regex_search(line, matches, pattern))
+        return;
+
+    is_script = Trim(matches[1].str()) == "Script";
+    if (matches[2].matched)
+        key_index = std::stoi(matches[2].str());
+    if (matches[3].matched)
+        key_name = matches[3].str();
+}
+
+static void ParserEventInfo(const std::string &line, AiluHeadTool::MemberInfo &info, AiluHeadTool &aht, int key_index,
+                            const std::string &key_name)
+{
+    std::regex pattern(R"(DECLARE_DELEGATE\s*\(\s*(\w+)\s*(?:,\s*(.*?))?\s*\))");
+    std::smatch matches;
+    if (!std::regex_search(line, matches, pattern))
+    {
+        aht.Log(std::format("ParserEventInfo failed with line: {}", line));
+        return;
+    }
+
+    info._name = matches[1].str();
+    info._params = matches[2].matched ? SplitParams(matches[2].str()) : std::vector<std::string>{};
+    info._param_names = matches[2].matched ? SplitParamNames(matches[2].str()) : std::vector<std::string>{};
+    info._event_key_index = key_index;
+    info._event_key_name = key_name;
+    info._return_type = "void";
+    info._is_event = true;
+}
+
 static std::string ToLuaFunctionName(const std::string &name)
 {
     std::string result;
     for (size_t index = 0u; index < name.size(); ++index)
     {
         const char ch = name[index];
-        if (std::isupper(static_cast<unsigned char>(ch)) && index > 0u)
+        if (std::isupper(static_cast<unsigned char>(ch)) && index > 0u &&
+            !std::isdigit(static_cast<unsigned char>(name[index - 1u])))
             result += '_';
         result += static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
     }
@@ -839,21 +874,44 @@ static bool IsSupportedLuaType(const std::string &type)
 {
     static const std::set<std::string> kSupportedTypes = {
         "void", "bool", "f32", "f64", "float", "double", "i32", "u32", "i64", "u64", "String", "Vector2f",
-        "Vector3f", "Math::Quaternion", "ScriptTransform", "ScriptEntity", "ScriptScene", "ScriptInput", "ScriptTime"};
+        "Vector3f", "Math::Quaternion", "ScriptTransform", "ScriptEntity", "ScriptCamera", "ScriptScene", "ScriptInput",
+        "ScriptTime", "ScriptAssetValue"};
     return kSupportedTypes.contains(NormalizeLuaType(type));
 }
 
-static void GenerateLuaBindings(const std::vector<AiluHeadTool::ClassInfo> &types, std::ofstream &file)
+static std::string LuaGlobalName(const std::string &type_name)
+{
+    if (type_name == "ScriptInput")
+        return "input";
+    if (type_name == "ScriptTime")
+        return "time";
+    if (type_name == "ScriptPhysics2D")
+        return "physics2d";
+    if (type_name == "ScriptCamera")
+        return "camera";
+    return {};
+}
+
+static std::string ToLower(std::string value)
+{
+    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char character) { return std::tolower(character); });
+    return value;
+}
+
+static void GenerateLuaBindings(const std::vector<AiluHeadTool::ClassInfo> &types, const std::string &binding_name, std::ofstream &file)
 {
     file << "#if AILU_ENABLE_LUA_SCRIPTING" << std::endl;
     file << "#include <sol/sol.hpp>" << std::endl;
-    file << "void Ailu::RegisterGeneratedLuaBindings(sol::state &lua)" << std::endl;
+    file << "#include <Framework/Script/ScriptLuaBindingRegistry.h>" << std::endl;
+    file << "#include <Framework/Script/ScriptSystem.h>" << std::endl;
+    file << std::format("namespace Ailu {{ void {}(sol::state &lua); }}", binding_name) << std::endl;
+    file << std::format("void Ailu::{}(sol::state &lua)", binding_name) << std::endl;
     file << "{" << std::endl;
     for (const auto &type : types)
     {
         bool has_script_function = false;
         for (const auto &member : type._members)
-            has_script_function |= member._is_function && member._is_script;
+            has_script_function |= (member._is_function || member._is_event) && member._is_script;
         if (!has_script_function)
             continue;
 
@@ -874,6 +932,34 @@ static void GenerateLuaBindings(const std::vector<AiluHeadTool::ClassInfo> &type
                 }
                 file << std::format("type_{}.set_function(\"{}\", &{}::{});", type._name, ToLuaFunctionName(member._name),
                                     full_name, member._name) << std::endl;
+                if (type._name == "ScriptAssetValue" && member._is_static)
+                    file << std::format("lua[\"{}\"] = &{}::{};", member._name, full_name, member._name) << std::endl;
+            }
+            else if (member._is_event && member._is_script)
+            {
+                for (const auto &param : member._params)
+                {
+                    if (!IsSupportedLuaType(param))
+                        throw std::runtime_error(std::format("Lua binding generation rejected {}::{} event parameter type '{}'", full_name,
+                                                             member._name, param));
+                }
+                if (!member._event_key_name.empty())
+                {
+                    if (member._event_key_index >= static_cast<int>(member._params.size()))
+                        throw std::runtime_error(std::format("Lua binding generation rejected {}::{} key index {}", full_name,
+                                                             member._name, member._event_key_index));
+                    file << std::format("type_{}.set_function(\"{}\", []( {} &self, const String &{}, "
+                                        "sol::protected_function callback) {{ return ScriptSystem::Get().BindLuaDelegate<{}>(self._{}, "
+                                        "{}, std::move(callback)); }});",
+                                        type._name, member._name, full_name, member._event_key_name, member._event_key_index, member._name,
+                                        member._event_key_name) << std::endl;
+                }
+                else
+                {
+                    file << std::format("type_{}.set_function(\"{}\", []( {} &self, sol::protected_function callback) {{ return "
+                                        "ScriptSystem::Get().BindLuaDelegate(self._{}, std::move(callback)); }});",
+                                        type._name, member._name, full_name, member._name) << std::endl;
+                }
             }
         }
         if (type._name == "ScriptEngine")
@@ -886,8 +972,16 @@ static void GenerateLuaBindings(const std::vector<AiluHeadTool::ClassInfo> &type
                                         member._name) << std::endl;
             }
         }
+        if (const std::string global_name = LuaGlobalName(type._name); !global_name.empty())
+        {
+            if (type._name == "ScriptInput")
+                file << "lua[\"input\"] = std::ref(ScriptSystem::Get().GetInput());" << std::endl;
+            else
+                file << std::format("lua[\"{}\"] = {}{{}};", global_name, full_name) << std::endl;
+        }
     }
     file << "}" << std::endl;
+    file << std::format("ScriptLuaBindingRegister s_register_lua_bindings_{}(&Ailu::{});", binding_name, binding_name) << std::endl;
     file << "#endif" << std::endl;
 }
 
@@ -929,12 +1023,6 @@ static void GenerateLuaDeclarations(const std::vector<AiluHeadTool::ClassInfo> &
 
     file << "---@meta\n";
     file << "-- Generated by AiluHeadTool from Script reflection metadata. Do not edit.\n\n";
-    file << "---@class Vec2\n---@field x number\n---@field y number\n"
-            "---@type fun(): Vec2\n---@overload fun(x: number, y: number): Vec2\nVec2 = nil\n\n";
-    file << "---@class Vec3\n---@field x number\n---@field y number\n---@field z number\n"
-            "---@type fun(): Vec3\n---@overload fun(x: number, y: number, z: number): Vec3\nVec3 = nil\n\n";
-    file << "---@class Quaternion\n---@field x number\n---@field y number\n---@field z number\n---@field w number\n"
-            "---@type fun(): Quaternion\n---@overload fun(x: number, y: number, z: number, w: number): Quaternion\nQuaternion = nil\n\n";
 
     for (const auto &type : types)
     {
@@ -944,14 +1032,38 @@ static void GenerateLuaDeclarations(const std::vector<AiluHeadTool::ClassInfo> &
         file << std::format("---@class {}\n", type._name);
         for (const auto &member : type._members)
         {
-            if (!member._is_function && member._is_script)
+            if (!member._is_function && !member._is_event && member._is_script)
                 file << std::format("---@field {} {}\n", ToLuaFunctionName(member._name), ToLuaTypeName(member._type));
         }
-        file << std::format("local {} = {{}}\n\n", type._name);
+        // These declarations describe runtime globals registered in ScriptSystem.
+        // Keeping them local makes LuaLS report the API as undefined in user scripts.
+        file << std::format("{} = {{}}\n\n", type._name);
         for (const auto &member : type._members)
         {
-            if (!member._is_function || !member._is_script)
+            if ((!member._is_function && !member._is_event) || !member._is_script)
                 continue;
+            if (member._is_event)
+            {
+                if (!member._event_key_name.empty())
+                    file << std::format("---@param {} string\n", member._event_key_name);
+                file << "---@param callback fun(";
+                bool has_callback_parameter = false;
+                for (size_t index = 0u; index < member._params.size(); ++index)
+                {
+                    if (static_cast<int>(index) == member._event_key_index)
+                        continue;
+                    if (has_callback_parameter)
+                        file << ", ";
+                    has_callback_parameter = true;
+                    const std::string parameter_name = index < member._param_names.size() && !member._param_names[index].empty() ?
+                                                           member._param_names[index] : std::format("arg{}", index);
+                    file << parameter_name << ": " << ToLuaTypeName(member._params[index]);
+                }
+                file << ")\n---@return integer subscription_id\n";
+                file << std::format("function {}:{}({}) end\n\n", type._name, member._name,
+                                    !member._event_key_name.empty() ? member._event_key_name + ", callback" : "callback");
+                continue;
+            }
             for (size_t index = 0u; index < member._params.size(); ++index)
             {
                 const std::string parameter_name = index < member._param_names.size() && !member._param_names[index].empty() ?
@@ -971,20 +1083,44 @@ static void GenerateLuaDeclarations(const std::vector<AiluHeadTool::ClassInfo> &
                 file << parameter_name;
             }
             file << ") end\n\n";
+            if (type._name == "ScriptAssetValue" && member._is_static)
+                file << std::format("---@return {}\nfunction {}() end\n\n", type._name, member._name);
         }
     }
 
+    for (const auto &type : types)
+    {
+        if (type._name == "ScriptInput")
+        {
+            file << "---@param subscription_id integer\n---@return boolean\nfunction ScriptInput:off(subscription_id) end\n\n";
+            break;
+        }
+    }
+
+}
+
+static void GenerateLuaDeclarationIndex(const Path &output_path)
+{
+    std::ofstream file(output_path);
+    if (!file.is_open())
+        throw std::runtime_error(std::format("Failed to create Lua declaration index {}", output_path.string()));
+
+    file << "---@meta\n";
+    file << "-- Generated by AiluHeadTool. Individual Script API declarations are split by module.\n\n";
+    file << "---@class Vec2\n---@field x number\n---@field y number\n"
+            "---@type fun(): Vec2\n---@overload fun(x: number, y: number): Vec2\nVec2 = nil\n\n";
+    file << "---@class Vec3\n---@field x number\n---@field y number\n---@field z number\n"
+            "---@type fun(): Vec3\n---@overload fun(x: number, y: number, z: number): Vec3\nVec3 = nil\n\n";
+    file << "---@class Quaternion\n---@field x number\n---@field y number\n---@field z number\n---@field w number\n"
+            "---@type fun(): Quaternion\n---@overload fun(x: number, y: number, z: number, w: number): Quaternion\nQuaternion = nil\n\n";
+    file << "require(\"scriptengine\")\nrequire(\"scriptentity\")\nrequire(\"scriptcamera\")\nrequire(\"scriptscene\")\n";
+    file << "require(\"scriptinput\")\nrequire(\"scripttime\")\nrequire(\"scriptphysics2d\")\n\n";
     file << "---@class AiluScript\n---@field entity ScriptEntity\n---@field scene ScriptScene\nlocal AiluScript = {}\n\n";
-    file << "function AiluScript:OnCreate() end\n\n";
-    file << "function AiluScript:OnEnable() end\n\n";
-    file << "function AiluScript:OnDisable() end\n\n";
-    file << "---@param dt number\nfunction AiluScript:OnFixedUpdate(dt) end\n\n";
-    file << "---@param dt number\nfunction AiluScript:OnUpdate(dt) end\n\n";
-    file << "---@param dt number\n---@param render_alpha number\nfunction AiluScript:OnLateUpdate(dt, render_alpha) end\n\n";
-    file << "function AiluScript:OnDestroy() end\n\n";
-    file << "---@type ScriptEngine\nengine = nil\n\n";
-    file << "---@type ScriptInput\ninput = nil\n\n";
-    file << "---@type ScriptTime\ntime = nil\n";
+    file << "function AiluScript:OnCreate() end\n\nfunction AiluScript:OnEnable() end\n\nfunction AiluScript:OnDisable() end\n\n";
+    file << "---@param dt number\nfunction AiluScript:OnFixedUpdate(dt) end\n\n---@param dt number\nfunction AiluScript:OnUpdate(dt) end\n\n";
+    file << "---@param dt number\n---@param render_alpha number\nfunction AiluScript:OnLateUpdate(dt, render_alpha) end\n\nfunction AiluScript:OnDestroy() end\n\n";
+    file << "---@type ScriptEngine\nengine = nil\n\n---@type ScriptInput\ninput = nil\n\n---@type ScriptTime\ntime = nil\n";
+    file << "---@type ScriptPhysics2D\nphysics2d = nil\n";
 }
 
 void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string work_namespace)
@@ -1012,8 +1148,11 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                 std::string last_include_target;
                 int last_include_line = 0;
                 bool is_last_include_generated = false;
-                bool has_class_marked = false, has_property_marked = false, has_function_marked = false, has_enum_marked = false, has_struct_marked = false;
+                bool has_class_marked = false, has_property_marked = false, has_function_marked = false, has_event_marked = false, has_enum_marked = false, has_struct_marked = false;
                 bool is_script_function = false;
+                bool is_script_event = false;
+                int event_key_index = -1;
+                std::string event_key_name;
                 bool is_cur_access_scope_public = false;
                 bool is_process_class = false;
                 int line_count = 0;
@@ -1158,6 +1297,19 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                             _classes.back()._members.emplace_back(member_info);
                             continue;
                         }
+                        if (has_event_marked)
+                        {
+                            MemberInfo member_info;
+                            ParserEventInfo(line, member_info, *this, event_key_index, event_key_name);
+                            member_info._is_public = is_cur_access_scope_public;
+                            member_info._is_script = is_script_event;
+                            is_script_event = false;
+                            event_key_index = -1;
+                            event_key_name.clear();
+                            has_event_marked = false;
+                            _classes.back()._members.emplace_back(member_info);
+                            continue;
+                        }
                         if (line.find(kPropertyMacro) != std::string::npos)
                         {
                             has_property_marked = true;
@@ -1168,6 +1320,12 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                         {
                             has_function_marked = true;
                             is_script_function = line.find("Script") != std::string::npos;
+                            continue;
+                        }
+                        if (line.find(kEventMacro) != std::string::npos)
+                        {
+                            has_event_marked = true;
+                            ParserEventAnnotation(line, is_script_event, event_key_index, event_key_name);
                             continue;
                         }
                     }
@@ -1205,6 +1363,19 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                             _structs.back()._members.emplace_back(member_info);
                             continue;
                         }
+                        if (has_event_marked)
+                        {
+                            MemberInfo member_info;
+                            ParserEventInfo(line, member_info, *this, event_key_index, event_key_name);
+                            member_info._is_public = is_cur_access_scope_public;
+                            member_info._is_script = is_script_event;
+                            is_script_event = false;
+                            event_key_index = -1;
+                            event_key_name.clear();
+                            has_event_marked = false;
+                            _structs.back()._members.emplace_back(member_info);
+                            continue;
+                        }
                         if (line.find(kPropertyMacro) != std::string::npos)
                         {
                             has_property_marked = true;
@@ -1215,6 +1386,12 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                         {
                             has_function_marked = true;
                             is_script_function = line.find("Script") != std::string::npos;
+                            continue;
+                        }
+                        if (line.find(kEventMacro) != std::string::npos)
+                        {
+                            has_event_marked = true;
+                            ParserEventAnnotation(line, is_script_event, event_key_index, event_key_name);
                             continue;
                         }
                     }
@@ -1384,13 +1561,15 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                         GenerateClassTypeInfo(struct_info, cpp_file, _class_ns_map);
                     for (auto &enum_info: _enums)
                         GenerateEnumTypeInfo(enum_info, cpp_file);
-                    if (path.filename() == "ScriptSystem.h")
+                    if (path.filename().string().starts_with("Script") && path.filename() != "ScriptSystem.h")
                     {
                         std::vector<ClassInfo> script_types = _classes;
                         script_types.insert(script_types.end(), _structs.begin(), _structs.end());
-                        GenerateLuaBindings(script_types, cpp_file);
+                        const std::string file_stem = path.stem().string();
+                        GenerateLuaBindings(script_types, "RegisterGeneratedLuaBindings_" + file_stem, cpp_file);
                         const Path project_dir = out_dir.parent_path().parent_path().parent_path().parent_path().parent_path();
-                        GenerateLuaDeclarations(script_types, project_dir / ".ailu" / "lua" / "ailu_engine.lua");
+                        GenerateLuaDeclarations(script_types, project_dir / ".ailu" / "lua" / (ToLower(file_stem) + ".lua"));
+                        GenerateLuaDeclarationIndex(project_dir / ".ailu" / "lua" / "ailu_engine.lua");
                     }
                     cpp_file.close();
                     Log(std::format("AiluHeadTool::Parser create file {} succeed!", cpp_path.string()));

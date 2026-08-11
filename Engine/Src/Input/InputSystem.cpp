@@ -162,6 +162,8 @@ namespace Ailu
         for (const auto &context : asset.GetContexts())
         {
             auto ctx_ref = MakeRef<InputContext>(context);
+            // Context activation is runtime state. Templates must remain inactive so PushContext() enables their maps.
+            ctx_ref->SetActive(false);
             _context_templates[context.GetName()] = ctx_ref;
         }
 
@@ -329,6 +331,26 @@ namespace Ailu
         return it != _action_id_to_ptr.end() ? it->second : nullptr;
     }
 
+    InputSystem::ActionEventListenerId InputSystem::AddActionEventListener(ActionEventCallback callback)
+    {
+        if (!callback)
+            return 0u;
+
+        const ActionEventListenerId listener_id = _next_action_event_listener_id++;
+        _action_event_listeners.push_back({listener_id, std::move(callback)});
+        return listener_id;
+    }
+
+    bool InputSystem::RemoveActionEventListener(ActionEventListenerId listener_id)
+    {
+        const auto iter = std::remove_if(_action_event_listeners.begin(), _action_event_listeners.end(),
+                                         [listener_id](const ActionEventListener &listener) { return listener._id == listener_id; });
+        if (iter == _action_event_listeners.end())
+            return false;
+        _action_event_listeners.erase(iter, _action_event_listeners.end());
+        return true;
+    }
+
     // ========================================================================
     //  Per-frame update
     // ========================================================================
@@ -400,18 +422,20 @@ namespace Ailu
                     if (!action.IsEnabled())
                         continue;
 
-                    if (action.WasStartedThisFrame() ||
-                        action.WasPerformedThisFrame() ||
-                        action.WasCanceledThisFrame())
+                    auto dispatch_event = [this, &action](EInputActionEventType type)
                     {
                         InputActionEvent event;
                         event._action = &action;
                         event._value = action.GetValue();
                         event._phase = action.GetPhase();
+                        event._type = type;
                         event._time = _current_time;
-
                         DispatchActionEvent(event);
-                    }
+                    };
+                    if (action.WasStartedThisFrame()) dispatch_event(EInputActionEventType::kStarted);
+                    if (action.WasPerformedThisFrame()) dispatch_event(EInputActionEventType::kPerformed);
+                    if (action.WasCanceledThisFrame()) dispatch_event(EInputActionEventType::kCanceled);
+                    if (action.ValueChangedThisFrame()) dispatch_event(EInputActionEventType::kValueChanged);
                 }
             }
 
@@ -472,8 +496,8 @@ namespace Ailu
     {
         for (auto &listener : _action_event_listeners)
         {
-            if (listener)
-                listener(event);
+            if (listener._callback)
+                listener._callback(event);
         }
     }
 

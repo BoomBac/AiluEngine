@@ -936,10 +936,11 @@ namespace Ailu
             {
                 if (e._key_code == EKey::kLBUTTON)
                 {
-                    if (abs(e._mouse_position.x - _abs_rect.x - _abs_rect.z) < 6.0f && _is_numeric)
+                    if (abs(e._mouse_position.x - _abs_rect.x) < 6.0f + _resolved_style._padding._l && StringUtils::IsNumeric(_content))
                     {
                         LOG_INFO("begin drag adjust...");
                         _is_drag_adjusting = true;
+                        _is_selecting = false;
                         _drag_start_value = std::stof(_content);
                         _drag_start_x = e._mouse_position.x;
                         Application::Get().SetCursor(ECursorType::kSizeEW);
@@ -973,6 +974,19 @@ namespace Ailu
             };
             OnMouseMove() += [this](UIEvent &e)
             {
+                if (_is_drag_adjusting)
+                {
+                    const f32 delta = e._mouse_position.x - _drag_start_x;
+                    const f32 new_value = _drag_start_value + delta * _drag_start_value * 0.02f;
+                    const String new_content = std::format("{:.3}", new_value);
+                    if (_content != new_content)
+                    {
+                        SetContent(new_content);
+                        _cursor_pos = (u32) new_content.size();
+                    }
+                    Application::Get().SetCursor(ECursorType::kSizeEW);
+                    return;
+                }
                 if (_is_selecting)// 鼠标左键按下中
                 {
                     const u32 select_end = IndexFromMouseX(e._mouse_position.x);
@@ -983,14 +997,15 @@ namespace Ailu
                         KeepCursorVisible();
                     }
                 }
-                if (abs(e._mouse_position.x - _abs_rect.x - _abs_rect.z) < 6.0f && _is_numeric)
+                if (abs(e._mouse_position.x - _abs_rect.x) < 6.0f + _resolved_style._padding._l && StringUtils::IsNumeric(_content))
                 {
                     Application::Get().SetCursor(ECursorType::kSizeEW);
                 }
             };
             OnMouseExit() += [this](UIEvent &e)
             {
-                Application::Get().SetCursor(ECursorType::kArrow);
+                if (!_is_drag_adjusting)
+                    Application::Get().SetCursor(ECursorType::kArrow);
             };
             OnMouseDoubleClick() += [this](UIEvent &e)
             {
@@ -1007,6 +1022,7 @@ namespace Ailu
             {
                 CommitEdit();
                 _is_selecting = false;
+                _is_drag_adjusting = false;
                 _cursor_visible = false;
                 _cursor_timer = 0.0f;
                 _cursor_hold_timer = 0.0f;
@@ -1058,27 +1074,6 @@ namespace Ailu
                 }
                 _cursor_timer = 0.0f;
                 _cursor_hold_timer = 0.0f;
-            }
-            if (_is_drag_adjusting)
-            {
-                if (Input::IsKeyDown(EKey::kLBUTTON))
-                {
-                    f32 delta = Input::GetMousePos().x - _drag_start_x;
-                    f32 new_value = _drag_start_value + delta;
-                    Application::Get().SetCursor(ECursorType::kSizeEW);
-                    if (delta)
-                    {
-                        const String new_content = std::format("{:.3}", new_value);
-                        SetContent(new_content);
-                        _cursor_pos = (u32) new_content.size();
-                    }
-                }
-                else
-                {
-                    _is_drag_adjusting = false;
-                    LOG_INFO("Exit _is_drag_adjusting")
-                    Application::Get().SetCursor(ECursorType::kArrow);
-                }
             }
         }
 
@@ -1287,6 +1282,7 @@ namespace Ailu
             opts._transform = _matrix;
             opts._tint = _resolved_visual._content_color;
             opts._size_override = _tex_size;
+            opts._corner_radius = _resolved_visual._corner_radius;
             r.DrawImage(_texture, _content_rect, opts);
         }
         Vector2f Image::MeasureDesiredSize()

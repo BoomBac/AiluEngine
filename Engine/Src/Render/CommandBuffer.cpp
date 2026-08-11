@@ -140,6 +140,8 @@ namespace Ailu::Render
             }
             _commands.clear();
             _command_resources.clear();
+            _leased_temp_rts.clear();
+            _released_temp_rts.clear();
             _rendering_states_data.Reset();
         }
         void ClearRenderTarget(Color color, f32 depth, u8 stencil)
@@ -405,11 +407,29 @@ namespace Ailu::Render
         }
         RTHandle GetTempRT(u16 width, u16 height, String name, ERenderTargetFormat format, bool mipmap_chain, bool linear, bool random_access)
         {
-            return RenderTexture::GetTempRT(width, height, name, format, mipmap_chain, linear, random_access);
+            RTHandle handle = RenderTexture::GetTempRT(width, height, name, format, mipmap_chain, linear, random_access);
+            if (RTHandle::Valid(handle))
+                _leased_temp_rts.emplace_back(handle);
+            return handle;
         }
         void ReleaseTempRT(RTHandle handle)
         {
-            RenderTexture::ReleaseTempRT(handle);
+            if (!RTHandle::Valid(handle))
+                return;
+            auto it = std::find_if(_leased_temp_rts.begin(), _leased_temp_rts.end(),
+                                   [handle](RTHandle lease) { return lease._id == handle._id; });
+            if (it == _leased_temp_rts.end())
+            {
+                RenderTexture::ReleaseTempRT(handle);
+                return;
+            }
+            _leased_temp_rts.erase(it);
+            _released_temp_rts.emplace_back(handle);
+        }
+        Vector<RTHandle> TakeReleasedTempRTs()
+        {
+            _leased_temp_rts.clear();
+            return std::move(_released_temp_rts);
         }
         void Blit(RTHandle src, RTHandle dst, Material *mat, u16 pass_index)
         {
@@ -777,6 +797,8 @@ namespace Ailu::Render
         RDG::RenderGraph *_render_graph = nullptr;
         // CommandBuffer局部资源，以kPriorityCmd烘焙进draw state snapshot
         HashMap<ShaderPropertyId, CommandResourceBinding> _command_resources;
+        Vector<RTHandle> _leased_temp_rts;
+        Vector<RTHandle> _released_temp_rts;
         CommandRenderingStatesData _rendering_states_data;
     };
 
@@ -1064,6 +1086,11 @@ namespace Ailu::Render
     Vector<GfxCommand *> CommandBuffer::TakeCommands()
     {
         return std::move(_impl->_commands);
+    }
+
+    Vector<RTHandle> CommandBuffer::TakeReleasedTempRTs()
+    {
+        return _impl->TakeReleasedTempRTs();
     }
 
     CommandRenderingStatesData CommandBuffer::TakeRenderingStatesData()

@@ -3,6 +3,7 @@
 #define __SELECTION_H__
 #include "Objects/Object.h"
 #include "Scene/Entity.h"
+#include "Framework/Core/Delegate.h"
 #include "Framework/Events/Event.h"
 #include "Framework/Math/Guid.h"
 namespace Ailu

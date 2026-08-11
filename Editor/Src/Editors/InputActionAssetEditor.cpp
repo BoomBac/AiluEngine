@@ -46,6 +46,11 @@ namespace Ailu
                 return {"MaxMagnitude", "Accumulate", "LastActiveDevice", "PassThrough"};
             }
 
+            Vector<String> CompositeTypeItems()
+            {
+                return {"None", "Axis1D"};
+            }
+
             i32 ClampIndex(i32 index, size_t size)
             {
                 if (size == 0u)
@@ -405,8 +410,9 @@ namespace Ailu
                 for (i32 action_index = 0; action_index < static_cast<i32>(actions.size()); ++action_index)
                 {
                     auto &action = actions[action_index];
+                    const String composite_suffix = action.IsComposite() ? " [Composite]" : "";
                     auto *action_button = _tree_root->AddChild<UI::Button>(
-                            std::format("  - {} [{}]", action.GetName(), action.GetBindings().size()));
+                            std::format("  - {} [{}]{}", action.GetName(), action.GetBindings().size(), composite_suffix));
                     action_button->GetSlotAs<UI::LinearSlot>()
                                  .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed)
                                  .Size(Vector2f(0.0f, 20.0f)).Margin(Vector4f(8.0f, 1.0f, 0.0f, 0.0f));
@@ -513,6 +519,46 @@ namespace Ailu
                                 action->SetMergeStrategy(static_cast<EBindingMergeStrategy>(value));
                                 MarkDirty();
                             });
+
+                i32 composite_index = 0;
+                if (dynamic_cast<const Axis1DCompositeBinding *>(action->GetComposite().get()) != nullptr)
+                    composite_index = 1;
+                AddDropdown(_detail_root, "Composite", CompositeTypeItems(), composite_index, [this, action](i32 value)
+                {
+                    if (value == 1)
+                    {
+                        if (dynamic_cast<const Axis1DCompositeBinding *>(action->GetComposite().get()) == nullptr)
+                        {
+                            auto composite = MakeScope<Axis1DCompositeBinding>();
+                            composite->_positive._control_path = "<Keyboard>/d";
+                            composite->_negative._control_path = "<Keyboard>/a";
+                            action->SetComposite(std::move(composite));
+                        }
+                    }
+                    else
+                    {
+                        action->SetComposite(nullptr);
+                    }
+                    MarkDirty();
+                    RefreshAllUI();
+                });
+
+                if (auto *axis_1d = dynamic_cast<Axis1DCompositeBinding *>(action->GetComposite().get()))
+                {
+                    AddSectionTitle(_detail_root, "Axis1D Composite");
+                    AddTextInput(_detail_root, "Positive (+1)", axis_1d->_positive._control_path,
+                                 [this, axis_1d](String value)
+                                 {
+                                     axis_1d->_positive._control_path = value;
+                                     MarkDirty();
+                                 });
+                    AddTextInput(_detail_root, "Negative (-1)", axis_1d->_negative._control_path,
+                                 [this, axis_1d](String value)
+                                 {
+                                     axis_1d->_negative._control_path = value;
+                                     MarkDirty();
+                                 });
+                }
                 auto *info = _detail_root->AddChild<UI::Text>(
                         std::format("Bindings: {}", action->GetBindings().size()));
                 info->_color = kMutedTextColor;

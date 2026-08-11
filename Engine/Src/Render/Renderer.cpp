@@ -218,6 +218,36 @@ namespace Ailu::Render
         _rendering_data._height = pixel_height;
         if (_is_use_render_graph)
         {
+            if (_presentation_texture == nullptr || _presentation_texture->Width() != pixel_width ||
+                _presentation_texture->Height() != pixel_height)
+            {
+                Ref<RenderTexture> matching_texture = nullptr;
+                for (auto &texture: _presentation_texture_cache)
+                {
+                    if (texture->Width() == pixel_width && texture->Height() == pixel_height)
+                    {
+                        matching_texture = texture;
+                        break;
+                    }
+                }
+                if (matching_texture != nullptr)
+                {
+                    _presentation_texture = matching_texture;
+                }
+                else
+                {
+                    _presentation_texture = RenderTexture::Create(pixel_width, pixel_height, "RendererPresentation",
+                                                                  ERenderTargetFormat::kDefaultHDR);
+                    _presentation_texture_cache.emplace_back(_presentation_texture);
+                    LOG_WARNING("Expand _presentation_texture_cache to {}",_presentation_texture_cache.size());
+                }
+                // std::erase_if(_presentation_texture_cache,[](Ref<RenderTexture>& rt){
+                //     bool should_release = GraphicsContext::Get().GetFenceValueGPU() - rt->GetFenceValue() > 100;
+                //     if (should_release)
+                //         LOG_WARNING("Release presentation_texture {}x{}",rt->Width(),rt->Height());
+                //     return should_release;
+                // });
+            }
             _rendering_data._rg_handles._gbuffers[0] = _rd_graph->CreateResource(TextureDesc(pixel_width, pixel_height, ERenderTargetFormat::kRGHalf),RenderResourceName::kGBuffer0);
             _rendering_data._rg_handles._gbuffers[1] = _rd_graph->CreateResource(TextureDesc(pixel_width, pixel_height, ERenderTargetFormat::kDefault), RenderResourceName::kGBuffer1);
             _rendering_data._rg_handles._gbuffers[2] = _rd_graph->CreateResource(TextureDesc(pixel_width, pixel_height, ERenderTargetFormat::kDefault), RenderResourceName::kGBuffer2);
@@ -439,7 +469,6 @@ namespace Ailu::Render
         //RENDER GRAPH
         if (_is_use_render_graph)
         {
-            _target_tex = _rd_graph->Resolve<RenderTexture>(_rendering_data._rg_handles._color_target);
             _rd_graph->EndFrame();
         }
         Gizmo::EndFrame();
@@ -901,7 +930,8 @@ namespace Ailu::Render
         if (_is_use_render_graph)
         {
             _rd_graph->Execute(*_p_context,_rendering_data);
-            if (output_target != nullptr)
+            RenderTexture *final_target = output_target != nullptr ? output_target : _presentation_texture.get();
+            if (final_target != nullptr)
             {
                 if (auto *src = _rd_graph->Resolve<Texture>(_rendering_data._rg_handles._color_target); src != nullptr)
                 {
@@ -909,12 +939,13 @@ namespace Ailu::Render
                     {
                         PROFILE_BLOCK_GPU(cmd.get(), cmd->Name())
                         if (output_view_index >= 0)
-                            cmd->Blit(src, output_target, 0, (u16)output_view_index, nullptr);
+                            cmd->Blit(src, final_target, 0, (u16)output_view_index, nullptr);
                         else
-                            cmd->Blit(src, output_target);
+                            cmd->Blit(src, final_target);
                     }
                     _p_context->ExecuteCommandBuffer(cmd);
                     CommandBufferPool::Release(cmd);
+                    _target_tex = final_target;
                 }
             }
         }

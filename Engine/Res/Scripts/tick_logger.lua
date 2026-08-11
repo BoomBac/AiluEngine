@@ -1,7 +1,7 @@
 local tick_logger = {}
 
-function tick_logger:OnInit()
-    engine.log("tick_logger:OnInit called")
+function tick_logger:OnCreate()
+    engine.log("tick_logger:OnCreate called")
     local pos = self.entity:get_position()
     self.base_x = pos[1]
     self.base_y = pos[2]

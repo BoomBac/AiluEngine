@@ -65,6 +65,7 @@ namespace Ailu
         using DeviceConnectedCallback = std::function<void(InputDevice *)>;
         using DeviceDisconnectedCallback = std::function<void(u32 device_id)>;
         using ActionEventCallback = std::function<void(const InputActionEvent &)>;
+        using ActionEventListenerId = u64;
 
         InputSystem();
         ~InputSystem();
@@ -118,7 +119,8 @@ namespace Ailu
         [[nodiscard]] InputAction *FindActionById(u32 id);
         [[nodiscard]] const InputAction *FindActionById(u32 id) const;
 
-        void AddActionEventListener(const ActionEventCallback &cb) { _action_event_listeners.push_back(cb); }
+        ActionEventListenerId AddActionEventListener(ActionEventCallback callback);
+        bool RemoveActionEventListener(ActionEventListenerId listener_id);
 
         // ====================================================================
         //  Per-frame update
@@ -172,7 +174,13 @@ namespace Ailu
         // --- Callbacks ---
         DeviceConnectedCallback _on_device_connected;
         DeviceDisconnectedCallback _on_device_disconnected;
-        Vector<ActionEventCallback> _action_event_listeners;
+        struct ActionEventListener
+        {
+            ActionEventListenerId _id = 0u;
+            ActionEventCallback _callback;
+        };
+        Vector<ActionEventListener> _action_event_listeners;
+        ActionEventListenerId _next_action_event_listener_id = 1u;
 
         // --- Persisted context templates (loaded from asset) ---
         HashMap<String, Ref<InputContext>> _context_templates;

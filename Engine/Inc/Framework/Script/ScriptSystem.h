@@ -4,166 +4,40 @@
 
 #include "Framework/Interface/IRuntimeModule.h"
 #include "Framework/Math/Guid.h"
-#include "Framework/Math/Quaternion.h"
-#include "Scene/Entity.h"
+#include "Framework/Script/ScriptCamera.h"
+#include "Framework/Script/ScriptEngine.h"
+#include "Framework/Script/ScriptEntity.h"
+#include "Framework/Script/ScriptInput.h"
+#include "Framework/Script/ScriptLuaBindingRegistry.h"
+#include "Framework/Script/ScriptPhysics2D.h"
+#include "Framework/Script/ScriptScene.h"
+#include "Framework/Script/ScriptTime.h"
+#include "Input/InputSystem.h"
+#include "Scene/Component.h"
 
 #include <filesystem>
+#include <optional>
+#include <tuple>
 #include <unordered_set>
+#include <utility>
 
 #if AILU_ENABLE_LUA_SCRIPTING
 #include <sol/sol.hpp>
 #endif
 
-#include "generated/ScriptSystem.gen.h"
-
 namespace Ailu
 {
-#if AILU_ENABLE_LUA_SCRIPTING
-    void RegisterGeneratedLuaBindings(sol::state &lua);
-#endif
-    class ScriptSystem;
-    namespace SceneManagement
-    {
-        class Scene;
-    }
-    namespace ECS
-    {
-        struct ScriptComponent;
-    }
+    using ScriptSubscriptionHandle = u64;
 
-    ASTRUCT()
-    struct AILU_API ScriptEngine
-    {
-        GENERATED_BODY()
-
-        AFUNCTION(Script)
-        static void Log(const String &message);
-        AFUNCTION(Script)
-        static f32 Time();
-        AFUNCTION(Script)
-        static f32 DeltaTime();
-        AFUNCTION(Script)
-        static f32 FixedDeltaTime();
-        AFUNCTION(Script)
-        static f32 RenderAlpha();
-    };
-
-    ASTRUCT()
-    struct AILU_API ScriptTransform
-    {
-        GENERATED_BODY()
-        SceneManagement::Scene *_scene = nullptr;
-        ECS::Entity _entity = ECS::kInvalidEntity;
-
-        AFUNCTION(Script)
-        bool IsValid() const;
-        AFUNCTION(Script)
-        Vector3f GetLocalPosition() const;
-        AFUNCTION(Script)
-        void SetLocalPosition(const Vector3f &position) const;
-        AFUNCTION(Script)
-        Math::Quaternion GetLocalRotation() const;
-        AFUNCTION(Script)
-        void SetLocalRotation(const Math::Quaternion &rotation) const;
-        AFUNCTION(Script)
-        Vector3f GetLocalScale() const;
-        AFUNCTION(Script)
-        void SetLocalScale(const Vector3f &scale) const;
-        Vector3f GetPosition() const;
-        Math::Quaternion GetRotation() const;
-        Vector3f GetScale() const;
-    };
-
-    ASTRUCT()
-    struct AILU_API ScriptEntity
-    {
-        GENERATED_BODY()
-        SceneManagement::Scene *_scene = nullptr;
-        ECS::Entity _entity = ECS::kInvalidEntity;
-
-        AFUNCTION(Script)
-        bool IsValid() const;
-        AFUNCTION(Script)
-        String GetName() const;
-        AFUNCTION(Script)
-        void SetName(const String &name) const;
-        AFUNCTION(Script)
-        String GetGuid() const;
-        AFUNCTION(Script)
-        ScriptTransform GetTransform() const;
-        AFUNCTION(Script)
-        void Destroy() const;
-    };
-
-    ASTRUCT()
-    struct AILU_API ScriptPhysics2D
-    {
-        GENERATED_BODY()
-
-        AFUNCTION(Script)
-        static bool IsValidBody(const ScriptEntity &entity);
-        AFUNCTION(Script)
-        static void SetPosition(const ScriptEntity &entity, const Vector2f &position);
-        AFUNCTION(Script)
-        static Vector2f GetPosition(const ScriptEntity &entity);
-        AFUNCTION(Script)
-        static void SetLinearVelocity(const ScriptEntity &entity, const Vector2f &velocity);
-        AFUNCTION(Script)
-        static Vector2f GetLinearVelocity(const ScriptEntity &entity);
-        AFUNCTION(Script)
-        static void SetAngularVelocity(const ScriptEntity &entity, f32 velocity);
-        AFUNCTION(Script)
-        static void AddForce(const ScriptEntity &entity, const Vector2f &force);
-        AFUNCTION(Script)
-        static void AddImpulse(const ScriptEntity &entity, const Vector2f &impulse);
-    };
-
-    ASTRUCT()
-    struct AILU_API ScriptScene
-    {
-        GENERATED_BODY()
-        SceneManagement::Scene *_scene = nullptr;
-
-        AFUNCTION(Script)
-        bool IsValid() const;
-        AFUNCTION(Script)
-        ScriptEntity FindEntity(const String &guid) const;
-        AFUNCTION(Script)
-        ScriptEntity FindEntityByName(const String &name) const;
-        AFUNCTION(Script)
-        ScriptEntity CreateEntity(const String &name) const;
-    };
-
-    ASTRUCT()
-    struct AILU_API ScriptInput
-    {
-        GENERATED_BODY()
-        AFUNCTION(Script)
-        bool IsPressed(const String &action_name) const;
-        AFUNCTION(Script)
-        bool IsDown(const String &action_name) const;
-        AFUNCTION(Script)
-        f32 GetFloat(const String &action_name) const;
-        AFUNCTION(Script)
-        Vector2f GetVector2(const String &action_name) const;
-    };
-
-    ASTRUCT()
-    struct AILU_API ScriptTime
-    {
-        GENERATED_BODY()
-        AFUNCTION(Script)
-        f32 GetDeltaTime() const;
-        AFUNCTION(Script)
-        f32 GetFixedDeltaTime() const;
-        AFUNCTION(Script)
-        f32 GetRenderAlpha() const;
-        AFUNCTION(Script)
-        f32 GetTime() const;
-    };
+    namespace SceneManagement { class Scene; }
+    namespace ECS { struct ScriptComponent; }
 
     class AILU_API ScriptSystem final : public IRuntimeModule
     {
+#if AILU_ENABLE_LUA_SCRIPTING
+        struct ScriptInstanceKey;
+        struct ScriptInstance;
+#endif
     public:
         static ScriptSystem &Get();
 
@@ -179,15 +53,57 @@ namespace Ailu
         void OnScriptFileChanged(const std::filesystem::path &path);
         void FixedUpdateComponent(SceneManagement::Scene *scene, ECS::Entity entity, ECS::ScriptComponent &component, f32 fixed_delta_time);
         void UpdateComponent(SceneManagement::Scene *scene, ECS::Entity entity, ECS::ScriptComponent &component, f32 delta_time);
-        void LateUpdateComponent(SceneManagement::Scene *scene, ECS::Entity entity, ECS::ScriptComponent &component, f32 delta_time, f32 render_alpha);
+        void LateUpdateComponent(SceneManagement::Scene *scene, ECS::Entity entity, ECS::ScriptComponent &component, f32 delta_time,
+                                 f32 render_alpha);
         void DestroyComponent(SceneManagement::Scene *scene, ECS::Entity entity, ECS::ScriptComponent &component);
         bool SynchronizeComponentProperties(ECS::ScriptComponent &component);
         bool IsEnabled() const;
         f32 GetDeltaTime() const { return _last_delta_time; }
         f32 GetFixedDeltaTime() const { return _last_fixed_delta_time; }
         f32 GetRenderAlpha() const { return _last_render_alpha; }
+        ScriptInput &GetInput() { return _input; }
 
 #if AILU_ENABLE_LUA_SCRIPTING
+        template<typename EventViewType>
+        ScriptSubscriptionHandle BindLuaDelegate(EventViewType event_view, sol::protected_function callback)
+        {
+            if (_currently_invoking_instance == nullptr || !callback.valid())
+                return 0u;
+            const auto owner = FindInstanceKey(_currently_invoking_instance);
+            if (!owner.has_value())
+                return 0u;
+            const auto delegate_handle = event_view.Subscribe([this, owner = *owner, callback = std::move(callback)](auto &&...args) mutable
+            {
+                auto instance_iter = _instances.find(owner);
+                if (instance_iter == _instances.end() || instance_iter->second._faulted)
+                    return;
+                InvokeLuaCallback(instance_iter->second, callback, std::forward<decltype(args)>(args)...);
+            });
+            return RegisterSubscription(*owner, [event_view, delegate_handle]() mutable { event_view.Unsubscribe(delegate_handle); });
+        }
+
+        template<size_t KeyIndex, typename EventViewType>
+        ScriptSubscriptionHandle BindLuaDelegate(EventViewType event_view, const String &key_name, sol::protected_function callback)
+        {
+            if (_currently_invoking_instance == nullptr || !callback.valid())
+                return 0u;
+            const auto owner = FindInstanceKey(_currently_invoking_instance);
+            if (!owner.has_value())
+                return 0u;
+            const auto delegate_handle = event_view.Subscribe([this, owner = *owner, key_name, callback = std::move(callback)](auto &&...args) mutable
+            {
+                auto instance_iter = _instances.find(owner);
+                if (instance_iter == _instances.end() || instance_iter->second._faulted)
+                    return;
+                auto arguments = std::forward_as_tuple(args...);
+                if (std::get<KeyIndex>(arguments) != key_name)
+                    return;
+                InvokeLuaCallbackWithoutKey<KeyIndex>(instance_iter->second, callback, arguments,
+                                                      std::make_index_sequence<sizeof...(args) - 1u>{});
+            });
+            return RegisterSubscription(*owner, [event_view, delegate_handle]() mutable { event_view.Unsubscribe(delegate_handle); });
+        }
+
         sol::state &GetState() { return _lua; }
         const sol::state &GetState() const { return _lua; }
 #endif
@@ -200,10 +116,8 @@ namespace Ailu
         {
             SceneManagement::Scene *_scene = nullptr;
             ECS::Entity _entity = ECS::kInvalidEntity;
-
             bool operator==(const ScriptInstanceKey &other) const = default;
         };
-
         struct ScriptInstanceKeyHasher
         {
             size_t operator()(const ScriptInstanceKey &key) const
@@ -211,7 +125,6 @@ namespace Ailu
                 return std::hash<SceneManagement::Scene *>{}(key._scene) ^ (std::hash<ECS::Entity>{}(key._entity) << 1u);
             }
         };
-
         struct ScriptInstance
         {
             Guid _script_asset = Guid::EmptyGuid();
@@ -221,14 +134,15 @@ namespace Ailu
             bool _is_enabled = false;
             bool _faulted = false;
             sol::table _instance;
-            sol::protected_function _on_create;
-            sol::protected_function _on_enable;
-            sol::protected_function _on_disable;
-            sol::protected_function _on_fixed_update;
-            sol::protected_function _on_update;
-            sol::protected_function _on_late_update;
-            sol::protected_function _on_destroy;
-            sol::protected_function _on_reload;
+            sol::protected_function _on_create, _on_enable, _on_disable, _on_fixed_update, _on_update, _on_late_update, _on_destroy,
+                                    _on_reload;
+            Vector<ScriptSubscriptionHandle> _subscriptions;
+        };
+        struct ScriptPropertyDeclaration
+        {
+            String _name;
+            String _type_hint;
+            String _asset_type;
         };
 
         struct ScriptPrototype
@@ -236,55 +150,81 @@ namespace Ailu
             String _resolved_path;
             u32 _version = 0u;
             sol::table _prototype;
+            Vector<ScriptPropertyDeclaration> _property_declarations;
         };
+        struct ScriptSubscription { std::function<void()> _unsubscribe; };
 
         void RegisterCoreBindings();
         bool ExecuteChunk(sol::load_result &&chunk, const String &chunk_name);
         void ReportError(const String &source, const sol::error &error) const;
         bool LoadComponentInstance(const ScriptInstanceKey &key, ECS::ScriptComponent &component, const ScriptEntity &entity);
         bool LoadPrototype(const Guid &script_asset, const std::filesystem::path &resolved_path, ScriptPrototype &prototype);
-        void SynchronizeScriptProperties(ECS::ScriptComponent &component, const sol::table &prototype);
+        void SynchronizeScriptProperties(ECS::ScriptComponent &component, const ScriptPrototype &prototype);
         void InjectScriptProperties(const ECS::ScriptComponent &component, SceneManagement::Scene *scene, sol::table &instance) const;
         bool EnsureComponentReady(SceneManagement::Scene *scene, ECS::Entity entity, ECS::ScriptComponent &component);
         bool SynchronizeComponentEnabledState(ScriptInstance &instance, bool is_enabled);
         void CacheLifecycleFunctions(ScriptInstance &instance);
-
+        std::optional<ScriptInstanceKey> FindInstanceKey(const ScriptInstance *instance) const;
+        ScriptSubscriptionHandle RegisterSubscription(const ScriptInstanceKey &owner, std::function<void()> unsubscribe);
+        bool Unsubscribe(ScriptSubscriptionHandle subscription_id);
+        void ClearSubscriptions(ScriptInstance &instance);
+        void DispatchInputEvent(const InputActionEvent &event);
         template<typename... Args>
-        bool InvokeComponentMethod(ScriptInstance &instance, sol::protected_function &function, Args &&...args)
+        bool InvokeLuaCallback(ScriptInstance &instance, sol::protected_function &callback, Args &&...args)
         {
-            if (!function.valid())
-                return true;
-
-            if (_traceback.valid())
-                function.set_error_handler(_traceback);
-            sol::protected_function_result result = function(instance._instance, std::forward<Args>(args)...);
-            if (result.valid())
-                return true;
-
+            ScriptInstance *previous_instance = _currently_invoking_instance;
+            _currently_invoking_instance = &instance;
+            if (_traceback.valid()) callback.set_error_handler(_traceback);
+            sol::protected_function_result result = callback(std::forward<Args>(args)...);
+            _currently_invoking_instance = previous_instance;
+            if (result.valid()) return true;
             sol::error error = result;
             ReportError(instance._resolved_script_path.empty() ? instance._script_asset.ToString() : instance._resolved_script_path, error);
             instance._faulted = true;
             return false;
         }
 
+        template<size_t KeyIndex, typename Tuple, size_t... Indices>
+        bool InvokeLuaCallbackWithoutKey(ScriptInstance &instance, sol::protected_function &callback, Tuple &arguments,
+                                         std::index_sequence<Indices...>)
+        {
+            return InvokeLuaCallback(instance, callback, std::get<Indices < KeyIndex ? Indices : Indices + 1u>(arguments)...);
+        }
+        template<typename... Args>
+        bool InvokeComponentMethod(ScriptInstance &instance, sol::protected_function &function, Args &&...args)
+        {
+            if (!function.valid()) return true;
+            ScriptInstance *previous_instance = _currently_invoking_instance;
+            _currently_invoking_instance = &instance;
+            if (_traceback.valid()) function.set_error_handler(_traceback);
+            sol::protected_function_result result = function(instance._instance, std::forward<Args>(args)...);
+            _currently_invoking_instance = previous_instance;
+            if (result.valid()) return true;
+            sol::error error = result;
+            ReportError(instance._resolved_script_path.empty() ? instance._script_asset.ToString() : instance._resolved_script_path, error);
+            instance._faulted = true;
+            return false;
+        }
         bool ProcessReload(const Guid &script_asset);
         void RebuildInstancesForPrototype(const Guid &script_asset);
         void PruneInvalidInstances();
 
-    private:
         sol::state _lua;
         sol::protected_function _traceback;
         HashMap<ScriptInstanceKey, ScriptInstance, ScriptInstanceKeyHasher> _instances;
         HashMap<String, ScriptPrototype> _prototypes;
+        HashMap<ScriptSubscriptionHandle, ScriptSubscription> _subscriptions;
+        ScriptInstance *_currently_invoking_instance = nullptr;
+        ScriptSubscriptionHandle _next_subscription_id = 1u;
+        InputSystem::ActionEventListenerId _input_event_listener_id = 0u;
 #endif
+        ScriptInput _input;
         HashMap<String, std::filesystem::path> _loaded_script_files;
         HashMap<String, u32> _script_versions;
         std::unordered_set<String> _pending_reload_assets;
         Queue<Guid> _reload_queue;
         bool _is_initialized = false;
-        f32 _last_delta_time = 0.0f;
-        f32 _last_fixed_delta_time = 0.0f;
-        f32 _last_render_alpha = 0.0f;
+        f32 _last_delta_time = 0.0f, _last_fixed_delta_time = 0.0f, _last_render_alpha = 0.0f;
     };
 }
 

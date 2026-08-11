@@ -11,11 +11,13 @@
             "_entity_guid": "09740016-4a70-441e-b6d6-3a476a65f6a9",
             "_tag_component": {
                 "_name": "directional_light",
+                "_tag": "Untagged",
                 "_layer_mask": 1
             },
+            "_disabled_components": [],
             "_transform_component": {
                 "_position": [14.5179, 3.0787, 8.7868],
-                "_rotation": [0.3603, -0.1851, 0.0731, 0.911],
+                "_rotation": [0.36, -0.1849, 0.0728, 0.9114],
                 "_scale": [0.9998, 0.9998, 0.9998]
             },
             "_light_component": {
@@ -34,14 +36,71 @@
             "_hierarchy_component": {
                 "_parent_guid": "null",
                 "_sibling_index": 0,
-                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0"
+                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
+                "_enabled": true
+            }
+        }, {
+            "_entity_guid": "16c32b0b-1a12-4851-bfde-3677529f9dae",
+            "_tag_component": {
+                "_name": "ground",
+                "_tag": "Untagged",
+                "_layer_mask": 1
+            },
+            "_disabled_components": [],
+            "_transform_component": {
+                "_position": [4.3144, 2.243, -0.0],
+                "_rotation": [0.0, -0.0, 0.0, 1.0],
+                "_scale": [1.0, 1.0, 1.0]
+            },
+            "_hierarchy_component": {
+                "_parent_guid": "null",
+                "_sibling_index": 0,
+                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
+                "_enabled": true
+            },
+            "_rigidbody_2d_component": {
+                "_type": "kStatic",
+                "_gravity_scale": 1.0,
+                "_linear_damping": 0.0,
+                "_angular_damping": 0.0,
+                "_fixed_rotation": false,
+                "_continuous": false,
+                "_allow_sleep": true
+            },
+            "_collider_2d_component": {
+                "_shapes": [{
+                        "_type": "kBox",
+                        "_center": [0.0, 0.0],
+                        "_rotation": 0.0,
+                        "_size": [20.0, 1.0],
+                        "_radius": 0.5,
+                        "_height": 1.0,
+                        "_is_trigger": false,
+                        "_density": 1.0,
+                        "_friction": 0.3,
+                        "_restitution": 0.0,
+                        "_layer": 0
+                    }]
+            },
+            "_sprite_renderer_component": {
+                "_sprite_guid": "e9bfde03-b5ab-4282-be2b-8fdc88f873ad",
+                "_material_guid": "",
+                "_color": [1.0, 1.0, 1.0, 1.0],
+                "_sorting_layer": 0,
+                "_order_in_layer": 0,
+                "_blend_mode": 0,
+                "_flip_x": false,
+                "_flip_y": false,
+                "_visible": true
             }
         }, {
             "_entity_guid": "407291e5-544f-43e2-9c04-3c50d9e3f786",
             "_tag_component": {
                 "_name": "sprite_test",
+                "_tag": "Untagged",
                 "_layer_mask": 1
             },
+            "_disabled_components": [],
             "_transform_component": {
                 "_position": [4.3144, 3.5541, -0.0],
                 "_rotation": [0.0, -0.0, 0.0, 1.0],
@@ -50,47 +109,7 @@
             "_script_component": {
                 "_script_asset": "960e8aa2-1d70-4bfa-9cad-6311564e3069",
                 "_properties": [{
-                        "_name": "can_jump",
-                        "_type": "kBool",
-                        "_bool_value": true,
-                        "_int_value": 0,
-                        "_float_value": 0.0,
-                        "_string_value": "",
-                        "_vector_value": [0.0, 0.0, 0.0, 0.0],
-                        "_guid_value": "null",
-                        "_is_orphan": true
-                    }, {
-                        "_name": "title",
-                        "_type": "kString",
-                        "_bool_value": false,
-                        "_int_value": 0,
-                        "_float_value": 0.0,
-                        "_string_value": "Player_AAA",
-                        "_vector_value": [0.0, 0.0, 0.0, 0.0],
-                        "_guid_value": "null",
-                        "_is_orphan": true
-                    }, {
-                        "_name": "target",
-                        "_type": "kEntity",
-                        "_bool_value": false,
-                        "_int_value": 0,
-                        "_float_value": 0.0,
-                        "_string_value": "",
-                        "_vector_value": [0.0, 0.0, 0.0, 0.0],
-                        "_guid_value": "null",
-                        "_is_orphan": true
-                    }, {
-                        "_name": "linked_asset",
-                        "_type": "kAsset",
-                        "_bool_value": false,
-                        "_int_value": 0,
-                        "_float_value": 0.0,
-                        "_string_value": "",
-                        "_vector_value": [0.0, 0.0, 0.0, 0.0],
-                        "_guid_value": "null",
-                        "_is_orphan": true
-                    }, {
-                        "_name": "speed",
+                        "_name": "move_speed",
                         "_type": "kFloat",
                         "_bool_value": false,
                         "_int_value": 0,
@@ -98,13 +117,58 @@
                         "_string_value": "",
                         "_vector_value": [0.0, 0.0, 0.0, 0.0],
                         "_guid_value": "null",
-                        "_is_orphan": true
+                        "_is_orphan": false
+                    }, {
+                        "_name": "jump_speed",
+                        "_type": "kFloat",
+                        "_bool_value": false,
+                        "_int_value": 0,
+                        "_float_value": 3.0,
+                        "_string_value": "",
+                        "_vector_value": [0.0, 0.0, 0.0, 0.0],
+                        "_guid_value": "null",
+                        "_is_orphan": false
+                    }, {
+                        "_name": "sprite_asset",
+                        "_type": "kAsset",
+                        "_bool_value": false,
+                        "_int_value": 0,
+                        "_float_value": 0.0,
+                        "_string_value": "",
+                        "_vector_value": [0.0, 0.0, 0.0, 0.0],
+                        "_guid_value": "e9bfde03-b5ab-4282-be2b-8fdc88f873ad",
+                        "_is_orphan": false
                     }]
             },
             "_hierarchy_component": {
                 "_parent_guid": "null",
                 "_sibling_index": 0,
-                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0"
+                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
+                "_enabled": true
+            },
+            "_rigidbody_2d_component": {
+                "_type": "kDynamic",
+                "_gravity_scale": 1.0,
+                "_linear_damping": 0.0,
+                "_angular_damping": 0.0,
+                "_fixed_rotation": false,
+                "_continuous": false,
+                "_allow_sleep": true
+            },
+            "_collider_2d_component": {
+                "_shapes": [{
+                        "_type": "kBox",
+                        "_center": [0.0, 0.0],
+                        "_rotation": 0.0,
+                        "_size": [1.0, 1.0],
+                        "_radius": 0.5,
+                        "_height": 1.0,
+                        "_is_trigger": false,
+                        "_density": 1.0,
+                        "_friction": 0.3,
+                        "_restitution": 0.0,
+                        "_layer": 0
+                    }]
             },
             "_sprite_renderer_component": {
                 "_sprite_guid": "e9bfde03-b5ab-4282-be2b-8fdc88f873ad",
@@ -121,8 +185,10 @@
             "_entity_guid": "55409c26-3026-4a3c-baaf-a5db3ebb3e94",
             "_tag_component": {
                 "_name": "LightProbe_4",
+                "_tag": "Untagged",
                 "_layer_mask": 1
             },
+            "_disabled_components": [],
             "_transform_component": {
                 "_position": [21.4696, 7.3102, 0.0],
                 "_rotation": [0.0, -0.0, 0.0, 1.0],
@@ -131,51 +197,39 @@
             "_hierarchy_component": {
                 "_parent_guid": "null",
                 "_sibling_index": 0,
-                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0"
+                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
+                "_enabled": true
             },
             "_lightprobe_component": {
                 "_size": 9.0,
                 "_is_update_every_tick": false
             }
         }, {
-            "_entity_guid": "bf006622-eae6-4445-a5bb-3cc6dc3d3b18",
+            "_entity_guid": "b6951e1d-1a1d-4fcb-84cf-553ae4a9ecb9",
             "_tag_component": {
-                "_name": "new_object_3",
-                "_layer_mask": 0
+                "_name": "main_camera",
+                "_tag": "MainCamera",
+                "_layer_mask": 1
             },
+            "_disabled_components": [],
             "_transform_component": {
-                "_position": [0.0, -0.2187, 0.0],
-                "_rotation": [0.0, -0.0, 0.0, 1.0],
-                "_scale": [14.9336, 14.9336, 14.9336]
-            },
-            "_static_mesh_component": {
-                "_mesh_guid": "c3315e03-1052-4825-98f7-a676beae0615",
-                "_material_guids": ["4f6e2fa4-c9af-4800-9ff9-70874abfbd50"]
-            },
-            "_hierarchy_component": {
-                "_parent_guid": "null",
-                "_sibling_index": 0,
-                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0"
-            }
-        }, {
-            "_entity_guid": "c2f41a5e-6e03-4273-a6ef-c6e44ffbaf97",
-            "_tag_component": {
-                "_name": "new_object_5",
-                "_layer_mask": 0
-            },
-            "_transform_component": {
-                "_position": [-1.1983, 1.0635, 1.3005],
-                "_rotation": [0.0, -0.0, 0.0, 1.0],
+                "_position": [0.2637, 3.7713, 6.603],
+                "_rotation": [-0.0, 1.0, -0.0, -0.0],
                 "_scale": [1.0, 1.0, 1.0]
             },
-            "_static_mesh_component": {
-                "_mesh_guid": "7baa598b-7eb4-478d-91ae-bf758da25d3b",
-                "_material_guids": ["e3891c79-694a-4968-bb84-49c409a611ce"]
-            },
             "_hierarchy_component": {
                 "_parent_guid": "null",
                 "_sibling_index": 0,
-                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0"
+                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
+                "_enabled": true
+            },
+            "_camera_component": {
+                "_type": "kOrthographic",
+                "_aspect": 1.7857,
+                "_far_clip": 100.0,
+                "_near_clip": 0.1,
+                "_fov_h": 60.0,
+                "_size": 10.0
             }
         }]
 }

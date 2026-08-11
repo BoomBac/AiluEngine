@@ -23,6 +23,7 @@ namespace Ailu::Render
 
         void Build(const Vector<SpriteRenderData> &render_data);
         void Render(CommandBuffer *cmd, RenderTexture *color_target, RenderTexture *depth_target);
+        void RenderWithMaterial(CommandBuffer *cmd, RenderTexture *color_target, RenderTexture *depth_target, Material *material);
 
         void Clear();
         static Vector<SpriteBatch> BuildBatchesForTesting(const Vector<SpriteRenderData> &render_data);

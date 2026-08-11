@@ -14,8 +14,8 @@ test_basic_loaded = true
 
 local TestBasic = {}
 
-function TestBasic:OnInit()
-    engine.log("TestBasic:OnInit called")
+function TestBasic:OnCreate()
+    engine.log("TestBasic:OnCreate called")
     self.init_called = true
 
     if self.entity then

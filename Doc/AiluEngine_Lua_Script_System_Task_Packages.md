@@ -69,7 +69,7 @@ Generated sol2 Bindings
 - `ScriptSystem` 单 Lua VM。
 - `ScriptEntityHandle`。
 - `ScriptComponent`。
-- `OnInit`。
+- `OnCreate`。
 - `OnFixedUpdate`。
 - `OnUpdate`。
 - `OnLateUpdate`。
@@ -202,7 +202,7 @@ lua.new_usertype<T>(...);
 - `RunFile()` 可暂时保留。
 - `RunString()` 可暂时保留。
 - `GetGlobalInt/Number/Bool()` 可暂时保留。
-- `OnInit()` 可兼容。
+- 生命周期初始化回调统一为 `OnCreate()`。
 - `_script_path` 在 ScriptAsset GUID 化完成之前继续使用。
 
 不要在同一个任务包中提前删除仍被后续任务依赖的旧接口。
@@ -292,7 +292,7 @@ Entity.set_position
 记录：
 
 ```text
-OnInit
+OnCreate
 OnFixedUpdate
 OnUpdate
 OnLateUpdate
@@ -337,7 +337,7 @@ self.counter = self.counter + 1
 1. RunFile / RunString；
 2. engine.log/time/delta_time；
 3. ScriptEntityHandle；
-4. OnInit/OnFixedUpdate/OnUpdate/OnLateUpdate/OnDestroy；
+4. OnCreate/OnFixedUpdate/OnUpdate/OnLateUpdate/OnDestroy；
 5. 同一脚本挂载多个 Entity 时实例状态独立；
 6. Lua error 不导致引擎崩溃。
 
@@ -658,7 +658,7 @@ global_counter = top_level_execute_count
 
 local Test = {}
 
-function Test:OnInit()
+function Test:OnCreate()
     self.value = 0
 end
 
@@ -1799,13 +1799,7 @@ OnDestroy
 OnReload
 ```
 
-兼容：
-
-```text
-OnInit -> OnCreate
-```
-
-旧脚本迁移期可 fallback。
+初始化生命周期统一使用 `OnCreate`，旧的 `OnInit` 不再兼容。
 
 ## 14.2 Enabled
 
@@ -1969,7 +1963,7 @@ sol::table 析构时 Lua VM 已不存在
 
 要求：
 1. 生命周期规范为 OnCreate/OnEnable/OnDisable/OnFixedUpdate/OnUpdate/OnLateUpdate/OnDestroy/OnReload；
-2. OnInit 保留兼容 fallback；
+2. OnInit 不再提供兼容 fallback；
 3. ScriptComponent 支持 enabled；
 4. 单个 callback 抛错后仅 fault 当前 ScriptInstance；
 5. faulted instance 不再每帧重复调用和刷日志；

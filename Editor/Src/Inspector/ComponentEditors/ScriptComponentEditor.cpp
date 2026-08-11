@@ -4,6 +4,12 @@
 #include "Framework/Script/ScriptSystem.h"
 #include "Assets/Asset.h"
 #include "Assets/ScriptAsset.h"
+#include "Audio/AudioClip.h"
+#include "Animation/Clip.h"
+#include "Render/2D/Sprite.h"
+#include "Render/Mesh.h"
+#include "Render/Material.h"
+#include "Render/Texture.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "UI/Container.h"
 #include "UI/DragDrop.h"
@@ -37,6 +43,82 @@ namespace Ailu
                     });
                 }
             }
+
+            struct AssetChoice
+            {
+                Guid _guid = Guid::EmptyGuid();
+                String _name;
+            };
+
+            template<typename T>
+            void CollectAssetChoices(Vector<AssetChoice> &choices)
+            {
+                for (auto it = ResourceMgr::Get().ResourceBegin<T>(); it != ResourceMgr::Get().ResourceEnd<T>(); ++it)
+                {
+                    T *resource = ResourceMgr::Get().IterToRefPtr<T>(it).get();
+                    if (resource == nullptr)
+                        continue;
+                    choices.push_back({ResourceMgr::Get().GetAssetGuid(resource), resource->Name()});
+                }
+            }
+
+            bool CollectTypedAssetChoices(const String &type_name, Vector<AssetChoice> &choices)
+            {
+                if (type_name == "Sprite") CollectAssetChoices<Render::Sprite>(choices);
+                else if (type_name == "Texture2D") CollectAssetChoices<Render::Texture2D>(choices);
+                else if (type_name == "Material") CollectAssetChoices<Render::Material>(choices);
+                else if (type_name == "Mesh") CollectAssetChoices<Render::Mesh>(choices);
+                else if (type_name == "SkeletonMesh") CollectAssetChoices<Render::SkeletonMesh>(choices);
+                else if (type_name == "AnimationClip") CollectAssetChoices<AnimationClip>(choices);
+                else if (type_name == "AudioClip") CollectAssetChoices<AudioClip>(choices);
+                else if (type_name == "Script")
+                {
+                    for (auto it = ResourceMgr::Get().Begin(); it != ResourceMgr::Get().End(); ++it)
+                    {
+                        Asset *asset = it->second.get();
+                        if (asset != nullptr && asset->_asset_type == ScriptAsset::StaticType())
+                            choices.push_back({asset->GetGuid(), asset->Name()});
+                    }
+                }
+                else return false;
+                return true;
+            }
+
+            void AddAssetPropertyRow(UIElement *parent, ECS::ScriptPropertyData &property)
+            {
+                Vector<AssetChoice> choices;
+                if (!CollectTypedAssetChoices(property._asset_type, choices))
+                {
+                    const String guid = property._guid_value == Guid::EmptyGuid() ? String{} : property._guid_value.ToString();
+                    AddTextInputRow(parent, property._name, guid, [&property](const String &value)
+                    {
+                        property._guid_value = Guid(value);
+                        MarkPropertyDirty();
+                    });
+                    return;
+                }
+
+                Vector<String> labels{"None"};
+                for (const auto &choice : choices)
+                    labels.push_back(choice._name);
+                auto dropdown = AddDropdownRow(parent, property._name, labels);
+                i32 selected_index = 0;
+                for (u32 index = 0u; index < choices.size(); ++index)
+                {
+                    if (choices[index]._guid == property._guid_value)
+                    {
+                        selected_index = static_cast<i32>(index + 1u);
+                        break;
+                    }
+                }
+                dropdown->SetSelectedIndex(selected_index);
+                dropdown->_on_selected_changed += [&property, choices](i32 index)
+                {
+                    property._guid_value = index > 0 && index - 1 < static_cast<i32>(choices.size())
+                        ? choices[index - 1]._guid : Guid::EmptyGuid();
+                    MarkPropertyDirty();
+                };
+            }
         }// namespace
 
         void ScriptComponentEditor::Build(ComponentEditorContext &context)
@@ -47,7 +129,7 @@ namespace Ailu
 
             auto entity = context._entity;
 
-            auto assign_script_asset = [entity](const Guid &script_asset)
+            auto assign_script_asset = [entity, request_rebuild = context._request_rebuild](const Guid &script_asset)
             {
                 auto *scene = SceneMgr::Get().ActiveScene();
                 if (scene == nullptr)
@@ -60,6 +142,8 @@ namespace Ailu
                 script_comp->_script_asset = script_asset;
                 script_comp->_properties.clear();
                 SceneMgr::Get().MarkCurSceneDirty();
+                if (request_rebuild)
+                    request_rebuild();
             };
 
             auto script_assets = std::make_shared<Vector<Asset *>>();
@@ -108,8 +192,8 @@ namespace Ailu
             };
             script_dropdown->SetDropHandler(std::move(drop_handler));
 
-            auto hint = context._content->AddChild<Text>("Select a ScriptAsset or drop one here.");
-            hint->GetSlotAs<LinearSlot>().Margin({2.0f, 0.0f, 2.0f, 2.0f});
+            //auto hint = context._content->AddChild<Text>("Select a ScriptAsset or drop one here.");
+            //hint->GetSlotAs<LinearSlot>().Margin({2.0f, 0.0f, 2.0f, 2.0f});
 
             ScriptSystem::Get().SynchronizeComponentProperties(*comp);
             for (ECS::ScriptPropertyData &property : comp->_properties)
@@ -157,12 +241,17 @@ namespace Ailu
                 case ECS::EScriptPropertyType::kEntity:
                 case ECS::EScriptPropertyType::kAsset:
                 {
-                    const String guid = property._guid_value == Guid::EmptyGuid() ? String{} : property._guid_value.ToString();
-                    AddTextInputRow(context._content, property._name, guid, [&property](const String &value)
+                    if (property._type == ECS::EScriptPropertyType::kAsset)
+                        AddAssetPropertyRow(context._content, property);
+                    else
                     {
-                        property._guid_value = Guid(value);
-                        MarkPropertyDirty();
-                    });
+                        const String guid = property._guid_value == Guid::EmptyGuid() ? String{} : property._guid_value.ToString();
+                        AddTextInputRow(context._content, property._name, guid, [&property](const String &value)
+                        {
+                            property._guid_value = Guid(value);
+                            MarkPropertyDirty();
+                        });
+                    }
                     break;
                 }
                 }

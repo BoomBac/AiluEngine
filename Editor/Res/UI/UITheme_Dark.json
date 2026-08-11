@@ -15,9 +15,9 @@
         "_control_padding": [6.0, 3.0, 6.0, 3.0]
     },
     "_typography": {
-        "_small_font_size": 12.0,
-        "_normal_font_size": 14.0,
-        "_title_font_size": 18.0
+        "_small_font_size": 10.0,
+        "_normal_font_size": 12.0,
+        "_title_font_size": 16.0
     },
     "_button_style": {
         "_normal": {
@@ -57,7 +57,7 @@
         },
         "_padding": [6.0, 3.0, 6.0, 3.0],
         "_min_size": [80.0, 20.0],
-        "_font_size": 14.0
+        "_font_size": 10.0
     },
     "_slider_style": {
         "_normal": {
@@ -150,13 +150,13 @@
         "_checked": { "_type": "kColor", "_tint": [0.18, 0.52, 0.86, 1.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] },
         "_checked_hovered": { "_type": "kColor", "_tint": [0.18, 0.52, 0.86, 1.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] },
         "_checked_pressed": { "_type": "kColor", "_tint": [0.18, 0.52, 0.86, 1.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] },
-        "_indeterminate": { "_type": "kColor", "_tint": [0.13, 0.14, 0.16, 1.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] },
+        "_indeterminate": { "_type": "kColor", "_tint": [0.13, 0.14, 0.16, 1.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 1.0, 1.0] },
         "_disabled_mark": { "_type": "kColor", "_tint": [0.50, 0.54, 0.58, 1.0], "_texture_guid": "", "_uv_rect": [0.0, 0.0, 1.0, 1.0], "_slice_margin": [0.0, 0.0, 0.0, 0.0] },
         "_mark_color": [0.92, 0.94, 0.96, 1.0],
         "_box_size": [16.0, 16.0],
         "_label_spacing": 6.0,
         "_padding": [2.0, 2.0, 2.0, 2.0],
-        "_font_size": 14.0
+        "_font_size": 10.0
     },
     "_input_style": {
         "_normal": {
@@ -206,7 +206,7 @@
         "_caret_color": [0.92, 0.94, 0.96, 1.0],
         "_padding": [6.0, 3.0, 6.0, 3.0],
         "_min_size": [120.0, 24.0],
-        "_font_size": 14.0,
+        "_font_size": 10.0,
         "_caret_width": 1.0,
         "_selection_corner_radius": 0.0
     },
@@ -327,7 +327,7 @@
         "_selected_color": [0.18, 0.52, 0.86, 0.45],
         "_selected_unfocused_color": [0.28, 0.31, 0.35, 0.45],
         "_padding": [2.0, 1.0, 2.0, 1.0],
-        "_font_size": 14.0
+        "_font_size": 10.0
     },
     "_tree_view_styles": {},
     "_table_style": {
@@ -342,7 +342,7 @@
         "_border_width": 1.0,
         "_column_separator_width": 1.0,
         "_column_separator_color": [0.28, 0.31, 0.35, 1.0],
-        "_font_size": 14.0,
+        "_font_size": 10.0,
         "_cell_padding": [4.0, 1.0, 4.0, 1.0]
     },
     "_table_styles": {},

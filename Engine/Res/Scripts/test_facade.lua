@@ -2,7 +2,7 @@
 
 local TestFacade = {}
 
-function TestFacade:OnInit()
+function TestFacade:OnCreate()
     reg_facade_started = true
     local transform = self.entity:get_transform()
     transform:set_local_position(Vec3.new(4.0, 5.0, 6.0))

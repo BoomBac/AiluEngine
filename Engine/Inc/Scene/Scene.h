@@ -79,6 +79,7 @@ namespace Ailu
             void EnqueueSceneCommand(ISceneCommand *command, bool undo = false);
             const Vector<ECS::Entity> &EntityView() const;
             ECS::Entity Pick(const Ray &ray);
+            Render::Camera *FindMainCamera();
             LightingData _light_data;
             auto GetAllStaticRenderable() const { return _register.View<ECS::StaticMeshComponent>(); };
             auto GetAllSkinedRenderable() const { return _register.View<ECS::CSkeletonMesh>(); };
@@ -194,6 +195,8 @@ namespace Ailu
             Scene *ActiveScene() { return _p_current; }
             void EnterPlayMode();
             void ExitPlayMode();
+            // Call after the render thread has consumed the previous frame's command stream.
+            void ReleaseRetiredRuntimeScene();
             void EnterSimulateMode();
             void ExitSimulateMode();
         private:
@@ -202,6 +205,7 @@ namespace Ailu
             Scene *_p_current = nullptr;
             Scene *_runtime_scene = nullptr;
             Scene *_runtime_scene_src = nullptr;
+            Scene *_retired_runtime_scene = nullptr;
             Vector<Transform> _transform_cache;
         };
     }

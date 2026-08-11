@@ -22,6 +22,7 @@
 #include "Input/InputComposite.h"
 #include "Objects/JsonArchive.h"
 #include "Objects/Type.h"
+#include "Physics/2D/Physics2DComponents.h"
 #include "Render/2D/Sprite.h"
 #include "Render/Camera.h"
 #include "Render/Font.h"
@@ -1134,6 +1135,7 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
         }
         if (auto *tag = reg.GetComponent<ECS::TagComponent>(new_entity))
         {
+            tag->_tag = entity_doc._tag_component._tag;
             tag->_layer_mask = entity_doc._tag_component._layer_mask;
         }
 
@@ -1281,6 +1283,26 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
             component._is_trigger = entity_doc._collider_component._is_trigger;
             component._center = entity_doc._collider_component._center;
             component._param = entity_doc._collider_component._param;
+        }
+        if (entity_doc._has_rigidbody_2d_component)
+        {
+            auto &component = reg.AddComponent<ECS::RigidBody2DComponent>(entity);
+            reg.SetComponentEnabled<ECS::RigidBody2DComponent>(entity,
+                                                                !is_component_disabled(entity_doc, "RigidBody2DComponent"));
+            component._type = entity_doc._rigidbody_2d_component._type;
+            component._gravity_scale = entity_doc._rigidbody_2d_component._gravity_scale;
+            component._linear_damping = entity_doc._rigidbody_2d_component._linear_damping;
+            component._angular_damping = entity_doc._rigidbody_2d_component._angular_damping;
+            component._fixed_rotation = entity_doc._rigidbody_2d_component._fixed_rotation;
+            component._continuous = entity_doc._rigidbody_2d_component._continuous;
+            component._allow_sleep = entity_doc._rigidbody_2d_component._allow_sleep;
+        }
+        if (entity_doc._has_collider_2d_component)
+        {
+            auto &component = reg.AddComponent<ECS::Collider2DComponent>(entity);
+            reg.SetComponentEnabled<ECS::Collider2DComponent>(entity,
+                                                               !is_component_disabled(entity_doc, "Collider2DComponent"));
+            component._shapes = entity_doc._collider_2d_component._shapes;
         }
         if (entity_doc._has_skeleton_mesh_component)
         {
@@ -1522,6 +1544,7 @@ bool SceneAssetHandler::Save(const AssetSaveContext &context)
         SceneEntityDocument entity_doc;
         entity_doc._entity_guid = scene->GetEntityGuid(entity);
         entity_doc._tag_component._name = tag._name;
+        entity_doc._tag_component._tag = tag._tag;
         entity_doc._tag_component._layer_mask = tag._layer_mask;
 
         if (const auto *transform = reg.GetComponent<ECS::TransformComponent>(entity); transform != nullptr)
@@ -1600,6 +1623,26 @@ bool SceneAssetHandler::Save(const AssetSaveContext &context)
             entity_doc._collider_component._is_trigger = collider->_is_trigger;
             entity_doc._collider_component._center = collider->_center;
             entity_doc._collider_component._param = collider->_param;
+        }
+        if (const auto *rigidbody = reg.GetComponent<ECS::RigidBody2DComponent>(entity); rigidbody != nullptr)
+        {
+            entity_doc._has_rigidbody_2d_component = true;
+            if (!reg.IsComponentEnabled<ECS::RigidBody2DComponent>(entity))
+                entity_doc._disabled_components.emplace_back("RigidBody2DComponent");
+            entity_doc._rigidbody_2d_component._type = rigidbody->_type;
+            entity_doc._rigidbody_2d_component._gravity_scale = rigidbody->_gravity_scale;
+            entity_doc._rigidbody_2d_component._linear_damping = rigidbody->_linear_damping;
+            entity_doc._rigidbody_2d_component._angular_damping = rigidbody->_angular_damping;
+            entity_doc._rigidbody_2d_component._fixed_rotation = rigidbody->_fixed_rotation;
+            entity_doc._rigidbody_2d_component._continuous = rigidbody->_continuous;
+            entity_doc._rigidbody_2d_component._allow_sleep = rigidbody->_allow_sleep;
+        }
+        if (const auto *collider = reg.GetComponent<ECS::Collider2DComponent>(entity); collider != nullptr)
+        {
+            entity_doc._has_collider_2d_component = true;
+            if (!reg.IsComponentEnabled<ECS::Collider2DComponent>(entity))
+                entity_doc._disabled_components.emplace_back("Collider2DComponent");
+            entity_doc._collider_2d_component._shapes = collider->_shapes;
         }
         if (const auto *skeleton_mesh = reg.GetComponent<ECS::CSkeletonMesh>(entity); skeleton_mesh != nullptr)
         {

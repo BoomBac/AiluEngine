@@ -107,6 +107,27 @@ namespace Ailu::Render
         }
     }
 
+    void SpriteBatcher::RenderWithMaterial(CommandBuffer *cmd, RenderTexture *color_target, RenderTexture *depth_target,
+                                           Material *material)
+    {
+        if (_batches.empty() || material == nullptr)
+            return;
+
+        cmd->SetRenderTarget(color_target, depth_target);
+
+        for (const auto &batch : _batches)
+        {
+            if (batch._instance_count == 0)
+                continue;
+
+            if (batch._key._texture != nullptr)
+                material->SetTexture("_MainTex", batch._key._texture);
+            material->SetBuffer("g_sprite_instances", _instance_buffer.get());
+            cmd->DrawIndexedInstanced(_vertex_buffer.get(), _index_buffer.get(), nullptr, material, 0,
+                                      batch._instance_count, batch._instance_offset, 0, 6);
+        }
+    }
+
     void SpriteBatcher::Clear()
     {
         _instance_data.clear();

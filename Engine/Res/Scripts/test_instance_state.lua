@@ -5,7 +5,7 @@
 
 local TestState = {}
 
-function TestState:OnInit()
+function TestState:OnCreate()
     self.counter = 0
     self.fixed_counter = 0
 

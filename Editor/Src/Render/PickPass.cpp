@@ -5,7 +5,10 @@
 #include <Framework/Common/ResourceMgr.h>
 #include <Render/Gizmo.h>
 #include <Render/Renderer.h>
+#include "Physics/2D/Physics2DSystem.h"
 #include "Render/RenderGraph/RenderGraph.h"
+#include "Render/2D/Sprite.h"
+#include "Scene/Scene.h"
 
 namespace Ailu
 {
@@ -17,7 +20,11 @@ namespace Ailu
         {
             _pick_gen = MakeScope<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/pick_buffer.hlsl"), "Runtime/PickGen");
             _select_gen = MakeScope<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/select_buffer.hlsl"), "Runtime/SelectGen");
+            _sprite_pick_gen = MakeScope<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/sprite_pick_buffer.hlsl"), "Runtime/SpritePickGen");
+            _sprite_select_gen = MakeScope<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/sprite_select_buffer.hlsl"), "Runtime/SpriteSelectGen");
             _editor_outline = MakeScope<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/editor_outline.hlsl"), "Runtime/EditorOutline");
+            _sprite_batcher = MakeScope<SpriteBatcher>();
+            _sprite_batcher->Initialize();
             _event = static_cast<ERenderPassEvent>(static_cast<u16>(ERenderPassEvent::kAfterPostprocess) - 1u);//before gizmo pass
         }
         PickPass::~PickPass()
@@ -27,6 +34,72 @@ namespace Ailu
         {
             _color = pick_buf;
             _depth = pick_buf_depth;
+        }
+
+        void PickPass::CollectSprites(const SceneManagement::Scene &scene, const Camera &camera, bool selected_only)
+        {
+            _sprite_render_data.clear();
+            auto &registry = scene.GetRegister();
+            u64 entity_index = 0u;
+            for (auto &sprite_renderer : registry.View<ECS::SpriteRendererComponent>())
+            {
+                const ECS::Entity entity = registry.GetEntity<ECS::SpriteRendererComponent>(entity_index);
+                const auto *transform = registry.GetComponent<ECS::SpriteRendererComponent, ECS::TransformComponent>(entity_index);
+                ++entity_index;
+                if (!scene.IsEntityEnabled(entity) || !registry.IsComponentEnabled<ECS::SpriteRendererComponent>(entity) ||
+                    !transform || !sprite_renderer._visible || !sprite_renderer._sprite)
+                    continue;
+                if (selected_only && std::find(Selection::SelectedEntities().begin(), Selection::SelectedEntities().end(), entity) ==
+                                         Selection::SelectedEntities().end())
+                    continue;
+                auto *texture = sprite_renderer._sprite->_texture.get();
+                if (!texture)
+                    continue;
+
+                SpriteRenderData data;
+                data._local_to_world = transform->GetWorldMatrix();
+                data._uv_rect = sprite_renderer._sprite->_uv_rect;
+                data._color = sprite_renderer._color;
+                data._size = sprite_renderer._sprite->_size;
+                data._pivot = sprite_renderer._sprite->_pivot;
+                data._texture = texture;
+                data._sorting_layer = sprite_renderer._sorting_layer;
+                data._order_in_layer = sprite_renderer._order_in_layer;
+                data._blend_mode = sprite_renderer._blend_mode;
+                data._flip_x = sprite_renderer._flip_x;
+                data._flip_y = sprite_renderer._flip_y;
+                data._entity_id = static_cast<u32>(entity);
+                data._distance_to_camera = Magnitude(transform->GetPosition() - camera.Position());
+                _sprite_render_data.emplace_back(std::move(data));
+            }
+            std::stable_sort(_sprite_render_data.begin(), _sprite_render_data.end(),
+                             [](const SpriteRenderData &lhs, const SpriteRenderData &rhs)
+                             {
+                                 if (lhs._sorting_layer != rhs._sorting_layer)
+                                     return lhs._sorting_layer < rhs._sorting_layer;
+                                 if (lhs._order_in_layer != rhs._order_in_layer)
+                                     return lhs._order_in_layer < rhs._order_in_layer;
+                                 return lhs._entity_id < rhs._entity_id;
+                             });
+            _sprite_batcher->Build(_sprite_render_data);
+        }
+
+        void PickPass::RecordSpritePick(RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data)
+        {
+            if (!rendering_data._scene || !rendering_data._camera)
+                return;
+            CollectSprites(*rendering_data._scene, *rendering_data._camera, false);
+            _sprite_batcher->RenderWithMaterial(cmd, graph.Resolve<RenderTexture>(_color_handle),
+                                                graph.Resolve<RenderTexture>(_depth_handle), _sprite_pick_gen.get());
+        }
+
+        void PickPass::RecordSpriteSelection(RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data,
+                                              RDG::RGHandle target)
+        {
+            if (!rendering_data._scene || !rendering_data._camera)
+                return;
+            CollectSprites(*rendering_data._scene, *rendering_data._camera, true);
+            _sprite_batcher->RenderWithMaterial(cmd, graph.Resolve<RenderTexture>(target), nullptr, _sprite_select_gen.get());
         }
         void PickPass::OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data)
         {
@@ -55,6 +128,7 @@ namespace Ailu
                         cmd->DrawMesh(obj._mesh, _pick_gen.get(), (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, 0, obj._instance_count);
                     }
                 }
+                RecordSpritePick(graph, cmd, rendering_data);
                 if (auto &selected = Editor::Selection::SelectedEntities(); selected.size() > 0)
                 {
                     for (auto entity: selected)
@@ -151,6 +225,7 @@ namespace Ailu
                 if (auto &selected = Selection::SelectedEntities(); selected.size() > 0)
                 {
                     cmd->SetRenderTarget(select_buf);
+                    RecordSpriteSelection(graph, cmd, rendering_data, select_buf);
                     ECS::Register &r = SceneMgr::Get().ActiveScene()->GetRegister();
                     for (auto entity: selected)
                     {
@@ -172,6 +247,8 @@ namespace Ailu
                         {
                             DebugDrawer::DebugWireframe(*c, t->GetWorldMatrix(), Colors::kGreen);
                         }
+                        if (auto *physics_system = r.GetSystem<ECS::Physics2DSystem>())
+                            physics_system->World().DebugDrawCollider(r, entity, Colors::kGreen);
                     }
                 } });
             _editor_outline->SetVector("_SelectBuffer_TexelSize", Vector4f(1.0f / _color->Width(), 1.0f / _color->Height(), (f32) _color->Width(), (f32) _color->Height()));
@@ -343,6 +420,8 @@ namespace Ailu
                         {
                             DebugDrawer::DebugWireframe(*c,t->GetWorldMatrix());
                         }
+                        if (auto *physics_system = r.GetSystem<ECS::Physics2DSystem>())
+                            physics_system->World().DebugDrawCollider(r, entity, Colors::kGreen);
                     }
                     _editor_outline->SetTexture("_SelectBuffer", select_buf);
                     _editor_outline->SetVector("_SelectBuffer_TexelSize", Vector4f(1.0f / _color->Width(), 1.0f / _color->Height(), (f32) _color->Width(), (f32) _color->Height()));

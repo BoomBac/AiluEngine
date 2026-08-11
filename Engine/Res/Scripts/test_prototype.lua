@@ -5,7 +5,7 @@ reg_prototype_top_level_count = (reg_prototype_top_level_count or 0) + 1
 
 local TestPrototype = {}
 
-function TestPrototype:OnInit()
+function TestPrototype:OnCreate()
     self.value = 0
 end
 

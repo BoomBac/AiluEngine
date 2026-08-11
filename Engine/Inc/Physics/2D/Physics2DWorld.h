@@ -4,7 +4,8 @@
 
 #include "Framework/Core/SmartPtr.h"
 #include "Framework/Core/Types.h"
-#include "Framework/Events/Event.h"
+#include "Framework/Core/Delegate.h"
+#include "Framework/Math/Color.h"
 #include "Framework/Platform/Api.h"
 #include "Physics/2D/Physics2DTypes.h"
 #include "Scene/Entity.h"
@@ -27,6 +28,7 @@ namespace Ailu
         void SyncTransforms(ECS::Register &r);
         void FlushEvents();
         void DebugDraw(ECS::Register &r) const;
+        void DebugDrawCollider(ECS::Register &r, ECS::Entity entity, Math::Color color) const;
         void CreateBody(ECS::Register &r, ECS::Entity entity);
         void DestroyBody(ECS::Entity entity);
         void SetPosition(ECS::Entity entity, const Vector2f &position);

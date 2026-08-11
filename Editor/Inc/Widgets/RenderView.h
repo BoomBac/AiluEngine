@@ -12,6 +12,7 @@ namespace Ailu
         enum class ECameraType;
         class Mesh;
         class Camera;
+        class RenderTexture;
         class VolumeTexturePreviewPass;
     }// namespace Render
     namespace UI
@@ -22,6 +23,7 @@ namespace Ailu
         class Dropdown;
         class HorizontalBox;
         class Image;
+        class Text;
         class VerticalBox;
         class SplitView;
     }
@@ -63,6 +65,7 @@ namespace Ailu
             void UpdateSceneToolbarBackdrop();
             void UpdateSceneToolbarState();
             void UpdateDragPreview();
+            void UpdateCameraPreview();
             void SetSceneCamera2DOrthographic();
             void SetSceneCamera2DOrthographic(ESceneView2DOrientation orientation);
             void SetSceneCameraPerspective();
@@ -79,6 +82,8 @@ namespace Ailu
             UI::Dropdown *_dropdown_2d_orientation = nullptr;
             UI::Button *_btn_perspective = nullptr;
             UI::Button *_btn_snap = nullptr;
+            UI::Border *_camera_preview_frame = nullptr;
+            UI::Image *_camera_preview = nullptr;
             Render::ECameraType _stored_camera_type;
             Vector3f _stored_camera_position = Vector3f::kZero;
             Vector2f _stored_camera_rotation = Vector2f::kZero;
@@ -98,7 +103,20 @@ namespace Ailu
             bool _has_camera_input_last_mouse_pos = false;
             Vector3f _drag_preview_pos = Vector3f::kZero;
             Ref<Render::Mesh> _drag_preview_mesh = nullptr;
+            Ref<Render::RenderTexture> _camera_preview_texture = nullptr;
         };
+
+        ACLASS()
+        class GameView : public RenderView
+        {
+            GENERATED_BODY()
+        public:
+            GameView();
+            void Update(f32 dt) final;
+        private:
+            UI::Text *_no_main_camera_text = nullptr;
+        };
+
         ACLASS()
         class Texture3DView : public DockWindow
         {

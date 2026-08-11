@@ -9,6 +9,7 @@
 #include "Objects/Object.h"
 #include "Objects/SerializeSpecializations.h"
 #include "AssetCommon.h"
+#include "Physics/2D/Physics2DComponents.h"
 #include "Scene/Component.h"
 #include "generated/AssetDocument.gen.h"
 
@@ -385,7 +386,9 @@ namespace Ailu
         APROPERTY()
         String _name;
         APROPERTY()
-        u32 _layer_mask = 0u;
+        String _tag = "Untagged";
+        APROPERTY()
+        u32 _layer_mask = 1u;
     };
 
     ASTRUCT()
@@ -568,6 +571,27 @@ namespace Ailu
     };
 
     ASTRUCT()
+    struct AILU_API SceneRigidBody2DComponentDocument
+    {
+        GENERATED_BODY()
+
+        APROPERTY()
+        ECS::EBody2DType _type = ECS::EBody2DType::kDynamic;
+        APROPERTY()
+        f32 _gravity_scale = 1.0f;
+        APROPERTY()
+        f32 _linear_damping = 0.0f;
+        APROPERTY()
+        f32 _angular_damping = 0.0f;
+        APROPERTY()
+        bool _fixed_rotation = false;
+        APROPERTY()
+        bool _continuous = false;
+        APROPERTY()
+        bool _allow_sleep = true;
+    };
+
+    ASTRUCT()
     struct AILU_API SceneColliderComponentDocument
     {
         GENERATED_BODY()
@@ -580,6 +604,15 @@ namespace Ailu
         Vector3f _center = Vector3f::kZero;
         APROPERTY()
         Vector3f _param = Vector3f{1.0f, 1.0f, 0.0f};
+    };
+
+    ASTRUCT()
+    struct AILU_API SceneCollider2DComponentDocument
+    {
+        GENERATED_BODY()
+
+        APROPERTY()
+        Vector<ECS::ColliderShape2D> _shapes;
     };
 
     ASTRUCT()
@@ -657,6 +690,10 @@ namespace Ailu
         inline static const String kRigidbodyComponent = "_rigidbody_component";
         inline static const String kHasColliderComponent = "_has_collider_component";
         inline static const String kColliderComponent = "_collider_component";
+        inline static const String kHasRigidBody2DComponent = "_has_rigidbody_2d_component";
+        inline static const String kRigidBody2DComponent = "_rigidbody_2d_component";
+        inline static const String kHasCollider2DComponent = "_has_collider_2d_component";
+        inline static const String kCollider2DComponent = "_collider_2d_component";
         inline static const String kHasSkeletonMeshComponent = "_has_skeleton_mesh_component";
         inline static const String kSkeletonMeshComponent = "_skeleton_mesh_component";
         inline static const String kHasSpriteRendererComponent = "_has_sprite_renderer_component";
@@ -689,6 +726,12 @@ namespace Ailu
                 SerializerWrapper<SceneRigidBodyComponentDocument>::Serialize(&_rigidbody_component, ar, &kRigidbodyComponent);
             if (_has_collider_component)
                 SerializerWrapper<SceneColliderComponentDocument>::Serialize(&_collider_component, ar, &kColliderComponent);
+            if (_has_rigidbody_2d_component)
+                SerializerWrapper<SceneRigidBody2DComponentDocument>::Serialize(&_rigidbody_2d_component, ar,
+                                                                                  &kRigidBody2DComponent);
+            if (_has_collider_2d_component)
+                SerializerWrapper<SceneCollider2DComponentDocument>::Serialize(&_collider_2d_component, ar,
+                                                                                 &kCollider2DComponent);
             if (_has_skeleton_mesh_component)
                 SerializerWrapper<SceneSkeletonMeshComponentDocument>::Serialize(&_skeleton_mesh_component, ar, &kSkeletonMeshComponent);
             if (_has_vxgi_component)
@@ -743,6 +786,10 @@ namespace Ailu
             deserialize_component(_has_lightprobe_component, _lightprobe_component, kHasLightprobeComponent, kLightprobeComponent);
             deserialize_component(_has_rigidbody_component, _rigidbody_component, kHasRigidbodyComponent, kRigidbodyComponent);
             deserialize_component(_has_collider_component, _collider_component, kHasColliderComponent, kColliderComponent);
+            deserialize_component(_has_rigidbody_2d_component, _rigidbody_2d_component, kHasRigidBody2DComponent,
+                                  kRigidBody2DComponent);
+            deserialize_component(_has_collider_2d_component, _collider_2d_component, kHasCollider2DComponent,
+                                  kCollider2DComponent);
             deserialize_component(_has_skeleton_mesh_component, _skeleton_mesh_component, kHasSkeletonMeshComponent, kSkeletonMeshComponent);
             deserialize_component(_has_sprite_renderer_component, _sprite_renderer_component, kHasSpriteRendererComponent, kSpriteRendererComponent);
             deserialize_component(_has_vxgi_component, _vxgi_component, kHasVxgiComponent, kVxgiComponent);
@@ -791,6 +838,14 @@ namespace Ailu
         bool _has_collider_component = false;
         APROPERTY()
         SceneColliderComponentDocument _collider_component;
+        APROPERTY()
+        bool _has_rigidbody_2d_component = false;
+        APROPERTY()
+        SceneRigidBody2DComponentDocument _rigidbody_2d_component;
+        APROPERTY()
+        bool _has_collider_2d_component = false;
+        APROPERTY()
+        SceneCollider2DComponentDocument _collider_2d_component;
         APROPERTY()
         bool _has_skeleton_mesh_component = false;
         APROPERTY()

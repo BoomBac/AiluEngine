@@ -1,25 +1,143 @@
 #include "Framework/Script/ScriptSystem.h"
+#include "Framework/Math/MatrixMath.h"
+#include "Framework/Math/Transform.h"
 #include "Physics/2D/Physics2D.h"
 
 #include "Framework/Common/Log.h"
 #include "Framework/Common/Application.h"
 #include "Framework/Common/Path.h"
+#include "Framework/Common/FileManager.h"
 #include "Framework/Common/Profiler.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Framework/Common/StackTrace.h"
 #include "Framework/Common/TimeMgr.h"
 #include "Assets/ScriptAsset.h"
 #include "Assets/Asset.h"
+#include "Input/InputActionAsset.h"
 #include "Scene/Component.h"
 #include "Scene/Scene.h"
 #include "pch.h"
+#include <sol/utility/is_integer.hpp>
 
 namespace Ailu
 {
     namespace fs = std::filesystem;
 
+#if AILU_ENABLE_LUA_SCRIPTING
+    Vector<ScriptLuaBindingFunction> &ScriptLuaBindingRegister::GetFunctions()
+    {
+        static Vector<ScriptLuaBindingFunction> s_functions;
+        return s_functions;
+    }
+
+    ScriptLuaBindingRegister::ScriptLuaBindingRegister(ScriptLuaBindingFunction function)
+    {
+        GetFunctions().emplace_back(function);
+    }
+
+    void ScriptLuaBindingRegister::RegisterAll(sol::state &lua)
+    {
+        for (const ScriptLuaBindingFunction function : GetFunctions())
+            function(lua);
+    }
+#endif
+
     namespace
     {
+        String TrimScriptPropertyText(String text)
+        {
+            const auto is_space = [](char character) { return std::isspace(static_cast<unsigned char>(character)) != 0; };
+            while (!text.empty() && is_space(text.front()))
+                text.erase(text.begin());
+            while (!text.empty() && is_space(text.back()))
+                text.pop_back();
+            return text;
+        }
+
+        bool IsLuaIdentifier(const String &text)
+        {
+            if (text.empty() || (!std::isalpha(static_cast<unsigned char>(text.front())) && text.front() != '_'))
+                return false;
+            return std::all_of(text.begin() + 1, text.end(), [](char character)
+            {
+                return std::isalnum(static_cast<unsigned char>(character)) != 0 || character == '_';
+            });
+        }
+
+        void ParseScriptPropertyDeclarations(const String &source, Vector<std::pair<String, String>> &declarations)
+        {
+            std::istringstream stream(source);
+            String line;
+            bool property_marker = false;
+            while (std::getline(stream, line))
+            {
+                const String trimmed_line = TrimScriptPropertyText(line);
+                if (trimmed_line.find("-- @property") != String::npos)
+                {
+                    property_marker = true;
+                    continue;
+                }
+                if (!property_marker || trimmed_line.empty() || trimmed_line.starts_with("--"))
+                    continue;
+
+                const size_t comment_begin = line.find("--");
+                const String assignment = TrimScriptPropertyText(line.substr(0, comment_begin));
+                const String type_hint = comment_begin == String::npos
+                    ? String{}
+                    : TrimScriptPropertyText(line.substr(comment_begin + 2));
+                const size_t equals = assignment.find('=');
+                const size_t dot = assignment.rfind('.', equals == String::npos ? String::npos : equals);
+                if (equals == String::npos || dot == String::npos)
+                {
+                    property_marker = false;
+                    continue;
+                }
+
+                const String name = TrimScriptPropertyText(assignment.substr(dot + 1, equals - dot - 1));
+                if (!IsLuaIdentifier(name))
+                {
+                    property_marker = false;
+                    continue;
+                }
+
+                declarations.emplace_back(name, type_hint);
+                property_marker = false;
+            }
+        }
+
+        String NormalizeScriptPropertyType(String type_name)
+        {
+            std::transform(type_name.begin(), type_name.end(), type_name.begin(), [](char character)
+            {
+                return static_cast<char>(std::tolower(static_cast<unsigned char>(character)));
+            });
+            return type_name;
+        }
+
+        std::optional<ECS::EScriptPropertyType> ResolveScriptPropertyType(const sol::object &value, const String &type_hint)
+        {
+            const String normalized_hint = NormalizeScriptPropertyType(type_hint);
+            if (normalized_hint == "bool" || normalized_hint == "boolean") return ECS::EScriptPropertyType::kBool;
+            if (normalized_hint == "int" || normalized_hint == "integer") return ECS::EScriptPropertyType::kInt;
+            if (normalized_hint == "float" || normalized_hint == "number") return ECS::EScriptPropertyType::kFloat;
+            if (normalized_hint == "string") return ECS::EScriptPropertyType::kString;
+            if (normalized_hint == "vec2" || normalized_hint == "vector2") return ECS::EScriptPropertyType::kVector2;
+            if (normalized_hint == "vec3" || normalized_hint == "vector3") return ECS::EScriptPropertyType::kVector3;
+            if (normalized_hint == "vec4" || normalized_hint == "vector4") return ECS::EScriptPropertyType::kVector4;
+            if (normalized_hint == "color") return ECS::EScriptPropertyType::kColor;
+            if (normalized_hint == "entity") return ECS::EScriptPropertyType::kEntity;
+            if (normalized_hint == "asset") return ECS::EScriptPropertyType::kAsset;
+            if (value.is<ScriptAssetValue>()) return ECS::EScriptPropertyType::kAsset;
+            if (value.is<bool>()) return ECS::EScriptPropertyType::kBool;
+            if (value.is<String>()) return ECS::EScriptPropertyType::kString;
+            if (value.is<Vector2f>()) return ECS::EScriptPropertyType::kVector2;
+            if (value.is<Vector3f>()) return ECS::EScriptPropertyType::kVector3;
+            if (value.is<Vector4f>()) return ECS::EScriptPropertyType::kVector4;
+            if (value.get_type() == sol::type::number)
+                return sol::utility::is_integer(value) ? ECS::EScriptPropertyType::kInt : ECS::EScriptPropertyType::kFloat;
+            return std::nullopt;
+        }
+
         std::optional<fs::path> ResolveScriptPath(const String &path)
         {
             if (path.empty())
@@ -43,12 +161,6 @@ namespace Ailu
 
     }
 
-        void ScriptEngine::Log(const String &message) { LOG_INFO("[Lua] {}", message); }
-        f32 ScriptEngine::Time() { return TimeMgr::TickTimeSinceLoad; }
-        f32 ScriptEngine::DeltaTime() { return ScriptSystem::Get().GetDeltaTime(); }
-        f32 ScriptEngine::FixedDeltaTime() { return ScriptSystem::Get().GetFixedDeltaTime(); }
-        f32 ScriptEngine::RenderAlpha() { return ScriptSystem::Get().GetRenderAlpha(); }
-
         std::optional<fs::path> ResolveScriptAssetPath(const Guid &script_asset)
         {
             if (script_asset == Guid::EmptyGuid())
@@ -59,191 +171,6 @@ namespace Ailu
                 return ResolveScriptPath(asset->As<ScriptAsset>()->SourceFile());
             Ref<ScriptAsset> loaded_asset = ResourceMgr::Get().Load<ScriptAsset>(script_asset);
             return loaded_asset == nullptr ? std::nullopt : ResolveScriptPath(loaded_asset->SourceFile());
-        }
-
-        bool ScriptTransform::IsValid() const
-        {
-            return _scene != nullptr && _scene->IsValidEntity(_entity) &&
-                   _scene->GetRegister().GetComponent<ECS::TransformComponent>(_entity) != nullptr;
-        }
-
-        Vector3f ScriptTransform::GetLocalPosition() const
-        {
-            const auto *transform = IsValid() ? _scene->GetRegister().GetComponent<ECS::TransformComponent>(_entity) : nullptr;
-            return transform != nullptr ? transform->GetLocalPosition() : Vector3f::kZero;
-        }
-
-        void ScriptTransform::SetLocalPosition(const Vector3f &position) const
-        {
-            if (auto *transform = IsValid() ? _scene->GetRegister().GetComponent<ECS::TransformComponent>(_entity) : nullptr)
-                transform->SetLocalPosition(position);
-        }
-
-        Math::Quaternion ScriptTransform::GetLocalRotation() const
-        {
-            const auto *transform = IsValid() ? _scene->GetRegister().GetComponent<ECS::TransformComponent>(_entity) : nullptr;
-            return transform != nullptr ? transform->GetLocalRotation() : Math::Quaternion::Identity();
-        }
-
-        void ScriptTransform::SetLocalRotation(const Math::Quaternion &rotation) const
-        {
-            if (auto *transform = IsValid() ? _scene->GetRegister().GetComponent<ECS::TransformComponent>(_entity) : nullptr)
-                transform->SetLocalRotation(rotation);
-        }
-
-        Vector3f ScriptTransform::GetLocalScale() const
-        {
-            const auto *transform = IsValid() ? _scene->GetRegister().GetComponent<ECS::TransformComponent>(_entity) : nullptr;
-            return transform != nullptr ? transform->GetLocalScale() : Vector3f::kOne;
-        }
-
-        void ScriptTransform::SetLocalScale(const Vector3f &scale) const
-        {
-            if (auto *transform = IsValid() ? _scene->GetRegister().GetComponent<ECS::TransformComponent>(_entity) : nullptr)
-                transform->SetLocalScale(scale);
-        }
-
-        Vector3f ScriptTransform::GetPosition() const
-        {
-            const auto *transform = IsValid() ? _scene->GetRegister().GetComponent<ECS::TransformComponent>(_entity) : nullptr;
-            return transform != nullptr && !transform->_world_dirty ? transform->GetPosition() : GetLocalPosition();
-        }
-
-        Math::Quaternion ScriptTransform::GetRotation() const
-        {
-            const auto *transform = IsValid() ? _scene->GetRegister().GetComponent<ECS::TransformComponent>(_entity) : nullptr;
-            return transform != nullptr && !transform->_world_dirty ? transform->GetRotation() : GetLocalRotation();
-        }
-
-        Vector3f ScriptTransform::GetScale() const
-        {
-            const auto *transform = IsValid() ? _scene->GetRegister().GetComponent<ECS::TransformComponent>(_entity) : nullptr;
-            return transform != nullptr && !transform->_world_dirty ? transform->GetScale() : GetLocalScale();
-        }
-
-        bool ScriptEntity::IsValid() const
-        {
-            return _scene != nullptr && _scene->IsValidEntity(_entity);
-        }
-
-        String ScriptEntity::GetName() const
-        {
-            if (!IsValid())
-                return {};
-            const auto *tag = _scene->GetRegister().GetComponent<ECS::TagComponent>(_entity);
-            return tag != nullptr ? tag->_name : String{};
-        }
-
-        void ScriptEntity::SetName(const String &name) const
-        {
-            if (IsValid())
-                _scene->RenameEntity(_entity, name);
-        }
-
-        String ScriptEntity::GetGuid() const
-        {
-            return IsValid() ? _scene->GetEntityGuid(_entity).ToString() : String{};
-        }
-
-        ScriptTransform ScriptEntity::GetTransform() const
-        {
-            return {_scene, _entity};
-        }
-
-    void ScriptEntity::Destroy() const
-        {
-            if (IsValid())
-                _scene->RemoveObject(_entity);
-        }
-
-        bool ScriptScene::IsValid() const
-        {
-            return _scene != nullptr;
-        }
-
-        ScriptEntity ScriptScene::FindEntity(const String &guid) const
-        {
-            if (!IsValid())
-                return {};
-            const ECS::Entity entity = _scene->FindEntity(Guid(guid));
-            return {_scene, entity};
-        }
-
-        ScriptEntity ScriptScene::FindEntityByName(const String &name) const
-        {
-            if (!IsValid())
-                return {};
-            u32 index = 0u;
-            for (const auto &tag : _scene->GetRegister().View<ECS::TagComponent>())
-            {
-                const ECS::Entity entity = _scene->GetRegister().GetEntity<ECS::TagComponent>(index++);
-                if (tag._name == name)
-                    return {_scene, entity};
-            }
-            return {_scene, ECS::kInvalidEntity};
-        }
-
-        ScriptEntity ScriptScene::CreateEntity(const String &name) const
-        {
-            if (!IsValid())
-                return {};
-            return {_scene, _scene->AddObject(name)};
-        }
-
-        bool ScriptInput::IsPressed(const String &action_name) const
-        {
-            auto *application = Application::Instance();
-            if (application == nullptr || application->GetInputSystemPtr() == nullptr)
-                return false;
-            const auto *action = application->GetInputSystem().FindAction(action_name);
-            return action != nullptr && action->WasPerformedThisFrame();
-        }
-
-        bool ScriptInput::IsDown(const String &action_name) const
-        {
-            auto *application = Application::Instance();
-            if (application == nullptr || application->GetInputSystemPtr() == nullptr)
-                return false;
-            const auto *action = application->GetInputSystem().FindAction(action_name);
-            return action != nullptr && action->GetValue().AsButton();
-        }
-
-        f32 ScriptInput::GetFloat(const String &action_name) const
-        {
-            auto *application = Application::Instance();
-            if (application == nullptr || application->GetInputSystemPtr() == nullptr)
-                return 0.0f;
-            const auto *action = application->GetInputSystem().FindAction(action_name);
-            return action != nullptr ? action->GetValue().AsAxis1D() : 0.0f;
-        }
-
-        Vector2f ScriptInput::GetVector2(const String &action_name) const
-        {
-            auto *application = Application::Instance();
-            if (application == nullptr || application->GetInputSystemPtr() == nullptr)
-                return Vector2f::kZero;
-            const auto *action = application->GetInputSystem().FindAction(action_name);
-            return action != nullptr ? action->GetValue().AsAxis2D() : Vector2f::kZero;
-        }
-
-        f32 ScriptTime::GetDeltaTime() const
-        {
-            return ScriptSystem::Get().GetDeltaTime();
-        }
-
-        f32 ScriptTime::GetFixedDeltaTime() const
-        {
-            return ScriptSystem::Get().GetFixedDeltaTime();
-        }
-
-        f32 ScriptTime::GetRenderAlpha() const
-        {
-            return ScriptSystem::Get().GetRenderAlpha();
-        }
-
-        f32 ScriptTime::GetTime() const
-        {
-            return TimeMgr::TickTimeSinceLoad;
         }
 
     ScriptSystem &ScriptSystem::Get()
@@ -268,6 +195,11 @@ namespace Ailu
                             sol::lib::table);
         RegisterCoreBindings();
         _traceback = _lua["debug"]["traceback"];
+        if (auto *application = Application::Instance(); application != nullptr && application->GetInputSystemPtr() != nullptr)
+        {
+            _input_event_listener_id = application->GetInputSystem().AddActionEventListener(
+                [this](const InputActionEvent &event) { DispatchInputEvent(event); });
+        }
         LOG_INFO("ScriptSystem initialized with Lua backend");
 #else
         LOG_WARNING("ScriptSystem initialized without Lua backend. Enable AILU_ENABLE_LUA_SCRIPTING and provide Lua/sol2 to activate scripting.");
@@ -280,10 +212,22 @@ namespace Ailu
     void ScriptSystem::Finalize()
     {
 #if AILU_ENABLE_LUA_SCRIPTING
+        if (_input_event_listener_id != 0u)
+        {
+            if (auto *application = Application::Instance(); application != nullptr && application->GetInputSystemPtr() != nullptr)
+                application->GetInputSystem().RemoveActionEventListener(_input_event_listener_id);
+            _input_event_listener_id = 0u;
+        }
         for (auto &[key, instance] : _instances)
+        {
             InvokeComponentMethod(instance, instance._on_destroy);
+            ClearSubscriptions(instance);
+        }
         _instances.clear();
         _prototypes.clear();
+        _subscriptions.clear();
+        _currently_invoking_instance = nullptr;
+        _next_subscription_id = 1u;
         _traceback = sol::protected_function();
         _lua = sol::state();
 #endif
@@ -297,44 +241,57 @@ namespace Ailu
         _is_initialized = false;
     }
 
-    bool ScriptPhysics2D::IsValidBody(const ScriptEntity &entity)
+    std::optional<ScriptSystem::ScriptInstanceKey> ScriptSystem::FindInstanceKey(const ScriptInstance *instance) const
     {
-        return entity._scene != nullptr && entity.IsValid() && Physics2D::IsValidBody(*entity._scene, entity._entity);
+        const auto iter = std::find_if(_instances.begin(), _instances.end(), [instance](const auto &pair)
+        {
+            return &pair.second == instance;
+        });
+        return iter != _instances.end() ? std::optional<ScriptInstanceKey>(iter->first) : std::nullopt;
     }
 
-    void ScriptPhysics2D::SetPosition(const ScriptEntity &entity, const Vector2f &position)
+    ScriptSubscriptionHandle ScriptSystem::RegisterSubscription(const ScriptInstanceKey &owner, std::function<void()> unsubscribe)
     {
-        if (entity._scene != nullptr && entity.IsValid()) Physics2D::SetPosition(*entity._scene, entity._entity, position);
+        const ScriptSubscriptionHandle subscription_id = _next_subscription_id++;
+        _subscriptions.emplace(subscription_id, ScriptSubscription{std::move(unsubscribe)});
+        auto instance_iter = _instances.find(owner);
+        if (instance_iter != _instances.end())
+            instance_iter->second._subscriptions.emplace_back(subscription_id);
+        return subscription_id;
     }
 
-    Vector2f ScriptPhysics2D::GetPosition(const ScriptEntity &entity)
+    bool ScriptSystem::Unsubscribe(ScriptSubscriptionHandle subscription_id)
     {
-        return entity._scene != nullptr && entity.IsValid() ? Physics2D::GetPosition(*entity._scene, entity._entity) : Vector2f::kZero;
+        const auto subscription_iter = _subscriptions.find(subscription_id);
+        if (subscription_iter == _subscriptions.end())
+            return false;
+
+        if (subscription_iter->second._unsubscribe)
+            subscription_iter->second._unsubscribe();
+        _subscriptions.erase(subscription_iter);
+        for (auto &[key, instance] : _instances)
+        {
+            std::erase(instance._subscriptions, subscription_id);
+        }
+        return true;
     }
 
-    void ScriptPhysics2D::SetLinearVelocity(const ScriptEntity &entity, const Vector2f &velocity)
+    void ScriptSystem::ClearSubscriptions(ScriptInstance &instance)
     {
-        if (entity._scene != nullptr && entity.IsValid()) Physics2D::SetLinearVelocity(*entity._scene, entity._entity, velocity);
+        const Vector<ScriptSubscriptionHandle> subscriptions = std::move(instance._subscriptions);
+        instance._subscriptions.clear();
+        for (const ScriptSubscriptionHandle subscription_id : subscriptions)
+            Unsubscribe(subscription_id);
     }
 
-    Vector2f ScriptPhysics2D::GetLinearVelocity(const ScriptEntity &entity)
+    void ScriptSystem::DispatchInputEvent(const InputActionEvent &event)
     {
-        return entity._scene != nullptr && entity.IsValid() ? Physics2D::GetLinearVelocity(*entity._scene, entity._entity) : Vector2f::kZero;
-    }
-
-    void ScriptPhysics2D::SetAngularVelocity(const ScriptEntity &entity, f32 velocity)
-    {
-        if (entity._scene != nullptr && entity.IsValid()) Physics2D::SetAngularVelocity(*entity._scene, entity._entity, velocity);
-    }
-
-    void ScriptPhysics2D::AddForce(const ScriptEntity &entity, const Vector2f &force)
-    {
-        if (entity._scene != nullptr && entity.IsValid()) Physics2D::AddForce(*entity._scene, entity._entity, force);
-    }
-
-    void ScriptPhysics2D::AddImpulse(const ScriptEntity &entity, const Vector2f &impulse)
-    {
-        if (entity._scene != nullptr && entity.IsValid()) Physics2D::AddImpulse(*entity._scene, entity._entity, impulse);
+        if (event._action == nullptr)
+            return;
+        if (event._type == EInputActionEventType::kPerformed)
+            _input.NotifyPerformed(event._action->GetName());
+        else if (event._type == EInputActionEventType::kValueChanged)
+            _input.NotifyValueChanged(event._action->GetName(), event._value._value.x);
     }
 
     void ScriptSystem::Tick(f32 delta_time)
@@ -343,7 +300,7 @@ namespace Ailu
 #if AILU_ENABLE_LUA_SCRIPTING
         PruneInvalidInstances();
 #endif
-        while (!_reload_queue.empty())
+        while (Application::Get()._is_playing_mode && !_reload_queue.empty())
         {
             const Guid script_asset = _reload_queue.front();
             _reload_queue.pop();
@@ -352,6 +309,8 @@ namespace Ailu
             ProcessReload(script_asset);
 #endif
         }
+#if AILU_ENABLE_LUA_SCRIPTING
+#endif
     }
 
     bool ScriptSystem::RunFile(const String &path)
@@ -490,23 +449,26 @@ namespace Ailu
             prototype_iter = _prototypes.find(prototype_key);
         }
 
-        SynchronizeScriptProperties(component, prototype_iter->second._prototype);
+        SynchronizeScriptProperties(component, prototype_iter->second);
         return true;
     }
 
-    void ScriptSystem::RegisterCoreBindings()
+        void ScriptSystem::RegisterCoreBindings()
     {
-        RegisterGeneratedLuaBindings(_lua);
-        _lua.new_usertype<Vector2f>("Vec2", sol::constructors<Vector2f(), Vector2f(f32, f32)>(), "x", &Vector2f::x, "y", &Vector2f::y);
-        _lua.new_usertype<Vector3f>("Vec3", sol::constructors<Vector3f(), Vector3f(f32, f32, f32)>(), "x", &Vector3f::x, "y", &Vector3f::y,
-                                    "z", &Vector3f::z);
-        _lua.new_usertype<Math::Quaternion>("Quaternion",
-                                             sol::constructors<Math::Quaternion(), Math::Quaternion(f32, f32, f32, f32)>(),
-                                             "x", &Math::Quaternion::x, "y", &Math::Quaternion::y, "z", &Math::Quaternion::z,
-                                             "w", &Math::Quaternion::w);
-        _lua["time"] = ScriptTime{};
-        _lua["input"] = ScriptInput{};
-        _lua["physics2d"] = ScriptPhysics2D{};
+        ScriptLuaBindingRegister::RegisterAll(_lua);
+        _lua.new_usertype<Vector2f>("Vector2f", "x", &Vector2f::x, "y", &Vector2f::y);
+        _lua.set_function("Vec2", sol::overload([]() { return Vector2f{}; }, [](f32 x, f32 y) { return Vector2f{x, y}; }));
+        _lua.new_usertype<Vector3f>("Vector3f", "x", &Vector3f::x, "y", &Vector3f::y, "z", &Vector3f::z);
+        _lua.set_function("Vec3", sol::overload([]() { return Vector3f{}; }, [](f32 x, f32 y, f32 z) { return Vector3f{x, y, z}; }));
+        _lua.new_usertype<Math::Quaternion>("Quaternion", "x", &Math::Quaternion::x, "y", &Math::Quaternion::y,
+                                             "z", &Math::Quaternion::z, "w", &Math::Quaternion::w);
+        _lua.set_function("Quaternion", sol::overload([]() { return Math::Quaternion{}; },
+                                                       [](f32 x, f32 y, f32 z, f32 w) { return Math::Quaternion{x, y, z, w}; }));
+        sol::table script_input_type = _lua["ScriptInput"];
+        script_input_type.set_function("off", [this](const ScriptInput &, std::optional<ScriptSubscriptionHandle> subscription_id)
+        {
+            return subscription_id.has_value() && Unsubscribe(*subscription_id);
+        });
     }
 
     bool ScriptSystem::LoadComponentInstance(const ScriptInstanceKey &key, ECS::ScriptComponent &component, const ScriptEntity &entity)
@@ -536,7 +498,7 @@ namespace Ailu
         instance._instance = _lua.create_table();
         instance._instance["entity"] = ScriptEntity{key._scene, key._entity};
         instance._instance["scene"] = ScriptScene{key._scene};
-        SynchronizeScriptProperties(component, prototype_iter->second._prototype);
+        SynchronizeScriptProperties(component, prototype_iter->second);
         InjectScriptProperties(component, key._scene, instance._instance);
         sol::table metatable = _lua.create_table();
         metatable["__index"] = prototype_iter->second._prototype;
@@ -621,56 +583,48 @@ namespace Ailu
         return is_enabled;
     }
 
-    void ScriptSystem::SynchronizeScriptProperties(ECS::ScriptComponent &component, const sol::table &prototype)
+    void ScriptSystem::SynchronizeScriptProperties(ECS::ScriptComponent &component, const ScriptPrototype &script_prototype)
     {
         for (ECS::ScriptPropertyData &property : component._properties)
             property._is_orphan = true;
 
-        const sol::object schema_object = prototype["__properties"];
-        if (!schema_object.valid() || schema_object.get_type() != sol::type::table)
-            return;
-
-        const sol::table schema = schema_object.as<sol::table>();
-        for (const auto &[name_object, definition_object] : schema)
+        for (const ScriptPropertyDeclaration &declaration : script_prototype._property_declarations)
         {
-            if (name_object.get_type() != sol::type::string || definition_object.get_type() != sol::type::table)
+            const String &name = declaration._name;
+            const sol::object default_value = script_prototype._prototype[name];
+            if (!default_value.valid())
                 continue;
-            const String name = name_object.as<String>();
-            const sol::table definition = definition_object.as<sol::table>();
-            const String type_name = definition.get_or<String>("type", "");
-            ECS::EScriptPropertyType type;
-            if (type_name == "bool") type = ECS::EScriptPropertyType::kBool;
-            else if (type_name == "int") type = ECS::EScriptPropertyType::kInt;
-            else if (type_name == "float") type = ECS::EScriptPropertyType::kFloat;
-            else if (type_name == "string") type = ECS::EScriptPropertyType::kString;
-            else if (type_name == "vec2") type = ECS::EScriptPropertyType::kVector2;
-            else if (type_name == "vec3") type = ECS::EScriptPropertyType::kVector3;
-            else if (type_name == "vec4") type = ECS::EScriptPropertyType::kVector4;
-            else if (type_name == "color") type = ECS::EScriptPropertyType::kColor;
-            else if (type_name == "entity") type = ECS::EScriptPropertyType::kEntity;
-            else if (type_name == "asset") type = ECS::EScriptPropertyType::kAsset;
-            else continue;
+            const auto type = ResolveScriptPropertyType(default_value, declaration._type_hint);
+            if (!type.has_value())
+                continue;
 
             const auto property_iter = std::find_if(component._properties.begin(), component._properties.end(), [&name, type](
-                const ECS::ScriptPropertyData &property) { return property._name == name && property._type == type; });
+                const ECS::ScriptPropertyData &property) { return property._name == name && property._type == type.value(); });
             if (property_iter != component._properties.end())
             {
                 property_iter->_is_orphan = false;
+                if (property_iter->_type == ECS::EScriptPropertyType::kAsset)
+                    property_iter->_asset_type = default_value.as<ScriptAssetValue>()._asset_type;
                 continue;
             }
 
             ECS::ScriptPropertyData property;
             property._name = name;
-            property._type = type;
-            const sol::object default_value = definition["default"];
-            if (type == ECS::EScriptPropertyType::kBool) property._bool_value = default_value.is<bool>() && default_value.as<bool>();
-            else if (type == ECS::EScriptPropertyType::kInt) property._int_value = default_value.is<i32>() ? default_value.as<i32>() : 0;
-            else if (type == ECS::EScriptPropertyType::kFloat) property._float_value = default_value.is<f32>() ? default_value.as<f32>() : 0.0f;
-            else if (type == ECS::EScriptPropertyType::kString) property._string_value = default_value.is<String>() ? default_value.as<String>() : "";
-            else if (type == ECS::EScriptPropertyType::kVector2) property._vector_value = default_value.is<Vector2f>() ? default_value.as<Vector2f>() : Vector2f::kZero;
-            else if (type == ECS::EScriptPropertyType::kVector3) property._vector_value = default_value.is<Vector3f>() ? default_value.as<Vector3f>() : Vector3f::kZero;
-            else if (type == ECS::EScriptPropertyType::kVector4 || type == ECS::EScriptPropertyType::kColor)
+            property._type = type.value();
+            if (property._type == ECS::EScriptPropertyType::kBool) property._bool_value = default_value.as<bool>();
+            else if (property._type == ECS::EScriptPropertyType::kInt) property._int_value = default_value.as<i32>();
+            else if (property._type == ECS::EScriptPropertyType::kFloat) property._float_value = default_value.as<f32>();
+            else if (property._type == ECS::EScriptPropertyType::kString) property._string_value = default_value.as<String>();
+            else if (property._type == ECS::EScriptPropertyType::kVector2) property._vector_value = default_value.as<Vector2f>();
+            else if (property._type == ECS::EScriptPropertyType::kVector3) property._vector_value = default_value.as<Vector3f>();
+            else if (property._type == ECS::EScriptPropertyType::kVector4 || property._type == ECS::EScriptPropertyType::kColor)
                 property._vector_value = default_value.is<Vector4f>() ? default_value.as<Vector4f>() : Vector4f::kZero;
+            else if (property._type == ECS::EScriptPropertyType::kAsset)
+            {
+                const auto asset = default_value.as<ScriptAssetValue>();
+                property._guid_value = asset._guid;
+                property._asset_type = asset._asset_type;
+            }
             component._properties.emplace_back(std::move(property));
         }
     }
@@ -693,7 +647,7 @@ namespace Ailu
             case ECS::EScriptPropertyType::kVector4:
             case ECS::EScriptPropertyType::kColor: instance[property._name] = property._vector_value; break;
             case ECS::EScriptPropertyType::kEntity: instance[property._name] = ScriptEntity{scene, scene->FindEntity(property._guid_value)}; break;
-            case ECS::EScriptPropertyType::kAsset: instance[property._name] = property._guid_value.ToString(); break;
+            case ECS::EScriptPropertyType::kAsset: instance[property._name] = ScriptAssetValue{property._guid_value, property._asset_type}; break;
             }
         }
     }
@@ -707,8 +661,6 @@ namespace Ailu
                 function = object.as<sol::protected_function>();
         };
         cache_function("OnCreate", instance._on_create);
-        if (!instance._on_create.valid())
-            cache_function("OnInit", instance._on_create);
         cache_function("OnEnable", instance._on_enable);
         cache_function("OnDisable", instance._on_disable);
         cache_function("OnFixedUpdate", instance._on_fixed_update);
@@ -754,6 +706,7 @@ namespace Ailu
             auto *component = key._scene->GetRegister().GetComponent<ECS::ScriptComponent>(key._entity);
             if (component == nullptr || component->_script_asset != script_asset)
                 continue;
+            ClearSubscriptions(_instances.at(key));
             if (!LoadComponentInstance(key, *component, {key._scene, key._entity}))
                 continue;
 
@@ -796,6 +749,14 @@ namespace Ailu
         prototype._resolved_path = script_asset.ToString();
         prototype._version = _script_versions[prototype._resolved_path];
         prototype._prototype = object.as<sol::table>();
+        String source;
+        if (FileManager::ReadFile(ToWChar(resolved_path.string()), source))
+        {
+            Vector<std::pair<String, String>> declarations;
+            ParseScriptPropertyDeclarations(source, declarations);
+            for (auto &[name, type_hint] : declarations)
+                prototype._property_declarations.push_back({std::move(name), std::move(type_hint)});
+        }
         _loaded_script_files[prototype._resolved_path] = resolved_path;
         _prototypes.insert_or_assign(prototype._resolved_path, std::move(prototype));
         return true;
@@ -815,6 +776,7 @@ namespace Ailu
             }
 
             InvokeComponentMethod(iter->second, iter->second._on_destroy);
+            ClearSubscriptions(iter->second);
             iter = _instances.erase(iter);
         }
     }
@@ -899,6 +861,7 @@ namespace Ailu
         if (iter != _instances.end())
         {
             InvokeComponentMethod(iter->second, iter->second._on_destroy);
+            ClearSubscriptions(iter->second);
             _instances.erase(iter);
         }
 #else

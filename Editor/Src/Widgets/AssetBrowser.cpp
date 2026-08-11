@@ -1905,9 +1905,10 @@ namespace Ailu
             if (ResourceMgr::Get().GetAsset(asset_path) != nullptr || fs::exists(ResourceMgr::GetResSysPath(asset_path)) || fs::exists(lua_sys_path))
                 return false;
 
-            const String script_template = R"(local script = {}
+            const String script_template = R"(---@type AiluScript
+local script = {}
 
-function script:OnInit()
+function script:OnCreate()
 end
 
 function script:OnFixedUpdate(fixed_delta_time)

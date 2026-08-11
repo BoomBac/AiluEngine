@@ -583,64 +583,74 @@ namespace Ailu
 
         for (const auto &[entity, body_runtime] : _impl->_bodies)
         {
-            const auto *transform = r.GetComponent<ECS::TransformComponent>(entity);
-            const auto *collider = r.GetComponent<ECS::Collider2DComponent>(entity);
-            if (transform == nullptr || collider == nullptr || !b2Body_IsValid(body_runtime._body_id))
-                continue;
-
             const b2BodyType body_type = b2Body_GetType(body_runtime._body_id);
             const Color body_color = body_type == b2_staticBody ? Math::Colors::kGreen
                                      : body_type == b2_kinematicBody ? Math::Colors::kCyan
                                                                     : Math::Colors::kBlue;
-            const b2Vec2 body_position = b2Body_GetPosition(body_runtime._body_id);
-            const f32 body_angle = b2Rot_GetAngle(b2Body_GetRotation(body_runtime._body_id));
-            const f32 z = transform->_position.z;
-            for (const ECS::ColliderShape2D &shape : collider->_shapes)
+            DebugDrawCollider(r, entity, body_color);
+        }
+    }
+
+    void Physics2DWorld::DebugDrawCollider(ECS::Register &r, ECS::Entity entity, Color color) const
+    {
+        const auto body_it = _impl->_bodies.find(entity);
+        if (body_it == _impl->_bodies.end() || !b2Body_IsValid(body_it->second._body_id))
+            return;
+
+        const auto *transform = r.GetComponent<ECS::TransformComponent>(entity);
+        const auto *collider = r.GetComponent<ECS::Collider2DComponent>(entity);
+        if (transform == nullptr || collider == nullptr)
+            return;
+
+        const b2BodyId body_id = body_it->second._body_id;
+        const b2Vec2 body_position = b2Body_GetPosition(body_id);
+        const f32 body_angle = b2Rot_GetAngle(b2Body_GetRotation(body_id));
+        const f32 z = transform->_position.z;
+        for (const ECS::ColliderShape2D &shape : collider->_shapes)
+        {
+            const Color shape_color = shape._is_trigger ? Math::Colors::kYellow : color;
+            const b2Vec2 local_center{shape._center.x, shape._center.y};
+            const b2Vec2 center_offset = Rotate(local_center, body_angle);
+            const Vector3f center(body_position.x + center_offset.x, body_position.y + center_offset.y, z);
+            if (shape._type == ECS::ECollider2DShape::kCircle)
             {
-                const Color color = shape._is_trigger ? Math::Colors::kYellow : body_color;
-                const b2Vec2 local_center{shape._center.x, shape._center.y};
-                const b2Vec2 center_offset = Rotate(local_center, body_angle);
-                const Vector3f center(body_position.x + center_offset.x, body_position.y + center_offset.y, z);
-                if (shape._type == ECS::ECollider2DShape::kCircle)
-                {
-                    Render::Gizmo::DrawCircle(center, shape._radius, Render::Gizmo::kSegments, color,
-                                               MatrixRotationX(Math::kHalfPi));
-                    continue;
-                }
+                Render::Gizmo::DrawCircle(center, shape._radius, Render::Gizmo::kSegments, shape_color,
+                                           MatrixRotationX(Math::kHalfPi));
+                continue;
+            }
 
-                if (shape._type == ECS::ECollider2DShape::kCapsule)
-                {
-                    const f32 half_segment = std::max(shape._height * 0.5f - shape._radius, 0.0f);
-                    const b2Vec2 offset = Rotate(b2Vec2{0.0f, half_segment}, body_angle + shape._rotation);
-                    const Vector3f point_a(center.x - offset.x, center.y - offset.y, z);
-                    const Vector3f point_b(center.x + offset.x, center.y + offset.y, z);
-                    Render::Gizmo::DrawCircle(point_a, shape._radius, Render::Gizmo::kSegments, color,
-                                               MatrixRotationX(Math::kHalfPi));
-                    Render::Gizmo::DrawCircle(point_b, shape._radius, Render::Gizmo::kSegments, color,
-                                               MatrixRotationX(Math::kHalfPi));
-                    const b2Vec2 side = Rotate(b2Vec2{shape._radius, 0.0f}, body_angle + shape._rotation);
-                    Render::Gizmo::DrawLine(point_a + Vector3f(side.x, side.y, 0.0f),
-                                             point_b + Vector3f(side.x, side.y, 0.0f), color);
-                    Render::Gizmo::DrawLine(point_a - Vector3f(side.x, side.y, 0.0f),
-                                             point_b - Vector3f(side.x, side.y, 0.0f), color);
-                    continue;
-                }
+            if (shape._type == ECS::ECollider2DShape::kCapsule)
+            {
+                const f32 half_segment = std::max(shape._height * 0.5f - shape._radius, 0.0f);
+                const b2Vec2 offset = Rotate(b2Vec2{0.0f, half_segment}, body_angle + shape._rotation);
+                const Vector3f point_a(center.x - offset.x, center.y - offset.y, z);
+                const Vector3f point_b(center.x + offset.x, center.y + offset.y, z);
+                Render::Gizmo::DrawCircle(point_a, shape._radius, Render::Gizmo::kSegments, shape_color,
+                                           MatrixRotationX(Math::kHalfPi));
+                Render::Gizmo::DrawCircle(point_b, shape._radius, Render::Gizmo::kSegments, shape_color,
+                                           MatrixRotationX(Math::kHalfPi));
+                const b2Vec2 side = Rotate(b2Vec2{shape._radius, 0.0f}, body_angle + shape._rotation);
+                Render::Gizmo::DrawLine(point_a + Vector3f(side.x, side.y, 0.0f),
+                                         point_b + Vector3f(side.x, side.y, 0.0f), shape_color);
+                Render::Gizmo::DrawLine(point_a - Vector3f(side.x, side.y, 0.0f),
+                                         point_b - Vector3f(side.x, side.y, 0.0f), shape_color);
+                continue;
+            }
 
-                if (shape._type == ECS::ECollider2DShape::kBox)
+            if (shape._type == ECS::ECollider2DShape::kBox)
+            {
+                const f32 half_width = shape._size.x * 0.5f;
+                const f32 half_height = shape._size.y * 0.5f;
+                const b2Vec2 corners[] = {{-half_width, -half_height}, {half_width, -half_height},
+                                           {half_width, half_height}, {-half_width, half_height}};
+                Vector3f points[4];
+                for (u32 index = 0u; index < 4u; ++index)
                 {
-                    const f32 half_width = shape._size.x * 0.5f;
-                    const f32 half_height = shape._size.y * 0.5f;
-                    const b2Vec2 corners[] = {{-half_width, -half_height}, {half_width, -half_height},
-                                               {half_width, half_height}, {-half_width, half_height}};
-                    Vector3f points[4];
-                    for (u32 index = 0u; index < 4u; ++index)
-                    {
-                        const b2Vec2 point = Rotate(corners[index], body_angle + shape._rotation);
-                        points[index] = center + Vector3f(point.x, point.y, 0.0f);
-                    }
-                    for (u32 index = 0u; index < 4u; ++index)
-                        Render::Gizmo::DrawLine(points[index], points[(index + 1u) % 4u], color);
+                    const b2Vec2 point = Rotate(corners[index], body_angle + shape._rotation);
+                    points[index] = center + Vector3f(point.x, point.y, 0.0f);
                 }
+                for (u32 index = 0u; index < 4u; ++index)
+                    Render::Gizmo::DrawLine(points[index], points[(index + 1u) % 4u], shape_color);
             }
         }
     }

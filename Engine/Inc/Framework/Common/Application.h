@@ -3,6 +3,7 @@
 #define __APPLICATION_H__
 #include "Framework/Common/Window.h"
 #include "Framework/Events/Event.h"
+#include "Framework/Core/Delegate.h"
 #include "Framework/Events/LayerStack.h"
 #include "Framework/Events/WindowEvent.h"
 #include "Framework/Events/KeyEvent.h"

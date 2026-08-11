@@ -209,6 +209,8 @@ namespace Ailu
 
         // Move-out the internal command list for submission.
         Vector<GfxCommand *> TakeCommands();
+        // Move-out temporary RTs whose pool leases can be released after GPU submission.
+        Vector<RTHandle> TakeReleasedTempRTs();
         CommandRenderingStatesData TakeRenderingStatesData();
         // Read-only access to internal commands (for synchronous processing).
         const Vector<GfxCommand *> &GetCommands() const;

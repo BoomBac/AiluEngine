@@ -23,6 +23,22 @@ namespace Ailu
                 return copy;
             }
 
+            bool CopyComponent(Entity source, Entity target) final
+            {
+                T *source_component = GetComponent(source);
+                if (source_component == nullptr)
+                    return false;
+
+                if (T *target_component = GetComponent(target))
+                {
+                    *target_component = *source_component;
+                    return false;
+                }
+
+                Create(target, *source_component);
+                return true;
+            }
+
             template<typename... Args>
             T &Create(Entity entity, Args &&...args)
             {

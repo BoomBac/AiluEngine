@@ -22,13 +22,33 @@ namespace Ailu
           _enabled(other._enabled),
           _started_this_frame(other._started_this_frame),
           _performed_this_frame(other._performed_this_frame),
-          _canceled_this_frame(other._canceled_this_frame),
-          _listeners(other._listeners)
+          _canceled_this_frame(other._canceled_this_frame)
     {
         if (other._composite)
             _composite = other._composite->Clone();
         if (other._default_interaction)
             _default_interaction = other._default_interaction->Clone();
+    }
+
+    InputAction::InputAction(InputAction &&other) noexcept
+        : _name(std::move(other._name)),
+          _id(other._id),
+          _action_type(other._action_type),
+          _value_type(other._value_type),
+          _phase(other._phase),
+          _bindings(std::move(other._bindings)),
+          _composite(std::move(other._composite)),
+          _default_interaction(std::move(other._default_interaction)),
+          _merge_strategy(other._merge_strategy),
+          _current_value(other._current_value),
+          _previous_value(other._previous_value),
+          _enabled(other._enabled),
+          _started_this_frame(other._started_this_frame),
+          _performed_this_frame(other._performed_this_frame),
+          _canceled_this_frame(other._canceled_this_frame),
+          _on_action_delegate(std::move(other._on_action_delegate)),
+          _on_action(_on_action_delegate.GetEventView())
+    {
     }
 
     InputAction &InputAction::operator=(const InputAction &other)
@@ -51,7 +71,31 @@ namespace Ailu
         _started_this_frame = other._started_this_frame;
         _performed_this_frame = other._performed_this_frame;
         _canceled_this_frame = other._canceled_this_frame;
-        _listeners = other._listeners;
+        return *this;
+    }
+
+    InputAction &InputAction::operator=(InputAction &&other) noexcept
+    {
+        if (this == &other)
+            return *this;
+
+        _name = std::move(other._name);
+        _id = other._id;
+        _action_type = other._action_type;
+        _value_type = other._value_type;
+        _phase = other._phase;
+        _bindings = std::move(other._bindings);
+        _composite = std::move(other._composite);
+        _default_interaction = std::move(other._default_interaction);
+        _merge_strategy = other._merge_strategy;
+        _current_value = other._current_value;
+        _previous_value = other._previous_value;
+        _enabled = other._enabled;
+        _started_this_frame = other._started_this_frame;
+        _performed_this_frame = other._performed_this_frame;
+        _canceled_this_frame = other._canceled_this_frame;
+        _on_action_delegate = std::move(other._on_action_delegate);
+        _on_action = _on_action_delegate.GetEventView();
         return *this;
     }
 
@@ -80,8 +124,7 @@ namespace Ailu
             event._value = _current_value;
             event._phase = EInputActionPhase::kCanceled;
             event._time = 0.0; // will be filled by InputSystem
-            for (auto &listener : _listeners)
-                listener(event);
+            _on_action_delegate.Invoke(event);
         }
 
         _enabled = false;
@@ -158,8 +201,7 @@ namespace Ailu
                     event._value = _current_value;
                     event._phase = EInputActionPhase::kPerformed;
                     event._time = context._time;
-                    for (auto &listener : _listeners)
-                        listener(event);
+                    _on_action_delegate.Invoke(event);
                 }
                 else
                 {
@@ -320,8 +362,7 @@ namespace Ailu
             event._value = _current_value;
             event._phase = result._phase;
             event._time = time;
-            for (auto &listener : _listeners)
-                listener(event);
+            _on_action_delegate.Invoke(event);
         }
     }
 

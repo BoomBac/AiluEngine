@@ -7,6 +7,7 @@ namespace Ailu
 {
     class Type;
     class Window;
+    class Event;
     namespace Editor
     {
         AENUM()
@@ -81,6 +82,7 @@ namespace Ailu
             DockManager();
             ~DockManager();
             void AddDock(Ref<DockWindow> dock);
+            bool ActivateDock(StringView type_name);
             void RemoveDock(DockWindow *dock);
             void RequestRemoveDock(DockWindow *dock);
             void Update(f32 dt);

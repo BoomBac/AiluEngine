@@ -82,7 +82,7 @@ namespace Ailu
             void RegisterEventAfterTick(AfterTickEvent e);
             void UnRegisterEventBeforeTick(BeforeTickEvent e);
             void UnRegisterEventAfterTick(AfterTickEvent e);
-            RenderTexture *GetTargetTexture() const { return g_pRenderTexturePool->Get(_gameview_rt_handle); }
+            RenderTexture *GetTargetTexture() const { return _presentation_texture.get(); }
             const RenderingData &GetRenderingData() const { return _rendering_data; }
             RenderTexture *TargetTexture();
             void AddFeature(RenderFeature *feature) { _features.emplace_back(feature); };
@@ -156,6 +156,8 @@ namespace Ailu
             Queue<Vector2f> _resize_events;
             List<BeforeTickEvent> _events_before_tick;
             List<AfterTickEvent> _events_after_tick;
+            Ref<RenderTexture> _presentation_texture;
+            Vector<Ref<RenderTexture>> _presentation_texture_cache;
             RenderTexture *_target_tex;
             Vector<MaterialData> _material_data_cache;
             Map<u64, u32> _material_data_lut;

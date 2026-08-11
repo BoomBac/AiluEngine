@@ -3084,6 +3084,27 @@ builder_name._meta = meta_name;
 builder_name._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<String>);
 builder_name._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<String>);
 initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_name));
+Meta meta_tag;
+meta_tag.Set("Category","");
+meta_tag.Set("IsColor",false);
+meta_tag.Set("IsRange",false);
+meta_tag.Set("IsFloatRange",true);
+meta_tag.Set("RangeMin",(f32)0);
+meta_tag.Set("RangeMax",(f32)1);
+MemberBuilder builder_tag;
+builder_tag._name = "_tag";
+builder_tag._type_name = "String";
+builder_tag._offset = offsetof(SceneTagComponentDocument,_tag);
+builder_tag._is_const = false;
+builder_tag._is_static = false;
+builder_tag._is_public = true;
+builder_tag._is_pointer = false;
+builder_tag._is_ref = false;
+builder_tag._is_template = false;
+builder_tag._meta = meta_tag;
+builder_tag._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<String>);
+builder_tag._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<String>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_tag));
 Meta meta_layer_mask;
 meta_layer_mask.Set("Category","");
 meta_layer_mask.Set("IsColor",false);
@@ -4169,6 +4190,188 @@ return Ailu::SceneRigidBodyComponentDocument::StaticType();
 return Ailu::SceneRigidBodyComponentDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_SceneRigidBodyComponentDocument(&Ailu::SceneRigidBodyComponentDocument::StaticType, "Ailu::SceneRigidBodyComponentDocument");
+const Ailu::Type* Ailu::Z_Construct_SceneRigidBody2DComponentDocument_Type()
+{
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "SceneRigidBody2DComponentDocument";
+initializer._size = sizeof(Ailu::SceneRigidBody2DComponentDocument);
+initializer._full_name = "Ailu::SceneRigidBody2DComponentDocument";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu";
+initializer._base_name = "";
+initializer._constructor = []()->Ailu::SceneRigidBody2DComponentDocument* {return new Ailu::SceneRigidBody2DComponentDocument;};
+Meta meta_type;
+meta_type.Set("Category","");
+meta_type.Set("IsColor",false);
+meta_type.Set("IsRange",false);
+meta_type.Set("IsFloatRange",true);
+meta_type.Set("RangeMin",(f32)0);
+meta_type.Set("RangeMax",(f32)1);
+MemberBuilder builder_type;
+builder_type._name = "_type";
+builder_type._type_name = "ECS::EBody2DType";
+builder_type._offset = offsetof(SceneRigidBody2DComponentDocument,_type);
+builder_type._is_const = false;
+builder_type._is_static = false;
+builder_type._is_public = true;
+builder_type._is_pointer = false;
+builder_type._is_ref = false;
+builder_type._is_template = false;
+builder_type._meta = meta_type;
+builder_type._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<ECS::EBody2DType>);
+builder_type._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<ECS::EBody2DType>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_type));
+Meta meta_gravity_scale;
+meta_gravity_scale.Set("Category","");
+meta_gravity_scale.Set("IsColor",false);
+meta_gravity_scale.Set("IsRange",false);
+meta_gravity_scale.Set("IsFloatRange",true);
+meta_gravity_scale.Set("RangeMin",(f32)0);
+meta_gravity_scale.Set("RangeMax",(f32)1);
+MemberBuilder builder_gravity_scale;
+builder_gravity_scale._name = "_gravity_scale";
+builder_gravity_scale._type_name = "f32";
+builder_gravity_scale._offset = offsetof(SceneRigidBody2DComponentDocument,_gravity_scale);
+builder_gravity_scale._is_const = false;
+builder_gravity_scale._is_static = false;
+builder_gravity_scale._is_public = true;
+builder_gravity_scale._is_pointer = false;
+builder_gravity_scale._is_ref = false;
+builder_gravity_scale._is_template = false;
+builder_gravity_scale._meta = meta_gravity_scale;
+builder_gravity_scale._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_gravity_scale._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_gravity_scale));
+Meta meta_linear_damping;
+meta_linear_damping.Set("Category","");
+meta_linear_damping.Set("IsColor",false);
+meta_linear_damping.Set("IsRange",false);
+meta_linear_damping.Set("IsFloatRange",true);
+meta_linear_damping.Set("RangeMin",(f32)0);
+meta_linear_damping.Set("RangeMax",(f32)1);
+MemberBuilder builder_linear_damping;
+builder_linear_damping._name = "_linear_damping";
+builder_linear_damping._type_name = "f32";
+builder_linear_damping._offset = offsetof(SceneRigidBody2DComponentDocument,_linear_damping);
+builder_linear_damping._is_const = false;
+builder_linear_damping._is_static = false;
+builder_linear_damping._is_public = true;
+builder_linear_damping._is_pointer = false;
+builder_linear_damping._is_ref = false;
+builder_linear_damping._is_template = false;
+builder_linear_damping._meta = meta_linear_damping;
+builder_linear_damping._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_linear_damping._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_linear_damping));
+Meta meta_angular_damping;
+meta_angular_damping.Set("Category","");
+meta_angular_damping.Set("IsColor",false);
+meta_angular_damping.Set("IsRange",false);
+meta_angular_damping.Set("IsFloatRange",true);
+meta_angular_damping.Set("RangeMin",(f32)0);
+meta_angular_damping.Set("RangeMax",(f32)1);
+MemberBuilder builder_angular_damping;
+builder_angular_damping._name = "_angular_damping";
+builder_angular_damping._type_name = "f32";
+builder_angular_damping._offset = offsetof(SceneRigidBody2DComponentDocument,_angular_damping);
+builder_angular_damping._is_const = false;
+builder_angular_damping._is_static = false;
+builder_angular_damping._is_public = true;
+builder_angular_damping._is_pointer = false;
+builder_angular_damping._is_ref = false;
+builder_angular_damping._is_template = false;
+builder_angular_damping._meta = meta_angular_damping;
+builder_angular_damping._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_angular_damping._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_angular_damping));
+Meta meta_fixed_rotation;
+meta_fixed_rotation.Set("Category","");
+meta_fixed_rotation.Set("IsColor",false);
+meta_fixed_rotation.Set("IsRange",false);
+meta_fixed_rotation.Set("IsFloatRange",true);
+meta_fixed_rotation.Set("RangeMin",(f32)0);
+meta_fixed_rotation.Set("RangeMax",(f32)1);
+MemberBuilder builder_fixed_rotation;
+builder_fixed_rotation._name = "_fixed_rotation";
+builder_fixed_rotation._type_name = "bool";
+builder_fixed_rotation._offset = offsetof(SceneRigidBody2DComponentDocument,_fixed_rotation);
+builder_fixed_rotation._is_const = false;
+builder_fixed_rotation._is_static = false;
+builder_fixed_rotation._is_public = true;
+builder_fixed_rotation._is_pointer = false;
+builder_fixed_rotation._is_ref = false;
+builder_fixed_rotation._is_template = false;
+builder_fixed_rotation._meta = meta_fixed_rotation;
+builder_fixed_rotation._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_fixed_rotation._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_fixed_rotation));
+Meta meta_continuous;
+meta_continuous.Set("Category","");
+meta_continuous.Set("IsColor",false);
+meta_continuous.Set("IsRange",false);
+meta_continuous.Set("IsFloatRange",true);
+meta_continuous.Set("RangeMin",(f32)0);
+meta_continuous.Set("RangeMax",(f32)1);
+MemberBuilder builder_continuous;
+builder_continuous._name = "_continuous";
+builder_continuous._type_name = "bool";
+builder_continuous._offset = offsetof(SceneRigidBody2DComponentDocument,_continuous);
+builder_continuous._is_const = false;
+builder_continuous._is_static = false;
+builder_continuous._is_public = true;
+builder_continuous._is_pointer = false;
+builder_continuous._is_ref = false;
+builder_continuous._is_template = false;
+builder_continuous._meta = meta_continuous;
+builder_continuous._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_continuous._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_continuous));
+Meta meta_allow_sleep;
+meta_allow_sleep.Set("Category","");
+meta_allow_sleep.Set("IsColor",false);
+meta_allow_sleep.Set("IsRange",false);
+meta_allow_sleep.Set("IsFloatRange",true);
+meta_allow_sleep.Set("RangeMin",(f32)0);
+meta_allow_sleep.Set("RangeMax",(f32)1);
+MemberBuilder builder_allow_sleep;
+builder_allow_sleep._name = "_allow_sleep";
+builder_allow_sleep._type_name = "bool";
+builder_allow_sleep._offset = offsetof(SceneRigidBody2DComponentDocument,_allow_sleep);
+builder_allow_sleep._is_const = false;
+builder_allow_sleep._is_static = false;
+builder_allow_sleep._is_public = true;
+builder_allow_sleep._is_pointer = false;
+builder_allow_sleep._is_ref = false;
+builder_allow_sleep._is_template = false;
+builder_allow_sleep._meta = meta_allow_sleep;
+builder_allow_sleep._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_allow_sleep._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_allow_sleep));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+const Ailu::Type* Ailu::SceneRigidBody2DComponentDocument::GetPrivateStaticClass()
+{
+	static const Ailu::Type* type = Z_Construct_SceneRigidBody2DComponentDocument_Type();
+	return type;
+}
+
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::SceneRigidBody2DComponentDocument>()
+{
+return Ailu::SceneRigidBody2DComponentDocument::StaticType();
+}
+    const Type *Ailu::SceneRigidBody2DComponentDocument::GetType()
+{
+return Ailu::SceneRigidBody2DComponentDocument::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_SceneRigidBody2DComponentDocument(&Ailu::SceneRigidBody2DComponentDocument::StaticType, "Ailu::SceneRigidBody2DComponentDocument");
 const Ailu::Type* Ailu::Z_Construct_SceneColliderComponentDocument_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -4288,6 +4491,62 @@ return Ailu::SceneColliderComponentDocument::StaticType();
 return Ailu::SceneColliderComponentDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_SceneColliderComponentDocument(&Ailu::SceneColliderComponentDocument::StaticType, "Ailu::SceneColliderComponentDocument");
+const Ailu::Type* Ailu::Z_Construct_SceneCollider2DComponentDocument_Type()
+{
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "SceneCollider2DComponentDocument";
+initializer._size = sizeof(Ailu::SceneCollider2DComponentDocument);
+initializer._full_name = "Ailu::SceneCollider2DComponentDocument";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu";
+initializer._base_name = "";
+initializer._constructor = []()->Ailu::SceneCollider2DComponentDocument* {return new Ailu::SceneCollider2DComponentDocument;};
+Meta meta_shapes;
+meta_shapes.Set("Category","");
+meta_shapes.Set("IsColor",false);
+meta_shapes.Set("IsRange",false);
+meta_shapes.Set("IsFloatRange",true);
+meta_shapes.Set("RangeMin",(f32)0);
+meta_shapes.Set("RangeMax",(f32)1);
+MemberBuilder builder_shapes;
+builder_shapes._name = "_shapes";
+builder_shapes._type_name = "Vector<ECS::ColliderShape2D>";
+builder_shapes._offset = offsetof(SceneCollider2DComponentDocument,_shapes);
+builder_shapes._is_const = false;
+builder_shapes._is_static = false;
+builder_shapes._is_public = true;
+builder_shapes._is_pointer = false;
+builder_shapes._is_ref = false;
+builder_shapes._is_template = true;
+builder_shapes._meta = meta_shapes;
+builder_shapes._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<ECS::ColliderShape2D>>);
+builder_shapes._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<ECS::ColliderShape2D>>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_shapes));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+const Ailu::Type* Ailu::SceneCollider2DComponentDocument::GetPrivateStaticClass()
+{
+	static const Ailu::Type* type = Z_Construct_SceneCollider2DComponentDocument_Type();
+	return type;
+}
+
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::SceneCollider2DComponentDocument>()
+{
+return Ailu::SceneCollider2DComponentDocument::StaticType();
+}
+    const Type *Ailu::SceneCollider2DComponentDocument::GetType()
+{
+return Ailu::SceneCollider2DComponentDocument::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_SceneCollider2DComponentDocument(&Ailu::SceneCollider2DComponentDocument::StaticType, "Ailu::SceneCollider2DComponentDocument");
 const Ailu::Type* Ailu::Z_Construct_SceneSkeletonMeshComponentDocument_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -5142,6 +5401,90 @@ builder_collider_component._meta = meta_collider_component;
 builder_collider_component._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<SceneColliderComponentDocument>);
 builder_collider_component._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<SceneColliderComponentDocument>);
 initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_collider_component));
+Meta meta_has_rigidbody_2d_component;
+meta_has_rigidbody_2d_component.Set("Category","");
+meta_has_rigidbody_2d_component.Set("IsColor",false);
+meta_has_rigidbody_2d_component.Set("IsRange",false);
+meta_has_rigidbody_2d_component.Set("IsFloatRange",true);
+meta_has_rigidbody_2d_component.Set("RangeMin",(f32)0);
+meta_has_rigidbody_2d_component.Set("RangeMax",(f32)1);
+MemberBuilder builder_has_rigidbody_2d_component;
+builder_has_rigidbody_2d_component._name = "_has_rigidbody_2d_component";
+builder_has_rigidbody_2d_component._type_name = "bool";
+builder_has_rigidbody_2d_component._offset = offsetof(SceneEntityDocument,_has_rigidbody_2d_component);
+builder_has_rigidbody_2d_component._is_const = false;
+builder_has_rigidbody_2d_component._is_static = false;
+builder_has_rigidbody_2d_component._is_public = true;
+builder_has_rigidbody_2d_component._is_pointer = false;
+builder_has_rigidbody_2d_component._is_ref = false;
+builder_has_rigidbody_2d_component._is_template = false;
+builder_has_rigidbody_2d_component._meta = meta_has_rigidbody_2d_component;
+builder_has_rigidbody_2d_component._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_has_rigidbody_2d_component._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_has_rigidbody_2d_component));
+Meta meta_rigidbody_2d_component;
+meta_rigidbody_2d_component.Set("Category","");
+meta_rigidbody_2d_component.Set("IsColor",false);
+meta_rigidbody_2d_component.Set("IsRange",false);
+meta_rigidbody_2d_component.Set("IsFloatRange",true);
+meta_rigidbody_2d_component.Set("RangeMin",(f32)0);
+meta_rigidbody_2d_component.Set("RangeMax",(f32)1);
+MemberBuilder builder_rigidbody_2d_component;
+builder_rigidbody_2d_component._name = "_rigidbody_2d_component";
+builder_rigidbody_2d_component._type_name = "Ailu::SceneRigidBody2DComponentDocument";
+builder_rigidbody_2d_component._offset = offsetof(SceneEntityDocument,_rigidbody_2d_component);
+builder_rigidbody_2d_component._is_const = false;
+builder_rigidbody_2d_component._is_static = false;
+builder_rigidbody_2d_component._is_public = true;
+builder_rigidbody_2d_component._is_pointer = false;
+builder_rigidbody_2d_component._is_ref = false;
+builder_rigidbody_2d_component._is_template = false;
+builder_rigidbody_2d_component._meta = meta_rigidbody_2d_component;
+builder_rigidbody_2d_component._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<SceneRigidBody2DComponentDocument>);
+builder_rigidbody_2d_component._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<SceneRigidBody2DComponentDocument>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_rigidbody_2d_component));
+Meta meta_has_collider_2d_component;
+meta_has_collider_2d_component.Set("Category","");
+meta_has_collider_2d_component.Set("IsColor",false);
+meta_has_collider_2d_component.Set("IsRange",false);
+meta_has_collider_2d_component.Set("IsFloatRange",true);
+meta_has_collider_2d_component.Set("RangeMin",(f32)0);
+meta_has_collider_2d_component.Set("RangeMax",(f32)1);
+MemberBuilder builder_has_collider_2d_component;
+builder_has_collider_2d_component._name = "_has_collider_2d_component";
+builder_has_collider_2d_component._type_name = "bool";
+builder_has_collider_2d_component._offset = offsetof(SceneEntityDocument,_has_collider_2d_component);
+builder_has_collider_2d_component._is_const = false;
+builder_has_collider_2d_component._is_static = false;
+builder_has_collider_2d_component._is_public = true;
+builder_has_collider_2d_component._is_pointer = false;
+builder_has_collider_2d_component._is_ref = false;
+builder_has_collider_2d_component._is_template = false;
+builder_has_collider_2d_component._meta = meta_has_collider_2d_component;
+builder_has_collider_2d_component._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_has_collider_2d_component._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_has_collider_2d_component));
+Meta meta_collider_2d_component;
+meta_collider_2d_component.Set("Category","");
+meta_collider_2d_component.Set("IsColor",false);
+meta_collider_2d_component.Set("IsRange",false);
+meta_collider_2d_component.Set("IsFloatRange",true);
+meta_collider_2d_component.Set("RangeMin",(f32)0);
+meta_collider_2d_component.Set("RangeMax",(f32)1);
+MemberBuilder builder_collider_2d_component;
+builder_collider_2d_component._name = "_collider_2d_component";
+builder_collider_2d_component._type_name = "Ailu::SceneCollider2DComponentDocument";
+builder_collider_2d_component._offset = offsetof(SceneEntityDocument,_collider_2d_component);
+builder_collider_2d_component._is_const = false;
+builder_collider_2d_component._is_static = false;
+builder_collider_2d_component._is_public = true;
+builder_collider_2d_component._is_pointer = false;
+builder_collider_2d_component._is_ref = false;
+builder_collider_2d_component._is_template = false;
+builder_collider_2d_component._meta = meta_collider_2d_component;
+builder_collider_2d_component._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<SceneCollider2DComponentDocument>);
+builder_collider_2d_component._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<SceneCollider2DComponentDocument>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_collider_2d_component));
 Meta meta_has_skeleton_mesh_component;
 meta_has_skeleton_mesh_component.Set("Category","");
 meta_has_skeleton_mesh_component.Set("IsColor",false);

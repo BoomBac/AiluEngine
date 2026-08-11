@@ -2,6 +2,8 @@
 #ifndef __PICK_PASS__
 #define __PICK_PASS__
 #include <Render/Features/RenderFeature.h>
+#include <Render/2D/SpriteBatcher.h>
+#include <Render/2D/SpriteRenderData.h>
 #include <Scene/Component.h>
 
 namespace Ailu
@@ -19,11 +21,18 @@ namespace Ailu
 
         private:
             void DrawLightGizmo(const ECS::TransformComponent& transf, const ECS::LightComponent& comp);
+            void CollectSprites(const SceneManagement::Scene &scene, const Camera &camera, bool selected_only);
+            void RecordSpritePick(RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data);
+            void RecordSpriteSelection(RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data, RDG::RGHandle target);
 
         private:
             Scope<Material> _pick_gen;
             Scope<Material> _select_gen;
+            Scope<Material> _sprite_pick_gen;
+            Scope<Material> _sprite_select_gen;
             Scope<Material> _editor_outline;
+            Scope<Render::SpriteBatcher> _sprite_batcher;
+            Vector<Render::SpriteRenderData> _sprite_render_data;
             RenderTexture *_color;
             RenderTexture *_depth;
             RDG::RGHandle _color_handle;

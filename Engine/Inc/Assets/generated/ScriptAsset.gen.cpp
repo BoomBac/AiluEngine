@@ -42,3 +42,13 @@ return Ailu::ScriptAsset::StaticType();
 return Ailu::ScriptAsset::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_ScriptAsset(&Ailu::ScriptAsset::StaticType, "Ailu::ScriptAsset");
+#if AILU_ENABLE_LUA_SCRIPTING
+#include <sol/sol.hpp>
+#include <Framework/Script/ScriptLuaBindingRegistry.h>
+#include <Framework/Script/ScriptSystem.h>
+namespace Ailu { void RegisterGeneratedLuaBindings_ScriptAsset(sol::state &lua); }
+void Ailu::RegisterGeneratedLuaBindings_ScriptAsset(sol::state &lua)
+{
+}
+ScriptLuaBindingRegister s_register_lua_bindings_RegisterGeneratedLuaBindings_ScriptAsset(&Ailu::RegisterGeneratedLuaBindings_ScriptAsset);
+#endif

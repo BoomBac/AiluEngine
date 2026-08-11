@@ -164,7 +164,7 @@ bool TestBasicLua()
 }
 
 // ============================================================================
-// Test 2: Script Lifecycle (OnInit/OnFixedUpdate/OnUpdate/OnLateUpdate/OnDestroy)
+// Test 2: Script Lifecycle (OnCreate/OnFixedUpdate/OnUpdate/OnLateUpdate/OnDestroy)
 // ============================================================================
 bool TestLifecycle()
 {
@@ -185,7 +185,7 @@ bool TestLifecycle()
     auto &comp = AddScript(scene, entity, script_path.string());
 
     // Drive lifecycle in order
-    ss.FixedUpdateComponent(&scene, entity, comp, 0.02f);   // OnInit + OnFixedUpdate
+    ss.FixedUpdateComponent(&scene, entity, comp, 0.02f);   // OnCreate + OnFixedUpdate
     ss.UpdateComponent(&scene, entity, comp, 0.016f);        // OnUpdate
     ss.LateUpdateComponent(&scene, entity, comp, 0.016f, 0.5f); // OnLateUpdate
     ss.DestroyComponent(&scene, entity, comp);                 // OnDestroy
@@ -196,7 +196,7 @@ bool TestLifecycle()
         "reg_lc_late = 0; reg_lc_destroy = 0; "
         "reg_lc_order_str = ''; "
         "for _, v in ipairs(lifecycle_record) do "
-        "  if v == 'OnInit' then reg_lc_init = reg_lc_init + 1 "
+        "  if v == 'OnCreate' then reg_lc_init = reg_lc_init + 1 "
         "  elseif v == 'OnFixedUpdate' then reg_lc_fixed = reg_lc_fixed + 1 "
         "  elseif v == 'OnUpdate' then reg_lc_update = reg_lc_update + 1 "
         "  elseif v == 'OnLateUpdate' then reg_lc_late = reg_lc_late + 1 "
@@ -208,7 +208,7 @@ bool TestLifecycle()
 
     bool all_ok = true;
     all_ok &= Check(ss.GetGlobalInt("reg_lc_init", -1) == 1,
-                    "OnInit count: " + std::to_string(ss.GetGlobalInt("reg_lc_init", -1)));
+                    "OnCreate count: " + std::to_string(ss.GetGlobalInt("reg_lc_init", -1)));
     all_ok &= Check(ss.GetGlobalInt("reg_lc_fixed", -1) == 1,
                     "OnFixedUpdate count: " + std::to_string(ss.GetGlobalInt("reg_lc_fixed", -1)));
     all_ok &= Check(ss.GetGlobalInt("reg_lc_update", -1) == 1,
@@ -220,12 +220,12 @@ bool TestLifecycle()
     all_ok &= Check(ss.GetGlobalInt("reg_lc_total", -1) == 5,
                     "Total lifecycle events: " + std::to_string(ss.GetGlobalInt("reg_lc_total", -1)));
 
-    // Verify order: OnInit first, OnDestroy last
+    // Verify order: OnCreate first, OnDestroy last
     ss.RunString(
-        "reg_lc_first_ok = (lifecycle_record[1] == 'OnInit'); "
+        "reg_lc_first_ok = (lifecycle_record[1] == 'OnCreate'); "
         "reg_lc_last_ok = (lifecycle_record[#lifecycle_record] == 'OnDestroy')");
     all_ok &= Check(ss.GetGlobalBool("reg_lc_first_ok", false),
-                    "First event should be OnInit");
+                    "First event should be OnCreate");
     all_ok &= Check(ss.GetGlobalBool("reg_lc_last_ok", false),
                     "Last event should be OnDestroy");
 
@@ -268,7 +268,7 @@ bool TestMultipleInstance()
     if (!Check(comp_a != nullptr && comp_b != nullptr, "Script components should be created"))
         return false;
 
-    // Initialize both (OnInit runs, sets counter=0 and writes to globals)
+    // Initialize both (OnCreate runs, sets counter=0 and writes to globals)
     ss.FixedUpdateComponent(&scene, entity_a, *comp_a, 0.02f);
     ss.FixedUpdateComponent(&scene, entity_b, *comp_b, 0.02f);
 
@@ -370,7 +370,7 @@ bool TestFacadeApi()
     ss.FixedUpdateComponent(&scene, entity, component, 0.02f);
 
     bool all_ok = true;
-    all_ok &= Check(ss.GetGlobalBool("reg_facade_started", false), "Script facade OnInit should execute");
+    all_ok &= Check(ss.GetGlobalBool("reg_facade_started", false), "Script facade OnCreate should execute");
     all_ok &= Check(ss.GetGlobalBool("reg_facade_position_ok", false), "ScriptTransform should use formal local-position setter");
     all_ok &= Check(ss.GetGlobalBool("reg_facade_guid_ok", false), "ScriptScene should find an entity by persistent Guid");
     all_ok &= Check(ss.GetGlobalBool("reg_facade_find_name_ok", false), "ScriptScene should find an entity by name");
@@ -450,7 +450,7 @@ bool TestErrorHandling()
 
     bool all_ok = true;
     all_ok &= Check(ss.GetGlobalBool("reg_err_init_called", false),
-                    "Error script OnInit should be called");
+                    "Error script OnCreate should be called");
 
     // Update Entity A (error script) — must NOT crash the process
     ss.UpdateComponent(&scene, entity_a, *comp_a, 0.016f);
@@ -565,9 +565,9 @@ bool TestEntityHandle()
 
     bool all_ok = true;
 
-    // Check globals set by test_basic.lua's OnInit
+    // Check globals set by test_basic.lua's OnCreate
     all_ok &= Check(ss.GetGlobalBool("reg_ent_init_HandleEntity", false),
-                    "Entity handle: OnInit should set init flag");
+                    "Entity handle: OnCreate should set init flag");
     all_ok &= Check(ss.GetGlobalBool("reg_ent_valid_HandleEntity", false),
                     "Entity handle: is_valid() should return true");
     all_ok &= Check(std::fabs(ss.GetGlobalNumber("reg_ent_pos_x_HandleEntity", -999.0) - 1.0) < 1e-6,

@@ -539,6 +539,10 @@ namespace Ailu
                     ClearTarget();
                 return;
             }
+            // 新创建或刚重挂父节点的实体会在下一次 TransformSystem 更新前保持 world dirty。
+            // 此时 world-space accessor 会断言；延后一帧绘制 Gizmo，等待场景变换同步完成。
+            if (target->_world_dirty)
+                return;
             if (target)
             {
                 _cur_target_pos = target->GetPosition();

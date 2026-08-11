@@ -12,6 +12,7 @@ namespace Ailu::ECS
         DECLARE_SYSTEM(Physics2DSystem)
 
     public:
+        void Synchronize(Register &r);
         void Update(Register &r, f32 fixed_delta_time) final;
         ESystemPhase GetPhase() const final { return ESystemPhase::kPhysics; }
 

@@ -52,10 +52,13 @@ public:
         bool _is_const = false;
         bool _is_virtual = false;
         bool _is_function = false;
+        bool _is_event = false;
         bool _is_script = false;
         std::string _return_type;
         std::vector<std::string> _params;
         std::vector<std::string> _param_names;
+        int _event_key_index = -1;
+        std::string _event_key_name;
         int _offset = 0u;
         PropertyMeta _meta;
     };
@@ -93,6 +96,7 @@ private:
     inline static std::string kStructBodyMacro = "GENERATED_BODY";
     inline static std::string kPropertyMacro = "APROPERTY";
     inline static std::string kFunctionMacro = "AFUNCTION";
+    inline static std::string kEventMacro = "AEVENT";
     inline static std::string kClassID = "class";
     inline static std::string kClassNsCachePath = "AHT/class_ns_map.txt";
     inline static std::vector<std::string> s_common_src_dep_file;

@@ -78,6 +78,42 @@ return Ailu::Editor::SceneView::StaticType();
 return Ailu::Editor::SceneView::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_SceneView(&Ailu::Editor::SceneView::StaticType, "Ailu::Editor::SceneView");
+const Ailu::Type* Ailu::Editor::Z_Construct_GameView_Type()
+{
+Ailu::Editor::RenderView::StaticType();
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "GameView";
+initializer._size = sizeof(Ailu::Editor::GameView);
+initializer._full_name = "Ailu::Editor::GameView";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu::Editor";
+initializer._base_name = "Ailu::Editor::RenderView";
+initializer._constructor = []()->Ailu::Editor::GameView* {return new Ailu::Editor::GameView;};
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+const Ailu::Type* Ailu::Editor::GameView::GetPrivateStaticClass()
+{
+	static const Ailu::Type* type = Z_Construct_GameView_Type();
+	return type;
+}
+
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::Editor::GameView>()
+{
+return Ailu::Editor::GameView::StaticType();
+}
+    const Type *Ailu::Editor::GameView::GetType()
+{
+return Ailu::Editor::GameView::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_GameView(&Ailu::Editor::GameView::StaticType, "Ailu::Editor::GameView");
 const Ailu::Type* Ailu::Editor::Z_Construct_Texture3DView_Type()
 {
 Ailu::Editor::DockWindow::StaticType();

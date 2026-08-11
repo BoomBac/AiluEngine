@@ -106,7 +106,8 @@ public:                                                                 \
         {
             DECLARE_COMPONENT(TagComponent, "Ailu.ECS.TagComponent")
             String _name;
-            u32 _layer_mask;
+            String _tag = "Untagged";
+            u32 _layer_mask = 1u;
         };
 
 
@@ -287,6 +288,7 @@ public:                                                                 \
             Vector4f _vector_value = Vector4f::kZero;
             APROPERTY()
             Guid _guid_value = Guid::EmptyGuid();
+            String _asset_type;
             APROPERTY()
             bool _is_orphan = false;
         };

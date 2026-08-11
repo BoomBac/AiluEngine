@@ -1,5 +1,5 @@
 -- T00 Regression: Script lifecycle test
--- Records OnInit, OnFixedUpdate, OnUpdate, OnLateUpdate, OnDestroy
+-- Records OnCreate, OnFixedUpdate, OnUpdate, OnLateUpdate, OnDestroy
 -- call order as simple strings in the global lifecycle_record table.
 -- C++ side reads lifecycle_record via RunString/GetGlobalInt.
 
@@ -7,8 +7,8 @@ lifecycle_record = {}
 
 local TestLifecycle = {}
 
-function TestLifecycle:OnInit()
-    table.insert(lifecycle_record, "OnInit")
+function TestLifecycle:OnCreate()
+    table.insert(lifecycle_record, "OnCreate")
 end
 
 function TestLifecycle:OnFixedUpdate(dt)

@@ -132,6 +132,7 @@ namespace Ailu::Render
         void Destory();
         void Render();
         virtual void Setup();
+        void SetPreviewCamera(Camera *camera, RenderTexture *target);
         Renderer *GetRenderer(u16 index = 0) { return index < _renderers.size() ? _renderers[index].get() : nullptr; };
         RenderTexture *GetTarget(u16 index = 0);
         void FrameCleanup();
@@ -161,6 +162,8 @@ namespace Ailu::Render
         Array<FramePacket,RenderConstants::kFrameCount + 1> _frame_packets;
         Array<FrameResource, RenderConstants::kFrameCount + 1> _frame_res;
         Vector<Camera *> _cameras;
+        Camera *_preview_camera = nullptr;
+        RenderTexture *_preview_target = nullptr;
         Vector<Scope<Renderer>> _renderers;
         Vector<RenderTexture *> _targets;
         FrameResource *_cur_frame_res;

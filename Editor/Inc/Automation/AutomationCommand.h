@@ -5,6 +5,7 @@
 #include "Automation/AutomationAdapter.h"
 #include "Automation/AutomationTypes.h"
 #include "Framework/Common/NonCopyable.h"
+#include "Framework/Core/Delegate.h"
 #include "Framework/Events/Event.h"
 #include "Scene/Scene.h"
 

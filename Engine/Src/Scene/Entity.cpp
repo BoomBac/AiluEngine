@@ -296,6 +296,28 @@ namespace Ailu
             }
             return result;
         }
+
+        bool Register::CopyComponent(Entity source, Entity target, ComponentTypeId type_id)
+        {
+            if (!IsAlive(source) || !IsAlive(target) || type_id >= static_cast<ComponentTypeId>(_mgrs.size()) ||
+                !_mgrs[type_id] || !_mgrs[type_id]->GetComponentPtr(source))
+                return false;
+
+            const bool added = _mgrs[type_id]->CopyComponent(source, target);
+            if (!added)
+                return true;
+
+            const u32 target_index = EntityIndex(target);
+            _entity_signatures[target_index].set(type_id, true);
+            if (type_id < static_cast<ComponentTypeId>(_on_comp_add_callback.size()))
+            {
+                for (auto &callback : _on_comp_add_callback[type_id])
+                    callback(target);
+            }
+            EntitySignatureChanged(target);
+            return true;
+        }
+
         u64 Register::HierarchyRevision() const { return _hierarchy_revision; }
         void Register::TouchHierarchy() { ++_hierarchy_revision; }
         bool Register::IsEntityEnabled(Entity entity) const

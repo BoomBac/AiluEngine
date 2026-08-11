@@ -2,6 +2,7 @@
 #include "Common/EditorStyle.h"
 #include "EditorApp.h"
 #include "Framework/Common/Input.h"
+#include "Framework/Events/Event.h"
 #include "UI/Basic.h"
 #include "UI/DragDrop.h"
 #include "UI/UIFramework.h"
@@ -1338,6 +1339,45 @@ namespace Ailu
             }
 
             CleanupWindowIfEmpty(own_window);
+        }
+
+        bool DockManager::ActivateDock(StringView type_name)
+        {
+            DockWindow *target_window = nullptr;
+            std::function<bool(DockNode *)> find_window = [&](DockNode *node) -> bool
+            {
+                if (node == nullptr)
+                    return false;
+                if (node->_type == DockNode::EType::kLeaf && node->_window && node->_window->GetType()->FullName() == type_name)
+                {
+                    target_window = node->_window.get();
+                    return true;
+                }
+                if (node->_type == DockNode::EType::kTab && node->_tab)
+                {
+                    i32 index = 0;
+                    for (const auto &item : *node->_tab)
+                    {
+                        if (auto *window = item->PrimaryWindow(); window != nullptr && window->GetType()->FullName() == type_name)
+                        {
+                            node->_tab->SetActiveIndex(index);
+                            target_window = window;
+                            return true;
+                        }
+                        ++index;
+                    }
+                }
+                return find_window(node->_left.get()) || find_window(node->_right.get());
+            };
+
+            for (DockNode *root : _roots)
+            {
+                if (!find_window(root))
+                    continue;
+                RequestFocus(target_window);
+                return true;
+            }
+            return false;
         }
 
         void DockManager::RequestRemoveDock(DockWindow *dock)

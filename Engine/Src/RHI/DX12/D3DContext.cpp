@@ -144,6 +144,20 @@ namespace Ailu::RHI::DX12
         PROFILE_BLOCK_CPU(std::format("RecordCommandGroup_{}", group._params._name))
         auto begin_time = std::chrono::high_resolution_clock::now();
         auto d3dcmd = static_cast<D3DCommandBuffer *>(cmd.get());
+        for (RTHandle handle: group._params._released_temp_rts)
+        {
+            if (auto *rt = g_pRenderTexturePool->Get(handle); rt != nullptr)
+                d3dcmd->MarkUsedResource(rt);
+        }
+        if (!group._params._released_temp_rts.empty())
+        {
+            auto released_temp_rts = std::move(group._params._released_temp_rts);
+            d3dcmd->AddPostSubmitCallback([released_temp_rts = std::move(released_temp_rts)](u64)
+            {
+                for (RTHandle handle: released_temp_rts)
+                    RenderTexture::ReleaseTempRT(handle);
+            });
+        }
         const bool emit_pix_event = g_engine_config._enable_pix && !group._params._is_end_frame && !group._params._name.empty();
 
 #if AILU_ENABLE_FRAME_DEBUGGER
@@ -881,6 +895,7 @@ namespace Ailu::RHI::DX12
     void D3DContext::ExecuteCommandBuffer(Ref<CommandBuffer> &cmd)
     {
         SubmitParams params{cmd->Name()};
+        params._released_temp_rts = cmd->TakeReleasedTempRTs();
         params._rendering_states_data = cmd->TakeRenderingStatesData();
 #if AILU_ENABLE_FRAME_DEBUGGER
         params._capture_pass_metadata = cmd->CapturePassMetadata();
@@ -890,10 +905,13 @@ namespace Ailu::RHI::DX12
 
     void D3DContext::ExecuteCommandBufferSync(Ref<CommandBuffer> &cmd)
     {
+        auto released_temp_rts = cmd->TakeReleasedTempRTs();
         auto rhi_cmd = RHICommandBufferPool::Get(cmd->Name());
         rhi_cmd->RecordingContext().AccumulateRenderingStatesData(cmd->TakeRenderingStatesData());
         for (auto *gfx_cmd: cmd->GetCommands()) { ProcessGpuCommand(gfx_cmd, rhi_cmd.get()); }
         ExecuteRHICommandBuffer(rhi_cmd.get());
+        for (RTHandle handle: released_temp_rts)
+            RenderTexture::ReleaseTempRT(handle);
         RHICommandBufferPool::Release(rhi_cmd);
     }
 

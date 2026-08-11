@@ -102,6 +102,8 @@ namespace Ailu
                 float _size;
         public:
             inline static Camera *sCurrent = nullptr;
+            inline static Camera *sMain = nullptr;
+            inline static Camera *sScene = nullptr;
             inline static Camera *sSelected = nullptr;
             static Camera *GetDefaultCamera();
             static void DrawGizmo(const Camera *p_camera, Color c);

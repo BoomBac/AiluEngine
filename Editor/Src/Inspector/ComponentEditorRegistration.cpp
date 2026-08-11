@@ -9,6 +9,10 @@
 #include "Inspector/ComponentEditors/RigidBodyComponentEditor.h"
 #include "Inspector/ComponentEditors/ColliderComponentEditor.h"
 #include "Inspector/ComponentEditors/PersistentIdComponentEditor.h"
+#include "Inspector/ComponentEditors/RigidBody2DComponentEditor.h"
+#include "Inspector/ComponentEditors/Collider2DComponentEditor.h"
+#include "Inspector/ComponentEditors/TagComponentEditor.h"
+#include "Physics/2D/Physics2DComponents.h"
 #include "Scene/Component.h"
 
 namespace Ailu
@@ -38,6 +42,8 @@ namespace Ailu
             registry.RegisterCustom<ECS::CRigidBody, RigidBodyComponentEditor>("Rigid Body", "Physics", 300);
 
             registry.RegisterCustom<ECS::CCollider, ColliderComponentEditor>("Collider", "Physics", 310);
+            registry.RegisterCustom<ECS::RigidBody2DComponent, RigidBody2DComponentEditor>("Rigid Body 2D", "Physics", 320);
+            registry.RegisterCustom<ECS::Collider2DComponent, Collider2DComponentEditor>("Collider 2D", "Physics", 330);
 
             registry.Register<ECS::CVXGI>("VXGI", "Rendering", 260);
 
@@ -45,7 +51,7 @@ namespace Ailu
 
             registry.Register<ECS::AudioListenerComponent>("Audio Listener", "Audio", 410);
 
-            registry.Register<ECS::TagComponent>("Tag", "Core", 10, false, false, false);
+            registry.RegisterCustom<ECS::TagComponent, TagComponentEditor>("Tag", "Core", 10, false, false, false);
 
             registry.RegisterCustom<ECS::PersistentIdComponent, PersistentIdComponentEditor>("Persistent ID", "Core", 20, false, false, false);
 

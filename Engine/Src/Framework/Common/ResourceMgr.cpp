@@ -508,6 +508,8 @@ namespace Ailu
 				L"Shaders/hlsl/pick_buffer.hlsl",
 				L"Shaders/hlsl/select_buffer.hlsl",
 				L"Shaders/hlsl/editor_outline.hlsl",
+				L"Shaders/hlsl/sprite_pick_buffer.hlsl",
+				L"Shaders/hlsl/sprite_select_buffer.hlsl",
 		};
 
 		//        std::atomic<int> shader_load_count = shader_asset_pathes.size() + shader_pathes.size();

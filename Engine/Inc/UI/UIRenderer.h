@@ -49,6 +49,7 @@ namespace Ailu
             Color _tint = Colors::kWhite;                 // 颜色混合
             f32 _depth = 0.0f;                            // Z 深度排序
             Vector2f _size_override = {0.f, 0.f};         // 手动指定绘制大小（默认取纹理大小）
+            Vector4f _corner_radius = Vector4f::kZero;
         };
 
         struct UIRenderStats

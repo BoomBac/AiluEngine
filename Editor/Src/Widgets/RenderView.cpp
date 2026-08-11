@@ -3,6 +3,7 @@
 #include "UI/Container.h"
 #include "Render/Camera.h"
 #include "Render/RenderPipeline.h"
+#include "Render/Texture.h"
 #include "EditorApp.h"
 #include "Widgets/EditorLayer.h"
 #include "Common/Selection.h"
@@ -41,6 +42,7 @@ namespace Ailu
             constexpr f32 kSceneToolbarSmallButtonWidth = 68.0f;
             constexpr f32 kSceneToolbarDropdownWidth = 82.0f;
             constexpr f32 kSceneToolbarButtonGap = 4.0f;
+            const Vector2f kPreviewRTSize = Vector2f(320.0f, 180.0f) * 0.8f;
 
             u32 AlignSceneViewSize(f32 value)
             {
@@ -196,6 +198,27 @@ namespace Ailu
         #pragma region SceneView
         SceneView::SceneView()
         {
+            constexpr f32 kPreviewBorderWidth = 2.0f;
+            constexpr f32 kPreviewCornerRadius = 10.0f;
+            _camera_preview_frame = _view_canvas->AddChild<UI::Border>();
+            _camera_preview_frame->GetSlotAs<UI::CanvasSlot>().Position(Vector2f::kZero).Size(kPreviewRTSize);
+            _camera_preview_frame->Thickness(kPreviewBorderWidth);
+            _camera_preview_frame->CornerRadius(kPreviewCornerRadius);
+            _camera_preview_frame->_bg_color = Color(0.03f, 0.04f, 0.06f, 0.92f);
+            _camera_preview_frame->_border_color = Color(1.0f, 1.0f, 1.0f, 0.22f);
+            UIBrush preview_background;
+            preview_background._type = EUIBrushType::kColor;
+            preview_background._tint = _camera_preview_frame->_bg_color;
+            auto &preview_style = _camera_preview_frame->GetStyleOverride();
+            preview_style.SetBackground(preview_background);
+            preview_style.SetBorderColor(_camera_preview_frame->_border_color);
+            preview_style.SetBorderWidth(kPreviewBorderWidth);
+            preview_style.SetCornerRadius(kPreviewCornerRadius);
+            _camera_preview = _camera_preview_frame->AddChild<UI::Image>();
+            _camera_preview->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
+            _camera_preview->GetStyleOverride().SetCornerRadius(kPreviewCornerRadius - kPreviewBorderWidth);
+            _camera_preview_frame->_visibility = UI::EVisibility::kHide;
+            _camera_preview_frame->SetVisible(false);
             _stored_camera_type = Render::ECameraType::kPerspective;
             if (Camera::sCurrent == nullptr)
             {
@@ -386,8 +409,17 @@ namespace Ailu
         void SceneView::Update(f32 dt)
         {
             RenderView::Update(dt);
+            if (Application::Get()._is_playing_mode)
+            {
+                Render::RenderPipeline::Get().SetPreviewCamera(nullptr, nullptr);
+                _camera_preview->SetTexture(nullptr);
+                _camera_preview_frame->_visibility = UI::EVisibility::kHide;
+                _camera_preview_frame->SetVisible(false);
+                return;
+            }
+            UpdateCameraPreview();
             UpdateCameraOutputSize(dt);
-            SetSource(s_renderer->TargetTexture());
+            SetSource(Render::RenderPipeline::Get().GetTarget(0));
             UpdateDragPreview();
             UpdateSceneToolbarBackdrop();
             if (Render::Camera::sCurrent)
@@ -532,19 +564,20 @@ namespace Ailu
         }
         void SceneView::UpdateSceneToolbarBackdrop()
         {
-            if (_scene_toolbar_bg == nullptr || s_renderer == nullptr || s_renderer->TargetTexture() == nullptr)
+            auto *main_target = Render::RenderPipeline::Get().GetTarget(0);
+            if (_scene_toolbar_bg == nullptr || main_target == nullptr)
                 return;
 
             const Vector4f source_rect = _source->GetArrangeRect();
             if (_dropdown_2d_orientation != nullptr)
-                _dropdown_2d_orientation->SetPopupBackdrop(s_renderer->TargetTexture(), source_rect);
+                _dropdown_2d_orientation->SetPopupBackdrop(main_target, source_rect);
             const Vector4f toolbar_rect = _scene_toolbar_bg->GetArrangeRect();
             if (source_rect.z <= 1.0f || source_rect.w <= 1.0f || toolbar_rect.z <= 1.0f || toolbar_rect.w <= 1.0f)
                 return;
 
             UIBrush backdrop_brush;
             backdrop_brush._type = EUIBrushType::kBackdropBlur;
-            backdrop_brush._texture = s_renderer->TargetTexture();
+            backdrop_brush._texture = main_target;
             backdrop_brush._tint = Color(1.0f, 1.0f, 1.0f, 0.88f);
             backdrop_brush._uv_rect = {
                     (toolbar_rect.x - source_rect.x) / source_rect.z,
@@ -636,6 +669,82 @@ namespace Ailu
         {
             return Camera::sCurrent && Camera::sCurrent->Type() == Render::ECameraType::kOrthographic;
         }
+
+        GameView::GameView()
+        {
+            SetTitle("GameView");
+            _no_main_camera_text = _view_canvas->AddChild<UI::Text>("no main camera");
+            _no_main_camera_text->FontSize(18.0f);
+            _no_main_camera_text->_color = Color(0.78f, 0.78f, 0.78f, 1.0f);
+            _no_main_camera_text->GetSlotAs<UI::CanvasSlot>()
+                    .Anchor(Vector2f(0.5f, 0.5f))
+                    .Position(Vector2f::kZero)
+                    .SizeToContent(true)
+                    .Alignment(UI::EAlignment::kCenter, UI::EAlignment::kCenter);
+        }
+
+        void GameView::Update(f32 dt)
+        {
+            RenderView::Update(dt);
+            const bool is_playing = Application::Get()._is_playing_mode;
+            const bool has_main_camera = is_playing && Camera::sMain != nullptr;
+            _source->_visibility = has_main_camera ? UI::EVisibility::kVisible : UI::EVisibility::kHide;
+            _no_main_camera_text->_visibility = is_playing && !has_main_camera ? UI::EVisibility::kVisible : UI::EVisibility::kHide;
+            if (!has_main_camera)
+                return;
+
+            const Vector4f rect = _source->GetArrangeRect();
+            constexpr f32 kMaxGameViewOutputSize = 4095.0f;
+            const u16 output_width = static_cast<u16>(std::clamp(rect.z, 1.0f, kMaxGameViewOutputSize));
+            const u16 output_height = static_cast<u16>(std::clamp(rect.w, 1.0f, kMaxGameViewOutputSize));
+            Camera::sMain->OutputSize(output_width, output_height);
+            SetSource(Render::RenderPipeline::Get().GetTarget(0));
+        }
+        void SceneView::UpdateCameraPreview()
+        {
+            auto *scene = SceneMgr::Get().ActiveScene();
+            const ECS::Entity selected_entity = Selection::FirstEntity();
+            auto *camera_component = scene != nullptr && selected_entity != ECS::kInvalidEntity
+                                             ? scene->GetRegister().GetComponent<ECS::CCamera>(selected_entity)
+                                             : nullptr;
+            if (camera_component == nullptr)
+            {
+                Render::RenderPipeline::Get().SetPreviewCamera(nullptr, nullptr);
+                _camera_preview->SetTexture(nullptr);
+                _camera_preview_frame->_visibility = UI::EVisibility::kHide;
+                _camera_preview_frame->SetVisible(false);
+                return;
+            }
+
+            const u16 kPreviewWidth = static_cast<u16>(kPreviewRTSize.x);
+            const u16 kPreviewHeight = static_cast<u16>(kPreviewRTSize.y);
+            const f32 kPreviewMargin = 12.0f;
+            if (_camera_preview_texture == nullptr || _camera_preview_texture->Width() != kPreviewWidth ||
+                _camera_preview_texture->Height() != kPreviewHeight)
+                _camera_preview_texture = Render::RenderTexture::Create(kPreviewWidth, kPreviewHeight, "SceneCameraPreview");
+
+            const Vector2f view_size = _source->GetSlotAs<UI::CanvasSlot>()._size;
+            if (view_size.x <= 1.0f || view_size.y <= 1.0f)
+            {
+                _camera_preview_frame->_visibility = UI::EVisibility::kHide;
+                _camera_preview_frame->SetVisible(false);
+                return;
+            }
+
+            const f32 view_width = view_size.x;
+            const f32 view_height = view_size.y;
+            const f32 preview_x = std::max(0.0f, view_width - kPreviewWidth - kPreviewMargin);
+            const f32 preview_y = std::max(0.0f, view_height - kPreviewHeight - kPreviewMargin);
+            _camera_preview_frame->GetSlotAs<UI::CanvasSlot>()
+                    .Position({preview_x, preview_y})
+                    .Size({static_cast<f32>(kPreviewWidth), static_cast<f32>(kPreviewHeight)});
+            camera_component->_camera.OutputSize(kPreviewWidth, kPreviewHeight);
+            Render::RenderPipeline::Get().SetPreviewCamera(&camera_component->_camera, _camera_preview_texture.get());
+            _camera_preview->SetTexture(_camera_preview_texture.get());
+            _camera_preview_frame->_visibility = UI::EVisibility::kVisible;
+            _camera_preview_frame->SetVisible(true);
+        }
+
         void SceneView::UpdateCameraOutputSize(f32 dt)
         {
             if (!Render::Camera::sCurrent)

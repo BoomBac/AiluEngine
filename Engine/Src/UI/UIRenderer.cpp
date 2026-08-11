@@ -24,6 +24,7 @@ namespace Ailu
         namespace
         {
             constexpr u16 kBackdropBlurDownsample = 1u;
+            constexpr u16 kMaxTempRTDimension = 4095u;
             using UIClock = std::chrono::high_resolution_clock;
 
             f32 ElapsedMs(UIClock::time_point start)
@@ -109,9 +110,6 @@ namespace Ailu
                         block->ResetBuildData();
                 }
             }
-            for (auto handle: _pending_backdrop_blur_release_handles)
-                cmd->ReleaseTempRT(handle);
-            _pending_backdrop_blur_release_handles.clear();
             _frame_backdrop_blur_cache.clear();
 
             if (auto selected = UIManager::Get()->GetDebugHighlightTarget(); selected != nullptr && selected->IsVisible())
@@ -328,6 +326,10 @@ namespace Ailu
                 if (backbuffer != nullptr)
                     cmd->Blit(it.second, backbuffer);
             }
+            for (RTHandle handle: _pending_backdrop_blur_release_handles)
+                cmd->ReleaseTempRT(handle);
+            _pending_backdrop_blur_release_handles.clear();
+            _frame_backdrop_blur_cache.clear();
             //暂时所有文本都渲染到后备缓冲区
             //TextRenderer::Get()->Render(RenderTexture::s_backbuffer, cmd, _text_block);
             //_text_block->Clear();
@@ -487,10 +489,10 @@ namespace Ailu
             cb->_rect_buf[cur_vert_num + 1] = rect;
             cb->_rect_buf[cur_vert_num + 2] = rect;
             cb->_rect_buf[cur_vert_num + 3] = rect;
-            cb->_corner_radius_buf[cur_vert_num] = Vector4f::kZero;
-            cb->_corner_radius_buf[cur_vert_num + 1] = Vector4f::kZero;
-            cb->_corner_radius_buf[cur_vert_num + 2] = Vector4f::kZero;
-            cb->_corner_radius_buf[cur_vert_num + 3] = Vector4f::kZero;
+              cb->_corner_radius_buf[cur_vert_num] = opts._corner_radius;
+              cb->_corner_radius_buf[cur_vert_num + 1] = opts._corner_radius;
+              cb->_corner_radius_buf[cur_vert_num + 2] = opts._corner_radius;
+              cb->_corner_radius_buf[cur_vert_num + 3] = opts._corner_radius;
             cb->_border_thickness_buf[cur_vert_num] = Vector4f::kZero;
             cb->_border_thickness_buf[cur_vert_num + 1] = Vector4f::kZero;
             cb->_border_thickness_buf[cur_vert_num + 2] = Vector4f::kZero;
@@ -811,8 +813,12 @@ namespace Ailu
             if (auto it = _frame_backdrop_blur_cache.find(source); it != _frame_backdrop_blur_cache.end())
                 return it->second;
 
-            const u16 blur_width = std::max<u16>(1u, static_cast<u16>(source->Width() / kBackdropBlurDownsample));
-            const u16 blur_height = std::max<u16>(1u, static_cast<u16>(source->Height() / kBackdropBlurDownsample));
+            const u32 source_width = source->Width();
+            const u32 source_height = source->Height();
+            const u16 blur_width = static_cast<u16>(std::clamp(source_width / kBackdropBlurDownsample, 1u,
+                                                                static_cast<u32>(kMaxTempRTDimension)));
+            const u16 blur_height = static_cast<u16>(std::clamp(source_height / kBackdropBlurDownsample, 1u,
+                                                                 static_cast<u32>(kMaxTempRTDimension)));
             RTHandle downsample = cmd->GetTempRT(blur_width, blur_height, "UI_BackdropBlur_Downsample", ERenderTargetFormat::kDefaultHDR, false, false, true);
             RTHandle blur_x = cmd->GetTempRT(blur_width, blur_height, "UI_BackdropBlur_X", ERenderTargetFormat::kDefaultHDR, false, false, true);
             RTHandle blur_y = cmd->GetTempRT(blur_width, blur_height, "UI_BackdropBlur_Y", ERenderTargetFormat::kDefaultHDR, false, false, true);

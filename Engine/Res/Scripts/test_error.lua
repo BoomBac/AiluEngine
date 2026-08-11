@@ -8,8 +8,8 @@
 
 local TestError = {}
 
-function TestError:OnInit()
-    engine.log("TestError:OnInit called")
+function TestError:OnCreate()
+    engine.log("TestError:OnCreate called")
     _G["reg_err_init_called"] = true
 end
 

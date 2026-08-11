@@ -211,6 +211,7 @@ namespace Ailu
             _p_scene_camera->Aspect(_editor_config._aspect);
             _p_scene_camera->Near(_editor_config._near);
             _p_scene_camera->Far(_editor_config._far);
+            Camera::sScene = _p_scene_camera;
             Camera::sCurrent = _p_scene_camera;
             _camera_controller->_rotation = _editor_config._controller_rot;
             _camera_controller->_base_camera_move_speed = _editor_config._move_speed;

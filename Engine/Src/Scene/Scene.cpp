@@ -16,6 +16,7 @@
 
 #include "Render/ShaderInterop.h"//lbvh
 #include "Render/Gizmo.h"
+#include "Render/RenderPipeline.h"
 #include "Scene/SceneCommand.h"
 
 using namespace Ailu::Render;
@@ -600,11 +601,15 @@ namespace Ailu::SceneManagement
     }
     ECS::Entity Scene::AddObject(String name)
     {
-        return CreateEntityInternal(std::move(name), Guid::EmptyGuid());
+        const ECS::Entity entity = CreateEntityInternal(std::move(name), Guid::EmptyGuid());
+        TouchStructure();
+        return entity;
     }
     ECS::Entity Scene::AddObject(String name, const Guid &requested_guid)
     {
-        return CreateEntityInternal(std::move(name), requested_guid);
+        const ECS::Entity entity = CreateEntityInternal(std::move(name), requested_guid);
+        TouchStructure();
+        return entity;
     }
     ECS::Entity Scene::DuplicateEntity(ECS::Entity e)
     {
@@ -626,7 +631,7 @@ namespace Ailu::SceneManagement
         }
         tag_comp->_name += "(" + std::to_string(max_index + 1) + ")";
 
-        // Save source local transform before copying
+        // Save source local transform and hierarchy before copying. Hierarchy links must be rebuilt for the new entity.
         Vector3f source_local_pos = Vector3f::kZero;
         Quaternion source_local_rot = Quaternion();
         Vector3f source_local_scale = Vector3f::kOne;
@@ -644,30 +649,14 @@ namespace Ailu::SceneManagement
             source_parent = _register.GetComponent<ECS::CHierarchy>(e)->_parent;
         }
 
-        if (const auto *src_transf = _register.GetComponent<ECS::TransformComponent>(e))
-            *_register.GetComponent<ECS::TransformComponent>(new_one) = *src_transf;
-
-        // Copy business components
-        if (_register.HasComponent<ECS::ScriptComponent>(e))
-            _register.AddComponent<ECS::ScriptComponent>(new_one, *_register.GetComponent<ECS::ScriptComponent>(e));
-        if (_register.HasComponent<ECS::StaticMeshComponent>(e))
-            _register.AddComponent<ECS::StaticMeshComponent>(new_one, *_register.GetComponent<ECS::StaticMeshComponent>(e));
-        if (_register.HasComponent<ECS::LightComponent>(e))
-            _register.AddComponent<ECS::LightComponent>(new_one, *_register.GetComponent<ECS::LightComponent>(e));
-        if (_register.HasComponent<ECS::CCamera>(e))
-            _register.AddComponent<ECS::CCamera>(new_one, *_register.GetComponent<ECS::CCamera>(e));
-        if (_register.HasComponent<ECS::CLightProbe>(e))
-            _register.AddComponent<ECS::CLightProbe>(new_one, *_register.GetComponent<ECS::CLightProbe>(e));
-        if (_register.HasComponent<ECS::CRigidBody>(e))
-            _register.AddComponent<ECS::CRigidBody>(new_one, *_register.GetComponent<ECS::CRigidBody>(e));
-        if (_register.HasComponent<ECS::CCollider>(e))
-            _register.AddComponent<ECS::CCollider>(new_one, *_register.GetComponent<ECS::CCollider>(e));
-        if (_register.HasComponent<ECS::SpriteRendererComponent>(e))
-            _register.AddComponent<ECS::SpriteRendererComponent>(new_one, *_register.GetComponent<ECS::SpriteRendererComponent>(e));
-        if (_register.HasComponent<ECS::AudioSourceComponent>(e))
-            _register.AddComponent<ECS::AudioSourceComponent>(new_one, *_register.GetComponent<ECS::AudioSourceComponent>(e));
-        if (_register.HasComponent<ECS::AudioListenerComponent>(e))
-            _register.AddComponent<ECS::AudioListenerComponent>(new_one, *_register.GetComponent<ECS::AudioListenerComponent>(e));
+        const ECS::ComponentTypeId persistent_id_type = ECS::PersistentIdComponent::StaticComponentTypeId();
+        const ECS::ComponentTypeId hierarchy_type = ECS::CHierarchy::StaticComponentTypeId();
+        for (ECS::ComponentTypeId type_id : _register.GetEntityComponentTypes(e))
+        {
+            if (type_id == persistent_id_type || type_id == hierarchy_type)
+                continue;
+            _register.CopyComponent(e, new_one, type_id);
+        }
 
         // Reparent to same parent, then restore local transform
         if (source_has_hierarchy && source_parent != ECS::kInvalidEntity)
@@ -796,6 +785,10 @@ namespace Ailu::SceneManagement
     void Scene::FixedUpdate(f32 fixed_delta_time)
     {
         BeginUpdate();
+
+        if (auto *physics_2d_system = _register.GetSystem<ECS::Physics2DSystem>())
+            physics_2d_system->Synchronize(_register);
+
         UpdateFixedScripts(fixed_delta_time);
         _register.ExecutePhase(ECS::ESystemPhase::kPrePhysics, fixed_delta_time);
         _register.ExecutePhase(ECS::ESystemPhase::kPhysics, fixed_delta_time);
@@ -804,6 +797,9 @@ namespace Ailu::SceneManagement
 
     void Scene::UpdateFixedScripts(f32 fixed_delta_time)
     {
+        if (!Application::Get()._is_playing_mode)
+            return;
+
         auto &reg = _register;
         u32 index = 0;
         for (auto &component: reg.View<ECS::ScriptComponent>())
@@ -815,6 +811,9 @@ namespace Ailu::SceneManagement
 
     void Scene::UpdateScripts(f32 delta_time)
     {
+        if (!Application::Get()._is_playing_mode)
+            return;
+
         auto &reg = _register;
         u32 index = 0;
         for (auto &component: reg.View<ECS::ScriptComponent>())
@@ -826,6 +825,9 @@ namespace Ailu::SceneManagement
 
     void Scene::UpdateLateScripts(f32 delta_time, f32 render_alpha)
     {
+        if (!Application::Get()._is_playing_mode)
+            return;
+
         auto &reg = _register;
         u32 index = 0;
         for (auto &component: reg.View<ECS::ScriptComponent>())
@@ -905,6 +907,9 @@ namespace Ailu::SceneManagement
     void Scene::UpdateCameras()
     {
         auto &reg = _register;
+        Camera::sMain = FindMainCamera();
+        if (Application::Get()._is_playing_mode && Camera::sMain != nullptr)
+            Camera::sCurrent = Camera::sMain;
         u32 index = 0;
         for (auto &component: reg.View<ECS::CCamera>())
         {
@@ -917,6 +922,21 @@ namespace Ailu::SceneManagement
             component._camera.Rotation(Quaternion::FromMat4f(world_matrix));
             component._camera.RecalculateMatrix(true);
         }
+    }
+
+    Camera *Scene::FindMainCamera()
+    {
+        auto &reg = _register;
+        u32 index = 0;
+        for (auto &camera : reg.View<ECS::CCamera>())
+        {
+            const ECS::Entity entity = reg.GetEntity<ECS::CCamera>(index++);
+            const auto *tag = reg.GetComponent<ECS::TagComponent>(entity);
+            if (tag != nullptr && tag->_tag == "MainCamera" && IsEntityEnabled(entity) &&
+                reg.IsComponentEnabled<ECS::CCamera>(entity))
+                return &camera._camera;
+        }
+        return nullptr;
     }
 
     void Scene::UpdateAccelerationStructures()
@@ -942,6 +962,10 @@ namespace Ailu::SceneManagement
     void Scene::Update(f32 dt)
     {
         BeginUpdate();
+
+        if (auto *physics_2d_system = _register.GetSystem<ECS::Physics2DSystem>())
+            physics_2d_system->Synchronize(_register);
+
         UpdateScripts(dt);
         _register.ExecutePhase(ECS::ESystemPhase::kAnimation, dt);
         _register.ExecutePhase(ECS::ESystemPhase::kGameplay, dt);
@@ -1178,6 +1202,7 @@ namespace Ailu::SceneManagement
     }
     void SceneMgr::EnterPlayMode()
     {
+        RenderPipeline::Get().SetPreviewCamera(nullptr, nullptr);
         Application::Get()._is_playing_mode = true;
         _runtime_scene = new Scene(*_p_current);
         auto name = _runtime_scene->Name();
@@ -1186,14 +1211,38 @@ namespace Ailu::SceneManagement
         _runtime_scene->RebuildEntityGuidIndex();
         _runtime_scene_src = _p_current;
         _p_current = _runtime_scene;
+        Camera::sMain = _runtime_scene->FindMainCamera();
+        Camera::sCurrent = Camera::sMain != nullptr ? Camera::sMain : Camera::sScene;
     }
 
     void SceneMgr::ExitPlayMode()
     {
         _p_current = _runtime_scene_src;
         _runtime_scene_src = nullptr;
-        delete _runtime_scene; _runtime_scene = nullptr;
+        if (Application::Get()._is_multi_thread_rendering.load())
+        {
+            // The render thread may still be recording draw commands captured from the runtime scene.
+            // Keep it alive until RenderPipeline has waited for that frame to finish recording.
+            _retired_runtime_scene = _runtime_scene;
+            _runtime_scene = nullptr;
+        }
+        else
+        {
+            delete _runtime_scene;
+            _runtime_scene = nullptr;
+        }
+        Camera::sMain = nullptr;
+        Camera::sCurrent = Camera::sScene;
         Application::Get()._is_playing_mode = false;
+    }
+
+    void SceneMgr::ReleaseRetiredRuntimeScene()
+    {
+        if (_retired_runtime_scene == nullptr)
+            return;
+
+        delete _retired_runtime_scene;
+        _retired_runtime_scene = nullptr;
     }
     void SceneMgr::EnterSimulateMode()
     {
