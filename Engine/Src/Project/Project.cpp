@@ -8,6 +8,16 @@
 
 namespace Ailu
 {
+    namespace
+    {
+        constexpr const wchar_t *kProjectSettingsFileName = L"ProjectSettings.json";
+
+        WString GetProjectSettingsPath(const Project &project)
+        {
+            return PathUtils::FormatFilePath((fs::path(project.ConfigDirectory()) / kProjectSettingsFileName).wstring());
+        }
+    }
+
     bool Project::Load(const WString &project_file_path)
     {
         const WString normalized_project_file = PathUtils::FormatFilePath(project_file_path);
@@ -30,6 +40,20 @@ namespace Ailu
         _descriptor = std::move(descriptor);
         _project_file_path = normalized_project_file;
         _root_directory = PathUtils::NormalizeDirectoryPath(PathUtils::Parent(_project_file_path));
+
+        const WString settings_path = GetProjectSettingsPath(*this);
+        if (FileManager::Exist(settings_path))
+        {
+            JsonArchive settings_archive;
+            settings_archive.Load(settings_path);
+            if (!settings_archive.IsLoaded())
+                return false;
+            const Type *settings_type = ProjectSettings::StaticType();
+            for (auto &property: settings_type->GetProperties())
+                property.Deserialize(&_settings, settings_archive);
+        }
+        if (_settings._physics_2d_collision_masks.size() != ProjectSettings::kPhysics2DLayerCount)
+            _settings.ResetPhysics2DLayerCollisionMatrix();
         return true;
     }
 
@@ -46,6 +70,12 @@ namespace Ailu
         for (auto &property: type->GetProperties())
             property.Serialize(const_cast<ProjectDescriptor *>(&_descriptor), ar);
         ar.Save(_project_file_path);
+
+        JsonArchive settings_archive;
+        const Type *settings_type = ProjectSettings::StaticType();
+        for (auto &property: settings_type->GetProperties())
+            property.Serialize(const_cast<ProjectSettings *>(&_settings), settings_archive);
+        settings_archive.Save(GetProjectSettingsPath(*this));
         return true;
     }
 

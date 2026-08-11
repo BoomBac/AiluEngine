@@ -2,6 +2,7 @@
 #define __PROJECT_H__
 
 #include "ProjectDescriptor.h"
+#include "ProjectSettings.h"
 
 namespace Ailu
 {
@@ -15,6 +16,9 @@ namespace Ailu
         {
             return _descriptor;
         }
+
+        ProjectSettings &Settings() { return _settings; }
+        const ProjectSettings &Settings() const { return _settings; }
 
         const WString& ProjectFilePath() const
         {
@@ -38,6 +42,7 @@ namespace Ailu
         friend class ProjectManager;
 
         ProjectDescriptor _descriptor;
+        ProjectSettings _settings;
         WString _project_file_path;
         WString _root_directory;
     };

@@ -17,3 +17,6 @@
 	path = Engine/Ext/lua
 	url = https://github.com/lua/lua
 	branch = v5.4
+[submodule "box2d"]
+	path = Engine/Ext/box2d
+	url = https://github.com/erincatto/box2d.git

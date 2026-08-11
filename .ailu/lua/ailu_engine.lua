@@ -87,6 +87,41 @@ function ScriptEntity:get_transform() end
 
 function ScriptEntity:destroy() end
 
+---@class ScriptPhysics2D
+local ScriptPhysics2D = {}
+
+---@param entity ScriptEntity
+---@return boolean
+function ScriptPhysics2D.is_valid_body(entity) end
+
+---@param entity ScriptEntity
+---@param position Vec2
+function ScriptPhysics2D.set_position(entity, position) end
+
+---@param entity ScriptEntity
+---@return Vec2
+function ScriptPhysics2D.get_position(entity) end
+
+---@param entity ScriptEntity
+---@param velocity Vec2
+function ScriptPhysics2D.set_linear_velocity(entity, velocity) end
+
+---@param entity ScriptEntity
+---@return Vec2
+function ScriptPhysics2D.get_linear_velocity(entity) end
+
+---@param entity ScriptEntity
+---@param velocity number
+function ScriptPhysics2D.set_angular_velocity(entity, velocity) end
+
+---@param entity ScriptEntity
+---@param force Vec2
+function ScriptPhysics2D.add_force(entity, force) end
+
+---@param entity ScriptEntity
+---@param impulse Vec2
+function ScriptPhysics2D.add_impulse(entity, impulse) end
+
 ---@class ScriptScene
 local ScriptScene = {}
 

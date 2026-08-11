@@ -7,6 +7,8 @@
 #include "Framework/Common/ResourceMgr.h"
 #include "Framework/Script/ScriptSystem.h"
 #include "Physics/PhysicsSystem.h"
+#include "Physics/2D/Physics2DComponents.h"
+#include "Physics/2D/Physics2DSystem.h"
 #include "Scene/RenderSystem.h"
 #include "Scene/TransformSystem.h"
 //#include "pch.h"
@@ -34,6 +36,8 @@ namespace Ailu::SceneManagement
         _register.RegisterComponent<ECS::CLightProbe>();
         _register.RegisterComponent<ECS::CRigidBody>();
         _register.RegisterComponent<ECS::CCollider>();
+        _register.RegisterComponent<ECS::RigidBody2DComponent>();
+        _register.RegisterComponent<ECS::Collider2DComponent>();
         _register.RegisterComponent<ECS::CSkeletonMesh>();
         _register.RegisterComponent<ECS::CVXGI>();
         _register.RegisterComponent<ECS::SpriteRendererComponent>();
@@ -53,6 +57,10 @@ namespace Ailu::SceneManagement
         phy_sig.set(_register.GetComponentTypeID<ECS::TransformComponent>(), true);
         phy_sig.set(_register.GetComponentTypeID<ECS::CRigidBody>(), true);
         _register.RegisterSystem<ECS::PhysicsSystem>(phy_sig);
+        ECS::Signature phy_2d_sig;
+        phy_2d_sig.set(_register.GetComponentTypeID<ECS::TransformComponent>(), true);
+        phy_2d_sig.set(_register.GetComponentTypeID<ECS::Collider2DComponent>(), true);
+        _register.RegisterSystem<ECS::Physics2DSystem>(phy_2d_sig);
         ECS::Signature anim_sig;
         anim_sig.set(_register.GetComponentTypeID<ECS::CSkeletonMesh>(), true);
         _register.RegisterSystem<ECS::AnimationSystem>(anim_sig);

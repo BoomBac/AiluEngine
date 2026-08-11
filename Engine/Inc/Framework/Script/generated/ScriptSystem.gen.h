@@ -52,8 +52,24 @@ template<>
 AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::ScriptEntity>();
 //Struct ScriptEntity end...........................
 
-//Struct ScriptScene begin...........................
+//Struct ScriptPhysics2D begin...........................
 #define SCRIPTSYSTEM_GEN_H_101_GENERATED_BODY \
+                            private: \
+                                friend const Type* Z_Construct_ScriptPhysics2D_Type();\
+                                static const Type* GetPrivateStaticClass();\
+                            public:\
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                const Type  *GetType();
+                            namespace Ailu {class Type;}
+namespace Ailu{
+struct ScriptPhysics2D ;
+}
+template<>
+AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::ScriptPhysics2D>();
+//Struct ScriptPhysics2D end...........................
+
+//Struct ScriptScene begin...........................
+#define SCRIPTSYSTEM_GEN_H_124_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_ScriptScene_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -69,7 +85,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::ScriptScene>();
 //Struct ScriptScene end...........................
 
 //Struct ScriptInput begin...........................
-#define SCRIPTSYSTEM_GEN_H_117_GENERATED_BODY \
+#define SCRIPTSYSTEM_GEN_H_140_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_ScriptInput_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -85,7 +101,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::ScriptInput>();
 //Struct ScriptInput end...........................
 
 //Struct ScriptTime begin...........................
-#define SCRIPTSYSTEM_GEN_H_131_GENERATED_BODY \
+#define SCRIPTSYSTEM_GEN_H_154_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_ScriptTime_Type();\
                                 static const Type* GetPrivateStaticClass();\

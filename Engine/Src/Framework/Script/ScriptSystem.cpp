@@ -1,4 +1,5 @@
 #include "Framework/Script/ScriptSystem.h"
+#include "Physics/2D/Physics2D.h"
 
 #include "Framework/Common/Log.h"
 #include "Framework/Common/Application.h"
@@ -149,7 +150,7 @@ namespace Ailu
             return {_scene, _entity};
         }
 
-        void ScriptEntity::Destroy() const
+    void ScriptEntity::Destroy() const
         {
             if (IsValid())
                 _scene->RemoveObject(_entity);
@@ -294,6 +295,46 @@ namespace Ailu
         _last_fixed_delta_time = 0.0f;
         _last_render_alpha = 0.0f;
         _is_initialized = false;
+    }
+
+    bool ScriptPhysics2D::IsValidBody(const ScriptEntity &entity)
+    {
+        return entity._scene != nullptr && entity.IsValid() && Physics2D::IsValidBody(*entity._scene, entity._entity);
+    }
+
+    void ScriptPhysics2D::SetPosition(const ScriptEntity &entity, const Vector2f &position)
+    {
+        if (entity._scene != nullptr && entity.IsValid()) Physics2D::SetPosition(*entity._scene, entity._entity, position);
+    }
+
+    Vector2f ScriptPhysics2D::GetPosition(const ScriptEntity &entity)
+    {
+        return entity._scene != nullptr && entity.IsValid() ? Physics2D::GetPosition(*entity._scene, entity._entity) : Vector2f::kZero;
+    }
+
+    void ScriptPhysics2D::SetLinearVelocity(const ScriptEntity &entity, const Vector2f &velocity)
+    {
+        if (entity._scene != nullptr && entity.IsValid()) Physics2D::SetLinearVelocity(*entity._scene, entity._entity, velocity);
+    }
+
+    Vector2f ScriptPhysics2D::GetLinearVelocity(const ScriptEntity &entity)
+    {
+        return entity._scene != nullptr && entity.IsValid() ? Physics2D::GetLinearVelocity(*entity._scene, entity._entity) : Vector2f::kZero;
+    }
+
+    void ScriptPhysics2D::SetAngularVelocity(const ScriptEntity &entity, f32 velocity)
+    {
+        if (entity._scene != nullptr && entity.IsValid()) Physics2D::SetAngularVelocity(*entity._scene, entity._entity, velocity);
+    }
+
+    void ScriptPhysics2D::AddForce(const ScriptEntity &entity, const Vector2f &force)
+    {
+        if (entity._scene != nullptr && entity.IsValid()) Physics2D::AddForce(*entity._scene, entity._entity, force);
+    }
+
+    void ScriptPhysics2D::AddImpulse(const ScriptEntity &entity, const Vector2f &impulse)
+    {
+        if (entity._scene != nullptr && entity.IsValid()) Physics2D::AddImpulse(*entity._scene, entity._entity, impulse);
     }
 
     void ScriptSystem::Tick(f32 delta_time)
@@ -465,6 +506,7 @@ namespace Ailu
                                              "w", &Math::Quaternion::w);
         _lua["time"] = ScriptTime{};
         _lua["input"] = ScriptInput{};
+        _lua["physics2d"] = ScriptPhysics2D{};
     }
 
     bool ScriptSystem::LoadComponentInstance(const ScriptInstanceKey &key, ECS::ScriptComponent &component, const ScriptEntity &entity)
