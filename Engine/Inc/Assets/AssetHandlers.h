@@ -70,6 +70,13 @@ namespace Ailu
         bool Save(const AssetSaveContext &context) final;
     };
 
+    class AILU_API PrefabAssetHandler : public IAssetHandler
+    {
+        const Type *AssetType() const final;
+        Scope<Asset> Load(const AssetLoadContext &context) final;
+        bool Save(const AssetSaveContext &context) final;
+    };
+
     class AILU_API AnimationClipAssetHandler : public IAssetHandler
     {
         const Type *AssetType() const final;

@@ -107,8 +107,12 @@ namespace Ailu
                 {
                     auto* tag = _scene->GetRegister().GetComponent<ECS::TagComponent>(entity);
                     result._label = tag && !tag->_name.empty() ? tag->_name : "<Unnamed>";
+                    result._draggable = true;
+                    result._drop_target = true;
                     if (!_scene->IsEntityEnabled(entity))
                         result._text_color = Color(0.42f, 0.45f, 0.52f, 1.0f);
+                    if (tag != nullptr && !tag->_prefab_entity.IsEmpty())
+                        result._text_color = Color(0.35f, 0.65f, 1.0f, 1.0f);
                 }
                 else
                 {
@@ -190,6 +194,7 @@ namespace Ailu
 
             // TreeView
             _tree_view = vb->AddChild<TreeView>();
+            _tree_view->Name("WorldOutlineTree");
             _tree_view->GetSlotAs<LinearSlot>().SizePolicy(ESizePolicy::kFill, ESizePolicy::kFill);
         }
 

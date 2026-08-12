@@ -11,6 +11,7 @@
 #include "AssetCommon.h"
 #include "Physics/2D/Physics2DComponents.h"
 #include "Scene/Component.h"
+#include "Scene/PrefabTypes.h"
 #include "generated/AssetDocument.gen.h"
 
 namespace Ailu
@@ -886,16 +887,18 @@ namespace Ailu
         GENERATED_BODY()
 
     public:
-        inline static constexpr u32 kCurrentSceneFormatVersion = 2u;
+        inline static constexpr u32 kCurrentSceneFormatVersion = 3u;
         inline static const String kHeader = "_header";
         inline static const String kSceneFormatVersion = "_scene_format_version";
         inline static const String kEntities = "_entities";
+        inline static const String kPrefabInstances = "_prefab_instances";
 
         void Serialize(FArchive &ar)
         {
             SerializerWrapper<AssetDocumentHeader>::Serialize(&_header, ar, &kHeader);
             SerializerWrapper<u32>::Serialize(&_scene_format_version, ar, &kSceneFormatVersion);
             SerializerWrapper<Vector<SceneEntityDocument>>::Serialize(&_entities, ar, &kEntities);
+            SerializerWrapper<Vector<SceneManagement::PrefabInstance>>::Serialize(&_prefab_instances, ar, &kPrefabInstances);
         }
 
         void Deserialize(FArchive &ar)
@@ -907,6 +910,8 @@ namespace Ailu
             if (json_ar == nullptr || json_ar->HasField(kSceneFormatVersion))
                 SerializerWrapper<u32>::Deserialize(&_scene_format_version, ar, &kSceneFormatVersion);
             SerializerWrapper<Vector<SceneEntityDocument>>::Deserialize(&_entities, ar, &kEntities);
+            if (json_ar == nullptr || json_ar->HasField(kPrefabInstances))
+                SerializerWrapper<Vector<SceneManagement::PrefabInstance>>::Deserialize(&_prefab_instances, ar, &kPrefabInstances);
         }
 
         APROPERTY()
@@ -915,6 +920,8 @@ namespace Ailu
         u32 _scene_format_version = 1u;
         APROPERTY()
         Vector<SceneEntityDocument> _entities;
+        APROPERTY()
+        Vector<SceneManagement::PrefabInstance> _prefab_instances;
     };
 }
 

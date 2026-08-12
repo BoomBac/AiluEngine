@@ -10,6 +10,7 @@
 #include "Physics/2D/Physics2DComponents.h"
 #include "Physics/2D/Physics2DSystem.h"
 #include "Scene/RenderSystem.h"
+#include "Scene/EntitySerializer.h"
 #include "Scene/TransformSystem.h"
 //#include "pch.h"
 #include <regex>
@@ -613,65 +614,7 @@ namespace Ailu::SceneManagement
     }
     ECS::Entity Scene::DuplicateEntity(ECS::Entity e)
     {
-        ECS::Entity new_one = CreateEntityInternal("", Guid::EmptyGuid());
-        if (const auto *src_tag = _register.GetComponent<ECS::TagComponent>(e))
-            *_register.GetComponent<ECS::TagComponent>(new_one) = *src_tag;
-        auto *tag_comp = _register.GetComponent<ECS::TagComponent>(new_one);
-        String base_name = tag_comp->_name.substr(0, tag_comp->_name.find_first_of('(') - 1);
-        i32 max_index = 0;
-        std::regex name_pattern(base_name + R"(\((\d+)\))");// 匹配 A(*) 的正则表达式
-        for (const auto &tag: _register.View<ECS::TagComponent>())
-        {
-            std::smatch match;
-            if (std::regex_match(tag._name, match, name_pattern))
-            {
-                int index = std::stoi(match[1].str());
-                max_index = std::max(max_index, index);
-            }
-        }
-        tag_comp->_name += "(" + std::to_string(max_index + 1) + ")";
-
-        // Save source local transform and hierarchy before copying. Hierarchy links must be rebuilt for the new entity.
-        Vector3f source_local_pos = Vector3f::kZero;
-        Quaternion source_local_rot = Quaternion();
-        Vector3f source_local_scale = Vector3f::kOne;
-        ECS::Entity source_parent = ECS::kInvalidEntity;
-        bool source_has_hierarchy = _register.HasComponent<ECS::CHierarchy>(e);
-
-        if (auto *src_transf = _register.GetComponent<ECS::TransformComponent>(e))
-        {
-            source_local_pos = src_transf->_local_transform._position;
-            source_local_rot = src_transf->_local_transform._rotation;
-            source_local_scale = src_transf->_local_transform._scale;
-        }
-        if (source_has_hierarchy)
-        {
-            source_parent = _register.GetComponent<ECS::CHierarchy>(e)->_parent;
-        }
-
-        const ECS::ComponentTypeId persistent_id_type = ECS::PersistentIdComponent::StaticComponentTypeId();
-        const ECS::ComponentTypeId hierarchy_type = ECS::CHierarchy::StaticComponentTypeId();
-        for (ECS::ComponentTypeId type_id : _register.GetEntityComponentTypes(e))
-        {
-            if (type_id == persistent_id_type || type_id == hierarchy_type)
-                continue;
-            _register.CopyComponent(e, new_one, type_id);
-        }
-
-        // Reparent to same parent, then restore local transform
-        if (source_has_hierarchy && source_parent != ECS::kInvalidEntity)
-        {
-            Reparent(new_one, source_parent, false);
-        }
-
-        // Restore saved local transform
-        if (auto *new_transf = _register.GetComponent<ECS::TransformComponent>(new_one))
-        {
-            new_transf->_local_transform._position = source_local_pos;
-            new_transf->_local_transform._rotation = source_local_rot;
-            new_transf->_local_transform._scale = source_local_scale;
-        }
-
+        ECS::Entity new_one = EntitySerializer::CloneEntity(*this, e);
         LOG_INFO("Duplicate entity {}", e);
         TouchStructure();
         return new_one;

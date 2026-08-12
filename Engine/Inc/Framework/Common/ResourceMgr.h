@@ -281,8 +281,6 @@ namespace Ailu
             return false;
         }
 
-        static const Type *GetObjectResourceType(Object *obj);
-
         static bool IsAssetType(const Asset *asset, const Type *type)
         {
             return asset != nullptr && asset->_asset_type == type;

@@ -2,6 +2,7 @@
 #include "Animation/Clip.h"
 #include "Animation/TransformTrack.h"
 #include "Assets/AssetDocument.h"
+#include "Assets/PrefabAsset.h"
 #include "Assets/ScriptAsset.h"
 #include "Audio/AudioClip.h"
 #include "Audio/AudioClipDocument.h"
@@ -1080,6 +1081,71 @@ const Type *SceneAssetHandler::AssetType() const
     return Scene::StaticType();
 }
 
+const Type *PrefabAssetHandler::AssetType() const
+{
+    return PrefabAssetDocument::StaticType();
+}
+
+Scope<Asset> PrefabAssetHandler::Load(const AssetLoadContext &context)
+{
+    auto prefab = MakeRef<PrefabAssetDocument>();
+    if (!LoadAssetDocument(context._system_path, *prefab))
+        return nullptr;
+
+    auto asset = MakeScope<Asset>(Guid(prefab->_header._guid), PrefabAssetDocument::StaticType(), context._asset_path);
+    asset->_asset_path = context._asset_path;
+    asset->_asset_type = PrefabAssetDocument::StaticType();
+    asset->_p_obj = std::move(prefab);
+    asset->_domain = context._resource_mgr->GetAssetPathDomain(asset->_asset_path);
+    return asset;
+}
+
+bool PrefabAssetHandler::Save(const AssetSaveContext &context)
+{
+    auto *prefab = context._asset->As<PrefabAssetDocument>();
+    if (prefab == nullptr)
+        return false;
+
+    prefab->_header = MakeAssetDocumentHeader(context._asset);
+    auto add_dependency = [&header = prefab->_header](const Guid &guid)
+    {
+        if (guid.IsEmpty() || std::any_of(header._dependencies.begin(), header._dependencies.end(),
+                                          [&guid](const AssetDependency &dependency) { return dependency._guid == guid; }))
+            return;
+        header._dependencies.emplace_back(AssetDependency{guid, EAssetDependencyType::kHard});
+    };
+    auto add_dependency_string = [&add_dependency](const String &guid_string)
+    {
+        if (!guid_string.empty())
+            add_dependency(Guid(guid_string));
+    };
+    for (const PrefabEntityDocument &entity : prefab->_entities)
+    {
+        const SceneEntityDocument &document = entity._entity;
+        if (document._has_script_component)
+            add_dependency(document._script_component._script_asset);
+        if (document._has_static_mesh_component)
+        {
+            add_dependency_string(document._static_mesh_component._mesh_guid);
+            for (const String &guid : document._static_mesh_component._material_guids)
+                add_dependency_string(guid);
+        }
+        if (document._has_skeleton_mesh_component)
+        {
+            add_dependency_string(document._skeleton_mesh_component._mesh_guid);
+            for (const String &guid : document._skeleton_mesh_component._material_guids)
+                add_dependency_string(guid);
+            add_dependency_string(document._skeleton_mesh_component._anim_clip_guid);
+        }
+        if (document._has_sprite_renderer_component)
+        {
+            add_dependency_string(document._sprite_renderer_component._sprite_guid);
+            add_dependency_string(document._sprite_renderer_component._material_guid);
+        }
+    }
+    return SaveAssetDocument(context._system_path, *prefab);
+}
+
 Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
 {
     WString sys_path = context._system_path;
@@ -1481,6 +1547,8 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
             loaded_scene->SetEntityEnabled(created_entities[doc_index], false);
     }
 
+    loaded_scene->MutablePrefabInstances() = doc._prefab_instances;
+
     // V1 迁移只在内存中升级，标记 Dirty 使下一次保存自动转为 V2。
     if (!is_v2)
         loaded_scene->MarkDirty();
@@ -1500,6 +1568,7 @@ bool SceneAssetHandler::Save(const AssetSaveContext &context)
     SceneAssetDocument doc;
     doc._header = MakeAssetDocumentHeader(context._asset);
     doc._scene_format_version = SceneAssetDocument::kCurrentSceneFormatVersion;
+    doc._prefab_instances = scene->PrefabInstances();
 
     // 保存前校验身份索引；Release 发现缺失时修复，Debug 额外触发断言。
     const bool index_valid = scene->ValidateEntityGuidIndex();

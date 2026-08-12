@@ -11,6 +11,8 @@
 #include "Framework/Common/ResourceMgr.h"
 #include "Common/Undo.h"
 #include "Common/TransformGizmo.h"
+#include "Assets/PrefabAsset.h"
+#include "Scene/PrefabSystem.h"
 #include "UI/DragDrop.h"
 #include "UI/Composite.h"
 #include <cmath>
@@ -383,16 +385,34 @@ namespace Ailu
             DropHandler handler;
             handler._can_drop = [](const DragPayload &payload) -> bool
             {
-                return payload._type == EDragType::kMesh;
+                return payload._type == EDragType::kMesh || payload._type == EDragType::kPrefab;
             };
             handler._on_drop = [this](const DragPayload &payload, f32 x, f32 y)
             {
                 LOG_INFO("SceneView {} drop", StaticEnum<EDragType>()->GetNameByEnum(payload._type));
-                if (payload._type != EDragType::kMesh || payload._data == nullptr)
+                if (payload._data == nullptr)
                     return;
                 auto *asset = static_cast<Asset *>(payload._data);
+                auto *scene = SceneMgr::Get().ActiveScene();
+                if (scene == nullptr)
+                    return;
+                if (payload._type == EDragType::kPrefab)
+                {
+                    Ref<PrefabAssetDocument> prefab = asset->AsRef<PrefabAssetDocument>();
+                    if (prefab == nullptr)
+                        return;
+                    const SceneManagement::PrefabInstantiateResult result = SceneManagement::PrefabSystem::Instantiate(*scene, *prefab);
+                    if (result._root == ECS::kInvalidEntity)
+                        return;
+                    if (auto *transform = scene->GetRegister().GetComponent<ECS::TransformComponent>(result._root))
+                        transform->SetLocalPosition(_drag_preview_pos);
+                    Selection::SetSelection(result._root);
+                    return;
+                }
+                if (payload._type != EDragType::kMesh)
+                    return;
                 auto mesh = asset->AsRef<Render::Mesh>();
-                if (mesh == nullptr || SceneMgr::Get().ActiveScene() == nullptr)
+                if (mesh == nullptr)
                     return;
                 _drag_preview_mesh = mesh;
                 Vector<Ref<Render::Material>> mats;
@@ -401,8 +421,8 @@ namespace Ailu
                     auto mat = ResourceMgr::Get().GetEmbeddedMaterial(mesh.get(), i);
                     mats.push_back(mat? mat : Render::Material::s_checker.lock());
                 }
-                auto new_entity = SceneMgr::Get().ActiveScene()->AddObject(mesh, mats);
-                SceneMgr::Get().ActiveScene()->GetRegister().GetComponent<ECS::TransformComponent>(new_entity)->_local_transform._position = _drag_preview_pos;
+                auto new_entity = scene->AddObject(mesh, mats);
+                scene->GetRegister().GetComponent<ECS::TransformComponent>(new_entity)->_local_transform._position = _drag_preview_pos;
             };
             _source->SetDropHandler(handler);
         }

@@ -55,6 +55,13 @@ namespace Ailu
             {
                 Remove(entity);
             }
+            bool RemoveComponent(Entity entity) final
+            {
+                if (GetComponent(entity) == nullptr)
+                    return false;
+                Remove(entity);
+                return true;
+            }
             void *GetComponentPtr(Entity entity) override
             {
                 auto it = _lut.find(entity);

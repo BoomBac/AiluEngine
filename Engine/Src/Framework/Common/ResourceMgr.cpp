@@ -473,6 +473,7 @@ namespace Ailu
 		_asset_handler_registry.Register(MakeScope<MeshAssetHandler>());
 		_asset_handler_registry.Register(MakeScope<SkeletonMeshAssetHandler>());
 		_asset_handler_registry.Register(MakeScope<SceneAssetHandler>());
+		_asset_handler_registry.Register(MakeScope<PrefabAssetHandler>());
 		_asset_handler_registry.Register(MakeScope<AnimationClipAssetHandler>());
 		_asset_handler_registry.Register(MakeScope<InputActionAssetHandler>());
 		_asset_handler_registry.Register(MakeScope<AudioClipAssetHandler>());
@@ -1003,7 +1004,8 @@ namespace Ailu
 				new_guid = Guid::Generate();
 			}
 		}
-		const Type *asset_type = GetObjectResourceType(obj.get());
+		const Type *asset_type = obj != nullptr ? obj->GetType() : nullptr;
+		AL_ASSERT(asset_type != nullptr);
 		new_asset = MakeScope<Asset>(new_guid, asset_type, normalized_asset_path);
 		new_asset->_domain = GetAssetPathDomain(normalized_asset_path, EAssetDomain::kProject);
 		if (asset_type == Mesh::StaticType() || asset_type == SkeletonMesh::StaticType())
@@ -1404,7 +1406,7 @@ namespace Ailu
 		{
 			_global_resources[asset_path] = obj;
 			_lut_global_resources[obj->ID()] = _global_resources.find(asset_path);
-			auto resource_type = GetObjectResourceType(obj.get());
+			auto resource_type = obj->GetType();
 			AL_ASSERT(resource_type != nullptr);
 			auto &v = _lut_global_resources_by_type[resource_type];
 			auto it = std::find_if(v.begin(), v.end(), [&](ResourcePoolContainerIter iter) -> bool
@@ -1426,7 +1428,7 @@ namespace Ailu
 		{
 			auto &obj = _global_resources[asset_path];
 			u32 ref_count = obj.use_count();
-			auto resource_type = GetObjectResourceType(obj.get());
+			auto resource_type = obj->GetType();
 			AL_ASSERT(resource_type != nullptr);
 			auto &v = _lut_global_resources_by_type[resource_type];
 			v.erase(std::find_if(v.begin(), v.end(), [&](ResourcePoolContainerIter it) -> bool
@@ -1470,45 +1472,6 @@ namespace Ailu
 			name = c[2].substr(c[2].find_first_of(L":") + 2);
 			type = FindAssetType(c[1].substr(c[1].find_first_of(L":") + 2));
 		}
-	}
-
-	const Type *ResourceMgr::GetObjectResourceType(Object *obj)
-	{
-		if (obj == nullptr)
-			return nullptr;
-
-		for (auto *type = obj->GetType(); type != nullptr; type = type->BaseType())
-		{
-			if (type == SkeletonMesh::StaticType())
-				return SkeletonMesh::StaticType();
-			if (type == Mesh::StaticType())
-				return Mesh::StaticType();
-			if (type == Material::StaticType())
-				return Material::StaticType();
-			if (type == Texture2D::StaticType())
-				return Texture2D::StaticType();
-			if (type == Texture3D::StaticType())
-				return Texture3D::StaticType();
-			if (type == Shader::StaticType())
-				return Shader::StaticType();
-			if (type == ComputeShader::StaticType())
-				return ComputeShader::StaticType();
-			if (type == SceneManagement::Scene::StaticType())
-				return SceneManagement::Scene::StaticType();
-			if (type == AnimationClip::StaticType())
-				return AnimationClip::StaticType();
-			if (type == Sprite::StaticType())
-				return Sprite::StaticType();
-			if (type == InputActionAsset::StaticType())
-				return InputActionAsset::StaticType();
-			if (type == AudioClip::StaticType())
-				return AudioClip::StaticType();
-			if (type == GraphAsset::StaticType())
-				return GraphAsset::StaticType();
-			if (type == ScriptAsset::StaticType())
-				return ScriptAsset::StaticType();
-		}
-		return nullptr;
 	}
 
 	bool ResourceMgr::IsFileOnDiskUpdated(const WString &sys_path)

@@ -10,6 +10,7 @@
 #include "Framework/Core/Containers/Map.h"
 #include "Framework/Common/NonCopyable.h"
 #include "Objects/Serialize.h"
+#include "Scene/PrefabTypes.h"
 #include "generated/Scene.gen.h"
 
 
@@ -85,6 +86,8 @@ namespace Ailu
             auto GetAllSkinedRenderable() const { return _register.View<ECS::CSkeletonMesh>(); };
             const ECS::Register &GetRegister() const { return _register; }
             ECS::Register &GetRegister() { return _register; }
+            const Vector<PrefabInstance> &PrefabInstances() const { return _prefab_instances; }
+            Vector<PrefabInstance> &MutablePrefabInstances() { return _prefab_instances; }
             u32 EntityNum() const { return _register.EntityNum(); }
 
             String AcquireName() const { return std::format("new_object_{}", _register.EntityNum()); };
@@ -174,6 +177,7 @@ namespace Ailu
             Vector<BVHNode> _tlas_nodes;
             HashMap<Guid, ECS::Entity, GuidHasher> _guid_to_entity;
             Guid _asset_guid;
+            Vector<PrefabInstance> _prefab_instances;
         };
 
         class AILU_API SceneMgr : public NonCopyable

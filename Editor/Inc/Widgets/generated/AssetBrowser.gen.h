@@ -5,14 +5,13 @@
 #include "Objects/ReflectTemplate.h"
 #define __ASSETBROWSER_GEN_H__
 //Class AssetBrowser begin...........................
-#define ASSETBROWSER_GEN_H_33_GENERATED_BODY \
+#define ASSETBROWSER_GEN_H_35_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_AssetBrowser_Type();\
                                 static const Type* GetPrivateStaticClass();\
                             public:\
                                 static const Type *StaticType() {return GetPrivateStaticClass();};\
                                 virtual const Type  *GetType() override;
-#define ASSETBROWSER_GEN_H_34_GENERATED_BODY ASSETBROWSER_GEN_H_33_GENERATED_BODY
                             namespace Ailu {class Type;}
 namespace Ailu::Editor{
 class AssetBrowser ;

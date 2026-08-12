@@ -2,7 +2,9 @@
 #include "Common/Selection.h"
 #include "Common/Undo.h"
 #include "Framework/Common/ResourceMgr.h"
+#include "Assets/PrefabAsset.h"
 #include "Scene/Scene.h"
+#include "Scene/PrefabSystem.h"
 #include "UI/Basic.h"
 #include "UI/Container.h"
 #include "UI/UIFramework.h"
@@ -156,6 +158,65 @@ namespace Ailu
                 ShowAddComponentPopup(e._current_target);
                 e._is_handled = true;
             };
+            auto *unpack_button = name_row->AddChild<UI::Button>();
+            unpack_button->SetText("Unpack");
+            unpack_button->GetSlotAs<UI::LinearSlot>()
+                    .SizePolicy(UI::ESizePolicy::kAuto, UI::ESizePolicy::kFixed)
+                    .Size({64.0f, UI::CollapsibleView::s_header_height});
+            unpack_button->OnMouseClick() += [this](UI::UIEvent &e)
+            {
+                auto *scene = SceneMgr::Get().ActiveScene();
+                if (scene != nullptr && _selected_entity != ECS::kInvalidEntity &&
+                    SceneManagement::PrefabSystem::Unpack(*scene, _selected_entity))
+                    _needs_rebuild = true;
+                e._is_handled = true;
+            };
+            auto add_prefab_action = [this, name_row](StringView text, auto &&action)
+            {
+                auto *button = name_row->AddChild<UI::Button>();
+                button->SetText(String(text));
+                button->GetSlotAs<UI::LinearSlot>()
+                        .SizePolicy(UI::ESizePolicy::kAuto, UI::ESizePolicy::kFixed)
+                        .Size({64.0f, UI::CollapsibleView::s_header_height});
+                button->OnMouseClick() += [this, action = std::forward<decltype(action)>(action)](UI::UIEvent &e)
+                {
+                    auto *scene = SceneMgr::Get().ActiveScene();
+                    if (scene != nullptr && _selected_entity != ECS::kInvalidEntity)
+                    {
+                        const Guid *root_guid = scene->FindEntityGuid(_selected_entity);
+                        if (root_guid != nullptr)
+                        {
+                            const auto it = std::find_if(scene->PrefabInstances().begin(), scene->PrefabInstances().end(),
+                                                         [root_guid](const SceneManagement::PrefabInstance &instance)
+                                                         { return instance._root_entity == *root_guid; });
+                            if (it != scene->PrefabInstances().end() && !it->_prefab_asset.IsEmpty())
+                            {
+                                ResourceMgr::Get().Load<PrefabAssetDocument>(it->_prefab_asset);
+                                if (Ref<PrefabAssetDocument> prefab = ResourceMgr::Get().GetRef<PrefabAssetDocument>(it->_prefab_asset))
+                                {
+                                    action(*scene, _selected_entity, *prefab);
+                                    _needs_rebuild = true;
+                                }
+                            }
+                        }
+                    }
+                    e._is_handled = true;
+                };
+            };
+            auto *refresh_button = name_row->AddChild<UI::Button>();
+            refresh_button->SetText("Refresh");
+            refresh_button->GetSlotAs<UI::LinearSlot>()
+                    .SizePolicy(UI::ESizePolicy::kAuto, UI::ESizePolicy::kFixed)
+                    .Size({64.0f, UI::CollapsibleView::s_header_height});
+            refresh_button->OnMouseClick() += [this](UI::UIEvent &e)
+            {
+                if (auto *scene = SceneMgr::Get().ActiveScene(); scene != nullptr && _selected_entity != ECS::kInvalidEntity &&
+                    SceneManagement::PrefabSystem::Refresh(*scene, _selected_entity))
+                    _needs_rebuild = true;
+                e._is_handled = true;
+            };
+            add_prefab_action("Revert All", [](SceneManagement::Scene &scene, ECS::Entity root, const PrefabAssetDocument &prefab)
+            { SceneManagement::PrefabSystem::RevertAll(scene, root, prefab); });
             _vb->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto);
 
             Selection::on_selection_changed += [this]()

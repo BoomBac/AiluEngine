@@ -73,6 +73,7 @@ namespace Ailu
             virtual void EntityDestroyed(Entity entity) = 0;
             virtual Ref<IComponentManager> Clone() = 0;
             virtual bool CopyComponent(Entity source, Entity target) = 0;
+            virtual bool RemoveComponent(Entity entity) = 0;
             // Type-erased component instance access; nullptr when the entity lacks the component.
             virtual void *GetComponentPtr(Entity entity) = 0;
         };
@@ -229,6 +230,7 @@ public:                                                                   \
             void *GetComponentInstance(Entity entity, ComponentTypeId type_id) const;
             Vector<ComponentTypeId> GetEntityComponentTypes(Entity entity) const;
             bool CopyComponent(Entity source, Entity target, ComponentTypeId type_id);
+            bool RemoveComponentType(Entity entity, ComponentTypeId type_id);
 
         private:
             void RebuildSystemSchedule();

@@ -318,6 +318,32 @@ namespace Ailu
             return true;
         }
 
+        bool Register::RemoveComponentType(Entity entity, ComponentTypeId type_id)
+        {
+            if (!IsAlive(entity) || type_id >= static_cast<ComponentTypeId>(_mgrs.size()) || !_mgrs[type_id] ||
+                !_mgrs[type_id]->GetComponentPtr(entity))
+                return false;
+            const u32 entity_index = EntityIndex(entity);
+            if (type_id == CHierarchy::StaticComponentTypeId())
+                TouchHierarchy();
+            if (!_mgrs[type_id]->RemoveComponent(entity))
+                return false;
+            _entity_signatures[entity_index].set(type_id, false);
+            if (const auto disabled_it = _disabled_components.find(entity); disabled_it != _disabled_components.end())
+            {
+                disabled_it->second.set(type_id, false);
+                if (disabled_it->second.none())
+                    _disabled_components.erase(disabled_it);
+            }
+            if (type_id < static_cast<ComponentTypeId>(_on_comp_remove_callback.size()))
+            {
+                for (auto &callback : _on_comp_remove_callback[type_id])
+                    callback(entity);
+            }
+            EntitySignatureChanged(entity);
+            return true;
+        }
+
         u64 Register::HierarchyRevision() const { return _hierarchy_revision; }
         void Register::TouchHierarchy() { ++_hierarchy_revision; }
         bool Register::IsEntityEnabled(Entity entity) const

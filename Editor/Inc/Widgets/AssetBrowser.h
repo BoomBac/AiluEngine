@@ -1,8 +1,9 @@
 #ifndef __ASSETBROWSER_H__
 #define __ASSETBROWSER_H__
 #include "Dock/DockWindow.h"
-#include "generated/AssetBrowser.gen.h"
+#include "Scene/Entity.h"
 #include <filesystem>
+#include "generated/AssetBrowser.gen.h"
 
 namespace Ailu
 {
@@ -63,6 +64,7 @@ namespace Ailu
             bool CreateInputActionAssetEntry(const String &name);
             bool CreateFlowGraphEntry(const String &name);
             bool CreateScriptEntry(const String &name);
+            bool CreatePrefabEntry(ECS::Entity entity, const std::filesystem::path &target_directory);
             WString CurrentAssetDirectoryPath() const;
             WString BuildCurrentAssetPath(const WString &file_name) const;
             Vector<Asset *> CollectAssetsUnderDirectory(const WString &directory_asset_path) const;

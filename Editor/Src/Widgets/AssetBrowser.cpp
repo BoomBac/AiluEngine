@@ -2,6 +2,7 @@
 #include "Audio/Audio.h"
 #include "Audio/AudioClip.h"
 #include "Assets/ScriptAsset.h"
+#include "Assets/PrefabAsset.h"
 #include "Common/EditorPopup.h"
 #include "Common/Selection.h"
 #include "Graph/GraphAsset.h"
@@ -27,6 +28,8 @@
 #include "Framework/Common/Input.h"
 #include "Dock/DockManager.h"
 #include "Render/2D/Sprite.h"
+#include "Scene/PrefabSystem.h"
+#include "Scene/Scene.h"
 
 #include <algorithm>
 #include <cctype>
@@ -629,11 +632,23 @@ namespace Ailu
             DropHandler handler;
             handler._can_drop = [](const DragPayload &payload) -> bool
             {
-                return payload._type == EDragType::kFile;
+                if (payload._type == EDragType::kFile)
+                    return true;
+                if (payload._type != EDragType::kTreeItem || payload._data == nullptr)
+                    return false;
+                const auto *tree_payload = static_cast<const TreeViewDragPayload *>(payload._data);
+                auto *scene = SceneManagement::SceneMgr::Get().ActiveScene();
+                return tree_payload != nullptr && tree_payload->_source_tree != nullptr &&
+                       tree_payload->_source_tree->Name() == "WorldOutlineTree" && scene != nullptr &&
+                       scene->IsValidEntity(static_cast<ECS::Entity>(tree_payload->_item));
             };
             handler._on_drop = [this](const DragPayload &payload, f32 x, f32 y)
             {
-                LOG_INFO("{} drop", StaticEnum<EDragType>()->GetNameByEnum(payload._type));
+                if (payload._type != EDragType::kTreeItem || payload._data == nullptr)
+                    return;
+                const auto *tree_payload = static_cast<const TreeViewDragPayload *>(payload._data);
+                if (tree_payload != nullptr && CreatePrefabEntry(static_cast<ECS::Entity>(tree_payload->_item), _current_path))
+                    _is_dirty = true;
             };
             _icon_area->SetDropHandler(handler);
             const auto file_drop_handler = [this](UI::UIEvent &e) { HandleFileDrop(e); };
@@ -1076,6 +1091,25 @@ namespace Ailu
                         {
                             NavigateToPath(item_path);
                         };
+                        DropHandler folder_drop_handler;
+                        folder_drop_handler._can_drop = [](const DragPayload &payload)
+                        {
+                            if (payload._type != EDragType::kTreeItem || payload._data == nullptr)
+                                return false;
+                            const auto *tree_payload = static_cast<const TreeViewDragPayload *>(payload._data);
+                            auto *scene = SceneManagement::SceneMgr::Get().ActiveScene();
+                            return tree_payload != nullptr && tree_payload->_source_tree != nullptr &&
+                                   tree_payload->_source_tree->Name() == "WorldOutlineTree" && scene != nullptr &&
+                                   scene->IsValidEntity(static_cast<ECS::Entity>(tree_payload->_item));
+                        };
+                        folder_drop_handler._on_drop = [this, item_path](const DragPayload &payload, f32 x, f32 y)
+                        {
+                            const auto *tree_payload = static_cast<const TreeViewDragPayload *>(payload._data);
+                            if (tree_payload != nullptr &&
+                                CreatePrefabEntry(static_cast<ECS::Entity>(tree_payload->_item), item_path))
+                                _is_dirty = true;
+                        };
+                        vb->SetDropHandler(folder_drop_handler);
                         //icon->OnMouseDown() += [this, icon](UI::UIEvent &e)
                         //{
                         //    s_is_drag_start = true;
@@ -1182,7 +1216,8 @@ namespace Ailu
                             OpenAsset(asset);
                         };
                         _icon_content->AddChild(vb);
-                        if (asset->_asset_type == StaticClass<Render::Mesh>() || asset->_asset_type == ScriptAsset::StaticType())
+                        if (asset->_asset_type == StaticClass<Render::Mesh>() || asset->_asset_type == ScriptAsset::StaticType() ||
+                            asset->_asset_type == PrefabAssetDocument::StaticType())
                         {
                             icon->OnMouseDown() += [this, icon, asset, display_name](UI::UIEvent &e)
                             {
@@ -1199,7 +1234,11 @@ namespace Ailu
                                         if (dist > kDragThreshold)
                                         {
                                             _is_dragging = true;
-                                            const EDragType drag_type = asset->_asset_type == ScriptAsset::StaticType() ? EDragType::kScript : EDragType::kMesh;
+                                            EDragType drag_type = EDragType::kMesh;
+                                            if (asset->_asset_type == ScriptAsset::StaticType())
+                                                drag_type = EDragType::kScript;
+                                            else if (asset->_asset_type == PrefabAssetDocument::StaticType())
+                                                drag_type = EDragType::kPrefab;
                                             auto payload = DragPayload{drag_type, asset};
                                             DragDropManager::Get().BeginDrag(payload, display_name);
                                         }
@@ -1848,6 +1887,36 @@ namespace Ailu
             ResourceMgr::Get().CreateAsset(asset_path, material);
             ResourceMgr::Get().SaveAllUnsavedAssets();
             _is_dirty = true;
+            return true;
+        }
+
+        bool AssetBrowser::CreatePrefabEntry(ECS::Entity entity, const fs::path &target_directory)
+        {
+            auto *scene = SceneManagement::SceneMgr::Get().ActiveScene();
+            if (scene == nullptr || !scene->IsValidEntity(entity) || !fs::is_directory(target_directory))
+                return false;
+
+            const auto *tag = scene->GetRegister().GetComponent<ECS::TagComponent>(entity);
+            const String prefab_name = TrimNameCopy(tag != nullptr ? tag->_name : String{});
+            if (prefab_name.empty())
+                return false;
+
+            const WString file_name = ToWChar(prefab_name.c_str()) + WString(L".alasset");
+            const WString asset_path = AppendChildAssetPath(GetRelativeAssetDirectory(target_directory), file_name);
+            if (ResourceMgr::Get().GetAsset(asset_path) != nullptr || fs::exists(ResourceMgr::GetResSysPath(asset_path)))
+            {
+                LOG_WARNING(L"AssetBrowser: Prefab asset {} already exists.", asset_path);
+                return false;
+            }
+
+            Ref<PrefabAssetDocument> prefab = SceneManagement::PrefabSystem::CreatePrefabDocument(*scene, entity);
+            if (prefab == nullptr)
+                return false;
+
+            prefab->Name(prefab_name);
+            if (ResourceMgr::Get().CreateAsset(asset_path, prefab, false) == nullptr)
+                return false;
+            ResourceMgr::Get().SaveAllUnsavedAssets();
             return true;
         }
 
