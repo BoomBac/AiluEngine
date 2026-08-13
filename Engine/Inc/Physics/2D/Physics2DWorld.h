@@ -35,9 +35,15 @@ namespace Ailu
         Vector2f GetPosition(ECS::Entity entity) const;
         void SetLinearVelocity(ECS::Entity entity, const Vector2f &velocity);
         Vector2f GetLinearVelocity(ECS::Entity entity) const;
+        f32 GetAngularVelocity(ECS::Entity entity) const;
         void SetAngularVelocity(ECS::Entity entity, f32 velocity);
+        f32 GetGravityScale(ECS::Entity entity) const;
+        void SetGravityScale(ECS::Entity entity, f32 scale);
+        bool IsFixedRotation(ECS::Entity entity) const;
+        void SetFixedRotation(ECS::Entity entity, bool fixed);
         void AddForce(ECS::Entity entity, const Vector2f &force);
         void AddImpulse(ECS::Entity entity, const Vector2f &impulse);
+        void AddTorque(ECS::Entity entity, f32 torque);
 
         void SetLayerCollision(u8 layer_a, u8 layer_b, bool enabled);
         bool CanLayersCollide(u8 layer_a, u8 layer_b) const;

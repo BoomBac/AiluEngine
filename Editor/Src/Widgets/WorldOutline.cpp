@@ -215,6 +215,19 @@ namespace Ailu
                 FocusCameraOnEntity(SceneTreeDataSource::ToEntity(item));
             };
 
+            _tree_view->OnKeyDown() += [this](UIEvent &e)
+            {
+                if (e._key_code != EKey::kF2)
+                    return;
+
+                auto item = _tree_view->GetSelectedItem();
+                auto *scene = SceneMgr::Get().ActiveScene();
+                auto entity = SceneTreeDataSource::ToEntity(item);
+                if (scene != nullptr && scene->IsValidEntity(entity))
+                    BeginEntityRename(entity);
+                e._is_handled = true;
+            };
+
             _tree_view->_on_item_context_menu += [this](TreeItemId item, Vector2f pos)
             {
                 auto entity = SceneTreeDataSource::ToEntity(item);
@@ -255,6 +268,14 @@ namespace Ailu
         void WorldOutline::Update(f32 dt)
         {
             DockWindow::Update(dt);
+            if (IsFocus() && Input::IsKeyJustPressed(EKey::kF2))
+            {
+                auto item = _tree_view->GetSelectedItem();
+                auto *scene = SceneMgr::Get().ActiveScene();
+                auto entity = SceneTreeDataSource::ToEntity(item);
+                if (scene != nullptr && scene->IsValidEntity(entity))
+                    BeginEntityRename(entity);
+            }
             auto* scene = SceneMgr::Get().ActiveScene();
 
             if (scene != _observed_scene)
@@ -326,25 +347,7 @@ namespace Ailu
 
             Vector<PopupMenuAction> actions;
 
-            actions.push_back({"Rename", [scene, entity]()
-            {
-                auto* tag = scene->GetRegister().GetComponent<ECS::TagComponent>(entity);
-                String initial = tag ? tag->_name : "";
-                EditorPopup::ShowTextInputAt(Input::GetGlobalMousePos(), "Rename Entity", initial,
-                    [scene, entity](const String& value) -> std::optional<String>
-                    {
-                        String name = value;
-                        // Trim
-                        size_t b = 0, e = name.size();
-                        while (b < e && std::isspace(static_cast<unsigned char>(name[b]))) ++b;
-                        while (e > b && std::isspace(static_cast<unsigned char>(name[e - 1]))) --e;
-                        name = name.substr(b, e - b);
-                        if (name.empty()) return String("Name cannot be empty.");
-                        if (name.size() > 256) return String("Name too long (max 256).");
-                        scene->RenameEntity(entity, name);
-                        return std::nullopt;
-                    });
-            }});
+            actions.push_back({"Rename", [this, entity]() { BeginEntityRename(entity); }});
 
             actions.push_back({"Duplicate", [scene, entity]()
             {
@@ -383,6 +386,41 @@ namespace Ailu
             }, true});
 
             EditorPopup::ShowActionMenuAt(position, actions);
+        }
+
+        void WorldOutline::BeginEntityRename(ECS::Entity entity)
+        {
+            auto *scene = SceneMgr::Get().ActiveScene();
+            if (scene == nullptr || !scene->IsValidEntity(entity))
+                return;
+
+            auto *tag = scene->GetRegister().GetComponent<ECS::TagComponent>(entity);
+            String initial = tag ? tag->_name : "";
+            auto *row = _tree_view->GetRowForItem(SceneTreeDataSource::ToTreeItem(entity));
+            if (row == nullptr || row->ChildAt(0u) == nullptr)
+                return;
+
+            auto *row_layout = row->ChildAt(0u)->As<HorizontalBox>();
+            if (row_layout == nullptr || row_layout->GetChildren().empty())
+                return;
+
+            auto *label = row_layout->ChildAt(static_cast<u32>(row_layout->GetChildren().size() - 1u))->As<Text>();
+            if (label == nullptr)
+                return;
+
+            EditorPopup::BeginInlineTextInput(row_layout, label, initial,
+                [scene, entity](const String& value) -> std::optional<String>
+                {
+                    String name = value;
+                    size_t b = 0, e = name.size();
+                    while (b < e && std::isspace(static_cast<unsigned char>(name[b]))) ++b;
+                    while (e > b && std::isspace(static_cast<unsigned char>(name[e - 1]))) --e;
+                    name = name.substr(b, e - b);
+                    if (name.empty()) return String("Name cannot be empty.");
+                    if (name.size() > 256) return String("Name too long (max 256).");
+                    scene->RenameEntity(entity, name);
+                    return std::nullopt;
+                });
         }
 
         void WorldOutline::FocusCameraOnEntity(ECS::Entity entity)

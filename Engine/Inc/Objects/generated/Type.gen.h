@@ -6,7 +6,7 @@
 #define __TYPE_GEN_H__
 //Enum EDataType begin...........................
 const Ailu::Enum* Z_Construct_Enum_EDataType_Type();
-namespace Ailu { 
+namespace Ailu {
 enum class EDataType : i32;
 }
 template<>

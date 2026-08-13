@@ -106,6 +106,7 @@ namespace Ailu
 
         private:
             explicit UITheme(bool init_default);
+            void InitializeDefaultDark();
 
         private:
             APROPERTY()

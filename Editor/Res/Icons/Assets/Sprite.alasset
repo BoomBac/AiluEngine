@@ -1,0 +1,11 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "e789b380-766f-4d42-b04b-4c06b2c83660",
+        "_asset_type": "Ailu::Render::Texture2D",
+        "_asset_name": "Sprite",
+        "_dependencies": []
+    },
+    "_file": "Sprite.png",
+    "_is_srgb": true
+}

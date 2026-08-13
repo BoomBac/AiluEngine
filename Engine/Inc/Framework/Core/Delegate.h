@@ -41,9 +41,13 @@ namespace Ailu
         class EventView
         {
         public:
-            Handle Subscribe(HandlerType&& handler) { return _delegate->Subscribe(std::move(handler)); }
-            void Unsubscribe(Handle id) { _delegate->Unsubscribe(id); }
-            void Unsubscribe(HandlerType handler) { _delegate->Unsubscribe(std::move(handler)); }
+            EventView() = default;
+            Handle Subscribe(HandlerType&& handler)
+            {
+                return _delegate != nullptr ? _delegate->Subscribe(std::move(handler)) : 0u;
+            }
+            void Unsubscribe(Handle id) { if (_delegate != nullptr) _delegate->Unsubscribe(id); }
+            void Unsubscribe(HandlerType handler) { if (_delegate != nullptr) _delegate->Unsubscribe(std::move(handler)); }
             Handle operator+=(HandlerType&& handler) { return Subscribe(std::move(handler)); }
             void operator-=(Handle id) { Unsubscribe(id); }
             void operator-=(HandlerType handler) { Unsubscribe(std::move(handler)); }
@@ -108,4 +112,8 @@ protected:                                     \
                                              \
 public:                                      \
     Delegate<__VA_ARGS__>::EventView _##Name = _##Name##_delegate.GetEventView()
+
+#define DECLARE_DELEGATE_VIEW(Name, ...)      \
+public:                                       \
+    Delegate<__VA_ARGS__>::EventView _##Name
 }

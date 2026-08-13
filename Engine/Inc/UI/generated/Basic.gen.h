@@ -101,7 +101,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::UI::InputBlock>()
 //Class InputBlock end...........................
 
 //Class Image begin...........................
-#define BASIC_GEN_H_274_GENERATED_BODY \
+#define BASIC_GEN_H_275_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_Image_Type();\
                                 static const Type* GetPrivateStaticClass();\

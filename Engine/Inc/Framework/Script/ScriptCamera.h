@@ -21,48 +21,48 @@ namespace Ailu
         struct TransformComponent;
     }
 
-    ASTRUCT()
+    ASTRUCT(Script; Global="camera")
     struct AILU_API ScriptCamera
     {
         GENERATED_BODY()
         SceneManagement::Scene *_scene = nullptr;
         ECS::Entity _entity = ECS::kInvalidEntity;
 
-        AFUNCTION(Script) 
+        AFUNCTION(ScriptProperty)
         bool IsValid() const;
-        AFUNCTION(Script) 
+        AFUNCTION(ScriptProperty)
         Vector3f GetPosition() const;
-        AFUNCTION(Script) 
+        AFUNCTION(ScriptProperty)
         void SetPosition(const Vector3f &position) const;
-        AFUNCTION(Script) 
+        AFUNCTION(ScriptProperty)
         Math::Quaternion GetRotation() const;
-        AFUNCTION(Script) 
+        AFUNCTION(ScriptProperty)
         void SetRotation(const Math::Quaternion &rotation) const;
-        AFUNCTION(Script) 
+        AFUNCTION(ScriptProperty)
         Vector3f GetForward() const;
-        AFUNCTION(Script) 
+        AFUNCTION(ScriptProperty)
         f32 GetFov() const;
-        AFUNCTION(Script) 
+        AFUNCTION(ScriptProperty)
         void SetFov(f32 fov) const;
-        AFUNCTION(Script) 
+        AFUNCTION(ScriptProperty)
         f32 GetNearClip() const;
-        AFUNCTION(Script) 
+        AFUNCTION(ScriptProperty)
         void SetNearClip(f32 near_clip) const;
-        AFUNCTION(Script) 
+        AFUNCTION(ScriptProperty)
         f32 GetFarClip() const;
-        AFUNCTION(Script) 
+        AFUNCTION(ScriptProperty)
         void SetFarClip(f32 far_clip) const;
-        AFUNCTION(Script) 
+        AFUNCTION(ScriptProperty)
         f32 GetAspect() const;
-        AFUNCTION(Script) 
+        AFUNCTION(ScriptProperty)
         void SetAspect(f32 aspect) const;
-        AFUNCTION(Script) 
+        AFUNCTION(ScriptProperty)
         bool IsOrthographic() const;
-        AFUNCTION(Script) 
+        AFUNCTION(ScriptProperty)
         void SetOrthographic(bool enabled) const;
-        AFUNCTION(Script) 
+        AFUNCTION(ScriptProperty)
         f32 GetOrthographicSize() const;
-        AFUNCTION(Script) 
+        AFUNCTION(ScriptProperty)
         void SetOrthographicSize(f32 size) const;
         AFUNCTION(Script) 
         void LookTo(const Vector3f &direction, const Vector3f &up) const;

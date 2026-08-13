@@ -1,6 +1,6 @@
 local tick_logger = {}
 
-function tick_logger:OnCreate()
+function tick_logger:on_create()
     engine.log("tick_logger:OnCreate called")
     local pos = self.entity:get_position()
     self.base_x = pos[1]
@@ -8,13 +8,13 @@ function tick_logger:OnCreate()
     self.base_z = pos[3]
 end
 
-function tick_logger:OnUpdate(delta_time)
+function tick_logger:on_update(delta_time)
     local t = engine.time()
     local y = (math.sin(t) + 1) * 6
     self.entity:set_position(self.base_x, y, self.base_z)
 end
 
-function tick_logger:OnDestroy()
+function tick_logger:on_destroy()
     engine.log("tick_logger:OnDestroy called")
 end
 

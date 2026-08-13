@@ -1,0 +1,11 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "031ec560-e06f-4505-b00d-b740a0b282bd",
+        "_asset_type": "Ailu::Render::Texture2D",
+        "_asset_name": "default",
+        "_dependencies": []
+    },
+    "_file": "default.png",
+    "_is_srgb": true
+}

@@ -15,9 +15,11 @@ namespace Ailu
             desc_list.emplace_back(RenderConstants::kSemanticTexcoord, EShaderDateType::kFloat4, 3, 1);
             desc_list.emplace_back(RenderConstants::kSemanticTexcoord, EShaderDateType::kFloat4, 4, 2);
             desc_list.emplace_back(RenderConstants::kSemanticTexcoord, EShaderDateType::kFloat4, 5, 3);
-            _vbuf = VertexBuffer::Create(desc_list, std::format("block({})_vbuf", s_id_gen));
-            _ibuf = IndexBuffer::Create(nullptr, vert_num, std::format("block({})_ibuf", s_id_gen), true);
-            _obj_cb = ConstantBuffer::Create(RenderConstants::kPerObjectDataSize);
+            _vbuf = Ref<VertexBuffer>(VertexBuffer::Create(desc_list, std::format("block({})_vbuf", s_id_gen)));
+            _vbuf->EnableBindlessSRV(false);
+            _ibuf = Ref<IndexBuffer>(IndexBuffer::Create(nullptr, vert_num, std::format("block({})_ibuf", s_id_gen), true));
+            _ibuf->EnableBindlessSRV(false);
+            _obj_cb = Ref<ConstantBuffer>(ConstantBuffer::Create(RenderConstants::kPerObjectDataSize));
             _vbuf->SetStream(nullptr, vert_num * sizeof(Vector3f), 0, true);
             _vbuf->SetStream(nullptr, vert_num * sizeof(Vector2f), 1, true);
             _vbuf->SetStream(nullptr, vert_num * sizeof(Vector4f), 2, true);
@@ -32,15 +34,13 @@ namespace Ailu
             _corner_radius_buf.resize(vert_num);
             _border_thickness_buf.resize(vert_num);
             _index_buf.resize(vert_num);
-            GraphicsContext::Get().CreateResourceSync(_vbuf);
-            GraphicsContext::Get().CreateResourceSync(_ibuf);
+            GraphicsContext::Get().CreateResourceSync(_vbuf.get());
+            GraphicsContext::Get().CreateResourceSync(_ibuf.get());
             ++s_id_gen;
         }
         DrawerBlock::~DrawerBlock()
         {
             --s_id_gen;
-            delete _vbuf; _vbuf = nullptr;
-            delete _ibuf; _ibuf = nullptr;
         }
 
         void DrawerBlock::CopyBuildDataFrom(const DrawerBlock &other)
@@ -89,19 +89,17 @@ namespace Ailu
 
         DrawerBlock::DrawerBlock(DrawerBlock &&other) noexcept
         {
-            _vbuf = other._vbuf;
-            _ibuf = other._ibuf;
+            _vbuf = std::move(other._vbuf);
+            _ibuf = std::move(other._ibuf);
+            _obj_cb = std::move(other._obj_cb);
             _mat = std::move(other._mat);
-            other._vbuf = nullptr;
-            other._ibuf = nullptr;
         }
         DrawerBlock &DrawerBlock::operator=(DrawerBlock &&other) noexcept
         {
-            _vbuf = other._vbuf;
-            _ibuf = other._ibuf;
+            _vbuf = std::move(other._vbuf);
+            _ibuf = std::move(other._ibuf);
+            _obj_cb = std::move(other._obj_cb);
             _mat = std::move(other._mat);
-            other._vbuf = nullptr;
-            other._ibuf = nullptr;
             return *this;
         }
     }

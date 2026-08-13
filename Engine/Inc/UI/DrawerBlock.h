@@ -62,9 +62,9 @@ namespace Ailu
             }
         public:
             Ref<Render::Material> _mat;
-            Render::VertexBuffer *_vbuf;
-            Render::IndexBuffer *_ibuf;
-            Render::ConstantBuffer *_obj_cb;
+            Ref<Render::VertexBuffer> _vbuf;
+            Ref<Render::IndexBuffer> _ibuf;
+            Ref<Render::ConstantBuffer> _obj_cb;
             Vector<Vector3f> _pos_buf;
             Vector<Vector2f> _uv_buf;
             Vector<Color> _color_buf;

@@ -32,6 +32,9 @@ namespace Ailu
     namespace SceneManagement { class Scene; }
     namespace ECS { struct ScriptComponent; }
 
+    struct PhysicsContact2D;
+    class AILU_API Physics2DWorld;
+
     class AILU_API ScriptSystem final : public IRuntimeModule
     {
 #if AILU_ENABLE_LUA_SCRIPTING
@@ -62,6 +65,8 @@ namespace Ailu
         f32 GetFixedDeltaTime() const { return _last_fixed_delta_time; }
         f32 GetRenderAlpha() const { return _last_render_alpha; }
         ScriptInput &GetInput() { return _input; }
+        void DispatchPhysicsContact(SceneManagement::Scene *scene, const PhysicsContact2D &contact);
+        void OnSceneDestroyed(SceneManagement::Scene *scene);
 
 #if AILU_ENABLE_LUA_SCRIPTING
         template<typename EventViewType>
@@ -75,7 +80,7 @@ namespace Ailu
             const auto delegate_handle = event_view.Subscribe([this, owner = *owner, callback = std::move(callback)](auto &&...args) mutable
             {
                 auto instance_iter = _instances.find(owner);
-                if (instance_iter == _instances.end() || instance_iter->second._faulted)
+                if (instance_iter == _instances.end() || instance_iter->second._faulted || !instance_iter->second._is_enabled)
                     return;
                 InvokeLuaCallback(instance_iter->second, callback, std::forward<decltype(args)>(args)...);
             });
@@ -93,7 +98,7 @@ namespace Ailu
             const auto delegate_handle = event_view.Subscribe([this, owner = *owner, key_name, callback = std::move(callback)](auto &&...args) mutable
             {
                 auto instance_iter = _instances.find(owner);
-                if (instance_iter == _instances.end() || instance_iter->second._faulted)
+                if (instance_iter == _instances.end() || instance_iter->second._faulted || !instance_iter->second._is_enabled)
                     return;
                 auto arguments = std::forward_as_tuple(args...);
                 if (std::get<KeyIndex>(arguments) != key_name)
@@ -106,6 +111,8 @@ namespace Ailu
 
         sol::state &GetState() { return _lua; }
         const sol::state &GetState() const { return _lua; }
+        bool Unsubscribe(ScriptSubscriptionHandle subscription_id);
+        ScriptCollider2D::EventViews GetColliderEventViews(SceneManagement::Scene *scene, ECS::Entity entity);
 #endif
 
     private:
@@ -138,6 +145,13 @@ namespace Ailu
                                     _on_reload;
             Vector<ScriptSubscriptionHandle> _subscriptions;
         };
+        struct ScriptColliderEventSource
+        {
+            ScriptCollider2D::CollisionEventDelegate _on_collision_enter;
+            ScriptCollider2D::CollisionEventDelegate _on_collision_exit;
+            ScriptCollider2D::EntityEventDelegate _on_trigger_enter;
+            ScriptCollider2D::EntityEventDelegate _on_trigger_exit;
+        };
         struct ScriptPropertyDeclaration
         {
             String _name;
@@ -166,7 +180,6 @@ namespace Ailu
         void CacheLifecycleFunctions(ScriptInstance &instance);
         std::optional<ScriptInstanceKey> FindInstanceKey(const ScriptInstance *instance) const;
         ScriptSubscriptionHandle RegisterSubscription(const ScriptInstanceKey &owner, std::function<void()> unsubscribe);
-        bool Unsubscribe(ScriptSubscriptionHandle subscription_id);
         void ClearSubscriptions(ScriptInstance &instance);
         void DispatchInputEvent(const InputActionEvent &event);
         template<typename... Args>
@@ -208,6 +221,8 @@ namespace Ailu
         bool ProcessReload(const Guid &script_asset);
         void RebuildInstancesForPrototype(const Guid &script_asset);
         void PruneInvalidInstances();
+        void EnsurePhysicsContactBridge(SceneManagement::Scene *scene);
+        void ClearPhysicsContactBridges();
 
         sol::state _lua;
         sol::protected_function _traceback;
@@ -217,6 +232,8 @@ namespace Ailu
         ScriptInstance *_currently_invoking_instance = nullptr;
         ScriptSubscriptionHandle _next_subscription_id = 1u;
         InputSystem::ActionEventListenerId _input_event_listener_id = 0u;
+        HashMap<Physics2DWorld *, u32> _physics_contact_bridges;
+        HashMap<ScriptInstanceKey, Scope<ScriptColliderEventSource>, ScriptInstanceKeyHasher> _collider_event_sources;
 #endif
         ScriptInput _input;
         HashMap<String, std::filesystem::path> _loaded_script_files;

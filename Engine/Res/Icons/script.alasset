@@ -1,0 +1,10 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "f5d84c3f-fcb5-414c-856d-102611140ec8",
+        "_asset_type": "Ailu::Render::Texture2D",
+        "_asset_name": "script"
+    },
+    "_file": "script.png",
+    "_is_srgb": true
+}

@@ -96,7 +96,7 @@ namespace Ailu::Render
         Vector4f _quality;
         Material *_taa_material;
         Matrix4x4f _cur_vp_matrix;
-        Scope<ConstantBuffer> _origin_camera_cbuf;
+        Ref<ConstantBuffer> _origin_camera_cbuf;
         Ref<ComputeShader> _taa_gen;
         ComputeShaderKernelId _taa_kernel = kInvalidComputeShaderKernelId;
     };

@@ -1,0 +1,11 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "6ff62bff-cd04-4661-882e-b5db03834b44",
+        "_asset_type": "Ailu::Render::Texture2D",
+        "_asset_name": "AnimationClip",
+        "_dependencies": []
+    },
+    "_file": "AnimationClip.png",
+    "_is_srgb": true
+}

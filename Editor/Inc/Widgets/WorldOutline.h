@@ -29,6 +29,7 @@ namespace Ailu
             void BindTreeEvents();
             void SyncSelectionFromEngine();
             void ShowEntityContextMenu(ECS::Entity entity, Vector2f position);
+            void BeginEntityRename(ECS::Entity entity);
             void FocusCameraOnEntity(ECS::Entity entity);
             void OnDropAction(UI::TreeView* source, u64 source_item, u64 target_item);
 

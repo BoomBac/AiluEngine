@@ -1,10 +1,18 @@
 #include "Framework/Script/ScriptScene.h"
 
+#include "Assets/PrefabAsset.h"
+#include "Framework/Common/ResourceMgr.h"
 #include "Scene/Component.h"
+#include "Scene/PrefabSystem.h"
 #include "Scene/Scene.h"
 
 namespace Ailu
 {
+    ScriptScene ScriptScene::CurrentScene()
+    {
+        auto *scene = SceneManagement::SceneMgr::Get().ActiveScene();
+        return {scene};
+    }
     bool ScriptScene::IsValid() const { return _scene != nullptr; }
     ScriptEntity ScriptScene::FindEntity(const String &guid) const
     {
@@ -21,7 +29,23 @@ namespace Ailu
         }
         return {_scene, ECS::kInvalidEntity};
     }
+    ScriptEntity ScriptScene::Find(const String &name) const { return FindEntityByName(name); }
+    ScriptEntity ScriptScene::FindGuid(const String &guid) const { return FindEntity(guid); }
     ScriptEntity ScriptScene::CreateEntity(const String &name) const { return IsValid() ? ScriptEntity{_scene, _scene->AddObject(name)} : ScriptEntity{}; }
+    ScriptEntity ScriptScene::CreateEntity(const ScriptAssetValue &prefab) const
+    {
+        if (!IsValid() || prefab._guid.IsEmpty())
+            return {};
+
+        ResourceMgr::Get().Load<PrefabAssetDocument>(prefab._guid);
+        const Ref<PrefabAssetDocument> prefab_asset = ResourceMgr::Get().GetRef<PrefabAssetDocument>(prefab._guid);
+        if (prefab_asset == nullptr)
+            return {};
+
+        const SceneManagement::PrefabInstantiateResult result = SceneManagement::PrefabSystem::Instantiate(*_scene, *prefab_asset);
+        return result._root == ECS::kInvalidEntity ? ScriptEntity{} : ScriptEntity{_scene, result._root};
+    }
+    ScriptEntity ScriptScene::Spawn(const ScriptAssetValue &prefab) const { return CreateEntity(prefab); }
     ScriptCamera ScriptScene::GetMainCamera() const
     {
         if (!IsValid()) return {};

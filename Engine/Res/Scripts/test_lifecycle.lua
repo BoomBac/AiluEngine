@@ -7,23 +7,23 @@ lifecycle_record = {}
 
 local TestLifecycle = {}
 
-function TestLifecycle:OnCreate()
+function TestLifecycle:on_create()
     table.insert(lifecycle_record, "OnCreate")
 end
 
-function TestLifecycle:OnFixedUpdate(dt)
+function TestLifecycle:on_fixed_update(dt)
     table.insert(lifecycle_record, "OnFixedUpdate")
 end
 
-function TestLifecycle:OnUpdate(dt)
+function TestLifecycle:on_update(dt)
     table.insert(lifecycle_record, "OnUpdate")
 end
 
-function TestLifecycle:OnLateUpdate(dt, alpha)
+function TestLifecycle:on_late_update(dt, alpha)
     table.insert(lifecycle_record, "OnLateUpdate")
 end
 
-function TestLifecycle:OnDestroy()
+function TestLifecycle:on_destroy()
     table.insert(lifecycle_record, "OnDestroy")
 end
 

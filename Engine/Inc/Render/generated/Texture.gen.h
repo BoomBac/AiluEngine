@@ -27,7 +27,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::Texture>(
                                 static const Type* GetPrivateStaticClass();\
                             public:\
                                 static const Type *StaticType() {return GetPrivateStaticClass();};\
-                                const Type  *GetType();
+                                virtual const Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::Render{
 class Texture2D ;
@@ -43,7 +43,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::Texture2D
                                 static const Type* GetPrivateStaticClass();\
                             public:\
                                 static const Type *StaticType() {return GetPrivateStaticClass();};\
-                                const Type  *GetType();
+                                virtual const Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::Render{
 class Texture3D ;
@@ -59,7 +59,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::Texture3D
                                 static const Type* GetPrivateStaticClass();\
                             public:\
                                 static const Type *StaticType() {return GetPrivateStaticClass();};\
-                                const AILU_API Type  *GetType();
+                                virtual const AILU_API Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::Render{
 class CubeMap ;
@@ -75,7 +75,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::CubeMap>(
                                 static const Type* GetPrivateStaticClass();\
                             public:\
                                 static const Type *StaticType() {return GetPrivateStaticClass();};\
-                                const Type  *GetType();
+                                virtual const Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::Render{
 class RenderTexture ;

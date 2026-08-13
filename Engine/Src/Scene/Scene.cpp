@@ -89,6 +89,7 @@ namespace Ailu::SceneManagement
     Scene::~Scene()
     {
         Clear();
+        ScriptSystem::Get().OnSceneDestroyed(this);
     }
 
     // =========================================================================

@@ -2,6 +2,8 @@
 #include "Framework/Math/MatrixMath.h"
 #include "Framework/Math/Transform.h"
 #include "Physics/2D/Physics2D.h"
+#include "Physics/2D/Physics2DComponents.h"
+#include "Physics/2D/Physics2DSystem.h"
 
 #include "Framework/Common/Log.h"
 #include "Framework/Common/Application.h"
@@ -226,6 +228,8 @@ namespace Ailu
         _instances.clear();
         _prototypes.clear();
         _subscriptions.clear();
+        _collider_event_sources.clear();
+        ClearPhysicsContactBridges();
         _currently_invoking_instance = nullptr;
         _next_subscription_id = 1u;
         _traceback = sol::protected_function();
@@ -464,11 +468,10 @@ namespace Ailu
                                              "z", &Math::Quaternion::z, "w", &Math::Quaternion::w);
         _lua.set_function("Quaternion", sol::overload([]() { return Math::Quaternion{}; },
                                                        [](f32 x, f32 y, f32 z, f32 w) { return Math::Quaternion{x, y, z, w}; }));
-        sol::table script_input_type = _lua["ScriptInput"];
-        script_input_type.set_function("off", [this](const ScriptInput &, std::optional<ScriptSubscriptionHandle> subscription_id)
-        {
-            return subscription_id.has_value() && Unsubscribe(*subscription_id);
-        });
+        _lua.new_usertype<Math::Color>("Color", "r", &Math::Color::r, "g", &Math::Color::g, "b", &Math::Color::b,
+                                       "a", &Math::Color::a);
+        _lua.set_function("Color", sol::overload([]() { return Math::Color{}; },
+                                                   [](f32 r, f32 g, f32 b, f32 a) { return Math::Color{r, g, b, a}; }));
     }
 
     bool ScriptSystem::LoadComponentInstance(const ScriptInstanceKey &key, ECS::ScriptComponent &component, const ScriptEntity &entity)
@@ -545,6 +548,8 @@ namespace Ailu
     {
         if (scene == nullptr || component._script_asset == Guid::EmptyGuid())
             return false;
+
+        EnsurePhysicsContactBridge(scene);
 
         const ScriptEntity handle{scene, entity};
         if (!handle.IsValid())
@@ -654,20 +659,40 @@ namespace Ailu
 
     void ScriptSystem::CacheLifecycleFunctions(ScriptInstance &instance)
     {
-        auto cache_function = [&instance](const char *name, sol::protected_function &function)
+        auto cache_function = [&instance](const char *name, const char *legacy_name, sol::protected_function &function)
         {
             sol::object object = instance._instance[name];
+            if ((!object.valid() || object.get_type() != sol::type::function) && legacy_name != nullptr)
+                object = instance._instance[legacy_name];
             if (object.valid() && object.get_type() == sol::type::function)
                 function = object.as<sol::protected_function>();
         };
-        cache_function("OnCreate", instance._on_create);
-        cache_function("OnEnable", instance._on_enable);
-        cache_function("OnDisable", instance._on_disable);
-        cache_function("OnFixedUpdate", instance._on_fixed_update);
-        cache_function("OnUpdate", instance._on_update);
-        cache_function("OnLateUpdate", instance._on_late_update);
-        cache_function("OnDestroy", instance._on_destroy);
-        cache_function("OnReload", instance._on_reload);
+        cache_function("on_create", "OnCreate", instance._on_create);
+        cache_function("on_enable", "OnEnable", instance._on_enable);
+        cache_function("on_disable", "OnDisable", instance._on_disable);
+        cache_function("on_fixed_update", "OnFixedUpdate", instance._on_fixed_update);
+        cache_function("on_update", "OnUpdate", instance._on_update);
+        cache_function("on_late_update", "OnLateUpdate", instance._on_late_update);
+        cache_function("on_destroy", "OnDestroy", instance._on_destroy);
+        cache_function("on_reload", "OnReload", instance._on_reload);
+    }
+
+    ScriptCollider2D::EventViews ScriptSystem::GetColliderEventViews(SceneManagement::Scene *scene, ECS::Entity entity)
+    {
+        if (scene == nullptr || !scene->IsValidEntity(entity))
+            return {};
+
+        const ScriptInstanceKey key{scene, entity};
+        auto event_source_iter = _collider_event_sources.find(key);
+        if (event_source_iter == _collider_event_sources.end())
+        {
+            auto event_source = MakeScope<ScriptColliderEventSource>();
+            event_source_iter = _collider_event_sources.emplace(key, std::move(event_source)).first;
+        }
+
+        ScriptColliderEventSource &event_source = *event_source_iter->second;
+        return {event_source._on_collision_enter.GetEventView(), event_source._on_collision_exit.GetEventView(),
+                event_source._on_trigger_enter.GetEventView(), event_source._on_trigger_exit.GetEventView()};
     }
 
     bool ScriptSystem::ProcessReload(const Guid &script_asset)
@@ -779,6 +804,110 @@ namespace Ailu
             ClearSubscriptions(iter->second);
             iter = _instances.erase(iter);
         }
+        for (auto iter = _collider_event_sources.begin(); iter != _collider_event_sources.end();)
+        {
+            const ScriptInstanceKey &key = iter->first;
+            if (key._scene == nullptr || !key._scene->IsValidEntity(key._entity) ||
+                !key._scene->GetRegister().HasComponent<ECS::Collider2DComponent>(key._entity))
+                iter = _collider_event_sources.erase(iter);
+            else
+                ++iter;
+        }
+    }
+
+    void ScriptSystem::EnsurePhysicsContactBridge(SceneManagement::Scene *scene)
+    {
+        if (scene == nullptr)
+            return;
+        auto *physics_system = scene->GetRegister().GetSystem<ECS::Physics2DSystem>();
+        if (physics_system == nullptr)
+            return;
+        Physics2DWorld *world = &physics_system->World();
+        if (_physics_contact_bridges.contains(world))
+            return;
+
+        const u32 handle = world->_OnContact.Subscribe([this, scene](const PhysicsContact2D &contact)
+        {
+            DispatchPhysicsContact(scene, contact);
+        });
+        _physics_contact_bridges.emplace(world, handle);
+    }
+
+    void ScriptSystem::ClearPhysicsContactBridges()
+    {
+        for (const auto &[world, handle] : _physics_contact_bridges)
+        {
+            if (world == nullptr)
+                continue;
+            world->_OnContact.Unsubscribe(handle);
+        }
+        _physics_contact_bridges.clear();
+    }
+
+    void ScriptSystem::OnSceneDestroyed(SceneManagement::Scene *scene)
+    {
+        if (scene == nullptr)
+            return;
+        for (auto iter = _collider_event_sources.begin(); iter != _collider_event_sources.end();)
+        {
+            if (iter->first._scene == scene)
+                iter = _collider_event_sources.erase(iter);
+            else
+                ++iter;
+        }
+        auto *physics_system = scene->GetRegister().GetSystem<ECS::Physics2DSystem>();
+        if (physics_system == nullptr)
+            return;
+        Physics2DWorld *world = &physics_system->World();
+        const auto bridge_iter = _physics_contact_bridges.find(world);
+        if (bridge_iter == _physics_contact_bridges.end())
+            return;
+        world->_OnContact.Unsubscribe(bridge_iter->second);
+        _physics_contact_bridges.erase(bridge_iter);
+    }
+
+    void ScriptSystem::DispatchPhysicsContact(SceneManagement::Scene *scene, const PhysicsContact2D &contact)
+    {
+        if (scene == nullptr || !scene->IsValidEntity(contact._entity_a) || !scene->IsValidEntity(contact._entity_b))
+            return;
+
+        const ScriptEntity other_a{scene, contact._entity_b};
+        const ScriptEntity other_b{scene, contact._entity_a};
+        const ScriptContact2D hit_a{contact._point, contact._normal, contact._shape_a, contact._shape_b};
+        const ScriptContact2D hit_b{contact._point, Vector2f{-contact._normal.x, -contact._normal.y}, contact._shape_b,
+                                    contact._shape_a};
+
+        const auto event_source_a = _collider_event_sources.find({scene, contact._entity_a});
+        const auto event_source_b = _collider_event_sources.find({scene, contact._entity_b});
+        switch (contact._type)
+        {
+        case EPhysicsContact2DType::kCollisionBegin:
+            if (event_source_a != _collider_event_sources.end())
+                event_source_a->second->_on_collision_enter.Invoke(other_a, hit_a);
+            if (event_source_b != _collider_event_sources.end())
+                event_source_b->second->_on_collision_enter.Invoke(other_b, hit_b);
+            break;
+        case EPhysicsContact2DType::kCollisionEnd:
+            if (event_source_a != _collider_event_sources.end())
+                event_source_a->second->_on_collision_exit.Invoke(other_a, hit_a);
+            if (event_source_b != _collider_event_sources.end())
+                event_source_b->second->_on_collision_exit.Invoke(other_b, hit_b);
+            break;
+        case EPhysicsContact2DType::kTriggerBegin:
+            if (event_source_a != _collider_event_sources.end())
+                event_source_a->second->_on_trigger_enter.Invoke(other_a);
+            if (event_source_b != _collider_event_sources.end())
+                event_source_b->second->_on_trigger_enter.Invoke(other_b);
+            break;
+        case EPhysicsContact2DType::kTriggerEnd:
+            if (event_source_a != _collider_event_sources.end())
+                event_source_a->second->_on_trigger_exit.Invoke(other_a);
+            if (event_source_b != _collider_event_sources.end())
+                event_source_b->second->_on_trigger_exit.Invoke(other_b);
+            break;
+        default:
+            break;
+        }
     }
 #endif
 
@@ -787,6 +916,14 @@ namespace Ailu
     {
         (void) component;
         return false;
+    }
+
+    void ScriptSystem::DispatchPhysicsContact(SceneManagement::Scene *, const PhysicsContact2D &)
+    {
+    }
+
+    void ScriptSystem::OnSceneDestroyed(SceneManagement::Scene *)
+    {
     }
 #endif
 

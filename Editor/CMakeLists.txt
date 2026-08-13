@@ -29,11 +29,17 @@ endfunction()
 add_source_files_recursive(${EDITOR_ROOT_PATH}/Src)
 add_source_files_recursive(${EDITOR_ROOT_PATH}/Inc)
 list(APPEND PROJECT_SOURCES ${AILU_EDITOR_GENERATED_SOURCES})
+set_source_files_properties(${AILU_EDITOR_GENERATED_SOURCES}
+    PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 
 set(EDITOR_RESOURCE ${EDITOR_ROOT_PATH}/Res/Editor.rc)
 
 add_executable(Editor WIN32 ${PROJECT_SOURCES} ${EDITOR_RESOURCE})
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${PROJECT_SOURCES})
+set_target_properties(Editor PROPERTIES
+    UNITY_BUILD ${AILU_ENABLE_UNITY_BUILD}
+    UNITY_BUILD_MODE BATCH
+    UNITY_BUILD_BATCH_SIZE ${AILU_UNITY_BUILD_BATCH_SIZE})
 
 # 包含路径
 target_include_directories(Editor PUBLIC ${EDITOR_ROOT_PATH}/)

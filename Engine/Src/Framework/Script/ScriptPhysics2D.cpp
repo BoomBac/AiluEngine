@@ -1,39 +1,111 @@
 #include "Framework/Script/ScriptPhysics2D.h"
 
 #include "Physics/2D/Physics2D.h"
+#include "Scene/Scene.h"
 
 namespace Ailu
 {
-    bool ScriptPhysics2D::IsValidBody(const ScriptEntity &entity)
+    Vector2f ScriptContact2D::GetPoint() const
     {
-        return entity._scene != nullptr && entity.IsValid() && Physics2D::IsValidBody(*entity._scene, entity._entity);
+        return _point;
     }
-    void ScriptPhysics2D::SetPosition(const ScriptEntity &entity, const Vector2f &position)
+    Vector2f ScriptContact2D::GetNormal() const
     {
-        if (entity._scene != nullptr && entity.IsValid()) Physics2D::SetPosition(*entity._scene, entity._entity, position);
+        return _normal;
     }
-    Vector2f ScriptPhysics2D::GetPosition(const ScriptEntity &entity)
+    u32 ScriptContact2D::GetSelfShape() const
     {
-        return entity._scene != nullptr && entity.IsValid() ? Physics2D::GetPosition(*entity._scene, entity._entity) : Vector2f::kZero;
+        return _self_shape;
     }
-    void ScriptPhysics2D::SetLinearVelocity(const ScriptEntity &entity, const Vector2f &velocity)
+    u32 ScriptContact2D::GetOtherShape() const
     {
-        if (entity._scene != nullptr && entity.IsValid()) Physics2D::SetLinearVelocity(*entity._scene, entity._entity, velocity);
+        return _other_shape;
     }
-    Vector2f ScriptPhysics2D::GetLinearVelocity(const ScriptEntity &entity)
+
+    namespace
     {
-        return entity._scene != nullptr && entity.IsValid() ? Physics2D::GetLinearVelocity(*entity._scene, entity._entity) : Vector2f::kZero;
+        ScriptRaycastHit2D MakeScriptRaycastHit(SceneManagement::Scene &scene, const RaycastHit2D &hit)
+        {
+            return {{&scene, hit._entity}, hit._point, hit._normal, hit._distance};
+        }
     }
-    void ScriptPhysics2D::SetAngularVelocity(const ScriptEntity &entity, f32 velocity)
+
+    bool ScriptRaycastHit2D::IsValid() const
     {
-        if (entity._scene != nullptr && entity.IsValid()) Physics2D::SetAngularVelocity(*entity._scene, entity._entity, velocity);
+        return _entity.IsValid();
     }
-    void ScriptPhysics2D::AddForce(const ScriptEntity &entity, const Vector2f &force)
+    ScriptEntity ScriptRaycastHit2D::GetEntity() const
     {
-        if (entity._scene != nullptr && entity.IsValid()) Physics2D::AddForce(*entity._scene, entity._entity, force);
+        return _entity;
     }
-    void ScriptPhysics2D::AddImpulse(const ScriptEntity &entity, const Vector2f &impulse)
+    Vector2f ScriptRaycastHit2D::GetPoint() const
     {
-        if (entity._scene != nullptr && entity.IsValid()) Physics2D::AddImpulse(*entity._scene, entity._entity, impulse);
+        return _point;
+    }
+    Vector2f ScriptRaycastHit2D::GetNormal() const
+    {
+        return _normal;
+    }
+    f32 ScriptRaycastHit2D::GetDistance() const
+    {
+        return _distance;
+    }
+
+    std::optional<ScriptRaycastHit2D> ScriptPhysics2D::Raycast(const Vector2f &origin, const Vector2f &direction,
+                                                               f32 distance, u32 layer_mask)
+    {
+        auto *scene = SceneManagement::SceneMgr::Get().ActiveScene();
+        if (scene == nullptr)
+            return std::nullopt;
+
+        Raycast2DDesc desc;
+        desc._origin = origin;
+        desc._direction = direction;
+        desc._distance = distance;
+        desc._filter._layer_mask = layer_mask;
+        RaycastHit2D hit;
+        if (!Physics2D::Raycast(*scene, desc, hit))
+            return std::nullopt;
+        return MakeScriptRaycastHit(*scene, hit);
+    }
+
+    Vector<ScriptRaycastHit2D> ScriptPhysics2D::OverlapCircle(const Vector2f &center, f32 radius, u32 layer_mask)
+    {
+        Vector<ScriptRaycastHit2D> result;
+        auto *scene = SceneManagement::SceneMgr::Get().ActiveScene();
+        if (scene == nullptr)
+            return result;
+
+        OverlapCircle2DDesc desc;
+        desc._center = center;
+        desc._radius = radius;
+        desc._filter._layer_mask = layer_mask;
+        Vector<OverlapHit2D> hits;
+        Physics2D::OverlapCircle(*scene, desc, hits);
+        result.reserve(hits.size());
+        for (const OverlapHit2D &hit : hits)
+            result.push_back(ScriptRaycastHit2D{ScriptEntity{scene, hit._entity}});
+        return result;
+    }
+
+    Vector<ScriptRaycastHit2D> ScriptPhysics2D::OverlapBox(const Vector2f &center, const Vector2f &size, f32 rotation,
+                                                           u32 layer_mask)
+    {
+        Vector<ScriptRaycastHit2D> result;
+        auto *scene = SceneManagement::SceneMgr::Get().ActiveScene();
+        if (scene == nullptr)
+            return result;
+
+        OverlapBox2DDesc desc;
+        desc._center = center;
+        desc._size = size;
+        desc._rotation = rotation;
+        desc._filter._layer_mask = layer_mask;
+        Vector<OverlapHit2D> hits;
+        Physics2D::OverlapBox(*scene, desc, hits);
+        result.reserve(hits.size());
+        for (const OverlapHit2D &hit : hits)
+            result.push_back(ScriptRaycastHit2D{ScriptEntity{scene, hit._entity}});
+        return result;
     }
 }

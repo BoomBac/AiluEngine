@@ -7,7 +7,7 @@
 
 namespace Ailu
 {
-    ASTRUCT()
+    ASTRUCT(Script; Global="engine")
     struct AILU_API ScriptEngine
     {
         GENERATED_BODY()

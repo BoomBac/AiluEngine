@@ -100,6 +100,22 @@ namespace Ailu
                 brush._tint = color;
                 return brush;
             }
+
+            void UpdateTreeViewRowBackground(TreeView* tree, TreeViewRow* row, bool is_hovered)
+            {
+                Color bg_color = tree->_normal_color;
+                if (row->GetItemId() == tree->GetSelectedItem())
+                    bg_color = tree->IsFocused() ? tree->_selected_color : tree->_selected_unfocused_color;
+                else if (is_hovered)
+                    bg_color = tree->_hover_color;
+
+                if (NearbyEqual(row->_bg_color, bg_color))
+                    return;
+
+                row->_bg_color = bg_color;
+                row->GetStyleOverride().SetBackground(MakeColorBrush(bg_color));
+                row->InvalidateStyle(EStyleInvalidation::kPaintOnly);
+            }
         } // anonymous namespace
 
         // =========================================================================
@@ -117,16 +133,34 @@ namespace Ailu
                 UIElement* hovered_row = FindTreeViewRow(e._target, _content_box);
                 if (_hovered_row != hovered_row)
                 {
+                    UIElement* previous_hovered_row = _hovered_row;
                     _hovered_row = hovered_row;
-                    InvalidatePaint();
+
+                    if (auto* row = dynamic_cast<TreeViewRow*>(previous_hovered_row))
+                        UpdateTreeViewRowBackground(this, row, false);
+                    if (auto* row = dynamic_cast<TreeViewRow*>(_hovered_row))
+                        UpdateTreeViewRowBackground(this, row, true);
                 }
             };
             OnMouseExit() += [this](UIEvent& e)
             {
                 if (_hovered_row == nullptr)
                     return;
+                UIElement* previous_hovered_row = _hovered_row;
                 _hovered_row = nullptr;
-                InvalidatePaint();
+                if (auto* row = dynamic_cast<TreeViewRow*>(previous_hovered_row))
+                    UpdateTreeViewRowBackground(this, row, false);
+            };
+
+            _on_focus_gained += [this]()
+            {
+                if (auto* row = dynamic_cast<TreeViewRow*>(FindRowForItem(_selected_item)))
+                    UpdateTreeViewRowBackground(this, row, row == _hovered_row);
+            };
+            _on_focus_lost += [this]()
+            {
+                if (auto* row = dynamic_cast<TreeViewRow*>(FindRowForItem(_selected_item)))
+                    UpdateTreeViewRowBackground(this, row, row == _hovered_row);
             };
 
             // Click: walk up from target to find the TreeViewRow
@@ -311,6 +345,7 @@ namespace Ailu
             _data_source = data_source;
             ClearSelection(false);
             ClearExpansionState();
+            _hovered_row = nullptr;
             _visible_items.clear();
             _item_rows.clear();
             _content_box->ClearChildren();
@@ -338,6 +373,10 @@ namespace Ailu
             _expanded_items = std::move(valid_expanded);
 
             // Clear current state
+            TreeItemId hovered_item = kInvalidTreeItemId;
+            if (auto* row = dynamic_cast<TreeViewRow*>(_hovered_row))
+                hovered_item = row->GetItemId();
+            _hovered_row = nullptr;
             _visible_items.clear();
             _item_rows.clear();
             _content_box->ClearChildren();
@@ -351,6 +390,15 @@ namespace Ailu
 
             // Create rows
             RebuildRows();
+
+            if (hovered_item != kInvalidTreeItemId)
+            {
+                if (auto* row = dynamic_cast<TreeViewRow*>(FindRowForItem(hovered_item)))
+                {
+                    _hovered_row = row;
+                    UpdateTreeViewRowBackground(this, row, true);
+                }
+            }
 
             // Validate selection
             if (_selected_item != kInvalidTreeItemId && !_data_source->IsValid(_selected_item))
@@ -429,6 +477,7 @@ namespace Ailu
                 _content_box->AddChild(row);
                 row->GetSlotAs<LinearSlot>().SizePolicy(ESizePolicy::kFill, ESizePolicy::kFixed).Size({0.0f, _row_height});
                 _item_rows[vi._id] = row.get();
+                UpdateTreeViewRowBackground(this, row.get(), row.get() == _hovered_row);
             }
 
             // Re-add empty drop handler area at the bottom
@@ -464,6 +513,17 @@ namespace Ailu
             }
         }
 
+        UIElement* TreeView::FindRowForItem(TreeItemId item) const
+        {
+            auto it = _item_rows.find(item);
+            return it != _item_rows.end() ? it->second : nullptr;
+        }
+
+        UIElement* TreeView::GetRowForItem(TreeItemId item) const
+        {
+            return FindRowForItem(item);
+        }
+
         // =========================================================================
         // Selection
         // =========================================================================
@@ -478,8 +538,13 @@ namespace Ailu
             }
             if (item == _selected_item) return;
 
+            TreeItemId previous_selected_item = _selected_item;
             _selected_item = item;
-            InvalidatePaint();
+
+            if (auto* row = dynamic_cast<TreeViewRow*>(FindRowForItem(previous_selected_item)))
+                UpdateTreeViewRowBackground(this, row, row == _hovered_row);
+            if (auto* row = dynamic_cast<TreeViewRow*>(FindRowForItem(_selected_item)))
+                UpdateTreeViewRowBackground(this, row, row == _hovered_row);
 
             if (notify && !_is_suppress_selection_notify)
                 _on_selection_changed_delegate.Invoke(item);
@@ -647,29 +712,6 @@ namespace Ailu
         // =========================================================================
         void TreeView::RenderImpl(UIRenderer& r)
         {
-            for (auto& child : _content_box->GetChildren())
-            {
-                if (child.get() == _empty_drop_handler) continue;
-
-                auto* row = dynamic_cast<TreeViewRow*>(child.get());
-                if (!row) continue;
-
-                TreeItemId id = row->GetItemId();
-
-                Color bg_color = _normal_color;
-                if (id == _selected_item)
-                    bg_color = IsFocused() ? _selected_color : _selected_unfocused_color;
-                else if (child.get() == _hovered_row)
-                    bg_color = _hover_color;
-
-                if (!NearbyEqual(row->_bg_color, bg_color))
-                {
-                    row->_bg_color = bg_color;
-                    row->GetStyleOverride().SetBackground(MakeColorBrush(row->_bg_color));
-                    row->InvalidateStyle(EStyleInvalidation::kPaintOnly);
-                }
-            }
-
             ScrollView::RenderImpl(r);
         }
 

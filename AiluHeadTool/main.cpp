@@ -11,12 +11,12 @@ using namespace std;
 struct Config
 {
     vector<fs::path> _head_dir;
+    vector<string> _filtered_base_classes;
 };
 
 void LoadConfig(const fs::path &p, Config &config)
 {
     map<string, vector<string>> block;
-    bool is_block_start = false, is_block_end = false;
     if (fs::exists(p))
     {
         std::ifstream file(p.string());
@@ -26,21 +26,14 @@ void LoadConfig(const fs::path &p, Config &config)
             std::string line;
             while (std::getline(file, line))
             {
-                if (line[0] == '[' && line[line.size() - 1] == ']')
+                if (line.empty())
+                    continue;
+                if (line.front() == '[' && line.back() == ']')
                 {
-                    if (!is_block_start)
-                    {
-                        is_block_start = true;
-                        cur_group = line.substr(1, line.size() - 2);
-                        block[cur_group] = vector<string>();
-                    }
-                    else
-                    {
-                        is_block_end = true;
-                        is_block_start = false;
-                    }
+                    cur_group = line.substr(1, line.size() - 2);
+                    block[cur_group] = vector<string>();
                 }
-                else if (is_block_start)
+                else if (!cur_group.empty())
                 {
                     block[cur_group].push_back(line);
                 }
@@ -58,6 +51,8 @@ void LoadConfig(const fs::path &p, Config &config)
     }
     for (auto &ps: block["HeadDir"])
         config._head_dir.emplace_back(ps);
+    for (auto &base_class : block["FilteredBaseClasses"])
+        config._filtered_base_classes.emplace_back(base_class);
 }
 namespace fs = std::filesystem;
 
@@ -284,6 +279,8 @@ int main(int argc, char **argv)
     AiluHeadTool::AddDependencyInc("<Objects/SerializeSpecializations.h>");
     AiluHeadTool::AddDependencyInc("<Framework/Common/Log.h>");
     AiluHeadTool aht;
+    aht.SetFilteredBaseClasses(config._filtered_base_classes);
+    aht.CollectScriptApiTypes(all_inc_sys_path);
     std::cout << "ColloctClassNamespace..." << std::endl;
     aht.ColloctClassNamespace(class_ns_update_files, class_ns_path);
     for (auto &p: work_files)

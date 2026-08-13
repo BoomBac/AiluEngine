@@ -29,7 +29,9 @@ namespace Ailu
             _root = nullptr;
             BindOutput(RenderTexture::s_backbuffer, nullptr);
             ResetClickState();
-            _parent = &Application::Get().GetWindow();
+            _parent = nullptr;
+            if (Application *application = Application::Instance(); application != nullptr)
+                _parent = application->GetWindowPtr();
         }
         void Widget::Destory()
         {

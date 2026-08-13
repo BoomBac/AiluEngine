@@ -48,7 +48,8 @@ namespace Ailu
         {
             if (_slot_obj != nullptr)
                 _slot_obj->SetOwner(nullptr);
-            UIManager::Get()->OnElementDestroying(this);
+            if (UIManager *ui_manager = UIManager::Get(); ui_manager != nullptr)
+                ui_manager->OnElementDestroying(this);
             _property_observers.clear();
             _children.clear();
         }
@@ -124,6 +125,28 @@ namespace Ailu
             }
         }
 
+        bool UIElement::MoveChild(UIElement *child, u32 new_index)
+        {
+            if (child == nullptr || _children.empty())
+                return false;
+
+            auto it = std::find_if(_children.begin(), _children.end(), [child](const Ref<UIElement> &item)
+                                   { return item.get() == child; });
+            if (it == _children.end())
+                return false;
+
+            const u32 old_index = static_cast<u32>(std::distance(_children.begin(), it));
+            new_index = std::min(new_index, static_cast<u32>(_children.size() - 1u));
+            if (old_index == new_index)
+                return false;
+
+            Ref<UIElement> moved_child = std::move(*it);
+            _children.erase(it);
+            _children.insert(_children.begin() + new_index, std::move(moved_child));
+            InvalidateHierarchy();
+            return true;
+        }
+
         void UIElement::ClearChildren()
         {
             if (_children.empty())
@@ -189,14 +212,14 @@ namespace Ailu
                     ++renderer->MutableStats()._ui_layout_count;
                 MeasureAndArrange(dt);
                 _is_layout_dirty = false;
-                _matrix = CalculateWorldMatrix();
+                _matrix = CalculateWorldMatrix(true);
                 _inv_matrix = MatrixInverse(_matrix);
                 _is_transf_dirty = false;
                 refresh_abs_rect();
             }
             if (_is_transf_dirty)
             {
-                _matrix = CalculateWorldMatrix();
+                _matrix = CalculateWorldMatrix(true);
                 _inv_matrix = MatrixInverse(_matrix);
                 _is_transf_dirty = false;
                 refresh_abs_rect();
@@ -350,7 +373,7 @@ namespace Ailu
             const bool needs_post_arrange = _is_layout_dirty || is_layout_changed;
             _arrange_rect = new_arrange_rect;
             _content_rect = new_content_rect;
-            auto mat = CalculateWorldMatrix();
+            auto mat = CalculateWorldMatrix(true);
             Vector3f corners[4] = {
                     {_arrange_rect.x, _arrange_rect.y, 1.0f},
                     {_arrange_rect.x + _arrange_rect.z, _arrange_rect.y, 1.0f},
@@ -492,9 +515,10 @@ namespace Ailu
                         }
                     }
                     _children[i].reset(child_type->CreateInstance<UIElement>());
+                    _children[i]->SetParent(this);
+                    _children[i]->_hierarchy_depth = _hierarchy_depth + 1u;
                     _on_child_add_delegate.Invoke(_children[i].get());
                     SerializerWrapper<UIElement>::Deserialize(_children[i].get(), ar, &item_name);
-                    _children[i]->SetParent(this);
                 }
                 sar->EndArray();
                 sar->EndObject();

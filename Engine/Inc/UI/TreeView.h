@@ -68,6 +68,7 @@ namespace Ailu
 
             void SetDataSource(ITreeViewDataSource* data_source);
             ITreeViewDataSource* GetDataSource() const { return _data_source; }
+            UIElement* GetRowForItem(TreeItemId item) const;
 
             void Refresh();
 

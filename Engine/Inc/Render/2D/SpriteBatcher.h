@@ -39,7 +39,7 @@ namespace Ailu::Render
         Ref<IndexBuffer> _index_buffer;
         Ref<GPUBuffer> _instance_buffer;
 
-        Scope<ConstantBuffer> _per_obj_cb;
+        Ref<ConstantBuffer> _per_obj_cb;
 
         Vector<SpriteInstanceData> _instance_data;
         Vector<SpriteBatch> _batches;

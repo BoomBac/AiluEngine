@@ -17,6 +17,7 @@ namespace Ailu
     namespace UI
     {
         class Image;
+        class UIElement;
         class SplitView;
         class Canvas;
         class HorizontalBox;
@@ -51,8 +52,11 @@ namespace Ailu
             void UpdatePathButtons();
             void OpenAsset(Asset *asset);
             void ShowBlankAreaContextMenu(Vector2f popup_pos);
-            void ShowFolderContextMenu(const WString &folder_sys_path, Vector2f popup_pos);
-            void ShowAssetContextMenu(Asset *asset, Vector2f popup_pos);
+            void ShowFolderContextMenu(const WString &folder_sys_path, Vector2f popup_pos, UI::UIElement *item_root,
+                                       UI::Text *item_text);
+            void ShowAssetContextMenu(Asset *asset, Vector2f popup_pos, UI::UIElement *item_root, UI::Text *item_text);
+            void BeginFolderRename(const WString &folder_sys_path, UI::UIElement *item_root, UI::Text *item_text);
+            void BeginAssetRename(Asset *asset, UI::UIElement *item_root, UI::Text *item_text);
             void ShowCreateMaterialDialog(Vector2f popup_pos, const std::filesystem::path &target_sys_path);
             bool RenameAssetEntry(Asset *asset, const String &new_name);
             bool RenameFolderEntry(const WString &folder_sys_path, const String &new_name);
@@ -60,8 +64,10 @@ namespace Ailu
             void DeleteFolderEntry(const WString &folder_sys_path);
             bool CreateFolderEntry(const String &name);
             bool CreateSceneEntry(const String &name);
+            bool CreateSpriteEntry(const String &name);
             bool CreateMaterialEntry(const String &name, Render::Shader *shader);
             bool CreateInputActionAssetEntry(const String &name);
+            bool CreateWidgetAssetEntry(const String &name);
             bool CreateFlowGraphEntry(const String &name);
             bool CreateScriptEntry(const String &name);
             bool CreatePrefabEntry(ECS::Entity entity, const std::filesystem::path &target_directory);
@@ -96,9 +102,12 @@ namespace Ailu
             Vector2f _last_icon_area_size = Vector2f::kZero;
             bool _is_list_view = false;
             Vector<Asset *> _cur_dir_assets;
+            UI::UIElement *_selected_item_root = nullptr;
+            UI::Text *_selected_item_text = nullptr;
+            Asset *_selected_asset = nullptr;
+            WString _selected_folder_path;
             Vector<WString> _pending_import_files;
             Vector2f _import_popup_pos = Vector2f::kZero;
-            HashMap<Object*, Ref<Render::RenderTexture>> _asset_preview_icons;
             bool _is_dragging = false;
             Vector2f _drag_start_pos;
         };

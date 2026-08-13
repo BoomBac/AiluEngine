@@ -4,6 +4,9 @@
 ---@class ScriptEngine
 ScriptEngine = {}
 
+---@type ScriptEngine
+engine = {}
+
 ---@param message string
 function ScriptEngine.log_info(message) end
 

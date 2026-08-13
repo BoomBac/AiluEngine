@@ -35,6 +35,7 @@ namespace Ailu::RHI::DX12
     void D3DCommandBuffer::Clear()
     {
         AL_ASSERT(IsReady());
+        RHICommandBuffer::Clear();
         ThrowIfFailed(_p_alloc->Reset());
         ThrowIfFailed(_p_cmd->Reset(_p_alloc.Get(), nullptr));
         _cur_cbv_heap_id = -1;

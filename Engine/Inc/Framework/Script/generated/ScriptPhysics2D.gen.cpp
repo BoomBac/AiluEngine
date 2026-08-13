@@ -6,6 +6,106 @@
 #include <Objects/SerializeSpecializations.h>
 #include <Framework/Common/Log.h>
 using namespace Ailu;
+const Ailu::Type* Ailu::Z_Construct_ScriptRaycastHit2D_Type()
+{
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "ScriptRaycastHit2D";
+initializer._size = sizeof(Ailu::ScriptRaycastHit2D);
+initializer._full_name = "Ailu::ScriptRaycastHit2D";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu";
+initializer._base_name = "";
+initializer._constructor = []()->Ailu::ScriptRaycastHit2D* {return new Ailu::ScriptRaycastHit2D;};
+Meta metaIsValid;
+metaIsValid.Set("Script",true);
+MemberBuilder builderIsValid;
+builderIsValid._name = "IsValid";
+builderIsValid._type_name = "bool() const";
+builderIsValid._offset = 0u;
+builderIsValid._is_const = true;
+builderIsValid._is_static = false;
+builderIsValid._is_public = false;
+builderIsValid._ret_type_name = "bool";
+builderIsValid._meta = metaIsValid;
+builderIsValid._member_ptr = &Ailu::ScriptRaycastHit2D::IsValid;
+initializer._functions.emplace_back(MemberBuilder::BuildFunction(builderIsValid));
+Meta metaGetEntity;
+metaGetEntity.Set("Script",true);
+MemberBuilder builderGetEntity;
+builderGetEntity._name = "GetEntity";
+builderGetEntity._type_name = "ScriptEntity() const";
+builderGetEntity._offset = 0u;
+builderGetEntity._is_const = true;
+builderGetEntity._is_static = false;
+builderGetEntity._is_public = false;
+builderGetEntity._ret_type_name = "ScriptEntity";
+builderGetEntity._meta = metaGetEntity;
+builderGetEntity._member_ptr = &Ailu::ScriptRaycastHit2D::GetEntity;
+initializer._functions.emplace_back(MemberBuilder::BuildFunction(builderGetEntity));
+Meta metaGetPoint;
+metaGetPoint.Set("Script",true);
+MemberBuilder builderGetPoint;
+builderGetPoint._name = "GetPoint";
+builderGetPoint._type_name = "Vector2f() const";
+builderGetPoint._offset = 0u;
+builderGetPoint._is_const = true;
+builderGetPoint._is_static = false;
+builderGetPoint._is_public = false;
+builderGetPoint._ret_type_name = "Vector2f";
+builderGetPoint._meta = metaGetPoint;
+builderGetPoint._member_ptr = &Ailu::ScriptRaycastHit2D::GetPoint;
+initializer._functions.emplace_back(MemberBuilder::BuildFunction(builderGetPoint));
+Meta metaGetNormal;
+metaGetNormal.Set("Script",true);
+MemberBuilder builderGetNormal;
+builderGetNormal._name = "GetNormal";
+builderGetNormal._type_name = "Vector2f() const";
+builderGetNormal._offset = 0u;
+builderGetNormal._is_const = true;
+builderGetNormal._is_static = false;
+builderGetNormal._is_public = false;
+builderGetNormal._ret_type_name = "Vector2f";
+builderGetNormal._meta = metaGetNormal;
+builderGetNormal._member_ptr = &Ailu::ScriptRaycastHit2D::GetNormal;
+initializer._functions.emplace_back(MemberBuilder::BuildFunction(builderGetNormal));
+Meta metaGetDistance;
+metaGetDistance.Set("Script",true);
+MemberBuilder builderGetDistance;
+builderGetDistance._name = "GetDistance";
+builderGetDistance._type_name = "f32() const";
+builderGetDistance._offset = 0u;
+builderGetDistance._is_const = true;
+builderGetDistance._is_static = false;
+builderGetDistance._is_public = false;
+builderGetDistance._ret_type_name = "f32";
+builderGetDistance._meta = metaGetDistance;
+builderGetDistance._member_ptr = &Ailu::ScriptRaycastHit2D::GetDistance;
+initializer._functions.emplace_back(MemberBuilder::BuildFunction(builderGetDistance));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+const Ailu::Type* Ailu::ScriptRaycastHit2D::GetPrivateStaticClass()
+{
+	static const Ailu::Type* type = Z_Construct_ScriptRaycastHit2D_Type();
+	return type;
+}
+
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::ScriptRaycastHit2D>()
+{
+return Ailu::ScriptRaycastHit2D::StaticType();
+}
+    const Type *Ailu::ScriptRaycastHit2D::GetType()
+{
+return Ailu::ScriptRaycastHit2D::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_ScriptRaycastHit2D(&Ailu::ScriptRaycastHit2D::StaticType, "Ailu::ScriptRaycastHit2D");
 const Ailu::Type* Ailu::Z_Construct_ScriptPhysics2D_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -20,110 +120,45 @@ initializer._is_abstract = false;
 initializer._namespace = "Ailu";
 initializer._base_name = "";
 initializer._constructor = []()->Ailu::ScriptPhysics2D* {return new Ailu::ScriptPhysics2D;};
-Meta metaIsValidBody;
-metaIsValidBody.Set("Script",true);
-MemberBuilder builderIsValidBody;
-builderIsValidBody._name = "IsValidBody";
-builderIsValidBody._type_name = "bool(const ScriptEntity)";
-builderIsValidBody._offset = 0u;
-builderIsValidBody._is_const = false;
-builderIsValidBody._is_static = true;
-builderIsValidBody._is_public = false;
-builderIsValidBody._ret_type_name = "bool";
-builderIsValidBody._meta = metaIsValidBody;
-builderIsValidBody._member_ptr = &ScriptPhysics2D::IsValidBody;
-initializer._functions.emplace_back(MemberBuilder::BuildFunction(builderIsValidBody));
-Meta metaSetPosition;
-metaSetPosition.Set("Script",true);
-MemberBuilder builderSetPosition;
-builderSetPosition._name = "SetPosition";
-builderSetPosition._type_name = "void(const ScriptEntity,const Vector2f)";
-builderSetPosition._offset = 0u;
-builderSetPosition._is_const = false;
-builderSetPosition._is_static = true;
-builderSetPosition._is_public = false;
-builderSetPosition._ret_type_name = "void";
-builderSetPosition._meta = metaSetPosition;
-builderSetPosition._member_ptr = &ScriptPhysics2D::SetPosition;
-initializer._functions.emplace_back(MemberBuilder::BuildFunction(builderSetPosition));
-Meta metaGetPosition;
-metaGetPosition.Set("Script",true);
-MemberBuilder builderGetPosition;
-builderGetPosition._name = "GetPosition";
-builderGetPosition._type_name = "Vector2f(const ScriptEntity)";
-builderGetPosition._offset = 0u;
-builderGetPosition._is_const = false;
-builderGetPosition._is_static = true;
-builderGetPosition._is_public = false;
-builderGetPosition._ret_type_name = "Vector2f";
-builderGetPosition._meta = metaGetPosition;
-builderGetPosition._member_ptr = &ScriptPhysics2D::GetPosition;
-initializer._functions.emplace_back(MemberBuilder::BuildFunction(builderGetPosition));
-Meta metaSetLinearVelocity;
-metaSetLinearVelocity.Set("Script",true);
-MemberBuilder builderSetLinearVelocity;
-builderSetLinearVelocity._name = "SetLinearVelocity";
-builderSetLinearVelocity._type_name = "void(const ScriptEntity,const Vector2f)";
-builderSetLinearVelocity._offset = 0u;
-builderSetLinearVelocity._is_const = false;
-builderSetLinearVelocity._is_static = true;
-builderSetLinearVelocity._is_public = false;
-builderSetLinearVelocity._ret_type_name = "void";
-builderSetLinearVelocity._meta = metaSetLinearVelocity;
-builderSetLinearVelocity._member_ptr = &ScriptPhysics2D::SetLinearVelocity;
-initializer._functions.emplace_back(MemberBuilder::BuildFunction(builderSetLinearVelocity));
-Meta metaGetLinearVelocity;
-metaGetLinearVelocity.Set("Script",true);
-MemberBuilder builderGetLinearVelocity;
-builderGetLinearVelocity._name = "GetLinearVelocity";
-builderGetLinearVelocity._type_name = "Vector2f(const ScriptEntity)";
-builderGetLinearVelocity._offset = 0u;
-builderGetLinearVelocity._is_const = false;
-builderGetLinearVelocity._is_static = true;
-builderGetLinearVelocity._is_public = false;
-builderGetLinearVelocity._ret_type_name = "Vector2f";
-builderGetLinearVelocity._meta = metaGetLinearVelocity;
-builderGetLinearVelocity._member_ptr = &ScriptPhysics2D::GetLinearVelocity;
-initializer._functions.emplace_back(MemberBuilder::BuildFunction(builderGetLinearVelocity));
-Meta metaSetAngularVelocity;
-metaSetAngularVelocity.Set("Script",true);
-MemberBuilder builderSetAngularVelocity;
-builderSetAngularVelocity._name = "SetAngularVelocity";
-builderSetAngularVelocity._type_name = "void(const ScriptEntity,f32)";
-builderSetAngularVelocity._offset = 0u;
-builderSetAngularVelocity._is_const = false;
-builderSetAngularVelocity._is_static = true;
-builderSetAngularVelocity._is_public = false;
-builderSetAngularVelocity._ret_type_name = "void";
-builderSetAngularVelocity._meta = metaSetAngularVelocity;
-builderSetAngularVelocity._member_ptr = &ScriptPhysics2D::SetAngularVelocity;
-initializer._functions.emplace_back(MemberBuilder::BuildFunction(builderSetAngularVelocity));
-Meta metaAddForce;
-metaAddForce.Set("Script",true);
-MemberBuilder builderAddForce;
-builderAddForce._name = "AddForce";
-builderAddForce._type_name = "void(const ScriptEntity,const Vector2f)";
-builderAddForce._offset = 0u;
-builderAddForce._is_const = false;
-builderAddForce._is_static = true;
-builderAddForce._is_public = false;
-builderAddForce._ret_type_name = "void";
-builderAddForce._meta = metaAddForce;
-builderAddForce._member_ptr = &ScriptPhysics2D::AddForce;
-initializer._functions.emplace_back(MemberBuilder::BuildFunction(builderAddForce));
-Meta metaAddImpulse;
-metaAddImpulse.Set("Script",true);
-MemberBuilder builderAddImpulse;
-builderAddImpulse._name = "AddImpulse";
-builderAddImpulse._type_name = "void(const ScriptEntity,const Vector2f)";
-builderAddImpulse._offset = 0u;
-builderAddImpulse._is_const = false;
-builderAddImpulse._is_static = true;
-builderAddImpulse._is_public = false;
-builderAddImpulse._ret_type_name = "void";
-builderAddImpulse._meta = metaAddImpulse;
-builderAddImpulse._member_ptr = &ScriptPhysics2D::AddImpulse;
-initializer._functions.emplace_back(MemberBuilder::BuildFunction(builderAddImpulse));
+Meta metaRaycast;
+metaRaycast.Set("Script",true);
+MemberBuilder builderRaycast;
+builderRaycast._name = "Raycast";
+builderRaycast._type_name = "std::optional<ScriptRaycastHit2D>(const Vector2f,const Vector2f,f32,u32)";
+builderRaycast._offset = 0u;
+builderRaycast._is_const = false;
+builderRaycast._is_static = true;
+builderRaycast._is_public = false;
+builderRaycast._ret_type_name = "std::optional<ScriptRaycastHit2D>";
+builderRaycast._meta = metaRaycast;
+builderRaycast._member_ptr = &Ailu::ScriptPhysics2D::Raycast;
+initializer._functions.emplace_back(MemberBuilder::BuildFunction(builderRaycast));
+Meta metaOverlapCircle;
+metaOverlapCircle.Set("Script",true);
+MemberBuilder builderOverlapCircle;
+builderOverlapCircle._name = "OverlapCircle";
+builderOverlapCircle._type_name = "Vector<ScriptRaycastHit2D>(const Vector2f,f32,u32)";
+builderOverlapCircle._offset = 0u;
+builderOverlapCircle._is_const = false;
+builderOverlapCircle._is_static = true;
+builderOverlapCircle._is_public = false;
+builderOverlapCircle._ret_type_name = "Vector<ScriptRaycastHit2D>";
+builderOverlapCircle._meta = metaOverlapCircle;
+builderOverlapCircle._member_ptr = &Ailu::ScriptPhysics2D::OverlapCircle;
+initializer._functions.emplace_back(MemberBuilder::BuildFunction(builderOverlapCircle));
+Meta metaOverlapBox;
+metaOverlapBox.Set("Script",true);
+MemberBuilder builderOverlapBox;
+builderOverlapBox._name = "OverlapBox";
+builderOverlapBox._type_name = "Vector<ScriptRaycastHit2D>(const Vector2f,const Vector2f,f32,u32)";
+builderOverlapBox._offset = 0u;
+builderOverlapBox._is_const = false;
+builderOverlapBox._is_static = true;
+builderOverlapBox._is_public = false;
+builderOverlapBox._ret_type_name = "Vector<ScriptRaycastHit2D>";
+builderOverlapBox._meta = metaOverlapBox;
+builderOverlapBox._member_ptr = &Ailu::ScriptPhysics2D::OverlapBox;
+initializer._functions.emplace_back(MemberBuilder::BuildFunction(builderOverlapBox));
 cur_type = std::make_unique<Ailu::Type>(initializer);
 Ailu::Type::RegisterType(cur_type.get());
 }
@@ -152,15 +187,21 @@ ClassTypeRegister s_register_ScriptPhysics2D(&Ailu::ScriptPhysics2D::StaticType,
 namespace Ailu { void RegisterGeneratedLuaBindings_ScriptPhysics2D(sol::state &lua); }
 void Ailu::RegisterGeneratedLuaBindings_ScriptPhysics2D(sol::state &lua)
 {
+auto type_ScriptRaycastHit2D = lua.new_usertype<Ailu::ScriptRaycastHit2D>("ScriptRaycastHit2D");
+type_ScriptRaycastHit2D["distance"] = sol::property(&Ailu::ScriptRaycastHit2D::GetDistance);
+type_ScriptRaycastHit2D["entity"] = sol::property(&Ailu::ScriptRaycastHit2D::GetEntity);
+type_ScriptRaycastHit2D["normal"] = sol::property(&Ailu::ScriptRaycastHit2D::GetNormal);
+type_ScriptRaycastHit2D["point"] = sol::property(&Ailu::ScriptRaycastHit2D::GetPoint);
+type_ScriptRaycastHit2D["valid"] = sol::property(&Ailu::ScriptRaycastHit2D::IsValid);
+type_ScriptRaycastHit2D.set_function("is_valid", &Ailu::ScriptRaycastHit2D::IsValid);
+type_ScriptRaycastHit2D.set_function("get_entity", &Ailu::ScriptRaycastHit2D::GetEntity);
+type_ScriptRaycastHit2D.set_function("get_point", &Ailu::ScriptRaycastHit2D::GetPoint);
+type_ScriptRaycastHit2D.set_function("get_normal", &Ailu::ScriptRaycastHit2D::GetNormal);
+type_ScriptRaycastHit2D.set_function("get_distance", &Ailu::ScriptRaycastHit2D::GetDistance);
 auto type_ScriptPhysics2D = lua.new_usertype<Ailu::ScriptPhysics2D>("ScriptPhysics2D");
-type_ScriptPhysics2D.set_function("is_valid_body", &Ailu::ScriptPhysics2D::IsValidBody);
-type_ScriptPhysics2D.set_function("set_position", &Ailu::ScriptPhysics2D::SetPosition);
-type_ScriptPhysics2D.set_function("get_position", &Ailu::ScriptPhysics2D::GetPosition);
-type_ScriptPhysics2D.set_function("set_linear_velocity", &Ailu::ScriptPhysics2D::SetLinearVelocity);
-type_ScriptPhysics2D.set_function("get_linear_velocity", &Ailu::ScriptPhysics2D::GetLinearVelocity);
-type_ScriptPhysics2D.set_function("set_angular_velocity", &Ailu::ScriptPhysics2D::SetAngularVelocity);
-type_ScriptPhysics2D.set_function("add_force", &Ailu::ScriptPhysics2D::AddForce);
-type_ScriptPhysics2D.set_function("add_impulse", &Ailu::ScriptPhysics2D::AddImpulse);
+type_ScriptPhysics2D.set_function("raycast", &Ailu::ScriptPhysics2D::Raycast);
+type_ScriptPhysics2D.set_function("overlap_circle", &Ailu::ScriptPhysics2D::OverlapCircle);
+type_ScriptPhysics2D.set_function("overlap_box", &Ailu::ScriptPhysics2D::OverlapBox);
 lua["physics2d"] = Ailu::ScriptPhysics2D{};
 }
 ScriptLuaBindingRegister s_register_lua_bindings_RegisterGeneratedLuaBindings_ScriptPhysics2D(&Ailu::RegisterGeneratedLuaBindings_ScriptPhysics2D);

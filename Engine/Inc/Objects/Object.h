@@ -7,16 +7,16 @@
 #include "Framework/Core/ReflectionMacros.h"
 #include "Framework/Core/String.h"
 #include "Framework/Math/Guid.h"
-#include "generated/Object.gen.h"
 #include <mutex>
 #include <set>
+#include "generated/Object.gen.h"
 
 namespace Ailu
 {
     class Type;
     class PropertyInfo;
     ACLASS()
-    class AILU_API Object
+    class AILU_API Object : public std::enable_shared_from_this<Object>
     {
         GENERATED_BODY();
         friend class ResourceMgr;
@@ -25,6 +25,7 @@ namespace Ailu
         Object();
         explicit Object(const String &name);
         virtual ~Object();
+        [[nodiscard]] Ref<Object> SharedFromThis() { return weak_from_this().lock(); }
         virtual void Name(const String &value) { _name = value; }
         [[nodiscard]] const String &Name() const { return _name; }
         bool operator==(const Object &other) const { return _id == other._id; };

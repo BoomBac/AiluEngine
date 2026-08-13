@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __PROJECTSETTINGS_GEN_H__
 //Struct ProjectSettings begin...........................
-#define PROJECTSETTINGS_GEN_H_14_GENERATED_BODY \
+#define PROJECTSETTINGS_GEN_H_15_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_ProjectSettings_Type();\
                                 static const Type* GetPrivateStaticClass();\

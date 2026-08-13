@@ -450,7 +450,9 @@ namespace Ailu
         SerializerWrapper<Vector<T>>::Deserialize(&tmp, ar, name);
         auto &value = *static_cast<VecType *>(data);
         for (size_t i = 0; i < N; ++i)
-            value[(u32)i] = tmp[i];
+            value[(u32)i] = i < tmp.size() ? tmp[i] : T{};
+        if (tmp.size() != N)
+            LOG_WARNING("DeserializeVectorND size mismatch, archive: {}, target: {}", tmp.size(), N);
     }
 
 

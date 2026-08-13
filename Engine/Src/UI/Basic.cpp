@@ -247,6 +247,8 @@ namespace Ailu
         void Text::UpdateTextLayout(bool record_dirty_reason)
         {
             Render::Font *font = TextRenderer::GetDefaultFont();
+            if (font == nullptr)
+                return;
             if (!_is_text_layout_dirty && _text_layout_font == font && NearbyEqual(_text_layout_font_size, _font_size))
                 return;
             _text_layout_cache = TextRenderer::BuildLayout(_text, Vector2f::kZero, _font_size, font);
@@ -356,6 +358,7 @@ namespace Ailu
         void Text::PostDeserialize()
         {
             UIElement::PostDeserialize();
+            _style_override.SetFontSize(_font_size);
             UpdateTextLayout();
         }
         void Text::OnPropertyChanged(const PropertyInfo &prop)
@@ -364,6 +367,8 @@ namespace Ailu
             const String &name = prop.Name();
             if (name == "_text" || name == "_font_size")
             {
+                if (name == "_font_size")
+                    _style_override.SetFontSize(_font_size);
                 MarkTextLayoutDirty();
                 UpdateTextLayout();
                 InvalidatePaint();
@@ -391,6 +396,7 @@ namespace Ailu
             if (NearbyEqual(_font_size, size))
                 return;
             _font_size = size;
+            _style_override.SetFontSize(size);
             MarkTextLayoutDirty(record_dirty_reason);
             UpdateTextLayout(record_dirty_reason);
             if (record_dirty_reason)
@@ -1087,6 +1093,16 @@ namespace Ailu
             InvalidatePaint();
             if (trigger_event)
                 _on_content_changed_delegate.Invoke(content);
+        }
+
+        void InputBlock::SetCursorToEnd()
+        {
+            _cursor_pos = static_cast<u32>(_content.size());
+            _select_start = _cursor_pos;
+            _select_end = _cursor_pos;
+            _is_selecting = false;
+            _is_editing = true;
+            KeepCursorVisible();
         }
 
         void InputBlock::RenderImpl(UIRenderer &r)

@@ -400,6 +400,16 @@
       "path": "engine://Icons/spot_light.alasset",
       "type": "Ailu::Render::Texture2D"
     },
+      {
+      "guid": "f5d84c3f-fcb5-414c-856d-102611140ec8",
+      "path": "engine://Icons/script.alasset",
+      "type": "Ailu::Render::Texture2D"
+    },
+      {
+      "guid": "f4c709d1-154b-4cc3-86b9-c055d4bf28e9",
+      "path": "engine://Icons/prefab.alasset",
+      "type": "Ailu::Render::Texture2D"
+    },
     {
       "guid": "da893f79-e318-4de1-8a73-68c4a51b6892",
       "path": "engine://Shaders/hlsl/motion_vector.alasset",

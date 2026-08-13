@@ -17,6 +17,7 @@
 #include "Render/RayTracing/RayTracingScene.h"
 #include "Render/RayTracing/RayTracingGeometry.h"
 #include "Render/RayTracing/RayTracingShader.h"
+#include <unordered_set>
 
 namespace Ailu::Render
 {
@@ -139,6 +140,8 @@ namespace Ailu::Render
                     CommandPool::Get().DeAlloc(cmd);
             }
             _commands.clear();
+            _keep_alive_objects.clear();
+            _keep_alive_set.clear();
             _command_resources.clear();
             _leased_temp_rts.clear();
             _released_temp_rts.clear();
@@ -430,6 +433,112 @@ namespace Ailu::Render
         {
             _leased_temp_rts.clear();
             return std::move(_released_temp_rts);
+        }
+
+        void KeepAlive(Object *object)
+        {
+            if (object == nullptr || !_keep_alive_set.insert(object).second)
+                return;
+            if (auto object_ref = object->SharedFromThis(); object_ref != nullptr)
+                _keep_alive_objects.emplace_back(std::move(object_ref));
+        }
+
+        void CollectKeepAliveObjects()
+        {
+            const auto collect_bindings = [this](const PipelineBindingSnapshot &bindings)
+            {
+                for (u16 i = 0u; i < bindings._entry_count; ++i)
+                    KeepAlive(bindings._entries[i]._resource);
+            };
+            const auto collect_compute_bindings = [this](const ComputeDispatchSnapshot &bindings)
+            {
+                for (u16 i = 0u; i < bindings._entry_count; ++i)
+                    KeepAlive(bindings._entries[i]._resource);
+            };
+            for (GfxCommand *command: _commands)
+            {
+                if (command == nullptr)
+                    continue;
+                switch (command->GetCmdType())
+                {
+                case EGpuCommandType::kSetTarget:
+                {
+                    auto *target = static_cast<CommandSetTarget *>(command);
+                    for (u16 i = 0u; i < target->_color_target_num; ++i)
+                        KeepAlive(target->_color_target[i]);
+                    KeepAlive(target->_depth_target);
+                    break;
+                }
+                case EGpuCommandType::kDraw:
+                {
+                    auto *draw = static_cast<CommandDraw *>(command);
+                    KeepAlive(draw->_vb);
+                    KeepAlive(draw->_ib);
+                    KeepAlive(draw->_per_obj_cb);
+                    KeepAlive(draw->_mat);
+                    KeepAlive(draw->_arg_buffer);
+                    KeepAlive(draw->_material_draw_state._shader);
+                    collect_bindings(draw->_material_draw_state._bindings);
+                    break;
+                }
+                case EGpuCommandType::kDispatch:
+                {
+                    auto *dispatch = static_cast<CommandDispatch *>(command);
+                    KeepAlive(dispatch->_cs);
+                    KeepAlive(dispatch->_arg_buffer);
+                    collect_compute_bindings(dispatch->_bindings);
+                    break;
+                }
+                case EGpuCommandType::kResourceUpload:
+                    KeepAlive(static_cast<CommandGpuResourceUpload *>(command)->_res);
+                    break;
+                case EGpuCommandType::kTransResourceState:
+                    KeepAlive(static_cast<CommandTranslateState *>(command)->_res);
+                    break;
+                case EGpuCommandType::kResourceBarrier:
+                    KeepAlive(static_cast<CommandResourceBarrier *>(command)->_res);
+                    break;
+                case EGpuCommandType::kUAVBarrier:
+                    KeepAlive(static_cast<CommandUAVBarrier *>(command)->_res);
+                    break;
+                case EGpuCommandType::kCopyCounter:
+                {
+                    auto *copy = static_cast<CommandCopyCounter *>(command);
+                    KeepAlive(copy->_src);
+                    KeepAlive(copy->_dst);
+                    break;
+                }
+                case EGpuCommandType::kReadBack:
+                    KeepAlive(static_cast<CommandReadBack *>(command)->_res);
+                    break;
+                case EGpuCommandType::kBuildAS:
+                {
+                    auto *build = static_cast<CommandBuildAS *>(command);
+                    KeepAlive(build->_dst);
+                    KeepAlive(build->_src);
+                    KeepAlive(build->_tlas._instance_buffer);
+                    break;
+                }
+                case EGpuCommandType::kDispatchRays:
+                {
+                    auto *dispatch = static_cast<CommandDispatchRays *>(command);
+                    KeepAlive(dispatch->_shader);
+                    KeepAlive(dispatch->_scene);
+                    break;
+                }
+                default:
+                    break;
+                }
+            }
+            for (const auto &[property_id, binding]: _command_resources)
+                KeepAlive(binding._resource);
+        }
+
+        Vector<Ref<Object>> TakeKeepAliveObjects()
+        {
+            CollectKeepAliveObjects();
+            _keep_alive_set.clear();
+            return std::move(_keep_alive_objects);
         }
         void Blit(RTHandle src, RTHandle dst, Material *mat, u16 pass_index)
         {
@@ -793,6 +902,8 @@ namespace Ailu::Render
             _commands.emplace_back(cmd);
         }
         Vector<GfxCommand *> _commands;
+        Vector<Ref<Object>> _keep_alive_objects;
+        std::unordered_set<Object *> _keep_alive_set;
         Array<Rect, RenderConstants::kMaxMRTNum> _viewports;
         RDG::RenderGraph *_render_graph = nullptr;
         // CommandBuffer局部资源，以kPriorityCmd烘焙进draw state snapshot
@@ -1086,6 +1197,11 @@ namespace Ailu::Render
     Vector<GfxCommand *> CommandBuffer::TakeCommands()
     {
         return std::move(_impl->_commands);
+    }
+
+    Vector<Ref<Object>> CommandBuffer::TakeKeepAliveObjects()
+    {
+        return _impl->TakeKeepAliveObjects();
     }
 
     Vector<RTHandle> CommandBuffer::TakeReleasedTempRTs()

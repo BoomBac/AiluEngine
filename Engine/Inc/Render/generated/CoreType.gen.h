@@ -6,7 +6,7 @@
 #define __CORETYPE_GEN_H__
 //Enum EResourceUsage begin...........................
 const Ailu::Enum* Z_Construct_Enum_EResourceUsage_Type();
-namespace Ailu::Render { 
+namespace Ailu::Render {
 enum class EResourceUsage : u32;
 }
 template<>
@@ -15,7 +15,7 @@ AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::EResourceUsage>();
 
 //Enum EResourceState begin...........................
 const Ailu::Enum* Z_Construct_Enum_EResourceState_Type();
-namespace Ailu::Render { 
+namespace Ailu::Render {
 enum class EResourceState : i32;
 }
 template<>

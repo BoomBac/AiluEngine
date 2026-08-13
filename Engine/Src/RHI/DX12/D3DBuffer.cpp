@@ -512,8 +512,12 @@ namespace Ailu::RHI::DX12
             _buffer_views[stream_index].SizeInBytes = (u32) _stream_data[i]._size;
             _buffer_layout_indexer.emplace(std::make_pair(std::make_pair(_buffer_layout[stream_index].Name, _buffer_layout[stream_index]._semantic_index), stream_index));
 
-            ReleaseBindlessSrvIndex(_bindless_srv_indices[stream_index]);
-            CreateBindlessBufferSrv(d3d_dev, _vertex_buffers[stream_index].Get(), _stream_data[i]._size, _bindless_srv_indices[stream_index]);
+            if (_bindless_srv_enabled)
+            {
+                ReleaseBindlessSrvIndex(_bindless_srv_indices[stream_index]);
+                CreateBindlessBufferSrv(d3d_dev, _vertex_buffers[stream_index].Get(), _stream_data[i]._size,
+                                        _bindless_srv_indices[stream_index]);
+            }
         }
         ++_view_version;
     }
@@ -578,8 +582,11 @@ namespace Ailu::RHI::DX12
         _index_buf_view.Format = DXGI_FORMAT_R32_UINT;
         _index_buf_view.SizeInBytes = static_cast<u32>(_mem_size);
 
-        ReleaseBindlessSrvIndex(_bindless_srv_index);
-        CreateBindlessBufferSrv(d3d_conetxt->GetDevice(), _index_buf.Get(), _mem_size, _bindless_srv_index);
+        if (_bindless_srv_enabled)
+        {
+            ReleaseBindlessSrvIndex(_bindless_srv_index);
+            CreateBindlessBufferSrv(d3d_conetxt->GetDevice(), _index_buf.Get(), _mem_size, _bindless_srv_index);
+        }
         ++_view_version;
     }
     void D3DIndexBuffer::BindImpl(RHICommandBuffer *rhi_cmd, const BindParams& params)

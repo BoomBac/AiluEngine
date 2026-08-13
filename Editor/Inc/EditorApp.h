@@ -9,8 +9,8 @@
 #include "Framework/Core/Containers/Vector.h"
 #include "Framework/Math/Vector.hpp"
 #include "Widgets/EditorLayer.h"
-#include "generated/EditorApp.gen.h"
 #include <filesystem>
+#include "generated/EditorApp.gen.h"
 
 namespace Ailu
 {

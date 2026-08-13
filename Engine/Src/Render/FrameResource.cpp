@@ -14,7 +14,9 @@ namespace Ailu::Render
     {
         for (u32 i = 0; i < RenderConstants::kMaxRenderObjectCount; ++i)
         {
-            _obj_cbs.push_back(ConstantBuffer::Create(RenderConstants::kPerObjectDataSize));
+            auto cb = Ref<ConstantBuffer>(ConstantBuffer::Create(RenderConstants::kPerObjectDataSize));
+            _obj_cb_refs.emplace_back(cb);
+            _obj_cbs.emplace_back(cb.get());
         }
         BufferDesc desc;
         desc._element_num = RenderConstants::kMaxMaterialDataCount;
@@ -27,26 +29,6 @@ namespace Ailu::Render
     }
     FrameResource::~FrameResource()
     {
-        for (auto cb: _obj_cbs)
-        {
-            delete cb;
-            cb = nullptr;
-        }
-        for (auto cb: _camera_cbs)
-        {
-            delete cb;
-            cb = nullptr;
-        }
-        for (auto cb: _mat_cbs)
-        {
-            delete cb;
-            cb = nullptr;
-        }
-        for (auto cb: _scene_cbs)
-        {
-            delete cb;
-            cb = nullptr;
-        }
     }
     ConstantBuffer *FrameResource::GetObjCB(u32 index)
     {
@@ -66,7 +48,9 @@ namespace Ailu::Render
     {
         if (!_camera_cb_lut.contains(hash))
         {
-            _camera_cbs.push_back(ConstantBuffer::Create(RenderConstants::kPerCameraDataSize));
+            auto cb = Ref<ConstantBuffer>(ConstantBuffer::Create(RenderConstants::kPerCameraDataSize));
+            _camera_cb_refs.emplace_back(cb);
+            _camera_cbs.emplace_back(cb.get());
             _camera_cbs.back()->Name(std::format("CameraCB_{}", hash));
             _camera_cb_lut[hash] = _camera_cbs.size() - 1;
             return _camera_cbs.back();
@@ -77,7 +61,9 @@ namespace Ailu::Render
     {
         if (!_scene_cb_lut.contains(hash))
         {
-            _scene_cbs.push_back(ConstantBuffer::Create(RenderConstants::kPerSceneDataSize));
+            auto cb = Ref<ConstantBuffer>(ConstantBuffer::Create(RenderConstants::kPerSceneDataSize));
+            _scene_cb_refs.emplace_back(cb);
+            _scene_cbs.emplace_back(cb.get());
             _scene_cb_lut[hash] = _scene_cbs.size() - 1;
             return _scene_cbs.back();
         }

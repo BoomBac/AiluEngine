@@ -23,7 +23,7 @@ local function move_towards(current, target, max_delta)
     return math.max(current - max_delta, target)
 end
 
-function script:OnCreate()
+function script:on_create()
     assert(input:load_action_asset("project://NewInputActions.alasset"))
     assert(input:push_context("Gameplay"))
 
@@ -45,7 +45,7 @@ function script:OnCreate()
     assert(physics2d:is_valid_body(self.entity), "Mario requires a 2D rigid body")
 end
 
-function script:OnDestroy()
+function script:on_destroy()
     if self._attack_subscription then
         input:off(self._attack_subscription)
     end
@@ -57,7 +57,7 @@ function script:OnDestroy()
     end
 end
 
-function script:OnUpdate(delta_time)
+function script:on_update(delta_time)
     local move_axis = input:get_float("Move")
     local position = physics2d:get_position(self.entity)
     local velocity = physics2d:get_linear_velocity(self.entity)

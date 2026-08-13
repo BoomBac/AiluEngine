@@ -158,6 +158,22 @@ endif()
 set_source_files_properties(IMGUIZMO_SRC PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 set_source_files_properties(${MINIAUDIO_SRC} PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 # set_source_files_properties(IMGUI_BACKENDS PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
+
+set(ENGINE_THIRD_PARTY_SOURCES
+        ${IMGUI_ROOT}
+        ${IMPLOT_ROOT}
+        ${IMGUI_BACKENDS}
+        ${IMGUIZMO_SRC}
+        ${DDS_LOADER}
+        ${HDR_LOADER}
+        ${MINIAUDIO_SRC}
+        ${IMNODE}
+        ${AILU_LUA_SOURCES}
+        ${ENGINE_ROOT_PATH}/Ext/tracy/public/TracyClient.cpp)
+set_source_files_properties(${ENGINE_THIRD_PARTY_SOURCES}
+        PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
+set_source_files_properties(${AILU_ENGINE_GENERATED_SOURCES}
+        PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 # aux_source_directory (Src engine_src_dir)
 # 为目标添加 include 目录
 
@@ -174,7 +190,11 @@ ${HDR_LOADER} ${MINIAUDIO_SRC} ${IMNODE} ${AILU_LUA_SOURCES} "Ext/tracy/public/T
 
 add_library (Engine SHARED ${SOURCE_LIST})
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCE_LIST})
-set_target_properties(Engine PROPERTIES CXX_SCAN_FOR_MODULES OFF)
+set_target_properties(Engine PROPERTIES
+        CXX_SCAN_FOR_MODULES OFF
+        UNITY_BUILD ${AILU_ENABLE_UNITY_BUILD}
+        UNITY_BUILD_MODE BATCH
+        UNITY_BUILD_BATCH_SIZE ${AILU_UNITY_BUILD_BATCH_SIZE})
 
 add_dependencies(Engine ailu_reflection_codegen)
 # 包含路径

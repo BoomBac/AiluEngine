@@ -1,8 +1,8 @@
 #pragma
 
-#define ACLASS()
-#define ASTRUCT()
-#define AENUM()
+#define ACLASS(...)
+#define ASTRUCT(...)
+#define AENUM(...)
 #define APROPERTY(...)
 #define AFIELD(...)
 #define AFUNCTION(...)

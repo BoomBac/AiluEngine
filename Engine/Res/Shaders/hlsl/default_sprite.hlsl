@@ -13,6 +13,10 @@
 
 #include "common.hlsli"
 
+PerMaterialCBufferBegin
+    uint _base_instance_index;
+PerMaterialCBufferEnd
+
 struct sprite_instance_data
 {
     float4x4 local_to_world;
@@ -45,7 +49,7 @@ TEXTURE2D(_MainTex)
 
 PSInput VSMain(VSInput input)
 {
-    sprite_instance_data instance = g_sprite_instances[input.instance_id];
+    sprite_instance_data instance = g_sprite_instances[input.instance_id + _base_instance_index];
 
     float2 unit_position = input.position;
     float2 uv = input.uv;

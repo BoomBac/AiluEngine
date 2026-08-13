@@ -56,9 +56,17 @@ namespace Ailu
             _name = std::move(name);
         };
         virtual ~RHICommandBuffer() {};
-        virtual void Clear() {};
+        virtual void Clear() { _keep_alive_objects.clear(); };
         virtual bool IsReady() const { return true; }
         virtual void InsertUAVBarrier() {}
+        void AddKeepAliveObjects(Vector<Ref<Object>> &&objects)
+        {
+            for (auto &object : objects)
+            {
+                if (object != nullptr)
+                    _keep_alive_objects.emplace_back(std::move(object));
+            }
+        }
         [[nodiscard]] ECommandBufferType GetCommandBufferType() const { return _cmd_type; }
         [[nodiscard]] bool IsExecuted() const { return _is_executed; }
         CommandRecordingContext &RecordingContext() { return _recording_context; }
@@ -72,6 +80,7 @@ namespace Ailu
     protected:
         bool _is_executed = false;
         CommandRecordingContext _recording_context;
+        Vector<Ref<Object>> _keep_alive_objects;
 #if AILU_ENABLE_FRAME_DEBUGGER
         Render::FrameDebugger::FrameCaptureWriter *_capture_writer = nullptr;
 #endif
@@ -209,6 +218,8 @@ namespace Ailu
 
         // Move-out the internal command list for submission.
         Vector<GfxCommand *> TakeCommands();
+        // Move-out the unique strong references required by asynchronous command recording.
+        Vector<Ref<Object>> TakeKeepAliveObjects();
         // Move-out temporary RTs whose pool leases can be released after GPU submission.
         Vector<RTHandle> TakeReleasedTempRTs();
         CommandRenderingStatesData TakeRenderingStatesData();

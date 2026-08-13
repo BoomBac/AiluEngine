@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __SCRIPTENTITY_GEN_H__
 //Struct ScriptComponent begin...........................
-#define SCRIPTENTITY_GEN_H_22_GENERATED_BODY \
+#define SCRIPTENTITY_GEN_H_30_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_ScriptComponent_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -21,7 +21,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::ScriptComponent>
 //Struct ScriptComponent end...........................
 
 //Struct ScriptTransform begin...........................
-#define SCRIPTENTITY_GEN_H_69_GENERATED_BODY \
+#define SCRIPTENTITY_GEN_H_73_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_ScriptTransform_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -37,7 +37,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::ScriptTransform>
 //Struct ScriptTransform end...........................
 
 //Struct ScriptEntity begin...........................
-#define SCRIPTENTITY_GEN_H_95_GENERATED_BODY \
+#define SCRIPTENTITY_GEN_H_114_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_ScriptEntity_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -51,22 +51,6 @@ struct ScriptEntity ;
 template<>
 AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::ScriptEntity>();
 //Struct ScriptEntity end...........................
-
-//Struct ScriptAssetValue begin...........................
-#define SCRIPTENTITY_GEN_H_122_GENERATED_BODY \
-                            private: \
-                                friend const Type* Z_Construct_ScriptAssetValue_Type();\
-                                static const Type* GetPrivateStaticClass();\
-                            public:\
-                                static const Type *StaticType() {return GetPrivateStaticClass();};\
-                                const Type  *GetType();
-                            namespace Ailu {class Type;}
-namespace Ailu{
-struct ScriptAssetValue ;
-}
-template<>
-AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::ScriptAssetValue>();
-//Struct ScriptAssetValue end...........................
 
 #undef CURRENT_FILE_ID
 #define CURRENT_FILE_ID SCRIPTENTITY_GEN_H

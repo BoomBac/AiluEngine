@@ -4,6 +4,29 @@
 ---@class ScriptInput
 ScriptInput = {}
 
+---@type ScriptInput
+input = {}
+
+---@param action_name string
+---@return boolean
+function ScriptInput:pressed(action_name) end
+
+---@param action_name string
+---@return boolean
+function ScriptInput:released(action_name) end
+
+---@param action_name string
+---@return boolean
+function ScriptInput:down(action_name) end
+
+---@param action_name string
+---@return number
+function ScriptInput:axis(action_name) end
+
+---@param action_name string
+---@return Vec2
+function ScriptInput:axis2(action_name) end
+
 ---@param action_name string
 ---@return boolean
 function ScriptInput:is_pressed(action_name) end
@@ -28,6 +51,10 @@ function ScriptInput:load_action_asset(asset_path) end
 ---@return boolean
 function ScriptInput:push_context(context_name) end
 
+---@param subscription_id number
+---@return boolean
+function ScriptInput:off(subscription_id) end
+
 ---@param action_name string
 ---@param callback fun()
 ---@return integer subscription_id
@@ -37,8 +64,4 @@ function ScriptInput:on_performed(action_name, callback) end
 ---@param callback fun(arg1: number)
 ---@return integer subscription_id
 function ScriptInput:on_value_changed(action_name, callback) end
-
----@param subscription_id integer
----@return boolean
-function ScriptInput:off(subscription_id) end
 

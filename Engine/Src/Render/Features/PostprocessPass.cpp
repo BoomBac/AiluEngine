@@ -14,7 +14,7 @@ namespace Ailu::Render
         _blur_y_kernel = _cs_blur->FindKernel("blur_y");
         _p_bloom_thread_mat = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/PostProcess/bloom.alasset"), "BloomThread");
         _p_blit_mat = ResourceMgr::Get().Get<Material>(L"Runtime/Material/Blit");
-        _p_obj_cb = ConstantBuffer::Create(256);
+        _p_obj_cb = Ref<ConstantBuffer>(ConstantBuffer::Create(256));
         memcpy(_p_obj_cb->GetData(), &BuildIdentityMatrix(), sizeof(Matrix4x4f));
         _bloom_thread_rect = Rect(0, 0, 800, 450);
         _p_quad_mesh = ResourceMgr::Get().Get<Mesh>(L"Runtime/Mesh/FullScreenQuad");

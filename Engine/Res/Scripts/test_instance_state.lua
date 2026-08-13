@@ -5,7 +5,7 @@
 
 local TestState = {}
 
-function TestState:OnCreate()
+function TestState:on_create()
     self.counter = 0
     self.fixed_counter = 0
 
@@ -17,7 +17,7 @@ function TestState:OnCreate()
     end
 end
 
-function TestState:OnUpdate(dt)
+function TestState:on_update(dt)
     self.counter = self.counter + 1
 
     if self.entity then
@@ -26,7 +26,7 @@ function TestState:OnUpdate(dt)
     end
 end
 
-function TestState:OnFixedUpdate(dt)
+function TestState:on_fixed_update(dt)
     self.fixed_counter = self.fixed_counter + 1
 
     if self.entity then

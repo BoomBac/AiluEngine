@@ -478,6 +478,7 @@ namespace Ailu
 		_asset_handler_registry.Register(MakeScope<InputActionAssetHandler>());
 		_asset_handler_registry.Register(MakeScope<AudioClipAssetHandler>());
 		_asset_handler_registry.Register(MakeScope<GraphAssetHandler>());
+		_asset_handler_registry.Register(MakeScope<WidgetAssetHandler>());
 		
 		Vector<WString> shader_asset_pathes = {
 				L"Shaders/hlsl/deferred_lighting.alasset",

@@ -51,10 +51,6 @@ function ScriptComponent:set_vector3(property, value) end
 ---@return boolean
 function ScriptComponent:add_box_shape(size, is_trigger) end
 
----@param sprite_guid string
----@return boolean
-function ScriptComponent:set_sprite(sprite_guid) end
-
 ---@param entity ScriptEntity
 ---@param type_name string
 ---@return boolean
@@ -88,13 +84,17 @@ function ScriptComponent.set_entity_vector3(entity, type_name, property, value) 
 ---@return boolean
 function ScriptComponent.add_entity_box_shape(entity, type_name, size, is_trigger) end
 
----@param entity ScriptEntity
----@param type_name string
----@param sprite_guid string
----@return boolean
-function ScriptComponent.set_entity_sprite(entity, type_name, sprite_guid) end
-
 ---@class ScriptTransform
+---@field forward Vec3
+---@field local_position Vec3
+---@field local_rotation Quaternion
+---@field local_scale Vec3
+---@field position Vec3
+---@field right Vec3
+---@field rotation Quaternion
+---@field scale Vec3
+---@field up Vec3
+---@field valid boolean
 ScriptTransform = {}
 
 ---@return boolean
@@ -118,7 +118,42 @@ function ScriptTransform:get_local_scale() end
 ---@param scale Vec3
 function ScriptTransform:set_local_scale(scale) end
 
+---@return Vec3
+function ScriptTransform:get_position() end
+
+---@param position Vec3
+function ScriptTransform:set_position(position) end
+
+---@return Quaternion
+function ScriptTransform:get_rotation() end
+
+---@param rotation Quaternion
+function ScriptTransform:set_rotation(rotation) end
+
+---@return Vec3
+function ScriptTransform:get_scale() end
+
+---@param scale Vec3
+function ScriptTransform:set_scale(scale) end
+
+---@return Vec3
+function ScriptTransform:get_forward() end
+
+---@return Vec3
+function ScriptTransform:get_right() end
+
+---@return Vec3
+function ScriptTransform:get_up() end
+
 ---@class ScriptEntity
+---@field animator ScriptAnimator|nil
+---@field audio ScriptAudioSource|nil
+---@field collider2d ScriptCollider2D|nil
+---@field guid string
+---@field name string
+---@field rigid_body2d ScriptRigidBody2D|nil
+---@field sprite ScriptSpriteRenderer|nil
+---@field transform ScriptTransform
 ScriptEntity = {}
 
 ---@return boolean
@@ -136,6 +171,21 @@ function ScriptEntity:get_guid() end
 ---@return ScriptTransform
 function ScriptEntity:get_transform() end
 
+---@return ScriptRigidBody2D|nil
+function ScriptEntity:get_rigid_body2d() end
+
+---@return ScriptCollider2D|nil
+function ScriptEntity:get_collider2d() end
+
+---@return ScriptSpriteRenderer|nil
+function ScriptEntity:get_sprite() end
+
+---@return ScriptAnimator|nil
+function ScriptEntity:get_animator() end
+
+---@return ScriptAudioSource|nil
+function ScriptEntity:get_audio() end
+
 function ScriptEntity:destroy() end
 
 ---@param type_name string
@@ -145,70 +195,4 @@ function ScriptEntity:has_component(type_name) end
 ---@param type_name string
 ---@return boolean
 function ScriptEntity:remove_component(type_name) end
-
----@class ScriptAssetValue
-ScriptAssetValue = {}
-
----@return ScriptAssetValue
-function ScriptAssetValue.sprite() end
-
----@return ScriptAssetValue
-function Sprite() end
-
----@return ScriptAssetValue
-function ScriptAssetValue.texture2d() end
-
----@return ScriptAssetValue
-function Texture2D() end
-
----@return ScriptAssetValue
-function ScriptAssetValue.material() end
-
----@return ScriptAssetValue
-function Material() end
-
----@return ScriptAssetValue
-function ScriptAssetValue.mesh() end
-
----@return ScriptAssetValue
-function Mesh() end
-
----@return ScriptAssetValue
-function ScriptAssetValue.skeleton_mesh() end
-
----@return ScriptAssetValue
-function SkeletonMesh() end
-
----@return ScriptAssetValue
-function ScriptAssetValue.animation_clip() end
-
----@return ScriptAssetValue
-function AnimationClip() end
-
----@return ScriptAssetValue
-function ScriptAssetValue.audio_clip() end
-
----@return ScriptAssetValue
-function AudioClip() end
-
----@return ScriptAssetValue
-function ScriptAssetValue.script() end
-
----@return ScriptAssetValue
-function Script() end
-
----@return boolean
-function ScriptAssetValue:is_valid() end
-
----@return string
-function ScriptAssetValue:get_guid() end
-
----@return string
-function ScriptAssetValue:get_name() end
-
----@return string
-function ScriptAssetValue:get_path() end
-
----@return string
-function ScriptAssetValue:get_asset_type() end
 

@@ -40,6 +40,10 @@ namespace Ailu::Render
         Vector<ConstantBuffer *> _mat_cbs;
         Vector<ConstantBuffer *> _camera_cbs;
         Vector<ConstantBuffer *> _scene_cbs;
+        Vector<Ref<ConstantBuffer>> _obj_cb_refs;
+        Vector<Ref<ConstantBuffer>> _mat_cb_refs;
+        Vector<Ref<ConstantBuffer>> _camera_cb_refs;
+        Vector<Ref<ConstantBuffer>> _scene_cb_refs;
         Vector<Ref<GPUBuffer>> _scene_instance_buffers;
         Ref<GPUBuffer> _material_buffer;//for ray tracing material data
         Map<u64,u64> _camera_cb_lut;

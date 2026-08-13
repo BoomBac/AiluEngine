@@ -4,6 +4,7 @@
 #include <vector>
 #include <set>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "NamespaceTracker.h"
 
@@ -15,7 +16,10 @@ public:
     void SaveLog(const Path &out_dir);
     void Log(const std::string &msg);
     void ColloctClassNamespace(std::set<fs::path> inc_files,Path p);
+    void CollectScriptApiTypes(const std::set<fs::path> &inc_files);
     void Parser(const Path &path, const Path &out_dir, std::string work_namespace = "Ailu");
+    void SetFilteredBaseClasses(std::vector<std::string> filtered_base_classes);
+    bool IsFilteredBaseClass(const std::string &line) const;
     static void AddDependencyInc(std::string file) { s_common_src_dep_file.push_back(std::move(file)); };
     struct PropertyMeta
     {
@@ -54,8 +58,10 @@ public:
         bool _is_function = false;
         bool _is_event = false;
         bool _is_script = false;
+        bool _is_script_property = false;
         std::string _return_type;
         std::vector<std::string> _params;
+        std::vector<std::string> _function_pointer_params;
         std::vector<std::string> _param_names;
         int _event_key_index = -1;
         std::string _event_key_name;
@@ -72,6 +78,8 @@ public:
         bool _is_abstract = false;
         bool is_export;
         bool _is_struct = false;
+        bool _is_script_api = false;
+        std::string _script_global_name;
         std::vector<MemberInfo> _members;
     };
     struct EnumInfo
@@ -105,7 +113,9 @@ private:
     std::vector<ClassInfo> _classes;
     std::vector<ClassInfo> _structs;
     std::vector<EnumInfo> _enums;
+    std::vector<std::string> _filtered_base_classes;
     NamespaceTracker _tracker;
     std::unordered_map<std::string, std::set<std::string>> _class_ns_map;
+    std::unordered_set<std::string> _script_api_types;
     bool _is_cur_file_engine_lib = true;
 };

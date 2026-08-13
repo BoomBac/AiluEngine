@@ -4,6 +4,7 @@
 #include "Assets/AssetDocument.h"
 #include "Assets/PrefabAsset.h"
 #include "Assets/ScriptAsset.h"
+#include "Assets/WidgetAsset.h"
 #include "Audio/AudioClip.h"
 #include "Audio/AudioClipDocument.h"
 #include "Framework/Common/FileManager.h"
@@ -1963,6 +1964,51 @@ bool GraphAssetHandler::Save(const AssetSaveContext &context)
         return false;
     }
     LOG_INFO(L"Save graph asset to {}", context._system_path);
+    return true;
+}
+
+// ============================================================
+// WidgetAssetHandler
+// ============================================================
+
+const Type *WidgetAssetHandler::AssetType() const
+{
+    return WidgetAsset::StaticType();
+}
+
+Scope<Asset> WidgetAssetHandler::Load(const AssetLoadContext &context)
+{
+    WidgetAssetDocument doc;
+    if (!LoadAssetDocument(context._system_path, doc))
+        return nullptr;
+
+    auto widget_asset = MakeRef<WidgetAsset>(doc._header._asset_name);
+    widget_asset->SetDesignSize(doc._design_size);
+    widget_asset->SetRoot(std::move(doc._root));
+
+    auto asset = MakeScope<Asset>(Guid(doc._header._guid), WidgetAsset::StaticType(), context._asset_path);
+    asset->_p_obj = std::move(widget_asset);
+    asset->_domain = context._resource_mgr->GetAssetPathDomain(asset->_asset_path);
+    return asset;
+}
+
+bool WidgetAssetHandler::Save(const AssetSaveContext &context)
+{
+    const WidgetAsset *widget_asset = context._asset->As<WidgetAsset>();
+    if (widget_asset == nullptr)
+        return false;
+
+    WidgetAssetDocument doc;
+    doc._header = MakeAssetDocumentHeader(context._asset);
+    doc._design_size = widget_asset->DesignSize();
+    doc._root = widget_asset->RootRef();
+
+    if (!SaveAssetDocument(context._system_path, doc))
+    {
+        LOG_ERROR(L"Save widget asset failed to {}", context._system_path);
+        return false;
+    }
+    LOG_INFO(L"Save widget asset to {}", context._system_path);
     return true;
 }
 

@@ -101,7 +101,7 @@ namespace Ailu::Render
 
     TAAExecutePass::TAAExecutePass() : RenderPass("TAAExecutePass")
     {
-        _origin_camera_cbuf = std::unique_ptr<ConstantBuffer>(ConstantBuffer::Create(RenderConstants::kPerCameraDataSize));
+        _origin_camera_cbuf = Ref<ConstantBuffer>(ConstantBuffer::Create(RenderConstants::kPerCameraDataSize));
         _taa_gen = ResourceMgr::Get().GetRef<ComputeShader>(L"Shaders/hlsl/Compute/taa.alasset");
         _taa_kernel = _taa_gen->FindKernel("CSMain");
     }

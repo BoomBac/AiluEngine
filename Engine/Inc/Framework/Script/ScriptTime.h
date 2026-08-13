@@ -6,17 +6,17 @@
 
 namespace Ailu
 {
-    ASTRUCT()
+    ASTRUCT(Script; Global="time")
     struct AILU_API ScriptTime
     {
         GENERATED_BODY()
-        AFUNCTION(Script)
+        AFUNCTION(ScriptProperty)
         f32 GetDeltaTime() const;
-        AFUNCTION(Script)
+        AFUNCTION(ScriptProperty)
         f32 GetFixedDeltaTime() const;
-        AFUNCTION(Script)
+        AFUNCTION(ScriptProperty)
         f32 GetRenderAlpha() const;
-        AFUNCTION(Script)
+        AFUNCTION(ScriptProperty)
         f32 GetTime() const;
     };
 }

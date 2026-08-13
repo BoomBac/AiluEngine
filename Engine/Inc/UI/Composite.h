@@ -13,6 +13,7 @@ namespace Ailu
             struct Params
             {
                 virtual ~Params() = default;
+                std::function<void(PropertyInfo *)> _on_value_changing;
                 std::function<void(PropertyInfo *)> _on_value_changed;
             };
             using Builder = std::function<Ref<UIElement>(const String &, PropertyInfo *, void *, Params *)>;
@@ -29,6 +30,8 @@ namespace Ailu
             template<typename TValue>
             static void SetPropertyValue(PropertyInfo *property, void *instance, const TValue &value, Params *params)
             {
+                if (params != nullptr && params->_on_value_changing)
+                    params->_on_value_changing(property);
                 property->Set<TValue>(instance, value, PropertyInfo::EPropertyChangeSource::kUI);
                 if (params != nullptr && params->_on_value_changed)
                     params->_on_value_changed(property);

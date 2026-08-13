@@ -180,12 +180,10 @@ namespace Ailu::Render
 	}
 	void ConstBufferPool::ShutDown()
 	{
-		if (s_ConstBufferPool)
-		{
-			for (auto& it: s_ConstBufferPool->_buffer_pool)
-				ConstantBuffer::Release(it.second._buffer);
-			s_ConstBufferPool->_buffer_pool.clear();
-			AL_DELETE(s_ConstBufferPool);
+        if (s_ConstBufferPool)
+        {
+            s_ConstBufferPool->_buffer_pool.clear();
+            AL_DELETE(s_ConstBufferPool);
 		}
 	}
 	ConstantBuffer *ConstBufferPool::Acquire(u32 size)
@@ -199,11 +197,11 @@ namespace Ailu::Render
 			{
 				//buffer->Reset();
 				frame_count = cur_frame;
-				return buffer;
+				return buffer.get();
 			}
 		}
 		ConstantBuffer *buffer = ConstantBuffer::Create(size);
-		s_ConstBufferPool->_buffer_pool.emplace(size, ConstbufferNode{buffer, cur_frame});
+        s_ConstBufferPool->_buffer_pool.emplace(size, ConstbufferNode{Ref<ConstantBuffer>(buffer), cur_frame});
 		if (s_ConstBufferPool->_buffer_pool.size()> 100u)
 			LOG_INFO("[ConstBufferPool::Acquire]: Create a new constant buffer pool: {}", s_ConstBufferPool->_buffer_pool.size());
 		return buffer;

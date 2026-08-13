@@ -15,6 +15,22 @@ namespace Ailu
             inline const Vector4f kPropInnerMargin = {2.0f, 0.0f, 2.0f, 2.0f};
             inline constexpr f32 kPropLabelFill = 1.0f;
             inline constexpr f32 kPropValueFill = 3.0f;
+
+            struct InlineTextEditState
+            {
+                UI::UIElement *_parent = nullptr;
+                UI::Text *_display = nullptr;
+                UI::InputBlock *_input = nullptr;
+                std::shared_ptr<String> _value;
+                std::function<std::optional<String>(const String &)> _on_submit;
+                UI::Padding _display_margin;
+                Vector2f _display_size = Vector2f::kZero;
+                UI::ESizePolicy _display_size_policy_h = UI::ESizePolicy::kAuto;
+                UI::ESizePolicy _display_size_policy_v = UI::ESizePolicy::kAuto;
+                f32 _display_fill_rate = 1.0f;
+                UI::EAlignment _display_cross_align = UI::EAlignment::kCenter;
+                bool _is_finished = false;
+            };
         }
 
         UI::HorizontalBox *EditorPopup::AddPropertyRow(UI::UIElement *parent, const String &label, UI::HorizontalBox **out_value_box)
@@ -84,6 +100,108 @@ namespace Ailu
 
             UI::UIManager::Get()->HidePopup();
             UI::UIManager::Get()->ShowPopupAt(popup_pos.x, popup_pos.y, list_view);
+        }
+
+        void EditorPopup::BeginInlineTextInput(UI::UIElement *parent, UI::Text *display, const String &initial_value,
+                                               const std::function<std::optional<String>(const String &)> &on_submit)
+        {
+            if (parent == nullptr || display == nullptr || !display->IsVisible())
+                return;
+
+            auto state = std::make_shared<InlineTextEditState>();
+            state->_parent = parent;
+            state->_display = display;
+            state->_value = std::make_shared<String>(initial_value);
+            state->_on_submit = on_submit;
+
+            const auto &display_slot = display->GetSlotAs<UI::LinearSlot>();
+            state->_display_margin = display_slot._margin;
+            state->_display_size = display_slot._size;
+            state->_display_size_policy_h = display_slot._size_policy_h;
+            state->_display_size_policy_v = display_slot._size_policy_v;
+            state->_display_fill_rate = display_slot._fill_rate;
+            state->_display_cross_align = display_slot._cross_align;
+            display->SetVisible(false);
+
+            auto *input = parent->AddChild<UI::InputBlock>(initial_value);
+            state->_input = input;
+            auto &input_slot = input->GetSlotAs<UI::LinearSlot>();
+            input_slot._margin = display_slot._margin;
+            input_slot._size = display_slot._size;
+            input_slot._size_policy_h = display_slot._size_policy_h;
+            input_slot._size_policy_v = display_slot._size_policy_v;
+            input_slot._fill_rate = display_slot._fill_rate;
+            input_slot._cross_align = display_slot._cross_align;
+            auto &hidden_display_slot = display->GetSlotAs<UI::LinearSlot>();
+            hidden_display_slot._margin = UI::Padding();
+            hidden_display_slot._size = Vector2f::kZero;
+            hidden_display_slot._size_policy_h = UI::ESizePolicy::kFixed;
+            hidden_display_slot._size_policy_v = UI::ESizePolicy::kFixed;
+            hidden_display_slot._fill_rate = 0.0f;
+            input->_on_content_changed += [value = state->_value](String content)
+            {
+                *value = std::move(content);
+            };
+
+            auto finish_edit = std::make_shared<std::function<void(bool)>>();
+            *finish_edit = [state, finish_edit](bool commit)
+            {
+                if (state->_is_finished)
+                    return;
+
+                if (commit && state->_on_submit)
+                {
+                    if (auto error = state->_on_submit(*state->_value); error.has_value())
+                    {
+                        state->_input->RequestFocus();
+                        return;
+                    }
+                }
+
+                state->_is_finished = true;
+                UI::UIManager::Get()->ClearFocus(state->_input);
+                if (commit)
+                {
+                    state->_display->Name(*state->_value);
+                    state->_display->SetText(*state->_value);
+                }
+                auto &display_slot = state->_display->GetSlotAs<UI::LinearSlot>();
+                display_slot._margin = state->_display_margin;
+                display_slot._size = state->_display_size;
+                display_slot._size_policy_h = state->_display_size_policy_h;
+                display_slot._size_policy_v = state->_display_size_policy_v;
+                display_slot._fill_rate = state->_display_fill_rate;
+                display_slot._cross_align = state->_display_cross_align;
+                state->_display->SetVisible(true);
+                state->_parent->RemoveChild(state->_input);
+                state->_parent->InvalidateLayout();
+            };
+
+            input->OnKeyDown() += [finish_edit](UI::UIEvent &e)
+            {
+                if (e._key_code == EKey::kESCAPE)
+                {
+                    (*finish_edit)(false);
+                    e._is_handled = true;
+                }
+                else if (e._key_code == EKey::kRETURN)
+                {
+                    (*finish_edit)(true);
+                    e._is_handled = true;
+                }
+            };
+            input->OnMouseDown() += [](UI::UIEvent &e)
+            {
+                e._is_handled = true;
+            };
+            input->_on_focus_lost += [finish_edit]()
+            {
+                (*finish_edit)(true);
+            };
+
+            parent->InvalidateLayout();
+            input->SetCursorToEnd();
+            input->RequestFocus();
         }
 
         void EditorPopup::ShowDialogAt(Vector2f popup_pos, const String &popup_name, const String &title, Vector2f size,

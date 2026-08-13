@@ -66,7 +66,7 @@ function(ailu_configure_test_target target_name)
     endif()
 
     if (MSVC)
-        target_compile_options(${target_name} PUBLIC /MP /wd4819)
+        target_compile_options(${target_name} PUBLIC /MP /utf-8 /wd4819)
     endif()
 
     if (TARGET Engine)

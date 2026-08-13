@@ -94,10 +94,15 @@ namespace Ailu
                     continue;
 
                 auto params = BuildParams(*property);
-                if (args._on_property_changed)
+                if (args._on_property_changing || args._on_property_changed)
                 {
                     if (params == nullptr)
                         params = MakeScope<UI::CompositeBuilder::Params>();
+                    params->_on_value_changing = [callback = args._on_property_changing](PropertyInfo *p)
+                    {
+                        if (callback)
+                            callback(*p);
+                    };
                     params->_on_value_changed = [callback = args._on_property_changed](PropertyInfo *p)
                     {
                         if (callback)
@@ -109,6 +114,8 @@ namespace Ailu
                 if (element != nullptr)
                 {
                     current_content->AddChild(element);
+                    if (params != nullptr)
+                        _params.push_back(std::move(params));
                 }
             }
         }
@@ -142,6 +149,7 @@ namespace Ailu
 
         void ReflectedPropertyPanel::Clear()
         {
+            _params.clear();
         }
     }// namespace Editor
 }// namespace Ailu

@@ -1,0 +1,11 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "a5cfce95-56e1-46a9-8c95-bd4f008865e9",
+        "_asset_type": "Ailu::Render::Texture2D",
+        "_asset_name": "SkeletonMesh",
+        "_dependencies": []
+    },
+    "_file": "SkeletonMesh.png",
+    "_is_srgb": true
+}

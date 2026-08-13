@@ -1,0 +1,10 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "f4c709d1-154b-4cc3-86b9-c055d4bf28e9",
+        "_asset_type": "Ailu::Render::Texture2D",
+        "_asset_name": "prefab"
+    },
+    "_file": "prefab.png",
+    "_is_srgb": true
+}

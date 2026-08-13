@@ -68,8 +68,13 @@ namespace Ailu::RHI::DX12
 
     void GpuCommandWorker::Push(Vector<GfxCommand *> &&cmds, SubmitParams &&params)
     {
+        Push(std::move(cmds), {}, std::move(params));
+    }
+
+    void GpuCommandWorker::Push(Vector<GfxCommand *> &&cmds, Vector<Ref<Object>> &&keep_alive_objects, SubmitParams &&params)
+    {
         u32 submission_index = _next_submission_index.fetch_add(1u, std::memory_order_relaxed);
-        _cmd_queue.Push(CommandGroup(std::move(cmds), std::move(params), submission_index));
+        _cmd_queue.Push(CommandGroup(std::move(cmds), std::move(keep_alive_objects), std::move(params), submission_index));
         _cmd_wait_cv.notify_one();
     }
 
@@ -142,6 +147,7 @@ namespace Ailu::RHI::DX12
     void GpuCommandWorker::RecordCommandGroup(CommandGroup& group,Ref<RHICommandBuffer>& cmd)
     {
         PROFILE_BLOCK_CPU(std::format("RecordCommandGroup_{}", group._params._name))
+        cmd->AddKeepAliveObjects(std::move(group._keep_alive_objects));
         auto begin_time = std::chrono::high_resolution_clock::now();
         auto d3dcmd = static_cast<D3DCommandBuffer *>(cmd.get());
         for (RTHandle handle: group._params._released_temp_rts)
@@ -897,16 +903,19 @@ namespace Ailu::RHI::DX12
         SubmitParams params{cmd->Name()};
         params._released_temp_rts = cmd->TakeReleasedTempRTs();
         params._rendering_states_data = cmd->TakeRenderingStatesData();
+        auto keep_alive_objects = cmd->TakeKeepAliveObjects();
 #if AILU_ENABLE_FRAME_DEBUGGER
         params._capture_pass_metadata = cmd->CapturePassMetadata();
 #endif
-        _cmd_worker->Push(cmd->TakeCommands(), std::move(params));
+        _cmd_worker->Push(cmd->TakeCommands(), std::move(keep_alive_objects), std::move(params));
     }
 
     void D3DContext::ExecuteCommandBufferSync(Ref<CommandBuffer> &cmd)
     {
         auto released_temp_rts = cmd->TakeReleasedTempRTs();
+        auto keep_alive_objects = cmd->TakeKeepAliveObjects();
         auto rhi_cmd = RHICommandBufferPool::Get(cmd->Name());
+        rhi_cmd->AddKeepAliveObjects(std::move(keep_alive_objects));
         rhi_cmd->RecordingContext().AccumulateRenderingStatesData(cmd->TakeRenderingStatesData());
         for (auto *gfx_cmd: cmd->GetCommands()) { ProcessGpuCommand(gfx_cmd, rhi_cmd.get()); }
         ExecuteRHICommandBuffer(rhi_cmd.get());

@@ -1,4 +1,4 @@
-﻿//
+//
 // Created by 22292 on 2024/10/29.
 //
 
@@ -934,7 +934,7 @@ namespace Ailu
                     if (prev_scissor != full_rect)
                         cmd->SetScissorRect(full_rect);
                 }
-                cmd->DrawIndexed(b->_vbuf, b->_ibuf, _obj_cb.get(), node._mat,0u,node._index_offset,node._index_num);
+                cmd->DrawIndexed(b->_vbuf.get(), b->_ibuf.get(), _obj_cb.get(), node._mat,0u,node._index_offset,node._index_num);
                 ++_stats._ui_draw_call_count;
                 prev_scissor = node._is_custom_scissor ? node._scissor : full_rect;
             }

@@ -9,10 +9,20 @@
 
 namespace Ailu
 {
-    ASTRUCT()
+    ASTRUCT(Script; Global="input")
     struct AILU_API ScriptInput
     {
         GENERATED_BODY()
+        AFUNCTION(Script)
+        bool Pressed(const String &action_name) const;
+        AFUNCTION(Script)
+        bool Released(const String &action_name) const;
+        AFUNCTION(Script)
+        bool Down(const String &action_name) const;
+        AFUNCTION(Script)
+        f32 Axis(const String &action_name) const;
+        AFUNCTION(Script)
+        Vector2f Axis2(const String &action_name) const;
         AFUNCTION(Script)
         bool IsPressed(const String &action_name) const;
         AFUNCTION(Script)
@@ -25,6 +35,8 @@ namespace Ailu
         bool LoadActionAsset(const String &asset_path) const;
         AFUNCTION(Script)
         bool PushContext(const String &context_name) const;
+        AFUNCTION(Script)
+        bool Off(u64 subscription_id) const;
         AEVENT(Script, KeyIndex = 0, KeyName = action_name)
         DECLARE_DELEGATE(on_performed, String);
         AEVENT(Script, KeyIndex = 0, KeyName = action_name)

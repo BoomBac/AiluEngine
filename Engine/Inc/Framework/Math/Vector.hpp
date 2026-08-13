@@ -44,21 +44,19 @@ namespace Ailu
             }
             TT<T> operator+(T scale)
             {
-                TT<T> ret = v;
-                int indexes[] = {Indexes...};
+                TT<T> ret = *this;
                 for (int i = 0; i < sizeof...(Indexes); i++)
                 {
-                    ret[indexes[i]] += scale;
+                    ret[i] += scale;
                 }
                 return ret;
             }
             TT<T> operator-(T scale)
             {
-                TT<T> ret = v;
-                int indexes[] = {Indexes...};
+                TT<T> ret = *this;
                 for (int i = 0; i < sizeof...(Indexes); i++)
                 {
-                    ret[indexes[i]] -= scale;
+                    ret[i] -= scale;
                 }
                 return ret;
             }
@@ -94,30 +92,27 @@ namespace Ailu
             TT<T> operator*(T s) const
             {
                 TT<T> r = *this;
-                int indexes[] = {Indexes...};
                 for (int i = 0; i < sizeof...(Indexes); i++)
                 {
-                    r[indexes[i]] *= s;
+                    r[i] *= s;
                 }
                 return r;
             }
             TT<T> operator/(T s) const
             {
                 TT<T> r = *this;
-                int indexes[] = {Indexes...};
                 for (int i = 0; i < sizeof...(Indexes); i++)
                 {
-                    r[indexes[i]] /= (s + kFloatEpsilon);
+                    r[i] /= (s + kFloatEpsilon);
                 }
                 return r;
             }
             TT<T> operator-() const
             {
                 TT<T> r = *this;
-                int indexes[] = {Indexes...};
                 for (int i = 0; i < sizeof...(Indexes); i++)
                 {
-                    r[indexes[i]] *= -1;
+                    r[i] *= -1;
                 }
                 return r;
             }

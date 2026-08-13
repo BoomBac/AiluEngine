@@ -241,12 +241,6 @@ namespace Ailu::Render
                     _presentation_texture_cache.emplace_back(_presentation_texture);
                     LOG_WARNING("Expand _presentation_texture_cache to {}",_presentation_texture_cache.size());
                 }
-                // std::erase_if(_presentation_texture_cache,[](Ref<RenderTexture>& rt){
-                //     bool should_release = GraphicsContext::Get().GetFenceValueGPU() - rt->GetFenceValue() > 100;
-                //     if (should_release)
-                //         LOG_WARNING("Release presentation_texture {}x{}",rt->Width(),rt->Height());
-                //     return should_release;
-                // });
             }
             _rendering_data._rg_handles._gbuffers[0] = _rd_graph->CreateResource(TextureDesc(pixel_width, pixel_height, ERenderTargetFormat::kRGHalf),RenderResourceName::kGBuffer0);
             _rendering_data._rg_handles._gbuffers[1] = _rd_graph->CreateResource(TextureDesc(pixel_width, pixel_height, ERenderTargetFormat::kDefault), RenderResourceName::kGBuffer1);

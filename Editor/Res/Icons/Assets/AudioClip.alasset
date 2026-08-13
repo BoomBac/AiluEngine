@@ -1,0 +1,11 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "83cef41d-c7ba-4285-a880-a1206bd6dd8c",
+        "_asset_type": "Ailu::Render::Texture2D",
+        "_asset_name": "AudioClip",
+        "_dependencies": []
+    },
+    "_file": "AudioClip.png",
+    "_is_srgb": true
+}

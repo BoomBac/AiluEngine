@@ -4,7 +4,7 @@
 ---@class Vec2
 ---@field x number
 ---@field y number
----@type fun(): Vec2
+---@overload fun(): Vec2
 ---@overload fun(x: number, y: number): Vec2
 Vec2 = nil
 
@@ -12,7 +12,7 @@ Vec2 = nil
 ---@field x number
 ---@field y number
 ---@field z number
----@type fun(): Vec3
+---@overload fun(): Vec3
 ---@overload fun(x: number, y: number, z: number): Vec3
 Vec3 = nil
 
@@ -21,48 +21,54 @@ Vec3 = nil
 ---@field y number
 ---@field z number
 ---@field w number
----@type fun(): Quaternion
+---@overload fun(): Quaternion
 ---@overload fun(x: number, y: number, z: number, w: number): Quaternion
 Quaternion = nil
 
+---@class Color
+---@field r number
+---@field g number
+---@field b number
+---@field a number
+---@overload fun(): Color
+---@overload fun(r: number, g: number, b: number, a: number): Color
+Color = nil
+
 require("scriptengine")
+require("scriptassetvalue")
 require("scriptentity")
 require("scriptcamera")
 require("scriptscene")
 require("scriptinput")
 require("scripttime")
 require("scriptphysics2d")
+require("scriptrigidbody2d")
+require("scriptspriterenderer")
+require("scriptanimator")
+require("scriptaudiosource")
+require("scriptaudio")
 
 ---@class AiluScript
 ---@field entity ScriptEntity
 ---@field scene ScriptScene
 local AiluScript = {}
 
-function AiluScript:OnCreate() end
+function AiluScript:on_create() end
 
-function AiluScript:OnEnable() end
-
-function AiluScript:OnDisable() end
+function AiluScript:on_enable() end
 
 ---@param dt number
-function AiluScript:OnFixedUpdate(dt) end
+function AiluScript:on_fixed_update(dt) end
 
 ---@param dt number
-function AiluScript:OnUpdate(dt) end
+function AiluScript:on_update(dt) end
 
 ---@param dt number
 ---@param render_alpha number
-function AiluScript:OnLateUpdate(dt, render_alpha) end
+function AiluScript:on_late_update(dt, render_alpha) end
 
-function AiluScript:OnDestroy() end
+function AiluScript:on_disable() end
 
----@type ScriptEngine
-engine = nil
+function AiluScript:on_destroy() end
 
----@type ScriptInput
-input = nil
-
----@type ScriptTime
-time = nil
----@type ScriptPhysics2D
-physics2d = nil
+function AiluScript:on_reload() end

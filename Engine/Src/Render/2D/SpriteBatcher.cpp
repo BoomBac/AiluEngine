@@ -7,6 +7,10 @@
 
 namespace Ailu::Render
 {
+    static const ShaderPropertyId kBaseInstID        = Shader::PropertyID("_base_instance_index");
+    static const ShaderPropertyId kSpriteInstancesID = Shader::PropertyID("g_sprite_instances");
+    static const ShaderPropertyId kMainTexID         = Shader::PropertyID("_MainTex");
+
     SpriteBatcher::SpriteBatcher()
     {
     }
@@ -100,8 +104,9 @@ namespace Ailu::Render
 
             Texture *tex = batch._key._texture;
             if (tex != nullptr)
-                mat->SetTexture("_MainTex", tex);
-            mat->SetBuffer("g_sprite_instances", _instance_buffer.get());
+                mat->SetTexture(kMainTexID, tex);
+            mat->SetBuffer(kSpriteInstancesID, _instance_buffer.get());
+            mat->SetInt(kBaseInstID, batch._instance_offset);
             cmd->DrawIndexedInstanced(_vertex_buffer.get(), _index_buffer.get(), nullptr, mat, 0, batch._instance_count,
                                       batch._instance_offset, 0, 6);
         }
@@ -114,15 +119,15 @@ namespace Ailu::Render
             return;
 
         cmd->SetRenderTarget(color_target, depth_target);
-
         for (const auto &batch : _batches)
         {
             if (batch._instance_count == 0)
                 continue;
 
             if (batch._key._texture != nullptr)
-                material->SetTexture("_MainTex", batch._key._texture);
-            material->SetBuffer("g_sprite_instances", _instance_buffer.get());
+                material->SetTexture(kMainTexID, batch._key._texture);
+            material->SetBuffer(kSpriteInstancesID, _instance_buffer.get());
+            material->SetInt(kBaseInstID, batch._instance_offset);
             cmd->DrawIndexedInstanced(_vertex_buffer.get(), _index_buffer.get(), nullptr, material, 0,
                                       batch._instance_count, batch._instance_offset, 0, 6);
         }

@@ -1006,7 +1006,7 @@ namespace Ailu::Render
     {
         for (int i = 0; i < 20; i++)
         {
-            _p_cbuffers.push_back(std::unique_ptr<ConstantBuffer>(ConstantBuffer::Create(256)));
+            _p_cbuffers.emplace_back(Ref<ConstantBuffer>(ConstantBuffer::Create(256)));
         }
         auto grid_plane_pos = MatrixScale(1000.0f, 1000.f, 1000.f);
         memcpy(_p_cbuffers[0]->GetData(), &grid_plane_pos, sizeof(Matrix4x4f));

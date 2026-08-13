@@ -3,11 +3,11 @@
 #include "Framework/Core/String.h"
 #include "Framework/Core/SmartPtr.h"
 #include "RenderConstants.h"
-#include "generated/CoreType.gen.h"
 #include <mutex>
 #include <set>
 #include <unordered_map>
 #include <vector>
+#include "generated/CoreType.gen.h"
 
 
 namespace Ailu

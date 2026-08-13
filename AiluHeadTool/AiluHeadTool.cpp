@@ -8,6 +8,8 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <sstream>
+#include <unordered_set>
 #include <vector>
 
 
@@ -53,43 +55,127 @@ static std::string ResolveReflectedTypeName(const std::string &type_name,
     return type_name;
 }
 
+void AiluHeadTool::SetFilteredBaseClasses(std::vector<std::string> filtered_base_classes)
+{
+    _filtered_base_classes = std::move(filtered_base_classes);
+}
+
+bool AiluHeadTool::IsFilteredBaseClass(const std::string &line) const
+{
+    for (const std::string &base_class : _filtered_base_classes)
+    {
+        if (line.find(base_class) != std::string::npos)
+            return true;
+    }
+    return false;
+}
+
+static const std::regex kClassDeclarationRegex(
+    "(class|struct)[ \\t]+"
+    "([A-Za-z_][A-Za-z0-9_]*_API[ \\t]+)?"
+    "([A-Za-z_][A-Za-z0-9_]*)([ \\t]*:[ \\t]*public[ \\t]+"
+    "([A-Za-z_][A-Za-z0-9_:]*))?");
+static thread_local std::smatch s_class_matches;
+
 static void ParserClassOrStructInfo(const std::string& line,AiluHeadTool::ClassInfo& info,AiluHeadTool& aht)
 {
-    // 支持：
-    // class / struct
-    // 可选导出宏
-    // 可选 public 继承
-    // 命名空间父类（A::B::C）
-    std::regex pattern(
-        R"((class|struct)\s+((\w*_API)\s+)?(\w+)(?:\s*:\s*public\s+([\w:]+))?)"
-    );
-
-    std::smatch matches;
-    if (!std::regex_search(line, matches, pattern))
+    // Supports class/struct declarations with an optional export macro and public base type.
+    if (!std::regex_search(line, s_class_matches, kClassDeclarationRegex))
     {
         aht.Log(std::format("ParserClassInfo failed with line: {}", line));
         return;
     }
+    info._is_struct = s_class_matches[1].str() == "struct";
+    info._export_id = s_class_matches[2].matched ? s_class_matches[2].str() : std::string{};
+    if (!info._export_id.empty())
+        info._export_id.resize(info._export_id.find_last_not_of(" \t") + 1u);
+    info._name = s_class_matches[3].str();
+    info._parent = s_class_matches[5].matched ? s_class_matches[5].str() : std::string{};
 
-    // class / struct
-    info._is_struct = (matches[1] == "struct");
-
-    // export macro
-    if (matches[3].matched)
-        info._export_id = matches[3].str();
-    else
-        info._export_id.clear();
-
-    // class / struct name
-    info._name = matches[4].str();
-
-    // parent class
-    if (matches[5].matched)
-        info._parent = matches[5].str();
-    else
+    // These are implementation-only bases, not reflected engine types.
+    if (aht.IsFilteredBaseClass(line))
         info._parent.clear();
 
     info.is_export = !info._export_id.empty();
+}
+
+static void ParserScriptTypeAnnotation(const std::string &line, bool &is_script_api,
+                                       std::string *script_global_name = nullptr)
+{
+    size_t macro_begin = line.find("ASTRUCT(");
+    if (macro_begin == std::string::npos)
+        macro_begin = line.find("ACLASS(");
+    if (macro_begin == std::string::npos)
+        return;
+
+    const size_t content_begin = line.find('(', macro_begin);
+    const size_t content_search_begin = content_begin == std::string::npos ? macro_begin : content_begin + 1u;
+    const size_t content_end = line.find(')', content_search_begin);
+    if (content_begin == std::string::npos || content_end == std::string::npos)
+        return;
+
+    std::string content = line.substr(content_begin + 1u, content_end - content_begin - 1u);
+    content = std::regex_replace(content, std::regex("\\s+"), "");
+    size_t token_begin = 0u;
+    while (token_begin <= content.size())
+    {
+        const size_t token_end = content.find_first_of(",;", token_begin);
+        const size_t token_length = token_end == std::string::npos ? std::string::npos : token_end - token_begin;
+        const std::string token = content.substr(token_begin, token_length);
+        if (token == "Script")
+            is_script_api = true;
+        else if (token.rfind("Global=", 0u) == 0u && script_global_name != nullptr)
+        {
+            std::string global_name = token.substr(7u);
+            if (global_name.size() >= 2u &&
+                ((global_name.front() == '"' && global_name.back() == '"') ||
+                 (global_name.front() == '\'' && global_name.back() == '\'')))
+                global_name = global_name.substr(1u, global_name.size() - 2u);
+            *script_global_name = std::move(global_name);
+        }
+        if (token_end == std::string::npos)
+            break;
+        token_begin = token_end + 1u;
+    }
+}
+
+static void ParserScriptFunctionAnnotation(const std::string &line, bool &is_script, bool &is_script_property)
+{
+    const size_t macro_begin = line.find("AFUNCTION(");
+    if (macro_begin == std::string::npos)
+        return;
+
+    const size_t content_begin = line.find('(', macro_begin);
+    const size_t content_search_begin = content_begin == std::string::npos ? macro_begin : content_begin + 1u;
+    const size_t content_end = line.find(')', content_search_begin);
+    if (content_begin == std::string::npos || content_end == std::string::npos)
+        return;
+
+    std::string content = line.substr(content_begin + 1u, content_end - content_begin - 1u);
+    content = std::regex_replace(content, std::regex("\\s+"), "");
+    size_t token_begin = 0u;
+    while (token_begin <= content.size())
+    {
+        const size_t token_end = content.find_first_of(",;", token_begin);
+        const size_t token_length = token_end == std::string::npos ? std::string::npos : token_end - token_begin;
+        const std::string token = content.substr(token_begin, token_length);
+        if (token == "Script" || token == "ScriptProperty")
+            is_script = true;
+        if (token == "ScriptProperty")
+            is_script_property = true;
+        if (token_end == std::string::npos)
+            break;
+        token_begin = token_end + 1u;
+    }
+}
+
+static bool ParseReflectedDeclarationName(const std::string &line, std::string &name)
+{
+    std::smatch matches;
+    if (!std::regex_search(line, matches, kClassDeclarationRegex))
+        return false;
+    name = matches[3].str();
+    return !name.empty();
 }
 
 
@@ -578,9 +664,39 @@ static std::vector<std::string> SplitParamNames(const std::string &params)
     return result;
 }
 
+static std::vector<std::string> SplitFunctionPointerParams(const std::string &params)
+{
+    std::vector<std::string> result;
+    std::istringstream stream(params);
+    std::string param;
+    while (std::getline(stream, param, ','))
+    {
+        param = Trim(param);
+        if (param.empty() || param == "void")
+            continue;
+        const size_t default_pos = param.find('=');
+        if (default_pos != std::string::npos)
+            param = Trim(param.substr(0u, default_pos));
+        const size_t name_pos = param.find_last_of(" \t");
+        if (name_pos == std::string::npos)
+        {
+            result.emplace_back(std::move(param));
+            continue;
+        }
+
+        std::string type = Trim(param.substr(0u, name_pos));
+        const std::string name = Trim(param.substr(name_pos + 1u));
+        const size_t name_begin = name.find_first_not_of("*&");
+        if (name_begin != 0u && name_begin != std::string::npos)
+            type += " " + name.substr(0u, name_begin);
+        result.emplace_back(std::move(type));
+    }
+    return result;
+}
+
 static void ParserFunctionInfo(const std::string &line, AiluHeadTool::MemberInfo &info, AiluHeadTool &aht)
 {
-    std::regex pattern(R"((static\s+)?(virtual\s+)?([\w:]+(?:\s*\*|\s*&|\s*::\s*\w+)*)\s+(\w+)\(([^)]*)\)\s*(const)?)");
+    std::regex pattern(R"((static\s+)?(virtual\s+)?([\w:]+(?:<[^<>]*>)?(?:\s*\*|\s*&|\s*::\s*\w+)*)\s+(\w+)\(([^)]*)\)\s*(const)?)");
     std::smatch matches;
 
     if (std::regex_search(line, matches, pattern))
@@ -591,6 +707,7 @@ static void ParserFunctionInfo(const std::string &line, AiluHeadTool::MemberInfo
         info._return_type = matches[3].str();
         info._name = matches[4].str();
         info._params = SplitParams(matches[5].str());
+        info._function_pointer_params = SplitFunctionPointerParams(matches[5].str());
         info._param_names = SplitParamNames(matches[5].str());
         info._is_const = matches[6].matched;
         info._is_function = true;
@@ -619,6 +736,24 @@ static std::string ConstructFuncType(std::string return_type, const std::vector<
     func_type += ")";
     if (is_const) { func_type += " const"; }
     return func_type;
+}
+
+static std::string FunctionPointerCast(const std::string &class_name, const AiluHeadTool::MemberInfo &member)
+{
+    std::string pointer_type = member._return_type;
+    pointer_type += member._is_static ? " (*)" : " (" + class_name + "::*)";
+    pointer_type += "(";
+    const auto &params = member._function_pointer_params.empty() ? member._params : member._function_pointer_params;
+    for (size_t index = 0u; index < params.size(); ++index)
+    {
+        if (index > 0u)
+            pointer_type += ",";
+        pointer_type += params[index];
+    }
+    pointer_type += ")";
+    if (!member._is_static && member._is_const)
+        pointer_type += " const";
+    return std::format("static_cast<{}>(&{}::{})", pointer_type, class_name, member._name);
 }
 
 static void ParserMeta(std::string line, AiluHeadTool::PropertyMeta &meta)
@@ -697,14 +832,23 @@ static void GenerateClassTypeInfo(const AiluHeadTool::ClassInfo &class_info,
     file << std::format("initializer._base_name = \"{}\"", class_info._parent) << ";" << endl;
     file << std::format("initializer._constructor = []()->{}* {{return new {};}}",full_name, full_name)<< ";" << endl;
 
+    std::unordered_map<std::string, size_t> function_counts;
+    for (const auto &member : class_info._members)
+    {
+        if (member._is_function)
+            ++function_counts[member._name];
+    }
+    std::unordered_map<std::string, size_t> function_indices;
     for (auto &mem: class_info._members)
     {
         if (mem._is_function)
         {
-            std::string cur_meta = "meta" + mem._name;
+            const bool is_overloaded = function_counts[mem._name] > 1u;
+            const std::string suffix = is_overloaded ? std::format("_{}", function_indices[mem._name]++) : std::string{};
+            std::string cur_meta = "meta" + mem._name + suffix;
             file << "Meta " << cur_meta << ";" << std::endl;
             file << std::format("{}.Set(\"Script\",{});", cur_meta, BOOL_STR(mem._is_script)) << std::endl;
-            auto bd_name = "builder" + mem._name;
+            auto bd_name = "builder" + mem._name + suffix;
             file << std::format("MemberBuilder {};", bd_name) << std::endl;
             file << std::format("{}._name = \"{}\";", bd_name, mem._name) << std::endl;
             file << std::format("{}._type_name = \"{}\";", bd_name, ConstructFuncType(mem._return_type, mem._params, mem._is_const)) << std::endl;
@@ -714,7 +858,9 @@ static void GenerateClassTypeInfo(const AiluHeadTool::ClassInfo &class_info,
             file << std::format("{}._is_public = {};", bd_name, BOOL_STR(mem._is_public)) << std::endl;
             file << std::format("{}._ret_type_name = \"{}\";", bd_name, mem._return_type) << std::endl;
             file << std::format("{}._meta = {};", bd_name, cur_meta) << std::endl;
-            file << std::format("{}._member_ptr = &{}::{};", bd_name, class_info._name, mem._name) << std::endl;
+            file << std::format("{}._member_ptr = {};", bd_name,
+                                is_overloaded ? FunctionPointerCast(full_name, mem) : "&" + full_name + "::" + mem._name)
+                 << std::endl;
             //file << std::format("{}._accessor = MakeScope<OffsetPropertyAccessor>({}._offset);", bd_name) << std::endl;
             file << std::format("initializer._functions.emplace_back(MemberBuilder::BuildFunction({}));", bd_name) << std::endl;
         }
@@ -830,7 +976,7 @@ static void ParserEventAnnotation(const std::string &line, bool &is_script, int 
 static void ParserEventInfo(const std::string &line, AiluHeadTool::MemberInfo &info, AiluHeadTool &aht, int key_index,
                             const std::string &key_name)
 {
-    std::regex pattern(R"(DECLARE_DELEGATE\s*\(\s*(\w+)\s*(?:,\s*(.*?))?\s*\))");
+    std::regex pattern(R"(DECLARE_DELEGATE(?:_VIEW)?\s*\(\s*(\w+)\s*(?:,\s*(.*?))?\s*\))");
     std::smatch matches;
     if (!std::regex_search(line, matches, pattern))
     {
@@ -870,26 +1016,97 @@ static std::string NormalizeLuaType(std::string type)
     return Trim(type);
 }
 
-static bool IsSupportedLuaType(const std::string &type)
+static bool IsSupportedLuaType(const std::string &type, const std::unordered_set<std::string> &script_api_types)
 {
     static const std::set<std::string> kSupportedTypes = {
         "void", "bool", "f32", "f64", "float", "double", "i32", "u32", "i64", "u64", "String", "Vector2f",
-        "Vector3f", "Math::Quaternion", "ScriptTransform", "ScriptEntity", "ScriptCamera", "ScriptScene", "ScriptInput",
-        "ScriptTime", "ScriptAssetValue"};
-    return kSupportedTypes.contains(NormalizeLuaType(type));
+        "Vector3f", "Math::Quaternion", "Color"};
+    const std::string normalized_type = NormalizeLuaType(type);
+    if (kSupportedTypes.contains(normalized_type) || script_api_types.contains(normalized_type))
+        return true;
+    if (normalized_type.starts_with("std::optional<") && normalized_type.ends_with('>'))
+    {
+        const std::string value_type = normalized_type.substr(14u, normalized_type.size() - 15u);
+        return IsSupportedLuaType(value_type, script_api_types);
+    }
+    if (normalized_type.starts_with("Vector<") && normalized_type.ends_with('>'))
+    {
+        const std::string element_type = normalized_type.substr(7u, normalized_type.size() - 8u);
+        return IsSupportedLuaType(element_type, script_api_types);
+    }
+    const size_t namespace_separator = normalized_type.rfind("::");
+    return namespace_separator != std::string::npos &&
+           script_api_types.contains(normalized_type.substr(namespace_separator + 2u));
 }
 
-static std::string LuaGlobalName(const std::string &type_name)
+struct LuaPropertyBinding
 {
-    if (type_name == "ScriptInput")
-        return "input";
-    if (type_name == "ScriptTime")
-        return "time";
-    if (type_name == "ScriptPhysics2D")
-        return "physics2d";
-    if (type_name == "ScriptCamera")
-        return "camera";
-    return {};
+    std::string _name;
+    const AiluHeadTool::MemberInfo *_getter = nullptr;
+    const AiluHeadTool::MemberInfo *_setter = nullptr;
+};
+
+static std::string LuaPropertyName(const std::string &function_name)
+{
+    const size_t prefix_size = function_name.starts_with("Is") ? 2u : 3u;
+    return ToLuaFunctionName(function_name.substr(prefix_size));
+}
+
+static std::vector<LuaPropertyBinding> CollectLuaProperties(const AiluHeadTool::ClassInfo &type)
+{
+    std::unordered_map<std::string, LuaPropertyBinding> properties;
+    for (const auto &member : type._members)
+    {
+        if (!member._is_function || !member._is_script_property)
+            continue;
+
+        const bool is_getter = member._name.starts_with("Get") || member._name.starts_with("Is");
+        const bool is_setter = member._name.starts_with("Set");
+        if (!is_getter && !is_setter)
+            throw std::runtime_error(std::format("Lua property method {}::{} must start with Get, Is, or Set",
+                                                 type._name, member._name));
+
+        const bool valid_getter = is_getter && member._params.empty() &&
+                                  NormalizeLuaType(member._return_type) != "void";
+        const bool valid_setter = is_setter && member._params.size() == 1u &&
+                                  NormalizeLuaType(member._return_type) == "void";
+        if (!valid_getter && !valid_setter)
+            throw std::runtime_error(std::format("Invalid Lua property signature {}::{}", type._name, member._name));
+        if (member._is_static)
+            throw std::runtime_error(std::format("Lua property {}::{} cannot be static", type._name, member._name));
+
+        const std::string property_name = LuaPropertyName(member._name);
+        auto &property = properties[property_name];
+        property._name = property_name;
+        if (valid_getter)
+        {
+            if (property._getter != nullptr)
+                throw std::runtime_error(std::format("Duplicate Lua property getter {}::{}",
+                                                     type._name, property_name));
+            property._getter = &member;
+        }
+        else
+        {
+            if (property._setter != nullptr)
+                throw std::runtime_error(std::format("Duplicate Lua property setter {}::{}",
+                                                     type._name, property_name));
+            property._setter = &member;
+        }
+    }
+
+    std::vector<LuaPropertyBinding> result;
+    result.reserve(properties.size());
+    for (auto &[name, property] : properties)
+    {
+        if (property._setter != nullptr && property._getter == nullptr)
+            throw std::runtime_error(std::format("Lua property setter {}::{} has no getter", type._name, name));
+        result.emplace_back(property);
+    }
+    std::sort(result.begin(), result.end(), [](const LuaPropertyBinding &lhs, const LuaPropertyBinding &rhs)
+    {
+        return lhs._name < rhs._name;
+    });
+    return result;
 }
 
 static std::string ToLower(std::string value)
@@ -898,7 +1115,9 @@ static std::string ToLower(std::string value)
     return value;
 }
 
-static void GenerateLuaBindings(const std::vector<AiluHeadTool::ClassInfo> &types, const std::string &binding_name, std::ofstream &file)
+static void GenerateLuaBindings(const std::vector<AiluHeadTool::ClassInfo> &types,
+                                const std::string &binding_name, std::ofstream &file,
+                                const std::unordered_set<std::string> &script_api_types)
 {
     file << "#if AILU_ENABLE_LUA_SCRIPTING" << std::endl;
     file << "#include <sol/sol.hpp>" << std::endl;
@@ -909,6 +1128,9 @@ static void GenerateLuaBindings(const std::vector<AiluHeadTool::ClassInfo> &type
     file << "{" << std::endl;
     for (const auto &type : types)
     {
+        if (!type._is_script_api)
+            continue;
+
         bool has_script_function = false;
         for (const auto &member : type._members)
             has_script_function |= (member._is_function || member._is_event) && member._is_script;
@@ -917,29 +1139,69 @@ static void GenerateLuaBindings(const std::vector<AiluHeadTool::ClassInfo> &type
 
         const std::string full_name = type._namespace.empty() ? type._name : type._namespace + "::" + type._name;
         file << std::format("auto type_{} = lua.new_usertype<{}>(\"{}\");", type._name, full_name, type._name) << std::endl;
+        for (const auto &property : CollectLuaProperties(type))
+        {
+            if (!IsSupportedLuaType(property._getter->_return_type, script_api_types))
+                throw std::runtime_error(std::format("Lua property generation rejected {}::{} return type '{}'",
+                                                     full_name, property._name, property._getter->_return_type));
+            file << std::format("type_{}[\"{}\"] = sol::property(", type._name, property._name);
+            file << "&" << full_name << "::" << property._getter->_name;
+            if (property._setter != nullptr)
+                file << ", &" << full_name << "::" << property._setter->_name;
+            file << ");" << std::endl;
+        }
+        std::unordered_set<std::string> emitted_function_names;
         for (const auto &member : type._members)
         {
             if (member._is_function && member._is_script)
             {
-                if (!IsSupportedLuaType(member._return_type))
+                if (!emitted_function_names.emplace(member._name).second)
+                    continue;
+
+                std::vector<const AiluHeadTool::MemberInfo *> overloads;
+                for (const auto &candidate : type._members)
+                {
+                    if (candidate._is_function && candidate._is_script && candidate._name == member._name)
+                        overloads.emplace_back(&candidate);
+                }
+                if (!IsSupportedLuaType(member._return_type, script_api_types))
                     throw std::runtime_error(std::format("Lua binding generation rejected {}::{} return type '{}'", full_name,
                                                          member._name, member._return_type));
-                for (const auto &param : member._params)
+                for (const auto *overload : overloads)
                 {
-                    if (!IsSupportedLuaType(param))
-                        throw std::runtime_error(std::format("Lua binding generation rejected {}::{} parameter type '{}'", full_name,
-                                                             member._name, param));
+                    if (!IsSupportedLuaType(overload->_return_type, script_api_types))
+                        throw std::runtime_error(std::format("Lua binding generation rejected {}::{} return type '{}'", full_name,
+                                                             overload->_name, overload->_return_type));
+                    for (const auto &param : overload->_params)
+                    {
+                        if (!IsSupportedLuaType(param, script_api_types))
+                            throw std::runtime_error(std::format("Lua binding generation rejected {}::{} parameter type '{}'", full_name,
+                                                                 overload->_name, param));
+                    }
                 }
-                file << std::format("type_{}.set_function(\"{}\", &{}::{});", type._name, ToLuaFunctionName(member._name),
-                                    full_name, member._name) << std::endl;
-                if (type._name == "ScriptAssetValue" && member._is_static)
+                file << std::format("type_{}.set_function(\"{}\", ", type._name, ToLuaFunctionName(member._name));
+                if (overloads.size() > 1u)
+                {
+                    file << "sol::overload(";
+                    for (size_t index = 0u; index < overloads.size(); ++index)
+                    {
+                        if (index > 0u)
+                            file << ", ";
+                        file << FunctionPointerCast(full_name, *overloads[index]);
+                    }
+                    file << ")";
+                }
+                else
+                    file << "&" << full_name << "::" << member._name;
+                file << ");" << std::endl;
+                if (type._name == "ScriptAssetValue" && member._is_static && overloads.size() == 1u)
                     file << std::format("lua[\"{}\"] = &{}::{};", member._name, full_name, member._name) << std::endl;
             }
             else if (member._is_event && member._is_script)
             {
                 for (const auto &param : member._params)
                 {
-                    if (!IsSupportedLuaType(param))
+                    if (!IsSupportedLuaType(param, script_api_types))
                         throw std::runtime_error(std::format("Lua binding generation rejected {}::{} event parameter type '{}'", full_name,
                                                              member._name, param));
                 }
@@ -962,7 +1224,7 @@ static void GenerateLuaBindings(const std::vector<AiluHeadTool::ClassInfo> &type
                 }
             }
         }
-        if (type._name == "ScriptEngine")
+        if (type._script_global_name == "engine")
         {
             file << "auto global_engine = lua[\"engine\"].get_or_create<sol::table>();" << std::endl;
             for (const auto &member : type._members)
@@ -972,12 +1234,12 @@ static void GenerateLuaBindings(const std::vector<AiluHeadTool::ClassInfo> &type
                                         member._name) << std::endl;
             }
         }
-        if (const std::string global_name = LuaGlobalName(type._name); !global_name.empty())
+        else if (!type._script_global_name.empty())
         {
-            if (type._name == "ScriptInput")
+            if (type._script_global_name == "input")
                 file << "lua[\"input\"] = std::ref(ScriptSystem::Get().GetInput());" << std::endl;
             else
-                file << std::format("lua[\"{}\"] = {}{{}};", global_name, full_name) << std::endl;
+                file << std::format("lua[\"{}\"] = {}{{}};", type._script_global_name, full_name) << std::endl;
         }
     }
     file << "}" << std::endl;
@@ -988,6 +1250,16 @@ static void GenerateLuaBindings(const std::vector<AiluHeadTool::ClassInfo> &type
 static std::string ToLuaTypeName(const std::string &type)
 {
     const std::string normalized_type = NormalizeLuaType(type);
+    if (normalized_type.starts_with("std::optional<") && normalized_type.ends_with('>'))
+    {
+        const std::string value_type = normalized_type.substr(14u, normalized_type.size() - 15u);
+        return ToLuaTypeName(value_type) + "|nil";
+    }
+    if (normalized_type.starts_with("Vector<") && normalized_type.ends_with('>'))
+    {
+        const std::string element_type = normalized_type.substr(7u, normalized_type.size() - 8u);
+        return ToLuaTypeName(element_type) + "[]";
+    }
     if (normalized_type == "bool")
         return "boolean";
     if (normalized_type == "f32" || normalized_type == "f64" || normalized_type == "float" || normalized_type == "double" ||
@@ -1001,6 +1273,8 @@ static std::string ToLuaTypeName(const std::string &type)
         return "Vec3";
     if (normalized_type == "Math::Quaternion")
         return "Quaternion";
+    if (normalized_type == "Color")
+        return "Color";
     return normalized_type;
 }
 
@@ -1026,6 +1300,8 @@ static void GenerateLuaDeclarations(const std::vector<AiluHeadTool::ClassInfo> &
 
     for (const auto &type : types)
     {
+        if (!type._is_script_api)
+            continue;
         if (!HasScriptMember(type))
             continue;
 
@@ -1035,12 +1311,21 @@ static void GenerateLuaDeclarations(const std::vector<AiluHeadTool::ClassInfo> &
             if (!member._is_function && !member._is_event && member._is_script)
                 file << std::format("---@field {} {}\n", ToLuaFunctionName(member._name), ToLuaTypeName(member._type));
         }
+        for (const auto &property : CollectLuaProperties(type))
+            file << std::format("---@field {} {}\n", property._name, ToLuaTypeName(property._getter->_return_type));
         // These declarations describe runtime globals registered in ScriptSystem.
         // Keeping them local makes LuaLS report the API as undefined in user scripts.
         file << std::format("{} = {{}}\n\n", type._name);
+        if (!type._script_global_name.empty())
+        {
+            file << std::format("---@type {}\n{} = {{}}\n\n", type._name, type._script_global_name);
+        }
+        std::unordered_set<std::string> emitted_function_names;
         for (const auto &member : type._members)
         {
             if ((!member._is_function && !member._is_event) || !member._is_script)
+                continue;
+            if (member._is_function && !emitted_function_names.emplace(member._name).second)
                 continue;
             if (member._is_event)
             {
@@ -1063,6 +1348,26 @@ static void GenerateLuaDeclarations(const std::vector<AiluHeadTool::ClassInfo> &
                 file << std::format("function {}:{}({}) end\n\n", type._name, member._name,
                                     !member._event_key_name.empty() ? member._event_key_name + ", callback" : "callback");
                 continue;
+            }
+            for (const auto &overload : type._members)
+            {
+                if (!overload._is_function || !overload._is_script || overload._name != member._name || &overload == &member)
+                    continue;
+                file << "---@overload fun(";
+                if (!member._is_static)
+                    file << std::format("self: {}, ", type._name);
+                for (size_t index = 0u; index < overload._params.size(); ++index)
+                {
+                    if (index > 0u)
+                        file << ", ";
+                    const std::string parameter_name = index < overload._param_names.size() && !overload._param_names[index].empty()
+                                                           ? overload._param_names[index] : std::format("arg{}", index);
+                    file << parameter_name << ": " << ToLuaTypeName(overload._params[index]);
+                }
+                file << ")";
+                if (NormalizeLuaType(overload._return_type) != "void")
+                    file << ": " << ToLuaTypeName(overload._return_type);
+                file << "\n";
             }
             for (size_t index = 0u; index < member._params.size(); ++index)
             {
@@ -1087,16 +1392,6 @@ static void GenerateLuaDeclarations(const std::vector<AiluHeadTool::ClassInfo> &
                 file << std::format("---@return {}\nfunction {}() end\n\n", type._name, member._name);
         }
     }
-
-    for (const auto &type : types)
-    {
-        if (type._name == "ScriptInput")
-        {
-            file << "---@param subscription_id integer\n---@return boolean\nfunction ScriptInput:off(subscription_id) end\n\n";
-            break;
-        }
-    }
-
 }
 
 static void GenerateLuaDeclarationIndex(const Path &output_path)
@@ -1108,19 +1403,71 @@ static void GenerateLuaDeclarationIndex(const Path &output_path)
     file << "---@meta\n";
     file << "-- Generated by AiluHeadTool. Individual Script API declarations are split by module.\n\n";
     file << "---@class Vec2\n---@field x number\n---@field y number\n"
-            "---@type fun(): Vec2\n---@overload fun(x: number, y: number): Vec2\nVec2 = nil\n\n";
+            "---@overload fun(): Vec2\n---@overload fun(x: number, y: number): Vec2\nVec2 = nil\n\n";
     file << "---@class Vec3\n---@field x number\n---@field y number\n---@field z number\n"
-            "---@type fun(): Vec3\n---@overload fun(x: number, y: number, z: number): Vec3\nVec3 = nil\n\n";
+            "---@overload fun(): Vec3\n---@overload fun(x: number, y: number, z: number): Vec3\nVec3 = nil\n\n";
     file << "---@class Quaternion\n---@field x number\n---@field y number\n---@field z number\n---@field w number\n"
-            "---@type fun(): Quaternion\n---@overload fun(x: number, y: number, z: number, w: number): Quaternion\nQuaternion = nil\n\n";
-    file << "require(\"scriptengine\")\nrequire(\"scriptentity\")\nrequire(\"scriptcamera\")\nrequire(\"scriptscene\")\n";
-    file << "require(\"scriptinput\")\nrequire(\"scripttime\")\nrequire(\"scriptphysics2d\")\n\n";
+            "---@overload fun(): Quaternion\n---@overload fun(x: number, y: number, z: number, w: number): Quaternion\nQuaternion = nil\n\n";
+    file << "---@class Color\n---@field r number\n---@field g number\n---@field b number\n---@field a number\n"
+            "---@overload fun(): Color\n---@overload fun(r: number, g: number, b: number, a: number): Color\nColor = nil\n\n";
+    file << "require(\"scriptengine\")\nrequire(\"scriptassetvalue\")\nrequire(\"scriptentity\")\n"
+            "require(\"scriptcamera\")\nrequire(\"scriptscene\")\n";
+    file << "require(\"scriptinput\")\nrequire(\"scripttime\")\nrequire(\"scriptphysics2d\")\n"
+            "require(\"scriptrigidbody2d\")\nrequire(\"scriptspriterenderer\")\n"
+            "require(\"scriptanimator\")\nrequire(\"scriptaudiosource\")\nrequire(\"scriptaudio\")\n\n";
     file << "---@class AiluScript\n---@field entity ScriptEntity\n---@field scene ScriptScene\nlocal AiluScript = {}\n\n";
-    file << "function AiluScript:OnCreate() end\n\nfunction AiluScript:OnEnable() end\n\nfunction AiluScript:OnDisable() end\n\n";
-    file << "---@param dt number\nfunction AiluScript:OnFixedUpdate(dt) end\n\n---@param dt number\nfunction AiluScript:OnUpdate(dt) end\n\n";
-    file << "---@param dt number\n---@param render_alpha number\nfunction AiluScript:OnLateUpdate(dt, render_alpha) end\n\nfunction AiluScript:OnDestroy() end\n\n";
-    file << "---@type ScriptEngine\nengine = nil\n\n---@type ScriptInput\ninput = nil\n\n---@type ScriptTime\ntime = nil\n";
-    file << "---@type ScriptPhysics2D\nphysics2d = nil\n";
+    file << "function AiluScript:on_create() end\n\nfunction AiluScript:on_enable() end\n\n";
+    file << "---@param dt number\nfunction AiluScript:on_fixed_update(dt) end\n\n---@param dt number\n"
+            "function AiluScript:on_update(dt) end\n\n";
+    file << "---@param dt number\n---@param render_alpha number\n"
+            "function AiluScript:on_late_update(dt, render_alpha) end\n\n"
+            "function AiluScript:on_disable() end\n\n";
+    file << "function AiluScript:on_destroy() end\n\nfunction AiluScript:on_reload() end\n";
+}
+
+static void GenerateLuaWorkspaceConfig(const Path &output_path)
+{
+    std::ofstream file(output_path);
+    if (!file.is_open())
+        throw std::runtime_error(std::format("Failed to create Lua workspace config {}", output_path.string()));
+
+    file << "{\n";
+    file << "    \"runtime.version\": \"Lua 5.4\",\n";
+    file << "    \"workspace.library\": [\".ailu/lua\"],\n";
+    file << "    \"diagnostics.globals\": [\"engine\", \"input\", \"time\", \"physics2d\", \"camera\", \"audio\"]\n";
+    file << "}\n";
+}
+
+void AiluHeadTool::CollectScriptApiTypes(const std::set<fs::path> &inc_files)
+{
+    _script_api_types.clear();
+    for (const fs::path &path : inc_files)
+    {
+        std::ifstream file(path);
+        if (!file.is_open())
+            continue;
+
+        std::string line;
+        bool has_script_type_marked = false;
+        while (std::getline(file, line))
+        {
+            if (line.find("ASTRUCT(") != std::string::npos || line.find("ACLASS(") != std::string::npos)
+            {
+                has_script_type_marked = false;
+                ParserScriptTypeAnnotation(line, has_script_type_marked);
+                continue;
+            }
+            if (!has_script_type_marked)
+                continue;
+
+            std::string type_name;
+            if (ParseReflectedDeclarationName(line, type_name))
+            {
+                _script_api_types.emplace(type_name);
+                has_script_type_marked = false;
+            }
+        }
+    }
 }
 
 void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string work_namespace)
@@ -1149,8 +1496,10 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                 int last_include_line = 0;
                 bool is_last_include_generated = false;
                 bool has_class_marked = false, has_property_marked = false, has_function_marked = false, has_event_marked = false, has_enum_marked = false, has_struct_marked = false;
-                bool is_script_function = false;
-                bool is_script_event = false;
+                bool is_script_function = false, is_script_property_function = false;
+        bool is_script_event = false;
+        bool is_script_api = false;
+        std::string script_global_name;
                 int event_key_index = -1;
                 std::string event_key_name;
                 bool is_cur_access_scope_public = false;
@@ -1227,7 +1576,11 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                             ClassInfo class_info;
                             ParserClassOrStructInfo(line, class_info, *this);
                             class_info._namespace = cur_namespace;
+                            class_info._is_script_api = is_script_api;
+                            class_info._script_global_name = script_global_name;
                             has_class_marked = false;
+                            is_script_api = false;
+                            script_global_name.clear();
                             is_process_class = true;
                             FindBaseClass(class_info);
                             _classes.emplace_back(class_info);
@@ -1241,7 +1594,11 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                             ClassInfo struct_info;
                             ParserClassOrStructInfo(line, struct_info, *this);
                             struct_info._namespace = cur_namespace;
+                            struct_info._is_script_api = is_script_api;
+                            struct_info._script_global_name = script_global_name;
                             has_struct_marked = false;
+                            is_script_api = false;
+                            script_global_name.clear();
                             is_process_class = false;
                             _structs.emplace_back(struct_info);
                             continue;
@@ -1251,11 +1608,17 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                     if (line.find(kClassMacro) != std::string::npos)
                     {
                         has_class_marked = true;
+                        is_script_api = false;
+                        script_global_name.clear();
+                        ParserScriptTypeAnnotation(line, is_script_api, &script_global_name);
                         continue;
                     }
                     if (line.find(kStructMacro) != std::string::npos)
                     {
                         has_struct_marked = true;
+                        is_script_api = false;
+                        script_global_name.clear();
+                        ParserScriptTypeAnnotation(line, is_script_api, &script_global_name);
                         continue;
                     }
                     if (line.find(kEnumMacro) != std::string::npos)
@@ -1292,7 +1655,9 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                             member_info._is_public = is_cur_access_scope_public;
                             member_info._is_function = true;
                             member_info._is_script = is_script_function;
+                            member_info._is_script_property = is_script_property_function;
                             is_script_function = false;
+                            is_script_property_function = false;
                             has_function_marked = false;
                             _classes.back()._members.emplace_back(member_info);
                             continue;
@@ -1319,7 +1684,9 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                         if (line.find(kFunctionMacro) != std::string::npos)
                         {
                             has_function_marked = true;
-                            is_script_function = line.find("Script") != std::string::npos;
+                            is_script_function = false;
+                            is_script_property_function = false;
+                            ParserScriptFunctionAnnotation(line, is_script_function, is_script_property_function);
                             continue;
                         }
                         if (line.find(kEventMacro) != std::string::npos)
@@ -1358,7 +1725,9 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                             member_info._is_public = is_cur_access_scope_public;
                             member_info._is_function = true;
                             member_info._is_script = is_script_function;
+                            member_info._is_script_property = is_script_property_function;
                             is_script_function = false;
+                            is_script_property_function = false;
                             has_function_marked = false;
                             _structs.back()._members.emplace_back(member_info);
                             continue;
@@ -1385,7 +1754,9 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                         if (line.find(kFunctionMacro) != std::string::npos)
                         {
                             has_function_marked = true;
-                            is_script_function = line.find("Script") != std::string::npos;
+                            is_script_function = false;
+                            is_script_property_function = false;
+                            ParserScriptFunctionAnnotation(line, is_script_function, is_script_property_function);
                             continue;
                         }
                         if (line.find(kEventMacro) != std::string::npos)
@@ -1566,10 +1937,12 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                         std::vector<ClassInfo> script_types = _classes;
                         script_types.insert(script_types.end(), _structs.begin(), _structs.end());
                         const std::string file_stem = path.stem().string();
-                        GenerateLuaBindings(script_types, "RegisterGeneratedLuaBindings_" + file_stem, cpp_file);
+                        GenerateLuaBindings(script_types, "RegisterGeneratedLuaBindings_" + file_stem, cpp_file,
+                                            _script_api_types);
                         const Path project_dir = out_dir.parent_path().parent_path().parent_path().parent_path().parent_path();
                         GenerateLuaDeclarations(script_types, project_dir / ".ailu" / "lua" / (ToLower(file_stem) + ".lua"));
                         GenerateLuaDeclarationIndex(project_dir / ".ailu" / "lua" / "ailu_engine.lua");
+                        GenerateLuaWorkspaceConfig(project_dir / ".luarc.json");
                     }
                     cpp_file.close();
                     Log(std::format("AiluHeadTool::Parser create file {} succeed!", cpp_path.string()));

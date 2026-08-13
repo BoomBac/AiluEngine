@@ -3,6 +3,8 @@
 #include "Audio/AudioClip.h"
 #include "Assets/ScriptAsset.h"
 #include "Assets/PrefabAsset.h"
+#include "Assets/AssetTypeRegistry.h"
+#include "Assets/WidgetAsset.h"
 #include "Common/EditorPopup.h"
 #include "Common/Selection.h"
 #include "Graph/GraphAsset.h"
@@ -10,7 +12,9 @@
 #include "Graph/GraphEditorWindow.h"
 #include "Editors/InputActionAssetEditor.h"
 #include "Editors/AudioClipEditor.h"
+#include "Editors/ProjectSettingsEditor.h"
 #include "Editors/SpriteAssetEditor.h"
+#include "Editors/Widget/WidgetEditor.h"
 #include "Widgets/AssetEditorRegistry.h"
 #include "Framework/Common/FileManager.h"
 #include "Framework/Common/ResourceMgr.h"
@@ -24,7 +28,6 @@
 #include "UI/TreeView.h"
 #include "Objects/JsonArchive.h"
 #include "Project/ProjectManager.h"
-#include "Render/AssetPreviewGenerator.h"
 #include "Framework/Common/Input.h"
 #include "Dock/DockManager.h"
 #include "Render/2D/Sprite.h"
@@ -73,8 +76,6 @@ namespace Ailu
             constexpr f32 kListRowHeight = 24.0f;
             constexpr f32 kListIconSize = 18.0f;
             constexpr f32 kListTextLeftPadding = 6.0f;
-            Array<Vector<Ref<Render::RenderTexture>>, Render::RenderConstants::kFrameCount> s_retired_asset_preview_icons;
-            u16 s_retired_asset_preview_icon_index = 0u;
             AudioHandle s_audio_preview_handle;
 
             bool IsListView(f32 icon_size)
@@ -344,6 +345,20 @@ namespace Ailu
                     }
                     return nullptr;
                 });
+                AssetEditorRegistry::Get().RegisterEditor(StaticClass<WidgetAsset>(), [](Asset *asset) -> Ref<DockWindow>
+                {
+                    if (asset == nullptr)
+                        return nullptr;
+                    if (asset->_p_obj == nullptr)
+                        ResourceMgr::Get().Load<WidgetAsset>(asset->_asset_path);
+                    auto *widget_asset = asset->As<WidgetAsset>();
+                    if (widget_asset == nullptr)
+                        return nullptr;
+
+                    auto editor = MakeRef<WidgetEditor>();
+                    editor->Open(widget_asset);
+                    return editor;
+                });
             }
 
             WString AppendChildAssetPath(const WString &directory_asset_path, const WString &file_name)
@@ -584,6 +599,19 @@ namespace Ailu
                     NavigateToPath(parent_path);
             };
             back_btn->SetText("<");
+            if (ProjectManager::Get().HasOpenedProject())
+            {
+                auto project_settings_btn = hb->AddChild<UI::Button>("Project Settings");
+                project_settings_btn->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFixed)
+                    .Size({124.0f, 22.0f});
+                project_settings_btn->OnMouseClick() += [](UI::UIEvent &event)
+                {
+                    auto editor = MakeRef<ProjectSettingsEditor>();
+                    editor->Open();
+                    DockManager::Get().AddDock(editor);
+                    event._is_handled = true;
+                };
+            }
             _path_bar = hb->AddChild<UI::HorizontalBox>();
             _path_bar->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed).Size({0.0f, 22.0f}).FillRate(1.0f);
             _path_title = _path_bar->AddChild<UI::Text>("Current Path");
@@ -619,6 +647,19 @@ namespace Ailu
             };
             _icon_area->OnMouseDown() += blank_context_handler;
             _icon_content->OnMouseDown() += blank_context_handler;
+            _icon_area->OnKeyDown() += [this](UI::UIEvent &e)
+            {
+                if (e._key_code != EKey::kF2 || _selected_item_root == nullptr || _selected_item_text == nullptr)
+                    return;
+
+                if (_selected_asset != nullptr)
+                    BeginAssetRename(_selected_asset, _selected_item_root, _selected_item_text);
+                else if (!_selected_folder_path.empty())
+                    BeginFolderRename(_selected_folder_path, _selected_item_root, _selected_item_text);
+                else
+                    return;
+                e._is_handled = true;
+            };
             slider->_on_value_change += [&](f32 value)
             {
                 const bool was_list_view = _is_list_view;
@@ -946,22 +987,19 @@ namespace Ailu
         void AssetBrowser::Update(f32 dt)
         {
             DockWindow::Update(dt);
-            s_retired_asset_preview_icons[s_retired_asset_preview_icon_index].clear();
-            s_retired_asset_preview_icon_index =
-                    (s_retired_asset_preview_icon_index + 1u) % Render::RenderConstants::kFrameCount;
+            if (IsFocus() && Input::IsKeyJustPressed(EKey::kF2))
+            {
+                if (_selected_asset != nullptr)
+                    BeginAssetRename(_selected_asset, _selected_item_root, _selected_item_text);
+                else if (!_selected_folder_path.empty())
+                    BeginFolderRename(_selected_folder_path, _selected_item_root, _selected_item_text);
+            }
+            AssetTypeRegistry::Get().BeginFrame();
             if (_is_directory_tree_dirty)
                 RefreshDirectoryTree();
 
             static auto s_folder_icon = ResourceMgr::Get().Get<Texture2D>(EnginePath::kEngineIconPathW + L"folder.alasset");
             static auto s_file_icon = ResourceMgr::Get().Get<Texture2D>(EnginePath::kEngineIconPathW + L"file.alasset");
-            static auto s_mesh_icon = ResourceMgr::Get().Get<Texture2D>(EnginePath::kEngineIconPathW + L"3d.alasset");
-            static auto s_shader_icon = ResourceMgr::Get().Get<Texture2D>(EnginePath::kEngineIconPathW + L"shader.alasset");
-            static auto s_image_icon = ResourceMgr::Get().Get<Texture2D>(EnginePath::kEngineIconPathW + L"image.alasset");
-            static auto s_scene_icon = ResourceMgr::Get().Get<Texture2D>(EnginePath::kEngineIconPathW + L"dark/scene.alasset");
-            static auto s_material_icon = ResourceMgr::Get().Get<Texture2D>(EnginePath::kEngineIconPathW + L"dark/material.alasset");
-            static auto s_animclip_icon = ResourceMgr::Get().Get<Texture2D>(EnginePath::kEngineIconPathW + L"dark/anim_clip.alasset");
-            static auto s_skeleton_icon = ResourceMgr::Get().Get<Texture2D>(EnginePath::kEngineIconPathW + L"dark/skeleton.alasset");
-            static auto s_graph_icon = ResourceMgr::Get().Get<Texture2D>(EnginePath::kEngineIconPathW + L"shader.alasset");
 
             Vector2f parent_size = _icon_area->GetContentRect().zw;
             if (parent_size.x <= 0.0f || parent_size.y <= 0.0f)
@@ -972,16 +1010,15 @@ namespace Ailu
                 _last_icon_area_size = parent_size;
                 _is_icon_layout_dirty = true;
             }
-            static Render::Sprite* preview_sp = nullptr;
-            // if (preview_sp)
-            // {
-            //     AssetPreviewGenerator::GeneratorSpriteSnapshot(256,256,preview_sp,_asset_preview_icons[preview_sp]);
-            // }
             if (_is_dirty)
             {
                 if (fs::exists(_current_path))
                 {
                     _icon_content->ClearChildren();
+                    _selected_item_root = nullptr;
+                    _selected_item_text = nullptr;
+                    _selected_asset = nullptr;
+                    _selected_folder_path.clear();
                     const WString current_asset_directory = GetRelativeAssetDirectory(_current_path);
                     const EAssetDomain current_domain = GetDomainForPath(_current_path);
                     const bool is_searching = !_search_text.empty();
@@ -1067,11 +1104,15 @@ namespace Ailu
                         auto [vb, icon,text] = create_icon_group(display_name);
                         icon->Name(display_name);
                         icon->SetTexture(s_folder_icon);
-                        vb->OnMouseDown() += [this, folder_sys_path](UI::UIEvent &e)
+                        vb->OnMouseDown() += [this, folder_sys_path, item_root = vb.get(), item_text = text](UI::UIEvent &e)
                         {
+                            _selected_item_root = item_root;
+                            _selected_item_text = item_text;
+                            _selected_asset = nullptr;
+                            _selected_folder_path = folder_sys_path;
                             if (e._key_code != EKey::kRBUTTON)
                                 return;
-                            ShowFolderContextMenu(folder_sys_path, e._mouse_position);
+                            ShowFolderContextMenu(folder_sys_path, e._mouse_position, item_root, item_text);
                             e._is_handled = true;
                         };
                         icon->OnMouseEnter() += [this, icon](UI::UIEvent &e)
@@ -1125,79 +1166,18 @@ namespace Ailu
                         Color tint = asset->_p_obj ? Colors::kWhite : Colors::kGray;
                         icon->Name(asset->Name());
                         icon->_tint_color = tint;
-                        vb->OnMouseDown() += [this, asset](UI::UIEvent &e)
+                        vb->OnMouseDown() += [this, asset, item_root = vb.get(), item_text = text](UI::UIEvent &e)
                         {
+                            _selected_item_root = item_root;
+                            _selected_item_text = item_text;
+                            _selected_asset = asset;
+                            _selected_folder_path.clear();
                             if (e._key_code != EKey::kRBUTTON)
                                 return;
-                            ShowAssetContextMenu(asset, e._mouse_position);
+                            ShowAssetContextMenu(asset, e._mouse_position, item_root, item_text);
                             e._is_handled = true;
                         };
-                        if (asset->_asset_type == StaticClass<Render::Mesh>())
-                        {
-                            if (asset->_p_obj)
-                            {
-                                auto mesh = asset->As<Render::Mesh>();
-                                Ref<RenderTexture> mesh_icon{nullptr};
-                                AssetPreviewGenerator::GeneratorMeshSnapshot(512u, 512u, mesh, mesh_icon);
-                                if (mesh_icon)
-                                {
-                                    if (auto it = _asset_preview_icons.find(mesh); it != _asset_preview_icons.end() && it->second)
-                                        s_retired_asset_preview_icons[s_retired_asset_preview_icon_index].push_back(it->second);
-                                    _asset_preview_icons[mesh] = mesh_icon;
-                                }
-                                icon->SetTexture(_asset_preview_icons[mesh].get());
-                            }
-                            else
-                            icon->SetTexture(s_mesh_icon);
-                        }
-                        else if (asset->_asset_type == StaticClass<Render::Shader>())
-                        {
-                            icon->SetTexture(s_shader_icon);
-                        }
-                        else if (asset->_asset_type == StaticClass<SceneManagement::Scene>())
-                        {
-                            icon->SetTexture(s_scene_icon);
-                        }
-                        else if (asset->_asset_type == StaticClass<Render::Texture2D>())
-                        {
-                            if (asset->_p_obj == nullptr)
-                            {
-                                //并非当帧完成
-                                icon->SetTexture(ResourceMgr::Get().Load<Texture2D>(asset->_asset_path).get());
-                            }
-                            else
-                            {
-                                icon->SetTexture(asset->As<Texture>());
-                            }
-                        }
-                        else if (asset->_asset_type == StaticClass<Render::Material>())
-                            icon->SetTexture(s_material_icon);
-                        else if (asset->_asset_type == StaticClass<AnimationClip>())
-                            icon->SetTexture(s_animclip_icon);
-                        else if (asset->_asset_type == StaticClass<Render::SkeletonMesh>())
-                            icon->SetTexture(s_skeleton_icon);
-                        else if (asset->_asset_type == StaticClass<GraphAsset>())
-                            icon->SetTexture(s_graph_icon);
-                        else if (asset->_asset_type == StaticClass<Render::Sprite>())
-                        {
-                            if (asset->_p_obj)
-                            {
-                                auto obj = asset->As<Render::Sprite>();
-                                Ref<RenderTexture> preview_icon{nullptr};
-                                AssetPreviewGenerator::GeneratorSpriteSnapshot(256,256,obj,preview_icon);
-                                if (preview_icon)
-                                {
-                                    if (auto it = _asset_preview_icons.find(obj); it != _asset_preview_icons.end() && it->second)
-                                        s_retired_asset_preview_icons[s_retired_asset_preview_icon_index].push_back(it->second);
-                                    _asset_preview_icons[obj] = preview_icon;
-                                }
-                                preview_sp = obj;
-                                icon->SetTexture(_asset_preview_icons[obj].get());
-                            }
-                            else
-                            icon->SetTexture(s_mesh_icon);
-                        }
-                        else {};
+                        icon->SetTexture(AssetTypeRegistry::Get().GetIcon(asset));
                         icon->OnMouseEnter() += [this, icon](UI::UIEvent &e)
                         {
                             _hover_item = e._current_target;
@@ -1469,6 +1449,20 @@ namespace Ailu
                                                  return std::nullopt;
                                              });
             }});
+            actions.push_back({"New Sprite", [this, popup_pos]()
+            {
+                EditorPopup::ShowTextInputAt(popup_pos, "Create Sprite",
+                                             MakeUniqueEntryName(_current_path.wstring(), "NewSprite", L".alasset", false),
+                                             [this](const String &input) -> std::optional<String>
+                                             {
+                                                 const String name = TrimNameCopy(input);
+                                                 if (auto error = ValidateEntryName(name); error.has_value())
+                                                     return error;
+                                                 if (!CreateSpriteEntry(name))
+                                                     return String("Sprite already exists.");
+                                                 return std::nullopt;
+                                             });
+            }});
             actions.push_back({"New Material", [this, popup_pos]()
             {
                 ShowCreateMaterialDialog(popup_pos, _current_path);
@@ -1484,6 +1478,20 @@ namespace Ailu
                                                      return error;
                                                  if (!CreateInputActionAssetEntry(name))
                                                      return String("Input Action Asset already exists.");
+                                                 return std::nullopt;
+                                             });
+            }});
+            actions.push_back({"New Widget Asset", [this, popup_pos]()
+            {
+                EditorPopup::ShowTextInputAt(popup_pos, "Create Widget Asset",
+                                             MakeUniqueEntryName(_current_path.wstring(), "NewWidget", L".alasset", false),
+                                             [this](const String &input) -> std::optional<String>
+                                             {
+                                                 const String name = TrimNameCopy(input);
+                                                 if (auto error = ValidateEntryName(name); error.has_value())
+                                                     return error;
+                                                 if (!CreateWidgetAssetEntry(name))
+                                                     return String("Widget Asset already exists.");
                                                  return std::nullopt;
                                              });
             }});
@@ -1519,7 +1527,8 @@ namespace Ailu
             EditorPopup::ShowActionMenuAt(popup_pos, actions);
         }
 
-        void AssetBrowser::ShowFolderContextMenu(const WString &folder_sys_path, Vector2f popup_pos)
+        void AssetBrowser::ShowFolderContextMenu(const WString &folder_sys_path, Vector2f popup_pos, UI::UIElement *item_root,
+                                                 UI::Text *item_text)
         {
             const String folder_name = fs::path(folder_sys_path).filename().string();
             const auto create_folder_in_target = [this, folder_sys_path](const String &name) -> bool
@@ -1535,6 +1544,14 @@ namespace Ailu
                 const fs::path previous_path = _current_path;
                 _current_path = folder_sys_path;
                 const bool created = CreateSceneEntry(name);
+                _current_path = previous_path;
+                return created;
+            };
+            const auto create_sprite_in_target = [this, folder_sys_path](const String &name) -> bool
+            {
+                const fs::path previous_path = _current_path;
+                _current_path = folder_sys_path;
+                const bool created = CreateSpriteEntry(name);
                 _current_path = previous_path;
                 return created;
             };
@@ -1554,23 +1571,22 @@ namespace Ailu
                 _current_path = previous_path;
                 return created;
             };
+            const auto create_widget_asset_in_target = [this, folder_sys_path](const String &name) -> bool
+            {
+                const fs::path previous_path = _current_path;
+                _current_path = folder_sys_path;
+                const bool created = CreateWidgetAssetEntry(name);
+                _current_path = previous_path;
+                return created;
+            };
             Vector<PopupMenuAction> actions;
             actions.push_back({"Open", [this, folder_sys_path]()
             {
                 NavigateToPath(folder_sys_path);
             }});
-            actions.push_back({"Rename", [this, folder_name, folder_sys_path, popup_pos]()
+            actions.push_back({"Rename", [this, folder_sys_path, item_root, item_text]()
             {
-                EditorPopup::ShowTextInputAt(popup_pos, "Rename Folder", folder_name,
-                                             [this, folder_sys_path](const String &input) -> std::optional<String>
-                                             {
-                                                 const String name = TrimNameCopy(input);
-                                                 if (auto error = ValidateEntryName(name); error.has_value())
-                                                     return error;
-                                                 if (!RenameFolderEntry(folder_sys_path, name))
-                                                     return String("Folder rename failed.");
-                                                 return std::nullopt;
-                                             });
+                BeginFolderRename(folder_sys_path, item_root, item_text);
             }});
             actions.push_back({"Delete", [this, folder_name, folder_sys_path, popup_pos]()
             {
@@ -1605,6 +1621,20 @@ namespace Ailu
                                                  return std::nullopt;
                                              });
             }});
+            actions.push_back({"New Sprite", [this, popup_pos, folder_sys_path, create_sprite_in_target]()
+            {
+                EditorPopup::ShowTextInputAt(popup_pos, "Create Sprite",
+                                             MakeUniqueEntryName(folder_sys_path, "NewSprite", L".alasset", false),
+                                             [create_sprite_in_target](const String &input) -> std::optional<String>
+                                             {
+                                                 const String name = TrimNameCopy(input);
+                                                 if (auto error = ValidateEntryName(name); error.has_value())
+                                                     return error;
+                                                 if (!create_sprite_in_target(name))
+                                                     return String("Sprite already exists.");
+                                                 return std::nullopt;
+                                             });
+            }});
             actions.push_back({"New Material", [this, popup_pos, folder_sys_path]()
             {
                 ShowCreateMaterialDialog(popup_pos, folder_sys_path);
@@ -1620,6 +1650,20 @@ namespace Ailu
                                                      return error;
                                                  if (!create_input_action_asset_in_target(name))
                                                      return String("Input Action Asset already exists.");
+                                                 return std::nullopt;
+                                             });
+            }});
+            actions.push_back({"New Widget Asset", [this, popup_pos, folder_sys_path, create_widget_asset_in_target]()
+            {
+                EditorPopup::ShowTextInputAt(popup_pos, "Create Widget Asset",
+                                             MakeUniqueEntryName(folder_sys_path, "NewWidget", L".alasset", false),
+                                             [create_widget_asset_in_target](const String &input) -> std::optional<String>
+                                             {
+                                                 const String name = TrimNameCopy(input);
+                                                 if (auto error = ValidateEntryName(name); error.has_value())
+                                                     return error;
+                                                 if (!create_widget_asset_in_target(name))
+                                                     return String("Widget Asset already exists.");
                                                  return std::nullopt;
                                              });
             }});
@@ -1658,7 +1702,7 @@ namespace Ailu
             EditorPopup::ShowActionMenuAt(popup_pos, actions);
         }
 
-        void AssetBrowser::ShowAssetContextMenu(Asset *asset, Vector2f popup_pos)
+        void AssetBrowser::ShowAssetContextMenu(Asset *asset, Vector2f popup_pos, UI::UIElement *item_root, UI::Text *item_text)
         {
             if (asset == nullptr)
                 return;
@@ -1676,18 +1720,9 @@ namespace Ailu
                 actions.push_back({"Play Audio", [asset]() { PlayAudioClipAsset(asset); }});
                 actions.push_back({"Stop Audio", []() { StopAudioPreview(); }});
             }
-            actions.push_back({"Rename", [this, asset_name, asset, popup_pos]()
+            actions.push_back({"Rename", [this, asset, item_root, item_text]()
             {
-                EditorPopup::ShowTextInputAt(popup_pos, "Rename Asset", asset_name,
-                                             [this, asset](const String &input) -> std::optional<String>
-                                             {
-                                                 const String name = TrimNameCopy(input);
-                                                 if (auto error = ValidateEntryName(name); error.has_value())
-                                                     return error;
-                                                 if (!RenameAssetEntry(asset, name))
-                                                     return String("Asset rename failed.");
-                                                 return std::nullopt;
-                                             });
+                BeginAssetRename(asset, item_root, item_text);
             }});
             actions.push_back({"Delete", [this, asset_name, asset, popup_pos]()
             {
@@ -1695,6 +1730,42 @@ namespace Ailu
                                            [this, asset]() { DeleteAssetEntry(asset); });
             }, true});
             EditorPopup::ShowActionMenuAt(popup_pos, actions);
+        }
+
+        void AssetBrowser::BeginFolderRename(const WString &folder_sys_path, UI::UIElement *item_root, UI::Text *item_text)
+        {
+            if (item_root == nullptr || item_text == nullptr)
+                return;
+
+            const String folder_name = fs::path(folder_sys_path).filename().string();
+            EditorPopup::BeginInlineTextInput(item_root, item_text, folder_name,
+                                              [this, folder_sys_path](const String &input) -> std::optional<String>
+                                              {
+                                                  const String name = TrimNameCopy(input);
+                                                  if (auto error = ValidateEntryName(name); error.has_value())
+                                                      return error;
+                                                  if (!RenameFolderEntry(folder_sys_path, name))
+                                                      return String("Folder rename failed.");
+                                                  return std::nullopt;
+                                              });
+        }
+
+        void AssetBrowser::BeginAssetRename(Asset *asset, UI::UIElement *item_root, UI::Text *item_text)
+        {
+            if (asset == nullptr || item_root == nullptr || item_text == nullptr)
+                return;
+
+            const String asset_name = asset->Name();
+            EditorPopup::BeginInlineTextInput(item_root, item_text, asset_name,
+                                              [this, asset](const String &input) -> std::optional<String>
+                                              {
+                                                  const String name = TrimNameCopy(input);
+                                                  if (auto error = ValidateEntryName(name); error.has_value())
+                                                      return error;
+                                                  if (!RenameAssetEntry(asset, name))
+                                                      return String("Asset rename failed.");
+                                                  return std::nullopt;
+                                              });
         }
 
         bool AssetBrowser::RenameAssetEntry(Asset *asset, const String &new_name)
@@ -1866,6 +1937,24 @@ namespace Ailu
             return true;
         }
 
+        bool AssetBrowser::CreateSpriteEntry(const String &name)
+        {
+            const String trimmed_name = TrimNameCopy(name);
+            if (trimmed_name.empty())
+                return false;
+
+            const WString asset_path = BuildCurrentAssetPath(ToWChar(trimmed_name.c_str()) + WString(L".alasset"));
+            if (ResourceMgr::Get().GetAsset(asset_path) != nullptr || fs::exists(ResourceMgr::GetResSysPath(asset_path)))
+                return false;
+
+            auto sprite = MakeRef<Sprite>(trimmed_name);
+            if (ResourceMgr::Get().CreateAsset(asset_path, sprite, false) == nullptr)
+                return false;
+            ResourceMgr::Get().SaveAllUnsavedAssets();
+            _is_dirty = true;
+            return true;
+        }
+
         bool AssetBrowser::CreateMaterialEntry(const String &name, Render::Shader *shader)
         {
             const String trimmed_name = TrimNameCopy(name);
@@ -1937,6 +2026,24 @@ namespace Ailu
             return true;
         }
 
+        bool AssetBrowser::CreateWidgetAssetEntry(const String &name)
+        {
+            const String trimmed_name = TrimNameCopy(name);
+            if (trimmed_name.empty())
+                return false;
+
+            const WString asset_path = BuildCurrentAssetPath(ToWChar(trimmed_name.c_str()) + WString(L".alasset"));
+            if (ResourceMgr::Get().GetAsset(asset_path) != nullptr || fs::exists(ResourceMgr::GetResSysPath(asset_path)))
+                return false;
+
+            auto widget_asset = MakeRef<WidgetAsset>(trimmed_name);
+            if (ResourceMgr::Get().CreateAsset(asset_path, widget_asset, false) == nullptr)
+                return false;
+            ResourceMgr::Get().SaveAllUnsavedAssets();
+            _is_dirty = true;
+            return true;
+        }
+
         bool AssetBrowser::CreateFlowGraphEntry(const String &name)
         {
             const String trimmed_name = TrimNameCopy(name);
@@ -1974,29 +2081,35 @@ namespace Ailu
             if (ResourceMgr::Get().GetAsset(asset_path) != nullptr || fs::exists(ResourceMgr::GetResSysPath(asset_path)) || fs::exists(lua_sys_path))
                 return false;
 
-            const String script_template = R"(---@type AiluScript
-local script = {}
+            const String script_template = std::format(R"(---@class {} : AiluScript
+            local script = {{}}
 
-function script:OnCreate()
-end
+            function script:on_create()
+            end
 
-function script:OnFixedUpdate(fixed_delta_time)
-end
+            function script:on_enable()
+            end
 
-function script:OnUpdate(delta_time)
-end
+            function script:on_disable()
+            end
 
-function script:OnLateUpdate(delta_time, render_alpha)
-end
+            function script:on_fixed_update(fixed_delta_time)
+            end
 
-function script:OnDestroy()
-end
+            function script:on_update(delta_time)
+            end
 
-function script:OnReload()
-end
+            function script:on_late_update(delta_time)
+            end
 
-return script
-)";
+            function script:on_destroy()
+            end
+
+            function script:on_reload()
+            end
+
+            return script
+            )",trimmed_name);
             if (!FileManager::WriteFile(lua_sys_path, false, script_template))
                 return false;
             auto script_asset = MakeRef<ScriptAsset>(ToChar(lua_sys_path));

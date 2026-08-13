@@ -191,6 +191,76 @@ namespace Ailu
 
 
         static const UI::Padding kDefaultLabelMargin = {2.0f, 2.0f, 2.0f, 2.0f};
+
+        template<typename TValue, typename GetComponent, typename SetComponent>
+        Ref<UIElement> BuildFourComponentField(const String &label, PropertyInfo *property, void *instance,
+                                               CompositeBuilder::Params *params, GetComponent get_component,
+                                               SetComponent set_component)
+        {
+            auto hb = MakeRef<UI::HorizontalBox>();
+            hb->AddChild<UI::Text>(label)->GetSlotAs<UI::LinearSlot>()
+                .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto).FillRate(GetLabelFillRate(4)).Margin(kDefaultLabelMargin);
+            for (i32 index = 0; index < 4; ++index)
+            {
+                const TValue value = property->Get<TValue>(instance);
+                auto *input = hb->AddChild<UI::InputBlock>(std::format("{:.2f}", get_component(value, index)));
+                input->GetSlotAs<UI::LinearSlot>().Margin({2.0f, 2.0f, 2.0f, 4.0f})
+                    .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto).FillRate(GetInputFillRate(4));
+                input->_on_content_changed += [property, instance, index, params, set_component](String content)
+                {
+                    if (auto value = StringUtils::ParseFloat(content); value.has_value())
+                    {
+                        TValue data = property->Get<TValue>(instance);
+                        set_component(data, index, *value);
+                        CompositeBuilder::SetPropertyValue(property, instance, data, params);
+                    }
+                };
+            }
+            auto *field = hb.get();
+            hb->AddPropertyObserver(std::move(property->AddObserver(instance,
+                [field, property, instance, get_component](void *)
+                {
+                    const TValue value = property->Get<TValue>(instance);
+                    for (i32 index = 0; index < 4; ++index)
+                    {
+                        if (auto *input = field->ChildAt(index + 1)->As<UI::InputBlock>(); input != nullptr)
+                            input->SetContent(std::format("{:.2f}", get_component(value, index)), false);
+                    }
+                })));
+            return hb;
+        }
+
+        Ref<UIElement> BuildPaddingField(const String &label, PropertyInfo *property, void *instance,
+                                         CompositeBuilder::Params *params)
+        {
+            return BuildFourComponentField<UI::Padding>(label, property, instance, params,
+                [](const UI::Padding &value, i32 index)
+                {
+                    return index == 0 ? value._l : (index == 1 ? value._t : (index == 2 ? value._r : value._b));
+                },
+                [](UI::Padding &value, i32 index, f32 component)
+                {
+                    if (index == 0) value._l = component;
+                    else if (index == 1) value._t = component;
+                    else if (index == 2) value._r = component;
+                    else value._b = component;
+                });
+        }
+
+        Ref<UIElement> BuildColorField(const String &label, PropertyInfo *property, void *instance,
+                                       CompositeBuilder::Params *params)
+        {
+            return BuildFourComponentField<Color>(label, property, instance, params,
+                [](const Color &value, i32 index) { return index == 0 ? value.r : (index == 1 ? value.g : (index == 2 ? value.b : value.a)); },
+                [](Color &value, i32 index, f32 component)
+                {
+                    if (index == 0) value.r = component;
+                    else if (index == 1) value.g = component;
+                    else if (index == 2) value.b = component;
+                    else value.a = component;
+                });
+        }
+
         template<typename VecT>
         Ref<UIElement> BuildVectorFieldImpl(const String &label, PropertyInfo *property, void *instance, CompositeBuilder::Params *params)
         {
@@ -235,15 +305,16 @@ namespace Ailu
                 };
             }
 
+            auto *field = hb.get();
             hb->AddPropertyObserver(
                     property->AddObserver(instance,
-                                          [hb, property, instance](void *)
+                                          [field, property, instance](void *)
                                           {
                                               auto vec = property->Get<VecT>(instance);
                                               for (int i = 0; i < Traits::kDimension; ++i)
                                               {
                                                   auto value = Traits::Get(vec, i);
-                                                  hb->ChildAt(i + 1)
+                                                  field->ChildAt(i + 1)
                                                           ->As<UI::InputBlock>()
                                                           ->SetContent(
                                                                   [&]()
@@ -296,10 +367,11 @@ namespace Ailu
                 };
             }
 
-            hb->AddPropertyObserver(std::move(property->AddObserver(instance, [hb, property, instance](void *)
+            auto *field = hb.get();
+            hb->AddPropertyObserver(std::move(property->AddObserver(instance, [field, property, instance](void *)
             { 
                 auto data = property->Get<T>(instance);
-                auto input_x = hb->ChildAt(1)->As<UI::InputBlock>();
+                auto input_x = field->ChildAt(1)->As<UI::InputBlock>();
                 String text;
                 if constexpr (std::is_floating_point_v<T>)
                     text = std::format("{:.2f}", data);
@@ -334,11 +406,12 @@ namespace Ailu
                     CompositeBuilder::SetPropertyValue(property, instance, value.value(), params);
                 }
             };
-            hb->AddPropertyObserver(std::move(property->AddObserver(instance, [hb, property, instance](void *)
+            auto *field = hb.get();
+            hb->AddPropertyObserver(std::move(property->AddObserver(instance, [field, property, instance](void *)
             { 
                 auto data = property->Get<T>(instance);
-                auto slider = hb->ChildAt(1)->As<UI::Slider>();
-                auto input = hb->ChildAt(2)->As<UI::InputBlock>();
+                auto slider = field->ChildAt(1)->As<UI::Slider>();
+                auto input = field->ChildAt(2)->As<UI::InputBlock>();
                 slider->SetValue(static_cast<f32>(data), false);
                 input->SetContent(FormatNumericFieldValue(data), false);
             })));
@@ -375,7 +448,8 @@ namespace Ailu
                 CompositeBuilder::SetPropertyValue(property, instance, static_cast<u32>(idx), params);
             };
 
-            hb->AddPropertyObserver(std::move(property->AddObserver(instance, [hb, property, instance](void *)
+            auto *field = hb.get();
+            hb->AddPropertyObserver(std::move(property->AddObserver(instance, [field, property, instance](void *)
             {
                 auto data = property->Get<u32>(instance);
                 const auto *et = dynamic_cast<const Enum *>(property->GetType());
@@ -383,7 +457,7 @@ namespace Ailu
                     return;
                 i32 idx = et->GetIndexByName(et->GetNameByEnum(data));
                 if (idx >= 0)
-                    hb->ChildAt(1)->As<UI::Dropdown>()->SetSelectedIndex(idx);
+                    field->ChildAt(1)->As<UI::Dropdown>()->SetSelectedIndex(idx);
             })));
 
             return hb;
@@ -395,6 +469,16 @@ namespace Ailu
             if (s_is_init)
                 return;
             s_is_init = true;
+            s_builders[StaticClass<UI::Padding>()] = [](const String &label, PropertyInfo *property, void *instance,
+                                                         Params *params) -> Ref<UIElement>
+            {
+                return BuildPaddingField(label, property, instance, params);
+            };
+            s_builders[StaticClass<Color>()] = [](const String &label, PropertyInfo *property, void *instance,
+                                                   Params *params) -> Ref<UIElement>
+            {
+                return BuildColorField(label, property, instance, params);
+            };
             s_builders[StaticClass<Vector2f>()] = [](const String &label, PropertyInfo *property, void *instance, Params *params) -> Ref<UIElement>
             {
                 return BuildVectorFieldImpl<Vector2f>(label, property, instance, params);
@@ -458,10 +542,11 @@ namespace Ailu
                 {
                     SetPropertyValue(property, instance, v, params);
                 };
-                hb->AddPropertyObserver(std::move(property->AddObserver(instance, [hb, property, instance](void *)
+                auto *field = hb.get();
+                hb->AddPropertyObserver(std::move(property->AddObserver(instance, [field, property, instance](void *)
                 { 
                     auto data = property->Get<bool>(instance);
-                    auto checkbox = hb->ChildAt(1)->As<UI::CheckBox>();
+                    auto checkbox = field->ChildAt(1)->As<UI::CheckBox>();
                     checkbox->SetChecked(data);
                 })));
                 return hb;
@@ -478,10 +563,11 @@ namespace Ailu
                 {
                     SetPropertyValue(property, instance, content, params);
                 };
-                hb->AddPropertyObserver(std::move(property->AddObserver(instance, [hb, property, instance](void *)
+                auto *field = hb.get();
+                hb->AddPropertyObserver(std::move(property->AddObserver(instance, [field, property, instance](void *)
                 {
                     auto data = property->Get<String>(instance);
-                    auto input_x = hb->ChildAt(1)->As<UI::InputBlock>();
+                    auto input_x = field->ChildAt(1)->As<UI::InputBlock>();
                     input_x->SetContent(data, false);
                 })));
                 return hb;

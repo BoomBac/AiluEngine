@@ -8,12 +8,12 @@
 
 local TestError = {}
 
-function TestError:OnCreate()
+function TestError:on_create()
     engine.log("TestError:OnCreate called")
     _G["reg_err_init_called"] = true
 end
 
-function TestError:OnUpdate(dt)
+function TestError:on_update(dt)
     -- Set flag BEFORE the error so C++ can verify OnUpdate was reached
     _G["reg_err_update_tried"] = true
     error("Intentional Lua error in test_error:OnUpdate for regression testing")

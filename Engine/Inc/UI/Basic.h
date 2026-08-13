@@ -223,6 +223,7 @@ namespace Ailu
             InputBlock(const String &content);
             void Update(f32 dt) final;
             void SetContent(const String& content, bool trigger_event = true);
+            void SetCursorToEnd();
             Vector2f MeasureDesiredSize() override;
             bool IsEditing() const { return _is_editing; }
             UIInputStyleOverride &GetStyleOverride() { return _style_override; }

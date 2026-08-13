@@ -1,0 +1,17 @@
+{
+  "assets": [
+    { "guid": "031ec560-e06f-4505-b00d-b740a0b282bd", "path": "editor://Icons/Assets/default.alasset", "type": "Ailu::Render::Texture2D" },
+    { "guid": "2b4e1f23-d077-4a03-b389-1addc4f8d248", "path": "editor://Icons/Assets/Mesh.alasset", "type": "Ailu::Render::Texture2D" },
+    { "guid": "f5bc9949-38fd-4e4f-8b34-9e0583d60e05", "path": "editor://Icons/Assets/Shader.alasset", "type": "Ailu::Render::Texture2D" },
+    { "guid": "9e964533-f813-4e6a-88ec-aaa26a8e4689", "path": "editor://Icons/Assets/Texture2D.alasset", "type": "Ailu::Render::Texture2D" },
+    { "guid": "ce7230a3-d3f2-4c24-b8e1-5646efae0390", "path": "editor://Icons/Assets/Scene.alasset", "type": "Ailu::Render::Texture2D" },
+    { "guid": "b39777a7-3cfe-4903-922f-6c4702c15cce", "path": "editor://Icons/Assets/Material.alasset", "type": "Ailu::Render::Texture2D" },
+    { "guid": "6ff62bff-cd04-4661-882e-b5db03834b44", "path": "editor://Icons/Assets/AnimationClip.alasset", "type": "Ailu::Render::Texture2D" },
+    { "guid": "a5cfce95-56e1-46a9-8c95-bd4f008865e9", "path": "editor://Icons/Assets/SkeletonMesh.alasset", "type": "Ailu::Render::Texture2D" },
+    { "guid": "9b31c753-5694-4472-8b0d-fba818f1f11d", "path": "editor://Icons/Assets/GraphAsset.alasset", "type": "Ailu::Render::Texture2D" },
+    { "guid": "e789b380-766f-4d42-b04b-4c06b2c83660", "path": "editor://Icons/Assets/Sprite.alasset", "type": "Ailu::Render::Texture2D" },
+    { "guid": "72e4290f-cfea-4ff5-b603-d56c575a58e0", "path": "editor://Icons/Assets/ScriptAsset.alasset", "type": "Ailu::Render::Texture2D" },
+    { "guid": "63e8d6b6-7578-43e5-a420-92b5021ad116", "path": "editor://Icons/Assets/PrefabAssetDocument.alasset", "type": "Ailu::Render::Texture2D" },
+    { "guid": "83cef41d-c7ba-4285-a880-a1206bd6dd8c", "path": "editor://Icons/Assets/AudioClip.alasset", "type": "Ailu::Render::Texture2D" }
+  ]
+}

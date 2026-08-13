@@ -37,6 +37,16 @@ namespace Ailu
             }
             return UI::UIEvent::EType::kMouseMove;
         }
+
+        static Vector2f GetEventMousePosition(const Ailu::Event &event)
+        {
+            if (event.GetEventType() == EEventType::kMouseMoved)
+            {
+                const auto &mouse_event = static_cast<const MouseMovedEvent &>(event);
+                return {mouse_event.GetX(), mouse_event.GetY()};
+            }
+            return Input::GetMousePosAccurate(event._window);
+        }
         UILayer::UILayer()
         {
         }
@@ -54,7 +64,7 @@ namespace Ailu
             Widget *cur_hover_widget = nullptr;
             UI::UIEvent ue;
             ue._type = EventToUIEvent(e);
-            ue._mouse_position = Input::GetMousePos(e._window);
+            ue._mouse_position = GetEventMousePosition(e);
             ue._mouse_delta = Input::GetMousePosDelta();
             const bool is_keyboard_event = (e.GetCategoryFlags() & EEventCategory::kEventCategoryKeyboard) != 0;
             const InputChannel route_channel = is_keyboard_event ? InputChannel::kKeyboard : InputChannel::kMouse;
@@ -115,8 +125,8 @@ namespace Ailu
                     for (i32 i = (i32) s_mgr->_widgets.size() - 1; i >= 0; --i)
                     {
                         Widget *widget = s_mgr->_widgets[i].get();
-                        if (widget->_visibility != EVisibility::kVisible || widget->_is_receive_event == false ||
-                            widget->Parent() != e._window || (modal_widget != nullptr && widget != modal_widget))
+                        if (widget->_visibility != EVisibility::kVisible || widget->Parent() != e._window ||
+                            (modal_widget != nullptr && widget != modal_widget))
                             continue;
                         UIElement *node = focused;
                         while (node != nullptr && node != widget->Root())
@@ -251,7 +261,7 @@ namespace Ailu
                 {
                     UI::UIEvent ue;
                     ue._type = UIEvent::EType::kMouseExit;
-                    ue._mouse_position = Input::GetMousePos(e._window);
+                    ue._mouse_position = GetEventMousePosition(e);
                     ue._mouse_delta = Input::GetMousePosDelta();
                     s_mgr->_pre_hover_widget->OnEvent(ue);
                 }

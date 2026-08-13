@@ -371,6 +371,7 @@ public:                                                                 \
             BlendSpace _blend_space;
             //0 clip,1 blend space,2 anim graph
             i16 _anim_type;
+            f32 _anim_speed = 1.0f;
             EMotionVectorType _motion_vector_type = EMotionVectorType::kPerObject;
         };
 

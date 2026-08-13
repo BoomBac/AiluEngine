@@ -1,0 +1,11 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "f5bc9949-38fd-4e4f-8b34-9e0583d60e05",
+        "_asset_type": "Ailu::Render::Texture2D",
+        "_asset_name": "Shader",
+        "_dependencies": []
+    },
+    "_file": "Shader.png",
+    "_is_srgb": true
+}

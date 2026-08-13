@@ -6,6 +6,7 @@
 #include "UI/Container.h"
 
 #include <functional>
+#include <memory>
 #include <optional>
 
 namespace Ailu
@@ -34,6 +35,8 @@ namespace Ailu
             static UI::CheckBox *AddCheckBoxRow(UI::UIElement *parent, const String &label, bool initial_state);
 
             static void ShowActionMenuAt(Vector2f popup_pos, const Vector<PopupMenuAction> &actions);
+            static void BeginInlineTextInput(UI::UIElement *parent, UI::Text *display, const String &initial_value,
+                                             const std::function<std::optional<String>(const String &)> &on_submit);
             static void ShowTextInputAt(Vector2f popup_pos, const String &title, const String &initial_value,
                                         const std::function<std::optional<String>(const String &)> &on_submit);
             static void ShowConfirmAt(Vector2f popup_pos, const String &message, const std::function<void()> &on_confirm,

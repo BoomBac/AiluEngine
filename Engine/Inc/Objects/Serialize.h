@@ -273,37 +273,8 @@ namespace Ailu
         GENERATED_BODY()
     public:
         virtual ~SerializeObject() = default;
-        virtual void Serialize(FArchive &ar) 
-        {
-            const Type *class_type = GetType();
-            auto sar = dynamic_cast<FStructedArchive *>(&ar);
-            if (sar != nullptr)
-            {
-                sar->BeginObject("_type_name");
-                *sar << class_type->FullName();
-                sar->EndObject();
-            }
-            while (class_type != nullptr)
-            {
-                for (auto &p: class_type->GetProperties())
-                {
-                    p.Serialize(this, ar);
-                }
-                class_type = class_type->BaseType();
-            }
-        }
-        virtual void Deserialize(FArchive &ar)
-        {
-            const Type *class_type = GetType();
-            while (class_type != nullptr)
-            {
-                for (auto &p: class_type->GetProperties())
-                {
-                    p.Deserialize(this, ar);
-                }
-                class_type = class_type->BaseType();
-            }
-        }
+        virtual void Serialize(FArchive &ar);
+        virtual void Deserialize(FArchive &ar);
         virtual void PostDeserialize() { /*optional override*/ }
     };
 
@@ -330,6 +301,8 @@ namespace Ailu
                 const Enum *enum_type = StaticEnum<T>();
                 if (enum_type == nullptr)
                 {
+                    if (sar && name)
+                        sar->EndObject();
                     LOG_ERROR(" SerializerWrapper::Serialize(object: {}) : enum_type is nullptr", name ? *name : "noname");
                     return;
                 }
@@ -381,6 +354,8 @@ namespace Ailu
                 const Enum *enum_type = StaticEnum<T>();
                 if (enum_type == nullptr)
                 {
+                    if (sar && name)
+                        sar->EndObject();
                     LOG_ERROR(" SerializerWrapper::Serialize(object: {}) : enum_type is nullptr", name ? *name : "noname");
                     return;
                 }

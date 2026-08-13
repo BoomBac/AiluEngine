@@ -1,0 +1,11 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "9b31c753-5694-4472-8b0d-fba818f1f11d",
+        "_asset_type": "Ailu::Render::Texture2D",
+        "_asset_name": "GraphAsset",
+        "_dependencies": []
+    },
+    "_file": "GraphAsset.png",
+    "_is_srgb": true
+}

@@ -4,8 +4,24 @@
 #endif 
 #include "Objects/ReflectTemplate.h"
 #define __SCRIPTPHYSICS2D_GEN_H__
+//Struct ScriptRaycastHit2D begin...........................
+#define SCRIPTPHYSICS2D_GEN_H_17_GENERATED_BODY \
+                            private: \
+                                friend const Type* Z_Construct_ScriptRaycastHit2D_Type();\
+                                static const Type* GetPrivateStaticClass();\
+                            public:\
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                const Type  *GetType();
+                            namespace Ailu {class Type;}
+namespace Ailu{
+struct ScriptRaycastHit2D ;
+}
+template<>
+AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::ScriptRaycastHit2D>();
+//Struct ScriptRaycastHit2D end...........................
+
 //Struct ScriptPhysics2D begin...........................
-#define SCRIPTPHYSICS2D_GEN_H_13_GENERATED_BODY \
+#define SCRIPTPHYSICS2D_GEN_H_38_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_ScriptPhysics2D_Type();\
                                 static const Type* GetPrivateStaticClass();\

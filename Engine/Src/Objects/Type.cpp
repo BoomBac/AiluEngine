@@ -83,7 +83,7 @@ namespace Ailu
     Ailu::PropertyObserverHandle::~PropertyObserverHandle()
     {
         if (_prop)
-            _prop->RemoveObserver(_inst);
+            _prop->RemoveObserver(_inst, _id);
     }
 
     void PropertyInfo::Notify(void *instance, EPropertyChangeSource source) const
@@ -193,6 +193,23 @@ namespace Ailu
         }
         return s_global_types[name];
     };
+
+    Vector<const Type *> Type::GetAllTypes()
+    {
+        while (!s_global_register.empty())
+        {
+            auto iter = s_global_register.begin();
+            RegisterFunc register_func = std::move(iter->second);
+            s_global_register.erase(iter);
+            register_func();
+        }
+
+        Vector<const Type *> types;
+        types.reserve(s_global_types.size());
+        for (const auto &[name, type]: s_global_types)
+            types.emplace_back(type);
+        return types;
+    }
 
 
     Type::Type()

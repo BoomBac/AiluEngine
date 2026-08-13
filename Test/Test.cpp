@@ -13,6 +13,10 @@
 #include <Objects/Type.h>
 #include <Render/2D/SpriteBatcher.h>
 #include <Scene/EntityReference.h>
+#include <Assets/WidgetAsset.h>
+#include <UI/Basic.h>
+#include <UI/Container.h>
+#include <UI/Widget.h>
 
 #include <algorithm>
 #include <array>
@@ -81,6 +85,9 @@ namespace Ailu::Editor::AIAssistantTests
 
 namespace
 {
+    int s_ui_element_roundtrip_failure = 0;
+    int s_widget_asset_roundtrip_failure = 0;
+
     struct TestResult
     {
         u32 _passed = 0u;
@@ -1310,6 +1317,259 @@ namespace
         return true;
     }
 
+    bool TestUIElementTreeSerializationRoundtrip()
+    {
+        Enum::InitTypeInfo();
+
+        auto root = MakeRef<UI::Canvas>();
+        root->Name("RootCanvas");
+
+        UI::VerticalBox *content = root->AddChild<UI::VerticalBox>();
+        content->Name("Content");
+        auto &content_slot = content->GetSlotAs<UI::CanvasSlot>();
+        content_slot.Position({32.0f, 48.0f}).Size({320.0f, 180.0f}).Anchor({0.25f, 0.5f});
+
+        UI::Text *label = content->AddChild<UI::Text>("Widget editor round-trip");
+        label->Name("Title");
+        label->GetSlotAs<UI::LinearSlot>().Size({300.0f, 24.0f})
+             .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed).FillRate(2.0f);
+
+        UI::Button *button = content->AddChild<UI::Button>("Confirm");
+        button->Name("ConfirmButton");
+        button->GetSlotAs<UI::LinearSlot>().Size({300.0f, 36.0f})
+              .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed).FillRate(1.0f);
+
+        const String root_name = "_ui_element_root";
+        JsonArchive save_archive;
+        SerializerWrapper<UI::UIElement>::Serialize(root.get(), save_archive, &root_name);
+        const String json = save_archive.SaveToString();
+        if (json.find("RootCanvas") == String::npos)
+        {
+            s_ui_element_roundtrip_failure = 11;
+            return false;
+        }
+
+        JsonArchive load_archive;
+        if (!load_archive.LoadFromString(json))
+        {
+            s_ui_element_roundtrip_failure = 2;
+            return false;
+        }
+
+        auto loaded_root = MakeRef<UI::Canvas>();
+        SerializerWrapper<UI::UIElement>::Deserialize(loaded_root.get(), load_archive, &root_name);
+        if (loaded_root->Name() != "RootCanvas")
+        {
+            s_ui_element_roundtrip_failure = 3;
+            return false;
+        }
+        if (loaded_root->GetChildren().size() != 1u)
+        {
+            s_ui_element_roundtrip_failure = 10;
+            return false;
+        }
+
+        UI::UIElement *loaded_content_element = loaded_root->ChildAt(0);
+        if (loaded_content_element == nullptr)
+        {
+            s_ui_element_roundtrip_failure = 4;
+            return false;
+        }
+        UI::VerticalBox *loaded_content = loaded_content_element->As<UI::VerticalBox>();
+        if (loaded_content == nullptr || loaded_content->Name() != "Content" ||
+            loaded_content->GetParent() != loaded_root.get() || loaded_content->GetHierarchyDepth() != 1u)
+        {
+            s_ui_element_roundtrip_failure = 4;
+            return false;
+        }
+
+        const auto &loaded_content_slot = loaded_content->GetSlot();
+        const auto *loaded_canvas_slot = dynamic_cast<const UI::CanvasSlot *>(loaded_content_slot.get());
+        if (loaded_canvas_slot == nullptr || loaded_canvas_slot->_position != Vector2f(32.0f, 48.0f) ||
+            loaded_canvas_slot->_size != Vector2f(320.0f, 180.0f) ||
+            loaded_canvas_slot->_anchor != Vector2f(0.25f, 0.5f))
+        {
+            s_ui_element_roundtrip_failure = 5;
+            return false;
+        }
+
+        if (loaded_content->GetChildren().size() != 2u)
+        {
+            s_ui_element_roundtrip_failure = 6;
+            return false;
+        }
+
+        UI::UIElement *loaded_label_element = loaded_content->ChildAt(0);
+        UI::UIElement *loaded_button_element = loaded_content->ChildAt(1);
+        if (loaded_label_element == nullptr || loaded_button_element == nullptr)
+        {
+            s_ui_element_roundtrip_failure = 7;
+            return false;
+        }
+        UI::Text *loaded_label = loaded_label_element->As<UI::Text>();
+        UI::Button *loaded_button = loaded_button_element->As<UI::Button>();
+        if (loaded_label == nullptr || loaded_button == nullptr ||
+            loaded_label->GetText() != "Widget editor round-trip" || loaded_button->GetText() != "Confirm" ||
+            loaded_label->GetParent() != loaded_content ||
+            loaded_button->GetParent() != loaded_content || loaded_label->GetHierarchyDepth() != 2u ||
+            loaded_button->GetHierarchyDepth() != 2u)
+        {
+            s_ui_element_roundtrip_failure = 7;
+            return false;
+        }
+
+        const auto *loaded_linear_slot = dynamic_cast<const UI::LinearSlot *>(loaded_label->GetSlot().get());
+        if (loaded_linear_slot == nullptr || loaded_linear_slot->_size != Vector2f(300.0f, 24.0f) ||
+            loaded_linear_slot->_size_policy_h != UI::ESizePolicy::kFill ||
+            loaded_linear_slot->_size_policy_v != UI::ESizePolicy::kFixed || loaded_linear_slot->_fill_rate != 2.0f)
+        {
+            s_ui_element_roundtrip_failure = 8;
+            return false;
+        }
+
+        loaded_root->Arrange(0.0f, 0.0f, 640.0f, 360.0f);
+        if (loaded_root->GetArrangeRect() != Vector4f(0.0f, 0.0f, 640.0f, 360.0f))
+        {
+            s_ui_element_roundtrip_failure = 9;
+            return false;
+        }
+        return true;
+    }
+
+    bool TestWidgetAssetDocumentSerializationRoundtrip()
+    {
+        Enum::InitTypeInfo();
+
+        WidgetAsset asset("MainHud");
+        if (asset.DesignSize() != Vector2f(1920.0f, 1080.0f) || asset.Root() == nullptr ||
+            asset.Root()->As<UI::Canvas>() == nullptr || asset.Root()->Name() != "RootCanvas")
+        {
+            s_widget_asset_roundtrip_failure = 1;
+            return false;
+        }
+
+        asset.SetDesignSize({1280.0f, 720.0f});
+        UI::Text *title = asset.Root()->AddChild<UI::Text>("Widget Asset");
+        title->Name("Title");
+        title->GetSlotAs<UI::CanvasSlot>().Position({64.0f, 32.0f}).Size({400.0f, 48.0f});
+
+        WidgetAssetDocument source;
+        source._header._asset_name = asset.Name();
+        source._header._asset_type = WidgetAsset::StaticType()->FullName();
+        source._design_size = asset.DesignSize();
+        source._root = asset.RootRef();
+
+        const String document_name = "_widget_asset";
+        JsonArchive save_archive;
+        SerializerWrapper<WidgetAssetDocument>::Serialize(&source, save_archive, &document_name);
+        const String json = save_archive.SaveToString();
+        if (json.find("RootCanvas") == String::npos || json.find("Widget Asset") == String::npos)
+        {
+            s_widget_asset_roundtrip_failure = 2;
+            return false;
+        }
+
+        JsonArchive load_archive;
+        if (!load_archive.LoadFromString(json))
+        {
+            s_widget_asset_roundtrip_failure = 3;
+            return false;
+        }
+
+        WidgetAssetDocument loaded;
+        SerializerWrapper<WidgetAssetDocument>::Deserialize(&loaded, load_archive, &document_name);
+        if (loaded._header._asset_name != "MainHud" || loaded._header._asset_type != WidgetAsset::StaticType()->FullName() ||
+            loaded._design_size != Vector2f(1280.0f, 720.0f) || loaded._root == nullptr ||
+            loaded._root->As<UI::Canvas>() == nullptr || loaded._root->Name() != "RootCanvas" ||
+            loaded._root->GetChildren().size() != 1u)
+        {
+            s_widget_asset_roundtrip_failure = 4;
+            return false;
+        }
+
+        UI::Text *loaded_title = loaded._root->ChildAt(0)->As<UI::Text>();
+        const auto *slot = loaded_title != nullptr ? dynamic_cast<const UI::CanvasSlot *>(loaded_title->GetSlot().get()) : nullptr;
+        const bool is_valid = loaded_title != nullptr && loaded_title->Name() == "Title" &&
+                              loaded_title->GetText() == "Widget Asset" && slot != nullptr &&
+                              slot->_position == Vector2f(64.0f, 32.0f) && slot->_size == Vector2f(400.0f, 48.0f);
+        if (!is_valid)
+            s_widget_asset_roundtrip_failure = 5;
+        return is_valid;
+    }
+
+    bool TestWidgetAssetHierarchyRoundtrip()
+    {
+        Enum::InitTypeInfo();
+
+        WidgetAsset asset("HierarchyWidget");
+        UI::Text *first = asset.Root()->AddChild<UI::Text>("First");
+        first->Name("First");
+        UI::Text *second = asset.Root()->AddChild<UI::Text>("Second");
+        second->Name("Second");
+        UI::VerticalBox *panel = asset.Root()->AddChild<UI::VerticalBox>();
+        panel->Name("Panel");
+        if (!asset.Root()->MoveChild(panel, 0u)) return false;
+
+        Ref<UI::UIElement> second_ref;
+        for (const Ref<UI::UIElement> &child : asset.Root()->GetChildren())
+        {
+            if (child.get() == second)
+            {
+                second_ref = child;
+                break;
+            }
+        }
+        if (second_ref == nullptr) return false;
+        panel->AddChild(std::move(second_ref));
+
+        WidgetAssetDocument source;
+        source._header._asset_name = asset.Name();
+        source._header._asset_type = WidgetAsset::StaticType()->FullName();
+        source._root = asset.RootRef();
+        const String document_name = "_widget_hierarchy";
+        JsonArchive save_archive;
+        SerializerWrapper<WidgetAssetDocument>::Serialize(&source, save_archive, &document_name);
+
+        JsonArchive load_archive;
+        if (!load_archive.LoadFromString(save_archive.SaveToString())) return false;
+        WidgetAssetDocument loaded;
+        SerializerWrapper<WidgetAssetDocument>::Deserialize(&loaded, load_archive, &document_name);
+        if (loaded._root == nullptr || loaded._root->GetChildren().size() != 2u || loaded._root->ChildAt(0)->Name() != "Panel" ||
+            loaded._root->ChildAt(1)->Name() != "First")
+            return false;
+
+        UI::UIElement *loaded_panel = loaded._root->ChildAt(0);
+        return loaded_panel->GetChildren().size() == 1u && loaded_panel->ChildAt(0)->Name() == "Second" &&
+               loaded_panel->ChildAt(0)->GetParent() == loaded_panel;
+    }
+
+    bool TestWidgetAssetRuntimeInstantiation()
+    {
+        Enum::InitTypeInfo();
+
+        WidgetAsset asset("MainHud");
+        asset.SetDesignSize({1280.0f, 720.0f});
+        UI::Text *title = asset.Root()->AddChild<UI::Text>("Runtime title");
+        title->Name("Title");
+        title->GetSlotAs<UI::CanvasSlot>().Position({64.0f, 32.0f}).Size({400.0f, 48.0f});
+
+        Ref<UI::Widget> instance = asset.CreateInstance();
+        if (instance == nullptr || instance->GetSize() != Vector2f(1280.0f, 720.0f) || instance->Root() == nullptr ||
+            instance->Root() == asset.Root() || instance->Root()->As<UI::Canvas>() == nullptr ||
+            instance->Root()->GetChildren().size() != 1u)
+            return false;
+
+        UI::Text *instance_title = instance->Root()->ChildAt(0)->As<UI::Text>();
+        if (instance_title == nullptr || instance_title == title || instance_title->GetParent() != instance->Root() ||
+            instance_title->GetText() != "Runtime title")
+            return false;
+
+        instance_title->Name("RuntimeOnlyTitle");
+        instance_title->GetSlotAs<UI::CanvasSlot>().Position({128.0f, 64.0f});
+        const UI::CanvasSlot &asset_slot = title->GetSlotAs<UI::CanvasSlot>();
+        return title->Name() == "Title" && asset_slot._position == Vector2f(64.0f, 32.0f);
+    }
+
     void RunEntityGuidUnitTests()
     {
         TestResult result;
@@ -1320,6 +1580,10 @@ namespace
         RunTest(result, "SceneDocument V1 legacy deserialize", TestSceneDocumentV1LegacyDeserialize);
         RunTest(result, "EntityReference IsValid", TestEntityReferenceIsValid);
         RunTest(result, "EntityReference serialization roundtrip", TestEntityReferenceSerializationRoundtrip);
+        RunTest(result, "UIElement tree serialization roundtrip", TestUIElementTreeSerializationRoundtrip);
+        RunTest(result, "WidgetAsset document serialization roundtrip", TestWidgetAssetDocumentSerializationRoundtrip);
+        RunTest(result, "WidgetAsset hierarchy roundtrip", TestWidgetAssetHierarchyRoundtrip);
+        RunTest(result, "WidgetAsset runtime instantiation", TestWidgetAssetRuntimeInstantiation);
 
         std::cout << "========================================\n";
         std::cout << "Entity GUID unit tests passed: " << result._passed << '\n';
@@ -1475,6 +1739,39 @@ int main(int argc, char **argv)
     Allocator::Init();
     // DEBUG 构建下部分引擎系统（如 SceneMgr 构造的 TIMER_BLOCK）依赖 TimeMgr。
     TimeMgr::Init();
+
+    if (argc == 2 && std::strcmp(argv[1], "--ui-element-roundtrip") == 0)
+    {
+        TestResult result;
+        RunTest(result, "UIElement tree serialization roundtrip", TestUIElementTreeSerializationRoundtrip);
+        Allocator::Shutdown();
+        LogMgr::Shutdown();
+        return result._failed == 0u ? EXIT_SUCCESS : s_ui_element_roundtrip_failure;
+    }
+    if (argc == 2 && std::strcmp(argv[1], "--widget-asset-roundtrip") == 0)
+    {
+        TestResult result;
+        RunTest(result, "WidgetAsset document serialization roundtrip", TestWidgetAssetDocumentSerializationRoundtrip);
+        Allocator::Shutdown();
+        LogMgr::Shutdown();
+        return result._failed == 0u ? EXIT_SUCCESS : s_widget_asset_roundtrip_failure;
+    }
+    if (argc == 2 && std::strcmp(argv[1], "--widget-asset-instance") == 0)
+    {
+        TestResult result;
+        RunTest(result, "WidgetAsset runtime instantiation", TestWidgetAssetRuntimeInstantiation);
+        Allocator::Shutdown();
+        LogMgr::Shutdown();
+        return result._failed == 0u ? EXIT_SUCCESS : EXIT_FAILURE;
+    }
+    if (argc == 2 && std::strcmp(argv[1], "--widget-hierarchy-roundtrip") == 0)
+    {
+        TestResult result;
+        RunTest(result, "WidgetAsset hierarchy roundtrip", TestWidgetAssetHierarchyRoundtrip);
+        Allocator::Shutdown();
+        LogMgr::Shutdown();
+        return result._failed == 0u ? EXIT_SUCCESS : EXIT_FAILURE;
+    }
 
     RunAutomationCoreTests();
     RunAutomationReadModelTests();

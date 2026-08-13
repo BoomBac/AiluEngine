@@ -11,13 +11,13 @@
 #include "Framework/Math/Color.h"
 #include "Object.h"
 #include "ReflectTemplate.h"
-#include "generated/Type.gen.h"
 #include <any>
 #include <functional>
 #include <set>
 #include <tuple>
 #include <utility>
 #include <variant>
+#include "generated/Type.gen.h"
 
 namespace Ailu
 {
@@ -179,19 +179,21 @@ namespace Ailu
     class AILU_API PropertyObserverHandle : public NonCopyable
     {
     public:
-        PropertyObserverHandle() : _prop(nullptr), _inst(nullptr) {}
-        PropertyObserverHandle(PropertyInfo* prop, void* inst)
-            : _prop(prop), _inst(inst) {}
+        PropertyObserverHandle() : _prop(nullptr), _inst(nullptr), _id(0u) {}
+        PropertyObserverHandle(PropertyInfo* prop, void* inst, u64 id)
+            : _prop(prop), _inst(inst), _id(id) {}
 
         ~PropertyObserverHandle();
         PropertyObserverHandle(PropertyObserverHandle&& other) noexcept
             : _prop(std::exchange(other._prop, nullptr)),
-            _inst(std::exchange(other._inst, nullptr))
+            _inst(std::exchange(other._inst, nullptr)),
+            _id(std::exchange(other._id, 0u))
         {}
 
     private:
         PropertyInfo* _prop;
         void* _inst;
+        u64 _id;
     };
 
     class AILU_API PropertyInfo : public MemberInfo
@@ -250,13 +252,17 @@ namespace Ailu
         }
         PropertyObserverHandle AddObserver(void* instance, Observer cb)
         {
-            _observers.emplace_back(instance, std::move(cb));
-            return std::move(PropertyObserverHandle{this, instance});
+            const u64 observer_id = _next_observer_id++;
+            _observers.emplace_back(instance, observer_id, std::move(cb));
+            return PropertyObserverHandle{this, instance, observer_id};
         }
 
-        void RemoveObserver(void* instance)
+        void RemoveObserver(void* instance, u64 observer_id)
         {
-            std::erase_if(_observers,[instance](const auto &entry)->bool{ return entry._instance == instance; });
+            std::erase_if(_observers, [instance, observer_id](const auto &entry)
+            {
+                return entry._instance == instance && entry._id == observer_id;
+            });
         }
     public:
         SerializeFunc _serialize_fn = nullptr;
@@ -272,10 +278,15 @@ namespace Ailu
         struct ObserverEntry
         {
             void* _instance;
+            u64 _id;
             Observer _callback;
+
+            ObserverEntry(void *instance, u64 id, Observer callback)
+                : _instance(instance), _id(id), _callback(std::move(callback)) {}
         };
 
         mutable Vector<ObserverEntry> _observers;
+        u64 _next_observer_id = 1u;
     };
 
 
@@ -512,6 +523,7 @@ namespace Ailu
     public:
         static void RegisterType(Type *type);
         static const Type *Find(const String &name);
+        static Vector<const Type *> GetAllTypes();
 
     public:
         Type();
@@ -520,6 +532,7 @@ namespace Ailu
         [[nodiscard]] bool IsClass() const;
         [[nodiscard]] bool IsAbstract() const;
         [[nodiscard]] bool IsEnum() const { return _is_enum; };
+        [[nodiscard]] bool CanCreateInstance() const { return _constructor != nullptr; }
         template<typename T>
         [[nodiscard]] T *CreateInstance() const
         {

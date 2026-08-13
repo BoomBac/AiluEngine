@@ -185,6 +185,7 @@ namespace Ailu
             void SetData(u8 *data, u32 size, u8 stream_index, u32 offset);
             u8 *GetStream(u8 index) { return _stream_data[index]._data; };
             void SetLayout(VertexBufferLayout layout) { _buffer_layout = std::move(layout); };
+            void EnableBindlessSRV(bool enable = true) { _bindless_srv_enabled = enable; }
             [[nodiscard]] const VertexBufferLayout &GetLayout() const { return _buffer_layout; };
             [[nodiscard]] u64 GetViewVersion() const { return _view_version; }
             u32 GetVertexCount() const { return _vertices_count; };
@@ -203,6 +204,7 @@ namespace Ailu
             Vector<StreamData> _stream_data;
             std::map<std::pair<String, u8>, u8> _buffer_layout_indexer;
             Vector<i32> _bindless_srv_indices;
+            bool _bindless_srv_enabled = true;
             u64 _view_version = 0u;
         };
 
@@ -217,6 +219,7 @@ namespace Ailu
             [[nodiscard]] u32 GetCount() const { return _count; };
             u8 *GetData() { return _data; };
             void SetData(u8 *data, u32 size);
+            void EnableBindlessSRV(bool enable = true) { _bindless_srv_enabled = enable; }
             virtual void Resize(u32 new_size) = 0;
             [[nodiscard]] u64 GetViewVersion() const { return _view_version; }
             [[nodiscard]] i32 GetBindlessSRVIndex() const { return _bindless_srv_index; }
@@ -227,6 +230,7 @@ namespace Ailu
             bool _is_dynamic;
             u8 *_data = nullptr;
             i32 _bindless_srv_index = -1;
+            bool _bindless_srv_enabled = true;
             u64 _view_version = 0u;
         };
 
@@ -264,7 +268,7 @@ namespace Ailu
         private:
             struct ConstbufferNode
             {
-                ConstantBuffer *_buffer;
+                Ref<ConstantBuffer> _buffer;
                 u64 _access_frame_count = 0u;
             };
             std::multimap<u32, ConstbufferNode> _buffer_pool;

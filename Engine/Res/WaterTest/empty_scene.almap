@@ -6,7 +6,7 @@
         "_asset_name": "empty_scene",
         "_dependencies": []
     },
-    "_scene_format_version": 2,
+    "_scene_format_version": 3,
     "_entities": [{
             "_entity_guid": "09740016-4a70-441e-b6d6-3a476a65f6a9",
             "_tag_component": {
@@ -17,7 +17,7 @@
             "_disabled_components": [],
             "_transform_component": {
                 "_position": [14.5179, 3.0787, 8.7868],
-                "_rotation": [0.36, -0.1849, 0.0728, 0.9114],
+                "_rotation": [0.3598, -0.1847, 0.0727, 0.9114],
                 "_scale": [0.9998, 0.9998, 0.9998]
             },
             "_light_component": {
@@ -102,7 +102,7 @@
             },
             "_disabled_components": [],
             "_transform_component": {
-                "_position": [4.3144, 3.5541, -0.0],
+                "_position": [-4.1553, 3.5541, 0.0],
                 "_rotation": [0.0, -0.0, 0.0, 1.0],
                 "_scale": [1.0, 1.0, 1.0]
             },
@@ -137,6 +137,16 @@
                         "_string_value": "",
                         "_vector_value": [0.0, 0.0, 0.0, 0.0],
                         "_guid_value": "e9bfde03-b5ab-4282-be2b-8fdc88f873ad",
+                        "_is_orphan": true
+                    }, {
+                        "_name": "bullet_prefab",
+                        "_type": "kAsset",
+                        "_bool_value": false,
+                        "_int_value": 0,
+                        "_float_value": 0.0,
+                        "_string_value": "",
+                        "_vector_value": [0.0, 0.0, 0.0, 0.0],
+                        "_guid_value": "57a4a5f9-85c3-4bfa-958e-1db6d5a0ece1",
                         "_is_orphan": false
                     }]
             },
@@ -177,7 +187,7 @@
                 "_sorting_layer": 0,
                 "_order_in_layer": 0,
                 "_blend_mode": 0,
-                "_flip_x": false,
+                "_flip_x": true,
                 "_flip_y": false,
                 "_visible": true
             }
@@ -205,6 +215,64 @@
                 "_is_update_every_tick": false
             }
         }, {
+            "_entity_guid": "66e94a31-af92-4a12-a79e-a4f852fe72d3",
+            "_tag_component": {
+                "_name": "enemy_c3",
+                "_tag": "Untagged",
+                "_layer_mask": 1
+            },
+            "_disabled_components": [],
+            "_transform_component": {
+                "_position": [0.0, 3.6064, 0.0],
+                "_rotation": [0.0, -0.0, 0.0, 1.0],
+                "_scale": [1.0, 1.0, 1.0]
+            },
+            "_script_component": {
+                "_script_asset": "cb131683-ef8a-4097-8210-e990392a57bb",
+                "_properties": []
+            },
+            "_hierarchy_component": {
+                "_parent_guid": "null",
+                "_sibling_index": 0,
+                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
+                "_enabled": true
+            },
+            "_rigidbody_2d_component": {
+                "_type": "kDynamic",
+                "_gravity_scale": 1.0,
+                "_linear_damping": 0.0,
+                "_angular_damping": 0.0,
+                "_fixed_rotation": false,
+                "_continuous": false,
+                "_allow_sleep": true
+            },
+            "_collider_2d_component": {
+                "_shapes": [{
+                        "_type": "kBox",
+                        "_center": [0.0, 0.0],
+                        "_rotation": 0.0,
+                        "_size": [1.0, 1.0],
+                        "_radius": 0.5,
+                        "_height": 1.0,
+                        "_is_trigger": false,
+                        "_density": 1.0,
+                        "_friction": 0.3,
+                        "_restitution": 0.0,
+                        "_layer": 0
+                    }]
+            },
+            "_sprite_renderer_component": {
+                "_sprite_guid": "ab604a5e-ea31-41c7-954c-68ef76948f34",
+                "_material_guid": "",
+                "_color": [1.0, 1.0, 1.0, 1.0],
+                "_sorting_layer": 0,
+                "_order_in_layer": 0,
+                "_blend_mode": 0,
+                "_flip_x": true,
+                "_flip_y": false,
+                "_visible": true
+            }
+        }, {
             "_entity_guid": "b6951e1d-1a1d-4fcb-84cf-553ae4a9ecb9",
             "_tag_component": {
                 "_name": "main_camera",
@@ -213,8 +281,8 @@
             },
             "_disabled_components": [],
             "_transform_component": {
-                "_position": [0.2637, 3.7713, 6.603],
-                "_rotation": [-0.0, 1.0, -0.0, -0.0],
+                "_position": [0.2637, 3.7713, -8.2826],
+                "_rotation": [0.0, -0.0, 0.0, 1.0],
                 "_scale": [1.0, 1.0, 1.0]
             },
             "_hierarchy_component": {
@@ -231,5 +299,14 @@
                 "_fov_h": 60.0,
                 "_size": 10.0
             }
+        }],
+    "_prefab_instances": [{
+            "_prefab_asset": "57a4a5f9-85c3-4bfa-958e-1db6d5a0ece1",
+            "_root_entity": "996aad63-e3b0-4f15-a6f8-a30cb8919a2f",
+            "_overrides": []
+        }, {
+            "_prefab_asset": "cf92504d-2579-4cd1-8d14-9477565bec86",
+            "_root_entity": "66e94a31-af92-4a12-a79e-a4f852fe72d3",
+            "_overrides": []
         }]
 }

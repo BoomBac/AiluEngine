@@ -14,7 +14,7 @@ test_basic_loaded = true
 
 local TestBasic = {}
 
-function TestBasic:OnCreate()
+function TestBasic:on_create()
     engine.log("TestBasic:OnCreate called")
     self.init_called = true
 
@@ -30,7 +30,7 @@ function TestBasic:OnCreate()
     end
 end
 
-function TestBasic:OnUpdate(dt)
+function TestBasic:on_update(dt)
     engine.log("TestBasic:OnUpdate called, dt=" .. tostring(dt))
     self.update_called = true
     self.last_dt = dt

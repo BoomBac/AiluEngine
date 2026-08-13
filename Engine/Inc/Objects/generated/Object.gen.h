@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __OBJECT_GEN_H__
 //Class Object begin...........................
-#define OBJECT_GEN_H_17_GENERATED_BODY \
+#define OBJECT_GEN_H_21_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_Object_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -13,7 +13,6 @@
                                 static const Type *StaticType() {return GetPrivateStaticClass();};\
                                 virtual const Type  *GetType();
                             namespace Ailu {class Type;}
-#define OBJECT_GEN_H_21_GENERATED_BODY OBJECT_GEN_H_17_GENERATED_BODY
 namespace Ailu{
 class Object ;
 }

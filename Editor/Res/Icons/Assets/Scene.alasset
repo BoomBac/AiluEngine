@@ -1,0 +1,11 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "ce7230a3-d3f2-4c24-b8e1-5646efae0390",
+        "_asset_type": "Ailu::Render::Texture2D",
+        "_asset_name": "Scene",
+        "_dependencies": []
+    },
+    "_file": "Scene.png",
+    "_is_srgb": true
+}

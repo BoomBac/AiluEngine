@@ -52,8 +52,7 @@ namespace Ailu
             for (auto &property: settings_type->GetProperties())
                 property.Deserialize(&_settings, settings_archive);
         }
-        if (_settings._physics_2d_collision_masks.size() != ProjectSettings::kPhysics2DLayerCount)
-            _settings.ResetPhysics2DLayerCollisionMatrix();
+        _settings.EnsureValid();
         return true;
     }
 

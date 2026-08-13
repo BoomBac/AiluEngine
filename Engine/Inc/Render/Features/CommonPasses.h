@@ -94,8 +94,8 @@ namespace Ailu
             RDG::RGHandle _radiance_handle;
             RDG::RGHandle _env_handle;
             CBufferPerCameraData _camera_data[6];
-            Scope<ConstantBuffer> _per_camera_cb[6];
-            Scope<ConstantBuffer> _per_obj_cb;
+            Ref<ConstantBuffer> _per_camera_cb[6];
+            Ref<ConstantBuffer> _per_obj_cb;
             Matrix4x4f _world_mat;
             Rect _cubemap_rect;
             Rect _ibl_rect;
@@ -149,7 +149,7 @@ namespace Ailu
 
         private:
             Ref<Material> _p_skybox_material;
-            Scope<ConstantBuffer> _p_cbuffer;
+            Ref<ConstantBuffer> _p_cbuffer;
             Ref<ComputeShader> _p_lut_gen;
             ComputeShaderKernelId _transmittance_lut_gen_kernel = kInvalidComputeShaderKernelId;
             ComputeShaderKernelId _mult_scatter_lut_gen_kernel = kInvalidComputeShaderKernelId;
@@ -172,7 +172,7 @@ namespace Ailu
             void EndPass(GraphicsContext *context) final;
 
         private:
-            Vector<Scope<ConstantBuffer>> _p_cbuffers;
+            Vector<Ref<ConstantBuffer>> _p_cbuffers;
         };
 
         class WireFramePass : public RenderPass

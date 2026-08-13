@@ -150,27 +150,32 @@ namespace Ailu
         }
 
         UITheme::UITheme()
-            : UITheme(true)
         {
+            InitializeDefaultDark();
         }
 
         UITheme::UITheme(bool init_default)
         {
             if (init_default)
-                *this = DefaultDark();
+                InitializeDefaultDark();
+        }
+
+        void UITheme::InitializeDefaultDark()
+        {
+            _colors._text_primary = Color(0.92f, 0.94f, 0.96f, 1.0f);
+            _colors._text_disabled = Color(0.50f, 0.54f, 0.58f, 1.0f);
+            _colors._surface = Color(0.13f, 0.14f, 0.16f, 1.0f);
+            _colors._surface_hovered = Color(0.18f, 0.20f, 0.23f, 1.0f);
+            _colors._surface_pressed = Color(0.09f, 0.10f, 0.12f, 1.0f);
+            _colors._border = Color(0.28f, 0.31f, 0.35f, 1.0f);
+            _colors._accent = Color(0.18f, 0.52f, 0.86f, 1.0f);
+            FillCommonControlStyles(*this);
         }
 
         UITheme UITheme::DefaultDark()
         {
             UITheme theme(false);
-            theme._colors._text_primary = Color(0.92f, 0.94f, 0.96f, 1.0f);
-            theme._colors._text_disabled = Color(0.50f, 0.54f, 0.58f, 1.0f);
-            theme._colors._surface = Color(0.13f, 0.14f, 0.16f, 1.0f);
-            theme._colors._surface_hovered = Color(0.18f, 0.20f, 0.23f, 1.0f);
-            theme._colors._surface_pressed = Color(0.09f, 0.10f, 0.12f, 1.0f);
-            theme._colors._border = Color(0.28f, 0.31f, 0.35f, 1.0f);
-            theme._colors._accent = Color(0.18f, 0.52f, 0.86f, 1.0f);
-            FillCommonControlStyles(theme);
+            theme.InitializeDefaultDark();
             return theme;
         }
 

@@ -271,6 +271,7 @@ namespace Ailu::Render
         //0 is normal, 4001 is compiling, 4000 is error,same with render queue id
         static u32 GetShaderState(Shader *shader, u16 pass_index, ShaderVariantHash variant_hash);
         static const ShaderGlobalResourceRegistry &GlobalResourceRegistry() { return s_global_res_registry; }
+        static ShaderPropertyId PropertyID(const String &name) { return ShaderPropertyRegistry::Get().Intern(name); }
         Shader() = default;
         Shader(const WString &sys_path);
         virtual ~Shader() = default;

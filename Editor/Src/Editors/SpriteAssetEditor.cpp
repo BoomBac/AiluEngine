@@ -11,8 +11,10 @@
 #include "Common/EditorPopup.h"
 #include "Dock/DockManager.h"
 #include "Render/2D/Sprite.h"
+#include <algorithm>
 #include <cmath>
 #include <format>
+#include <memory>
 
 using namespace Ailu::UI;
 
@@ -44,6 +46,13 @@ namespace Ailu
             String GuidToString(const Guid& g) { return g.ToString().substr(0, 8) + "..."; }
             String FormatResolution(u16 w, u16 h) { return std::format("{} x {}", w, h); }
             String FormatFloat(f32 v, i32 decimals = 3) { return std::format("{:.{}f}", v, decimals); }
+
+            struct TextureChoice
+            {
+                Guid _guid;
+                String _name;
+                String _path;
+            };
         }
 
         // =====================================================================
@@ -143,8 +152,12 @@ namespace Ailu
 
         void SpriteAssetEditor::ApplyEditData(const SpriteAssetEditData& data)
         {
+            const bool texture_changed = _editing._texture != data._texture;
             _editing = data;
-            ValidateEditingData();
+            if (texture_changed)
+                OnTextureChanged();
+            else
+                ValidateEditingData();
             RefreshAllUI();
             RefreshPreview();
         }
@@ -317,7 +330,7 @@ namespace Ailu
             RefreshSizeInputs();
             RefreshBorderInputs();
             RefreshStatusBar();
-            if (_img_tex_preview && _texture) _img_tex_preview->SetTexture(_texture);
+            if (_img_tex_preview) _img_tex_preview->SetTexture(_texture);
             if (_txt_tex_field)
                 _txt_tex_field->SetText(_editing._texture == Guid::EmptyGuid() ? String("None") : GuidToString(_editing._texture));
         }
@@ -325,15 +338,12 @@ namespace Ailu
         void SpriteAssetEditor::RefreshAssetInfo()
         {
             if (!_sprite_asset) return;
+            auto* linked = ResourceMgr::Get().GetLinkedAsset(_sprite_asset);
             if (_txt_asset_name) _txt_asset_name->SetText(_sprite_asset->Name());
             if (_txt_asset_type) _txt_asset_type->SetText("SpriteAsset");
-            if (_txt_asset_guid)
-                _txt_asset_guid->SetText(ResourceMgr::Get().GetLinkedAsset(_sprite_asset->_texture.get())->GetGuid().ToString());
-            auto* linked = ResourceMgr::Get().GetLinkedAsset(_sprite_asset);
+            if (_txt_asset_guid) _txt_asset_guid->SetText(linked ? linked->GetGuid().ToString() : "-");
             if (linked && _txt_asset_path)
-            { 
                 _txt_asset_path->SetText(ToChar(linked->_asset_path));
-            }
             if (_texture)
             {
                 if (_txt_tex_name) _txt_tex_name->SetText(_texture->Name());
@@ -659,13 +669,130 @@ namespace Ailu
             br->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed).Size(Vector2f(0.0f, 22.0f)).Margin(Vector4f(0.0f, 4.0f, 0.0f, 0.0f));
 
             _btn_select_tex = br->AddChild<UI::Button>("Select");
-            _btn_select_tex->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFill).Size(Vector2f(48.0f, 0.0f)).Margin(Vector4f(0.0f, 0.0f, 4.0f, 0.0f));
-            _btn_select_tex->OnMouseClick() += [this](UI::UIEvent& e) { LOG_INFO("Select texture"); e._is_handled = true; };
+            _btn_select_tex->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFill).Size(Vector2f(56.0f, 0.0f)).Margin(Vector4f(0.0f, 0.0f, 4.0f, 0.0f));
+            _btn_select_tex->OnMouseClick() += [this](UI::UIEvent& e)
+            {
+                constexpr f32 kPopupWidth = 320.0f;
+                constexpr f32 kPopupHeight = 360.0f;
+                constexpr f32 kSearchHeight = 26.0f;
+                constexpr f32 kItemHeight = 28.0f;
+
+                auto root = MakeRef<UI::Border>();
+                root->Name("SpriteTexturePicker");
+                root->GetSlot()->Size({kPopupWidth, kPopupHeight});
+                root->Thickness(1.0f);
+                root->CornerRadius(4.0f);
+                root->SlotPadding() = UI::Padding(5.0f);
+                root->_bg_color = Color(0.095f, 0.10f, 0.11f, 0.98f);
+                root->_border_color = Color(0.45f, 0.50f, 0.56f, 0.85f);
+
+                auto* layout = root->AddChild<UI::VerticalBox>();
+                layout->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
+
+                auto* search = layout->AddChild<UI::InputBlock>("");
+                search->Name("TextureSearch");
+                search->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed)
+                    .Size({0.0f, kSearchHeight}).Margin({2.0f, 2.0f, 2.0f, 5.0f});
+
+                auto* list = layout->AddChild<UI::ListView>();
+                list->Name("TextureChoices");
+                list->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
+                list->SetStyleId("DropdownPopup");
+
+                Vector<TextureChoice> choices;
+                for (auto it = ResourceMgr::Get().Begin(); it != ResourceMgr::Get().End(); ++it)
+                {
+                    Asset* asset = it->second.get();
+                    if (!asset || asset->_asset_type != Render::Texture2D::StaticType())
+                        continue;
+
+                    TextureChoice choice;
+                    choice._guid = asset->GetGuid();
+                    choice._name = asset->_p_obj ? asset->_p_obj->Name() : asset->Name();
+                    choice._path = ToChar(asset->_asset_path);
+                    if (choice._name.empty())
+                        choice._name = ToChar(PathUtils::GetFileName(asset->_asset_path));
+                    choices.emplace_back(std::move(choice));
+                }
+                std::sort(choices.begin(), choices.end(), [](const TextureChoice& lhs, const TextureChoice& rhs)
+                {
+                    const String left = StringUtils::ToLower(lhs._name);
+                    const String right = StringUtils::ToLower(rhs._name);
+                    return left == right ? lhs._path < rhs._path : left < right;
+                });
+
+                auto all_choices = std::make_shared<Vector<TextureChoice>>(std::move(choices));
+                auto rebuild_list = [this, list, all_choices, kItemHeight](const String& query)
+                {
+                    list->ClearItems();
+                    const String needle = StringUtils::ToLower(query);
+                    i32 visible_count = 0;
+                    for (const TextureChoice& choice : *all_choices)
+                    {
+                        const String name = StringUtils::ToLower(choice._name);
+                        const String path = StringUtils::ToLower(choice._path);
+                        if (!needle.empty() && name.find(needle) == String::npos && path.find(needle) == String::npos)
+                            continue;
+
+                        auto item = MakeRef<UI::Button>(choice._name + "  [" + choice._path + "]");
+                        list->AddItem(item);
+                        item->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed)
+                            .Size({0.0f, kItemHeight}).Margin({2.0f, 1.0f, 2.0f, 1.0f});
+                        const Guid guid = choice._guid;
+                        item->OnMouseClick() += [this, guid](UI::UIEvent& event)
+                        {
+                            SpriteAssetEditData data = _editing;
+                            data._texture = guid;
+                            if (g_pCommandMgr)
+                                g_pCommandMgr->ExecuteCommand(std::make_unique<SpriteAssetEditCommand>(this, _editing, data));
+                            else
+                                ApplyEditData(data);
+                            UI::UIManager::Get()->HidePopup();
+                            event._is_handled = true;
+                        };
+                        ++visible_count;
+                    }
+
+                    if (visible_count == 0)
+                    {
+                        auto empty = MakeRef<UI::Text>(needle.empty() ? "No textures found" : "No matching textures");
+                        list->AddItem(empty);
+                        empty->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed)
+                            .Size({0.0f, kItemHeight}).Margin({6.0f, 4.0f, 6.0f, 4.0f});
+                        empty->_color = Color(0.55f, 0.55f, 0.55f, 1.0f);
+                    }
+                };
+
+                rebuild_list("");
+                search->_on_content_changed += [rebuild_list](String value) { rebuild_list(value); };
+                auto close_on_escape = [](UI::UIEvent& event)
+                {
+                    if (event._key_code == EKey::kESCAPE)
+                    {
+                        UI::UIManager::Get()->HidePopup();
+                        event._is_handled = true;
+                    }
+                };
+                root->OnKeyDown() += close_on_escape;
+                search->OnKeyDown() += close_on_escape;
+
+                const Vector4f rect = e._current_target->GetArrangeRect();
+                UI::UIManager::Get()->HidePopup();
+                UI::UIManager::Get()->ShowPopupAt(rect.x, rect.y + rect.w, root);
+                search->RequestFocus();
+                e._is_handled = true;
+            };
 
             _btn_clear_tex = br->AddChild<UI::Button>("Clear");
             _btn_clear_tex->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFill).Size(Vector2f(48.0f, 0.0f));
             _btn_clear_tex->OnMouseClick() += [this](UI::UIEvent& e) {
-                _editing._texture = Guid::EmptyGuid(); OnTextureChanged(); RefreshAllUI(); e._is_handled = true;
+                SpriteAssetEditData data = _editing;
+                data._texture = Guid::EmptyGuid();
+                if (g_pCommandMgr)
+                    g_pCommandMgr->ExecuteCommand(std::make_unique<SpriteAssetEditCommand>(this, _editing, data));
+                else
+                    ApplyEditData(data);
+                e._is_handled = true;
             };
         }
 

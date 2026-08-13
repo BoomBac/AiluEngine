@@ -94,7 +94,7 @@ namespace Ailu
                 }
             }
             _hover_target = handle;
-            if (_hover_target)
+            if (_hover_target && _payload->_type != EDragType::kUIWidget)
             {
                 UI::UIRenderer::Get()->DrawBox(drop_target->GetArrangeRect().xy, drop_target->GetArrangeRect().zw, 2.0f, Colors::kYellow, 0.0f);
             }

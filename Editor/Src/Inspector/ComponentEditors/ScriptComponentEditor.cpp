@@ -3,6 +3,7 @@
 #include "Inspector/ComponentEditorHelpers.h"
 #include "Framework/Script/ScriptSystem.h"
 #include "Assets/Asset.h"
+#include "Assets/PrefabAsset.h"
 #include "Assets/ScriptAsset.h"
 #include "Audio/AudioClip.h"
 #include "Animation/Clip.h"
@@ -71,6 +72,15 @@ namespace Ailu
                 else if (type_name == "SkeletonMesh") CollectAssetChoices<Render::SkeletonMesh>(choices);
                 else if (type_name == "AnimationClip") CollectAssetChoices<AnimationClip>(choices);
                 else if (type_name == "AudioClip") CollectAssetChoices<AudioClip>(choices);
+                else if (type_name == "Prefab")
+                {
+                    for (auto it = ResourceMgr::Get().Begin(); it != ResourceMgr::Get().End(); ++it)
+                    {
+                        Asset *asset = it->second.get();
+                        if (asset != nullptr && asset->_asset_type == PrefabAssetDocument::StaticType())
+                            choices.push_back({asset->GetGuid(), asset->Name()});
+                    }
+                }
                 else if (type_name == "Script")
                 {
                     for (auto it = ResourceMgr::Get().Begin(); it != ResourceMgr::Get().End(); ++it)

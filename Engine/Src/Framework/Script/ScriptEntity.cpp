@@ -1,11 +1,12 @@
 #include "Framework/Script/ScriptEntity.h"
 
+#include "Framework/Math/MatrixMath.h"
+#include "Framework/Math/Transform.h"
 #include "Scene/Component.h"
 #include "Scene/Scene.h"
 #include "Assets/Asset.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Physics/2D/Physics2DComponents.h"
-#include "Render/2D/Sprite.h"
 
 namespace Ailu
 {
@@ -72,6 +73,44 @@ namespace Ailu
             else return false;
             scene.MarkStructureChanged();
             return true;
+        }
+
+        ECS::TransformComponent *ResolveTransform(const ScriptTransform &script_transform)
+        {
+            if (script_transform._scene == nullptr || !script_transform._scene->IsValidEntity(script_transform._entity))
+                return nullptr;
+            return script_transform._scene->GetRegister().GetComponent<ECS::TransformComponent>(script_transform._entity);
+        }
+
+        Transform GetWorldTransform(const ECS::TransformComponent &transform)
+        {
+            return transform._world_dirty
+                       ? transform._local_transform
+                       : Transform(transform.GetPosition(), transform.GetRotation(), transform.GetScale());
+        }
+
+        void SetWorldTransform(const ScriptTransform &script_transform, const Transform &world_transform)
+        {
+            auto *transform = ResolveTransform(script_transform);
+            if (transform == nullptr)
+                return;
+
+            Matrix4x4f local_matrix = Transform::ToMatrix(world_transform);
+            const auto *hierarchy = script_transform._scene->GetRegister().GetComponent<ECS::CHierarchy>(script_transform._entity);
+            if (hierarchy != nullptr && hierarchy->_parent != ECS::kInvalidEntity)
+            {
+                const auto *parent = script_transform._scene->GetRegister().GetComponent<ECS::TransformComponent>(hierarchy->_parent);
+                if (parent != nullptr)
+                    local_matrix = local_matrix * Math::MatrixInverse(parent->_world_matrix);
+            }
+
+            const Transform local_transform = Transform::FromMatrix(local_matrix);
+            bool edited = false;
+            edited |= transform->SetLocalPosition(local_transform._position);
+            edited |= transform->SetLocalRotation(local_transform._rotation);
+            edited |= transform->SetLocalScale(local_transform._scale);
+            if (edited)
+                script_transform._scene->MarkEdited();
         }
     }
 
@@ -210,18 +249,6 @@ namespace Ailu
         return true;
     }
 
-    bool ScriptComponent::SetSprite(const String &sprite_guid) const
-    {
-        auto *comp = GetComponent<ECS::SpriteRendererComponent>(*this);
-        if (comp == nullptr) return false;
-        Asset *asset = ResolveScriptAsset(Guid(sprite_guid));
-        auto *resolved = asset == nullptr ? nullptr : asset->As<Render::Sprite>();
-        if (resolved == nullptr) return false;
-        comp->_sprite = resolved;
-        _scene->MarkEdited();
-        return true;
-    }
-
     bool ScriptComponent::Add(const ScriptEntity &entity, const String &type_name)
     {
         return entity.AddComponent(type_name).IsValid();
@@ -249,60 +276,78 @@ namespace Ailu
         return entity.GetComponent(type_name).AddBoxShape(size, is_trigger);
     }
 
-    bool ScriptComponent::SetEntitySprite(const ScriptEntity &entity, const String &type_name, const String &sprite_guid)
-    {
-        return entity.GetComponent(type_name).SetSprite(sprite_guid);
-    }
-
     bool ScriptTransform::IsValid() const
     {
-        return _scene != nullptr && _scene->IsValidEntity(_entity) &&
-               _scene->GetRegister().GetComponent<ECS::TransformComponent>(_entity) != nullptr;
+        return ResolveTransform(*this) != nullptr;
     }
     Vector3f ScriptTransform::GetLocalPosition() const
     {
-        const auto *transform = IsValid() ? _scene->GetRegister().GetComponent<ECS::TransformComponent>(_entity) : nullptr;
+        const auto *transform = ResolveTransform(*this);
         return transform != nullptr ? transform->GetLocalPosition() : Vector3f::kZero;
     }
     void ScriptTransform::SetLocalPosition(const Vector3f &position) const
     {
-        if (auto *transform = IsValid() ? _scene->GetRegister().GetComponent<ECS::TransformComponent>(_entity) : nullptr)
-            transform->SetLocalPosition(position);
+        if (auto *transform = ResolveTransform(*this); transform != nullptr && transform->SetLocalPosition(position))
+            _scene->MarkEdited();
     }
     Math::Quaternion ScriptTransform::GetLocalRotation() const
     {
-        const auto *transform = IsValid() ? _scene->GetRegister().GetComponent<ECS::TransformComponent>(_entity) : nullptr;
+        const auto *transform = ResolveTransform(*this);
         return transform != nullptr ? transform->GetLocalRotation() : Math::Quaternion::Identity();
     }
     void ScriptTransform::SetLocalRotation(const Math::Quaternion &rotation) const
     {
-        if (auto *transform = IsValid() ? _scene->GetRegister().GetComponent<ECS::TransformComponent>(_entity) : nullptr)
-            transform->SetLocalRotation(rotation);
+        if (auto *transform = ResolveTransform(*this); transform != nullptr && transform->SetLocalRotation(rotation))
+            _scene->MarkEdited();
     }
     Vector3f ScriptTransform::GetLocalScale() const
     {
-        const auto *transform = IsValid() ? _scene->GetRegister().GetComponent<ECS::TransformComponent>(_entity) : nullptr;
+        const auto *transform = ResolveTransform(*this);
         return transform != nullptr ? transform->GetLocalScale() : Vector3f::kOne;
     }
     void ScriptTransform::SetLocalScale(const Vector3f &scale) const
     {
-        if (auto *transform = IsValid() ? _scene->GetRegister().GetComponent<ECS::TransformComponent>(_entity) : nullptr)
-            transform->SetLocalScale(scale);
+        if (auto *transform = ResolveTransform(*this); transform != nullptr && transform->SetLocalScale(scale))
+            _scene->MarkEdited();
     }
     Vector3f ScriptTransform::GetPosition() const
     {
-        const auto *transform = IsValid() ? _scene->GetRegister().GetComponent<ECS::TransformComponent>(_entity) : nullptr;
-        return transform != nullptr && !transform->_world_dirty ? transform->GetPosition() : GetLocalPosition();
+        const auto *transform = ResolveTransform(*this);
+        return transform != nullptr ? GetWorldTransform(*transform)._position : Vector3f::kZero;
+    }
+    void ScriptTransform::SetPosition(const Vector3f &position) const
+    {
+        SetWorldTransform(*this, Transform(position, GetRotation(), GetScale()));
     }
     Math::Quaternion ScriptTransform::GetRotation() const
     {
-        const auto *transform = IsValid() ? _scene->GetRegister().GetComponent<ECS::TransformComponent>(_entity) : nullptr;
-        return transform != nullptr && !transform->_world_dirty ? transform->GetRotation() : GetLocalRotation();
+        const auto *transform = ResolveTransform(*this);
+        return transform != nullptr ? GetWorldTransform(*transform)._rotation : Math::Quaternion::Identity();
+    }
+    void ScriptTransform::SetRotation(const Math::Quaternion &rotation) const
+    {
+        SetWorldTransform(*this, Transform(GetPosition(), rotation, GetScale()));
     }
     Vector3f ScriptTransform::GetScale() const
     {
-        const auto *transform = IsValid() ? _scene->GetRegister().GetComponent<ECS::TransformComponent>(_entity) : nullptr;
-        return transform != nullptr && !transform->_world_dirty ? transform->GetScale() : GetLocalScale();
+        const auto *transform = ResolveTransform(*this);
+        return transform != nullptr ? GetWorldTransform(*transform)._scale : Vector3f::kOne;
+    }
+    void ScriptTransform::SetScale(const Vector3f &scale) const
+    {
+        SetWorldTransform(*this, Transform(GetPosition(), GetRotation(), scale));
+    }
+    Vector3f ScriptTransform::GetForward() const
+    {
+        return GetRotation() * Vector3f::kForward;
+    }
+    Vector3f ScriptTransform::GetRight() const
+    {
+        return GetRotation() * Vector3f::kRight;
+    }
+    Vector3f ScriptTransform::GetUp() const
+    {
+        return GetRotation() * Vector3f::kUp;
     }
     bool ScriptEntity::IsValid() const { return _scene != nullptr && _scene->IsValidEntity(_entity); }
     String ScriptEntity::GetName() const
@@ -317,6 +362,31 @@ namespace Ailu
     }
     String ScriptEntity::GetGuid() const { return IsValid() ? _scene->GetEntityGuid(_entity).ToString() : String{}; }
     ScriptTransform ScriptEntity::GetTransform() const { return {_scene, _entity}; }
+    std::optional<ScriptRigidBody2D> ScriptEntity::GetRigidBody2D() const
+    {
+        return IsValid() && _scene->GetRegister().HasComponent<ECS::RigidBody2DComponent>(_entity) ?
+                   std::optional<ScriptRigidBody2D>(ScriptRigidBody2D{_scene, _entity}) : std::nullopt;
+    }
+    std::optional<ScriptCollider2D> ScriptEntity::GetCollider2D() const
+    {
+        return IsValid() && _scene->GetRegister().HasComponent<ECS::Collider2DComponent>(_entity) ?
+                   std::optional<ScriptCollider2D>(ScriptCollider2D{_scene, _entity}) : std::nullopt;
+    }
+    std::optional<ScriptSpriteRenderer> ScriptEntity::GetSprite() const
+    {
+        return IsValid() && _scene->GetRegister().HasComponent<ECS::SpriteRendererComponent>(_entity) ?
+                   std::optional<ScriptSpriteRenderer>(ScriptSpriteRenderer{_scene, _entity}) : std::nullopt;
+    }
+    std::optional<ScriptAnimator> ScriptEntity::GetAnimator() const
+    {
+        return IsValid() && _scene->GetRegister().HasComponent<ECS::CSkeletonMesh>(_entity) ?
+                   std::optional<ScriptAnimator>(ScriptAnimator{_scene, _entity}) : std::nullopt;
+    }
+    std::optional<ScriptAudioSource> ScriptEntity::GetAudio() const
+    {
+        return IsValid() && _scene->GetRegister().HasComponent<ECS::AudioSourceComponent>(_entity) ?
+                   std::optional<ScriptAudioSource>(ScriptAudioSource{_scene, _entity}) : std::nullopt;
+    }
     void ScriptEntity::Destroy() const
     {
         if (IsValid()) _scene->RemoveObject(_entity);
@@ -362,28 +432,10 @@ namespace Ailu
     ScriptAssetValue ScriptAssetValue::AnimationClip() { return {Guid::EmptyGuid(), "AnimationClip"}; }
     ScriptAssetValue ScriptAssetValue::AudioClip() { return {Guid::EmptyGuid(), "AudioClip"}; }
     ScriptAssetValue ScriptAssetValue::Script() { return {Guid::EmptyGuid(), "Script"}; }
+    ScriptAssetValue ScriptAssetValue::Prefab() { return {Guid::EmptyGuid(), "Prefab"}; }
 
     bool ScriptAssetValue::IsValid() const
     {
         return ResolveScriptAsset(_guid) != nullptr;
-    }
-    String ScriptAssetValue::GetGuid() const
-    {
-        return _guid == Guid::EmptyGuid() ? String{} : _guid.ToString();
-    }
-    String ScriptAssetValue::GetName() const
-    {
-        const auto *asset = ResolveScriptAsset(_guid);
-        return asset == nullptr ? String{} : asset->Name();
-    }
-    String ScriptAssetValue::GetPath() const
-    {
-        const auto *asset = ResolveScriptAsset(_guid);
-        return asset == nullptr ? String{} : ToChar(asset->_asset_path);
-    }
-    String ScriptAssetValue::GetAssetType() const
-    {
-        const auto *asset = ResolveScriptAsset(_guid);
-        return asset == nullptr || asset->_asset_type == nullptr ? String{} : asset->_asset_type->Name();
     }
 }

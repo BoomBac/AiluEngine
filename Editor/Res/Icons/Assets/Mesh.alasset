@@ -1,0 +1,11 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "2b4e1f23-d077-4a03-b389-1addc4f8d248",
+        "_asset_type": "Ailu::Render::Texture2D",
+        "_asset_name": "Mesh",
+        "_dependencies": []
+    },
+    "_file": "Mesh.png",
+    "_is_srgb": true
+}

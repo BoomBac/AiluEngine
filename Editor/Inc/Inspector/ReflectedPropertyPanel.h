@@ -20,6 +20,7 @@ namespace Ailu
         {
         public:
             using PropertyFilter = std::function<bool(const PropertyInfo &)>;
+            using PropertyChanging = std::function<void(const PropertyInfo &)>;
             using PropertyChanged = std::function<void(const PropertyInfo &)>;
 
             struct BuildArgs
@@ -28,6 +29,7 @@ namespace Ailu
                 void *_instance = nullptr;
                 UI::VerticalBox *_parent = nullptr;
                 PropertyFilter _filter;
+                PropertyChanging _on_property_changing;
                 PropertyChanged _on_property_changed;
             };
 
@@ -35,6 +37,8 @@ namespace Ailu
             void Clear();
 
         private:
+            Vector<Scope<UI::CompositeBuilder::Params>> _params;
+
             void SortProperties(Vector<const PropertyInfo *> &properties) const;
             void BuildCategories(const BuildArgs &args, const Vector<const PropertyInfo *> &properties);
             Scope<UI::CompositeBuilder::Params> BuildParams(const PropertyInfo &property) const;

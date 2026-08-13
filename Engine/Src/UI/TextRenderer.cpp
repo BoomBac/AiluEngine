@@ -168,7 +168,7 @@ namespace Ailu
             cmd->SetGlobalBuffer(Render::RenderConstants::kCBufNamePerCamera, &cb_per_cam, Render::RenderConstants::kPerCameraDataSize);
             for (const auto &node: b->_nodes)
             {
-                cmd->DrawIndexed(b->_vbuf, b->_ibuf, b->_obj_cb, node._mat, 0u, node._index_offset, node._index_num);
+                cmd->DrawIndexed(b->_vbuf.get(), b->_ibuf.get(), b->_obj_cb.get(), node._mat, 0u, node._index_offset, node._index_num);
             }
         }
         void TextRenderer::Render(Render::CommandBuffer *cmd)
@@ -184,7 +184,7 @@ namespace Ailu
             memcpy(_default_block->_obj_cb->GetData(), &per_obj_data, Render::RenderConstants::kPerObjectDataSize);
             for (const auto &node: _default_block->_nodes)
             {
-                cmd->DrawIndexed(_default_block->_vbuf, _default_block->_ibuf, _default_block->_obj_cb, node._mat, 0u, node._index_offset, node._index_num);
+                cmd->DrawIndexed(_default_block->_vbuf.get(), _default_block->_ibuf.get(), _default_block->_obj_cb.get(), node._mat, 0u, node._index_offset, node._index_num);
             }
             _default_block->ResetBuildData();
         }

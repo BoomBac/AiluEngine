@@ -247,6 +247,7 @@ namespace Ailu
             }
             void RemoveChild(Ref<UIElement> child);
             void RemoveChild(UIElement* child);
+            bool MoveChild(UIElement *child, u32 new_index);
             void ClearChildren();
             i32 IndexOf(UIElement *child);
             UIElement *ChildAt(u32 index);

@@ -1,9 +1,17 @@
 #pragma once
 
+#include <optional>
+
 #include "Framework/Core/CoreMinimal.h"
 #include "Framework/Math/Quaternion.h"
 #include "Framework/Math/Guid.h"
 #include "Scene/Entity.h"
+#include "Framework/Script/ScriptAnimator.h"
+#include "Framework/Script/ScriptAssetValue.h"
+#include "Framework/Script/ScriptAudioSource.h"
+#include "Framework/Script/ScriptCollider2D.h"
+#include "Framework/Script/ScriptRigidBody2D.h"
+#include "Framework/Script/ScriptSpriteRenderer.h"
 
 #include "generated/ScriptEntity.gen.h"
 
@@ -16,7 +24,7 @@ namespace Ailu
 
     struct ScriptEntity;
 
-    ASTRUCT()
+    ASTRUCT(Script)
     struct AILU_API ScriptComponent
     {
         GENERATED_BODY()
@@ -46,8 +54,6 @@ namespace Ailu
         bool SetVector3(const String &property, const Vector3f &value) const;
         AFUNCTION(Script)
         bool AddBoxShape(const Vector2f &size, bool is_trigger = false) const;
-        AFUNCTION(Script)
-        bool SetSprite(const String &sprite_guid) const;
 
         AFUNCTION(Script)
         static bool Add(const ScriptEntity &entity, const String &type_name);
@@ -59,37 +65,50 @@ namespace Ailu
         static bool SetEntityVector3(const ScriptEntity &entity, const String &type_name, const String &property, const Vector3f &value);
         AFUNCTION(Script)
         static bool AddEntityBoxShape(const ScriptEntity &entity, const String &type_name, const Vector2f &size, bool is_trigger = false);
-        AFUNCTION(Script)
-        static bool SetEntitySprite(const ScriptEntity &entity, const String &type_name, const String &sprite_guid);
     };
 
-    ASTRUCT()
+    ASTRUCT(Script)
     struct AILU_API ScriptTransform
     {
         GENERATED_BODY()
         SceneManagement::Scene *_scene = nullptr;
         ECS::Entity _entity = ECS::kInvalidEntity;
 
-        AFUNCTION(Script)
+        AFUNCTION(ScriptProperty)
         bool IsValid() const;
-        AFUNCTION(Script)
+        AFUNCTION(ScriptProperty)
         Vector3f GetLocalPosition() const;
-        AFUNCTION(Script)
+        AFUNCTION(ScriptProperty)
         void SetLocalPosition(const Vector3f &position) const;
-        AFUNCTION(Script)
+        AFUNCTION(ScriptProperty)
         Math::Quaternion GetLocalRotation() const;
-        AFUNCTION(Script)
+        AFUNCTION(ScriptProperty)
         void SetLocalRotation(const Math::Quaternion &rotation) const;
-        AFUNCTION(Script)
+        AFUNCTION(ScriptProperty)
         Vector3f GetLocalScale() const;
-        AFUNCTION(Script)
+        AFUNCTION(ScriptProperty)
         void SetLocalScale(const Vector3f &scale) const;
+        AFUNCTION(ScriptProperty)
         Vector3f GetPosition() const;
+        AFUNCTION(ScriptProperty)
+        void SetPosition(const Vector3f &position) const;
+        AFUNCTION(ScriptProperty)
         Math::Quaternion GetRotation() const;
+        AFUNCTION(ScriptProperty)
+        void SetRotation(const Math::Quaternion &rotation) const;
+        AFUNCTION(ScriptProperty)
         Vector3f GetScale() const;
+        AFUNCTION(ScriptProperty)
+        void SetScale(const Vector3f &scale) const;
+        AFUNCTION(ScriptProperty)
+        Vector3f GetForward() const;
+        AFUNCTION(ScriptProperty)
+        Vector3f GetRight() const;
+        AFUNCTION(ScriptProperty)
+        Vector3f GetUp() const;
     };
 
-    ASTRUCT()
+    ASTRUCT(Script)
     struct AILU_API ScriptEntity
     {
         GENERATED_BODY()
@@ -98,14 +117,24 @@ namespace Ailu
 
         AFUNCTION(Script)
         bool IsValid() const;
-        AFUNCTION(Script)
+        AFUNCTION(ScriptProperty)
         String GetName() const;
-        AFUNCTION(Script)
+        AFUNCTION(ScriptProperty)
         void SetName(const String &name) const;
-        AFUNCTION(Script)
+        AFUNCTION(ScriptProperty)
         String GetGuid() const;
-        AFUNCTION(Script)
+        AFUNCTION(ScriptProperty)
         ScriptTransform GetTransform() const;
+        AFUNCTION(ScriptProperty)
+        std::optional<ScriptRigidBody2D> GetRigidBody2D() const;
+        AFUNCTION(ScriptProperty)
+        std::optional<ScriptCollider2D> GetCollider2D() const;
+        AFUNCTION(ScriptProperty)
+        std::optional<ScriptSpriteRenderer> GetSprite() const;
+        AFUNCTION(ScriptProperty)
+        std::optional<ScriptAnimator> GetAnimator() const;
+        AFUNCTION(ScriptProperty)
+        std::optional<ScriptAudioSource> GetAudio() const;
         AFUNCTION(Script)
         void Destroy() const;
         AFUNCTION(Script)
@@ -116,39 +145,4 @@ namespace Ailu
         bool RemoveComponent(const String &type_name) const;
     };
 
-    ASTRUCT()
-    struct AILU_API ScriptAssetValue
-    {
-        GENERATED_BODY()
-        Guid _guid = Guid::EmptyGuid();
-        String _asset_type;
-
-        AFUNCTION(Script)
-        static ScriptAssetValue Sprite();
-        AFUNCTION(Script)
-        static ScriptAssetValue Texture2D();
-        AFUNCTION(Script)
-        static ScriptAssetValue Material();
-        AFUNCTION(Script)
-        static ScriptAssetValue Mesh();
-        AFUNCTION(Script)
-        static ScriptAssetValue SkeletonMesh();
-        AFUNCTION(Script)
-        static ScriptAssetValue AnimationClip();
-        AFUNCTION(Script)
-        static ScriptAssetValue AudioClip();
-        AFUNCTION(Script)
-        static ScriptAssetValue Script();
-
-        AFUNCTION(Script)
-        bool IsValid() const;
-        AFUNCTION(Script)
-        String GetGuid() const;
-        AFUNCTION(Script)
-        String GetName() const;
-        AFUNCTION(Script)
-        String GetPath() const;
-        AFUNCTION(Script)
-        String GetAssetType() const;
-    };
 }

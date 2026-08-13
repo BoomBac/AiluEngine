@@ -292,11 +292,49 @@ namespace Ailu
         return Vector2f(velocity.x, velocity.y);
     }
 
+    f32 Physics2DWorld::GetAngularVelocity(ECS::Entity entity) const
+    {
+        const auto it = _impl->_bodies.find(entity);
+        return it != _impl->_bodies.end() && b2Body_IsValid(it->second._body_id) ?
+                   b2Body_GetAngularVelocity(it->second._body_id) : 0.0f;
+    }
+
     void Physics2DWorld::SetAngularVelocity(ECS::Entity entity, f32 velocity)
     {
         const auto it = _impl->_bodies.find(entity);
         if (it != _impl->_bodies.end() && b2Body_IsValid(it->second._body_id))
             b2Body_SetAngularVelocity(it->second._body_id, velocity);
+    }
+
+    f32 Physics2DWorld::GetGravityScale(ECS::Entity entity) const
+    {
+        const auto it = _impl->_bodies.find(entity);
+        return it != _impl->_bodies.end() && b2Body_IsValid(it->second._body_id) ?
+                   b2Body_GetGravityScale(it->second._body_id) : 0.0f;
+    }
+
+    void Physics2DWorld::SetGravityScale(ECS::Entity entity, f32 scale)
+    {
+        const auto it = _impl->_bodies.find(entity);
+        if (it != _impl->_bodies.end() && b2Body_IsValid(it->second._body_id))
+            b2Body_SetGravityScale(it->second._body_id, scale);
+    }
+
+    bool Physics2DWorld::IsFixedRotation(ECS::Entity entity) const
+    {
+        const auto it = _impl->_bodies.find(entity);
+        return it != _impl->_bodies.end() && b2Body_IsValid(it->second._body_id) &&
+               b2Body_GetMotionLocks(it->second._body_id).angularZ;
+    }
+
+    void Physics2DWorld::SetFixedRotation(ECS::Entity entity, bool fixed)
+    {
+        const auto it = _impl->_bodies.find(entity);
+        if (it == _impl->_bodies.end() || !b2Body_IsValid(it->second._body_id))
+            return;
+        b2MotionLocks locks = b2Body_GetMotionLocks(it->second._body_id);
+        locks.angularZ = fixed;
+        b2Body_SetMotionLocks(it->second._body_id, locks);
     }
 
     void Physics2DWorld::AddForce(ECS::Entity entity, const Vector2f &force)
@@ -311,6 +349,13 @@ namespace Ailu
         const auto it = _impl->_bodies.find(entity);
         if (it != _impl->_bodies.end() && b2Body_IsValid(it->second._body_id))
             b2Body_ApplyLinearImpulseToCenter(it->second._body_id, b2Vec2{impulse.x, impulse.y}, true);
+    }
+
+    void Physics2DWorld::AddTorque(ECS::Entity entity, f32 torque)
+    {
+        const auto it = _impl->_bodies.find(entity);
+        if (it != _impl->_bodies.end() && b2Body_IsValid(it->second._body_id))
+            b2Body_ApplyTorque(it->second._body_id, torque, true);
     }
 
     void Physics2DWorld::SetLayerCollision(u8 layer_a, u8 layer_b, bool enabled)
@@ -531,7 +576,8 @@ namespace Ailu
 
         b2World_Step(_impl->_world_id, fixed_delta_time, 4);
 
-        auto append_event = [this](b2ShapeId shape_a, b2ShapeId shape_b, EPhysicsContact2DType type) {
+        auto append_event = [this](b2ShapeId shape_a, b2ShapeId shape_b, EPhysicsContact2DType type,
+                                   b2ContactId contact_id = b2_nullContactId) {
             if (!b2Shape_IsValid(shape_a) || !b2Shape_IsValid(shape_b))
                 return;
             const auto *data_a = static_cast<const Impl::ShapeRuntime *>(b2Shape_GetUserData(shape_a));
@@ -539,8 +585,21 @@ namespace Ailu
             if (data_a == nullptr || data_b == nullptr)
                 return;
 
-            _impl->_pending_events.push_back(PhysicsContact2D{type, data_a->_entity, data_b->_entity,
-                                                               data_a->_shape_index, data_b->_shape_index});
+            PhysicsContact2D contact{type, data_a->_entity, data_b->_entity,
+                                     data_a->_shape_index, data_b->_shape_index};
+            if (type == EPhysicsContact2DType::kCollisionBegin && b2Contact_IsValid(contact_id))
+            {
+                const b2ContactData contact_data = b2Contact_GetData(contact_id);
+                if (contact_data.manifold.pointCount > 0)
+                {
+                    contact._normal = Vector2f(contact_data.manifold.normal.x, contact_data.manifold.normal.y);
+                    const b2ManifoldPoint &manifold_point = contact_data.manifold.points[0];
+                    const b2Vec2 point_a = b2OffsetPos(b2Body_GetWorldCenter(b2Shape_GetBody(shape_a)), manifold_point.anchorA);
+                    const b2Vec2 point_b = b2OffsetPos(b2Body_GetWorldCenter(b2Shape_GetBody(shape_b)), manifold_point.anchorB);
+                    contact._point = Vector2f((point_a.x + point_b.x) * 0.5f, (point_a.y + point_b.y) * 0.5f);
+                }
+            }
+            _impl->_pending_events.push_back(contact);
         };
 
         const b2SensorEvents sensor_events = b2World_GetSensorEvents(_impl->_world_id);
@@ -559,7 +618,7 @@ namespace Ailu
         for (int index = 0; index < contact_events.beginCount; ++index)
         {
             const b2ContactBeginTouchEvent &event = contact_events.beginEvents[index];
-            append_event(event.shapeIdA, event.shapeIdB, EPhysicsContact2DType::kCollisionBegin);
+            append_event(event.shapeIdA, event.shapeIdB, EPhysicsContact2DType::kCollisionBegin, event.contactId);
         }
         for (int index = 0; index < contact_events.endCount; ++index)
         {
