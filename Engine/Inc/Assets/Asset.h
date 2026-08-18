@@ -28,6 +28,12 @@ namespace Ailu
 
         void AssignGuid(const Guid &guid);
         const Guid &GetGuid() const { return _guid; };
+
+        //Editor runtime 状态：用于跟踪内容是否已被修改（不序列化）。
+        void MarkDirty() { ++_revision; }
+        bool IsDirty() const { return _revision != _saved_revision; }
+        u64 Revision() const { return _revision; }
+        void MarkSaved(u64 revision) { _saved_revision = revision; }
         template<typename T>
         T *As() const
         {
@@ -57,6 +63,8 @@ namespace Ailu
         Vector<RuntimeDependency> _dependencies;
     private:
         Guid _guid;
+        u64 _revision = 0;
+        u64 _saved_revision = 0;
     };
 }// namespace Ailu
 

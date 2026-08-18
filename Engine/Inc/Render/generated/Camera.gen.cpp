@@ -8,7 +8,7 @@
 using namespace Ailu;
 static std::unique_ptr<Ailu::Enum> s_enum_type_EAntiAliasing = nullptr;
 //Enum EAntiAliasing begin...........................
-const Ailu::Enum* Z_Construct_Enum_EAntiAliasing_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_Render_EAntiAliasing_Type()
 {
 if(s_enum_type_EAntiAliasing == nullptr)
 {
@@ -24,7 +24,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_EAntiAliasing.get());
 }
 return s_enum_type_EAntiAliasing.get();
 }
-static Ailu::EnumTypeRegister g_register_EAntiAliasing(Z_Construct_Enum_EAntiAliasing_Type);
+static Ailu::EnumTypeRegister g_register_EAntiAliasing(Z_Construct_Enum_Ailu_Render_EAntiAliasing_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::EAntiAliasing>()
 {
 return s_enum_type_EAntiAliasing.get();
@@ -33,7 +33,7 @@ return s_enum_type_EAntiAliasing.get();
 
 static std::unique_ptr<Ailu::Enum> s_enum_type_ECameraType = nullptr;
 //Enum ECameraType begin...........................
-const Ailu::Enum* Z_Construct_Enum_ECameraType_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_Render_ECameraType_Type()
 {
 if(s_enum_type_ECameraType == nullptr)
 {
@@ -48,7 +48,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_ECameraType.get());
 }
 return s_enum_type_ECameraType.get();
 }
-static Ailu::EnumTypeRegister g_register_ECameraType(Z_Construct_Enum_ECameraType_Type);
+static Ailu::EnumTypeRegister g_register_ECameraType(Z_Construct_Enum_Ailu_Render_ECameraType_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::ECameraType>()
 {
 return s_enum_type_ECameraType.get();

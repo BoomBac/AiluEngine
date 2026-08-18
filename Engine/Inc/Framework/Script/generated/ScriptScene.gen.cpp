@@ -124,6 +124,19 @@ builderCreateEntity_1._ret_type_name = "ScriptEntity";
 builderCreateEntity_1._meta = metaCreateEntity_1;
 builderCreateEntity_1._member_ptr = static_cast<ScriptEntity (Ailu::ScriptScene::*)(const ScriptAssetValue &) const>(&Ailu::ScriptScene::CreateEntity);
 initializer._functions.emplace_back(MemberBuilder::BuildFunction(builderCreateEntity_1));
+Meta metaDestroyEntity;
+metaDestroyEntity.Set("Script",true);
+MemberBuilder builderDestroyEntity;
+builderDestroyEntity._name = "DestroyEntity";
+builderDestroyEntity._type_name = "bool(const ScriptEntity) const";
+builderDestroyEntity._offset = 0u;
+builderDestroyEntity._is_const = true;
+builderDestroyEntity._is_static = false;
+builderDestroyEntity._is_public = false;
+builderDestroyEntity._ret_type_name = "bool";
+builderDestroyEntity._meta = metaDestroyEntity;
+builderDestroyEntity._member_ptr = &Ailu::ScriptScene::DestroyEntity;
+initializer._functions.emplace_back(MemberBuilder::BuildFunction(builderDestroyEntity));
 Meta metaSpawn;
 metaSpawn.Set("Script",true);
 MemberBuilder builderSpawn;
@@ -187,6 +200,7 @@ type_ScriptScene.set_function("find_entity_by_name", &Ailu::ScriptScene::FindEnt
 type_ScriptScene.set_function("find", &Ailu::ScriptScene::Find);
 type_ScriptScene.set_function("find_guid", &Ailu::ScriptScene::FindGuid);
 type_ScriptScene.set_function("create_entity", sol::overload(static_cast<ScriptEntity (Ailu::ScriptScene::*)(const String &) const>(&Ailu::ScriptScene::CreateEntity), static_cast<ScriptEntity (Ailu::ScriptScene::*)(const ScriptAssetValue &) const>(&Ailu::ScriptScene::CreateEntity)));
+type_ScriptScene.set_function("destroy_entity", &Ailu::ScriptScene::DestroyEntity);
 type_ScriptScene.set_function("spawn", &Ailu::ScriptScene::Spawn);
 type_ScriptScene.set_function("get_main_camera", &Ailu::ScriptScene::GetMainCamera);
 }

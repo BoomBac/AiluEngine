@@ -388,6 +388,7 @@ namespace Ailu
             void SetFocusedInternal(bool v);// 仅 UIManager 使用
             void ApplyTransform();
             Ref<UISlot> &EnsureSlotObject() const;
+            void EnsureStyleResolvedRecursive();
             virtual Ref<UISlot> CreateSlotForChild();
             virtual bool UsesVerticalChildLayout() const { return false; }
         protected:

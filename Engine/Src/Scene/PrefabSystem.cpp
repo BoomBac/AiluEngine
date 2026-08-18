@@ -92,6 +92,61 @@ namespace Ailu::SceneManagement
         return prefab;
     }
 
+    bool PrefabSystem::UpdatePrefabDocument(const Scene &scene, ECS::Entity root_entity, PrefabAssetDocument &prefab)
+    {
+        auto updated = CreatePrefabDocument(scene, root_entity);
+        if (updated == nullptr || updated->_entities.empty())
+            return false;
+
+        Vector<ECS::Entity> runtime_entities;
+        Vector<ECS::Entity> pending{root_entity};
+        for (size_t index = 0u; index < pending.size(); ++index)
+        {
+            const ECS::Entity entity = pending[index];
+            runtime_entities.emplace_back(entity);
+            const auto *hierarchy = scene.GetRegister().GetComponent<ECS::CHierarchy>(entity);
+            if (hierarchy == nullptr)
+                continue;
+            for (ECS::Entity child = hierarchy->_first_child; child != ECS::kInvalidEntity;)
+            {
+                pending.emplace_back(child);
+                const auto *child_hierarchy = scene.GetRegister().GetComponent<ECS::CHierarchy>(child);
+                child = child_hierarchy != nullptr ? child_hierarchy->_next_sibling : ECS::kInvalidEntity;
+            }
+        }
+        if (runtime_entities.size() != updated->_entities.size())
+            return false;
+
+        HashMap<Guid, Guid, GuidHasher> guid_remap;
+        std::unordered_set<Guid, GuidHasher> used_guids;
+        guid_remap.reserve(updated->_entities.size());
+        for (u32 index = 0u; index < updated->_entities.size(); ++index)
+        {
+            const Guid generated_guid = updated->_entities[index]._guid;
+            Guid stable_guid = generated_guid;
+            const auto *tag = scene.GetRegister().GetComponent<ECS::TagComponent>(runtime_entities[index]);
+            if (tag != nullptr && !tag->_prefab_entity.IsEmpty() && !used_guids.contains(tag->_prefab_entity))
+                stable_guid = tag->_prefab_entity;
+            used_guids.insert(stable_guid);
+            guid_remap.emplace(generated_guid, stable_guid);
+        }
+
+        for (PrefabEntityDocument &entity : updated->_entities)
+        {
+            const Guid old_guid = entity._guid;
+            entity._guid = guid_remap.at(old_guid);
+            entity._entity._entity_guid = entity._guid;
+            if (!entity._parent.IsEmpty())
+                entity._parent = guid_remap.at(entity._parent);
+            if (entity._entity._has_hierarchy_component && !entity._entity._hierarchy_component._parent_guid.IsEmpty())
+                entity._entity._hierarchy_component._parent_guid = guid_remap.at(entity._entity._hierarchy_component._parent_guid);
+        }
+        updated->_root = guid_remap.at(updated->_root);
+        prefab._root = updated->_root;
+        prefab._entities = std::move(updated->_entities);
+        return true;
+    }
+
     PrefabInstantiateResult PrefabSystem::Instantiate(Scene &scene, const PrefabAssetDocument &prefab)
     {
         PrefabInstantiateResult result;
@@ -247,6 +302,8 @@ namespace Ailu::SceneManagement
             if (entity_doc._has_collider_2d_component)
             {
                 auto &component = registry.AddComponent<ECS::Collider2DComponent>(entity);
+                component._preset = entity_doc._collider_2d_component._preset;
+                component._collision_profile = entity_doc._collider_2d_component._collision_profile;
                 component._shapes = entity_doc._collider_2d_component._shapes;
                 registry.SetComponentEnabled<ECS::Collider2DComponent>(entity,
                                                                          !IsComponentDisabled(entity_doc, "Collider2DComponent"));
@@ -697,6 +754,8 @@ namespace Ailu::SceneManagement
             if (entity_doc._has_collider_2d_component && registry.GetComponent<ECS::Collider2DComponent>(entity) == nullptr)
             {
                 auto &component = registry.AddComponent<ECS::Collider2DComponent>(entity);
+                component._preset = entity_doc._collider_2d_component._preset;
+                component._collision_profile = entity_doc._collider_2d_component._collision_profile;
                 component._shapes = entity_doc._collider_2d_component._shapes;
                 registry.SetComponentEnabled<ECS::Collider2DComponent>(entity,
                                                                          !IsComponentDisabled(entity_doc, "Collider2DComponent"));

@@ -349,6 +349,7 @@ namespace Ailu
             _file_watch_service.AddDirectory(s_editor_root_path + L"/Res/UI/");
             _file_watch_service.AddFile(s_editor_root_path + L"/EngineConfig.json");
             _file_watch_service.Snapshot();
+            ResourceMgr::SetFileWatchService(&_file_watch_service);
 
             _is_resource_reload_configured = true;
         }

@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __RENDERINGDATA_GEN_H__
 //Enum ERenderLayer begin...........................
-const Ailu::Enum* Z_Construct_Enum_ERenderLayer_Type();
+const Ailu::Enum* Z_Construct_Enum_Ailu_RHI_Ailu_Ailu_Render_ERenderLayer_Type();
 namespace Ailu::RHI::Ailu::Ailu::Render {
 enum class ERenderLayer : u8;
 }

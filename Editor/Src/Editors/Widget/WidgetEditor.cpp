@@ -886,6 +886,7 @@ namespace Ailu
             if (_asset == nullptr || _is_asset_dirty)
                 return;
             _is_asset_dirty = true;
+            ResourceMgr::Get().MarkAssetDirty(_asset);
             RefreshDirtyState();
         }
 

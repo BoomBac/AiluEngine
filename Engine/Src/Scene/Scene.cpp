@@ -95,6 +95,14 @@ namespace Ailu::SceneManagement
     // =========================================================================
     // Hierarchy Helpers
     // =========================================================================
+    void Scene::MarkDirty()
+    {
+        _dirty = true;
+        //编辑行为（MarkEdited / TouchStructure）均汇聚于此；由 Editor 驱动时才标记所属 Asset。
+        //运行时 Scene 副本不会被注册为 Asset，GetLinkedAsset 返回 nullptr 自动规避。
+        ResourceMgr::Get().MarkAssetDirty(this);
+    }
+
     void Scene::TouchStructure()
     {
         ++_structure_revision;
@@ -1117,6 +1125,7 @@ namespace Ailu::SceneManagement
     Ref<Scene> SceneMgr::OpenScene(const WString &scene_path)
     {
         AL_ASSERT(!scene_path.empty());
+        CloseTemporaryScene();
         if (auto it = _all_scene.find(scene_path); it != _all_scene.end())
         {
             _p_current = it->second.get();
@@ -1144,6 +1153,34 @@ namespace Ailu::SceneManagement
         //    _all_scene
         //}
     }
+    void SceneMgr::OpenTemporaryScene(Ref<Scene> scene, const Guid &prefab_asset_guid, ECS::Entity prefab_root_entity)
+    {
+        if (scene == nullptr)
+            return;
+        CloseTemporaryScene();
+        _scene_before_temporary = _p_current;
+        _temporary_scene = std::move(scene);
+        _p_current = _temporary_scene.get();
+        _temporary_prefab_asset_guid = prefab_asset_guid;
+        _temporary_prefab_root_entity = prefab_root_entity;
+        _temporary_scene_initial_edit_revision = _temporary_scene->EditRevision();
+        RenderPipeline::Get().SetPreviewCamera(nullptr, nullptr);
+        Camera::sMain = _p_current->FindMainCamera();
+        Camera::sCurrent = Camera::sScene != nullptr ? Camera::sScene : Camera::sMain;
+    }
+    void SceneMgr::CloseTemporaryScene()
+    {
+        if (_temporary_scene == nullptr)
+            return;
+        _p_current = _scene_before_temporary;
+        _scene_before_temporary = nullptr;
+        _retired_temporary_scene = std::move(_temporary_scene);
+        _temporary_prefab_asset_guid = Guid::EmptyGuid();
+        _temporary_prefab_root_entity = ECS::kInvalidEntity;
+        _temporary_scene_initial_edit_revision = 0u;
+        Camera::sMain = _p_current != nullptr ? _p_current->FindMainCamera() : nullptr;
+        Camera::sCurrent = Camera::sScene != nullptr ? Camera::sScene : Camera::sMain;
+    }
     void SceneMgr::EnterPlayMode()
     {
         RenderPipeline::Get().SetPreviewCamera(nullptr, nullptr);
@@ -1161,6 +1198,9 @@ namespace Ailu::SceneManagement
 
     void SceneMgr::ExitPlayMode()
     {
+        // The runtime scene may be retired for render-thread safety, so stop its script callbacks
+        // before deferring destruction.
+        ScriptSystem::Get().OnSceneDestroyed(_runtime_scene);
         _p_current = _runtime_scene_src;
         _runtime_scene_src = nullptr;
         if (Application::Get()._is_multi_thread_rendering.load())
@@ -1182,11 +1222,10 @@ namespace Ailu::SceneManagement
 
     void SceneMgr::ReleaseRetiredRuntimeScene()
     {
-        if (_retired_runtime_scene == nullptr)
+        if (_retired_runtime_scene == nullptr && _retired_temporary_scene == nullptr)
             return;
-
-        delete _retired_runtime_scene;
         _retired_runtime_scene = nullptr;
+        _retired_temporary_scene.reset();
     }
     void SceneMgr::EnterSimulateMode()
     {

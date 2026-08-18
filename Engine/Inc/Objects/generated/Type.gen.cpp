@@ -8,7 +8,7 @@
 using namespace Ailu;
 static std::unique_ptr<Ailu::Enum> s_enum_type_EDataType = nullptr;
 //Enum EDataType begin...........................
-const Ailu::Enum* Z_Construct_Enum_EDataType_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_EDataType_Type()
 {
 if(s_enum_type_EDataType == nullptr)
 {
@@ -49,7 +49,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_EDataType.get());
 }
 return s_enum_type_EDataType.get();
 }
-static Ailu::EnumTypeRegister g_register_EDataType(Z_Construct_Enum_EDataType_Type);
+static Ailu::EnumTypeRegister g_register_EDataType(Z_Construct_Enum_Ailu_EDataType_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::EDataType>()
 {
 return s_enum_type_EDataType.get();

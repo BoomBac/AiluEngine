@@ -547,7 +547,7 @@ return Ailu::UI::UITypographyTokens::GetPrivateStaticClass();
 ClassTypeRegister s_register_UITypographyTokens(&Ailu::UI::UITypographyTokens::StaticType, "Ailu::UI::UITypographyTokens");
 static std::unique_ptr<Ailu::Enum> s_enum_type_EUIBrushType = nullptr;
 //Enum EUIBrushType begin...........................
-const Ailu::Enum* Z_Construct_Enum_EUIBrushType_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_UI_EUIBrushType_Type()
 {
 if(s_enum_type_EUIBrushType == nullptr)
 {
@@ -565,7 +565,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_EUIBrushType.get());
 }
 return s_enum_type_EUIBrushType.get();
 }
-static Ailu::EnumTypeRegister g_register_EUIBrushType(Z_Construct_Enum_EUIBrushType_Type);
+static Ailu::EnumTypeRegister g_register_EUIBrushType(Z_Construct_Enum_Ailu_UI_EUIBrushType_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::UI::EUIBrushType>()
 {
 return s_enum_type_EUIBrushType.get();

@@ -8,7 +8,7 @@
 using namespace Ailu;
 static std::unique_ptr<Ailu::Enum> s_enum_type_EDragType = nullptr;
 //Enum EDragType begin...........................
-const Ailu::Enum* Z_Construct_Enum_EDragType_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_UI_EDragType_Type()
 {
 if(s_enum_type_EDragType == nullptr)
 {
@@ -39,7 +39,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_EDragType.get());
 }
 return s_enum_type_EDragType.get();
 }
-static Ailu::EnumTypeRegister g_register_EDragType(Z_Construct_Enum_EDragType_Type);
+static Ailu::EnumTypeRegister g_register_EDragType(Z_Construct_Enum_Ailu_UI_EDragType_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::UI::EDragType>()
 {
 return s_enum_type_EDragType.get();

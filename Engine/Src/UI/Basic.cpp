@@ -682,7 +682,13 @@ namespace Ailu
                 _resolved_visual._corner_radius = _corner_radius;
             }
             _style_override.ApplyTo(_resolved_visual);
-            SlotPadding() = Padding(_resolved_visual._border_width);
+            const Padding &current_padding = SlotPadding();
+            const bool has_explicit_content_padding = current_padding._l != _thickness.x ||
+                                                       current_padding._t != _thickness.y ||
+                                                       current_padding._r != _thickness.z ||
+                                                       current_padding._b != _thickness.w;
+            if (!has_explicit_content_padding)
+                SlotPadding() = Padding(_resolved_visual._border_width);
         }
 
         void Border::SetStyleId(const UIStyleId &id)

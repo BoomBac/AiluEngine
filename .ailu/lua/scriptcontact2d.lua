@@ -3,6 +3,7 @@
 
 ---@class ScriptContact2D
 ---@field normal Vec2
+---@field other_object_type number
 ---@field other_shape number
 ---@field point Vec2
 ---@field self_shape number
@@ -19,4 +20,7 @@ function ScriptContact2D:get_self_shape() end
 
 ---@return number
 function ScriptContact2D:get_other_shape() end
+
+---@return number
+function ScriptContact2D:get_other_object_type() end
 

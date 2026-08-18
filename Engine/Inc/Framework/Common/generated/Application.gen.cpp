@@ -8,7 +8,7 @@
 using namespace Ailu;
 static std::unique_ptr<Ailu::Enum> s_enum_type_EApplicationState = nullptr;
 //Enum EApplicationState begin...........................
-const Ailu::Enum* Z_Construct_Enum_EApplicationState_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_EApplicationState_Type()
 {
 if(s_enum_type_EApplicationState == nullptr)
 {
@@ -25,7 +25,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_EApplicationState.get());
 }
 return s_enum_type_EApplicationState.get();
 }
-static Ailu::EnumTypeRegister g_register_EApplicationState(Z_Construct_Enum_EApplicationState_Type);
+static Ailu::EnumTypeRegister g_register_EApplicationState(Z_Construct_Enum_Ailu_EApplicationState_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::EApplicationState>()
 {
 return s_enum_type_EApplicationState.get();

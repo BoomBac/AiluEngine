@@ -7,6 +7,9 @@
 #include "Scene/Component.h"
 #include "Scene/Scene.h"
 
+#include <algorithm>
+#include <stdexcept>
+
 namespace Ailu::SceneManagement
 {
     ECS::Entity EntitySerializer::CloneEntity(Scene &scene, ECS::Entity source)
@@ -63,6 +66,201 @@ namespace Ailu::SceneManagement
         return entity_map.at(source_root);
     }
 
+    SceneEntityDocument EntitySerializer::BuildEntityDocument(const Scene &scene, ECS::Entity entity, u32 sibling_index)
+    {
+        SceneEntityDocument entity_doc;
+        if (!scene.IsValidEntity(entity))
+            return entity_doc;
+
+        const auto &registry = scene.GetRegister();
+        entity_doc._entity_guid = scene.GetEntityGuid(entity);
+        if (const auto *tag = registry.GetComponent<ECS::TagComponent>(entity); tag != nullptr)
+        {
+            entity_doc._tag_component._name = tag->_name;
+            entity_doc._tag_component._tag = tag->_tag;
+            entity_doc._tag_component._layer_mask = tag->_layer_mask;
+        }
+
+        auto asset_guid_string = [](Object *object)
+        {
+            if (object == nullptr)
+                return String{};
+            const Guid &guid = ResourceMgr::Get().GetAssetGuid(object);
+            return guid.IsEmpty() ? String{} : guid.ToString();
+        };
+        auto fill_material_guids = [&asset_guid_string](const Vector<Ref<Material>> &materials, Vector<String> &guids)
+        {
+            guids.clear();
+            guids.reserve(materials.size());
+            for (const auto &material : materials)
+                guids.emplace_back(asset_guid_string(material.get()));
+        };
+        auto mark_disabled = [&]<typename T>(StringView component_name)
+        {
+            if (!registry.IsComponentEnabled<T>(entity))
+                entity_doc._disabled_components.emplace_back(component_name);
+        };
+
+        if (const auto *transform = registry.GetComponent<ECS::TransformComponent>(entity); transform != nullptr)
+        {
+            entity_doc._has_transform_component = true;
+            entity_doc._transform_component._position = transform->_local_transform._position;
+            entity_doc._transform_component._rotation = transform->_local_transform._rotation;
+            entity_doc._transform_component._scale = transform->_local_transform._scale;
+        }
+        if (const auto *script = registry.GetComponent<ECS::ScriptComponent>(entity); script != nullptr)
+        {
+            entity_doc._has_script_component = true;
+            entity_doc._script_component._script_asset = script->_script_asset;
+            entity_doc._script_component._properties = script->_properties;
+            mark_disabled.template operator()<ECS::ScriptComponent>("ScriptComponent");
+        }
+        if (const auto *static_mesh = registry.GetComponent<ECS::StaticMeshComponent>(entity); static_mesh != nullptr)
+        {
+            entity_doc._has_static_mesh_component = true;
+            entity_doc._static_mesh_component._mesh_guid = asset_guid_string(static_mesh->_p_mesh.get());
+            fill_material_guids(static_mesh->_p_mats, entity_doc._static_mesh_component._material_guids);
+            mark_disabled.template operator()<ECS::StaticMeshComponent>("StaticMeshComponent");
+        }
+        if (const auto *light = registry.GetComponent<ECS::LightComponent>(entity); light != nullptr)
+        {
+            entity_doc._has_light_component = true;
+            if (const Enum *enum_type = StaticEnum<ECS::ELightType>())
+                entity_doc._light_component._type = enum_type->GetNameByEnum(light->_type);
+            entity_doc._light_component._light._light_color = light->_light._light_color;
+            entity_doc._light_component._light._light_param = light->_light._light_param;
+            entity_doc._light_component._light._is_two_side = light->_light._is_two_side;
+            entity_doc._light_component._shadow._is_cast_shadow = light->_shadow._is_cast_shadow;
+            entity_doc._light_component._shadow._constant_bias = light->_shadow._constant_bias;
+            entity_doc._light_component._shadow._slope_bias = light->_shadow._slope_bias;
+            mark_disabled.template operator()<ECS::LightComponent>("LightComponent");
+        }
+        if (const auto *hierarchy = registry.GetComponent<ECS::CHierarchy>(entity); hierarchy != nullptr)
+        {
+            entity_doc._has_hierarchy_component = true;
+            entity_doc._hierarchy_component._enabled = hierarchy->_enabled;
+            entity_doc._hierarchy_component._parent_guid = scene.GetEntityGuid(hierarchy->_parent);
+            entity_doc._hierarchy_component._sibling_index = sibling_index;
+            entity_doc._hierarchy_component._inv_matrix_attach = hierarchy->_inv_matrix_attach.ToString();
+        }
+        if (const auto *camera = registry.GetComponent<ECS::CCamera>(entity); camera != nullptr)
+        {
+            entity_doc._has_camera_component = true;
+            entity_doc._camera_component._type = CameraTypeToString(camera->_camera.Type());
+            entity_doc._camera_component._aspect = camera->_camera.Aspect();
+            entity_doc._camera_component._far_clip = camera->_camera.Far();
+            entity_doc._camera_component._near_clip = camera->_camera.Near();
+            entity_doc._camera_component._fov_h = camera->_camera.FovH();
+            entity_doc._camera_component._size = camera->_camera.Size();
+            mark_disabled.template operator()<ECS::CCamera>("CCamera");
+        }
+        if (const auto *light_probe = registry.GetComponent<ECS::CLightProbe>(entity); light_probe != nullptr)
+        {
+            entity_doc._has_lightprobe_component = true;
+            entity_doc._lightprobe_component._size = light_probe->_size;
+            entity_doc._lightprobe_component._is_update_every_tick = light_probe->_is_update_every_tick;
+            mark_disabled.template operator()<ECS::CLightProbe>("CLightProbe");
+        }
+        if (const auto *rigidbody = registry.GetComponent<ECS::CRigidBody>(entity); rigidbody != nullptr)
+        {
+            entity_doc._has_rigidbody_component = true;
+            entity_doc._rigidbody_component._mass = rigidbody->_mass;
+            mark_disabled.template operator()<ECS::CRigidBody>("CRigidBody");
+        }
+        if (const auto *collider = registry.GetComponent<ECS::CCollider>(entity); collider != nullptr)
+        {
+            entity_doc._has_collider_component = true;
+            if (const Enum *enum_type = StaticEnum<ECS::EColliderType>())
+                entity_doc._collider_component._type = enum_type->GetNameByEnum(collider->_type);
+            entity_doc._collider_component._is_trigger = collider->_is_trigger;
+            entity_doc._collider_component._center = collider->_center;
+            entity_doc._collider_component._param = collider->_param;
+            mark_disabled.template operator()<ECS::CCollider>("CCollider");
+        }
+        if (const auto *rigidbody_2d = registry.GetComponent<ECS::RigidBody2DComponent>(entity); rigidbody_2d != nullptr)
+        {
+            entity_doc._has_rigidbody_2d_component = true;
+            auto &document = entity_doc._rigidbody_2d_component;
+            document._type = rigidbody_2d->_type;
+            document._gravity_scale = rigidbody_2d->_gravity_scale;
+            document._linear_damping = rigidbody_2d->_linear_damping;
+            document._angular_damping = rigidbody_2d->_angular_damping;
+            document._fixed_rotation = rigidbody_2d->_fixed_rotation;
+            document._continuous = rigidbody_2d->_continuous;
+            document._allow_sleep = rigidbody_2d->_allow_sleep;
+            mark_disabled.template operator()<ECS::RigidBody2DComponent>("RigidBody2DComponent");
+        }
+        if (const auto *collider_2d = registry.GetComponent<ECS::Collider2DComponent>(entity); collider_2d != nullptr)
+        {
+            entity_doc._has_collider_2d_component = true;
+            entity_doc._collider_2d_component._preset = collider_2d->_preset;
+            entity_doc._collider_2d_component._collision_profile = collider_2d->_collision_profile;
+            entity_doc._collider_2d_component._shapes = collider_2d->_shapes;
+            mark_disabled.template operator()<ECS::Collider2DComponent>("Collider2DComponent");
+        }
+        if (const auto *skeleton_mesh = registry.GetComponent<ECS::CSkeletonMesh>(entity); skeleton_mesh != nullptr)
+        {
+            entity_doc._has_skeleton_mesh_component = true;
+            entity_doc._skeleton_mesh_component._mesh_guid = asset_guid_string(skeleton_mesh->_p_mesh.get());
+            fill_material_guids(skeleton_mesh->_p_mats, entity_doc._skeleton_mesh_component._material_guids);
+            entity_doc._skeleton_mesh_component._anim_clip_guid = asset_guid_string(skeleton_mesh->_anim_clip.get());
+            mark_disabled.template operator()<ECS::CSkeletonMesh>("CSkeletonMesh");
+        }
+        if (const auto *vxgi = registry.GetComponent<ECS::CVXGI>(entity); vxgi != nullptr)
+        {
+            entity_doc._has_vxgi_component = true;
+            entity_doc._vxgi_component._grid_num = vxgi->_grid_num;
+            entity_doc._vxgi_component._distance = vxgi->_distance;
+            mark_disabled.template operator()<ECS::CVXGI>("CVXGI");
+        }
+        if (const auto *sprite = registry.GetComponent<ECS::SpriteRendererComponent>(entity); sprite != nullptr)
+        {
+            entity_doc._has_sprite_renderer_component = true;
+            entity_doc._sprite_renderer_component._sprite_guid = asset_guid_string(sprite->_sprite);
+            entity_doc._sprite_renderer_component._material_guid = asset_guid_string(sprite->_material.get());
+            entity_doc._sprite_renderer_component._color =
+                Vector4f(sprite->_color.r, sprite->_color.g, sprite->_color.b, sprite->_color.a);
+            entity_doc._sprite_renderer_component._sorting_layer = sprite->_sorting_layer;
+            entity_doc._sprite_renderer_component._order_in_layer = sprite->_order_in_layer;
+            entity_doc._sprite_renderer_component._blend_mode = static_cast<i32>(sprite->_blend_mode);
+            entity_doc._sprite_renderer_component._flip_x = sprite->_flip_x;
+            entity_doc._sprite_renderer_component._flip_y = sprite->_flip_y;
+            entity_doc._sprite_renderer_component._visible = sprite->_visible;
+            mark_disabled.template operator()<ECS::SpriteRendererComponent>("SpriteRendererComponent");
+        }
+
+        const Vector<ECS::ComponentTypeId> handled_component_types{
+            ECS::TagComponent::StaticComponentTypeId(),
+            ECS::PersistentIdComponent::StaticComponentTypeId(),
+            ECS::TransformComponent::StaticComponentTypeId(),
+            ECS::CHierarchy::StaticComponentTypeId(),
+            ECS::ScriptComponent::StaticComponentTypeId(),
+            ECS::StaticMeshComponent::StaticComponentTypeId(),
+            ECS::LightComponent::StaticComponentTypeId(),
+            ECS::CCamera::StaticComponentTypeId(),
+            ECS::CLightProbe::StaticComponentTypeId(),
+            ECS::CRigidBody::StaticComponentTypeId(),
+            ECS::CCollider::StaticComponentTypeId(),
+            ECS::RigidBody2DComponent::StaticComponentTypeId(),
+            ECS::Collider2DComponent::StaticComponentTypeId(),
+            ECS::CSkeletonMesh::StaticComponentTypeId(),
+            ECS::CVXGI::StaticComponentTypeId(),
+            ECS::SpriteRendererComponent::StaticComponentTypeId()};
+        for (const ECS::ComponentTypeId component_type : registry.GetEntityComponentTypes(entity))
+        {
+            if (std::find(handled_component_types.begin(), handled_component_types.end(), component_type) !=
+                handled_component_types.end())
+                continue;
+
+            const StringView component_name = ECS::GetComponentStableName(component_type);
+            throw std::runtime_error(std::format(
+                "EntitySerializer::BuildEntityDocument: unhandled component '{}' (type id {}) on entity {} ('{}')",
+                component_name.empty() ? StringView("Unknown") : component_name, component_type, entity,
+                entity_doc._tag_component._name));
+        }
+        return entity_doc;
+    }
+
     bool EntitySerializer::SerializeSubtree(const Scene &scene, ECS::Entity source_root, PrefabAssetDocument &prefab)
     {
         if (!scene.IsValidEntity(source_root))
@@ -78,166 +276,27 @@ namespace Ailu::SceneManagement
         prefab._root = prefab_guids.at(source_root);
         prefab._entities.clear();
         prefab._entities.reserve(source_entities.size());
-        const auto &registry = scene.GetRegister();
-        auto asset_guid_string = [](Object *object)
-        {
-            if (object == nullptr)
-                return String{};
-            const Guid &guid = ResourceMgr::Get().GetAssetGuid(object);
-            return guid.IsEmpty() ? String{} : guid.ToString();
-        };
-        auto fill_material_guids = [&asset_guid_string](const Vector<Ref<Material>> &materials, Vector<String> &guids)
-        {
-            guids.clear();
-            guids.reserve(materials.size());
-            for (const auto &material : materials)
-                guids.emplace_back(asset_guid_string(material.get()));
-        };
-
         for (ECS::Entity entity : source_entities)
         {
             PrefabEntityDocument prefab_entity;
             prefab_entity._guid = prefab_guids.at(entity);
+            prefab_entity._entity = BuildEntityDocument(scene, entity);
             prefab_entity._entity._entity_guid = prefab_entity._guid;
-            const auto *tag = registry.GetComponent<ECS::TagComponent>(entity);
-            prefab_entity._name = tag != nullptr ? tag->_name : String{};
-            prefab_entity._entity._tag_component._name = prefab_entity._name;
-            if (tag != nullptr)
+            prefab_entity._name = prefab_entity._entity._tag_component._name;
+            prefab_entity._enabled = prefab_entity._entity._has_hierarchy_component
+                ? prefab_entity._entity._hierarchy_component._enabled
+                : true;
+            if (const auto *hierarchy = scene.GetRegister().GetComponent<ECS::CHierarchy>(entity); hierarchy != nullptr)
             {
-                prefab_entity._entity._tag_component._tag = tag->_tag;
-                prefab_entity._entity._tag_component._layer_mask = tag->_layer_mask;
-            }
-
-            if (const auto *hierarchy = registry.GetComponent<ECS::CHierarchy>(entity))
-            {
-                prefab_entity._enabled = hierarchy->_enabled;
-                prefab_entity._entity._has_hierarchy_component = true;
-                prefab_entity._entity._hierarchy_component._enabled = hierarchy->_enabled;
-                prefab_entity._entity._hierarchy_component._inv_matrix_attach = hierarchy->_inv_matrix_attach.ToString();
                 if (const auto parent_it = prefab_guids.find(hierarchy->_parent); parent_it != prefab_guids.end())
                 {
                     prefab_entity._parent = parent_it->second;
                     prefab_entity._entity._hierarchy_component._parent_guid = parent_it->second;
                 }
-            }
-            if (const auto *transform = registry.GetComponent<ECS::TransformComponent>(entity))
-            {
-                prefab_entity._entity._has_transform_component = true;
-                prefab_entity._entity._transform_component._position = transform->_local_transform._position;
-                prefab_entity._entity._transform_component._rotation = transform->_local_transform._rotation;
-                prefab_entity._entity._transform_component._scale = transform->_local_transform._scale;
-            }
-            if (const auto *script = registry.GetComponent<ECS::ScriptComponent>(entity))
-            {
-                prefab_entity._entity._has_script_component = true;
-                prefab_entity._entity._script_component._script_asset = script->_script_asset;
-                prefab_entity._entity._script_component._properties = script->_properties;
-                if (!registry.IsComponentEnabled<ECS::ScriptComponent>(entity))
-                    prefab_entity._entity._disabled_components.emplace_back("ScriptComponent");
-            }
-            if (const auto *static_mesh = registry.GetComponent<ECS::StaticMeshComponent>(entity))
-            {
-                prefab_entity._entity._has_static_mesh_component = true;
-                prefab_entity._entity._static_mesh_component._mesh_guid = asset_guid_string(static_mesh->_p_mesh.get());
-                fill_material_guids(static_mesh->_p_mats, prefab_entity._entity._static_mesh_component._material_guids);
-                if (!registry.IsComponentEnabled<ECS::StaticMeshComponent>(entity))
-                    prefab_entity._entity._disabled_components.emplace_back("StaticMeshComponent");
-            }
-            if (const auto *light = registry.GetComponent<ECS::LightComponent>(entity))
-            {
-                prefab_entity._entity._has_light_component = true;
-                if (const Enum *enum_type = StaticEnum<ECS::ELightType>())
-                    prefab_entity._entity._light_component._type = enum_type->GetNameByEnum(light->_type);
-                prefab_entity._entity._light_component._light._light_color = light->_light._light_color;
-                prefab_entity._entity._light_component._light._light_param = light->_light._light_param;
-                prefab_entity._entity._light_component._light._is_two_side = light->_light._is_two_side;
-                prefab_entity._entity._light_component._shadow._is_cast_shadow = light->_shadow._is_cast_shadow;
-                prefab_entity._entity._light_component._shadow._constant_bias = light->_shadow._constant_bias;
-                prefab_entity._entity._light_component._shadow._slope_bias = light->_shadow._slope_bias;
-                if (!registry.IsComponentEnabled<ECS::LightComponent>(entity))
-                    prefab_entity._entity._disabled_components.emplace_back("LightComponent");
-            }
-            if (const auto *camera = registry.GetComponent<ECS::CCamera>(entity))
-            {
-                prefab_entity._entity._has_camera_component = true;
-                prefab_entity._entity._camera_component._type = CameraTypeToString(camera->_camera.Type());
-                prefab_entity._entity._camera_component._aspect = camera->_camera.Aspect();
-                prefab_entity._entity._camera_component._far_clip = camera->_camera.Far();
-                prefab_entity._entity._camera_component._near_clip = camera->_camera.Near();
-                prefab_entity._entity._camera_component._fov_h = camera->_camera.FovH();
-                prefab_entity._entity._camera_component._size = camera->_camera.Size();
-                if (!registry.IsComponentEnabled<ECS::CCamera>(entity))
-                    prefab_entity._entity._disabled_components.emplace_back("CCamera");
-            }
-            if (const auto *light_probe = registry.GetComponent<ECS::CLightProbe>(entity))
-            {
-                prefab_entity._entity._has_lightprobe_component = true;
-                prefab_entity._entity._lightprobe_component._size = light_probe->_size;
-                prefab_entity._entity._lightprobe_component._is_update_every_tick = light_probe->_is_update_every_tick;
-                if (!registry.IsComponentEnabled<ECS::CLightProbe>(entity))
-                    prefab_entity._entity._disabled_components.emplace_back("CLightProbe");
-            }
-            if (const auto *rigidbody = registry.GetComponent<ECS::CRigidBody>(entity))
-            {
-                prefab_entity._entity._has_rigidbody_component = true;
-                prefab_entity._entity._rigidbody_component._mass = rigidbody->_mass;
-                if (!registry.IsComponentEnabled<ECS::CRigidBody>(entity))
-                    prefab_entity._entity._disabled_components.emplace_back("CRigidBody");
-            }
-            if (const auto *collider = registry.GetComponent<ECS::CCollider>(entity))
-            {
-                prefab_entity._entity._has_collider_component = true;
-                if (const Enum *enum_type = StaticEnum<ECS::EColliderType>())
-                    prefab_entity._entity._collider_component._type = enum_type->GetNameByEnum(collider->_type);
-                prefab_entity._entity._collider_component._is_trigger = collider->_is_trigger;
-                prefab_entity._entity._collider_component._center = collider->_center;
-                prefab_entity._entity._collider_component._param = collider->_param;
-                if (!registry.IsComponentEnabled<ECS::CCollider>(entity))
-                    prefab_entity._entity._disabled_components.emplace_back("CCollider");
-            }
-            if (const auto *rigidbody_2d = registry.GetComponent<ECS::RigidBody2DComponent>(entity))
-            {
-                prefab_entity._entity._has_rigidbody_2d_component = true;
-                auto &document = prefab_entity._entity._rigidbody_2d_component;
-                document._type = rigidbody_2d->_type;
-                document._gravity_scale = rigidbody_2d->_gravity_scale;
-                document._linear_damping = rigidbody_2d->_linear_damping;
-                document._angular_damping = rigidbody_2d->_angular_damping;
-                document._fixed_rotation = rigidbody_2d->_fixed_rotation;
-                document._continuous = rigidbody_2d->_continuous;
-                document._allow_sleep = rigidbody_2d->_allow_sleep;
-                if (!registry.IsComponentEnabled<ECS::RigidBody2DComponent>(entity))
-                    prefab_entity._entity._disabled_components.emplace_back("RigidBody2DComponent");
-            }
-            if (const auto *collider_2d = registry.GetComponent<ECS::Collider2DComponent>(entity))
-            {
-                prefab_entity._entity._has_collider_2d_component = true;
-                prefab_entity._entity._collider_2d_component._shapes = collider_2d->_shapes;
-                if (!registry.IsComponentEnabled<ECS::Collider2DComponent>(entity))
-                    prefab_entity._entity._disabled_components.emplace_back("Collider2DComponent");
-            }
-            if (const auto *vxgi = registry.GetComponent<ECS::CVXGI>(entity))
-            {
-                prefab_entity._entity._has_vxgi_component = true;
-                prefab_entity._entity._vxgi_component._grid_num = vxgi->_grid_num;
-                prefab_entity._entity._vxgi_component._distance = vxgi->_distance;
-                if (!registry.IsComponentEnabled<ECS::CVXGI>(entity))
-                    prefab_entity._entity._disabled_components.emplace_back("CVXGI");
-            }
-            if (const auto *sprite = registry.GetComponent<ECS::SpriteRendererComponent>(entity))
-            {
-                prefab_entity._entity._has_sprite_renderer_component = true;
-                prefab_entity._entity._sprite_renderer_component._sprite_guid = asset_guid_string(sprite->_sprite);
-                prefab_entity._entity._sprite_renderer_component._material_guid = asset_guid_string(sprite->_material.get());
-                prefab_entity._entity._sprite_renderer_component._color = {sprite->_color.r, sprite->_color.g, sprite->_color.b, sprite->_color.a};
-                prefab_entity._entity._sprite_renderer_component._sorting_layer = sprite->_sorting_layer;
-                prefab_entity._entity._sprite_renderer_component._order_in_layer = sprite->_order_in_layer;
-                prefab_entity._entity._sprite_renderer_component._blend_mode = static_cast<i32>(sprite->_blend_mode);
-                prefab_entity._entity._sprite_renderer_component._flip_x = sprite->_flip_x;
-                prefab_entity._entity._sprite_renderer_component._flip_y = sprite->_flip_y;
-                prefab_entity._entity._sprite_renderer_component._visible = sprite->_visible;
-                if (!registry.IsComponentEnabled<ECS::SpriteRendererComponent>(entity))
-                    prefab_entity._entity._disabled_components.emplace_back("SpriteRendererComponent");
+                else
+                {
+                    prefab_entity._entity._hierarchy_component._parent_guid = Guid::EmptyGuid();
+                }
             }
             prefab._entities.emplace_back(std::move(prefab_entity));
         }

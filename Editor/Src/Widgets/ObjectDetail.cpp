@@ -99,7 +99,7 @@ namespace Ailu
                         if (scene != nullptr && info._remove_component)
                         {
                             info._remove_component(scene->GetRegister(), entity);
-                            SceneMgr::Get().MarkCurSceneDirty();
+                            scene->MarkStructureChanged();
                         }
                         _needs_rebuild = true;
                     }
@@ -269,14 +269,14 @@ namespace Ailu
                         continue;
 
                     auto item_text = MakeRef<UI::Text>(comp_info._display_name);
-                    item_text->OnMouseClick() += [this, &comp_info, scene](UI::UIEvent &e)
+                    item_text->OnMouseClick() += [this, comp_info, scene](UI::UIEvent &e)
                     {
                         auto entity = Selection::FirstEntity();
                         auto &scene_register = scene->GetRegister();
                         if (comp_info._has_component && !comp_info._has_component(scene_register, entity))
                         {
                             comp_info._add_component(scene_register, entity);
-                            SceneMgr::Get().MarkCurSceneDirty();
+                            scene->MarkStructureChanged();
                             _needs_rebuild = true;
                         }
                         UI::UIManager::Get()->HidePopup();

@@ -3,6 +3,7 @@
 #include "Assets/ScriptAsset.h"
 #include "Audio/AudioClip.h"
 #include "Framework/Common/FileManager.h"
+#include "Framework/Common/FileWatcher.h"
 #include "Framework/Common/JobSystem.h"
 #include "Framework/Common/Log.h"
 #include "Framework/Common/ThreadPool.h"
@@ -730,11 +731,6 @@ namespace Ailu
 		while (!_pending_delete_assets.empty())
 		{
 			Asset *asset = _pending_delete_assets.front();
-			auto asset_sys_path = ResourceMgr::GetResSysPath(asset->_asset_path);
-			if (_file_last_load_time.contains(asset_sys_path))
-			{
-				_file_last_load_time.erase(asset_sys_path);
-			}
 			UnRegisterResource(asset->_asset_path);
 			UnRegisterAsset(asset);
 			_pending_delete_assets.pop();
@@ -751,28 +747,75 @@ namespace Ailu
 		}
 	}
 
-	void ResourceMgr::SaveAsset(const Asset *asset)
+	bool ResourceMgr::SaveAsset(Asset *asset)
 	{
-		if (asset->_p_obj == nullptr)
+		if (asset == nullptr || asset->_p_obj == nullptr)
 		{
-			LOG_WARNING("SaveAsset: Asset: {} save failed!it hasn't a instanced object!", asset->Name());
-			return;
+			LOG_WARNING("SaveAsset: Asset save failed!it hasn't a instanced object!");
+			return false;
 		}
 		AL_ASSERT(!asset->_asset_path.empty());
 
 		IAssetHandler *handler = FindAssetHandler(asset->_asset_type);
-		if (handler != nullptr)
+		if (handler == nullptr)
 		{
-			AssetSaveContext ctx;
-			ctx._asset = asset;
-			ctx._asset_path = asset->_asset_path;
-			ctx._resource_mgr = this;
-			ctx._system_path = GetResSysPath(asset->_asset_path);
-			handler->Save(ctx);
-			return;
+			AL_ASSERT_MSG(false, "SaveAsset: No handler registered for asset type {}", GetAssetTypeName(asset->_asset_type));
+			return false;
 		}
 
-		AL_ASSERT_MSG(false, "SaveAsset: No handler registered for asset type {}", GetAssetTypeName(asset->_asset_type));
+		const u64 revision = asset->Revision();
+
+		AssetSaveContext ctx;
+		ctx._asset = asset;
+		ctx._asset_path = asset->_asset_path;
+		ctx._resource_mgr = this;
+		ctx._system_path = GetResSysPath(asset->_asset_path);
+
+		if (!handler->Save(ctx))
+			return false;
+
+		asset->MarkSaved(revision);
+
+		//通知 FileWatcher 此修改来自引擎自身，接受为新 baseline，避免触发自身 Reload。
+		if (FileWatchService *watcher = s_p_file_watch_service; watcher != nullptr)
+			watcher->AcknowledgeWrite(ctx._system_path);
+
+		return true;
+	}
+
+	void ResourceMgr::SaveAllDirtyAssets()
+	{
+		Vector<Asset *> dirty_assets;
+		for (auto &[guid, asset]: _asset_db)
+		{
+			if (asset->IsDirty())
+				dirty_assets.emplace_back(asset.get());
+		}
+		for (Asset *asset: dirty_assets)
+			SaveAsset(asset);
+		SaveAssetDB(EAssetDomain::kProject);
+	}
+
+	void ResourceMgr::MarkAssetDirty(Asset *asset)
+	{
+		if (asset != nullptr)
+			asset->MarkDirty();
+	}
+
+	void ResourceMgr::MarkAssetDirty(Object *obj)
+	{
+		if (Asset *asset = GetLinkedAsset(obj); asset != nullptr)
+			asset->MarkDirty();
+	}
+
+	void ResourceMgr::SetFileWatchService(FileWatchService *service)
+	{
+		s_p_file_watch_service = service;
+	}
+
+	FileWatchService *ResourceMgr::GetFileWatchService()
+	{
+		return s_p_file_watch_service;
 	}
 
 	void ResourceMgr::SaveAllUnsavedAssets()
@@ -945,12 +988,6 @@ namespace Ailu
             LOG_ERROR(L"Load asset {} failed because no loader is registered for asset type {} after {}ms", normalized_asset_path, GetAssetTypeName(type), timer.GetElapsedSinceLastMark());
             return nullptr;
         }
-        // bool is_skip_load = false;
-        // if (!IsFileOnDiskUpdated(sys_path))
-        // {
-        //     LogMgr::Get().LogWarningFormat(L"Load asset {} succeed with everything is new after {}ms", asset_path, timer.GetElapsedSinceLastMark());
-        //     return _global_resources.contains(asset_path) ? std::static_pointer_cast<T>(_global_resources[asset_path]) : nullptr;
-        // }
 		if (settings == nullptr)
 			settings = &ImportSetting::Default();
 		AssetLoadContext load_ctx;
@@ -969,7 +1006,6 @@ namespace Ailu
             {
                 RegisterResource(normalized_asset_path, out_asset->_p_obj);
                 RegisterAsset(std::move(out_asset));
-                MarkFileTimeStamp(sys_path);
                 LOG_WARNING(L"Load asset {} succeed after {} ms", normalized_asset_path, timer.GetElapsedSinceLastMark());
             }
             else
@@ -980,7 +1016,6 @@ namespace Ailu
             if (settings->_is_reimport)
             {
                 asset_handler->Load(load_ctx);
-                MarkFileTimeStamp(sys_path);
                 LOG_WARNING(L"Reload asset {} after {} ms", normalized_asset_path, timer.GetElapsedSinceLastMark());
             }
         }
@@ -1026,8 +1061,13 @@ namespace Ailu
 			_object_to_asset.emplace(obj->ID(), new_asset.get());
 		}
 		RegisterResource(normalized_asset_path, obj);
-		s_pending_save_assets.push(RegisterAsset(std::move(new_asset)));
-		return s_pending_save_assets.back();
+		Asset *registered_asset = RegisterAsset(std::move(new_asset));
+		if (registered_asset == nullptr)
+			return nullptr;
+		//新创建 Asset 视为 Dirty，等待首次保存。
+		registered_asset->MarkDirty();
+		s_pending_save_assets.push(registered_asset);
+		return registered_asset;
 	}
 
 	void ResourceMgr::DeleteAsset(Asset *asset)
@@ -1475,25 +1515,6 @@ namespace Ailu
 		}
 	}
 
-	bool ResourceMgr::IsFileOnDiskUpdated(const WString &sys_path)
-	{
-		fs::path p(sys_path);
-		fs::file_time_type last_load_time;
-		fs::file_time_type last_write_time = std::filesystem::last_write_time(p);
-		bool newer = true;
-		if (_file_last_load_time.contains(sys_path))
-		{
-			last_load_time = _file_last_load_time[sys_path];
-			//前者大于后者就表示其表示的时间点晚于后者
-			newer = last_write_time > last_load_time;
-		}
-		return newer;
-	}
-	void ResourceMgr::MarkFileTimeStamp(const WString &sys_path)
-	{
-		_file_last_load_time[sys_path] = fs::file_time_type::clock::now();
-	}
-
 	Ref<void> ResourceMgr::ImportResource(const WString &sys_path, const WString &target_dir, const ImportSetting &setting)
 	{
 		return ImportResourceImpl(sys_path, target_dir, &setting);
@@ -1537,21 +1558,6 @@ namespace Ailu
 		if (ext.empty() || (!kHDRImageExt.contains(ext) && !kLDRImageExt.contains(ext) && !kMeshExt.contains(ext) && !kAudioExt.contains(ext)))
 		{
 			LOG_ERROR(L"Path {} is not a supported file!", sys_path);
-			return nullptr;
-		}
-		const WString normalized_source_path = NormalizeAssetPath(sys_path, EAssetDomain::kRuntime);
-		bool source_is_asset_path = false;
-		for (const auto &scheme: kPathScheme)
-		{
-			if (normalized_source_path.starts_with(scheme))
-			{
-				source_is_asset_path = true;
-				break;
-			}
-		}
-		if (source_is_asset_path && !IsFileOnDiskUpdated(sys_path))
-		{
-			LOG_WARNING(L"File {} is new,skip load!", sys_path);
 			return nullptr;
 		}
 		auto res_copy_path = dir / p.filename();

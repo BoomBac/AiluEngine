@@ -645,7 +645,7 @@ return Ailu::UI::UITableStyleOverride::GetPrivateStaticClass();
 ClassTypeRegister s_register_UITableStyleOverride(&Ailu::UI::UITableStyleOverride::StaticType, "Ailu::UI::UITableStyleOverride");
 static std::unique_ptr<Ailu::Enum> s_enum_type_EUITableStyleOverride = nullptr;
 //Enum EUITableStyleOverride begin...........................
-const Ailu::Enum* Z_Construct_Enum_EUITableStyleOverride_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_UI_EUITableStyleOverride_Type()
 {
 if(s_enum_type_EUITableStyleOverride == nullptr)
 {
@@ -672,7 +672,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_EUITableStyleOverride.get());
 }
 return s_enum_type_EUITableStyleOverride.get();
 }
-static Ailu::EnumTypeRegister g_register_EUITableStyleOverride(Z_Construct_Enum_EUITableStyleOverride_Type);
+static Ailu::EnumTypeRegister g_register_EUITableStyleOverride(Z_Construct_Enum_Ailu_UI_EUITableStyleOverride_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::UI::EUITableStyleOverride>()
 {
 return s_enum_type_EUITableStyleOverride.get();

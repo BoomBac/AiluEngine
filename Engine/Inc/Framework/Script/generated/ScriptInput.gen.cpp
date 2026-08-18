@@ -217,8 +217,8 @@ type_ScriptInput.set_function("get_vector2", &Ailu::ScriptInput::GetVector2);
 type_ScriptInput.set_function("load_action_asset", &Ailu::ScriptInput::LoadActionAsset);
 type_ScriptInput.set_function("push_context", &Ailu::ScriptInput::PushContext);
 type_ScriptInput.set_function("off", &Ailu::ScriptInput::Off);
-type_ScriptInput.set_function("on_performed", []( Ailu::ScriptInput &self, const String &action_name, sol::protected_function callback) { return ScriptSystem::Get().BindLuaDelegate<0>(self._on_performed, action_name, std::move(callback)); });
-type_ScriptInput.set_function("on_value_changed", []( Ailu::ScriptInput &self, const String &action_name, sol::protected_function callback) { return ScriptSystem::Get().BindLuaDelegate<0>(self._on_value_changed, action_name, std::move(callback)); });
+type_ScriptInput.set_function("on_performed", []( Ailu::ScriptInput &self, const String &action_name, sol::protected_function callback) { return ScriptSystem::Get().BindLuaEventRouter(self._on_performed, action_name, std::move(callback)); });
+type_ScriptInput.set_function("on_value_changed", []( Ailu::ScriptInput &self, const String &action_name, sol::protected_function callback) { return ScriptSystem::Get().BindLuaEventRouter(self._on_value_changed, action_name, std::move(callback)); });
 lua["input"] = std::ref(ScriptSystem::Get().GetInput());
 }
 ScriptLuaBindingRegister s_register_lua_bindings_RegisterGeneratedLuaBindings_ScriptInput(&Ailu::RegisterGeneratedLuaBindings_ScriptInput);

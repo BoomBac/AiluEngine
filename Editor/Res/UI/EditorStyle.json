@@ -24,5 +24,6 @@
     "_toolbar_border_color": [0.34, 0.36, 0.4, 1.0],
     "_status_bar_height": 24.0,
     "_status_bar_bg_color": [0.1597, 0.1699, 0.18, 1.0],
-    "_status_bar_play_bg_color": [0.4372, 0.2387, 0.0649, 1.0]
+    "_status_bar_play_bg_color": [0.4372, 0.2387, 0.0649, 1.0],
+    "_status_bar_prefab_bg_color": [0.08, 0.30, 0.58, 1.0]
 }

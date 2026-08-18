@@ -188,7 +188,7 @@ return Ailu::Render::RenderTexture::GetPrivateStaticClass();
 ClassTypeRegister s_register_RenderTexture(&Ailu::Render::RenderTexture::StaticType, "Ailu::Render::RenderTexture");
 static std::unique_ptr<Ailu::Enum> s_enum_type_ETextureDimension = nullptr;
 //Enum ETextureDimension begin...........................
-const Ailu::Enum* Z_Construct_Enum_ETextureDimension_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_Render_ETextureDimension_Type()
 {
 if(s_enum_type_ETextureDimension == nullptr)
 {
@@ -207,7 +207,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_ETextureDimension.get());
 }
 return s_enum_type_ETextureDimension.get();
 }
-static Ailu::EnumTypeRegister g_register_ETextureDimension(Z_Construct_Enum_ETextureDimension_Type);
+static Ailu::EnumTypeRegister g_register_ETextureDimension(Z_Construct_Enum_Ailu_Render_ETextureDimension_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::ETextureDimension>()
 {
 return s_enum_type_ETextureDimension.get();
@@ -216,7 +216,7 @@ return s_enum_type_ETextureDimension.get();
 
 static std::unique_ptr<Ailu::Enum> s_enum_type_EFilterMode = nullptr;
 //Enum EFilterMode begin...........................
-const Ailu::Enum* Z_Construct_Enum_EFilterMode_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_Render_EFilterMode_Type()
 {
 if(s_enum_type_EFilterMode == nullptr)
 {
@@ -232,7 +232,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_EFilterMode.get());
 }
 return s_enum_type_EFilterMode.get();
 }
-static Ailu::EnumTypeRegister g_register_EFilterMode(Z_Construct_Enum_EFilterMode_Type);
+static Ailu::EnumTypeRegister g_register_EFilterMode(Z_Construct_Enum_Ailu_Render_EFilterMode_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::EFilterMode>()
 {
 return s_enum_type_EFilterMode.get();
@@ -241,7 +241,7 @@ return s_enum_type_EFilterMode.get();
 
 static std::unique_ptr<Ailu::Enum> s_enum_type_EWrapMode = nullptr;
 //Enum EWrapMode begin...........................
-const Ailu::Enum* Z_Construct_Enum_EWrapMode_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_Render_EWrapMode_Type()
 {
 if(s_enum_type_EWrapMode == nullptr)
 {
@@ -257,7 +257,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_EWrapMode.get());
 }
 return s_enum_type_EWrapMode.get();
 }
-static Ailu::EnumTypeRegister g_register_EWrapMode(Z_Construct_Enum_EWrapMode_Type);
+static Ailu::EnumTypeRegister g_register_EWrapMode(Z_Construct_Enum_Ailu_Render_EWrapMode_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::EWrapMode>()
 {
 return s_enum_type_EWrapMode.get();
@@ -266,7 +266,7 @@ return s_enum_type_EWrapMode.get();
 
 static std::unique_ptr<Ailu::Enum> s_enum_type_ETextureFormat = nullptr;
 //Enum ETextureFormat begin...........................
-const Ailu::Enum* Z_Construct_Enum_ETextureFormat_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_Render_ETextureFormat_Type()
 {
 if(s_enum_type_ETextureFormat == nullptr)
 {
@@ -329,7 +329,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_ETextureFormat.get());
 }
 return s_enum_type_ETextureFormat.get();
 }
-static Ailu::EnumTypeRegister g_register_ETextureFormat(Z_Construct_Enum_ETextureFormat_Type);
+static Ailu::EnumTypeRegister g_register_ETextureFormat(Z_Construct_Enum_Ailu_Render_ETextureFormat_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::ETextureFormat>()
 {
 return s_enum_type_ETextureFormat.get();
@@ -338,7 +338,7 @@ return s_enum_type_ETextureFormat.get();
 
 static std::unique_ptr<Ailu::Enum> s_enum_type_ECubemapFace = nullptr;
 //Enum ECubemapFace begin...........................
-const Ailu::Enum* Z_Construct_Enum_ECubemapFace_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_Render_ECubemapFace_Type()
 {
 if(s_enum_type_ECubemapFace == nullptr)
 {
@@ -358,7 +358,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_ECubemapFace.get());
 }
 return s_enum_type_ECubemapFace.get();
 }
-static Ailu::EnumTypeRegister g_register_ECubemapFace(Z_Construct_Enum_ECubemapFace_Type);
+static Ailu::EnumTypeRegister g_register_ECubemapFace(Z_Construct_Enum_Ailu_Render_ECubemapFace_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::ECubemapFace>()
 {
 return s_enum_type_ECubemapFace.get();
@@ -367,7 +367,7 @@ return s_enum_type_ECubemapFace.get();
 
 static std::unique_ptr<Ailu::Enum> s_enum_type_ERenderTargetFormat = nullptr;
 //Enum ERenderTargetFormat begin...........................
-const Ailu::Enum* Z_Construct_Enum_ERenderTargetFormat_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_Render_ERenderTargetFormat_Type()
 {
 if(s_enum_type_ERenderTargetFormat == nullptr)
 {
@@ -392,7 +392,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_ERenderTargetFormat.get());
 }
 return s_enum_type_ERenderTargetFormat.get();
 }
-static Ailu::EnumTypeRegister g_register_ERenderTargetFormat(Z_Construct_Enum_ERenderTargetFormat_Type);
+static Ailu::EnumTypeRegister g_register_ERenderTargetFormat(Z_Construct_Enum_Ailu_Render_ERenderTargetFormat_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::ERenderTargetFormat>()
 {
 return s_enum_type_ERenderTargetFormat.get();

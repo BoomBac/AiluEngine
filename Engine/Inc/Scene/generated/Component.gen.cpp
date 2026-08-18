@@ -232,7 +232,7 @@ return Ailu::ECS::ScriptPropertyData::GetPrivateStaticClass();
 ClassTypeRegister s_register_ScriptPropertyData(&Ailu::ECS::ScriptPropertyData::StaticType, "Ailu::ECS::ScriptPropertyData");
 static std::unique_ptr<Ailu::Enum> s_enum_type_EMotionVectorType = nullptr;
 //Enum EMotionVectorType begin...........................
-const Ailu::Enum* Z_Construct_Enum_EMotionVectorType_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_ECS_EMotionVectorType_Type()
 {
 if(s_enum_type_EMotionVectorType == nullptr)
 {
@@ -248,7 +248,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_EMotionVectorType.get());
 }
 return s_enum_type_EMotionVectorType.get();
 }
-static Ailu::EnumTypeRegister g_register_EMotionVectorType(Z_Construct_Enum_EMotionVectorType_Type);
+static Ailu::EnumTypeRegister g_register_EMotionVectorType(Z_Construct_Enum_Ailu_ECS_EMotionVectorType_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::ECS::EMotionVectorType>()
 {
 return s_enum_type_EMotionVectorType.get();
@@ -257,7 +257,7 @@ return s_enum_type_EMotionVectorType.get();
 
 static std::unique_ptr<Ailu::Enum> s_enum_type_EScriptPropertyType = nullptr;
 //Enum EScriptPropertyType begin...........................
-const Ailu::Enum* Z_Construct_Enum_EScriptPropertyType_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_ECS_EScriptPropertyType_Type()
 {
 if(s_enum_type_EScriptPropertyType == nullptr)
 {
@@ -280,7 +280,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_EScriptPropertyType.get());
 }
 return s_enum_type_EScriptPropertyType.get();
 }
-static Ailu::EnumTypeRegister g_register_EScriptPropertyType(Z_Construct_Enum_EScriptPropertyType_Type);
+static Ailu::EnumTypeRegister g_register_EScriptPropertyType(Z_Construct_Enum_Ailu_ECS_EScriptPropertyType_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::ECS::EScriptPropertyType>()
 {
 return s_enum_type_EScriptPropertyType.get();
@@ -289,7 +289,7 @@ return s_enum_type_EScriptPropertyType.get();
 
 static std::unique_ptr<Ailu::Enum> s_enum_type_ELightType = nullptr;
 //Enum ELightType begin...........................
-const Ailu::Enum* Z_Construct_Enum_ELightType_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_ECS_ELightType_Type()
 {
 if(s_enum_type_ELightType == nullptr)
 {
@@ -306,7 +306,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_ELightType.get());
 }
 return s_enum_type_ELightType.get();
 }
-static Ailu::EnumTypeRegister g_register_ELightType(Z_Construct_Enum_ELightType_Type);
+static Ailu::EnumTypeRegister g_register_ELightType(Z_Construct_Enum_Ailu_ECS_ELightType_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::ECS::ELightType>()
 {
 return s_enum_type_ELightType.get();
@@ -315,7 +315,7 @@ return s_enum_type_ELightType.get();
 
 static std::unique_ptr<Ailu::Enum> s_enum_type_EColliderType = nullptr;
 //Enum EColliderType begin...........................
-const Ailu::Enum* Z_Construct_Enum_EColliderType_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_ECS_EColliderType_Type()
 {
 if(s_enum_type_EColliderType == nullptr)
 {
@@ -331,7 +331,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_EColliderType.get());
 }
 return s_enum_type_EColliderType.get();
 }
-static Ailu::EnumTypeRegister g_register_EColliderType(Z_Construct_Enum_EColliderType_Type);
+static Ailu::EnumTypeRegister g_register_EColliderType(Z_Construct_Enum_Ailu_ECS_EColliderType_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::ECS::EColliderType>()
 {
 return s_enum_type_EColliderType.get();

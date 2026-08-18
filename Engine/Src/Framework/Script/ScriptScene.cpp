@@ -45,6 +45,13 @@ namespace Ailu
         const SceneManagement::PrefabInstantiateResult result = SceneManagement::PrefabSystem::Instantiate(*_scene, *prefab_asset);
         return result._root == ECS::kInvalidEntity ? ScriptEntity{} : ScriptEntity{_scene, result._root};
     }
+    bool ScriptScene::DestroyEntity(const ScriptEntity &entity) const
+    {
+        if (!IsValid() || entity._scene != _scene || !_scene->IsValidEntity(entity._entity))
+            return false;
+        _scene->RemoveObject(entity._entity);
+        return true;
+    }
     ScriptEntity ScriptScene::Spawn(const ScriptAssetValue &prefab) const { return CreateEntity(prefab); }
     ScriptCamera ScriptScene::GetMainCamera() const
     {

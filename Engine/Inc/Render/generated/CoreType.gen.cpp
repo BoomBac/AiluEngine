@@ -8,7 +8,7 @@
 using namespace Ailu;
 static std::unique_ptr<Ailu::Enum> s_enum_type_EResourceUsage = nullptr;
 //Enum EResourceUsage begin...........................
-const Ailu::Enum* Z_Construct_Enum_EResourceUsage_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_Render_EResourceUsage_Type()
 {
 if(s_enum_type_EResourceUsage == nullptr)
 {
@@ -30,7 +30,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_EResourceUsage.get());
 }
 return s_enum_type_EResourceUsage.get();
 }
-static Ailu::EnumTypeRegister g_register_EResourceUsage(Z_Construct_Enum_EResourceUsage_Type);
+static Ailu::EnumTypeRegister g_register_EResourceUsage(Z_Construct_Enum_Ailu_Render_EResourceUsage_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::EResourceUsage>()
 {
 return s_enum_type_EResourceUsage.get();
@@ -39,7 +39,7 @@ return s_enum_type_EResourceUsage.get();
 
 static std::unique_ptr<Ailu::Enum> s_enum_type_EResourceState = nullptr;
 //Enum EResourceState begin...........................
-const Ailu::Enum* Z_Construct_Enum_EResourceState_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_Render_EResourceState_Type()
 {
 if(s_enum_type_EResourceState == nullptr)
 {
@@ -79,7 +79,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_EResourceState.get());
 }
 return s_enum_type_EResourceState.get();
 }
-static Ailu::EnumTypeRegister g_register_EResourceState(Z_Construct_Enum_EResourceState_Type);
+static Ailu::EnumTypeRegister g_register_EResourceState(Z_Construct_Enum_Ailu_Render_EResourceState_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::EResourceState>()
 {
 return s_enum_type_EResourceState.get();

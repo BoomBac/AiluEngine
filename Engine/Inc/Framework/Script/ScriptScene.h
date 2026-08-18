@@ -36,6 +36,8 @@ namespace Ailu
         AFUNCTION(Script)
         ScriptEntity CreateEntity(const ScriptAssetValue &prefab) const;
         AFUNCTION(Script)
+        bool DestroyEntity(const ScriptEntity &entity) const;
+        AFUNCTION(Script)
         ScriptEntity Spawn(const ScriptAssetValue &prefab) const;
         AFUNCTION(ScriptProperty)
         ScriptCamera GetMainCamera() const;

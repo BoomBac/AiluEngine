@@ -186,8 +186,9 @@ namespace Ailu::UI
         auto popup_root = MakeRef<Canvas>();
         popup_root->Name(std::format("{}Root", popup_widget->Name()));
         popup_root->AddChild(root);
-        const Vector2f popup_size = root->MeasureDesiredSize();
-        root->GetSlotAs<CanvasSlot>().Position(Vector2f::kZero).Size(popup_size);
+        auto &root_slot = root->GetSlotAs<CanvasSlot>();
+        const Vector2f popup_size = root_slot._size_to_content ? root->MeasureDesiredSize() : root_slot._size;
+        root_slot.Position(Vector2f::kZero).Size(popup_size);
         const Vector2f window_size = {(f32) target_window->GetWidth(), (f32) target_window->GetHeight()};
         constexpr f32 kScreenPadding = 4.0f;
         Vector2f popup_pos{x, y};

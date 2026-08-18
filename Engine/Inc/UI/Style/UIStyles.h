@@ -49,6 +49,95 @@ namespace Ailu
             UIControlVisual _visual;
         };
 
+        ASTRUCT()
+        struct AILU_API UICollapsibleViewStyle
+        {
+            GENERATED_BODY()
+
+            APROPERTY()
+            UIControlVisual _header;
+
+            APROPERTY()
+            UIControlVisual _content;
+
+            APROPERTY()
+            f32 _header_height = 24.0f;
+
+            APROPERTY()
+            f32 _title_font_size = 14.0f;
+
+            APROPERTY()
+            Padding _header_padding = Padding(6.0f, 3.0f, 6.0f, 3.0f);
+
+            APROPERTY()
+            Padding _content_padding = Padding(0.0f);
+        };
+
+        ASTRUCT()
+        struct AILU_API UICollapsibleViewStyleOverride
+        {
+            GENERATED_BODY()
+        public:
+            void SetHeader(const UIControlVisual &visual) { _header = visual; _has_header = true; }
+            void SetContent(const UIControlVisual &visual) { _content = visual; _has_content = true; }
+            void SetHeaderHeight(f32 height) { _header_height = height; _has_header_height = true; }
+            void SetTitleFontSize(f32 size) { _title_font_size = size; _has_title_font_size = true; }
+            void SetHeaderPadding(const Padding &padding) { _header_padding = padding; _has_header_padding = true; }
+            void SetContentPadding(const Padding &padding) { _content_padding = padding; _has_content_padding = true; }
+
+            void ClearAllOverrides()
+            {
+                _has_header = false;
+                _has_content = false;
+                _has_header_height = false;
+                _has_title_font_size = false;
+                _has_header_padding = false;
+                _has_content_padding = false;
+            }
+
+            void ApplyTo(UICollapsibleViewStyle &style) const
+            {
+                if (_has_header)
+                    style._header = _header;
+                if (_has_content)
+                    style._content = _content;
+                if (_has_header_height)
+                    style._header_height = _header_height;
+                if (_has_title_font_size)
+                    style._title_font_size = _title_font_size;
+                if (_has_header_padding)
+                    style._header_padding = _header_padding;
+                if (_has_content_padding)
+                    style._content_padding = _content_padding;
+            }
+
+        public:
+            APROPERTY()
+            bool _has_header = false;
+            APROPERTY()
+            UIControlVisual _header;
+            APROPERTY()
+            bool _has_content = false;
+            APROPERTY()
+            UIControlVisual _content;
+            APROPERTY()
+            bool _has_header_height = false;
+            APROPERTY()
+            f32 _header_height = 24.0f;
+            APROPERTY()
+            bool _has_title_font_size = false;
+            APROPERTY()
+            f32 _title_font_size = 14.0f;
+            APROPERTY()
+            bool _has_header_padding = false;
+            APROPERTY()
+            Padding _header_padding = Padding(6.0f, 3.0f, 6.0f, 3.0f);
+            APROPERTY()
+            bool _has_content_padding = false;
+            APROPERTY()
+            Padding _content_padding = Padding(0.0f);
+        };
+
         // ================================================================
         // EUIControlVisualOverride - visual property override flags
         // ================================================================

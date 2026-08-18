@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __SCRIPTCONTACT2D_GEN_H__
 //Struct ScriptContact2D begin...........................
-#define SCRIPTCONTACT2D_GEN_H_13_GENERATED_BODY \
+#define SCRIPTCONTACT2D_GEN_H_14_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_ScriptContact2D_Type();\
                                 static const Type* GetPrivateStaticClass();\

@@ -21,7 +21,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::AssetDependency>
 //Struct AssetDependency end...........................
 
 //Enum EAssetDomain begin...........................
-const Ailu::Enum* Z_Construct_Enum_EAssetDomain_Type();
+const Ailu::Enum* Z_Construct_Enum_Ailu_EAssetDomain_Type();
 namespace Ailu {
 enum class EAssetDomain : i32;
 }
@@ -30,7 +30,7 @@ AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::EAssetDomain>();
 //Enum EAssetDomain end...........................
 
 //Enum EAssetDependencyType begin...........................
-const Ailu::Enum* Z_Construct_Enum_EAssetDependencyType_Type();
+const Ailu::Enum* Z_Construct_Enum_Ailu_EAssetDependencyType_Type();
 namespace Ailu {
 enum class EAssetDependencyType : u8;
 }

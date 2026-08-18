@@ -20,6 +20,8 @@ namespace Ailu::SceneManagement
     {
     public:
         static Ref<PrefabAssetDocument> CreatePrefabDocument(const Scene &scene, ECS::Entity root_entity);
+        // Updates an existing Prefab document while preserving stable prefab-local entity GUIDs.
+        static bool UpdatePrefabDocument(const Scene &scene, ECS::Entity root_entity, PrefabAssetDocument &prefab);
         static PrefabInstantiateResult Instantiate(Scene &scene, const PrefabAssetDocument &prefab);
         static bool RecordPropertyOverride(Scene &scene, ECS::Entity entity, StringView component, StringView property);
         static bool RevertProperty(Scene &scene, ECS::Entity entity, const PrefabAssetDocument &prefab,

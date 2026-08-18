@@ -438,27 +438,21 @@ namespace Ailu::RHI::DX12
             g_pGfxContext->WaitForFence(_fence_value);
     }
 
-    void D3DVertexBuffer::BindImpl(RHICommandBuffer *rhi_cmd, const BindParams& params)
+    void D3DVertexBuffer::BindImpl(RHICommandBuffer *rhi_cmd, const BindParams &params)
     {
-        auto d3dcmd = dynamic_cast<D3DCommandBuffer *>(rhi_cmd);
-        auto cmdlist = d3dcmd->NativeCmdList();
-        GpuResource::BindImpl(rhi_cmd, params);
-        for (const auto &layout_ele: *params._params._vb_binder._layout)
+        auto *d3d_cmd = static_cast<D3DCommandBuffer *>(rhi_cmd);
+        auto *cmd_list = d3d_cmd->NativeCmdList();
+
+        const auto &layout = *params._params._vb_binder._layout;
+        const auto &resolved = ResolveLayout(layout);
+
+        for (u8 i = 0u; i < resolved._binding_count; ++i)
         {
-            auto it = _buffer_layout_indexer.find(std::make_pair(layout_ele.Name, layout_ele._semantic_index));
-            if (it != _buffer_layout_indexer.end())
-            {
-                const u8 stream_index = it->second;
-                if (_buffer_views[stream_index].StrideInBytes != layout_ele.Size)
-                    LOG_WARNING("Stride mismatch between vertex buffer and layout element {} between {} and {}", layout_ele.Name, _buffer_views[stream_index].StrideInBytes, layout_ele.Size);
-                cmdlist->IASetVertexBuffers(layout_ele.Stream, 1, &_buffer_views[stream_index]);
-            }
-            else
-            {
-                LOG_WARNING("Try to bind a vertex buffer with an invalid layout element name {}{}", layout_ele.Name, layout_ele._semantic_index);
-            }
+            const auto &binding = resolved._bindings[i];
+            cmd_list->IASetVertexBuffers(binding._slot, 1u, &_buffer_views[binding._stream_index]);
         }
     }
+    
     void D3DVertexBuffer::UploadImpl(GraphicsContext *ctx, RHICommandBuffer *rhi_cmd, UploadParams *params)
     {
         GpuResource::UploadImpl(ctx, rhi_cmd, params);

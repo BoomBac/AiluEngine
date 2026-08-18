@@ -1,5 +1,6 @@
 #pragma once
 #include "CoreMinimal.h"
+#include "Framework/Core/Containers/Map.h"
 #include "Framework/Core/Containers/Vector.h"
 #include "Framework/Common/NonCopyable.h"
 #include <functional>
@@ -15,6 +16,7 @@ namespace Ailu
     public:
         using HandlerType = std::function<void(Args...)>;
         using Handle = u32;
+        static constexpr Handle kInvalidHandle = 0u;
 
         Delegate() = default;
 
@@ -23,7 +25,7 @@ namespace Ailu
             std::lock_guard<std::mutex> lock(other._mutex);
             _handlers = std::move(other._handlers);
             _next_id = other._next_id;
-            other._next_id = 0;
+            other._next_id = 1u;
         }
 
         Delegate& operator=(Delegate&& other) noexcept
@@ -34,7 +36,7 @@ namespace Ailu
             std::scoped_lock lock(_mutex, other._mutex);
             _handlers = std::move(other._handlers);
             _next_id = other._next_id;
-            other._next_id = 0;
+            other._next_id = 1u;
             return *this;
         }
 
@@ -44,13 +46,11 @@ namespace Ailu
             EventView() = default;
             Handle Subscribe(HandlerType&& handler)
             {
-                return _delegate != nullptr ? _delegate->Subscribe(std::move(handler)) : 0u;
+                return _delegate != nullptr ? _delegate->Subscribe(std::move(handler)) : kInvalidHandle;
             }
             void Unsubscribe(Handle id) { if (_delegate != nullptr) _delegate->Unsubscribe(id); }
-            void Unsubscribe(HandlerType handler) { if (_delegate != nullptr) _delegate->Unsubscribe(std::move(handler)); }
             Handle operator+=(HandlerType&& handler) { return Subscribe(std::move(handler)); }
             void operator-=(Handle id) { Unsubscribe(id); }
-            void operator-=(HandlerType handler) { Unsubscribe(std::move(handler)); }
 
         private:
             friend class Delegate;
@@ -88,21 +88,101 @@ namespace Ailu
                             _handlers.end());
         }
 
-        void Unsubscribe(HandlerType handler)
+    private:
+        Vector<std::pair<Handle, HandlerType>> _handlers;
+        Handle _next_id = 1u;
+        std::mutex _mutex;
+    };
+
+    template<typename Key, typename... Args>
+    class EventRouter : public NonCopyable
+    {
+    public:
+        using HandlerType = std::function<void(Args...)>;
+        using Handle = u32;
+        static constexpr Handle kInvalidHandle = 0u;
+
+        struct HandlerEntry
         {
-            std::lock_guard<std::mutex> lock(_mutex);
-            _handlers.erase(std::remove_if(_handlers.begin(), _handlers.end(),
-                                        [&handler](const auto& pair)
-                                        {
-                                            return pair.second.template target<void(Args...)>() ==
-                                                    handler.template target<void(Args...)>();
-                                        }),
-                            _handlers.end());
+            Handle _handle = kInvalidHandle;
+            HandlerType _handler;
+        };
+
+        class EventView
+        {
+        public:
+            EventView() = default;
+
+            Handle Subscribe(const Key &key, HandlerType &&handler)
+            {
+                return _router != nullptr ? _router->Subscribe(key, std::move(handler)) : kInvalidHandle;
+            }
+
+            void Unsubscribe(Handle handle)
+            {
+                if (_router != nullptr)
+                    _router->Unsubscribe(handle);
+            }
+
+        private:
+            friend class EventRouter;
+            explicit EventView(EventRouter *router) : _router(router) {}
+            EventRouter *_router = nullptr;
+        };
+
+        EventView GetEventView() { return EventView(this); }
+
+        void Invoke(const Key &key, Args... args)
+        {
+            Vector<HandlerEntry> handlers_copy;
+            {
+                std::lock_guard<std::mutex> lock(_mutex);
+                const auto bucket_iter = _handlers.find(key);
+                if (bucket_iter == _handlers.end())
+                    return;
+                handlers_copy = bucket_iter->second;
+            }
+
+            for (auto &entry : handlers_copy)
+                entry._handler(args...);
         }
 
     private:
-        Vector<std::pair<Handle, HandlerType>> _handlers;
-        Handle _next_id = 0;
+        Handle Subscribe(const Key &key, HandlerType &&handler)
+        {
+            std::lock_guard<std::mutex> lock(_mutex);
+            const Handle handle = _next_id++;
+            _handlers[key].emplace_back(HandlerEntry{handle, std::move(handler)});
+            _handle_to_key.emplace(handle, key);
+            return handle;
+        }
+
+        void Unsubscribe(Handle handle)
+        {
+            if (handle == kInvalidHandle)
+                return;
+
+            std::lock_guard<std::mutex> lock(_mutex);
+            const auto key_iter = _handle_to_key.find(handle);
+            if (key_iter == _handle_to_key.end())
+                return;
+
+            const auto bucket_iter = _handlers.find(key_iter->second);
+            if (bucket_iter != _handlers.end())
+            {
+                auto &handlers = bucket_iter->second;
+                handlers.erase(std::remove_if(handlers.begin(), handlers.end(),
+                                              [handle](const HandlerEntry &entry) { return entry._handle == handle; }),
+                               handlers.end());
+                if (handlers.empty())
+                    _handlers.erase(bucket_iter);
+            }
+            _handle_to_key.erase(key_iter);
+        }
+
+        HashMap<Key, Vector<HandlerEntry>> _handlers;
+        HashMap<Handle, Key> _handle_to_key;
+        Handle _next_id = 1u;
         std::mutex _mutex;
     };
 
@@ -116,4 +196,11 @@ public:                                      \
 #define DECLARE_DELEGATE_VIEW(Name, ...)      \
 public:                                       \
     Delegate<__VA_ARGS__>::EventView _##Name
+
+#define DECLARE_EVENT_ROUTER(Name, Key, ...)       \
+protected:                                          \
+    EventRouter<Key, __VA_ARGS__> _##Name##_router; \
+                                                  \
+public:                                             \
+    EventRouter<Key, __VA_ARGS__>::EventView _##Name = _##Name##_router.GetEventView()
 }

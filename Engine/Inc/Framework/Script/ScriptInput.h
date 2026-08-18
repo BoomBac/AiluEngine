@@ -37,12 +37,18 @@ namespace Ailu
         bool PushContext(const String &context_name) const;
         AFUNCTION(Script)
         bool Off(u64 subscription_id) const;
-        AEVENT(Script, KeyIndex = 0, KeyName = action_name)
-        DECLARE_DELEGATE(on_performed, String);
-        AEVENT(Script, KeyIndex = 0, KeyName = action_name)
-        DECLARE_DELEGATE(on_value_changed, String, f32);
+        DECLARE_EVENT_ROUTER(on_performed, String);
+        DECLARE_EVENT_ROUTER(on_value_changed, String, f32);
 
-        void NotifyPerformed(const String &action_name) { _on_performed_delegate.Invoke(action_name); }
-        void NotifyValueChanged(const String &action_name, f32 value) { _on_value_changed_delegate.Invoke(action_name, value); }
+        AEVENT(Script, KeyName = action_name)
+        void OnPerformed(String action_name);
+        AEVENT(Script, KeyName = action_name)
+        void OnValueChanged(String action_name, f32 value);
+
+        void NotifyPerformed(const String &action_name) { _on_performed_router.Invoke(action_name); }
+        void NotifyValueChanged(const String &action_name, f32 value)
+        {
+            _on_value_changed_router.Invoke(action_name, value);
+        }
     };
 }

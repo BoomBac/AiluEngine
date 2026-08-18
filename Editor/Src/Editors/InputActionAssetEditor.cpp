@@ -323,6 +323,7 @@ namespace Ailu
         void InputActionAssetEditor::MarkDirty()
         {
             _is_dirty = true;
+            ResourceMgr::Get().MarkAssetDirty(_input_asset);
             RefreshSummary();
             RefreshStatusBar();
         }

@@ -21,7 +21,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::RenderPas
 //Class RenderPass end...........................
 
 //Enum ERenderPassEvent begin...........................
-const Ailu::Enum* Z_Construct_Enum_ERenderPassEvent_Type();
+const Ailu::Enum* Z_Construct_Enum_Ailu_Render_ERenderPassEvent_Type();
 namespace Ailu::Render {
 enum class ERenderPassEvent : u16;
 }

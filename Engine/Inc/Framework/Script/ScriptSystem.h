@@ -87,26 +87,23 @@ namespace Ailu
             return RegisterSubscription(*owner, [event_view, delegate_handle]() mutable { event_view.Unsubscribe(delegate_handle); });
         }
 
-        template<size_t KeyIndex, typename EventViewType>
-        ScriptSubscriptionHandle BindLuaDelegate(EventViewType event_view, const String &key_name, sol::protected_function callback)
+        template<typename EventViewType, typename KeyType>
+        ScriptSubscriptionHandle BindLuaEventRouter(EventViewType event_view, const KeyType &key,
+                                                     sol::protected_function callback)
         {
             if (_currently_invoking_instance == nullptr || !callback.valid())
                 return 0u;
             const auto owner = FindInstanceKey(_currently_invoking_instance);
             if (!owner.has_value())
                 return 0u;
-            const auto delegate_handle = event_view.Subscribe([this, owner = *owner, key_name, callback = std::move(callback)](auto &&...args) mutable
+            const auto event_handle = event_view.Subscribe(key, [this, owner = *owner, callback = std::move(callback)](auto &&...args) mutable
             {
                 auto instance_iter = _instances.find(owner);
                 if (instance_iter == _instances.end() || instance_iter->second._faulted || !instance_iter->second._is_enabled)
                     return;
-                auto arguments = std::forward_as_tuple(args...);
-                if (std::get<KeyIndex>(arguments) != key_name)
-                    return;
-                InvokeLuaCallbackWithoutKey<KeyIndex>(instance_iter->second, callback, arguments,
-                                                      std::make_index_sequence<sizeof...(args) - 1u>{});
+                InvokeLuaCallback(instance_iter->second, callback, std::forward<decltype(args)>(args)...);
             });
-            return RegisterSubscription(*owner, [event_view, delegate_handle]() mutable { event_view.Unsubscribe(delegate_handle); });
+            return RegisterSubscription(*owner, [event_view, event_handle]() mutable { event_view.Unsubscribe(event_handle); });
         }
 
         sol::state &GetState() { return _lua; }
@@ -147,10 +144,10 @@ namespace Ailu
         };
         struct ScriptColliderEventSource
         {
-            ScriptCollider2D::CollisionEventDelegate _on_collision_enter;
-            ScriptCollider2D::CollisionEventDelegate _on_collision_exit;
-            ScriptCollider2D::EntityEventDelegate _on_trigger_enter;
-            ScriptCollider2D::EntityEventDelegate _on_trigger_exit;
+            ScriptCollider2D::CollisionEventRouter _on_collision_enter;
+            ScriptCollider2D::CollisionEventRouter _on_collision_exit;
+            ScriptCollider2D::CollisionEventRouter _on_trigger_enter;
+            ScriptCollider2D::CollisionEventRouter _on_trigger_exit;
         };
         struct ScriptPropertyDeclaration
         {
@@ -197,12 +194,6 @@ namespace Ailu
             return false;
         }
 
-        template<size_t KeyIndex, typename Tuple, size_t... Indices>
-        bool InvokeLuaCallbackWithoutKey(ScriptInstance &instance, sol::protected_function &callback, Tuple &arguments,
-                                         std::index_sequence<Indices...>)
-        {
-            return InvokeLuaCallback(instance, callback, std::get<Indices < KeyIndex ? Indices : Indices + 1u>(arguments)...);
-        }
         template<typename... Args>
         bool InvokeComponentMethod(ScriptInstance &instance, sol::protected_function &function, Args &&...args)
         {

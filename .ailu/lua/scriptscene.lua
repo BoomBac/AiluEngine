@@ -32,6 +32,10 @@ function ScriptScene:find_guid(guid) end
 ---@return ScriptEntity
 function ScriptScene:create_entity(name) end
 
+---@param entity ScriptEntity
+---@return boolean
+function ScriptScene:destroy_entity(entity) end
+
 ---@param prefab ScriptAssetValue
 ---@return ScriptEntity
 function ScriptScene:spawn(prefab) end

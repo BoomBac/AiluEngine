@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __TYPE_GEN_H__
 //Enum EDataType begin...........................
-const Ailu::Enum* Z_Construct_Enum_EDataType_Type();
+const Ailu::Enum* Z_Construct_Enum_Ailu_EDataType_Type();
 namespace Ailu {
 enum class EDataType : i32;
 }

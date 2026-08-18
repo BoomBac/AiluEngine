@@ -33,6 +33,8 @@ namespace Ailu
         void Clear();
         void Snapshot();
         Vector<FileChangeEvent> PollChanges();
+        //接受一次由引擎自身写入磁盘产生的修改，作为新的 watcher baseline。
+        void AcknowledgeWrite(const std::filesystem::path &path);
 
     private:
         void CollectWatchedFiles(std::set<std::filesystem::path> &out_files) const;

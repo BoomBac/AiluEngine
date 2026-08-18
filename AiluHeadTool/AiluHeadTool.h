@@ -89,7 +89,8 @@ public:
         std::string _decl_type;
         std::string _namespace;
         std::vector<std::tuple<std::string, uint32_t>> _members;
-        bool _is_enum_class;
+        bool _is_enum_class = false;
+        bool _is_script = false;
     };
 private:
     void SaveClassNamespaceMap(const std::unordered_map<std::string, std::set<std::string>> &map, const std::string &filename);

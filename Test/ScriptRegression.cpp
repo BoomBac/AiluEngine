@@ -236,7 +236,50 @@ bool TestLifecycle()
 }
 
 // ============================================================================
-// Test 3: Multiple Entity Instance State Isolation
+// Test 3: Scene destruction clears Lua event subscriptions
+// ============================================================================
+bool TestSceneDestroyedClearsSubscriptions()
+{
+    auto &ss = ScriptSystem::Get();
+    const fs::path script_path = ScriptPath("test_input_subscription.lua");
+    if (!Check(fs::exists(script_path), "test_input_subscription.lua should exist"))
+        return false;
+
+    ss.RunString("reg_input_subscription_count = 0");
+    {
+        SceneManagement::Scene scene("RegTest_InputSubscription", false);
+        const ECS::Entity entity = scene.AddObject("InputSubscriptionEntity");
+        auto &component = AddScript(scene, entity, script_path.string());
+        ss.FixedUpdateComponent(&scene, entity, component, 0.02f);
+        ss.GetInput().NotifyPerformed("Spawn");
+        if (!Check(ss.GetGlobalInt("reg_input_subscription_count", -1) == 1,
+                   "Initial action subscription should fire once"))
+            return false;
+
+        ss.OnSceneDestroyed(&scene);
+        ss.GetInput().NotifyPerformed("Spawn");
+        if (!Check(ss.GetGlobalInt("reg_input_subscription_count", -1) == 1,
+                   "Destroyed scene subscription should not fire"))
+            return false;
+    }
+
+    {
+        SceneManagement::Scene scene("RegTest_InputSubscription_Restart", false);
+        const ECS::Entity entity = scene.AddObject("InputSubscriptionEntity");
+        auto &component = AddScript(scene, entity, script_path.string());
+        ss.FixedUpdateComponent(&scene, entity, component, 0.02f);
+        ss.GetInput().NotifyPerformed("Spawn");
+        if (!Check(ss.GetGlobalInt("reg_input_subscription_count", -1) == 2,
+                   "Restarted scene action subscription should fire once"))
+            return false;
+        ss.OnSceneDestroyed(&scene);
+    }
+
+    return true;
+}
+
+// ============================================================================
+// Test 4: Multiple Entity Instance State Isolation
 // ============================================================================
 bool TestMultipleInstance()
 {
@@ -313,7 +356,7 @@ bool TestMultipleInstance()
 }
 
 // ============================================================================
-// Test 4: Shared ScriptPrototype
+// Test 5: Shared ScriptPrototype
 // ============================================================================
 bool TestSharedPrototype()
 {
@@ -355,7 +398,7 @@ bool TestSharedPrototype()
 }
 
 // ============================================================================
-// Test 5: Script Facade API
+// Test 6: Script Facade API
 // ============================================================================
 bool TestFacadeApi()
 {
@@ -405,7 +448,7 @@ bool TestFacadeApi()
 }
 
 // ============================================================================
-// Test 6: AHT-generated LuaLS declarations stay synchronized with bindings
+// Test 7: AHT-generated LuaLS declarations stay synchronized with bindings
 // ============================================================================
 bool TestGeneratedLuaDeclarations()
 {
@@ -766,6 +809,20 @@ bool TestPhysicsCallbackDispatch()
     ss.DispatchPhysicsContact(&scene, PhysicsContact2D{EPhysicsContact2DType::kTriggerBegin, entity_b, entity_a, 0u, 0u});
     ss.DispatchPhysicsContact(&scene, PhysicsContact2D{EPhysicsContact2DType::kTriggerEnd, entity_b, entity_a, 0u, 0u});
 
+    using ECS::ECollisionChannel2D;
+    ss.DispatchPhysicsContact(&scene, PhysicsContact2D{EPhysicsContact2DType::kCollisionBegin, entity_a, entity_b,
+                                                       0u, 0u, Vector2f::kZero, Vector2f::kZero,
+                                                       ECollisionChannel2D::kPlayer, ECollisionChannel2D::kEnemy});
+    ss.DispatchPhysicsContact(&scene, PhysicsContact2D{EPhysicsContact2DType::kCollisionEnd, entity_a, entity_b,
+                                                       0u, 0u, Vector2f::kZero, Vector2f::kZero,
+                                                       ECollisionChannel2D::kPlayer, ECollisionChannel2D::kEnemy});
+    ss.DispatchPhysicsContact(&scene, PhysicsContact2D{EPhysicsContact2DType::kTriggerBegin, entity_a, entity_b,
+                                                       0u, 0u, Vector2f::kZero, Vector2f::kZero,
+                                                       ECollisionChannel2D::kPlayer, ECollisionChannel2D::kEnemy});
+    ss.DispatchPhysicsContact(&scene, PhysicsContact2D{EPhysicsContact2DType::kTriggerEnd, entity_a, entity_b,
+                                                       0u, 0u, Vector2f::kZero, Vector2f::kZero,
+                                                       ECollisionChannel2D::kPlayer, ECollisionChannel2D::kEnemy});
+
     ss.RunString(
         "reg_pc_a_col = (physics_cb['PcA'] and physics_cb['PcA'].collision_enter) or 0; "
         "reg_pc_a_col_other_ok = physics_cb['PcA'] and physics_cb['PcA'].collision_other == 'PcB'; "
@@ -783,7 +840,15 @@ bool TestPhysicsCallbackDispatch()
         "reg_pc_a_trig_exit = (physics_cb['PcA'] and physics_cb['PcA'].trigger_exit) or 0; "
         "reg_pc_b_trig = (physics_cb['PcB'] and physics_cb['PcB'].trigger_enter) or 0; "
         "reg_pc_b_trig_other_ok = physics_cb['PcB'] and physics_cb['PcB'].trigger_other == 'PcA'; "
-        "reg_pc_b_trig_exit = (physics_cb['PcB'] and physics_cb['PcB'].trigger_exit) or 0");
+        "reg_pc_b_trig_exit = (physics_cb['PcB'] and physics_cb['PcB'].trigger_exit) or 0; "
+        "reg_pc_a_filtered_col = (physics_cb['PcA'] and physics_cb['PcA'].filtered_collision_enter) or 0; "
+        "reg_pc_a_filtered_col_exit = (physics_cb['PcA'] and physics_cb['PcA'].filtered_collision_exit) or 0; "
+        "reg_pc_a_filtered_trig = (physics_cb['PcA'] and physics_cb['PcA'].filtered_trigger_enter) or 0; "
+        "reg_pc_a_filtered_trig_exit = (physics_cb['PcA'] and physics_cb['PcA'].filtered_trigger_exit) or 0; "
+        "reg_pc_b_filtered_col = (physics_cb['PcB'] and physics_cb['PcB'].filtered_collision_enter) or 0; "
+        "reg_pc_b_filtered_col_exit = (physics_cb['PcB'] and physics_cb['PcB'].filtered_collision_exit) or 0; "
+        "reg_pc_b_filtered_trig = (physics_cb['PcB'] and physics_cb['PcB'].filtered_trigger_enter) or 0; "
+        "reg_pc_b_filtered_trig_exit = (physics_cb['PcB'] and physics_cb['PcB'].filtered_trigger_exit) or 0");
 
     all_ok &= Check(ss.GetGlobalInt("reg_pc_a_col", -1) == 1,
                     "A collision_enter should fire once: " + std::to_string(ss.GetGlobalInt("reg_pc_a_col", -1)));
@@ -807,6 +872,16 @@ bool TestPhysicsCallbackDispatch()
     all_ok &= Check(ss.GetGlobalInt("reg_pc_b_trig", -1) == 1, "B trigger_enter should fire once");
     all_ok &= Check(ss.GetGlobalBool("reg_pc_b_trig_other_ok", false), "B trigger_enter other should be PcA");
     all_ok &= Check(ss.GetGlobalInt("reg_pc_b_trig_exit", -1) == 1, "B trigger_exit should fire once");
+    all_ok &= Check(ss.GetGlobalInt("reg_pc_a_filtered_col", -1) == 1 &&
+                        ss.GetGlobalInt("reg_pc_a_filtered_col_exit", -1) == 1 &&
+                        ss.GetGlobalInt("reg_pc_a_filtered_trig", -1) == 1 &&
+                        ss.GetGlobalInt("reg_pc_a_filtered_trig_exit", -1) == 1,
+                    "A should receive all four callbacks when the target channel is Enemy");
+    all_ok &= Check(ss.GetGlobalInt("reg_pc_b_filtered_col", -1) == 0 &&
+                        ss.GetGlobalInt("reg_pc_b_filtered_col_exit", -1) == 0 &&
+                        ss.GetGlobalInt("reg_pc_b_filtered_trig", -1) == 0 &&
+                        ss.GetGlobalInt("reg_pc_b_filtered_trig_exit", -1) == 0,
+                    "B should reject all four callbacks when the target channel is Player");
 
     // ---- Faulted script guard: PcErr's OnCreate errored, so its callbacks must NOT fire ----
     ss.DispatchPhysicsContact(&scene, PhysicsContact2D{EPhysicsContact2DType::kCollisionBegin, entity_err, entity_a,
@@ -861,6 +936,44 @@ bool TestPhysicsCallbackDispatch()
 }
 
 // ============================================================================
+// T08: Collision channel response and preset rules
+// ============================================================================
+bool TestCollisionChannelResponses()
+{
+    using ECS::ECollisionChannel2D;
+    using ECS::ECollisionPreset2D;
+    using ECS::ECollisionResponse2D;
+
+    bool all_ok = true;
+    all_ok &= Check(ECS::ResolveCollisionResponse(ECollisionResponse2D::kBlock, ECollisionResponse2D::kBlock) ==
+                        ECollisionResponse2D::kBlock,
+                    "Block + Block should resolve to Block");
+    all_ok &= Check(ECS::ResolveCollisionResponse(ECollisionResponse2D::kBlock, ECollisionResponse2D::kOverlap) ==
+                        ECollisionResponse2D::kOverlap,
+                    "Block + Overlap should resolve to Overlap");
+    all_ok &= Check(ECS::ResolveCollisionResponse(ECollisionResponse2D::kBlock, ECollisionResponse2D::kIgnore) ==
+                        ECollisionResponse2D::kIgnore,
+                    "Block + Ignore should resolve to Ignore");
+
+    const ECS::CollisionProfile2D enemy = ECS::MakeCollisionProfile2D(ECollisionPreset2D::kEnemy);
+    all_ok &= Check(enemy._object_type == ECollisionChannel2D::kEnemy &&
+                        enemy.GetResponse(ECollisionChannel2D::kWorldStatic) == ECollisionResponse2D::kBlock &&
+                        enemy.GetResponse(ECollisionChannel2D::kPickup) == ECollisionResponse2D::kIgnore,
+                    "Enemy preset should block world and ignore pickups");
+
+    ECS::CollisionProfile2D custom = enemy;
+    custom.SetResponse(ECollisionChannel2D::kPlayer, ECollisionResponse2D::kIgnore);
+    all_ok &= Check(custom.GetResponse(ECollisionChannel2D::kPlayer) == ECollisionResponse2D::kIgnore,
+                    "Custom profile should preserve edited response");
+
+    const ECS::CollisionProfile2D trigger = ECS::MakeCollisionProfile2D(ECollisionPreset2D::kTrigger);
+    all_ok &= Check(trigger.GetResponse(ECollisionChannel2D::kWorldStatic) == ECollisionResponse2D::kIgnore &&
+                        trigger.GetResponse(ECollisionChannel2D::kEnemy) == ECollisionResponse2D::kOverlap,
+                    "Trigger preset should ignore world and overlap enemies");
+    return all_ok;
+}
+
+// ============================================================================
 // T07: Physics2D callback integration through a real Box2D world
 // ============================================================================
 bool TestPhysicsCallbackIntegration()
@@ -880,7 +993,7 @@ bool TestPhysicsCallbackIntegration()
         return false;
     Physics2DWorld &world = physics_system->World();
 
-    // Collision pair: dynamic IntA overlapping static IntB (both non-trigger).
+    // Collision pair: dynamic Projectile overlapping static WorldDynamic (both non-trigger).
     ECS::Entity entity_a = scene.AddObject("IntA");
     ECS::Entity entity_b = scene.AddObject("IntB");
     // Trigger pair: static trigger IntC overlapping dynamic IntD.
@@ -897,6 +1010,9 @@ bool TestPhysicsCallbackIntegration()
     auto &coll_b = scene.GetRegister().AddComponent<ECS::Collider2DComponent>(entity_b);
     auto &coll_c = scene.GetRegister().AddComponent<ECS::Collider2DComponent>(entity_c);
     auto &coll_d = scene.GetRegister().AddComponent<ECS::Collider2DComponent>(entity_d);
+    coll_a._preset = ECS::ECollisionPreset2D::kProjectile;
+    // Keep a deliberately stale profile to verify that the selected preset is authoritative at runtime.
+    coll_a._collision_profile = ECS::MakeCollisionProfile2D(ECS::ECollisionPreset2D::kTrigger);
     coll_a._shapes.emplace_back();
     coll_b._shapes.emplace_back();
     ECS::ColliderShape2D trigger_shape;
@@ -1004,6 +1120,7 @@ int main(int argc, char **argv)
 
     RunTest(stats, "Basic Lua Execution", TestBasicLua);
     RunTest(stats, "Script Lifecycle", TestLifecycle);
+    RunTest(stats, "Scene Destroyed Clears Subscriptions", TestSceneDestroyedClearsSubscriptions);
     RunTest(stats, "Multiple Instance Isolation", TestMultipleInstance);
     RunTest(stats, "Shared ScriptPrototype", TestSharedPrototype);
     RunTest(stats, "Script Facade API", TestFacadeApi);
@@ -1012,6 +1129,7 @@ int main(int argc, char **argv)
     RunTest(stats, "Hot Reload Baseline", TestHotReloadBaseline);
     RunTest(stats, "Entity API", TestEntityApi);
     RunTest(stats, "Physics Callback Dispatch", TestPhysicsCallbackDispatch);
+    RunTest(stats, "Collision Channel Responses", TestCollisionChannelResponses);
     RunTest(stats, "Physics Callback Integration", TestPhysicsCallbackIntegration);
 
     std::cout << "========================================" << std::endl;

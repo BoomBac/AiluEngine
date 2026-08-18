@@ -6,6 +6,83 @@
 #include <Objects/SerializeSpecializations.h>
 #include <Framework/Common/Log.h>
 using namespace Ailu;
+const Ailu::Type* Ailu::ECS::Z_Construct_CollisionProfile2D_Type()
+{
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "CollisionProfile2D";
+initializer._size = sizeof(Ailu::ECS::CollisionProfile2D);
+initializer._full_name = "Ailu::ECS::CollisionProfile2D";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu::ECS";
+initializer._base_name = "";
+initializer._constructor = []()->Ailu::ECS::CollisionProfile2D* {return new Ailu::ECS::CollisionProfile2D;};
+Meta meta_object_type;
+meta_object_type.Set("Category","");
+meta_object_type.Set("IsColor",false);
+meta_object_type.Set("IsRange",false);
+meta_object_type.Set("IsFloatRange",true);
+meta_object_type.Set("RangeMin",(f32)0);
+meta_object_type.Set("RangeMax",(f32)1);
+MemberBuilder builder_object_type;
+builder_object_type._name = "_object_type";
+builder_object_type._type_name = "Ailu::ECS::ECollisionChannel2D";
+builder_object_type._offset = offsetof(CollisionProfile2D,_object_type);
+builder_object_type._is_const = false;
+builder_object_type._is_static = false;
+builder_object_type._is_public = false;
+builder_object_type._is_pointer = false;
+builder_object_type._is_ref = false;
+builder_object_type._is_template = false;
+builder_object_type._meta = meta_object_type;
+builder_object_type._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<ECollisionChannel2D>);
+builder_object_type._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<ECollisionChannel2D>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_object_type));
+Meta meta_responses;
+meta_responses.Set("Category","");
+meta_responses.Set("IsColor",false);
+meta_responses.Set("IsRange",false);
+meta_responses.Set("IsFloatRange",true);
+meta_responses.Set("RangeMin",(f32)0);
+meta_responses.Set("RangeMax",(f32)1);
+MemberBuilder builder_responses;
+builder_responses._name = "_responses";
+builder_responses._type_name = "Vector<ECollisionResponse2D>";
+builder_responses._offset = offsetof(CollisionProfile2D,_responses);
+builder_responses._is_const = false;
+builder_responses._is_static = false;
+builder_responses._is_public = false;
+builder_responses._is_pointer = false;
+builder_responses._is_ref = false;
+builder_responses._is_template = true;
+builder_responses._meta = meta_responses;
+builder_responses._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<ECollisionResponse2D>>);
+builder_responses._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<ECollisionResponse2D>>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_responses));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+const Ailu::Type* Ailu::ECS::CollisionProfile2D::GetPrivateStaticClass()
+{
+	static const Ailu::Type* type = Z_Construct_CollisionProfile2D_Type();
+	return type;
+}
+
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::ECS::CollisionProfile2D>()
+{
+return Ailu::ECS::CollisionProfile2D::StaticType();
+}
+    const Type *Ailu::ECS::CollisionProfile2D::GetType()
+{
+return Ailu::ECS::CollisionProfile2D::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_CollisionProfile2D(&Ailu::ECS::CollisionProfile2D::StaticType, "Ailu::ECS::CollisionProfile2D");
 const Ailu::Type* Ailu::ECS::Z_Construct_RigidBody2DComponent_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -468,6 +545,48 @@ initializer._is_abstract = false;
 initializer._namespace = "Ailu::ECS";
 initializer._base_name = "";
 initializer._constructor = []()->Ailu::ECS::Collider2DComponent* {return new Ailu::ECS::Collider2DComponent;};
+Meta meta_preset;
+meta_preset.Set("Category","");
+meta_preset.Set("IsColor",false);
+meta_preset.Set("IsRange",false);
+meta_preset.Set("IsFloatRange",true);
+meta_preset.Set("RangeMin",(f32)0);
+meta_preset.Set("RangeMax",(f32)1);
+MemberBuilder builder_preset;
+builder_preset._name = "_preset";
+builder_preset._type_name = "Ailu::ECS::ECollisionPreset2D";
+builder_preset._offset = offsetof(Collider2DComponent,_preset);
+builder_preset._is_const = false;
+builder_preset._is_static = false;
+builder_preset._is_public = false;
+builder_preset._is_pointer = false;
+builder_preset._is_ref = false;
+builder_preset._is_template = false;
+builder_preset._meta = meta_preset;
+builder_preset._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<ECollisionPreset2D>);
+builder_preset._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<ECollisionPreset2D>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_preset));
+Meta meta_collision_profile;
+meta_collision_profile.Set("Category","");
+meta_collision_profile.Set("IsColor",false);
+meta_collision_profile.Set("IsRange",false);
+meta_collision_profile.Set("IsFloatRange",true);
+meta_collision_profile.Set("RangeMin",(f32)0);
+meta_collision_profile.Set("RangeMax",(f32)1);
+MemberBuilder builder_collision_profile;
+builder_collision_profile._name = "_collision_profile";
+builder_collision_profile._type_name = "Ailu::ECS::CollisionProfile2D";
+builder_collision_profile._offset = offsetof(Collider2DComponent,_collision_profile);
+builder_collision_profile._is_const = false;
+builder_collision_profile._is_static = false;
+builder_collision_profile._is_public = false;
+builder_collision_profile._is_pointer = false;
+builder_collision_profile._is_ref = false;
+builder_collision_profile._is_template = false;
+builder_collision_profile._meta = meta_collision_profile;
+builder_collision_profile._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<CollisionProfile2D>);
+builder_collision_profile._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<CollisionProfile2D>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_collision_profile));
 Meta meta_shapes;
 meta_shapes.Set("Category","");
 meta_shapes.Set("IsColor",false);
@@ -510,9 +629,95 @@ return Ailu::ECS::Collider2DComponent::StaticType();
 return Ailu::ECS::Collider2DComponent::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_Collider2DComponent(&Ailu::ECS::Collider2DComponent::StaticType, "Ailu::ECS::Collider2DComponent");
+static std::unique_ptr<Ailu::Enum> s_enum_type_ECollisionResponse2D = nullptr;
+//Enum ECollisionResponse2D begin...........................
+const Ailu::Enum* Z_Construct_Enum_Ailu_ECS_ECollisionResponse2D_Type()
+{
+if(s_enum_type_ECollisionResponse2D == nullptr)
+{
+EnumInitializer initializer;
+initializer._name = "ECollisionResponse2D";
+initializer._namespace = "Ailu::ECS";
+initializer._full_name = "Ailu::ECS::ECollisionResponse2D";
+initializer._str_to_enum_lut["kIgnore"] = 0;
+initializer._str_to_enum_lut["kOverlap"] = 1;
+initializer._str_to_enum_lut["kBlock"] = 2;
+s_enum_type_ECollisionResponse2D = std::make_unique<Ailu::Enum>(initializer);
+Ailu::Enum::RegisterEnum(s_enum_type_ECollisionResponse2D.get());
+}
+return s_enum_type_ECollisionResponse2D.get();
+}
+static Ailu::EnumTypeRegister g_register_ECollisionResponse2D(Z_Construct_Enum_Ailu_ECS_ECollisionResponse2D_Type);
+template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::ECS::ECollisionResponse2D>()
+{
+return s_enum_type_ECollisionResponse2D.get();
+}
+//Enum ECollisionResponse2D end...........................
+
+static std::unique_ptr<Ailu::Enum> s_enum_type_ECollisionChannel2D = nullptr;
+//Enum ECollisionChannel2D begin...........................
+const Ailu::Enum* Z_Construct_Enum_Ailu_ECS_ECollisionChannel2D_Type()
+{
+if(s_enum_type_ECollisionChannel2D == nullptr)
+{
+EnumInitializer initializer;
+initializer._name = "ECollisionChannel2D";
+initializer._namespace = "Ailu::ECS";
+initializer._full_name = "Ailu::ECS::ECollisionChannel2D";
+initializer._str_to_enum_lut["kWorldStatic"] = 0;
+initializer._str_to_enum_lut["kWorldDynamic"] = 1;
+initializer._str_to_enum_lut["kPlayer"] = 2;
+initializer._str_to_enum_lut["kEnemy"] = 3;
+initializer._str_to_enum_lut["kProjectile"] = 4;
+initializer._str_to_enum_lut["kTrigger"] = 5;
+initializer._str_to_enum_lut["kPickup"] = 6;
+initializer._str_to_enum_lut["kCount"] = 7;
+s_enum_type_ECollisionChannel2D = std::make_unique<Ailu::Enum>(initializer);
+Ailu::Enum::RegisterEnum(s_enum_type_ECollisionChannel2D.get());
+}
+return s_enum_type_ECollisionChannel2D.get();
+}
+static Ailu::EnumTypeRegister g_register_ECollisionChannel2D(Z_Construct_Enum_Ailu_ECS_ECollisionChannel2D_Type);
+template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::ECS::ECollisionChannel2D>()
+{
+return s_enum_type_ECollisionChannel2D.get();
+}
+//Enum ECollisionChannel2D end...........................
+
+static std::unique_ptr<Ailu::Enum> s_enum_type_ECollisionPreset2D = nullptr;
+//Enum ECollisionPreset2D begin...........................
+const Ailu::Enum* Z_Construct_Enum_Ailu_ECS_ECollisionPreset2D_Type()
+{
+if(s_enum_type_ECollisionPreset2D == nullptr)
+{
+EnumInitializer initializer;
+initializer._name = "ECollisionPreset2D";
+initializer._namespace = "Ailu::ECS";
+initializer._full_name = "Ailu::ECS::ECollisionPreset2D";
+initializer._str_to_enum_lut["kDefault"] = 0;
+initializer._str_to_enum_lut["kPlayer"] = 1;
+initializer._str_to_enum_lut["kEnemy"] = 2;
+initializer._str_to_enum_lut["kWorldStatic"] = 3;
+initializer._str_to_enum_lut["kWorldDynamic"] = 4;
+initializer._str_to_enum_lut["kProjectile"] = 5;
+initializer._str_to_enum_lut["kTrigger"] = 6;
+initializer._str_to_enum_lut["kPickup"] = 7;
+initializer._str_to_enum_lut["kCustom"] = 8;
+s_enum_type_ECollisionPreset2D = std::make_unique<Ailu::Enum>(initializer);
+Ailu::Enum::RegisterEnum(s_enum_type_ECollisionPreset2D.get());
+}
+return s_enum_type_ECollisionPreset2D.get();
+}
+static Ailu::EnumTypeRegister g_register_ECollisionPreset2D(Z_Construct_Enum_Ailu_ECS_ECollisionPreset2D_Type);
+template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::ECS::ECollisionPreset2D>()
+{
+return s_enum_type_ECollisionPreset2D.get();
+}
+//Enum ECollisionPreset2D end...........................
+
 static std::unique_ptr<Ailu::Enum> s_enum_type_EBody2DType = nullptr;
 //Enum EBody2DType begin...........................
-const Ailu::Enum* Z_Construct_Enum_EBody2DType_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_ECS_EBody2DType_Type()
 {
 if(s_enum_type_EBody2DType == nullptr)
 {
@@ -528,7 +733,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_EBody2DType.get());
 }
 return s_enum_type_EBody2DType.get();
 }
-static Ailu::EnumTypeRegister g_register_EBody2DType(Z_Construct_Enum_EBody2DType_Type);
+static Ailu::EnumTypeRegister g_register_EBody2DType(Z_Construct_Enum_Ailu_ECS_EBody2DType_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::ECS::EBody2DType>()
 {
 return s_enum_type_EBody2DType.get();
@@ -537,7 +742,7 @@ return s_enum_type_EBody2DType.get();
 
 static std::unique_ptr<Ailu::Enum> s_enum_type_ECollider2DShape = nullptr;
 //Enum ECollider2DShape begin...........................
-const Ailu::Enum* Z_Construct_Enum_ECollider2DShape_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_ECS_ECollider2DShape_Type()
 {
 if(s_enum_type_ECollider2DShape == nullptr)
 {
@@ -555,7 +760,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_ECollider2DShape.get());
 }
 return s_enum_type_ECollider2DShape.get();
 }
-static Ailu::EnumTypeRegister g_register_ECollider2DShape(Z_Construct_Enum_ECollider2DShape_Type);
+static Ailu::EnumTypeRegister g_register_ECollider2DShape(Z_Construct_Enum_Ailu_ECS_ECollider2DShape_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::ECS::ECollider2DShape>()
 {
 return s_enum_type_ECollider2DShape.get();

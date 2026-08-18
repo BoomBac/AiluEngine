@@ -72,6 +72,19 @@ builderGetOtherShape._ret_type_name = "u32";
 builderGetOtherShape._meta = metaGetOtherShape;
 builderGetOtherShape._member_ptr = &Ailu::ScriptContact2D::GetOtherShape;
 initializer._functions.emplace_back(MemberBuilder::BuildFunction(builderGetOtherShape));
+Meta metaGetOtherObjectType;
+metaGetOtherObjectType.Set("Script",true);
+MemberBuilder builderGetOtherObjectType;
+builderGetOtherObjectType._name = "GetOtherObjectType";
+builderGetOtherObjectType._type_name = "u32() const";
+builderGetOtherObjectType._offset = 0u;
+builderGetOtherObjectType._is_const = true;
+builderGetOtherObjectType._is_static = false;
+builderGetOtherObjectType._is_public = false;
+builderGetOtherObjectType._ret_type_name = "u32";
+builderGetOtherObjectType._meta = metaGetOtherObjectType;
+builderGetOtherObjectType._member_ptr = &Ailu::ScriptContact2D::GetOtherObjectType;
+initializer._functions.emplace_back(MemberBuilder::BuildFunction(builderGetOtherObjectType));
 cur_type = std::make_unique<Ailu::Type>(initializer);
 Ailu::Type::RegisterType(cur_type.get());
 }
@@ -102,6 +115,7 @@ void Ailu::RegisterGeneratedLuaBindings_ScriptContact2D(sol::state &lua)
 {
 auto type_ScriptContact2D = lua.new_usertype<Ailu::ScriptContact2D>("ScriptContact2D");
 type_ScriptContact2D["normal"] = sol::property(&Ailu::ScriptContact2D::GetNormal);
+type_ScriptContact2D["other_object_type"] = sol::property(&Ailu::ScriptContact2D::GetOtherObjectType);
 type_ScriptContact2D["other_shape"] = sol::property(&Ailu::ScriptContact2D::GetOtherShape);
 type_ScriptContact2D["point"] = sol::property(&Ailu::ScriptContact2D::GetPoint);
 type_ScriptContact2D["self_shape"] = sol::property(&Ailu::ScriptContact2D::GetSelfShape);
@@ -109,6 +123,7 @@ type_ScriptContact2D.set_function("get_point", &Ailu::ScriptContact2D::GetPoint)
 type_ScriptContact2D.set_function("get_normal", &Ailu::ScriptContact2D::GetNormal);
 type_ScriptContact2D.set_function("get_self_shape", &Ailu::ScriptContact2D::GetSelfShape);
 type_ScriptContact2D.set_function("get_other_shape", &Ailu::ScriptContact2D::GetOtherShape);
+type_ScriptContact2D.set_function("get_other_object_type", &Ailu::ScriptContact2D::GetOtherObjectType);
 }
 ScriptLuaBindingRegister s_register_lua_bindings_RegisterGeneratedLuaBindings_ScriptContact2D(&Ailu::RegisterGeneratedLuaBindings_ScriptContact2D);
 #endif

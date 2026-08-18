@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __APPLICATION_GEN_H__
 //Enum EApplicationState begin...........................
-const Ailu::Enum* Z_Construct_Enum_EApplicationState_Type();
+const Ailu::Enum* Z_Construct_Enum_Ailu_EApplicationState_Type();
 namespace Ailu {
 enum class EApplicationState : i32;
 }

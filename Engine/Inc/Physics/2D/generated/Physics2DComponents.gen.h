@@ -4,8 +4,24 @@
 #endif 
 #include "Objects/ReflectTemplate.h"
 #define __PHYSICS2DCOMPONENTS_GEN_H__
+//Struct CollisionProfile2D begin...........................
+#define PHYSICS2DCOMPONENTS_GEN_H_50_GENERATED_BODY \
+                            private: \
+                                friend const Type* Z_Construct_CollisionProfile2D_Type();\
+                                static const Type* GetPrivateStaticClass();\
+                            public:\
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                const Type  *GetType();
+                            namespace Ailu {class Type;}
+namespace Ailu::ECS{
+struct CollisionProfile2D ;
+}
+template<>
+AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::ECS::CollisionProfile2D>();
+//Struct CollisionProfile2D end...........................
+
 //Struct RigidBody2DComponent begin...........................
-#define PHYSICS2DCOMPONENTS_GEN_H_33_GENERATED_BODY \
+#define PHYSICS2DCOMPONENTS_GEN_H_185_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_RigidBody2DComponent_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -21,7 +37,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::ECS::RigidBody2D
 //Struct RigidBody2DComponent end...........................
 
 //Struct ColliderShape2D begin...........................
-#define PHYSICS2DCOMPONENTS_GEN_H_55_GENERATED_BODY \
+#define PHYSICS2DCOMPONENTS_GEN_H_207_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_ColliderShape2D_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -37,7 +53,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::ECS::ColliderSha
 //Struct ColliderShape2D end...........................
 
 //Struct Collider2DComponent begin...........................
-#define PHYSICS2DCOMPONENTS_GEN_H_83_GENERATED_BODY \
+#define PHYSICS2DCOMPONENTS_GEN_H_235_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_Collider2DComponent_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -52,8 +68,35 @@ template<>
 AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::ECS::Collider2DComponent>();
 //Struct Collider2DComponent end...........................
 
+//Enum ECollisionResponse2D begin...........................
+const Ailu::Enum* Z_Construct_Enum_Ailu_ECS_ECollisionResponse2D_Type();
+namespace Ailu::ECS {
+enum class ECollisionResponse2D : u8;
+}
+template<>
+AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::ECS::ECollisionResponse2D>();
+//Enum ECollisionResponse2D end...........................
+
+//Enum ECollisionChannel2D begin...........................
+const Ailu::Enum* Z_Construct_Enum_Ailu_ECS_ECollisionChannel2D_Type();
+namespace Ailu::ECS {
+enum class ECollisionChannel2D : u8;
+}
+template<>
+AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::ECS::ECollisionChannel2D>();
+//Enum ECollisionChannel2D end...........................
+
+//Enum ECollisionPreset2D begin...........................
+const Ailu::Enum* Z_Construct_Enum_Ailu_ECS_ECollisionPreset2D_Type();
+namespace Ailu::ECS {
+enum class ECollisionPreset2D : u8;
+}
+template<>
+AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::ECS::ECollisionPreset2D>();
+//Enum ECollisionPreset2D end...........................
+
 //Enum EBody2DType begin...........................
-const Ailu::Enum* Z_Construct_Enum_EBody2DType_Type();
+const Ailu::Enum* Z_Construct_Enum_Ailu_ECS_EBody2DType_Type();
 namespace Ailu::ECS {
 enum class EBody2DType : u8;
 }
@@ -62,7 +105,7 @@ AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::ECS::EBody2DType>();
 //Enum EBody2DType end...........................
 
 //Enum ECollider2DShape begin...........................
-const Ailu::Enum* Z_Construct_Enum_ECollider2DShape_Type();
+const Ailu::Enum* Z_Construct_Enum_Ailu_ECS_ECollider2DShape_Type();
 namespace Ailu::ECS {
 enum class ECollider2DShape : u8;
 }

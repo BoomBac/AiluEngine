@@ -102,6 +102,31 @@ namespace Ailu::Render
 		_stream_data[stream_index] = {data, size, is_dynamic};
 		_mem_size += size;
 	}
+	const VertexBuffer::ResolvedVertexLayout& VertexBuffer::ResolveLayout(const VertexBufferLayout &layout)
+	{
+		auto hash = layout.Hash();
+		AL_ASSERT(hash < 64);
+		auto &resolved = _resolved_layouts[hash];
+		if (resolved._valid)
+			return resolved;
+
+		for (const auto &layout_ele : layout)
+		{
+			const auto it = _buffer_layout_indexer.find({layout_ele.Name, layout_ele._semantic_index});
+			if (it == _buffer_layout_indexer.end())
+			{
+				LOG_WARNING("Invalid vertex layout element {}{}", layout_ele.Name, layout_ele._semantic_index);
+				continue;
+			}
+			auto &binding = resolved._bindings[resolved._binding_count++];
+			binding._slot = layout_ele.Stream;
+			binding._stream_index = it->second;
+		}
+
+		resolved._valid = true;
+		return resolved;
+	}
+
 	#pragma endregion
 
 	#pragma region IndexBuffer

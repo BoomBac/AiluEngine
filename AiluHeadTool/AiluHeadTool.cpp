@@ -169,6 +169,23 @@ static void ParserScriptFunctionAnnotation(const std::string &line, bool &is_scr
     }
 }
 
+static void ParserEnumAnnotation(const std::string &line, bool &is_script)
+{
+    const size_t macro_begin = line.find("AENUM(");
+    if (macro_begin == std::string::npos)
+        return;
+
+    const size_t content_begin = line.find('(', macro_begin);
+    const size_t content_end = line.find(')', content_begin == std::string::npos ? macro_begin : content_begin + 1u);
+    if (content_begin == std::string::npos || content_end == std::string::npos)
+        return;
+
+    std::string content = line.substr(content_begin + 1u, content_end - content_begin - 1u);
+    content = std::regex_replace(content, std::regex("\\s+"), "");
+    is_script = content == "Script" || content.starts_with("Script,") || content.find(",Script,") != std::string::npos ||
+                content.ends_with(",Script");
+}
+
 static bool ParseReflectedDeclarationName(const std::string &line, std::string &name)
 {
     std::smatch matches;
@@ -925,14 +942,29 @@ static void GenerateClassTypeInfo(const AiluHeadTool::ClassInfo &class_info,
     file << std::format("ClassTypeRegister s_register_{}(&{}::StaticType, \"{}\");", class_info._name, full_name, full_name) << std::endl;
 }
 
+static std::string EnumConstructorName(const AiluHeadTool::EnumInfo &enum_info)
+{
+    std::string namespace_name = enum_info._namespace;
+    std::string::size_type pos = 0;
+    while ((pos = namespace_name.find("::", pos)) != std::string::npos)
+    {
+        namespace_name.replace(pos, 2, "_");
+        ++pos;
+    }
+
+    if (namespace_name.empty())
+        return std::format("Z_Construct_Enum_{}_Type", enum_info._name);
+    return std::format("Z_Construct_Enum_{}_{}_Type", namespace_name, enum_info._name);
+}
+
 static void GenerateEnumTypeInfo(const AiluHeadTool::EnumInfo &enum_info, std::ofstream &file)
 {
     const std::string full_name = enum_info._namespace.empty() ? enum_info._name : enum_info._namespace + "::" + enum_info._name;
     std::string type_ins_name = std::format("s_enum_type_{}", enum_info._name);
     file << std::format("static std::unique_ptr<Ailu::Enum> {} = nullptr;", type_ins_name) << std::endl;
-    std::string construct_enum_func = std::format("Z_Construct_Enum_{}_Type", enum_info._name);
+    const std::string construct_enum_func = EnumConstructorName(enum_info);
     file << "//Enum " << enum_info._name << " begin..........................." << std::endl;
-    file << std::format("const Ailu::Enum* Z_Construct_Enum_{}_Type()", enum_info._name) << std::endl;
+    file << std::format("const Ailu::Enum* {}()", construct_enum_func) << std::endl;
     file << "{" << std::endl;
     file << std::format("if({} == nullptr)", type_ins_name) << std::endl;
     file << "{" << std::endl;
@@ -976,9 +1008,39 @@ static void ParserEventAnnotation(const std::string &line, bool &is_script, int 
 static void ParserEventInfo(const std::string &line, AiluHeadTool::MemberInfo &info, AiluHeadTool &aht, int key_index,
                             const std::string &key_name)
 {
-    std::regex pattern(R"(DECLARE_DELEGATE(?:_VIEW)?\s*\(\s*(\w+)\s*(?:,\s*(.*?))?\s*\))");
+    std::regex function_pattern(
+        R"((static\s+)?(virtual\s+)?([\w:]+(?:<[^<>]*>)?(?:\s*\*|\s*&|\s*::\s*\w+)*)\s+)"
+        R"((\w+)\(([^)]*)\)\s*(const)?)");
     std::smatch matches;
-    if (!std::regex_search(line, matches, pattern))
+    if (std::regex_search(line, matches, function_pattern))
+    {
+        info._is_static = matches[1].matched;
+        info._is_virtual = matches[2].matched;
+        info._return_type = matches[3].str();
+        info._name = matches[4].str();
+        info._params = SplitParams(matches[5].str());
+        info._param_names = SplitParamNames(matches[5].str());
+        info._is_const = matches[6].matched;
+        info._event_key_index = key_index;
+        info._event_key_name = key_name;
+        if (!key_name.empty() && info._event_key_index < 0)
+        {
+            for (size_t index = 0u; index < info._param_names.size(); ++index)
+            {
+                if (info._param_names[index] == key_name)
+                {
+                    info._event_key_index = static_cast<int>(index);
+                    break;
+                }
+            }
+        }
+        info._is_function = false;
+        info._is_event = true;
+        return;
+    }
+
+    std::regex legacy_pattern(R"(DECLARE_DELEGATE(?:_VIEW)?\s*\(\s*(\w+)\s*(?:,\s*(.*?))?\s*\))");
+    if (!std::regex_search(line, matches, legacy_pattern))
     {
         aht.Log(std::format("ParserEventInfo failed with line: {}", line));
         return;
@@ -990,6 +1052,7 @@ static void ParserEventInfo(const std::string &line, AiluHeadTool::MemberInfo &i
     info._event_key_index = key_index;
     info._event_key_name = key_name;
     info._return_type = "void";
+    info._is_function = false;
     info._is_event = true;
 }
 
@@ -1109,13 +1172,31 @@ static std::vector<LuaPropertyBinding> CollectLuaProperties(const AiluHeadTool::
     return result;
 }
 
+static std::string EventFieldName(const std::string &name)
+{
+    return "_" + ToLuaFunctionName(name);
+}
+
 static std::string ToLower(std::string value)
 {
     std::transform(value.begin(), value.end(), value.begin(), [](unsigned char character) { return std::tolower(character); });
     return value;
 }
 
+static std::string ToLuaEnumName(const std::string &enum_name)
+{
+    return enum_name.size() > 1u && enum_name[0] == 'E' && std::isupper(static_cast<unsigned char>(enum_name[1])) ?
+               enum_name.substr(1u) : enum_name;
+}
+
+static std::string ToLuaEnumMemberName(const std::string &member_name)
+{
+    return member_name.size() > 1u && member_name[0] == 'k' && std::isupper(static_cast<unsigned char>(member_name[1])) ?
+               member_name.substr(1u) : member_name;
+}
+
 static void GenerateLuaBindings(const std::vector<AiluHeadTool::ClassInfo> &types,
+                                const std::vector<AiluHeadTool::EnumInfo> &enums,
                                 const std::string &binding_name, std::ofstream &file,
                                 const std::unordered_set<std::string> &script_api_types)
 {
@@ -1126,6 +1207,20 @@ static void GenerateLuaBindings(const std::vector<AiluHeadTool::ClassInfo> &type
     file << std::format("namespace Ailu {{ void {}(sol::state &lua); }}", binding_name) << std::endl;
     file << std::format("void Ailu::{}(sol::state &lua)", binding_name) << std::endl;
     file << "{" << std::endl;
+    for (const auto &enum_info : enums)
+    {
+        if (!enum_info._is_script)
+            continue;
+
+        const std::string full_name = enum_info._namespace.empty() ? enum_info._name : enum_info._namespace + "::" + enum_info._name;
+        file << std::format("auto enum_{} = lua.create_table();", enum_info._name) << std::endl;
+        for (const auto &[member_name, member_value] : enum_info._members)
+        {
+            file << std::format("enum_{}[\"{}\"] = static_cast<u32>({}::{});", enum_info._name,
+                                ToLuaEnumMemberName(member_name), full_name, member_name) << std::endl;
+        }
+        file << std::format("lua[\"{}\"] = enum_{};", ToLuaEnumName(enum_info._name), enum_info._name) << std::endl;
+    }
     for (const auto &type : types)
     {
         if (!type._is_script_api)
@@ -1207,20 +1302,22 @@ static void GenerateLuaBindings(const std::vector<AiluHeadTool::ClassInfo> &type
                 }
                 if (!member._event_key_name.empty())
                 {
-                    if (member._event_key_index >= static_cast<int>(member._params.size()))
+                    if (member._event_key_index < 0 ||
+                        member._event_key_index >= static_cast<int>(member._params.size()))
                         throw std::runtime_error(std::format("Lua binding generation rejected {}::{} key index {}", full_name,
                                                              member._name, member._event_key_index));
-                    file << std::format("type_{}.set_function(\"{}\", []( {} &self, const String &{}, "
-                                        "sol::protected_function callback) {{ return ScriptSystem::Get().BindLuaDelegate<{}>(self._{}, "
+                    const std::string key_type = NormalizeLuaType(member._params[member._event_key_index]);
+                    file << std::format("type_{}.set_function(\"{}\", []( {} &self, const {} &{}, "
+                                        "sol::protected_function callback) {{ return ScriptSystem::Get().BindLuaEventRouter(self.{}, "
                                         "{}, std::move(callback)); }});",
-                                        type._name, member._name, full_name, member._event_key_name, member._event_key_index, member._name,
-                                        member._event_key_name) << std::endl;
+                                        type._name, ToLuaFunctionName(member._name), full_name, key_type, member._event_key_name,
+                                        EventFieldName(member._name), member._event_key_name) << std::endl;
                 }
                 else
                 {
                     file << std::format("type_{}.set_function(\"{}\", []( {} &self, sol::protected_function callback) {{ return "
-                                        "ScriptSystem::Get().BindLuaDelegate(self._{}, std::move(callback)); }});",
-                                        type._name, member._name, full_name, member._name) << std::endl;
+                                        "ScriptSystem::Get().BindLuaDelegate(self.{}, std::move(callback)); }});",
+                                        type._name, ToLuaFunctionName(member._name), full_name, EventFieldName(member._name)) << std::endl;
                 }
             }
         }
@@ -1247,18 +1344,18 @@ static void GenerateLuaBindings(const std::vector<AiluHeadTool::ClassInfo> &type
     file << "#endif" << std::endl;
 }
 
-static std::string ToLuaTypeName(const std::string &type)
+static std::string ToLuaTypeName(const std::string &type, const std::unordered_set<std::string> *script_enum_types = nullptr)
 {
     const std::string normalized_type = NormalizeLuaType(type);
     if (normalized_type.starts_with("std::optional<") && normalized_type.ends_with('>'))
     {
         const std::string value_type = normalized_type.substr(14u, normalized_type.size() - 15u);
-        return ToLuaTypeName(value_type) + "|nil";
+        return ToLuaTypeName(value_type, script_enum_types) + "|nil";
     }
     if (normalized_type.starts_with("Vector<") && normalized_type.ends_with('>'))
     {
         const std::string element_type = normalized_type.substr(7u, normalized_type.size() - 8u);
-        return ToLuaTypeName(element_type) + "[]";
+        return ToLuaTypeName(element_type, script_enum_types) + "[]";
     }
     if (normalized_type == "bool")
         return "boolean";
@@ -1275,6 +1372,8 @@ static std::string ToLuaTypeName(const std::string &type)
         return "Quaternion";
     if (normalized_type == "Color")
         return "Color";
+    if (script_enum_types != nullptr && script_enum_types->contains(normalized_type))
+        return ToLuaEnumName(normalized_type);
     return normalized_type;
 }
 
@@ -1288,7 +1387,8 @@ static bool HasScriptMember(const AiluHeadTool::ClassInfo &type)
     return false;
 }
 
-static void GenerateLuaDeclarations(const std::vector<AiluHeadTool::ClassInfo> &types, const Path &output_path)
+static void GenerateLuaDeclarations(const std::vector<AiluHeadTool::ClassInfo> &types,
+                                    const std::vector<AiluHeadTool::EnumInfo> &enums, const Path &output_path)
 {
     std::filesystem::create_directories(output_path.parent_path());
     std::ofstream file(output_path);
@@ -1297,6 +1397,19 @@ static void GenerateLuaDeclarations(const std::vector<AiluHeadTool::ClassInfo> &
 
     file << "---@meta\n";
     file << "-- Generated by AiluHeadTool from Script reflection metadata. Do not edit.\n\n";
+
+    std::unordered_set<std::string> script_enum_types;
+    for (const auto &enum_info : enums)
+    {
+        if (!enum_info._is_script)
+            continue;
+
+        script_enum_types.emplace(enum_info._name);
+        file << std::format("---@enum {}\n{} = {{\n", ToLuaEnumName(enum_info._name), ToLuaEnumName(enum_info._name));
+        for (const auto &[member_name, member_value] : enum_info._members)
+            file << std::format("    {} = {},\n", ToLuaEnumMemberName(member_name), member_value);
+        file << "}\n\n";
+    }
 
     for (const auto &type : types)
     {
@@ -1309,10 +1422,12 @@ static void GenerateLuaDeclarations(const std::vector<AiluHeadTool::ClassInfo> &
         for (const auto &member : type._members)
         {
             if (!member._is_function && !member._is_event && member._is_script)
-                file << std::format("---@field {} {}\n", ToLuaFunctionName(member._name), ToLuaTypeName(member._type));
+                file << std::format("---@field {} {}\n", ToLuaFunctionName(member._name),
+                                    ToLuaTypeName(member._type, &script_enum_types));
         }
         for (const auto &property : CollectLuaProperties(type))
-            file << std::format("---@field {} {}\n", property._name, ToLuaTypeName(property._getter->_return_type));
+            file << std::format("---@field {} {}\n", property._name,
+                                ToLuaTypeName(property._getter->_return_type, &script_enum_types));
         // These declarations describe runtime globals registered in ScriptSystem.
         // Keeping them local makes LuaLS report the API as undefined in user scripts.
         file << std::format("{} = {{}}\n\n", type._name);
@@ -1330,7 +1445,8 @@ static void GenerateLuaDeclarations(const std::vector<AiluHeadTool::ClassInfo> &
             if (member._is_event)
             {
                 if (!member._event_key_name.empty())
-                    file << std::format("---@param {} string\n", member._event_key_name);
+                    file << std::format("---@param {} {}\n", member._event_key_name,
+                                        ToLuaTypeName(member._params[member._event_key_index], &script_enum_types));
                 file << "---@param callback fun(";
                 bool has_callback_parameter = false;
                 for (size_t index = 0u; index < member._params.size(); ++index)
@@ -1342,10 +1458,10 @@ static void GenerateLuaDeclarations(const std::vector<AiluHeadTool::ClassInfo> &
                     has_callback_parameter = true;
                     const std::string parameter_name = index < member._param_names.size() && !member._param_names[index].empty() ?
                                                            member._param_names[index] : std::format("arg{}", index);
-                    file << parameter_name << ": " << ToLuaTypeName(member._params[index]);
+                    file << parameter_name << ": " << ToLuaTypeName(member._params[index], &script_enum_types);
                 }
                 file << ")\n---@return integer subscription_id\n";
-                file << std::format("function {}:{}({}) end\n\n", type._name, member._name,
+                file << std::format("function {}:{}({}) end\n\n", type._name, ToLuaFunctionName(member._name),
                                     !member._event_key_name.empty() ? member._event_key_name + ", callback" : "callback");
                 continue;
             }
@@ -1362,21 +1478,22 @@ static void GenerateLuaDeclarations(const std::vector<AiluHeadTool::ClassInfo> &
                         file << ", ";
                     const std::string parameter_name = index < overload._param_names.size() && !overload._param_names[index].empty()
                                                            ? overload._param_names[index] : std::format("arg{}", index);
-                    file << parameter_name << ": " << ToLuaTypeName(overload._params[index]);
+                    file << parameter_name << ": " << ToLuaTypeName(overload._params[index], &script_enum_types);
                 }
                 file << ")";
                 if (NormalizeLuaType(overload._return_type) != "void")
-                    file << ": " << ToLuaTypeName(overload._return_type);
+                    file << ": " << ToLuaTypeName(overload._return_type, &script_enum_types);
                 file << "\n";
             }
             for (size_t index = 0u; index < member._params.size(); ++index)
             {
                 const std::string parameter_name = index < member._param_names.size() && !member._param_names[index].empty() ?
                                                    member._param_names[index] : std::format("arg{}", index);
-                file << std::format("---@param {} {}\n", parameter_name, ToLuaTypeName(member._params[index]));
+                file << std::format("---@param {} {}\n", parameter_name,
+                                    ToLuaTypeName(member._params[index], &script_enum_types));
             }
             if (NormalizeLuaType(member._return_type) != "void")
-                file << std::format("---@return {}\n", ToLuaTypeName(member._return_type));
+                file << std::format("---@return {}\n", ToLuaTypeName(member._return_type, &script_enum_types));
             const char *separator = member._is_static ? "." : ":";
             file << std::format("function {}{}{}(", type._name, separator, ToLuaFunctionName(member._name));
             for (size_t index = 0u; index < member._params.size(); ++index)
@@ -1449,6 +1566,7 @@ void AiluHeadTool::CollectScriptApiTypes(const std::set<fs::path> &inc_files)
 
         std::string line;
         bool has_script_type_marked = false;
+        bool has_script_enum_marked = false;
         while (std::getline(file, line))
         {
             if (line.find("ASTRUCT(") != std::string::npos || line.find("ACLASS(") != std::string::npos)
@@ -1456,6 +1574,21 @@ void AiluHeadTool::CollectScriptApiTypes(const std::set<fs::path> &inc_files)
                 has_script_type_marked = false;
                 ParserScriptTypeAnnotation(line, has_script_type_marked);
                 continue;
+            }
+            if (line.find("AENUM(") != std::string::npos)
+            {
+                has_script_enum_marked = false;
+                ParserEnumAnnotation(line, has_script_enum_marked);
+                continue;
+            }
+            if (has_script_enum_marked)
+            {
+                std::smatch matches;
+                if (std::regex_search(line, matches, std::regex(R"(enum\s+(?:class\s+)?(\w+))")))
+                {
+                    _script_api_types.emplace(matches[1].str());
+                    has_script_enum_marked = false;
+                }
             }
             if (!has_script_type_marked)
                 continue;
@@ -1498,6 +1631,7 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                 bool has_class_marked = false, has_property_marked = false, has_function_marked = false, has_event_marked = false, has_enum_marked = false, has_struct_marked = false;
                 bool is_script_function = false, is_script_property_function = false;
         bool is_script_event = false;
+        bool is_script_enum = false;
         bool is_script_api = false;
         std::string script_global_name;
                 int event_key_index = -1;
@@ -1563,8 +1697,10 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                                 }
                                 else { Log("[Error]: the next line of enum define must only have {"); }
                                 enum_info._namespace = cur_namespace;
+                                enum_info._is_script = is_script_enum;
                             }
                             if (!enum_info._members.empty()) _enums.emplace_back(enum_info);
+                            is_script_enum = false;
                             has_enum_marked = false;
                         }
                     }
@@ -1624,6 +1760,7 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                     if (line.find(kEnumMacro) != std::string::npos)
                     {
                         has_enum_marked = true;
+                        ParserEnumAnnotation(line, is_script_enum);
                         continue;
                     }
                     if (!_classes.empty() && is_process_class)
@@ -1892,7 +2029,7 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                     for (auto &enum_info: _enums)
                     {
                         out_file << "//Enum " << enum_info._name << " begin..........................." << std::endl;
-                        std::string func_name = std::format("const Ailu::Enum* Z_Construct_Enum_{}_Type()", enum_info._name);
+                        std::string func_name = std::format("const Ailu::Enum* {}()", EnumConstructorName(enum_info));
                         out_file << func_name << ";" << std::endl;
                         out_file << "namespace " << enum_info._namespace << " {" << std::endl;
                         out_file << enum_info._decl_type << " " << enum_info._name << " : " << enum_info._underlying_type << ";" << std::endl;
@@ -1937,10 +2074,11 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                         std::vector<ClassInfo> script_types = _classes;
                         script_types.insert(script_types.end(), _structs.begin(), _structs.end());
                         const std::string file_stem = path.stem().string();
-                        GenerateLuaBindings(script_types, "RegisterGeneratedLuaBindings_" + file_stem, cpp_file,
+                        GenerateLuaBindings(script_types, _enums, "RegisterGeneratedLuaBindings_" + file_stem, cpp_file,
                                             _script_api_types);
                         const Path project_dir = out_dir.parent_path().parent_path().parent_path().parent_path().parent_path();
-                        GenerateLuaDeclarations(script_types, project_dir / ".ailu" / "lua" / (ToLower(file_stem) + ".lua"));
+                        GenerateLuaDeclarations(script_types, _enums,
+                                                project_dir / ".ailu" / "lua" / (ToLower(file_stem) + ".lua"));
                         GenerateLuaDeclarationIndex(project_dir / ".ailu" / "lua" / "ailu_engine.lua");
                         GenerateLuaWorkspaceConfig(project_dir / ".luarc.json");
                     }

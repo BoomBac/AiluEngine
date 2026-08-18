@@ -269,6 +269,8 @@ namespace Ailu
                     return DrawNestedProperty<UI::UIElementVisualStyle>(prop, instance);
                 if (prop_type == StaticClass<UI::UIBorderStyle>())
                     return DrawNestedProperty<UI::UIBorderStyle>(prop, instance);
+                if (prop_type == StaticClass<UI::UICollapsibleViewStyle>())
+                    return DrawNestedProperty<UI::UICollapsibleViewStyle>(prop, instance);
                 if (prop_type == StaticClass<UI::UISplitViewStyle>())
                     return DrawNestedProperty<UI::UISplitViewStyle>(prop, instance);
                 if (prop_type == StaticClass<UI::UIColorPickerStyle>())

@@ -52,8 +52,40 @@ template<>
 AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UIBorderStyle>();
 //Struct UIBorderStyle end...........................
 
+//Struct UICollapsibleViewStyle begin...........................
+#define UISTYLES_GEN_H_55_GENERATED_BODY \
+                            private: \
+                                friend const Type* Z_Construct_UICollapsibleViewStyle_Type();\
+                                static const Type* GetPrivateStaticClass();\
+                            public:\
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                const Type  *GetType();
+                            namespace Ailu {class Type;}
+namespace Ailu::UI{
+struct UICollapsibleViewStyle ;
+}
+template<>
+AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UICollapsibleViewStyle>();
+//Struct UICollapsibleViewStyle end...........................
+
+//Struct UICollapsibleViewStyleOverride begin...........................
+#define UISTYLES_GEN_H_79_GENERATED_BODY \
+                            private: \
+                                friend const Type* Z_Construct_UICollapsibleViewStyleOverride_Type();\
+                                static const Type* GetPrivateStaticClass();\
+                            public:\
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                const Type  *GetType();
+                            namespace Ailu {class Type;}
+namespace Ailu::UI{
+struct UICollapsibleViewStyleOverride ;
+}
+template<>
+AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UICollapsibleViewStyleOverride>();
+//Struct UICollapsibleViewStyleOverride end...........................
+
 //Struct UIControlVisualOverride begin...........................
-#define UISTYLES_GEN_H_76_GENERATED_BODY \
+#define UISTYLES_GEN_H_165_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_UIControlVisualOverride_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -69,7 +101,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UIControlVis
 //Struct UIControlVisualOverride end...........................
 
 //Struct UIButtonStyle begin...........................
-#define UISTYLES_GEN_H_138_GENERATED_BODY \
+#define UISTYLES_GEN_H_227_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_UIButtonStyle_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -85,7 +117,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UIButtonStyl
 //Struct UIButtonStyle end...........................
 
 //Struct UIButtonStyleOverride begin...........................
-#define UISTYLES_GEN_H_183_GENERATED_BODY \
+#define UISTYLES_GEN_H_272_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_UIButtonStyleOverride_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -101,7 +133,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UIButtonStyl
 //Struct UIButtonStyleOverride end...........................
 
 //Struct UISliderStyle begin...........................
-#define UISTYLES_GEN_H_230_GENERATED_BODY \
+#define UISTYLES_GEN_H_319_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_UISliderStyle_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -117,7 +149,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UISliderStyl
 //Struct UISliderStyle end...........................
 
 //Struct UISliderStyleOverride begin...........................
-#define UISTYLES_GEN_H_311_GENERATED_BODY \
+#define UISTYLES_GEN_H_400_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_UISliderStyleOverride_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -133,7 +165,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UISliderStyl
 //Struct UISliderStyleOverride end...........................
 
 //Struct UICheckBoxStyle begin...........................
-#define UISTYLES_GEN_H_386_GENERATED_BODY \
+#define UISTYLES_GEN_H_475_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_UICheckBoxStyle_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -149,7 +181,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UICheckBoxSt
 //Struct UICheckBoxStyle end...........................
 
 //Struct UICheckBoxStyleOverride begin...........................
-#define UISTYLES_GEN_H_471_GENERATED_BODY \
+#define UISTYLES_GEN_H_560_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_UICheckBoxStyleOverride_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -165,7 +197,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UICheckBoxSt
 //Struct UICheckBoxStyleOverride end...........................
 
 //Struct UIInputStyle begin...........................
-#define UISTYLES_GEN_H_549_GENERATED_BODY \
+#define UISTYLES_GEN_H_638_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_UIInputStyle_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -181,7 +213,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UIInputStyle
 //Struct UIInputStyle end...........................
 
 //Struct UIInputStyleOverride begin...........................
-#define UISTYLES_GEN_H_618_GENERATED_BODY \
+#define UISTYLES_GEN_H_707_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_UIInputStyleOverride_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -197,7 +229,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UIInputStyle
 //Struct UIInputStyleOverride end...........................
 
 //Struct UIListViewStyle begin...........................
-#define UISTYLES_GEN_H_684_GENERATED_BODY \
+#define UISTYLES_GEN_H_773_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_UIListViewStyle_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -213,7 +245,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UIListViewSt
 //Struct UIListViewStyle end...........................
 
 //Struct UISplitViewStyle begin...........................
-#define UISTYLES_GEN_H_711_GENERATED_BODY \
+#define UISTYLES_GEN_H_800_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_UISplitViewStyle_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -229,7 +261,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UISplitViewS
 //Struct UISplitViewStyle end...........................
 
 //Struct UIColorPickerStyle begin...........................
-#define UISTYLES_GEN_H_724_GENERATED_BODY \
+#define UISTYLES_GEN_H_813_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_UIColorPickerStyle_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -245,7 +277,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UIColorPicke
 //Struct UIColorPickerStyle end...........................
 
 //Struct UIScrollBarStyle begin...........................
-#define UISTYLES_GEN_H_746_GENERATED_BODY \
+#define UISTYLES_GEN_H_835_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_UIScrollBarStyle_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -261,7 +293,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UIScrollBarS
 //Struct UIScrollBarStyle end...........................
 
 //Struct UIScrollBarStyleOverride begin...........................
-#define UISTYLES_GEN_H_859_GENERATED_BODY \
+#define UISTYLES_GEN_H_948_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_UIScrollBarStyleOverride_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -277,7 +309,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UIScrollBarS
 //Struct UIScrollBarStyleOverride end...........................
 
 //Struct UIScrollViewStyle begin...........................
-#define UISTYLES_GEN_H_958_GENERATED_BODY \
+#define UISTYLES_GEN_H_1047_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_UIScrollViewStyle_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -293,7 +325,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UIScrollView
 //Struct UIScrollViewStyle end...........................
 
 //Struct UIScrollViewStyleOverride begin...........................
-#define UISTYLES_GEN_H_1019_GENERATED_BODY \
+#define UISTYLES_GEN_H_1108_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_UIScrollViewStyleOverride_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -309,7 +341,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UIScrollView
 //Struct UIScrollViewStyleOverride end...........................
 
 //Struct UITreeViewStyle begin...........................
-#define UISTYLES_GEN_H_1079_GENERATED_BODY \
+#define UISTYLES_GEN_H_1168_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_UITreeViewStyle_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -325,7 +357,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UITreeViewSt
 //Struct UITreeViewStyle end...........................
 
 //Struct UITreeViewStyleOverride begin...........................
-#define UISTYLES_GEN_H_1128_GENERATED_BODY \
+#define UISTYLES_GEN_H_1217_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_UITreeViewStyleOverride_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -341,7 +373,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::UITreeViewSt
 //Struct UITreeViewStyleOverride end...........................
 
 //Enum EUIControlVisualOverride begin...........................
-const Ailu::Enum* Z_Construct_Enum_EUIControlVisualOverride_Type();
+const Ailu::Enum* Z_Construct_Enum_Ailu_UI_EUIControlVisualOverride_Type();
 namespace Ailu::UI {
 enum class EUIControlVisualOverride : u32;
 }
@@ -350,7 +382,7 @@ AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::UI::EUIControlVisualOverride>(
 //Enum EUIControlVisualOverride end...........................
 
 //Enum EUIButtonStyleOverride begin...........................
-const Ailu::Enum* Z_Construct_Enum_EUIButtonStyleOverride_Type();
+const Ailu::Enum* Z_Construct_Enum_Ailu_UI_EUIButtonStyleOverride_Type();
 namespace Ailu::UI {
 enum class EUIButtonStyleOverride : u32;
 }
@@ -359,7 +391,7 @@ AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::UI::EUIButtonStyleOverride>();
 //Enum EUIButtonStyleOverride end...........................
 
 //Enum EUISliderStyleOverride begin...........................
-const Ailu::Enum* Z_Construct_Enum_EUISliderStyleOverride_Type();
+const Ailu::Enum* Z_Construct_Enum_Ailu_UI_EUISliderStyleOverride_Type();
 namespace Ailu::UI {
 enum class EUISliderStyleOverride : u32;
 }
@@ -368,7 +400,7 @@ AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::UI::EUISliderStyleOverride>();
 //Enum EUISliderStyleOverride end...........................
 
 //Enum EUICheckBoxStyleOverride begin...........................
-const Ailu::Enum* Z_Construct_Enum_EUICheckBoxStyleOverride_Type();
+const Ailu::Enum* Z_Construct_Enum_Ailu_UI_EUICheckBoxStyleOverride_Type();
 namespace Ailu::UI {
 enum class EUICheckBoxStyleOverride : u32;
 }
@@ -377,7 +409,7 @@ AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::UI::EUICheckBoxStyleOverride>(
 //Enum EUICheckBoxStyleOverride end...........................
 
 //Enum EUIInputStyleOverride begin...........................
-const Ailu::Enum* Z_Construct_Enum_EUIInputStyleOverride_Type();
+const Ailu::Enum* Z_Construct_Enum_Ailu_UI_EUIInputStyleOverride_Type();
 namespace Ailu::UI {
 enum class EUIInputStyleOverride : u32;
 }
@@ -386,7 +418,7 @@ AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::UI::EUIInputStyleOverride>();
 //Enum EUIInputStyleOverride end...........................
 
 //Enum EUIScrollBarStyleOverride begin...........................
-const Ailu::Enum* Z_Construct_Enum_EUIScrollBarStyleOverride_Type();
+const Ailu::Enum* Z_Construct_Enum_Ailu_UI_EUIScrollBarStyleOverride_Type();
 namespace Ailu::UI {
 enum class EUIScrollBarStyleOverride : u32;
 }
@@ -395,7 +427,7 @@ AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::UI::EUIScrollBarStyleOverride>
 //Enum EUIScrollBarStyleOverride end...........................
 
 //Enum EUIScrollViewStyleOverride begin...........................
-const Ailu::Enum* Z_Construct_Enum_EUIScrollViewStyleOverride_Type();
+const Ailu::Enum* Z_Construct_Enum_Ailu_UI_EUIScrollViewStyleOverride_Type();
 namespace Ailu::UI {
 enum class EUIScrollViewStyleOverride : u32;
 }
@@ -404,7 +436,7 @@ AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::UI::EUIScrollViewStyleOverride
 //Enum EUIScrollViewStyleOverride end...........................
 
 //Enum EUITreeViewStyleOverride begin...........................
-const Ailu::Enum* Z_Construct_Enum_EUITreeViewStyleOverride_Type();
+const Ailu::Enum* Z_Construct_Enum_Ailu_UI_EUITreeViewStyleOverride_Type();
 namespace Ailu::UI {
 enum class EUITreeViewStyleOverride : u32;
 }

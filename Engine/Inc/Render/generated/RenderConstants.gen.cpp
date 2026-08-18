@@ -8,7 +8,7 @@
 using namespace Ailu;
 static std::unique_ptr<Ailu::Enum> s_enum_type_EColorRange = nullptr;
 //Enum EColorRange begin...........................
-const Ailu::Enum* Z_Construct_Enum_EColorRange_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_Render_EColorRange_Type()
 {
 if(s_enum_type_EColorRange == nullptr)
 {
@@ -23,7 +23,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_EColorRange.get());
 }
 return s_enum_type_EColorRange.get();
 }
-static Ailu::EnumTypeRegister g_register_EColorRange(Z_Construct_Enum_EColorRange_Type);
+static Ailu::EnumTypeRegister g_register_EColorRange(Z_Construct_Enum_Ailu_Render_EColorRange_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::EColorRange>()
 {
 return s_enum_type_EColorRange.get();

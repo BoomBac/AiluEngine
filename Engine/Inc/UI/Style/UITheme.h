@@ -46,6 +46,9 @@ namespace Ailu
             const UIBorderStyle *FindBorderStyle(const UIStyleId &style_id) const;
             void SetBorderStyle(const UIStyleId &style_id, const UIBorderStyle &style);
 
+            const UICollapsibleViewStyle *FindCollapsibleViewStyle(const UIStyleId &style_id) const;
+            void SetCollapsibleViewStyle(const UIStyleId &style_id, const UICollapsibleViewStyle &style);
+
             const UISplitViewStyle *FindSplitViewStyle(const UIStyleId &style_id) const;
             void SetSplitViewStyle(const UIStyleId &style_id, const UISplitViewStyle &style);
 
@@ -90,6 +93,9 @@ namespace Ailu
             UIBorderStyle _border_style;
 
             APROPERTY()
+            UICollapsibleViewStyle _collapsible_view_style;
+
+            APROPERTY()
             UISplitViewStyle _split_view_style;
 
             APROPERTY()
@@ -129,6 +135,9 @@ namespace Ailu
 
             APROPERTY()
             HashMap<UIStyleId, UIBorderStyle> _border_styles;
+
+            APROPERTY()
+            HashMap<UIStyleId, UICollapsibleViewStyle> _collapsible_view_styles;
 
             APROPERTY()
             HashMap<UIStyleId, UISplitViewStyle> _split_view_styles;

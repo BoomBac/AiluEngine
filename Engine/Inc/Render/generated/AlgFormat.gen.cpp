@@ -8,7 +8,7 @@
 using namespace Ailu;
 static std::unique_ptr<Ailu::Enum> s_enum_type_EALGFormat = nullptr;
 //Enum EALGFormat begin...........................
-const Ailu::Enum* Z_Construct_Enum_EALGFormat_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_EALGFormat_Type()
 {
 if(s_enum_type_EALGFormat == nullptr)
 {
@@ -121,7 +121,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_EALGFormat.get());
 }
 return s_enum_type_EALGFormat.get();
 }
-static Ailu::EnumTypeRegister g_register_EALGFormat(Z_Construct_Enum_EALGFormat_Type);
+static Ailu::EnumTypeRegister g_register_EALGFormat(Z_Construct_Enum_Ailu_EALGFormat_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::EALGFormat>()
 {
 return s_enum_type_EALGFormat.get();

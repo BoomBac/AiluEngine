@@ -402,6 +402,7 @@ namespace Ailu
         {
             if (_document != nullptr && _document->Apply())
             {
+                ResourceMgr::Get().MarkAssetDirty(_asset);
                 RefreshWindowTitle();
                 RefreshStatusBar();
             }

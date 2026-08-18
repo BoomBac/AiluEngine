@@ -80,7 +80,7 @@ return Ailu::Render::StandardMaterial::GetPrivateStaticClass();
 ClassTypeRegister s_register_StandardMaterial(&Ailu::Render::StandardMaterial::StaticType, "Ailu::Render::StandardMaterial");
 static std::unique_ptr<Ailu::Enum> s_enum_type_EMaterialID = nullptr;
 //Enum EMaterialID begin...........................
-const Ailu::Enum* Z_Construct_Enum_EMaterialID_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_Render_EMaterialID_Type()
 {
 if(s_enum_type_EMaterialID == nullptr)
 {
@@ -96,7 +96,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_EMaterialID.get());
 }
 return s_enum_type_EMaterialID.get();
 }
-static Ailu::EnumTypeRegister g_register_EMaterialID(Z_Construct_Enum_EMaterialID_Type);
+static Ailu::EnumTypeRegister g_register_EMaterialID(Z_Construct_Enum_Ailu_Render_EMaterialID_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::EMaterialID>()
 {
 return s_enum_type_EMaterialID.get();
@@ -105,7 +105,7 @@ return s_enum_type_EMaterialID.get();
 
 static std::unique_ptr<Ailu::Enum> s_enum_type_ESurfaceType = nullptr;
 //Enum ESurfaceType begin...........................
-const Ailu::Enum* Z_Construct_Enum_ESurfaceType_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_Render_ESurfaceType_Type()
 {
 if(s_enum_type_ESurfaceType == nullptr)
 {
@@ -121,7 +121,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_ESurfaceType.get());
 }
 return s_enum_type_ESurfaceType.get();
 }
-static Ailu::EnumTypeRegister g_register_ESurfaceType(Z_Construct_Enum_ESurfaceType_Type);
+static Ailu::EnumTypeRegister g_register_ESurfaceType(Z_Construct_Enum_Ailu_Render_ESurfaceType_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::ESurfaceType>()
 {
 return s_enum_type_ESurfaceType.get();

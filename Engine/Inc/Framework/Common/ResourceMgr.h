@@ -97,6 +97,7 @@ namespace Ailu
         Vector<WString> _asset_names;
     };
     class Project;
+    class FileWatchService;
     using AssetPath = WString;
     using SystemPath = WString;
 
@@ -171,8 +172,15 @@ namespace Ailu
         void DeleteAsset(Asset *asset);
         bool RenameAsset(Asset *p_asset, const WString &new_name);
         bool MoveAsset(Asset *p_asset, const WString &new_asset_path);
-        void SaveAsset(const Asset *asset);
+        bool SaveAsset(Asset *asset);
+        void SaveAllDirtyAssets();
         void SaveAllUnsavedAssets();
+        //由 Editor 编辑操作标记 Asset 为 Dirty（revision 递增）。
+        void MarkAssetDirty(Asset *asset);
+        void MarkAssetDirty(Object *obj);
+        //Editor 启动时注入文件监视服务，用于保存后同步 watcher baseline。
+        static void SetFileWatchService(FileWatchService *service);
+        static FileWatchService *GetFileWatchService();
         void MigrateLegacyAssetDocuments(const WString &root_asset_dir = L"");
         Asset *GetLinkedAsset(Object *obj);
         //提交一个任务，该任务会在ResourceMgr tick时在主线程执行
@@ -320,9 +328,6 @@ namespace Ailu
         static void FormatLine(const String &line, String &key, String &value);
         static void ExtractCommonAssetInfo(const WString &asset_path, WString &name, Guid &guid, const Type *&type);
 
-        bool IsFileOnDiskUpdated(const WString &sys_path);
-        void MarkFileTimeStamp(const WString &sys_path);
-
         bool ExistInAssetDB(const Asset *asset) const;
         bool ExistInAssetDB(const WString &asset_path) const;
         void RemoveFromAssetDB(const Asset *asset);
@@ -366,7 +371,7 @@ namespace Ailu
 
         inline static Map<u32, WString> s_object_sys_path_map;
         inline static Queue<Asset *> s_pending_save_assets;
-        HashMap<WString, fs::file_time_type> _file_last_load_time;
+        inline static FileWatchService *s_p_file_watch_service = nullptr;
         bool _is_watching_directory = true;
         WString _project_root_path;
         std::mutex _asset_db_mutex;

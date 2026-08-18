@@ -8,7 +8,7 @@
 using namespace Ailu;
 static std::unique_ptr<Ailu::Enum> s_enum_type_ERenderLayer = nullptr;
 //Enum ERenderLayer begin...........................
-const Ailu::Enum* Z_Construct_Enum_ERenderLayer_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_RHI_Ailu_Ailu_Render_ERenderLayer_Type()
 {
 if(s_enum_type_ERenderLayer == nullptr)
 {
@@ -23,7 +23,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_ERenderLayer.get());
 }
 return s_enum_type_ERenderLayer.get();
 }
-static Ailu::EnumTypeRegister g_register_ERenderLayer(Z_Construct_Enum_ERenderLayer_Type);
+static Ailu::EnumTypeRegister g_register_ERenderLayer(Z_Construct_Enum_Ailu_RHI_Ailu_Ailu_Render_ERenderLayer_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::RHI::Ailu::Ailu::Render::ERenderLayer>()
 {
 return s_enum_type_ERenderLayer.get();

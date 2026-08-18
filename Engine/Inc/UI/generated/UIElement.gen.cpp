@@ -170,7 +170,7 @@ return Ailu::UI::UIElement::GetPrivateStaticClass();
 ClassTypeRegister s_register_UIElement(&Ailu::UI::UIElement::StaticType, "Ailu::UI::UIElement");
 static std::unique_ptr<Ailu::Enum> s_enum_type_EVisibility = nullptr;
 //Enum EVisibility begin...........................
-const Ailu::Enum* Z_Construct_Enum_EVisibility_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_UI_EVisibility_Type()
 {
 if(s_enum_type_EVisibility == nullptr)
 {
@@ -185,7 +185,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_EVisibility.get());
 }
 return s_enum_type_EVisibility.get();
 }
-static Ailu::EnumTypeRegister g_register_EVisibility(Z_Construct_Enum_EVisibility_Type);
+static Ailu::EnumTypeRegister g_register_EVisibility(Z_Construct_Enum_Ailu_UI_EVisibility_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::UI::EVisibility>()
 {
 return s_enum_type_EVisibility.get();
@@ -194,7 +194,7 @@ return s_enum_type_EVisibility.get();
 
 static std::unique_ptr<Ailu::Enum> s_enum_type_EStyleInvalidation = nullptr;
 //Enum EStyleInvalidation begin...........................
-const Ailu::Enum* Z_Construct_Enum_EStyleInvalidation_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_UI_EStyleInvalidation_Type()
 {
 if(s_enum_type_EStyleInvalidation == nullptr)
 {
@@ -209,7 +209,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_EStyleInvalidation.get());
 }
 return s_enum_type_EStyleInvalidation.get();
 }
-static Ailu::EnumTypeRegister g_register_EStyleInvalidation(Z_Construct_Enum_EStyleInvalidation_Type);
+static Ailu::EnumTypeRegister g_register_EStyleInvalidation(Z_Construct_Enum_Ailu_UI_EStyleInvalidation_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::UI::EStyleInvalidation>()
 {
 return s_enum_type_EStyleInvalidation.get();
@@ -218,7 +218,7 @@ return s_enum_type_EStyleInvalidation.get();
 
 static std::unique_ptr<Ailu::Enum> s_enum_type_EUIElementState = nullptr;
 //Enum EUIElementState begin...........................
-const Ailu::Enum* Z_Construct_Enum_EUIElementState_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_UI_EUIElementState_Type()
 {
 if(s_enum_type_EUIElementState == nullptr)
 {
@@ -238,7 +238,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_EUIElementState.get());
 }
 return s_enum_type_EUIElementState.get();
 }
-static Ailu::EnumTypeRegister g_register_EUIElementState(Z_Construct_Enum_EUIElementState_Type);
+static Ailu::EnumTypeRegister g_register_EUIElementState(Z_Construct_Enum_Ailu_UI_EUIElementState_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::UI::EUIElementState>()
 {
 return s_enum_type_EUIElementState.get();
@@ -247,7 +247,7 @@ return s_enum_type_EUIElementState.get();
 
 static std::unique_ptr<Ailu::Enum> s_enum_type_EUIVisualState = nullptr;
 //Enum EUIVisualState begin...........................
-const Ailu::Enum* Z_Construct_Enum_EUIVisualState_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_UI_EUIVisualState_Type()
 {
 if(s_enum_type_EUIVisualState == nullptr)
 {
@@ -265,7 +265,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_EUIVisualState.get());
 }
 return s_enum_type_EUIVisualState.get();
 }
-static Ailu::EnumTypeRegister g_register_EUIVisualState(Z_Construct_Enum_EUIVisualState_Type);
+static Ailu::EnumTypeRegister g_register_EUIVisualState(Z_Construct_Enum_Ailu_UI_EUIVisualState_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::UI::EUIVisualState>()
 {
 return s_enum_type_EUIVisualState.get();

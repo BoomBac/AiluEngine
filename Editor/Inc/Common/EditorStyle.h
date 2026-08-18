@@ -100,6 +100,9 @@ namespace Ailu
 
             APROPERTY()
             Color _status_bar_play_bg_color;// 运行中状态栏背景色
+
+            APROPERTY()
+            Color _status_bar_prefab_bg_color;// 预制体编辑模式状态栏背景色
         };
         static EditorStyle DefaultDark()
         {
@@ -141,6 +144,7 @@ namespace Ailu
             s._status_bar_height = 24.0f;
             s._status_bar_bg_color = Color(0.16f, 0.17f, 0.18f, 1.0f);
             s._status_bar_play_bg_color = Color(0.85f, 0.45f, 0.10f, 1.0f);
+            s._status_bar_prefab_bg_color = Color(0.08f, 0.30f, 0.58f, 1.0f);
 
             return s;
         }
@@ -185,6 +189,7 @@ namespace Ailu
             s._status_bar_height = 24.0f;
             s._status_bar_bg_color = Color(0.73f, 0.75f, 0.77f, 1.0f);
             s._status_bar_play_bg_color = Color(0.92f, 0.55f, 0.18f, 1.0f);
+            s._status_bar_prefab_bg_color = Color(0.18f, 0.45f, 0.78f, 1.0f);
 
             return s;
         }

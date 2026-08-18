@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __CAMERA_GEN_H__
 //Enum EAntiAliasing begin...........................
-const Ailu::Enum* Z_Construct_Enum_EAntiAliasing_Type();
+const Ailu::Enum* Z_Construct_Enum_Ailu_Render_EAntiAliasing_Type();
 namespace Ailu::Render {
 enum class EAntiAliasing : i32;
 }
@@ -14,7 +14,7 @@ AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::EAntiAliasing>();
 //Enum EAntiAliasing end...........................
 
 //Enum ECameraType begin...........................
-const Ailu::Enum* Z_Construct_Enum_ECameraType_Type();
+const Ailu::Enum* Z_Construct_Enum_Ailu_Render_ECameraType_Type();
 namespace Ailu::Render {
 enum class ECameraType : i32;
 }

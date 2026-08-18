@@ -16,18 +16,31 @@ namespace Ailu
 
     struct ScriptEntity;
 
+    AENUM(Script)
+    enum class ECollisionChannel2D : u8
+    {
+        kWorldStatic,
+        kWorldDynamic,
+        kPlayer,
+        kEnemy,
+        kProjectile,
+        kTrigger,
+        kPickup,
+        kCount
+    };
+
     ASTRUCT(Script)
     struct AILU_API ScriptCollider2D
     {
-        using CollisionEventDelegate = Delegate<const ScriptEntity &, const ScriptContact2D &>;
+        using CollisionEventRouter = EventRouter<ECollisionChannel2D, const ScriptEntity &, const ScriptContact2D &>;
         using EntityEventDelegate = Delegate<const ScriptEntity &>;
 
         struct EventViews
         {
-            CollisionEventDelegate::EventView _on_collision_enter;
-            CollisionEventDelegate::EventView _on_collision_exit;
-            EntityEventDelegate::EventView _on_trigger_enter;
-            EntityEventDelegate::EventView _on_trigger_exit;
+            CollisionEventRouter::EventView _on_collision_enter;
+            CollisionEventRouter::EventView _on_collision_exit;
+            CollisionEventRouter::EventView _on_trigger_enter;
+            CollisionEventRouter::EventView _on_trigger_exit;
         };
 
         GENERATED_BODY()
@@ -42,13 +55,18 @@ namespace Ailu
         AFUNCTION(ScriptProperty)
         u32 GetShapeCount() const;
 
-        AEVENT(Script)
-        DECLARE_DELEGATE_VIEW(on_collision_enter, const ScriptEntity &, const ScriptContact2D &);
-        AEVENT(Script)
-        DECLARE_DELEGATE_VIEW(on_collision_exit, const ScriptEntity &, const ScriptContact2D &);
-        AEVENT(Script)
-        DECLARE_DELEGATE_VIEW(on_trigger_enter, const ScriptEntity &);
-        AEVENT(Script)
-        DECLARE_DELEGATE_VIEW(on_trigger_exit, const ScriptEntity &);
+        AEVENT(Script, KeyName = target_channel)
+        void OnCollisionEnter(ECollisionChannel2D target_channel, const ScriptEntity &other, const ScriptContact2D &contact);
+        AEVENT(Script, KeyName = target_channel)
+        void OnCollisionExit(ECollisionChannel2D target_channel, const ScriptEntity &other, const ScriptContact2D &contact);
+        AEVENT(Script, KeyName = target_channel)
+        void OnTriggerEnter(ECollisionChannel2D target_channel, const ScriptEntity &other, const ScriptContact2D &contact);
+        AEVENT(Script, KeyName = target_channel)
+        void OnTriggerExit(ECollisionChannel2D target_channel, const ScriptEntity &other, const ScriptContact2D &contact);
+
+        CollisionEventRouter::EventView _on_collision_enter;
+        CollisionEventRouter::EventView _on_collision_exit;
+        CollisionEventRouter::EventView _on_trigger_enter;
+        CollisionEventRouter::EventView _on_trigger_exit;
     };
 }

@@ -32,9 +32,12 @@ namespace Ailu
             void BeginEntityRename(ECS::Entity entity);
             void FocusCameraOnEntity(ECS::Entity entity);
             void OnDropAction(UI::TreeView* source, u64 source_item, u64 target_item);
+            void UpdateSceneTitle(SceneManagement::Scene *scene);
+            void ExitTemporaryPrefabScene();
 
             UI::TreeView* _tree_view = nullptr;
             UI::Text* _scene_title = nullptr;
+            UI::Button* _back_button = nullptr;
             UI::Button* _add_button = nullptr;
 
             class SceneTreeDataSource;

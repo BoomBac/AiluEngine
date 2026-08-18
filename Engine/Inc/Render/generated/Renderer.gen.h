@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __RENDERER_GEN_H__
 //Enum EShadingMode begin...........................
-const Ailu::Enum* Z_Construct_Enum_EShadingMode_Type();
+const Ailu::Enum* Z_Construct_Enum_Ailu_Render_EShadingMode_Type();
 namespace Ailu::Render {
 enum class EShadingMode : u8;
 }

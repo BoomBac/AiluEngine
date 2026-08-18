@@ -69,7 +69,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::GraphCommentData
 //Struct GraphCommentData end...........................
 
 //Enum EGraphPinDirection begin...........................
-const Ailu::Enum* Z_Construct_Enum_EGraphPinDirection_Type();
+const Ailu::Enum* Z_Construct_Enum_Ailu_EGraphPinDirection_Type();
 namespace Ailu {
 enum class EGraphPinDirection : u8;
 }
@@ -78,7 +78,7 @@ AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::EGraphPinDirection>();
 //Enum EGraphPinDirection end...........................
 
 //Enum EGraphPinKind begin...........................
-const Ailu::Enum* Z_Construct_Enum_EGraphPinKind_Type();
+const Ailu::Enum* Z_Construct_Enum_Ailu_EGraphPinKind_Type();
 namespace Ailu {
 enum class EGraphPinKind : u8;
 }
@@ -87,7 +87,7 @@ AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::EGraphPinKind>();
 //Enum EGraphPinKind end...........................
 
 //Enum EGraphNodeFlag begin...........................
-const Ailu::Enum* Z_Construct_Enum_EGraphNodeFlag_Type();
+const Ailu::Enum* Z_Construct_Enum_Ailu_EGraphNodeFlag_Type();
 namespace Ailu {
 enum class EGraphNodeFlag : u32;
 }
@@ -96,7 +96,7 @@ AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::EGraphNodeFlag>();
 //Enum EGraphNodeFlag end...........................
 
 //Enum EGraphLinkFlag begin...........................
-const Ailu::Enum* Z_Construct_Enum_EGraphLinkFlag_Type();
+const Ailu::Enum* Z_Construct_Enum_Ailu_EGraphLinkFlag_Type();
 namespace Ailu {
 enum class EGraphLinkFlag : u32;
 }

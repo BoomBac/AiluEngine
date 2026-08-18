@@ -61,7 +61,7 @@ function ScriptInput:off(subscription_id) end
 function ScriptInput:on_performed(action_name, callback) end
 
 ---@param action_name string
----@param callback fun(arg1: number)
+---@param callback fun(value: number)
 ---@return integer subscription_id
 function ScriptInput:on_value_changed(action_name, callback) end
 

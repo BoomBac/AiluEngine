@@ -255,6 +255,7 @@ namespace Ailu
             ValidateEditingData();
             WriteToAsset();
             _original = _editing;
+            ResourceMgr::Get().MarkAssetDirty(_sprite_asset);
             auto* linked = ResourceMgr::Get().GetLinkedAsset(_sprite_asset);
             if (linked)
             {

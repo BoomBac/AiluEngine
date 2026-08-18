@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __ALGFORMAT_GEN_H__
 //Enum EALGFormat begin...........................
-const Ailu::Enum* Z_Construct_Enum_EALGFormat_Type();
+const Ailu::Enum* Z_Construct_Enum_Ailu_EALGFormat_Type();
 namespace Ailu {
 enum class EALGFormat : u16;
 }

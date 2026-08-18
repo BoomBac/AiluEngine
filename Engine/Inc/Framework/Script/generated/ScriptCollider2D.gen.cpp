@@ -67,6 +67,36 @@ return Ailu::ScriptCollider2D::StaticType();
 return Ailu::ScriptCollider2D::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_ScriptCollider2D(&Ailu::ScriptCollider2D::StaticType, "Ailu::ScriptCollider2D");
+static std::unique_ptr<Ailu::Enum> s_enum_type_ECollisionChannel2D = nullptr;
+//Enum ECollisionChannel2D begin...........................
+const Ailu::Enum* Z_Construct_Enum_Ailu_ECollisionChannel2D_Type()
+{
+if(s_enum_type_ECollisionChannel2D == nullptr)
+{
+EnumInitializer initializer;
+initializer._name = "ECollisionChannel2D";
+initializer._namespace = "Ailu";
+initializer._full_name = "Ailu::ECollisionChannel2D";
+initializer._str_to_enum_lut["kWorldStatic"] = 0;
+initializer._str_to_enum_lut["kWorldDynamic"] = 1;
+initializer._str_to_enum_lut["kPlayer"] = 2;
+initializer._str_to_enum_lut["kEnemy"] = 3;
+initializer._str_to_enum_lut["kProjectile"] = 4;
+initializer._str_to_enum_lut["kTrigger"] = 5;
+initializer._str_to_enum_lut["kPickup"] = 6;
+initializer._str_to_enum_lut["kCount"] = 7;
+s_enum_type_ECollisionChannel2D = std::make_unique<Ailu::Enum>(initializer);
+Ailu::Enum::RegisterEnum(s_enum_type_ECollisionChannel2D.get());
+}
+return s_enum_type_ECollisionChannel2D.get();
+}
+static Ailu::EnumTypeRegister g_register_ECollisionChannel2D(Z_Construct_Enum_Ailu_ECollisionChannel2D_Type);
+template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::ECollisionChannel2D>()
+{
+return s_enum_type_ECollisionChannel2D.get();
+}
+//Enum ECollisionChannel2D end...........................
+
 #if AILU_ENABLE_LUA_SCRIPTING
 #include <sol/sol.hpp>
 #include <Framework/Script/ScriptLuaBindingRegistry.h>
@@ -74,15 +104,25 @@ ClassTypeRegister s_register_ScriptCollider2D(&Ailu::ScriptCollider2D::StaticTyp
 namespace Ailu { void RegisterGeneratedLuaBindings_ScriptCollider2D(sol::state &lua); }
 void Ailu::RegisterGeneratedLuaBindings_ScriptCollider2D(sol::state &lua)
 {
+auto enum_ECollisionChannel2D = lua.create_table();
+enum_ECollisionChannel2D["WorldStatic"] = static_cast<u32>(Ailu::ECollisionChannel2D::kWorldStatic);
+enum_ECollisionChannel2D["WorldDynamic"] = static_cast<u32>(Ailu::ECollisionChannel2D::kWorldDynamic);
+enum_ECollisionChannel2D["Player"] = static_cast<u32>(Ailu::ECollisionChannel2D::kPlayer);
+enum_ECollisionChannel2D["Enemy"] = static_cast<u32>(Ailu::ECollisionChannel2D::kEnemy);
+enum_ECollisionChannel2D["Projectile"] = static_cast<u32>(Ailu::ECollisionChannel2D::kProjectile);
+enum_ECollisionChannel2D["Trigger"] = static_cast<u32>(Ailu::ECollisionChannel2D::kTrigger);
+enum_ECollisionChannel2D["Pickup"] = static_cast<u32>(Ailu::ECollisionChannel2D::kPickup);
+enum_ECollisionChannel2D["Count"] = static_cast<u32>(Ailu::ECollisionChannel2D::kCount);
+lua["CollisionChannel2D"] = enum_ECollisionChannel2D;
 auto type_ScriptCollider2D = lua.new_usertype<Ailu::ScriptCollider2D>("ScriptCollider2D");
 type_ScriptCollider2D["shape_count"] = sol::property(&Ailu::ScriptCollider2D::GetShapeCount);
 type_ScriptCollider2D["valid"] = sol::property(&Ailu::ScriptCollider2D::IsValid);
 type_ScriptCollider2D.set_function("is_valid", &Ailu::ScriptCollider2D::IsValid);
 type_ScriptCollider2D.set_function("get_shape_count", &Ailu::ScriptCollider2D::GetShapeCount);
-type_ScriptCollider2D.set_function("on_collision_enter", []( Ailu::ScriptCollider2D &self, sol::protected_function callback) { return ScriptSystem::Get().BindLuaDelegate(self._on_collision_enter, std::move(callback)); });
-type_ScriptCollider2D.set_function("on_collision_exit", []( Ailu::ScriptCollider2D &self, sol::protected_function callback) { return ScriptSystem::Get().BindLuaDelegate(self._on_collision_exit, std::move(callback)); });
-type_ScriptCollider2D.set_function("on_trigger_enter", []( Ailu::ScriptCollider2D &self, sol::protected_function callback) { return ScriptSystem::Get().BindLuaDelegate(self._on_trigger_enter, std::move(callback)); });
-type_ScriptCollider2D.set_function("on_trigger_exit", []( Ailu::ScriptCollider2D &self, sol::protected_function callback) { return ScriptSystem::Get().BindLuaDelegate(self._on_trigger_exit, std::move(callback)); });
+type_ScriptCollider2D.set_function("on_collision_enter", []( Ailu::ScriptCollider2D &self, const ECollisionChannel2D &target_channel, sol::protected_function callback) { return ScriptSystem::Get().BindLuaEventRouter(self._on_collision_enter, target_channel, std::move(callback)); });
+type_ScriptCollider2D.set_function("on_collision_exit", []( Ailu::ScriptCollider2D &self, const ECollisionChannel2D &target_channel, sol::protected_function callback) { return ScriptSystem::Get().BindLuaEventRouter(self._on_collision_exit, target_channel, std::move(callback)); });
+type_ScriptCollider2D.set_function("on_trigger_enter", []( Ailu::ScriptCollider2D &self, const ECollisionChannel2D &target_channel, sol::protected_function callback) { return ScriptSystem::Get().BindLuaEventRouter(self._on_trigger_enter, target_channel, std::move(callback)); });
+type_ScriptCollider2D.set_function("on_trigger_exit", []( Ailu::ScriptCollider2D &self, const ECollisionChannel2D &target_channel, sol::protected_function callback) { return ScriptSystem::Get().BindLuaEventRouter(self._on_trigger_exit, target_channel, std::move(callback)); });
 }
 ScriptLuaBindingRegister s_register_lua_bindings_RegisterGeneratedLuaBindings_ScriptCollider2D(&Ailu::RegisterGeneratedLuaBindings_ScriptCollider2D);
 #endif

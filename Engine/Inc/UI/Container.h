@@ -112,6 +112,8 @@ namespace Ailu
             const UIControlVisual *GetVisual(EUIVisualState state) const override;
             bool HasVerticalBar() const;
             bool HasHorizontalBar() const;
+            Vector2f GetScrollViewportSize() const;
+            void UpdateScrollBarVisibility();
             Vector4f CalculateVerticalBarRect() const;
             Vector4f CalculateHorizontalBarRect() const;
         protected:
@@ -120,6 +122,8 @@ namespace Ailu
             Vector2f _target_offset = Vector2f::kZero, _max_offset = Vector2f::kZero;
             Vector2f _content_size;
             Vector4f _vbar_rect,_hbar_rect;
+            bool _has_vertical_bar = false;
+            bool _has_horizontal_bar = false;
             bool _is_hover_vbar = false, _is_hover_hbar;
             bool _is_dragging_bar = false;
             Vector2f _drag_start_mouse;     // 鼠标按下时位置(全局)
@@ -225,10 +229,16 @@ namespace Ailu
             UIElement* GetHeader() { return _header; }
             void SetTitle(const String &title);
             String GetTitle() const;
+
+            // ── Style ────────────────────────────────────────────
+            UICollapsibleViewStyleOverride &GetStyleOverride() { return _style_override; }
+            void SetStyleId(const UIStyleId &id);
+            const UIStyleId &GetStyleId() const { return _style_id; }
         private:
             void RenderImpl(UIRenderer &r) override;
             void PostDeserialize() override;
             void MeasureAndArrange(f32 dt) override;
+            void ResolveStyle(const UIStyleContext &context) override;
         private:
             UIElement* _header; // 标题栏（内部有 Text + Icon/Button）
             UIElement* _content;// 折叠区的内容
@@ -239,6 +249,9 @@ namespace Ailu
             bool _is_collapsed = false;
             bool _is_animated = true;
             f32 _anim_progress = 1.0f;// 0.0=折叠 1.0=展开
+            UIStyleId _style_id;
+            UICollapsibleViewStyleOverride _style_override;
+            UICollapsibleViewStyle _resolved_style;
         };
 
         ACLASS()

@@ -21,6 +21,10 @@ namespace Ailu
     {
         return _other_shape;
     }
+    u32 ScriptContact2D::GetOtherObjectType() const
+    {
+        return static_cast<u32>(_other_object_type);
+    }
 
     namespace
     {

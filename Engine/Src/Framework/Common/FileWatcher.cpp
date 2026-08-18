@@ -89,6 +89,28 @@ namespace Ailu
         return events;
     }
 
+    void FileWatchService::AcknowledgeWrite(const fs::path &path)
+    {
+        if (!fs::exists(path))
+            return;
+
+        const WString normalized_input = NormalizePath(path);
+        const fs::file_time_type write_time = fs::last_write_time(path);
+
+        for (auto &[known_path, known_time]: _known_files)
+        {
+            if (NormalizePath(known_path) == normalized_input)
+            {
+                known_time = write_time;
+                return;
+            }
+        }
+
+        fs::path native_key = path;
+        native_key.make_preferred();
+        _known_files.emplace(std::move(native_key), write_time);
+    }
+
     void FileWatchService::CollectWatchedFiles(std::set<fs::path> &out_files) const
     {
         for (const auto &dir: _directories)

@@ -20,7 +20,7 @@ namespace Ailu
         void ComponentEditorContext::MarkSceneDirty() const
         {
             if (_scene != nullptr)
-                _scene->MarkDirty();
+                _scene->MarkEdited();
         }
 
         void ComponentEditorContext::RequestRebuild() const

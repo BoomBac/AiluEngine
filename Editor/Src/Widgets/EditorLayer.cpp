@@ -1334,16 +1334,9 @@ namespace Ailu
                 {
                     if (Input::IsKeyDownAccurate(EKey::kCONTROL))
                     {
-                        LOG_INFO("Save assets...");
-                        Core::ThreadPool::Get().Enqueue([]()
-                                                        {
-                                                   f32 asset_count = 1.0f;
-                                                   for(auto it = ResourceMgr::Get().Begin(); it != ResourceMgr::Get().End(); it++)
-                                                   {
-                                                       ResourceMgr::Get().SaveAsset(it->second.get());
-                                                       //ImGuiWidget::DisplayProgressBar("SaveAsset...",asset_count / (f32)ResourceMgr::Get().AssetNum());
-                                                       asset_count += 1.0;
-                                                   } });
+                        LOG_INFO("Save dirty assets...");
+                        //只保存被修改过的 Asset，且在主线程直接序列化，避免 worker 线程修改正在编辑的 live Object。
+                        ResourceMgr::Get().SaveAllDirtyAssets();
                     }
                 }
                 if (key_e.GetKeyCode() == EKey::kZ)
@@ -1629,6 +1622,7 @@ namespace Ailu
             }
 
             const bool is_playing = Application::Get()._is_playing_mode;
+            const bool is_prefab_editing = SceneMgr::Get().IsTemporaryPrefabScene();
 
             // Sync toolbar & status bar colors from EditorStyle every frame
             if (_toolbar_border)
@@ -1641,7 +1635,8 @@ namespace Ailu
             }
             if (_status_bar_border)
             {
-                const Color status_bar_bg_color = is_playing ? g_editor_style._status_bar_play_bg_color : g_editor_style._status_bar_bg_color;
+                const Color status_bar_bg_color = is_prefab_editing ? g_editor_style._status_bar_prefab_bg_color :
+                    (is_playing ? g_editor_style._status_bar_play_bg_color : g_editor_style._status_bar_bg_color);
                 if (SetColorIfChanged(_status_bar_border->_bg_color, status_bar_bg_color))
                 {
                     UI::UIBrush background_brush;
@@ -1679,13 +1674,7 @@ namespace Ailu
         {
             _editor_status_message = "Save assets queued";
             LOG_INFO("EditorToolbar: Save Scene clicked, saving assets...");
-            Core::ThreadPool::Get().Enqueue([]()
-            {
-                for (auto it = ResourceMgr::Get().Begin(); it != ResourceMgr::Get().End(); it++)
-                {
-                    ResourceMgr::Get().SaveAsset(it->second.get());
-                }
-            });
+            ResourceMgr::Get().SaveAllDirtyAssets();
         }
 
         static bool show = false;

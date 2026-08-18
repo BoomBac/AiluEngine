@@ -32,6 +32,13 @@ namespace Ailu
             const f32 cos_angle = std::cos(angle);
             return b2Vec2{cos_angle * value.x - sin_angle * value.y, sin_angle * value.x + cos_angle * value.y};
         }
+
+        ECS::CollisionProfile2D GetEffectiveCollisionProfile(const ECS::Collider2DComponent &collider)
+        {
+            return collider._preset == ECS::ECollisionPreset2D::kCustom
+                       ? collider._collision_profile
+                       : ECS::MakeCollisionProfile2D(collider._preset);
+        }
     }
 
     struct Physics2DWorld::Impl
@@ -42,6 +49,7 @@ namespace Ailu
             u16 _shape_index = 0u;
             u8 _layer = 0u;
             bool _is_trigger = false;
+            ECS::CollisionProfile2D _collision_profile;
         };
 
         struct BodyRuntime
@@ -49,7 +57,35 @@ namespace Ailu
             b2BodyId _body_id = b2_nullBodyId;
             Vector<b2ShapeId> _shape_ids;
             Vector<Scope<ShapeRuntime>> _shape_data;
+            ECS::CollisionProfile2D _collision_profile;
+            size_t _shape_count = 0u;
         };
+
+        static bool CustomFilter(b2ShapeId shape_a, b2ShapeId shape_b, void *)
+        {
+            const auto *data_a = static_cast<const ShapeRuntime *>(b2Shape_GetUserData(shape_a));
+            const auto *data_b = static_cast<const ShapeRuntime *>(b2Shape_GetUserData(shape_b));
+            if (data_a == nullptr || data_b == nullptr)
+                return true;
+
+            const ECS::ECollisionResponse2D response = ECS::ResolveCollisionResponse(
+                data_a->_collision_profile.GetResponse(data_b->_collision_profile._object_type),
+                data_b->_collision_profile.GetResponse(data_a->_collision_profile._object_type));
+            return response != ECS::ECollisionResponse2D::kIgnore;
+        }
+
+        static bool PreSolve(b2ShapeId shape_a, b2ShapeId shape_b, b2Pos, b2Vec2, void *)
+        {
+            const auto *data_a = static_cast<const ShapeRuntime *>(b2Shape_GetUserData(shape_a));
+            const auto *data_b = static_cast<const ShapeRuntime *>(b2Shape_GetUserData(shape_b));
+            if (data_a == nullptr || data_b == nullptr)
+                return true;
+
+            const ECS::ECollisionResponse2D response = ECS::ResolveCollisionResponse(
+                data_a->_collision_profile.GetResponse(data_b->_collision_profile._object_type),
+                data_b->_collision_profile.GetResponse(data_a->_collision_profile._object_type));
+            return response != ECS::ECollisionResponse2D::kOverlap;
+        }
 
         b2WorldId _world_id = b2_nullWorldId;
         std::unordered_map<ECS::Entity, BodyRuntime> _bodies;
@@ -79,6 +115,8 @@ namespace Ailu
         b2WorldDef world_def = b2DefaultWorldDef();
         world_def.gravity = b2Vec2{0.0f, -9.8f};
         _impl->_world_id = b2CreateWorld(&world_def);
+        b2World_SetCustomFilterCallback(_impl->_world_id, &Impl::CustomFilter, nullptr);
+        b2World_SetPreSolveCallback(_impl->_world_id, &Impl::PreSolve, nullptr);
     }
 
     void Physics2DWorld::Shutdown()
@@ -125,6 +163,19 @@ namespace Ailu
                                         b2MakeRot(GetPhysicsAngle(transform->_rotation)));
                 }
             }
+
+            const auto *collider = r.GetComponent<ECS::Collider2DComponent>(entity);
+            const auto &body_runtime = _impl->_bodies.at(entity);
+            if (collider != nullptr)
+            {
+                const ECS::CollisionProfile2D collision_profile = GetEffectiveCollisionProfile(*collider);
+                if (body_runtime._collision_profile != collision_profile ||
+                    body_runtime._shape_count != collider->_shapes.size())
+                {
+                    DestroyBody(entity);
+                    CreateBody(r, entity);
+                }
+            }
         }
 
         Vector<ECS::Entity> entities_to_destroy;
@@ -168,6 +219,9 @@ namespace Ailu
 
         Impl::BodyRuntime body_runtime;
         body_runtime._body_id = b2CreateBody(_impl->_world_id, &body_def);
+        const ECS::CollisionProfile2D collision_profile = GetEffectiveCollisionProfile(*collider);
+        body_runtime._collision_profile = collision_profile;
+        body_runtime._shape_count = collider->_shapes.size();
         for (u16 shape_index = 0u; shape_index < collider->_shapes.size(); ++shape_index)
         {
             const ECS::ColliderShape2D &shape = collider->_shapes[shape_index];
@@ -198,6 +252,8 @@ namespace Ailu
             shape_def.isSensor = shape._is_trigger;
             shape_def.enableSensorEvents = shape._is_trigger;
             shape_def.enableContactEvents = !shape._is_trigger;
+            shape_def.enableCustomFiltering = true;
+            shape_def.enablePreSolveEvents = !shape._is_trigger;
             shape_def.filter.categoryBits = 1ull << shape._layer;
             shape_def.filter.maskBits = _impl->_layer_collision_masks[shape._layer];
             auto shape_data = MakeScope<Impl::ShapeRuntime>();
@@ -205,6 +261,7 @@ namespace Ailu
             shape_data->_shape_index = shape_index;
             shape_data->_layer = shape._layer;
             shape_data->_is_trigger = shape._is_trigger;
+            shape_data->_collision_profile = collision_profile;
             shape_def.userData = shape_data.get();
 
             b2ShapeId shape_id = b2_nullShapeId;
@@ -577,7 +634,7 @@ namespace Ailu
         b2World_Step(_impl->_world_id, fixed_delta_time, 4);
 
         auto append_event = [this](b2ShapeId shape_a, b2ShapeId shape_b, EPhysicsContact2DType type,
-                                   b2ContactId contact_id = b2_nullContactId) {
+                                   b2ContactId contact_id = b2_nullContactId, bool sensor_event = false) {
             if (!b2Shape_IsValid(shape_a) || !b2Shape_IsValid(shape_b))
                 return;
             const auto *data_a = static_cast<const Impl::ShapeRuntime *>(b2Shape_GetUserData(shape_a));
@@ -585,9 +642,25 @@ namespace Ailu
             if (data_a == nullptr || data_b == nullptr)
                 return;
 
+            const ECS::ECollisionResponse2D response = ECS::ResolveCollisionResponse(
+                data_a->_collision_profile.GetResponse(data_b->_collision_profile._object_type),
+                data_b->_collision_profile.GetResponse(data_a->_collision_profile._object_type));
+            const bool is_collision_begin = type == EPhysicsContact2DType::kCollisionBegin;
+            if (response == ECS::ECollisionResponse2D::kIgnore)
+                return;
+            if (!sensor_event && (type == EPhysicsContact2DType::kCollisionBegin ||
+                                  type == EPhysicsContact2DType::kCollisionEnd) &&
+                response == ECS::ECollisionResponse2D::kOverlap)
+            {
+                type = type == EPhysicsContact2DType::kCollisionBegin ? EPhysicsContact2DType::kTriggerBegin
+                                                                       : EPhysicsContact2DType::kTriggerEnd;
+            }
+
             PhysicsContact2D contact{type, data_a->_entity, data_b->_entity,
-                                     data_a->_shape_index, data_b->_shape_index};
-            if (type == EPhysicsContact2DType::kCollisionBegin && b2Contact_IsValid(contact_id))
+                                     data_a->_shape_index, data_b->_shape_index, Vector2f::kZero, Vector2f::kZero,
+                                     data_a->_collision_profile._object_type,
+                                     data_b->_collision_profile._object_type};
+            if (is_collision_begin && b2Contact_IsValid(contact_id))
             {
                 const b2ContactData contact_data = b2Contact_GetData(contact_id);
                 if (contact_data.manifold.pointCount > 0)
@@ -606,12 +679,14 @@ namespace Ailu
         for (int index = 0; index < sensor_events.beginCount; ++index)
         {
             const b2SensorBeginTouchEvent &event = sensor_events.beginEvents[index];
-            append_event(event.sensorShapeId, event.visitorShapeId, EPhysicsContact2DType::kTriggerBegin);
+            append_event(event.sensorShapeId, event.visitorShapeId, EPhysicsContact2DType::kTriggerBegin,
+                         b2_nullContactId, true);
         }
         for (int index = 0; index < sensor_events.endCount; ++index)
         {
             const b2SensorEndTouchEvent &event = sensor_events.endEvents[index];
-            append_event(event.sensorShapeId, event.visitorShapeId, EPhysicsContact2DType::kTriggerEnd);
+            append_event(event.sensorShapeId, event.visitorShapeId, EPhysicsContact2DType::kTriggerEnd,
+                         b2_nullContactId, true);
         }
 
         const b2ContactEvents contact_events = b2World_GetContactEvents(_impl->_world_id);

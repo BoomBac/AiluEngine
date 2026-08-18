@@ -8,7 +8,7 @@
 using namespace Ailu;
 static std::unique_ptr<Ailu::Enum> s_enum_type_EThreadStatus = nullptr;
 //Enum EThreadStatus begin...........................
-const Ailu::Enum* Z_Construct_Enum_EThreadStatus_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_Core_EThreadStatus_Type()
 {
 if(s_enum_type_EThreadStatus == nullptr)
 {
@@ -24,7 +24,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_EThreadStatus.get());
 }
 return s_enum_type_EThreadStatus.get();
 }
-static Ailu::EnumTypeRegister g_register_EThreadStatus(Z_Construct_Enum_EThreadStatus_Type);
+static Ailu::EnumTypeRegister g_register_EThreadStatus(Z_Construct_Enum_Ailu_Core_EThreadStatus_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::Core::EThreadStatus>()
 {
 return s_enum_type_EThreadStatus.get();

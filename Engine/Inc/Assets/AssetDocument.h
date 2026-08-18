@@ -613,6 +613,10 @@ namespace Ailu
         GENERATED_BODY()
 
         APROPERTY()
+        ECS::ECollisionPreset2D _preset = ECS::ECollisionPreset2D::kDefault;
+        APROPERTY()
+        ECS::CollisionProfile2D _collision_profile = ECS::MakeCollisionProfile2D(ECS::ECollisionPreset2D::kDefault);
+        APROPERTY()
         Vector<ECS::ColliderShape2D> _shapes;
     };
 

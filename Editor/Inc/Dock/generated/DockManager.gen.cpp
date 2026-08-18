@@ -414,7 +414,7 @@ return Ailu::Editor::DockNodeDataArray::GetPrivateStaticClass();
 ClassTypeRegister s_register_DockNodeDataArray(&Ailu::Editor::DockNodeDataArray::StaticType, "Ailu::Editor::DockNodeDataArray");
 static std::unique_ptr<Ailu::Enum> s_enum_type_EDockArea = nullptr;
 //Enum EDockArea begin...........................
-const Ailu::Enum* Z_Construct_Enum_EDockArea_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_Editor_EDockArea_Type()
 {
 if(s_enum_type_EDockArea == nullptr)
 {
@@ -433,7 +433,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_EDockArea.get());
 }
 return s_enum_type_EDockArea.get();
 }
-static Ailu::EnumTypeRegister g_register_EDockArea(Z_Construct_Enum_EDockArea_Type);
+static Ailu::EnumTypeRegister g_register_EDockArea(Z_Construct_Enum_Ailu_Editor_EDockArea_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::Editor::EDockArea>()
 {
 return s_enum_type_EDockArea.get();

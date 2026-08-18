@@ -21,7 +21,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::ECS::ScriptPrope
 //Struct ScriptPropertyData end...........................
 
 //Enum EMotionVectorType begin...........................
-const Ailu::Enum* Z_Construct_Enum_EMotionVectorType_Type();
+const Ailu::Enum* Z_Construct_Enum_Ailu_ECS_EMotionVectorType_Type();
 namespace Ailu::ECS {
 enum class EMotionVectorType : i32;
 }
@@ -30,7 +30,7 @@ AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::ECS::EMotionVectorType>();
 //Enum EMotionVectorType end...........................
 
 //Enum EScriptPropertyType begin...........................
-const Ailu::Enum* Z_Construct_Enum_EScriptPropertyType_Type();
+const Ailu::Enum* Z_Construct_Enum_Ailu_ECS_EScriptPropertyType_Type();
 namespace Ailu::ECS {
 enum class EScriptPropertyType : u8;
 }
@@ -39,7 +39,7 @@ AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::ECS::EScriptPropertyType>();
 //Enum EScriptPropertyType end...........................
 
 //Enum ELightType begin...........................
-const Ailu::Enum* Z_Construct_Enum_ELightType_Type();
+const Ailu::Enum* Z_Construct_Enum_Ailu_ECS_ELightType_Type();
 namespace Ailu::ECS {
 enum class ELightType : i32;
 }
@@ -48,7 +48,7 @@ AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::ECS::ELightType>();
 //Enum ELightType end...........................
 
 //Enum EColliderType begin...........................
-const Ailu::Enum* Z_Construct_Enum_EColliderType_Type();
+const Ailu::Enum* Z_Construct_Enum_Ailu_ECS_EColliderType_Type();
 namespace Ailu::ECS {
 enum class EColliderType : i32;
 }

@@ -76,7 +76,7 @@ namespace Ailu
             // --- Compatibility wrappers ---
             void Attach(ECS::Entity current, ECS::Entity parent) { Reparent(current, parent); }
             void Detach(ECS::Entity current) { Detach(current, true); }
-            void MarkDirty() { _dirty = true; };
+            void MarkDirty();
             void EnqueueSceneCommand(ISceneCommand *command, bool undo = false);
             const Vector<ECS::Entity> &EntityView() const;
             ECS::Entity Pick(const Ray &ray);
@@ -196,6 +196,17 @@ namespace Ailu
             void MarkCurSceneDirty() { _p_current->MarkDirty(); };
             Ref<Scene> Create(String name);
             Ref<Scene> OpenScene(const WString &scene_path);
+            void OpenTemporaryScene(Ref<Scene> scene, const Guid &prefab_asset_guid = Guid::EmptyGuid(),
+                                    ECS::Entity prefab_root_entity = ECS::kInvalidEntity);
+            void CloseTemporaryScene();
+            bool IsTemporaryScene() const { return _temporary_scene != nullptr; }
+            bool IsTemporaryPrefabScene() const { return IsTemporaryScene() && !_temporary_prefab_asset_guid.IsEmpty(); }
+            bool HasTemporarySceneEdits() const
+            {
+                return IsTemporaryScene() && _temporary_scene->EditRevision() != _temporary_scene_initial_edit_revision;
+            }
+            const Guid &TemporaryPrefabAssetGuid() const { return _temporary_prefab_asset_guid; }
+            ECS::Entity TemporaryPrefabRootEntity() const { return _temporary_prefab_root_entity; }
             Scene *ActiveScene() { return _p_current; }
             void EnterPlayMode();
             void ExitPlayMode();
@@ -210,6 +221,12 @@ namespace Ailu
             Scene *_runtime_scene = nullptr;
             Scene *_runtime_scene_src = nullptr;
             Scene *_retired_runtime_scene = nullptr;
+            Ref<Scene> _temporary_scene;
+            Scene *_scene_before_temporary = nullptr;
+            Ref<Scene> _retired_temporary_scene;
+            Guid _temporary_prefab_asset_guid;
+            ECS::Entity _temporary_prefab_root_entity = ECS::kInvalidEntity;
+            u64 _temporary_scene_initial_edit_revision = 0u;
             Vector<Transform> _transform_cache;
         };
     }

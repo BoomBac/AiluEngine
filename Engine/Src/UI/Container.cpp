@@ -45,6 +45,15 @@ namespace Ailu
                 brush._tint = color;
                 return brush;
             }
+
+            void SetVisualOverride(UIControlVisualOverride &style_override, const UIControlVisual &visual)
+            {
+                style_override.SetBackground(visual._background);
+                style_override.SetContentColor(visual._content_color);
+                style_override.SetBorderColor(visual._border_color);
+                style_override.SetBorderWidth(visual._border_width);
+                style_override.SetCornerRadius(visual._corner_radius);
+            }
         }
 
 #undef max
@@ -159,12 +168,18 @@ namespace Ailu
                 if (_orientation == EOrientation::kVertical)
                 {
                     total_len += margin._t + child_size.y + margin._b;
-                    max_cross = std::max(max_cross, child_size.x + margin._l + margin._r);
+                    // A Fill child gets its cross-axis size from the parent during arrangement. Its
+                    // intrinsic width must not make an otherwise constrained vertical container wider.
+                    const f32 child_cross_size = slot._size_policy_h == ESizePolicy::kFill ? 0.0f : child_size.x;
+                    max_cross = std::max(max_cross, child_cross_size + margin._l + margin._r);
                 }
                 else
                 {
                     total_len += margin._l + child_size.x + margin._r;
-                    max_cross = std::max(max_cross, child_size.y + margin._t + margin._b);
+                    // A Fill child gets its cross-axis size from the parent during arrangement. Its
+                    // intrinsic height must not make an otherwise constrained horizontal container taller.
+                    const f32 child_cross_size = slot._size_policy_v == ESizePolicy::kFill ? 0.0f : child_size.y;
+                    max_cross = std::max(max_cross, child_cross_size + margin._t + margin._b);
                 }
             }
 
@@ -549,10 +564,11 @@ namespace Ailu
                 {
                     f32 delta = mpos.y - _drag_start_mouse.y;
                     // 根据滚动条比例转换到内容偏移
-                    f32 scrollable_height = _content_size.y - _content_rect.w;
+                    const f32 viewport_height = GetScrollViewportSize().y;
+                    f32 scrollable_height = _content_size.y - viewport_height;
                     if (scrollable_height > 0.0f)
                     {
-                        f32 bar_movable_height = _content_rect.w - CalculateVerticalBarRect().w;// _bar_rect.w = 滚动条高度
+                        f32 bar_movable_height = viewport_height - CalculateVerticalBarRect().w;// _bar_rect.w = 滚动条高度
                         f32 offset_delta = -(delta * (scrollable_height / bar_movable_height));
                         _target_offset.y = std::clamp(_drag_start_offset + offset_delta, -scrollable_height, 0.0f);
                     }
@@ -560,10 +576,11 @@ namespace Ailu
                 else
                 {
                     f32 delta = mpos.x - _drag_start_mouse.x;
-                    f32 scrollable_width = _content_size.x - _content_rect.z;
+                    const f32 viewport_width = GetScrollViewportSize().x;
+                    f32 scrollable_width = _content_size.x - viewport_width;
                     if (scrollable_width > 0.0f)
                     {
-                        f32 bar_movable_width = _content_rect.z - CalculateHorizontalBarRect().z;// _bar_rect.z = 滚动条宽度
+                        f32 bar_movable_width = viewport_width - CalculateHorizontalBarRect().z;// _bar_rect.z = 滚动条宽度
                         f32 offset_delta = -(delta * (scrollable_width / bar_movable_width));
                         _target_offset.x = std::clamp(_drag_start_offset + offset_delta, -scrollable_width, 0.0f);
                     }
@@ -612,7 +629,7 @@ namespace Ailu
             }
             r.PopScissor();
             // Vertical scrollbar
-            if (_content_size.y > _content_rect.w)
+            if (HasVerticalBar())
             {
                 _vbar_rect = CalculateVerticalBarRect();
                 const auto &sb_style = _resolved_style._vertical_scrollbar;
@@ -626,7 +643,7 @@ namespace Ailu
                 r.DrawQuad(_vbar_rect, _matrix, *thumb);
             }
             // Horizontal scrollbar
-            if (_content_size.x > _content_rect.z)
+            if (HasHorizontalBar())
             {
                 _hbar_rect = CalculateHorizontalBarRect();
                 const auto &sb_style = _resolved_style._horizontal_scrollbar;
@@ -673,21 +690,30 @@ namespace Ailu
             _content_size = Vector2f::kZero;
             for (auto &c: _children)
                 _content_size = Max(c->MeasureDesiredSize(), _content_size);
-            _max_offset = Min(Vector2f::kZero, GetSlot()->_size - _content_size);
+            UpdateScrollBarVisibility();
+            _max_offset = Min(Vector2f::kZero, GetScrollViewportSize() - _content_size);
         }
         void ScrollView::MeasureAndArrange(f32 dt)
         {
             _content_size = Vector2f::kZero;
             for (auto &c: _children)
             {
-                const auto &slot = c->GetSlotAs<LinearSlot>();
                 const auto &s = c->MeasureDesiredSize();
                 _content_size += s;
-                c->Arrange(0.0f, 0.0f, _is_vertical ? _content_rect.z : s.x, s.y);
+            }
+
+            UpdateScrollBarVisibility();
+            const Vector2f viewport_size = GetScrollViewportSize();
+            for (auto &c: _children)
+            {
+                const auto &s = c->MeasureDesiredSize();
+                const f32 content_width = _has_horizontal_bar ? (std::max)(viewport_size.x, s.x) : viewport_size.x;
+                const f32 content_height = _has_vertical_bar ? (std::max)(viewport_size.y, s.y) : s.y;
+                c->Arrange(0.0f, 0.0f, content_width, content_height);
                 c->Translate(_current_offset);
                 c->MeasureAndArrange(dt);
             }
-            _max_offset = Min(Vector2f::kZero, _content_rect.zw - _content_size);
+            _max_offset = Min(Vector2f::kZero, viewport_size - _content_size);
             _target_offset = Max(_max_offset, Min(Vector2f::kZero, _target_offset));
             _current_offset = Max(_max_offset, Min(Vector2f::kZero, _current_offset));
         }
@@ -707,26 +733,42 @@ namespace Ailu
         }
         bool ScrollView::HasVerticalBar() const
         {
-            return _content_size.y > _content_rect.w && _content_rect.w > 0.0f;
+            return _has_vertical_bar && _content_rect.w > 0.0f;
         }
         bool ScrollView::HasHorizontalBar() const
         {
-            return _content_size.x > _content_rect.z && _content_rect.z > 0.0f;
+            return _has_horizontal_bar && _content_rect.z > 0.0f;
+        }
+        Vector2f ScrollView::GetScrollViewportSize() const
+        {
+            return {(std::max)(0.0f, _content_rect.z - (_has_vertical_bar ? kScrollBarWidth : 0.0f)),
+                    (std::max)(0.0f, _content_rect.w - (_has_horizontal_bar ? kScrollBarWidth : 0.0f))};
+        }
+        void ScrollView::UpdateScrollBarVisibility()
+        {
+            const f32 viewport_width = (std::max)(0.0f, _content_rect.z);
+            const f32 viewport_height = (std::max)(0.0f, _content_rect.w);
+            _has_vertical_bar = _content_size.y > viewport_height;
+            _has_horizontal_bar = _content_size.x > viewport_width - (_has_vertical_bar ? kScrollBarWidth : 0.0f);
+            _has_vertical_bar = _content_size.y > viewport_height - (_has_horizontal_bar ? kScrollBarWidth : 0.0f);
+            _has_horizontal_bar = _content_size.x > viewport_width - (_has_vertical_bar ? kScrollBarWidth : 0.0f);
         }
         Vector4f ScrollView::CalculateVerticalBarRect() const
         {
             if (!HasVerticalBar())
                 return Vector4f::kZero;
-            f32 bar_height = _content_rect.w * (_content_rect.w / _content_size.y);
-            f32 bar_y = -_current_offset.y * (_content_rect.w / _content_size.y) + _content_rect.y;
+            const f32 viewport_height = GetScrollViewportSize().y;
+            f32 bar_height = viewport_height * (viewport_height / _content_size.y);
+            f32 bar_y = -_current_offset.y * (viewport_height / _content_size.y) + _content_rect.y;
             return {_content_rect.x + _content_rect.z - kScrollBarWidth, bar_y, kScrollBarWidth, bar_height};
         }
         Vector4f ScrollView::CalculateHorizontalBarRect() const
         {
             if (!HasHorizontalBar())
                 return Vector4f::kZero;
-            f32 bar_width = _content_rect.z * (_content_rect.z / _content_size.x);
-            f32 bar_x = -_current_offset.x * (_content_rect.z / _content_size.x) + _content_rect.x;
+            const f32 viewport_width = GetScrollViewportSize().x;
+            f32 bar_width = viewport_width * (viewport_width / _content_size.x);
+            f32 bar_x = -_current_offset.x * (viewport_width / _content_size.x) + _content_rect.x;
             return {bar_x, _content_rect.y + _content_rect.w - kScrollBarWidth, bar_width, kScrollBarWidth};
         }
         UIElement *ScrollView::HitTest(Vector2f pos)
@@ -1094,13 +1136,76 @@ namespace Ailu
             _content->SetVisible(!_is_collapsed);
             InvalidateLayout();
         }
+        void CollapsibleView::SetStyleId(const UIStyleId &id)
+        {
+            if (_style_id == id)
+                return;
+            _style_id = id;
+            InvalidateStyle();
+        }
+
+        void CollapsibleView::ResolveStyle(const UIStyleContext &context)
+        {
+            if (context._theme)
+            {
+                const UICollapsibleViewStyle *theme_style = context._theme->FindCollapsibleViewStyle(_style_id);
+                _resolved_style = theme_style != nullptr ? *theme_style : context._theme->_collapsible_view_style;
+            }
+            else
+            {
+                static UITheme s_default_theme = UITheme::DefaultDark();
+                _resolved_style = s_default_theme._collapsible_view_style;
+            }
+
+            _style_override.ApplyTo(_resolved_style);
+            if (auto *header = dynamic_cast<LinearBox *>(_header))
+            {
+                SetVisualOverride(header->GetStyleOverride(), _resolved_style._header);
+                Padding &header_padding = header->SlotPadding();
+                const Padding &style_padding = _resolved_style._header_padding;
+                if (header_padding._l != style_padding._l || header_padding._t != style_padding._t ||
+                    header_padding._r != style_padding._r || header_padding._b != style_padding._b)
+                {
+                    header_padding = style_padding;
+                    header->InvalidateLayout();
+                }
+            }
+            if (auto *content = dynamic_cast<Border *>(_content))
+            {
+                SetVisualOverride(content->GetStyleOverride(), _resolved_style._content);
+                content->InvalidateStyle();
+                content->EnsureStyleResolved();
+
+                const Vector4f border_width = _resolved_style._content._border_width;
+                const Padding &content_padding = _resolved_style._content_padding;
+                const Padding combined_padding(border_width.x + content_padding._l,
+                                               border_width.y + content_padding._t,
+                                               border_width.z + content_padding._r,
+                                               border_width.w + content_padding._b);
+                Padding &resolved_padding = content->SlotPadding();
+                if (resolved_padding._l != combined_padding._l || resolved_padding._t != combined_padding._t ||
+                    resolved_padding._r != combined_padding._r || resolved_padding._b != combined_padding._b)
+                {
+                    resolved_padding = combined_padding;
+                    content->InvalidateLayout();
+                }
+            }
+            if (_title != nullptr)
+            {
+                _title->GetStyleOverride().SetContentColor(_resolved_style._header._content_color);
+                _title->GetStyleOverride().SetFontSize(_resolved_style._title_font_size);
+            }
+        }
+
         Vector2f CollapsibleView::MeasureDesiredSize()
         {
+            EnsureStyleResolved();
+            const f32 header_height = (std::max)(0.0f, _resolved_style._header_height);
             Vector2f sz;
             if (!_is_collapsed && !_content->GetChildren().empty())
                 sz = _content->MeasureDesiredSize();
             sz.x = std::max(sz.x, _header->MeasureDesiredSize().x);
-            sz.y += s_header_height;
+            sz.y += header_height;
             return sz;
         }
         void CollapsibleView::SetTitle(const String &title)
@@ -1130,11 +1235,13 @@ namespace Ailu
         }
         void CollapsibleView::MeasureAndArrange(f32 dt)
         {
-            _header->Arrange(0.0f, 0.0f, _content_rect.z, s_header_height);
+            EnsureStyleResolved();
+            const f32 header_height = (std::max)(0.0f, _resolved_style._header_height);
+            _header->Arrange(0.0f, 0.0f, _content_rect.z, header_height);
             if (!_is_collapsed)
             {
                 Vector2f sz = _content->GetChildren().empty() ? Vector2f::kZero : _content->MeasureDesiredSize();
-                _content->Arrange(0.0f, s_header_height, _content_rect.z, sz.y);
+                _content->Arrange(0.0f, header_height, _content_rect.z, sz.y);
             }
         }
 #pragma endregion

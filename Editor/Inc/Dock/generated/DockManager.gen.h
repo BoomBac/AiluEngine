@@ -37,7 +37,7 @@ const class Ailu::Type* Ailu::StaticClass<struct Ailu::Editor::DockNodeDataArray
 //Struct DockNodeDataArray end...........................
 
 //Enum EDockArea begin...........................
-const Ailu::Enum* Z_Construct_Enum_EDockArea_Type();
+const Ailu::Enum* Z_Construct_Enum_Ailu_Editor_EDockArea_Type();
 namespace Ailu::Editor {
 enum class EDockArea : i32;
 }

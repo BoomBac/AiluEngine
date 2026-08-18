@@ -848,6 +848,18 @@ namespace Ailu
     {
         if (scene == nullptr)
             return;
+        for (auto iter = _instances.begin(); iter != _instances.end();)
+        {
+            if (iter->first._scene != scene)
+            {
+                ++iter;
+                continue;
+            }
+
+            InvokeComponentMethod(iter->second, iter->second._on_destroy);
+            ClearSubscriptions(iter->second);
+            iter = _instances.erase(iter);
+        }
         for (auto iter = _collider_event_sources.begin(); iter != _collider_event_sources.end();)
         {
             if (iter->first._scene == scene)
@@ -873,9 +885,14 @@ namespace Ailu
 
         const ScriptEntity other_a{scene, contact._entity_b};
         const ScriptEntity other_b{scene, contact._entity_a};
-        const ScriptContact2D hit_a{contact._point, contact._normal, contact._shape_a, contact._shape_b};
+        const ScriptContact2D hit_a{contact._point, contact._normal, contact._shape_a, contact._shape_b,
+                                    contact._object_type_b};
         const ScriptContact2D hit_b{contact._point, Vector2f{-contact._normal.x, -contact._normal.y}, contact._shape_b,
-                                    contact._shape_a};
+                                    contact._shape_a, contact._object_type_a};
+        const ECollisionChannel2D target_channel_a =
+            static_cast<ECollisionChannel2D>(static_cast<u8>(contact._object_type_b));
+        const ECollisionChannel2D target_channel_b =
+            static_cast<ECollisionChannel2D>(static_cast<u8>(contact._object_type_a));
 
         const auto event_source_a = _collider_event_sources.find({scene, contact._entity_a});
         const auto event_source_b = _collider_event_sources.find({scene, contact._entity_b});
@@ -883,27 +900,27 @@ namespace Ailu
         {
         case EPhysicsContact2DType::kCollisionBegin:
             if (event_source_a != _collider_event_sources.end())
-                event_source_a->second->_on_collision_enter.Invoke(other_a, hit_a);
+                event_source_a->second->_on_collision_enter.Invoke(target_channel_a, other_a, hit_a);
             if (event_source_b != _collider_event_sources.end())
-                event_source_b->second->_on_collision_enter.Invoke(other_b, hit_b);
+                event_source_b->second->_on_collision_enter.Invoke(target_channel_b, other_b, hit_b);
             break;
         case EPhysicsContact2DType::kCollisionEnd:
             if (event_source_a != _collider_event_sources.end())
-                event_source_a->second->_on_collision_exit.Invoke(other_a, hit_a);
+                event_source_a->second->_on_collision_exit.Invoke(target_channel_a, other_a, hit_a);
             if (event_source_b != _collider_event_sources.end())
-                event_source_b->second->_on_collision_exit.Invoke(other_b, hit_b);
+                event_source_b->second->_on_collision_exit.Invoke(target_channel_b, other_b, hit_b);
             break;
         case EPhysicsContact2DType::kTriggerBegin:
             if (event_source_a != _collider_event_sources.end())
-                event_source_a->second->_on_trigger_enter.Invoke(other_a);
+                event_source_a->second->_on_trigger_enter.Invoke(target_channel_a, other_a, hit_a);
             if (event_source_b != _collider_event_sources.end())
-                event_source_b->second->_on_trigger_enter.Invoke(other_b);
+                event_source_b->second->_on_trigger_enter.Invoke(target_channel_b, other_b, hit_b);
             break;
         case EPhysicsContact2DType::kTriggerEnd:
             if (event_source_a != _collider_event_sources.end())
-                event_source_a->second->_on_trigger_exit.Invoke(other_a);
+                event_source_a->second->_on_trigger_exit.Invoke(target_channel_a, other_a, hit_a);
             if (event_source_b != _collider_event_sources.end())
-                event_source_b->second->_on_trigger_exit.Invoke(other_b);
+                event_source_b->second->_on_trigger_exit.Invoke(target_channel_b, other_b, hit_b);
             break;
         default:
             break;

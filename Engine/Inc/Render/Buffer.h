@@ -7,6 +7,7 @@
 #include "Framework/Core/CoreMinimal.h"
 #include "Framework/Core/String.h"
 #include "Framework/Core/Containers/Vector.h"
+#include "Framework/Core/Containers/Array.h"
 #include "GpuResource.h"
 #include "PipelineState.h"
 #include "Framework/Common/Misc.h"
@@ -177,6 +178,19 @@ namespace Ailu
 
         class VertexBuffer : public GpuResource
         {
+        private:
+            struct ResolvedVertexBinding
+            {
+                u8 _slot = 0u;
+                u8 _stream_index = 0u;
+            };
+
+            struct ResolvedVertexLayout
+            {
+                std::array<ResolvedVertexBinding, RenderConstants::kMaxVertexAttrNum> _bindings{};
+                u8 _binding_count = 0u;
+                bool _valid = false;
+            };
         public:
             static VertexBuffer *Create(VertexBufferLayout layout, const String &name = std::format("vertex_buffer_{}", s_global_buffer_index++));
             VertexBuffer(VertexBufferLayout layout);
@@ -192,6 +206,8 @@ namespace Ailu
             [[nodiscard]] i32 GetBindlessSRVIndex(u8 stream_index = 0u) const { return stream_index < _bindless_srv_indices.size() ? _bindless_srv_indices[stream_index] : -1; }
 
         protected:
+            const ResolvedVertexLayout& ResolveLayout(const VertexBufferLayout &layout);
+        protected:
             VertexBufferLayout _buffer_layout;
             u32 _vertices_count;
             //只读
@@ -206,6 +222,7 @@ namespace Ailu
             Vector<i32> _bindless_srv_indices;
             bool _bindless_srv_enabled = true;
             u64 _view_version = 0u;
+            Array<ResolvedVertexLayout, 64> _resolved_layouts;
         };
 
         class IndexBuffer : public GpuResource

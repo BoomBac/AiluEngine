@@ -1,5 +1,7 @@
 #include "Assets/AssetTypeRegistry.h"
 
+#include "Widgets/AssetBrowserOperations.h"
+
 #include "Assets/Asset.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Render/2D/Sprite.h"
@@ -69,6 +71,54 @@ namespace Ailu
             RegisterPreview(Render::Mesh::StaticType(), GenerateMeshPreview);
             RegisterPreview(Render::Sprite::StaticType(), GenerateSpritePreview);
             RegisterPreview(Render::Texture2D::StaticType(), GetTexturePreview);
+
+            RegisterCreator({
+                "New Scene", "Create Scene", "NewScene", "Scene already exists.", L".almap",
+                [](const fs::path &directory, const String &name) { return CreateSceneAsset(directory, name); },
+                nullptr
+            });
+            RegisterCreator({
+                "New Sprite", "Create Sprite", "NewSprite", "Sprite already exists.", L".alasset",
+                [](const fs::path &directory, const String &name) { return CreateSpriteAsset(directory, name); },
+                nullptr
+            });
+            RegisterCreator({
+                "New Material", "Create Material", "NewMaterial", "Material already exists.", L".alasset",
+                nullptr,
+                [](const fs::path &directory, Vector2f popup_pos) { ShowCreateMaterialDialog(popup_pos, directory); }
+            });
+            RegisterCreator({
+                "New Input Action Asset", "Create Input Action Asset", "NewInputActions", "Input Action Asset already exists.", L".alasset",
+                [](const fs::path &directory, const String &name) { return CreateInputActionAsset(directory, name); },
+                nullptr
+            });
+            RegisterCreator({
+                "New Widget Asset", "Create Widget Asset", "NewWidget", "Widget Asset already exists.", L".alasset",
+                [](const fs::path &directory, const String &name) { return CreateWidgetAsset(directory, name); },
+                nullptr
+            });
+            RegisterCreator({
+                "New Flow Graph", "Create Flow Graph", "NewFlowGraph", "Flow Graph already exists.", L".alasset",
+                [](const fs::path &directory, const String &name) { return CreateFlowGraphAsset(directory, name); },
+                nullptr
+            });
+            RegisterCreator({
+                "New Script", "Create Script", "NewScript", "Script already exists.", L".lua",
+                [](const fs::path &directory, const String &name) { return CreateScriptAsset(directory, name); },
+                nullptr
+            });
+        }
+
+        void AssetTypeRegistry::RegisterCreator(AssetCreatorDesc creator)
+        {
+            if (creator._menu_name.empty() || (!creator._create && !creator._create_dialog))
+                return;
+            _creators.push_back(std::move(creator));
+        }
+
+        const Vector<AssetCreatorDesc> &AssetTypeRegistry::Creators() const
+        {
+            return _creators;
         }
 
         Render::Texture *AssetTypeRegistry::GetIcon(Asset *asset)

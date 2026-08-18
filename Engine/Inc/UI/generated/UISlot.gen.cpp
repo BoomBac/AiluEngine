@@ -382,7 +382,7 @@ return Ailu::UI::Padding::GetPrivateStaticClass();
 ClassTypeRegister s_register_Padding(&Ailu::UI::Padding::StaticType, "Ailu::UI::Padding");
 static std::unique_ptr<Ailu::Enum> s_enum_type_EAlignment = nullptr;
 //Enum EAlignment begin...........................
-const Ailu::Enum* Z_Construct_Enum_EAlignment_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_UI_EAlignment_Type()
 {
 if(s_enum_type_EAlignment == nullptr)
 {
@@ -401,7 +401,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_EAlignment.get());
 }
 return s_enum_type_EAlignment.get();
 }
-static Ailu::EnumTypeRegister g_register_EAlignment(Z_Construct_Enum_EAlignment_Type);
+static Ailu::EnumTypeRegister g_register_EAlignment(Z_Construct_Enum_Ailu_UI_EAlignment_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::UI::EAlignment>()
 {
 return s_enum_type_EAlignment.get();
@@ -410,7 +410,7 @@ return s_enum_type_EAlignment.get();
 
 static std::unique_ptr<Ailu::Enum> s_enum_type_ESizePolicy = nullptr;
 //Enum ESizePolicy begin...........................
-const Ailu::Enum* Z_Construct_Enum_ESizePolicy_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_UI_ESizePolicy_Type()
 {
 if(s_enum_type_ESizePolicy == nullptr)
 {
@@ -426,7 +426,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_ESizePolicy.get());
 }
 return s_enum_type_ESizePolicy.get();
 }
-static Ailu::EnumTypeRegister g_register_ESizePolicy(Z_Construct_Enum_ESizePolicy_Type);
+static Ailu::EnumTypeRegister g_register_ESizePolicy(Z_Construct_Enum_Ailu_UI_ESizePolicy_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::UI::ESizePolicy>()
 {
 return s_enum_type_ESizePolicy.get();

@@ -44,7 +44,7 @@ return Ailu::Render::RenderPass::GetPrivateStaticClass();
 ClassTypeRegister s_register_RenderPass(&Ailu::Render::RenderPass::StaticType, "Ailu::Render::RenderPass");
 static std::unique_ptr<Ailu::Enum> s_enum_type_ERenderPassEvent = nullptr;
 //Enum ERenderPassEvent begin...........................
-const Ailu::Enum* Z_Construct_Enum_ERenderPassEvent_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_Render_ERenderPassEvent_Type()
 {
 if(s_enum_type_ERenderPassEvent == nullptr)
 {
@@ -73,7 +73,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_ERenderPassEvent.get());
 }
 return s_enum_type_ERenderPassEvent.get();
 }
-static Ailu::EnumTypeRegister g_register_ERenderPassEvent(Z_Construct_Enum_ERenderPassEvent_Type);
+static Ailu::EnumTypeRegister g_register_ERenderPassEvent(Z_Construct_Enum_Ailu_Render_ERenderPassEvent_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::ERenderPassEvent>()
 {
 return s_enum_type_ERenderPassEvent.get();

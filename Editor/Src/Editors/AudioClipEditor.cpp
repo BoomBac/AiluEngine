@@ -121,6 +121,7 @@ namespace Ailu
                 return;
             WriteToAsset();
             _original = _editing;
+            ResourceMgr::Get().MarkAssetDirty(_clip);
             if (auto *linked = ResourceMgr::Get().GetLinkedAsset(_clip))
             {
                 ResourceMgr::Get().SaveAsset(linked);

@@ -258,6 +258,454 @@ return Ailu::UI::UIBorderStyle::StaticType();
 return Ailu::UI::UIBorderStyle::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_UIBorderStyle(&Ailu::UI::UIBorderStyle::StaticType, "Ailu::UI::UIBorderStyle");
+const Ailu::Type* Ailu::UI::Z_Construct_UICollapsibleViewStyle_Type()
+{
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "UICollapsibleViewStyle";
+initializer._size = sizeof(Ailu::UI::UICollapsibleViewStyle);
+initializer._full_name = "Ailu::UI::UICollapsibleViewStyle";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu::UI";
+initializer._base_name = "";
+initializer._constructor = []()->Ailu::UI::UICollapsibleViewStyle* {return new Ailu::UI::UICollapsibleViewStyle;};
+Meta meta_header;
+meta_header.Set("Category","");
+meta_header.Set("IsColor",false);
+meta_header.Set("IsRange",false);
+meta_header.Set("IsFloatRange",true);
+meta_header.Set("RangeMin",(f32)0);
+meta_header.Set("RangeMax",(f32)1);
+MemberBuilder builder_header;
+builder_header._name = "_header";
+builder_header._type_name = "Ailu::UI::UIControlVisual";
+builder_header._offset = offsetof(UICollapsibleViewStyle,_header);
+builder_header._is_const = false;
+builder_header._is_static = false;
+builder_header._is_public = false;
+builder_header._is_pointer = false;
+builder_header._is_ref = false;
+builder_header._is_template = false;
+builder_header._meta = meta_header;
+builder_header._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<UIControlVisual>);
+builder_header._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<UIControlVisual>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_header));
+Meta meta_content;
+meta_content.Set("Category","");
+meta_content.Set("IsColor",false);
+meta_content.Set("IsRange",false);
+meta_content.Set("IsFloatRange",true);
+meta_content.Set("RangeMin",(f32)0);
+meta_content.Set("RangeMax",(f32)1);
+MemberBuilder builder_content;
+builder_content._name = "_content";
+builder_content._type_name = "Ailu::UI::UIControlVisual";
+builder_content._offset = offsetof(UICollapsibleViewStyle,_content);
+builder_content._is_const = false;
+builder_content._is_static = false;
+builder_content._is_public = false;
+builder_content._is_pointer = false;
+builder_content._is_ref = false;
+builder_content._is_template = false;
+builder_content._meta = meta_content;
+builder_content._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<UIControlVisual>);
+builder_content._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<UIControlVisual>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_content));
+Meta meta_header_height;
+meta_header_height.Set("Category","");
+meta_header_height.Set("IsColor",false);
+meta_header_height.Set("IsRange",false);
+meta_header_height.Set("IsFloatRange",true);
+meta_header_height.Set("RangeMin",(f32)0);
+meta_header_height.Set("RangeMax",(f32)1);
+MemberBuilder builder_header_height;
+builder_header_height._name = "_header_height";
+builder_header_height._type_name = "f32";
+builder_header_height._offset = offsetof(UICollapsibleViewStyle,_header_height);
+builder_header_height._is_const = false;
+builder_header_height._is_static = false;
+builder_header_height._is_public = false;
+builder_header_height._is_pointer = false;
+builder_header_height._is_ref = false;
+builder_header_height._is_template = false;
+builder_header_height._meta = meta_header_height;
+builder_header_height._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_header_height._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_header_height));
+Meta meta_title_font_size;
+meta_title_font_size.Set("Category","");
+meta_title_font_size.Set("IsColor",false);
+meta_title_font_size.Set("IsRange",false);
+meta_title_font_size.Set("IsFloatRange",true);
+meta_title_font_size.Set("RangeMin",(f32)0);
+meta_title_font_size.Set("RangeMax",(f32)1);
+MemberBuilder builder_title_font_size;
+builder_title_font_size._name = "_title_font_size";
+builder_title_font_size._type_name = "f32";
+builder_title_font_size._offset = offsetof(UICollapsibleViewStyle,_title_font_size);
+builder_title_font_size._is_const = false;
+builder_title_font_size._is_static = false;
+builder_title_font_size._is_public = false;
+builder_title_font_size._is_pointer = false;
+builder_title_font_size._is_ref = false;
+builder_title_font_size._is_template = false;
+builder_title_font_size._meta = meta_title_font_size;
+builder_title_font_size._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_title_font_size._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_title_font_size));
+Meta meta_header_padding;
+meta_header_padding.Set("Category","");
+meta_header_padding.Set("IsColor",false);
+meta_header_padding.Set("IsRange",false);
+meta_header_padding.Set("IsFloatRange",true);
+meta_header_padding.Set("RangeMin",(f32)0);
+meta_header_padding.Set("RangeMax",(f32)1);
+MemberBuilder builder_header_padding;
+builder_header_padding._name = "_header_padding";
+builder_header_padding._type_name = "Ailu::UI::Padding";
+builder_header_padding._offset = offsetof(UICollapsibleViewStyle,_header_padding);
+builder_header_padding._is_const = false;
+builder_header_padding._is_static = false;
+builder_header_padding._is_public = false;
+builder_header_padding._is_pointer = false;
+builder_header_padding._is_ref = false;
+builder_header_padding._is_template = false;
+builder_header_padding._meta = meta_header_padding;
+builder_header_padding._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Padding>);
+builder_header_padding._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Padding>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_header_padding));
+Meta meta_content_padding;
+meta_content_padding.Set("Category","");
+meta_content_padding.Set("IsColor",false);
+meta_content_padding.Set("IsRange",false);
+meta_content_padding.Set("IsFloatRange",true);
+meta_content_padding.Set("RangeMin",(f32)0);
+meta_content_padding.Set("RangeMax",(f32)1);
+MemberBuilder builder_content_padding;
+builder_content_padding._name = "_content_padding";
+builder_content_padding._type_name = "Ailu::UI::Padding";
+builder_content_padding._offset = offsetof(UICollapsibleViewStyle,_content_padding);
+builder_content_padding._is_const = false;
+builder_content_padding._is_static = false;
+builder_content_padding._is_public = false;
+builder_content_padding._is_pointer = false;
+builder_content_padding._is_ref = false;
+builder_content_padding._is_template = false;
+builder_content_padding._meta = meta_content_padding;
+builder_content_padding._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Padding>);
+builder_content_padding._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Padding>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_content_padding));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+const Ailu::Type* Ailu::UI::UICollapsibleViewStyle::GetPrivateStaticClass()
+{
+	static const Ailu::Type* type = Z_Construct_UICollapsibleViewStyle_Type();
+	return type;
+}
+
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::UICollapsibleViewStyle>()
+{
+return Ailu::UI::UICollapsibleViewStyle::StaticType();
+}
+    const Type *Ailu::UI::UICollapsibleViewStyle::GetType()
+{
+return Ailu::UI::UICollapsibleViewStyle::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_UICollapsibleViewStyle(&Ailu::UI::UICollapsibleViewStyle::StaticType, "Ailu::UI::UICollapsibleViewStyle");
+const Ailu::Type* Ailu::UI::Z_Construct_UICollapsibleViewStyleOverride_Type()
+{
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "UICollapsibleViewStyleOverride";
+initializer._size = sizeof(Ailu::UI::UICollapsibleViewStyleOverride);
+initializer._full_name = "Ailu::UI::UICollapsibleViewStyleOverride";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu::UI";
+initializer._base_name = "";
+initializer._constructor = []()->Ailu::UI::UICollapsibleViewStyleOverride* {return new Ailu::UI::UICollapsibleViewStyleOverride;};
+Meta meta_has_header;
+meta_has_header.Set("Category","");
+meta_has_header.Set("IsColor",false);
+meta_has_header.Set("IsRange",false);
+meta_has_header.Set("IsFloatRange",true);
+meta_has_header.Set("RangeMin",(f32)0);
+meta_has_header.Set("RangeMax",(f32)1);
+MemberBuilder builder_has_header;
+builder_has_header._name = "_has_header";
+builder_has_header._type_name = "bool";
+builder_has_header._offset = offsetof(UICollapsibleViewStyleOverride,_has_header);
+builder_has_header._is_const = false;
+builder_has_header._is_static = false;
+builder_has_header._is_public = true;
+builder_has_header._is_pointer = false;
+builder_has_header._is_ref = false;
+builder_has_header._is_template = false;
+builder_has_header._meta = meta_has_header;
+builder_has_header._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_has_header._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_has_header));
+Meta meta_header;
+meta_header.Set("Category","");
+meta_header.Set("IsColor",false);
+meta_header.Set("IsRange",false);
+meta_header.Set("IsFloatRange",true);
+meta_header.Set("RangeMin",(f32)0);
+meta_header.Set("RangeMax",(f32)1);
+MemberBuilder builder_header;
+builder_header._name = "_header";
+builder_header._type_name = "Ailu::UI::UIControlVisual";
+builder_header._offset = offsetof(UICollapsibleViewStyleOverride,_header);
+builder_header._is_const = false;
+builder_header._is_static = false;
+builder_header._is_public = true;
+builder_header._is_pointer = false;
+builder_header._is_ref = false;
+builder_header._is_template = false;
+builder_header._meta = meta_header;
+builder_header._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<UIControlVisual>);
+builder_header._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<UIControlVisual>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_header));
+Meta meta_has_content;
+meta_has_content.Set("Category","");
+meta_has_content.Set("IsColor",false);
+meta_has_content.Set("IsRange",false);
+meta_has_content.Set("IsFloatRange",true);
+meta_has_content.Set("RangeMin",(f32)0);
+meta_has_content.Set("RangeMax",(f32)1);
+MemberBuilder builder_has_content;
+builder_has_content._name = "_has_content";
+builder_has_content._type_name = "bool";
+builder_has_content._offset = offsetof(UICollapsibleViewStyleOverride,_has_content);
+builder_has_content._is_const = false;
+builder_has_content._is_static = false;
+builder_has_content._is_public = true;
+builder_has_content._is_pointer = false;
+builder_has_content._is_ref = false;
+builder_has_content._is_template = false;
+builder_has_content._meta = meta_has_content;
+builder_has_content._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_has_content._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_has_content));
+Meta meta_content;
+meta_content.Set("Category","");
+meta_content.Set("IsColor",false);
+meta_content.Set("IsRange",false);
+meta_content.Set("IsFloatRange",true);
+meta_content.Set("RangeMin",(f32)0);
+meta_content.Set("RangeMax",(f32)1);
+MemberBuilder builder_content;
+builder_content._name = "_content";
+builder_content._type_name = "Ailu::UI::UIControlVisual";
+builder_content._offset = offsetof(UICollapsibleViewStyleOverride,_content);
+builder_content._is_const = false;
+builder_content._is_static = false;
+builder_content._is_public = true;
+builder_content._is_pointer = false;
+builder_content._is_ref = false;
+builder_content._is_template = false;
+builder_content._meta = meta_content;
+builder_content._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<UIControlVisual>);
+builder_content._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<UIControlVisual>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_content));
+Meta meta_has_header_height;
+meta_has_header_height.Set("Category","");
+meta_has_header_height.Set("IsColor",false);
+meta_has_header_height.Set("IsRange",false);
+meta_has_header_height.Set("IsFloatRange",true);
+meta_has_header_height.Set("RangeMin",(f32)0);
+meta_has_header_height.Set("RangeMax",(f32)1);
+MemberBuilder builder_has_header_height;
+builder_has_header_height._name = "_has_header_height";
+builder_has_header_height._type_name = "bool";
+builder_has_header_height._offset = offsetof(UICollapsibleViewStyleOverride,_has_header_height);
+builder_has_header_height._is_const = false;
+builder_has_header_height._is_static = false;
+builder_has_header_height._is_public = true;
+builder_has_header_height._is_pointer = false;
+builder_has_header_height._is_ref = false;
+builder_has_header_height._is_template = false;
+builder_has_header_height._meta = meta_has_header_height;
+builder_has_header_height._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_has_header_height._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_has_header_height));
+Meta meta_header_height;
+meta_header_height.Set("Category","");
+meta_header_height.Set("IsColor",false);
+meta_header_height.Set("IsRange",false);
+meta_header_height.Set("IsFloatRange",true);
+meta_header_height.Set("RangeMin",(f32)0);
+meta_header_height.Set("RangeMax",(f32)1);
+MemberBuilder builder_header_height;
+builder_header_height._name = "_header_height";
+builder_header_height._type_name = "f32";
+builder_header_height._offset = offsetof(UICollapsibleViewStyleOverride,_header_height);
+builder_header_height._is_const = false;
+builder_header_height._is_static = false;
+builder_header_height._is_public = true;
+builder_header_height._is_pointer = false;
+builder_header_height._is_ref = false;
+builder_header_height._is_template = false;
+builder_header_height._meta = meta_header_height;
+builder_header_height._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_header_height._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_header_height));
+Meta meta_has_title_font_size;
+meta_has_title_font_size.Set("Category","");
+meta_has_title_font_size.Set("IsColor",false);
+meta_has_title_font_size.Set("IsRange",false);
+meta_has_title_font_size.Set("IsFloatRange",true);
+meta_has_title_font_size.Set("RangeMin",(f32)0);
+meta_has_title_font_size.Set("RangeMax",(f32)1);
+MemberBuilder builder_has_title_font_size;
+builder_has_title_font_size._name = "_has_title_font_size";
+builder_has_title_font_size._type_name = "bool";
+builder_has_title_font_size._offset = offsetof(UICollapsibleViewStyleOverride,_has_title_font_size);
+builder_has_title_font_size._is_const = false;
+builder_has_title_font_size._is_static = false;
+builder_has_title_font_size._is_public = true;
+builder_has_title_font_size._is_pointer = false;
+builder_has_title_font_size._is_ref = false;
+builder_has_title_font_size._is_template = false;
+builder_has_title_font_size._meta = meta_has_title_font_size;
+builder_has_title_font_size._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_has_title_font_size._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_has_title_font_size));
+Meta meta_title_font_size;
+meta_title_font_size.Set("Category","");
+meta_title_font_size.Set("IsColor",false);
+meta_title_font_size.Set("IsRange",false);
+meta_title_font_size.Set("IsFloatRange",true);
+meta_title_font_size.Set("RangeMin",(f32)0);
+meta_title_font_size.Set("RangeMax",(f32)1);
+MemberBuilder builder_title_font_size;
+builder_title_font_size._name = "_title_font_size";
+builder_title_font_size._type_name = "f32";
+builder_title_font_size._offset = offsetof(UICollapsibleViewStyleOverride,_title_font_size);
+builder_title_font_size._is_const = false;
+builder_title_font_size._is_static = false;
+builder_title_font_size._is_public = true;
+builder_title_font_size._is_pointer = false;
+builder_title_font_size._is_ref = false;
+builder_title_font_size._is_template = false;
+builder_title_font_size._meta = meta_title_font_size;
+builder_title_font_size._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_title_font_size._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_title_font_size));
+Meta meta_has_header_padding;
+meta_has_header_padding.Set("Category","");
+meta_has_header_padding.Set("IsColor",false);
+meta_has_header_padding.Set("IsRange",false);
+meta_has_header_padding.Set("IsFloatRange",true);
+meta_has_header_padding.Set("RangeMin",(f32)0);
+meta_has_header_padding.Set("RangeMax",(f32)1);
+MemberBuilder builder_has_header_padding;
+builder_has_header_padding._name = "_has_header_padding";
+builder_has_header_padding._type_name = "bool";
+builder_has_header_padding._offset = offsetof(UICollapsibleViewStyleOverride,_has_header_padding);
+builder_has_header_padding._is_const = false;
+builder_has_header_padding._is_static = false;
+builder_has_header_padding._is_public = true;
+builder_has_header_padding._is_pointer = false;
+builder_has_header_padding._is_ref = false;
+builder_has_header_padding._is_template = false;
+builder_has_header_padding._meta = meta_has_header_padding;
+builder_has_header_padding._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_has_header_padding._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_has_header_padding));
+Meta meta_header_padding;
+meta_header_padding.Set("Category","");
+meta_header_padding.Set("IsColor",false);
+meta_header_padding.Set("IsRange",false);
+meta_header_padding.Set("IsFloatRange",true);
+meta_header_padding.Set("RangeMin",(f32)0);
+meta_header_padding.Set("RangeMax",(f32)1);
+MemberBuilder builder_header_padding;
+builder_header_padding._name = "_header_padding";
+builder_header_padding._type_name = "Ailu::UI::Padding";
+builder_header_padding._offset = offsetof(UICollapsibleViewStyleOverride,_header_padding);
+builder_header_padding._is_const = false;
+builder_header_padding._is_static = false;
+builder_header_padding._is_public = true;
+builder_header_padding._is_pointer = false;
+builder_header_padding._is_ref = false;
+builder_header_padding._is_template = false;
+builder_header_padding._meta = meta_header_padding;
+builder_header_padding._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Padding>);
+builder_header_padding._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Padding>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_header_padding));
+Meta meta_has_content_padding;
+meta_has_content_padding.Set("Category","");
+meta_has_content_padding.Set("IsColor",false);
+meta_has_content_padding.Set("IsRange",false);
+meta_has_content_padding.Set("IsFloatRange",true);
+meta_has_content_padding.Set("RangeMin",(f32)0);
+meta_has_content_padding.Set("RangeMax",(f32)1);
+MemberBuilder builder_has_content_padding;
+builder_has_content_padding._name = "_has_content_padding";
+builder_has_content_padding._type_name = "bool";
+builder_has_content_padding._offset = offsetof(UICollapsibleViewStyleOverride,_has_content_padding);
+builder_has_content_padding._is_const = false;
+builder_has_content_padding._is_static = false;
+builder_has_content_padding._is_public = true;
+builder_has_content_padding._is_pointer = false;
+builder_has_content_padding._is_ref = false;
+builder_has_content_padding._is_template = false;
+builder_has_content_padding._meta = meta_has_content_padding;
+builder_has_content_padding._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_has_content_padding._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_has_content_padding));
+Meta meta_content_padding;
+meta_content_padding.Set("Category","");
+meta_content_padding.Set("IsColor",false);
+meta_content_padding.Set("IsRange",false);
+meta_content_padding.Set("IsFloatRange",true);
+meta_content_padding.Set("RangeMin",(f32)0);
+meta_content_padding.Set("RangeMax",(f32)1);
+MemberBuilder builder_content_padding;
+builder_content_padding._name = "_content_padding";
+builder_content_padding._type_name = "Ailu::UI::Padding";
+builder_content_padding._offset = offsetof(UICollapsibleViewStyleOverride,_content_padding);
+builder_content_padding._is_const = false;
+builder_content_padding._is_static = false;
+builder_content_padding._is_public = true;
+builder_content_padding._is_pointer = false;
+builder_content_padding._is_ref = false;
+builder_content_padding._is_template = false;
+builder_content_padding._meta = meta_content_padding;
+builder_content_padding._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Padding>);
+builder_content_padding._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Padding>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_content_padding));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+const Ailu::Type* Ailu::UI::UICollapsibleViewStyleOverride::GetPrivateStaticClass()
+{
+	static const Ailu::Type* type = Z_Construct_UICollapsibleViewStyleOverride_Type();
+	return type;
+}
+
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::UI::UICollapsibleViewStyleOverride>()
+{
+return Ailu::UI::UICollapsibleViewStyleOverride::StaticType();
+}
+    const Type *Ailu::UI::UICollapsibleViewStyleOverride::GetType()
+{
+return Ailu::UI::UICollapsibleViewStyleOverride::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_UICollapsibleViewStyleOverride(&Ailu::UI::UICollapsibleViewStyleOverride::StaticType, "Ailu::UI::UICollapsibleViewStyleOverride");
 const Ailu::Type* Ailu::UI::Z_Construct_UIControlVisualOverride_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -5909,7 +6357,7 @@ return Ailu::UI::UITreeViewStyleOverride::GetPrivateStaticClass();
 ClassTypeRegister s_register_UITreeViewStyleOverride(&Ailu::UI::UITreeViewStyleOverride::StaticType, "Ailu::UI::UITreeViewStyleOverride");
 static std::unique_ptr<Ailu::Enum> s_enum_type_EUIControlVisualOverride = nullptr;
 //Enum EUIControlVisualOverride begin...........................
-const Ailu::Enum* Z_Construct_Enum_EUIControlVisualOverride_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_UI_EUIControlVisualOverride_Type()
 {
 if(s_enum_type_EUIControlVisualOverride == nullptr)
 {
@@ -5932,7 +6380,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_EUIControlVisualOverride.get());
 }
 return s_enum_type_EUIControlVisualOverride.get();
 }
-static Ailu::EnumTypeRegister g_register_EUIControlVisualOverride(Z_Construct_Enum_EUIControlVisualOverride_Type);
+static Ailu::EnumTypeRegister g_register_EUIControlVisualOverride(Z_Construct_Enum_Ailu_UI_EUIControlVisualOverride_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::UI::EUIControlVisualOverride>()
 {
 return s_enum_type_EUIControlVisualOverride.get();
@@ -5941,7 +6389,7 @@ return s_enum_type_EUIControlVisualOverride.get();
 
 static std::unique_ptr<Ailu::Enum> s_enum_type_EUIButtonStyleOverride = nullptr;
 //Enum EUIButtonStyleOverride begin...........................
-const Ailu::Enum* Z_Construct_Enum_EUIButtonStyleOverride_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_UI_EUIButtonStyleOverride_Type()
 {
 if(s_enum_type_EUIButtonStyleOverride == nullptr)
 {
@@ -5963,7 +6411,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_EUIButtonStyleOverride.get());
 }
 return s_enum_type_EUIButtonStyleOverride.get();
 }
-static Ailu::EnumTypeRegister g_register_EUIButtonStyleOverride(Z_Construct_Enum_EUIButtonStyleOverride_Type);
+static Ailu::EnumTypeRegister g_register_EUIButtonStyleOverride(Z_Construct_Enum_Ailu_UI_EUIButtonStyleOverride_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::UI::EUIButtonStyleOverride>()
 {
 return s_enum_type_EUIButtonStyleOverride.get();
@@ -5972,7 +6420,7 @@ return s_enum_type_EUIButtonStyleOverride.get();
 
 static std::unique_ptr<Ailu::Enum> s_enum_type_EUISliderStyleOverride = nullptr;
 //Enum EUISliderStyleOverride begin...........................
-const Ailu::Enum* Z_Construct_Enum_EUISliderStyleOverride_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_UI_EUISliderStyleOverride_Type()
 {
 if(s_enum_type_EUISliderStyleOverride == nullptr)
 {
@@ -6003,7 +6451,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_EUISliderStyleOverride.get());
 }
 return s_enum_type_EUISliderStyleOverride.get();
 }
-static Ailu::EnumTypeRegister g_register_EUISliderStyleOverride(Z_Construct_Enum_EUISliderStyleOverride_Type);
+static Ailu::EnumTypeRegister g_register_EUISliderStyleOverride(Z_Construct_Enum_Ailu_UI_EUISliderStyleOverride_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::UI::EUISliderStyleOverride>()
 {
 return s_enum_type_EUISliderStyleOverride.get();
@@ -6012,7 +6460,7 @@ return s_enum_type_EUISliderStyleOverride.get();
 
 static std::unique_ptr<Ailu::Enum> s_enum_type_EUICheckBoxStyleOverride = nullptr;
 //Enum EUICheckBoxStyleOverride begin...........................
-const Ailu::Enum* Z_Construct_Enum_EUICheckBoxStyleOverride_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_UI_EUICheckBoxStyleOverride_Type()
 {
 if(s_enum_type_EUICheckBoxStyleOverride == nullptr)
 {
@@ -6044,7 +6492,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_EUICheckBoxStyleOverride.get());
 }
 return s_enum_type_EUICheckBoxStyleOverride.get();
 }
-static Ailu::EnumTypeRegister g_register_EUICheckBoxStyleOverride(Z_Construct_Enum_EUICheckBoxStyleOverride_Type);
+static Ailu::EnumTypeRegister g_register_EUICheckBoxStyleOverride(Z_Construct_Enum_Ailu_UI_EUICheckBoxStyleOverride_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::UI::EUICheckBoxStyleOverride>()
 {
 return s_enum_type_EUICheckBoxStyleOverride.get();
@@ -6053,7 +6501,7 @@ return s_enum_type_EUICheckBoxStyleOverride.get();
 
 static std::unique_ptr<Ailu::Enum> s_enum_type_EUIInputStyleOverride = nullptr;
 //Enum EUIInputStyleOverride begin...........................
-const Ailu::Enum* Z_Construct_Enum_EUIInputStyleOverride_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_UI_EUIInputStyleOverride_Type()
 {
 if(s_enum_type_EUIInputStyleOverride == nullptr)
 {
@@ -6081,7 +6529,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_EUIInputStyleOverride.get());
 }
 return s_enum_type_EUIInputStyleOverride.get();
 }
-static Ailu::EnumTypeRegister g_register_EUIInputStyleOverride(Z_Construct_Enum_EUIInputStyleOverride_Type);
+static Ailu::EnumTypeRegister g_register_EUIInputStyleOverride(Z_Construct_Enum_Ailu_UI_EUIInputStyleOverride_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::UI::EUIInputStyleOverride>()
 {
 return s_enum_type_EUIInputStyleOverride.get();
@@ -6090,7 +6538,7 @@ return s_enum_type_EUIInputStyleOverride.get();
 
 static std::unique_ptr<Ailu::Enum> s_enum_type_EUIScrollBarStyleOverride = nullptr;
 //Enum EUIScrollBarStyleOverride begin...........................
-const Ailu::Enum* Z_Construct_Enum_EUIScrollBarStyleOverride_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_UI_EUIScrollBarStyleOverride_Type()
 {
 if(s_enum_type_EUIScrollBarStyleOverride == nullptr)
 {
@@ -6129,7 +6577,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_EUIScrollBarStyleOverride.get());
 }
 return s_enum_type_EUIScrollBarStyleOverride.get();
 }
-static Ailu::EnumTypeRegister g_register_EUIScrollBarStyleOverride(Z_Construct_Enum_EUIScrollBarStyleOverride_Type);
+static Ailu::EnumTypeRegister g_register_EUIScrollBarStyleOverride(Z_Construct_Enum_Ailu_UI_EUIScrollBarStyleOverride_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::UI::EUIScrollBarStyleOverride>()
 {
 return s_enum_type_EUIScrollBarStyleOverride.get();
@@ -6138,7 +6586,7 @@ return s_enum_type_EUIScrollBarStyleOverride.get();
 
 static std::unique_ptr<Ailu::Enum> s_enum_type_EUIScrollViewStyleOverride = nullptr;
 //Enum EUIScrollViewStyleOverride begin...........................
-const Ailu::Enum* Z_Construct_Enum_EUIScrollViewStyleOverride_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_UI_EUIScrollViewStyleOverride_Type()
 {
 if(s_enum_type_EUIScrollViewStyleOverride == nullptr)
 {
@@ -6164,7 +6612,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_EUIScrollViewStyleOverride.get());
 }
 return s_enum_type_EUIScrollViewStyleOverride.get();
 }
-static Ailu::EnumTypeRegister g_register_EUIScrollViewStyleOverride(Z_Construct_Enum_EUIScrollViewStyleOverride_Type);
+static Ailu::EnumTypeRegister g_register_EUIScrollViewStyleOverride(Z_Construct_Enum_Ailu_UI_EUIScrollViewStyleOverride_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::UI::EUIScrollViewStyleOverride>()
 {
 return s_enum_type_EUIScrollViewStyleOverride.get();
@@ -6173,7 +6621,7 @@ return s_enum_type_EUIScrollViewStyleOverride.get();
 
 static std::unique_ptr<Ailu::Enum> s_enum_type_EUITreeViewStyleOverride = nullptr;
 //Enum EUITreeViewStyleOverride begin...........................
-const Ailu::Enum* Z_Construct_Enum_EUITreeViewStyleOverride_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_UI_EUITreeViewStyleOverride_Type()
 {
 if(s_enum_type_EUITreeViewStyleOverride == nullptr)
 {
@@ -6196,7 +6644,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_EUITreeViewStyleOverride.get());
 }
 return s_enum_type_EUITreeViewStyleOverride.get();
 }
-static Ailu::EnumTypeRegister g_register_EUITreeViewStyleOverride(Z_Construct_Enum_EUITreeViewStyleOverride_Type);
+static Ailu::EnumTypeRegister g_register_EUITreeViewStyleOverride(Z_Construct_Enum_Ailu_UI_EUITreeViewStyleOverride_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::UI::EUITreeViewStyleOverride>()
 {
 return s_enum_type_EUITreeViewStyleOverride.get();

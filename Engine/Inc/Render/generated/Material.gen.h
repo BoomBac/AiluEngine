@@ -37,7 +37,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::StandardM
 //Class StandardMaterial end...........................
 
 //Enum EMaterialID begin...........................
-const Ailu::Enum* Z_Construct_Enum_EMaterialID_Type();
+const Ailu::Enum* Z_Construct_Enum_Ailu_Render_EMaterialID_Type();
 namespace Ailu::Render {
 enum class EMaterialID : i32;
 }
@@ -46,7 +46,7 @@ AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::EMaterialID>();
 //Enum EMaterialID end...........................
 
 //Enum ESurfaceType begin...........................
-const Ailu::Enum* Z_Construct_Enum_ESurfaceType_Type();
+const Ailu::Enum* Z_Construct_Enum_Ailu_Render_ESurfaceType_Type();
 namespace Ailu::Render {
 enum class ESurfaceType : i32;
 }

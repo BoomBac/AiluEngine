@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __CURVE_GEN_H__
 //Enum EInterpolationType begin...........................
-const Ailu::Enum* Z_Construct_Enum_EInterpolationType_Type();
+const Ailu::Enum* Z_Construct_Enum_Ailu_EInterpolationType_Type();
 namespace Ailu {
 enum class EInterpolationType : i32;
 }

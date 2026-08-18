@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __RENDERCONSTANTS_GEN_H__
 //Enum EColorRange begin...........................
-const Ailu::Enum* Z_Construct_Enum_EColorRange_Type();
+const Ailu::Enum* Z_Construct_Enum_Ailu_Render_EColorRange_Type();
 namespace Ailu::Render {
 enum class EColorRange : i32;
 }

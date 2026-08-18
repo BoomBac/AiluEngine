@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __SCRIPTCOLLIDER2D_GEN_H__
 //Struct ScriptCollider2D begin...........................
-#define SCRIPTCOLLIDER2D_GEN_H_33_GENERATED_BODY \
+#define SCRIPTCOLLIDER2D_GEN_H_46_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_ScriptCollider2D_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -19,6 +19,15 @@ struct ScriptCollider2D ;
 template<>
 AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::ScriptCollider2D>();
 //Struct ScriptCollider2D end...........................
+
+//Enum ECollisionChannel2D begin...........................
+const Ailu::Enum* Z_Construct_Enum_Ailu_ECollisionChannel2D_Type();
+namespace Ailu {
+enum class ECollisionChannel2D : u8;
+}
+template<>
+AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::ECollisionChannel2D>();
+//Enum ECollisionChannel2D end...........................
 
 #undef CURRENT_FILE_ID
 #define CURRENT_FILE_ID SCRIPTCOLLIDER2D_GEN_H

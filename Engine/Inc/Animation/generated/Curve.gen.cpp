@@ -8,7 +8,7 @@
 using namespace Ailu;
 static std::unique_ptr<Ailu::Enum> s_enum_type_EInterpolationType = nullptr;
 //Enum EInterpolationType begin...........................
-const Ailu::Enum* Z_Construct_Enum_EInterpolationType_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_EInterpolationType_Type()
 {
 if(s_enum_type_EInterpolationType == nullptr)
 {
@@ -24,7 +24,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_EInterpolationType.get());
 }
 return s_enum_type_EInterpolationType.get();
 }
-static Ailu::EnumTypeRegister g_register_EInterpolationType(Z_Construct_Enum_EInterpolationType_Type);
+static Ailu::EnumTypeRegister g_register_EInterpolationType(Z_Construct_Enum_Ailu_EInterpolationType_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::EInterpolationType>()
 {
 return s_enum_type_EInterpolationType.get();

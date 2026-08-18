@@ -183,6 +183,10 @@ namespace Ailu
         {
             if (!_is_visible)
                 return;
+            if (_parent == nullptr)
+                EnsureStyleResolvedRecursive();
+            else
+                EnsureStyleResolved();
             auto refresh_abs_rect = [this]()
             {
                 Vector3f corners[4] = {
@@ -738,6 +742,13 @@ namespace Ailu
 
             _resolved_theme_revision = context._theme_revision;
             _is_style_dirty = false;
+        }
+
+        void UIElement::EnsureStyleResolvedRecursive()
+        {
+            EnsureStyleResolved();
+            for (auto &child: _children)
+                child->EnsureStyleResolvedRecursive();
         }
 
         void UIElement::InvalidateStyle(EStyleInvalidation invalidation)

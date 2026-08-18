@@ -4,9 +4,12 @@
 #include "Common/EditorPopup.h"
 #include "Common/CameraControllers.h"
 #include "EditorApp.h"
+#include "Assets/PrefabAsset.h"
 #include "Framework/Common/Application.h"
 #include "Framework/Common/Input.h"
+#include "Framework/Common/ResourceMgr.h"
 #include "Framework/Events/Event.h"
+#include "Scene/PrefabSystem.h"
 #include "Scene/Scene.h"
 #include "UI/TreeView.h"
 #include "UI/Basic.h"
@@ -151,11 +154,12 @@ namespace Ailu
                 _data_source->SetScene(scene);
                 _tree_view->SetDataSource(_data_source.get());
                 _observed_structure_revision = scene->StructureRevision();
-                _scene_title->SetText(scene->Name());
+                _observed_edit_revision = scene->EditRevision();
+                UpdateSceneTitle(scene);
             }
             else
             {
-                _scene_title->SetText("No Scene");
+                UpdateSceneTitle(nullptr);
             }
         }
 
@@ -173,6 +177,16 @@ namespace Ailu
             // Toolbar
             auto* toolbar = vb->AddChild<HorizontalBox>();
             toolbar->GetSlotAs<LinearSlot>().SizePolicy(ESizePolicy::kFill, ESizePolicy::kFixed).Size(Vector2f(0.0f, 28.0f));
+
+            _back_button = toolbar->AddChild<Button>("<");
+            _back_button->GetSlotAs<LinearSlot>().SizePolicy(ESizePolicy::kFixed, ESizePolicy::kFixed).Size(Vector2f(24.0f, 22.0f))
+                    .Margin(Padding(2.0f, 0.0f, 0.0f, 0.0f));
+            _back_button->OnMouseClick() += [this](UIEvent& e)
+            {
+                ExitTemporaryPrefabScene();
+                e._is_handled = true;
+            };
+            _back_button->SetVisible(false);
 
             _scene_title = toolbar->AddChild<Text>("No Scene");
             _scene_title->GetSlotAs<LinearSlot>().SizePolicy(ESizePolicy::kFill, ESizePolicy::kAuto);
@@ -287,12 +301,12 @@ namespace Ailu
                 _observed_edit_revision = scene ? scene->EditRevision() : 0;
                 if (scene)
                 {
-                    _scene_title->SetText(scene->Name());
+                    UpdateSceneTitle(scene);
                     SyncSelectionFromEngine();
                 }
                 else
                 {
-                    _scene_title->SetText("No Scene");
+                    UpdateSceneTitle(nullptr);
                 }
             }
             else if (scene)
@@ -306,6 +320,7 @@ namespace Ailu
                     _tree_view->Refresh();
                 }
             }
+            UpdateSceneTitle(scene);
 
             u64 sel_rev = Selection::Revision();
             if (sel_rev != _observed_selection_revision)
@@ -386,6 +401,56 @@ namespace Ailu
             }, true});
 
             EditorPopup::ShowActionMenuAt(position, actions);
+        }
+
+        void WorldOutline::UpdateSceneTitle(Scene *scene)
+        {
+            const bool is_temporary_prefab = SceneMgr::Get().IsTemporaryPrefabScene();
+            if (_back_button != nullptr)
+                _back_button->SetVisible(is_temporary_prefab);
+            if (_scene_title == nullptr)
+                return;
+
+            if (scene == nullptr)
+            {
+                _scene_title->SetText("No Scene");
+                return;
+            }
+
+            String title = scene->Name();
+            if (is_temporary_prefab && SceneMgr::Get().HasTemporarySceneEdits())
+                title.push_back('*');
+            _scene_title->SetText(title);
+        }
+
+        void WorldOutline::ExitTemporaryPrefabScene()
+        {
+            auto &scene_mgr = SceneMgr::Get();
+            if (!scene_mgr.IsTemporaryPrefabScene())
+                return;
+
+            Scene *scene = scene_mgr.ActiveScene();
+            if (scene != nullptr && scene_mgr.HasTemporarySceneEdits())
+            {
+                const Guid &asset_guid = scene_mgr.TemporaryPrefabAssetGuid();
+                const WString &asset_path = ResourceMgr::Get().GuidToAssetPath(asset_guid);
+                Asset *asset = ResourceMgr::Get().GetAsset(asset_path);
+                auto *prefab = asset != nullptr ? asset->As<PrefabAssetDocument>() : nullptr;
+                if (asset == nullptr || prefab == nullptr ||
+                    !SceneManagement::PrefabSystem::UpdatePrefabDocument(*scene, scene_mgr.TemporaryPrefabRootEntity(), *prefab))
+                {
+                    LOG_ERROR(L"WorldOutline: failed to update prefab document before leaving prefab edit mode");
+                }
+                else
+                {
+                    ResourceMgr::Get().MarkAssetDirty(asset);
+                    if (!ResourceMgr::Get().SaveAsset(asset))
+                        LOG_ERROR(L"WorldOutline: failed to save prefab asset {}", asset_path);
+                }
+            }
+
+            Selection::RemoveSlection();
+            scene_mgr.CloseTemporaryScene();
         }
 
         void WorldOutline::BeginEntityRename(ECS::Entity entity)

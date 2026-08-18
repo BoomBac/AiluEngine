@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __CORETYPE_GEN_H__
 //Enum EResourceUsage begin...........................
-const Ailu::Enum* Z_Construct_Enum_EResourceUsage_Type();
+const Ailu::Enum* Z_Construct_Enum_Ailu_Render_EResourceUsage_Type();
 namespace Ailu::Render {
 enum class EResourceUsage : u32;
 }
@@ -14,7 +14,7 @@ AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::EResourceUsage>();
 //Enum EResourceUsage end...........................
 
 //Enum EResourceState begin...........................
-const Ailu::Enum* Z_Construct_Enum_EResourceState_Type();
+const Ailu::Enum* Z_Construct_Enum_Ailu_Render_EResourceState_Type();
 namespace Ailu::Render {
 enum class EResourceState : i32;
 }

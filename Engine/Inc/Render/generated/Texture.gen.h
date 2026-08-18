@@ -85,7 +85,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::RenderTex
 //Class RenderTexture end...........................
 
 //Enum ETextureDimension begin...........................
-const Ailu::Enum* Z_Construct_Enum_ETextureDimension_Type();
+const Ailu::Enum* Z_Construct_Enum_Ailu_Render_ETextureDimension_Type();
 namespace Ailu::Render {
 enum class ETextureDimension : i32;
 }
@@ -94,7 +94,7 @@ AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::ETextureDimension>();
 //Enum ETextureDimension end...........................
 
 //Enum EFilterMode begin...........................
-const Ailu::Enum* Z_Construct_Enum_EFilterMode_Type();
+const Ailu::Enum* Z_Construct_Enum_Ailu_Render_EFilterMode_Type();
 namespace Ailu::Render {
 enum class EFilterMode : i32;
 }
@@ -103,7 +103,7 @@ AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::EFilterMode>();
 //Enum EFilterMode end...........................
 
 //Enum EWrapMode begin...........................
-const Ailu::Enum* Z_Construct_Enum_EWrapMode_Type();
+const Ailu::Enum* Z_Construct_Enum_Ailu_Render_EWrapMode_Type();
 namespace Ailu::Render {
 enum class EWrapMode : i32;
 }
@@ -112,7 +112,7 @@ AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::EWrapMode>();
 //Enum EWrapMode end...........................
 
 //Enum ETextureFormat begin...........................
-const Ailu::Enum* Z_Construct_Enum_ETextureFormat_Type();
+const Ailu::Enum* Z_Construct_Enum_Ailu_Render_ETextureFormat_Type();
 namespace Ailu::Render {
 enum class ETextureFormat : i32;
 }
@@ -121,7 +121,7 @@ AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::ETextureFormat>();
 //Enum ETextureFormat end...........................
 
 //Enum ECubemapFace begin...........................
-const Ailu::Enum* Z_Construct_Enum_ECubemapFace_Type();
+const Ailu::Enum* Z_Construct_Enum_Ailu_Render_ECubemapFace_Type();
 namespace Ailu::Render {
 enum class ECubemapFace : i32;
 }
@@ -130,7 +130,7 @@ AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::ECubemapFace>();
 //Enum ECubemapFace end...........................
 
 //Enum ERenderTargetFormat begin...........................
-const Ailu::Enum* Z_Construct_Enum_ERenderTargetFormat_Type();
+const Ailu::Enum* Z_Construct_Enum_Ailu_Render_ERenderTargetFormat_Type();
 namespace Ailu::Render {
 enum class ERenderTargetFormat : i32;
 }

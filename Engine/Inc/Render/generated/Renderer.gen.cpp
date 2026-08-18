@@ -8,7 +8,7 @@
 using namespace Ailu;
 static std::unique_ptr<Ailu::Enum> s_enum_type_EShadingMode = nullptr;
 //Enum EShadingMode begin...........................
-const Ailu::Enum* Z_Construct_Enum_EShadingMode_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_Render_EShadingMode_Type()
 {
 if(s_enum_type_EShadingMode == nullptr)
 {
@@ -24,7 +24,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_EShadingMode.get());
 }
 return s_enum_type_EShadingMode.get();
 }
-static Ailu::EnumTypeRegister g_register_EShadingMode(Z_Construct_Enum_EShadingMode_Type);
+static Ailu::EnumTypeRegister g_register_EShadingMode(Z_Construct_Enum_Ailu_Render_EShadingMode_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::EShadingMode>()
 {
 return s_enum_type_EShadingMode.get();

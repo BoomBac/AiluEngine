@@ -95,6 +95,12 @@ namespace Ailu
 
                 theme._element_visual_style._visual = Visual(Colors::kTransparent, c._text_primary);
                 theme._border_style._visual = Visual(c._surface, c._border, c._border, 1.0f);
+                theme._collapsible_view_style._header = Visual(c._surface_hovered, c._text_primary, c._border, 1.0f);
+                theme._collapsible_view_style._content = Visual(Colors::kTransparent, c._text_primary);
+                theme._collapsible_view_style._header_height = 24.0f;
+                theme._collapsible_view_style._title_font_size = t._normal_font_size;
+                theme._collapsible_view_style._header_padding = s._control_padding;
+                theme._collapsible_view_style._content_padding = Padding(0.0f);
                 theme._split_view_style._visual = theme._element_visual_style._visual;
                 theme._split_view_style._divider_color = c._border;
                 theme._split_view_style._divider_hovered_color = c._accent;
@@ -305,6 +311,22 @@ namespace Ailu
             BumpRevision();
         }
 
+        const UICollapsibleViewStyle *UITheme::FindCollapsibleViewStyle(const UIStyleId &style_id) const
+        {
+            if (style_id.empty())
+                return nullptr;
+            auto it = _collapsible_view_styles.find(style_id);
+            return it == _collapsible_view_styles.end() ? nullptr : &it->second;
+        }
+
+        void UITheme::SetCollapsibleViewStyle(const UIStyleId &style_id, const UICollapsibleViewStyle &style)
+        {
+            if (style_id.empty())
+                return;
+            _collapsible_view_styles[style_id] = style;
+            BumpRevision();
+        }
+
         const UISplitViewStyle *UITheme::FindSplitViewStyle(const UIStyleId &style_id) const
         {
             if (style_id.empty())
@@ -394,6 +416,19 @@ namespace Ailu
             // Only add Primary if it wasn't explicitly set from file
             if (_button_styles.find("Primary") == _button_styles.end())
                 _button_styles["Primary"] = primary;
+
+            // Older theme files do not contain CollapsibleView style data. Their missing numeric fields are
+            // deserialized as zero, so restore a valid token-based default instead of collapsing the header to 0px.
+            if (_collapsible_view_style._header_height <= 0.0f || _collapsible_view_style._title_font_size <= 0.0f)
+            {
+                _collapsible_view_style._header = Visual(_colors._surface_hovered, _colors._text_primary,
+                                                         _colors._border, 1.0f);
+                _collapsible_view_style._content = Visual(Colors::kTransparent, _colors._text_primary);
+                _collapsible_view_style._header_height = 24.0f;
+                _collapsible_view_style._title_font_size = _typography._normal_font_size;
+                _collapsible_view_style._header_padding = _spacing._control_padding;
+                _collapsible_view_style._content_padding = Padding(0.0f);
+            }
 
             BumpRevision();
         }

@@ -85,7 +85,7 @@ return Ailu::AssetDependency::GetPrivateStaticClass();
 ClassTypeRegister s_register_AssetDependency(&Ailu::AssetDependency::StaticType, "Ailu::AssetDependency");
 static std::unique_ptr<Ailu::Enum> s_enum_type_EAssetDomain = nullptr;
 //Enum EAssetDomain begin...........................
-const Ailu::Enum* Z_Construct_Enum_EAssetDomain_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_EAssetDomain_Type()
 {
 if(s_enum_type_EAssetDomain == nullptr)
 {
@@ -102,7 +102,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_EAssetDomain.get());
 }
 return s_enum_type_EAssetDomain.get();
 }
-static Ailu::EnumTypeRegister g_register_EAssetDomain(Z_Construct_Enum_EAssetDomain_Type);
+static Ailu::EnumTypeRegister g_register_EAssetDomain(Z_Construct_Enum_Ailu_EAssetDomain_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::EAssetDomain>()
 {
 return s_enum_type_EAssetDomain.get();
@@ -111,7 +111,7 @@ return s_enum_type_EAssetDomain.get();
 
 static std::unique_ptr<Ailu::Enum> s_enum_type_EAssetDependencyType = nullptr;
 //Enum EAssetDependencyType begin...........................
-const Ailu::Enum* Z_Construct_Enum_EAssetDependencyType_Type()
+const Ailu::Enum* Z_Construct_Enum_Ailu_EAssetDependencyType_Type()
 {
 if(s_enum_type_EAssetDependencyType == nullptr)
 {
@@ -127,7 +127,7 @@ Ailu::Enum::RegisterEnum(s_enum_type_EAssetDependencyType.get());
 }
 return s_enum_type_EAssetDependencyType.get();
 }
-static Ailu::EnumTypeRegister g_register_EAssetDependencyType(Z_Construct_Enum_EAssetDependencyType_Type);
+static Ailu::EnumTypeRegister g_register_EAssetDependencyType(Z_Construct_Enum_Ailu_EAssetDependencyType_Type);
 template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::EAssetDependencyType>()
 {
 return s_enum_type_EAssetDependencyType.get();

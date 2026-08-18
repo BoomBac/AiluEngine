@@ -5,12 +5,18 @@
 #include "Framework/Core/CoreMinimal.h"
 #include "Framework/Core/Containers/Array.h"
 #include "Framework/Core/Containers/Map.h"
+#include "Framework/Core/Containers/Vector.h"
+#include "Framework/Core/String.h"
+#include "Framework/Math/ALMath.hpp"
 #include "Render/RenderConstants.h"
 
+#include <filesystem>
 #include <functional>
 
 namespace Ailu
 {
+    namespace fs = std::filesystem;
+
     class Asset;
     class Type;
 
@@ -25,6 +31,19 @@ namespace Ailu
     {
         using AssetPreviewProvider = std::function<Ref<Render::Texture>(Asset *)>;
 
+        struct AssetCreatorDesc
+        {
+            String _menu_name;
+            String _dialog_title;
+            String _default_name;
+            String _exists_message;
+            WString _extension;
+            // 简单文本输入创建；为空时表示该类型使用 _create_dialog。
+            std::function<bool(const fs::path &, const String &)> _create;
+            // 自定义创建（如 Material 需要选择 Shader）；优先于 _create 使用。
+            std::function<void(const fs::path &, Vector2f)> _create_dialog;
+        };
+
         class AssetTypeRegistry
         {
         public:
@@ -32,6 +51,8 @@ namespace Ailu
 
             Render::Texture *GetIcon(Asset *asset);
             void RegisterPreview(const Type *type, AssetPreviewProvider provider);
+            void RegisterCreator(AssetCreatorDesc creator);
+            const Vector<AssetCreatorDesc> &Creators() const;
             void BeginFrame();
 
         private:
@@ -46,6 +67,7 @@ namespace Ailu
             HashMap<Asset *, Ref<Render::Texture>> _preview_cache;
             Array<Vector<Ref<Render::RenderTexture>>, Render::RenderConstants::kFrameCount> _retired_previews;
             u16 _retired_preview_index = 0u;
+            Vector<AssetCreatorDesc> _creators;
         };
     }// namespace Editor
 }// namespace Ailu

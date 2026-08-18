@@ -4,6 +4,7 @@
 
 #include "Framework/Core/CoreMinimal.h"
 #include "Framework/Math/ALMath.hpp"
+#include "Physics/2D/Physics2DComponents.h"
 #include "Scene/Entity.h"
 
 namespace Ailu
@@ -26,6 +27,8 @@ namespace Ailu
         u16 _shape_b = 0u;
         Vector2f _point = Vector2f::kZero;
         Vector2f _normal = Vector2f::kZero;
+        ECS::ECollisionChannel2D _object_type_a = ECS::ECollisionChannel2D::kWorldDynamic;
+        ECS::ECollisionChannel2D _object_type_b = ECS::ECollisionChannel2D::kWorldDynamic;
     };
 
     struct PhysicsQueryFilter

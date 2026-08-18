@@ -7,6 +7,7 @@
 namespace Ailu
 {
     class PrefabAssetDocument;
+    struct SceneEntityDocument;
 }
 
 namespace Ailu::SceneManagement
@@ -20,6 +21,8 @@ namespace Ailu::SceneManagement
         static ECS::Entity CloneEntity(Scene &scene, ECS::Entity source);
         // Clone a complete hierarchy while preserving local transforms and parent-child relationships.
         static ECS::Entity CloneSubtree(Scene &scene, ECS::Entity source_root);
+        // Builds the persistent entity document shared by Scene and Prefab serialization.
+        static SceneEntityDocument BuildEntityDocument(const Scene &scene, ECS::Entity entity, u32 sibling_index = 0u);
         // Serializes a Scene subtree into a Prefab document using Prefab-local entity GUIDs.
         static bool SerializeSubtree(const Scene &scene, ECS::Entity source_root, PrefabAssetDocument &prefab);
 
