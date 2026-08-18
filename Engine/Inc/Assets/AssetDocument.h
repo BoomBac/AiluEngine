@@ -218,6 +218,30 @@ namespace Ailu
         Vector<AnimationClipFrameDocument> _frames;
     };
 
+    ASTRUCT()
+    struct AILU_API AnimationSpriteFrameDocument
+    {
+        GENERATED_BODY()
+
+        APROPERTY()
+        f32 _time = 0.0f;
+        APROPERTY()
+        Guid _sprite = Guid::EmptyGuid();
+    };
+
+    ASTRUCT()
+    struct AILU_API AnimationEventDocument
+    {
+        GENERATED_BODY()
+
+        APROPERTY()
+        f32 _time = 0.0f;
+        APROPERTY()
+        u32 _event_id = 0u;
+        APROPERTY()
+        EAnimationEventKind _kind = EAnimationEventKind::kCosmetic;
+    };
+
     ACLASS()
     class AILU_API AnimationClipAssetDocument : public Object
     {
@@ -240,6 +264,30 @@ namespace Ailu
         bool _is_looping = true;
         APROPERTY()
         Vector<AnimationClipTrackDocument> _tracks;
+        APROPERTY()
+        Vector<AnimationSpriteFrameDocument> _sprite_frames;
+        APROPERTY()
+        Vector<AnimationEventDocument> _events;
+    };
+
+    ACLASS()
+    class AILU_API AnimationControllerAssetDocument : public Object
+    {
+        GENERATED_BODY()
+
+    public:
+        APROPERTY()
+        AssetDocumentHeader _header;
+        APROPERTY()
+        Vector<AnimationParameterDesc> _parameters;
+        APROPERTY()
+        Vector<AnimationState> _states;
+        APROPERTY()
+        Vector<AnimationTransition> _transitions;
+        APROPERTY()
+        Vector<u16> _any_state_transitions;
+        APROPERTY()
+        u16 _entry_state = kInvalidAnimationState;
     };
 
     ACLASS()
@@ -634,6 +682,19 @@ namespace Ailu
     };
 
     ASTRUCT()
+    struct AILU_API SceneAnimatorComponentDocument
+    {
+        GENERATED_BODY()
+
+        APROPERTY()
+        String _controller_guid;
+        APROPERTY()
+        f32 _speed = 1.0f;
+        APROPERTY()
+        bool _play_on_awake = true;
+    };
+
+    ASTRUCT()
     struct AILU_API SceneVXGIComponentDocument
     {
         GENERATED_BODY()
@@ -701,6 +762,8 @@ namespace Ailu
         inline static const String kCollider2DComponent = "_collider_2d_component";
         inline static const String kHasSkeletonMeshComponent = "_has_skeleton_mesh_component";
         inline static const String kSkeletonMeshComponent = "_skeleton_mesh_component";
+        inline static const String kHasAnimatorComponent = "_has_animator_component";
+        inline static const String kAnimatorComponent = "_animator_component";
         inline static const String kHasSpriteRendererComponent = "_has_sprite_renderer_component";
         inline static const String kSpriteRendererComponent = "_sprite_renderer_component";
         inline static const String kHasVxgiComponent = "_has_vxgi_component";
@@ -739,6 +802,8 @@ namespace Ailu
                                                                                  &kCollider2DComponent);
             if (_has_skeleton_mesh_component)
                 SerializerWrapper<SceneSkeletonMeshComponentDocument>::Serialize(&_skeleton_mesh_component, ar, &kSkeletonMeshComponent);
+            if (_has_animator_component)
+                SerializerWrapper<SceneAnimatorComponentDocument>::Serialize(&_animator_component, ar, &kAnimatorComponent);
             if (_has_vxgi_component)
                 SerializerWrapper<SceneVXGIComponentDocument>::Serialize(&_vxgi_component, ar, &kVxgiComponent);
             if (_has_sprite_renderer_component)
@@ -796,6 +861,7 @@ namespace Ailu
             deserialize_component(_has_collider_2d_component, _collider_2d_component, kHasCollider2DComponent,
                                   kCollider2DComponent);
             deserialize_component(_has_skeleton_mesh_component, _skeleton_mesh_component, kHasSkeletonMeshComponent, kSkeletonMeshComponent);
+            deserialize_component(_has_animator_component, _animator_component, kHasAnimatorComponent, kAnimatorComponent);
             deserialize_component(_has_sprite_renderer_component, _sprite_renderer_component, kHasSpriteRendererComponent, kSpriteRendererComponent);
             deserialize_component(_has_vxgi_component, _vxgi_component, kHasVxgiComponent, kVxgiComponent);
         }
@@ -855,6 +921,10 @@ namespace Ailu
         bool _has_skeleton_mesh_component = false;
         APROPERTY()
         SceneSkeletonMeshComponentDocument _skeleton_mesh_component;
+        APROPERTY()
+        bool _has_animator_component = false;
+        APROPERTY()
+        SceneAnimatorComponentDocument _animator_component;
         APROPERTY()
         bool _has_vxgi_component = false;
         APROPERTY()

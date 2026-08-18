@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __SERIALIZE_GEN_H__
 //Class SerializeObject begin...........................
-#define SERIALIZE_GEN_H_273_GENERATED_BODY \
+#define SERIALIZE_GEN_H_255_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_SerializeObject_Type();\
                                 static const Type* GetPrivateStaticClass();\

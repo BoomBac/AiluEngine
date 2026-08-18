@@ -60,7 +60,7 @@ namespace Ailu
                 data._local_to_world = transform->GetWorldMatrix();
                 data._uv_rect = sprite_renderer._sprite->_uv_rect;
                 data._color = sprite_renderer._color;
-                data._size = sprite_renderer._sprite->_size;
+                data._size = sprite_renderer._sprite->GetRenderSize();
                 data._pivot = sprite_renderer._sprite->_pivot;
                 data._texture = texture;
                 data._sorting_layer = sprite_renderer._sorting_layer;

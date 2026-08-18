@@ -33,6 +33,8 @@ namespace Ailu
         bool CreateSpriteAsset(const fs::path &directory, const String &name);
         bool CreateMaterialAsset(const fs::path &directory, const String &name, Render::Shader *shader);
         bool CreateInputActionAsset(const fs::path &directory, const String &name);
+        bool CreateAnimationClipAsset(const fs::path &directory, const String &name);
+        bool CreateAnimationControllerAsset(const fs::path &directory, const String &name);
         bool CreateWidgetAsset(const fs::path &directory, const String &name);
         bool CreateFlowGraphAsset(const fs::path &directory, const String &name);
         bool CreateScriptAsset(const fs::path &directory, const String &name);
@@ -50,6 +52,8 @@ namespace Ailu
             bool DeleteAsset(Asset *asset);
             bool DeleteFolder(const fs::path &folder);
             bool CreateFolder(const fs::path &directory, const String &name);
+            bool MoveAssets(const Vector<Asset *> &assets, const fs::path &target_directory);
+            bool CopyAssets(const Vector<Asset *> &assets, const fs::path &target_directory);
 
             String MakeUniqueEntryName(const fs::path &directory, const String &base_name, const WString &extension, bool is_directory) const;
         };

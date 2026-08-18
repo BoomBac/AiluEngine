@@ -39,7 +39,7 @@ namespace Ailu
             Guid     _texture = Guid::EmptyGuid();
             Vector4f _uv_rect = Vector4f(0.0f, 0.0f, 1.0f, 1.0f);
             Vector2f _pivot   = Vector2f(0.5f, 0.5f);
-            Vector2f _size    = Vector2f::kOne;
+            f32      _size    = 1.0f;
             Vector4f _border  = Vector4f::kZero;
 
             bool operator==(const SpriteAssetEditData& other) const
@@ -199,11 +199,7 @@ namespace Ailu
             UI::InputBlock* _pivot_x = nullptr;
             UI::InputBlock* _pivot_y = nullptr;
 
-            UI::InputBlock* _size_w = nullptr;
-            UI::InputBlock* _size_h = nullptr;
-            UI::CheckBox*   _chk_lock_ratio = nullptr;
-            bool            _lock_ratio = false;
-            f32             _locked_aspect = 1.0f;
+            UI::InputBlock* _size_input = nullptr;
 
             UI::InputBlock* _border_l = nullptr;
             UI::InputBlock* _border_r = nullptr;

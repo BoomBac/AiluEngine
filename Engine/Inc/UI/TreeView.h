@@ -52,6 +52,8 @@ namespace Ailu
         using TreeCanDragCallback = std::function<bool(TreeItemId)>;
         using TreeCanDropCallback = std::function<bool(TreeView*, TreeItemId, TreeItemId)>;
         using TreeDropCallback = std::function<void(TreeView*, TreeItemId, TreeItemId)>;
+        using TreeExternalCanDropCallback = std::function<bool(const DragPayload &, TreeItemId)>;
+        using TreeExternalDropCallback = std::function<void(const DragPayload &, TreeItemId, Vector2f)>;
 
         ACLASS()
         class AILU_API TreeView : public ScrollView
@@ -90,6 +92,14 @@ namespace Ailu
             void SetCanDragCallback(TreeCanDragCallback callback) { _can_drag_callback = std::move(callback); }
             void SetCanDropCallback(TreeCanDropCallback callback) { _can_drop_callback = std::move(callback); }
             void SetDropCallback(TreeDropCallback callback) { _drop_callback = std::move(callback); }
+            void SetExternalCanDropCallback(TreeExternalCanDropCallback callback)
+            {
+                _external_can_drop_callback = std::move(callback);
+            }
+            void SetExternalDropCallback(TreeExternalDropCallback callback)
+            {
+                _external_drop_callback = std::move(callback);
+            }
 
             // ── Style ────────────────────────────────────────────
             void SetStyleId(const UIStyleId &id);
@@ -135,6 +145,8 @@ namespace Ailu
             TreeCanDragCallback _can_drag_callback;
             TreeCanDropCallback _can_drop_callback;
             TreeDropCallback _drop_callback;
+            TreeExternalCanDropCallback _external_can_drop_callback;
+            TreeExternalDropCallback _external_drop_callback;
             bool _expand_on_row_click = false;
 
             // Drag initiation tracking

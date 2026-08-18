@@ -8,6 +8,7 @@
 
 #include "Animation/BlendSpace.h"
 #include "Animation/Clip.h"
+#include "Animation/AnimationInstance.h"
 #include "Audio/AudioHandle.h"
 #include "Entity.h"
 #include "Framework/Math/Guid.h"
@@ -373,6 +374,15 @@ public:                                                                 \
             i16 _anim_type;
             f32 _anim_speed = 1.0f;
             EMotionVectorType _motion_vector_type = EMotionVectorType::kPerObject;
+        };
+
+        struct AILU_API AnimatorComponent
+        {
+            DECLARE_COMPONENT(AnimatorComponent, "Ailu.ECS.AnimatorComponent")
+            Guid _controller = Guid::EmptyGuid();
+            f32 _speed = 1.0f;
+            bool _play_on_awake = true;
+            AnimationInstanceHandle _instance = kInvalidAnimationInstanceHandle;
         };
 
 

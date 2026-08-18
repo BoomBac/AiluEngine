@@ -436,6 +436,7 @@ namespace Ailu
 		_lut_global_resources_by_type[ComputeShader::StaticType()] = {};
 		_lut_global_resources_by_type[Scene::StaticType()] = {};
 		_lut_global_resources_by_type[AnimationClip::StaticType()] = {};
+		_lut_global_resources_by_type[AnimationControllerAsset::StaticType()] = {};
 		_lut_global_resources_by_type[Sprite::StaticType()] = {};
 		_lut_global_resources_by_type[InputActionAsset::StaticType()] = {};
 		_lut_global_resources_by_type[AudioClip::StaticType()] = {};
@@ -476,6 +477,7 @@ namespace Ailu
 		_asset_handler_registry.Register(MakeScope<SceneAssetHandler>());
 		_asset_handler_registry.Register(MakeScope<PrefabAssetHandler>());
 		_asset_handler_registry.Register(MakeScope<AnimationClipAssetHandler>());
+		_asset_handler_registry.Register(MakeScope<AnimationControllerAssetHandler>());
 		_asset_handler_registry.Register(MakeScope<InputActionAssetHandler>());
 		_asset_handler_registry.Register(MakeScope<AudioClipAssetHandler>());
 		_asset_handler_registry.Register(MakeScope<GraphAssetHandler>());
@@ -1136,6 +1138,8 @@ namespace Ailu
 
 	bool ResourceMgr::RenameAsset(Asset *p_asset, const WString &new_name)
 	{
+		if (p_asset == nullptr)
+			return false;
 		WString old_asset_path = p_asset->_asset_path;
 		WString new_asset_path = PathUtils::RenameFile(p_asset->_asset_path, new_name);
 		WString ext_name = PathUtils::ExtractExt(p_asset->_asset_path);
@@ -1144,8 +1148,11 @@ namespace Ailu
 			LOG_WARNING(L"Rename asset {} whih name {} failed,try another name!", p_asset->_asset_path, new_name);
 			return false;
 		}
-		UnRegisterResource(old_asset_path);
-		RegisterResource(new_asset_path, p_asset->_p_obj);
+		if (p_asset->_p_obj != nullptr)
+		{
+			UnRegisterResource(old_asset_path);
+			RegisterResource(new_asset_path, p_asset->_p_obj);
+		}
 		Scope<Asset> asset = std::move(_asset_db.at(p_asset->GetGuid()));
 		UnRegisterAsset(p_asset);
 		p_asset->Name(ToChar(new_name));
@@ -1157,6 +1164,8 @@ namespace Ailu
 
 	bool ResourceMgr::MoveAsset(Asset *p_asset, const WString &new_asset_path)
 	{
+		if (p_asset == nullptr)
+			return false;
 		WString old_asset_path = p_asset->_asset_path;
 		WString normalized_new_asset_path = NormalizeAssetPath(new_asset_path, p_asset->_domain);
 		if (ExistInAssetDB(normalized_new_asset_path))
@@ -1164,8 +1173,11 @@ namespace Ailu
 			LOG_WARNING(L"MoveAsset to path {} failed,try another name!", normalized_new_asset_path);
 			return false;
 		}
-		UnRegisterResource(old_asset_path);
-		RegisterResource(normalized_new_asset_path, p_asset->_p_obj);
+		if (p_asset->_p_obj != nullptr)
+		{
+			UnRegisterResource(old_asset_path);
+			RegisterResource(normalized_new_asset_path, p_asset->_p_obj);
+		}
 		Scope<Asset> asset = std::move(_asset_db.at(p_asset->GetGuid()));
 		UnRegisterAsset(p_asset);
 		p_asset->_asset_path = normalized_new_asset_path;
@@ -1441,20 +1453,14 @@ namespace Ailu
 
 	void ResourceMgr::RegisterResource(const WString &asset_path, Ref<Object> obj, bool override)
 	{
+		if (obj == nullptr)
+			return;
 		std::lock_guard<std::mutex> lock(_asset_db_mutex);
 		bool exist = _global_resources.contains(asset_path);
 		if (exist && override || !exist)
 		{
 			_global_resources[asset_path] = obj;
-			_lut_global_resources[obj->ID()] = _global_resources.find(asset_path);
-			auto resource_type = obj->GetType();
-			AL_ASSERT(resource_type != nullptr);
-			auto &v = _lut_global_resources_by_type[resource_type];
-			auto it = std::find_if(v.begin(), v.end(), [&](ResourcePoolContainerIter iter) -> bool
-								   { return iter->first == asset_path; });
-			if (it != v.end())
-				v.erase(it);
-			v.push_back(_global_resources.find(asset_path));
+			RebuildResourceLookups();
 		}
 		else
 		{
@@ -1469,15 +1475,25 @@ namespace Ailu
 		{
 			auto &obj = _global_resources[asset_path];
 			u32 ref_count = obj.use_count();
-			auto resource_type = obj->GetType();
-			AL_ASSERT(resource_type != nullptr);
-			auto &v = _lut_global_resources_by_type[resource_type];
-			v.erase(std::find_if(v.begin(), v.end(), [&](ResourcePoolContainerIter it) -> bool
-								 { return it->second.get() == obj.get(); }));
 			_object_to_asset.erase(obj->ID());
-			_lut_global_resources.erase(obj->ID());
 			_global_resources.erase(asset_path);
+			RebuildResourceLookups();
 			LOG_WARNING(L"UnRegisterResource: {} ref count is {}", asset_path, ref_count - 1);
+		}
+	}
+
+	void ResourceMgr::RebuildResourceLookups()
+	{
+		_lut_global_resources.clear();
+		_lut_global_resources_by_type.clear();
+		for (auto resource_it = _global_resources.begin(); resource_it != _global_resources.end(); ++resource_it)
+		{
+			if (resource_it->second == nullptr)
+				continue;
+			_lut_global_resources.insert_or_assign(resource_it->second->ID(), resource_it);
+			const Type *resource_type = resource_it->second->GetType();
+			if (resource_type != nullptr)
+				_lut_global_resources_by_type[resource_type].push_back(resource_it);
 		}
 	}
 

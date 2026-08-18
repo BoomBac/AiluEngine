@@ -231,6 +231,7 @@ namespace Ailu
                 AssetBrowserEntry entry;
                 entry._type = AssetBrowserEntry::EType::kAsset;
                 entry._display_name = asset->_p_obj ? asset->_p_obj->Name() : asset->Name();
+                entry._sys_path = fs::path(ResourceMgr::GetResSysPath(asset->_asset_path));
                 entry._asset = asset;
                 entries.push_back(std::move(entry));
             }

@@ -234,13 +234,13 @@ namespace Ailu
         u32 TotalNum() const;
         void Release(const WString &asset_path)
         {
+            std::lock_guard<std::mutex> lock(_asset_db_mutex);
             const WString resource_path = _global_resources.contains(asset_path) ? asset_path : NormalizeAssetPath(asset_path);
-            u32 obj_id = 0;
             if (_global_resources.contains(resource_path))
             {
                 auto ref_count = _global_resources[resource_path].use_count();
-                obj_id = _global_resources[resource_path]->ID();
                 _global_resources.erase(resource_path);
+                RebuildResourceLookups();
                 LOG_INFO(L"Release resource: {},and current ref count is {}", resource_path.c_str(), ref_count - 1);
             }
         }
@@ -335,6 +335,7 @@ namespace Ailu
 
         void LoadAssetDB(const AssetMountDomain& domain);
         void SaveAssetDB(EAssetDomain domain);
+        void RebuildResourceLookups();
 
         //导入外部资源并创建对应的asset
         Ref<void> ImportResourceImpl(const WString &sys_path,const WString& target_dir,const ImportSetting *setting);

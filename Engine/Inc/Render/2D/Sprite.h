@@ -15,11 +15,14 @@ namespace Ailu
         public:
             Sprite() = default;
             Sprite(const String& name) : Object(name) {};
+
+            Vector2f GetRenderSize() const;
+
         public:
             Ref<Render::Texture2D> _texture;
             Vector4f _uv_rect = {0.0f, 0.0f, 1.0f, 1.0f};
             Vector2f _pivot = {0.5f, 0.5f};
-            Vector2f _size = Vector2f::kOne;
+            f32 _size = 1.0f;
             //九宫格slice,RLBT，靠近边界的像素不会被拉伸
             Vector4f _border = Vector4f::kZero;
         };

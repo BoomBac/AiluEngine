@@ -206,6 +206,14 @@ namespace Ailu::SceneManagement
             entity_doc._skeleton_mesh_component._anim_clip_guid = asset_guid_string(skeleton_mesh->_anim_clip.get());
             mark_disabled.template operator()<ECS::CSkeletonMesh>("CSkeletonMesh");
         }
+        if (const auto *animator = registry.GetComponent<ECS::AnimatorComponent>(entity); animator != nullptr)
+        {
+            entity_doc._has_animator_component = true;
+            entity_doc._animator_component._controller_guid = animator->_controller.IsEmpty() ? String{} : animator->_controller.ToString();
+            entity_doc._animator_component._speed = animator->_speed;
+            entity_doc._animator_component._play_on_awake = animator->_play_on_awake;
+            mark_disabled.template operator()<ECS::AnimatorComponent>("AnimatorComponent");
+        }
         if (const auto *vxgi = registry.GetComponent<ECS::CVXGI>(entity); vxgi != nullptr)
         {
             entity_doc._has_vxgi_component = true;
@@ -244,6 +252,7 @@ namespace Ailu::SceneManagement
             ECS::RigidBody2DComponent::StaticComponentTypeId(),
             ECS::Collider2DComponent::StaticComponentTypeId(),
             ECS::CSkeletonMesh::StaticComponentTypeId(),
+            ECS::AnimatorComponent::StaticComponentTypeId(),
             ECS::CVXGI::StaticComponentTypeId(),
             ECS::SpriteRendererComponent::StaticComponentTypeId()};
         for (const ECS::ComponentTypeId component_type : registry.GetEntityComponentTypes(entity))

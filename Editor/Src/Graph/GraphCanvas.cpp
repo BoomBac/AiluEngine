@@ -176,19 +176,13 @@ namespace Ailu
 
                 RequestFocus();
                 _interaction_mouse = e._mouse_position;
-                if (e._key_code == EKey::kMBUTTON)
+                if (e._key_code == EKey::kRBUTTON)
                 {
                     _interaction = EInteraction::kPanning;
                     _drag_start_mouse = e._mouse_position;
                     _drag_start_view_offset = _view_offset;
-                    e._is_handled = true;
-                    return;
-                }
-
-                if (e._key_code == EKey::kRBUTTON)
-                {
-                    const GraphPinData *hit_pin = HitTestPin(e._mouse_position);
-                    OpenActionMenu(e._mouse_position, hit_pin != nullptr ? hit_pin->_id : Guid::EmptyGuid());
+                    _right_down_mouse = e._mouse_position;
+                    _right_pan_moved = false;
                     e._is_handled = true;
                     return;
                 }
@@ -302,6 +296,8 @@ namespace Ailu
                 _interaction_mouse = e._mouse_position;
                 if (_interaction == EInteraction::kPanning)
                 {
+                    const Vector2f right_delta = e._mouse_position - _right_down_mouse;
+                    _right_pan_moved = _right_pan_moved || right_delta.x * right_delta.x + right_delta.y * right_delta.y > 16.0f;
                     _view_offset = _drag_start_view_offset + e._mouse_position - _drag_start_mouse;
                     InvalidatePaint();
                     e._is_handled = true;
@@ -355,13 +351,24 @@ namespace Ailu
 
             OnMouseUp() += [this](UI::UIEvent &e)
             {
+                if (e._key_code == EKey::kRBUTTON && _interaction == EInteraction::kPanning)
+                {
+                    const bool is_click = !_right_pan_moved;
+                    const Vector2f menu_position = e._mouse_position;
+                    const GraphPinData *hit_pin = is_click ? HitTestPin(_right_down_mouse) : nullptr;
+                    EndInteraction();
+                    if (is_click)
+                        OpenActionMenu(menu_position, hit_pin != nullptr ? hit_pin->_id : Guid::EmptyGuid());
+                    e._is_handled = true;
+                    return;
+                }
                 if (e._key_code == EKey::kLBUTTON && _interaction == EInteraction::kDraggingLink)
                 {
                     FinishLinkDrag(e._mouse_position);
                     e._is_handled = true;
                     return;
                 }
-                if (e._key_code == EKey::kLBUTTON || e._key_code == EKey::kMBUTTON)
+                if (e._key_code == EKey::kLBUTTON)
                 {
                     EndInteraction();
                     e._is_handled = true;
@@ -905,8 +912,19 @@ namespace Ailu
                                         mini_offset.y + graph_view_min.y * mini_scale,
                                         (graph_view_max.x - graph_view_min.x) * mini_scale,
                                         (graph_view_max.y - graph_view_min.y) * mini_scale};
-            renderer.DrawQuad(mini_view, MakeColorBrush(Color(0.78f, 0.86f, 0.95f, 0.12f)), Vector4f(1.0f), 0.39f);
-            renderer.DrawBox(mini_view.xy, mini_view.zw, 1.0f, Color(0.78f, 0.86f, 0.95f, 0.9f), 0.4f);
+            const f32 mini_right = mini_rect.x + mini_rect.z;
+            const f32 mini_bottom = mini_rect.y + mini_rect.w;
+            const f32 visible_left = std::clamp(mini_view.x, mini_rect.x, mini_right);
+            const f32 visible_top = std::clamp(mini_view.y, mini_rect.y, mini_bottom);
+            const f32 visible_right = std::clamp(mini_view.x + mini_view.z, mini_rect.x, mini_right);
+            const f32 visible_bottom = std::clamp(mini_view.y + mini_view.w, mini_rect.y, mini_bottom);
+            if (visible_right > visible_left && visible_bottom > visible_top)
+            {
+                const Vector4f visible_view = {visible_left, visible_top, visible_right - visible_left,
+                                               visible_bottom - visible_top};
+                renderer.DrawQuad(visible_view, MakeColorBrush(Color(0.78f, 0.86f, 0.95f, 0.12f)), Vector4f(1.0f), 0.39f);
+                renderer.DrawBox(visible_view.xy, visible_view.zw, 1.0f, Color(0.78f, 0.86f, 0.95f, 0.9f), 0.4f);
+            }
         }
 
         void GraphCanvas::DrawAlignmentGuides(UI::UIRenderer &renderer, const Vector4f &content_rect)
@@ -1449,6 +1467,7 @@ namespace Ailu
             _connection_message.clear();
             _marquee_base_selection.clear();
             _is_marquee_additive = false;
+            _right_pan_moved = false;
             InvalidatePaint();
         }
 
@@ -1472,6 +1491,7 @@ namespace Ailu
             _connection_message.clear();
             _marquee_base_selection.clear();
             _is_marquee_additive = false;
+            _right_pan_moved = false;
             InvalidatePaint();
         }
 

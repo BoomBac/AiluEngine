@@ -84,6 +84,13 @@ namespace Ailu
         bool Save(const AssetSaveContext &context) final;
     };
 
+    class AILU_API AnimationControllerAssetHandler : public IAssetHandler
+    {
+        const Type *AssetType() const final;
+        Scope<Asset> Load(const AssetLoadContext &context) final;
+        bool Save(const AssetSaveContext &context) final;
+    };
+
     class AILU_API InputActionAssetHandler : public IAssetHandler
     {
         const Type *AssetType() const final;

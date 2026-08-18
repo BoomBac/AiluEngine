@@ -50,6 +50,11 @@ namespace Ailu
                 return icon_size < kListViewIconThreshold;
             }
 
+            bool IsKeyDownNow(EKey key)
+            {
+                return Input::IsKeyDown(key) || Input::IsKeyDownAccurate(key);
+            }
+
             String FitTextToWidth(const String &text, f32 max_width, f32 font_size)
             {
                 if (text.empty() || max_width <= 0.0f)
@@ -135,6 +140,17 @@ namespace Ailu
                     return;
                 NavigateToPath(_directory_tree_data_source->GetPath(item));
             };
+            _directory_tree->SetExternalCanDropCallback([this](const DragPayload &payload, UI::TreeItemId item)
+            {
+                return item != UI::kInvalidTreeItemId && _directory_tree_data_source != nullptr &&
+                       CanAcceptAssetDrag(payload) && fs::is_directory(_directory_tree_data_source->GetPath(item));
+            });
+            _directory_tree->SetExternalDropCallback([this](const DragPayload &payload, UI::TreeItemId item, Vector2f pos)
+            {
+                if (item == UI::kInvalidTreeItemId || _directory_tree_data_source == nullptr)
+                    return;
+                ShowAssetTransferDialog(payload, _directory_tree_data_source->GetPath(item), pos);
+            });
 
             _right = _sv->AddChild<UI::VerticalBox>();
             _right->SlotPadding() = UI::Padding(2.0f, 2.0f, 0.0f, 0.0f);
@@ -201,9 +217,15 @@ namespace Ailu
             _icon_content->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kAuto, UI::ESizePolicy::kAuto);
             const auto blank_context_handler = [this](UI::UIEvent &e)
             {
-                if (e._key_code != EKey::kRBUTTON)
-                    return;
                 if (e._target != _icon_area && e._target != _icon_content)
+                    return;
+                if (e._key_code == EKey::kLBUTTON)
+                {
+                    ClearSelection();
+                    e._is_handled = true;
+                    return;
+                }
+                if (e._key_code != EKey::kRBUTTON)
                     return;
                 ShowBlankAreaContextMenu(e._mouse_position);
                 e._is_handled = true;
@@ -234,12 +256,17 @@ namespace Ailu
                     _layout_dirty = true;
             };
             DropHandler handler;
-            handler._can_drop = [](const DragPayload &payload) -> bool
+            handler._can_drop = [this](const DragPayload &payload) -> bool
             {
-                return IsWorldOutlineEntityDrag(payload);
+                return IsWorldOutlineEntityDrag(payload) || CanAcceptAssetDrag(payload);
             };
             handler._on_drop = [this](const DragPayload &payload, f32 x, f32 y)
             {
+                if (CanAcceptAssetDrag(payload))
+                {
+                    ShowAssetTransferDialog(payload, _current_path, {x, y});
+                    return;
+                }
                 if (payload._type != EDragType::kTreeItem || payload._data == nullptr)
                     return;
                 const auto *tree_payload = static_cast<const TreeViewDragPayload *>(payload._data);
@@ -264,7 +291,22 @@ namespace Ailu
 
         void AssetBrowser::HandleShortcuts()
         {
-            if (!IsFocus() || !Input::IsKeyJustPressed(EKey::kF2))
+            if (!IsFocus() || (_search_input != nullptr && _search_input->IsEditing()))
+                return;
+
+            const bool control_down = IsKeyDownNow(EKey::kCONTROL) || IsKeyDownNow(EKey::kLCONTROL) ||
+                                      IsKeyDownNow(EKey::kRCONTROL);
+            if (control_down && Input::IsKeyJustPressed(EKey::kC))
+            {
+                CopySelectionToClipboard();
+                return;
+            }
+            if (control_down && Input::IsKeyJustPressed(EKey::kV))
+            {
+                PasteClipboard();
+                return;
+            }
+            if (!Input::IsKeyJustPressed(EKey::kF2))
                 return;
 
             if (_selected_asset != nullptr)
@@ -317,6 +359,7 @@ namespace Ailu
 
             const auto entries = _content.Query(_current_path, _search_text);
 
+            _visible_entries = entries;
             _icon_content->ClearChildren();
             ClearSelection();
 
@@ -337,6 +380,14 @@ namespace Ailu
         std::tuple<Ref<UI::UIElement>, UI::Image *, UI::Text *> AssetBrowser::CreateEntryWidgetRoot(const String &display_name)
         {
             Ref<UI::UIElement> root;
+            auto border = MakeRef<UI::Border>();
+            border->Thickness(0.0f);
+            border->GetStyleOverride().SetBorderWidth(0.0f);
+            border->GetStyleOverride().SetBorderColor(Colors::kTransparent);
+            UI::UIBrush transparent_brush;
+            transparent_brush._type = UI::EUIBrushType::kColor;
+            transparent_brush._tint = Colors::kTransparent;
+            border->GetStyleOverride().SetBackground(transparent_brush);
             UI::Image *icon = nullptr;
             UI::Text *text = nullptr;
             if (_is_list_view)
@@ -351,7 +402,7 @@ namespace Ailu
                 text->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed)
                         .Size({0.0f, kListRowHeight}).FillRate(1.0f).CrossAlignment(UI::EAlignment::kFill);
                 text->_horizontal_align = UI::EAlignment::kLeft;
-                root = hb;
+                border->AddChild(hb);
             }
             else
             {
@@ -365,8 +416,9 @@ namespace Ailu
                 text->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFixed)
                         .Size({kIconCellMinWidth, kIconLabelHeight}).CrossAlignment(UI::EAlignment::kCenter);
                 text->_horizontal_align = UI::EAlignment::kCenter;
-                root = vb;
+                border->AddChild(vb);
             }
+            root = border;
             root->Name(display_name);
             text->Name(display_name);
             text->SetText(display_name);
@@ -385,25 +437,26 @@ namespace Ailu
             icon->SetTexture(s_folder_icon);
             const fs::path item_path = entry._sys_path;
             const WString folder_sys_path = item_path.wstring();
-            vb->OnMouseDown() += [this, folder_sys_path, item_path, item_root = vb.get(), item_text = text](UI::UIEvent &e)
+            const u32 entry_index = static_cast<u32>(&entry - _visible_entries.data());
+            vb->OnMouseDown() += [this, folder_sys_path, item_path, entry_index, item_root = vb.get(), item_text = text](UI::UIEvent &e)
             {
-                SelectFolder(item_path, item_root, item_text);
+                SelectFolder(item_path, entry_index, item_root, item_text, e._key_code != EKey::kRBUTTON);
                 if (e._key_code != EKey::kRBUTTON)
                     return;
                 ShowFolderContextMenu(folder_sys_path, e._mouse_position, item_root, item_text);
                 e._is_handled = true;
             };
-            icon->OnMouseEnter() += [this, icon](UI::UIEvent &e)
+            vb->OnMouseEnter() += [this, item_root = vb.get()](UI::UIEvent &e)
             {
-                _hover_item = e._current_target;
-                e._current_target->As<Image>()->_tint_color = Colors::kYellow;
+                _hover_item = item_root;
+                UpdateEntryVisual(item_root, true);
             };
-            icon->OnMouseExit() += [this](UI::UIEvent &e)
+            vb->OnMouseExit() += [this, item_root = vb.get()](UI::UIEvent &e)
             {
-                if (_hover_item == e._current_target)
+                if (_hover_item == item_root)
                 {
                     _hover_item = nullptr;
-                    e._current_target->As<Image>()->_tint_color = Colors::kWhite;
+                    UpdateEntryVisual(item_root, false);
                 }
             };
             icon->OnMouseDoubleClick() += [this, item_path](UI::UIEvent &e)
@@ -411,12 +464,17 @@ namespace Ailu
                 NavigateToPath(item_path);
             };
             DropHandler folder_drop_handler;
-            folder_drop_handler._can_drop = [](const DragPayload &payload)
+            folder_drop_handler._can_drop = [this](const DragPayload &payload)
             {
-                return IsWorldOutlineEntityDrag(payload);
+                return IsWorldOutlineEntityDrag(payload) || CanAcceptAssetDrag(payload);
             };
             folder_drop_handler._on_drop = [this, item_path](const DragPayload &payload, f32 x, f32 y)
             {
+                if (CanAcceptAssetDrag(payload))
+                {
+                    ShowAssetTransferDialog(payload, item_path, {x, y});
+                    return;
+                }
                 if (payload._type != EDragType::kTreeItem || payload._data == nullptr)
                     return;
                 const auto *tree_payload = static_cast<const TreeViewDragPayload *>(payload._data);
@@ -434,29 +492,30 @@ namespace Ailu
                 return;
             const String display_name = entry._display_name;
             auto [vb, icon, text] = CreateEntryWidgetRoot(display_name);
+            const u32 entry_index = static_cast<u32>(&entry - _visible_entries.data());
             Color tint = asset->_p_obj ? Colors::kWhite : Colors::kGray;
             icon->Name(asset->Name());
             icon->_tint_color = tint;
-            vb->OnMouseDown() += [this, asset, item_root = vb.get(), item_text = text](UI::UIEvent &e)
+            vb->OnMouseDown() += [this, asset, entry_index, item_root = vb.get(), item_text = text](UI::UIEvent &e)
             {
-                SelectAsset(asset, item_root, item_text);
+                SelectAsset(asset, entry_index, item_root, item_text, e._key_code != EKey::kRBUTTON);
                 if (e._key_code != EKey::kRBUTTON)
                     return;
                 ShowAssetContextMenu(asset, e._mouse_position, item_root, item_text);
                 e._is_handled = true;
             };
             icon->SetTexture(AssetTypeRegistry::Get().GetIcon(asset));
-            icon->OnMouseEnter() += [this, icon](UI::UIEvent &e)
+            vb->OnMouseEnter() += [this, item_root = vb.get()](UI::UIEvent &e)
             {
-                _hover_item = e._current_target;
-                e._current_target->As<Image>()->_tint_color = Colors::kYellow;
+                _hover_item = item_root;
+                UpdateEntryVisual(item_root, true);
             };
-            icon->OnMouseExit() += [this, tint](UI::UIEvent &e)
+            vb->OnMouseExit() += [this, item_root = vb.get()](UI::UIEvent &e)
             {
-                if (_hover_item == e._current_target)
+                if (_hover_item == item_root)
                 {
                     _hover_item = nullptr;
-                    e._current_target->As<Image>()->_tint_color = tint;
+                    UpdateEntryVisual(item_root, false);
                 }
             };
             icon->OnMouseDoubleClick() += [this, asset](UI::UIEvent &e)
@@ -464,10 +523,8 @@ namespace Ailu
                 OpenAsset(asset);
             };
             _icon_content->AddChild(vb);
-            if (asset->_asset_type == StaticClass<Render::Mesh>() || asset->_asset_type == ScriptAsset::StaticType() ||
-                asset->_asset_type == PrefabAssetDocument::StaticType())
             {
-                icon->OnMouseDown() += [this, icon, asset, display_name](UI::UIEvent &e)
+                icon->OnMouseDown() += [this, asset](UI::UIEvent &e)
                 {
                     _is_dragging = false;
                     _drag_start_pos = e._mouse_position;
@@ -482,13 +539,7 @@ namespace Ailu
                             if (dist > kDragThreshold)
                             {
                                 _is_dragging = true;
-                                EDragType drag_type = EDragType::kMesh;
-                                if (asset->_asset_type == ScriptAsset::StaticType())
-                                    drag_type = EDragType::kScript;
-                                else if (asset->_asset_type == PrefabAssetDocument::StaticType())
-                                    drag_type = EDragType::kPrefab;
-                                auto payload = DragPayload{drag_type, asset};
-                                DragDropManager::Get().BeginDrag(payload, display_name);
+                                BeginAssetDrag(asset, display_name);
                             }
                         }
                     }
@@ -496,28 +547,260 @@ namespace Ailu
             }
         }
 
-        void AssetBrowser::SelectFolder(const fs::path &path, UI::UIElement *root, UI::Text *text)
+        void AssetBrowser::SelectFolder(const fs::path &path, u32 index, UI::UIElement *root, UI::Text *text, bool preserve_modifiers)
         {
-            _selected_item_root = root;
-            _selected_item_text = text;
-            _selected_asset = nullptr;
-            _selected_folder_path = path.wstring();
+            SelectEntry(path, nullptr, index, root, text, preserve_modifiers);
         }
 
-        void AssetBrowser::SelectAsset(Asset *asset, UI::UIElement *root, UI::Text *text)
+        void AssetBrowser::SelectAsset(Asset *asset, u32 index, UI::UIElement *root, UI::Text *text, bool preserve_modifiers)
         {
-            _selected_item_root = root;
-            _selected_item_text = text;
-            _selected_asset = asset;
-            _selected_folder_path.clear();
+            if (asset != nullptr)
+                SelectEntry(fs::path(ResourceMgr::GetResSysPath(asset->_asset_path)), asset, index, root, text, preserve_modifiers);
         }
 
-        void AssetBrowser::ClearSelection()
+        bool AssetBrowser::IsSelected(const fs::path &path) const
+        {
+            return std::any_of(_selected_entries.begin(), _selected_entries.end(), [&path](const SelectedEntry &entry)
+            {
+                return entry._path == path;
+            });
+        }
+
+        void AssetBrowser::UpdateEntryVisual(UI::UIElement *root, bool is_hovered)
+        {
+            auto *border = root != nullptr ? root->As<UI::Border>() : nullptr;
+            if (border == nullptr)
+                return;
+
+            const bool is_selected = std::any_of(_selected_entries.begin(), _selected_entries.end(), [root](const SelectedEntry &entry)
+            {
+                return entry._root == root;
+            });
+            Color background = Colors::kTransparent;
+            if (is_selected)
+                background = Color(0.18f, 0.34f, 0.62f, 0.9f);
+            else if (is_hovered)
+                background = Color(0.20f, 0.25f, 0.38f, 0.75f);
+
+            UI::UIBrush brush;
+            brush._type = UI::EUIBrushType::kColor;
+            brush._tint = background;
+            border->GetStyleOverride().SetBackground(brush);
+            border->InvalidateStyle(UI::EStyleInvalidation::kPaintOnly);
+        }
+
+        void AssetBrowser::UpdateSelectionVisuals()
+        {
+            if (_icon_content == nullptr)
+                return;
+            for (u32 i = 0u; i < static_cast<u32>(_icon_content->GetChildren().size()); ++i)
+            {
+                UI::UIElement *root = _icon_content->ChildAt(i);
+                UpdateEntryVisual(root, root == _hover_item);
+            }
+        }
+
+        void AssetBrowser::SyncPrimarySelection()
         {
             _selected_item_root = nullptr;
             _selected_item_text = nullptr;
             _selected_asset = nullptr;
             _selected_folder_path.clear();
+            if (_selected_entries.empty())
+                return;
+
+            const SelectedEntry *primary = &_selected_entries.back();
+            if (_selection_anchor >= 0 && _selection_anchor < static_cast<i32>(_visible_entries.size()))
+            {
+                const fs::path anchor_path = _visible_entries[_selection_anchor]._sys_path;
+                for (const auto &entry: _selected_entries)
+                {
+                    if (entry._path == anchor_path || (entry._asset != nullptr &&
+                        fs::path(ResourceMgr::GetResSysPath(entry._asset->_asset_path)) == anchor_path))
+                    {
+                        primary = &entry;
+                        break;
+                    }
+                }
+            }
+            _selected_item_root = primary->_root;
+            _selected_item_text = primary->_text;
+            _selected_asset = primary->_asset;
+            if (_selected_asset == nullptr)
+                _selected_folder_path = primary->_path.wstring();
+        }
+
+        void AssetBrowser::SelectEntry(const fs::path &path, Asset *asset, u32 index, UI::UIElement *root, UI::Text *text,
+                                       bool preserve_modifiers)
+        {
+            const bool control_down = IsKeyDownNow(EKey::kCONTROL) || IsKeyDownNow(EKey::kLCONTROL) ||
+                                      IsKeyDownNow(EKey::kRCONTROL);
+            const bool shift_down = IsKeyDownNow(EKey::kSHIFT) || IsKeyDownNow(EKey::kLSHIFT) ||
+                                    IsKeyDownNow(EKey::kRSHIFT);
+            const bool use_control = preserve_modifiers && control_down;
+            const bool use_shift = preserve_modifiers && shift_down;
+            auto make_entry = [this](u32 entry_index)
+            {
+                SelectedEntry selected;
+                selected._path = _visible_entries[entry_index]._sys_path;
+                selected._asset = _visible_entries[entry_index]._asset;
+                selected._root = _icon_content->ChildAt(entry_index);
+                UI::UIElement *content = selected._root != nullptr ? selected._root->ChildAt(0u) : nullptr;
+                selected._text = content != nullptr && content->ChildAt(1u) != nullptr ? content->ChildAt(1u)->As<UI::Text>() : nullptr;
+                return selected;
+            };
+
+            if (use_shift && _selection_anchor >= 0 && _selection_anchor < static_cast<i32>(_visible_entries.size()))
+            {
+                if (!use_control)
+                    _selected_entries.clear();
+                const u32 begin = std::min(static_cast<u32>(_selection_anchor), index);
+                const u32 end = std::max(static_cast<u32>(_selection_anchor), index);
+                for (u32 i = begin; i <= end; ++i)
+                {
+                    if (!IsSelected(_visible_entries[i]._sys_path))
+                        _selected_entries.push_back(make_entry(i));
+                }
+            }
+            else if (use_control)
+            {
+                auto it = std::find_if(_selected_entries.begin(), _selected_entries.end(), [&path](const SelectedEntry &entry)
+                {
+                    return entry._path == path;
+                });
+                if (it != _selected_entries.end())
+                    _selected_entries.erase(it);
+                else
+                    _selected_entries.push_back({path, asset, root, text});
+                _selection_anchor = static_cast<i32>(index);
+            }
+            else
+            {
+                _selected_entries.clear();
+                _selected_entries.push_back({path, asset, root, text});
+                _selection_anchor = static_cast<i32>(index);
+            }
+
+            SyncPrimarySelection();
+            UpdateSelectionVisuals();
+        }
+
+        void AssetBrowser::ClearSelection()
+        {
+            _selected_entries.clear();
+            _selection_anchor = -1;
+            _selected_item_root = nullptr;
+            _selected_item_text = nullptr;
+            _selected_asset = nullptr;
+            _selected_folder_path.clear();
+        }
+
+        Vector<Asset *> AssetBrowser::GetSelectedAssets() const
+        {
+            Vector<Asset *> assets;
+            for (const auto &entry: _selected_entries)
+            {
+                if (entry._asset != nullptr && std::find(assets.begin(), assets.end(), entry._asset) == assets.end())
+                    assets.push_back(entry._asset);
+            }
+            return assets;
+        }
+
+        Vector<Asset *> AssetBrowser::GetDraggedAssets(const UI::DragPayload &payload) const
+        {
+            if (payload._data == nullptr)
+                return {};
+            if (payload._type == UI::EDragType::kFile)
+            {
+                if (payload._data != &_asset_drag_data)
+                    return {};
+                const auto *drag_data = static_cast<const AssetDragData *>(payload._data);
+                return drag_data != nullptr ? drag_data->_assets : Vector<Asset *>();
+            }
+            if (payload._type == UI::EDragType::kMesh || payload._type == UI::EDragType::kScript ||
+                payload._type == UI::EDragType::kPrefab)
+                return {static_cast<Asset *>(payload._data)};
+            return {};
+        }
+
+        bool AssetBrowser::CanAcceptAssetDrag(const UI::DragPayload &payload) const
+        {
+            const Vector<Asset *> assets = GetDraggedAssets(payload);
+            return !assets.empty() && std::all_of(assets.begin(), assets.end(), [](Asset *asset) { return asset != nullptr; });
+        }
+
+        void AssetBrowser::ShowAssetTransferDialog(const UI::DragPayload &payload, const fs::path &target_directory, Vector2f popup_pos)
+        {
+            const Vector<Asset *> assets = GetDraggedAssets(payload);
+            if (assets.empty() || !fs::is_directory(target_directory))
+                return;
+
+            const String operation_text = assets.size() == 1u ? assets.front()->Name() : std::format("{} assets", assets.size());
+            EditorPopup::ShowDialogAt(popup_pos, "AssetTransferPrompt", "Move or Copy Asset", {300.0f, 128.0f},
+                                      [operation_text](UI::VerticalBox *content, UI::Text *)
+                                      {
+                                          auto *message = content->AddChild<UI::Text>(std::format("Transfer {} to this folder?", operation_text));
+                                          message->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
+                                          message->_horizontal_align = UI::EAlignment::kCenter;
+                                          message->_vertical_align = UI::EAlignment::kCenter;
+                                      },
+                                      {
+                                          {"Move", [this, assets, target_directory]() -> std::optional<String>
+                                          {
+                                              if (!_operations.MoveAssets(assets, target_directory))
+                                                  return String("Move failed.");
+                                              _content_dirty = true;
+                                              _directory_tree_dirty = true;
+                                              return std::nullopt;
+                                          }},
+                                          {"Copy", [this, assets, target_directory]() -> std::optional<String>
+                                          {
+                                              if (!_operations.CopyAssets(assets, target_directory))
+                                                  return String("Copy failed.");
+                                              _content_dirty = true;
+                                              return std::nullopt;
+                                          }},
+                                          {"Cancel", []() -> std::optional<String> { return std::nullopt; }}
+                                      });
+        }
+
+        void AssetBrowser::BeginAssetDrag(Asset *asset, const String &display_name)
+        {
+            _asset_drag_data._assets = GetSelectedAssets();
+            if (_asset_drag_data._assets.empty() && asset != nullptr)
+                _asset_drag_data._assets.push_back(asset);
+            if (_asset_drag_data._assets.empty())
+                return;
+
+            UI::EDragType drag_type = UI::EDragType::kFile;
+            void *drag_data = &_asset_drag_data;
+            if (_asset_drag_data._assets.size() == 1u)
+            {
+                Asset *dragged_asset = _asset_drag_data._assets.front();
+                drag_data = dragged_asset;
+                if (dragged_asset->_asset_type == StaticClass<Render::Mesh>())
+                    drag_type = UI::EDragType::kMesh;
+                else if (dragged_asset->_asset_type == ScriptAsset::StaticType())
+                    drag_type = UI::EDragType::kScript;
+                else if (dragged_asset->_asset_type == PrefabAssetDocument::StaticType())
+                    drag_type = UI::EDragType::kPrefab;
+                else
+                    drag_data = &_asset_drag_data;
+            }
+            auto payload = UI::DragPayload{drag_type, drag_data};
+            UI::DragDropManager::Get().BeginDrag(payload, display_name);
+        }
+
+        void AssetBrowser::CopySelectionToClipboard()
+        {
+            _clipboard_assets = GetSelectedAssets();
+        }
+
+        void AssetBrowser::PasteClipboard()
+        {
+            if (_clipboard_assets.empty() || !_operations.CopyAssets(_clipboard_assets, _current_path))
+                return;
+            _content_dirty = true;
         }
 
         void AssetBrowser::RefreshContentLayout()
@@ -538,7 +821,8 @@ namespace Ailu
                 child->GetSlotAs<UI::CanvasSlot>().Position({x, y}).Size({cell_width, cell_height});
                 if (_is_list_view)
                 {
-                    if (auto row = child->As<UI::HorizontalBox>())
+                    UI::UIElement *content = child->ChildAt(0u);
+                    if (auto row = content != nullptr ? content->As<UI::HorizontalBox>() : nullptr)
                     {
                         if (auto icon = row->ChildAt(0u); icon != nullptr)
                             icon->GetSlotAs<UI::LinearSlot>().Size({icon_draw_size, icon_draw_size});
@@ -549,14 +833,18 @@ namespace Ailu
                         }
                     }
                 }
-                else if (auto tile = child->As<UI::VerticalBox>())
+                else
                 {
-                    if (auto icon = tile->ChildAt(0u); icon != nullptr)
-                        icon->GetSlotAs<UI::LinearSlot>().Size({icon_draw_size, icon_draw_size});
-                    if (auto text = tile->ChildAt(1u)->As<UI::Text>(); text != nullptr)
+                    UI::UIElement *content = child->ChildAt(0u);
+                    if (auto tile = content != nullptr ? content->As<UI::VerticalBox>() : nullptr)
                     {
-                        text->GetSlotAs<UI::LinearSlot>().Size({label_width, kIconLabelHeight});
-                        text->SetText(FitTextToWidth(text->Name(), label_width, text->FontSize()));
+                        if (auto icon = tile->ChildAt(0u); icon != nullptr)
+                            icon->GetSlotAs<UI::LinearSlot>().Size({icon_draw_size, icon_draw_size});
+                        if (auto text = tile->ChildAt(1u)->As<UI::Text>(); text != nullptr)
+                        {
+                            text->GetSlotAs<UI::LinearSlot>().Size({label_width, kIconLabelHeight});
+                            text->SetText(FitTextToWidth(text->Name(), label_width, text->FontSize()));
+                        }
                     }
                 }
                 if ((i + 1) % num_per_row == 0)
@@ -718,6 +1006,8 @@ namespace Ailu
         {
             Vector<PopupMenuAction> actions;
             BuildCreateAssetActions(actions, _current_path, popup_pos);
+            if (!_clipboard_assets.empty())
+                actions.push_back({"Paste", [this]() { PasteClipboard(); }});
             actions.push_back({"Refresh", [this]() { _content_dirty = true; }});
             EditorPopup::ShowActionMenuAt(popup_pos, actions);
         }
@@ -771,6 +1061,10 @@ namespace Ailu
             actions.push_back({"Rename", [this, asset, item_root, item_text]()
             {
                 BeginAssetRename(asset, item_root, item_text);
+            }});
+            actions.push_back({"Copy", [this, asset]()
+            {
+                _clipboard_assets = {asset};
             }});
             actions.push_back({"Delete", [this, asset_name, asset, popup_pos]()
             {

@@ -24,6 +24,7 @@ namespace Ailu
         f32 GetEndTime();
         bool IsValid();
         Transform Evaluate(const Transform& ref, f32 time, bool looping);
+        Transform Evaluate(const Transform& ref, f32 time, bool looping) const;
         void Resize(u16 frame_num);
     private:
         u16 _id;

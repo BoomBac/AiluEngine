@@ -14,13 +14,6 @@
 namespace Ailu
 {
     class Archive;
-    class AILU_API IPersistentable
-    {
-    public:
-        virtual ~IPersistentable() = default;
-        virtual void Serialize(Archive &arch) = 0;
-        virtual void Deserialize(Archive &arch) = 0;
-    };
     class AILU_API Archive
     {
     public:
@@ -63,17 +56,6 @@ namespace Ailu
             (*_is) >> obj;
             return (*_is);
         }
-        // std::ostream &operator<<(IPersistentable &obj)
-        // {
-        //     obj.Serialize(*this);
-        //     return GetOStream();
-        // }
-        // std::istream &operator>>(IPersistentable &obj)
-        // {
-        //     obj.Deserialize(*this);
-        //     return GetIStream();
-        // }
-
     protected:
         std::ostream *_os;
         std::istream *_is;

@@ -3,6 +3,53 @@
 
 namespace Ailu
 {
+    namespace
+    {
+        class AnimationControllerGraphSchema final : public IGraphSchema
+        {
+        public:
+            GraphConnectionResponse CanConnect(const GraphDocument &document, const GraphPinData &source,
+                                               const GraphPinData &target) const override
+            {
+                (void)document;
+                if (source._kind != EGraphPinKind::kExecution || target._kind != EGraphPinKind::kExecution)
+                    return GraphConnectionResponse::Disallow("Animation transitions require execution pins.");
+                if (source._direction == target._direction)
+                    return GraphConnectionResponse::Disallow("Transition pins must have opposite directions.");
+                const GraphPinData &output = source._direction == EGraphPinDirection::kOutput ? source : target;
+                const GraphPinData &input = source._direction == EGraphPinDirection::kInput ? source : target;
+                if (output._direction != EGraphPinDirection::kOutput || input._direction != EGraphPinDirection::kInput)
+                    return GraphConnectionResponse::Disallow("Invalid transition pin direction.");
+                return GraphConnectionResponse::Allow();
+            }
+
+            void CollectNodeActions(const GraphDocument &document, const GraphPinData *source_pin,
+                                    Vector<GraphNodeAction> &actions) const override
+            {
+                (void)document;
+                if (source_pin == nullptr || source_pin->_direction == EGraphPinDirection::kOutput)
+                    actions.emplace_back(GraphNodeAction{"Animation.State", "State", "Animation", "Animation state"});
+            }
+
+            bool CanDeleteNode(const GraphDocument &document, const GraphNodeData &node) const override
+            {
+                (void)document;
+                return node._node_type == "Animation.State";
+            }
+
+            bool CanCreateNode(const GraphDocument &document, StringView node_type) const override
+            {
+                (void)document;
+                return node_type == "Animation.State";
+            }
+
+            bool AllowsCycles() const override
+            {
+                return true;
+            }
+        };
+    }
+
     GraphConnectionResponse GraphConnectionResponse::Allow()
     {
         return {EGraphConnectionAction::kAllow, "", ""};
@@ -85,6 +132,8 @@ namespace Ailu
     {
         if (schema_type == "FlowGraphSchema")
             return MakeScope<FlowGraphSchema>();
+        if (schema_type == "AnimationControllerGraphSchema")
+            return MakeScope<AnimationControllerGraphSchema>();
         return MakeScope<IGraphSchema>();
     }
 } // namespace Ailu

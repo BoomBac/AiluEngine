@@ -293,6 +293,7 @@ namespace Ailu
             Color _tint_color = Colors::kWhite;
             Render::Texture *_texture = nullptr;
             Vector2f _tex_size = Vector2f::kZero;
+            Vector4f _uv_rect = {0.0f, 0.0f, 1.0f, 1.0f};
             APROPERTY()
             String _texture_guid;
         private:

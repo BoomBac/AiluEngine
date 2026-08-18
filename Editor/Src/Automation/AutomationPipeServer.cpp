@@ -42,17 +42,12 @@ namespace Ailu
         {
             if (!_running.exchange(false))
                 return;
-            {
-                // Closing the current instance unblocks a pending ReadFile / ConnectNamedPipe.
-                std::lock_guard<std::mutex> lock(_pipe_mutex);
-                if (_pipe != nullptr)
-                {
-                    CloseHandle(static_cast<HANDLE>(_pipe));
-                    _pipe = nullptr;
-                }
-            }
             if (_thread.joinable())
+            {
+                // Closing a synchronous pipe handle from another thread does not reliably cancel its I/O.
+                CancelSynchronousIo(_thread.native_handle());
                 _thread.join();
+            }
             _service = nullptr;
         }
 
@@ -71,51 +66,28 @@ namespace Ailu
                 if (pipe == INVALID_HANDLE_VALUE)
                     break;
 
-                bool handoff_to_finalize = false;
+                if (!_running.load())
                 {
-                    std::lock_guard<std::mutex> lock(_pipe_mutex);
-                    if (!_running.load())
-                    {
-                        // Finalize already returned; we own this handle.
-                        CloseHandle(pipe);
-                        return;
-                    }
-                    _pipe = pipe;
+                    CloseHandle(pipe);
+                    return;
                 }
 
                 const bool connected = ConnectNamedPipe(pipe, nullptr) || GetLastError() == ERROR_PIPE_CONNECTED;
-                {
-                    std::lock_guard<std::mutex> lock(_pipe_mutex);
-                    if (!_running.load())
-                    {
-                        // Finalize took the handle (closed it); never touch it again.
-                        _pipe = nullptr;
-                        handoff_to_finalize = true;
-                    }
-                    else
-                    {
-                        _pipe = nullptr;
-                    }
-                }
-                if (handoff_to_finalize)
-                    return;
-
                 if (!connected)
                 {
                     CloseHandle(pipe);
                     continue;
                 }
 
-                HandleConnection(pipe);
-
-                bool closed_by_finalize = false;
+                if (!_running.load())
                 {
-                    std::lock_guard<std::mutex> lock(_pipe_mutex);
-                    closed_by_finalize = !_running.load();
-                }
-                if (closed_by_finalize)
+                    CloseHandle(pipe);
                     return;
+                }
+                HandleConnection(pipe);
                 CloseHandle(pipe);
+                if (!_running.load())
+                    return;
             }
         }
 
@@ -134,7 +106,22 @@ namespace Ailu
                 }
                 const u64 request_id = request._request_id;
                 std::future<AutomationResult> future = _service->Submit(std::move(request));
-                if (future.wait_for(std::chrono::seconds(kRequestTimeoutSeconds)) == std::future_status::timeout)
+                const auto request_deadline = std::chrono::steady_clock::now() +
+                                              std::chrono::seconds(kRequestTimeoutSeconds);
+                bool request_timed_out = false;
+                while (_running.load())
+                {
+                    if (future.wait_for(std::chrono::milliseconds(50)) == std::future_status::ready)
+                        break;
+                    if (std::chrono::steady_clock::now() >= request_deadline)
+                    {
+                        request_timed_out = true;
+                        break;
+                    }
+                }
+                if (!_running.load())
+                    return;
+                if (request_timed_out)
                 {
                     const AutomationResult error = AutomationResult::Fail(AutomationErrors::kEditorNotReady,
                                                                           "request timed out waiting for the editor main thread");
@@ -204,5 +191,6 @@ namespace Ailu
                 return true;
             return ReadExact(pipe, payload.data(), length);
         }
+
     }// namespace Editor
 }// namespace Ailu

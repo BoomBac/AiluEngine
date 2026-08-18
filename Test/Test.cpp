@@ -64,6 +64,7 @@ namespace Ailu::Editor::AutomationTransportTests
     bool TestRequestResultJson();
     bool TestSessionFile();
     bool TestPipeRoundTrip();
+    bool TestPipeFinalizeWithoutClient();
 }
 
 namespace Ailu::Editor::AutomationCommandTests
@@ -81,6 +82,15 @@ namespace Ailu::Editor::AIAssistantTests
     bool TestAILoopReadAndPreview();
     bool TestAIReject();
     bool TestAIImmediateFinishForReadOnly();
+}
+
+namespace Ailu::AnimationTests
+{
+    bool TestControllerEntryAndClipEvaluation();
+    bool TestControllerCrossFadeWeights();
+    bool TestControllerTriggerConsumption();
+    bool TestAnimationEventLoopWrap();
+    bool TestSpriteAnimationTrackSampling();
 }
 
 namespace
@@ -1647,6 +1657,7 @@ namespace
         RunTest(result, "Request/Result JSON", TestRequestResultJson);
         RunTest(result, "Session file", TestSessionFile);
         RunTest(result, "Named pipe round trip", TestPipeRoundTrip);
+        RunTest(result, "Named pipe finalize without client", TestPipeFinalizeWithoutClient);
 
         std::cout << "========================================\n";
         std::cout << "Automation transport tests passed: " << result._passed << '\n';
@@ -1683,6 +1694,25 @@ namespace
         std::cout << "AI assistant tests passed: " << result._passed << '\n';
         std::cout << "AI assistant tests failed: " << result._failed << '\n';
         std::cout << "========================================\n";
+    }
+
+    void RunAnimationTests()
+    {
+        using namespace Ailu::AnimationTests;
+        TestResult result;
+        RunTest(result, "AnimationController entry and clip evaluation", TestControllerEntryAndClipEvaluation);
+        RunTest(result, "AnimationController crossfade weights", TestControllerCrossFadeWeights);
+        RunTest(result, "AnimationController trigger consumption", TestControllerTriggerConsumption);
+        RunTest(result, "Animation event loop wrap", TestAnimationEventLoopWrap);
+        RunTest(result, "Sprite animation track sampling", TestSpriteAnimationTrackSampling);
+
+        std::cout << "========================================\n";
+        std::cout << "Animation tests passed: " << result._passed << '\n';
+        std::cout << "Animation tests failed: " << result._failed << '\n';
+        std::cout << "========================================\n";
+
+        if (result._failed != 0u)
+            std::exit(EXIT_FAILURE);
     }
 
     void RunAllocatorTests()
@@ -1740,6 +1770,14 @@ int main(int argc, char **argv)
     // DEBUG 构建下部分引擎系统（如 SceneMgr 构造的 TIMER_BLOCK）依赖 TimeMgr。
     TimeMgr::Init();
 
+    if (argc == 2 && std::strcmp(argv[1], "--animation-tests") == 0)
+    {
+        RunAnimationTests();
+        Allocator::Shutdown();
+        LogMgr::Shutdown();
+        return EXIT_SUCCESS;
+    }
+
     if (argc == 2 && std::strcmp(argv[1], "--ui-element-roundtrip") == 0)
     {
         TestResult result;
@@ -1779,6 +1817,7 @@ int main(int argc, char **argv)
     RunAutomationTransportTests();
     RunAutomationCommandTests();
     RunAIAssistantTests();
+    RunAnimationTests();
     RunEntityGuidUnitTests();
     RunAllocatorTests();// 内部负责 Shutdown
     return EXIT_SUCCESS;

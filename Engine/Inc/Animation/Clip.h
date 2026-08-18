@@ -4,14 +4,15 @@
 #include <map>
 #include "Skeleton.h"
 #include "Objects/Object.h"
-#include "Objects/Serialize.h"
 #include "TransformTrack.h"
+#include "SpriteAnimationTrack.h"
+#include "AnimationEvent.h"
 #include "Pose.h"
 #include "generated/Clip.gen.h"
 namespace Ailu
 {
     ACLASS()
-    class AILU_API AnimationClip : public Object, public IPersistentable
+    class AILU_API AnimationClip : public Object
 	{
         GENERATED_BODY()
 	public:
@@ -20,6 +21,11 @@ namespace Ailu
         //特定轨道索引的关节标识
         u16 GetIdAtIndex(u32 index) const;
         const TransformTrack& GetTrackAtIndex(u32 index) const { return _tracks[index]; }
+        const SpriteAnimationTrack &SpriteTrack() const { return _sprite_track; }
+        SpriteAnimationTrack &SpriteTrack() { return _sprite_track; }
+        const Vector<AnimationEvent> &Events() const { return _events; }
+        Vector<AnimationEvent> &Events() { return _events; }
+        void AddEvent(AnimationEvent event);
         void SetIdAtIndex(u32 index, u32 id);
         //包含的关节数量
         [[nodiscard]] u32 Size() const;
@@ -27,9 +33,6 @@ namespace Ailu
         TransformTrack& operator[](u16 joint);
         //由anim loader调用，
         void RecalculateDuration();
-        void Serialize(Archive &arch) final;
-        void Deserialize(Archive &arch) final;
-
 		[[nodiscard]] u32 FrameCount() const { return _frame_count; }
         void FrameCount(u32 frame_count) { _frame_count = frame_count; }
 		//total duration in seconds
@@ -57,6 +60,8 @@ namespace Ailu
         f32 _frame_duration;
         bool _is_looping;
         Vector<TransformTrack> _tracks;
+        SpriteAnimationTrack _sprite_track;
+        Vector<AnimationEvent> _events;
 	};
 
     class AILU_API AnimationClipLibrary

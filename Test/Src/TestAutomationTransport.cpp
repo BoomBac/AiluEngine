@@ -10,6 +10,7 @@
 
 #include <windows.h>
 
+#include <chrono>
 #include <filesystem>
 
 using namespace Ailu;
@@ -198,5 +199,24 @@ namespace Ailu::Editor::AutomationTransportTests
         server.Finalize();
         service.Finalize();
         return true;
+    }
+
+    bool TestPipeFinalizeWithoutClient()
+    {
+        EditorAutomationService service;
+        service.Initialize();
+        AutomationPipeServer server;
+        server.Initialize(service);
+        if (!server.IsRunning())
+        {
+            service.Finalize();
+            return false;
+        }
+
+        const auto start = std::chrono::steady_clock::now();
+        server.Finalize();
+        const auto elapsed = std::chrono::steady_clock::now() - start;
+        service.Finalize();
+        return elapsed < std::chrono::seconds(1);
     }
 }// namespace Ailu::Editor::AutomationTransportTests

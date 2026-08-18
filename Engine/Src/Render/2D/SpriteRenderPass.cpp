@@ -113,7 +113,7 @@ namespace Ailu::Render
             render_data._local_to_world = transform->GetWorldMatrix();
             render_data._uv_rect = sprite->_uv_rect;
             render_data._color = sprite_renderer._color;
-            render_data._size = sprite->_size;
+            render_data._size = sprite->GetRenderSize();
             render_data._pivot = sprite->_pivot;
             render_data._texture = texture_ptr;
             render_data._material = sprite_renderer._material.get();

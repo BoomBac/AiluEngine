@@ -93,6 +93,17 @@ namespace Ailu
                 nullptr
             });
             RegisterCreator({
+                "New Animation Clip", "Create Animation Clip", "NewAnimationClip", "Animation Clip already exists.", L".alasset",
+                [](const fs::path &directory, const String &name) { return CreateAnimationClipAsset(directory, name); },
+                nullptr
+            });
+            RegisterCreator({
+                "New Animation Controller", "Create Animation Controller", "NewAnimationController",
+                "Animation Controller already exists.", L".alasset",
+                [](const fs::path &directory, const String &name) { return CreateAnimationControllerAsset(directory, name); },
+                nullptr
+            });
+            RegisterCreator({
                 "New Widget Asset", "Create Widget Asset", "NewWidget", "Widget Asset already exists.", L".alasset",
                 [](const fs::path &directory, const String &name) { return CreateWidgetAsset(directory, name); },
                 nullptr

@@ -80,6 +80,7 @@ endfunction()
 add_executable(Test
     "Test.cpp"
     "Test.h"
+    "Src/TestAnimation.cpp"
     "Src/TestAutomationCore.cpp"
     "Src/TestAutomationReadModel.cpp"
     "Src/TestAutomationAdapter.cpp"

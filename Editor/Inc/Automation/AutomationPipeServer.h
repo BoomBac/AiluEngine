@@ -6,7 +6,6 @@
 #include "Framework/Core/String.h"
 
 #include <atomic>
-#include <mutex>
 #include <thread>
 
 namespace Ailu
@@ -43,10 +42,6 @@ namespace Ailu
             EditorAutomationService *_service = nullptr;
             String _pipe_name;
             String _session_id;
-            // Current pipe instance; owned by the worker thread, but Finalize may
-            // take it (close it) to unblock a pending connect/read during shutdown.
-            void *_pipe = nullptr;
-            std::mutex _pipe_mutex;
             std::thread _thread;
             std::atomic<bool> _running = false;
         };

@@ -1,10 +1,13 @@
 #include "Widgets/AssetBrowserOperations.h"
 
+#include "Assets/Asset.h"
 #include "Widgets/AssetBrowserContent.h"
 
 #include "Assets/PrefabAsset.h"
 #include "Assets/ScriptAsset.h"
 #include "Assets/WidgetAsset.h"
+#include "Animation/AnimationControllerAsset.h"
+#include "Animation/Clip.h"
 #include "Common/EditorPopup.h"
 #include "Framework/Common/FileManager.h"
 #include "Framework/Common/Path.h"
@@ -55,10 +58,26 @@ namespace Ailu
                     return false;
 
                 auto lines = StringUtils::Split(content, L"\n");
-                if (lines.size() < 3u)
+                const WString key = L"\"_asset_name\"";
+                const WString value = ToWChar(new_name.c_str());
+                bool replaced = false;
+                for (auto &line: lines)
+                {
+                    const size_t key_pos = line.find(key);
+                    if (key_pos == WString::npos)
+                        continue;
+                    const size_t colon_pos = line.find(L':', key_pos + key.size());
+                    const size_t value_begin = colon_pos == WString::npos ? WString::npos : line.find(L'"', colon_pos + 1u);
+                    const size_t value_end = value_begin == WString::npos ? WString::npos : line.find(L'"', value_begin + 1u);
+                    if (value_end == WString::npos)
+                        continue;
+                    line.replace(value_begin + 1u, value_end - value_begin - 1u, value);
+                    replaced = true;
+                    break;
+                }
+                if (!replaced)
                     return false;
 
-                lines[2] = std::format(L"name: {}", ToWChar(new_name.c_str()));
                 std::wstringstream buffer;
                 for (size_t i = 0; i < lines.size(); ++i)
                 {
@@ -69,6 +88,75 @@ namespace Ailu
                         buffer << L'\n';
                 }
                 return FileManager::WriteFile(sys_path, false, buffer.str());
+            }
+
+            bool RewriteAssetHeaderGuid(const WString &sys_path, const Guid &guid)
+            {
+                WString content;
+                if (!FileManager::ReadFile(sys_path, content))
+                    return false;
+
+                auto lines = StringUtils::Split(content, L"\n");
+                const WString key = L"\"_guid\"";
+                const WString value = ToWChar(guid.ToString().c_str());
+                bool replaced = false;
+                for (auto &line: lines)
+                {
+                    const size_t key_pos = line.find(key);
+                    if (key_pos == WString::npos)
+                        continue;
+                    const size_t colon_pos = line.find(L':', key_pos + key.size());
+                    const size_t value_begin = colon_pos == WString::npos ? WString::npos : line.find(L'"', colon_pos + 1u);
+                    const size_t value_end = value_begin == WString::npos ? WString::npos : line.find(L'"', value_begin + 1u);
+                    if (value_end == WString::npos)
+                        continue;
+                    line.replace(value_begin + 1u, value_end - value_begin - 1u, value);
+                    replaced = true;
+                    break;
+                }
+                if (!replaced)
+                    return false;
+
+                std::wstringstream buffer;
+                for (size_t i = 0; i < lines.size(); ++i)
+                {
+                    if (!lines[i].empty() && lines[i].back() == L'\r')
+                        lines[i].pop_back();
+                    buffer << lines[i];
+                    if (i + 1u < lines.size())
+                        buffer << L'\n';
+                }
+                return FileManager::WriteFile(sys_path, false, buffer.str());
+            }
+
+            fs::path MakeUniqueTransferPath(const fs::path &directory, const fs::path &source_path)
+            {
+                AssetBrowserContent content;
+                const WString asset_directory = content.GetAssetDirectory(directory);
+                const String stem = source_path.stem().string();
+                const WString extension = source_path.extension().wstring();
+                auto is_available = [&](const String &name)
+                {
+                    const fs::path candidate = directory / fs::path(ToWChar(name.c_str()) + extension);
+                    const WString logical_path = AppendChildAssetPath(asset_directory, candidate.filename().wstring());
+                    return !fs::exists(candidate) && ResourceMgr::Get().GetAsset(logical_path) == nullptr;
+                };
+
+                if (is_available(stem))
+                    return directory / fs::path(ToWChar(stem.c_str()) + extension);
+
+                for (u32 suffix = 1u;; ++suffix)
+                {
+                    const String candidate_name = std::format("{}({})", stem, suffix);
+                    if (is_available(candidate_name))
+                        return directory / fs::path(ToWChar(candidate_name.c_str()) + extension);
+                }
+            }
+
+            WString GetAssetPathForSystemPath(const fs::path &path)
+            {
+                AssetBrowserContent content;
+                return ResourceMgr::NormalizeAssetPath(path.wstring(), content.GetDomain(path));
             }
 
             Ref<Render::Shader> EnsureDefaultMaterialShader()
@@ -294,6 +382,45 @@ namespace Ailu
 
             auto input_asset = MakeRef<InputActionAsset>(trimmed_name);
             ResourceMgr::Get().CreateAsset(asset_path, input_asset);
+            ResourceMgr::Get().SaveAllUnsavedAssets();
+            return true;
+        }
+
+        bool CreateAnimationClipAsset(const fs::path &directory, const String &name)
+        {
+            const String trimmed_name = TrimNameCopy(name);
+            if (trimmed_name.empty())
+                return false;
+
+            AssetBrowserContent content;
+            const WString asset_path = AppendChildAssetPath(content.GetAssetDirectory(directory),
+                                                            ToWChar(trimmed_name.c_str()) + WString(L".alasset"));
+            if (ResourceMgr::Get().GetAsset(asset_path) != nullptr || fs::exists(ResourceMgr::GetResSysPath(asset_path)))
+                return false;
+
+            auto clip = MakeRef<AnimationClip>();
+            clip->Name(trimmed_name);
+            if (ResourceMgr::Get().CreateAsset(asset_path, clip, false) == nullptr)
+                return false;
+            ResourceMgr::Get().SaveAllUnsavedAssets();
+            return true;
+        }
+
+        bool CreateAnimationControllerAsset(const fs::path &directory, const String &name)
+        {
+            const String trimmed_name = TrimNameCopy(name);
+            if (trimmed_name.empty())
+                return false;
+
+            AssetBrowserContent content;
+            const WString asset_path = AppendChildAssetPath(content.GetAssetDirectory(directory),
+                                                            ToWChar(trimmed_name.c_str()) + WString(L".alasset"));
+            if (ResourceMgr::Get().GetAsset(asset_path) != nullptr || fs::exists(ResourceMgr::GetResSysPath(asset_path)))
+                return false;
+
+            auto controller = MakeRef<AnimationControllerAsset>(trimmed_name);
+            if (ResourceMgr::Get().CreateAsset(asset_path, controller, false) == nullptr)
+                return false;
             ResourceMgr::Get().SaveAllUnsavedAssets();
             return true;
         }
@@ -536,6 +663,99 @@ return script
 
             FileManager::CreateDirectory(new_folder_path.wstring());
             return fs::exists(new_folder_path);
+        }
+
+        bool AssetBrowserOperations::MoveAssets(const Vector<Asset *> &assets, const fs::path &target_directory)
+        {
+            if (assets.empty() || !fs::exists(target_directory) || !fs::is_directory(target_directory))
+                return false;
+
+            bool moved_any = false;
+            for (auto *asset: assets)
+            {
+                if (asset == nullptr)
+                    continue;
+
+                const fs::path source_path(ResourceMgr::GetResSysPath(asset->_asset_path));
+                if (!fs::exists(source_path) || !fs::is_regular_file(source_path))
+                    continue;
+                if (source_path.parent_path() == target_directory)
+                {
+                    moved_any = true;
+                    continue;
+                }
+
+                fs::path target_path = MakeUniqueTransferPath(target_directory, source_path);
+
+                const WString target_asset_path = GetAssetPathForSystemPath(target_path);
+                std::error_code rename_error;
+                fs::rename(source_path, target_path, rename_error);
+                if (rename_error)
+                {
+                    LOG_WARNING("AssetBrowser: move asset failed, {}", rename_error.message());
+                    continue;
+                }
+
+                if (!ResourceMgr::Get().MoveAsset(asset, target_asset_path))
+                {
+                    std::error_code rollback_error;
+                    fs::rename(target_path, source_path, rollback_error);
+                    if (rollback_error)
+                        LOG_WARNING("AssetBrowser: move rollback failed, {}", rollback_error.message());
+                    continue;
+                }
+                moved_any = true;
+            }
+
+            if (moved_any)
+                ResourceMgr::Get().SaveAllUnsavedAssets();
+            return moved_any;
+        }
+
+        bool AssetBrowserOperations::CopyAssets(const Vector<Asset *> &assets, const fs::path &target_directory)
+        {
+            if (assets.empty() || !fs::exists(target_directory) || !fs::is_directory(target_directory))
+                return false;
+
+            bool copied_any = false;
+            for (auto *asset: assets)
+            {
+                if (asset == nullptr)
+                    continue;
+
+                const fs::path source_path(ResourceMgr::GetResSysPath(asset->_asset_path));
+                if (!fs::exists(source_path) || !fs::is_regular_file(source_path))
+                    continue;
+
+                const fs::path target_path = MakeUniqueTransferPath(target_directory, source_path);
+                std::error_code copy_error;
+                fs::copy_file(source_path, target_path, fs::copy_options::none, copy_error);
+                if (copy_error)
+                {
+                    LOG_WARNING("AssetBrowser: copy asset failed, {}", copy_error.message());
+                    continue;
+                }
+
+                const String target_name = target_path.stem().string();
+                if (!RewriteAssetHeaderGuid(target_path.wstring(), Guid::Generate()) ||
+                    !RewriteAssetHeaderName(target_path.wstring(), target_name))
+                {
+                    std::error_code remove_error;
+                    fs::remove(target_path, remove_error);
+                    continue;
+                }
+
+                const WString target_asset_path = GetAssetPathForSystemPath(target_path);
+                if (ResourceMgr::Get().Load(target_asset_path, nullptr, asset->_asset_type) == nullptr)
+                {
+                    std::error_code remove_error;
+                    fs::remove(target_path, remove_error);
+                    continue;
+                }
+                copied_any = true;
+            }
+
+            return copied_any;
         }
 
         String AssetBrowserOperations::MakeUniqueEntryName(const fs::path &directory, const String &base_name, const WString &extension, bool is_directory) const

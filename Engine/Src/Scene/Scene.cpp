@@ -41,6 +41,7 @@ namespace Ailu::SceneManagement
         _register.RegisterComponent<ECS::RigidBody2DComponent>();
         _register.RegisterComponent<ECS::Collider2DComponent>();
         _register.RegisterComponent<ECS::CSkeletonMesh>();
+        _register.RegisterComponent<ECS::AnimatorComponent>();
         _register.RegisterComponent<ECS::CVXGI>();
         _register.RegisterComponent<ECS::SpriteRendererComponent>();
         _register.RegisterComponent<ECS::AudioSourceComponent>();
@@ -64,7 +65,7 @@ namespace Ailu::SceneManagement
         phy_2d_sig.set(_register.GetComponentTypeID<ECS::Collider2DComponent>(), true);
         _register.RegisterSystem<ECS::Physics2DSystem>(phy_2d_sig);
         ECS::Signature anim_sig;
-        anim_sig.set(_register.GetComponentTypeID<ECS::CSkeletonMesh>(), true);
+        anim_sig.set(_register.GetComponentTypeID<ECS::AnimatorComponent>(), true);
         _register.RegisterSystem<ECS::AnimationSystem>(anim_sig);
         ECS::Signature audio_sig;
         audio_sig.set(_register.GetComponentTypeID<ECS::TransformComponent>(), true);

@@ -1302,6 +1302,7 @@ namespace Ailu
             // Draw the texture on top
             ImageDrawOptions opts;
             opts._transform = _matrix;
+            opts._uv_rect = _uv_rect;
             opts._tint = _resolved_visual._content_color;
             opts._size_override = _tex_size;
             opts._corner_radius = _resolved_visual._corner_radius;

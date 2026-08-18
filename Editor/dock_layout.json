@@ -5,14 +5,14 @@
             "_parent_id": 4294967295,
             "_type": 0,
             "_is_vertical_split": true,
-            "_split_ratio": 0.7424,
+            "_split_ratio": 0.7422,
             "_title": "null",
             "_window_id": 0,
             "_tab_id": "",
             "_window_position": [-858993472.0, -858993472.0],
-            "_window_size": [1491.0, 801.0],
+            "_window_size": [2015.0, 1098.0],
             "_position": [0.0, 34.0],
-            "_size": [1491.0, 743.0],
+            "_size": [2015.0, 1040.0],
             "_flags": 16,
             "_window_state": ""
         }, {
@@ -26,9 +26,9 @@
             "_window_id": 0,
             "_tab_id": "",
             "_window_position": [-858993472.0, -858993472.0],
-            "_window_size": [1491.0, 801.0],
+            "_window_size": [2015.0, 1098.0],
             "_position": [0.0, 34.0],
-            "_size": [1107.0, 743.0],
+            "_size": [1495.7344, 1040.0],
             "_flags": 0,
             "_window_state": ""
         }, {
@@ -37,14 +37,14 @@
             "_parent_id": 4,
             "_type": 0,
             "_is_vertical_split": true,
-            "_split_ratio": 0.2199,
+            "_split_ratio": 0.2197,
             "_title": "null",
             "_window_id": 0,
             "_tab_id": "",
             "_window_position": [-858993472.0, -858993472.0],
-            "_window_size": [1491.0, 801.0],
+            "_window_size": [2015.0, 1098.0],
             "_position": [0.0, 34.0],
-            "_size": [1107.0, 473.0279],
+            "_size": [1495.7344, 662.064],
             "_flags": 0,
             "_window_state": ""
         }, {
@@ -58,9 +58,9 @@
             "_window_id": 0,
             "_tab_id": "",
             "_window_position": [-858993472.0, -858993472.0],
-            "_window_size": [1491.0, 801.0],
+            "_window_size": [2015.0, 1098.0],
             "_position": [0.0, 34.0],
-            "_size": [243.5399, 473.0279],
+            "_size": [328.7624, 662.064],
             "_flags": 0,
             "_window_state": ""
         }, {
@@ -74,14 +74,14 @@
             "_window_id": 0,
             "_tab_id": "0",
             "_window_position": [-858993472.0, -858993472.0],
-            "_window_size": [1491.0, 801.0],
-            "_position": [243.5399, 34.0],
-            "_size": [863.46, 473.0279],
+            "_window_size": [2015.0, 1098.0],
+            "_position": [328.7624, 34.0],
+            "_size": [1166.972, 662.064],
             "_flags": 0,
             "_window_state": ""
         }, {
             "_type_id": "Ailu::Editor::SceneView",
-            "_id": 6,
+            "_id": 114,
             "_parent_id": 5,
             "_type": 2,
             "_is_vertical_split": true,
@@ -90,14 +90,14 @@
             "_window_id": 0,
             "_tab_id": "",
             "_window_position": [-858993472.0, -858993472.0],
-            "_window_size": [1491.0, 801.0],
-            "_position": [243.5399, 34.0],
-            "_size": [863.46, 473.0279],
+            "_window_size": [2015.0, 1098.0],
+            "_position": [328.7624, 34.0],
+            "_size": [1166.972, 662.064],
             "_flags": 0,
             "_window_state": ""
         }, {
             "_type_id": "Ailu::Editor::GameView",
-            "_id": 7,
+            "_id": 115,
             "_parent_id": 5,
             "_type": 2,
             "_is_vertical_split": true,
@@ -106,9 +106,9 @@
             "_window_id": 0,
             "_tab_id": "",
             "_window_position": [-858993472.0, -858993472.0],
-            "_window_size": [1491.0, 801.0],
-            "_position": [243.5399, 34.0],
-            "_size": [863.46, 473.0279],
+            "_window_size": [2015.0, 1098.0],
+            "_position": [328.7624, 34.0],
+            "_size": [1166.972, 662.064],
             "_flags": 0,
             "_window_state": ""
         }, {
@@ -122,11 +122,11 @@
             "_window_id": 0,
             "_tab_id": "",
             "_window_position": [-858993472.0, -858993472.0],
-            "_window_size": [1491.0, 801.0],
-            "_position": [0.0, 507.0279],
-            "_size": [1107.0, 269.972],
+            "_window_size": [2015.0, 1098.0],
+            "_position": [0.0, 696.064],
+            "_size": [1495.7344, 377.9359],
             "_flags": 0,
-            "_window_state": "{\n    \"_split_ratio\": 0.2127\n}"
+            "_window_state": "{\n    \"_split_ratio\": 0.2125\n}"
         }, {
             "_type_id": "Ailu::Editor::ObjectDetail",
             "_id": 2,
@@ -138,9 +138,9 @@
             "_window_id": 0,
             "_tab_id": "",
             "_window_position": [-858993472.0, -858993472.0],
-            "_window_size": [1491.0, 801.0],
-            "_position": [1107.0, 34.0],
-            "_size": [384.0, 743.0],
+            "_window_size": [2015.0, 1098.0],
+            "_position": [1495.7344, 34.0],
+            "_size": [519.2655, 1040.0],
             "_flags": 0,
             "_window_state": ""
         }]

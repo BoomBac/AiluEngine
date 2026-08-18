@@ -966,6 +966,48 @@ builder_tracks._meta = meta_tracks;
 builder_tracks._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<AnimationClipTrackDocument>>);
 builder_tracks._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<AnimationClipTrackDocument>>);
 initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_tracks));
+Meta meta_sprite_frames;
+meta_sprite_frames.Set("Category","");
+meta_sprite_frames.Set("IsColor",false);
+meta_sprite_frames.Set("IsRange",false);
+meta_sprite_frames.Set("IsFloatRange",true);
+meta_sprite_frames.Set("RangeMin",(f32)0);
+meta_sprite_frames.Set("RangeMax",(f32)1);
+MemberBuilder builder_sprite_frames;
+builder_sprite_frames._name = "_sprite_frames";
+builder_sprite_frames._type_name = "Vector<AnimationSpriteFrameDocument>";
+builder_sprite_frames._offset = offsetof(AnimationClipAssetDocument,_sprite_frames);
+builder_sprite_frames._is_const = false;
+builder_sprite_frames._is_static = false;
+builder_sprite_frames._is_public = true;
+builder_sprite_frames._is_pointer = false;
+builder_sprite_frames._is_ref = false;
+builder_sprite_frames._is_template = true;
+builder_sprite_frames._meta = meta_sprite_frames;
+builder_sprite_frames._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<AnimationSpriteFrameDocument>>);
+builder_sprite_frames._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<AnimationSpriteFrameDocument>>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_sprite_frames));
+Meta meta_events;
+meta_events.Set("Category","");
+meta_events.Set("IsColor",false);
+meta_events.Set("IsRange",false);
+meta_events.Set("IsFloatRange",true);
+meta_events.Set("RangeMin",(f32)0);
+meta_events.Set("RangeMax",(f32)1);
+MemberBuilder builder_events;
+builder_events._name = "_events";
+builder_events._type_name = "Vector<AnimationEventDocument>";
+builder_events._offset = offsetof(AnimationClipAssetDocument,_events);
+builder_events._is_const = false;
+builder_events._is_static = false;
+builder_events._is_public = true;
+builder_events._is_pointer = false;
+builder_events._is_ref = false;
+builder_events._is_template = true;
+builder_events._meta = meta_events;
+builder_events._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<AnimationEventDocument>>);
+builder_events._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<AnimationEventDocument>>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_events));
 cur_type = std::make_unique<Ailu::Type>(initializer);
 Ailu::Type::RegisterType(cur_type.get());
 }
@@ -987,6 +1029,168 @@ return Ailu::AnimationClipAssetDocument::StaticType();
 return Ailu::AnimationClipAssetDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_AnimationClipAssetDocument(&Ailu::AnimationClipAssetDocument::StaticType, "Ailu::AnimationClipAssetDocument");
+const Ailu::Type* Ailu::Z_Construct_AnimationControllerAssetDocument_Type()
+{
+Ailu::Object::StaticType();
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "AnimationControllerAssetDocument";
+initializer._size = sizeof(Ailu::AnimationControllerAssetDocument);
+initializer._full_name = "Ailu::AnimationControllerAssetDocument";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu";
+initializer._base_name = "Ailu::Object";
+initializer._constructor = []()->Ailu::AnimationControllerAssetDocument* {return new Ailu::AnimationControllerAssetDocument;};
+Meta meta_header;
+meta_header.Set("Category","");
+meta_header.Set("IsColor",false);
+meta_header.Set("IsRange",false);
+meta_header.Set("IsFloatRange",true);
+meta_header.Set("RangeMin",(f32)0);
+meta_header.Set("RangeMax",(f32)1);
+MemberBuilder builder_header;
+builder_header._name = "_header";
+builder_header._type_name = "Ailu::AssetDocumentHeader";
+builder_header._offset = offsetof(AnimationControllerAssetDocument,_header);
+builder_header._is_const = false;
+builder_header._is_static = false;
+builder_header._is_public = true;
+builder_header._is_pointer = false;
+builder_header._is_ref = false;
+builder_header._is_template = false;
+builder_header._meta = meta_header;
+builder_header._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<AssetDocumentHeader>);
+builder_header._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<AssetDocumentHeader>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_header));
+Meta meta_parameters;
+meta_parameters.Set("Category","");
+meta_parameters.Set("IsColor",false);
+meta_parameters.Set("IsRange",false);
+meta_parameters.Set("IsFloatRange",true);
+meta_parameters.Set("RangeMin",(f32)0);
+meta_parameters.Set("RangeMax",(f32)1);
+MemberBuilder builder_parameters;
+builder_parameters._name = "_parameters";
+builder_parameters._type_name = "Vector<AnimationParameterDesc>";
+builder_parameters._offset = offsetof(AnimationControllerAssetDocument,_parameters);
+builder_parameters._is_const = false;
+builder_parameters._is_static = false;
+builder_parameters._is_public = true;
+builder_parameters._is_pointer = false;
+builder_parameters._is_ref = false;
+builder_parameters._is_template = true;
+builder_parameters._meta = meta_parameters;
+builder_parameters._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<AnimationParameterDesc>>);
+builder_parameters._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<AnimationParameterDesc>>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_parameters));
+Meta meta_states;
+meta_states.Set("Category","");
+meta_states.Set("IsColor",false);
+meta_states.Set("IsRange",false);
+meta_states.Set("IsFloatRange",true);
+meta_states.Set("RangeMin",(f32)0);
+meta_states.Set("RangeMax",(f32)1);
+MemberBuilder builder_states;
+builder_states._name = "_states";
+builder_states._type_name = "Vector<AnimationState>";
+builder_states._offset = offsetof(AnimationControllerAssetDocument,_states);
+builder_states._is_const = false;
+builder_states._is_static = false;
+builder_states._is_public = true;
+builder_states._is_pointer = false;
+builder_states._is_ref = false;
+builder_states._is_template = true;
+builder_states._meta = meta_states;
+builder_states._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<AnimationState>>);
+builder_states._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<AnimationState>>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_states));
+Meta meta_transitions;
+meta_transitions.Set("Category","");
+meta_transitions.Set("IsColor",false);
+meta_transitions.Set("IsRange",false);
+meta_transitions.Set("IsFloatRange",true);
+meta_transitions.Set("RangeMin",(f32)0);
+meta_transitions.Set("RangeMax",(f32)1);
+MemberBuilder builder_transitions;
+builder_transitions._name = "_transitions";
+builder_transitions._type_name = "Vector<AnimationTransition>";
+builder_transitions._offset = offsetof(AnimationControllerAssetDocument,_transitions);
+builder_transitions._is_const = false;
+builder_transitions._is_static = false;
+builder_transitions._is_public = true;
+builder_transitions._is_pointer = false;
+builder_transitions._is_ref = false;
+builder_transitions._is_template = true;
+builder_transitions._meta = meta_transitions;
+builder_transitions._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<AnimationTransition>>);
+builder_transitions._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<AnimationTransition>>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_transitions));
+Meta meta_any_state_transitions;
+meta_any_state_transitions.Set("Category","");
+meta_any_state_transitions.Set("IsColor",false);
+meta_any_state_transitions.Set("IsRange",false);
+meta_any_state_transitions.Set("IsFloatRange",true);
+meta_any_state_transitions.Set("RangeMin",(f32)0);
+meta_any_state_transitions.Set("RangeMax",(f32)1);
+MemberBuilder builder_any_state_transitions;
+builder_any_state_transitions._name = "_any_state_transitions";
+builder_any_state_transitions._type_name = "Vector<u16>";
+builder_any_state_transitions._offset = offsetof(AnimationControllerAssetDocument,_any_state_transitions);
+builder_any_state_transitions._is_const = false;
+builder_any_state_transitions._is_static = false;
+builder_any_state_transitions._is_public = true;
+builder_any_state_transitions._is_pointer = false;
+builder_any_state_transitions._is_ref = false;
+builder_any_state_transitions._is_template = true;
+builder_any_state_transitions._meta = meta_any_state_transitions;
+builder_any_state_transitions._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<u16>>);
+builder_any_state_transitions._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<u16>>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_any_state_transitions));
+Meta meta_entry_state;
+meta_entry_state.Set("Category","");
+meta_entry_state.Set("IsColor",false);
+meta_entry_state.Set("IsRange",false);
+meta_entry_state.Set("IsFloatRange",true);
+meta_entry_state.Set("RangeMin",(f32)0);
+meta_entry_state.Set("RangeMax",(f32)1);
+MemberBuilder builder_entry_state;
+builder_entry_state._name = "_entry_state";
+builder_entry_state._type_name = "u16";
+builder_entry_state._offset = offsetof(AnimationControllerAssetDocument,_entry_state);
+builder_entry_state._is_const = false;
+builder_entry_state._is_static = false;
+builder_entry_state._is_public = true;
+builder_entry_state._is_pointer = false;
+builder_entry_state._is_ref = false;
+builder_entry_state._is_template = false;
+builder_entry_state._meta = meta_entry_state;
+builder_entry_state._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<u16>);
+builder_entry_state._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<u16>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_entry_state));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+const Ailu::Type* Ailu::AnimationControllerAssetDocument::GetPrivateStaticClass()
+{
+	static const Ailu::Type* type = Z_Construct_AnimationControllerAssetDocument_Type();
+	return type;
+}
+
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::AnimationControllerAssetDocument>()
+{
+return Ailu::AnimationControllerAssetDocument::StaticType();
+}
+    const Type *Ailu::AnimationControllerAssetDocument::GetType()
+{
+return Ailu::AnimationControllerAssetDocument::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_AnimationControllerAssetDocument(&Ailu::AnimationControllerAssetDocument::StaticType, "Ailu::AnimationControllerAssetDocument");
 const Ailu::Type* Ailu::Z_Construct_SpriteAssetDocument_Type()
 {
 Ailu::Object::StaticType();
@@ -2230,6 +2434,181 @@ return Ailu::AnimationClipTrackDocument::StaticType();
 return Ailu::AnimationClipTrackDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_AnimationClipTrackDocument(&Ailu::AnimationClipTrackDocument::StaticType, "Ailu::AnimationClipTrackDocument");
+const Ailu::Type* Ailu::Z_Construct_AnimationSpriteFrameDocument_Type()
+{
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "AnimationSpriteFrameDocument";
+initializer._size = sizeof(Ailu::AnimationSpriteFrameDocument);
+initializer._full_name = "Ailu::AnimationSpriteFrameDocument";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu";
+initializer._base_name = "";
+initializer._constructor = []()->Ailu::AnimationSpriteFrameDocument* {return new Ailu::AnimationSpriteFrameDocument;};
+Meta meta_time;
+meta_time.Set("Category","");
+meta_time.Set("IsColor",false);
+meta_time.Set("IsRange",false);
+meta_time.Set("IsFloatRange",true);
+meta_time.Set("RangeMin",(f32)0);
+meta_time.Set("RangeMax",(f32)1);
+MemberBuilder builder_time;
+builder_time._name = "_time";
+builder_time._type_name = "f32";
+builder_time._offset = offsetof(AnimationSpriteFrameDocument,_time);
+builder_time._is_const = false;
+builder_time._is_static = false;
+builder_time._is_public = true;
+builder_time._is_pointer = false;
+builder_time._is_ref = false;
+builder_time._is_template = false;
+builder_time._meta = meta_time;
+builder_time._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_time._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_time));
+Meta meta_sprite;
+meta_sprite.Set("Category","");
+meta_sprite.Set("IsColor",false);
+meta_sprite.Set("IsRange",false);
+meta_sprite.Set("IsFloatRange",true);
+meta_sprite.Set("RangeMin",(f32)0);
+meta_sprite.Set("RangeMax",(f32)1);
+MemberBuilder builder_sprite;
+builder_sprite._name = "_sprite";
+builder_sprite._type_name = "Ailu::Guid";
+builder_sprite._offset = offsetof(AnimationSpriteFrameDocument,_sprite);
+builder_sprite._is_const = false;
+builder_sprite._is_static = false;
+builder_sprite._is_public = true;
+builder_sprite._is_pointer = false;
+builder_sprite._is_ref = false;
+builder_sprite._is_template = false;
+builder_sprite._meta = meta_sprite;
+builder_sprite._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Guid>);
+builder_sprite._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Guid>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_sprite));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+const Ailu::Type* Ailu::AnimationSpriteFrameDocument::GetPrivateStaticClass()
+{
+	static const Ailu::Type* type = Z_Construct_AnimationSpriteFrameDocument_Type();
+	return type;
+}
+
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::AnimationSpriteFrameDocument>()
+{
+return Ailu::AnimationSpriteFrameDocument::StaticType();
+}
+    const Type *Ailu::AnimationSpriteFrameDocument::GetType()
+{
+return Ailu::AnimationSpriteFrameDocument::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_AnimationSpriteFrameDocument(&Ailu::AnimationSpriteFrameDocument::StaticType, "Ailu::AnimationSpriteFrameDocument");
+const Ailu::Type* Ailu::Z_Construct_AnimationEventDocument_Type()
+{
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "AnimationEventDocument";
+initializer._size = sizeof(Ailu::AnimationEventDocument);
+initializer._full_name = "Ailu::AnimationEventDocument";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu";
+initializer._base_name = "";
+initializer._constructor = []()->Ailu::AnimationEventDocument* {return new Ailu::AnimationEventDocument;};
+Meta meta_time;
+meta_time.Set("Category","");
+meta_time.Set("IsColor",false);
+meta_time.Set("IsRange",false);
+meta_time.Set("IsFloatRange",true);
+meta_time.Set("RangeMin",(f32)0);
+meta_time.Set("RangeMax",(f32)1);
+MemberBuilder builder_time;
+builder_time._name = "_time";
+builder_time._type_name = "f32";
+builder_time._offset = offsetof(AnimationEventDocument,_time);
+builder_time._is_const = false;
+builder_time._is_static = false;
+builder_time._is_public = true;
+builder_time._is_pointer = false;
+builder_time._is_ref = false;
+builder_time._is_template = false;
+builder_time._meta = meta_time;
+builder_time._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_time._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_time));
+Meta meta_event_id;
+meta_event_id.Set("Category","");
+meta_event_id.Set("IsColor",false);
+meta_event_id.Set("IsRange",false);
+meta_event_id.Set("IsFloatRange",true);
+meta_event_id.Set("RangeMin",(f32)0);
+meta_event_id.Set("RangeMax",(f32)1);
+MemberBuilder builder_event_id;
+builder_event_id._name = "_event_id";
+builder_event_id._type_name = "u32";
+builder_event_id._offset = offsetof(AnimationEventDocument,_event_id);
+builder_event_id._is_const = false;
+builder_event_id._is_static = false;
+builder_event_id._is_public = true;
+builder_event_id._is_pointer = false;
+builder_event_id._is_ref = false;
+builder_event_id._is_template = false;
+builder_event_id._meta = meta_event_id;
+builder_event_id._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<u32>);
+builder_event_id._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<u32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_event_id));
+Meta meta_kind;
+meta_kind.Set("Category","");
+meta_kind.Set("IsColor",false);
+meta_kind.Set("IsRange",false);
+meta_kind.Set("IsFloatRange",true);
+meta_kind.Set("RangeMin",(f32)0);
+meta_kind.Set("RangeMax",(f32)1);
+MemberBuilder builder_kind;
+builder_kind._name = "_kind";
+builder_kind._type_name = "Ailu::EAnimationEventKind";
+builder_kind._offset = offsetof(AnimationEventDocument,_kind);
+builder_kind._is_const = false;
+builder_kind._is_static = false;
+builder_kind._is_public = true;
+builder_kind._is_pointer = false;
+builder_kind._is_ref = false;
+builder_kind._is_template = false;
+builder_kind._meta = meta_kind;
+builder_kind._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<EAnimationEventKind>);
+builder_kind._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<EAnimationEventKind>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_kind));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+const Ailu::Type* Ailu::AnimationEventDocument::GetPrivateStaticClass()
+{
+	static const Ailu::Type* type = Z_Construct_AnimationEventDocument_Type();
+	return type;
+}
+
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::AnimationEventDocument>()
+{
+return Ailu::AnimationEventDocument::StaticType();
+}
+    const Type *Ailu::AnimationEventDocument::GetType()
+{
+return Ailu::AnimationEventDocument::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_AnimationEventDocument(&Ailu::AnimationEventDocument::StaticType, "Ailu::AnimationEventDocument");
 const Ailu::Type* Ailu::Z_Construct_InputProcessorDocument_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -4708,6 +5087,104 @@ return Ailu::SceneSkeletonMeshComponentDocument::StaticType();
 return Ailu::SceneSkeletonMeshComponentDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_SceneSkeletonMeshComponentDocument(&Ailu::SceneSkeletonMeshComponentDocument::StaticType, "Ailu::SceneSkeletonMeshComponentDocument");
+const Ailu::Type* Ailu::Z_Construct_SceneAnimatorComponentDocument_Type()
+{
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "SceneAnimatorComponentDocument";
+initializer._size = sizeof(Ailu::SceneAnimatorComponentDocument);
+initializer._full_name = "Ailu::SceneAnimatorComponentDocument";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu";
+initializer._base_name = "";
+initializer._constructor = []()->Ailu::SceneAnimatorComponentDocument* {return new Ailu::SceneAnimatorComponentDocument;};
+Meta meta_controller_guid;
+meta_controller_guid.Set("Category","");
+meta_controller_guid.Set("IsColor",false);
+meta_controller_guid.Set("IsRange",false);
+meta_controller_guid.Set("IsFloatRange",true);
+meta_controller_guid.Set("RangeMin",(f32)0);
+meta_controller_guid.Set("RangeMax",(f32)1);
+MemberBuilder builder_controller_guid;
+builder_controller_guid._name = "_controller_guid";
+builder_controller_guid._type_name = "String";
+builder_controller_guid._offset = offsetof(SceneAnimatorComponentDocument,_controller_guid);
+builder_controller_guid._is_const = false;
+builder_controller_guid._is_static = false;
+builder_controller_guid._is_public = true;
+builder_controller_guid._is_pointer = false;
+builder_controller_guid._is_ref = false;
+builder_controller_guid._is_template = false;
+builder_controller_guid._meta = meta_controller_guid;
+builder_controller_guid._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<String>);
+builder_controller_guid._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<String>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_controller_guid));
+Meta meta_speed;
+meta_speed.Set("Category","");
+meta_speed.Set("IsColor",false);
+meta_speed.Set("IsRange",false);
+meta_speed.Set("IsFloatRange",true);
+meta_speed.Set("RangeMin",(f32)0);
+meta_speed.Set("RangeMax",(f32)1);
+MemberBuilder builder_speed;
+builder_speed._name = "_speed";
+builder_speed._type_name = "f32";
+builder_speed._offset = offsetof(SceneAnimatorComponentDocument,_speed);
+builder_speed._is_const = false;
+builder_speed._is_static = false;
+builder_speed._is_public = true;
+builder_speed._is_pointer = false;
+builder_speed._is_ref = false;
+builder_speed._is_template = false;
+builder_speed._meta = meta_speed;
+builder_speed._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_speed._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_speed));
+Meta meta_play_on_awake;
+meta_play_on_awake.Set("Category","");
+meta_play_on_awake.Set("IsColor",false);
+meta_play_on_awake.Set("IsRange",false);
+meta_play_on_awake.Set("IsFloatRange",true);
+meta_play_on_awake.Set("RangeMin",(f32)0);
+meta_play_on_awake.Set("RangeMax",(f32)1);
+MemberBuilder builder_play_on_awake;
+builder_play_on_awake._name = "_play_on_awake";
+builder_play_on_awake._type_name = "bool";
+builder_play_on_awake._offset = offsetof(SceneAnimatorComponentDocument,_play_on_awake);
+builder_play_on_awake._is_const = false;
+builder_play_on_awake._is_static = false;
+builder_play_on_awake._is_public = true;
+builder_play_on_awake._is_pointer = false;
+builder_play_on_awake._is_ref = false;
+builder_play_on_awake._is_template = false;
+builder_play_on_awake._meta = meta_play_on_awake;
+builder_play_on_awake._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_play_on_awake._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_play_on_awake));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+const Ailu::Type* Ailu::SceneAnimatorComponentDocument::GetPrivateStaticClass()
+{
+	static const Ailu::Type* type = Z_Construct_SceneAnimatorComponentDocument_Type();
+	return type;
+}
+
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::SceneAnimatorComponentDocument>()
+{
+return Ailu::SceneAnimatorComponentDocument::StaticType();
+}
+    const Type *Ailu::SceneAnimatorComponentDocument::GetType()
+{
+return Ailu::SceneAnimatorComponentDocument::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_SceneAnimatorComponentDocument(&Ailu::SceneAnimatorComponentDocument::StaticType, "Ailu::SceneAnimatorComponentDocument");
 const Ailu::Type* Ailu::Z_Construct_SceneVXGIComponentDocument_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -5590,6 +6067,48 @@ builder_skeleton_mesh_component._meta = meta_skeleton_mesh_component;
 builder_skeleton_mesh_component._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<SceneSkeletonMeshComponentDocument>);
 builder_skeleton_mesh_component._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<SceneSkeletonMeshComponentDocument>);
 initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_skeleton_mesh_component));
+Meta meta_has_animator_component;
+meta_has_animator_component.Set("Category","");
+meta_has_animator_component.Set("IsColor",false);
+meta_has_animator_component.Set("IsRange",false);
+meta_has_animator_component.Set("IsFloatRange",true);
+meta_has_animator_component.Set("RangeMin",(f32)0);
+meta_has_animator_component.Set("RangeMax",(f32)1);
+MemberBuilder builder_has_animator_component;
+builder_has_animator_component._name = "_has_animator_component";
+builder_has_animator_component._type_name = "bool";
+builder_has_animator_component._offset = offsetof(SceneEntityDocument,_has_animator_component);
+builder_has_animator_component._is_const = false;
+builder_has_animator_component._is_static = false;
+builder_has_animator_component._is_public = true;
+builder_has_animator_component._is_pointer = false;
+builder_has_animator_component._is_ref = false;
+builder_has_animator_component._is_template = false;
+builder_has_animator_component._meta = meta_has_animator_component;
+builder_has_animator_component._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_has_animator_component._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_has_animator_component));
+Meta meta_animator_component;
+meta_animator_component.Set("Category","");
+meta_animator_component.Set("IsColor",false);
+meta_animator_component.Set("IsRange",false);
+meta_animator_component.Set("IsFloatRange",true);
+meta_animator_component.Set("RangeMin",(f32)0);
+meta_animator_component.Set("RangeMax",(f32)1);
+MemberBuilder builder_animator_component;
+builder_animator_component._name = "_animator_component";
+builder_animator_component._type_name = "Ailu::SceneAnimatorComponentDocument";
+builder_animator_component._offset = offsetof(SceneEntityDocument,_animator_component);
+builder_animator_component._is_const = false;
+builder_animator_component._is_static = false;
+builder_animator_component._is_public = true;
+builder_animator_component._is_pointer = false;
+builder_animator_component._is_ref = false;
+builder_animator_component._is_template = false;
+builder_animator_component._meta = meta_animator_component;
+builder_animator_component._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<SceneAnimatorComponentDocument>);
+builder_animator_component._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<SceneAnimatorComponentDocument>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_animator_component));
 Meta meta_has_vxgi_component;
 meta_has_vxgi_component.Set("Category","");
 meta_has_vxgi_component.Set("IsColor",false);

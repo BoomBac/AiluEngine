@@ -11,6 +11,7 @@
 #include "Inspector/ComponentEditors/PersistentIdComponentEditor.h"
 #include "Inspector/ComponentEditors/RigidBody2DComponentEditor.h"
 #include "Inspector/ComponentEditors/Collider2DComponentEditor.h"
+#include "Inspector/ComponentEditors/AnimatorComponentEditor.h"
 #include "Inspector/ComponentEditors/TagComponentEditor.h"
 #include "Physics/2D/Physics2DComponents.h"
 #include "Scene/Component.h"
@@ -36,6 +37,8 @@ namespace Ailu
             registry.RegisterCustom<ECS::CCamera, CameraComponentEditor>("Camera", "Rendering", 230);
 
             registry.RegisterCustom<ECS::SpriteRendererComponent, SpriteRendererComponentEditor>("Sprite Renderer", "Rendering", 240);
+
+            registry.RegisterCustom<ECS::AnimatorComponent, AnimatorComponentEditor>("Animator", "Animation", 245);
 
             registry.Register<ECS::CSkeletonMesh>("Skeleton Mesh", "Rendering", 250);
 

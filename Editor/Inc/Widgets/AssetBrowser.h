@@ -6,6 +6,7 @@
 #include "Widgets/AssetBrowserOperations.h"
 #include "Widgets/AssetImportController.h"
 #include "Common/EditorPopup.h"
+#include "UI/DragDrop.h"
 #include <filesystem>
 #include <tuple>
 #include "generated/AssetBrowser.gen.h"
@@ -41,6 +42,19 @@ namespace Ailu
             void Update(f32 dt) final;
 
         private:
+            struct SelectedEntry
+            {
+                fs::path _path;
+                Asset *_asset = nullptr;
+                UI::UIElement *_root = nullptr;
+                UI::Text *_text = nullptr;
+            };
+
+            struct AssetDragData
+            {
+                Vector<Asset *> _assets;
+            };
+
             void HandleShortcuts();
             void HandleFileDrop(UI::UIEvent &e);
 
@@ -63,9 +77,22 @@ namespace Ailu
 
             std::tuple<Ref<UI::UIElement>, UI::Image *, UI::Text *> CreateEntryWidgetRoot(const String &display_name);
 
-            void SelectFolder(const fs::path &path, UI::UIElement *root, UI::Text *text);
-            void SelectAsset(Asset *asset, UI::UIElement *root, UI::Text *text);
+            void SelectFolder(const fs::path &path, u32 index, UI::UIElement *root, UI::Text *text, bool preserve_modifiers);
+            void SelectAsset(Asset *asset, u32 index, UI::UIElement *root, UI::Text *text, bool preserve_modifiers);
+            void SelectEntry(const fs::path &path, Asset *asset, u32 index, UI::UIElement *root, UI::Text *text,
+                             bool preserve_modifiers);
             void ClearSelection();
+            bool IsSelected(const fs::path &path) const;
+            void UpdateEntryVisual(UI::UIElement *root, bool is_hovered);
+            void UpdateSelectionVisuals();
+            void SyncPrimarySelection();
+            Vector<Asset *> GetSelectedAssets() const;
+            Vector<Asset *> GetDraggedAssets(const UI::DragPayload &payload) const;
+            bool CanAcceptAssetDrag(const UI::DragPayload &payload) const;
+            void ShowAssetTransferDialog(const UI::DragPayload &payload, const fs::path &target_directory, Vector2f popup_pos);
+            void BeginAssetDrag(Asset *asset, const String &display_name);
+            void CopySelectionToClipboard();
+            void PasteClipboard();
 
             void SaveDockLayoutState(JsonArchive &ar) override;
             void LoadDockLayoutState(JsonArchive &ar) override;
@@ -93,12 +120,17 @@ namespace Ailu
             DirectoryTreeDataSource *_directory_tree_data_source = nullptr;
             Vector2f _last_icon_area_size = Vector2f::kZero;
             bool _is_list_view = false;
+            Vector<AssetBrowserEntry> _visible_entries;
+            Vector<SelectedEntry> _selected_entries;
+            i32 _selection_anchor = -1;
             UI::UIElement *_selected_item_root = nullptr;
             UI::Text *_selected_item_text = nullptr;
             Asset *_selected_asset = nullptr;
             WString _selected_folder_path;
             bool _is_dragging = false;
             Vector2f _drag_start_pos;
+            AssetDragData _asset_drag_data;
+            Vector<Asset *> _clipboard_assets;
 
             AssetBrowserContent _content;
             AssetBrowserOperations _operations;

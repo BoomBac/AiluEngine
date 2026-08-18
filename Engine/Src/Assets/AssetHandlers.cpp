@@ -1,4 +1,5 @@
 #include "Assets/AssetHandlers.h"
+#include "Animation/AnimationControllerAsset.h"
 #include "Animation/Clip.h"
 #include "Animation/TransformTrack.h"
 #include "Assets/AssetDocument.h"
@@ -530,7 +531,9 @@ Scope<Asset> SpriteAssetHandler::Load(const AssetLoadContext &context)
     sprite->_texture = texture;
     sprite->_uv_rect = document._uv_rect;
     sprite->_pivot = document._pivot;
-    sprite->_size = document._size;
+    // Sprite assets written before the uniform-size model stored the final width and height.
+    // Keep those assets loadable by using the old height as the new uniform base size.
+    sprite->_size = std::max(document._size.y, 0.0001f);
     sprite->_border = document._border;
 
     auto asset = MakeScope<Asset>(Guid(document._header._guid),Sprite::StaticType(),context._asset_path);
@@ -557,7 +560,7 @@ bool SpriteAssetHandler::Save(const AssetSaveContext &context)
     }
     document._uv_rect = sprite->_uv_rect;
     document._pivot = sprite->_pivot;
-    document._size = sprite->_size;
+    document._size = sprite->GetRenderSize();
     document._border = sprite->_border;
 
     return SaveAssetDocument(context._system_path, document);
@@ -1128,6 +1131,8 @@ bool PrefabAssetHandler::Save(const AssetSaveContext &context)
                 add_dependency_string(guid);
             add_dependency_string(document._skeleton_mesh_component._anim_clip_guid);
         }
+        if (document._has_animator_component)
+            add_dependency_string(document._animator_component._controller_guid);
         if (document._has_sprite_renderer_component)
         {
             add_dependency_string(document._sprite_renderer_component._sprite_guid);
@@ -1384,6 +1389,15 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
                 context._resource_mgr->Load<AnimationClip>(clip_guid);
                 component._anim_clip = context._resource_mgr->GetRef<AnimationClip>(clip_guid);
             }
+        }
+        if (entity_doc._has_animator_component)
+        {
+            auto &component = reg.AddComponent<ECS::AnimatorComponent>(entity);
+            reg.SetComponentEnabled<ECS::AnimatorComponent>(entity, !is_component_disabled(entity_doc, "AnimatorComponent"));
+            if (!entity_doc._animator_component._controller_guid.empty())
+                component._controller = Guid(entity_doc._animator_component._controller_guid);
+            component._speed = entity_doc._animator_component._speed;
+            component._play_on_awake = entity_doc._animator_component._play_on_awake;
         }
         if (entity_doc._has_vxgi_component)
         {
@@ -1674,6 +1688,10 @@ Scope<Asset> AnimationClipAssetHandler::Load(const AssetLoadContext &context)
             cur_time += frame_duration;
         }
     }
+    for (const auto &frame_doc : doc._sprite_frames)
+        loaded_clip->SpriteTrack().AddFrame(SpriteKeyFrame{frame_doc._time, frame_doc._sprite});
+    for (const auto &event_doc : doc._events)
+        loaded_clip->AddEvent(AnimationEvent{event_doc._time, event_doc._event_id, event_doc._kind});
     if (doc._duration <= 0.0f)
     {
         loaded_clip->RecalculateDuration();
@@ -1699,6 +1717,8 @@ bool AnimationClipAssetHandler::Save(const AssetSaveContext &context)
     doc._frame_duration = clip->FrameDuration();
     doc._is_looping = clip->IsLooping();
     doc._tracks.reserve(clip->Size());
+    doc._sprite_frames.reserve(clip->SpriteTrack().Frames().size());
+    doc._events.reserve(clip->Events().size());
 
     for (u32 index = 0u; index < clip->Size(); ++index)
     {
@@ -1720,6 +1740,23 @@ bool AnimationClipAssetHandler::Save(const AssetSaveContext &context)
         }
         doc._tracks.emplace_back(std::move(track_doc));
     }
+    for (const auto &frame : clip->SpriteTrack().Frames())
+    {
+        AnimationSpriteFrameDocument frame_doc;
+        frame_doc._time = frame._time;
+        frame_doc._sprite = frame._sprite;
+        doc._sprite_frames.emplace_back(std::move(frame_doc));
+        if (!frame._sprite.IsEmpty())
+            doc._header._dependencies.push_back(AssetDependency{frame._sprite, EAssetDependencyType::kHard});
+    }
+    for (const auto &event : clip->Events())
+    {
+        AnimationEventDocument event_doc;
+        event_doc._time = event._time;
+        event_doc._event_id = event._event_id;
+        event_doc._kind = event._kind;
+        doc._events.emplace_back(std::move(event_doc));
+    }
 
     if (!SaveAssetDocument(sys_path, doc))
     {
@@ -1727,6 +1764,66 @@ bool AnimationClipAssetHandler::Save(const AssetSaveContext &context)
         return false;
     }
     LOG_INFO(L"Save animclip to {}", sys_path);
+    return true;
+}
+
+// ============================================================
+// AnimationControllerAssetHandler
+// ============================================================
+
+const Type *AnimationControllerAssetHandler::AssetType() const
+{
+    return AnimationControllerAsset::StaticType();
+}
+
+Scope<Asset> AnimationControllerAssetHandler::Load(const AssetLoadContext &context)
+{
+    AnimationControllerAssetDocument doc;
+    if (!LoadAssetDocument(context._system_path, doc))
+        return nullptr;
+
+    Ref<AnimationControllerAsset> controller = MakeRef<AnimationControllerAsset>(
+        !doc._header._asset_name.empty() ? doc._header._asset_name : "AnimationControllerAsset");
+    controller->Parameters() = doc._parameters;
+    controller->States() = doc._states;
+    controller->Transitions() = doc._transitions;
+    controller->AnyStateTransitions() = doc._any_state_transitions;
+    controller->EntryState(doc._entry_state);
+
+    auto asset = MakeScope<Asset>(Guid(doc._header._guid), AnimationControllerAsset::StaticType(), context._asset_path);
+    asset->_p_obj = controller;
+    asset->_domain = context._resource_mgr->GetAssetPathDomain(asset->_asset_path);
+    return asset;
+}
+
+bool AnimationControllerAssetHandler::Save(const AssetSaveContext &context)
+{
+    const auto *controller = context._asset->As<AnimationControllerAsset>();
+    if (controller == nullptr)
+        return false;
+
+    AnimationControllerAssetDocument doc;
+    doc._header = MakeAssetDocumentHeader(context._asset);
+    doc._parameters = controller->Parameters();
+    doc._states = controller->States();
+    doc._transitions = controller->Transitions();
+    doc._any_state_transitions = controller->AnyStateTransitions();
+    doc._entry_state = controller->EntryState();
+    for (const auto &state : doc._states)
+    {
+        const Guid &guid = state._motion._asset;
+        if (guid.IsEmpty() || std::any_of(doc._header._dependencies.begin(), doc._header._dependencies.end(),
+                                          [&guid](const AssetDependency &dependency) { return dependency._guid == guid; }))
+            continue;
+        doc._header._dependencies.emplace_back(AssetDependency{guid, EAssetDependencyType::kHard});
+    }
+
+    if (!SaveAssetDocument(context._system_path, doc))
+    {
+        LOG_ERROR(L"Save animation controller failed to {}", context._system_path);
+        return false;
+    }
+    LOG_INFO(L"Save animation controller to {}", context._system_path);
     return true;
 }
 

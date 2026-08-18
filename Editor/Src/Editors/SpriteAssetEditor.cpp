@@ -294,10 +294,8 @@ namespace Ailu
 
             d._pivot.x = std::clamp(d._pivot.x, 0.0f, 1.0f);
             d._pivot.y = std::clamp(d._pivot.y, 0.0f, 1.0f);
-            d._size.x = std::max(d._size.x, 0.0001f);
-            d._size.y = std::max(d._size.y, 0.0001f);
-            if (!std::isfinite(d._size.x)) d._size.x = 1.0f;
-            if (!std::isfinite(d._size.y)) d._size.y = 1.0f;
+            d._size = std::max(d._size, 0.0001f);
+            if (!std::isfinite(d._size)) d._size = 1.0f;
 
             d._border.x = std::max(d._border.x, 0.0f);
             d._border.y = std::max(d._border.y, 0.0f);
@@ -396,8 +394,7 @@ namespace Ailu
         {
             if (_is_syncing_size) return;
             _is_syncing_size = true;
-            if (_size_w) _size_w->SetContent(FormatFloat(_editing._size.x, 1));
-            if (_size_h) _size_h->SetContent(FormatFloat(_editing._size.y, 1));
+            if (_size_input) _size_input->SetContent(FormatFloat(_editing._size, 1));
             _is_syncing_size = false;
         }
 
@@ -875,30 +872,29 @@ namespace Ailu
         {
             AddSectionTitle(parent, "Size");
 
-            _size_w = AddLabeledInput(parent, "W", _editing._size.x);
-            _size_h = AddLabeledInput(parent, "H", _editing._size.y);
-
-            _size_w->_on_content_changed += [this](String v) { if (_is_syncing_size) return; f32 val = std::max((f32)std::atof(v.c_str()), 0.0001f); _editing._size.x = val; if (_lock_ratio && _locked_aspect > 0) _editing._size.y = val / _locked_aspect; ValidateEditingData(); RefreshSizeInputs(); };
-            _size_h->_on_content_changed += [this](String v) { if (_is_syncing_size) return; f32 val = std::max((f32)std::atof(v.c_str()), 0.0001f); _editing._size.y = val; if (_lock_ratio && _locked_aspect > 0) _editing._size.x = val * _locked_aspect; ValidateEditingData(); RefreshSizeInputs(); };
-
-            auto* lr = parent->AddChild<UI::HorizontalBox>();
-            lr->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed).Size(Vector2f(0.0f, 20.0f)).Margin(Vector4f(4.0f, 2.0f, 4.0f, 0.0f));
-            _chk_lock_ratio = lr->AddChild<UI::CheckBox>();
-            _chk_lock_ratio->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFill).Size(Vector2f(18.0f, 0.0f));
-            _chk_lock_ratio->OnMouseClick() += [this](UI::UIEvent& e) { _lock_ratio = _chk_lock_ratio->IsChecked(); if (_lock_ratio && _editing._size.y > 0) _locked_aspect = _editing._size.x / _editing._size.y; e._is_handled = true; };
-            auto* ll = lr->AddChild<UI::Text>("Lock Ratio"); ll->_color = Color(0.65f, 0.65f, 0.65f, 1.0f);
-            ll->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
+            _size_input = AddLabeledInput(parent, "Size", _editing._size);
+            _size_input->_on_content_changed += [this](String v) {
+                if (_is_syncing_size) return;
+                _editing._size = std::max((f32)std::atof(v.c_str()), 0.0001f);
+                ValidateEditingData();
+                RefreshSizeInputs();
+            };
 
             auto* br = parent->AddChild<UI::HorizontalBox>();
             br->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed).Size(Vector2f(0.0f, 22.0f)).Margin(Vector4f(4.0f, 2.0f, 4.0f, 0.0f));
 
             auto* bu = br->AddChild<UI::Button>("From UV");
             bu->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFill).Size(Vector2f(60.0f, 0.0f)).Margin(Vector4f(0.0f, 0.0f, 4.0f, 0.0f));
-            bu->OnMouseClick() += [this](UI::UIEvent& e) { if (_texture) { f32 sw = std::round(_editing._uv_rect.z*(f32)_texture->Width()); f32 sh = std::round(_editing._uv_rect.w*(f32)_texture->Height()); _editing._size = Vector2f(sw, sh); RefreshSizeInputs(); } e._is_handled = true; };
+            bu->OnMouseClick() += [this](UI::UIEvent& e) {
+                if (_texture)
+                    _editing._size = std::max(std::round(_editing._uv_rect.w * (f32)_texture->Height()), 0.0001f);
+                RefreshSizeInputs();
+                e._is_handled = true;
+            };
 
             auto* bz = br->AddChild<UI::Button>("Reset");
             bz->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFill).Size(Vector2f(44.0f, 0.0f));
-            bz->OnMouseClick() += [this](UI::UIEvent& e) { _editing._size = Vector2f::kOne; RefreshSizeInputs(); e._is_handled = true; };
+            bz->OnMouseClick() += [this](UI::UIEvent& e) { _editing._size = 1.0f; RefreshSizeInputs(); e._is_handled = true; };
         }
 
         void SpriteAssetEditor::BuildBorderSection(UI::VerticalBox* parent)

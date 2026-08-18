@@ -128,6 +128,11 @@ namespace Ailu
         }
         return result;
     }
+
+    Transform TransformTrack::Evaluate(const Transform &ref, f32 time, bool looping) const
+    {
+        return const_cast<TransformTrack *>(this)->Evaluate(ref, time, looping);
+    }
     void TransformTrack::Resize(u16 frame_num)
     {
         _pos_track.Resize(frame_num);

@@ -17,7 +17,7 @@
             "_disabled_components": [],
             "_transform_component": {
                 "_position": [14.5179, 3.0787, 8.7868],
-                "_rotation": [0.3598, -0.1844, 0.0727, 0.9114],
+                "_rotation": [0.3668, 0.016, -0.0063, 0.93],
                 "_scale": [0.9998, 0.9998, 0.9998]
             },
             "_light_component": {
@@ -197,7 +197,7 @@
                 "_sorting_layer": 0,
                 "_order_in_layer": 0,
                 "_blend_mode": 0,
-                "_flip_x": true,
+                "_flip_x": false,
                 "_flip_y": false,
                 "_visible": true
             }
@@ -308,7 +308,7 @@
             },
             "_camera_component": {
                 "_type": "kOrthographic",
-                "_aspect": 1.7857,
+                "_aspect": 1.7776,
                 "_far_clip": 100.0,
                 "_near_clip": 0.1,
                 "_fov_h": 60.0,

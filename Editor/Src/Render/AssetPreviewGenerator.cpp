@@ -102,7 +102,7 @@ namespace Ailu
             render_data._local_to_world = BuildIdentityMatrix();
             render_data._uv_rect = sprite->_uv_rect;
             render_data._color = Colors::kWhite;
-            render_data._size = sprite->_size;
+            render_data._size = sprite->GetRenderSize();
             render_data._pivot = sprite->_pivot;
             render_data._texture = sprite->_texture.get();
             render_data._material = nullptr;       // use default sprite material
@@ -111,7 +111,7 @@ namespace Ailu
             // Orthographic camera: positioned behind the sprite (-Z), looking toward +Z.
             // In left-hand coordinates, the camera looks along +Z, so objects in front
             // have positive view-space Z — this is what BuildOrthographicMatrix expects.
-            f32 max_dim = std::max(sprite->_size.x, sprite->_size.y);
+            f32 max_dim = std::max(render_data._size.x, render_data._size.y);
             f32 margin = 1.1f;
             f32 half_extent = max_dim * 0.5f * margin;
             f32 aspect = f32(target->Width()) / f32(target->Height());

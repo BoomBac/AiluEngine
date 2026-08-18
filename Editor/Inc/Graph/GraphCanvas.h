@@ -186,6 +186,8 @@ namespace Ailu
             Vector4f _marquee_rect = Vector4f::kZero;
             EInteraction _interaction = EInteraction::kNone;
             bool _is_marquee_additive = false;
+            bool _right_pan_moved = false;
+            Vector2f _right_down_mouse = Vector2f::kZero;
             bool _snap_to_grid = true;
             f32 _grid_snap = 16.0f;
             f32 _last_link_click_timer = 1000.0f;

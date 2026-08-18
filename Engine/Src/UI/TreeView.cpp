@@ -456,21 +456,27 @@ namespace Ailu
                 // Set up drop handler if this item accepts drops
                 if (pres._drop_target)
                 {
-                    DropHandler dh;
-                    dh._can_drop = [this, id = vi._id](const DragPayload& p) -> bool
-                    {
-                        if (p._type != EDragType::kTreeItem) return false;
-                        if (!_drop_callback) return false;
-                        auto* tdp = static_cast<const TreeViewDragPayload*>(p._data);
-                        if (!tdp) return false;
-                        if (_can_drop_callback)
-                            return _can_drop_callback(tdp->_source_tree, tdp->_item, id);
-                        return true;
-                    };
-                    dh._on_drop = [this, id = vi._id](const DragPayload& p, f32 x, f32 y)
-                    {
-                        HandleDrop(p, x, y, id);
-                    };
+                     DropHandler dh;
+                     dh._can_drop = [this, id = vi._id](const DragPayload& p) -> bool
+                     {
+                         if (p._type == EDragType::kTreeItem)
+                         {
+                             if (!_drop_callback) return false;
+                             auto* tdp = static_cast<const TreeViewDragPayload*>(p._data);
+                             if (!tdp) return false;
+                             if (_can_drop_callback)
+                                 return _can_drop_callback(tdp->_source_tree, tdp->_item, id);
+                             return true;
+                         }
+                         return _external_can_drop_callback && _external_can_drop_callback(p, id);
+                     };
+                     dh._on_drop = [this, id = vi._id](const DragPayload& p, f32 x, f32 y)
+                     {
+                         if (p._type == EDragType::kTreeItem)
+                             HandleDrop(p, x, y, id);
+                         else if (_external_drop_callback)
+                             _external_drop_callback(p, id, {x, y});
+                     };
                     row->SetDropHandler(dh);
                 }
 
@@ -491,21 +497,27 @@ namespace Ailu
                 _empty_drop_handler_ref = std::move(border);
                 _empty_drop_handler->Thickness(0.0f);
                 {
-                    DropHandler dh;
-                    dh._can_drop = [this](const DragPayload& p) -> bool
-                    {
-                        if (p._type != EDragType::kTreeItem) return false;
-                        if (!_drop_callback) return false;
-                        auto* tdp = static_cast<const TreeViewDragPayload*>(p._data);
-                        if (!tdp) return false;
-                        if (_can_drop_callback)
-                            return _can_drop_callback(tdp->_source_tree, tdp->_item, kInvalidTreeItemId);
-                        return true;
-                    };
-                    dh._on_drop = [this](const DragPayload& p, f32 x, f32 y)
-                    {
-                        HandleDrop(p, x, y, kInvalidTreeItemId);
-                    };
+                     DropHandler dh;
+                     dh._can_drop = [this](const DragPayload& p) -> bool
+                     {
+                         if (p._type == EDragType::kTreeItem)
+                         {
+                             if (!_drop_callback) return false;
+                             auto* tdp = static_cast<const TreeViewDragPayload*>(p._data);
+                             if (!tdp) return false;
+                             if (_can_drop_callback)
+                                 return _can_drop_callback(tdp->_source_tree, tdp->_item, kInvalidTreeItemId);
+                             return true;
+                         }
+                         return _external_can_drop_callback && _external_can_drop_callback(p, kInvalidTreeItemId);
+                     };
+                     dh._on_drop = [this](const DragPayload& p, f32 x, f32 y)
+                     {
+                         if (p._type == EDragType::kTreeItem)
+                             HandleDrop(p, x, y, kInvalidTreeItemId);
+                         else if (_external_drop_callback)
+                             _external_drop_callback(p, kInvalidTreeItemId, {x, y});
+                     };
                     _empty_drop_handler->SetDropHandler(dh);
                 }
                 _content_box->AddChild(_empty_drop_handler_ref);

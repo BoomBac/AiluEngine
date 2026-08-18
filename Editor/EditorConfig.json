@@ -1,13 +1,13 @@
 {
-    "_window_size": [1491, 801],
+    "_window_size": [2015, 1098],
     "_viewport_size": [0, 0],
-    "_position": [-0.0448, 6.7689, 8.351],
-    "_rotation": [0.0007, -0.9752, 0.2212, 0.003],
+    "_position": [-3.2587, 4.5821, -4.5015],
+    "_rotation": [0.0908, 0.0531, -0.0048, 0.9944],
     "_fov": 60.0,
-    "_aspect": 2.0,
+    "_aspect": 1.8999,
     "_near": 0.1,
     "_far": 300.0,
-    "_move_speed": 0.7079,
-    "_controller_rot": [25.5597, 540.3631],
+    "_move_speed": 0.3647,
+    "_controller_rot": [10.4395, 726.122],
     "_scene_path": "engine://WaterTest/empty_scene.almap"
 }

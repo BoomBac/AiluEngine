@@ -4,10 +4,14 @@
 #include "Assets/PrefabAsset.h"
 #include "Assets/ScriptAsset.h"
 #include "Assets/WidgetAsset.h"
+#include "Animation/AnimationControllerAsset.h"
+#include "Animation/Clip.h"
 #include "Audio/AudioClip.h"
 #include "Common/Selection.h"
 #include "Dock/DockManager.h"
 #include "Editors/AudioClipEditor.h"
+#include "Editors/AnimationClipEditor.h"
+#include "Editors/AnimationControllerEditor.h"
 #include "Editors/InputActionAssetEditor.h"
 #include "Editors/SpriteAssetEditor.h"
 #include "Editors/Widget/WidgetEditor.h"
@@ -73,6 +77,34 @@ namespace Ailu
 
                 auto editor = MakeRef<SpriteAssetEditor>();
                 editor->Open(asset->As<Render::Sprite>());
+                return editor;
+            });
+
+            RegisterEditor(StaticClass<AnimationClip>(), [](Asset *asset) -> Ref<DockWindow>
+            {
+                if (asset == nullptr)
+                    return nullptr;
+                if (asset->_p_obj == nullptr)
+                    ResourceMgr::Get().Load<AnimationClip>(asset->_asset_path);
+                auto *clip = asset->As<AnimationClip>();
+                if (clip == nullptr)
+                    return nullptr;
+                auto editor = MakeRef<AnimationClipEditor>();
+                editor->Open(clip);
+                return editor;
+            });
+
+            RegisterEditor(StaticClass<AnimationControllerAsset>(), [](Asset *asset) -> Ref<DockWindow>
+            {
+                if (asset == nullptr)
+                    return nullptr;
+                if (asset->_p_obj == nullptr)
+                    ResourceMgr::Get().Load<AnimationControllerAsset>(asset->_asset_path);
+                auto *controller = asset->As<AnimationControllerAsset>();
+                if (controller == nullptr)
+                    return nullptr;
+                auto editor = MakeRef<AnimationControllerEditor>();
+                editor->Open(controller);
                 return editor;
             });
 

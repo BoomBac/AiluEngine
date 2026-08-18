@@ -496,7 +496,8 @@ namespace Ailu
                                 // Sprite metadata
                                 if (sprite)
                                 {
-                                    ImGui::TextDisabled("Size: %.1f x %.1f", sprite->_size.x, sprite->_size.y);
+                                    const Vector2f sprite_size = sprite->GetRenderSize();
+                                    ImGui::TextDisabled("Size: %.1f x %.1f", sprite_size.x, sprite_size.y);
                                     ImGui::TextDisabled("Pivot: (%.2f, %.2f)", sprite->_pivot.x, sprite->_pivot.y);
                                     if (sprite->_border != Vector4f::kZero)
                                         ImGui::TextDisabled("Border: L%.0f R%.0f B%.0f T%.0f",

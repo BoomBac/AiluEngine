@@ -477,10 +477,11 @@ namespace Ailu
             TransformCoord(cb->_pos_buf[cur_vert_num + 1], opts._transform);
             TransformCoord(cb->_pos_buf[cur_vert_num + 2], opts._transform);
             TransformCoord(cb->_pos_buf[cur_vert_num + 3], opts._transform);
-            cb->_uv_buf[cur_vert_num] = {0.f, 0.f};
-            cb->_uv_buf[cur_vert_num + 1] = {1.f, 0.f};
-            cb->_uv_buf[cur_vert_num + 2] = {0.f, 1.f};
-            cb->_uv_buf[cur_vert_num + 3] = {1.f, 1.f};
+            const Vector4f uv_rect = opts._uv_rect;
+            cb->_uv_buf[cur_vert_num] = {uv_rect.x, uv_rect.y};
+            cb->_uv_buf[cur_vert_num + 1] = {uv_rect.x + uv_rect.z, uv_rect.y};
+            cb->_uv_buf[cur_vert_num + 2] = {uv_rect.x, uv_rect.y + uv_rect.w};
+            cb->_uv_buf[cur_vert_num + 3] = {uv_rect.x + uv_rect.z, uv_rect.y + uv_rect.w};
             cb->_color_buf[cur_vert_num]     = opts._tint;
             cb->_color_buf[cur_vert_num + 1] = opts._tint;
             cb->_color_buf[cur_vert_num + 2] = opts._tint;
