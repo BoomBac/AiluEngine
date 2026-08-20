@@ -18,27 +18,6 @@ namespace Ailu
     {
         namespace
         {
-            void ShowPopupListView(UIElement *anchor, float viewport_height, const std::function<void(const Ref<ListView> &)> &fill_fn)
-            {
-                auto list_view = MakeRef<ListView>();
-                list_view->Name("PopupListView");
-                UIBrush transparent_brush;
-                transparent_brush._type = EUIBrushType::kColor;
-                transparent_brush._tint = Colors::kTransparent;
-                list_view->SetBackgroundBrush(transparent_brush);
-
-                const auto abs_rect = anchor->GetArrangeRect();
-                list_view->GetSlot()->Size({abs_rect.z, list_view->GetSlot()->_size.y});
-
-                fill_fn(list_view);
-
-                list_view->SetViewportHeight(viewport_height);
-
-                Vector2f show_pos = abs_rect.xy;
-                show_pos.y += abs_rect.w;
-
-                UIManager::Get()->ShowPopupAt(show_pos.x, show_pos.y, list_view);
-            }
         }// namespace
 
         void SpriteRendererComponentEditor::Build(ComponentEditorContext &context)
@@ -48,65 +27,22 @@ namespace Ailu
                 return;
 
             {
-                String sprite_name = (comp->_sprite != nullptr) ? comp->_sprite->Name() : "None";
-                auto btn = Editor::AddButtonRow(context._content, "Sprite", sprite_name);
-                btn->OnMouseClick() += [comp, btn](UIEvent &e)
+                auto *dropdown = Editor::AddObjectAssetDropdownRow(context._content, "Sprite", Render::Sprite::StaticType(),
+                    ResourceMgr::Get().GetAssetGuid(comp->_sprite));
+                dropdown->_on_object_asset_selected += [comp](Asset *, Object *selected, const Guid &)
                 {
-                    ShowPopupListView(e._current_target, 200.0f, [comp, btn](const Ref<ListView> &list_view)
-                                      {
-                        auto none_item = MakeRef<Text>("None");
-                        none_item->OnMouseClick() += [comp, btn](UIEvent &)
-                        {
-                            comp->_sprite = nullptr;
-                            btn->SetText("None");
-                            UIManager::Get()->HidePopup();
-                            SceneMgr::Get().MarkCurSceneDirty();
-                        };
-                        list_view->AddItem(none_item);
-                        for (auto it = ResourceMgr::Get().ResourceBegin<Render::Sprite>(); it != ResourceMgr::Get().ResourceEnd<Render::Sprite>(); it++)
-                        {
-                            const auto &sprite_ref = ResourceMgr::Get().IterToRefPtr<Render::Sprite>(it);
-                            auto text = MakeRef<Text>(sprite_ref->Name());
-                            text->OnMouseClick() += [sprite_ref, comp, btn](UIEvent &)
-                            {
-                                comp->_sprite = sprite_ref.get();
-                                btn->SetText(sprite_ref->Name());
-                                UIManager::Get()->HidePopup();
-                                SceneMgr::Get().MarkCurSceneDirty();
-                            };
-                            list_view->AddItem(text);
-                        } });
+                    comp->_sprite = dynamic_cast<Render::Sprite *>(selected);
+                    SceneMgr::Get().MarkCurSceneDirty();
                 };
             }
 
             {
-                auto btn = Editor::AddButtonRow(context._content, "Material", comp->_material != nullptr ? comp->_material->Name() : "Default");
-                btn->OnMouseClick() += [comp, btn](UIEvent &e)
+                auto *dropdown = Editor::AddObjectAssetDropdownRow(context._content, "Material", Render::Material::StaticType(),
+                    ResourceMgr::Get().GetAssetGuid(comp->_material.get()));
+                dropdown->_on_object_asset_selected += [comp](Asset *, Object *selected, const Guid &)
                 {
-                    ShowPopupListView(e._current_target, 200.0f, [comp, btn](const Ref<ListView> &list_view)
-                                      {
-                        auto none_item = MakeRef<Text>("Default");
-                        none_item->OnMouseClick() += [comp, btn](UIEvent &)
-                        {
-                            comp->_material = nullptr;
-                            btn->SetText("Default");
-                            UIManager::Get()->HidePopup();
-                            SceneMgr::Get().MarkCurSceneDirty();
-                        };
-                        list_view->AddItem(none_item);
-                        for (auto it = ResourceMgr::Get().ResourceBegin<Render::Material>(); it != ResourceMgr::Get().ResourceEnd<Render::Material>(); it++)
-                        {
-                            const auto &mat = ResourceMgr::Get().IterToRefPtr<Render::Material>(it);
-                            auto text = MakeRef<Text>(mat->Name());
-                            text->OnMouseClick() += [mat, comp, btn](UIEvent &)
-                            {
-                                comp->_material = mat;
-                                btn->SetText(mat->Name());
-                                UIManager::Get()->HidePopup();
-                                SceneMgr::Get().MarkCurSceneDirty();
-                            };
-                            list_view->AddItem(text);
-                        } });
+                    comp->_material = selected == nullptr ? nullptr : std::dynamic_pointer_cast<Render::Material>(selected->SharedFromThis());
+                    SceneMgr::Get().MarkCurSceneDirty();
                 };
             }
 

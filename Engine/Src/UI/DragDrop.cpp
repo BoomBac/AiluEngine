@@ -94,9 +94,12 @@ namespace Ailu
                 }
             }
             _hover_target = handle;
-            if (_hover_target && _payload->_type != EDragType::kUIWidget)
+            // A valid drop handler is the source of truth for visual feedback.  Widget palette drags use kUIWidget,
+            // so excluding that type made valid targets such as the Widget Editor hierarchy appear non-droppable.
+            if (_hover_target && !(_payload->_type == EDragType::kTreeItem && _hover_target->_use_custom_tree_feedback))
             {
-                UI::UIRenderer::Get()->DrawBox(drop_target->GetArrangeRect().xy, drop_target->GetArrangeRect().zw, 2.0f, Colors::kYellow, 0.0f);
+                UI::UIRenderer::Get()->DrawBox(drop_target->GetArrangeRect().xy, drop_target->GetArrangeRect().zw,
+                                                2.0f, Colors::kYellow, 0.0f);
             }
             if (Input::IsKeyJustReleased(EKey::kLBUTTON))
             {

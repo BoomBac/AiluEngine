@@ -33,7 +33,7 @@ namespace Ailu::Render
         {
             u32 buffer_size = cbuf._size;
             _property_blocks.emplace_back(PropertyBlock());
-            _property_blocks.back()._data = new u8[buffer_size];
+            _property_blocks.back()._data = AL_ALLOC_TAG(EMemoryTag::kRenderer, u8, buffer_size);
             _property_blocks.back()._size = buffer_size;
             memcpy(_property_blocks.back()._data, cbuf._data, buffer_size);
         }
@@ -70,7 +70,7 @@ namespace Ailu::Render
         {
             u32 buffer_size = cbuf._size;
             _property_blocks.emplace_back(PropertyBlock());
-            _property_blocks.back()._data = new u8[buffer_size];
+            _property_blocks.back()._data = AL_ALLOC_TAG(EMemoryTag::kRenderer, u8, buffer_size);
             _property_blocks.back()._size = buffer_size;
             memcpy(_property_blocks.back()._data, cbuf._data, buffer_size);
         }
@@ -916,7 +916,8 @@ namespace Ailu::Render
                 //_p_cbufs[i].reset(ConstantBuffer::Create(_mat_cbuf_per_pass_size[i]));
                 //memset(_p_cbufs[i]->GetData(), 0, _mat_cbuf_per_pass_size[i]);
                 _property_blocks[i]._size = _mat_cbuf_per_pass_size[i];
-                _property_blocks[i]._data = new u8[_mat_cbuf_per_pass_size[i]];
+                _property_blocks[i]._data =
+                    AL_ALLOC_TAG(EMemoryTag::kRenderer, u8, _mat_cbuf_per_pass_size[i]);
                 memset(_property_blocks[i]._data, 0, _mat_cbuf_per_pass_size[i]);
             }
             else if (_mat_cbuf_per_pass_size[i] != cbuf_size_per_passes[i])

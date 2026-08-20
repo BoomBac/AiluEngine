@@ -1,0 +1,10 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "7943a6f3-55c5-4b33-bd95-efe909b02479",
+        "_asset_type": "Ailu::Render::Texture2D",
+        "_asset_name": "InputActionAsset"
+    },
+    "_file": "InputActionAsset.png",
+    "_is_srgb": true
+}

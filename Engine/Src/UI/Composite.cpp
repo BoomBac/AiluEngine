@@ -1,6 +1,11 @@
 #include "UI/Composite.h"
 #include "UI/Basic.h"
+#include "UI/ColorPicker.h"
 #include "UI/Container.h"
+#include "UI/ObjectAssetDropdown.h"
+#include "UI/UIFramework.h"
+
+#include "Render/Texture.h"
 
 #include <type_traits>
 
@@ -250,15 +255,81 @@ namespace Ailu
         Ref<UIElement> BuildColorField(const String &label, PropertyInfo *property, void *instance,
                                        CompositeBuilder::Params *params)
         {
-            return BuildFourComponentField<Color>(label, property, instance, params,
-                [](const Color &value, i32 index) { return index == 0 ? value.r : (index == 1 ? value.g : (index == 2 ? value.b : value.a)); },
-                [](Color &value, i32 index, f32 component)
+            const auto update_button = [](Button *button, const Color &color)
+            {
+                if (button == nullptr)
+                    return;
+                const Color srgb = color.ToSrgb();
+                button->SetText(std::format("R {:.2f} G {:.2f} B {:.2f} A {:.2f}", color.r, color.g, color.b, color.a), false);
+                UIControlVisual visual;
+                visual._background._type = EUIBrushType::kColor;
+                visual._background._tint = color;
+                visual._border_color = Colors::kWhite;
+                visual._border_width = Vector4f(1.0f);
+                visual._corner_radius = Vector4f(3.0f);
+                visual._content_color = srgb.r * 0.299f + srgb.g * 0.587f + srgb.b * 0.114f > 0.5f ?
+                    Colors::kBlack : Colors::kWhite;
+                UIButtonStyleOverride &style_override = button->GetStyleOverride();
+                style_override.SetNormal(visual);
+                style_override.SetHovered(visual);
+                style_override.SetPressed(visual);
+                style_override.SetFocused(visual);
+                button->InvalidateStyle(EStyleInvalidation::kPaintOnly);
+            };
+
+            auto hb = MakeRef<UI::HorizontalBox>();
+            hb->AddChild<UI::Text>(label)->GetSlotAs<UI::LinearSlot>()
+                .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto).FillRate(GetLabelFillRate(1)).Margin(kDefaultLabelMargin);
+            auto *button = hb->AddChild<UI::Button>();
+            button->Name(std::format("ColorButton_{}", label));
+            button->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto)
+                .FillRate(GetInputFillRate(1));
+            update_button(button, property->Get<Color>(instance));
+            button->OnMouseClick() += [property, instance, params, button, update_button](UIEvent &event)
+            {
+                const Color current_color = property->Get<Color>(instance);
+                auto color_picker = MakeRef<ColorPicker>(current_color);
+                color_picker->Name(std::format("ColorPicker_{}", property->Name()));
+                color_picker->GetSlot()->Size({320.0f, 240.0f});
+                color_picker->OnValueChanged() += [property, instance, params, button, update_button](Color color)
                 {
-                    if (index == 0) value.r = component;
-                    else if (index == 1) value.g = component;
-                    else if (index == 2) value.b = component;
-                    else value.a = component;
-                });
+                    CompositeBuilder::SetPropertyValue(property, instance, color, params);
+                    update_button(button, color);
+                };
+                const Vector4f rect = event._current_target->GetArrangeRect();
+                UIManager::Get()->ShowPopupAt(rect.x, rect.y + rect.w, color_picker);
+                event._is_handled = true;
+            };
+            auto *field = hb.get();
+            hb->AddPropertyObserver(std::move(property->AddObserver(instance, [field, property, instance, update_button](void *)
+            {
+                update_button(field->ChildAt(1)->As<UI::Button>(), property->Get<Color>(instance));
+            })));
+            return hb;
+        }
+
+        Ref<UIElement> BuildObjectAssetField(const String &label, PropertyInfo *property, void *instance,
+                                             CompositeBuilder::Params *params, const Type *object_type, bool allow_none)
+        {
+            auto hb = MakeRef<UI::HorizontalBox>();
+            hb->AddChild<UI::Text>(label)->GetSlotAs<UI::LinearSlot>()
+                .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto).FillRate(GetLabelFillRate(1)).Margin(kDefaultLabelMargin);
+            auto *dropdown = hb->AddChild<UI::ObjectAssetDropdown>(object_type);
+            dropdown->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto)
+                .FillRate(GetInputFillRate(1));
+            dropdown->SetAllowNone(allow_none);
+            dropdown->SetSelectedGuid(Guid(property->Get<String>(instance)));
+            dropdown->_on_object_asset_selected += [property, instance, params](Asset *, Object *, const Guid &guid)
+            {
+                CompositeBuilder::SetPropertyValue(property, instance, guid.IsEmpty() ? String{} : guid.ToString(), params);
+            };
+            auto *field = hb.get();
+            hb->AddPropertyObserver(std::move(property->AddObserver(instance, [field, property, instance](void *)
+            {
+                if (auto *asset_dropdown = field->ChildAt(1)->As<UI::ObjectAssetDropdown>(); asset_dropdown != nullptr)
+                    asset_dropdown->SetSelectedGuid(Guid(property->Get<String>(instance)));
+            })));
+            return hb;
         }
 
         template<typename VecT>
@@ -553,6 +624,10 @@ namespace Ailu
             };
             s_builders[StaticClass<String>()] = [](const String &label, PropertyInfo *property, void *instance, Params *params) -> Ref<UIElement>
             {
+                if (auto *asset_params = dynamic_cast<ObjectAssetFieldParams *>(params); asset_params != nullptr)
+                    return BuildObjectAssetField(label, property, instance, params, asset_params->_object_type, asset_params->_allow_none);
+                if (property->Name() == "_texture_guid")
+                    return BuildObjectAssetField(label, property, instance, params, Render::Texture2D::StaticType(), true);
                 auto hb = MakeRef<UI::HorizontalBox>();
                 hb->AddChild<UI::Text>(label)->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto).Margin(kDefaultLabelMargin);
                 auto data = property->Get<String>(instance);

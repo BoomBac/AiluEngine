@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <limits>
 #include <set>
 #include <unordered_map>
 
@@ -22,6 +23,9 @@ namespace Ailu
             constexpr f32 kFullDetailZoomThreshold = 0.75f;
             constexpr f32 kAutoScrollEdgeSize = 26.0f;
             constexpr f32 kAutoScrollSpeed = 720.0f;
+            constexpr f32 kBidirectionalLinkOffset = 42.0f;
+            constexpr f32 kStateTransitionBidirectionalOffset = 26.0f;
+            constexpr f32 kStateTransitionLaneSpacing = 12.0f;
 
             UI::UIBrush MakeColorBrush(Color color)
             {
@@ -41,6 +45,25 @@ namespace Ailu
             {
                 return point.x >= rect.x && point.x <= rect.x + rect.z && point.y >= rect.y &&
                        point.y <= rect.y + rect.w;
+            }
+
+            Vector2f IntersectRectBoundary(const Vector4f &rect, Vector2f from, Vector2f toward)
+            {
+                const Vector2f center = {rect.x + rect.z * 0.5f, rect.y + rect.w * 0.5f};
+                const Vector2f direction = toward - from;
+                const f32 half_width = rect.z * 0.5f;
+                const f32 half_height = rect.w * 0.5f;
+                const f32 max_value = std::numeric_limits<f32>::max();
+                const f32 x_ratio = std::abs(direction.x) > 0.0001f ? half_width / std::abs(direction.x) : max_value;
+                const f32 y_ratio = std::abs(direction.y) > 0.0001f ? half_height / std::abs(direction.y) : max_value;
+                const f32 scale = std::min(x_ratio, y_ratio);
+                return center + direction * std::max(scale, 0.0f);
+            }
+
+            Vector2f Normalize(Vector2f value)
+            {
+                const f32 length = std::sqrt(value.x * value.x + value.y * value.y);
+                return length > 0.0001f ? value / length : Vector2f(1.0f, 0.0f);
             }
 
             String ToLowerCopy(String value)
@@ -71,13 +94,45 @@ namespace Ailu
                        end_tangent * (3.0f * inv_t * t * t) + end * (t * t * t);
             }
 
-            void GetLinkTangents(Vector2f start, Vector2f end, Vector2f &start_tangent, Vector2f &end_tangent)
+            bool HasReverseLink(const GraphDocument &document, const GraphLinkData &link)
+            {
+                const GraphNodeData *source_node = document.FindNodeByPin(link._output_pin);
+                const GraphNodeData *target_node = document.FindNodeByPin(link._input_pin);
+                if (source_node == nullptr || target_node == nullptr)
+                    return false;
+                for (const GraphLinkData &other : document.Links())
+                {
+                    if (other._id == link._id)
+                        continue;
+                    const GraphNodeData *other_source = document.FindNodeByPin(other._output_pin);
+                    const GraphNodeData *other_target = document.FindNodeByPin(other._input_pin);
+                    if (other_source != nullptr && other_target != nullptr && other_source->_id == target_node->_id &&
+                        other_target->_id == source_node->_id)
+                    {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            void GetLinkTangents(Vector2f start, Vector2f end, Vector2f &start_tangent, Vector2f &end_tangent,
+                                 f32 curve_offset = 0.0f)
             {
                 const f32 distance_x = std::abs(end.x - start.x);
                 const f32 distance_y = std::abs(end.y - start.y);
                 const f32 tangent = std::clamp(std::max(distance_x * 0.45f, distance_y * 0.18f), 28.0f, 160.0f);
-                start_tangent = start + Vector2f(tangent, 0.0f);
-                end_tangent = end - Vector2f(tangent, 0.0f);
+                const f32 horizontal_direction = end.x >= start.x ? 1.0f : -1.0f;
+                const Vector2f tangent_offset(horizontal_direction * tangent, 0.0f);
+                start_tangent = start + tangent_offset;
+                end_tangent = end - tangent_offset;
+                if (curve_offset != 0.0f)
+                {
+                    const Vector2f direction = end - start;
+                    const f32 length = std::max(std::sqrt(direction.x * direction.x + direction.y * direction.y), 1.0f);
+                    const Vector2f normal(-direction.y / length, direction.x / length);
+                    start_tangent += normal * curve_offset;
+                    end_tangent += normal * curve_offset;
+                }
             }
 
             f32 DistanceToSegmentSquared(Vector2f point, Vector2f start, Vector2f end)
@@ -250,7 +305,8 @@ namespace Ailu
                             click_delta.x * click_delta.x + click_delta.y * click_delta.y <=
                                     kLinkDoubleClickDistance * kLinkDoubleClickDistance)
                         {
-                            InsertRerouteOnLink(hit_link->_id, e._mouse_position);
+                            if (_presentation._allow_reroute)
+                                InsertRerouteOnLink(hit_link->_id, e._mouse_position);
                             _last_link_click = Guid::EmptyGuid();
                             _last_link_click_timer = 1000.0f;
                             e._is_handled = true;
@@ -478,6 +534,12 @@ namespace Ailu
             InvalidatePaint();
         }
 
+        void GraphCanvas::SetPresentation(const GraphCanvasPresentation &presentation)
+        {
+            _presentation = presentation;
+            InvalidatePaint();
+        }
+
         void GraphCanvas::SetView(Vector2f view_offset, f32 zoom)
         {
             _view_offset = view_offset;
@@ -623,7 +685,7 @@ namespace Ailu
             u32 output_count = 0u;
             for (const GraphPinData &pin : node._pins)
             {
-                if (pin._is_hidden)
+                if (pin._is_hidden || _presentation._pin_presentation == EGraphPinPresentation::kHoverOnly)
                     continue;
                 pin._direction == EGraphPinDirection::kInput ? ++input_count : ++output_count;
             }
@@ -730,18 +792,20 @@ namespace Ailu
 
         void GraphCanvas::DrawLink(UI::UIRenderer &renderer, const GraphLinkData &link)
         {
-            const GraphNodeData *output_node = _document->FindNodeByPin(link._output_pin);
-            const GraphNodeData *input_node = _document->FindNodeByPin(link._input_pin);
-            const GraphPinData *output_pin = _document->FindPin(link._output_pin);
-            const GraphPinData *input_pin = _document->FindPin(link._input_pin);
-            if (output_node == nullptr || input_node == nullptr || output_pin == nullptr || input_pin == nullptr)
+            const GraphLinkGeometry geometry = BuildLinkGeometry(link);
+            if (geometry._start == Vector2f::kZero && geometry._end == Vector2f::kZero)
                 return;
 
-            const Vector2f start = GetPinScreenPosition(*output_node, *output_pin);
-            const Vector2f end = GetPinScreenPosition(*input_node, *input_pin);
             const Vector4f content_rect = GetContentRect();
-            const Vector4f link_bounds = {std::min(start.x, end.x), std::min(start.y, end.y),
-                                          std::abs(end.x - start.x), std::abs(end.y - start.y)};
+            const f32 min_x = std::min({geometry._start.x, geometry._control0.x, geometry._control1.x,
+                                       geometry._end.x});
+            const f32 min_y = std::min({geometry._start.y, geometry._control0.y, geometry._control1.y,
+                                       geometry._end.y});
+            const f32 max_x = std::max({geometry._start.x, geometry._control0.x, geometry._control1.x,
+                                       geometry._end.x});
+            const f32 max_y = std::max({geometry._start.y, geometry._control0.y, geometry._control1.y,
+                                       geometry._end.y});
+            const Vector4f link_bounds = {min_x, min_y, max_x - min_x, max_y - min_y};
             if (!RectIntersects({link_bounds.x - 80.0f, link_bounds.y - 80.0f, link_bounds.z + 160.0f,
                                 link_bounds.w + 160.0f}, content_rect))
                 return;
@@ -750,10 +814,31 @@ namespace Ailu
             const f32 thickness = is_selected || is_hovered ? _style._selected_link_thickness : _style._link_thickness;
             const Color color = is_selected || is_hovered ? _style._selected_link_color : _style._link_color;
             const u32 segments = _zoom < kNodeTextZoomThreshold ? 8u : (_zoom < kFullDetailZoomThreshold ? 14u : 24u);
-            Vector2f start_tangent = Vector2f::kZero;
-            Vector2f end_tangent = Vector2f::kZero;
-            GetLinkTangents(start, end, start_tangent, end_tangent);
-            renderer.DrawBezier(start, start_tangent, end_tangent, end, thickness, color, 0.05f, segments);
+            renderer.DrawBezier(geometry._start, geometry._control0, geometry._control1, geometry._end, thickness,
+                                color, 0.05f, segments);
+            DrawArrow(renderer, geometry, color);
+        }
+
+        void GraphCanvas::DrawArrow(UI::UIRenderer &renderer, const GraphLinkGeometry &geometry, Color color)
+        {
+            if (!_presentation._draw_direction_arrow)
+                return;
+
+            constexpr f32 kArrowT = 0.8f;
+            const f32 delta = 0.025f;
+            const Vector2f arrow = SampleBezier(geometry._start, geometry._control0, geometry._control1, geometry._end,
+                                                kArrowT);
+            const Vector2f before = SampleBezier(geometry._start, geometry._control0, geometry._control1, geometry._end,
+                                                 kArrowT - delta);
+            const Vector2f after = SampleBezier(geometry._start, geometry._control0, geometry._control1, geometry._end,
+                                                kArrowT + delta);
+            const Vector2f direction = Normalize(after - before);
+            const Vector2f normal(-direction.y, direction.x);
+            const f32 arrow_length = 8.0f * _zoom;
+            const f32 arrow_width = 4.5f * _zoom;
+            const Vector2f base = arrow - direction * arrow_length;
+            renderer.DrawLine(arrow, base + normal * arrow_width, _style._link_thickness, color, 0.08f);
+            renderer.DrawLine(arrow, base - normal * arrow_width, _style._link_thickness, color, 0.08f);
         }
 
         void GraphCanvas::DrawPendingLink(UI::UIRenderer &renderer)
@@ -781,6 +866,29 @@ namespace Ailu
                 const GraphConnectionResponse response = GetConnectionResponse(_drag_target_pin);
                 color = response._action == EGraphConnectionAction::kDisallow ? _style._invalid_link_color :
                                                                                 _style._compatible_pin_color;
+                if (_presentation._link_route == EGraphLinkRoute::kStateTransition)
+                {
+                    const GraphPinData *target_pin = _document->FindPin(_drag_target_pin);
+                    if (target_pin != nullptr)
+                    {
+                        GraphLinkData preview;
+                        if (pin->_direction == EGraphPinDirection::kOutput)
+                        {
+                            preview._output_pin = pin->_id;
+                            preview._input_pin = target_pin->_id;
+                        }
+                        else
+                        {
+                            preview._output_pin = target_pin->_id;
+                            preview._input_pin = pin->_id;
+                        }
+                        const GraphLinkGeometry geometry = BuildLinkGeometry(preview);
+                        renderer.DrawBezier(geometry._start, geometry._control0, geometry._control1, geometry._end,
+                                            _style._link_thickness, color, 0.08f, 24u);
+                        DrawArrow(renderer, geometry, color);
+                        return;
+                    }
+                }
             }
             Vector2f start_tangent = Vector2f::kZero;
             Vector2f end_tangent = Vector2f::kZero;
@@ -848,7 +956,7 @@ namespace Ailu
 
             for (const GraphPinData &pin : node._pins)
             {
-                if (!pin._is_hidden)
+                if (ShouldDrawPin(node, pin))
                     DrawPin(renderer, node, pin);
             }
         }
@@ -867,7 +975,8 @@ namespace Ailu
             renderer.DrawQuad({pin_screen.x - radius, pin_screen.y - radius, radius * 2.0f, radius * 2.0f},
                               MakeColorBrush(pin_color), Vector4f(radius), 0.2f);
 
-            if (_zoom < kFullDetailZoomThreshold)
+            if (_presentation._pin_presentation != EGraphPinPresentation::kFull ||
+                _zoom < kFullDetailZoomThreshold)
                 return;
 
             const Vector2f node_size = GetNodeDisplaySize(node);
@@ -885,6 +994,15 @@ namespace Ailu
                 renderer.DrawText(pin._name, {node_rect.x + node_rect.z - text_size.x - 10.0f * _zoom, text_y},
                                   12.0f * _zoom, _style._pin_text_color);
             }
+        }
+
+        bool GraphCanvas::ShouldDrawPin(const GraphNodeData &node, const GraphPinData &pin) const
+        {
+            if (pin._is_hidden)
+                return false;
+            if (_presentation._pin_presentation != EGraphPinPresentation::kHoverOnly)
+                return true;
+            return _hovered_node == node._id || _hovered_pin == pin._id || _drag_start_pin == pin._id;
         }
 
         void GraphCanvas::DrawMiniMap(UI::UIRenderer &renderer, const Vector4f &content_rect)
@@ -1064,7 +1182,7 @@ namespace Ailu
             {
                 for (const GraphPinData &pin : node_it->_pins)
                 {
-                    if (pin._is_hidden)
+                    if (!ShouldDrawPin(*node_it, pin))
                         continue;
                     const Vector2f delta = GetPinScreenPosition(*node_it, pin) - screen_pos;
                     if (delta.x * delta.x + delta.y * delta.y <= hit_radius_sq)
@@ -1085,23 +1203,16 @@ namespace Ailu
             const auto &links = _document->Links();
             for (auto it = links.rbegin(); it != links.rend(); ++it)
             {
-                const GraphNodeData *output_node = _document->FindNodeByPin(it->_output_pin);
-                const GraphNodeData *input_node = _document->FindNodeByPin(it->_input_pin);
-                const GraphPinData *output_pin = _document->FindPin(it->_output_pin);
-                const GraphPinData *input_pin = _document->FindPin(it->_input_pin);
-                if (output_node == nullptr || input_node == nullptr || output_pin == nullptr || input_pin == nullptr)
+                const GraphLinkGeometry geometry = BuildLinkGeometry(*it);
+                if (geometry._start == Vector2f::kZero && geometry._end == Vector2f::kZero)
                     continue;
 
-                const Vector2f start = GetPinScreenPosition(*output_node, *output_pin);
-                const Vector2f end = GetPinScreenPosition(*input_node, *input_pin);
-                Vector2f start_tangent = Vector2f::kZero;
-                Vector2f end_tangent = Vector2f::kZero;
-                GetLinkTangents(start, end, start_tangent, end_tangent);
-                Vector2f previous = start;
+                Vector2f previous = geometry._start;
                 for (u32 index = 1u; index <= kHitSegments; ++index)
                 {
                     const f32 t = static_cast<f32>(index) / static_cast<f32>(kHitSegments);
-                    const Vector2f current = SampleBezier(start, start_tangent, end_tangent, end, t);
+                    const Vector2f current = SampleBezier(geometry._start, geometry._control0, geometry._control1,
+                                                          geometry._end, t);
                     if (DistanceToSegmentSquared(screen_pos, previous, current) <= hit_radius_sq)
                         return &(*it);
                     previous = current;
@@ -1301,6 +1412,11 @@ namespace Ailu
             _connection_message.clear();
 
             const GraphPinData *target_pin = HitTestPin(mouse_pos);
+            if (target_pin == nullptr && _presentation._node_as_link_target)
+            {
+                if (const GraphNodeData *target_node = HitTestNode(mouse_pos); target_node != nullptr)
+                    target_pin = FindCompatiblePinOnNode(*target_node);
+            }
             if (target_pin != nullptr && !(target_pin->_id == _drag_start_pin))
             {
                 _drag_target_pin = target_pin->_id;
@@ -1966,6 +2082,91 @@ namespace Ailu
             return true;
         }
 
+        GraphLinkGeometry GraphCanvas::BuildLinkGeometry(const GraphLinkData &link) const
+        {
+            GraphLinkGeometry geometry;
+            if (_document == nullptr)
+                return geometry;
+
+            const GraphNodeData *output_node = _document->FindNodeByPin(link._output_pin);
+            const GraphNodeData *input_node = _document->FindNodeByPin(link._input_pin);
+            const GraphPinData *output_pin = _document->FindPin(link._output_pin);
+            const GraphPinData *input_pin = _document->FindPin(link._input_pin);
+            if (output_node == nullptr || input_node == nullptr || output_pin == nullptr || input_pin == nullptr)
+                return geometry;
+
+            if (_presentation._link_route == EGraphLinkRoute::kPinBezier)
+            {
+                geometry._start = GetPinScreenPosition(*output_node, *output_pin);
+                geometry._end = GetPinScreenPosition(*input_node, *input_pin);
+                const f32 curve_offset = HasReverseLink(*_document, link) ? kBidirectionalLinkOffset : 0.0f;
+                GetLinkTangents(geometry._start, geometry._end, geometry._control0, geometry._control1,
+                                curve_offset);
+                return geometry;
+            }
+
+            const Vector4f output_rect = GraphRectToScreen(GetNodeGraphRect(*output_node));
+            const Vector4f input_rect = GraphRectToScreen(GetNodeGraphRect(*input_node));
+            const Vector2f output_center = {output_rect.x + output_rect.z * 0.5f,
+                                           output_rect.y + output_rect.w * 0.5f};
+            const Vector2f input_center = {input_rect.x + input_rect.z * 0.5f,
+                                          input_rect.y + input_rect.w * 0.5f};
+            if (output_node->_id == input_node->_id)
+            {
+                const f32 loop_width = 42.0f * _zoom;
+                const f32 loop_height = 48.0f * _zoom;
+                geometry._start = {output_rect.x + output_rect.z, output_rect.y + output_rect.w * 0.28f};
+                geometry._end = {output_rect.x + output_rect.z, output_rect.y + output_rect.w * 0.58f};
+                geometry._control0 = {geometry._start.x + loop_width, geometry._start.y - loop_height};
+                geometry._control1 = {geometry._end.x + loop_width, geometry._end.y - loop_height};
+                return geometry;
+            }
+
+            const Vector2f center_delta = input_center - output_center;
+            if (std::abs(center_delta.x) <= 0.0001f && std::abs(center_delta.y) <= 0.0001f)
+            {
+                geometry._start = {output_rect.x + output_rect.z, output_center.y};
+                geometry._end = {input_rect.x, input_center.y};
+            }
+            else
+            {
+                geometry._start = IntersectRectBoundary(output_rect, output_center, input_center);
+                geometry._end = IntersectRectBoundary(input_rect, input_center, output_center);
+            }
+            const Vector2f direction = Normalize(geometry._end - geometry._start);
+            const Vector2f normal(-direction.y, direction.x);
+            const Vector2f delta = geometry._end - geometry._start;
+            const f32 distance = std::sqrt(delta.x * delta.x + delta.y * delta.y);
+            const f32 tangent_length = std::clamp(distance * 0.35f, 30.0f * _zoom, 160.0f * _zoom);
+
+            u32 same_direction_count = 0u;
+            u32 same_direction_index = 0u;
+            for (const GraphLinkData &other : _document->Links())
+            {
+                const GraphNodeData *other_output = _document->FindNodeByPin(other._output_pin);
+                const GraphNodeData *other_input = _document->FindNodeByPin(other._input_pin);
+                if (other_output == nullptr || other_input == nullptr || other_output->_id != output_node->_id ||
+                    other_input->_id != input_node->_id)
+                    continue;
+                if (other._id == link._id)
+                    same_direction_index = same_direction_count;
+                ++same_direction_count;
+            }
+            const f32 lane_offset = same_direction_count > 1u ?
+                                        (static_cast<f32>(same_direction_index) -
+                                         static_cast<f32>(same_direction_count - 1u) * 0.5f) *
+                                            kStateTransitionLaneSpacing * _zoom :
+                                        0.0f;
+            const f32 bidirectional_offset = _presentation._separate_bidirectional_links &&
+                                                     HasReverseLink(*_document, link) ?
+                                                 kStateTransitionBidirectionalOffset * _zoom :
+                                                 0.0f;
+            const f32 curve_offset = lane_offset + bidirectional_offset;
+            geometry._control0 = geometry._start + direction * tangent_length + normal * curve_offset;
+            geometry._control1 = geometry._end - direction * tangent_length + normal * curve_offset;
+            return geometry;
+        }
+
         Vector4f GraphCanvas::GetNodeGraphRect(const GraphNodeData &node) const
         {
             const Vector2f node_size = GetNodeDisplaySize(node);
@@ -1993,6 +2194,20 @@ namespace Ailu
             if (_document == nullptr || _drag_start_pin == Guid::EmptyGuid() || target_pin_id == Guid::EmptyGuid())
                 return GraphConnectionResponse::Disallow("");
             return _document->CanConnect(_drag_start_pin, target_pin_id);
+        }
+
+        const GraphPinData *GraphCanvas::FindCompatiblePinOnNode(const GraphNodeData &node) const
+        {
+            if (_document == nullptr || _drag_start_pin == Guid::EmptyGuid())
+                return nullptr;
+            for (const GraphPinData &pin : node._pins)
+            {
+                if (pin._is_hidden || pin._id == _drag_start_pin)
+                    continue;
+                if (GetConnectionResponse(pin._id)._action != EGraphConnectionAction::kDisallow)
+                    return &pin;
+            }
+            return nullptr;
         }
 
         bool GraphCanvas::IsPinCompatibleDragTarget(const Guid &pin_id) const

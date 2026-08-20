@@ -22,6 +22,25 @@ namespace Ailu
         };
 
         ASTRUCT()
+        struct DockWindowPlacement
+        {
+            GENERATED_BODY()
+        public:
+            APROPERTY()
+            String _dock_id;
+            APROPERTY()
+            Vector2f _position;
+            APROPERTY()
+            Vector2f _size;
+            APROPERTY()
+            Vector2f _native_window_position;
+            APROPERTY()
+            Vector2f _native_window_size;
+            APROPERTY()
+            bool _is_external_window = false;
+        };
+
+        ASTRUCT()
         struct DockNodeData
         {
             GENERATED_BODY()
@@ -65,6 +84,8 @@ namespace Ailu
         public:
             APROPERTY()
             Vector<DockNodeData> _node_data;
+            APROPERTY()
+            Vector<DockWindowPlacement> _window_placements;
         };
 
         
@@ -85,6 +106,7 @@ namespace Ailu
             bool ActivateDock(StringView type_name);
             void RemoveDock(DockWindow *dock);
             void RequestRemoveDock(DockWindow *dock);
+            void OnEvent(Event &e);
             void Update(f32 dt);
             void SetMainDockArea(Vector2f position, Vector2f size);
 
@@ -95,13 +117,24 @@ namespace Ailu
             void DrawFloatingPreview();
             void MarkDeleteNode(DockNode* node);
             bool IsFocused(DockWindow *w) const;
+            bool IsTabItemFocused(const IDockTabItem *item) const;
         private:
+            enum class EDockMouseInteraction : u8
+            {
+                kNone,
+                kResizeEdge,
+                kSplit,
+                kMove
+            };
+
             void OnWindowFloat(bool draw_preview);
             void DrawPreviewDockArea(Window *window, Vector2f pos, Vector2f size, Vector2f start_pos = Vector2f::kZero,
                                      bool draw_preview = true);
             void UpdateDockNode(DockNode *node);
             //处理节点move/resize/split size
             void HandleNodeResize();
+            void ReleaseMouseCapture();
+            bool HasMouseCapture() const { return _mouse_interaction != EDockMouseInteraction::kNone; }
             void TryAddFloatNode(Ref<DockNode>& n);
             void TryRemoveFloatNode(DockNode* n);
             void UntrackFloatNode(DockNode *n);
@@ -110,6 +143,9 @@ namespace Ailu
             void WindowEventHandler(Event &e);
             //将docknode 保存为docknodedata用于序列化
             void WriteNodeData(DockNode *n);
+            void SaveWindowPlacement(DockWindow *dock, DockNode *node);
+            void SyncWindowPlacementArray();
+            void EnsureMainWorkspaceTabs();
             Window *CreateNewWindow(String title,u16 w,u16 h,bool is_sync = false);
             void RequestFocus(DockWindow *w);
             DockNode *FindNodeByWindow(DockWindow *w);
@@ -134,7 +170,9 @@ namespace Ailu
             DockNode* _floating_preview_node = nullptr;
             DockNode *_resizing_node = nullptr;
             DockNode *_adj_split_node = nullptr;
+            DockNode *_adj_split_node_cross = nullptr;
             DockNode *_drag_move_node = nullptr;
+            EDockMouseInteraction _mouse_interaction = EDockMouseInteraction::kNone;
             Vector2f _drag_start_offset;//拖拽开始时节点位置与鼠标位置的偏移
             Vector2f _float_node_start_pos;//记录按下标题栏的鼠标位置，移动一定距离后才显示预览矩形
             bool _can_draw_float_preview = false;
@@ -145,8 +183,10 @@ namespace Ailu
             bool _is_floating_whole_node = false;
             Vector<Scope<Window>> _float_windows;
             DockNodeDataArray _node_data_array;
+            HashMap<String, DockWindowPlacement> _window_placement_map;
             WString _dock_layout_path;
             DockNode *_focused_node = nullptr;
+            DockWindow *_focused_window = nullptr;
             u32 _next_serialize_node_id = 0u;
             Vector2f _main_dock_position = Vector2f::kZero;
             Vector2f _main_dock_size = Vector2f::kZero;

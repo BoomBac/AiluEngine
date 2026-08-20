@@ -1,4 +1,5 @@
 #include "Objects/Object.h"
+#include "Framework/Common/Allocator.hpp"
 #include "Framework/Common/Log.h"
 #include "pch.h"
 
@@ -37,13 +38,13 @@ namespace Ailu
 
     void ObjectRegister::Shutdown()
     {
-        delete g_pObjectRegister; g_pObjectRegister = nullptr;
+        AL_DELETE(g_pObjectRegister);
     }
 
     ObjectRegister &ObjectRegister::Get()
     {
         if (g_pObjectRegister == nullptr)
-            g_pObjectRegister = new ObjectRegister();
+            g_pObjectRegister = AL_NEW_TAG(EMemoryTag::kCore, ObjectRegister);
         return *g_pObjectRegister;
     }
 

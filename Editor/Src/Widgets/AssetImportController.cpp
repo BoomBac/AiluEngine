@@ -124,7 +124,8 @@ namespace Ailu
                                                        finish_popup();
                                                        return std::nullopt;
                                                    }, false, false}
-                                          });
+                                          },
+                                          {}, true);
                 return;
             }
             case EImportPopupType::kMesh:
@@ -174,7 +175,8 @@ namespace Ailu
                                                        finish_popup();
                                                        return std::nullopt;
                                                    }, false, false}
-                                          });
+                                          },
+                                          {}, true);
                 return;
             }
             case EImportPopupType::kDirect:

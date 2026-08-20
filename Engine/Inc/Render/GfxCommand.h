@@ -16,6 +16,7 @@
 #include <functional>
 #include <mutex>
 #include <new>
+#include "Framework/Common/Allocator.hpp"
 #include <type_traits>
 
 namespace Ailu::Render
@@ -157,7 +158,7 @@ namespace Ailu::Render
         UploadParams *_params;
         ~CommandGpuResourceUpload()
         {
-            delete _params; _params = nullptr;
+            AL_DELETE(_params);
         }
         void Reset() {
             SafeResetCommand(this);

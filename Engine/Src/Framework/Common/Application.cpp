@@ -186,7 +186,7 @@ namespace Ailu
         TimeMgr::Get().Mark();
         sp_instance = this;
         s_main_thread_id = std::this_thread::get_id();
-        LogMgr::Get().AddAppender(new FileAppender());
+        LogMgr::Get().AddAppender(AL_NEW_TAG(EMemoryTag::kCore, FileAppender));
         //Load ini
         {
             ProjectManager::Init();
@@ -206,16 +206,18 @@ namespace Ailu
             _is_multi_thread_rendering.store(g_engine_config.isMultiThreadRender);
         }
         //LogMgr::Get().AddAppender(new ConsoleAppender());
-        _p_window = std::move(WindowFactory::Create(g_engine_config.isMultiThreadRender ? L"AiluEngine -mt" : L"AiluEngine", desc._window_width, desc._window_height));
+        const WString window_title = g_engine_config.isMultiThreadRender ? L"AiluEngine -mt" : L"AiluEngine";
+        _p_window = std::move(WindowFactory::Create(window_title, desc._window_width, desc._window_height,
+                                                    desc._window_flags));
         _p_window->SetEventHandler(BIND_EVENT_HANDLER(OnEvent));
         s_focus_window = _p_window.get();
         _input_system = MakeScope<InputSystem>();
         _win_input_backend.Initialize(*_input_system, _p_window.get());
-        _layer_stack = new LayerStack();
+        _layer_stack = AL_NEW_TAG(EMemoryTag::kCore, LayerStack);
         //PushLayer(new UI::UILayer());
 #ifdef DEAR_IMGUI
         //初始化imgui gfx时要求imgui window已经初始化
-        _p_imgui_layer = new ImGUILayer();
+        _p_imgui_layer = AL_NEW_TAG(EMemoryTag::kUi, ImGUILayer);
 #endif// DEAR_IMGUI
     Core::ThreadPool::Init(6u, "GlobalThreadPool");
     JobSystem::Init(6u);
@@ -270,7 +272,7 @@ namespace Ailu
         ar.Save(s_engine_config_path);
         _win_input_backend.Shutdown(*_input_system);
         _input_system.reset();
-        delete _layer_stack; _layer_stack = nullptr;
+        AL_DELETE(_layer_stack);
         UI::UIManager::Shutdown();
         Gizmo::Shutdown();
         SceneManagement::SceneMgr::Shutdown();
@@ -804,6 +806,7 @@ namespace Ailu
             s_cursor_map[ECursorType::kSizeEW] = LoadCursor(NULL, IDC_SIZEWE);
             s_cursor_map[ECursorType::kSizeNWSE] = LoadCursor(NULL, IDC_SIZENWSE);
             s_cursor_map[ECursorType::kSizeNESW] = LoadCursor(NULL, IDC_SIZENESW);
+            s_cursor_map[ECursorType::kSizeAll] = LoadCursor(NULL, IDC_SIZEALL);
             s_cursor_map[ECursorType::kHand] = LoadCursor(NULL, IDC_HAND);
         }
         ::SetCursor(s_cursor_map[type]);

@@ -8,6 +8,7 @@
 #include "UI/Container.h"
 #include "UI/Basic.h"
 #include "Framework/Common/Application.h"
+#include "Framework/Common/Allocator.hpp"
 
 namespace Ailu::UI
 {
@@ -15,12 +16,12 @@ namespace Ailu::UI
     //----------------------------------------------------------------------------------------UIManager-----------------------------------------------------------------------------
     void UIManager::Init()
     {
-        g_pUIManager = new UIManager();
+        g_pUIManager = AL_NEW_TAG(EMemoryTag::kUi, UIManager);
     }
     void UIManager::Shutdown()
     {
         UIRenderer::Shutdown();
-        delete g_pUIManager; g_pUIManager = nullptr;
+        AL_DELETE(g_pUIManager);
     }
     UIManager *UIManager::Get()
     {
@@ -30,7 +31,7 @@ namespace Ailu::UI
     UIManager::UIManager()
     {
         UIRenderer::Init();
-        _ui_layer = new UILayer();
+        _ui_layer = AL_NEW_TAG(EMemoryTag::kUi, UILayer);
         Application::Get().PushLayer(_ui_layer);
         _renderer = UIRenderer::Get();
         _capture_target = nullptr;
@@ -174,7 +175,8 @@ namespace Ailu::UI
         _focus_target = nullptr;
         ApplyFocusChange(old, nullptr);
     }
-    void UIManager::ShowPopupAt(f32 x, f32 y, Ref<UIElement> root, std::function<void()> on_close, Window *win)
+    void UIManager::ShowPopupAt(f32 x, f32 y, Ref<UIElement> root, std::function<void()> on_close, Window *win,
+                                bool is_modal)
     {
         if (!root)
             return;
@@ -183,12 +185,44 @@ namespace Ailu::UI
         auto popup_widget = MakeRef<Widget>();
         popup_widget->Name(std::format("PopupWidget_{}", _popup_stack.size()));
         popup_widget->SetPopup(true);
+        const auto &root_slot = root->GetSlot();
+        const auto *root_canvas_slot = dynamic_cast<const CanvasSlot *>(root_slot.get());
+        const Vector2f popup_size = root_canvas_slot != nullptr && root_canvas_slot->_size_to_content ?
+                                        root->MeasureDesiredSize() : root_slot->_size;
+
         auto popup_root = MakeRef<Canvas>();
         popup_root->Name(std::format("{}Root", popup_widget->Name()));
-        popup_root->AddChild(root);
-        auto &root_slot = root->GetSlotAs<CanvasSlot>();
-        const Vector2f popup_size = root_slot._size_to_content ? root->MeasureDesiredSize() : root_slot._size;
-        root_slot.Position(Vector2f::kZero).Size(popup_size);
+        const bool root_has_default_frame = root->As<Border>() != nullptr || root->As<ListView>() != nullptr;
+        if (!is_modal && !root_has_default_frame)
+        {
+            auto popup_frame = MakeRef<Border>();
+            popup_frame->Name(std::format("{}Frame", popup_widget->Name()));
+            auto &frame_slot = popup_root->AddChild(popup_frame)->GetSlotAs<CanvasSlot>();
+            frame_slot.Position(Vector2f::kZero).Size(popup_size);
+
+            UIBrush transparent_brush;
+            transparent_brush._type = EUIBrushType::kColor;
+            transparent_brush._tint = Colors::kTransparent;
+            auto &frame_style = popup_frame->GetStyleOverride();
+            frame_style.SetBackground(transparent_brush);
+            popup_frame->SetStyleId("Popup");
+            if (_theme == nullptr || _theme->FindBorderStyle("Popup") == nullptr)
+            {
+                frame_style.SetBorderColor(Color(0.28f, 0.31f, 0.35f, 1.0f));
+                frame_style.SetBorderWidth(1.0f);
+                frame_style.SetCornerRadius(10.0f);
+            }
+
+            popup_frame->AddChild(root);
+            root->GetSlotAs<LinearSlot>().Margin(Padding(0.0f)).SizePolicy(ESizePolicy::kFill, ESizePolicy::kFill);
+        }
+        else
+        {
+            popup_root->AddChild(root);
+            auto &canvas_slot = root->GetSlotAs<CanvasSlot>();
+            canvas_slot.Position(Vector2f::kZero).Size(popup_size);
+        }
+
         const Vector2f window_size = {(f32) target_window->GetWidth(), (f32) target_window->GetHeight()};
         constexpr f32 kScreenPadding = 4.0f;
         Vector2f popup_pos{x, y};
@@ -199,6 +233,29 @@ namespace Ailu::UI
         popup_pos.x = std::clamp(popup_pos.x, kScreenPadding, std::max(kScreenPadding, window_size.x - popup_size.x - kScreenPadding));
         popup_pos.y = std::clamp(popup_pos.y, kScreenPadding, std::max(kScreenPadding, window_size.y - popup_size.y - kScreenPadding));
 
+        if (is_modal)
+        {
+            if (auto *border = root->As<Border>())
+            {
+                if (auto *backdrop_texture = RenderTexture::WindowBackBuffer(target_window))
+                {
+                    UIBrush backdrop_brush;
+                    backdrop_brush._type = EUIBrushType::kBackdropBlur;
+                    backdrop_brush._texture = backdrop_texture;
+                    backdrop_brush._tint = Color(0.12f, 0.12f, 0.14f, 0.72f);
+                    if (_theme != nullptr)
+                    {
+                        if (const auto *popup_style = _theme->FindBorderStyle("Popup"))
+                        {
+                            backdrop_brush._tint = popup_style->_visual._background._tint;
+                            backdrop_brush._tint.a = 0.72f;
+                        }
+                    }
+                    border->GetStyleOverride().SetBackground(backdrop_brush);
+                }
+            }
+        }
+
         popup_widget->SetParent(target_window);
         popup_widget->BindOutput(RenderTexture::WindowBackBuffer(target_window));
         popup_widget->SetPosition(popup_pos);
@@ -207,7 +264,7 @@ namespace Ailu::UI
         popup_widget->_visibility = EVisibility::kVisible;
         RegisterWidget(popup_widget);
         BringToFront(popup_widget.get());
-        _popup_stack.push_back({popup_widget, on_close});
+        _popup_stack.push_back({popup_widget, on_close, is_modal});
     }
     void UIManager::HidePopup()
     {
@@ -247,6 +304,26 @@ namespace Ailu::UI
         if (_popup_stack.empty())
             return nullptr;
         return _popup_stack.back()._widget.get();
+    }
+    Widget *UIManager::GetModalPopupWidget() const
+    {
+        for (auto it = _popup_stack.rbegin(); it != _popup_stack.rend(); ++it)
+        {
+            if (it->_is_modal)
+                return it->_widget.get();
+        }
+        return nullptr;
+    }
+    bool UIManager::IsPopupModal(const Widget *widget) const
+    {
+        if (widget == nullptr)
+            return false;
+        for (auto it = _popup_stack.rbegin(); it != _popup_stack.rend(); ++it)
+        {
+            if (it->_widget.get() == widget)
+                return it->_is_modal;
+        }
+        return false;
     }
     void UIManager::SetTheme(UITheme *theme) { _theme = theme; }
     void UIManager::Destroy(Ref<UIElement> element)

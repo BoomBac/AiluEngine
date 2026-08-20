@@ -1191,6 +1191,147 @@ return Ailu::AnimationControllerAssetDocument::StaticType();
 return Ailu::AnimationControllerAssetDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_AnimationControllerAssetDocument(&Ailu::AnimationControllerAssetDocument::StaticType, "Ailu::AnimationControllerAssetDocument");
+const Ailu::Type* Ailu::Z_Construct_BlendSpaceAssetDocument_Type()
+{
+Ailu::Object::StaticType();
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "BlendSpaceAssetDocument";
+initializer._size = sizeof(Ailu::BlendSpaceAssetDocument);
+initializer._full_name = "Ailu::BlendSpaceAssetDocument";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu";
+initializer._base_name = "Ailu::Object";
+initializer._constructor = []()->Ailu::BlendSpaceAssetDocument* {return new Ailu::BlendSpaceAssetDocument;};
+Meta meta_header;
+meta_header.Set("Category","");
+meta_header.Set("IsColor",false);
+meta_header.Set("IsRange",false);
+meta_header.Set("IsFloatRange",true);
+meta_header.Set("RangeMin",(f32)0);
+meta_header.Set("RangeMax",(f32)1);
+MemberBuilder builder_header;
+builder_header._name = "_header";
+builder_header._type_name = "Ailu::AssetDocumentHeader";
+builder_header._offset = offsetof(BlendSpaceAssetDocument,_header);
+builder_header._is_const = false;
+builder_header._is_static = false;
+builder_header._is_public = true;
+builder_header._is_pointer = false;
+builder_header._is_ref = false;
+builder_header._is_template = false;
+builder_header._meta = meta_header;
+builder_header._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<AssetDocumentHeader>);
+builder_header._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<AssetDocumentHeader>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_header));
+Meta meta_samples;
+meta_samples.Set("Category","");
+meta_samples.Set("IsColor",false);
+meta_samples.Set("IsRange",false);
+meta_samples.Set("IsFloatRange",true);
+meta_samples.Set("RangeMin",(f32)0);
+meta_samples.Set("RangeMax",(f32)1);
+MemberBuilder builder_samples;
+builder_samples._name = "_samples";
+builder_samples._type_name = "Vector<BlendSpaceSample>";
+builder_samples._offset = offsetof(BlendSpaceAssetDocument,_samples);
+builder_samples._is_const = false;
+builder_samples._is_static = false;
+builder_samples._is_public = true;
+builder_samples._is_pointer = false;
+builder_samples._is_ref = false;
+builder_samples._is_template = true;
+builder_samples._meta = meta_samples;
+builder_samples._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<BlendSpaceSample>>);
+builder_samples._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<BlendSpaceSample>>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_samples));
+Meta meta_x_range;
+meta_x_range.Set("Category","");
+meta_x_range.Set("IsColor",false);
+meta_x_range.Set("IsRange",false);
+meta_x_range.Set("IsFloatRange",true);
+meta_x_range.Set("RangeMin",(f32)0);
+meta_x_range.Set("RangeMax",(f32)1);
+MemberBuilder builder_x_range;
+builder_x_range._name = "_x_range";
+builder_x_range._type_name = "Vector2f";
+builder_x_range._offset = offsetof(BlendSpaceAssetDocument,_x_range);
+builder_x_range._is_const = false;
+builder_x_range._is_static = false;
+builder_x_range._is_public = true;
+builder_x_range._is_pointer = false;
+builder_x_range._is_ref = false;
+builder_x_range._is_template = false;
+builder_x_range._meta = meta_x_range;
+builder_x_range._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector2f>);
+builder_x_range._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector2f>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_x_range));
+Meta meta_y_range;
+meta_y_range.Set("Category","");
+meta_y_range.Set("IsColor",false);
+meta_y_range.Set("IsRange",false);
+meta_y_range.Set("IsFloatRange",true);
+meta_y_range.Set("RangeMin",(f32)0);
+meta_y_range.Set("RangeMax",(f32)1);
+MemberBuilder builder_y_range;
+builder_y_range._name = "_y_range";
+builder_y_range._type_name = "Vector2f";
+builder_y_range._offset = offsetof(BlendSpaceAssetDocument,_y_range);
+builder_y_range._is_const = false;
+builder_y_range._is_static = false;
+builder_y_range._is_public = true;
+builder_y_range._is_pointer = false;
+builder_y_range._is_ref = false;
+builder_y_range._is_template = false;
+builder_y_range._meta = meta_y_range;
+builder_y_range._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector2f>);
+builder_y_range._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector2f>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_y_range));
+Meta meta_is_2d;
+meta_is_2d.Set("Category","");
+meta_is_2d.Set("IsColor",false);
+meta_is_2d.Set("IsRange",false);
+meta_is_2d.Set("IsFloatRange",true);
+meta_is_2d.Set("RangeMin",(f32)0);
+meta_is_2d.Set("RangeMax",(f32)1);
+MemberBuilder builder_is_2d;
+builder_is_2d._name = "_is_2d";
+builder_is_2d._type_name = "bool";
+builder_is_2d._offset = offsetof(BlendSpaceAssetDocument,_is_2d);
+builder_is_2d._is_const = false;
+builder_is_2d._is_static = false;
+builder_is_2d._is_public = true;
+builder_is_2d._is_pointer = false;
+builder_is_2d._is_ref = false;
+builder_is_2d._is_template = false;
+builder_is_2d._meta = meta_is_2d;
+builder_is_2d._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_is_2d._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_is_2d));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+const Ailu::Type* Ailu::BlendSpaceAssetDocument::GetPrivateStaticClass()
+{
+	static const Ailu::Type* type = Z_Construct_BlendSpaceAssetDocument_Type();
+	return type;
+}
+
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::BlendSpaceAssetDocument>()
+{
+return Ailu::BlendSpaceAssetDocument::StaticType();
+}
+    const Type *Ailu::BlendSpaceAssetDocument::GetType()
+{
+return Ailu::BlendSpaceAssetDocument::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_BlendSpaceAssetDocument(&Ailu::BlendSpaceAssetDocument::StaticType, "Ailu::BlendSpaceAssetDocument");
 const Ailu::Type* Ailu::Z_Construct_SpriteAssetDocument_Type()
 {
 Ailu::Object::StaticType();
@@ -1353,6 +1494,105 @@ return Ailu::SpriteAssetDocument::StaticType();
 return Ailu::SpriteAssetDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_SpriteAssetDocument(&Ailu::SpriteAssetDocument::StaticType, "Ailu::SpriteAssetDocument");
+const Ailu::Type* Ailu::Z_Construct_SpriteAtlasAssetDocument_Type()
+{
+Ailu::Object::StaticType();
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "SpriteAtlasAssetDocument";
+initializer._size = sizeof(Ailu::SpriteAtlasAssetDocument);
+initializer._full_name = "Ailu::SpriteAtlasAssetDocument";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu";
+initializer._base_name = "Ailu::Object";
+initializer._constructor = []()->Ailu::SpriteAtlasAssetDocument* {return new Ailu::SpriteAtlasAssetDocument;};
+Meta meta_header;
+meta_header.Set("Category","");
+meta_header.Set("IsColor",false);
+meta_header.Set("IsRange",false);
+meta_header.Set("IsFloatRange",true);
+meta_header.Set("RangeMin",(f32)0);
+meta_header.Set("RangeMax",(f32)1);
+MemberBuilder builder_header;
+builder_header._name = "_header";
+builder_header._type_name = "Ailu::AssetDocumentHeader";
+builder_header._offset = offsetof(SpriteAtlasAssetDocument,_header);
+builder_header._is_const = false;
+builder_header._is_static = false;
+builder_header._is_public = true;
+builder_header._is_pointer = false;
+builder_header._is_ref = false;
+builder_header._is_template = false;
+builder_header._meta = meta_header;
+builder_header._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<AssetDocumentHeader>);
+builder_header._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<AssetDocumentHeader>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_header));
+Meta meta_texture;
+meta_texture.Set("Category","");
+meta_texture.Set("IsColor",false);
+meta_texture.Set("IsRange",false);
+meta_texture.Set("IsFloatRange",true);
+meta_texture.Set("RangeMin",(f32)0);
+meta_texture.Set("RangeMax",(f32)1);
+MemberBuilder builder_texture;
+builder_texture._name = "_texture";
+builder_texture._type_name = "Ailu::Guid";
+builder_texture._offset = offsetof(SpriteAtlasAssetDocument,_texture);
+builder_texture._is_const = false;
+builder_texture._is_static = false;
+builder_texture._is_public = true;
+builder_texture._is_pointer = false;
+builder_texture._is_ref = false;
+builder_texture._is_template = false;
+builder_texture._meta = meta_texture;
+builder_texture._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Guid>);
+builder_texture._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Guid>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_texture));
+Meta meta_sprites;
+meta_sprites.Set("Category","");
+meta_sprites.Set("IsColor",false);
+meta_sprites.Set("IsRange",false);
+meta_sprites.Set("IsFloatRange",true);
+meta_sprites.Set("RangeMin",(f32)0);
+meta_sprites.Set("RangeMax",(f32)1);
+MemberBuilder builder_sprites;
+builder_sprites._name = "_sprites";
+builder_sprites._type_name = "Vector<SpriteAtlasEntryDocument>";
+builder_sprites._offset = offsetof(SpriteAtlasAssetDocument,_sprites);
+builder_sprites._is_const = false;
+builder_sprites._is_static = false;
+builder_sprites._is_public = true;
+builder_sprites._is_pointer = false;
+builder_sprites._is_ref = false;
+builder_sprites._is_template = true;
+builder_sprites._meta = meta_sprites;
+builder_sprites._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<SpriteAtlasEntryDocument>>);
+builder_sprites._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<SpriteAtlasEntryDocument>>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_sprites));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+const Ailu::Type* Ailu::SpriteAtlasAssetDocument::GetPrivateStaticClass()
+{
+	static const Ailu::Type* type = Z_Construct_SpriteAtlasAssetDocument_Type();
+	return type;
+}
+
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::SpriteAtlasAssetDocument>()
+{
+return Ailu::SpriteAtlasAssetDocument::StaticType();
+}
+    const Type *Ailu::SpriteAtlasAssetDocument::GetType()
+{
+return Ailu::SpriteAtlasAssetDocument::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_SpriteAtlasAssetDocument(&Ailu::SpriteAtlasAssetDocument::StaticType, "Ailu::SpriteAtlasAssetDocument");
 const Ailu::Type* Ailu::Z_Construct_InputActionAssetDocument_Type()
 {
 Ailu::Object::StaticType();
@@ -2609,6 +2849,167 @@ return Ailu::AnimationEventDocument::StaticType();
 return Ailu::AnimationEventDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_AnimationEventDocument(&Ailu::AnimationEventDocument::StaticType, "Ailu::AnimationEventDocument");
+const Ailu::Type* Ailu::Z_Construct_SpriteAtlasEntryDocument_Type()
+{
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "SpriteAtlasEntryDocument";
+initializer._size = sizeof(Ailu::SpriteAtlasEntryDocument);
+initializer._full_name = "Ailu::SpriteAtlasEntryDocument";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu";
+initializer._base_name = "";
+initializer._constructor = []()->Ailu::SpriteAtlasEntryDocument* {return new Ailu::SpriteAtlasEntryDocument;};
+Meta meta_guid;
+meta_guid.Set("Category","");
+meta_guid.Set("IsColor",false);
+meta_guid.Set("IsRange",false);
+meta_guid.Set("IsFloatRange",true);
+meta_guid.Set("RangeMin",(f32)0);
+meta_guid.Set("RangeMax",(f32)1);
+MemberBuilder builder_guid;
+builder_guid._name = "_guid";
+builder_guid._type_name = "Ailu::Guid";
+builder_guid._offset = offsetof(SpriteAtlasEntryDocument,_guid);
+builder_guid._is_const = false;
+builder_guid._is_static = false;
+builder_guid._is_public = true;
+builder_guid._is_pointer = false;
+builder_guid._is_ref = false;
+builder_guid._is_template = false;
+builder_guid._meta = meta_guid;
+builder_guid._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Guid>);
+builder_guid._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Guid>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_guid));
+Meta meta_name;
+meta_name.Set("Category","");
+meta_name.Set("IsColor",false);
+meta_name.Set("IsRange",false);
+meta_name.Set("IsFloatRange",true);
+meta_name.Set("RangeMin",(f32)0);
+meta_name.Set("RangeMax",(f32)1);
+MemberBuilder builder_name;
+builder_name._name = "_name";
+builder_name._type_name = "String";
+builder_name._offset = offsetof(SpriteAtlasEntryDocument,_name);
+builder_name._is_const = false;
+builder_name._is_static = false;
+builder_name._is_public = true;
+builder_name._is_pointer = false;
+builder_name._is_ref = false;
+builder_name._is_template = false;
+builder_name._meta = meta_name;
+builder_name._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<String>);
+builder_name._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<String>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_name));
+Meta meta_uv_rect;
+meta_uv_rect.Set("Category","");
+meta_uv_rect.Set("IsColor",false);
+meta_uv_rect.Set("IsRange",false);
+meta_uv_rect.Set("IsFloatRange",true);
+meta_uv_rect.Set("RangeMin",(f32)0);
+meta_uv_rect.Set("RangeMax",(f32)1);
+MemberBuilder builder_uv_rect;
+builder_uv_rect._name = "_uv_rect";
+builder_uv_rect._type_name = "Vector4f";
+builder_uv_rect._offset = offsetof(SpriteAtlasEntryDocument,_uv_rect);
+builder_uv_rect._is_const = false;
+builder_uv_rect._is_static = false;
+builder_uv_rect._is_public = true;
+builder_uv_rect._is_pointer = false;
+builder_uv_rect._is_ref = false;
+builder_uv_rect._is_template = false;
+builder_uv_rect._meta = meta_uv_rect;
+builder_uv_rect._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector4f>);
+builder_uv_rect._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector4f>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_uv_rect));
+Meta meta_pivot;
+meta_pivot.Set("Category","");
+meta_pivot.Set("IsColor",false);
+meta_pivot.Set("IsRange",false);
+meta_pivot.Set("IsFloatRange",true);
+meta_pivot.Set("RangeMin",(f32)0);
+meta_pivot.Set("RangeMax",(f32)1);
+MemberBuilder builder_pivot;
+builder_pivot._name = "_pivot";
+builder_pivot._type_name = "Vector2f";
+builder_pivot._offset = offsetof(SpriteAtlasEntryDocument,_pivot);
+builder_pivot._is_const = false;
+builder_pivot._is_static = false;
+builder_pivot._is_public = true;
+builder_pivot._is_pointer = false;
+builder_pivot._is_ref = false;
+builder_pivot._is_template = false;
+builder_pivot._meta = meta_pivot;
+builder_pivot._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector2f>);
+builder_pivot._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector2f>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_pivot));
+Meta meta_size;
+meta_size.Set("Category","");
+meta_size.Set("IsColor",false);
+meta_size.Set("IsRange",false);
+meta_size.Set("IsFloatRange",true);
+meta_size.Set("RangeMin",(f32)0);
+meta_size.Set("RangeMax",(f32)1);
+MemberBuilder builder_size;
+builder_size._name = "_size";
+builder_size._type_name = "f32";
+builder_size._offset = offsetof(SpriteAtlasEntryDocument,_size);
+builder_size._is_const = false;
+builder_size._is_static = false;
+builder_size._is_public = true;
+builder_size._is_pointer = false;
+builder_size._is_ref = false;
+builder_size._is_template = false;
+builder_size._meta = meta_size;
+builder_size._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_size._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_size));
+Meta meta_border;
+meta_border.Set("Category","");
+meta_border.Set("IsColor",false);
+meta_border.Set("IsRange",false);
+meta_border.Set("IsFloatRange",true);
+meta_border.Set("RangeMin",(f32)0);
+meta_border.Set("RangeMax",(f32)1);
+MemberBuilder builder_border;
+builder_border._name = "_border";
+builder_border._type_name = "Vector4f";
+builder_border._offset = offsetof(SpriteAtlasEntryDocument,_border);
+builder_border._is_const = false;
+builder_border._is_static = false;
+builder_border._is_public = true;
+builder_border._is_pointer = false;
+builder_border._is_ref = false;
+builder_border._is_template = false;
+builder_border._meta = meta_border;
+builder_border._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector4f>);
+builder_border._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector4f>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_border));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+const Ailu::Type* Ailu::SpriteAtlasEntryDocument::GetPrivateStaticClass()
+{
+	static const Ailu::Type* type = Z_Construct_SpriteAtlasEntryDocument_Type();
+	return type;
+}
+
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::SpriteAtlasEntryDocument>()
+{
+return Ailu::SpriteAtlasEntryDocument::StaticType();
+}
+    const Type *Ailu::SpriteAtlasEntryDocument::GetType()
+{
+return Ailu::SpriteAtlasEntryDocument::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_SpriteAtlasEntryDocument(&Ailu::SpriteAtlasEntryDocument::StaticType, "Ailu::SpriteAtlasEntryDocument");
 const Ailu::Type* Ailu::Z_Construct_InputProcessorDocument_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;

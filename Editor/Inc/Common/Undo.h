@@ -6,6 +6,8 @@
 #define AILU_UNDO_H
 
 #include "Framework/Common/Log.h"
+#include "Assets/Asset.h"
+#include "Objects/JsonArchive.h"
 #include "Scene/Component.h"
 #include "Scene/Scene.h"
 #include "Scene/SceneCommand.h"
@@ -22,6 +24,117 @@ namespace Ailu
             virtual void Execute() = 0;
             virtual void Undo() = 0;
             virtual const String &ToString() const = 0;
+        };
+
+        // Base for asset commands.  A command owns the revision transitions while
+        // derived classes only apply and undo their domain-specific value changes.
+        class AssetEditCommand : public ICommand
+        {
+        public:
+            explicit AssetEditCommand(Asset *asset) : _asset(asset) {}
+
+            void Execute() final
+            {
+                if (_asset == nullptr)
+                    return;
+                if (!_has_executed)
+                {
+                    _before_revision = _asset->GetRevision();
+                    if (!ApplyEdit(false))
+                        return;
+                    _after_revision = _asset->MarkModified();
+                    _has_executed = true;
+                    return;
+                }
+
+                if (ApplyEdit(true))
+                    _asset->RestoreRevision(_after_revision);
+            }
+
+            void Undo() final
+            {
+                if (_asset != nullptr && _has_executed && UndoEdit())
+                    _asset->RestoreRevision(_before_revision);
+            }
+
+            Asset *GetAsset() const { return _asset; }
+            Asset::Revision BeforeRevision() const { return _before_revision; }
+            Asset::Revision AfterRevision() const { return _after_revision; }
+
+        protected:
+            virtual bool ApplyEdit(bool is_redo) = 0;
+            virtual bool UndoEdit() = 0;
+
+        protected:
+            Asset *_asset = nullptr;
+            Asset::Revision _before_revision = 0;
+            Asset::Revision _after_revision = 0;
+            bool _has_executed = false;
+        };
+
+        inline String CaptureAssetObject(const Asset *asset)
+        {
+            if (asset == nullptr || asset->_p_obj == nullptr)
+                return {};
+            Object *object = asset->_p_obj.get();
+            JsonArchive archive;
+            for (const Type *type = object->GetType(); type != nullptr && type != Object::StaticType();
+                 type = type->BaseType())
+            {
+                for (const PropertyInfo &property : type->GetProperties())
+                    property.Serialize(object, archive);
+            }
+            return archive.SaveToString();
+        }
+
+        inline bool ApplyAssetObjectSnapshot(Asset *asset, const String &snapshot)
+        {
+            if (asset == nullptr || asset->_p_obj == nullptr || snapshot.empty())
+                return false;
+            JsonArchive archive;
+            if (!archive.LoadFromString(snapshot))
+                return false;
+            Object *object = asset->_p_obj.get();
+            for (const Type *type = object->GetType(); type != nullptr && type != Object::StaticType();
+                 type = type->BaseType())
+            {
+                for (const PropertyInfo &property : type->GetProperties())
+                    property.Deserialize(object, archive);
+            }
+            return true;
+        }
+
+        class AssetSnapshotCommand final : public AssetEditCommand
+        {
+        public:
+            AssetSnapshotCommand(Asset *asset, String before, String after, String name = "Asset Edit")
+                : AssetEditCommand(asset), _before(std::move(before)), _after(std::move(after)), _name(std::move(name))
+            {
+            }
+
+            const String &ToString() const final { return _name; }
+
+        protected:
+            bool ApplyEdit(bool is_redo) override
+            {
+                if (!is_redo && _initial_state_applied)
+                {
+                    _initial_state_applied = false;
+                    return true;
+                }
+                return ApplyAssetObjectSnapshot(_asset, _after);
+            }
+
+            bool UndoEdit() override
+            {
+                return ApplyAssetObjectSnapshot(_asset, _before);
+            }
+
+        private:
+            String _before;
+            String _after;
+            String _name;
+            bool _initial_state_applied = true;
         };
 #define DECLARE_COMMAND(name)                                             \
 public:                                                                   \

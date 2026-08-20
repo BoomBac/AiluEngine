@@ -156,44 +156,18 @@ namespace Ailu
                     request_rebuild();
             };
 
-            auto script_assets = std::make_shared<Vector<Asset *>>();
-            Vector<String> script_asset_names{"None"};
-            for (auto it = ResourceMgr::Get().Begin(); it != ResourceMgr::Get().End(); ++it)
+            auto *script_dropdown = Editor::AddObjectAssetDropdownRow(context._content, "Script Asset", ScriptAsset::StaticType(),
+                comp->_script_asset);
+            script_dropdown->_on_object_asset_selected += [assign_script_asset](Asset *, Object *, const Guid &guid)
             {
-                Asset *asset = it->second.get();
-                if (asset == nullptr || asset->_asset_type != ScriptAsset::StaticType())
-                    continue;
-                script_assets->push_back(asset);
-                script_asset_names.push_back(asset->Name());
-            }
-
-            auto script_row = context._content->AddChild<HorizontalBox>();
-            script_row->AddChild<Text>("Script Asset")
-                    ->GetSlotAs<LinearSlot>().SizePolicy(ESizePolicy::kFill, ESizePolicy::kAuto).Margin({2.0f, 0.0f, 2.0f, 2.0f});
-            auto script_dropdown = script_row->AddChild<Dropdown>(script_asset_names);
-            script_dropdown->GetSlotAs<LinearSlot>().SizePolicy(ESizePolicy::kFill, ESizePolicy::kAuto).Margin({10.0f, 0.0f, 2.0f, 2.0f});
-            i32 selected_index = 0;
-            for (u32 index = 0u; index < script_assets->size(); ++index)
-            {
-                if ((*script_assets)[index]->GetGuid() == comp->_script_asset)
-                {
-                    selected_index = static_cast<i32>(index + 1u);
-                    break;
-                }
-            }
-            script_dropdown->SetSelectedIndex(selected_index);
-            script_dropdown->_on_selected_changed += [script_assets, assign_script_asset](i32 index)
-            {
-                assign_script_asset(index > 0 && index - 1 < static_cast<i32>(script_assets->size())
-                                         ? (*script_assets)[index - 1]->GetGuid()
-                                         : Guid::EmptyGuid());
+                assign_script_asset(guid);
             };
             DropHandler drop_handler;
             drop_handler._can_drop = [](const DragPayload &payload)
             {
                 return payload._type == EDragType::kScript && payload._data != nullptr;
             };
-            drop_handler._on_drop = [script_assets, assign_script_asset](const DragPayload &payload, f32, f32)
+            drop_handler._on_drop = [assign_script_asset](const DragPayload &payload, f32, f32)
             {
                 auto *asset = static_cast<Asset *>(payload._data);
                 if (asset == nullptr || asset->_asset_type != ScriptAsset::StaticType())

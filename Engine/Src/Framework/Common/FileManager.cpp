@@ -1,4 +1,5 @@
 #include "Framework/Common/FileManager.h"
+#include "Framework/Common/Allocator.hpp"
 #include "Framework/Common/Log.h"
 #include "pch.h"
 
@@ -280,13 +281,13 @@ namespace Ailu
         file_byte_size = (u64) in_file.tellg();
         in_file.seekg(data_start, std::ios::beg);
         data_size = data_size == -1 ? file_byte_size : data_size;
-        u8 *read_data = new u8[data_size];
+        u8 *read_data = AL_ALLOC_TAG(EMemoryTag::kTemporary, u8, data_size);
         in_file.read(reinterpret_cast<char *>(read_data), data_size);
         in_file.close();
         if (in_file.fail())
         {
             LOG_ERROR(L"Failed to read file {} at position {}!", sys_path, data_start);
-            delete[] read_data;
+            AL_FREE(read_data);
             return std::tuple<u8 *, u64>(nullptr, -1);
         }
         return std::tuple<u8 *, u64>(read_data, file_byte_size);

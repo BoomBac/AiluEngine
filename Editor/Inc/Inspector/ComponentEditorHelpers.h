@@ -2,6 +2,7 @@
 #define INSPECTOR_COMPONENTEDITORHELPERS_H
 #include "UI/Basic.h"
 #include "UI/Container.h"
+#include "UI/ObjectAssetDropdown.h"
 #include "Framework/Core/String.h"
 #include "Framework/Core/Containers/Vector.h"
 #include "Framework/Core/Containers/Array.h"
@@ -143,6 +144,20 @@ namespace Ailu
             auto dropdown = value_box->AddChild<UI::Dropdown>(items);
             dropdown->GetSlotAs<UI::LinearSlot>().Margin(kPropInnerMargin).CrossAlignment(UI::EAlignment::kRight)
                     .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto).FillRate(1.0f);
+            return dropdown;
+        }
+
+        inline UI::ObjectAssetDropdown *AddObjectAssetDropdownRow(UI::UIElement *parent, const String &label,
+                                                                    const Type *object_type, const Guid &selected_guid = Guid::EmptyGuid(),
+                                                                    bool allow_none = true)
+        {
+            UI::HorizontalBox *value_box = nullptr;
+            AddPropertyRow(parent, label, &value_box);
+            auto *dropdown = value_box->AddChild<UI::ObjectAssetDropdown>(object_type);
+            dropdown->GetSlotAs<UI::LinearSlot>().Margin(kPropInnerMargin).CrossAlignment(UI::EAlignment::kRight)
+                .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto).FillRate(1.0f);
+            dropdown->SetAllowNone(allow_none);
+            dropdown->SetSelectedGuid(selected_guid);
             return dropdown;
         }
 

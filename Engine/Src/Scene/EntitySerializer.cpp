@@ -203,7 +203,6 @@ namespace Ailu::SceneManagement
             entity_doc._has_skeleton_mesh_component = true;
             entity_doc._skeleton_mesh_component._mesh_guid = asset_guid_string(skeleton_mesh->_p_mesh.get());
             fill_material_guids(skeleton_mesh->_p_mats, entity_doc._skeleton_mesh_component._material_guids);
-            entity_doc._skeleton_mesh_component._anim_clip_guid = asset_guid_string(skeleton_mesh->_anim_clip.get());
             mark_disabled.template operator()<ECS::CSkeletonMesh>("CSkeletonMesh");
         }
         if (const auto *animator = registry.GetComponent<ECS::AnimatorComponent>(entity); animator != nullptr)

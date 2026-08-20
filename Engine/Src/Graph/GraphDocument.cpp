@@ -1,4 +1,5 @@
 #include "Graph/GraphDocument.h"
+#include "Assets/Asset.h"
 #include "Graph/Flow/FlowGraphNodes.h"
 #include "Graph/GraphNodeRegistry.h"
 #include <algorithm>
@@ -83,12 +84,21 @@ namespace Ailu
     bool GraphSnapshotCommand::ExecuteWithSnapshots(GraphDocument &document)
     {
         _before = document.CaptureSnapshot();
+        if (document._asset_wrapper != nullptr)
+        {
+            _before_revision = document._asset_wrapper->GetRevision();
+            _has_asset_revision = true;
+        }
         if (!Apply(document))
         {
             document.RestoreSnapshot(_before);
+            if (_has_asset_revision)
+                document._asset_wrapper->RestoreRevision(_before_revision);
             return false;
         }
         _after = document.CaptureSnapshot();
+        if (_has_asset_revision)
+            _after_revision = document._asset_wrapper->GetRevision();
         _has_snapshot = true;
         return true;
     }
@@ -96,13 +106,21 @@ namespace Ailu
     void GraphSnapshotCommand::Undo(GraphDocument &document)
     {
         if (_has_snapshot)
+        {
             document.RestoreSnapshot(_before);
+            if (_has_asset_revision)
+                document._asset_wrapper->RestoreRevision(_before_revision);
+        }
     }
 
     void GraphSnapshotCommand::Redo(GraphDocument &document)
     {
         if (_has_snapshot)
+        {
             document.RestoreSnapshot(_after);
+            if (_has_asset_revision)
+                document._asset_wrapper->RestoreRevision(_after_revision);
+        }
     }
 
     AddGraphNodeCommand::AddGraphNodeCommand(StringView node_type, Vector2f position) :
@@ -444,13 +462,14 @@ namespace Ailu
         Close();
     }
 
-    bool GraphDocument::Open(GraphAsset *asset)
+    bool GraphDocument::Open(GraphAsset *asset, ::Ailu::Asset *asset_wrapper)
     {
         Close();
         if (asset == nullptr)
             return false;
 
         _asset = asset;
+        _asset_wrapper = asset_wrapper;
         _schema = CreateGraphSchema(asset->SchemaType().empty() ? "FlowGraphSchema" : asset->SchemaType());
         _original_nodes = asset->Nodes();
         _original_links = asset->Links();
@@ -459,7 +478,6 @@ namespace Ailu
         _editing_links = _original_links;
         _editing_comments = _original_comments;
         RepairLoadedNodePins();
-        _is_dirty = false;
         RebuildIndices();
         CanonicalizeLoadedLinks();
         RebuildIndices();
@@ -473,6 +491,7 @@ namespace Ailu
     void GraphDocument::Close()
     {
         _asset = nullptr;
+        _asset_wrapper = nullptr;
         _original_nodes.clear();
         _original_links.clear();
         _original_comments.clear();
@@ -485,7 +504,6 @@ namespace Ailu
         _schema.reset();
         _command_stack.SetDocument(this);
         _validation_messages.clear();
-        _is_dirty = false;
     }
 
     bool GraphDocument::Apply()
@@ -493,13 +511,10 @@ namespace Ailu
         if (_asset == nullptr)
             return false;
 
-        _asset->MutableNodes() = _editing_nodes;
-        _asset->MutableLinks() = _editing_links;
-        _asset->MutableComments() = _editing_comments;
+        SyncAssetFromEditing();
         _original_nodes = _editing_nodes;
         _original_links = _editing_links;
         _original_comments = _editing_comments;
-        _is_dirty = false;
         _command_stack.Clear();
         Validate();
         return true;
@@ -510,7 +525,9 @@ namespace Ailu
         _editing_nodes = _original_nodes;
         _editing_links = _original_links;
         _editing_comments = _original_comments;
-        _is_dirty = false;
+        SyncAssetFromEditing();
+        if (_asset_wrapper != nullptr)
+            _asset_wrapper->RestoreRevision(_asset_wrapper->GetSavedRevision());
         _command_stack.Clear();
         RebuildIndices();
         Validate();
@@ -1009,6 +1026,7 @@ namespace Ailu
         _editing_links = snapshot._links;
         _editing_comments = snapshot._comments;
         RebuildIndices();
+        SyncAssetFromEditing();
         MarkDirty();
         Validate();
     }
@@ -1095,8 +1113,24 @@ namespace Ailu
         return false;
     }
 
+    void GraphDocument::SyncAssetFromEditing()
+    {
+        if (_asset == nullptr)
+            return;
+        _asset->MutableNodes() = _editing_nodes;
+        _asset->MutableLinks() = _editing_links;
+        _asset->MutableComments() = _editing_comments;
+    }
+
     void GraphDocument::MarkDirty()
     {
-        _is_dirty = true;
+        SyncAssetFromEditing();
+        if (_asset_wrapper != nullptr && !_asset_wrapper->IsDirty())
+            _asset_wrapper->MarkModified();
+    }
+
+    bool GraphDocument::IsDirty() const
+    {
+        return _asset_wrapper != nullptr && _asset_wrapper->IsDirty();
     }
 } // namespace Ailu

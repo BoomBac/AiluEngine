@@ -44,7 +44,7 @@ namespace Ailu
             static void ShowDialogAt(Vector2f popup_pos, const String &popup_name, const String &title, Vector2f size,
                                      const std::function<void(UI::VerticalBox *content, UI::Text *title_text)> &build_content,
                                      const Vector<PopupDialogAction> &actions,
-                                     const std::function<void()> &on_shown = {});
+                                     const std::function<void()> &on_shown = {}, bool is_modal = true);
         };
     }// namespace Editor
 }// namespace Ailu

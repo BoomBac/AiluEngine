@@ -229,6 +229,71 @@ def generate_guid_safe(existing_guids: set[str] | None) -> str:
             return g
 
 
+def GetAssetDatabaseInfo(path: str) -> tuple[str, str, str] | None:
+    """Return the asset database, resource root, and URI scheme for a project path."""
+    project_root = os.path.normpath(generate_guid._project_root())
+    path_abs = os.path.normpath(os.path.abspath(path))
+    try:
+        relative_path = os.path.relpath(path_abs, project_root)
+    except ValueError:
+        return None
+
+    path_parts = Path(relative_path).parts
+    if not path_parts or path_parts[0].lower() not in {"engine", "editor"}:
+        return None
+
+    scope_name = path_parts[0]
+    scope = scope_name.lower()
+    resource_root = os.path.join(project_root, scope_name, "Res")
+    assetdb_path = os.path.join(resource_root, "assetdb.alasset")
+    return assetdb_path, resource_root, f"{scope}://"
+
+
+def GetVirtualAssetPath(path: str, resource_root: str, uri_scheme: str) -> str | None:
+    """Convert a resource file path into the engine/editor asset URI format."""
+    path_abs = os.path.normpath(os.path.abspath(path))
+    resource_root_abs = os.path.normpath(os.path.abspath(resource_root))
+    try:
+        common_path = os.path.commonpath([path_abs, resource_root_abs])
+        if os.path.normcase(common_path) != os.path.normcase(resource_root_abs):
+            return None
+    except ValueError:
+        return None
+
+    relative_path = os.path.relpath(path_abs, resource_root_abs)
+    if relative_path == os.curdir or relative_path.startswith(f"..{os.sep}"):
+        return None
+    return uri_scheme + relative_path.replace(os.sep, "/")
+
+
+def RegisterAsset(assetdb_path: str, asset_path: str, guid: str, type_string: str) -> None:
+    """Insert or update one asset entry in an asset database."""
+    if os.path.isfile(assetdb_path):
+        with open(assetdb_path, "r", encoding="utf-8") as f:
+            database = json.load(f)
+    else:
+        database = {"assets": []}
+
+    assets = database.get("assets")
+    if not isinstance(assets, list):
+        raise ValueError(f"Invalid asset database: 'assets' must be an array: {assetdb_path}")
+
+    entry = {
+        "guid": guid,
+        "path": asset_path,
+        "type": type_string,
+    }
+    existing_entry = next((item for item in assets if item.get("path") == asset_path), None)
+    if existing_entry is None:
+        assets.append(entry)
+    else:
+        existing_entry.update(entry)
+
+    with open(assetdb_path, "w", encoding="utf-8") as f:
+        json.dump(database, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Generate an .alasset file alongside a source file.",
@@ -365,9 +430,10 @@ def main():
     # ---- Generate GUID ----
     existing_guids: set[str] | None = None
 
+    assetdb_info = GetAssetDatabaseInfo(source)
     db_paths: list[str] = []
-    if not args.no_default_db:
-        db_paths.extend(generate_guid._DEFAULT_ASSETDB_PATHS)
+    if not args.no_default_db and assetdb_info:
+        db_paths.append(assetdb_info[0])
     if args.assetdb:
         db_paths.extend(args.assetdb)
 
@@ -419,6 +485,19 @@ def main():
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(asset, f, indent=4, ensure_ascii=False)
         f.write("\n")
+
+    if assetdb_info:
+        assetdb_path, resource_root, uri_scheme = assetdb_info
+        virtual_asset_path = GetVirtualAssetPath(output_path, resource_root, uri_scheme)
+        if virtual_asset_path is None:
+            print(
+                f"Warning: generated asset is outside the resource root, skipping asset database registration: "
+                f"{output_path}",
+                file=sys.stderr,
+            )
+        else:
+            RegisterAsset(assetdb_path, virtual_asset_path, guid, type_string)
+            print(f"Registered: {assetdb_path}", file=sys.stderr)
 
     print(f"Created: {output_path}", file=sys.stderr)
     print(f"  GUID:  {guid}", file=sys.stderr)

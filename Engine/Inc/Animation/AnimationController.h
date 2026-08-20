@@ -4,9 +4,12 @@
 
 #include "Animation/AnimationEvaluation.h"
 #include "Animation/AnimationInstance.h"
+#include "Framework/Core/Containers/Map.h"
 
 namespace Ailu
 {
+    class BlendSpaceAsset;
+
     class AILU_API AnimationController
     {
     public:
@@ -15,6 +18,9 @@ namespace Ailu
 
         void SetAsset(const AnimationControllerAsset *asset) { _asset = asset; }
         const AnimationControllerAsset *Asset() const { return _asset; }
+
+        void BindBlendSpace(const Guid &asset_id, const BlendSpaceAsset *blend_space);
+        void ClearBlendSpaces() { _blend_spaces.clear(); }
 
         void Update(AnimationInstance &instance, f32 delta_time) const;
         AnimationEvaluation Evaluate(const AnimationInstance &instance) const;
@@ -28,6 +34,7 @@ namespace Ailu
                             AnimationEvaluation &evaluation) const;
 
         const AnimationControllerAsset *_asset = nullptr;
+        Map<Guid, const BlendSpaceAsset *> _blend_spaces;
     };
 }
 

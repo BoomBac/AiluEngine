@@ -84,22 +84,20 @@ namespace Ailu
             _sprite_batcher->Build(_sprite_render_data);
         }
 
-        void PickPass::RecordSpritePick(RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data)
+        void PickPass::RecordSpritePick(CommandBuffer *cmd, const RenderingData &rendering_data)
         {
             if (!rendering_data._scene || !rendering_data._camera)
                 return;
             CollectSprites(*rendering_data._scene, *rendering_data._camera, false);
-            _sprite_batcher->RenderWithMaterial(cmd, graph.Resolve<RenderTexture>(_color_handle),
-                                                graph.Resolve<RenderTexture>(_depth_handle), _sprite_pick_gen.get());
+            _sprite_batcher->RenderWithMaterial(cmd, _sprite_pick_gen.get());
         }
 
-        void PickPass::RecordSpriteSelection(RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data,
-                                              RDG::RGHandle target)
+        void PickPass::RecordSpriteSelection(CommandBuffer *cmd, const RenderingData &rendering_data)
         {
             if (!rendering_data._scene || !rendering_data._camera)
                 return;
             CollectSprites(*rendering_data._scene, *rendering_data._camera, true);
-            _sprite_batcher->RenderWithMaterial(cmd, graph.Resolve<RenderTexture>(target), nullptr, _sprite_select_gen.get());
+            _sprite_batcher->RenderWithMaterial(cmd, _sprite_select_gen.get());
         }
         void PickPass::OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data)
         {
@@ -128,7 +126,7 @@ namespace Ailu
                         cmd->DrawMesh(obj._mesh, _pick_gen.get(), (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, 0, obj._instance_count);
                     }
                 }
-                RecordSpritePick(graph, cmd, rendering_data);
+                RecordSpritePick(cmd, rendering_data);
                 if (auto &selected = Editor::Selection::SelectedEntities(); selected.size() > 0)
                 {
                     for (auto entity: selected)
@@ -225,7 +223,7 @@ namespace Ailu
                 if (auto &selected = Selection::SelectedEntities(); selected.size() > 0)
                 {
                     cmd->SetRenderTarget(select_buf);
-                    RecordSpriteSelection(graph, cmd, rendering_data, select_buf);
+                    RecordSpriteSelection(cmd, rendering_data);
                     ECS::Register &r = SceneMgr::Get().ActiveScene()->GetRegister();
                     for (auto entity: selected)
                     {

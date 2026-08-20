@@ -1,4 +1,5 @@
 #include "Framework/Common/Log.h"
+#include "Framework/Common/Allocator.hpp"
 #include "Objects/JsonArchive.h"
 
 #include <Ext/rapidjson/inc/document.h>
@@ -296,11 +297,11 @@ namespace Ailu
             }
             if (!fp) return false;
 
-            char *buffer = new char[65536];
+            char *buffer = AL_ALLOC_TAG(EMemoryTag::kTemporary, char, 65536);
             rapidjson::FileReadStream is(fp, buffer, sizeof(buffer));
             doc.ParseStream(is);
             fclose(fp);
-            delete[] buffer;
+            AL_FREE(buffer);
             return !doc.HasParseError();
         }
 
@@ -314,11 +315,11 @@ namespace Ailu
             }
             if (!fp) return false;
 
-            char *buffer = new char[65536];
+            char *buffer = AL_ALLOC_TAG(EMemoryTag::kTemporary, char, 65536);
             rapidjson::FileReadStream is(fp, buffer, sizeof(buffer));
             doc.ParseStream(is);
             fclose(fp);
-            delete[] buffer;
+            AL_FREE(buffer);
             FromRapidJsonValue(doc, dst);
             return !doc.HasParseError();
         }
@@ -333,12 +334,12 @@ namespace Ailu
             }
             if (!fp) return false;
 
-            char *buffer = new char[65536];
+            char *buffer = AL_ALLOC_TAG(EMemoryTag::kTemporary, char, 65536);
             rapidjson::FileWriteStream os(fp, buffer, sizeof(buffer));
             rapidjson::PrettyWriter<rapidjson::FileWriteStream> writer(os);
             doc.Accept(writer);
             fclose(fp);
-            delete[] buffer;
+            AL_FREE(buffer);
             return true;
         }
 
@@ -354,14 +355,14 @@ namespace Ailu
             rapidjson::Document doc;
             doc.SetObject();
             ToRapidJsonValue(root, doc, doc.GetAllocator());
-            char *buffer = new char[65536];
+            char *buffer = AL_ALLOC_TAG(EMemoryTag::kTemporary, char, 65536);
             rapidjson::FileWriteStream os(fp, buffer, sizeof(buffer));
             rapidjson::PrettyWriter<rapidjson::FileWriteStream> writer(os);
             writer.SetMaxDecimalPlaces(4);
             writer.SetFormatOptions(rapidjson::kFormatSingleLineArray);
             doc.Accept(writer);
             fclose(fp);
-            delete[] buffer;
+            AL_FREE(buffer);
             return true;
         }
 
@@ -590,11 +591,11 @@ namespace Ailu
 
 #pragma region JsonSerializer
 #define RJ_NODE(n) reinterpret_cast<rapidjson::Value *>(n)
-    JsonArchive::JsonArchive() : _impl(new Impl()) 
+    JsonArchive::JsonArchive() : _impl(AL_NEW_TAG(EMemoryTag::kAsset, Impl))
     {
         _root = JsonObject{};
     }
-    JsonArchive::~JsonArchive() { delete _impl; }
+    JsonArchive::~JsonArchive() { AL_DELETE(_impl); }
 
     #define ZERO_NODES_CHECH(fn) if (_cur_obj_nodes.empty())\
     {\

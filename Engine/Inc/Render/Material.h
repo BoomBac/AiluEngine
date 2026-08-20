@@ -3,6 +3,7 @@
 #define __MATERIAL_H__
 #include "Buffer.h"
 #include "Framework/Common/Reflect.h"
+#include "Framework/Common/Allocator.hpp"
 #include "Framework/Core/CoreMinimal.h"
 #include "Framework/Core/String.h"
 #include "Framework/Core/Containers/Vector.h"
@@ -46,7 +47,7 @@ namespace Ailu::Render
             ~PropertyBlock()
             {
                 if (_data)
-                    delete[] _data;
+                    AL_FREE(_data);
             }
         };
         struct PropertyBlockView

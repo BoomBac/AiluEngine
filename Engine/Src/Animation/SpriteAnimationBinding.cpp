@@ -46,7 +46,7 @@ namespace Ailu
             return;
 
         const AnimationClip &clip = *clip_binding->_clip;
-        const Guid sprite_id = clip.SpriteTrack().Sample(dominant_sample->_time, clip.Duration(), clip.IsLooping());
+        const Guid sprite_id = clip.SpriteTrack().Sample(dominant_sample->_time, clip.Duration(), dominant_sample->_loop);
         if (!sprite_id.IsEmpty())
             if (Render::Sprite *sprite = ResolveSprite(sprite_id); sprite != nullptr)
                 renderer._sprite = sprite;

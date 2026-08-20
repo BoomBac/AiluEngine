@@ -16,8 +16,10 @@
 #include "Widgets/RenderView.h"
 #include "Inspector/ComponentEditorRegistry.h"
 #include "Inspector/ComponentEditorRegistration.h"
+#include "Assets/AssetTypeRegistry.h"
 
 #include "Framework/Common/FileManager.h"
+#include "Framework/Common/Allocator.hpp"
 #include "Framework/Common/JobSystem.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Objects/Type.h"
@@ -32,6 +34,7 @@
 #include "Common/CameraControllers.h"
 #include "Common/EditorStyle.h"
 #include "UI/Container.h"
+#include "UI/ObjectAssetDropdown.h"
 #include "UI/UIFramework.h"
 #include "UI/Style/UITheme.h"
 #include "UI/Widget.h"
@@ -46,7 +49,7 @@ namespace Ailu
     {
         namespace fs = std::filesystem;
 
-        CommandManager *g_pCommandMgr = new CommandManager;
+        CommandManager *g_pCommandMgr = nullptr;
 
         EditorStyle g_editor_style = {};
         UI::UITheme g_editor_ui_theme = {};
@@ -66,6 +69,7 @@ namespace Ailu
         int EditorApp::Initialize(ApplicationInitContext init_ctx)
         {
             LogMgr::Init();
+            g_pCommandMgr = AL_NEW_TAG(EMemoryTag::kEditor, CommandManager);
             Enum::InitTypeInfo();
 
             Application::SetEngineConfigPath(Application::GetUserHomePath() + L"/OneDrive/AiluEngine/Editor/EngineConfig.json");
@@ -76,18 +80,21 @@ namespace Ailu
             desc._window_height = 900;
             desc._gameview_width = 1600;
             desc._gameview_height = 900;
+            desc._window_flags = EWindowFlags::kWindow_NoTitleBar;
             _camera_controller = MakeScope<FirstPersonCameraController>();
             LoadEditorConfig(desc);
             auto ret = Application::Initialize(desc,init_ctx);
-            _p_input_layer = new InputLayer();
+            _p_input_layer = AL_NEW_TAG(EMemoryTag::kEditor, InputLayer);
             PushLayer(_p_input_layer);
-            _pipeline.reset(new CommonRenderPipeline());
-            Render::RenderPipeline::Register(_pipeline.get());
+            _pipeline = AL_NEW_TAG(EMemoryTag::kEditor, CommonRenderPipeline);
+            Render::RenderPipeline::Register(_pipeline);
             {
                 Selection::RemoveSlection();
                 SceneManagement::SceneMgr::Get().OpenScene(_opened_scene_path);
             }
             LoadEditorResource();
+            UI::ObjectAssetDropdown::SetAssetIconProvider([](Asset *asset)
+            { return AssetTypeRegistry::Get().GetTypeIcon(asset); });
             ResourceMgr::Get().MigrateLegacyAssetDocuments();
             g_editor_style = DefaultDark();
             {
@@ -135,7 +142,7 @@ namespace Ailu
                 session_info._editor_version = "0.1.0";
                 AutomationSession::Save(ProjectManager::Get().CurrentProject().RootDirectory(), session_info);
             }
-            _p_editor_layer = new EditorLayer();
+            _p_editor_layer = AL_NEW_TAG(EMemoryTag::kEditor, EditorLayer);
             PushLayer(_p_editor_layer);
             _is_playing_mode = false;
             _is_simulate_mode = false;
@@ -150,9 +157,9 @@ namespace Ailu
                 _pipe_server->Finalize();
             if (_automation_service)
                 _automation_service->Finalize();
-            delete _p_scene_camera;
-            delete g_pCommandMgr; g_pCommandMgr = nullptr;
-            _pipeline.release();
+            AL_DELETE(_p_scene_camera);
+            AL_DELETE(g_pCommandMgr);
+            AL_DELETE(_pipeline);
             Application::Finalize();
             fs::path p(s_editor_root_path);
             fs::directory_iterator dir_it(p);
@@ -202,7 +209,7 @@ namespace Ailu
             //    if (auto itt = config_values.find(it.Name()); itt != config_values.end())
             //        it.SetValueFromString(&_editor_config, itt->second);
             //}
-            _p_scene_camera = new Camera();
+            _p_scene_camera = AL_NEW_TAG(EMemoryTag::kEditor, Camera);
             _p_scene_camera->_anti_aliasing = EAntiAliasing::kNone;
             _p_scene_camera->Name("SceneCamera");
             _p_scene_camera->Position(_editor_config._position);

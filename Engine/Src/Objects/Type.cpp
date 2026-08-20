@@ -5,6 +5,7 @@
 #include "Inc/Objects/Type.h"
 #include "Objects/Serialize.h"
 #include "Framework/Common/Log.h"
+#include "Framework/Common/Allocator.hpp"
 #include "Framework/Math/ALMath.hpp"
 #include <Framework/Common/Utils.h>
 
@@ -359,7 +360,7 @@ namespace Ailu
         initializer._is_abstract = false;
         initializer._is_class = false;
         initializer._size = size;
-        Type::RegisterType(new Type(initializer));
+        Type::RegisterType(AL_NEW_TAG(EMemoryTag::kCore, Type, initializer));
     }
     void Type::InitBaseTypeInfo()
     {
@@ -373,7 +374,7 @@ namespace Ailu
             initializer._is_abstract = false;
             initializer._is_class = false;
             initializer._size = size;
-            return new Type(initializer);
+            return AL_NEW_TAG(EMemoryTag::kCore, Type, initializer);
         };
         Vector<Type *> all_base_types;
 #define MAKE_BASE_TYPE(name) all_base_types.push_back(make_base_type(#name, sizeof(name)))

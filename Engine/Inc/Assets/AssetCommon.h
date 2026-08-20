@@ -61,6 +61,7 @@ namespace Ailu
         virtual const Type *AssetType() const = 0;
         virtual Scope<Asset> Load(const AssetLoadContext &context) = 0;
         virtual bool Save(const AssetSaveContext &context) = 0;
+        virtual bool ReloadInPlace(Asset &target, const Asset &source);
     };
 
     inline constexpr u32 kSerializedAssetDocumentVersion = 1u;

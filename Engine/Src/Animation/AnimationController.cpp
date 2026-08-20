@@ -1,9 +1,17 @@
 #include "Animation/AnimationController.h"
+#include "Animation/BlendSpace.h"
 
 #include <algorithm>
 
 namespace Ailu
 {
+    void AnimationController::BindBlendSpace(const Guid &asset_id, const BlendSpaceAsset *blend_space)
+    {
+        if (asset_id.IsEmpty() || blend_space == nullptr)
+            return;
+        _blend_spaces[asset_id] = blend_space;
+    }
+
     void AnimationController::Update(AnimationInstance &instance, f32 delta_time) const
     {
         if (_asset == nullptr || !_asset->States().size() || !instance._initialized)
@@ -179,13 +187,35 @@ namespace Ailu
                                              f32 state_time, AnimationEvaluation &evaluation) const
     {
         const auto &state = _asset->States()[state_index];
-        if (state._motion._type != EAnimationMotionType::kClip || weight <= 0.0f)
+        if (weight <= 0.0f)
             return;
 
-        AnimationSample sample;
-        sample._clip = state._motion._asset;
-        sample._time = state_time * state._speed * instance._speed;
-        sample._weight = weight;
-        evaluation.AddSample(sample);
+        const f32 sample_time = state_time * state._speed * instance._speed;
+        if (state._motion._type == EAnimationMotionType::kClip)
+        {
+            evaluation.AddSample(AnimationSample{state._motion._asset, sample_time, weight, state._loop});
+            return;
+        }
+
+        const auto blend_space_iter = _blend_spaces.find(state._motion._asset);
+        if (blend_space_iter == _blend_spaces.end() || blend_space_iter->second == nullptr)
+            return;
+
+        f32 position = 0.0f;
+        u16 parameter_index = state._motion._parameter_index;
+        if (parameter_index == kInvalidAnimationParameter)
+        {
+            for (u16 index = 0u; index < _asset->Parameters().size(); ++index)
+            {
+                if (_asset->Parameters()[index]._type == EAnimationParameterType::kFloat)
+                {
+                    parameter_index = index;
+                    break;
+                }
+            }
+        }
+        if (parameter_index < instance._float_parameters.size())
+            position = instance._float_parameters[parameter_index];
+        blend_space_iter->second->AddSamples(position, sample_time, weight, state._loop, evaluation);
     }
 }

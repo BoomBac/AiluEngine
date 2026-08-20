@@ -1,6 +1,7 @@
 ﻿#include "pch.h"
 
 #include "Framework/Common/ThreadPool.h"
+#include "Framework/Common/Allocator.hpp"
 #include "RHI/DX12/D3DCommandBuffer.h"
 #include "Render/CommandBuffer.h"
 #include "Render/GraphicsContext.h"
@@ -27,7 +28,7 @@ namespace Ailu::Render
 #pragma region CommandBufferPool
     void CommandBufferPool::Init()
     {
-        s_pCommandBufferPool = new CommandBufferPool();
+        s_pCommandBufferPool = AL_NEW_TAG(EMemoryTag::kRenderer, CommandBufferPool);
         for (int i = 0; i < kInitialPoolSize; i++)
         {
             auto cmd = std::make_shared<CommandBuffer>("noname");
@@ -36,7 +37,7 @@ namespace Ailu::Render
     }
     void CommandBufferPool::Shutdown()
     {
-        delete s_pCommandBufferPool; s_pCommandBufferPool = nullptr;
+        AL_DELETE(s_pCommandBufferPool);
     }
 
     Ref<CommandBuffer> CommandBufferPool::Get(const String &name)
@@ -917,11 +918,11 @@ namespace Ailu::Render
     CommandBuffer::CommandBuffer(String name)
     {
         _name = std::move(name);
-        _impl = new Impl();
+        _impl = AL_NEW_TAG(EMemoryTag::kRenderer, Impl);
     }
     CommandBuffer::~CommandBuffer()
     {
-        delete _impl; _impl = nullptr;
+        AL_DELETE(_impl);
     }
     void CommandBuffer::SetRenderGraph(RDG::RenderGraph *render_graph)
     {
@@ -1225,7 +1226,7 @@ namespace Ailu::Render
 
     void RHICommandBufferPool::Init()
     {
-        s_pRHICommandBufferPool = new RHICommandBufferPool();
+        s_pRHICommandBufferPool = AL_NEW_TAG(EMemoryTag::kRenderer, RHICommandBufferPool);
         for (int i = 0; i < kInitialPoolSize; i++)
         {
             Ref<RHICommandBuffer> cmd = nullptr;
@@ -1240,7 +1241,7 @@ namespace Ailu::Render
     }
     void RHICommandBufferPool::Shutdown()
     {
-        delete s_pRHICommandBufferPool; s_pRHICommandBufferPool = nullptr;
+        AL_DELETE(s_pRHICommandBufferPool);
     }
     Ref<RHICommandBuffer> RHICommandBufferPool::Get(const String &name, ECommandBufferType type)
     {

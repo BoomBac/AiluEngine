@@ -15,6 +15,7 @@
 #include <stdexcept>
 #include <wrl/client.h>
 #include <wrl/wrappers/corewrappers.h>
+#include "Framework/Common/Allocator.hpp"
 
 // Note that while ComPtr is used to manage the lifetime of resources on the CPU,
 // it has no understanding of the lifetime of resources on the GPU. Apps must account
@@ -107,7 +108,7 @@ inline HRESULT ReadDataFromFile(LPCWSTR filename, byte** data, UINT* size)
         throw std::exception();
     }
 
-    *data = reinterpret_cast<byte*>(malloc(fileInfo.EndOfFile.LowPart));
+    *data = reinterpret_cast<byte *>(AL_ALLOC_TAG(Ailu::EMemoryTag::kTemporary, byte, fileInfo.EndOfFile.LowPart));
     *size = fileInfo.EndOfFile.LowPart;
 
     if (!ReadFile(file.Get(), *data, fileInfo.EndOfFile.LowPart, nullptr, nullptr))

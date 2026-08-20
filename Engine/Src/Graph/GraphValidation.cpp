@@ -82,7 +82,9 @@ namespace Ailu
                            Guid::EmptyGuid(), Guid::EmptyGuid(), link._id);
             }
             const u32 input_link_count = ++input_link_counts[link._input_pin];
-            if (input_link_count > 1u)
+            const bool allows_multiple_input_links = document.Schema() != nullptr &&
+                                                     document.Schema()->AllowsMultipleInputLinks();
+            if (input_link_count > 1u && !allows_multiple_input_links)
             {
                 AddMessage(messages, EGraphValidationSeverity::kError, "Input pin has multiple links.", Guid::EmptyGuid(),
                            link._input_pin, link._id);

@@ -140,7 +140,6 @@ set(ANIM_MODULE
         Inc/Animation/Track.hpp
         Src/Animation/Track.cpp
         Src/Animation/TransformTrack.cpp
-        Src/Animation/CrossFade.cpp
         Src/Animation/Solver.cpp "Src/Animation/BlendSpace.cpp")
 set(IMNODE Ext/imnodes/imnodes.cpp Ext/imnodes/imnodes.h Ext/imnodes/imnodes_internal.h)
 # set(IMGUI_PLOT ${ENGINE_ROOT_PATH}/Ext/implot/implot.cpp ${ENGINE_ROOT_PATH}/Ext/implot/implot_items.cpp)
@@ -270,7 +269,7 @@ target_precompile_headers(Engine PRIVATE Inc/pch.h)
 # 链接库
 target_link_libraries(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/pix/WinPixEventRuntime.lib;d3d12.lib;dxgi.lib;
 d2d1.lib;dwrite.lib;d3d11.lib;
-imm32.lib;
+imm32.lib;dwmapi.lib;
         ${ENGINE_ROOT_PATH}/Ext/dxc/lib/x64/dxcompiler.lib;d3dcompiler.lib;dxguid.lib;
         ${AILU_FBXSDK_LINK_LIB}) # ;msvcrtd.lib
 target_link_libraries(Engine PRIVATE box2d::box2d)

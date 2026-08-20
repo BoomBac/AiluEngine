@@ -29,6 +29,7 @@ struct PSInput
 	float2 rect_size : TEXCOORD2;
 	float4 corner_radius : TEXCOORD3;
 	float4 border_thickness : TEXCOORD4;
+	float2 local_uv : TEXCOORD5;
 };
 PerMaterialCBufferBegin
 	float4 _Color;
@@ -45,6 +46,7 @@ PSInput VSMain(VSInput v)
 	result.rect_size = v.rect.zw;
 	result.corner_radius = v.corner_radius;
 	result.border_thickness = v.border_thickness;
+	result.local_uv = (v.position.xy - v.rect.xy) / max(v.rect.zw, float2(0.0001f, 0.0001f));
 	return result;
 }
 
@@ -64,13 +66,13 @@ float4 PSMain(PSInput input) : SV_TARGET
 	float4 color = SAMPLE_TEXTURE2D_LOD(_MainTex, g_LinearClampSampler, input.uv, 0) * input.color;
 	if (any(input.corner_radius > 0.0f))
 	{
-		float dist = RoundedRectSDF(input.uv * input.rect_size, input.rect_size, input.corner_radius);
+		float dist = RoundedRectSDF(input.local_uv * input.rect_size, input.rect_size, input.corner_radius);
 		float aa = max(fwidth(dist), 0.001f);
 		color.a *= 1.0f - smoothstep(-aa, aa, dist);
 	}
 	if (any(input.border_thickness > 0.0f))
 	{
-		float2 p = input.uv * input.rect_size;
+		float2 p = input.local_uv * input.rect_size;
 		float2 inner_pos = p - input.border_thickness.xy;
 		float2 inner_size = max(input.rect_size - input.border_thickness.xy - input.border_thickness.zw, 1.0f);
 		float4 inner_radius = max(input.corner_radius - float4(

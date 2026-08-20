@@ -77,6 +77,8 @@ namespace Ailu
         EAnimationMotionType _type = EAnimationMotionType::kClip;
         APROPERTY()
         Guid _asset = Guid::EmptyGuid();
+        APROPERTY()
+        u16 _parameter_index = kInvalidAnimationParameter;
     };
 
     ASTRUCT()

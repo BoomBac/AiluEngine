@@ -229,6 +229,7 @@ namespace Ailu
         _prototypes.clear();
         _subscriptions.clear();
         _collider_event_sources.clear();
+        _animator_event_sources.clear();
         ClearPhysicsContactBridges();
         _currently_invoking_instance = nullptr;
         _next_subscription_id = 1u;
@@ -695,6 +696,22 @@ namespace Ailu
                 event_source._on_trigger_enter.GetEventView(), event_source._on_trigger_exit.GetEventView()};
     }
 
+    ScriptAnimator::AnimationEventRouter::EventView ScriptSystem::GetAnimatorEventView(SceneManagement::Scene *scene,
+                                                                                        ECS::Entity entity)
+    {
+        if (scene == nullptr || !scene->IsValidEntity(entity))
+            return {};
+
+        const ScriptInstanceKey key{scene, entity};
+        auto event_source_iter = _animator_event_sources.find(key);
+        if (event_source_iter == _animator_event_sources.end())
+        {
+            auto event_source = MakeScope<ScriptAnimatorEventSource>();
+            event_source_iter = _animator_event_sources.emplace(key, std::move(event_source)).first;
+        }
+        return event_source_iter->second->_on_event.GetEventView();
+    }
+
     bool ScriptSystem::ProcessReload(const Guid &script_asset)
     {
         const auto resolved_path = ResolveScriptAssetPath(script_asset);
@@ -867,6 +884,13 @@ namespace Ailu
             else
                 ++iter;
         }
+        for (auto iter = _animator_event_sources.begin(); iter != _animator_event_sources.end();)
+        {
+            if (iter->first._scene == scene)
+                iter = _animator_event_sources.erase(iter);
+            else
+                ++iter;
+        }
         auto *physics_system = scene->GetRegister().GetSystem<ECS::Physics2DSystem>();
         if (physics_system == nullptr)
             return;
@@ -927,6 +951,24 @@ namespace Ailu
         }
     }
 #endif
+
+    void ScriptSystem::DispatchAnimationEvents(SceneManagement::Scene *scene,
+                                               std::span<const AnimationEventMessage> events)
+    {
+#if AILU_ENABLE_LUA_SCRIPTING
+        if (scene == nullptr)
+            return;
+        for (const AnimationEventMessage &event : events)
+        {
+            const auto source_iter = _animator_event_sources.find({scene, event._entity});
+            if (source_iter != _animator_event_sources.end())
+                source_iter->second->_on_event.Invoke(event._event_id, event._event_id);
+        }
+#else
+        (void) scene;
+        (void) events;
+#endif
+    }
 
 #if !AILU_ENABLE_LUA_SCRIPTING
     bool ScriptSystem::SynchronizeComponentProperties(ECS::ScriptComponent &component)

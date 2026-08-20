@@ -379,7 +379,7 @@ namespace Ailu
     }
     std::optional<ScriptAnimator> ScriptEntity::GetAnimator() const
     {
-        return IsValid() && _scene->GetRegister().HasComponent<ECS::CSkeletonMesh>(_entity) ?
+        return IsValid() && _scene->GetRegister().HasComponent<ECS::AnimatorComponent>(_entity) ?
                    std::optional<ScriptAnimator>(ScriptAnimator{_scene, _entity}) : std::nullopt;
     }
     std::optional<ScriptAudioSource> ScriptEntity::GetAudio() const

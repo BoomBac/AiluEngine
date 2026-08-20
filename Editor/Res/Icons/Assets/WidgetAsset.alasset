@@ -1,0 +1,10 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "f4836889-c8b2-4e11-b53c-abbdfbfd5cc9",
+        "_asset_type": "Ailu::Render::Texture2D",
+        "_asset_name": "WidgetAsset"
+    },
+    "_file": "WidgetAsset.png",
+    "_is_srgb": true
+}

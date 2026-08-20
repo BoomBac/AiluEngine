@@ -76,6 +76,7 @@ namespace Ailu
             void ResolveStyle(const UIStyleContext &context) override;
             const UIControlVisual *GetVisual(EUIVisualState state) const override;
             void OnPropertyChanged(const PropertyInfo& prop) override;
+            UIControlVisualOverride *GetPropertyVisualOverride() override { return &_style_override; }
             void UpdateTextLayout(bool record_dirty_reason = true);
             void MarkTextLayoutDirty(bool record_dirty_reason = true);
             void RenderImpl(UIRenderer &r) override;
@@ -197,6 +198,7 @@ namespace Ailu
             void ResolveStyle(const UIStyleContext &context) override;
             const UIControlVisual *GetVisual(EUIVisualState state) const override;
             void OnPropertyChanged(const PropertyInfo& prop) override;
+            UIControlVisualOverride *GetPropertyVisualOverride() override { return &_style_override; }
         public:
             APROPERTY()
             Color _bg_color = Colors::kGray;
@@ -226,6 +228,7 @@ namespace Ailu
             void SetCursorToEnd();
             Vector2f MeasureDesiredSize() override;
             bool IsEditing() const { return _is_editing; }
+            bool IsDragAdjusting() const { return _is_drag_adjusting; }
             UIInputStyleOverride &GetStyleOverride() { return _style_override; }
 
             // ── Style ────────────────────────────────────────────
@@ -288,6 +291,8 @@ namespace Ailu
             void RenderImpl(UIRenderer &r) override;
             void ResolveStyle(const UIStyleContext &context) override;
             const UIControlVisual *GetVisual(EUIVisualState state) const override;
+            void OnPropertyChanged(const PropertyInfo &prop) override;
+            UIControlVisualOverride *GetPropertyVisualOverride() override { return &_style_override; }
         public:
             APROPERTY()
             Color _tint_color = Colors::kWhite;

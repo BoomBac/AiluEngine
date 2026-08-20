@@ -1,6 +1,7 @@
 #include "Editors/AudioClipEditor.h"
 #include "Audio/Audio.h"
 #include "Audio/AudioClip.h"
+#include "Common/Undo.h"
 #include "Framework/Common/Input.h"
 #include "Framework/Common/Log.h"
 #include "Framework/Common/ResourceMgr.h"
@@ -25,7 +26,7 @@ namespace Ailu
             }
         }// namespace
 
-        AudioClipEditor::AudioClipEditor() : DockWindow("Audio Clip", Vector2f(780.0f, 420.0f))
+        AudioClipEditor::AudioClipEditor() : AssetEditor("Audio Clip", Vector2f(780.0f, 420.0f))
         {
             SetPosition(Vector2f(160.0f, 80.0f));
 
@@ -60,82 +61,65 @@ namespace Ailu
             StopPreview();
         }
 
-        void AudioClipEditor::Open(AudioClip *asset)
+        void AudioClipEditor::Open(AudioClip *clip)
         {
-            if (!asset)
+            if (clip == nullptr)
                 return;
-            _clip = asset;
-            ReadFromAsset();
-            _original = _editing;
-            SetTitle("Audio Clip - " + asset->Name());
-            RefreshAllUI();
+            AssetEditor::Open(ResourceMgr::Get().GetLinkedAsset(clip));
         }
 
-        void AudioClipEditor::Close()
+        bool AudioClipEditor::OnOpen()
+        {
+            _clip = GetAssetObject<AudioClip>();
+            if (_clip == nullptr)
+                return false;
+            _last_edit_snapshot = CaptureAssetObject(GetAsset());
+            RefreshAllUI();
+            return true;
+        }
+
+        void AudioClipEditor::OnClose()
         {
             StopPreview();
             _clip = nullptr;
         }
 
-        void AudioClipEditor::Update(f32 dt)
+        void AudioClipEditor::OnAssetSaved()
         {
-            DockWindow::Update(dt);
-            if (!_clip)
-                return;
-
-            const bool ctrl = Input::IsKeyDown(EKey::kLCONTROL) || Input::IsKeyDown(EKey::kRCONTROL);
-            if (ctrl && Input::IsKeyDownAccurate(EKey::kS))
-                Apply();
-            if (Input::IsKeyDownAccurate(EKey::kSPACE))
-                PlayPreview();
-
-            const bool dirty = IsDirty();
-            if (_btn_apply)
-                _btn_apply->SetInteractiveEnabled(dirty);
-            if (_btn_revert)
-                _btn_revert->SetInteractiveEnabled(dirty);
+            _last_edit_snapshot = CaptureAssetObject(GetAsset());
             RefreshStatus();
         }
 
-        void AudioClipEditor::ReadFromAsset()
+        void AudioClipEditor::OnAssetReloaded()
         {
-            if (!_clip)
-                return;
-            _editing._load_mode = _clip->_load_mode;
-            _editing._channel_mode = _clip->_channel_mode;
-            _editing._force_mono = _clip->_force_mono;
+            _clip = GetAssetObject<AudioClip>();
+            _last_edit_snapshot = CaptureAssetObject(GetAsset());
+            RefreshAllUI();
         }
 
-        void AudioClipEditor::WriteToAsset()
+        void AudioClipEditor::Update(f32 dt)
         {
+            AssetEditor::Update(dt);
             if (!_clip)
                 return;
-            _clip->_load_mode = _editing._load_mode;
-            _clip->_channel_mode = _editing._channel_mode;
-            _clip->_force_mono = _editing._force_mono;
-        }
 
-        void AudioClipEditor::Apply()
-        {
-            if (!_clip || !IsDirty())
-                return;
-            WriteToAsset();
-            _original = _editing;
-            ResourceMgr::Get().MarkAssetDirty(_clip);
-            if (auto *linked = ResourceMgr::Get().GetLinkedAsset(_clip))
+            if (Input::IsKeyDownAccurate(EKey::kSPACE))
+                PlayPreview();
+            const bool ctrl = Input::IsKeyDown(EKey::kLCONTROL) || Input::IsKeyDown(EKey::kRCONTROL);
+            if (ctrl && Input::IsKeyDownAccurate(EKey::kZ) && g_pCommandMgr != nullptr)
             {
-                ResourceMgr::Get().SaveAsset(linked);
-                LOG_INFO("AudioClipEditor: Applied");
+                g_pCommandMgr->Undo();
+                _last_edit_snapshot = CaptureAssetObject(GetAsset());
+                RefreshAllUI();
             }
-            RefreshAllUI();
-        }
+            if (ctrl && Input::IsKeyDownAccurate(EKey::kY) && g_pCommandMgr != nullptr)
+            {
+                g_pCommandMgr->Redo();
+                _last_edit_snapshot = CaptureAssetObject(GetAsset());
+                RefreshAllUI();
+            }
 
-        void AudioClipEditor::Revert()
-        {
-            if (!IsDirty())
-                return;
-            _editing = _original;
-            RefreshAllUI();
+            RefreshStatus();
         }
 
         void AudioClipEditor::PlayPreview()
@@ -149,7 +133,7 @@ namespace Ailu
             AudioPlayOptions options;
             options._bus = EAudioBus::kUi;
             options._is_3d = false;
-            options._streaming = _editing._load_mode == EAudioLoadMode::kStreaming;
+            options._streaming = _clip->_load_mode == EAudioLoadMode::kStreaming;
             _preview_handle = Audio::Play(linked->GetGuid(), options);
         }
 
@@ -198,13 +182,15 @@ namespace Ailu
 
         void AudioClipEditor::RefreshImportSettings()
         {
-            StyleModeButton(_btn_memory, _editing._load_mode == EAudioLoadMode::kMemory);
-            StyleModeButton(_btn_streaming, _editing._load_mode == EAudioLoadMode::kStreaming);
-            StyleModeButton(_btn_auto, _editing._channel_mode == EAudioChannelMode::kAuto);
-            StyleModeButton(_btn_mono, _editing._channel_mode == EAudioChannelMode::kMono);
-            StyleModeButton(_btn_stereo, _editing._channel_mode == EAudioChannelMode::kStereo);
+            if (_clip == nullptr)
+                return;
+            StyleModeButton(_btn_memory, _clip->_load_mode == EAudioLoadMode::kMemory);
+            StyleModeButton(_btn_streaming, _clip->_load_mode == EAudioLoadMode::kStreaming);
+            StyleModeButton(_btn_auto, _clip->_channel_mode == EAudioChannelMode::kAuto);
+            StyleModeButton(_btn_mono, _clip->_channel_mode == EAudioChannelMode::kMono);
+            StyleModeButton(_btn_stereo, _clip->_channel_mode == EAudioChannelMode::kStereo);
             if (_chk_force_mono)
-                _chk_force_mono->SetChecked(_editing._force_mono);
+                _chk_force_mono->SetChecked(_clip->_force_mono);
         }
 
         void AudioClipEditor::RefreshStatus()
@@ -215,14 +201,36 @@ namespace Ailu
 
         void AudioClipEditor::SetLoadMode(EAudioLoadMode mode)
         {
-            _editing._load_mode = mode;
+            if (_clip == nullptr || _clip->_load_mode == mode)
+                return;
+            _clip->_load_mode = mode;
+            MarkEdited();
             RefreshImportSettings();
         }
 
         void AudioClipEditor::SetChannelMode(EAudioChannelMode mode)
         {
-            _editing._channel_mode = mode;
+            if (_clip == nullptr || _clip->_channel_mode == mode)
+                return;
+            _clip->_channel_mode = mode;
+            MarkEdited();
             RefreshImportSettings();
+        }
+
+        void AudioClipEditor::MarkEdited()
+        {
+            if (GetAsset() == nullptr)
+                return;
+            const String snapshot = CaptureAssetObject(GetAsset());
+            if (snapshot == _last_edit_snapshot)
+                return;
+            const String before = _last_edit_snapshot;
+            _last_edit_snapshot = snapshot;
+            if (g_pCommandMgr != nullptr)
+                g_pCommandMgr->ExecuteCommand(std::make_unique<AssetSnapshotCommand>(
+                    GetAsset(), before, snapshot, "Audio Clip Edit"));
+            else if (!GetAsset()->IsDirty())
+                GetAsset()->MarkModified();
         }
 
         UI::Text *AudioClipEditor::AddSectionTitle(UI::UIElement *parent, const String &title)
@@ -266,15 +274,10 @@ namespace Ailu
         {
             toolbar->SlotPadding() = UI::Padding(4.0f, 2.0f, 4.0f, 2.0f);
 
-            _btn_apply = toolbar->AddChild<UI::Button>("Apply");
-            _btn_apply->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFill)
-                    .Size(Vector2f(56.0f, 0.0f)).Margin(Vector4f(0.0f, 0.0f, 2.0f, 0.0f));
-            _btn_apply->OnMouseClick() += [this](UI::UIEvent &e) { Apply(); e._is_handled = true; };
-
-            _btn_revert = toolbar->AddChild<UI::Button>("Revert");
-            _btn_revert->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFill)
-                    .Size(Vector2f(56.0f, 0.0f)).Margin(Vector4f(0.0f, 0.0f, 8.0f, 0.0f));
-            _btn_revert->OnMouseClick() += [this](UI::UIEvent &e) { Revert(); e._is_handled = true; };
+            auto *save_button = toolbar->AddChild<UI::Button>("Save");
+            save_button->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFill)
+                    .Size(Vector2f(50.0f, 0.0f)).Margin(Vector4f(0.0f, 0.0f, 8.0f, 0.0f));
+            save_button->OnMouseClick() += [this](UI::UIEvent &e) { Save(); e._is_handled = true; };
 
             _btn_play = toolbar->AddChild<UI::Button>("Play");
             _btn_play->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFill)
@@ -374,7 +377,11 @@ namespace Ailu
                                                                     UI::ESizePolicy::kFill)
                     .Size(Vector2f(24.0f, 0.0f));
             _chk_force_mono->OnMouseClick() += [this](UI::UIEvent &e) {
-                _editing._force_mono = _chk_force_mono->IsChecked();
+                if (_clip != nullptr && _clip->_force_mono != _chk_force_mono->IsChecked())
+                {
+                    _clip->_force_mono = _chk_force_mono->IsChecked();
+                    MarkEdited();
+                }
                 RefreshImportSettings();
                 e._is_handled = true;
             };

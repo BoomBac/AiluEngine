@@ -17,6 +17,7 @@
 #include "Graph/GraphDocument.h"
 #include "Input/InputActionAsset.h"
 #include "Render/2D/Sprite.h"
+#include "Render/2D/SpriteAtlas.h"
 #include "Render/Material.h"
 #include "Render/Shader.h"
 #include "Scene/PrefabSystem.h"
@@ -309,6 +310,25 @@ namespace Ailu
 
             auto sprite = MakeRef<Render::Sprite>(trimmed_name);
             if (ResourceMgr::Get().CreateAsset(asset_path, sprite, false) == nullptr)
+                return false;
+            ResourceMgr::Get().SaveAllUnsavedAssets();
+            return true;
+        }
+
+        bool CreateSpriteAtlasAsset(const fs::path &directory, const String &name)
+        {
+            const String trimmed_name = TrimNameCopy(name);
+            if (trimmed_name.empty())
+                return false;
+
+            AssetBrowserContent content;
+            const WString asset_path = AppendChildAssetPath(content.GetAssetDirectory(directory),
+                                                            ToWChar(trimmed_name.c_str()) + WString(L".alasset"));
+            if (ResourceMgr::Get().GetAsset(asset_path) != nullptr || fs::exists(ResourceMgr::GetResSysPath(asset_path)))
+                return false;
+
+            auto atlas = MakeRef<Render::SpriteAtlas>(trimmed_name);
+            if (ResourceMgr::Get().CreateAsset(asset_path, atlas, false) == nullptr)
                 return false;
             ResourceMgr::Get().SaveAllUnsavedAssets();
             return true;

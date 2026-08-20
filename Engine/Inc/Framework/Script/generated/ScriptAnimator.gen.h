@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __SCRIPTANIMATOR_GEN_H__
 //Struct ScriptAnimator begin...........................
-#define SCRIPTANIMATOR_GEN_H_18_GENERATED_BODY \
+#define SCRIPTANIMATOR_GEN_H_21_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_ScriptAnimator_Type();\
                                 static const Type* GetPrivateStaticClass();\

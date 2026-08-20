@@ -1,0 +1,10 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "908bb487-6b06-49b9-a897-398b58227cd5",
+        "_asset_type": "Ailu::Render::Texture2D",
+        "_asset_name": "SpriteAtlas"
+    },
+    "_file": "SpriteAtlas.png",
+    "_is_srgb": true
+}

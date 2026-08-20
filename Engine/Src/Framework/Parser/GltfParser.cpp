@@ -1,4 +1,5 @@
 #include "Framework/Parser/GltfParser.h"
+#include "Framework/Common/Allocator.hpp"
 #include "Framework/Common/FileManager.h"
 #include "Framework/Common/Log.h"
 #include "Framework/Common/Path.h"
@@ -666,7 +667,7 @@ namespace Ailu
             }
 
             out_buffer._data.assign(file_data, file_data + file_size);
-            delete[] file_data;
+            AL_FREE(file_data);
             return true;
         }
 

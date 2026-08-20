@@ -175,7 +175,7 @@ namespace Ailu
         void Button::RenderImpl(UIRenderer &r)
         {
             if (const UIControlVisual *visual = GetCurrentVisual())
-                r.DrawVisual(_arrange_rect, _matrix, *visual);
+                r.DrawVisual(_arrange_rect, _matrix, *visual, this);
             for (auto& c: _children)
                 c->Render(r);
         }
@@ -373,7 +373,7 @@ namespace Ailu
                 UpdateTextLayout();
                 InvalidatePaint();
             }
-            else if (name == "_color" || name == "_horizontal_align" || name == "_vertical_align")
+            else if (name == "_horizontal_align" || name == "_vertical_align")
             {
                 InvalidatePaint();
             }
@@ -456,7 +456,7 @@ namespace Ailu
         void Slider::RenderImpl(UIRenderer &r)
         {
             if (const UIControlVisual *visual = GetCurrentVisual())
-                r.DrawVisual(_arrange_rect, _matrix, *visual);
+                r.DrawVisual(_arrange_rect, _matrix, *visual, this);
             Vector4f track_corner = Vector4f(_resolved_style._track_corner_radius);
             r.DrawQuad(_bar_rect, _matrix, _resolved_style._track_background, track_corner);
             f32 value01 = (_value - _range.x) / (_range.y - _range.x);
@@ -544,7 +544,7 @@ namespace Ailu
         void CheckBox::RenderImpl(UIRenderer &r)
         {
             if (const UIControlVisual *visual = GetCurrentVisual())
-                r.DrawVisual(_arrange_rect, _matrix, *visual);
+                r.DrawVisual(_arrange_rect, _matrix, *visual, this);
             const UIBrush *box_brush = &_resolved_style._unchecked;
             if (_is_checked)
                 box_brush = &_resolved_style._checked;
@@ -718,10 +718,10 @@ namespace Ailu
                     std::max(thickness.x, thickness.y), std::max(thickness.y, thickness.z),
                     std::max(thickness.z, thickness.w), std::max(thickness.w, thickness.x)}, Vector4f::kZero);
                 if (bg._type != EUIBrushType::kNone && bg._tint.a > 0.0f)
-                    r.DrawQuad(_content_rect, _matrix, bg, inner_radius);
+                    r.DrawQuad(_content_rect, _matrix, r.ResolveBackdropBrush(this, bg), inner_radius);
             }
             else if (bg._type != EUIBrushType::kNone && bg._tint.a > 0.0f)
-                r.DrawQuad(_content_rect, _matrix, bg, corner_radius);
+                r.DrawQuad(_content_rect, _matrix, r.ResolveBackdropBrush(this, bg), corner_radius);
 
             if (!_children.empty())
                 _children[0]->Render(r);
@@ -772,16 +772,7 @@ namespace Ailu
             if (name == "_thickness")
             {
                 SlotPadding() = Padding(_thickness);
-                InvalidateStyle();
                 InvalidateLayout();
-            }
-            else if (name == "_bg_color" || name == "_border_color")
-            {
-                InvalidateStyle();
-            }
-            else if (name == "_corner_radius")
-            {
-                InvalidateStyle();
             }
         }
         Ref<UISlot> Border::CreateSlotForChild()
@@ -948,7 +939,7 @@ namespace Ailu
             {
                 if (e._key_code == EKey::kLBUTTON)
                 {
-                    if (abs(e._mouse_position.x - _abs_rect.x) < 6.0f + _resolved_style._padding._l && StringUtils::IsNumeric(_content))
+                    if (StringUtils::IsNumeric(_content))
                     {
                         LOG_INFO("begin drag adjust...");
                         _is_drag_adjusting = true;
@@ -989,7 +980,7 @@ namespace Ailu
                 if (_is_drag_adjusting)
                 {
                     const f32 delta = e._mouse_position.x - _drag_start_x;
-                    const f32 new_value = _drag_start_value + delta * _drag_start_value * 0.02f;
+                    const f32 new_value = _drag_start_value + delta * std::max(_drag_start_value * 0.02f,0.01f);
                     const String new_content = std::format("{:.3}", new_value);
                     if (_content != new_content)
                     {
@@ -1009,7 +1000,7 @@ namespace Ailu
                         KeepCursorVisible();
                     }
                 }
-                if (abs(e._mouse_position.x - _abs_rect.x) < 6.0f + _resolved_style._padding._l && StringUtils::IsNumeric(_content))
+                if (StringUtils::IsNumeric(_content))
                 {
                     Application::Get().SetCursor(ECursorType::kSizeEW);
                 }
@@ -1113,10 +1104,12 @@ namespace Ailu
 
         void InputBlock::RenderImpl(UIRenderer &r)
         {
+            if (_is_need_recalc_offset_table)
+                FillCursorOffsetTable();
             const UIControlVisual *visual = GetCurrentVisual();
             const f32 font_height = _resolved_style._font_size;
             if (visual)
-                r.DrawVisual(_arrange_rect, _matrix, *visual);
+                r.DrawVisual(_arrange_rect, _matrix, *visual, this);
             const auto text_layout = TextRenderer::BuildLayout(_content, Vector2f::kZero, font_height);
             const Vector4f text_visual_bounds = TextRenderer::CalculateTextVisualBounds(text_layout);
             const f32 visual_height = text_visual_bounds.w > 0.0f ? text_visual_bounds.w : font_height;
@@ -1124,10 +1117,11 @@ namespace Ailu
             const f32 caret_height = std::min(_content_rect.w, std::max(font_height, visual_height));
             const f32 caret_y = _content_rect.y + (_content_rect.w - caret_height) * 0.5f;
             const Vector2f text_pos = {_content_rect.x, line_y - text_visual_bounds.y};
-            if (IsFocused() && _select_start != _select_end)
+            if (IsFocused() && _select_start != _select_end && !_cursor_offsets.empty())
             {
-                const u32 select_start = std::min(_select_start, _select_end);
-                const u32 select_end = std::max(_select_start, _select_end);
+                const u32 max_offset_index = static_cast<u32>(_cursor_offsets.size() - 1u);
+                const u32 select_start = std::min(std::min(_select_start, _select_end), max_offset_index);
+                const u32 select_end = std::min(std::max(_select_start, _select_end), max_offset_index);
                 f32 start_offset = select_start == 0u ? 0.0f : _cursor_offsets[select_start];
                 f32 end_offset = select_end == 0u ? 0.0f : _cursor_offsets[select_end];
                 UIBrush selection;
@@ -1138,9 +1132,12 @@ namespace Ailu
             UIBrush caret;
             caret._tint = Color(_resolved_style._caret_color.x, _resolved_style._caret_color.y, _resolved_style._caret_color.z,
                                 (f32) _cursor_visible);
-            if (IsFocused() && !_is_selecting)
-                r.DrawQuad({_content_rect.x + (_cursor_pos == 0u ? 1.0f : _cursor_offsets[_cursor_pos]), caret_y,
+            if (IsFocused() && !_is_selecting && !_cursor_offsets.empty())
+            {
+                const u32 cursor_pos = std::min(_cursor_pos, static_cast<u32>(_cursor_offsets.size() - 1u));
+                r.DrawQuad({_content_rect.x + (cursor_pos == 0u ? 1.0f : _cursor_offsets[cursor_pos]), caret_y,
                             _resolved_style._caret_width, caret_height}, _matrix, caret);
+            }
         }
         void InputBlock::FillCursorOffsetTable()
         {
@@ -1298,7 +1295,7 @@ namespace Ailu
         void Image::RenderImpl(UIRenderer &r)
         {
             // Draw background / border from resolved style
-            r.DrawVisual(_arrange_rect, _matrix, _resolved_visual);
+            r.DrawVisual(_arrange_rect, _matrix, _resolved_visual, this);
             // Draw the texture on top
             ImageDrawOptions opts;
             opts._transform = _matrix;
@@ -1339,12 +1336,12 @@ namespace Ailu
                 SetTexture(ResourceMgr::Get().Load<Texture2D>(Guid(_texture_guid)).get());
             }
         }
-        // void Image::OnPropertyChanged(const PropertyInfo &prop)
-        // {
-        //     UIElement::OnPropertyChanged(prop);
-        //     if (prop.Name() == "_texture_guid")
-        //         PostDeserialize();
-        // }
+        void Image::OnPropertyChanged(const PropertyInfo &prop)
+        {
+            UIElement::OnPropertyChanged(prop);
+            if (prop.Name() == "_texture_guid")
+                PostDeserialize();
+        }
 #pragma endregion
     }// namespace UI
 }

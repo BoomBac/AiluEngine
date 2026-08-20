@@ -1,4 +1,5 @@
 #include "RHI/DX12/D3DContext.h"
+#include "Framework/Common/Allocator.hpp"
 //#include "Ext/imgui/backends/imgui_impl_dx12.h"
 #include "Framework/Common/Application.h"
 #include "Framework/Common/JobSystem.h"
@@ -455,7 +456,8 @@ namespace Ailu::RHI::DX12
         if (_worker_thread != nullptr)
             return;
         _is_stop.store(false);
-        if (_worker_thread == nullptr) { _worker_thread = new std::thread(&GpuCommandWorker::RunAsync, this); }
+        if (_worker_thread == nullptr)
+            _worker_thread = AL_NEW_TAG(EMemoryTag::kJobSystem, std::thread, &GpuCommandWorker::RunAsync, this);
     }
     void GpuCommandWorker::Stop()
     {
@@ -465,7 +467,7 @@ namespace Ailu::RHI::DX12
             Application::Get().NotifyRender();
             _cmd_wait_cv.notify_all();
             if (_worker_thread->joinable()) _worker_thread->join();
-            delete _worker_thread; _worker_thread = nullptr;
+            AL_DELETE(_worker_thread);
             LOG_INFO("Exit RenderThread")
         }
     }
@@ -1724,7 +1726,7 @@ namespace Ailu::RHI::DX12
         if (res->GetResourceType() == EGpuResType::kGraphicsPSO || res->GetResourceType() == EGpuResType::kRenderTexture)
         {
             res->Upload(this, nullptr, params);
-            delete params; params = nullptr;
+            AL_DELETE(params);
             //不需要cmd参与的资源直接将其create fence置为0，否则在实际构建之后进行
             ResourceStateTracker::Get().AddResource(res, 0u);
         }
@@ -1743,7 +1745,7 @@ namespace Ailu::RHI::DX12
         if (res->GetResourceType() == EGpuResType::kGraphicsPSO || res->GetResourceType() == EGpuResType::kRenderTexture)
         {
             res->Upload(this, nullptr, params);
-            delete params; params = nullptr;
+            AL_DELETE(params);
             ResourceStateTracker::Get().AddResource(res, 0u);
             return;
         }

@@ -60,6 +60,9 @@ namespace Ailu
         void UILayer::OnDetach() {}
         void UILayer::OnEvent(Ailu::Event &e)
         {
+            const bool is_mouse_event = (e.GetCategoryFlags() & EEventCategory::kEventCategoryMouse) != 0;
+            if (e.Handled() || (is_mouse_event && InputRouteState::Get().IsMouseCaptured()))
+                return;
             static UIManager *s_mgr = UIManager::Get();
             Widget *cur_hover_widget = nullptr;
             UI::UIEvent ue;
@@ -73,7 +76,7 @@ namespace Ailu
             else if (e.GetEventType() == EEventType::kKeyReleased)
                 ue._key_code = dynamic_cast<KeyReleasedEvent *>(&e)->GetKeyCode();
             UIElement *capture_target = s_mgr->_capture_target;
-            Widget *modal_widget = s_mgr->GetPopupWidget();
+            Widget *modal_widget = s_mgr->GetModalPopupWidget();
             const bool has_capture = s_mgr->_capture_target != nullptr;
             bool is_capture_sensitive_mouse_event = has_capture &&
                                                     (ue._type == UI::UIEvent::EType::kMouseMove ||
@@ -90,20 +93,6 @@ namespace Ailu
                     node = node->GetParent();
                 }
                 return false;
-            };
-            auto find_hover_widget = [&]() -> Widget *
-            {
-                auto &widget = s_mgr->_widgets;
-                for (i32 i = (i32) widget.size() - 1; i >= 0; i--)
-                {
-                    auto w = widget[i].get();
-                    if (w->_visibility != EVisibility::kVisible || w->_is_receive_event == false ||
-                        w->Parent() != e._window || (modal_widget != nullptr && w != modal_widget))
-                        continue;
-                    if (w->IsHover(ue._mouse_position))
-                        return w;
-                }
-                return nullptr;
             };
             auto dispatch_widget = [&](Widget *widget) -> bool
             {
@@ -140,19 +129,17 @@ namespace Ailu
                 }
                 return;
             }
-            Widget *top_hover_widget = find_hover_widget();
             bool is_in_zone = false;
             for (const auto &zone: s_mgr->GetInteractionZones())
             {
                 if (zone._rect.z <= 0.0f || zone._rect.w <= 0.0f)
                     continue;
+                if (zone._owner != nullptr && zone._owner->Parent() != e._window)
+                    continue;
                 if (UIElement::IsPointInside(ue._mouse_position, zone._rect))
                 {
-                    // Resize zones are intentionally outside their owner widget. Only reject an
-                    // overlapping zone when the pointer is still inside another widget's content.
-                    if (zone._owner != nullptr && top_hover_widget != nullptr && zone._owner != top_hover_widget &&
-                        zone._owner->IsHover(ue._mouse_position))
-                        continue;
+                    // A registered interaction zone is an explicit input layer. Its rectangle is
+                    // authoritative, including shared boundaries at resize corners.
                     is_in_zone = true;
                     break;
                 }
@@ -167,7 +154,8 @@ namespace Ailu
                 {
                     ue._key_code = static_cast<MouseButtonReleasedEvent *>(&e)->GetButton();
                     Widget *top_popup = s_mgr->GetPopupWidget();
-                    if (ue._key_code != EKey::kRBUTTON && top_popup != nullptr && !top_popup->IsHover(ue._mouse_position))
+                    if (ue._key_code != EKey::kRBUTTON && top_popup != nullptr && !s_mgr->IsPopupModal(top_popup) &&
+                        !top_popup->IsHover(ue._mouse_position))
                     {
                         s_mgr->HidePopup();
                         // HidePopup clears the manager's capture target. Do not use the stale
@@ -175,7 +163,7 @@ namespace Ailu
                         // on an element that is already pending destruction.
                         capture_target = nullptr;
                         is_capture_sensitive_mouse_event = false;
-                        modal_widget = s_mgr->GetPopupWidget();
+                        modal_widget = s_mgr->GetModalPopupWidget();
                     }
                 }
                 else if (e.GetEventType() == EEventType::kMouseScroll)
@@ -214,6 +202,10 @@ namespace Ailu
             }
             else
             {
+                // An interaction zone is an exclusive input layer.  It may be outside its
+                // owner's widget, so a widget behind the zone can still pass IsHover().  That
+                // widget must not remain the current hover target while the zone is active.
+                cur_hover_widget = nullptr;
                 auto &widget = s_mgr->_widgets;
                 if (is_capture_sensitive_mouse_event)
                 {
@@ -229,19 +221,6 @@ namespace Ailu
                             dispatch_widget(w);
                             break;
                         }
-                    }
-                }
-                for (i32 i = (i32) widget.size() - 1; i >= 0; i--)
-                {
-                    auto w = widget[i].get();
-                    if (w->_visibility != EVisibility::kVisible || w->_is_receive_event == false || w->Parent() != e._window)
-                        continue;
-                    if (modal_widget != nullptr && w != modal_widget)
-                        continue;
-                    if (w->IsHover(ue._mouse_position))//上层已经生成了事件，下次就不再响应
-                    {
-                        cur_hover_widget = w;
-                        break;
                     }
                 }
             }

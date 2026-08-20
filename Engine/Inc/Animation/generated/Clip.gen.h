@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __CLIP_GEN_H__
 //Class AnimationClip begin...........................
-#define CLIP_GEN_H_17_GENERATED_BODY \
+#define CLIP_GEN_H_15_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_AnimationClip_Type();\
                                 static const Type* GetPrivateStaticClass();\

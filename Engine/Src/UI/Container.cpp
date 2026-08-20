@@ -112,7 +112,7 @@ namespace Ailu
 
         void Canvas::RenderImpl(UIRenderer &r)
         {
-            r.DrawVisual(_arrange_rect, _matrix, _resolved_visual);
+            r.DrawVisual(_arrange_rect, _matrix, _resolved_visual, this);
             for (auto &child: _children)
             {
                 child->Render(r);
@@ -197,7 +197,7 @@ namespace Ailu
         }
         void LinearBox::RenderImpl(UIRenderer &r)
         {
-            r.DrawVisual(_arrange_rect, _matrix, _resolved_visual);
+            r.DrawVisual(_arrange_rect, _matrix, _resolved_visual, this);
             for (auto &child: _children)
             {
                 child->Render(r);
@@ -621,7 +621,7 @@ namespace Ailu
         void ScrollView::RenderImpl(UIRenderer &r)
         {
             if (const UIControlVisual *visual = GetCurrentVisual())
-                r.DrawVisual(_arrange_rect, _matrix, *visual);
+                r.DrawVisual(_arrange_rect, _matrix, *visual, this);
             r.PushScissor(_abs_rect);
             for (auto &child: _children)
             {
@@ -800,7 +800,7 @@ namespace Ailu
                 for (int i = 0; i < _content_box->GetChildren().size(); i++)
                 {
                     auto &child = _content_box->GetChildren()[i];
-                    if (child->IsPointInside(e._mouse_position))
+                    if (UIElement::IsPointInside(e._mouse_position, child->GetArrangeRect()))
                     {
                         hovered_item = child.get();
                         break;
@@ -821,16 +821,74 @@ namespace Ailu
                 InvalidatePaint();
             };
 
-            //OnMouseClick() += [this](UIEvent &e)
-            //{
-            //    if (_hovered_item)
-            //    {
-            //        _selected_item = _hovered_item;
-            //        if (i32 index = _content_box->IndexOf(_selected_item); index != -1)
-            //            _on_item_clicked_delegate.Invoke(_selected_item, index);
-            //        e._is_handled = true;
-            //    }
-            //};
+            OnMouseClick() += [this](UIEvent &e)
+            {
+                UIElement *selected_item = nullptr;
+                for (auto &child : _content_box->GetChildren())
+                {
+                    if (UIElement::IsPointInside(e._mouse_position, child->GetArrangeRect()))
+                    {
+                        selected_item = child.get();
+                        break;
+                    }
+                }
+                if (selected_item == nullptr)
+                    return;
+
+                const i32 index = _content_box->IndexOf(selected_item);
+                if (index == -1)
+                    return;
+
+                const bool control_down = Input::IsKeyDown(EKey::kCONTROL) || Input::IsKeyDown(EKey::kLCONTROL) ||
+                                           Input::IsKeyDown(EKey::kRCONTROL) || Input::IsKeyDownAccurate(EKey::kCONTROL) ||
+                                           Input::IsKeyDownAccurate(EKey::kLCONTROL) || Input::IsKeyDownAccurate(EKey::kRCONTROL);
+                const bool shift_down = Input::IsKeyDown(EKey::kSHIFT) || Input::IsKeyDown(EKey::kLSHIFT) ||
+                                        Input::IsKeyDown(EKey::kRSHIFT) || Input::IsKeyDownAccurate(EKey::kSHIFT) ||
+                                        Input::IsKeyDownAccurate(EKey::kLSHIFT) || Input::IsKeyDownAccurate(EKey::kRSHIFT);
+                auto is_selected = [this](i32 item_index)
+                {
+                    return std::find(_selected_indices.begin(), _selected_indices.end(), item_index) != _selected_indices.end();
+                };
+                auto add_index = [this, &is_selected](i32 item_index)
+                {
+                    if (!is_selected(item_index))
+                        _selected_indices.push_back(item_index);
+                };
+
+                if (shift_down && _selection_anchor >= 0 && _selection_anchor < static_cast<i32>(_content_box->GetChildren().size()))
+                {
+                    if (!control_down)
+                        _selected_indices.clear();
+                    const i32 begin = std::min(_selection_anchor, index);
+                    const i32 end = std::max(_selection_anchor, index);
+                    for (i32 i = begin; i <= end; ++i)
+                        add_index(i);
+                }
+                else if (control_down)
+                {
+                    auto it = std::find(_selected_indices.begin(), _selected_indices.end(), index);
+                    if (it != _selected_indices.end())
+                        _selected_indices.erase(it);
+                    else
+                        _selected_indices.push_back(index);
+                    _selection_anchor = index;
+                }
+                else
+                {
+                    _selected_indices = {index};
+                    _selection_anchor = index;
+                }
+
+                if (is_selected(index))
+                    _selected_item = selected_item;
+                else if (_selected_indices.empty())
+                    _selected_item = nullptr;
+                else
+                    _selected_item = _content_box->GetChildren()[_selected_indices.back()].get();
+                _on_item_clicked_delegate.Invoke(selected_item, index);
+                InvalidatePaint();
+                e._is_handled = true;
+            };
         }
         void ListView::AddItem(Ref<UIElement> item)
         {
@@ -839,8 +897,33 @@ namespace Ailu
         }
         void ListView::ClearItems()
         {
+            _hovered_item = nullptr;
+            _selected_item = nullptr;
+            _selected_indices.clear();
+            _selection_anchor = -1;
             _content_box->ClearChildren();
             InvalidateHierarchy();
+        }
+        void ListView::SetSelectedIndex(i32 index)
+        {
+            Vector<i32> indices;
+            if (index >= 0 && index < static_cast<i32>(_content_box->GetChildren().size()))
+                indices.push_back(index);
+            SetSelectedIndices(indices);
+        }
+        void ListView::SetSelectedIndices(const Vector<i32> &indices)
+        {
+            _selected_indices.clear();
+            for (i32 index : indices)
+            {
+                if (index >= 0 && index < static_cast<i32>(_content_box->GetChildren().size()) &&
+                    std::find(_selected_indices.begin(), _selected_indices.end(), index) == _selected_indices.end())
+                    _selected_indices.push_back(index);
+            }
+            _selected_item = _selected_indices.empty()
+                ? nullptr : _content_box->GetChildren()[_selected_indices.back()].get();
+            _selection_anchor = _selected_indices.empty() ? -1 : _selected_indices.back();
+            InvalidatePaint();
         }
         void ListView::SizeToContent(bool enable)
         {
@@ -907,12 +990,24 @@ namespace Ailu
                             _abs_rect.z / _backdrop_source_rect.z,
                             _abs_rect.w / _backdrop_source_rect.w};
                 }
+                background_brush = r.ResolveBackdropBrush(this, background_brush);
                 r.DrawQuad(_arrange_rect, _matrix, background_brush, _corner_radius);
             }
             if (_border_width > 0.0f && _border_color.a > 0.0f)
-                r.DrawBox(_arrange_rect.xy, _arrange_rect.zw, _matrix, _border_width, _border_color);
+                r.DrawBorder(_arrange_rect, _matrix, Vector4f(_border_width), _corner_radius, _border_color);
 
             r.PushScissor(_abs_rect);
+            for (auto &c: _content_box->GetChildren())
+            {
+                const Color *item_color = nullptr;
+                const i32 index = _content_box->IndexOf(c.get());
+                if (std::find(_selected_indices.begin(), _selected_indices.end(), index) != _selected_indices.end())
+                    item_color = &_resolved_list_style._item_selected_color;
+                else if (c.get() == _hovered_item)
+                    item_color = &_resolved_list_style._item_hovered_color;
+                if (item_color != nullptr)
+                    r.DrawQuad(c->GetArrangeRect(), Matrix4x4f::Identity(), ColorBrush(*item_color));
+            }
             for (auto &child: _children)
             {
                 if (auto *text = child->As<Text>())
@@ -948,19 +1043,6 @@ namespace Ailu
                 r.DrawQuad(_hbar_rect, _matrix, *thumb);
             }
 
-            for (auto &c: _content_box->GetChildren())
-            {
-                // hover 高亮
-                if (c.get() == _hovered_item)
-                {
-                    r.DrawQuad(c->GetArrangeRect(), _matrix, ColorBrush(_resolved_list_style._item_hovered_color));
-                }
-                // selected 高亮
-                if (c.get() == _selected_item)
-                {
-                    r.DrawQuad(c->GetArrangeRect(), _matrix, ColorBrush(_resolved_list_style._item_selected_color));
-                }
-            }
         }
 
 #pragma endregion
@@ -971,21 +1053,36 @@ namespace Ailu
         }
         Dropdown::Dropdown(const Vector<String> &items) : UIElement("Dropdown")
         {
-            _root = AddChild<HorizontalBox>();
-            _root->GetSlot()->Size(GetSlot()->_size);
+            _border = AddChild<Border>();
+            _root = _border->AddChild<HorizontalBox>();
+            _root->GetSlotAs<LinearSlot>().SizePolicy(ESizePolicy::kFill, ESizePolicy::kFill);
             _text = _root->AddChild<Text>();
             _text->GetSlotAs<LinearSlot>().SizePolicy(ESizePolicy::kFill, ESizePolicy::kAuto);
-            _button = _root->AddChild<Button>();
-            _button->SetText("v");
+            _button = _root->AddChild<Text>("v");
             _button->GetSlotAs<LinearSlot>().SizePolicy(ESizePolicy::kFixed, ESizePolicy::kFill).Size({20.0f, 20.0f});
+            _button->_horizontal_align = EAlignment::kCenter;
             _items = items;
-            _button->OnMouseClick() += [this](UIEvent &e)
+            OnMouseClick() += [this](UIEvent &e)
             {
                 if (_is_dropdown_open)
                 {
                     UIManager::Get()->HidePopup();
                     _is_dropdown_open = false;
                     return;
+                }
+                if (_on_popup_opening)
+                    _on_popup_opening();
+                const auto abs_rect = GetArrangeRect();
+                if (_popup_builder)
+                {
+                    Ref<UIElement> popup = _popup_builder({abs_rect.z, abs_rect.w});
+                    if (popup != nullptr)
+                    {
+                        UIManager::Get()->ShowPopupAt(abs_rect.x, abs_rect.y + abs_rect.w, popup, [this]()
+                        { _is_dropdown_open = false; });
+                        _is_dropdown_open = true;
+                        return;
+                    }
                 }
                 auto list_view = MakeRef<ListView>();
                 UIBrush transparent_brush;
@@ -995,18 +1092,19 @@ namespace Ailu
                 list_view->SetSlot(MakeRef<LinearSlot>());
                 list_view->GetSlotAs<LinearSlot>().SizePolicy(ESizePolicy::kFixed, ESizePolicy::kAuto);
                 list_view->Name(std::format("Dropdown_{}", _name));
-                auto abs_rect = _text->GetArrangeRect();
                 list_view->GetSlot()->Size({abs_rect.z, list_view->GetSlot()->_size.y});
                 for (u16 i = 0; i < (u16) _items.size(); i++)
                 {
-                    auto text = MakeRef<Text>(_items[i]);
-                    text->OnMouseClick() += [this, i](UIEvent &e)
+                    Ref<UIElement> item = _popup_item_builder ? _popup_item_builder(i) : MakeRef<Text>(_items[i]);
+                    if (item == nullptr)
+                        item = MakeRef<Text>(_items[i]);
+                    item->OnMouseClick() += [this, i](UIEvent &e)
                     {
                         LOG_INFO("Dropdown item clicked: {}", _items[i]);
                         SetSelectedIndex(i);
                         UIManager::Get()->HidePopup();
                     };
-                    list_view->AddItem(text);
+                    list_view->AddItem(item);
                 }
                 Vector2f size = list_view->MeasureDesiredSize();
                 if (size.y > 200.0f)
@@ -1016,6 +1114,7 @@ namespace Ailu
                 else
                     list_view->SizeToContent(true);
                 Vector2f popup_size = list_view->MeasureDesiredSize();
+                popup_size.x = abs_rect.z;
                 list_view->GetSlot()->Size(popup_size);
                 list_view->SetStyleId("DropdownPopup");
                 if (_popup_backdrop_texture != nullptr && _popup_backdrop_source_rect.z > 1.0f && _popup_backdrop_source_rect.w > 1.0f)
@@ -1027,6 +1126,12 @@ namespace Ailu
         }
         void Dropdown::SetSelectedIndex(i32 index)
         {
+            if (_selected_index == index)
+            {
+                if (_selected_index >= 0 && _selected_index < static_cast<i32>(_items.size()))
+                    _text->SetText(_items[_selected_index]);
+                return;
+            }
             _selected_index = index;
             _on_selected_changed_delegate.Invoke(_selected_index);
             if (_selected_index >= 0 && _selected_index < static_cast<i32>(_items.size()))
@@ -1047,8 +1152,52 @@ namespace Ailu
             _popup_backdrop_texture = texture;
             _popup_backdrop_source_rect = source_rect;
         }
+        void Dropdown::SetStyleId(const UIStyleId &id)
+        {
+            if (_style_id == id)
+                return;
+            _style_id = id;
+            InvalidateStyle();
+        }
+        void Dropdown::ResolveStyle(const UIStyleContext &context)
+        {
+            if (context._theme)
+            {
+                const UIButtonStyle *theme_style = context._theme->FindButtonStyle(_style_id);
+                if (theme_style)
+                    _resolved_style = *theme_style;
+                else
+                    _resolved_style = context._theme->_button_style;
+            }
+            else
+            {
+                static UITheme s_default_theme = UITheme::DefaultDark();
+                _resolved_style = s_default_theme._button_style;
+            }
+            _style_override.ApplyTo(_resolved_style);
+            _text->FontSize(_resolved_style._font_size, false);
+            _button->FontSize(_resolved_style._font_size, false);
+            _border->SlotPadding() = Padding(_resolved_style._padding);
+        }
+        const UIControlVisual *Dropdown::GetVisual(EUIVisualState state) const
+        {
+            switch (state)
+            {
+                case EUIVisualState::kHovered:
+                    return &_resolved_style._hovered;
+                case EUIVisualState::kPressed:
+                    return &_resolved_style._pressed;
+                case EUIVisualState::kFocused:
+                    return &_resolved_style._focused;
+                case EUIVisualState::kDisabled:
+                    return &_resolved_style._disabled;
+                default:
+                    return &_resolved_style._normal;
+            }
+        }
         Vector2f Dropdown::MeasureDesiredSize()
         {
+            EnsureStyleResolved();
             Vector2f size = GetSlot()->_size;
             if (GetSizePolicy(this, true) == ESizePolicy::kAuto)
             {
@@ -1070,33 +1219,38 @@ namespace Ailu
                     size.y = std::max(size.y, c_size.y + margin._t + margin._b);
                 }
             }
+            if (GetSizePolicy(this, true) == ESizePolicy::kAuto)
+                size.x = std::max(size.x, _resolved_style._min_size.x);
+            if (GetSizePolicy(this, false) == ESizePolicy::kAuto)
+                size.y = std::max(size.y, _resolved_style._min_size.y);
             return size;
         }
         void Dropdown::RenderImpl(UIRenderer &r)
         {
+            if (const UIControlVisual *visual = GetCurrentVisual())
+            {
+                _text->_color = visual->_content_color;
+                _button->_color = visual->_content_color;
+                r.DrawVisual(_arrange_rect, _matrix, *visual, this);
+            }
             _root->Render(r);
         }
         void Dropdown::PostDeserialize()
         {
             UIElement::PostDeserialize();
-            _root->GetSlot()->Size(GetSlot()->_size);
             _text->SetText(GetSelectedText());
             _button->GetSlot()->Size({GetSlot()->_size.y, GetSlot()->_size.y});
         }
         UIElement *Dropdown::HitTest(Vector2f pos)
         {
             Vector2f lpos = TransformCoord(_inv_matrix, Vector3f{pos, 0.0f}).xy;
-            //test text and button
-            if (!IsPointInside(lpos))
-                return nullptr;
-            if (_text->HitTest(pos))
-                return _text;
-            return _button->HitTest(pos) ? (UIElement *) _button : this;
+            return IsPointInside(lpos) ? this : nullptr;
         }
         void Dropdown::PostArrange()
         {
             InvalidateTransform();
-            _root->Arrange(0.0f, 0.0f, _content_rect.z, _content_rect.w);
+            _border->SlotPadding() = Padding(_resolved_style._padding);
+            _border->Arrange(0.0f, 0.0f, _content_rect.z, _content_rect.w);
         }
 #pragma endregion
 
@@ -1325,7 +1479,7 @@ namespace Ailu
         }
         void SplitView::RenderImpl(UIRenderer &r)
         {
-            r.DrawVisual(_arrange_rect, _matrix, _resolved_visual);
+            r.DrawVisual(_arrange_rect, _matrix, _resolved_visual, this);
             for (auto &child: _children)
             {
                 child->Render(r);

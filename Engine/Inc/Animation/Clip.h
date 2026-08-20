@@ -2,12 +2,10 @@
 #ifndef __ANIM_CLIP_H__
 #define __ANIM_CLIP_H__
 #include <map>
-#include "Skeleton.h"
 #include "Objects/Object.h"
 #include "TransformTrack.h"
 #include "SpriteAnimationTrack.h"
 #include "AnimationEvent.h"
-#include "Pose.h"
 #include "generated/Clip.gen.h"
 namespace Ailu
 {
@@ -16,8 +14,9 @@ namespace Ailu
 	{
         GENERATED_BODY()
 	public:
-		AnimationClip();
-		~AnimationClip() override = default;
+        AnimationClip();
+        ~AnimationClip() override = default;
+        void CopyFrom(const AnimationClip &source);
         //特定轨道索引的关节标识
         u16 GetIdAtIndex(u32 index) const;
         const TransformTrack& GetTrackAtIndex(u32 index) const { return _tracks[index]; }
@@ -29,7 +28,6 @@ namespace Ailu
         void SetIdAtIndex(u32 index, u32 id);
         //包含的关节数量
         [[nodiscard]] u32 Size() const;
-        f32 Sample(Pose& pose,f32 time);
         TransformTrack& operator[](u16 joint);
         //由anim loader调用，
         void RecalculateDuration();
@@ -48,9 +46,6 @@ namespace Ailu
         void StartTime(f32 start_time) { _start_time = start_time; }
         [[nodiscard]] f32 GetEndTime() const { return _end_time; }
         void EndTime(f32 end_time) { _end_time = end_time; }
-        [[nodiscard]] f32 GetNormalizedTime(f32 in_time) const;
-    private:
-        f32 AdjustTimeToFitRange(f32 in_time) const;
 	private:
         f32 _start_time;
         f32 _end_time;

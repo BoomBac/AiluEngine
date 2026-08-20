@@ -1,5 +1,6 @@
 ﻿#include "Render/Features/CommonPasses.h"
 #include "Framework/Common/Profiler.h"
+#include "Framework/Common/Allocator.hpp"
 #include "Framework/Common/ResourceMgr.h"
 #include "Render/Buffer.h"
 #include "Render/CommandBuffer.h"
@@ -1485,18 +1486,21 @@ namespace Ailu::Render
         _vbuf.reset(VertexBuffer::Create(desc_list, "ui_vbuf"));
         _ibuf.reset(IndexBuffer::Create(nullptr, vertex_count, "ui_ibuf", true));
         f32 box_w = 180.f, box_h = 30.f;
-        Vector3f *vertices = new Vector3f[4]{{-box_w * 0.5f, box_h * 0.5f, 0.0f},
-                                             {box_w * 0.5f, box_h * 0.5f, 0.0f},
-                                             {-box_w * 0.5f, -box_h * 0.5f, 0.0f},
-                                             {box_w * 0.5f, -box_h * 0.5f, 0.0f}};
-        u32 *indices = new u32[6]{0, 1, 2, 1, 3, 2};
-        Vector2f *uv0 = new Vector2f[4]{{0.f, 0.f}, {1.f, 0.f}, {0.f, 1.f}, {1.f, 1.f}};
+        Vector3f *vertices = AL_ALLOC_TAG(EMemoryTag::kTemporary, Vector3f, 4);
+        vertices[0] = {-box_w * 0.5f, box_h * 0.5f, 0.0f};
+        vertices[1] = {box_w * 0.5f, box_h * 0.5f, 0.0f};
+        vertices[2] = {-box_w * 0.5f, -box_h * 0.5f, 0.0f};
+        vertices[3] = {box_w * 0.5f, -box_h * 0.5f, 0.0f};
+        u32 *indices = AL_ALLOC_TAG(EMemoryTag::kTemporary, u32, 6);
+        indices[0] = 0; indices[1] = 1; indices[2] = 2; indices[3] = 1; indices[4] = 3; indices[5] = 2;
+        Vector2f *uv0 = AL_ALLOC_TAG(EMemoryTag::kTemporary, Vector2f, 4);
+        uv0[0] = {0.f, 0.f}; uv0[1] = {1.f, 0.f}; uv0[2] = {0.f, 1.f}; uv0[3] = {1.f, 1.f};
         _vbuf->SetStream(nullptr, vertex_count * sizeof(Vector3f), 0, true);
         _vbuf->SetStream(nullptr, vertex_count * sizeof(Vector2f), 1, true);
         _ibuf->SetData((u8 *) indices, 6 * sizeof(u32));
-        delete[] vertices;
-        delete[] indices;
-        delete[] uv0;
+        AL_FREE(vertices);
+        AL_FREE(indices);
+        AL_FREE(uv0);
     }
     GUIPass::~GUIPass()
     {

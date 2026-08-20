@@ -1,54 +1,59 @@
-//
-// Created by 22292 on 2024/10/22.
-//
 #pragma once
 #ifndef __BLEND_SPACE_H__
 #define __BLEND_SPACE_H__
 
-#include "Framework/Core/CoreMinimal.h"
+#include "Animation/AnimationEvaluation.h"
 #include "Framework/Core/Containers/Vector.h"
-#include "Framework/Core/Containers/Array.h"
-#include "Clip.h"
-#include "Pose.h"
-#include "Skeleton.h"
+#include "Framework/Core/CoreMinimal.h"
+#include "Framework/Math/ALMath.hpp"
+#include "Framework/Math/Guid.h"
+#include "Objects/Object.h"
+#include "generated/BlendSpace.gen.h"
 
 namespace Ailu
 {
-	class AILU_API BlendSpace
-	{
-	public:
-        struct ClipEntry
-        {
-            f32 _x, _y;
-            AnimationClip *_clip;
-        };
-        BlendSpace();
-        BlendSpace(Skeleton * sk,Vector2f x_range, Vector2f y_range,bool is_2d = false);
-        ~BlendSpace();
-        void SetSkeleton(Skeleton* sk);
-        Skeleton* GetSkeleton() const;
-        void AddClip(AnimationClip* clip, f32 x, f32 y);
-        void RemoveClip(AnimationClip* clip);
-        void Resize(Vector2f x_range, Vector2f y_range);
-        void GetRange(Vector2f &x_range, Vector2f &y_range) const;
-        void SetPosition(f32 x, f32 y);
-        void GetPosition(f32 &x, f32 &y) const;
-        void Update(f32 dt);
-        Pose &GetCurrentPose();
-        void SetClipPosition(AnimationClip* clip, f32 x, f32 y);
-        Vector<ClipEntry> &GetClips() {return _clips;};
+    ASTRUCT()
+    struct AILU_API BlendSpaceSample
+    {
+        GENERATED_BODY()
+
+        APROPERTY()
+        Guid _clip = Guid::EmptyGuid();
+        APROPERTY()
+        Vector2f _position = Vector2f::kZero;
+    };
+
+    ACLASS()
+    class AILU_API BlendSpaceAsset : public Object
+    {
+        GENERATED_BODY()
+
+    public:
+        BlendSpaceAsset();
+        explicit BlendSpaceAsset(const String &name);
+
+        const Vector<BlendSpaceSample> &Samples() const { return _samples; }
+        Vector<BlendSpaceSample> &Samples() { return _samples; }
+        const Vector2f &XRange() const { return _x_range; }
+        void XRange(const Vector2f &range) { _x_range = range; }
+        const Vector2f &YRange() const { return _y_range; }
+        void YRange(const Vector2f &range) { _y_range = range; }
+        bool Is2D() const { return _is_2d; }
+        void Is2D(bool value) { _is_2d = value; }
+
+        void AddSample(BlendSpaceSample sample);
+        void AddSamples(f32 position, f32 time, f32 weight, bool loop, AnimationEvaluation &evaluation) const;
+
     private:
-        void NormalizeRange(f32 &x, f32 &y) const;
-    private:
-        bool _is_2d;
-        //index 0 is blend res
-        Array<Pose, 5> _poses;
-        f32 _time;
-        Skeleton* _skeleton;
-        Vector2f _x_range, _y_range;
-        f32 _x, _y;
-		Vector<ClipEntry> _clips;
-	};
+        APROPERTY()
+        Vector<BlendSpaceSample> _samples;
+        APROPERTY()
+        Vector2f _x_range = Vector2f(0.0f, 1.0f);
+        APROPERTY()
+        Vector2f _y_range = Vector2f(0.0f, 1.0f);
+        APROPERTY()
+        bool _is_2d = false;
+    };
 }
 
-#endif// !BLEND_SPACE_H__
+#endif // __BLEND_SPACE_H__

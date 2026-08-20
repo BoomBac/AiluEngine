@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "Framework/Common/StackTrace.h"
+#include "Framework/Common/Allocator.hpp"
 
 #if defined(AL_PLATFORM_WINDOWS)
     #include <windows.h>
@@ -26,7 +27,9 @@ namespace Ailu
     
         std::ostringstream oss;
     
-        SYMBOL_INFO* symbol = (SYMBOL_INFO*)malloc(sizeof(SYMBOL_INFO) + 256);
+        u8 *symbol_memory = AL_ALIGN_ALLOC_TAG(EMemoryTag::kTemporary, u8, sizeof(SYMBOL_INFO) + 256u,
+                                               alignof(SYMBOL_INFO));
+        SYMBOL_INFO *symbol = reinterpret_cast<SYMBOL_INFO *>(symbol_memory);
         if (!symbol) return "<failed to allocate symbol info>\n";
     
         symbol->MaxNameLen = 255;
@@ -58,7 +61,7 @@ namespace Ailu
             }
         }
     
-        free(symbol);
+        AL_FREE(symbol_memory);
         return oss.str();
     #else
         return "<stack trace not supported on this platform>\n";

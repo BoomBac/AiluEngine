@@ -1,4 +1,5 @@
 #include "Render/Gizmo.h"
+#include "Framework/Common/Allocator.hpp"
 #include "Framework/Common/ResourceMgr.h"
 #include "Render/GraphicsPipelineStateObject.h"
 #include "Render/CommandBuffer.h"
@@ -49,16 +50,16 @@ namespace Ailu::Render
         _draw_tex_items.resize(kMaxDrawTextureNum);
         s_color.a = 0.75f;
         _line_drawer = ResourceMgr::Get().Get<Material>(L"Runtime/Material/Gizmo");
-        _text_renderer = new UI::TextRenderer();
+        _text_renderer = AL_NEW_TAG(EMemoryTag::kUi, UI::TextRenderer);
     }
     void Gizmo::Initialize()
     {
-        s_pInstance = new Gizmo();
+        s_pInstance = AL_NEW_TAG(EMemoryTag::kRenderer, Gizmo);
     }
     void Gizmo::Shutdown()
     {
-        delete s_pInstance->_text_renderer; s_pInstance->_text_renderer = nullptr;
-        delete s_pInstance; s_pInstance = nullptr;
+        AL_DELETE(s_pInstance->_text_renderer);
+        AL_DELETE(s_pInstance);
     }
 
     void Gizmo::DrawLine(const Vector3f &from, const Vector3f &to, Color color)

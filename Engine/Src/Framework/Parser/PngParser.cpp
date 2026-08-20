@@ -1,5 +1,6 @@
 #include "Framework/Parser/PngParser.h"
 #include "Framework/Common/Log.h"
+#include "Framework/Common/Allocator.hpp"
 #include "pch.h"
 #define STB_IMAGE_IMPLEMENTATION
 #include "Ext/stb/stb_image.h"
@@ -36,7 +37,7 @@ namespace Ailu
                 else
                 {
                     int data_size = x * y * n;
-                    expand_data = new u8[data_size];
+                    expand_data = AL_ALLOC_TAG(EMemoryTag::kTemporary, u8, data_size);
                     memcpy(expand_data, data, data_size);
                 }
                 stbi_image_free(data);
@@ -109,17 +110,15 @@ namespace Ailu
 
     bool PngParser::LoadTextureData(const WString &sys_path, TextureLoadData &data)
     {
-		int x, y, n;
+		int x, y;
         String sys_path_n = ToChar(sys_path);
-        u8 *raw_data = stbi_load(sys_path_n.data(), &x, &y, &n, 0);
+        u8 *raw_data = stbi_load(sys_path_n.data(), &x, &y, nullptr, 4);
         if (raw_data != nullptr)
         {
-            u8 *new_data = raw_data;
-            if (n != 4)
-            {
-                new_data = TextureUtils::ExpandImageDataToFourChannel(raw_data, x * y * n, n);
-                stbi_image_free(raw_data);
-            }
+            const size_t data_size = static_cast<size_t>(x) * static_cast<size_t>(y) * 4u;
+            u8 *new_data = AL_ALLOC_TAG(EMemoryTag::kTemporary, u8, data_size);
+            memcpy(new_data, raw_data, data_size);
+            stbi_image_free(raw_data);
             data._width = x;
             data._height = y;
             data._data.emplace_back(new_data);

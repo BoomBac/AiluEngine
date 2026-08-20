@@ -1,4 +1,5 @@
 #include "Animation/Skeleton.h"
+#include "Framework/Common/Allocator.hpp"
 #include "pch.h"
 
 namespace Ailu
@@ -10,8 +11,7 @@ namespace Ailu
     {
         for (auto &it: _solvers)
         {
-            delete it.second;
-            it.second = nullptr;
+            AL_DELETE(it.second);
         }
     }
     Map<String, Solver *> &Skeleton::GetSolvers()

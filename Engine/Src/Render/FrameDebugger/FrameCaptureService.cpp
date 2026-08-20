@@ -1,4 +1,5 @@
 #include "Render/FrameDebugger/FrameCaptureService.h"
+#include "Framework/Common/Allocator.hpp"
 #include "Render/FrameDebugger/FrameCaptureSession.h"
 #include "Render/FrameDebugger/FrameCaptureWriter.h"
 #include "Render/FrameDebugger/FrameCaptureFinalizer.h"
@@ -39,7 +40,7 @@ void FrameCaptureService::BeginFrame(u64 frame_index)
     s_capture_requested.store(false);
     s_current_frame_index = frame_index;
 
-    auto session = new FrameCaptureSession(s_options);
+    auto session = AL_NEW_TAG(EMemoryTag::kTemporary, FrameCaptureSession, s_options);
     session->SetFrameIndex(frame_index);
     s_active_session.store(session, std::memory_order_release);
     s_state.store(EFrameCaptureState::kCapturing, std::memory_order_release);
@@ -71,7 +72,7 @@ void FrameCaptureService::FinalizeFrame()
     s_latest_capture = capture;
     s_state.store(EFrameCaptureState::kReady, std::memory_order_release);
 
-    delete session;
+    AL_DELETE(session);
 }
 
 FrameCaptureSession *FrameCaptureService::ActiveSession()

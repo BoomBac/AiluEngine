@@ -107,8 +107,8 @@ namespace Ailu::Render
                 mat->SetTexture(kMainTexID, tex);
             mat->SetBuffer(kSpriteInstancesID, _instance_buffer.get());
             mat->SetInt(kBaseInstID, batch._instance_offset);
-            cmd->DrawIndexedInstanced(_vertex_buffer.get(), _index_buffer.get(), nullptr, mat, 0, batch._instance_count,
-                                      batch._instance_offset, 0, 6);
+            cmd->DrawIndexedInstanced(_vertex_buffer.get(), _index_buffer.get(), nullptr, mat, 0, batch._instance_count, 0, 0,
+                                      6);
         }
     }
 
@@ -119,6 +119,14 @@ namespace Ailu::Render
             return;
 
         cmd->SetRenderTarget(color_target, depth_target);
+        RenderWithMaterial(cmd, material);
+    }
+
+    void SpriteBatcher::RenderWithMaterial(CommandBuffer *cmd, Material *material)
+    {
+        if (_batches.empty() || material == nullptr)
+            return;
+
         for (const auto &batch : _batches)
         {
             if (batch._instance_count == 0)
@@ -128,8 +136,8 @@ namespace Ailu::Render
                 material->SetTexture(kMainTexID, batch._key._texture);
             material->SetBuffer(kSpriteInstancesID, _instance_buffer.get());
             material->SetInt(kBaseInstID, batch._instance_offset);
-            cmd->DrawIndexedInstanced(_vertex_buffer.get(), _index_buffer.get(), nullptr, material, 0,
-                                      batch._instance_count, batch._instance_offset, 0, 6);
+            cmd->DrawIndexedInstanced(_vertex_buffer.get(), _index_buffer.get(), nullptr, material, 0, batch._instance_count, 0, 0,
+                                      6);
         }
     }
 

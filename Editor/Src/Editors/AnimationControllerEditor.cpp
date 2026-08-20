@@ -1,14 +1,16 @@
 #include "Editors/AnimationControllerEditor.h"
 
 #include "Animation/Clip.h"
+#include "Animation/BlendSpace.h"
 #include "Assets/Asset.h"
+#include "Common/Undo.h"
 #include "Framework/Common/Input.h"
 #include "Framework/Common/Log.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Framework/Common/Utils.h"
 #include "Graph/GraphCanvas.h"
 #include "Graph/GraphNodeRegistry.h"
-#include "Inspector/ComponentEditorHelpers.h"
+#include "Common/EditorUIHelpers.h"
 #include "UI/Basic.h"
 #include "UI/Container.h"
 #include "UI/UIFramework.h"
@@ -61,9 +63,30 @@ namespace Ailu
                 return {"Equal", "Not Equal", "Greater", "Greater Equal", "Less", "Less Equal", "Triggered"};
             }
 
+            String MotionAssetName(const AnimationMotion &motion)
+            {
+                if (motion._asset.IsEmpty())
+                    return {};
+                if (motion._type == EAnimationMotionType::kBlendSpace)
+                {
+                    auto blend_space = ResourceMgr::Get().Load<BlendSpaceAsset>(motion._asset);
+                    return blend_space != nullptr ? blend_space->Name() : String();
+                }
+                auto clip = ResourceMgr::Get().Load<AnimationClip>(motion._asset);
+                return clip != nullptr ? clip->Name() : String();
+            }
+
+            String StateDisplayName(const AnimationState &state, u32 index)
+            {
+                const String asset_name = MotionAssetName(state._motion);
+                if (!asset_name.empty())
+                    return asset_name;
+                return state._name.empty() ? std::format("State{}", index + 1u) : state._name;
+            }
+
             String StateName(const Vector<AnimationState> &states, u16 index)
             {
-                return index < states.size() ? states[index]._name : String("Any State");
+                return index < states.size() ? StateDisplayName(states[index], index) : String("Any State");
             }
 
             const GraphPinData *FindPin(const GraphNodeData &node, StringView name, EGraphPinDirection direction)
@@ -106,7 +129,7 @@ namespace Ailu
         }
 
         AnimationControllerEditor::AnimationControllerEditor()
-            : DockWindow("Animation Controller Editor", Vector2f(1240.0f, 760.0f))
+            : AssetEditor("Animation Controller Editor", Vector2f(1240.0f, 760.0f))
         {
             EnsureGraphNodeRegistry();
             _graph_asset = MakeScope<GraphAsset>("AnimationControllerPreview");
@@ -128,10 +151,8 @@ namespace Ailu
                         .Size(Vector2f(width, 0.0f)).Margin(Vector4f(0.0f, 0.0f, 2.0f, 0.0f));
                 return button;
             };
-            _btn_apply = add_button("Apply", 56.0f);
-            _btn_apply->OnMouseClick() += [this](UI::UIEvent &e) { Apply(); e._is_handled = true; };
-            _btn_revert = add_button("Revert", 58.0f);
-            _btn_revert->OnMouseClick() += [this](UI::UIEvent &e) { Revert(); e._is_handled = true; };
+            auto *save_button = add_button("Save", 50.0f);
+            save_button->OnMouseClick() += [this](UI::UIEvent &e) { AssetEditor::Save(); e._is_handled = true; };
             auto *add_parameter = add_button("+ Parameter", 90.0f);
             add_parameter->OnMouseClick() += [this](UI::UIEvent &e) { AddParameter(); e._is_handled = true; };
             auto *add_state = add_button("+ State", 64.0f);
@@ -169,6 +190,14 @@ namespace Ailu
             graph_border->_bg_color = kCenterColor;
             _graph_canvas = graph_border->AddChild<GraphCanvas>(_graph_document.get());
             _graph_canvas->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
+            GraphCanvasPresentation presentation;
+            presentation._link_route = EGraphLinkRoute::kStateTransition;
+            presentation._pin_presentation = EGraphPinPresentation::kHoverOnly;
+            presentation._draw_direction_arrow = true;
+            presentation._separate_bidirectional_links = true;
+            presentation._node_as_link_target = true;
+            presentation._allow_reroute = false;
+            _graph_canvas->SetPresentation(presentation);
 
             auto *inspector_border = right->AddChild<UI::Border>();
             inspector_border->_bg_color = kPanelColor;
@@ -180,18 +209,54 @@ namespace Ailu
             _transitions_root = nullptr;
         }
 
+        void AnimationControllerEditor::OnBeforeSave()
+        {
+            if (_controller != nullptr)
+                WriteToAsset();
+        }
+
+        void AnimationControllerEditor::OnAssetSaved()
+        {
+            _last_edit_snapshot = CaptureAssetObject(GetAsset());
+            RefreshAllUI();
+        }
+
+        void AnimationControllerEditor::OnAssetReloaded()
+        {
+            _controller = GetAssetObject<AnimationControllerAsset>();
+            if (_controller != nullptr)
+                Open(_controller);
+        }
+
         void AnimationControllerEditor::Update(f32 dt)
         {
-            DockWindow::Update(dt);
+            AssetEditor::Update(dt);
             if (!_controller)
                 return;
+            const bool ctrl = Input::IsKeyDown(EKey::kLCONTROL) || Input::IsKeyDown(EKey::kRCONTROL);
+            if (ctrl && Input::IsKeyDownAccurate(EKey::kZ) && g_pCommandMgr != nullptr)
+            {
+                g_pCommandMgr->Undo();
+                ReadFromAsset();
+                RefreshGraphFromController();
+                RefreshAllUI();
+            }
+            if (ctrl && Input::IsKeyDownAccurate(EKey::kY) && g_pCommandMgr != nullptr)
+            {
+                g_pCommandMgr->Redo();
+                ReadFromAsset();
+                RefreshGraphFromController();
+                RefreshAllUI();
+            }
             if (_graph_document != nullptr)
             {
                 SyncGraphPositions();
                 const String node_signature = MakeGraphSignature(_graph_document->Nodes(), {});
                 const String link_signature = MakeGraphSignature({}, _graph_document->Links());
-                if (node_signature != _graph_node_signature || link_signature != _graph_link_signature)
-                    SyncControllerFromGraph();
+                const bool nodes_changed = node_signature != _graph_node_signature;
+                const bool links_changed = link_signature != _graph_link_signature;
+                if (nodes_changed || links_changed)
+                    SyncControllerFromGraph(nodes_changed);
 
                 if (_graph_canvas != nullptr && !_graph_canvas->SelectedNodes().empty())
                 {
@@ -208,31 +273,31 @@ namespace Ailu
                         }
                     }
                 }
+                if (_graph_canvas != nullptr && !_graph_canvas->SelectedLinks().empty())
+                {
+                    const auto transition_it = _transition_link_map.find(_graph_canvas->SelectedLinks().front());
+                    if (transition_it != _transition_link_map.end() && transition_it->second != _selected_transition)
+                    {
+                        _selected_transition = transition_it->second;
+                        _selected_state = -1;
+                        RefreshAllUI();
+                    }
+                }
             }
-            const bool ctrl = Input::IsKeyDown(EKey::kLCONTROL) || Input::IsKeyDown(EKey::kRCONTROL);
-            if (ctrl && Input::IsKeyPressed(EKey::kS))
-                Apply();
-            if (_btn_apply)
-                _btn_apply->SetInteractiveEnabled(_is_dirty);
-            if (_btn_revert)
-                _btn_revert->SetInteractiveEnabled(_is_dirty);
         }
 
         void AnimationControllerEditor::Open(AnimationControllerAsset *controller)
         {
             if (!controller)
                 return;
+            BindAsset(ResourceMgr::Get().GetLinkedAsset(controller));
             _controller = controller;
             ReadFromAsset();
-            _original_parameters = _editing_parameters;
-            _original_states = _editing_states;
-            _original_transitions = _editing_transitions;
-            _original_any_state_transitions = _editing_any_state_transitions;
-            _original_entry_state = _editing_entry_state;
-            _is_dirty = false;
+            _last_edit_snapshot = CaptureAssetObject(GetAsset());
             _selected_state = _editing_states.empty() ? -1 : 0;
             _selected_transition = _editing_transitions.empty() ? -1 : 0;
-            SetTitle("Animation Controller Editor - " + controller->Name());
+            _transition_link_map.clear();
+            _graph_view_initialized = false;
             RefreshGraphFromController();
             RefreshAllUI();
         }
@@ -244,8 +309,11 @@ namespace Ailu
             _editing_states.clear();
             _editing_transitions.clear();
             _editing_any_state_transitions.clear();
+            _transition_link_map.clear();
+            _graph_view_initialized = false;
             if (_graph_document != nullptr)
                 _graph_document->Close();
+            AssetEditor::Close();
         }
 
         void AnimationControllerEditor::ReadFromAsset()
@@ -255,6 +323,12 @@ namespace Ailu
             _editing_transitions = _controller->Transitions();
             _editing_any_state_transitions = _controller->AnyStateTransitions();
             _editing_entry_state = _controller->EntryState();
+            for (auto &state : _editing_states)
+            {
+                const String asset_name = MotionAssetName(state._motion);
+                if (!asset_name.empty())
+                    state._name = asset_name;
+            }
         }
 
         void AnimationControllerEditor::WriteToAsset()
@@ -267,44 +341,24 @@ namespace Ailu
             _controller->EntryState(_editing_entry_state);
         }
 
-        void AnimationControllerEditor::Apply()
-        {
-            if (!_controller || !_is_dirty)
-                return;
-            WriteToAsset();
-            if (auto *linked = ResourceMgr::Get().GetLinkedAsset(_controller))
-                ResourceMgr::Get().SaveAsset(linked);
-            _original_parameters = _editing_parameters;
-            _original_states = _editing_states;
-            _original_transitions = _editing_transitions;
-            _original_any_state_transitions = _editing_any_state_transitions;
-            _original_entry_state = _editing_entry_state;
-            _is_dirty = false;
-            RefreshGraphFromController();
-            RefreshAllUI();
-            LOG_INFO("AnimationControllerEditor: Applied");
-        }
-
-        void AnimationControllerEditor::Revert()
-        {
-            if (!_is_dirty)
-                return;
-            _editing_parameters = _original_parameters;
-            _editing_states = _original_states;
-            _editing_transitions = _original_transitions;
-            _editing_any_state_transitions = _original_any_state_transitions;
-            _editing_entry_state = _original_entry_state;
-            _is_dirty = false;
-            _selected_state = _editing_states.empty() ? -1 : std::clamp(_selected_state, 0, static_cast<i32>(_editing_states.size()) - 1);
-            _selected_transition = _editing_transitions.empty() ? -1 : std::clamp(_selected_transition, 0,
-                                                                                    static_cast<i32>(_editing_transitions.size()) - 1);
-            RefreshGraphFromController();
-            RefreshAllUI();
-        }
-
         void AnimationControllerEditor::MarkDirty()
         {
-            _is_dirty = true;
+            if (_controller != nullptr)
+                WriteToAsset();
+            if (GetAsset() != nullptr)
+            {
+                const String snapshot = CaptureAssetObject(GetAsset());
+                if (snapshot != _last_edit_snapshot)
+                {
+                    const String before = _last_edit_snapshot;
+                    _last_edit_snapshot = snapshot;
+                    if (g_pCommandMgr != nullptr)
+                        g_pCommandMgr->ExecuteCommand(std::make_unique<AssetSnapshotCommand>(
+                            GetAsset(), before, snapshot, "Animation Controller Edit"));
+                    else if (!GetAsset()->IsDirty())
+                        GetAsset()->MarkModified();
+                }
+            }
             if (_txt_status)
                 _txt_status->SetText("Modified");
         }
@@ -329,6 +383,10 @@ namespace Ailu
             if (_graph_asset == nullptr || _graph_document == nullptr)
                 return;
 
+            const bool preserve_view = _graph_view_initialized && _graph_canvas != nullptr;
+            const Vector2f view_offset = preserve_view ? _graph_canvas->ViewOffset() : Vector2f::kZero;
+            const f32 zoom = preserve_view ? _graph_canvas->Zoom() : 1.0f;
+
             Vector<Vector2f> positions(_editing_states.size());
             for (u32 index = 0u; index < positions.size(); ++index)
                 positions[index] = {360.0f + static_cast<f32>(index % 3u) * 280.0f,
@@ -344,6 +402,7 @@ namespace Ailu
             auto &links = _graph_asset->MutableLinks();
             nodes.clear();
             links.clear();
+            _transition_link_map.clear();
             _graph_asset->MutableComments().clear();
 
             GraphNodeData entry;
@@ -358,14 +417,14 @@ namespace Ailu
             {
                 GraphNodeData node;
                 GraphNodeRegistry::Get().InitializeNode("Animation.State", node);
-                node._display_name = _editing_states[index]._name.empty() ? std::format("State{}", index + 1u) :
-                                                                              _editing_states[index]._name;
+                node._display_name = StateDisplayName(_editing_states[index], index);
                 node._property_data = std::format("state:{}", index);
                 node._position = positions[index];
                 nodes.emplace_back(std::move(node));
             }
 
-            auto add_link = [&nodes, &links](u32 output_node_index, u32 input_node_index)
+            auto add_link = [this, &nodes, &links](u32 output_node_index, u32 input_node_index,
+                                                   i32 transition_index = -1)
             {
                 if (output_node_index >= nodes.size() || input_node_index >= nodes.size())
                     return;
@@ -373,31 +432,69 @@ namespace Ailu
                 const GraphPinData *input = FindPin(nodes[input_node_index], "In", EGraphPinDirection::kInput);
                 if (output == nullptr || input == nullptr)
                     return;
-                links.push_back({Guid::Generate(), output->_id, input->_id, GraphFlag(EGraphLinkFlag::kNone)});
+                const Guid link_id = Guid::Generate();
+                links.push_back({link_id, output->_id, input->_id, GraphFlag(EGraphLinkFlag::kNone)});
+                if (transition_index >= 0)
+                    _transition_link_map[link_id] = transition_index;
             };
             if (_editing_entry_state < _editing_states.size())
                 add_link(0u, 2u + _editing_entry_state);
-            for (const auto &transition : _editing_transitions)
+            for (u32 transition_index = 0u; transition_index < _editing_transitions.size(); ++transition_index)
             {
+                const auto &transition = _editing_transitions[transition_index];
                 if (transition._to_state >= _editing_states.size())
                     continue;
-                const u32 source_index = transition._from_state == kInvalidAnimationState ? 1u : 2u + transition._from_state;
+                const u32 source_index =
+                    transition._from_state == kInvalidAnimationState ? 1u : 2u + transition._from_state;
                 if (source_index < nodes.size())
-                    add_link(source_index, 2u + transition._to_state);
+                    add_link(source_index, 2u + transition._to_state,
+                             static_cast<i32>(transition_index));
             }
 
             _graph_document->Open(_graph_asset.get());
+            RefreshGraphNodeTitles();
             if (_graph_canvas != nullptr)
             {
-                _graph_canvas->SetDocument(nullptr);
                 _graph_canvas->SetDocument(_graph_document.get());
-                _graph_canvas->FocusAll();
+                _graph_canvas->ClearSelection();
+                if (!preserve_view)
+                {
+                    _graph_canvas->FocusAll();
+                    _graph_view_initialized = true;
+                }
+                else
+                {
+                    if (_selected_transition >= 0 &&
+                        _selected_transition < static_cast<i32>(_editing_transitions.size()))
+                    {
+                        for (const auto &entry : _transition_link_map)
+                        {
+                            if (entry.second == _selected_transition)
+                            {
+                                _graph_canvas->FocusLink(entry.first);
+                                break;
+                            }
+                        }
+                    }
+                    else if (_selected_state >= 0 && _selected_state < static_cast<i32>(_editing_states.size()))
+                    {
+                        for (const auto &node : _graph_document->Nodes())
+                        {
+                            if (ParseStateIndex(node._property_data) == _selected_state)
+                            {
+                                _graph_canvas->FocusNode(node._id);
+                                break;
+                            }
+                        }
+                    }
+                    _graph_canvas->SetView(view_offset, zoom);
+                }
             }
             _graph_node_signature = MakeGraphSignature(_graph_document->Nodes(), {});
             _graph_link_signature = MakeGraphSignature({}, _graph_document->Links());
         }
 
-        void AnimationControllerEditor::SyncControllerFromGraph()
+        void AnimationControllerEditor::SyncControllerFromGraph(bool nodes_changed)
         {
             if (_graph_document == nullptr)
                 return;
@@ -431,7 +528,10 @@ namespace Ailu
                 if (auto *node = _graph_document->FindNode(state_node_ids[index]))
                 {
                     node->_property_data = std::format("state:{}", index);
-                    if (!node->_display_name.empty())
+                    const String asset_name = MotionAssetName(states[index]._motion);
+                    if (!asset_name.empty())
+                        states[index]._name = asset_name;
+                    else if (old_indices[index] < 0 && !node->_display_name.empty())
                         states[index]._name = node->_display_name;
                 }
             }
@@ -461,6 +561,7 @@ namespace Ailu
             };
 
             Vector<AnimationTransition> transitions;
+            Vector<Guid> transition_link_ids;
             u16 entry_state = kInvalidAnimationState;
             for (const auto &link : _graph_document->Links())
             {
@@ -488,16 +589,24 @@ namespace Ailu
                 transition._from_state = from_state;
                 transition._to_state = static_cast<u16>(target_index);
                 transitions.push_back(std::move(transition));
+                transition_link_ids.push_back(link._id);
             }
             _editing_states = std::move(states);
             _editing_transitions = std::move(transitions);
+            _transition_link_map.clear();
+            for (u32 index = 0u; index < transition_link_ids.size(); ++index)
+                _transition_link_map[transition_link_ids[index]] = static_cast<i32>(index);
             _editing_entry_state = entry_state;
             RebuildTransitionLinks();
             _selected_state = _editing_states.empty() ? -1 : std::clamp(_selected_state, 0, static_cast<i32>(_editing_states.size()) - 1);
             _selected_transition = _editing_transitions.empty() ? -1 : std::clamp(_selected_transition, 0,
                                                                                     static_cast<i32>(_editing_transitions.size()) - 1);
             MarkDirty();
-            RefreshAllUI();
+            RefreshGraphNodeTitles();
+            if (nodes_changed)
+                RefreshAllUI();
+            else
+                RefreshTransitions();
             _graph_node_signature = MakeGraphSignature(_graph_document->Nodes(), {});
             _graph_link_signature = MakeGraphSignature({}, _graph_document->Links());
         }
@@ -507,10 +616,24 @@ namespace Ailu
             // Positions are intentionally kept in the in-memory graph document. AnimationControllerAsset remains runtime JSON.
         }
 
+        void AnimationControllerEditor::RefreshGraphNodeTitles()
+        {
+            if (_graph_document == nullptr)
+                return;
+            for (const auto &node : _graph_document->Nodes())
+            {
+                const i32 state_index = ParseStateIndex(node._property_data);
+                if (state_index < 0 || state_index >= static_cast<i32>(_editing_states.size()))
+                    continue;
+                if (auto *mutable_node = _graph_document->FindNode(node._id))
+                    mutable_node->_display_name = StateDisplayName(_editing_states[state_index], state_index);
+            }
+        }
+
         void AnimationControllerEditor::RefreshAllUI()
         {
             if (_txt_status)
-                _txt_status->SetText(_is_dirty ? "Modified" : "Saved");
+                _txt_status->SetText(IsDirty() ? "Modified" : "Saved");
             RefreshParameters();
             RefreshStates();
             if (_details_root == nullptr)
@@ -551,15 +674,15 @@ namespace Ailu
                 auto *asset_button = AddButtonRow(_details_root, "Asset", "None");
                 if (!state._motion._asset.IsEmpty())
                 {
-                    auto clip = ResourceMgr::Get().Load<AnimationClip>(state._motion._asset);
-                    if (clip != nullptr)
-                        asset_button->SetText(clip->Name());
+                    const String asset_name = MotionAssetName(state._motion);
+                    if (!asset_name.empty())
+                        asset_button->SetText(asset_name);
                     else
                         asset_button->SetText(state._motion._asset.ToString());
                 }
                 asset_button->OnMouseClick() += [this](UI::UIEvent &event)
                 {
-                    ShowClipPicker(static_cast<u32>(_selected_state), event._current_target);
+                    ShowMotionPicker(static_cast<u32>(_selected_state), event._current_target);
                     event._is_handled = true;
                 };
                 AddFloatInput(_details_root, "Speed", state._speed, [this](f32 value)
@@ -666,7 +789,7 @@ namespace Ailu
                 auto *row = _states_root->AddChild<UI::HorizontalBox>();
                 row->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed)
                         .Size(Vector2f(0.0f, kInputHeight)).Margin(Vector4f(0.0f, 1.0f, 0.0f, 1.0f));
-                auto *select = row->AddChild<UI::Button>(_editing_states[index]._name);
+                auto *select = row->AddChild<UI::Button>(StateDisplayName(_editing_states[index], index));
                 select->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill)
                         .Margin(Vector4f(0.0f, 0.0f, 2.0f, 0.0f));
                 select->SetInteractiveEnabled(static_cast<i32>(index) != _selected_state);
@@ -787,7 +910,6 @@ namespace Ailu
             auto *add_condition = _transitions_root->AddChild<UI::Button>("+ Condition");
             add_condition->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed)
                     .Size(Vector2f(0.0f, kInputHeight)).Margin(Vector4f(0.0f, 5.0f, 0.0f, 2.0f));
-            add_condition->SetInteractiveEnabled(!_editing_parameters.empty());
             add_condition->OnMouseClick() += [this](UI::UIEvent &event)
             {
                 AddCondition();
@@ -937,7 +1059,7 @@ namespace Ailu
             parameter._name_hash = AnimationParameterNameHash(parameter._name);
             _editing_parameters.push_back(parameter);
             MarkDirty();
-            RefreshParameters();
+            RefreshAllUI();
         }
 
         void AnimationControllerEditor::AddState()
@@ -970,14 +1092,20 @@ namespace Ailu
 
         void AnimationControllerEditor::AddCondition()
         {
-            if (_selected_transition < 0 || _selected_transition >= static_cast<i32>(_editing_transitions.size()) ||
-                _editing_parameters.empty())
+            if (_selected_transition < 0 || _selected_transition >= static_cast<i32>(_editing_transitions.size()))
                 return;
+            if (_editing_parameters.empty())
+            {
+                AnimationParameterDesc parameter;
+                parameter._name = "Parameter1";
+                parameter._name_hash = AnimationParameterNameHash(parameter._name);
+                _editing_parameters.push_back(std::move(parameter));
+            }
             AnimationCondition condition;
             condition._parameter_index = 0u;
             _editing_transitions[_selected_transition]._conditions.push_back(condition);
             MarkDirty();
-            RefreshTransitions();
+            RefreshAllUI();
         }
 
         void AnimationControllerEditor::RemoveParameter(u32 index)
@@ -1042,8 +1170,11 @@ namespace Ailu
             RefreshAllUI();
         }
 
-        void AnimationControllerEditor::ShowClipPicker(u32 state_index, UI::UIElement *anchor)
+        void AnimationControllerEditor::ShowMotionPicker(u32 state_index, UI::UIElement *anchor)
         {
+            if (state_index >= _editing_states.size())
+                return;
+            const bool is_blend_space = _editing_states[state_index]._motion._type == EAnimationMotionType::kBlendSpace;
             auto list = MakeRef<UI::ListView>();
             list->SetViewportHeight(220.0f);
             auto none = MakeRef<UI::Text>("None");
@@ -1059,19 +1190,30 @@ namespace Ailu
             for (auto it = ResourceMgr::Get().Begin(); it != ResourceMgr::Get().End(); ++it)
             {
                 Asset *asset = it->second.get();
-                if (asset == nullptr || asset->_asset_type != AnimationClip::StaticType())
+                const Type *asset_type = is_blend_space ? BlendSpaceAsset::StaticType() : AnimationClip::StaticType();
+                if (asset == nullptr || asset->_asset_type != asset_type)
                     continue;
-                auto clip = ResourceMgr::Get().Load<AnimationClip>(asset->_asset_path);
-                if (!clip)
-                    continue;
-                auto item = MakeRef<UI::Text>(clip->Name());
                 const Guid guid = asset->GetGuid();
+                AnimationMotion motion;
+                motion._type = is_blend_space ? EAnimationMotionType::kBlendSpace : EAnimationMotionType::kClip;
+                motion._asset = guid;
+                const String asset_name = MotionAssetName(motion);
+                if (asset_name.empty())
+                    continue;
+                auto item = MakeRef<UI::Text>(asset_name);
                 item->OnMouseClick() += [this, state_index, guid](UI::UIEvent &)
                 {
                     if (state_index < _editing_states.size())
-                        _editing_states[state_index]._motion._asset = guid;
+                    {
+                        auto &state = _editing_states[state_index];
+                        state._motion._asset = guid;
+                        const String asset_name = MotionAssetName(state._motion);
+                        if (!asset_name.empty())
+                            state._name = asset_name;
+                    }
                     MarkDirty();
                     UIManager::Get()->HidePopup();
+                    RefreshGraphFromController();
                     RefreshAllUI();
                 };
                 list->AddItem(item);

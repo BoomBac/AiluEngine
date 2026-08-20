@@ -25,6 +25,10 @@ namespace Ailu
         std::tuple<i32, i32> GetWindowPosition() const final;
 		void SetTitle(const WString& title) final;
         WString GetTitle() final;
+        void Minimize() final;
+        void ToggleMaximize() final;
+        void RequestClose() final;
+        bool IsMaximized() const final;
         void SetPosition(i32 x, i32 y);
         std::tuple<f32, f32, f32, f32> ReserveArea() const final;
         void ReserveArea(f32 x, f32 y, f32 w, f32 h) final;

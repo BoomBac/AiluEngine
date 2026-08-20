@@ -27,16 +27,21 @@ namespace Ailu
                     auto* hb = AddChild<HorizontalBox>();
                     hb->GetSlotAs<LinearSlot>().SizePolicy(ESizePolicy::kFill, ESizePolicy::kAuto);
 
-                    // Indent via left margin on the horizontal box
-                    const Padding &padding = tree->GetStylePadding();
-                    f32 indent = depth * tree->_indent_width + padding._l;
-                    hb->GetSlotAs<LinearSlot>().Margin(Padding(indent, padding._t, padding._r, padding._b));
+                    // Border arranges its single child directly and does not apply the child's slot margin.  Keep
+                    // the indentation inside the row so every hierarchy level is reflected in the visual layout.
+                    auto* indent_spacer = hb->AddChild<Border>();
+                    indent_spacer->Thickness(0.0f);
+                    indent_spacer->GetSlotAs<LinearSlot>().Size({depth * tree->_indent_width, tree->_row_height})
+                        .SizePolicy(ESizePolicy::kFixed, ESizePolicy::kFixed);
 
                     // Expand button
                     if (_has_children)
                     {
                         _expand_btn = hb->AddChild<Text>(expanded ? "v" : ">");
-                        _expand_btn->GetSlotAs<LinearSlot>().Size({tree->_expand_button_width, tree->_row_height}).SizePolicy(ESizePolicy::kFixed, ESizePolicy::kFixed);
+                        _expand_btn->_horizontal_align = EAlignment::kCenter;
+                        _expand_btn->_vertical_align = EAlignment::kCenter;
+                        _expand_btn->GetSlotAs<LinearSlot>().Size({tree->_expand_button_width, tree->_row_height})
+                            .SizePolicy(ESizePolicy::kFixed, ESizePolicy::kFixed);
                         _expand_btn->FontSize(tree->GetStyleFontSize(), false);
                         _expand_btn->GetSlotAs<LinearSlot>().Margin(Padding(0.0f, 0.0f, 2.0f, 0.0f));
                     }
@@ -461,12 +466,14 @@ namespace Ailu
                      {
                          if (p._type == EDragType::kTreeItem)
                          {
-                             if (!_drop_callback) return false;
+                             if (!_drop_callback && !_drop_at_callback) return false;
                              auto* tdp = static_cast<const TreeViewDragPayload*>(p._data);
                              if (!tdp) return false;
-                             if (_can_drop_callback)
-                                 return _can_drop_callback(tdp->_source_tree, tdp->_item, id);
-                             return true;
+                             const Vector2f mouse_pos = Input::GetMousePos(Application::FocusedWindow());
+                             const ETreeDropLocation location = ResolveDropLocation(id, mouse_pos.y);
+                             const bool can_drop = CanDropAt(tdp->_source_tree, tdp->_item, id, location);
+                             UpdateDropPreview(id, location, can_drop);
+                             return can_drop;
                          }
                          return _external_can_drop_callback && _external_can_drop_callback(p, id);
                      };
@@ -477,6 +484,7 @@ namespace Ailu
                          else if (_external_drop_callback)
                              _external_drop_callback(p, id, {x, y});
                      };
+                    dh._use_custom_tree_feedback = true;
                     row->SetDropHandler(dh);
                 }
 
@@ -714,9 +722,47 @@ namespace Ailu
         {
             if (payload._type != EDragType::kTreeItem) return;
             auto* tdp = static_cast<const TreeViewDragPayload*>(payload._data);
-            if (!tdp || !_drop_callback) return;
+            if (!tdp || (!_drop_callback && !_drop_at_callback)) return;
 
-            _drop_callback(tdp->_source_tree, tdp->_item, target);
+            const ETreeDropLocation location = ResolveDropLocation(target, y);
+            if (_drop_at_callback && target != kInvalidTreeItemId)
+                _drop_at_callback(tdp->_source_tree, tdp->_item, target, location);
+            else if (_drop_callback)
+                _drop_callback(tdp->_source_tree, tdp->_item, target);
+        }
+
+        ETreeDropLocation TreeView::ResolveDropLocation(TreeItemId target, f32 y) const
+        {
+            if (_can_drop_at_callback == nullptr || target == kInvalidTreeItemId)
+                return ETreeDropLocation::kOnItem;
+            UIElement *row = FindRowForItem(target);
+            if (row == nullptr)
+                return ETreeDropLocation::kOnItem;
+            const Vector4f rect = row->GetArrangeRect();
+            const f32 edge_height = std::min(6.0f, rect.w * 0.25f);
+            if (y <= rect.y + edge_height)
+                return ETreeDropLocation::kBeforeItem;
+            if (y >= rect.y + rect.w - edge_height)
+                return ETreeDropLocation::kAfterItem;
+            return ETreeDropLocation::kOnItem;
+        }
+
+        bool TreeView::CanDropAt(TreeView *source_tree, TreeItemId source, TreeItemId target,
+                                 ETreeDropLocation location) const
+        {
+            if (_can_drop_at_callback)
+                return _can_drop_at_callback(source_tree, source, target, location);
+            return _can_drop_callback == nullptr || _can_drop_callback(source_tree, source, target);
+        }
+
+        void TreeView::UpdateDropPreview(TreeItemId target, ETreeDropLocation location, bool can_drop)
+        {
+            const TreeItemId previous_item = _drop_preview_item;
+            const ETreeDropLocation previous_location = _drop_preview_location;
+            _drop_preview_item = can_drop ? target : kInvalidTreeItemId;
+            _drop_preview_location = location;
+            if (previous_item != _drop_preview_item || previous_location != _drop_preview_location)
+                InvalidatePaint();
         }
 
         // =========================================================================
@@ -725,6 +771,23 @@ namespace Ailu
         void TreeView::RenderImpl(UIRenderer& r)
         {
             ScrollView::RenderImpl(r);
+            if (!DragDropManager::Get().IsDragging(EDragType::kTreeItem) || _drop_preview_item == kInvalidTreeItemId)
+                return;
+            UIElement *row = FindRowForItem(_drop_preview_item);
+            if (row == nullptr || !UIElement::IsPointInside(Input::GetMousePos(Application::FocusedWindow()), GetArrangeRect()))
+                return;
+            const Vector4f rect = row->GetArrangeRect();
+            const Color color(0.18f, 0.72f, 1.0f, 0.95f);
+            if (_drop_preview_location == ETreeDropLocation::kOnItem)
+            {
+                r.DrawBox(rect.xy, rect.zw, 2.0f, color, -0.5f);
+                return;
+            }
+            const f32 y = _drop_preview_location == ETreeDropLocation::kBeforeItem ? rect.y : rect.y + rect.w;
+            UIBrush brush;
+            brush._type = EUIBrushType::kColor;
+            brush._tint = color;
+            r.DrawQuad({rect.x + 4.0f, y - 1.5f, std::max(0.0f, rect.z - 8.0f), 3.0f}, brush, -0.5f);
         }
 
     }// namespace UI

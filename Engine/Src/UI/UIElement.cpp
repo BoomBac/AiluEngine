@@ -7,6 +7,7 @@
 #include "UI/TextRenderer.h"
 #include "UI/UIFramework.h"
 #include "UI/Widget.h"
+#include "UI/Style/UIStyles.h"
 #include "UI/Style/UITheme.h"
 #include <memory>
 
@@ -15,6 +16,26 @@ namespace Ailu
     using namespace Render;
     namespace UI
     {
+        namespace
+        {
+            constexpr u32 kPropertyVisualOverrideBackground = 1u << 0u;
+            constexpr u32 kPropertyVisualOverrideBorderColor = 1u << 1u;
+            constexpr u32 kPropertyVisualOverrideBorderWidth = 1u << 2u;
+            constexpr u32 kPropertyVisualOverrideCornerRadius = 1u << 3u;
+            constexpr u32 kPropertyVisualOverrideContentColor = 1u << 4u;
+            constexpr u32 kPropertyVisualOverrideFontSize = 1u << 5u;
+
+            u32 GetPropertyVisualOverrideFlag(const String &name)
+            {
+                if (name == "_bg_color") return kPropertyVisualOverrideBackground;
+                if (name == "_border_color") return kPropertyVisualOverrideBorderColor;
+                if (name == "_thickness") return kPropertyVisualOverrideBorderWidth;
+                if (name == "_corner_radius") return kPropertyVisualOverrideCornerRadius;
+                if (name == "_color" || name == "_tint_color") return kPropertyVisualOverrideContentColor;
+                return name == "_font_size" ? kPropertyVisualOverrideFontSize : 0u;
+            }
+        }
+
         String UIEvent::ToString() const
         {
             return "UIEvent{ type=" + TypeToString(_type) +
@@ -29,6 +50,7 @@ namespace Ailu
         UIElement::UIElement() : SerializeObject()
         {
             _name = std::format("ui_element_{}", _id);
+            RegenerateGuid();
             _depth = 0.0f;
             _on_child_add += [this](UIElement* e) {
                 InvalidateLayout();
@@ -145,6 +167,45 @@ namespace Ailu
             _children.insert(_children.begin() + new_index, std::move(moved_child));
             InvalidateHierarchy();
             return true;
+        }
+
+        void UIElement::RegenerateGuid()
+        {
+            _guid = Guid::Generate();
+        }
+
+        void UIElement::RegenerateGuidRecursive()
+        {
+            RegenerateGuid();
+            for (const Ref<UIElement> &child : _children)
+            {
+                if (child != nullptr)
+                    child->RegenerateGuidRecursive();
+            }
+        }
+
+        UIElement *UIElement::FindChildByGuid(const Guid &guid, bool recursive)
+        {
+            if (_guid == guid)
+                return this;
+            for (const Ref<UIElement> &child : _children)
+            {
+                if (child == nullptr)
+                    continue;
+                if (child->_guid == guid)
+                    return child.get();
+                if (recursive)
+                {
+                    if (UIElement *result = child->FindChildByGuid(guid, true); result != nullptr)
+                        return result;
+                }
+            }
+            return nullptr;
+        }
+
+        const UIElement *UIElement::FindChildByGuid(const Guid &guid, bool recursive) const
+        {
+            return const_cast<UIElement *>(this)->FindChildByGuid(guid, recursive);
         }
 
         void UIElement::ClearChildren()
@@ -449,6 +510,40 @@ namespace Ailu
         {
             Object::OnPropertyChanged(prop);
             const String &name = prop.Name();
+            UIControlVisualOverride *style_override = GetPropertyVisualOverride();
+            const u32 visual_override_flag = GetPropertyVisualOverrideFlag(name);
+            if (style_override != nullptr && visual_override_flag != 0u)
+            {
+                if (name == "_bg_color")
+                {
+                    UIBrush brush;
+                    brush._type = EUIBrushType::kColor;
+                    brush._tint = prop.Get<Color>(this);
+                    style_override->SetBackground(brush);
+                }
+                else if (name == "_border_color")
+                {
+                    style_override->SetBorderColor(prop.Get<Color>(this));
+                }
+                else if (name == "_thickness")
+                {
+                    style_override->SetBorderWidth(prop.Get<Vector4f>(this));
+                }
+                else if (name == "_corner_radius")
+                {
+                    style_override->SetCornerRadius(prop.Get<Vector4f>(this));
+                }
+                else if (name == "_color" || name == "_tint_color")
+                {
+                    style_override->SetContentColor(prop.Get<Color>(this));
+                }
+                else if (name == "_font_size")
+                {
+                    style_override->SetFontSize(prop.Get<f32>(this));
+                }
+                _property_visual_override_flags |= visual_override_flag;
+                InvalidateStyle(name == "_font_size" ? EStyleInvalidation::kLayoutAndPaint : EStyleInvalidation::kPaintOnly);
+            }
             if (name == "_slot_obj")
             {
                 InvalidateLayout();
@@ -527,6 +622,7 @@ namespace Ailu
                 sar->EndArray();
                 sar->EndObject();
             }
+            RestorePropertyVisualOverrides();
             PostDeserialize();
         }
         
@@ -812,6 +908,21 @@ namespace Ailu
         void UIElement::PostDeserialize()
         {
             InvalidateLayout();
+        }
+
+        void UIElement::RestorePropertyVisualOverrides()
+        {
+            if (_property_visual_override_flags == 0u || GetPropertyVisualOverride() == nullptr)
+                return;
+            for (const Type *type = GetType(); type != nullptr; type = type->BaseType())
+            {
+                for (const PropertyInfo &property : type->GetProperties())
+                {
+                    const u32 flag = GetPropertyVisualOverrideFlag(property.Name());
+                    if (flag != 0u && (_property_visual_override_flags & flag) != 0u)
+                        OnPropertyChanged(property);
+                }
+            }
         }
     }// namespace UI
 }// namespace Ailu

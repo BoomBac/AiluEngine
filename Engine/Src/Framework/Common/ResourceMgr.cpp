@@ -1,6 +1,8 @@
 #include "Framework/Common/ResourceMgr.h"
+#include "Framework/Common/Allocator.hpp"
 #include "Assets/AssetDocument.h"
 #include "Assets/ScriptAsset.h"
+#include "Assets/WidgetAsset.h"
 #include "Audio/AudioClip.h"
 #include "Framework/Common/FileManager.h"
 #include "Framework/Common/FileWatcher.h"
@@ -26,6 +28,7 @@
 #include "Input/InputActionAsset.h"
 #include "Render/GraphicsPipelineStateObject.h"
 #include "Render/2D/Sprite.h"
+#include "Render/2D/SpriteAtlas.h"
 #include "Assets/AssetHandlers.h"
 
 using namespace Ailu::Render;
@@ -276,12 +279,12 @@ namespace Ailu
 	void ResourceMgr::Init()
 	{
 		AL_ASSERT_MSG(g_pResourceMgr == nullptr, "ResourceMgr already init!");
-		g_pResourceMgr = new ResourceMgr();
+		g_pResourceMgr = AL_NEW_TAG(EMemoryTag::kResource, ResourceMgr);
 	}
 
 	void ResourceMgr::Shutdown()
 	{
-		delete g_pResourceMgr; g_pResourceMgr = nullptr;
+		AL_DELETE(g_pResourceMgr);
 	}
 
 	ResourceMgr &ResourceMgr::Get()
@@ -438,6 +441,7 @@ namespace Ailu
 		_lut_global_resources_by_type[AnimationClip::StaticType()] = {};
 		_lut_global_resources_by_type[AnimationControllerAsset::StaticType()] = {};
 		_lut_global_resources_by_type[Sprite::StaticType()] = {};
+		_lut_global_resources_by_type[SpriteAtlas::StaticType()] = {};
 		_lut_global_resources_by_type[InputActionAsset::StaticType()] = {};
 		_lut_global_resources_by_type[AudioClip::StaticType()] = {};
 		_lut_global_resources_by_type[GraphAsset::StaticType()] = {};
@@ -467,6 +471,7 @@ namespace Ailu
 		LoadAssetDB(_asset_domains[1]);
 		LoadAssetDB(_asset_domains[2]);
 		_asset_handler_registry.Register(MakeScope<SpriteAssetHandler>());
+		_asset_handler_registry.Register(MakeScope<SpriteAtlasAssetHandler>());
 		_asset_handler_registry.Register(MakeScope<ScriptAssetHandler>());
 		_asset_handler_registry.Register(MakeScope<ShaderAssetHandler>());
 		_asset_handler_registry.Register(MakeScope<ComputeShaderAssetHandler>());
@@ -478,6 +483,7 @@ namespace Ailu
 		_asset_handler_registry.Register(MakeScope<PrefabAssetHandler>());
 		_asset_handler_registry.Register(MakeScope<AnimationClipAssetHandler>());
 		_asset_handler_registry.Register(MakeScope<AnimationControllerAssetHandler>());
+		_asset_handler_registry.Register(MakeScope<BlendSpaceAssetHandler>());
 		_asset_handler_registry.Register(MakeScope<InputActionAssetHandler>());
 		_asset_handler_registry.Register(MakeScope<AudioClipAssetHandler>());
 		_asset_handler_registry.Register(MakeScope<GraphAssetHandler>());
@@ -494,6 +500,7 @@ namespace Ailu
 				L"Shaders/hlsl/PostProcess/bloom.alasset",
 				L"Shaders/hlsl/forwardlit.alasset",
 				L"Shaders/hlsl/default_ui.alasset",
+				L"Shaders/hlsl/color_picker_sv.alasset",
 				L"Shaders/hlsl/ui_shadow.alasset",
 				L"Shaders/hlsl/default_text.alasset",
 				L"Shaders/hlsl/voxel_drawer.alasset",
@@ -554,7 +561,7 @@ namespace Ailu
 									  { Load<ComputeShader>(p); }, p);
 		JobSystem::Get().Wait();//防止加载mesh时，shader未加载完成
 		{
-			u8 *default_data = new u8[4 * 4 * 4];
+			u8 *default_data = AL_ALLOC_TAG(EMemoryTag::kTemporary, u8, 4 * 4 * 4);
 			memset(default_data, 255, 64);
 			auto default_white = Texture2D::Create(4, 4, ETextureFormat::kRGBA32);
 			default_white->SetPixelData(default_data, 0);
@@ -589,7 +596,7 @@ namespace Ailu
 			default_normal->Name("default_normal");
 			default_normal->Apply();
 			RegisterResource(L"Runtime/default_normal", default_normal);
-			delete[] default_data; default_data = nullptr;
+			AL_FREE(default_data);
 			Texture::s_p_default_white = default_white.get();
 			Texture::s_p_default_black = default_black.get();
 			Texture::s_p_default_gray = default_gray.get();
@@ -733,6 +740,7 @@ namespace Ailu
 		while (!_pending_delete_assets.empty())
 		{
 			Asset *asset = _pending_delete_assets.front();
+			UnregisterSubAssets(asset->GetGuid());
 			UnRegisterResource(asset->_asset_path);
 			UnRegisterAsset(asset);
 			_pending_delete_assets.pop();
@@ -765,7 +773,7 @@ namespace Ailu
 			return false;
 		}
 
-		const u64 revision = asset->Revision();
+		const Asset::Revision revision = asset->GetRevision();
 
 		AssetSaveContext ctx;
 		ctx._asset = asset;
@@ -782,6 +790,61 @@ namespace Ailu
 		if (FileWatchService *watcher = s_p_file_watch_service; watcher != nullptr)
 			watcher->AcknowledgeWrite(ctx._system_path);
 
+		return true;
+	}
+
+	bool ResourceMgr::ReloadAsset(Asset *asset)
+	{
+		if (asset == nullptr || asset->_asset_type == nullptr || asset->_asset_path.empty())
+			return false;
+
+		IAssetHandler *handler = FindAssetHandler(asset->_asset_type);
+		if (handler == nullptr)
+			return false;
+
+		AssetLoadContext ctx;
+		ctx._asset_path = asset->_asset_path;
+		ctx._resource_mgr = this;
+		ctx._system_path = GetResSysPath(asset->_asset_path);
+		ctx._import_setting = GetImportSetting(asset->_asset_path);
+
+		Scope<Asset> reloaded = handler->Load(ctx);
+		if (reloaded == nullptr || reloaded->_p_obj == nullptr)
+			return false;
+
+		// Keep the runtime object address stable whenever the asset handler supports in-place reload.
+		// Scene components and editor previews may hold raw pointers to these objects, so replacing
+		// the payload must be the fallback, not the normal reload path.
+		const bool reload_in_place = handler->ReloadInPlace(*asset, *reloaded);
+
+		// Keep the Asset wrapper stable.  AssetEditor refreshes its typed pointer from this
+		// stable wrapper after reload.  For types without in-place support, replace the
+		// resource payload and rebuild the object lookup table as before.
+		{
+			std::lock_guard<std::mutex> lock(_asset_db_mutex);
+			if (!reload_in_place)
+			{
+				if (asset->_p_obj != nullptr)
+					_object_to_asset.erase(asset->_p_obj->ID());
+				asset->_p_obj = std::move(reloaded->_p_obj);
+				asset->_asset_type = reloaded->_asset_type;
+			}
+			asset->_name = reloaded->_name;
+			asset->_addi_info = reloaded->_addi_info;
+			asset->_external_asset_path = reloaded->_external_asset_path;
+			if (!reload_in_place)
+			{
+				_object_to_asset[asset->_p_obj->ID()] = asset;
+				_global_resources[asset->_asset_path] = asset->_p_obj;
+				RebuildResourceLookups();
+			}
+		}
+
+		asset->RestoreRevision(asset->GetRevision());
+		asset->MarkSaved(asset->GetRevision());
+		UnregisterSubAssets(asset->GetGuid());
+		IndexSubAssets(asset, ctx._system_path);
+		RegisterEmbeddedMaterialSubAssets(asset);
 		return true;
 	}
 
@@ -838,9 +901,82 @@ namespace Ailu
 
 	Asset *ResourceMgr::GetLinkedAsset(Object *obj)
 	{
+		if (obj == nullptr)
+			return nullptr;
 		if (_object_to_asset.contains(obj->ID()))
 			return _object_to_asset[obj->ID()];
+		auto sub_asset_guid = _sub_asset_guids.find(obj);
+		if (sub_asset_guid != _sub_asset_guids.end())
+		{
+			auto location = _sub_asset_locations.find(sub_asset_guid->second);
+			if (location != _sub_asset_locations.end())
+			{
+				auto owner = _asset_db.find(location->second._owner_guid);
+				return owner != _asset_db.end() ? owner->second.get() : nullptr;
+			}
+		}
 		return nullptr;
+	}
+
+	void ResourceMgr::RegisterSubAsset(Asset *owner, const Guid &guid, Ref<Object> object, StringView name)
+	{
+		if (owner == nullptr || object == nullptr || guid.IsEmpty())
+			return;
+
+		auto existing = _sub_asset_locations.find(guid);
+		if (existing != _sub_asset_locations.end() && existing->second._owner_guid != owner->GetGuid())
+		{
+			LOG_ERROR("RegisterSubAsset: GUID {} is already owned by another asset", guid.ToString());
+			return;
+		}
+
+		_sub_asset_locations[guid] = SubAssetLocation{owner->GetGuid(), String(name), object->GetType()};
+		_sub_assets[guid] = object;
+		_sub_asset_guids[object.get()] = guid;
+	}
+
+	void ResourceMgr::UnregisterSubAssets(const Guid &owner_guid)
+	{
+		for (auto location = _sub_asset_locations.begin(); location != _sub_asset_locations.end();)
+		{
+			if (location->second._owner_guid != owner_guid)
+			{
+				++location;
+				continue;
+			}
+
+			auto object = _sub_assets.find(location->first);
+			if (object != _sub_assets.end())
+			{
+				_sub_asset_guids.erase(object->second.get());
+				_sub_assets.erase(object);
+			}
+			location = _sub_asset_locations.erase(location);
+		}
+	}
+
+	void ResourceMgr::UnregisterSubAsset(const Guid &guid)
+	{
+		auto object = _sub_assets.find(guid);
+		if (object != _sub_assets.end())
+		{
+			_sub_asset_guids.erase(object->second.get());
+			_sub_assets.erase(object);
+		}
+		_sub_asset_locations.erase(guid);
+	}
+
+	Vector<ResourceMgr::SubAssetEntry> ResourceMgr::GetSubAssets(const Type *type) const
+	{
+		Vector<SubAssetEntry> entries;
+		entries.reserve(_sub_asset_locations.size());
+		for (const auto &[guid, location] : _sub_asset_locations)
+		{
+			if (type != nullptr && !IsTypeCompatible(type, location._type))
+				continue;
+			entries.push_back(SubAssetEntry{guid, location._name, location._type});
+		}
+		return entries;
 	}
 
 
@@ -1007,7 +1143,8 @@ namespace Ailu
             if (out_asset != nullptr)
             {
                 RegisterResource(normalized_asset_path, out_asset->_p_obj);
-                RegisterAsset(std::move(out_asset));
+                Asset *registered_asset = RegisterAsset(std::move(out_asset));
+                RegisterEmbeddedMaterialSubAssets(registered_asset);
                 LOG_WARNING(L"Load asset {} succeed after {} ms", normalized_asset_path, timer.GetElapsedSinceLastMark());
             }
             else
@@ -1022,7 +1159,47 @@ namespace Ailu
             }
         }
 
-        return _global_resources.contains(normalized_asset_path) ? _global_resources[normalized_asset_path] : nullptr;
+		return _global_resources.contains(normalized_asset_path) ? _global_resources[normalized_asset_path] : nullptr;
+	}
+
+	Ref<Object> ResourceMgr::LoadSubAsset(const Guid &guid, const Type *requested_type)
+	{
+		auto cached = _sub_assets.find(guid);
+		if (cached != _sub_assets.end() && cached->second != nullptr)
+		{
+			return requested_type == nullptr || IsTypeCompatible(requested_type, cached->second->GetType())
+				? cached->second
+				: nullptr;
+		}
+
+		auto location = _sub_asset_locations.find(guid);
+		if (location == _sub_asset_locations.end())
+			return nullptr;
+
+		if (requested_type != nullptr && location->second._type != nullptr &&
+			!IsTypeCompatible(requested_type, location->second._type))
+			return nullptr;
+
+		const Guid owner_guid = location->second._owner_guid;
+		const Asset *owner = _asset_db.contains(owner_guid) ? _asset_db.at(owner_guid).get() : nullptr;
+		if (owner == nullptr)
+			return nullptr;
+
+		if (owner->_asset_type == SpriteAtlas::StaticType())
+		{
+			if (Load<SpriteAtlas>(owner_guid) == nullptr)
+				return nullptr;
+		}
+		else if (IsTypeCompatible(Mesh::StaticType(), owner->_asset_type))
+		{
+			if (Load<Mesh>(owner_guid) == nullptr)
+				return nullptr;
+		}
+		else
+			return nullptr;
+
+		cached = _sub_assets.find(guid);
+		return cached != _sub_assets.end() ? cached->second : nullptr;
 	}
 
 	Asset *ResourceMgr::CreateAsset(const WString &asset_path, Ref<Object> obj, bool overwrite)
@@ -1066,6 +1243,7 @@ namespace Ailu
 		Asset *registered_asset = RegisterAsset(std::move(new_asset));
 		if (registered_asset == nullptr)
 			return nullptr;
+		RegisterEmbeddedMaterialSubAssets(registered_asset);
 		//新创建 Asset 视为 Dirty，等待首次保存。
 		registered_asset->MarkDirty();
 		s_pending_save_assets.push(registered_asset);
@@ -1090,19 +1268,37 @@ namespace Ailu
 
 	const WString &ResourceMgr::GetAssetPath(Object *obj) const
 	{
+		if (obj == nullptr)
+			return kEmptyWString;
 		if (_object_to_asset.contains(obj->ID()))
 		{
 			return _object_to_asset.at(obj->ID())->_asset_path;
+		}
+		auto sub_asset_guid = _sub_asset_guids.find(obj);
+		if (sub_asset_guid != _sub_asset_guids.end())
+		{
+			auto location = _sub_asset_locations.find(sub_asset_guid->second);
+			if (location != _sub_asset_locations.end())
+			{
+				auto owner = _asset_db.find(location->second._owner_guid);
+				if (owner != _asset_db.end())
+					return owner->second->_asset_path;
+			}
 		}
 		return kEmptyWString;
 	}
 
 	const Guid &ResourceMgr::GetAssetGuid(Object *obj) const
 	{
+		if (obj == nullptr)
+			return Guid::EmptyGuid();
 		if (_object_to_asset.contains(obj->ID()))
 		{
 			return _object_to_asset.at(obj->ID())->GetGuid();
 		}
+		auto sub_asset_guid = _sub_asset_guids.find(obj);
+		if (sub_asset_guid != _sub_asset_guids.end())
+			return sub_asset_guid->second;
 		return Guid::EmptyGuid();
 	}
 
@@ -1111,6 +1307,13 @@ namespace Ailu
 		if (_asset_db.contains(guid))
 		{
 			return _asset_db.at(guid)->_asset_path;
+		}
+		auto sub_asset = _sub_asset_locations.find(guid);
+		if (sub_asset != _sub_asset_locations.end())
+		{
+			auto owner = _asset_db.find(sub_asset->second._owner_guid);
+			if (owner != _asset_db.end())
+				return owner->second->_asset_path;
 		}
 		return kEmptyWString;
 	}
@@ -1246,10 +1449,62 @@ namespace Ailu
 			asset->Name(ToChar(PathUtils::GetFileName(asset_path).c_str()));
 			asset->_domain = domain._domain;
 			//先占位，不进行资源加载，实际有使用时才加载。
-			RegisterAsset(std::move(asset));
+			Asset *registered_asset = RegisterAsset(std::move(asset));
+			if (registered_asset != nullptr && registered_asset->_asset_type == SpriteAtlas::StaticType())
+				IndexSubAssets(registered_asset, GetResSysPath(registered_asset->_asset_path));
 		}
 		ar.EndArray();
 		ar.EndObject();
+	}
+
+	void ResourceMgr::IndexSubAssets(const Asset *owner, const WString &system_path)
+	{
+		if (owner == nullptr)
+			return;
+
+		SpriteAtlasAssetDocument document;
+		if (!LoadAssetDocument(system_path, document))
+			return;
+
+		for (const auto &entry : document._sprites)
+		{
+			if (entry._guid.IsEmpty())
+				continue;
+			auto existing = _sub_asset_locations.find(entry._guid);
+			if (existing != _sub_asset_locations.end() && existing->second._owner_guid != owner->GetGuid())
+			{
+				LOG_ERROR("IndexSubAssets: duplicate SpriteAtlas sub-asset GUID {}", entry._guid.ToString());
+				continue;
+			}
+			_sub_asset_locations[entry._guid] = SubAssetLocation{
+				owner->GetGuid(), entry._name, Sprite::StaticType()};
+		}
+	}
+
+	void ResourceMgr::RegisterEmbeddedMaterialSubAssets(Asset *owner)
+	{
+		if (owner == nullptr || owner->_p_obj == nullptr)
+			return;
+
+		auto *mesh = dynamic_cast<Mesh *>(owner->_p_obj.get());
+		if (mesh == nullptr || mesh->GetCacheMaterials().empty())
+			return;
+
+		if (GetEmbeddedMaterial(mesh, 0u) == nullptr)
+			CreateAndRegisterEmbeddedMaterial(mesh);
+
+		const auto &cached_materials = mesh->GetCacheMaterials();
+		for (u32 index = 0u; index < cached_materials.size(); ++index)
+		{
+			const auto material = GetEmbeddedMaterial(mesh, static_cast<u16>(index));
+			if (material == nullptr)
+				continue;
+
+			const Guid material_guid(std::format("{}:EmbeddedMaterial:{}", owner->GetGuid().ToString(), index));
+			const auto &cached_material = cached_materials[index];
+			const String material_name = std::format("{}/Material[{}]/{}", mesh->Name(), index, cached_material._name);
+			RegisterSubAsset(owner, material_guid, material, material_name);
+		}
 	}
 
 	void ResourceMgr::SaveAssetDB(EAssetDomain domain)
@@ -1690,6 +1945,7 @@ namespace Ailu
 				_importers[new_asset->_asset_path] = AL_NEW(TextureImportSetting, (*tex_import_setting));
 			}
 			LOG_INFO(L"Create asset at path {}", path);
+			RegisterEmbeddedMaterialSubAssets(new_asset);
 			loaded_objects.pop();
 		}
 		OnAssetDataBaseChanged();

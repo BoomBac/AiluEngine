@@ -1,5 +1,6 @@
 #include "Assets/AssetHandlers.h"
 #include "Animation/AnimationControllerAsset.h"
+#include "Animation/BlendSpace.h"
 #include "Animation/Clip.h"
 #include "Animation/TransformTrack.h"
 #include "Assets/AssetDocument.h"
@@ -27,6 +28,7 @@
 #include "Objects/Type.h"
 #include "Physics/2D/Physics2DComponents.h"
 #include "Render/2D/Sprite.h"
+#include "Render/2D/SpriteAtlas.h"
 #include "Render/Camera.h"
 #include "Render/Font.h"
 #include "Render/GraphicsContext.h"
@@ -56,6 +58,29 @@ bool SaveAssetDocument(const WString &sys_path, TDocument &document);
 template<typename TDocument>
 bool LoadAssetDocument(const WString &sys_path, TDocument &document);
 AssetDocumentHeader MakeAssetDocumentHeader(const Asset *asset);
+
+bool IAssetHandler::ReloadInPlace(Asset &target, const Asset &source)
+{
+    Object *target_object = target._p_obj.get();
+    Object *source_object = const_cast<Object *>(source._p_obj.get());
+    if (target_object == nullptr || source_object == nullptr || target_object->GetType() != source_object->GetType())
+        return false;
+
+    JsonArchive archive;
+    for (const Type *type = source_object->GetType(); type != nullptr && type != Object::StaticType();
+         type = type->BaseType())
+    {
+        for (const PropertyInfo &property : type->GetProperties())
+            property.Serialize(source_object, archive);
+    }
+    for (const Type *type = target_object->GetType(); type != nullptr && type != Object::StaticType();
+         type = type->BaseType())
+    {
+        for (const PropertyInfo &property : type->GetProperties())
+            property.Deserialize(target_object, archive);
+    }
+    return true;
+}
 
 // ============================================================
 // ScriptAssetHandler
@@ -567,6 +592,89 @@ bool SpriteAssetHandler::Save(const AssetSaveContext &context)
 }
 
 // ============================================================
+// SpriteAtlasAssetHandler
+// ============================================================
+
+const Type *SpriteAtlasAssetHandler::AssetType() const
+{
+    return SpriteAtlas::StaticType();
+}
+
+Scope<Asset> SpriteAtlasAssetHandler::Load(const AssetLoadContext &context)
+{
+    SpriteAtlasAssetDocument document;
+    if (!LoadAssetDocument(context._system_path, document))
+        return nullptr;
+
+    Ref<Texture2D> texture;
+    if (document._texture != Guid::EmptyGuid())
+        texture = context._resource_mgr->Load<Texture2D>(document._texture);
+
+    auto atlas = MakeRef<SpriteAtlas>(document._header._asset_name);
+    atlas->SetTexture(texture);
+    auto asset = MakeScope<Asset>(Guid(document._header._guid), SpriteAtlas::StaticType(), context._asset_path);
+    asset->_p_obj = atlas;
+    asset->_domain = context._resource_mgr->GetAssetPathDomain(asset->_asset_path);
+
+    for (const auto &entry : document._sprites)
+    {
+        Guid sprite_guid = entry._guid;
+        if (sprite_guid.IsEmpty())
+            sprite_guid = Guid::Generate();
+
+        auto sprite = MakeRef<Sprite>(entry._name);
+        sprite->_texture = texture;
+        sprite->_uv_rect = entry._uv_rect;
+        sprite->_pivot = entry._pivot;
+        sprite->_size = std::max(entry._size, 0.0001f);
+        sprite->_border = entry._border;
+        atlas->Sprites().push_back(sprite);
+        context._resource_mgr->RegisterSubAsset(asset.get(), sprite_guid, sprite, entry._name);
+    }
+
+    return asset;
+}
+
+bool SpriteAtlasAssetHandler::Save(const AssetSaveContext &context)
+{
+    const auto *atlas = context._asset->As<SpriteAtlas>();
+    if (atlas == nullptr)
+        return false;
+
+    SpriteAtlasAssetDocument document;
+    document._header = MakeAssetDocumentHeader(context._asset);
+    document._texture = Guid::EmptyGuid();
+    if (atlas->Texture() != nullptr)
+    {
+        document._texture = context._resource_mgr->GetAssetGuid(atlas->Texture().get());
+        if (!document._texture.IsEmpty())
+            document._header._dependencies.emplace_back(document._texture, EAssetDependencyType::kHard);
+    }
+
+    for (const auto &sprite : atlas->Sprites())
+    {
+        if (sprite == nullptr)
+            continue;
+        SpriteAtlasEntryDocument entry;
+        entry._guid = context._resource_mgr->GetAssetGuid(sprite.get());
+        if (entry._guid.IsEmpty())
+        {
+            entry._guid = Guid::Generate();
+            context._resource_mgr->RegisterSubAsset(const_cast<Asset *>(context._asset), entry._guid, sprite,
+                                                    sprite->Name());
+        }
+        entry._name = sprite->Name();
+        entry._uv_rect = sprite->_uv_rect;
+        entry._pivot = sprite->_pivot;
+        entry._size = sprite->_size;
+        entry._border = sprite->_border;
+        document._sprites.emplace_back(entry);
+    }
+
+    return SaveAssetDocument(context._system_path, document);
+}
+
+// ============================================================
 // AudioClipAssetHandler
 // ============================================================
 
@@ -614,6 +722,35 @@ bool AudioClipAssetHandler::Save(const AssetSaveContext &context)
     {
         LOG_ERROR(L"Save audio clip to {} failed!", context._system_path);
         return false;
+    }
+    return true;
+}
+
+bool SpriteAtlasAssetHandler::ReloadInPlace(Asset &target, const Asset &source)
+{
+    auto *target_atlas = target.As<SpriteAtlas>();
+    const auto *source_atlas = source.As<SpriteAtlas>();
+    if (target_atlas == nullptr || source_atlas == nullptr)
+        return false;
+
+    target_atlas->SetTexture(source_atlas->Texture());
+    auto &target_sprites = target_atlas->Sprites();
+    const auto &source_sprites = source_atlas->Sprites();
+    target_sprites.resize(source_sprites.size());
+    for (u32 i = 0u; i < source_sprites.size(); ++i)
+    {
+        if (target_sprites[i] == nullptr)
+            target_sprites[i] = MakeRef<Sprite>();
+        const Sprite *source_sprite = source_sprites[i].get();
+        Sprite *target_sprite = target_sprites[i].get();
+        if (source_sprite == nullptr || target_sprite == nullptr)
+            continue;
+        target_sprite->Name(source_sprite->Name());
+        target_sprite->_texture = source_sprite->_texture;
+        target_sprite->_uv_rect = source_sprite->_uv_rect;
+        target_sprite->_pivot = source_sprite->_pivot;
+        target_sprite->_size = source_sprite->_size;
+        target_sprite->_border = source_sprite->_border;
     }
     return true;
 }
@@ -1129,7 +1266,6 @@ bool PrefabAssetHandler::Save(const AssetSaveContext &context)
             add_dependency_string(document._skeleton_mesh_component._mesh_guid);
             for (const String &guid : document._skeleton_mesh_component._material_guids)
                 add_dependency_string(guid);
-            add_dependency_string(document._skeleton_mesh_component._anim_clip_guid);
         }
         if (document._has_animator_component)
             add_dependency_string(document._animator_component._controller_guid);
@@ -1383,12 +1519,6 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
                 }
             }
             loadMaterialRefs(entity_doc._skeleton_mesh_component._material_guids, component._p_mesh.get(), component._p_mats);
-            if (!entity_doc._skeleton_mesh_component._anim_clip_guid.empty())
-            {
-                const Guid clip_guid(entity_doc._skeleton_mesh_component._anim_clip_guid);
-                context._resource_mgr->Load<AnimationClip>(clip_guid);
-                component._anim_clip = context._resource_mgr->GetRef<AnimationClip>(clip_guid);
-            }
         }
         if (entity_doc._has_animator_component)
         {
@@ -1767,6 +1897,17 @@ bool AnimationClipAssetHandler::Save(const AssetSaveContext &context)
     return true;
 }
 
+bool AnimationClipAssetHandler::ReloadInPlace(Asset &target, const Asset &source)
+{
+    auto *target_clip = target.As<AnimationClip>();
+    const auto *source_clip = source.As<AnimationClip>();
+    if (target_clip == nullptr || source_clip == nullptr)
+        return false;
+
+    target_clip->CopyFrom(*source_clip);
+    return true;
+}
+
 // ============================================================
 // AnimationControllerAssetHandler
 // ============================================================
@@ -1824,6 +1965,82 @@ bool AnimationControllerAssetHandler::Save(const AssetSaveContext &context)
         return false;
     }
     LOG_INFO(L"Save animation controller to {}", context._system_path);
+    return true;
+}
+
+bool AnimationControllerAssetHandler::ReloadInPlace(Asset &target, const Asset &source)
+{
+    auto *target_controller = target.As<AnimationControllerAsset>();
+    const auto *source_controller = source.As<AnimationControllerAsset>();
+    if (target_controller == nullptr || source_controller == nullptr)
+        return false;
+
+    target_controller->Parameters() = source_controller->Parameters();
+    target_controller->States() = source_controller->States();
+    target_controller->Transitions() = source_controller->Transitions();
+    target_controller->AnyStateTransitions() = source_controller->AnyStateTransitions();
+    target_controller->EntryState(source_controller->EntryState());
+    return true;
+}
+
+// ============================================================
+// BlendSpaceAssetHandler
+// ============================================================
+
+const Type *BlendSpaceAssetHandler::AssetType() const
+{
+    return BlendSpaceAsset::StaticType();
+}
+
+Scope<Asset> BlendSpaceAssetHandler::Load(const AssetLoadContext &context)
+{
+    BlendSpaceAssetDocument doc;
+    if (!LoadAssetDocument(context._system_path, doc))
+        return nullptr;
+
+    Ref<BlendSpaceAsset> blend_space = MakeRef<BlendSpaceAsset>(
+        !doc._header._asset_name.empty() ? doc._header._asset_name : "BlendSpaceAsset");
+    blend_space->Samples() = doc._samples;
+    blend_space->XRange(doc._x_range);
+    blend_space->YRange(doc._y_range);
+    blend_space->Is2D(doc._is_2d);
+    std::sort(blend_space->Samples().begin(), blend_space->Samples().end(),
+              [](const BlendSpaceSample &lhs, const BlendSpaceSample &rhs)
+              { return lhs._position.x < rhs._position.x; });
+
+    auto asset = MakeScope<Asset>(Guid(doc._header._guid), BlendSpaceAsset::StaticType(), context._asset_path);
+    asset->_p_obj = blend_space;
+    asset->_domain = context._resource_mgr->GetAssetPathDomain(asset->_asset_path);
+    return asset;
+}
+
+bool BlendSpaceAssetHandler::Save(const AssetSaveContext &context)
+{
+    const auto *blend_space = context._asset->As<BlendSpaceAsset>();
+    if (blend_space == nullptr)
+        return false;
+
+    BlendSpaceAssetDocument doc;
+    doc._header = MakeAssetDocumentHeader(context._asset);
+    doc._samples = blend_space->Samples();
+    doc._x_range = blend_space->XRange();
+    doc._y_range = blend_space->YRange();
+    doc._is_2d = blend_space->Is2D();
+    for (const auto &sample : doc._samples)
+    {
+        if (sample._clip.IsEmpty() || std::any_of(doc._header._dependencies.begin(), doc._header._dependencies.end(),
+                                                   [&sample](const AssetDependency &dependency)
+                                                   { return dependency._guid == sample._clip; }))
+            continue;
+        doc._header._dependencies.emplace_back(AssetDependency{sample._clip, EAssetDependencyType::kHard});
+    }
+
+    if (!SaveAssetDocument(context._system_path, doc))
+    {
+        LOG_ERROR(L"Save blend space failed, {}", context._system_path);
+        return false;
+    }
+    LOG_INFO(L"Save blend space to {}", context._system_path);
     return true;
 }
 
@@ -1968,6 +2185,21 @@ bool WidgetAssetHandler::Save(const AssetSaveContext &context)
         return false;
     }
     LOG_INFO(L"Save widget asset to {}", context._system_path);
+    return true;
+}
+
+bool WidgetAssetHandler::ReloadInPlace(Asset &target, const Asset &source)
+{
+    auto *target_widget = target.As<WidgetAsset>();
+    const auto *source_widget = source.As<WidgetAsset>();
+    if (target_widget == nullptr || source_widget == nullptr)
+        return false;
+
+    Ref<UI::UIElement> root = CloneUIElementTree(source_widget->RootRef());
+    if (source_widget->RootRef() != nullptr && root == nullptr)
+        return false;
+    target_widget->SetDesignSize(source_widget->DesignSize());
+    target_widget->SetRoot(std::move(root));
     return true;
 }
 

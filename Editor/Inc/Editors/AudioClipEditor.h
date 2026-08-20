@@ -4,7 +4,7 @@
 
 #include "Audio/AudioHandle.h"
 #include "Audio/AudioTypes.h"
-#include "Dock/DockWindow.h"
+#include "Editors/AssetEditor.h"
 #include "Framework/Math/Guid.h"
 #include "UI/Basic.h"
 #include "UI/Container.h"
@@ -26,40 +26,20 @@ namespace Ailu
 
     namespace Editor
     {
-        struct AudioClipEditData
-        {
-            EAudioLoadMode _load_mode = EAudioLoadMode::kMemory;
-            EAudioChannelMode _channel_mode = EAudioChannelMode::kAuto;
-            bool _force_mono = false;
-
-            bool operator==(const AudioClipEditData &other) const
-            {
-                return _load_mode == other._load_mode && _channel_mode == other._channel_mode &&
-                       _force_mono == other._force_mono;
-            }
-            bool operator!=(const AudioClipEditData &other) const { return !(*this == other); }
-        };
-
-        class AudioClipEditor : public DockWindow
+        class AudioClipEditor : public AssetEditor
         {
         public:
             AudioClipEditor();
             ~AudioClipEditor() override;
 
             void Update(f32 dt) override;
-            void Open(AudioClip *asset);
-            void Close();
-
-            bool IsDirty() const { return _editing != _original; }
+            using AssetEditor::Open;
+            void Open(AudioClip *clip);
 
         private:
             void BuildToolbar(UI::HorizontalBox *toolbar);
             void BuildInfoPanel(UI::VerticalBox *panel);
             void BuildImportPanel(UI::VerticalBox *panel);
-            void ReadFromAsset();
-            void WriteToAsset();
-            void Apply();
-            void Revert();
             void PlayPreview();
             void StopPreview();
             void RefreshAllUI();
@@ -68,6 +48,7 @@ namespace Ailu
             void RefreshStatus();
             void SetLoadMode(EAudioLoadMode mode);
             void SetChannelMode(EAudioChannelMode mode);
+            void MarkEdited();
 
             static UI::Text *AddSectionTitle(UI::UIElement *parent, const String &title);
             static UI::HorizontalBox *AddPropertyRow(UI::UIElement *parent, const String &label,
@@ -75,14 +56,15 @@ namespace Ailu
             static String ToString(EAudioLoadMode mode);
             static String ToString(EAudioChannelMode mode);
 
+            bool OnOpen() override;
+            void OnClose() override;
+            void OnAssetSaved() override;
+            void OnAssetReloaded() override;
+
         private:
             AudioClip *_clip = nullptr;
-            AudioClipEditData _original;
-            AudioClipEditData _editing;
             AudioHandle _preview_handle;
 
-            UI::Button *_btn_apply = nullptr;
-            UI::Button *_btn_revert = nullptr;
             UI::Button *_btn_play = nullptr;
             UI::Button *_btn_stop = nullptr;
             UI::Button *_btn_memory = nullptr;
@@ -100,6 +82,7 @@ namespace Ailu
             UI::Text *_txt_sample_rate = nullptr;
             UI::Text *_txt_channels = nullptr;
             UI::Text *_txt_status = nullptr;
+            String _last_edit_snapshot;
         };
     }// namespace Editor
 }// namespace Ailu

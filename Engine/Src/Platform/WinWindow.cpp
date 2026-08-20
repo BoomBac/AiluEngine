@@ -14,6 +14,7 @@
 #include "Framework/Common/ResourceMgr.h"
 #include "Framework/Common/Utils.h"
 #include "Framework/Common/Application.h"
+#include "Framework/Common/Allocator.hpp"
 
 
 //#define _USE_CONSOLE
@@ -37,8 +38,17 @@ namespace
         }
 
         // Implement IUnknown methods
-        ULONG STDMETHODCALLTYPE AddRef() override { return 1; }
-        ULONG STDMETHODCALLTYPE Release() override { return 1; }
+        ULONG STDMETHODCALLTYPE AddRef() override { return ++_ref_count; }
+        ULONG STDMETHODCALLTYPE Release() override
+        {
+            const ULONG ref_count = --_ref_count;
+            if (ref_count == 0u)
+            {
+                auto *self = this;
+                AL_DELETE(self);
+            }
+            return ref_count;
+        }
         HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void **ppvObject) override
         {
             if (riid == IID_IUnknown || riid == IID_IDropTarget)
@@ -108,6 +118,7 @@ namespace
 
     private:
         std::function<void(Ailu::Vector<Ailu::WString> &, POINTL)> _on_drop;
+        ULONG _ref_count = 1u;
     };
 }
 
@@ -262,6 +273,7 @@ namespace Ailu
             return true;
         };
         _data._flags = prop._flag;
+        _reserver_area = {0.0f, 0.0f, 0.0f, 0.0f};
         auto hinstance = GetModuleHandle(NULL);
         LOG_INFO(L"Create window {}, ({},{})", prop.Title, prop.Width, prop.Height);
         // Initialize the window class.
@@ -273,15 +285,11 @@ namespace Ailu
         windowClass.hCursor = LoadCursor(NULL, IDC_ARROW);
         windowClass.lpszClassName = L"AiluEngineClass";
         RegisterClassEx(&windowClass);
-        u32 style_flags = WS_OVERLAPPEDWINDOW;
-        if (prop._flag & EWindowFlags::kWindow_NoTitleBar)
-        {
-            style_flags = WS_POPUP | WS_VISIBLE;
-        }
+        const u32 style_flags = WS_OVERLAPPEDWINDOW;
         auto main_win = Application::Get().GetWindowPtr();
         bool is_sub_window = false;//main_win != nullptr;
         RECT windowRect = {0, 0, static_cast<LONG>(prop.Width), static_cast<LONG>(prop.Height)};
-        if (style_flags & WS_OVERLAPPEDWINDOW)
+        if ((prop._flag & EWindowFlags::kWindow_NoTitleBar) == 0u)
             AdjustWindowRect(&windowRect, style_flags, FALSE);
         // Create the window and store a handle to it.
         _hwnd = CreateWindowEx(
@@ -297,6 +305,11 @@ namespace Ailu
                 nullptr,// We aren't using menus.
                 hinstance,
                 this);
+        if (_hwnd && (prop._flag & EWindowFlags::kWindow_NoTitleBar))
+        {
+            const DWM_WINDOW_CORNER_PREFERENCE corner_preference = DWMWCP_ROUND;
+            DwmSetWindowAttribute(_hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &corner_preference, sizeof(corner_preference));
+        }
         //dark mode
         //BOOL value = TRUE;
         //::DwmSetWindowAttribute(_hwnd,DWMWA_USE_IMMERSIVE_DARK_MODE,&value,sizeof(value));
@@ -338,7 +351,8 @@ namespace Ailu
         _ole_initialized = SUCCEEDED(ole_result);
         if (FAILED(ole_result) && ole_result != RPC_E_CHANGED_MODE)
             LOG_WARNING("WinWindow: OleInitialize failed: 0x{:08X}", static_cast<u32>(ole_result));
-        MyDropTarget *target = new MyDropTarget([this](Vector<WString> &dragged_files, POINTL point)
+        MyDropTarget *target = AL_NEW_TAG(EMemoryTag::kCore, MyDropTarget,
+                                          [this](Vector<WString> &dragged_files, POINTL point)
         {
             POINT client_point{point.x, point.y};
             ScreenToClient(_hwnd, &client_point);
@@ -356,6 +370,7 @@ namespace Ailu
         {
             LOG_INFO("WinWindow: RegisterDragDrop succeeded");
         }
+        target->Release();
     }
     void WinWindow::OnUpdate()
     {
@@ -470,6 +485,26 @@ namespace Ailu
         return _data.Title;
     }
 
+    void WinWindow::Minimize()
+    {
+        SendMessage(_hwnd, WM_SYSCOMMAND, SC_MINIMIZE, 0);
+    }
+
+    void WinWindow::ToggleMaximize()
+    {
+        SendMessage(_hwnd, WM_SYSCOMMAND, IsZoomed(_hwnd) ? SC_RESTORE : SC_MAXIMIZE, 0);
+    }
+
+    void WinWindow::RequestClose()
+    {
+        PostMessage(_hwnd, WM_CLOSE, 0, 0);
+    }
+
+    bool WinWindow::IsMaximized() const
+    {
+        return IsZoomed(_hwnd) != FALSE;
+    }
+
     void WinWindow::SetPosition(i32 x, i32 y)
     {
         SetWindowPos(_hwnd, HWND_TOP, x, y, (i32)_data.Width, (i32)_data.Height, SWP_SHOWWINDOW);
@@ -513,7 +548,15 @@ namespace Ailu
         if (ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam))
             return true;
 #endif// DEAR_IMGUI
-        return ((WinWindow *) GetWindowLongPtr(hWnd, GWLP_USERDATA))->WindowProcImpl(hWnd, message, wParam, lParam);
+        auto *window = reinterpret_cast<WinWindow *>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
+        if (message == WM_NCCREATE)
+        {
+            auto *create_struct = reinterpret_cast<CREATESTRUCT *>(lParam);
+            window = static_cast<WinWindow *>(create_struct->lpCreateParams);
+            SetWindowLongPtr(hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(window));
+        }
+        return window ? window->WindowProcImpl(hWnd, message, wParam, lParam)
+                      : DefWindowProc(hWnd, message, wParam, lParam);
     }
 
 #pragma warning(push)
@@ -523,14 +566,24 @@ namespace Ailu
         static bool s_is_track = false;
         switch (message)
         {
-                //case WM_NCCALCSIZE:
-                //    // 移除窗口边框，使客户区占据整个窗口
-                //    return 0;
+            case WM_NCCALCSIZE:
+                if (_data._flags & EWindowFlags::kWindow_NoTitleBar)
+                {
+                    // A borderless maximized window can cover the monitor instead of its work area.
+                    // Keep the client area out of the taskbar and any edge-docked system UI.
+                    if (wParam != FALSE && IsZoomed(hWnd))
+                    {
+                        auto *params = reinterpret_cast<NCCALCSIZE_PARAMS *>(lParam);
+                        MONITORINFO monitor_info{sizeof(MONITORINFO)};
+                        const HMONITOR monitor = MonitorFromWindow(hWnd, MONITOR_DEFAULTTONEAREST);
+                        if (GetMonitorInfo(monitor, &monitor_info))
+                            params->rgrc[0] = monitor_info.rcWork;
+                    }
+                    return 0;
+                }
+                break;
             case WM_CREATE:
             {
-                // Save the DXSample* passed in to CreateWindow.
-                LPCREATESTRUCT pCreateStruct = reinterpret_cast<LPCREATESTRUCT>(lParam);
-                SetWindowLongPtr(hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(pCreateStruct->lpCreateParams));
                 //DragAcceptFiles(_hwnd, true);
                 //DragAcceptFiles(((LPCREATESTRUCT)lParam)->hwndParent, TRUE);
             }
@@ -544,10 +597,10 @@ namespace Ailu
                 for (UINT i = 0; i < fileCount; ++i)
                 {
                     UINT pathLength = DragQueryFile(hDrop, i, NULL, 0);
-                    wchar_t *filePath = new wchar_t[pathLength + 1];
+                    wchar_t *filePath = AL_ALLOC_TAG(EMemoryTag::kTemporary, wchar_t, pathLength + 1);
                     DragQueryFile(hDrop, i, filePath, pathLength + 1);
                     draged_files[i] = filePath;
-                    delete[] filePath;
+                    AL_FREE(filePath);
                 }
                 POINT drop_point{};
                 DragQueryPoint(hDrop, &drop_point);
@@ -726,6 +779,26 @@ namespace Ailu
                 _data.Handler(e);
             }
                 return 0;
+            case WM_GETMINMAXINFO:
+            {
+                if (_data._flags & EWindowFlags::kWindow_NoTitleBar)
+                {
+                    auto *min_max_info = reinterpret_cast<MINMAXINFO *>(lParam);
+                    MONITORINFO monitor_info{sizeof(MONITORINFO)};
+                    const HMONITOR monitor = MonitorFromWindow(_hwnd, MONITOR_DEFAULTTONEAREST);
+                    if (GetMonitorInfo(monitor, &monitor_info))
+                    {
+                        const RECT &work = monitor_info.rcWork;
+                        const RECT &monitor_rect = monitor_info.rcMonitor;
+                        min_max_info->ptMaxPosition.x = work.left - monitor_rect.left;
+                        min_max_info->ptMaxPosition.y = work.top - monitor_rect.top;
+                        min_max_info->ptMaxSize.x = work.right - work.left;
+                        min_max_info->ptMaxSize.y = work.bottom - work.top;
+                    }
+                    return 0;
+                }
+            }
+            break;
             case WM_NCHITTEST://无边框窗口的移动/缩放
             {
                 static const auto is_point_inside = [](Vector2f point, Vector4f rect) {
@@ -734,8 +807,6 @@ namespace Ailu
                 if (_data._flags & EWindowFlags::kWindow_NoTitleBar)
                 {
                     Vector2f pos = Input::GetMousePosAccurate(this);
-                    if (is_point_inside(pos, {(f32) (_data.Width - _reserver_area[3]), 0.0f, (f32) _reserver_area[3], (f32) _reserver_area[3]}))
-                        return HTCLIENT;
                     f32 border = 4.0f;
                     if (pos.y < border)
                     {
@@ -757,8 +828,9 @@ namespace Ailu
                         return HTLEFT;
                     if (pos.x > _data.Width - border)
                         return HTRIGHT;
-                    //kTitleBarHeight = 20.0f = _reserver_area[3];
-                    if (pos.y > border && pos.y < _reserver_area[3] && pos.x > _reserver_area[0] + _reserver_area[2])
+                    const Vector4f drag_area = {_reserver_area[0], _reserver_area[1],
+                                                _reserver_area[2], _reserver_area[3]};
+                    if (is_point_inside(pos, drag_area))
                         return HTCAPTION;
                 }
             }

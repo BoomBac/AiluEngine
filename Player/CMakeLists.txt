@@ -58,7 +58,7 @@ if (AILU_ENABLE_TRACY)
 endif()
 
 if (MSVC)
-    target_compile_options(Player PUBLIC /MP /wd4819)
+    target_compile_options(Player PUBLIC /MP /wd4819 /utf-8)
 endif()
 
 add_dependencies(Player Engine)

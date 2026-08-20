@@ -1,0 +1,12 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "c3c5d3d8-2d0d-4e8e-9de8-c0b75d3d5e5a",
+        "_asset_type": "Ailu::Render::Shader",
+        "_asset_name": "color_picker_sv",
+        "_dependencies": []
+    },
+    "_file": "color_picker_sv.hlsl",
+    "_vs_entry": "VSMain",
+    "_ps_entry": "PSMain"
+}

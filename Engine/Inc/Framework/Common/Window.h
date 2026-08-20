@@ -51,11 +51,14 @@ namespace Ailu
 		virtual void* GetNativeWindowPtr() const = 0;
 		virtual void SetTitle(const WString& title) = 0;
 		virtual WString GetTitle() = 0;
+		virtual void Minimize() = 0;
+		virtual void ToggleMaximize() = 0;
+		virtual void RequestClose() = 0;
+		virtual bool IsMaximized() const = 0;
 		virtual std::tuple<i32, i32> GetClientPosition() const = 0;
 		virtual std::tuple<i32, i32> GetWindowPosition() const = 0;
 		virtual void SetPosition(i32 x, i32 y) = 0;
-		//用于无边框窗口自绘标题栏，这个区域内当做客户区从而可以响应窗口事件，h一般就是标题栏高度
-		//w则是标题文本框或者标签框宽度
+		// 用于无边框窗口自绘标题栏：指定可拖动窗口的客户区矩形，按钮等交互区域应排除在外。
         virtual std::tuple<f32, f32, f32, f32> ReserveArea() const = 0;
         virtual void ReserveArea(f32 x, f32 y, f32 w, f32 h) = 0;
 	};

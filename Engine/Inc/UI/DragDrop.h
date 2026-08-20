@@ -53,6 +53,7 @@ namespace Ailu
         {
             CanDropCallback _can_drop;
             DropCallback _on_drop;
+            bool _use_custom_tree_feedback = false;
         };
 
         class AILU_API DragTypeRegistry

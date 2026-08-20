@@ -27,6 +27,23 @@ namespace Ailu
                 return visual;
             }
 
+            UIButtonStyle WindowControlButtonStyle(const UIButtonStyle &base_style)
+            {
+                UIButtonStyle style = base_style;
+                style._normal._background = ColorBrush(Colors::kTransparent);
+                style._disabled._background = ColorBrush(Colors::kTransparent);
+                for (UIControlVisual *visual : {&style._normal, &style._hovered, &style._pressed, &style._focused,
+                                                &style._disabled})
+                {
+                    visual->_border_color = Colors::kTransparent;
+                    visual->_border_width = Vector4f::kZero;
+                    visual->_corner_radius = Vector4f::kZero;
+                }
+                style._padding = Padding(0.0f);
+                style._min_size = Vector2f::kZero;
+                return style;
+            }
+
             void FillCommonControlStyles(UITheme &theme)
             {
                 const auto &c = theme._colors;
@@ -91,7 +108,7 @@ namespace Ailu
                 theme._list_view_style._item_selected_color = Color(c._accent.x, c._accent.y, c._accent.z, 0.85f);
                 theme._list_view_style._border_color = c._border;
                 theme._list_view_style._border_width = 1.0f;
-                theme._list_view_style._corner_radius = Vector4f(4.0f);
+                theme._list_view_style._corner_radius = Vector4f(6.0f);
 
                 theme._element_visual_style._visual = Visual(Colors::kTransparent, c._text_primary);
                 theme._border_style._visual = Visual(c._surface, c._border, c._border, 1.0f);
@@ -151,6 +168,7 @@ namespace Ailu
                 primary._hovered._background = ColorBrush(Color((std::min)(c._accent.x + 0.08f, 1.0f), (std::min)(c._accent.y + 0.08f, 1.0f), (std::min)(c._accent.z + 0.08f, 1.0f), c._accent.w));
                 primary._pressed._background = ColorBrush(Color((std::max)(c._accent.x - 0.08f, 0.0f), (std::max)(c._accent.y - 0.08f, 0.0f), (std::max)(c._accent.z - 0.08f, 0.0f), c._accent.w));
                 theme.SetButtonStyle("Primary", primary);
+                theme.SetButtonStyle("WindowControl", WindowControlButtonStyle(theme._button_style));
             }
 
         }
@@ -416,6 +434,8 @@ namespace Ailu
             // Only add Primary if it wasn't explicitly set from file
             if (_button_styles.find("Primary") == _button_styles.end())
                 _button_styles["Primary"] = primary;
+            if (_button_styles.find("WindowControl") == _button_styles.end())
+                _button_styles["WindowControl"] = WindowControlButtonStyle(_button_style);
 
             // Older theme files do not contain CollapsibleView style data. Their missing numeric fields are
             // deserialized as zero, so restore a valid token-based default instead of collapsing the header to 0px.

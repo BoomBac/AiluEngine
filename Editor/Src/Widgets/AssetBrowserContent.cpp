@@ -238,6 +238,35 @@ namespace Ailu
             return entries;
         }
 
+        Vector<AssetBrowserEntry> AssetBrowserContent::GetSubAssets(const Asset *owner) const
+        {
+            Vector<AssetBrowserEntry> entries;
+            if (owner == nullptr)
+                return entries;
+
+            const WString owner_path = NormalizeLogicalPathWithoutTrailingSlash(owner->_asset_path);
+            const fs::path owner_system_path = fs::path(ResourceMgr::GetResSysPath(owner->_asset_path));
+            for (const auto &sub_asset: ResourceMgr::Get().GetSubAssets())
+            {
+                if (NormalizeLogicalPathWithoutTrailingSlash(ResourceMgr::Get().GuidToAssetPath(sub_asset._guid)) != owner_path)
+                    continue;
+
+                AssetBrowserEntry entry;
+                entry._type = AssetBrowserEntry::EType::kSubAsset;
+                entry._display_name = sub_asset._name;
+                entry._sys_path = owner_system_path;
+                entry._asset = const_cast<Asset *>(owner);
+                entry._sub_asset_guid = sub_asset._guid;
+                entry._sub_asset_type = sub_asset._type;
+                entries.push_back(std::move(entry));
+            }
+            std::sort(entries.begin(), entries.end(), [](const AssetBrowserEntry &lhs, const AssetBrowserEntry &rhs)
+            {
+                return lhs._display_name < rhs._display_name;
+            });
+            return entries;
+        }
+
         Vector<AssetBrowserRootDesc> AssetBrowserContent::GetRoots() const
         {
             return GetAssetBrowserRoots();

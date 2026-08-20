@@ -2,6 +2,7 @@
 // Created by 22292 on 2024/10/11.
 //
 #include "Framework/Common/JobSystem.h"
+#include "Framework/Common/Allocator.hpp"
 #include "Framework/Common/Profiler.h"
 
 #include "Render/GraphicsContext.h"
@@ -27,7 +28,7 @@ namespace Ailu
         _jobs.resize(capacity);
         for(u16 i = 0; i < capacity; ++i)
         {
-            _jobs[i] = new Job(i);
+            _jobs[i] = AL_NEW_TAG(EMemoryTag::kJobSystem, Job, i);
             _job_to_index[_jobs[i]] = i;
             _free_indices.push(i);
         }
@@ -36,19 +37,18 @@ namespace Ailu
     {
         for(auto& item : _jobs)
         {
-            delete item;
-            item = nullptr;
+            AL_DELETE(item);
         }
     }
     JobSystem* g_pJobSystem = nullptr;
     void JobSystem::Init(u32 thread_count)
     {
         if (g_pJobSystem == nullptr)
-            g_pJobSystem = new JobSystem(thread_count);
+            g_pJobSystem = AL_NEW_TAG(EMemoryTag::kJobSystem, JobSystem, thread_count);
     }
     void JobSystem::Shutdown()
     {
-        delete g_pJobSystem; g_pJobSystem = nullptr;
+        AL_DELETE(g_pJobSystem);
     }
     JobSystem& JobSystem::Get()
     {
@@ -65,7 +65,7 @@ namespace Ailu
             if (_jobs.size() < kMaxJobPoolSize)
             {
                 u32 index = static_cast<u32>(_jobs.size());
-                _jobs.push_back(new Job(index));
+                _jobs.push_back(AL_NEW_TAG(EMemoryTag::kJobSystem, Job, index));
                 _job_to_index[_jobs.back()] = index;
                 LOG_INFO("JobSystem::JobPool::Fetch: job pool resized to {}", _jobs.size());
                 return _jobs.back();
@@ -105,7 +105,7 @@ namespace Ailu
         }
         for (u32 i = 0u; i < kMaxJobPoolSize; i++)
             _job_fence[i] = 0u;
-        _pool = new JobPool(64);
+        _pool = AL_NEW_TAG(EMemoryTag::kJobSystem, JobPool, 64);
     }
 
     JobSystem::~JobSystem()
@@ -118,7 +118,7 @@ namespace Ailu
             if (thread.joinable())
                 thread.join();
         }
-        delete _pool; _pool = nullptr;
+        AL_DELETE(_pool);
     }
 
     WaitHandle JobSystem::Dispatch(Job *job)

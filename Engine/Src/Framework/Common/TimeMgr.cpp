@@ -1,4 +1,5 @@
 #include "Framework/Common/TimeMgr.h"
+#include "Framework/Common/Allocator.hpp"
 #include "Framework/Math/ALMath.hpp"
 //#include "Framework/Common/Log.h"
 #include "pch.h"
@@ -17,12 +18,12 @@ namespace Ailu
     void TimeMgr::Init()
     {
         AL_ASSERT_MSG(s_time_mgr == nullptr, "TimeMgr already init!");
-        s_time_mgr = new TimeMgr();
+        s_time_mgr = AL_NEW_TAG(EMemoryTag::kCore, TimeMgr);
     }
 
     void TimeMgr::Shutdown()
     {
-        delete s_time_mgr; s_time_mgr = nullptr;
+        AL_DELETE(s_time_mgr);
     }
 
     TimeMgr &TimeMgr::Get()

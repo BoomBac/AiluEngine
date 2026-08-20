@@ -1,6 +1,8 @@
 #include "UI/ColorPicker.h"
 #include "UI/Basic.h"
 #include "Framework/Common/Input.h"
+#include "Framework/Common/ResourceMgr.h"
+#include "Render/Shader.h"
 #include "UI/TextRenderer.h"
 #include "UI/UIRenderer.h"
 #include "pch.h"
@@ -17,7 +19,6 @@ namespace Ailu
             _resolved_style = context._theme ? context._theme->_color_picker_style : UIColorPickerStyle{};
         }
 
-        static constexpr u16 SV_RES = 256;
         static constexpr u16 HUE_RES = 256;
         static constexpr u16 CHECK_RES = 8;
         static constexpr f32 kHdrMaxIntensity = 64.0f;
@@ -123,7 +124,13 @@ namespace Ailu
             OnMouseUp() += [this](UIEvent &e)
             {
                 if (e._key_code != EKey::kLBUTTON) return;
+                const bool was_dragging = IsDragAdjusting();
                 _drag_sv = _drag_hue = _drag_alpha = _drag_hdr = false;
+                if (was_dragging)
+                {
+                    SyncInputFields();
+                    InvalidatePaint();
+                }
             };
             OnMouseMove() += [this](UIEvent &e)
             {
@@ -176,7 +183,7 @@ namespace Ailu
                 if (changed)
                 {
                     SyncRgbFromState();
-                    NotifyValueChanged();
+                    NotifyValueChanged(false);
                     e._is_handled = true;
                 }
             };
@@ -261,24 +268,18 @@ namespace Ailu
             }
             SyncInputFields();
 
-            // Rebuild SV texture if hue changed significantly
-            if (std::abs(_hsv.x - _last_h_for_sv) > 1e-6f || !_tex_sv)
-            {
-                RebuildSVTexture();
-                _last_h_for_sv = _hsv.x;
-            }
         }
 
         void ColorPicker::RenderImpl(UIRenderer &r)
         {
             r.DrawQuad(_arrange_rect, _matrix, ColorBrush(_resolved_style._background_color));
-            // SV box
-            if (_tex_sv)
+            // SV box: calculate HSV in the pixel shader so hue changes only update a material parameter.
+            if (_sv_material)
             {
+                _sv_material->SetFloat("_Hue", _hsv.x);
                 ImageDrawOptions opt;
                 opt._transform = _matrix;
-                opt._size_override = {SV_RES, SV_RES};
-                r.DrawImage(_tex_sv.get(), _rect_sv, opt);
+                r.DrawImage(Render::Texture::s_p_default_white, _rect_sv, opt, _sv_material.get());
             }
             else
             {
@@ -447,10 +448,11 @@ namespace Ailu
             SyncRgbFromState();
         }
 
-        void ColorPicker::NotifyValueChanged()
+        void ColorPicker::NotifyValueChanged(bool sync_input_fields)
         {
-            InvalidateLayout();
-            SyncInputFields();
+            InvalidatePaint();
+            if (sync_input_fields)
+                SyncInputFields();
             _on_value_changed_delegate.Invoke(GetColorRGBA());
         }
 
@@ -467,6 +469,15 @@ namespace Ailu
 
         void ColorPicker::EnsureStaticTextures()
         {
+            if (!_sv_material)
+            {
+                auto *shader = ResourceMgr::Get().Get<Render::Shader>(L"Shaders/hlsl/color_picker_sv.alasset");
+                if (shader != nullptr)
+                {
+                    _sv_material = MakeRef<Render::Material>(shader, "ColorPicker_SVMaterial");
+                    _sv_material->SetFloat("_Hue", _hsv.x);
+                }
+            }
             if (!s_tex_hue)
             {
                 s_tex_hue = Texture2D::Create(HUE_RES, 1, Render::ETextureFormat::kRGBA8UNormSRGB, false, false);
@@ -505,29 +516,6 @@ namespace Ailu
                 s_tex_checker->SetPixelData(data.data(), 0, 0);
                 s_tex_checker->Apply();
             }
-        }
-
-        void ColorPicker::RebuildSVTexture()
-        {
-            _tex_sv = Texture2D::Create(SV_RES, SV_RES, Render::ETextureFormat::kRGBA8UNormSRGB, false, false);
-            _tex_sv->Name("ColorPicker_SVSquare");
-            Vector<u8> data(SV_RES * SV_RES * 4);
-            for (u32 y = 0; y < SV_RES; ++y)
-            {
-                float v = 1.0f - (float) y / (SV_RES - 1);
-                for (u32 x = 0; x < SV_RES; ++x)
-                {
-                    float s = (float) x / (SV_RES - 1);
-                    Vector3f rgb = HsvToRgb({_hsv.x, s, v});
-                    u32 idx = (y * SV_RES + x) * 4;
-                    data[idx + 0] = toByte(rgb.x);
-                    data[idx + 1] = toByte(rgb.y);
-                    data[idx + 2] = toByte(rgb.z);
-                    data[idx + 3] = 255;
-                }
-            }
-            _tex_sv->SetPixelData(data.data(), 0, 0);
-            _tex_sv->Apply();
         }
 
         Vector2f ColorPicker::ToLocal(Vector2f screen) const

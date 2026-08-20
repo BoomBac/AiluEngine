@@ -6,6 +6,7 @@
 #define AILU_UIELEMENT_H
 
 #include "Framework/Math/Transform2D.h"
+#include "Framework/Math/Guid.h"
 #include "Framework/Core/Delegate.h"
 #include "Objects/Serialize.h"
 #include <Render/RendererAPI.h>
@@ -106,6 +107,7 @@ namespace Ailu
         class Widget;
         class UITheme;
         struct UIControlVisual;
+        struct UIControlVisualOverride;
 
         enum class EUIInvalidationReason : u32
         {
@@ -175,7 +177,6 @@ namespace Ailu
             kFocused,
             kDisabled
         };
-
         ACLASS()
         class AILU_API UIElement : public SerializeObject
         {
@@ -248,6 +249,11 @@ namespace Ailu
             void RemoveChild(Ref<UIElement> child);
             void RemoveChild(UIElement* child);
             bool MoveChild(UIElement *child, u32 new_index);
+            const Guid &GuidValue() const { return _guid; }
+            void RegenerateGuid();
+            void RegenerateGuidRecursive();
+            UIElement *FindChildByGuid(const Guid &guid, bool recursive = true);
+            const UIElement *FindChildByGuid(const Guid &guid, bool recursive = true) const;
             void ClearChildren();
             i32 IndexOf(UIElement *child);
             UIElement *ChildAt(u32 index);
@@ -389,10 +395,12 @@ namespace Ailu
             void ApplyTransform();
             Ref<UISlot> &EnsureSlotObject() const;
             void EnsureStyleResolvedRecursive();
+            void RestorePropertyVisualOverrides();
             virtual Ref<UISlot> CreateSlotForChild();
             virtual bool UsesVerticalChildLayout() const { return false; }
         protected:
             void OnPropertyChanged(const PropertyInfo& prop) override;
+            virtual UIControlVisualOverride *GetPropertyVisualOverride() { return nullptr; }
             virtual void RenderImpl(UIRenderer &r) {};
             /// <summary>
             /// Calculates the world transformation matrix for the object.
@@ -402,6 +410,10 @@ namespace Ailu
             Matrix4x4f CalculateWorldMatrix(bool is_exclude_self_offset = true) const;
             virtual void PostArrange() {};
         protected:
+            APROPERTY()
+            Guid _guid = Guid::EmptyGuid();
+            APROPERTY()
+            u32 _property_visual_override_flags = 0u;
             APROPERTY()
             mutable Ref<UISlot> _slot_obj;
             APROPERTY()

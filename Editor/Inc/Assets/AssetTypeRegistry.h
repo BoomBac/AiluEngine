@@ -7,6 +7,7 @@
 #include "Framework/Core/Containers/Map.h"
 #include "Framework/Core/Containers/Vector.h"
 #include "Framework/Core/String.h"
+#include "Framework/Math/Guid.h"
 #include "Framework/Math/ALMath.hpp"
 #include "Render/RenderConstants.h"
 
@@ -18,6 +19,7 @@ namespace Ailu
     namespace fs = std::filesystem;
 
     class Asset;
+    class Object;
     class Type;
 
     namespace Render
@@ -50,6 +52,9 @@ namespace Ailu
             static AssetTypeRegistry &Get();
 
             Render::Texture *GetIcon(Asset *asset);
+            Render::Texture *GetIcon(const Guid &guid, const Type *type, const Ref<Object> &object);
+            Render::Texture *GetTypeIcon(Asset *asset);
+            Render::Texture *GetTypeIcon(const Type *type);
             void RegisterPreview(const Type *type, AssetPreviewProvider provider);
             void RegisterCreator(AssetCreatorDesc creator);
             const Vector<AssetCreatorDesc> &Creators() const;
@@ -65,6 +70,7 @@ namespace Ailu
             Map<const Type *, WString> _resolved_icon_paths;
             Map<const Type *, Ref<Render::Texture2D>> _icon_cache;
             HashMap<Asset *, Ref<Render::Texture>> _preview_cache;
+            HashMap<Guid, Ref<Render::Texture>, GuidHasher> _sub_asset_preview_cache;
             Array<Vector<Ref<Render::RenderTexture>>, Render::RenderConstants::kFrameCount> _retired_previews;
             u16 _retired_preview_index = 0u;
             Vector<AssetCreatorDesc> _creators;

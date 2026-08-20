@@ -1,4 +1,5 @@
 #include "Render/RenderPipeline.h"
+#include "Framework/Common/Allocator.hpp"
 #include "Framework/Common/Application.h"
 #include "Framework/Common/JobSystem.h"
 #include "Framework/Common/Profiler.h"
@@ -65,8 +66,7 @@ namespace Ailu::Render
     {
         for (auto &it: _cam_cb)
         {
-            delete it.second;
-            it.second = nullptr;
+            AL_DELETE(it.second);
         }
     }
 #pragma endregion

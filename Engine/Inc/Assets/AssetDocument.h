@@ -2,6 +2,8 @@
 #ifndef __ASSET_DOCUMENT_H__
 #define __ASSET_DOCUMENT_H__
 
+#include "Animation/AnimationEvent.h"
+#include "Animation/BlendSpace.h"
 #include "Framework/Math/Guid.h"
 #include "Framework/Math/ALMath.hpp"
 #include "Graph/GraphTypes.h"
@@ -291,6 +293,24 @@ namespace Ailu
     };
 
     ACLASS()
+    class AILU_API BlendSpaceAssetDocument : public Object
+    {
+        GENERATED_BODY()
+
+    public:
+        APROPERTY()
+        AssetDocumentHeader _header;
+        APROPERTY()
+        Vector<BlendSpaceSample> _samples;
+        APROPERTY()
+        Vector2f _x_range = Vector2f(0.0f, 1.0f);
+        APROPERTY()
+        Vector2f _y_range = Vector2f(0.0f, 1.0f);
+        APROPERTY()
+        bool _is_2d = false;
+    };
+
+    ACLASS()
     class AILU_API SpriteAssetDocument : public Object
     {
         GENERATED_BODY()
@@ -308,6 +328,46 @@ namespace Ailu
         //九宫格slice,RLBT，靠近边界的像素不会被拉伸
         APROPERTY()
         Vector4f _border = Vector4f::kZero;
+    };
+
+    ASTRUCT()
+    struct AILU_API SpriteAtlasEntryDocument
+    {
+        GENERATED_BODY()
+
+        APROPERTY()
+        Guid _guid = Guid::EmptyGuid();
+
+        APROPERTY()
+        String _name;
+
+        APROPERTY()
+        Vector4f _uv_rect = {0.0f, 0.0f, 1.0f, 1.0f};
+
+        APROPERTY()
+        Vector2f _pivot = {0.5f, 0.5f};
+
+        APROPERTY()
+        f32 _size = 1.0f;
+
+        APROPERTY()
+        Vector4f _border = Vector4f::kZero;
+    };
+
+    ACLASS()
+    class AILU_API SpriteAtlasAssetDocument : public Object
+    {
+        GENERATED_BODY()
+
+    public:
+        APROPERTY()
+        AssetDocumentHeader _header;
+
+        APROPERTY()
+        Guid _texture = Guid::EmptyGuid();
+
+        APROPERTY()
+        Vector<SpriteAtlasEntryDocument> _sprites;
     };
 
     ASTRUCT()

@@ -6,6 +6,7 @@
 #include <mutex>
 
 #include "Framework/Common/Application.h"
+#include "Framework/Common/Allocator.hpp"
 #include "Framework/Common/FileManager.h"
 #include "Framework/Common/Log.h"
 #include "Framework/Common/ResourceMgr.h"
@@ -225,7 +226,8 @@ namespace Ailu
 
     HRESULT D3DShaderInclude ::Close(LPCVOID pData)
     {
-        delete[] pData;
+        auto *data = const_cast<u8 *>(reinterpret_cast<const u8 *>(pData));
+        AL_FREE(data);
         return S_OK;
     }
 
@@ -301,7 +303,10 @@ namespace Ailu
         {
             ULONG ref = --_ref_count;
             if (ref == 0)
-                delete this;
+            {
+                auto *self = this;
+                AL_DELETE(self);
+            }
             return ref;
         }
 
@@ -320,7 +325,7 @@ namespace Ailu
                 ComPtr<IDxcBlobEncoding> blob;
                 HRESULT hr = _utils->CreateBlob(file_data, (UINT32) byte_size, DXC_CP_UTF8, blob.GetAddressOf());
 
-                delete[] file_data;
+                AL_FREE(file_data);
 
                 if (FAILED(hr))
                     return hr;
@@ -443,7 +448,7 @@ namespace Ailu
             DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&compiler));
 
             auto base_path = std::filesystem::path(desc._filename).parent_path().wstring();
-            auto include = std::make_unique<DxcIncludeHandlerEx>(utils.Get());
+            auto *include = AL_NEW_TAG(EMemoryTag::kRenderer, DxcIncludeHandlerEx, utils.Get());
             include->_cur_source_file_path = desc._filename;
 
             ComPtr<IDxcBlobEncoding> source;
@@ -501,7 +506,8 @@ namespace Ailu
             }
 
             ComPtr<IDxcResult> result;
-            compiler->Compile(&src, args.data(), (UINT) args.size(), include.get(), IID_PPV_ARGS(&result));
+            compiler->Compile(&src, args.data(), (UINT) args.size(), include, IID_PPV_ARGS(&result));
+            include->Release();
 
             HRESULT hr;
             result->GetStatus(&hr);

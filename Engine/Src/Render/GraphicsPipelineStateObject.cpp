@@ -1,4 +1,5 @@
 #include "Render/GraphicsPipelineStateObject.h"
+#include "Framework/Common/Allocator.hpp"
 #include "Framework/Common/ResourceMgr.h"
 #include "Framework/Common/ThreadPool.h"
 #include "Framework/Common/TimeMgr.h"
@@ -122,12 +123,12 @@ namespace Ailu::Render
     GraphicsPipelineStateMgr::~GraphicsPipelineStateMgr() {}
     void GraphicsPipelineStateMgr::Init()
     {
-        if (!g_pPSOMgr) g_pPSOMgr = new GraphicsPipelineStateMgr();
+        if (!g_pPSOMgr)
+            g_pPSOMgr = AL_NEW_TAG(EMemoryTag::kRenderer, GraphicsPipelineStateMgr);
     }
     void GraphicsPipelineStateMgr::Shutdown()
     {
-        delete g_pPSOMgr;
-        g_pPSOMgr = nullptr;
+        AL_DELETE(g_pPSOMgr);
     }
 
     GraphicsPipelineStateMgr &GraphicsPipelineStateMgr::Get() { return *g_pPSOMgr; }
@@ -198,7 +199,7 @@ namespace Ailu::Render
             pso_desc._rt_state = RenderTargetState{{EALGFormat::kALGFormatR11G11B10_FLOAT}, EALGFormat::kALGFormatUNKOWN};
             pso_desc._depth_stencil_state = TStaticDepthStencilState<false, ECompareFunc::kAlways>::GetRHI();
             stand_pso = GraphicsPipelineStateObject::Create(pso_desc);
-            g_pGfxContext->CreateResource(stand_pso.get(), new UploadParamsGPSO(i, 0));
+            g_pGfxContext->CreateResource(stand_pso.get(), AL_NEW_TAG(EMemoryTag::kRenderer, UploadParamsGPSO, i, 0));
             AddPSO(std::move(stand_pso));
         }
 
@@ -242,7 +243,7 @@ namespace Ailu::Render
             pso_desc._p_vertex_shader = shader;
             pso_desc._rt_state = RenderTargetState{{EALGFormat::kALGFormatR11G11B10_FLOAT}, EALGFormat::kALGFormatUNKOWN};
             pso = std::move(GraphicsPipelineStateObject::Create(pso_desc));
-            g_pGfxContext->CreateResource(pso.get(), new UploadParamsGPSO(i, 0));
+            g_pGfxContext->CreateResource(pso.get(), AL_NEW_TAG(EMemoryTag::kRenderer, UploadParamsGPSO, i, 0));
             GraphicsPipelineStateMgr::AddPSO(std::move(pso));
         }
 
@@ -260,7 +261,7 @@ namespace Ailu::Render
             pso_desc._p_vertex_shader = shader;
             pso_desc._rt_state = RenderTargetState{{EALGFormat::kALGFormatR11G11B10_FLOAT}, EALGFormat::kALGFormatD32_FLOAT_S8X24_UINT};
             pso = std::move(GraphicsPipelineStateObject::Create(pso_desc));
-            g_pGfxContext->CreateResource(pso.get(), new UploadParamsGPSO(i, 0));
+            g_pGfxContext->CreateResource(pso.get(), AL_NEW_TAG(EMemoryTag::kRenderer, UploadParamsGPSO, i, 0));
             GraphicsPipelineStateMgr::AddPSO(std::move(pso));
         }
         memset(&pso_desc, 0, sizeof(GraphicsPipelineStateInitializer));
@@ -277,7 +278,7 @@ namespace Ailu::Render
             pso_desc._p_vertex_shader = shader;
             pso_desc._rt_state = RenderTargetState{{EALGFormat::kALGFormatR11G11B10_FLOAT}, EALGFormat::kALGFormatD32_FLOAT_S8X24_UINT};
             pso = std::move(GraphicsPipelineStateObject::Create(pso_desc));
-            g_pGfxContext->CreateResource(pso.get(), new UploadParamsGPSO(i, 0));
+            g_pGfxContext->CreateResource(pso.get(), AL_NEW_TAG(EMemoryTag::kRenderer, UploadParamsGPSO, i, 0));
             GraphicsPipelineStateMgr::AddPSO(std::move(pso));
         }
 
@@ -349,7 +350,8 @@ namespace Ailu::Render
                 gpso_desc._topology = shader->PipelineTopology(pass_id);
                 gpso_desc._rt_state = RenderTargetState::_s_hash_obj.Get(rt_state);
                 auto pso = GraphicsPipelineStateObject::Create(gpso_desc);
-                g_pGfxContext->CreateResource(pso.get(), new UploadParamsGPSO(pass_id, variant_hash));
+                g_pGfxContext->CreateResource(pso.get(),
+                                              AL_NEW_TAG(EMemoryTag::kRenderer, UploadParamsGPSO, pass_id, variant_hash));
                 {
                     std::lock_guard<std::mutex> l(g_pPSOMgr->_pso_lock);
                     g_pPSOMgr->_update_pso.emplace_back(std::move(pso));
@@ -362,7 +364,8 @@ namespace Ailu::Render
         gpso_desc._topology = shader->PipelineTopology(pass_id);
         gpso_desc._rt_state = RenderTargetState{};
         auto pso = GraphicsPipelineStateObject::Create(gpso_desc);
-        g_pGfxContext->CreateResource(pso.get(), new UploadParamsGPSO(pass_id, variant_hash));
+        g_pGfxContext->CreateResource(pso.get(),
+                                      AL_NEW_TAG(EMemoryTag::kRenderer, UploadParamsGPSO, pass_id, variant_hash));
         {
             std::lock_guard<std::mutex> l(g_pPSOMgr->_pso_lock);
             g_pPSOMgr->_update_pso.emplace_back(std::move(pso));
@@ -395,7 +398,8 @@ namespace Ailu::Render
             new_desc._p_vertex_shader = new_shader;
             new_desc._rt_state = RenderTargetState::_s_hash_obj.Get(rt_state);
             auto pso = std::move(GraphicsPipelineStateObject::Create(new_desc));
-            g_pGfxContext->CreateResource(pso.get(), new UploadParamsGPSO(pass_index, variant_hash));
+            g_pGfxContext->CreateResource(pso.get(),
+                                          AL_NEW_TAG(EMemoryTag::kRenderer, UploadParamsGPSO, pass_index, variant_hash));
             matched_pso = pso.get();
             GraphicsPipelineStateMgr::AddPSO(std::move(pso));
         }

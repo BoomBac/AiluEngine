@@ -6,6 +6,167 @@
 #include <Objects/SerializeSpecializations.h>
 #include <Framework/Common/Log.h>
 using namespace Ailu;
+const Ailu::Type* Ailu::Editor::Z_Construct_DockWindowPlacement_Type()
+{
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "DockWindowPlacement";
+initializer._size = sizeof(Ailu::Editor::DockWindowPlacement);
+initializer._full_name = "Ailu::Editor::DockWindowPlacement";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu::Editor";
+initializer._base_name = "";
+initializer._constructor = []()->Ailu::Editor::DockWindowPlacement* {return new Ailu::Editor::DockWindowPlacement;};
+Meta meta_dock_id;
+meta_dock_id.Set("Category","");
+meta_dock_id.Set("IsColor",false);
+meta_dock_id.Set("IsRange",false);
+meta_dock_id.Set("IsFloatRange",true);
+meta_dock_id.Set("RangeMin",(f32)0);
+meta_dock_id.Set("RangeMax",(f32)1);
+MemberBuilder builder_dock_id;
+builder_dock_id._name = "_dock_id";
+builder_dock_id._type_name = "String";
+builder_dock_id._offset = offsetof(DockWindowPlacement,_dock_id);
+builder_dock_id._is_const = false;
+builder_dock_id._is_static = false;
+builder_dock_id._is_public = true;
+builder_dock_id._is_pointer = false;
+builder_dock_id._is_ref = false;
+builder_dock_id._is_template = false;
+builder_dock_id._meta = meta_dock_id;
+builder_dock_id._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<String>);
+builder_dock_id._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<String>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_dock_id));
+Meta meta_position;
+meta_position.Set("Category","");
+meta_position.Set("IsColor",false);
+meta_position.Set("IsRange",false);
+meta_position.Set("IsFloatRange",true);
+meta_position.Set("RangeMin",(f32)0);
+meta_position.Set("RangeMax",(f32)1);
+MemberBuilder builder_position;
+builder_position._name = "_position";
+builder_position._type_name = "Vector2f";
+builder_position._offset = offsetof(DockWindowPlacement,_position);
+builder_position._is_const = false;
+builder_position._is_static = false;
+builder_position._is_public = true;
+builder_position._is_pointer = false;
+builder_position._is_ref = false;
+builder_position._is_template = false;
+builder_position._meta = meta_position;
+builder_position._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector2f>);
+builder_position._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector2f>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_position));
+Meta meta_size;
+meta_size.Set("Category","");
+meta_size.Set("IsColor",false);
+meta_size.Set("IsRange",false);
+meta_size.Set("IsFloatRange",true);
+meta_size.Set("RangeMin",(f32)0);
+meta_size.Set("RangeMax",(f32)1);
+MemberBuilder builder_size;
+builder_size._name = "_size";
+builder_size._type_name = "Vector2f";
+builder_size._offset = offsetof(DockWindowPlacement,_size);
+builder_size._is_const = false;
+builder_size._is_static = false;
+builder_size._is_public = true;
+builder_size._is_pointer = false;
+builder_size._is_ref = false;
+builder_size._is_template = false;
+builder_size._meta = meta_size;
+builder_size._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector2f>);
+builder_size._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector2f>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_size));
+Meta meta_native_window_position;
+meta_native_window_position.Set("Category","");
+meta_native_window_position.Set("IsColor",false);
+meta_native_window_position.Set("IsRange",false);
+meta_native_window_position.Set("IsFloatRange",true);
+meta_native_window_position.Set("RangeMin",(f32)0);
+meta_native_window_position.Set("RangeMax",(f32)1);
+MemberBuilder builder_native_window_position;
+builder_native_window_position._name = "_native_window_position";
+builder_native_window_position._type_name = "Vector2f";
+builder_native_window_position._offset = offsetof(DockWindowPlacement,_native_window_position);
+builder_native_window_position._is_const = false;
+builder_native_window_position._is_static = false;
+builder_native_window_position._is_public = true;
+builder_native_window_position._is_pointer = false;
+builder_native_window_position._is_ref = false;
+builder_native_window_position._is_template = false;
+builder_native_window_position._meta = meta_native_window_position;
+builder_native_window_position._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector2f>);
+builder_native_window_position._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector2f>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_native_window_position));
+Meta meta_native_window_size;
+meta_native_window_size.Set("Category","");
+meta_native_window_size.Set("IsColor",false);
+meta_native_window_size.Set("IsRange",false);
+meta_native_window_size.Set("IsFloatRange",true);
+meta_native_window_size.Set("RangeMin",(f32)0);
+meta_native_window_size.Set("RangeMax",(f32)1);
+MemberBuilder builder_native_window_size;
+builder_native_window_size._name = "_native_window_size";
+builder_native_window_size._type_name = "Vector2f";
+builder_native_window_size._offset = offsetof(DockWindowPlacement,_native_window_size);
+builder_native_window_size._is_const = false;
+builder_native_window_size._is_static = false;
+builder_native_window_size._is_public = true;
+builder_native_window_size._is_pointer = false;
+builder_native_window_size._is_ref = false;
+builder_native_window_size._is_template = false;
+builder_native_window_size._meta = meta_native_window_size;
+builder_native_window_size._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector2f>);
+builder_native_window_size._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector2f>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_native_window_size));
+Meta meta_is_external_window;
+meta_is_external_window.Set("Category","");
+meta_is_external_window.Set("IsColor",false);
+meta_is_external_window.Set("IsRange",false);
+meta_is_external_window.Set("IsFloatRange",true);
+meta_is_external_window.Set("RangeMin",(f32)0);
+meta_is_external_window.Set("RangeMax",(f32)1);
+MemberBuilder builder_is_external_window;
+builder_is_external_window._name = "_is_external_window";
+builder_is_external_window._type_name = "bool";
+builder_is_external_window._offset = offsetof(DockWindowPlacement,_is_external_window);
+builder_is_external_window._is_const = false;
+builder_is_external_window._is_static = false;
+builder_is_external_window._is_public = true;
+builder_is_external_window._is_pointer = false;
+builder_is_external_window._is_ref = false;
+builder_is_external_window._is_template = false;
+builder_is_external_window._meta = meta_is_external_window;
+builder_is_external_window._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_is_external_window._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_is_external_window));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+const Ailu::Type* Ailu::Editor::DockWindowPlacement::GetPrivateStaticClass()
+{
+	static const Ailu::Type* type = Z_Construct_DockWindowPlacement_Type();
+	return type;
+}
+
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::Editor::DockWindowPlacement>()
+{
+return Ailu::Editor::DockWindowPlacement::StaticType();
+}
+    const Type *Ailu::Editor::DockWindowPlacement::GetType()
+{
+return Ailu::Editor::DockWindowPlacement::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_DockWindowPlacement(&Ailu::Editor::DockWindowPlacement::StaticType, "Ailu::Editor::DockWindowPlacement");
 const Ailu::Type* Ailu::Editor::Z_Construct_DockNodeData_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -391,6 +552,27 @@ builder_node_data._meta = meta_node_data;
 builder_node_data._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<DockNodeData>>);
 builder_node_data._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<DockNodeData>>);
 initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_node_data));
+Meta meta_window_placements;
+meta_window_placements.Set("Category","");
+meta_window_placements.Set("IsColor",false);
+meta_window_placements.Set("IsRange",false);
+meta_window_placements.Set("IsFloatRange",true);
+meta_window_placements.Set("RangeMin",(f32)0);
+meta_window_placements.Set("RangeMax",(f32)1);
+MemberBuilder builder_window_placements;
+builder_window_placements._name = "_window_placements";
+builder_window_placements._type_name = "Vector<DockWindowPlacement>";
+builder_window_placements._offset = offsetof(DockNodeDataArray,_window_placements);
+builder_window_placements._is_const = false;
+builder_window_placements._is_static = false;
+builder_window_placements._is_public = true;
+builder_window_placements._is_pointer = false;
+builder_window_placements._is_ref = false;
+builder_window_placements._is_template = true;
+builder_window_placements._meta = meta_window_placements;
+builder_window_placements._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<DockWindowPlacement>>);
+builder_window_placements._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<DockWindowPlacement>>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_window_placements));
 cur_type = std::make_unique<Ailu::Type>(initializer);
 Ailu::Type::RegisterType(cur_type.get());
 }

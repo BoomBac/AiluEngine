@@ -6,6 +6,7 @@
 
 #include "AlgFormat.h"
 #include "Framework/Common/Hash.hpp"
+#include "Framework/Common/Allocator.hpp"
 #include "Framework/Common/Log.h"
 #include "Framework/Common/Path.h"
 #include "Framework/Common/ThreadPool.h"
@@ -34,7 +35,7 @@ namespace Ailu
         {
             static u8 *ExpandImageDataToFourChannel(u8 *p_data, size_t size, u8 channel, u8 alpha = 255u)
             {
-                u8 *new_data = new u8[size / channel * 4];
+                u8 *new_data = AL_ALLOC_TAG(EMemoryTag::kTemporary, u8, size / channel * 4);
                 auto pixel_num = size / channel;
                 for (size_t i = 0; i < pixel_num; i++)
                 {
@@ -52,7 +53,7 @@ namespace Ailu
                 int new_width = width >> 1;
                 int new_height = height >> 1;
                 int new_img_size = new_width * new_height * channels;
-                u8 *new_image = new u8[new_img_size];
+                u8 *new_image = AL_ALLOC_TAG(EMemoryTag::kTemporary, u8, new_img_size);
                 auto downsample_sub_task = [&](int xbegin, int xend, int ybegin, int yend, int new_width) -> bool
                 {
                     u8 blend_color[4]{};
@@ -811,7 +812,7 @@ namespace Ailu
             /// @return
             virtual TextureHandle DepthTexture(u16 view_index) { return 0; };
             virtual void GenerateMipmap() override;
-            //ret data need to be delete[] by client
+            // Returned data is allocated with AL_ALLOC and must be released with AL_FREE.
             virtual void *ReadBack(u16 mipmap, u16 array_slice = 0, ECubemapFace face = ECubemapFace::kUnknown) { return nullptr; };
             virtual void ReadBackAsync(std::function<void(void *)> callback, u16 mipmap, u16 array_slice = 0, ECubemapFace face = ECubemapFace::kUnknown) {};
             bool IsSwapChain() const { return _is_swapchain; }

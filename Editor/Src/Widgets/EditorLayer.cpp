@@ -1,4 +1,5 @@
 #include "Widgets/EditorLayer.h"
+#include "Framework/Common/Allocator.hpp"
 #include "Automation/AutomationService.h"
 #include "Widgets/AIAssistantWindow.h"
 #include "Common/Selection.h"
@@ -1191,7 +1192,7 @@ namespace Ailu
 
         EditorLayer::EditorLayer(const String &name) : Layer(name)
         {
-            s_prifile_wd = new ProfileWindow();
+            s_prifile_wd = AL_NEW_TAG(EMemoryTag::kEditor, ProfileWindow);
             s_prifile_wd->_content_size = Vector2f(800.0f, 600.0f);
 
             Selection::on_selection_changed += [this]()
@@ -1214,7 +1215,7 @@ namespace Ailu
 
         EditorLayer::~EditorLayer()
         {
-            delete s_prifile_wd; s_prifile_wd = nullptr;
+            AL_DELETE(s_prifile_wd);
         }
         UI::Text *g_text = nullptr;
         static void FindFirstText(UI::Widget *w)
@@ -1307,6 +1308,9 @@ namespace Ailu
                 UI::UIManager::Get()->UnRegisterWidget(_status_bar_widget.get());
             _toolbar_widget.reset();
             _status_bar_widget.reset();
+            _toolbar_border = nullptr;
+            _window_drag_area = nullptr;
+            _maximize_button = nullptr;
             _status_bar_border = nullptr;
             _status_left_text = nullptr;
             _status_right_text = nullptr;
@@ -1322,6 +1326,7 @@ namespace Ailu
         static CCDSolver fabrik_solver;
         void EditorLayer::OnEvent(Event &e)
         {
+            DockManager::Get().OnEvent(e);
             if (e.GetEventType() == EEventType::kKeyPressed)
             {
                 auto &key_e = static_cast<KeyPressedEvent &>(e);
@@ -1562,13 +1567,42 @@ namespace Ailu
                 e._is_handled = true;
             };
 
-            auto *spacer = toolbar->AddChild<UI::Text>("");
-            spacer->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
-
-            auto *title = toolbar->AddChild<UI::Text>("AiluEngine");
+            _window_drag_area = toolbar->AddChild<UI::Border>();
+            _window_drag_area->Thickness(0.0f);
+            _window_drag_area->_bg_color = Colors::kTransparent;
+            _window_drag_area->GetStyleOverride().SetBorderWidth(0.0f);
+            _window_drag_area->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
+            auto *title = _window_drag_area->AddChild<UI::Text>("AiluEngine");
             title->_color = Colors::kGray;
-            title->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kAuto, UI::ESizePolicy::kFill)
-                    .Margin({0.0f, 0.0f, 10.0f, 0.0f});
+            title->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill)
+                    .Margin({10.0f, 0.0f, 10.0f, 0.0f});
+
+            auto add_window_button = [toolbar](const String &text) -> UI::Button *
+            {
+                auto *button = toolbar->AddChild<UI::Button>(text);
+                button->SetStyleId("WindowControl");
+                button->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFill)
+                        .Size({46.0f, 0.0f});
+                return button;
+            };
+            auto *minimize = add_window_button("-");
+            minimize->OnMouseClick() += [](UI::UIEvent &e)
+            {
+                Application::Get().GetWindow().Minimize();
+                e._is_handled = true;
+            };
+            _maximize_button = add_window_button("[]");
+            _maximize_button->OnMouseClick() += [](UI::UIEvent &e)
+            {
+                Application::Get().GetWindow().ToggleMaximize();
+                e._is_handled = true;
+            };
+            auto *close = add_window_button("x");
+            close->OnMouseClick() += [](UI::UIEvent &e)
+            {
+                Application::Get().GetWindow().RequestClose();
+                e._is_handled = true;
+            };
             _toolbar_widget->AddToWidget(toolbar_border);
             _toolbar_border = toolbar_border.get();
             UI::UIManager::Get()->RegisterWidget(_toolbar_widget);
@@ -1607,6 +1641,13 @@ namespace Ailu
             const f32 dock_height = std::max(0.0f, window_size.y - g_editor_style._toolbar_height - g_editor_style._status_bar_height);
             ResizeWidgetRoot(_toolbar_widget, Vector2f::kZero, {window_size.x, g_editor_style._toolbar_height});
             ResizeWidgetRoot(_status_bar_widget, {0.0f, g_editor_style._toolbar_height + dock_height}, {window_size.x, g_editor_style._status_bar_height});
+            if (_window_drag_area)
+            {
+                const Vector4f drag_rect = _window_drag_area->GetArrangeRect();
+                window.ReserveArea(drag_rect.x, drag_rect.y, drag_rect.z, drag_rect.w);
+            }
+            if (_maximize_button)
+                _maximize_button->SetText(window.IsMaximized() ? "<>" : "[]", false);
             DockManager::Get().SetMainDockArea({0.0f, g_editor_style._toolbar_height}, {window_size.x, dock_height});
 
             auto *scene = SceneMgr::Get().ActiveScene();

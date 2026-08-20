@@ -49,6 +49,8 @@ namespace Ailu
             Ref<UI::Widget> _toolbar_widget = nullptr;
             Ref<UI::Widget> _status_bar_widget = nullptr;
             UI::Border *_toolbar_border = nullptr;
+            UI::Border *_window_drag_area = nullptr;
+            UI::Button *_maximize_button = nullptr;
             UI::Border *_status_bar_border = nullptr;
             UI::Text *_status_left_text = nullptr;
             UI::Text *_status_right_text = nullptr;

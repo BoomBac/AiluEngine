@@ -22,8 +22,8 @@ namespace Ailu
         private:
             void DrawLightGizmo(const ECS::TransformComponent& transf, const ECS::LightComponent& comp);
             void CollectSprites(const SceneManagement::Scene &scene, const Camera &camera, bool selected_only);
-            void RecordSpritePick(RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data);
-            void RecordSpriteSelection(RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data, RDG::RGHandle target);
+            void RecordSpritePick(CommandBuffer *cmd, const RenderingData &rendering_data);
+            void RecordSpriteSelection(CommandBuffer *cmd, const RenderingData &rendering_data);
 
         private:
             Scope<Material> _pick_gen;

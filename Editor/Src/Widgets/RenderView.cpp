@@ -1,4 +1,5 @@
 #include "Widgets/RenderView.h"
+#include "Framework/Common/Allocator.hpp"
 #include "UI/Basic.h"
 #include "UI/Container.h"
 #include "Render/Camera.h"
@@ -903,7 +904,7 @@ namespace Ailu
             _right_menu->GetSlot()->Size({100.0f, 100.0f});
             _right_menu->SlotPadding() = UI::Padding(_content_root->Thickness());
             _right_menu->InvalidateLayout();
-            _pass = new Render::VolumeTexturePreviewPass();
+            _pass = AL_NEW_TAG(EMemoryTag::kEditor, Render::VolumeTexturePreviewPass);
             _orbit_controller.Attach(_pass);
             auto pass_type = _pass->GetType();
             _right_menu->AddChild(UI::CompositeBuilder::BuildPropertyElement("CameraPos", pass_type->FindPropertyByName("_camera_pos"), _pass));
@@ -953,7 +954,7 @@ namespace Ailu
 
         Texture3DView::~Texture3DView()
         {
-            delete _pass; _pass = nullptr;
+            AL_DELETE(_pass);
             //Render::RenderPipeline::Get().GetRenderer()->RemoveTaskPass(_pass);
         }
         void Texture3DView::Update(f32 dt)

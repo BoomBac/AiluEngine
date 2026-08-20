@@ -31,7 +31,8 @@ namespace Ailu
             kNoResize = 1 << 1,
             kNoMove = 1 << 2,
             kNoCollapse = 1 << 3,
-            kFullSize = 1 << 4//窗口内容区撑满整个窗口
+            kFullSize = 1 << 4,//窗口内容区撑满整个窗口
+            kKeepTabBar = 1 << 5//即使只剩一个标签，也保留标签宿主
         };
 
         class DockWindow;
@@ -46,11 +47,15 @@ namespace Ailu
             virtual void Update(f32 dt) = 0;
             virtual bool IsHover(Vector2f pos) const = 0;
             virtual void SetFocus(bool is_focus) = 0;
+            virtual void CaptureStandaloneRect() = 0;
             virtual void SetTabActive(bool is_active) = 0;
             virtual void RestoreStandaloneFromTab() = 0;
             virtual bool ContainsWindow(DockWindow *w) const = 0;
             virtual DockWindow *PrimaryWindow() const = 0;
             virtual void AttachToWindow(Window *w) = 0;
+            virtual bool ContainsWidget(UI::Widget *widget) const = 0;
+            virtual bool CanClose() const = 0;
+            virtual void RequestClose() = 0;
         };
 
         using UI::Widget;
@@ -79,6 +84,10 @@ namespace Ailu
             void SetTitleBarVisibility(bool is_visibility,bool is_expand_content = false);
             void SetContentVisibility(bool is_visibility);
             String GetTitle() const;
+            virtual String GetDockPersistenceId() const
+            {
+                return const_cast<DockWindow *>(this)->GetType()->FullName();
+            }
             void SetTitle(String title);
             void SetFocus(bool is_focus);
             bool IsFocus() const { return _is_focused; }
@@ -100,12 +109,18 @@ namespace Ailu
             Vector2f Size() const override { return _size; };
             void SetSize(Vector2f size);
             void SetPosition(Vector2f position);
+            void CaptureStandaloneRect() override;
             void SetTabActive(bool is_active) override;
             void RestoreStandaloneFromTab() override;
             bool ContainsWindow(DockWindow *w) const override { return this == w; }
+            bool ContainsWidget(UI::Widget *widget) const override
+            {
+                return widget == _title_widget.get() || widget == _content_widget.get();
+            }
             DockWindow *PrimaryWindow() const override { return const_cast<DockWindow *>(this); }
             void AttachToWindow(Window *w) override;
-            virtual void RequestClose();
+            void RequestClose() override;
+            bool CanClose() const override { return true; }
             virtual void SaveDockLayoutState(JsonArchive &ar) {}
             virtual void LoadDockLayoutState(JsonArchive &ar) {}
             virtual void OnDockLayoutLoaded() {}
@@ -129,6 +144,9 @@ namespace Ailu
             Vector2f _drag_start_mouse_pos;
             Vector2f _drag_start_offset;
             Vector2f _pre_mouse_pos;
+            Vector2f _standalone_position;
+            Vector2f _standalone_size;
+            bool _has_standalone_rect = false;
             bool _is_dirty = true;
             bool _is_title_bar_visible = true;
             bool _is_expand_content_when_title_hidden = false;
@@ -158,6 +176,7 @@ namespace Ailu
             /// <returns>combine of EHoverEdgeDir</returns>
             u32 HoverEdge(Vector2f pos) const;
             bool HoverDragArea(Vector2f pos) const;
+            bool HoverTabBar(Vector2f pos) const;
             bool IsHover(Vector2f pos) const;
             Ref<IDockTabItem> ActiveItem() const;
             DockWindow *ActivePrimaryWindow() const;

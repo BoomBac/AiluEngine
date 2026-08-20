@@ -8,6 +8,8 @@
 
 namespace Ailu
 {
+    class Asset;
+
     struct AILU_API GraphDocumentSnapshot
     {
         Vector<GraphNodeData> _nodes;
@@ -71,11 +73,11 @@ namespace Ailu
         GraphDocument();
         ~GraphDocument();
 
-        bool Open(GraphAsset *asset);
+        bool Open(GraphAsset *asset, ::Ailu::Asset *asset_wrapper = nullptr);
         void Close();
         bool Apply();
         void Revert();
-        bool IsDirty() const { return _is_dirty; }
+        bool IsDirty() const;
         GraphAsset *Asset() const { return _asset; }
 
         const Vector<GraphNodeData> &Nodes() const { return _editing_nodes; }
@@ -138,10 +140,12 @@ namespace Ailu
                            std::span<const GraphCommentData> comments = {});
         void RepairLoadedNodePins();
         void CanonicalizeLoadedLinks();
+        void SyncAssetFromEditing();
         void MarkDirty();
 
     private:
         GraphAsset *_asset = nullptr;
+        ::Ailu::Asset *_asset_wrapper = nullptr;
         Vector<GraphNodeData> _original_nodes;
         Vector<GraphLinkData> _original_links;
         Vector<GraphCommentData> _original_comments;
@@ -154,7 +158,6 @@ namespace Ailu
         Scope<IGraphSchema> _schema;
         GraphCommandStack _command_stack;
         Vector<GraphValidationMessage> _validation_messages;
-        bool _is_dirty = false;
     };
 
     class AILU_API GraphSnapshotCommand : public IGraphCommand
@@ -174,6 +177,9 @@ namespace Ailu
         GraphDocumentSnapshot _before;
         GraphDocumentSnapshot _after;
         bool _has_snapshot = false;
+        u64 _before_revision = 0;
+        u64 _after_revision = 0;
+        bool _has_asset_revision = false;
     };
 
     class AILU_API AddGraphNodeCommand final : public GraphSnapshotCommand

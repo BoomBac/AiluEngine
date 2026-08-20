@@ -47,7 +47,7 @@ namespace Ailu
 
             SkeletonPose &sample_pose = _sample_poses[sample_index];
             sample_pose = skeleton.GetBindPose();
-            SampleClip(*binding, sample._time, sample_pose);
+            SampleClip(*binding, sample._time, sample._loop, sample_pose);
 
             const f32 next_weight = accumulated_weight + sample._weight;
             const f32 blend_weight = next_weight > 0.0f ? sample._weight / next_weight : 0.0f;
@@ -86,7 +86,8 @@ namespace Ailu
             pose = skeleton.GetBindPose();
     }
 
-    void SkeletonAnimationBinding::SampleClip(const ClipBinding &binding, f32 time, SkeletonPose &out_pose) const
+    void SkeletonAnimationBinding::SampleClip(const ClipBinding &binding, f32 time, bool loop,
+                                              SkeletonPose &out_pose) const
     {
         const AnimationClip &clip = *binding._clip;
         for (u32 track_index = 0u; track_index < clip.Size(); ++track_index)
@@ -96,7 +97,7 @@ namespace Ailu
                 continue;
             const TransformTrack &track = clip.GetTrackAtIndex(track_index);
             const Transform local = out_pose.GetLocalTransform(joint_index);
-            out_pose.SetLocalTransform(joint_index, track.Evaluate(local, time, clip.IsLooping()));
+            out_pose.SetLocalTransform(joint_index, track.Evaluate(local, time, loop));
         }
     }
 }

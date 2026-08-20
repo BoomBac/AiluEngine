@@ -40,6 +40,10 @@ namespace Ailu
         void ClearOwner(InputChannel channel, EInputOwner owner = EInputOwner::kNone);
         EInputOwner GetOwner(InputChannel channel) const;
         bool IsOwnedBy(InputChannel channel, EInputOwner owner) const;
+        void CaptureMouse(EInputOwner owner);
+        void ReleaseMouseCapture(EInputOwner owner = EInputOwner::kNone);
+        bool IsMouseCaptured() const;
+        bool IsMouseCapturedBy(EInputOwner owner) const;
 
     private:
         EInputOwner &_GetOwner(InputChannel channel);
@@ -50,6 +54,7 @@ namespace Ailu
         EInputOwner _keyboard_owner = EInputOwner::kNone;
         EInputOwner _text_owner = EInputOwner::kNone;
         EInputOwner _gamepad_owner = EInputOwner::kNone;
+        EInputOwner _mouse_capture_owner = EInputOwner::kNone;
     };
 
     class Window;

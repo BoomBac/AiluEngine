@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "Framework/Parser/DDSParser.h"
 #include "Framework/Common/FileManager.h"
+#include "Framework/Common/Allocator.hpp"
 #include "Ext/dds_loader/DDSTextureLoader12.h"
 #include "RHI/DX12/D3DContext.h"
 #include "RHI/DX12/dxhelper.h"
@@ -234,7 +235,7 @@ namespace Ailu
             assert(BitsPerPixel(format) != 0);
         }
         data._format = DXGIToETextureFormat(format);
-        u8* raw_data = new u8[bitSize];
+        u8* raw_data = AL_ALLOC_TAG(EMemoryTag::kTemporary, u8, bitSize);
         memcpy(raw_data, bitData, bitSize);
         data._data.emplace_back(raw_data);
         return true;

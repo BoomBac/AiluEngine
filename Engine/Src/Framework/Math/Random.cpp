@@ -1,4 +1,5 @@
 #include "Framework/Math/Random.hpp"
+#include "Framework/Common/Allocator.hpp"
 #include "pch.h"
 
 namespace Ailu::Random
@@ -56,9 +57,11 @@ namespace Ailu::Random
 
     NoiseGenerator::NoiseGenerator(u32 seed)
     {
-        _perlin_grads = new Vector2f[kMaxNoiseCellCount * kMaxNoiseCellCount];
-        _perlin_grad3ds = new Vector3f[kMaxNoiseCellCount * kMaxNoiseCellCount * kMaxNoiseCellCount];
-        _voronoi_offsets = new Vector3f[kMaxNoiseCellCount * kMaxNoiseCellCount * kMaxNoiseCellCount];
+        _perlin_grads = AL_ALLOC_TAG(EMemoryTag::kTemporary, Vector2f, kMaxNoiseCellCount * kMaxNoiseCellCount);
+        _perlin_grad3ds = AL_ALLOC_TAG(EMemoryTag::kTemporary, Vector3f,
+                                       kMaxNoiseCellCount * kMaxNoiseCellCount * kMaxNoiseCellCount);
+        _voronoi_offsets = AL_ALLOC_TAG(EMemoryTag::kTemporary, Vector3f,
+                                        kMaxNoiseCellCount * kMaxNoiseCellCount * kMaxNoiseCellCount);
         std::mt19937 rng(seed);
         std::uniform_real_distribution<f32> dist(0.0f, 1.0f);
         auto dice = std::bind(dist, rng);
@@ -80,9 +83,9 @@ namespace Ailu::Random
 
     NoiseGenerator::~NoiseGenerator()
     {
-        delete[] _perlin_grads;
-        delete[] _perlin_grad3ds;
-        delete[] _voronoi_offsets;
+        AL_FREE(_perlin_grads);
+        AL_FREE(_perlin_grad3ds);
+        AL_FREE(_voronoi_offsets);
     }
 
     f32 NoiseGenerator::Perlin2D(f32 u, f32 v, f32 cell_size)

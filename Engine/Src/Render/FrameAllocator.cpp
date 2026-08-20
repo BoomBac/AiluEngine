@@ -1,5 +1,6 @@
 #include "Render/FrameAllocator.h"
 #include "Framework/Common/Log.h"
+#include "Framework/Common/Allocator.hpp"
 #include <algorithm>
 
 namespace Ailu::Render
@@ -19,8 +20,7 @@ namespace Ailu::Render
     {
         for (auto &page: _pages)
         {
-            delete[] page._data;
-            page._data = nullptr;
+            AL_FREE(page._data);
         }
         _pages.clear();
         _total_size = 0u;
@@ -32,7 +32,7 @@ namespace Ailu::Render
         Page page;
         page._size = size;
         page._offset = 0u;
-        page._data = new u8[size];
+        page._data = AL_ALLOC_TAG(EMemoryTag::kTemporary, u8, size);
         _pages.emplace_back(page);
         _total_size += size;
     }

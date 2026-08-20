@@ -1,4 +1,5 @@
 #include "Render/GraphicsContext.h"
+#include "Framework/Common/Allocator.hpp"
 #include "Framework/Common/Application.h"
 #include "RHI/DX12/D3DContext.h"
 #include "RHI/DX12/GPUResourceManager.h"
@@ -16,8 +17,8 @@ namespace Ailu::Render
 	void GraphicsContext::InitGlobalContext()
 	{
         TimerBlock b("----------------------------------------------------------- GraphicsContext::InitGlobalContext");
-		g_pRenderTexturePool = new RenderTexturePool();//在ctx之前，使得backbuffer可以被注册到池中
-		g_pGfxContext = new RHI::DX12::D3DContext();
+		g_pRenderTexturePool = AL_NEW_TAG(EMemoryTag::kRenderer, RenderTexturePool);//在ctx之前，使得backbuffer可以被注册到池中
+		g_pGfxContext = AL_NEW_TAG(EMemoryTag::kRenderer, RHI::DX12::D3DContext);
 		g_pGfxContext->Init();
 		CommandPool::Init();
         RHI::DX12::GpuResourceManager::Init();
@@ -38,8 +39,8 @@ namespace Ailu::Render
         FrameResourceManager::Shutdown();
         RHI::DX12::GpuResourceManager::Shutdown();
 		CommandPool::Shutdown();
-		delete g_pRenderTexturePool; g_pRenderTexturePool = nullptr;
-		delete g_pGfxContext; g_pGfxContext = nullptr;
+		AL_DELETE(g_pRenderTexturePool);
+		AL_DELETE(g_pGfxContext);
 	}
     GraphicsContext &GraphicsContext::Get()
     {

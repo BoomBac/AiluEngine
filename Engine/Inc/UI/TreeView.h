@@ -49,9 +49,18 @@ namespace Ailu
             TreeItemId _item = kInvalidTreeItemId;
         };
 
+        enum class ETreeDropLocation
+        {
+            kOnItem,
+            kBeforeItem,
+            kAfterItem
+        };
+
         using TreeCanDragCallback = std::function<bool(TreeItemId)>;
         using TreeCanDropCallback = std::function<bool(TreeView*, TreeItemId, TreeItemId)>;
         using TreeDropCallback = std::function<void(TreeView*, TreeItemId, TreeItemId)>;
+        using TreeCanDropAtCallback = std::function<bool(TreeView*, TreeItemId, TreeItemId, ETreeDropLocation)>;
+        using TreeDropAtCallback = std::function<void(TreeView*, TreeItemId, TreeItemId, ETreeDropLocation)>;
         using TreeExternalCanDropCallback = std::function<bool(const DragPayload &, TreeItemId)>;
         using TreeExternalDropCallback = std::function<void(const DragPayload &, TreeItemId, Vector2f)>;
 
@@ -92,6 +101,8 @@ namespace Ailu
             void SetCanDragCallback(TreeCanDragCallback callback) { _can_drag_callback = std::move(callback); }
             void SetCanDropCallback(TreeCanDropCallback callback) { _can_drop_callback = std::move(callback); }
             void SetDropCallback(TreeDropCallback callback) { _drop_callback = std::move(callback); }
+            void SetCanDropAtCallback(TreeCanDropAtCallback callback) { _can_drop_at_callback = std::move(callback); }
+            void SetDropAtCallback(TreeDropAtCallback callback) { _drop_at_callback = std::move(callback); }
             void SetExternalCanDropCallback(TreeExternalCanDropCallback callback)
             {
                 _external_can_drop_callback = std::move(callback);
@@ -130,6 +141,9 @@ namespace Ailu
             void OnRowDoubleClicked(TreeItemId item);
             void OnRowContextMenu(TreeItemId item, Vector2f pos);
             void HandleDrop(const DragPayload& payload, f32 x, f32 y, TreeItemId target);
+            ETreeDropLocation ResolveDropLocation(TreeItemId target, f32 y) const;
+            bool CanDropAt(TreeView *source_tree, TreeItemId source, TreeItemId target, ETreeDropLocation location) const;
+            void UpdateDropPreview(TreeItemId target, ETreeDropLocation location, bool can_drop);
 
             ITreeViewDataSource* _data_source = nullptr;
             Vector<VisibleTreeItem> _visible_items;
@@ -145,6 +159,8 @@ namespace Ailu
             TreeCanDragCallback _can_drag_callback;
             TreeCanDropCallback _can_drop_callback;
             TreeDropCallback _drop_callback;
+            TreeCanDropAtCallback _can_drop_at_callback;
+            TreeDropAtCallback _drop_at_callback;
             TreeExternalCanDropCallback _external_can_drop_callback;
             TreeExternalDropCallback _external_drop_callback;
             bool _expand_on_row_click = false;
@@ -153,6 +169,8 @@ namespace Ailu
             TreeItemId _drag_pending_item = kInvalidTreeItemId;
             Vector2f _drag_pending_mouse_pos = Vector2f::kZero;
             bool _is_drag_started = false;
+            TreeItemId _drop_preview_item = kInvalidTreeItemId;
+            ETreeDropLocation _drop_preview_location = ETreeDropLocation::kOnItem;
 
             bool _is_suppress_selection_notify = false;
 

@@ -1,6 +1,7 @@
 #include "PlayerApp.h"
 
 #include "Framework/Common/FileManager.h"
+#include "Framework/Common/Allocator.hpp"
 #include "Framework/Common/ResourceMgr.h"
 #include "Framework/Common/Utils.h"
 #include "Objects/JsonArchive.h"
@@ -29,8 +30,8 @@ namespace Ailu
         if (ret != 0)
             return ret;
 
-        _pipeline = MakeScope<Render::RenderPipeline>();
-        Render::RenderPipeline::Register(_pipeline.get());
+        _pipeline = AL_NEW_TAG(EMemoryTag::kRenderer, Render::RenderPipeline);
+        Render::RenderPipeline::Register(_pipeline);
         SceneManagement::SceneMgr::Get().OpenScene(_startup_scene_path);
         SceneManagement::SceneMgr::Get().Tick(0.0f);
         BindActiveSceneCamera();
@@ -39,6 +40,7 @@ namespace Ailu
 
     void PlayerApp::Finalize()
     {
+        AL_DELETE(_pipeline);
         LogMgr::Shutdown();
         Application::Finalize();
     }

@@ -32,6 +32,7 @@ namespace Ailu
             void RenderImpl(UIRenderer &r) final;
             void ResolveStyle(const UIStyleContext &context) override;
             const UIControlVisual *GetVisual(EUIVisualState state) const override;
+            UIControlVisualOverride *GetPropertyVisualOverride() override { return &_style_override; }
 
             UIControlVisualOverride _style_override;
             mutable UIControlVisual _resolved_visual;
@@ -60,6 +61,7 @@ namespace Ailu
             void RenderImpl(UIRenderer &r) override;
             void ResolveStyle(const UIStyleContext &context) override;
             const UIControlVisual *GetVisual(EUIVisualState state) const override;
+            UIControlVisualOverride *GetPropertyVisualOverride() override { return &_style_override; }
         private:
             EOrientation _orientation;
             UIControlVisualOverride _style_override;
@@ -145,6 +147,9 @@ namespace Ailu
 
             void AddItem(Ref<UIElement> item);
             void ClearItems();
+            void SetSelectedIndex(i32 index);
+            void SetSelectedIndices(const Vector<i32> &indices);
+            const Vector<i32> &GetSelectedIndices() const { return _selected_indices; }
             void SizeToContent(bool enable);
             bool IsSizeToContent() const { return _is_size_to_content; }
             void SetBackgroundBrush(const UIBrush &brush);
@@ -164,6 +169,8 @@ namespace Ailu
             VerticalBox *_content_box = nullptr;// 用于布局子项
             UIElement *_hovered_item = nullptr;
             UIElement *_selected_item = nullptr;
+            Vector<i32> _selected_indices;
+            i32 _selection_anchor = -1;
             UIBrush _background_brush;
             bool _is_background_brush_set = false;
             Vector4f _backdrop_source_rect = Vector4f::kZero;
@@ -175,7 +182,7 @@ namespace Ailu
         };
 
         class Text;
-        class Button;
+        class Border;
         ACLASS()
         class AILU_API Dropdown : public UIElement
         {
@@ -191,23 +198,43 @@ namespace Ailu
             String GetSelectedText() const;
             void SetItems(const Vector<String> &items) { _items = items; }
             void SetPopupBackdrop(Render::Texture *texture, const Vector4f &source_rect);
+            using PopupItemBuilder = std::function<Ref<UIElement>(i32)>;
+            using PopupBuilder = std::function<Ref<UIElement>(Vector2f)>;
+            void SetPopupItemBuilder(PopupItemBuilder builder) { _popup_item_builder = std::move(builder); }
+            void SetPopupBuilder(PopupBuilder builder) { _popup_builder = std::move(builder); }
+            void SetOnPopupOpening(std::function<void()> callback) { _on_popup_opening = std::move(callback); }
+
+            // ── Style ────────────────────────────────────────────
+            void SetStyleId(const UIStyleId &id);
+            const UIStyleId &GetStyleId() const { return _style_id; }
+            UIButtonStyleOverride &GetStyleOverride() { return _style_override; }
+
             Vector2f MeasureDesiredSize() final;
         private:
             void RenderImpl(UIRenderer &r) final;
             void PostDeserialize() final;
             UIElement *HitTest(Vector2f pos) final;
             void PostArrange() final;
+            void ResolveStyle(const UIStyleContext &context) override;
+            const UIControlVisual *GetVisual(EUIVisualState state) const override;
         private:
             APROPERTY()
             Vector<String> _items;
             i32 _selected_index = -1;
             Vector4f _button_rect;
-            HorizontalBox* _root;
+            Border *_border;
+            HorizontalBox *_root;
             Text *_text;
-            Button *_button;
+            Text *_button;
             bool _is_dropdown_open = false;
             Render::Texture *_popup_backdrop_texture = nullptr;
             Vector4f _popup_backdrop_source_rect = Vector4f::kZero;
+            PopupItemBuilder _popup_item_builder;
+            PopupBuilder _popup_builder;
+            std::function<void()> _on_popup_opening;
+            UIStyleId _style_id;
+            UIButtonStyleOverride _style_override;
+            UIButtonStyle _resolved_style;
         };
 
         ACLASS()
@@ -279,6 +306,7 @@ namespace Ailu
             Vector4f CalculateSplitBarRect(bool is_absolute) const;
             void ResolveStyle(const UIStyleContext &context) override;
             const UIControlVisual *GetVisual(EUIVisualState state) const override;
+            UIControlVisualOverride *GetPropertyVisualOverride() override { return &_style_override; }
         private:
             APROPERTY()
             f32 _ratio = 0.5f;

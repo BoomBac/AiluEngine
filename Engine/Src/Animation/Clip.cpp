@@ -6,6 +6,20 @@ namespace Ailu
     AnimationClip::AnimationClip() : Object("animation_clip"), _frame_count(0), _duration(0.f), _frame_rate(30u), _frame_duration(0.f), _start_time(0.f), _end_time(0.f), _is_looping(true)
     {
     }
+    void AnimationClip::CopyFrom(const AnimationClip &source)
+    {
+        Name(source.Name());
+        _start_time = source._start_time;
+        _end_time = source._end_time;
+        _frame_count = source._frame_count;
+        _duration = source._duration;
+        _frame_rate = source._frame_rate;
+        _frame_duration = source._frame_duration;
+        _is_looping = source._is_looping;
+        _tracks = source._tracks;
+        _sprite_track = source._sprite_track;
+        _events = source._events;
+    }
     u16 AnimationClip::GetIdAtIndex(u32 index) const
     {
         return _tracks[index].GetId();
@@ -23,22 +37,6 @@ namespace Ailu
         const auto it = std::lower_bound(_events.begin(), _events.end(), event._time,
                                          [](const AnimationEvent &item, f32 time) { return item._time < time; });
         _events.insert(it, std::move(event));
-    }
-    f32 AnimationClip::Sample(Pose &pose, f32 time)
-    {
-        AL_ASSERT(pose.Size() != 0);
-        if (_duration == 0.f)
-            return 0.f;
-        time = AdjustTimeToFitRange(time);
-        u32 size = (u32)_tracks.size();
-        for (u32 i = 0; i < size; i++)
-        {
-            u16 joint_index = _tracks[i].GetId();
-            Transform local = pose.GetLocalTransform(joint_index);
-            Transform animated = _tracks[i].Evaluate(local, time, _is_looping);
-            pose.SetLocalTransform(joint_index, animated);
-        }
-        return time;
     }
 
     TransformTrack &AnimationClip::operator[](u16 joint)
@@ -81,31 +79,6 @@ namespace Ailu
         }
         _duration = _end_time - _start_time;
     }
-    f32 AnimationClip::AdjustTimeToFitRange(f32 in_time) const
-    {
-        if (_is_looping)
-        {
-            f32 duration = _end_time - _start_time;
-            if (duration <= 0) { 0.0f; }
-            in_time = fmodf(in_time - _start_time, _end_time - _start_time);
-            if (in_time < 0.0f)
-            {
-                in_time += _end_time - _start_time;
-            }
-            in_time += _start_time;
-        }
-        else
-        {
-            in_time = std::clamp(in_time, _start_time, _end_time);
-        }
-        return in_time;
-    }
-    f32 AnimationClip::GetNormalizedTime(f32 in_time) const
-    {
-        in_time = AdjustTimeToFitRange(in_time);
-        return in_time / _duration;
-    }
-
     void AnimationClipLibrary::AddClip(const String &name, Ref<AnimationClip> clip)
     {
         s_clips.insert(std::make_pair(name, clip));

@@ -309,7 +309,7 @@ namespace Ailu::Render
         _is_ready_for_rendering = false;
         for (size_t i = 0; i < _pixel_data.size(); i++)
         {
-            delete _pixel_data[i]; _pixel_data[i] = nullptr;
+            AL_FREE(_pixel_data[i]);
         }
         _pixel_data.clear();
     }
@@ -408,7 +408,7 @@ namespace Ailu::Render
         {
             auto [w, h] = CalculateMipSize(_width, _height, i);
             u64 cur_mipmap_byte_size = std::max<u64>(w * h * _pixel_size,4u);
-            _pixel_data[i] = new u8[cur_mipmap_byte_size];
+            _pixel_data[i] = AL_ALLOC_TAG(EMemoryTag::kTemporary, u8, cur_mipmap_byte_size);
             memset(_pixel_data[i], 0, cur_mipmap_byte_size);
             _mem_size += cur_mipmap_byte_size;
         }
@@ -578,7 +578,8 @@ namespace Ailu::Render
             {
                 auto [w, h] = Texture::CalculateMipSize(_width, _width, mipmap);
                 u64 cur_mipmap_byte_size = std::max<u64>(w * h * _pixel_size, 4u);
-                _pixel_data[face * _mipmap_count + mipmap] = new u8[cur_mipmap_byte_size];
+                _pixel_data[face * _mipmap_count + mipmap] =
+                    AL_ALLOC_TAG(EMemoryTag::kTemporary, u8, cur_mipmap_byte_size);
                 memset(_pixel_data[face * _mipmap_count + mipmap], 0, cur_mipmap_byte_size);
                 _mem_size += cur_mipmap_byte_size;
             }
@@ -672,7 +673,7 @@ namespace Ailu::Render
             auto [w, h, d] = Texture::CalculateMipSize(_width, _width, _depth, i);
             u64 row_size = AlignTo(w * _pixel_size,256);
             u64 cur_mipmap_byte_size = row_size * h * d;
-            _pixel_data[i] = new u8[cur_mipmap_byte_size];
+            _pixel_data[i] = AL_ALLOC_TAG(EMemoryTag::kTemporary, u8, cur_mipmap_byte_size);
             memset(_pixel_data[i], 0, cur_mipmap_byte_size);
             _mem_size += cur_mipmap_byte_size;
         }
@@ -682,7 +683,7 @@ namespace Ailu::Render
     {
         for (auto p: _pixel_data)
         {
-            delete[] p; p = nullptr;
+            AL_FREE(p);
         }
     }
 

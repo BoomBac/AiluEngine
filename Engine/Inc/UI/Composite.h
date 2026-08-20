@@ -52,6 +52,13 @@ namespace Ailu
             f32 _step = 0.01f;
         };
 
+        struct ObjectAssetFieldParams : public CompositeBuilder::Params
+        {
+        public:
+            const Type *_object_type = nullptr;
+            bool _allow_none = true;
+        };
+
     }
 }
 #endif // UI_COMPOSITE_H

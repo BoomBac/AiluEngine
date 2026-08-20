@@ -1,6 +1,7 @@
 #include "Audio/Backend/MiniaudioBackend.h"
 #include "Audio/AudioClip.h"
 #include "Framework/Common/Log.h"
+#include "Framework/Common/Allocator.hpp"
 #include "Framework/Common/ResourceMgr.h"
 #include "Framework/Common/Utils.h"
 
@@ -49,14 +50,13 @@ namespace Ailu
         if (_impl && _impl->_initialized)
             return true;
 
-        _impl = new Implementation();
+        _impl = AL_NEW_TAG(EMemoryTag::kAudio, Implementation);
 
         ma_engine_config engine_config = ma_engine_config_init();
         engine_config.sampleRate = config._sample_rate;
         if (ma_engine_init(&engine_config, &_impl->_engine) != MA_SUCCESS)
         {
-            delete _impl;
-            _impl = nullptr;
+            AL_DELETE(_impl);
             return false;
         }
 
@@ -64,8 +64,7 @@ namespace Ailu
         if (master_result != MA_SUCCESS)
         {
             ma_engine_uninit(&_impl->_engine);
-            delete _impl;
-            _impl = nullptr;
+            AL_DELETE(_impl);
             return false;
         }
         _impl->_group_initialized[BusIndex(EAudioBus::kMaster)] = true;
@@ -105,8 +104,7 @@ namespace Ailu
         }
 
         ma_engine_uninit(&_impl->_engine);
-        delete _impl;
-        _impl = nullptr;
+        AL_DELETE(_impl);
     }
 
     void MiniaudioBackend::Update()

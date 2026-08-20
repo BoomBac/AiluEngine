@@ -13,6 +13,37 @@ function ScriptAnimator:is_valid() end
 ---@return boolean
 function ScriptAnimator:play(name) end
 
+---@param name string
+---@return number
+function ScriptAnimator:get_parameter_id(name) end
+
+---@param name string
+---@param value number
+function ScriptAnimator:set_float(name, value) end
+
+---@param name string
+---@param value number
+function ScriptAnimator:set_int(name, value) end
+
+---@param name string
+---@param value boolean
+function ScriptAnimator:set_bool(name, value) end
+
+---@param name string
+function ScriptAnimator:set_trigger(name) end
+
+---@param name string
+function ScriptAnimator:reset_trigger(name) end
+
+---@param name string
+---@return number
+function ScriptAnimator:get_event_id(name) end
+
+---@param event_id number
+---@param callback fun()
+---@return integer subscription_id
+function ScriptAnimator:on_event(event_id, callback) end
+
 ---@return number
 function ScriptAnimator:get_speed() end
 

@@ -47,6 +47,11 @@ namespace Ailu
             {
                 return true;
             }
+
+            bool AllowsMultipleInputLinks() const override
+            {
+                return true;
+            }
         };
     }
 
@@ -124,6 +129,11 @@ namespace Ailu
     }
 
     bool IGraphSchema::AllowsCycles() const
+    {
+        return false;
+    }
+
+    bool IGraphSchema::AllowsMultipleInputLinks() const
     {
         return false;
     }

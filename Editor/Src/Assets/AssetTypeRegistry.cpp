@@ -78,6 +78,11 @@ namespace Ailu
                 nullptr
             });
             RegisterCreator({
+                "New Sprite Atlas", "Create Sprite Atlas", "NewSpriteAtlas", "Sprite Atlas already exists.", L".alasset",
+                [](const fs::path &directory, const String &name) { return CreateSpriteAtlasAsset(directory, name); },
+                nullptr
+            });
+            RegisterCreator({
                 "New Sprite", "Create Sprite", "NewSprite", "Sprite already exists.", L".alasset",
                 [](const fs::path &directory, const String &name) { return CreateSpriteAsset(directory, name); },
                 nullptr
@@ -151,6 +156,43 @@ namespace Ailu
             }
 
             return GetStaticIcon(asset->_asset_type);
+        }
+
+        Render::Texture *AssetTypeRegistry::GetIcon(const Guid &guid, const Type *type, const Ref<Object> &object)
+        {
+            if (guid.IsEmpty() || type == nullptr || object == nullptr)
+                return GetStaticIcon(type);
+
+            if (auto cache_it = _sub_asset_preview_cache.find(guid); cache_it != _sub_asset_preview_cache.end() &&
+                cache_it->second != nullptr)
+                return cache_it->second.get();
+
+            if (auto provider_it = _preview_providers.find(type); provider_it != _preview_providers.end())
+            {
+                Asset preview_asset(type, L"");
+                preview_asset._p_obj = object;
+                Ref<Render::Texture> preview = provider_it->second(&preview_asset);
+                if (preview != nullptr)
+                {
+                    auto cache_it = _sub_asset_preview_cache.find(guid);
+                    if (cache_it != _sub_asset_preview_cache.end() && cache_it->second != preview)
+                        RetirePreview(cache_it->second);
+                    _sub_asset_preview_cache[guid] = preview;
+                    return preview.get();
+                }
+            }
+
+            return GetStaticIcon(type);
+        }
+
+        Render::Texture *AssetTypeRegistry::GetTypeIcon(Asset *asset)
+        {
+            return GetStaticIcon(asset == nullptr ? nullptr : asset->_asset_type);
+        }
+
+        Render::Texture *AssetTypeRegistry::GetTypeIcon(const Type *type)
+        {
+            return GetStaticIcon(type);
         }
 
         void AssetTypeRegistry::RegisterPreview(const Type *type, AssetPreviewProvider provider)

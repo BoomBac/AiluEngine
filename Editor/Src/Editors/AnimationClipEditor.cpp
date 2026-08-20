@@ -1,6 +1,7 @@
 #include "Editors/AnimationClipEditor.h"
 
 #include "Assets/Asset.h"
+#include "Common/Undo.h"
 #include "Framework/Common/Input.h"
 #include "Framework/Common/Log.h"
 #include "Framework/Common/ResourceMgr.h"
@@ -44,7 +45,7 @@ namespace Ailu
             }
         }
 
-        AnimationClipEditor::AnimationClipEditor() : DockWindow("Animation Clip Editor", Vector2f(1120.0f, 700.0f))
+        AnimationClipEditor::AnimationClipEditor() : AssetEditor("Animation Clip Editor", Vector2f(1120.0f, 700.0f))
         {
             SetPosition(Vector2f(100.0f, 50.0f));
             auto *root = _content_root->AddChild<UI::VerticalBox>();
@@ -61,10 +62,8 @@ namespace Ailu
                         .Size(Vector2f(width, 0.0f)).Margin(Vector4f(0.0f, 0.0f, 2.0f, 0.0f));
                 return button;
             };
-            _btn_apply = add_button("Apply", 56.0f);
-            _btn_apply->OnMouseClick() += [this](UI::UIEvent &e) { Apply(); e._is_handled = true; };
-            _btn_revert = add_button("Revert", 58.0f);
-            _btn_revert->OnMouseClick() += [this](UI::UIEvent &e) { Revert(); e._is_handled = true; };
+            auto *save_button = add_button("Save", 50.0f);
+            save_button->OnMouseClick() += [this](UI::UIEvent &e) { AssetEditor::Save(); e._is_handled = true; };
             auto *add_frame = add_button("+ Frame", 68.0f);
             add_frame->OnMouseClick() += [this](UI::UIEvent &e) { AddFrame(); e._is_handled = true; };
             auto *add_event = add_button("+ Event", 66.0f);
@@ -105,22 +104,26 @@ namespace Ailu
             AddSectionTitle(info, "Clip");
             _input_name = AddTextInput(info, "Name", "", [this](String value)
             {
-                _editing_name = std::move(value);
+                if (_clip != nullptr)
+                    _clip->Name(value);
                 MarkDirty();
             });
             _input_duration = AddFloatInput(info, "Duration", 0.0f, [this](f32 value)
             {
-                _editing_duration = std::max(value, 0.0f);
+                if (_clip != nullptr)
+                    _clip->Duration(std::max(value, 0.0f));
                 MarkDirty();
             });
             _input_rate = AddFloatInput(info, "Frame Rate", 30.0f, [this](f32 value)
             {
-                _editing_frame_rate = std::max(value, 0.0f);
+                if (_clip != nullptr)
+                    _clip->FrameRate(std::max(value, 0.0f));
                 MarkDirty();
             });
             _input_frame_duration = AddFloatInput(info, "Frame Duration", 0.0f, [this](f32 value)
             {
-                _editing_frame_duration = std::max(value, 0.0f);
+                if (_clip != nullptr)
+                    _clip->FrameDuration(std::max(value, 0.0f));
                 MarkDirty();
             });
             auto *loop_row = AddPropertyRow(info, "Looping");
@@ -129,11 +132,12 @@ namespace Ailu
                     .Size(Vector2f(28.0f, 0.0f));
             _check_looping->_on_click += [this](bool value)
             {
-                _editing_looping = value;
+                if (_clip != nullptr)
+                    _clip->IsLooping(value);
                 MarkDirty();
             };
             AddSectionTitle(info, "Usage");
-            auto *usage = info->AddChild<UI::Text>("Edit sprite frames and events in the timeline.\nApply saves JSON.");
+            auto *usage = info->AddChild<UI::Text>("Edit sprite frames and events in the timeline.\nSave writes JSON.");
             StyleText(usage, kMutedTextColor);
             usage->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed)
                     .Size(Vector2f(0.0f, 42.0f)).Margin(Vector4f(4.0f, 2.0f, 4.0f, 2.0f));
@@ -158,14 +162,48 @@ namespace Ailu
             _events_root->SlotPadding() = UI::Padding(5.0f);
         }
 
+        void AnimationClipEditor::OnAssetReloaded()
+        {
+            _clip = GetAssetObject<AnimationClip>();
+            if (_clip != nullptr)
+                Open(_clip);
+        }
+
+        void AnimationClipEditor::OnBeforeSave()
+        {
+            if (_clip == nullptr)
+                return;
+            std::sort(Events().begin(), Events().end(),
+                      [](const AnimationEvent &lhs, const AnimationEvent &rhs) { return lhs._time < rhs._time; });
+        }
+
+        void AnimationClipEditor::OnAssetSaved()
+        {
+            _last_edit_snapshot = CaptureAssetObject(GetAsset());
+            RefreshAllUI();
+        }
+
         void AnimationClipEditor::Update(f32 dt)
         {
-            DockWindow::Update(dt);
+            AssetEditor::Update(dt);
             if (!_clip)
                 return;
+            const bool ctrl = Input::IsKeyDown(EKey::kLCONTROL) || Input::IsKeyDown(EKey::kRCONTROL);
+            if (ctrl && Input::IsKeyDownAccurate(EKey::kZ) && g_pCommandMgr != nullptr)
+            {
+                g_pCommandMgr->Undo();
+                _last_edit_snapshot = CaptureAssetObject(GetAsset());
+                RefreshAllUI();
+            }
+            if (ctrl && Input::IsKeyDownAccurate(EKey::kY) && g_pCommandMgr != nullptr)
+            {
+                g_pCommandMgr->Redo();
+                _last_edit_snapshot = CaptureAssetObject(GetAsset());
+                RefreshAllUI();
+            }
             if (_is_previewing)
             {
-                if (_editing_duration <= 0.0f)
+                if (_clip->Duration() <= 0.0f)
                 {
                     _is_previewing = false;
                     if (_btn_play)
@@ -174,11 +212,11 @@ namespace Ailu
                 else
                 {
                     _preview_time += std::max(dt, 0.0f);
-                    if (_editing_looping)
-                        _preview_time = std::fmod(_preview_time, _editing_duration);
-                    else if (_preview_time >= _editing_duration)
+                    if (_clip->IsLooping())
+                        _preview_time = std::fmod(_preview_time, _clip->Duration());
+                    else if (_preview_time >= _clip->Duration())
                     {
-                        _preview_time = _editing_duration;
+                        _preview_time = _clip->Duration();
                         _is_previewing = false;
                         if (_btn_play)
                             _btn_play->SetText("Play");
@@ -186,35 +224,19 @@ namespace Ailu
                     RefreshPreview();
                 }
             }
-            const bool ctrl = Input::IsKeyDown(EKey::kLCONTROL) || Input::IsKeyDown(EKey::kRCONTROL);
-            if (ctrl && Input::IsKeyPressed(EKey::kS))
-                Apply();
-            if (_btn_apply)
-                _btn_apply->SetInteractiveEnabled(_is_dirty);
-            if (_btn_revert)
-                _btn_revert->SetInteractiveEnabled(_is_dirty);
         }
 
         void AnimationClipEditor::Open(AnimationClip *clip)
         {
             if (clip == nullptr)
                 return;
+            BindAsset(ResourceMgr::Get().GetLinkedAsset(clip));
             _clip = clip;
-            ReadFromAsset();
-            _original_name = _editing_name;
-            _original_frame_count = _editing_frame_count;
-            _original_duration = _editing_duration;
-            _original_frame_rate = _editing_frame_rate;
-            _original_frame_duration = _editing_frame_duration;
-            _original_looping = _editing_looping;
-            _original_frames = _editing_frames;
-            _original_events = _editing_events;
-            _is_dirty = false;
             _is_previewing = false;
             _preview_time = 0.0f;
             _preview_sprite.reset();
             _preview_sprite_guid = Guid::EmptyGuid();
-            SetTitle("Animation Clip Editor - " + clip->Name());
+            _last_edit_snapshot = CaptureAssetObject(GetAsset());
             RefreshAllUI();
         }
 
@@ -225,102 +247,41 @@ namespace Ailu
             _preview_time = 0.0f;
             _preview_sprite.reset();
             _preview_sprite_guid = Guid::EmptyGuid();
-            _editing_frames.clear();
-            _editing_events.clear();
-        }
-
-        void AnimationClipEditor::ReadFromAsset()
-        {
-            _editing_name = _clip->Name();
-            _editing_frame_count = _clip->FrameCount();
-            _editing_duration = _clip->Duration();
-            _editing_frame_rate = _clip->FrameRate();
-            _editing_frame_duration = _clip->FrameDuration();
-            _editing_looping = _clip->IsLooping();
-            _editing_frames = _clip->SpriteTrack().Frames();
-            _editing_events = _clip->Events();
-        }
-
-        void AnimationClipEditor::WriteToAsset()
-        {
-            _clip->Name(_editing_name);
-            _clip->FrameCount(_editing_frame_count);
-            _clip->Duration(_editing_duration);
-            _clip->FrameRate(_editing_frame_rate);
-            _clip->FrameDuration(_editing_frame_duration);
-            _clip->IsLooping(_editing_looping);
-            _clip->SpriteTrack().Frames().clear();
-            for (const auto &frame : _editing_frames)
-                _clip->SpriteTrack().AddFrame(frame);
-            _clip->Events() = _editing_events;
-            std::sort(_clip->Events().begin(), _clip->Events().end(),
-                      [](const AnimationEvent &lhs, const AnimationEvent &rhs) { return lhs._time < rhs._time; });
-        }
-
-        void AnimationClipEditor::Apply()
-        {
-            if (_clip == nullptr || !_is_dirty)
-                return;
-            WriteToAsset();
-            if (auto *linked = ResourceMgr::Get().GetLinkedAsset(_clip))
-                ResourceMgr::Get().SaveAsset(linked);
-            _original_name = _editing_name;
-            _original_frame_count = _editing_frame_count;
-            _original_duration = _editing_duration;
-            _original_frame_rate = _editing_frame_rate;
-            _original_frame_duration = _editing_frame_duration;
-            _original_looping = _editing_looping;
-            _original_frames = _editing_frames;
-            _original_events = _editing_events;
-            _is_dirty = false;
-            SetTitle("Animation Clip Editor - " + _clip->Name());
-            RefreshAllUI();
-            LOG_INFO("AnimationClipEditor: Applied");
-        }
-
-        void AnimationClipEditor::Revert()
-        {
-            if (!_is_dirty)
-                return;
-            _editing_name = _original_name;
-            _editing_frame_count = _original_frame_count;
-            _editing_duration = _original_duration;
-            _editing_frame_rate = _original_frame_rate;
-            _editing_frame_duration = _original_frame_duration;
-            _editing_looping = _original_looping;
-            _editing_frames = _original_frames;
-            _editing_events = _original_events;
-            _is_dirty = false;
-            _preview_time = 0.0f;
-            _is_previewing = false;
-            RefreshAllUI();
+            AssetEditor::Close();
         }
 
         void AnimationClipEditor::MarkDirty()
         {
-            _is_dirty = true;
+            if (_is_refreshing_ui)
+                return;
+            // AnimationClip is stored through AnimationClipAssetDocument and its runtime fields are
+            // intentionally not reflected.  The generic object snapshot therefore cannot detect edits.
+            if (Asset *asset = GetAsset(); asset != nullptr && !asset->IsDirty())
+                asset->MarkModified();
             if (_txt_status)
                 _txt_status->SetText("Modified");
         }
 
         void AnimationClipEditor::RefreshAllUI()
         {
+            _is_refreshing_ui = true;
             if (_input_name)
-                _input_name->SetContent(_editing_name, false);
+                _input_name->SetContent(_clip != nullptr ? _clip->Name() : String{}, false);
             if (_input_duration)
-                _input_duration->SetContent(std::format("{:.3f}", _editing_duration), false);
+                _input_duration->SetContent(std::format("{:.3f}", _clip != nullptr ? _clip->Duration() : 0.0f), false);
             if (_input_rate)
-                _input_rate->SetContent(std::format("{:.3f}", _editing_frame_rate), false);
+                _input_rate->SetContent(std::format("{:.3f}", _clip != nullptr ? _clip->FrameRate() : 0.0f), false);
             if (_input_frame_duration)
-                _input_frame_duration->SetContent(std::format("{:.3f}", _editing_frame_duration), false);
+                _input_frame_duration->SetContent(std::format("{:.3f}", _clip != nullptr ? _clip->FrameDuration() : 0.0f), false);
             if (_check_looping)
-                _check_looping->SetChecked(_editing_looping);
+                _check_looping->SetChecked(_clip != nullptr && _clip->IsLooping());
             if (_btn_play)
                 _btn_play->SetText(_is_previewing ? "Pause" : "Play");
             if (_txt_status)
-                _txt_status->SetText(_is_dirty ? "Modified" : "Saved");
+                _txt_status->SetText(IsDirty() ? "Modified" : "Saved");
             RefreshTimeline();
             RefreshEvents();
+            _is_refreshing_ui = false;
         }
 
         void AnimationClipEditor::RefreshTimeline()
@@ -330,7 +291,7 @@ namespace Ailu
             _timeline_root->ClearChildren();
             _preview_image = nullptr;
             _txt_preview_time = nullptr;
-            AddSectionTitle(_timeline_root, std::format("Sprite Timeline ({} frames)", _editing_frames.size()));
+            AddSectionTitle(_timeline_root, std::format("Sprite Timeline ({} frames)", Frames().size()));
             auto *help = _timeline_root->AddChild<UI::Text>("Time is in seconds. Choose a loaded Sprite for each key frame.");
             StyleText(help, kMutedTextColor);
             help->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed)
@@ -350,9 +311,9 @@ namespace Ailu
             StyleText(preview_info->AddChild<UI::Text>("Atlas UV is used by runtime rendering; the editor preview shows the source texture."),
                       kMutedTextColor);
             RefreshPreview();
-            for (u32 index = 0u; index < _editing_frames.size(); ++index)
+            for (u32 index = 0u; index < Frames().size(); ++index)
             {
-                auto &frame = _editing_frames[index];
+                auto &frame = Frames()[index];
                 auto *row = _timeline_root->AddChild<UI::HorizontalBox>();
                 row->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed)
                         .Size(Vector2f(0.0f, kInputHeight)).Margin(Vector4f(0.0f, 1.0f, 0.0f, 1.0f));
@@ -364,11 +325,11 @@ namespace Ailu
                 time_input->GetSlotAs<UI::LinearSlot>().FillRate(1.0f);
                 time_input->_on_content_changed += [this, index](String value)
                 {
-                    if (index >= _editing_frames.size())
+                    if (index >= Frames().size())
                         return;
                     if (auto parsed = StringUtils::ParseFloat(value); parsed.has_value())
                     {
-                        _editing_frames[index]._time = std::max(parsed.value(), 0.0f);
+                        Frames()[index]._time = std::max(parsed.value(), 0.0f);
                         MarkDirty();
                     }
                 };
@@ -404,19 +365,19 @@ namespace Ailu
             if (_preview_image == nullptr)
                 return;
             Guid sprite_guid = Guid::EmptyGuid();
-            if (!_editing_frames.empty())
+            if (!Frames().empty())
             {
                 f32 sample_time = _preview_time;
-                if (_editing_looping && _editing_duration > 0.0f)
-                    sample_time = std::fmod(sample_time, _editing_duration);
-                for (const auto &frame : _editing_frames)
+                if (_clip->IsLooping() && _clip->Duration() > 0.0f)
+                    sample_time = std::fmod(sample_time, _clip->Duration());
+                for (const auto &frame : Frames())
                 {
                     if (frame._time > sample_time)
                         break;
                     sprite_guid = frame._sprite;
                 }
                 if (sprite_guid.IsEmpty())
-                    sprite_guid = _editing_frames.front()._sprite;
+                    sprite_guid = Frames().front()._sprite;
             }
             if (sprite_guid != _preview_sprite_guid)
             {
@@ -440,28 +401,28 @@ namespace Ailu
             if (_events_root == nullptr)
                 return;
             _events_root->ClearChildren();
-            AddSectionTitle(_events_root, std::format("Events ({})", _editing_events.size()));
+            AddSectionTitle(_events_root, std::format("Events ({})", Events().size()));
             auto *help = _events_root->AddChild<UI::Text>("Event ID is delivered to the animation event queue.");
             StyleText(help, kMutedTextColor);
             help->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed)
                     .Size(Vector2f(0.0f, 34.0f));
-            for (u32 index = 0u; index < _editing_events.size(); ++index)
+            for (u32 index = 0u; index < Events().size(); ++index)
             {
-                auto &event = _editing_events[index];
+                auto &event = Events()[index];
                 AddFloatInput(_events_root, std::format("{} Time", index + 1u), event._time, [this, index](f32 value)
                 {
-                    if (index < _editing_events.size())
+                    if (index < Events().size())
                     {
-                        _editing_events[index]._time = std::max(value, 0.0f);
+                        Events()[index]._time = std::max(value, 0.0f);
                         MarkDirty();
                     }
                 });
                 auto *id_input = AddTextInput(_events_root, "Event ID", std::to_string(event._event_id), [this, index](String value)
                 {
-                    if (index < _editing_events.size())
+                    if (index < Events().size())
                     {
                         if (auto parsed = StringUtils::ParseFloat(value); parsed.has_value())
-                            _editing_events[index]._event_id = static_cast<u32>(std::max(parsed.value(), 0.0f));
+                            Events()[index]._event_id = static_cast<u32>(std::max(parsed.value(), 0.0f));
                         MarkDirty();
                     }
                 });
@@ -472,9 +433,9 @@ namespace Ailu
                 kind->SetSelectedIndex(event._kind == EAnimationEventKind::kGameplay ? 0 : 1);
                 kind->_on_selected_changed += [this, index](i32 selected)
                 {
-                    if (index < _editing_events.size())
+                    if (index < Events().size())
                     {
-                        _editing_events[index]._kind = selected == 0 ? EAnimationEventKind::kGameplay : EAnimationEventKind::kCosmetic;
+                        Events()[index]._kind = selected == 0 ? EAnimationEventKind::kGameplay : EAnimationEventKind::kCosmetic;
                         MarkDirty();
                     }
                 };
@@ -492,40 +453,40 @@ namespace Ailu
         void AnimationClipEditor::AddFrame()
         {
             SpriteKeyFrame frame;
-            frame._time = _editing_frames.empty() ? 0.0f : _editing_frames.back()._time +
-                                                       (_editing_frame_duration > 0.0f ? _editing_frame_duration : 0.1f);
-            if (!_editing_frames.empty())
-                frame._sprite = _editing_frames.back()._sprite;
-            _editing_frames.push_back(frame);
-            _editing_frame_count = static_cast<u32>(_editing_frames.size());
-            if (_editing_duration < frame._time)
-                _editing_duration = frame._time;
+            frame._time = Frames().empty() ? 0.0f : Frames().back()._time +
+                                                   (_clip->FrameDuration() > 0.0f ? _clip->FrameDuration() : 0.1f);
+            if (!Frames().empty())
+                frame._sprite = Frames().back()._sprite;
+            Frames().push_back(frame);
+            _clip->FrameCount(static_cast<u32>(Frames().size()));
+            if (_clip->Duration() < frame._time)
+                _clip->Duration(frame._time);
             MarkDirty();
             RefreshAllUI();
         }
 
         void AnimationClipEditor::AddEvent()
         {
-            _editing_events.push_back(AnimationEvent{0.0f, 0u, EAnimationEventKind::kCosmetic});
+            Events().push_back(AnimationEvent{0.0f, 0u, EAnimationEventKind::kCosmetic});
             MarkDirty();
             RefreshEvents();
         }
 
         void AnimationClipEditor::RemoveFrame(u32 index)
         {
-            if (index >= _editing_frames.size())
+            if (index >= Frames().size())
                 return;
-            _editing_frames.erase(_editing_frames.begin() + index);
-            _editing_frame_count = static_cast<u32>(_editing_frames.size());
+            Frames().erase(Frames().begin() + index);
+            _clip->FrameCount(static_cast<u32>(Frames().size()));
             MarkDirty();
             RefreshTimeline();
         }
 
         void AnimationClipEditor::RemoveEvent(u32 index)
         {
-            if (index >= _editing_events.size())
+            if (index >= Events().size())
                 return;
-            _editing_events.erase(_editing_events.begin() + index);
+            Events().erase(Events().begin() + index);
             MarkDirty();
             RefreshEvents();
         }
@@ -537,15 +498,15 @@ namespace Ailu
             auto none = MakeRef<UI::Text>("None");
             none->OnMouseClick() += [this, frame_index](UI::UIEvent &)
             {
-                if (frame_index < _editing_frames.size())
-                    _editing_frames[frame_index]._sprite = Guid::EmptyGuid();
+                if (frame_index < Frames().size())
+                    Frames()[frame_index]._sprite = Guid::EmptyGuid();
                 MarkDirty();
                 UIManager::Get()->HidePopup();
                 RefreshTimeline();
             };
             list->AddItem(none);
-            for (auto it = ResourceMgr::Get().Begin(); it != ResourceMgr::Get().End(); ++it)
-            {
+             for (auto it = ResourceMgr::Get().Begin(); it != ResourceMgr::Get().End(); ++it)
+             {
                 Asset *asset = it->second.get();
                 if (asset == nullptr || asset->_asset_type != Render::Sprite::StaticType())
                     continue;
@@ -556,15 +517,35 @@ namespace Ailu
                 const Guid guid = asset->GetGuid();
                 item->OnMouseClick() += [this, frame_index, guid](UI::UIEvent &)
                 {
-                    if (frame_index < _editing_frames.size())
-                        _editing_frames[frame_index]._sprite = guid;
+                    if (frame_index < Frames().size())
+                        Frames()[frame_index]._sprite = guid;
                     MarkDirty();
                     UIManager::Get()->HidePopup();
                     RefreshTimeline();
                 };
-                list->AddItem(item);
-            }
-            const auto rect = anchor->GetArrangeRect();
+                 list->AddItem(item);
+             }
+             for (const auto &entry : ResourceMgr::Get().GetSubAssets(Render::Sprite::StaticType()))
+             {
+                 auto sprite = ResourceMgr::Get().GetRef<Render::Sprite>(entry._guid);
+                 if (!sprite)
+                     sprite = ResourceMgr::Get().Load<Render::Sprite>(entry._guid);
+                 if (!sprite)
+                     continue;
+                 const String name = sprite->Name().empty() ? entry._name : sprite->Name();
+                 auto item = MakeRef<UI::Text>(name);
+                 const Guid guid = entry._guid;
+                 item->OnMouseClick() += [this, frame_index, guid](UI::UIEvent &)
+                 {
+                    if (frame_index < Frames().size())
+                        Frames()[frame_index]._sprite = guid;
+                     MarkDirty();
+                     UIManager::Get()->HidePopup();
+                     RefreshTimeline();
+                 };
+                 list->AddItem(item);
+             }
+             const auto rect = anchor->GetArrangeRect();
             UIManager::Get()->ShowPopupAt(rect.x, rect.y + rect.w, list);
         }
 

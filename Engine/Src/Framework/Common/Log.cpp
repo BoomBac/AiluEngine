@@ -1,4 +1,5 @@
 #include "Framework/Common/Log.h"
+#include "Framework/Common/Allocator.hpp"
 #include "Framework/Common/ThreadPool.h"
 #include "Framework/Common/TimeMgr.h"
 #include "Framework/Common/Utils.h"
@@ -38,14 +39,14 @@ namespace Ailu
     void LogMgr::Init()
     {
         AL_ASSERT(g_LogMgr == nullptr);
-        g_LogMgr = new LogMgr();
+        g_LogMgr = AL_NEW_TAG(EMemoryTag::kCore, LogMgr);
         g_LogMgr->Initialize();
     }
     void LogMgr::Shutdown()
     {
         AL_ASSERT(g_LogMgr != nullptr);
         g_LogMgr->Finalize();
-        delete g_LogMgr; g_LogMgr = nullptr;
+        AL_DELETE(g_LogMgr);
     }
     LogMgr &LogMgr::Get()
     {
@@ -55,7 +56,7 @@ namespace Ailu
     int LogMgr::Initialize()
     {
         int ret = 0;
-        _appenders.push_back(new OutputAppender());
+        _appenders.push_back(AL_NEW_TAG(EMemoryTag::kCore, OutputAppender));
         // Open the file in truncate mode (clears the content).
         std::ofstream file(FileAppender::s_out_path, std::ofstream::out | std::ofstream::trunc);
 
@@ -75,7 +76,7 @@ namespace Ailu
     {
         for (auto &logger: _appenders)
         {
-            delete logger; logger = nullptr;
+            AL_DELETE(logger);
         }
     }
 

@@ -2,6 +2,7 @@
 #include "Framework/Common/FileManager.h"
 #include "Framework/Common/Log.h"
 #include "Framework/Common/Utils.h"
+#include "Framework/Common/Allocator.hpp"
 
 #include "pch.h"
 #include <Ext/rapidjson/inc/document.h>
@@ -129,11 +130,11 @@ namespace Ailu
             }
             if (!fp) return false;
 
-            char *buffer = new char[65536];
+            char *buffer = AL_ALLOC_TAG(EMemoryTag::kTemporary, char, 65536);
             rapidjson::FileReadStream is(fp, buffer, sizeof(buffer));
             doc.ParseStream(is);
             fclose(fp);
-            delete[] buffer;
+            AL_FREE(buffer);
             return !doc.HasParseError();
         }
 
@@ -147,12 +148,12 @@ namespace Ailu
             }
             if (!fp) return false;
 
-            char *buffer = new char[65536];
+            char *buffer = AL_ALLOC_TAG(EMemoryTag::kTemporary, char, 65536);
             rapidjson::FileWriteStream os(fp, buffer, sizeof(buffer));
             rapidjson::PrettyWriter<rapidjson::FileWriteStream> writer(os);
             doc.Accept(writer);
             fclose(fp);
-            delete[] buffer;
+            AL_FREE(buffer);
             return true;
         }
 
@@ -260,8 +261,8 @@ namespace Ailu
 
     // ========== JSONParser 实现 ==========
 
-    JSONParser::JSONParser() : _impl(new Impl()) {}
-    JSONParser::~JSONParser() { delete _impl; }
+    JSONParser::JSONParser() : _impl(AL_NEW_TAG(EMemoryTag::kAsset, Impl)) {}
+    JSONParser::~JSONParser() { AL_DELETE(_impl); }
 
     bool JSONParser::Load(const WString &sys_path)
     {

@@ -45,6 +45,7 @@ namespace Ailu
         virtual bool CanDeleteNode(const GraphDocument &document, const GraphNodeData &node) const;
         virtual bool CanCreateNode(const GraphDocument &document, StringView node_type) const;
         virtual bool AllowsCycles() const;
+        virtual bool AllowsMultipleInputLinks() const;
     };
 
     AILU_API Scope<IGraphSchema> CreateGraphSchema(StringView schema_type);

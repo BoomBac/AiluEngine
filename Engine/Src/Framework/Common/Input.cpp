@@ -46,6 +46,27 @@ namespace Ailu
         return GetOwner(channel) == owner;
     }
 
+    void InputRouteState::CaptureMouse(EInputOwner owner)
+    {
+        _mouse_capture_owner = owner;
+    }
+
+    void InputRouteState::ReleaseMouseCapture(EInputOwner owner)
+    {
+        if (owner == EInputOwner::kNone || _mouse_capture_owner == owner)
+            _mouse_capture_owner = EInputOwner::kNone;
+    }
+
+    bool InputRouteState::IsMouseCaptured() const
+    {
+        return _mouse_capture_owner != EInputOwner::kNone;
+    }
+
+    bool InputRouteState::IsMouseCapturedBy(EInputOwner owner) const
+    {
+        return _mouse_capture_owner == owner;
+    }
+
     EInputOwner &InputRouteState::_GetOwner(InputChannel channel)
     {
         switch (channel)

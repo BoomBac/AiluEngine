@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __ANIMATIONCONTROLLERASSET_GEN_H__
 //Class AnimationControllerAsset begin...........................
-#define ANIMATIONCONTROLLERASSET_GEN_H_138_GENERATED_BODY \
+#define ANIMATIONCONTROLLERASSET_GEN_H_140_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_AnimationControllerAsset_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -53,7 +53,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::AnimationMotion>
 //Struct AnimationMotion end...........................
 
 //Struct AnimationState begin...........................
-#define ANIMATIONCONTROLLERASSET_GEN_H_85_GENERATED_BODY \
+#define ANIMATIONCONTROLLERASSET_GEN_H_87_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_AnimationState_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -69,7 +69,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::AnimationState>(
 //Struct AnimationState end...........................
 
 //Struct AnimationCondition begin...........................
-#define ANIMATIONCONTROLLERASSET_GEN_H_102_GENERATED_BODY \
+#define ANIMATIONCONTROLLERASSET_GEN_H_104_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_AnimationCondition_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -85,7 +85,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::AnimationConditi
 //Struct AnimationCondition end...........................
 
 //Struct AnimationTransition begin...........................
-#define ANIMATIONCONTROLLERASSET_GEN_H_119_GENERATED_BODY \
+#define ANIMATIONCONTROLLERASSET_GEN_H_121_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_AnimationTransition_Type();\
                                 static const Type* GetPrivateStaticClass();\

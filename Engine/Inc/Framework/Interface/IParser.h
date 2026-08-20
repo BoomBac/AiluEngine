@@ -2,6 +2,7 @@
 #ifndef __IPARSER_H__
 #define __IPARSER_H__
 #include "Framework/Core/CoreMinimal.h"
+#include "Framework/Common/Allocator.hpp"
 #include "Framework/Core/String.h"
 #include "Framework/Core/Containers/Vector.h"
 #include "Framework/Core/Containers/List.h"
@@ -125,7 +126,7 @@ namespace Ailu
         {
             for (auto &d : _data)
             {
-                delete[] d;
+                AL_FREE(d);
             }
         }
     };

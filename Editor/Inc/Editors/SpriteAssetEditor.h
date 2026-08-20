@@ -2,7 +2,7 @@
 #ifndef __SPRITE_ASSET_EDITOR_H__
 #define __SPRITE_ASSET_EDITOR_H__
 
-#include "Dock/DockWindow.h"
+#include "Editors/AssetEditor.h"
 #include "UI/UIElement.h"
 #include "UI/Basic.h"
 #include "UI/Container.h"
@@ -21,12 +21,14 @@ namespace Ailu
         class InputBlock;
         class VerticalBox;
         class HorizontalBox;
+        class ListView;
         class ScrollView;
     }
 
     namespace Render 
     {
         class Sprite;
+        class SpriteAtlas;
     }
 
     namespace Editor
@@ -51,6 +53,16 @@ namespace Ailu
                     && _border  == other._border;
             }
             bool operator!=(const SpriteAssetEditData& other) const { return !(*this == other); }
+        };
+
+        struct SpriteAssetEditItem
+        {
+            Guid _guid = Guid::EmptyGuid();
+            String _name;
+            String _original_name;
+            Render::Sprite *_asset = nullptr;
+            SpriteAssetEditData _original;
+            SpriteAssetEditData _editing;
         };
 
         // =========================================================================
@@ -82,7 +94,7 @@ namespace Ailu
         class SpritePreviewWidget;
         class SpriteAssetEditCommand;
 
-        class SpriteAssetEditor : public DockWindow
+        class SpriteAssetEditor : public AssetEditor
         {
             friend class SpritePreviewWidget;
             friend class SpriteAssetEditCommand;
@@ -92,10 +104,22 @@ namespace Ailu
             ~SpriteAssetEditor() override;
 
             void Update(f32 dt) override;
+            using AssetEditor::Open;
             void Open(Render::Sprite* asset);
+            void Open(Render::SpriteAtlas* asset);
             void Close();
 
-            bool IsDirty() const { return _editing != _original; }
+            bool HasDraftChanges() const
+            {
+                if (!_supports_multiple_sprites)
+                    return false;
+                if (_editing != _original || _sprite_items.size() != _original_sprite_count)
+                    return true;
+                for (const auto& item : _sprite_items)
+                    if (item._editing != item._original || item._name != item._original_name)
+                        return true;
+                return false;
+            }
             void ApplyEditData(const SpriteAssetEditData& data);
 
         private:
@@ -105,6 +129,7 @@ namespace Ailu
             void BuildCenterPanel(UI::Border* center);
             void BuildRightPanel(UI::VerticalBox* right);
             void BuildStatusBar(UI::HorizontalBox* status_bar);
+            void BuildSpriteListSection(UI::VerticalBox* parent);
             void BuildTextureSection(UI::VerticalBox* parent);
             void BuildUvRectSection(UI::VerticalBox* parent);
             void BuildPivotSection(UI::VerticalBox* parent);
@@ -113,6 +138,8 @@ namespace Ailu
 
             void ReadFromAsset();
             void WriteToAsset();
+            void CommitLiveEdit(bool mark_dirty = true);
+            void WriteAtlasToAssets();
             void Apply();
             void Revert();
             void ValidateEditingData();
@@ -122,8 +149,22 @@ namespace Ailu
             void RefreshPivotInputs();
             void RefreshSizeInputs();
             void RefreshBorderInputs();
+            void RefreshNameInput();
             void RefreshStatusBar();
             void RefreshPreview();
+            void RefreshSpriteList();
+
+            void SelectSprite(i32 index);
+            void SelectSprites(const Vector<i32> &indices, i32 primary_index);
+            void AddSprite();
+            void RemoveSprite();
+            void DuplicateSprite();
+            String MakeAtlasSpriteName(u32 index) const;
+            void ShowGridSlicePopup();
+            void SliceGrid(u32 cell_width, u32 cell_height, u32 padding, u32 spacing);
+            void SliceAlpha(f32 threshold);
+            void StoreSelectedSprite();
+            void LoadSelectedSprite();
 
             Render::Texture2D* ResolveTexture();
             void OnTextureChanged();
@@ -135,9 +176,22 @@ namespace Ailu
             static UI::Text* AddSectionTitle(UI::UIElement* parent, const String& title);
             static UI::HorizontalBox* AddPropertyRow(UI::UIElement* parent, const String& label);
 
+            void OnBeforeSave() override;
+            void OnAssetSaved() override;
+            void OnAssetReloaded() override;
+
         private:
             Render::Sprite *_sprite_asset = nullptr;
+            Render::SpriteAtlas *_sprite_atlas = nullptr;
             Render::Texture2D* _texture = nullptr;
+            Vector<SpriteAssetEditItem> _sprite_items;
+            Vector<Ref<Render::Sprite>> _original_atlas_sprites;
+            Vector<Guid> _original_atlas_sprite_guids;
+            Vector<UI::Text*> _sprite_list_items;
+            Vector<i32> _selected_sprite_indices;
+            i32 _selected_sprite_index = -1;
+            u32 _original_sprite_count = 0;
+            bool _supports_multiple_sprites = false;
             SpriteAssetEditData _original;
             SpriteAssetEditData _editing;
 
@@ -158,6 +212,7 @@ namespace Ailu
             bool _is_syncing_pivot = false;
             bool _is_syncing_size = false;
             bool _is_syncing_border = false;
+            bool _is_syncing_name = false;
 
             UI::Button*   _btn_apply = nullptr;
             UI::Button*   _btn_revert = nullptr;
@@ -186,6 +241,17 @@ namespace Ailu
             UI::Text*      _txt_tex_field = nullptr;
             UI::Button*    _btn_select_tex = nullptr;
             UI::Button*    _btn_clear_tex = nullptr;
+            UI::InputBlock* _sprite_name_input = nullptr;
+            UI::Text*      _txt_multi_selection_notice = nullptr;
+
+            UI::Button*    _btn_add_sprite = nullptr;
+            UI::Button*    _btn_remove_sprite = nullptr;
+            UI::Button*    _btn_toolbar_add = nullptr;
+            UI::Button*    _btn_delete_sprite = nullptr;
+            UI::Button*    _btn_grid_slice = nullptr;
+            UI::Button*    _btn_auto_slice = nullptr;
+            UI::Button*    _btn_duplicate_sprite = nullptr;
+            UI::ListView*  _sprite_list = nullptr;
 
             UI::InputBlock* _uv_norm_x = nullptr;
             UI::InputBlock* _uv_norm_y = nullptr;

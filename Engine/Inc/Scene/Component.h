@@ -6,8 +6,6 @@
 #include "Framework/Core/Containers/Vector.h"
 #include "Framework/Core/Containers/Array.h"
 
-#include "Animation/BlendSpace.h"
-#include "Animation/Clip.h"
 #include "Animation/AnimationInstance.h"
 #include "Audio/AudioHandle.h"
 #include "Entity.h"
@@ -365,14 +363,6 @@ public:                                                                 \
             Ref<SkeletonMesh> _p_mesh;
             Vector<Ref<Material>> _p_mats;
             Vector<AABB> _transformed_aabbs;
-            Ref<AnimationClip> _anim_clip;
-            //temp
-            f32 _anim_time = 0.0f;
-            Ref<AnimationClip> _blend_anim_clip;
-            BlendSpace _blend_space;
-            //0 clip,1 blend space,2 anim graph
-            i16 _anim_type;
-            f32 _anim_speed = 1.0f;
             EMotionVectorType _motion_vector_type = EMotionVectorType::kPerObject;
         };
 
@@ -383,6 +373,7 @@ public:                                                                 \
             f32 _speed = 1.0f;
             bool _play_on_awake = true;
             AnimationInstanceHandle _instance = kInvalidAnimationInstanceHandle;
+            bool _started = false;
         };
 
 

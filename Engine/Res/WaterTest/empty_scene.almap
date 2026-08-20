@@ -17,7 +17,7 @@
             "_disabled_components": [],
             "_transform_component": {
                 "_position": [14.5179, 3.0787, 8.7868],
-                "_rotation": [0.3668, 0.016, -0.0063, 0.93],
+                "_rotation": [0.3665, 0.0158, -0.0061, 0.9302],
                 "_scale": [0.9998, 0.9998, 0.9998]
             },
             "_light_component": {
@@ -118,7 +118,7 @@
                         "_type": "kFloat",
                         "_bool_value": false,
                         "_int_value": 0,
-                        "_float_value": 3.0,
+                        "_float_value": 1.6598,
                         "_string_value": "",
                         "_vector_value": [0.0, 0.0, 0.0, 0.0],
                         "_guid_value": "null",
@@ -128,7 +128,7 @@
                         "_type": "kFloat",
                         "_bool_value": false,
                         "_int_value": 0,
-                        "_float_value": 3.0,
+                        "_float_value": 4.51,
                         "_string_value": "",
                         "_vector_value": [0.0, 0.0, 0.0, 0.0],
                         "_guid_value": "null",
@@ -190,8 +190,13 @@
                         "_layer": 0
                     }]
             },
+            "_animator_component": {
+                "_controller_guid": "9e5d5ac6-62e3-4a6c-a935-3a9a6a9f2f6a",
+                "_speed": 1.0,
+                "_play_on_awake": true
+            },
             "_sprite_renderer_component": {
-                "_sprite_guid": "e9bfde03-b5ab-4282-be2b-8fdc88f873ad",
+                "_sprite_guid": "e0f66ccd-ff56-4fd7-b10d-3dd75fed31be",
                 "_material_guid": "",
                 "_color": [1.0, 1.0, 1.0, 1.0],
                 "_sorting_layer": 0,
@@ -296,7 +301,7 @@
             },
             "_disabled_components": [],
             "_transform_component": {
-                "_position": [0.2637, 3.7713, -8.2826],
+                "_position": [-0.3871, 3.7713, -8.2826],
                 "_rotation": [0.0, -0.0, 0.0, 1.0],
                 "_scale": [1.0, 1.0, 1.0]
             },

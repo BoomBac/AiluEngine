@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "Framework/Common/Application.h"
 #include "RHI/DX12/DescriptorManager.h"
+#include "Framework/Common/Allocator.hpp"
 #include "RHI/DX12/D3DContext.h"
 #include "RHI/DX12/dxhelper.h"
 #include "RHI/DX12/D3DCommandBuffer.h"
@@ -541,11 +542,11 @@ namespace Ailu::RHI::DX12
 	void D3DDescriptorMgr::Init()
 	{
 		if(!g_DescriptorMgr)
-		g_DescriptorMgr = new D3DDescriptorMgr();
+			g_DescriptorMgr = AL_NEW_TAG(EMemoryTag::kRenderer, D3DDescriptorMgr);
 	}
     void D3DDescriptorMgr::Shutdown()
     {
-		delete g_DescriptorMgr; g_DescriptorMgr = nullptr;
+		AL_DELETE(g_DescriptorMgr);
     }
     D3DDescriptorMgr &D3DDescriptorMgr::Get()
     {
@@ -553,13 +554,13 @@ namespace Ailu::RHI::DX12
     }
     D3DDescriptorMgr::D3DDescriptorMgr()
     {
-		_gpu_alloc = new GPUVisibleDescriptorAllocator();
-		_cpu_alloc = new CPUVisibleDescriptorAllocator();
+		_gpu_alloc = AL_NEW_TAG(EMemoryTag::kRenderer, GPUVisibleDescriptorAllocator);
+		_cpu_alloc = AL_NEW_TAG(EMemoryTag::kRenderer, CPUVisibleDescriptorAllocator);
     }
     D3DDescriptorMgr::~D3DDescriptorMgr()
     {
-		delete _gpu_alloc; _gpu_alloc = nullptr;
-		delete _cpu_alloc; _cpu_alloc = nullptr;
+		AL_DELETE(_gpu_alloc);
+		AL_DELETE(_cpu_alloc);
     }
 #pragma endregion
 }

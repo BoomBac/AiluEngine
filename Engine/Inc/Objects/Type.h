@@ -264,13 +264,13 @@ namespace Ailu
                 return entry._instance == instance && entry._id == observer_id;
             });
         }
+        void NotifyObject(Object *obj, EPropertyChangeSource source = EPropertyChangeSource::kDefault) const;
     public:
         SerializeFunc _serialize_fn = nullptr;
         DeserializeFunc _deserialize_fn = nullptr;
 
     private:
         void Notify(void* instance, EPropertyChangeSource source) const;
-        void NotifyObject(Object* obj, EPropertyChangeSource source) const;
     private:
         String _type_name;               // 原始类型名（可含模板）：std::vector<int>
         TemplateParamInfo _template_info;// 模板结构树（非模板则 name=基名，subParams空）

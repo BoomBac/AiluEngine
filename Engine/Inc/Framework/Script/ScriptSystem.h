@@ -4,6 +4,7 @@
 
 #include "Framework/Interface/IRuntimeModule.h"
 #include "Framework/Math/Guid.h"
+#include "Animation/AnimationEvent.h"
 #include "Framework/Script/ScriptCamera.h"
 #include "Framework/Script/ScriptEngine.h"
 #include "Framework/Script/ScriptEntity.h"
@@ -66,6 +67,7 @@ namespace Ailu
         f32 GetRenderAlpha() const { return _last_render_alpha; }
         ScriptInput &GetInput() { return _input; }
         void DispatchPhysicsContact(SceneManagement::Scene *scene, const PhysicsContact2D &contact);
+        void DispatchAnimationEvents(SceneManagement::Scene *scene, std::span<const AnimationEventMessage> events);
         void OnSceneDestroyed(SceneManagement::Scene *scene);
 
 #if AILU_ENABLE_LUA_SCRIPTING
@@ -110,6 +112,8 @@ namespace Ailu
         const sol::state &GetState() const { return _lua; }
         bool Unsubscribe(ScriptSubscriptionHandle subscription_id);
         ScriptCollider2D::EventViews GetColliderEventViews(SceneManagement::Scene *scene, ECS::Entity entity);
+        ScriptAnimator::AnimationEventRouter::EventView GetAnimatorEventView(SceneManagement::Scene *scene,
+                                                                               ECS::Entity entity);
 #endif
 
     private:
@@ -148,6 +152,10 @@ namespace Ailu
             ScriptCollider2D::CollisionEventRouter _on_collision_exit;
             ScriptCollider2D::CollisionEventRouter _on_trigger_enter;
             ScriptCollider2D::CollisionEventRouter _on_trigger_exit;
+        };
+        struct ScriptAnimatorEventSource
+        {
+            ScriptAnimator::AnimationEventRouter _on_event;
         };
         struct ScriptPropertyDeclaration
         {
@@ -225,6 +233,7 @@ namespace Ailu
         InputSystem::ActionEventListenerId _input_event_listener_id = 0u;
         HashMap<Physics2DWorld *, u32> _physics_contact_bridges;
         HashMap<ScriptInstanceKey, Scope<ScriptColliderEventSource>, ScriptInstanceKeyHasher> _collider_event_sources;
+        HashMap<ScriptInstanceKey, Scope<ScriptAnimatorEventSource>, ScriptInstanceKeyHasher> _animator_event_sources;
 #endif
         ScriptInput _input;
         HashMap<String, std::filesystem::path> _loaded_script_files;

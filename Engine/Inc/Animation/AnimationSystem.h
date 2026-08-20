@@ -1,42 +1,97 @@
-/*
- * @author    : BoomBac
- * @created   : 2024.10
-*/
-
 #pragma once
 #ifndef __ANIM_SYS_H__
 #define __ANIM_SYS_H__
-#include "Scene/Entity.h"
+
+#include "Animation/AnimationController.h"
 #include "Animation/AnimationEvent.h"
-#include "Clip.h"
+#include "Animation/AnimationInstance.h"
+#include "Animation/BlendSpace.h"
+#include "Animation/Skeleton/SkeletonAnimationBinding.h"
 #include "Animation/SkinningSystem.h"
 #include "Animation/SpriteAnimationBinding.h"
+#include "Scene/Entity.h"
+
 namespace Ailu
 {
     namespace ECS
     {
+        struct AnimatorComponent;
+
         class AnimationSystem : public System
         {
             DECLARE_SYSTEM(AnimationSystem)
+
         public:
             inline static u32 s_vertex_num_per_skin_task = 2000u;
+
             void Update(Register &r, f32 delta_time) final;
             std::span<const AnimationEventMessage> Events() const { return _event_queue.Events(); }
             ESystemPhase GetPhase() const final { return ESystemPhase::kAnimation; }
             void OnPushEntity(Entity entity) final;
-            virtual Ref<System> Clone() final
+            Ref<System> Clone() final
             {
                 auto copy = MakeRef<AnimationSystem>();
                 copy->_entities = _entities;
                 return copy;
-            };
+            }
             void WaitFor() const final;
+
+            void SetFloat(Entity entity, AnimationParameterId id, f32 value);
+            void SetInt(Entity entity, AnimationParameterId id, i32 value);
+            void SetBool(Entity entity, AnimationParameterId id, bool value);
+            void SetTrigger(Entity entity, AnimationParameterId id);
+            void ResetTrigger(Entity entity, AnimationParameterId id);
+            void PlayState(Entity entity, u16 state_index);
+
         private:
-            Map<ECS::Entity, f32> _anim_playtime;
+            enum class EParameterCommandType : u8
+            {
+                kFloat,
+                kInt,
+                kBool,
+                kTrigger,
+                kResetTrigger,
+                kPlayState
+            };
+
+            struct ParameterCommand
+            {
+                EParameterCommandType _type = EParameterCommandType::kFloat;
+                AnimationParameterId _parameter = kInvalidAnimationParameter;
+                f32 _float_value = 0.0f;
+                i32 _int_value = 0;
+                bool _bool_value = false;
+                u16 _state = kInvalidAnimationState;
+            };
+
+            void QueueCommand(Entity entity, ParameterCommand command);
+            void ApplyCommands(Entity entity, AnimationInstance &instance, AnimatorComponent &animator,
+                               const AnimationControllerAsset &controller_asset);
+            const AnimationClip *ResolveClip(Entity entity, const Guid &clip_id, Skeleton *skeleton,
+                                             SpriteAnimationBinding *sprite_binding,
+                                             SkeletonAnimationBinding *skeleton_binding);
+            void ResolveMotionAssets(Entity entity, const AnimationControllerAsset &controller_asset,
+                                     AnimationController &controller);
+            void CollectStateEvents(Entity entity, const AnimationControllerAsset &controller_asset,
+                                    const AnimationController &controller, u16 state_index, f32 previous_time,
+                                    f32 current_time, bool allow_cosmetic, bool loop, Skeleton *skeleton,
+                                    SpriteAnimationBinding *sprite_binding, SkeletonAnimationBinding *skeleton_binding);
+
+            Map<Entity, SkeletonPose> _skeleton_poses;
+            Map<Entity, Vector<Matrix4x4f>> _matrix_palettes;
+            Map<Entity, SkeletonAnimationBinding> _skeleton_bindings;
+            Map<Entity, SpriteAnimationBinding> _sprite_bindings;
+            Map<Entity, AnimationController> _controllers;
+            Map<Entity, Guid> _controller_ids;
+            Map<Entity, Ref<AnimationControllerAsset>> _controller_assets;
+            Map<Entity, Map<Guid, Ref<BlendSpaceAsset>>> _blend_space_assets;
+            Map<Entity, Vector<ParameterCommand>> _pending_commands;
+            AnimationInstancePool _animation_instances;
             Scope<SkinningSystem> _skinning_system = MakeScope<SkinningSystem>();
             AnimationEventQueue _event_queue;
             Vector<AnimationEvent> _event_scratch;
         };
-    }// namespace ECS
-}// namespace Ailu
-#endif// !ANIM_SYS_H__
+    }
+}
+
+#endif // __ANIM_SYS_H__

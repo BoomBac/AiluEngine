@@ -2,6 +2,7 @@
 #include "Animation/AnimationSystem.h"
 #include "Audio/AudioSystem.h"
 #include "Framework/Common/Application.h"
+#include "Framework/Common/Allocator.hpp"
 #include "Framework/Math/QuaternionMatrix.h"
 #include "Framework/Common/Profiler.h"
 #include "Framework/Common/ResourceMgr.h"
@@ -921,6 +922,8 @@ namespace Ailu::SceneManagement
 
         UpdateScripts(dt);
         _register.ExecutePhase(ECS::ESystemPhase::kAnimation, dt);
+        if (auto *animation_system = _register.GetSystem<ECS::AnimationSystem>())
+            ScriptSystem::Get().DispatchAnimationEvents(this, animation_system->Events());
         _register.ExecutePhase(ECS::ESystemPhase::kGameplay, dt);
     }
 
@@ -1075,12 +1078,12 @@ namespace Ailu::SceneManagement
     {
         if (!s_scene_mgr)
         {
-            s_scene_mgr = new SceneMgr();
+            s_scene_mgr = AL_NEW_TAG(EMemoryTag::kScene, SceneMgr);
         }
     }
     void SceneMgr::Shutdown()
     {
-
+        AL_DELETE(s_scene_mgr);
     }
 
     SceneMgr::SceneMgr()
@@ -1186,7 +1189,7 @@ namespace Ailu::SceneManagement
     {
         RenderPipeline::Get().SetPreviewCamera(nullptr, nullptr);
         Application::Get()._is_playing_mode = true;
-        _runtime_scene = new Scene(*_p_current);
+        _runtime_scene = AL_NEW_TAG(EMemoryTag::kScene, Scene, *_p_current);
         auto name = _runtime_scene->Name();
         name.append("_copy");
         _runtime_scene->Name(name);
@@ -1213,8 +1216,7 @@ namespace Ailu::SceneManagement
         }
         else
         {
-            delete _runtime_scene;
-            _runtime_scene = nullptr;
+            AL_DELETE(_runtime_scene);
         }
         Camera::sMain = nullptr;
         Camera::sCurrent = Camera::sScene;

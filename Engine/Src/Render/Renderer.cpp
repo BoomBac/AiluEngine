@@ -52,24 +52,24 @@ namespace Ailu::Render
         _gui_pass = MakeScope<GUIPass>();
         _hzb_pass = MakeScope<HZBPass>();
         _depth_only_pass = MakeScope<DepthOnlyPass>();
-        _owned_features.push_back(std::move(std::unique_ptr<RenderFeature>(new TemporalAA())));
-        _taa = _owned_features.back().get();
-        _owned_features.push_back(std::move(std::unique_ptr<RenderFeature>(new VoxelGI())));
-        _vxgi = _owned_features.back().get();
-        _owned_features.push_back(std::move(std::unique_ptr<RenderFeature>(new VolumetricClouds())));
-        _cloud = _owned_features.back().get();
-        _owned_features.push_back(std::move(std::unique_ptr<RenderFeature>(new SSAO())));
-        _ssao = _owned_features.back().get();
-        _owned_features.push_back(std::move(std::unique_ptr<RenderFeature>(new GpuTerrain())));
-        _gpu_terrain = _owned_features.back().get();
-        _owned_features.push_back(std::move(std::unique_ptr<RenderFeature>(new RayTraceGI())));
-        _raytrace_gi = _owned_features.back().get();
-        _owned_features.push_back(std::move(std::unique_ptr<RenderFeature>(new RTXDI())));
-        _rtxdi = _owned_features.back().get();
-        _owned_features.push_back(std::move(std::unique_ptr<RenderFeature>(new VolumetricFog())));
-        _fog = _owned_features.back().get();
-        _owned_features.push_back(std::move(std::unique_ptr<RenderFeature>(new SpriteRenderFeature())));
-        _sprite = _owned_features.back().get();
+        _owned_features.push_back(AL_NEW_TAG(EMemoryTag::kRenderer, TemporalAA));
+        _taa = _owned_features.back();
+        _owned_features.push_back(AL_NEW_TAG(EMemoryTag::kRenderer, VoxelGI));
+        _vxgi = _owned_features.back();
+        _owned_features.push_back(AL_NEW_TAG(EMemoryTag::kRenderer, VolumetricClouds));
+        _cloud = _owned_features.back();
+        _owned_features.push_back(AL_NEW_TAG(EMemoryTag::kRenderer, SSAO));
+        _ssao = _owned_features.back();
+        _owned_features.push_back(AL_NEW_TAG(EMemoryTag::kRenderer, GpuTerrain));
+        _gpu_terrain = _owned_features.back();
+        _owned_features.push_back(AL_NEW_TAG(EMemoryTag::kRenderer, RayTraceGI));
+        _raytrace_gi = _owned_features.back();
+        _owned_features.push_back(AL_NEW_TAG(EMemoryTag::kRenderer, RTXDI));
+        _rtxdi = _owned_features.back();
+        _owned_features.push_back(AL_NEW_TAG(EMemoryTag::kRenderer, VolumetricFog));
+        _fog = _owned_features.back();
+        _owned_features.push_back(AL_NEW_TAG(EMemoryTag::kRenderer, SpriteRenderFeature));
+        _sprite = _owned_features.back();
         //_features.push_back(_vxgi);
         //_features.push_back(_cloud);
         //_features.push_back(_taa);
@@ -99,6 +99,8 @@ namespace Ailu::Render
 
     Renderer::~Renderer()
     {
+        for (auto *feature: _owned_features)
+            AL_DELETE(feature);
         _owned_features.clear();
         AL_DELETE(_rd_graph);
         Profiler::Shutdown();

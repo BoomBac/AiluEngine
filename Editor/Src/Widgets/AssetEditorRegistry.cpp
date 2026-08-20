@@ -14,6 +14,7 @@
 #include "Editors/AnimationControllerEditor.h"
 #include "Editors/InputActionAssetEditor.h"
 #include "Editors/SpriteAssetEditor.h"
+#include "Editors/SpriteAtlasEditor.h"
 #include "Editors/Widget/WidgetEditor.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Framework/Common/Utils.h"
@@ -24,6 +25,7 @@
 #include "Platform/Process.h"
 #include "Project/ProjectManager.h"
 #include "Render/2D/Sprite.h"
+#include "Render/2D/SpriteAtlas.h"
 #include "Render/Mesh.h"
 #include "Scene/PrefabSystem.h"
 #include "Scene/Scene.h"
@@ -36,105 +38,29 @@ namespace Ailu
     {
         AssetEditorRegistry::AssetEditorRegistry()
         {
-            RegisterEditor(StaticClass<GraphAsset>(), [](Asset *asset) -> Ref<DockWindow>
+            RegisterEditor<GraphAsset, GraphEditorWindow>();
+            RegisterEditor<WidgetAsset, WidgetEditor>();
+            RegisterEditor<Render::Sprite, SpriteAssetEditor>();
+
+            RegisterEditor(StaticClass<Render::SpriteAtlas>(), [](Asset *asset) -> Ref<DockWindow>
             {
                 if (asset == nullptr)
                     return nullptr;
                 if (asset->_p_obj == nullptr)
-                    ResourceMgr::Get().Load<GraphAsset>(asset->_asset_path);
-                if (auto *graph = asset->As<GraphAsset>(); graph != nullptr)
-                {
-                    auto editor = MakeRef<GraphEditorWindow>();
-                    editor->Open(graph);
-                    return editor;
-                }
-                return nullptr;
-            });
-
-            RegisterEditor(StaticClass<WidgetAsset>(), [](Asset *asset) -> Ref<DockWindow>
-            {
-                if (asset == nullptr)
-                    return nullptr;
-                if (asset->_p_obj == nullptr)
-                    ResourceMgr::Get().Load<WidgetAsset>(asset->_asset_path);
-                auto *widget_asset = asset->As<WidgetAsset>();
-                if (widget_asset == nullptr)
+                    ResourceMgr::Get().Load<Render::SpriteAtlas>(asset->_asset_path);
+                auto *atlas = asset->As<Render::SpriteAtlas>();
+                if (atlas == nullptr)
                     return nullptr;
 
-                auto editor = MakeRef<WidgetEditor>();
-                editor->Open(widget_asset);
+                auto editor = MakeRef<SpriteAtlasEditor>();
+                editor->Open(atlas);
                 return editor;
             });
 
-            RegisterEditor(StaticClass<Render::Sprite>(), [](Asset *asset) -> Ref<DockWindow>
-            {
-                if (asset == nullptr)
-                    return nullptr;
-                if (asset->_p_obj == nullptr)
-                    ResourceMgr::Get().Load<Render::Sprite>(asset->_asset_path);
-                if (asset->_p_obj == nullptr)
-                    return nullptr;
-
-                auto editor = MakeRef<SpriteAssetEditor>();
-                editor->Open(asset->As<Render::Sprite>());
-                return editor;
-            });
-
-            RegisterEditor(StaticClass<AnimationClip>(), [](Asset *asset) -> Ref<DockWindow>
-            {
-                if (asset == nullptr)
-                    return nullptr;
-                if (asset->_p_obj == nullptr)
-                    ResourceMgr::Get().Load<AnimationClip>(asset->_asset_path);
-                auto *clip = asset->As<AnimationClip>();
-                if (clip == nullptr)
-                    return nullptr;
-                auto editor = MakeRef<AnimationClipEditor>();
-                editor->Open(clip);
-                return editor;
-            });
-
-            RegisterEditor(StaticClass<AnimationControllerAsset>(), [](Asset *asset) -> Ref<DockWindow>
-            {
-                if (asset == nullptr)
-                    return nullptr;
-                if (asset->_p_obj == nullptr)
-                    ResourceMgr::Get().Load<AnimationControllerAsset>(asset->_asset_path);
-                auto *controller = asset->As<AnimationControllerAsset>();
-                if (controller == nullptr)
-                    return nullptr;
-                auto editor = MakeRef<AnimationControllerEditor>();
-                editor->Open(controller);
-                return editor;
-            });
-
-            RegisterEditor(StaticClass<InputActionAsset>(), [](Asset *asset) -> Ref<DockWindow>
-            {
-                if (asset == nullptr)
-                    return nullptr;
-                if (asset->_p_obj == nullptr)
-                    ResourceMgr::Get().Load<InputActionAsset>(asset->_asset_path);
-                if (asset->_p_obj == nullptr)
-                    return nullptr;
-
-                auto editor = MakeRef<InputActionAssetEditor>();
-                editor->Open(asset->As<InputActionAsset>());
-                return editor;
-            });
-
-            RegisterEditor(StaticClass<AudioClip>(), [](Asset *asset) -> Ref<DockWindow>
-            {
-                if (asset == nullptr)
-                    return nullptr;
-                if (asset->_p_obj == nullptr)
-                    ResourceMgr::Get().Load<AudioClip>(asset->_asset_path);
-                if (asset->_p_obj == nullptr)
-                    return nullptr;
-
-                auto editor = MakeRef<AudioClipEditor>();
-                editor->Open(asset->As<AudioClip>());
-                return editor;
-            });
+            RegisterEditor<AnimationClip, AnimationClipEditor>();
+            RegisterEditor<AnimationControllerAsset, AnimationControllerEditor>();
+            RegisterEditor<InputActionAsset, InputActionAssetEditor>();
+            RegisterEditor<AudioClip, AudioClipEditor>();
 
             RegisterOpenHandler(StaticClass<SceneManagement::Scene>(), [](Asset *asset)
             {

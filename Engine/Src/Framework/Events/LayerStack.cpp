@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "Framework/Events/LayerStack.h"
+#include "Framework/Common/Allocator.hpp"
 
 namespace Ailu
 {
@@ -12,7 +13,7 @@ namespace Ailu
         for (auto layer: _layers)
         {
             layer->OnDetach();
-            delete layer;
+            AL_DELETE(layer);
         }
     }
     void LayerStack::PushLayer(Layer* layer)

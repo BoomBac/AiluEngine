@@ -6,12 +6,14 @@
 #include <Framework/Common/Log.h>
 #include <Framework/Common/TimeMgr.h>
 #include <Framework/Math/Guid.h>
+#include <Framework/Common/ResourceMgr.h>
 #include <Assets/AssetDocument.h>
 #include <Graph/GraphDocument.h>
 #include <Input/InputSystem.h>
 #include <Objects/JsonArchive.h>
 #include <Objects/Type.h>
 #include <Render/2D/SpriteBatcher.h>
+#include <Render/2D/Sprite.h>
 #include <Scene/EntityReference.h>
 #include <Assets/WidgetAsset.h>
 #include <UI/Basic.h>
@@ -1580,6 +1582,104 @@ namespace
         return title->Name() == "Title" && asset_slot._position == Vector2f(64.0f, 32.0f);
     }
 
+    bool TestWidgetAssetGuidPersistence()
+    {
+        Enum::InitTypeInfo();
+
+        WidgetAsset asset("GuidWidget");
+        UI::Text *title = asset.Root()->AddChild<UI::Text>("Guid title");
+        title->Name("Title");
+        const Guid root_guid = asset.Root()->GuidValue();
+        const Guid title_guid = title->GuidValue();
+        if (root_guid.IsEmpty() || title_guid.IsEmpty() || root_guid == title_guid)
+            return false;
+
+        WidgetAssetDocument source;
+        source._header._asset_name = asset.Name();
+        source._header._asset_type = WidgetAsset::StaticType()->FullName();
+        source._root = asset.RootRef();
+        const String document_name = "_widget_guid";
+        JsonArchive save_archive;
+        SerializerWrapper<WidgetAssetDocument>::Serialize(&source, save_archive, &document_name);
+
+        JsonArchive load_archive;
+        if (!load_archive.LoadFromString(save_archive.SaveToString()))
+            return false;
+        WidgetAssetDocument loaded;
+        SerializerWrapper<WidgetAssetDocument>::Deserialize(&loaded, load_archive, &document_name);
+        return loaded._root != nullptr && loaded._root->GuidValue() == root_guid &&
+               loaded._root->FindChildByGuid(title_guid) != nullptr &&
+               loaded._root->FindChildByGuid(title_guid)->Name() == "Title";
+    }
+
+    bool TestWidgetAssetCloneAndDuplicateGuid()
+    {
+        Enum::InitTypeInfo();
+
+        WidgetAsset asset("CloneWidget");
+        UI::Text *title = asset.Root()->AddChild<UI::Text>("Clone title");
+        const Guid root_guid = asset.Root()->GuidValue();
+        const Guid title_guid = title->GuidValue();
+        Ref<UI::UIElement> runtime_clone = CloneUIElementTree(asset.RootRef());
+        if (runtime_clone == nullptr || runtime_clone.get() == asset.Root() || runtime_clone->GuidValue() != root_guid ||
+            runtime_clone->FindChildByGuid(title_guid) == nullptr)
+            return false;
+
+        Ref<UI::UIElement> duplicate = CloneUIElementTree(asset.RootRef());
+        if (duplicate == nullptr)
+            return false;
+        duplicate->RegenerateGuidRecursive();
+        return duplicate->GuidValue() != root_guid && duplicate->FindChildByGuid(title_guid) == nullptr &&
+               duplicate->GetChildren().size() == 1u && duplicate->ChildAt(0)->GuidValue() != title_guid;
+    }
+
+    bool TestSpriteAtlasDocumentSerializationRoundtrip()
+    {
+        Enum::InitTypeInfo();
+        SpriteAtlasAssetDocument source;
+        source._header._guid = Guid::Generate().ToString();
+        source._header._asset_type = "Ailu::Render::SpriteAtlas";
+        source._header._asset_name = "TestAtlas";
+        source._texture = Guid::Generate();
+        SpriteAtlasEntryDocument entry;
+        entry._guid = Guid::Generate();
+        entry._name = "idle_00";
+        entry._uv_rect = Vector4f(0.25f, 0.5f, 0.25f, 0.5f);
+        entry._pivot = Vector2f(0.25f, 0.75f);
+        entry._size = 2.0f;
+        entry._border = Vector4f(1.0f, 2.0f, 3.0f, 4.0f);
+        source._sprites.push_back(entry);
+
+        const String document_name = "_sprite_atlas";
+        JsonArchive save_archive;
+        SerializerWrapper<SpriteAtlasAssetDocument>::Serialize(&source, save_archive, &document_name);
+        JsonArchive load_archive;
+        if (!load_archive.LoadFromString(save_archive.SaveToString()))
+            return false;
+
+        SpriteAtlasAssetDocument loaded;
+        SerializerWrapper<SpriteAtlasAssetDocument>::Deserialize(&loaded, load_archive, &document_name);
+        return loaded._header._guid == source._header._guid && loaded._header._asset_name == "TestAtlas" &&
+               loaded._texture == source._texture && loaded._sprites.size() == 1u &&
+               loaded._sprites[0]._guid == entry._guid && loaded._sprites[0]._name == entry._name &&
+               loaded._sprites[0]._uv_rect == entry._uv_rect && loaded._sprites[0]._pivot == entry._pivot &&
+               loaded._sprites[0]._size == entry._size && loaded._sprites[0]._border == entry._border;
+    }
+
+    bool TestSpriteAtlasSubAssetGuidLookup()
+    {
+        Enum::InitTypeInfo();
+        ResourceMgr resource_mgr;
+        const Guid owner_guid = Guid::Generate();
+        const Guid sprite_guid = Guid::Generate();
+        Asset owner(owner_guid, Render::SpriteAtlas::StaticType(), L"project://TestAtlas.alasset");
+        auto sprite = MakeRef<Render::Sprite>("idle_00");
+        resource_mgr.RegisterSubAsset(&owner, sprite_guid, sprite, sprite->Name());
+        return resource_mgr.Get<Render::Sprite>(sprite_guid) == sprite.get() &&
+               resource_mgr.GetRef<Render::Sprite>(sprite_guid) == sprite &&
+               resource_mgr.GetAssetGuid(sprite.get()) == sprite_guid;
+    }
+
     void RunEntityGuidUnitTests()
     {
         TestResult result;
@@ -1594,6 +1694,10 @@ namespace
         RunTest(result, "WidgetAsset document serialization roundtrip", TestWidgetAssetDocumentSerializationRoundtrip);
         RunTest(result, "WidgetAsset hierarchy roundtrip", TestWidgetAssetHierarchyRoundtrip);
         RunTest(result, "WidgetAsset runtime instantiation", TestWidgetAssetRuntimeInstantiation);
+        RunTest(result, "WidgetAsset Guid persistence", TestWidgetAssetGuidPersistence);
+        RunTest(result, "WidgetAsset clone and duplicate Guid", TestWidgetAssetCloneAndDuplicateGuid);
+        RunTest(result, "SpriteAtlas document serialization roundtrip", TestSpriteAtlasDocumentSerializationRoundtrip);
+        RunTest(result, "SpriteAtlas SubAsset GUID lookup", TestSpriteAtlasSubAssetGuidLookup);
 
         std::cout << "========================================\n";
         std::cout << "Entity GUID unit tests passed: " << result._passed << '\n';
@@ -1806,6 +1910,15 @@ int main(int argc, char **argv)
     {
         TestResult result;
         RunTest(result, "WidgetAsset hierarchy roundtrip", TestWidgetAssetHierarchyRoundtrip);
+        Allocator::Shutdown();
+        LogMgr::Shutdown();
+        return result._failed == 0u ? EXIT_SUCCESS : EXIT_FAILURE;
+    }
+    if (argc == 2 && std::strcmp(argv[1], "--widget-asset-guid") == 0)
+    {
+        TestResult result;
+        RunTest(result, "WidgetAsset Guid persistence", TestWidgetAssetGuidPersistence);
+        RunTest(result, "WidgetAsset clone and duplicate Guid", TestWidgetAssetCloneAndDuplicateGuid);
         Allocator::Shutdown();
         LogMgr::Shutdown();
         return result._failed == 0u ? EXIT_SUCCESS : EXIT_FAILURE;

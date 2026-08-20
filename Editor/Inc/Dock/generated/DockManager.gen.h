@@ -4,8 +4,24 @@
 #endif 
 #include "Objects/ReflectTemplate.h"
 #define __DOCKMANAGER_GEN_H__
-//Struct DockNodeData begin...........................
+//Struct DockWindowPlacement begin...........................
 #define DOCKMANAGER_GEN_H_27_GENERATED_BODY \
+                            private: \
+                                friend const Type* Z_Construct_DockWindowPlacement_Type();\
+                                static const Type* GetPrivateStaticClass();\
+                            public:\
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                const Type  *GetType();
+                            namespace Ailu {class Type;}
+namespace Ailu::Editor{
+struct DockWindowPlacement ;
+}
+template<>
+const class Ailu::Type* Ailu::StaticClass<struct Ailu::Editor::DockWindowPlacement>();
+//Struct DockWindowPlacement end...........................
+
+//Struct DockNodeData begin...........................
+#define DOCKMANAGER_GEN_H_46_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_DockNodeData_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -21,7 +37,7 @@ const class Ailu::Type* Ailu::StaticClass<struct Ailu::Editor::DockNodeData>();
 //Struct DockNodeData end...........................
 
 //Struct DockNodeDataArray begin...........................
-#define DOCKMANAGER_GEN_H_64_GENERATED_BODY \
+#define DOCKMANAGER_GEN_H_83_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_DockNodeDataArray_Type();\
                                 static const Type* GetPrivateStaticClass();\

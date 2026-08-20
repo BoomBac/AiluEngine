@@ -8,6 +8,7 @@
 #include "./Features/CommonPasses.h"
 #include "Framework/Core/CoreMinimal.h"
 #include "Framework/Common/NonCopyable.h"
+#include "Framework/Common/Allocator.hpp"
 #include "Framework/Core/String.h"
 #include "Framework/Core/Containers/Vector.h"
 #include "Framework/Core/Containers/List.h"
@@ -148,7 +149,7 @@ namespace Ailu
 
             RenderingData _rendering_data;
 
-            Vector<Scope<RenderFeature>> _owned_features;
+            Vector<RenderFeature *> _owned_features;
             //存储一份当前renderer使用的所有feature，不对元素的生命周期负责
             Vector<RenderFeature *> _features;
             bool _b_init = false;

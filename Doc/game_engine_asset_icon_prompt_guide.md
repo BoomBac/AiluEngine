@@ -61,22 +61,22 @@ iOS style mesh asset icon
 
 ## 3. 统一视觉规范
 
-| 项目 | 推荐规范 |
-|---|---|
+| 项目   | 推荐规范                |
+| ---- | ------------------- |
 | 视觉风格 | 现代 iOS 系统图标、轻微立体、简洁 |
-| 视角 | 轻微正交 3/4 视角 |
-| 构图 | 单个主体、严格居中、紧凑轮廓 |
-| 主体数量 | 不超过三个主要形状 |
-| 背景 | 透明背景 |
-| 材质 | 半透明玻璃、磨砂塑料、阳极氧化金属 |
-| 灯光 | 左上方柔和摄影棚灯光 |
-| 阴影 | 短而柔和的接触阴影 |
-| 边缘 | 圆润、清晰、有足够厚度 |
-| 色彩 | 每类资产一个主色，整体低饱和 |
+| 视角   | 轻微正交 3/4 视角         |
+| 构图   | 单个主体、严格居中、紧凑轮廓      |
+| 主体数量 | 不超过三个主要形状           |
+| 背景   | 透明背景                |
+| 材质   | 半透明玻璃、磨砂塑料、阳极氧化金属   |
+| 灯光   | 左上方柔和摄影棚灯光          |
+| 阴影   | 短而柔和的接触阴影           |
+| 边缘   | 圆润、清晰、有足够厚度         |
+| 色彩   | 每类资产一个主色，整体低饱和      |
 | 细节密度 | 适合 24px、32px 和 64px |
-| 文字 | 禁止文字、字母、数字和文件扩展名 |
-| 透视 | 禁止强透视和夸张广角 |
-| 装饰 | 禁止粒子、复杂背景和无关物体 |
+| 文字   | 禁止文字、字母、数字和文件扩展名    |
+| 透视   | 禁止强透视和夸张广角          |
+| 装饰   | 禁止粒子、复杂背景和无关物体      |
 
 ---
 
@@ -726,25 +726,143 @@ angle, lighting direction, corner softness, object scale, material treatment and
 
 ---
 
+## 9.13 Animation Controller Asset
+
+### 视觉隐喻
+
+- 三个圆润的动画状态节点
+
+- 两条清晰的方向转换连接
+
+- 一个状态作为当前激活状态
+
+- 强调状态选择、条件转换和动画流程控制
+
+- 不使用角色动作姿态，避免与 Animation Clip 混淆
+
+- 不制作复杂完整的节点编辑器截图
+
+### 推荐主色
+
+```text
+soft emerald and turquoise
+```
+
+### 完整提示词
+
+```text
+A premium game engine editor asset icon representing an Animation Controller Asset.
+
+The central symbol is a compact animation state machine composed of three rounded state nodes connected by two
+clear directional transition paths, with one state subtly emphasized as the active state. It must clearly
+communicate selecting animation states and controlling transitions between animation clips rather than storing
+recorded motion itself.
+
+Designed as part of a unified professional icon family for a modern game engine editor. Inspired by modern iOS
+system icon design: clean rounded geometry, restrained gradients, subtle translucent glass, soft anodized metal,
+polished but minimal appearance.
+
+Use soft emerald and turquoise as the main accent colors with low saturation and controlled highlights. Single
+dominant silhouette, no more than three major visual groups, compact centered composition, slight orthographic
+3/4 view, consistent visual weight, rounded edges, soft studio lighting from the upper left, subtle ambient
+occlusion and a short soft contact shadow.
+
+The icon must remain immediately recognizable at 24px, 32px and 64px. Transparent background with clean alpha
+edges. No text, no letters, no numbers, no logo, no character motion poses, no timeline, no film reel, no complex
+node graph, no interface screenshot, no editor window, no border, no decorative particles, no thin unreadable
+connection lines.
+
+This icon must belong to the same coherent icon family as the other game engine asset icons, using identical
+camera angle, lighting direction, corner softness, object scale, material treatment and visual density.
+```
+
+---
+
+## 9.14 UI Widget Asset
+
+### 视觉隐喻
+
+- 一个圆润的半透明 UI 面板作为主体
+
+- 面板内部嵌套两个简化控件模块
+
+- 使用明显的层级和布局关系表达 UI 控件树
+
+- 强调“可复用 UI 组件 / User Widget”
+
+- 不表现为普通网页、软件窗口或完整界面截图
+
+- 不使用文字、菜单栏等具体 UI 内容
+
+### 推荐主色
+
+```text
+soft rose pink and lavender
+```
+
+### 完整提示词
+
+```text
+A premium game engine editor asset icon representing a reusable UI Widget Asset similar to a game engine
+User Widget.
+
+The central symbol is a clean translucent rounded UI panel containing two simplified nested control modules:
+a compact rounded button-like block and a smaller layout element arranged with a clear visual hierarchy.
+The elements should appear assembled into one reusable interface component. It must clearly communicate a
+reusable UI layout and control hierarchy rather than a texture, image file or complete application window.
+
+Designed as part of a unified professional icon family for a modern game engine editor. Inspired by modern iOS
+system icon design: clean rounded geometry, restrained gradients, subtle translucent glass, soft anodized metal,
+polished but minimal appearance.
+
+Use soft rose pink and lavender as the main accent colors with low saturation and controlled highlights. Single
+dominant silhouette, no more than three major visual groups, compact centered composition, slight orthographic
+3/4 view, consistent visual weight, rounded edges, soft studio lighting from the upper left, subtle ambient
+occlusion and a short soft contact shadow.
+
+The icon must remain immediately recognizable at 24px, 32px and 64px. Transparent background with clean alpha
+edges. No readable text, no letters, no numbers, no logo, no browser window, no desktop application window,
+no toolbar, no menu bar, no interface screenshot, no file extension, no border, no decorative particles,
+no dense layout details, no thin unreadable lines.
+
+This icon must belong to the same coherent icon family as the other game engine asset icons, using identical
+camera angle, lighting direction, corner softness, object scale, material treatment and visual density.
+```
+
+---
+
+## 推荐颜色映射补充
+
+| 资产类型                 | 主色        |
+| -------------------- | --------- |
+| Animation Clip       | 绿色        |
+| Animation Controller | 翡翠绿 / 青绿色 |
+| UI Widget            | 玫瑰粉 / 淡紫色 |
+
+其中 Animation Controller 和 Animation Clip 建议保持同一个“动画资产色域”，但 Controller 偏青绿色，  
+Clip 偏纯绿色。这样在 Asset Browser 中既能一眼看出它们属于动画系统，又能依靠主体轮廓和色相快速区分。
+
+UI Widget 则沿用现有 UI Asset 的粉色方向，但加入少量淡紫色，使半透明 UI 面板和嵌套控件的层级更加清晰。
+
 # 10. 推荐颜色映射
 
-| 资产类型 | 主色 |
-|---|---|
-| Mesh | 宝石蓝 |
-| Material | 紫色 |
-| Shader | 靛青 / 青色 |
-| Texture | 橙色 / 珊瑚色 |
-| Sprite | 青绿色 |
-| Animation Clip | 绿色 |
-| Skeleton / Rig | 琥珀黄 |
-| Prefab | 蓝紫色 |
-| Scene | 青蓝色 |
-| Render Texture | 亮青色 |
-| Audio Clip | 粉紫色 |
-| Script | 灰蓝色 |
-| Font | 红橙色 |
-| Physics Material | 黄绿色 |
-| UI Asset | 粉色 |
+| 资产类型             | 主色       |
+| ---------------- | -------- |
+| Mesh             | 宝石蓝      |
+| Material         | 紫色       |
+| Shader           | 靛青 / 青色  |
+| Texture          | 橙色 / 珊瑚色 |
+| Sprite           | 青绿色      |
+| Animation Clip   | 绿色       |
+| Skeleton / Rig   | 琥珀黄      |
+| Prefab           | 蓝紫色      |
+| Scene            | 青蓝色      |
+| Render Texture   | 亮青色      |
+| Audio Clip       | 粉紫色      |
+| Script           | 灰蓝色      |
+| Font             | 红橙色      |
+| Physics Material | 黄绿色      |
+| UI Asset         | 粉色       |
 
 颜色只能辅助识别，不能成为不同资产类型之间的唯一差异。每种图标仍应拥有明确不同的主体轮廓。
 

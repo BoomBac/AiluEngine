@@ -11,10 +11,12 @@
 #include "Common/EditorPopup.h"
 #include "Dock/DockManager.h"
 #include "Render/2D/Sprite.h"
+#include "Render/2D/SpriteAtlas.h"
 #include <algorithm>
 #include <cmath>
 #include <format>
 #include <memory>
+#include <queue>
 
 using namespace Ailu::UI;
 
@@ -58,17 +60,32 @@ namespace Ailu
         // =====================================================================
         // SpriteAssetEditCommand
         // =====================================================================
-        class SpriteAssetEditCommand : public ICommand
+        class SpriteAssetEditCommand : public AssetEditCommand
         {
             DECLARE_COMMAND(SpriteAssetEdit)
         public:
             SpriteAssetEditCommand(SpriteAssetEditor* editor,
                                    const SpriteAssetEditData& old_data,
                                    const SpriteAssetEditData& new_data)
-                : _editor(editor), _old_data(old_data), _new_data(new_data) {}
+                : AssetEditCommand(editor != nullptr ? editor->GetAsset() : nullptr),
+                  _editor(editor), _old_data(old_data), _new_data(new_data) {}
 
-            void Execute() override { if (_editor) _editor->ApplyEditData(_new_data); }
-            void Undo() override { if (_editor) _editor->ApplyEditData(_old_data); }
+        protected:
+            bool ApplyEdit(bool) override
+            {
+                if (_editor == nullptr)
+                    return false;
+                _editor->ApplyEditData(_new_data);
+                return true;
+            }
+
+            bool UndoEdit() override
+            {
+                if (_editor == nullptr)
+                    return false;
+                _editor->ApplyEditData(_old_data);
+                return true;
+            }
 
         private:
             SpriteAssetEditor* _editor;
@@ -80,7 +97,7 @@ namespace Ailu
         // Constructor
         // =====================================================================
         SpriteAssetEditor::SpriteAssetEditor()
-            : DockWindow("Sprite Editor", Vector2f(1000.0f, 650.0f))
+            : AssetEditor("Sprite Editor", Vector2f(1000.0f, 650.0f))
         {
             // Set initial position below the editor toolbar so the title bar is visible and draggable
             SetPosition(Vector2f(120.0f, 60.0f));
@@ -100,10 +117,8 @@ namespace Ailu
 
             auto* left_border = main_area->AddChild<UI::Border>();
             left_border->_bg_color = Color(0.16f, 0.17f, 0.19f, 1.0f);
-            auto* left_scroll = left_border->AddChild<UI::ScrollView>();
-            left_scroll->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
-            auto* left_vb = left_scroll->AddChild<UI::VerticalBox>();
-            left_vb->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto);
+            auto* left_vb = left_border->AddChild<UI::VerticalBox>();
+            left_vb->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
             BuildLeftPanel(left_vb);
 
             auto* right_split = main_area->AddChild<UI::SplitView>();
@@ -130,24 +145,152 @@ namespace Ailu
 
         SpriteAssetEditor::~SpriteAssetEditor() = default;
 
+        void SpriteAssetEditor::OnBeforeSave()
+        {
+            if (GetAsset() == nullptr || !HasDraftChanges())
+                return;
+            if (!GetAsset()->IsDirty())
+                GetAsset()->MarkModified();
+
+            if (_sprite_atlas != nullptr)
+            {
+                StoreSelectedSprite();
+                WriteAtlasToAssets();
+                return;
+            }
+
+            ValidateEditingData();
+            WriteToAsset();
+            if (_selected_sprite_index >= 0 && _selected_sprite_index < static_cast<i32>(_sprite_items.size()))
+                _sprite_asset->Name(_sprite_items[_selected_sprite_index]._name);
+        }
+
+        void SpriteAssetEditor::OnAssetSaved()
+        {
+            if (_sprite_atlas != nullptr)
+            {
+                _original_atlas_sprites = _sprite_atlas->Sprites();
+                _original_atlas_sprite_guids.clear();
+                for (const auto &sprite : _original_atlas_sprites)
+                    _original_atlas_sprite_guids.push_back(ResourceMgr::Get().GetAssetGuid(sprite.get()));
+                _original_sprite_count = static_cast<u32>(_sprite_items.size());
+                for (auto &item : _sprite_items)
+                {
+                    item._original = item._editing;
+                    item._original_name = item._name;
+                }
+            }
+            else if (_sprite_asset != nullptr)
+            {
+                ReadFromAsset();
+                _original = _editing;
+                StoreSelectedSprite();
+                _original_sprite_count = static_cast<u32>(_sprite_items.size());
+            }
+            RefreshAllUI();
+        }
+
+        void SpriteAssetEditor::OnAssetReloaded()
+        {
+            _sprite_asset = GetAssetObject<Render::Sprite>();
+            _sprite_atlas = GetAssetObject<Render::SpriteAtlas>();
+            if (_sprite_asset != nullptr)
+                Open(_sprite_asset);
+            else if (_sprite_atlas != nullptr)
+                Open(_sprite_atlas);
+        }
+
         // =====================================================================
         // Open / Close
         // =====================================================================
         void SpriteAssetEditor::Open(Sprite* asset)
         {
             if (!asset) return;
+            BindAsset(ResourceMgr::Get().GetLinkedAsset(asset));
             _sprite_asset = asset;
+            _sprite_atlas = nullptr;
+            _supports_multiple_sprites = false;
+            _sprite_items.clear();
+            _selected_sprite_indices.clear();
+            _selected_sprite_index = -1;
             ReadFromAsset();
             _original = _editing;
+            _sprite_items.push_back(SpriteAssetEditItem{
+                ResourceMgr::Get().GetAssetGuid(asset), asset->Name(), asset->Name(), asset, _original, _editing});
+            _selected_sprite_index = 0;
+            _selected_sprite_indices = {0};
+            _original_sprite_count = static_cast<u32>(_sprite_items.size());
             OnTextureChanged();
             SetTitle("Sprite Editor - " + asset->Name());
             RefreshAllUI();
         }
 
+        void SpriteAssetEditor::Open(Render::SpriteAtlas* asset)
+        {
+            if (!asset)
+                return;
+
+            BindAsset(ResourceMgr::Get().GetLinkedAsset(asset));
+
+            _sprite_atlas = asset;
+            _sprite_asset = nullptr;
+            _original = SpriteAssetEditData();
+            _editing = SpriteAssetEditData();
+            _texture = nullptr;
+            _supports_multiple_sprites = true;
+            _sprite_items.clear();
+            _selected_sprite_indices.clear();
+            _original_atlas_sprites = asset->Sprites();
+            _original_atlas_sprite_guids.clear();
+            _selected_sprite_index = -1;
+            u32 sprite_index = 0u;
+            for (const auto &sprite_ref : asset->Sprites())
+            {
+                Sprite *sprite = sprite_ref.get();
+                if (!sprite)
+                {
+                    ++sprite_index;
+                    continue;
+                }
+                _sprite_asset = sprite;
+                ReadFromAsset();
+                _original = _editing;
+                const String display_name = sprite->Name().empty()
+                    ? MakeAtlasSpriteName(sprite_index) : sprite->Name();
+                _sprite_items.push_back(SpriteAssetEditItem{
+                    ResourceMgr::Get().GetAssetGuid(sprite), display_name, display_name, sprite, _original, _editing});
+                _original_atlas_sprite_guids.push_back(ResourceMgr::Get().GetAssetGuid(sprite));
+                ++sprite_index;
+            }
+
+            _selected_sprite_index = _sprite_items.empty() ? -1 : 0;
+            if (_selected_sprite_index >= 0)
+                _selected_sprite_indices = {_selected_sprite_index};
+            LoadSelectedSprite();
+            _original_sprite_count = static_cast<u32>(_sprite_items.size());
+            OnTextureChanged();
+            // Validation during opening is load-time normalization, not a user edit.
+            // Capture the normalized selection as the clean editor baseline.
+            StoreSelectedSprite();
+            SetTitle("Sprite Atlas Editor - " + asset->Name());
+            RefreshAllUI();
+        }
+
         void SpriteAssetEditor::Close()
         {
+            if (_sprite_atlas && IsDirty())
+                Revert();
             _sprite_asset = nullptr;
+            _sprite_atlas = nullptr;
             _texture = nullptr;
+            _sprite_items.clear();
+            _original_atlas_sprites.clear();
+            _original_atlas_sprite_guids.clear();
+            _sprite_list_items.clear();
+            _selected_sprite_indices.clear();
+            _selected_sprite_index = -1;
+            _original_sprite_count = 0;
+            AssetEditor::Close();
         }
 
         void SpriteAssetEditor::ApplyEditData(const SpriteAssetEditData& data)
@@ -158,6 +301,8 @@ namespace Ailu
                 OnTextureChanged();
             else
                 ValidateEditingData();
+            CommitLiveEdit(false);
+            StoreSelectedSprite();
             RefreshAllUI();
             RefreshPreview();
         }
@@ -167,12 +312,14 @@ namespace Ailu
         // =====================================================================
         void SpriteAssetEditor::Update(f32 dt)
         {
-            DockWindow::Update(dt);
-            if (!_sprite_asset) return;
+            AssetEditor::Update(dt);
+            if (!_sprite_asset && !_sprite_atlas) return;
+
+            if (GetAsset() != nullptr && !GetAsset()->IsDirty() && HasDraftChanges())
+                GetAsset()->MarkModified();
 
             const bool ctrl = Input::IsKeyDown(EKey::kLCONTROL) || Input::IsKeyDown(EKey::kRCONTROL);
 
-            if (ctrl && Input::IsKeyDownAccurate(EKey::kS)) Apply();
             if (ctrl && Input::IsKeyDownAccurate(EKey::kZ)) { if (g_pCommandMgr) g_pCommandMgr->Undo(); }
             if (ctrl && Input::IsKeyDownAccurate(EKey::kY)) { if (g_pCommandMgr) g_pCommandMgr->Redo(); }
             if (Input::IsKeyDownAccurate(EKey::kF)) FitTexture();
@@ -249,29 +396,130 @@ namespace Ailu
             _sprite_asset->_border  = _editing._border;
         }
 
+        void SpriteAssetEditor::CommitLiveEdit(bool mark_dirty)
+        {
+            if (_supports_multiple_sprites || _sprite_asset == nullptr)
+                return;
+
+            ValidateEditingData();
+            if (mark_dirty && _editing != _original && GetAsset() != nullptr && g_pCommandMgr)
+            {
+                const SpriteAssetEditData old_data = _original;
+                const SpriteAssetEditData new_data = _editing;
+                g_pCommandMgr->ExecuteCommand(std::make_unique<SpriteAssetEditCommand>(this, old_data, new_data));
+                return;
+            }
+            WriteToAsset();
+            if (_selected_sprite_index >= 0 && _selected_sprite_index < static_cast<i32>(_sprite_items.size()))
+                _sprite_asset->Name(_sprite_items[_selected_sprite_index]._name);
+            _original = _editing;
+            StoreSelectedSprite();
+            if (mark_dirty && GetAsset() != nullptr && !GetAsset()->IsDirty())
+                GetAsset()->MarkModified();
+        }
+
         void SpriteAssetEditor::Apply()
         {
-            if (!_sprite_asset || !IsDirty()) return;
-            ValidateEditingData();
-            WriteToAsset();
-            _original = _editing;
-            ResourceMgr::Get().MarkAssetDirty(_sprite_asset);
-            auto* linked = ResourceMgr::Get().GetLinkedAsset(_sprite_asset);
-            if (linked)
+            if ((!_sprite_asset && !_sprite_atlas) || !IsDirty())
+                return;
+
+            if (_sprite_atlas)
             {
-                ResourceMgr::Get().SaveAsset(linked);
-                LOG_INFO("SpriteAssetEditor: Applied");
+                StoreSelectedSprite();
+                WriteAtlasToAssets();
+                auto *linked = ResourceMgr::Get().GetLinkedAsset(_sprite_atlas);
+                if (linked)
+                {
+                    ResourceMgr::Get().MarkAssetDirty(linked);
+                    ResourceMgr::Get().SaveAsset(linked);
+                    LOG_INFO("SpriteAtlasEditor: Applied");
+                }
+                _original_atlas_sprites = _sprite_atlas->Sprites();
+                _original_atlas_sprite_guids.clear();
+                for (const auto &sprite : _original_atlas_sprites)
+                    _original_atlas_sprite_guids.push_back(ResourceMgr::Get().GetAssetGuid(sprite.get()));
+                _original_sprite_count = static_cast<u32>(_sprite_items.size());
+                RefreshAllUI();
+                return;
             }
-            RefreshAllUI();
+
+            AssetEditor::Save();
+        }
+
+        void SpriteAssetEditor::WriteAtlasToAssets()
+        {
+            const i32 selected_index = _selected_sprite_index;
+            StoreSelectedSprite();
+            Guid atlas_texture_guid = _editing._texture;
+            if (atlas_texture_guid.IsEmpty() && _sprite_atlas->Texture() != nullptr)
+                atlas_texture_guid = ResourceMgr::Get().GetAssetGuid(_sprite_atlas->Texture().get());
+            Ref<Texture2D> atlas_texture;
+            if (!atlas_texture_guid.IsEmpty())
+                atlas_texture = ResourceMgr::Get().GetRef<Texture2D>(atlas_texture_guid);
+            _sprite_atlas->SetTexture(atlas_texture);
+            for (auto &item : _sprite_items)
+            {
+                if (!item._asset)
+                    continue;
+                _sprite_asset = item._asset;
+                _editing = item._editing;
+                _editing._texture = atlas_texture_guid;
+                _original = item._original;
+                _texture = ResolveTexture();
+                ValidateEditingData();
+                WriteToAsset();
+                item._asset->Name(item._name);
+                item._editing = _editing;
+                item._original = _editing;
+                item._original_name = item._name;
+            }
+
+            _selected_sprite_index = selected_index;
+            LoadSelectedSprite();
+            OnTextureChanged();
         }
 
         void SpriteAssetEditor::Revert()
         {
             if (!IsDirty()) return;
-            _editing = _original;
-            OnTextureChanged();
-            RefreshAllUI();
-            RefreshPreview();
+            if (_sprite_atlas)
+            {
+                for (const auto &item : _sprite_items)
+                    ResourceMgr::Get().UnregisterSubAsset(item._guid);
+                _sprite_atlas->Sprites() = _original_atlas_sprites;
+                auto *owner = ResourceMgr::Get().GetLinkedAsset(_sprite_atlas);
+                for (u32 i = 0u; owner != nullptr && i < _original_atlas_sprites.size(); ++i)
+                {
+                    const Guid guid = i < _original_atlas_sprite_guids.size()
+                        ? _original_atlas_sprite_guids[i] : Guid::Generate();
+                    ResourceMgr::Get().RegisterSubAsset(owner, guid, _original_atlas_sprites[i],
+                                                        _original_atlas_sprites[i]->Name());
+                }
+                _sprite_items.clear();
+                _sprite_asset = nullptr;
+                _selected_sprite_indices.clear();
+                _selected_sprite_index = -1;
+                for (const auto &sprite_ref : _original_atlas_sprites)
+                {
+                    if (!sprite_ref)
+                        continue;
+                    _sprite_asset = sprite_ref.get();
+                    ReadFromAsset();
+                    _original = _editing;
+                    const Guid guid = ResourceMgr::Get().GetAssetGuid(sprite_ref.get());
+                    _sprite_items.push_back(SpriteAssetEditItem{
+                        guid, sprite_ref->Name(), sprite_ref->Name(), sprite_ref.get(), _original, _editing});
+                }
+                _selected_sprite_index = _sprite_items.empty() ? -1 : 0;
+                if (_selected_sprite_index >= 0)
+                    _selected_sprite_indices = {_selected_sprite_index};
+                LoadSelectedSprite();
+                OnTextureChanged();
+                RefreshAllUI();
+                RefreshPreview();
+                return;
+            }
+            AssetEditor::DiscardChanges();
         }
 
         void SpriteAssetEditor::ValidateEditingData()
@@ -324,6 +572,7 @@ namespace Ailu
         void SpriteAssetEditor::RefreshAllUI()
         {
             RefreshAssetInfo();
+            RefreshNameInput();
             RefreshUvInputs();
             RefreshPivotInputs();
             RefreshSizeInputs();
@@ -332,14 +581,497 @@ namespace Ailu
             if (_img_tex_preview) _img_tex_preview->SetTexture(_texture);
             if (_txt_tex_field)
                 _txt_tex_field->SetText(_editing._texture == Guid::EmptyGuid() ? String("None") : GuidToString(_editing._texture));
+            const bool single_selection = _selected_sprite_indices.size() == 1u;
+            if (_txt_multi_selection_notice)
+            {
+                _txt_multi_selection_notice->SetText(_selected_sprite_indices.empty()
+                    ? "No sprite selected."
+                    : "Multiple selection editing is not supported.");
+                _txt_multi_selection_notice->SetVisible(!single_selection);
+            }
+            const auto set_inspector_enabled = [single_selection](UI::UIElement *element)
+            {
+                if (element != nullptr)
+                    element->SetInteractiveEnabled(single_selection);
+            };
+            set_inspector_enabled(_sprite_name_input);
+            set_inspector_enabled(_btn_select_tex);
+            set_inspector_enabled(_btn_clear_tex);
+            set_inspector_enabled(_uv_norm_x);
+            set_inspector_enabled(_uv_norm_y);
+            set_inspector_enabled(_uv_norm_w);
+            set_inspector_enabled(_uv_norm_h);
+            set_inspector_enabled(_uv_pix_x);
+            set_inspector_enabled(_uv_pix_y);
+            set_inspector_enabled(_uv_pix_w);
+            set_inspector_enabled(_uv_pix_h);
+            set_inspector_enabled(_pivot_x);
+            set_inspector_enabled(_pivot_y);
+            set_inspector_enabled(_size_input);
+            set_inspector_enabled(_border_l);
+            set_inspector_enabled(_border_r);
+            set_inspector_enabled(_border_t);
+            set_inspector_enabled(_border_b);
+            RefreshSpriteList();
+        }
+
+        void SpriteAssetEditor::RefreshSpriteList()
+        {
+            if (!_sprite_list)
+                return;
+
+            _sprite_list->ClearItems();
+            _sprite_list_items.clear();
+            for (i32 i = 0; i < static_cast<i32>(_sprite_items.size()); ++i)
+            {
+                auto item = MakeRef<UI::Text>(_sprite_items[i]._name);
+                _sprite_list->AddItem(item);
+                _sprite_list_items.push_back(item.get());
+                item->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed)
+                    .Size(Vector2f(0.0f, 22.0f)).Margin(Vector4f(4.0f, 1.0f, 4.0f, 1.0f));
+            }
+            _sprite_list->SetSelectedIndices(_selected_sprite_indices);
+
+            const bool can_edit_list = _supports_multiple_sprites;
+            const bool has_single_selection = _selected_sprite_indices.size() <= 1u;
+            if (_btn_add_sprite)
+                _btn_add_sprite->SetInteractiveEnabled(can_edit_list && has_single_selection);
+            if (_btn_remove_sprite)
+            {
+                const bool can_remove = can_edit_list && _sprite_items.size() > 1u && !_selected_sprite_indices.empty();
+                _btn_remove_sprite->SetInteractiveEnabled(can_remove);
+                if (_btn_delete_sprite)
+                    _btn_delete_sprite->SetInteractiveEnabled(can_remove);
+            }
+            if (_btn_toolbar_add)
+                _btn_toolbar_add->SetInteractiveEnabled(can_edit_list && has_single_selection);
+            if (_btn_grid_slice)
+                _btn_grid_slice->SetInteractiveEnabled(can_edit_list && _texture != nullptr);
+            if (_btn_auto_slice)
+                _btn_auto_slice->SetInteractiveEnabled(can_edit_list && _texture != nullptr);
+            if (_btn_duplicate_sprite)
+                _btn_duplicate_sprite->SetInteractiveEnabled(can_edit_list && has_single_selection && !_sprite_items.empty());
+        }
+
+        void SpriteAssetEditor::SelectSprite(i32 index)
+        {
+            if (index < 0 || index >= static_cast<i32>(_sprite_items.size()))
+                return;
+
+            SelectSprites({index}, index);
+        }
+
+        void SpriteAssetEditor::SelectSprites(const Vector<i32> &indices, i32 primary_index)
+        {
+            Vector<i32> valid_indices;
+            for (i32 index : indices)
+            {
+                if (index >= 0 && index < static_cast<i32>(_sprite_items.size()) &&
+                    std::find(valid_indices.begin(), valid_indices.end(), index) == valid_indices.end())
+                    valid_indices.push_back(index);
+            }
+            if (valid_indices.empty())
+            {
+                StoreSelectedSprite();
+                _selected_sprite_indices.clear();
+                _selected_sprite_index = -1;
+                _sprite_asset = nullptr;
+                _editing = SpriteAssetEditData();
+                _texture = nullptr;
+                RefreshAllUI();
+                RefreshPreview();
+                return;
+            }
+
+            StoreSelectedSprite();
+            _selected_sprite_indices = valid_indices;
+            if (valid_indices.size() == 1u)
+            {
+                _selected_sprite_index = valid_indices.front();
+                LoadSelectedSprite();
+                OnTextureChanged();
+            }
+            else
+            {
+                _selected_sprite_index = -1;
+            }
+            RefreshAllUI();
+            RefreshPreview();
+        }
+
+        String SpriteAssetEditor::MakeAtlasSpriteName(u32 index) const
+        {
+            const String atlas_name = _sprite_atlas != nullptr && !_sprite_atlas->Name().empty()
+                ? _sprite_atlas->Name() : String("SpriteAtlas");
+            return std::format("{}_{}", atlas_name, index);
+        }
+
+        void SpriteAssetEditor::AddSprite()
+        {
+            if (!_supports_multiple_sprites || !_sprite_atlas)
+                return;
+
+            StoreSelectedSprite();
+            u32 name_index = static_cast<u32>(_sprite_items.size());
+            String name = MakeAtlasSpriteName(name_index);
+            auto has_name = [this](const String &candidate)
+            {
+                return std::any_of(_sprite_items.begin(), _sprite_items.end(),
+                                   [&candidate](const SpriteAssetEditItem &item) { return item._name == candidate; });
+            };
+            while (has_name(name))
+                name = MakeAtlasSpriteName(++name_index);
+            auto sprite = MakeRef<Sprite>(name);
+            if (_editing._texture != Guid::EmptyGuid())
+                sprite->_texture = ResourceMgr::Get().GetRef<Render::Texture2D>(_editing._texture);
+            if (sprite->_texture != nullptr)
+                _sprite_atlas->SetTexture(sprite->_texture);
+            sprite->_uv_rect = _editing._uv_rect;
+            sprite->_pivot = _editing._pivot;
+            sprite->_size = _editing._size;
+            sprite->_border = _editing._border;
+            const Guid guid = Guid::Generate();
+            auto *owner = ResourceMgr::Get().GetLinkedAsset(_sprite_atlas);
+            if (!owner)
+                return;
+            ResourceMgr::Get().RegisterSubAsset(owner, guid, sprite, name);
+            _sprite_atlas->Sprites().push_back(sprite);
+
+            SpriteAssetEditItem item;
+            item._guid = guid;
+            item._name = name;
+            item._original_name = name;
+            item._asset = sprite.get();
+            item._original = _editing;
+            item._editing = _editing;
+            _sprite_items.push_back(item);
+            _selected_sprite_index = static_cast<i32>(_sprite_items.size() - 1u);
+            _selected_sprite_indices = {_selected_sprite_index};
+            LoadSelectedSprite();
+            RefreshAllUI();
+            RefreshPreview();
+        }
+
+        void SpriteAssetEditor::RemoveSprite()
+        {
+            if (!_supports_multiple_sprites || !_sprite_atlas || _sprite_items.size() <= 1u)
+                return;
+
+            StoreSelectedSprite();
+            Vector<i32> remove_indices = _selected_sprite_indices;
+            if (remove_indices.empty() && _selected_sprite_index >= 0)
+                remove_indices.push_back(_selected_sprite_index);
+            if (remove_indices.empty())
+                return;
+            std::sort(remove_indices.begin(), remove_indices.end());
+            remove_indices.erase(std::unique(remove_indices.begin(), remove_indices.end()), remove_indices.end());
+            while (remove_indices.size() >= _sprite_items.size())
+                remove_indices.pop_back();
+
+            i32 next_index = remove_indices.front();
+            for (auto it = remove_indices.rbegin(); it != remove_indices.rend(); ++it)
+            {
+                const i32 index = *it;
+                if (index < 0 || index >= static_cast<i32>(_sprite_items.size()))
+                    continue;
+                const SpriteAssetEditItem item = _sprite_items[index];
+                ResourceMgr::Get().UnregisterSubAsset(item._guid);
+                _sprite_atlas->Sprites().erase(
+                    std::remove_if(_sprite_atlas->Sprites().begin(), _sprite_atlas->Sprites().end(),
+                                   [&item](const Ref<Sprite> &sprite) { return sprite.get() == item._asset; }),
+                    _sprite_atlas->Sprites().end());
+                _sprite_items.erase(_sprite_items.begin() + index);
+            }
+            _selected_sprite_index = std::min(next_index, static_cast<i32>(_sprite_items.size() - 1u));
+            _selected_sprite_indices = {_selected_sprite_index};
+            LoadSelectedSprite();
+            OnTextureChanged();
+            RefreshAllUI();
+            RefreshPreview();
+        }
+
+        void SpriteAssetEditor::DuplicateSprite()
+        {
+            AddSprite();
+        }
+
+        void SpriteAssetEditor::ShowGridSlicePopup()
+        {
+            if (!_supports_multiple_sprites || !_sprite_atlas || !_texture)
+                return;
+
+            auto cell_width = std::make_shared<u32>(32u);
+            auto cell_height = std::make_shared<u32>(32u);
+            auto padding = std::make_shared<u32>(0u);
+            auto spacing = std::make_shared<u32>(0u);
+            auto root = MakeRef<UI::Border>();
+            root->GetSlot()->Size(Vector2f(260.0f, 190.0f));
+            root->Thickness(1.0f);
+            root->CornerRadius(4.0f);
+            root->SlotPadding() = UI::Padding(6.0f);
+            root->_bg_color = Color(0.095f, 0.10f, 0.11f, 0.98f);
+            root->_border_color = Color(0.45f, 0.50f, 0.56f, 0.85f);
+            auto *layout = root->AddChild<UI::VerticalBox>();
+            layout->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
+
+            auto add_input = [&layout](const String &label, u32 value, const std::function<void(String)> &on_changed)
+            {
+                auto *row = layout->AddChild<UI::HorizontalBox>();
+                row->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed)
+                    .Size(Vector2f(0.0f, kInputHeight));
+                auto *text = row->AddChild<UI::Text>(label);
+                text->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFill)
+                    .Size(Vector2f(90.0f, 0.0f));
+                auto *input = row->AddChild<UI::InputBlock>(std::to_string(value));
+                input->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
+                input->_on_content_changed += std::function<void(String)>(on_changed);
+            };
+            add_input("Cell Width", *cell_width, [cell_width](String value)
+            {
+                if (auto parsed = StringUtils::ParseUInt32(value); parsed.has_value())
+                    *cell_width = parsed.value();
+            });
+            add_input("Cell Height", *cell_height, [cell_height](String value)
+            {
+                if (auto parsed = StringUtils::ParseUInt32(value); parsed.has_value())
+                    *cell_height = parsed.value();
+            });
+            add_input("Padding", *padding, [padding](String value)
+            {
+                if (auto parsed = StringUtils::ParseUInt32(value); parsed.has_value())
+                    *padding = parsed.value();
+            });
+            add_input("Spacing", *spacing, [spacing](String value)
+            {
+                if (auto parsed = StringUtils::ParseUInt32(value); parsed.has_value())
+                    *spacing = parsed.value();
+            });
+
+            auto *slice = layout->AddChild<UI::Button>("Slice");
+            slice->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed)
+                .Size(Vector2f(0.0f, 24.0f)).Margin(Vector4f(0.0f, 6.0f, 0.0f, 0.0f));
+            slice->OnMouseClick() += [this, cell_width, cell_height, padding, spacing](UI::UIEvent &event)
+            {
+                SliceGrid(*cell_width, *cell_height, *padding, *spacing);
+                UI::UIManager::Get()->HidePopup();
+                event._is_handled = true;
+            };
+
+            const auto rect = _btn_grid_slice->GetArrangeRect();
+            UI::UIManager::Get()->ShowPopupAt(rect.x, rect.y + rect.w, root);
+        }
+
+        void SpriteAssetEditor::SliceGrid(u32 cell_width, u32 cell_height, u32 padding, u32 spacing)
+        {
+            if (!_supports_multiple_sprites || !_sprite_atlas || !_texture || cell_width == 0u || cell_height == 0u)
+                return;
+
+            const u32 texture_width = _texture->Width();
+            const u32 texture_height = _texture->Height();
+            if (texture_width == 0u || texture_height == 0u || padding >= texture_width || padding >= texture_height)
+                return;
+            auto *owner = ResourceMgr::Get().GetLinkedAsset(_sprite_atlas);
+            if (!owner)
+                return;
+            if (!_editing._texture.IsEmpty())
+            {
+                auto texture = ResourceMgr::Get().GetRef<Texture2D>(_editing._texture);
+                if (texture != nullptr)
+                    _sprite_atlas->SetTexture(texture);
+            }
+
+            StoreSelectedSprite();
+            for (const auto &item : _sprite_items)
+                ResourceMgr::Get().UnregisterSubAsset(item._guid);
+            _sprite_atlas->Sprites().clear();
+            _sprite_items.clear();
+
+            const u64 stride_x = static_cast<u64>(cell_width) + spacing;
+            const u64 stride_y = static_cast<u64>(cell_height) + spacing;
+            const u64 max_x = texture_width - padding;
+            const u64 max_y = texture_height - padding;
+            u32 index = 0u;
+            for (u64 y = padding; y + cell_height <= max_y; y += stride_y)
+            {
+                for (u64 x = padding; x + cell_width <= max_x; x += stride_x)
+                {
+                    const String name = MakeAtlasSpriteName(index++);
+                    auto sprite = MakeRef<Sprite>(name);
+                    sprite->_texture = _sprite_atlas->Texture();
+                    sprite->_uv_rect = Vector4f(static_cast<f32>(x) / texture_width,
+                                                1.0f - static_cast<f32>(y + cell_height) / texture_height,
+                                                static_cast<f32>(cell_width) / texture_width,
+                                                static_cast<f32>(cell_height) / texture_height);
+                    const Guid guid = Guid::Generate();
+                    ResourceMgr::Get().RegisterSubAsset(owner, guid, sprite, name);
+                    _sprite_atlas->Sprites().push_back(sprite);
+                    SpriteAssetEditItem item;
+                    item._guid = guid;
+                    item._name = name;
+                    item._original_name = name;
+                    item._asset = sprite.get();
+                    item._original._texture = ResourceMgr::Get().GetAssetGuid(_sprite_atlas->Texture().get());
+                    item._original._uv_rect = sprite->_uv_rect;
+                    item._original._pivot = sprite->_pivot;
+                    item._original._size = sprite->_size;
+                    item._original._border = sprite->_border;
+                    item._editing = item._original;
+                    _sprite_items.push_back(item);
+                }
+            }
+
+            _selected_sprite_index = _sprite_items.empty() ? -1 : 0;
+            _selected_sprite_indices.clear();
+            if (_selected_sprite_index >= 0)
+                _selected_sprite_indices = {_selected_sprite_index};
+            LoadSelectedSprite();
+            OnTextureChanged();
+            RefreshAllUI();
+            RefreshPreview();
+        }
+
+        void SpriteAssetEditor::SliceAlpha(f32 threshold)
+        {
+            if (!_supports_multiple_sprites || !_sprite_atlas || !_texture)
+                return;
+            const u32 width = _texture->Width();
+            const u32 height = _texture->Height();
+            if (width == 0u || height == 0u)
+                return;
+            Color first_pixel;
+            if (!_texture->TryGetPixel(0u, 0u, first_pixel))
+            {
+                LOG_WARNING("SpriteAtlasEditor: Auto Slice requires CPU texture pixel data");
+                return;
+            }
+            threshold = std::clamp(threshold, 0.0f, 1.0f);
+            auto *owner = ResourceMgr::Get().GetLinkedAsset(_sprite_atlas);
+            if (!owner)
+                return;
+
+            Vector<u8> visited(width * height, 0u);
+            Vector<Vector4Int> bounds;
+            const auto is_opaque = [this, threshold](u32 x, u32 y)
+            {
+                Color color;
+                return _texture->TryGetPixel(static_cast<u16>(x), static_cast<u16>(y), color) && color.a > threshold;
+            };
+            const Ref<Texture2D> atlas_texture = _sprite_atlas->Texture();
+            if (!atlas_texture)
+            {
+                LOG_WARNING("SpriteAtlasEditor: Auto Slice skipped because the atlas texture is missing");
+                return;
+            }
+            for (u32 y = 0u; y < height; ++y)
+            {
+                for (u32 x = 0u; x < width; ++x)
+                {
+                    const u32 offset = y * width + x;
+                    if (visited[offset] != 0u || !is_opaque(x, y))
+                        continue;
+                    visited[offset] = 1u;
+                    std::queue<Vector2Int> pending;
+                    pending.emplace(static_cast<i32>(x), static_cast<i32>(y));
+                    Vector4Int rect(static_cast<i32>(x), static_cast<i32>(y), static_cast<i32>(x), static_cast<i32>(y));
+                    while (!pending.empty())
+                    {
+                        const Vector2Int pixel = pending.front();
+                        pending.pop();
+                        rect.x = std::min(rect.x, pixel.x);
+                        rect.y = std::min(rect.y, pixel.y);
+                        rect.z = std::max(rect.z, pixel.x);
+                        rect.w = std::max(rect.w, pixel.y);
+                        const Array<Vector2Int, 4> kNeighbors = {
+                            Vector2Int(1, 0), Vector2Int(-1, 0), Vector2Int(0, 1), Vector2Int(0, -1)};
+                        for (const auto &neighbor : kNeighbors)
+                        {
+                            const i32 nx = pixel.x + neighbor.x;
+                            const i32 ny = pixel.y + neighbor.y;
+                            if (nx < 0 || ny < 0 || nx >= static_cast<i32>(width) || ny >= static_cast<i32>(height))
+                                continue;
+                            const u32 neighbor_offset = static_cast<u32>(ny) * width + static_cast<u32>(nx);
+                            if (visited[neighbor_offset] != 0u || !is_opaque(static_cast<u32>(nx), static_cast<u32>(ny)))
+                                continue;
+                            visited[neighbor_offset] = 1u;
+                            pending.emplace(nx, ny);
+                        }
+                    }
+                    bounds.push_back(rect);
+                }
+            }
+
+            StoreSelectedSprite();
+            for (const auto &item : _sprite_items)
+                ResourceMgr::Get().UnregisterSubAsset(item._guid);
+            _sprite_atlas->Sprites().clear();
+            _sprite_items.clear();
+            const Guid texture_guid = ResourceMgr::Get().GetAssetGuid(atlas_texture.get());
+            u32 index = 0u;
+            for (const auto &rect : bounds)
+            {
+                const u32 sprite_width = static_cast<u32>(rect.z - rect.x + 1);
+                const u32 sprite_height = static_cast<u32>(rect.w - rect.y + 1);
+                const String name = MakeAtlasSpriteName(index++);
+                auto sprite = MakeRef<Sprite>(name);
+                sprite->_texture = atlas_texture;
+                sprite->_uv_rect = Vector4f(static_cast<f32>(rect.x) / width,
+                                            1.0f - static_cast<f32>(rect.y + static_cast<i32>(sprite_height)) / height,
+                                            static_cast<f32>(sprite_width) / width,
+                                            static_cast<f32>(sprite_height) / height);
+                const Guid guid = Guid::Generate();
+                ResourceMgr::Get().RegisterSubAsset(owner, guid, sprite, name);
+                _sprite_atlas->Sprites().push_back(sprite);
+                SpriteAssetEditItem item;
+                item._guid = guid;
+                item._name = name;
+                item._original_name = name;
+                item._asset = sprite.get();
+                item._original._texture = texture_guid;
+                item._original._uv_rect = sprite->_uv_rect;
+                item._original._pivot = sprite->_pivot;
+                item._original._size = sprite->_size;
+                item._original._border = sprite->_border;
+                item._editing = item._original;
+                _sprite_items.push_back(item);
+            }
+            _selected_sprite_index = _sprite_items.empty() ? -1 : 0;
+            _selected_sprite_indices.clear();
+            if (_selected_sprite_index >= 0)
+                _selected_sprite_indices = {_selected_sprite_index};
+            LoadSelectedSprite();
+            OnTextureChanged();
+            RefreshAllUI();
+            RefreshPreview();
+        }
+
+        void SpriteAssetEditor::StoreSelectedSprite()
+        {
+            const bool invalid_index = _selected_sprite_index < 0 ||
+                _selected_sprite_index >= static_cast<i32>(_sprite_items.size());
+            if (invalid_index)
+                return;
+            _sprite_items[_selected_sprite_index]._original = _original;
+            _sprite_items[_selected_sprite_index]._editing = _editing;
+        }
+
+        void SpriteAssetEditor::LoadSelectedSprite()
+        {
+            if (_selected_sprite_index < 0 || _selected_sprite_index >= static_cast<i32>(_sprite_items.size()))
+                return;
+            _original = _sprite_items[_selected_sprite_index]._original;
+            _editing = _sprite_items[_selected_sprite_index]._editing;
+            _sprite_asset = _sprite_items[_selected_sprite_index]._asset;
+            RefreshNameInput();
         }
 
         void SpriteAssetEditor::RefreshAssetInfo()
         {
-            if (!_sprite_asset) return;
-            auto* linked = ResourceMgr::Get().GetLinkedAsset(_sprite_asset);
-            if (_txt_asset_name) _txt_asset_name->SetText(_sprite_asset->Name());
-            if (_txt_asset_type) _txt_asset_type->SetText("SpriteAsset");
+            if (!_sprite_asset && !_sprite_atlas)
+                return;
+            Object *asset_object = _sprite_atlas ? static_cast<Object *>(_sprite_atlas) : _sprite_asset;
+            auto* linked = ResourceMgr::Get().GetLinkedAsset(asset_object);
+            if (_txt_asset_name) _txt_asset_name->SetText(_sprite_atlas ? _sprite_atlas->Name() : _sprite_asset->Name());
+            if (_txt_asset_type) _txt_asset_type->SetText(_sprite_atlas ? "SpriteAtlas" : "SpriteAsset");
             if (_txt_asset_guid) _txt_asset_guid->SetText(linked ? linked->GetGuid().ToString() : "-");
             if (linked && _txt_asset_path)
                 _txt_asset_path->SetText(ToChar(linked->_asset_path));
@@ -407,6 +1139,17 @@ namespace Ailu
             if (_border_t) _border_t->SetContent(std::format("{}", (i32)std::round(_editing._border.w)));
             if (_border_b) _border_b->SetContent(std::format("{}", (i32)std::round(_editing._border.z)));
             _is_syncing_border = false;
+        }
+
+        void SpriteAssetEditor::RefreshNameInput()
+        {
+            if (_is_syncing_name || !_sprite_name_input)
+                return;
+            _is_syncing_name = true;
+            const String name = _selected_sprite_index >= 0 && _selected_sprite_index < static_cast<i32>(_sprite_items.size())
+                ? _sprite_items[_selected_sprite_index]._name : String();
+            _sprite_name_input->SetContent(name);
+            _is_syncing_name = false;
         }
 
         void SpriteAssetEditor::RefreshStatusBar()
@@ -511,11 +1254,11 @@ namespace Ailu
         {
             toolbar->SlotPadding() = UI::Padding(4.0f, 2.0f, 4.0f, 2.0f);
 
-            _btn_apply = toolbar->AddChild<UI::Button>("Apply");
+            _btn_apply = toolbar->AddChild<UI::Button>("Save");
             _btn_apply->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFill).Size(Vector2f(56.0f, 0.0f)).Margin(Vector4f(0.0f, 0.0f, 2.0f, 0.0f));
             _btn_apply->OnMouseClick() += [this](UI::UIEvent& e) { Apply(); e._is_handled = true; };
 
-            _btn_revert = toolbar->AddChild<UI::Button>("Revert");
+            _btn_revert = toolbar->AddChild<UI::Button>("Discard");
             _btn_revert->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFill).Size(Vector2f(56.0f, 0.0f)).Margin(Vector4f(0.0f, 0.0f, 6.0f, 0.0f));
             _btn_revert->OnMouseClick() += [this](UI::UIEvent& e) { Revert(); e._is_handled = true; };
 
@@ -526,6 +1269,47 @@ namespace Ailu
             _btn_redo = toolbar->AddChild<UI::Button>("Redo");
             _btn_redo->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFill).Size(Vector2f(48.0f, 0.0f)).Margin(Vector4f(0.0f, 0.0f, 8.0f, 0.0f));
             _btn_redo->OnMouseClick() += [this](UI::UIEvent& e) { if (g_pCommandMgr) g_pCommandMgr->Redo(); e._is_handled = true; };
+
+            _btn_toolbar_add = toolbar->AddChild<UI::Button>("Add");
+            _btn_toolbar_add->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFill)
+                .Size(Vector2f(44.0f, 0.0f));
+            _btn_toolbar_add->OnMouseClick() += [this](UI::UIEvent &event) { AddSprite(); event._is_handled = true; };
+
+            _btn_grid_slice = toolbar->AddChild<UI::Button>("Slice Grid");
+            _btn_grid_slice->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFill)
+                .Size(Vector2f(72.0f, 0.0f));
+            _btn_grid_slice->OnMouseClick() += [this](UI::UIEvent &event)
+            {
+                ShowGridSlicePopup();
+                event._is_handled = true;
+            };
+
+            _btn_auto_slice = toolbar->AddChild<UI::Button>("Auto Slice");
+            _btn_auto_slice->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFill)
+                .Size(Vector2f(72.0f, 0.0f));
+            _btn_auto_slice->OnMouseClick() += [this](UI::UIEvent &event)
+            {
+                SliceAlpha(0.1f);
+                event._is_handled = true;
+            };
+
+            _btn_duplicate_sprite = toolbar->AddChild<UI::Button>("Duplicate");
+            _btn_duplicate_sprite->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFill)
+                .Size(Vector2f(68.0f, 0.0f));
+            _btn_duplicate_sprite->OnMouseClick() += [this](UI::UIEvent &event)
+            {
+                DuplicateSprite();
+                event._is_handled = true;
+            };
+
+            _btn_delete_sprite = toolbar->AddChild<UI::Button>("Delete");
+            _btn_delete_sprite->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFill)
+                .Size(Vector2f(52.0f, 0.0f));
+            _btn_delete_sprite->OnMouseClick() += [this](UI::UIEvent &event)
+            {
+                RemoveSprite();
+                event._is_handled = true;
+            };
 
             auto* sep1 = toolbar->AddChild<UI::Text>("|");
             sep1->_color = Color(0.4f, 0.4f, 0.4f, 1.0f);
@@ -617,6 +1401,52 @@ namespace Ailu
             make_row("Res:", _txt_tex_resolution);
             make_row("Format:", _txt_tex_format);
             make_row("Sprite:", _txt_sprite_size);
+
+            BuildSpriteListSection(left);
+        }
+
+        void SpriteAssetEditor::BuildSpriteListSection(UI::VerticalBox* parent)
+        {
+            auto* sep = parent->AddChild<UI::Border>();
+            sep->_bg_color = Color(0.3f, 0.3f, 0.3f, 1.0f);
+            sep->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed)
+                .Size(Vector2f(0.0f, 1.0f)).Margin(Vector4f(0.0f, 6.0f, 0.0f, 6.0f));
+
+            AddSectionTitle(parent, "Sprites");
+
+            auto* button_row = parent->AddChild<UI::HorizontalBox>();
+            button_row->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed)
+                .Size(Vector2f(0.0f, 24.0f));
+
+            _btn_add_sprite = button_row->AddChild<UI::Button>("Add");
+            _btn_add_sprite->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFill)
+                .Size(Vector2f(52.0f, 0.0f)).Margin(Vector4f(0.0f, 0.0f, 4.0f, 0.0f));
+            _btn_add_sprite->OnMouseClick() += [this](UI::UIEvent& e)
+            {
+                AddSprite();
+                e._is_handled = true;
+            };
+
+            _btn_remove_sprite = button_row->AddChild<UI::Button>("Remove");
+            _btn_remove_sprite->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFill)
+                .Size(Vector2f(68.0f, 0.0f));
+            _btn_remove_sprite->OnMouseClick() += [this](UI::UIEvent& e)
+            {
+                RemoveSprite();
+                e._is_handled = true;
+            };
+            _btn_add_sprite->SetInteractiveEnabled(false);
+            _btn_remove_sprite->SetInteractiveEnabled(false);
+
+            _sprite_list = parent->AddChild<UI::ListView>();
+            _sprite_list->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill)
+                .Margin(Vector4f(0.0f, 4.0f, 0.0f, 0.0f));
+            _sprite_list->SetStyleId("DropdownPopup");
+            _sprite_list->SetBorder(Color(0.25f, 0.26f, 0.29f, 1.0f), 1.0f);
+            _sprite_list->_on_item_clicked += [this](UI::UIElement *, i32 index)
+            {
+                SelectSprites(_sprite_list->GetSelectedIndices(), index);
+            };
         }
 
         // =====================================================================
@@ -639,6 +1469,25 @@ namespace Ailu
         void SpriteAssetEditor::BuildRightPanel(UI::VerticalBox* right)
         {
             right->SlotPadding() = UI::Padding(4.0f);
+            AddSectionTitle(right, "Sprite");
+            _txt_multi_selection_notice = right->AddChild<UI::Text>("Multiple selection editing is not supported.");
+            _txt_multi_selection_notice->_color = Color(1.0f, 0.75f, 0.25f, 1.0f);
+            _txt_multi_selection_notice->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed)
+                .Size(Vector2f(0.0f, 30.0f)).Margin(Vector4f(4.0f, 2.0f, 4.0f, 4.0f));
+            _txt_multi_selection_notice->SetVisible(false);
+            auto *name_row = AddPropertyRow(right, "Name");
+            _sprite_name_input = name_row->AddChild<UI::InputBlock>("");
+            _sprite_name_input->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
+            _sprite_name_input->_on_content_changed += [this](String value)
+            {
+                if (_is_syncing_name || _selected_sprite_index < 0 ||
+                    _selected_sprite_index >= static_cast<i32>(_sprite_items.size()))
+                    return;
+                _sprite_items[_selected_sprite_index]._name = value;
+                CommitLiveEdit();
+                RefreshSpriteList();
+                RefreshStatusBar();
+            };
             BuildTextureSection(right);
             BuildUvRectSection(right);
             BuildPivotSection(right);
@@ -744,7 +1593,11 @@ namespace Ailu
                             if (g_pCommandMgr)
                                 g_pCommandMgr->ExecuteCommand(std::make_unique<SpriteAssetEditCommand>(this, _editing, data));
                             else
+                            {
                                 ApplyEditData(data);
+                                if (GetAsset() != nullptr && !GetAsset()->IsDirty())
+                                    GetAsset()->MarkModified();
+                            }
                             UI::UIManager::Get()->HidePopup();
                             event._is_handled = true;
                         };
@@ -789,7 +1642,11 @@ namespace Ailu
                 if (g_pCommandMgr)
                     g_pCommandMgr->ExecuteCommand(std::make_unique<SpriteAssetEditCommand>(this, _editing, data));
                 else
+                {
                     ApplyEditData(data);
+                    if (GetAsset() != nullptr && !GetAsset()->IsDirty())
+                        GetAsset()->MarkModified();
+                }
                 e._is_handled = true;
             };
         }
@@ -807,7 +1664,7 @@ namespace Ailu
             _uv_norm_w = AddLabeledInput(parent, "W", _editing._uv_rect.z);
             _uv_norm_h = AddLabeledInput(parent, "H", _editing._uv_rect.w);
 
-            auto on_norm = [this](f32& f) { return [this, &f](String v) { if (_is_syncing_uv) return; f = std::clamp((f32)std::atof(v.c_str()), 0.0f, 1.0f); ValidateEditingData(); RefreshUvInputs(); RefreshPreview(); }; };
+            auto on_norm = [this](f32& f) { return [this, &f](String v) { if (_is_syncing_uv) return; f = std::clamp((f32)std::atof(v.c_str()), 0.0f, 1.0f); ValidateEditingData(); CommitLiveEdit(); RefreshUvInputs(); RefreshPreview(); }; };
             _uv_norm_x->_on_content_changed += on_norm(_editing._uv_rect.x);
             _uv_norm_y->_on_content_changed += on_norm(_editing._uv_rect.y);
             _uv_norm_w->_on_content_changed += on_norm(_editing._uv_rect.z);
@@ -822,18 +1679,18 @@ namespace Ailu
             _uv_pix_w = AddLabeledInput(parent, "W", 0.0f);
             _uv_pix_h = AddLabeledInput(parent, "H", 0.0f);
 
-            auto on_pix = [this](bool is_x) { return [this, is_x](String v) { if (_is_syncing_uv || !_texture) return; f32 p = (f32)std::atof(v.c_str()); f32 s = (f32)(is_x ? _texture->Width() : _texture->Height()); if (is_x) _editing._uv_rect.x = p / (f32)_texture->Width(); else _editing._uv_rect.y = p / (f32)_texture->Height(); ValidateEditingData(); RefreshUvInputs(); RefreshPreview(); }; };
-            _uv_pix_x->_on_content_changed += [this](String v) { if (_is_syncing_uv || !_texture) return; _editing._uv_rect.x = (f32)std::atof(v.c_str()) / (f32)_texture->Width(); ValidateEditingData(); RefreshUvInputs(); RefreshPreview(); };
-            _uv_pix_y->_on_content_changed += [this](String v) { if (_is_syncing_uv || !_texture) return; _editing._uv_rect.y = (f32)std::atof(v.c_str()) / (f32)_texture->Height(); ValidateEditingData(); RefreshUvInputs(); RefreshPreview(); };
-            _uv_pix_w->_on_content_changed += [this](String v) { if (_is_syncing_uv || !_texture) return; _editing._uv_rect.z = (f32)std::atof(v.c_str()) / (f32)_texture->Width(); ValidateEditingData(); RefreshUvInputs(); RefreshPreview(); };
-            _uv_pix_h->_on_content_changed += [this](String v) { if (_is_syncing_uv || !_texture) return; _editing._uv_rect.w = (f32)std::atof(v.c_str()) / (f32)_texture->Height(); ValidateEditingData(); RefreshUvInputs(); RefreshPreview(); };
+            auto on_pix = [this](bool is_x) { return [this, is_x](String v) { if (_is_syncing_uv || !_texture) return; f32 p = (f32)std::atof(v.c_str()); if (is_x) _editing._uv_rect.x = p / (f32)_texture->Width(); else _editing._uv_rect.y = p / (f32)_texture->Height(); ValidateEditingData(); CommitLiveEdit(); RefreshUvInputs(); RefreshPreview(); }; };
+            _uv_pix_x->_on_content_changed += [this](String v) { if (_is_syncing_uv || !_texture) return; _editing._uv_rect.x = (f32)std::atof(v.c_str()) / (f32)_texture->Width(); ValidateEditingData(); CommitLiveEdit(); RefreshUvInputs(); RefreshPreview(); };
+            _uv_pix_y->_on_content_changed += [this](String v) { if (_is_syncing_uv || !_texture) return; _editing._uv_rect.y = (f32)std::atof(v.c_str()) / (f32)_texture->Height(); ValidateEditingData(); CommitLiveEdit(); RefreshUvInputs(); RefreshPreview(); };
+            _uv_pix_w->_on_content_changed += [this](String v) { if (_is_syncing_uv || !_texture) return; _editing._uv_rect.z = (f32)std::atof(v.c_str()) / (f32)_texture->Width(); ValidateEditingData(); CommitLiveEdit(); RefreshUvInputs(); RefreshPreview(); };
+            _uv_pix_h->_on_content_changed += [this](String v) { if (_is_syncing_uv || !_texture) return; _editing._uv_rect.w = (f32)std::atof(v.c_str()) / (f32)_texture->Height(); ValidateEditingData(); CommitLiveEdit(); RefreshUvInputs(); RefreshPreview(); };
 
             auto* br = parent->AddChild<UI::HorizontalBox>();
             br->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed).Size(Vector2f(0.0f, 22.0f)).Margin(Vector4f(4.0f, 4.0f, 4.0f, 0.0f));
 
             auto* bf = br->AddChild<UI::Button>("Full Tex");
             bf->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFill).Size(Vector2f(60.0f, 0.0f)).Margin(Vector4f(0.0f, 0.0f, 4.0f, 0.0f));
-            bf->OnMouseClick() += [this](UI::UIEvent& e) { _editing._uv_rect = Vector4f(0.0f, 0.0f, 1.0f, 1.0f); ValidateEditingData(); RefreshAllUI(); RefreshPreview(); e._is_handled = true; };
+            bf->OnMouseClick() += [this](UI::UIEvent& e) { _editing._uv_rect = Vector4f(0.0f, 0.0f, 1.0f, 1.0f); ValidateEditingData(); CommitLiveEdit(); RefreshAllUI(); RefreshPreview(); e._is_handled = true; };
 
             auto* bt = br->AddChild<UI::Button>("Trim");
             bt->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFill).Size(Vector2f(40.0f, 0.0f));
@@ -847,8 +1704,8 @@ namespace Ailu
             _pivot_x = AddLabeledInput(parent, "X", _editing._pivot.x);
             _pivot_y = AddLabeledInput(parent, "Y", _editing._pivot.y);
 
-            _pivot_x->_on_content_changed += [this](String v) { if (_is_syncing_pivot) return; _editing._pivot.x = std::clamp((f32)std::atof(v.c_str()), 0.0f, 1.0f); ValidateEditingData(); RefreshPivotInputs(); RefreshPreview(); };
-            _pivot_y->_on_content_changed += [this](String v) { if (_is_syncing_pivot) return; _editing._pivot.y = std::clamp((f32)std::atof(v.c_str()), 0.0f, 1.0f); ValidateEditingData(); RefreshPivotInputs(); RefreshPreview(); };
+            _pivot_x->_on_content_changed += [this](String v) { if (_is_syncing_pivot) return; _editing._pivot.x = std::clamp((f32)std::atof(v.c_str()), 0.0f, 1.0f); ValidateEditingData(); CommitLiveEdit(); RefreshPivotInputs(); RefreshPreview(); };
+            _pivot_y->_on_content_changed += [this](String v) { if (_is_syncing_pivot) return; _editing._pivot.y = std::clamp((f32)std::atof(v.c_str()), 0.0f, 1.0f); ValidateEditingData(); CommitLiveEdit(); RefreshPivotInputs(); RefreshPreview(); };
 
             struct PP { const char* lbl; f32 x; f32 y; };
             static const PP pr[9] = { {"TL",0,1},{"T",.5f,1},{"TR",1,1},{"L",0,.5f},{"C",.5f,.5f},{"R",1,.5f},{"BL",0,0},{"B",.5f,0},{"BR",1,0} };
@@ -863,7 +1720,7 @@ namespace Ailu
                     auto& p = pr[r*3+c];
                     auto* btn = hb->AddChild<UI::Button>(p.lbl);
                     btn->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill).Margin(Vector4f(1.0f));
-                    btn->OnMouseClick() += [this, px=p.x, py=p.y](UI::UIEvent& e) { _editing._pivot = Vector2f(px, py); RefreshPivotInputs(); RefreshPreview(); e._is_handled = true; };
+                    btn->OnMouseClick() += [this, px=p.x, py=p.y](UI::UIEvent& e) { _editing._pivot = Vector2f(px, py); CommitLiveEdit(); RefreshPivotInputs(); RefreshPreview(); e._is_handled = true; };
                 }
             }
         }
@@ -877,6 +1734,7 @@ namespace Ailu
                 if (_is_syncing_size) return;
                 _editing._size = std::max((f32)std::atof(v.c_str()), 0.0001f);
                 ValidateEditingData();
+                CommitLiveEdit();
                 RefreshSizeInputs();
             };
 
@@ -888,13 +1746,14 @@ namespace Ailu
             bu->OnMouseClick() += [this](UI::UIEvent& e) {
                 if (_texture)
                     _editing._size = std::max(std::round(_editing._uv_rect.w * (f32)_texture->Height()), 0.0001f);
+                CommitLiveEdit();
                 RefreshSizeInputs();
                 e._is_handled = true;
             };
 
             auto* bz = br->AddChild<UI::Button>("Reset");
             bz->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFill).Size(Vector2f(44.0f, 0.0f));
-            bz->OnMouseClick() += [this](UI::UIEvent& e) { _editing._size = 1.0f; RefreshSizeInputs(); e._is_handled = true; };
+            bz->OnMouseClick() += [this](UI::UIEvent& e) { _editing._size = 1.0f; CommitLiveEdit(); RefreshSizeInputs(); e._is_handled = true; };
         }
 
         void SpriteAssetEditor::BuildBorderSection(UI::VerticalBox* parent)
@@ -906,7 +1765,7 @@ namespace Ailu
             _border_t = AddLabeledInput(parent, "T", _editing._border.w);
             _border_b = AddLabeledInput(parent, "B", _editing._border.z);
 
-            auto on_b = [this](f32& f) { return [this, &f](String v) { if (_is_syncing_border) return; f = std::max((f32)std::atof(v.c_str()), 0.0f); ValidateEditingData(); RefreshBorderInputs(); RefreshPreview(); }; };
+            auto on_b = [this](f32& f) { return [this, &f](String v) { if (_is_syncing_border) return; f = std::max((f32)std::atof(v.c_str()), 0.0f); ValidateEditingData(); CommitLiveEdit(); RefreshBorderInputs(); RefreshPreview(); }; };
             _border_l->_on_content_changed += on_b(_editing._border.y);
             _border_r->_on_content_changed += on_b(_editing._border.x);
             _border_t->_on_content_changed += on_b(_editing._border.w);
@@ -917,11 +1776,11 @@ namespace Ailu
 
             auto* bz = br->AddChild<UI::Button>("Reset");
             bz->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFill).Size(Vector2f(44.0f, 0.0f)).Margin(Vector4f(0.0f, 0.0f, 4.0f, 0.0f));
-            bz->OnMouseClick() += [this](UI::UIEvent& e) { _editing._border = Vector4f::kZero; RefreshBorderInputs(); RefreshPreview(); e._is_handled = true; };
+            bz->OnMouseClick() += [this](UI::UIEvent& e) { _editing._border = Vector4f::kZero; CommitLiveEdit(); RefreshBorderInputs(); RefreshPreview(); e._is_handled = true; };
 
             auto* be = br->AddChild<UI::Button>("Equal");
             be->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFill).Size(Vector2f(44.0f, 0.0f));
-            be->OnMouseClick() += [this](UI::UIEvent& e) { if (_texture) { f32 sw = std::round(_editing._uv_rect.z*(f32)_texture->Width()); f32 sh = std::round(_editing._uv_rect.w*(f32)_texture->Height()); f32 b = std::round(std::min(sw,sh)*0.1f); _editing._border = Vector4f(b,b,b,b); RefreshBorderInputs(); RefreshPreview(); } e._is_handled = true; };
+            be->OnMouseClick() += [this](UI::UIEvent& e) { if (_texture) { f32 sw = std::round(_editing._uv_rect.z*(f32)_texture->Width()); f32 sh = std::round(_editing._uv_rect.w*(f32)_texture->Height()); f32 b = std::round(std::min(sw,sh)*0.1f); _editing._border = Vector4f(b,b,b,b); CommitLiveEdit(); RefreshBorderInputs(); RefreshPreview(); } e._is_handled = true; };
         }
 
         // =====================================================================
@@ -999,7 +1858,18 @@ namespace Ailu
             if (cr.z <= 0 || cr.w <= 0) return;
             r.PushScissor(cr);
             DrawBackground(r, cr);
-            if (_editor && _editor->_texture) {
+            if (_editor && _editor->_selected_sprite_indices.empty())
+            {
+                r.DrawText("No sprite selected.", Vector2f(cr.x + 16.0f, cr.y + cr.w * 0.5f - 8.0f),
+                           Matrix4x4f::Identity(), 14.0f, Color(0.7f, 0.7f, 0.7f, 1.0f));
+            }
+            else if (_editor && _editor->_selected_sprite_indices.size() > 1u)
+            {
+                r.DrawText("Multiple selection preview is not supported.",
+                           Vector2f(cr.x + 16.0f, cr.y + cr.w * 0.5f - 8.0f), Matrix4x4f::Identity(), 14.0f,
+                           Color(1.0f, 0.75f, 0.25f, 1.0f));
+            }
+            else if (_editor && _editor->_texture) {
                 DrawTexture(r, cr);
                 if (_editor->_show_border) DrawBorderOverlay(r);
                 if (_editor->_show_pivot) DrawPivotOverlay(r);

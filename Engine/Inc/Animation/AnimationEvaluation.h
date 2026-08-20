@@ -11,6 +11,7 @@ namespace Ailu
         Guid _clip = Guid::EmptyGuid();
         f32 _time = 0.0f;
         f32 _weight = 1.0f;
+        bool _loop = true;
     };
 
     struct AILU_API AnimationEvaluation

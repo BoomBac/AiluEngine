@@ -4,6 +4,7 @@
 #include "RHI/DX12/D3DBuffer.h"
 #include "Framework/Core/CoreMinimal.h"
 #include "Framework/Common/Assert.h"
+#include "Framework/Common/Allocator.hpp"
 
 namespace Ailu::Render
 {
@@ -139,7 +140,7 @@ namespace Ailu::Render
 			return nullptr;
         case RendererAPI::ERenderAPI::kDirectX12:
         {
-			auto buf = new RHI::DX12::D3DIndexBuffer(indices, count,is_dynamic);
+			auto buf = new RHI::DX12::D3DIndexBuffer(indices, count, is_dynamic);
 			buf->Name(name);
             return buf;
         }
@@ -181,7 +182,7 @@ namespace Ailu::Render
 			return nullptr;
 		case RendererAPI::ERenderAPI::kDirectX12:
 		{
-			RHI::DX12::D3DConstantBuffer *buffer = new RHI::DX12::D3DConstantBuffer(size);//AL_NEW(RHI::DX12::D3DConstantBuffer, size);
+			RHI::DX12::D3DConstantBuffer *buffer = new RHI::DX12::D3DConstantBuffer(size);
 			buffer->Name(name);
 			return buffer;
 		}
@@ -192,7 +193,7 @@ namespace Ailu::Render
 	}
 	void ConstantBuffer::Release(ConstantBuffer* ptr)
 	{
-		delete ptr; ptr = nullptr;
+		delete ptr;
 	}
 	#pragma endregion
 

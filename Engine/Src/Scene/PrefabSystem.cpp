@@ -308,6 +308,16 @@ namespace Ailu::SceneManagement
                 registry.SetComponentEnabled<ECS::Collider2DComponent>(entity,
                                                                          !IsComponentDisabled(entity_doc, "Collider2DComponent"));
             }
+            if (entity_doc._has_animator_component)
+            {
+                auto &component = registry.AddComponent<ECS::AnimatorComponent>(entity);
+                if (!entity_doc._animator_component._controller_guid.empty())
+                    component._controller = Guid(entity_doc._animator_component._controller_guid);
+                component._speed = entity_doc._animator_component._speed;
+                component._play_on_awake = entity_doc._animator_component._play_on_awake;
+                registry.SetComponentEnabled<ECS::AnimatorComponent>(entity,
+                                                                       !is_component_disabled(entity_doc, "AnimatorComponent"));
+            }
             if (entity_doc._has_vxgi_component)
             {
                 auto &component = registry.AddComponent<ECS::CVXGI>(entity);

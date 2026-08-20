@@ -2,6 +2,7 @@
 // Created by 22292 on 2024/10/16.
 //
 #include "Animation/Solver.h"
+#include "Framework/Common/Allocator.hpp"
 #include "Render/Gizmo.h"
 #include "pch.h"
 
@@ -107,8 +108,7 @@ namespace Ailu
         {
             for (auto p : c)
             {
-                delete p;
-                p = nullptr;
+                AL_DELETE(p);
             }
         }
     }
@@ -128,8 +128,7 @@ namespace Ailu
         {
             for (auto p: c)
             {
-                delete p;
-                p = nullptr;
+                AL_DELETE(p);
             }
         }
         _constraints.clear();

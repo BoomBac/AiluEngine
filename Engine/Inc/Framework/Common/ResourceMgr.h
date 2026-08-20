@@ -15,6 +15,7 @@
 #include "Render/Material.h"
 #include "Render/Mesh.h"
 #include "Render/Texture.h"
+#include "Render/2D/SpriteAtlas.h"
 #include "Scene/Scene.h"
 #include <optional>
 #include <unordered_map>
@@ -104,6 +105,20 @@ namespace Ailu
     class AILU_API ResourceMgr : public NonCopyable
     {
     public:
+        struct SubAssetLocation
+        {
+            Guid _owner_guid = Guid::EmptyGuid();
+            String _name;
+            const Type *_type = nullptr;
+        };
+
+        struct SubAssetEntry
+        {
+            Guid _guid = Guid::EmptyGuid();
+            String _name;
+            const Type *_type = nullptr;
+        };
+
         struct AssetMountDesc
         {
             EAssetDomain _domain;
@@ -173,6 +188,7 @@ namespace Ailu
         bool RenameAsset(Asset *p_asset, const WString &new_name);
         bool MoveAsset(Asset *p_asset, const WString &new_asset_path);
         bool SaveAsset(Asset *asset);
+        bool ReloadAsset(Asset *asset);
         void SaveAllDirtyAssets();
         void SaveAllUnsavedAssets();
         //由 Editor 编辑操作标记 Asset 为 Dirty（revision 递增）。
@@ -183,6 +199,10 @@ namespace Ailu
         static FileWatchService *GetFileWatchService();
         void MigrateLegacyAssetDocuments(const WString &root_asset_dir = L"");
         Asset *GetLinkedAsset(Object *obj);
+        void RegisterSubAsset(Asset *owner, const Guid &guid, Ref<Object> object, StringView name);
+        void UnregisterSubAsset(const Guid &guid);
+        void UnregisterSubAssets(const Guid &owner_guid);
+        Vector<SubAssetEntry> GetSubAssets(const Type *type = nullptr) const;
         //提交一个任务，该任务会在ResourceMgr tick时在主线程执行
         void SubmitTaskSync(ResourceTask task);
         void SubmitTaskSync(ResourceTask task,std::function<void(bool)> callback);
@@ -239,6 +259,8 @@ namespace Ailu
             if (_global_resources.contains(resource_path))
             {
                 auto ref_count = _global_resources[resource_path].use_count();
+                if (Asset *asset = GetLinkedAsset(_global_resources[resource_path].get()); asset != nullptr)
+                    UnregisterSubAssets(asset->GetGuid());
                 _global_resources.erase(resource_path);
                 RebuildResourceLookups();
                 LOG_INFO(L"Release resource: {},and current ref count is {}", resource_path.c_str(), ref_count - 1);
@@ -270,6 +292,7 @@ namespace Ailu
 
         // Handler lookup (used by GetAssetLoader lambda which needs public access)
         IAssetHandler* FindAssetHandler(const Type *asset_type) const;
+        Ref<Object> LoadSubAsset(const Guid &guid, const Type *requested_type);
 
     public:
         Ref<Font> _default_font;
@@ -334,6 +357,8 @@ namespace Ailu
         bool IsAssetLoaded(const WString &asset_path) const;
 
         void LoadAssetDB(const AssetMountDomain& domain);
+        void IndexSubAssets(const Asset *owner, const WString &system_path);
+        void RegisterEmbeddedMaterialSubAssets(Asset *owner);
         void SaveAssetDB(EAssetDomain domain);
         void RebuildResourceLookups();
 
@@ -382,6 +407,9 @@ namespace Ailu
         std::map<WString, Guid> _asset_looktable{};
         //object_id,asset*
         std::map<u32, Asset *> _object_to_asset{};
+        HashMap<Guid, SubAssetLocation, GuidHasher> _sub_asset_locations;
+        HashMap<Guid, Ref<Object>, GuidHasher> _sub_assets;
+        HashMap<Object *, Guid> _sub_asset_guids;
         ResourcePoolContainer _global_resources;
         ResourcePoolLut _lut_global_resources;
         ResourceTypeLut _lut_global_resources_by_type;
@@ -402,6 +430,8 @@ namespace Ailu
     template<typename T>
     inline Ref<T> ResourceMgr::Load(const Guid &guid, const ImportSetting *setting)
     {
+        if (!_asset_db.contains(guid) && _sub_asset_locations.contains(guid))
+            return std::static_pointer_cast<T>(LoadSubAsset(guid, T::StaticType()));
         return std::static_pointer_cast<T>(Load(GuidToAssetPath(guid),setting,T::StaticType()));
     }
 
@@ -468,11 +498,25 @@ namespace Ailu
     template<typename T>
     inline T *ResourceMgr::Get(const Guid &guid)
     {
+        if (!_asset_db.contains(guid))
+        {
+            auto sub_asset = _sub_assets.find(guid);
+            if (sub_asset != _sub_assets.end() && sub_asset->second != nullptr &&
+                IsTypeCompatible(T::StaticType(), sub_asset->second->GetType()))
+                return std::static_pointer_cast<T>(sub_asset->second).get();
+        }
         return Get<T>(GuidToAssetPath(guid));
     }
     template<typename T>
     inline Ref<T> ResourceMgr::GetRef(const Guid &guid)
     {
+        if (!_asset_db.contains(guid))
+        {
+            auto sub_asset = _sub_assets.find(guid);
+            if (sub_asset != _sub_assets.end() && sub_asset->second != nullptr &&
+                IsTypeCompatible(T::StaticType(), sub_asset->second->GetType()))
+                return std::static_pointer_cast<T>(sub_asset->second);
+        }
         return GetRef<T>(GuidToAssetPath(guid));
     }
     template<typename T>

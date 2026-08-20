@@ -1,4 +1,5 @@
 #include "Editors/InputActionAssetEditor.h"
+#include "Common/Undo.h"
 #include "Dock/DockManager.h"
 #include "Framework/Common/Input.h"
 #include "Framework/Common/Log.h"
@@ -79,7 +80,7 @@ namespace Ailu
         } // namespace
 
         InputActionAssetEditor::InputActionAssetEditor()
-            : DockWindow("Input Action Editor", Vector2f(1050.0f, 660.0f))
+            : AssetEditor("Input Action Editor", Vector2f(1050.0f, 660.0f))
         {
             SetPosition(Vector2f(130.0f, 70.0f));
 
@@ -132,41 +133,57 @@ namespace Ailu
 
         InputActionAssetEditor::~InputActionAssetEditor() = default;
 
+        void InputActionAssetEditor::OnAssetSaved()
+        {
+            _last_edit_snapshot = CaptureAssetObject(GetAsset());
+            RefreshAllUI();
+        }
+
+        void InputActionAssetEditor::OnAssetReloaded()
+        {
+            _input_asset = GetAssetObject<InputActionAsset>();
+            if (_input_asset != nullptr)
+                Open(_input_asset);
+        }
+
         void InputActionAssetEditor::Update(f32 dt)
         {
-            DockWindow::Update(dt);
+            AssetEditor::Update(dt);
             if (!_input_asset)
                 return;
-
             const bool ctrl = Input::IsKeyDown(EKey::kLCONTROL) || Input::IsKeyDown(EKey::kRCONTROL);
-            if (ctrl && Input::IsKeyPressed(EKey::kS))
-                Apply();
+            if (ctrl && Input::IsKeyDownAccurate(EKey::kZ) && g_pCommandMgr != nullptr)
+            {
+                g_pCommandMgr->Undo();
+                _last_edit_snapshot = CaptureAssetObject(GetAsset());
+                RefreshAllUI();
+            }
+            if (ctrl && Input::IsKeyDownAccurate(EKey::kY) && g_pCommandMgr != nullptr)
+            {
+                g_pCommandMgr->Redo();
+                _last_edit_snapshot = CaptureAssetObject(GetAsset());
+                RefreshAllUI();
+            }
         }
 
         void InputActionAssetEditor::Open(InputActionAsset *asset)
         {
             if (!asset)
                 return;
+            BindAsset(ResourceMgr::Get().GetLinkedAsset(asset));
             _input_asset = asset;
-            ReadFromAsset();
-            _original_action_maps = _editing_action_maps;
-            _original_contexts = _editing_contexts;
-            _is_dirty = false;
-            if (!_editing_action_maps.empty())
+            _last_edit_snapshot = CaptureAssetObject(GetAsset());
+            if (!ActionMaps().empty())
                 SelectActionMap(0);
-            else if (!_editing_contexts.empty())
+            else if (!Contexts().empty())
                 SelectContext(0);
-            SetTitle("Input Action Editor - " + asset->Name());
             RefreshAllUI();
         }
 
         void InputActionAssetEditor::Close()
         {
             _input_asset = nullptr;
-            _editing_action_maps.clear();
-            _editing_contexts.clear();
-            _original_action_maps.clear();
-            _original_contexts.clear();
+            AssetEditor::Close();
         }
 
         void InputActionAssetEditor::BuildToolbar(UI::HorizontalBox *toolbar)
@@ -181,10 +198,8 @@ namespace Ailu
                 return button;
             };
 
-            _btn_apply = add_button("Apply", 56.0f);
-            _btn_apply->OnMouseClick() += [this](UI::UIEvent &e) { Apply(); e._is_handled = true; };
-            _btn_revert = add_button("Revert", 58.0f);
-            _btn_revert->OnMouseClick() += [this](UI::UIEvent &e) { Revert(); e._is_handled = true; };
+            auto *save_button = add_button("Save", 50.0f);
+            save_button->OnMouseClick() += [this](UI::UIEvent &e) { AssetEditor::Save(); e._is_handled = true; };
 
             toolbar->AddChild<UI::Text>("|")->GetSlotAs<UI::LinearSlot>()
                    .SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFill).Size(Vector2f(12.0f, 0.0f));
@@ -279,73 +294,44 @@ namespace Ailu
             _txt_status->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
         }
 
-        void InputActionAssetEditor::ReadFromAsset()
-        {
-            _editing_action_maps.clear();
-            _editing_contexts.clear();
-            if (!_input_asset)
-                return;
-            _editing_action_maps = _input_asset->GetActionMaps();
-            _editing_contexts = _input_asset->GetContexts();
-        }
-
-        void InputActionAssetEditor::WriteToAsset()
-        {
-            if (!_input_asset)
-                return;
-            _input_asset->GetActionMaps() = _editing_action_maps;
-            _input_asset->GetContexts() = _editing_contexts;
-        }
-
-        void InputActionAssetEditor::Apply()
-        {
-            if (!_input_asset)
-                return;
-            WriteToAsset();
-            if (auto *linked = ResourceMgr::Get().GetLinkedAsset(_input_asset))
-                ResourceMgr::Get().SaveAsset(linked);
-            _original_action_maps = _editing_action_maps;
-            _original_contexts = _editing_contexts;
-            _is_dirty = false;
-            RefreshStatusBar();
-            LOG_INFO("InputActionAssetEditor: Applied");
-        }
-
-        void InputActionAssetEditor::Revert()
-        {
-            _editing_action_maps = _original_action_maps;
-            _editing_contexts = _original_contexts;
-            _is_dirty = false;
-            ValidateSelection();
-            RefreshAllUI();
-        }
-
         void InputActionAssetEditor::MarkDirty()
         {
-            _is_dirty = true;
-            ResourceMgr::Get().MarkAssetDirty(_input_asset);
+            if (GetAsset() != nullptr)
+            {
+                const String snapshot = CaptureAssetObject(GetAsset());
+                if (snapshot != _last_edit_snapshot)
+                {
+                    const String before = _last_edit_snapshot;
+                    _last_edit_snapshot = snapshot;
+                    if (g_pCommandMgr != nullptr)
+                        g_pCommandMgr->ExecuteCommand(std::make_unique<AssetSnapshotCommand>(
+                            GetAsset(), before, snapshot, "Input Action Edit"));
+                    else if (!GetAsset()->IsDirty())
+                        GetAsset()->MarkModified();
+                }
+            }
             RefreshSummary();
             RefreshStatusBar();
         }
 
         void InputActionAssetEditor::ValidateSelection()
         {
-            _selected_map = ClampIndex(_selected_map, _editing_action_maps.size());
+            _selected_map = ClampIndex(_selected_map, ActionMaps().size());
             if (_selected_map < 0)
                 _selected_action = _selected_binding = -1;
             else
             {
                 _selected_action = ClampIndex(_selected_action,
-                                              _editing_action_maps[_selected_map].GetActions().size());
+                                              ActionMaps()[_selected_map].GetActions().size());
                 if (_selected_action < 0)
                     _selected_binding = -1;
                 else
                 {
-                    auto &bindings = _editing_action_maps[_selected_map].GetActions()[_selected_action].GetBindings();
+                    auto &bindings = ActionMaps()[_selected_map].GetActions()[_selected_action].GetBindings();
                     _selected_binding = ClampIndex(_selected_binding, bindings.size());
                 }
             }
-            _selected_context = ClampIndex(_selected_context, _editing_contexts.size());
+            _selected_context = ClampIndex(_selected_context, Contexts().size());
 
             if (_selection_type == EInputActionEditorSelection::kActionMap && _selected_map < 0)
                 _selection_type = EInputActionEditorSelection::kNone;
@@ -394,9 +380,9 @@ namespace Ailu
                 return;
             _tree_root->ClearChildren();
 
-            for (i32 map_index = 0; map_index < static_cast<i32>(_editing_action_maps.size()); ++map_index)
+            for (i32 map_index = 0; map_index < static_cast<i32>(ActionMaps().size()); ++map_index)
             {
-                auto &map = _editing_action_maps[map_index];
+                auto &map = ActionMaps()[map_index];
                 auto *map_button = _tree_root->AddChild<UI::Button>(
                         std::format("[Map] {} ({})", map.GetName(), map.ActionCount()));
                 map_button->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed)
@@ -443,9 +429,9 @@ namespace Ailu
             }
 
             AddSectionTitle(_tree_root, "Contexts");
-            for (i32 context_index = 0; context_index < static_cast<i32>(_editing_contexts.size()); ++context_index)
+            for (i32 context_index = 0; context_index < static_cast<i32>(Contexts().size()); ++context_index)
             {
-                auto &context = _editing_contexts[context_index];
+                auto &context = Contexts()[context_index];
                 auto *context_button = _tree_root->AddChild<UI::Button>(std::format("[Context] {}", context.GetName()));
                 context_button->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed)
                               .Size(Vector2f(0.0f, 22.0f)).Margin(Vector4f(0.0f, 2.0f, 0.0f, 0.0f));
@@ -663,7 +649,7 @@ namespace Ailu
                 }
 
                 Vector<String> map_items;
-                for (const auto &map : _editing_action_maps)
+                for (const auto &map : ActionMaps())
                     map_items.emplace_back(map.GetName());
                 if (!map_items.empty())
                 {
@@ -680,20 +666,20 @@ namespace Ailu
         {
             size_t action_count = 0u;
             size_t binding_count = 0u;
-            for (const auto &map : _editing_action_maps)
+            for (const auto &map : ActionMaps())
             {
                 action_count += map.GetActions().size();
                 for (const auto &action : map.GetActions())
                     binding_count += action.GetBindings().size();
             }
             if (_txt_map_count)
-                _txt_map_count->SetText(std::to_string(_editing_action_maps.size()));
+                _txt_map_count->SetText(std::to_string(ActionMaps().size()));
             if (_txt_action_count)
                 _txt_action_count->SetText(std::to_string(action_count));
             if (_txt_binding_count)
                 _txt_binding_count->SetText(std::to_string(binding_count));
             if (_txt_context_count)
-                _txt_context_count->SetText(std::to_string(_editing_contexts.size()));
+                _txt_context_count->SetText(std::to_string(Contexts().size()));
 
             if (_summary_root)
             {
@@ -725,7 +711,7 @@ namespace Ailu
         {
             if (!_txt_status)
                 return;
-            _txt_status->SetText(_is_dirty ? "Modified. Ctrl+S or Apply to save." : "Saved.");
+            _txt_status->SetText(IsDirty() ? "Modified. Ctrl+S or Save to write." : "Saved.");
         }
 
         void InputActionAssetEditor::SelectActionMap(i32 map_index)
@@ -770,8 +756,8 @@ namespace Ailu
 
         void InputActionAssetEditor::AddActionMap()
         {
-            _editing_action_maps.emplace_back(std::format("ActionMap{}", _editing_action_maps.size() + 1u));
-            _selected_map = static_cast<i32>(_editing_action_maps.size()) - 1;
+            ActionMaps().emplace_back(std::format("ActionMap{}", ActionMaps().size() + 1u));
+            _selected_map = static_cast<i32>(ActionMaps().size()) - 1;
             _selection_type = EInputActionEditorSelection::kActionMap;
             MarkDirty();
             RefreshAllUI();
@@ -779,11 +765,11 @@ namespace Ailu
 
         void InputActionAssetEditor::RemoveSelectedActionMap()
         {
-            if (_selected_map < 0 || _selected_map >= static_cast<i32>(_editing_action_maps.size()))
+            if (_selected_map < 0 || _selected_map >= static_cast<i32>(ActionMaps().size()))
                 return;
-            const String removed_name = _editing_action_maps[_selected_map].GetName();
-            _editing_action_maps.erase(_editing_action_maps.begin() + _selected_map);
-            for (auto &context : _editing_contexts)
+            const String removed_name = ActionMaps()[_selected_map].GetName();
+            ActionMaps().erase(ActionMaps().begin() + _selected_map);
+            for (auto &context : Contexts())
             {
                 auto &refs = context.GetActionMaps();
                 refs.erase(std::remove_if(refs.begin(), refs.end(),
@@ -800,7 +786,7 @@ namespace Ailu
 
         void InputActionAssetEditor::AddAction()
         {
-            if (_selected_map < 0 && !_editing_action_maps.empty())
+            if (_selected_map < 0 && !ActionMaps().empty())
                 _selected_map = 0;
             auto *map = SelectedMap();
             if (!map)
@@ -852,8 +838,8 @@ namespace Ailu
 
         void InputActionAssetEditor::AddContext()
         {
-            _editing_contexts.emplace_back(std::format("Context{}", _editing_contexts.size() + 1u));
-            _selected_context = static_cast<i32>(_editing_contexts.size()) - 1;
+            Contexts().emplace_back(std::format("Context{}", Contexts().size() + 1u));
+            _selected_context = static_cast<i32>(Contexts().size()) - 1;
             _selection_type = EInputActionEditorSelection::kContext;
             MarkDirty();
             RefreshAllUI();
@@ -861,9 +847,9 @@ namespace Ailu
 
         void InputActionAssetEditor::RemoveSelectedContext()
         {
-            if (_selected_context < 0 || _selected_context >= static_cast<i32>(_editing_contexts.size()))
+            if (_selected_context < 0 || _selected_context >= static_cast<i32>(Contexts().size()))
                 return;
-            _editing_contexts.erase(_editing_contexts.begin() + _selected_context);
+            Contexts().erase(Contexts().begin() + _selected_context);
             _selection_type = EInputActionEditorSelection::kNone;
             MarkDirty();
             RefreshAllUI();
@@ -891,9 +877,9 @@ namespace Ailu
 
         InputActionMap *InputActionAssetEditor::SelectedMap()
         {
-            if (_selected_map < 0 || _selected_map >= static_cast<i32>(_editing_action_maps.size()))
+            if (_selected_map < 0 || _selected_map >= static_cast<i32>(ActionMaps().size()))
                 return nullptr;
-            return &_editing_action_maps[_selected_map];
+            return &ActionMaps()[_selected_map];
         }
 
         InputAction *InputActionAssetEditor::SelectedAction()
@@ -914,9 +900,9 @@ namespace Ailu
 
         InputContext *InputActionAssetEditor::SelectedContext()
         {
-            if (_selected_context < 0 || _selected_context >= static_cast<i32>(_editing_contexts.size()))
+            if (_selected_context < 0 || _selected_context >= static_cast<i32>(Contexts().size()))
                 return nullptr;
-            return &_editing_contexts[_selected_context];
+            return &Contexts()[_selected_context];
         }
 
         const InputActionMap *InputActionAssetEditor::SelectedMap() const

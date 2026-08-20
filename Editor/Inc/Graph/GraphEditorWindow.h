@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Dock/DockWindow.h"
+#include "Editors/AssetEditor.h"
 #include "Graph/GraphAsset.h"
 #include "Graph/GraphDocument.h"
 #include "UI/Basic.h"
@@ -12,21 +12,24 @@ namespace Ailu
     {
         class GraphCanvas;
 
-        class GraphEditorWindow final : public DockWindow
+        class GraphEditorWindow final : public AssetEditor
         {
         public:
             GraphEditorWindow();
             ~GraphEditorWindow() override;
 
+            using AssetEditor::Open;
             void Update(f32 dt) override;
             bool Open(GraphAsset *asset);
-            void Close();
-            void RequestClose() override;
             void SaveDockLayoutState(JsonArchive &ar) override;
             void LoadDockLayoutState(JsonArchive &ar) override;
             void OnDockLayoutLoaded() override;
 
-            bool IsDirty() const;
+        protected:
+            void OnClose() override;
+            void OnBeforeSave() override;
+            void OnAssetSaved() override;
+            void OnAssetReloaded() override;
 
         private:
             void BuildContent();
@@ -36,14 +39,10 @@ namespace Ailu
             void BuildDetails(UI::VerticalBox *details);
             void BuildStatusBar(UI::HorizontalBox *status_bar);
             void BuildPreviewGraph();
-            void Apply();
-            void Revert();
-            void Save();
             void RefreshDetails();
             void AddValidationPanel();
             void RefreshStatusBar();
             void RefreshWindowTitle();
-            void ShowDirtyClosePrompt();
             void AddNodeFromPalette(const String &node_type);
             void FocusValidationMessage(const GraphValidationMessage &message);
             String MakeSelectionSignature() const;
@@ -59,8 +58,6 @@ namespace Ailu
             UI::VerticalBox *_palette_root = nullptr;
             UI::VerticalBox *_details_root = nullptr;
             UI::Text *_status_text = nullptr;
-            UI::Button *_apply_button = nullptr;
-            UI::Button *_revert_button = nullptr;
             UI::Button *_save_button = nullptr;
             f32 _left_panel_ratio = 0.18f;
             f32 _right_panel_ratio = 0.74f;

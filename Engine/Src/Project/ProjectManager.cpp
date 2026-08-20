@@ -1,4 +1,5 @@
 #include "Project/ProjectManager.h"
+#include "Framework/Common/Allocator.hpp"
 
 #include "Framework/Common/FileManager.h"
 #include "Framework/Common/Log.h"
@@ -27,12 +28,12 @@ namespace Ailu
     void ProjectManager::Init()
     {
         AL_ASSERT_MSG(s_project_manager == nullptr, "ProjectManager already init!");
-        s_project_manager = new ProjectManager();
+        s_project_manager = AL_NEW_TAG(EMemoryTag::kCore, ProjectManager);
     }
 
     void ProjectManager::Shutdown()
     {
-        delete s_project_manager; s_project_manager = nullptr;
+        AL_DELETE(s_project_manager);
     }
 
     ProjectManager &ProjectManager::Get()

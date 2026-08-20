@@ -5,6 +5,7 @@
 #include "RHI/DX12/D3DContext.h"
 #include "RHI/DX12/dxhelper.h"
 #include <Framework/Common/Application.h>
+#include <Framework/Common/Allocator.hpp>
 #include <Framework/Common/Log.h>
 
 using namespace Ailu::Render;
@@ -56,11 +57,11 @@ namespace Ailu::RHI::DX12
     static GpuResourceManager* s_GpuResourceManager = nullptr;
     void GpuResourceManager::Init()
     {
-        s_GpuResourceManager = new GpuResourceManager();
+        s_GpuResourceManager = AL_NEW_TAG(EMemoryTag::kRenderer, GpuResourceManager);
     }
     void GpuResourceManager::Shutdown()
     {
-        delete s_GpuResourceManager; s_GpuResourceManager = nullptr;
+        AL_DELETE(s_GpuResourceManager);
     }
     GpuResourceManager *GpuResourceManager::Get()
     {

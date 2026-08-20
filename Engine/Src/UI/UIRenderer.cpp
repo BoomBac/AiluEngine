@@ -409,6 +409,12 @@ namespace Ailu
             TransformCoord(cb->_pos_buf[cur_vert_num + 1], matrix);
             TransformCoord(cb->_pos_buf[cur_vert_num + 2], matrix);
             TransformCoord(cb->_pos_buf[cur_vert_num + 3], matrix);
+            const Vector3f &top_left = cb->_pos_buf[cur_vert_num];
+            const Vector3f &top_right = cb->_pos_buf[cur_vert_num + 1];
+            const Vector3f &bottom_left = cb->_pos_buf[cur_vert_num + 2];
+            const Vector4f transformed_rect = {top_left.x, top_left.y,
+                                               std::abs(top_right.x - top_left.x),
+                                               std::abs(bottom_left.y - top_left.y)};
             cb->_uv_buf[cur_vert_num] = brush._uv_rect.xy;
             cb->_uv_buf[cur_vert_num + 1] = {brush._uv_rect.x + brush._uv_rect.z, brush._uv_rect.y};
             cb->_uv_buf[cur_vert_num + 2] = {brush._uv_rect.x, brush._uv_rect.y + brush._uv_rect.w};
@@ -417,10 +423,10 @@ namespace Ailu
             cb->_color_buf[cur_vert_num + 1] = color;
             cb->_color_buf[cur_vert_num + 2] = color;
             cb->_color_buf[cur_vert_num + 3] = color;
-            cb->_rect_buf[cur_vert_num] = rect;
-            cb->_rect_buf[cur_vert_num + 1] = rect;
-            cb->_rect_buf[cur_vert_num + 2] = rect;
-            cb->_rect_buf[cur_vert_num + 3] = rect;
+            cb->_rect_buf[cur_vert_num] = transformed_rect;
+            cb->_rect_buf[cur_vert_num + 1] = transformed_rect;
+            cb->_rect_buf[cur_vert_num + 2] = transformed_rect;
+            cb->_rect_buf[cur_vert_num + 3] = transformed_rect;
             cb->_corner_radius_buf[cur_vert_num] = corner_radius;
             cb->_corner_radius_buf[cur_vert_num + 1] = corner_radius;
             cb->_corner_radius_buf[cur_vert_num + 2] = corner_radius;
@@ -440,10 +446,35 @@ namespace Ailu
                        0.0f, brush._type == EUIBrushType::kBackdropBlur);
         }
 
-        void UIRenderer::DrawVisual(Vector4f rect, Matrix4x4f matrix, const UIControlVisual &visual)
+        UIBrush UIRenderer::ResolveBackdropBrush(const UIElement *element, const UIBrush &brush) const
+        {
+            if (element == nullptr || brush._type != EUIBrushType::kBackdropBlur)
+                return brush;
+            Widget *widget = element->GetOwningWidget();
+            if (widget == nullptr)
+                return brush;
+            const auto output = widget->GetOutput();
+            auto *color = std::get<0>(output);
+            if (color == nullptr || color->Width() == 0u || color->Height() == 0u)
+                return brush;
+
+            const f32 width = static_cast<f32>(color->Width());
+            const f32 height = static_cast<f32>(color->Height());
+            const Vector4f rect = element->GetArrangeRect();
+            UIBrush resolved_brush = brush;
+            resolved_brush._texture = color;
+            resolved_brush._uv_rect = {rect.x / width, rect.y / height, rect.z / width, rect.w / height};
+            return resolved_brush;
+        }
+
+        void UIRenderer::DrawVisual(Vector4f rect, Matrix4x4f matrix, const UIControlVisual &visual,
+                                    const UIElement *element)
         {
             if (visual._background._type != EUIBrushType::kNone && visual._background._tint.a > 0.0f)
-                DrawQuad(rect, matrix, visual._background, visual._corner_radius);
+            {
+                const UIBrush background = ResolveBackdropBrush(element, visual._background);
+                DrawQuad(rect, matrix, background, visual._corner_radius);
+            }
             if ((visual._border_width.x > 0.0f || visual._border_width.y > 0.0f ||
                  visual._border_width.z > 0.0f || visual._border_width.w > 0.0f) && visual._border_color.a > 0.0f)
                 DrawBorder(rect, matrix, visual._border_width, visual._corner_radius, visual._border_color);
@@ -463,7 +494,8 @@ namespace Ailu
             _text_renderer->DrawTextLayout(layout, pos, font_size, scale, color, matrix, font, GetAvailableBlock(4u, 6u));
         }
 
-        void UIRenderer::DrawImage(Render::Texture *texture, Vector4f rect, const ImageDrawOptions &opts)
+        void UIRenderer::DrawImage(Render::Texture *texture, Vector4f rect, const ImageDrawOptions &opts,
+                                   Render::Material *material)
         {
             if (!texture)
                 return;
@@ -477,6 +509,12 @@ namespace Ailu
             TransformCoord(cb->_pos_buf[cur_vert_num + 1], opts._transform);
             TransformCoord(cb->_pos_buf[cur_vert_num + 2], opts._transform);
             TransformCoord(cb->_pos_buf[cur_vert_num + 3], opts._transform);
+            const Vector3f &top_left = cb->_pos_buf[cur_vert_num];
+            const Vector3f &top_right = cb->_pos_buf[cur_vert_num + 1];
+            const Vector3f &bottom_left = cb->_pos_buf[cur_vert_num + 2];
+            const Vector4f transformed_rect = {top_left.x, top_left.y,
+                                               std::abs(top_right.x - top_left.x),
+                                               std::abs(bottom_left.y - top_left.y)};
             const Vector4f uv_rect = opts._uv_rect;
             cb->_uv_buf[cur_vert_num] = {uv_rect.x, uv_rect.y};
             cb->_uv_buf[cur_vert_num + 1] = {uv_rect.x + uv_rect.z, uv_rect.y};
@@ -486,10 +524,10 @@ namespace Ailu
             cb->_color_buf[cur_vert_num + 1] = opts._tint;
             cb->_color_buf[cur_vert_num + 2] = opts._tint;
             cb->_color_buf[cur_vert_num + 3] = opts._tint;
-            cb->_rect_buf[cur_vert_num] = rect;
-            cb->_rect_buf[cur_vert_num + 1] = rect;
-            cb->_rect_buf[cur_vert_num + 2] = rect;
-            cb->_rect_buf[cur_vert_num + 3] = rect;
+            cb->_rect_buf[cur_vert_num] = transformed_rect;
+            cb->_rect_buf[cur_vert_num + 1] = transformed_rect;
+            cb->_rect_buf[cur_vert_num + 2] = transformed_rect;
+            cb->_rect_buf[cur_vert_num + 3] = transformed_rect;
               cb->_corner_radius_buf[cur_vert_num] = opts._corner_radius;
               cb->_corner_radius_buf[cur_vert_num + 1] = opts._corner_radius;
               cb->_corner_radius_buf[cur_vert_num + 2] = opts._corner_radius;
@@ -504,7 +542,7 @@ namespace Ailu
             cb->_index_buf[cur_index_num + 3] = cur_vert_num + 1u;
             cb->_index_buf[cur_index_num + 4] = cur_vert_num + 3u;
             cb->_index_buf[cur_index_num + 5] = cur_vert_num + 2u;
-            AppendNode(cb, 4u, 6u, _default_material.get(),texture);
+            AppendNode(cb, 4u, 6u, material != nullptr ? material : _default_material.get(), texture);
         }
 
         void UIRenderer::DrawLine(Vector2f a, Vector2f b, f32 thickness, Color color, f32 depth)
@@ -856,21 +894,23 @@ namespace Ailu
         {
             if (widget == nullptr || widget->Root() == nullptr || color == nullptr || _popup_backdrop_block == nullptr)
                 return;
-            const Vector4f rect = widget->Root()->GetArrangeRect();
+            const f32 w = static_cast<f32>(color->Width());
+            const f32 h = static_cast<f32>(color->Height());
+            const bool is_modal = UIManager::Get() != nullptr && UIManager::Get()->IsPopupModal(widget);
+            const Vector4f rect = is_modal ? Vector4f(0.0f, 0.0f, w, h) : widget->Root()->GetArrangeRect();
             if (rect.z <= 1.0f || rect.w <= 1.0f)
                 return;
 
             _popup_backdrop_block->ResetBuildData();
             _frame_backdrop_blur_cache.erase(color);
 
-            const f32 w = static_cast<f32>(color->Width());
-            const f32 h = static_cast<f32>(color->Height());
             UIBrush brush;
             brush._type = EUIBrushType::kBackdropBlur;
             brush._texture = color;
             brush._tint = Color(1.0f, 1.0f, 1.0f, 0.92f);
             brush._uv_rect = {rect.x / w, rect.y / h, rect.z / w, rect.w / h};
-            AppendQuadToBlock(_popup_backdrop_block, rect, kIdentityMatrix, brush, Vector4f(6.0f), 0.0f);
+            AppendQuadToBlock(_popup_backdrop_block, rect, kIdentityMatrix, brush,
+                              is_modal ? Vector4f(0.0f) : Vector4f(10.0f), 0.0f);
             SubmitBlock(_popup_backdrop_block, cmd, color, depth);
         }
 

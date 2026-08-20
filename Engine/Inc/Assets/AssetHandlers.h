@@ -21,6 +21,14 @@ namespace Ailu
         bool Save(const AssetSaveContext &context) final;
     };
 
+    class AILU_API SpriteAtlasAssetHandler : public IAssetHandler
+    {
+        const Type *AssetType() const final;
+        Scope<Asset> Load(const AssetLoadContext &context) final;
+        bool Save(const AssetSaveContext &context) final;
+        bool ReloadInPlace(Asset &target, const Asset &source) final;
+    };
+
     class AILU_API ShaderAssetHandler : public IAssetHandler
     {
         const Type *AssetType() const final;
@@ -82,9 +90,18 @@ namespace Ailu
         const Type *AssetType() const final;
         Scope<Asset> Load(const AssetLoadContext &context) final;
         bool Save(const AssetSaveContext &context) final;
+        bool ReloadInPlace(Asset &target, const Asset &source) final;
     };
 
     class AILU_API AnimationControllerAssetHandler : public IAssetHandler
+    {
+        const Type *AssetType() const final;
+        Scope<Asset> Load(const AssetLoadContext &context) final;
+        bool Save(const AssetSaveContext &context) final;
+        bool ReloadInPlace(Asset &target, const Asset &source) final;
+    };
+
+    class AILU_API BlendSpaceAssetHandler : public IAssetHandler
     {
         const Type *AssetType() const final;
         Scope<Asset> Load(const AssetLoadContext &context) final;
@@ -117,5 +134,6 @@ namespace Ailu
         const Type *AssetType() const final;
         Scope<Asset> Load(const AssetLoadContext &context) final;
         bool Save(const AssetSaveContext &context) final;
+        bool ReloadInPlace(Asset &target, const Asset &source) final;
     };
 }

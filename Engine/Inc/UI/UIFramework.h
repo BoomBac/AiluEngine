@@ -47,9 +47,12 @@ namespace Ailu
             void SetDebugReflectorVisible(bool visible) { _is_debug_reflector_visible = visible; }
             bool IsDebugReflectorVisible() const { return _is_debug_reflector_visible; }
             //弹出一个popup widget,位置基于当前窗口左上角，root则会被添加到popup widget的root(canvas)进行显示
-            void ShowPopupAt(f32 x, f32 y, Ref<UIElement> root, std::function<void()> on_close = nullptr, Window *win = nullptr);
+            void ShowPopupAt(f32 x, f32 y, Ref<UIElement> root, std::function<void()> on_close = nullptr,
+                             Window *win = nullptr, bool is_modal = false);
             void HidePopup();
             Widget *GetPopupWidget() const;
+            Widget *GetModalPopupWidget() const;
+            bool IsPopupModal(const Widget *widget) const;
             UITheme *GetTheme() const { return _theme; }
             void SetTheme(UITheme *theme);
             void Destroy(Ref<UIElement> element);
@@ -58,6 +61,7 @@ namespace Ailu
             ZoneHandle RegisterInteractionZone(Vector4f rect, Widget *owner = nullptr);
             void UnRegisterInteractionZone(ZoneHandle handle);
             void UpdateInteractionZone(ZoneHandle handle, Vector4f rect);
+            void ClearMouseCapture() { _capture_target = nullptr; }
         public:
             UIElement *_capture_target = nullptr;//记录按下时的目标,全局共享，element销毁时检查这个值
             UIElement *_focus_target = nullptr;  //记录按下时的目标,全局共享，element销毁时检查这个值
@@ -81,6 +85,7 @@ namespace Ailu
             {
                 Ref<Widget> _widget;
                 std::function<void()> _on_close;
+                bool _is_modal = false;
             };
             Vector<PopupEntry> _popup_stack;
             Vector<Ref<Widget>> _pending_popup_destroy;

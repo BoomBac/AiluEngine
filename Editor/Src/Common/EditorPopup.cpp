@@ -16,6 +16,26 @@ namespace Ailu
             inline constexpr f32 kPropLabelFill = 1.0f;
             inline constexpr f32 kPropValueFill = 3.0f;
 
+            void ApplyPopupStyles(UI::UIElement *element)
+            {
+                if (element == nullptr)
+                    return;
+                if (auto *button = element->As<UI::Button>())
+                    button->SetStyleId("Popup");
+                else if (auto *input = element->As<UI::InputBlock>())
+                    input->SetStyleId("Popup");
+                else if (auto *border = element->As<UI::Border>())
+                {
+                    border->SetStyleId("Popup");
+                    border->GetStyleOverride().SetCornerRadius(6.0f);
+                }
+                else if (auto *list_view = element->As<UI::ListView>())
+                    list_view->SetStyleId("Popup");
+
+                for (const auto &child : element->GetChildren())
+                    ApplyPopupStyles(child.get());
+            }
+
             struct InlineTextEditState
             {
                 UI::UIElement *_parent = nullptr;
@@ -207,16 +227,29 @@ namespace Ailu
         void EditorPopup::ShowDialogAt(Vector2f popup_pos, const String &popup_name, const String &title, Vector2f size,
                                        const std::function<void(UI::VerticalBox *content, UI::Text *title_text)> &build_content,
                                        const Vector<PopupDialogAction> &actions,
-                                       const std::function<void()> &on_shown)
+                                       const std::function<void()> &on_shown, bool is_modal)
         {
             auto root = MakeRef<UI::Border>();
             root->Name(popup_name);
+            root->SetStyleId("Popup");
             root->GetSlot()->Size({size.x, size.y});
             root->Thickness(1.0f);
-            root->SlotPadding() = UI::Padding(4.0f);
+            root->SlotPadding() = UI::Padding(1.0f);
             root->InvalidateLayout();
             root->_bg_color = {0.12f, 0.12f, 0.12f, 0.96f};
             root->_border_color = Colors::kWhite;
+            Color popup_border_color(0.28f, 0.31f, 0.35f, 1.0f);
+            Vector4f popup_border_width(1.0f);
+            if (auto *theme = UI::UIManager::Get()->GetTheme(); theme != nullptr)
+            {
+                if (const auto *popup_style = theme->FindBorderStyle("Popup"); popup_style != nullptr)
+                {
+                    popup_border_color = popup_style->_visual._border_color;
+                    popup_border_width = popup_style->_visual._border_width;
+                }
+            }
+            root->GetStyleOverride().SetBorderColor(popup_border_color);
+            root->GetStyleOverride().SetBorderWidth(popup_border_width);
 
             auto *layout = root->AddChild<UI::VerticalBox>();
             layout->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
@@ -226,7 +259,7 @@ namespace Ailu
             auto drag_offset = std::make_shared<Vector2f>(0.0f, 0.0f);
 
             auto *title_bar = layout->AddChild<UI::Border>();
-            title_bar->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed).Size({size.x - 20.0f, 20.0f});
+            title_bar->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed).Size({0.0f, 20.0f});
             title_bar->Thickness(0.0f);
 
             auto *title_text = title_bar->AddChild<UI::Text>(title);
@@ -267,12 +300,13 @@ namespace Ailu
             if (!actions.empty())
             {
                 auto *button_row = layout->AddChild<UI::HorizontalBox>();
-                button_row->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed).Size({size.x - 20.0f, 24.0f});
+                button_row->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed).Size({0.0f, 24.0f});
 
                 for (const auto &action: actions)
                 {
                     auto btn = button_row->AddChild<UI::Button>();
-                    btn->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed).Size({0.0f, 24.0f}).FillRate(1.0f);
+                    btn->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed)
+                        .Size({0.0f, 24.0f}).Margin(UI::Padding(2.0f, 0.0f, 2.0f, 0.0f)).FillRate(1.0f);
                     btn->SetText(action._label);
 
                     btn->OnMouseClick() += [action, title, title_text](UI::UIEvent &e)
@@ -296,8 +330,9 @@ namespace Ailu
                 }
             }
 
+            ApplyPopupStyles(root.get());
             UI::UIManager::Get()->HidePopup();
-            UI::UIManager::Get()->ShowPopupAt(popup_pos.x, popup_pos.y, root);
+            UI::UIManager::Get()->ShowPopupAt(popup_pos.x, popup_pos.y, root, nullptr, nullptr, is_modal);
             title_text->SetText(title, false);
             title_text->_color = Colors::kWhite;
             if (on_shown)

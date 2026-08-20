@@ -21,7 +21,7 @@ namespace Ailu::Render
     }
     VoxelizePass::~VoxelizePass()
     {
-        delete _cam_cbuf; _cam_cbuf = nullptr;
+        AL_DELETE(_cam_cbuf);
     }
     void VoxelizePass::Execute(GraphicsContext *context, RenderingData &rendering_data)
     {

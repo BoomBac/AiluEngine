@@ -15,6 +15,8 @@ namespace Ailu
     class AILU_API Asset : public Object
     {
     public:
+        using Revision = u64;
+
         Asset() = default;
         Asset(const Type *type, const WString &asset_path);
         Asset(Guid guid, const Type *type, const WString &asset_path);
@@ -29,11 +31,22 @@ namespace Ailu
         void AssignGuid(const Guid &guid);
         const Guid &GetGuid() const { return _guid; };
 
-        //Editor runtime 状态：用于跟踪内容是否已被修改（不序列化）。
-        void MarkDirty() { ++_revision; }
+        // Editor runtime 状态：用于跟踪内容是否已被修改（不序列化）。
+        Revision MarkModified()
+        {
+            _revision = ++_next_revision;
+            return _revision;
+        }
+        void MarkDirty() { MarkModified(); }
         bool IsDirty() const { return _revision != _saved_revision; }
-        u64 Revision() const { return _revision; }
-        void MarkSaved(u64 revision) { _saved_revision = revision; }
+        Revision GetRevision() const { return _revision; }
+        Revision GetSavedRevision() const { return _saved_revision; }
+        void RestoreRevision(Revision revision)
+        {
+            _revision = revision;
+            _next_revision = std::max(_next_revision, revision);
+        }
+        void MarkSaved(Revision revision) { _saved_revision = revision; }
         template<typename T>
         T *As() const
         {
@@ -63,8 +76,9 @@ namespace Ailu
         Vector<RuntimeDependency> _dependencies;
     private:
         Guid _guid;
-        u64 _revision = 0;
-        u64 _saved_revision = 0;
+        Revision _revision = 0;
+        Revision _saved_revision = 0;
+        Revision _next_revision = 0;
     };
 }// namespace Ailu
 

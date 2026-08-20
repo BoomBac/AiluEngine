@@ -46,6 +46,7 @@ namespace Ailu
             {
                 fs::path _path;
                 Asset *_asset = nullptr;
+                Guid _sub_asset_guid = Guid::EmptyGuid();
                 UI::UIElement *_root = nullptr;
                 UI::Text *_text = nullptr;
             };
@@ -74,15 +75,21 @@ namespace Ailu
 
             void CreateFolderWidget(const AssetBrowserEntry &entry);
             void CreateAssetWidget(const AssetBrowserEntry &entry);
+            void CreateSubAssetWidget(const AssetBrowserEntry &entry);
 
-            std::tuple<Ref<UI::UIElement>, UI::Image *, UI::Text *> CreateEntryWidgetRoot(const String &display_name);
+            std::tuple<Ref<UI::UIElement>, UI::Image *, UI::Text *> CreateEntryWidgetRoot(const String &display_name,
+                                                                                           bool is_sub_asset = false);
 
             void SelectFolder(const fs::path &path, u32 index, UI::UIElement *root, UI::Text *text, bool preserve_modifiers);
             void SelectAsset(Asset *asset, u32 index, UI::UIElement *root, UI::Text *text, bool preserve_modifiers);
+            void SelectSubAsset(const AssetBrowserEntry &entry, u32 index, UI::UIElement *root, UI::Text *text,
+                                bool preserve_modifiers);
             void SelectEntry(const fs::path &path, Asset *asset, u32 index, UI::UIElement *root, UI::Text *text,
-                             bool preserve_modifiers);
+                             const Guid &sub_asset_guid, bool preserve_modifiers);
             void ClearSelection();
-            bool IsSelected(const fs::path &path) const;
+            bool IsSelected(const fs::path &path, const Guid &sub_asset_guid = Guid::EmptyGuid()) const;
+            bool IsAssetExpanded(const Asset *asset) const;
+            void ToggleAssetExpanded(Asset *asset);
             void UpdateEntryVisual(UI::UIElement *root, bool is_hovered);
             void UpdateSelectionVisuals();
             void SyncPrimarySelection();
@@ -121,12 +128,14 @@ namespace Ailu
             Vector2f _last_icon_area_size = Vector2f::kZero;
             bool _is_list_view = false;
             Vector<AssetBrowserEntry> _visible_entries;
+            Vector<Guid> _expanded_asset_guids;
             Vector<SelectedEntry> _selected_entries;
             i32 _selection_anchor = -1;
             UI::UIElement *_selected_item_root = nullptr;
             UI::Text *_selected_item_text = nullptr;
             Asset *_selected_asset = nullptr;
             WString _selected_folder_path;
+            Asset *_drag_source_asset = nullptr;
             bool _is_dragging = false;
             Vector2f _drag_start_pos;
             AssetDragData _asset_drag_data;

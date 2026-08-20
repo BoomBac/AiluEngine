@@ -32,8 +32,9 @@ namespace Ailu
     };
     struct AILU_API ApplicationDesc
     {
-        u32 _window_width, _window_height;
-        u32 _gameview_width, _gameview_height;
+        u32 _window_width = 1600u, _window_height = 900u;
+        u32 _gameview_width = 1600u, _gameview_height = 900u;
+        u32 _window_flags = 0u;
     };
 
     struct AILU_API ApplicationInitContext
@@ -56,6 +57,7 @@ namespace Ailu
         kSizeEW,  // 左右
         kSizeNESW,// ↘↖ 对角
         kSizeNWSE,// ↗↙ 对角
+        kSizeAll, // 四向
         kHand
     };
     enum class ECursorPriority : u8
@@ -227,7 +229,7 @@ namespace Ailu
         WinInputBackend _win_input_backend;
         std::atomic<bool> _is_handling_event;
         std::thread *_p_event_handle_thread;
-        Scope<RenderPipeline> _pipeline;
+        RenderPipeline *_pipeline = nullptr;
         std::atomic<EApplicationState> _state = EApplicationState::EApplicationState_None;
         double _render_lag = 0.0;
         double _update_lag = 0.0;

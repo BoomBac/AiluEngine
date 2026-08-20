@@ -3,6 +3,7 @@
 
 #include "UIElement.h"
 #include "UI/Style/UIStyles.h"
+#include "Render/Material.h"
 #include "Render/Texture.h"
 #include "generated/ColorPicker.gen.h"
 
@@ -32,6 +33,7 @@ public:
     void SetColorHSVA(Vector4f hsva);
 
     auto OnValueChanged() { return _on_value_changed_delegate.GetEventView(); }
+    bool IsDragAdjusting() const { return _drag_sv || _drag_hue || _drag_alpha || _drag_hdr; }
 
     void SetShowAlpha(bool v) { _show_alpha = v; InvalidateLayout(); }
     bool GetShowAlpha() const { return _show_alpha; }
@@ -41,13 +43,12 @@ public:
 private:
     void ResolveStyle(const UIStyleContext &context) override;
     void RenderImpl(UIRenderer& r) override;
-    void RebuildSVTexture();
     void EnsureStaticTextures();
     void SyncRgbFromState();
     void SyncStateFromRGBA(Color rgba);
     void SyncStateFromHSVA(Vector4f hsva);
     void SyncInputFields();
-    void NotifyValueChanged();
+    void NotifyValueChanged(bool sync_input_fields = true);
 
     static Vector3f RgbToHsv(const Vector3f& rgb);
     static Vector3f HsvToRgb(const Vector3f& hsv);
@@ -85,7 +86,7 @@ private:
     bool _drag_hdr = false;
 
     // Textures
-    Ref<Render::Texture2D> _tex_sv;     // 256x256, depends on hue
+    Ref<Render::Material> _sv_material; // HSV saturation/value shader material
     inline static Ref<Render::Texture2D> s_tex_hue;    // 256x1 rainbow
     inline static Ref<Render::Texture2D> s_tex_checker; // 8x8 checker
     inline static Ref<Render::Texture2D> s_tex_alpha;
@@ -98,8 +99,6 @@ private:
     f32 _hdr_intensity = 1.0f;
     Array<InputBlock*, 4> _channel_inputs{};
 
-    // Cached last hue to rebuild SV
-    f32 _last_h_for_sv = -1.0f;
     UIColorPickerStyle _resolved_style;
 };
 

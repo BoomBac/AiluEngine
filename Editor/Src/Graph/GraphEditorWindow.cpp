@@ -1,7 +1,6 @@
 #include "Graph/GraphEditorWindow.h"
-#include "Common/EditorPopup.h"
+#include "Common/AssetEditorLayout.h"
 #include "Dock/DockManager.h"
-#include "Framework/Common/Input.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Graph/GraphCanvas.h"
 #include "Graph/GraphNodeRegistry.h"
@@ -20,13 +19,11 @@ namespace Ailu
         {
             constexpr f32 kToolbarHeight = 30.0f;
             constexpr f32 kStatusBarHeight = 22.0f;
-            constexpr f32 kPanelLabelWidth = 78.0f;
-            constexpr f32 kRowHeight = 24.0f;
             const Color kPanelBgColor = {0.13f, 0.14f, 0.15f, 1.0f};
             const Color kTextColor = {0.86f, 0.86f, 0.86f, 1.0f};
             const Color kMutedTextColor = {0.58f, 0.61f, 0.65f, 1.0f};
 
-            UI::Text *AddText(UI::UIElement *parent, const String &text, f32 height = kRowHeight)
+            UI::Text *AddText(UI::UIElement *parent, const String &text)
             {
                 auto *label = parent->AddChild<UI::Text>(text);
                 label->_color = kTextColor;
@@ -34,32 +31,8 @@ namespace Ailu
                 label->_horizontal_align = UI::EAlignment::kLeft;
                 label->_vertical_align = UI::EAlignment::kCenter;
                 label->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed)
-                     .Size({0.0f, height}).Margin({4.0f, 1.0f, 4.0f, 1.0f});
+                    .Size({0.0f, 24.0f}).Margin({4.0f, 1.0f, 4.0f, 1.0f});
                 return label;
-            }
-
-            UI::Text *AddSectionTitle(UI::UIElement *parent, const String &title)
-            {
-                auto *label = AddText(parent, title, 24.0f);
-                label->_color = {0.95f, 0.95f, 0.95f, 1.0f};
-                label->FontSize(13.0f);
-                label->GetSlotAs<UI::LinearSlot>().Margin({4.0f, 7.0f, 4.0f, 2.0f});
-                return label;
-            }
-
-            UI::HorizontalBox *AddPropertyRow(UI::UIElement *parent, const String &label)
-            {
-                auto *row = parent->AddChild<UI::HorizontalBox>();
-                row->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed)
-                   .Size({0.0f, kRowHeight}).Margin({4.0f, 1.0f, 4.0f, 1.0f});
-                auto *name = row->AddChild<UI::Text>(label);
-                name->_color = kMutedTextColor;
-                name->_horizontal_align = UI::EAlignment::kLeft;
-                name->_vertical_align = UI::EAlignment::kCenter;
-                name->FontSize(12.0f);
-                name->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFill)
-                    .Size({kPanelLabelWidth, 0.0f});
-                return row;
             }
 
             String ValidationSeverityText(EGraphValidationSeverity severity)
@@ -76,7 +49,7 @@ namespace Ailu
             }
         }
 
-        GraphEditorWindow::GraphEditorWindow() : DockWindow("Graph Editor", {1120.0f, 700.0f})
+        GraphEditorWindow::GraphEditorWindow() : AssetEditor("Graph Editor", {1120.0f, 700.0f})
         {
             SetPosition({140.0f, 70.0f});
             _document = MakeScope<GraphDocument>();
@@ -90,11 +63,7 @@ namespace Ailu
 
         void GraphEditorWindow::Update(f32 dt)
         {
-            DockWindow::Update(dt);
-            const bool ctrl = Input::IsKeyDown(EKey::kLCONTROL) || Input::IsKeyDown(EKey::kRCONTROL) ||
-                              Input::IsKeyDown(EKey::kCONTROL);
-            if (Input::IsKeyPressed(EKey::kS) && ctrl)
-                Save();
+            AssetEditor::Update(dt);
             if (IsDirty() != _last_known_dirty)
                 RefreshWindowTitle();
             RefreshStatusBar();
@@ -110,10 +79,11 @@ namespace Ailu
         {
             if (asset == nullptr)
                 return false;
+            BindAsset(ResourceMgr::Get().GetLinkedAsset(asset));
             _asset = asset;
             if (_document == nullptr)
                 _document = MakeScope<GraphDocument>();
-            if (!_document->Open(asset))
+            if (!_document->Open(asset, GetAsset()))
                 return false;
             if (_canvas != nullptr)
             {
@@ -127,7 +97,7 @@ namespace Ailu
             return true;
         }
 
-        void GraphEditorWindow::Close()
+        void GraphEditorWindow::OnClose()
         {
             if (_canvas != nullptr)
                 _canvas->SetDocument(nullptr);
@@ -138,16 +108,6 @@ namespace Ailu
             RefreshWindowTitle();
             RefreshDetails();
             RefreshStatusBar();
-        }
-
-        void GraphEditorWindow::RequestClose()
-        {
-            if (IsDirty())
-            {
-                ShowDirtyClosePrompt();
-                return;
-            }
-            DockWindow::RequestClose();
         }
 
         void GraphEditorWindow::SaveDockLayoutState(JsonArchive &ar)
@@ -222,11 +182,6 @@ namespace Ailu
                 _canvas->SetView(_saved_view_offset, _saved_zoom);
         }
 
-        bool GraphEditorWindow::IsDirty() const
-        {
-            return _document != nullptr && _document->IsDirty();
-        }
-
         void GraphEditorWindow::BuildContent()
         {
             _content_root->ClearChildren();
@@ -281,21 +236,19 @@ namespace Ailu
 
         void GraphEditorWindow::BuildToolbar(UI::HorizontalBox *toolbar)
         {
-            auto add_button = [this, toolbar](const String &text, void (GraphEditorWindow::*callback)()) -> UI::Button *
+            auto add_button = [this, toolbar](const String &text, std::function<void()> callback) -> UI::Button *
             {
                 auto *button = toolbar->AddChild<UI::Button>(text);
                 button->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFixed)
                       .Size({72.0f, 24.0f}).Margin({4.0f, 3.0f, 0.0f, 3.0f});
                 button->OnMouseClick() += [this, callback](UI::UIEvent &e)
                 {
-                    (this->*callback)();
+                    callback();
                     e._is_handled = true;
                 };
                 return button;
             };
-            _apply_button = add_button("Apply", &GraphEditorWindow::Apply);
-            _revert_button = add_button("Revert", &GraphEditorWindow::Revert);
-            _save_button = add_button("Save", &GraphEditorWindow::Save);
+            _save_button = add_button("Save", [this]() { AssetEditor::Save(); });
             auto *spacer = toolbar->AddChild<UI::Text>("");
             spacer->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
             auto *find_label = toolbar->AddChild<UI::Text>("Find");
@@ -327,7 +280,7 @@ namespace Ailu
         void GraphEditorWindow::BuildPalette(UI::VerticalBox *palette)
         {
             palette->ClearChildren();
-            AddSectionTitle(palette, "Palette");
+            AssetEditorLayout::AddSectionTitle(palette, "Palette");
             Vector<const GraphNodeDesc *> nodes = GraphNodeRegistry::Get().FindNodes("");
             std::sort(nodes.begin(), nodes.end(), [](const GraphNodeDesc *lhs, const GraphNodeDesc *rhs)
             {
@@ -398,37 +351,23 @@ namespace Ailu
             _document->Apply();
         }
 
-        void GraphEditorWindow::Apply()
+        void GraphEditorWindow::OnBeforeSave()
         {
-            if (_document != nullptr && _document->Apply())
-            {
-                ResourceMgr::Get().MarkAssetDirty(_asset);
-                RefreshWindowTitle();
-                RefreshStatusBar();
-            }
+            if (_document != nullptr)
+                _document->Apply();
         }
 
-        void GraphEditorWindow::Revert()
+        void GraphEditorWindow::OnAssetSaved()
         {
-            if (_document == nullptr)
-                return;
-            _document->Revert();
-            if (_canvas != nullptr)
-                _canvas->ClearSelection();
-            _details_selection_signature.clear();
             RefreshWindowTitle();
-            RefreshDetails();
             RefreshStatusBar();
         }
 
-        void GraphEditorWindow::Save()
+        void GraphEditorWindow::OnAssetReloaded()
         {
-            if (_asset == nullptr)
-                return;
-            Apply();
-            if (Asset *asset = ResourceMgr::Get().GetLinkedAsset(_asset); asset != nullptr)
-                ResourceMgr::Get().SaveAsset(asset);
-            RefreshStatusBar();
+            GraphAsset *asset = GetAssetObject<GraphAsset>();
+            if (asset != nullptr)
+                Open(asset);
         }
 
         void GraphEditorWindow::RefreshDetails()
@@ -436,7 +375,7 @@ namespace Ailu
             if (_details_root == nullptr)
                 return;
             _details_root->ClearChildren();
-            AddSectionTitle(_details_root, "Details");
+            AssetEditorLayout::AddSectionTitle(_details_root, "Details");
             if (_document == nullptr || _canvas == nullptr)
             {
                 AddText(_details_root, "No document");
@@ -454,7 +393,8 @@ namespace Ailu
                     AddValidationPanel();
                     return;
                 }
-                auto *title_input = AddPropertyRow(_details_root, "Title")->AddChild<UI::InputBlock>(comment->_title);
+                auto *title_input = AssetEditorLayout::AddPropertyRow(_details_root, "Title")
+                    ->AddChild<UI::InputBlock>(comment->_title);
                 title_input->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
                 title_input->_on_content_changed += [this, comment_id = comment->_id](String content)
                 {
@@ -480,10 +420,11 @@ namespace Ailu
                 return;
             }
 
-            AddPropertyRow(_details_root, "Type")->AddChild<UI::Text>(node->_node_type)->GetSlotAs<UI::LinearSlot>()
+            AssetEditorLayout::AddPropertyRow(_details_root, "Type")->AddChild<UI::Text>(node->_node_type)
+                ->GetSlotAs<UI::LinearSlot>()
                 .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
-            auto *property_input = AddPropertyRow(_details_root, "Property")
-                                           ->AddChild<UI::InputBlock>(node->_property_data);
+            auto *property_input = AssetEditorLayout::AddPropertyRow(_details_root, "Property")
+                                            ->AddChild<UI::InputBlock>(node->_property_data);
             property_input->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
             property_input->_on_content_changed += [this, node_id = node->_id](String content)
             {
@@ -493,11 +434,11 @@ namespace Ailu
                 RefreshStatusBar();
             };
 
-            AddSectionTitle(_details_root, "Pins");
+            AssetEditorLayout::AddSectionTitle(_details_root, "Pins");
             for (const GraphPinData &pin : node->_pins)
             {
-                auto *row = AddPropertyRow(_details_root, std::format("{} {}", PinDirectionText(pin._direction),
-                                                                      pin._name));
+                auto *row = AssetEditorLayout::AddPropertyRow(
+                    _details_root, std::format("{} {}", PinDirectionText(pin._direction), pin._name));
                 auto *input = row->AddChild<UI::InputBlock>(pin._default_value);
                 input->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
                 input->_on_content_changed += [this, pin_id = pin._id](String content)
@@ -517,7 +458,7 @@ namespace Ailu
             if (_details_root == nullptr)
                 return;
 
-            AddSectionTitle(_details_root, "Validation");
+            AssetEditorLayout::AddSectionTitle(_details_root, "Validation");
             if (_document == nullptr)
             {
                 AddText(_details_root, "No document");
@@ -561,39 +502,6 @@ namespace Ailu
             const String asset_name = _asset != nullptr ? _asset->Name() : "No Asset";
             _last_known_dirty = IsDirty();
             SetTitle(std::format("Graph Editor - {}{}", asset_name, _last_known_dirty ? "*" : ""));
-        }
-
-        void GraphEditorWindow::ShowDirtyClosePrompt()
-        {
-            const Vector2f dialog_size = {330.0f, 112.0f};
-            const Vector2f popup_pos = Position() + (Size() - dialog_size) * 0.5f;
-            EditorPopup::ShowDialogAt(popup_pos, "GraphEditorDirtyClosePrompt", "Unsaved Graph Changes",
-                                      dialog_size,
-                                      [](UI::VerticalBox *content, UI::Text *)
-                                      {
-                                          auto *message = content->AddChild<UI::Text>(
-                                                  "Save changes before closing this graph?");
-                                          message->_horizontal_align = UI::EAlignment::kLeft;
-                                          message->_vertical_align = UI::EAlignment::kCenter;
-                                          message->GetSlotAs<UI::LinearSlot>()
-                                                 .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed)
-                                                 .Size({0.0f, 38.0f});
-                                      },
-                                      {
-                                              {"Save", [this]() -> std::optional<String>
-                                               {
-                                                   Save();
-                                                   DockWindow::RequestClose();
-                                                   return std::nullopt;
-                                               }},
-                                              {"Discard", [this]() -> std::optional<String>
-                                               {
-                                                   Revert();
-                                                   DockWindow::RequestClose();
-                                                   return std::nullopt;
-                                               }, true},
-                                              {"Cancel", []() -> std::optional<String> { return std::nullopt; }}
-                                      });
         }
 
         void GraphEditorWindow::AddNodeFromPalette(const String &node_type)

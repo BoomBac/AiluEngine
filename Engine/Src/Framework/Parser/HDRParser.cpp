@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "Framework/Parser/HDRParser.h"
+#include "Framework/Common/Allocator.hpp"
 #include "Framework/Common/StackTrace.h"
 //#ifndef STB_IMAGE_IMPLEMENTATION
 //#define STB_IMAGE_IMPLEMENTATION
@@ -87,10 +88,14 @@ namespace Ailu
 		{
 			if (n == 3)
 			{
+				const size_t data_size = static_cast<size_t>(w) * static_cast<size_t>(h) * static_cast<size_t>(n);
+				f32 *new_data = AL_ALLOC_TAG(EMemoryTag::kTemporary, f32, data_size);
+				memcpy(new_data, raw_data, data_size * sizeof(f32));
+				stbi_image_free(raw_data);
 				data._width = w;
 				data._height = h;
 				data._format = ETextureFormat::kRGBFloat;
-				data._data.emplace_back(reinterpret_cast<u8*>(raw_data));
+				data._data.emplace_back(reinterpret_cast<u8 *>(new_data));
 			}
 			else
 			{

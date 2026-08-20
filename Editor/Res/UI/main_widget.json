@@ -12,6 +12,8 @@
     "_root": {
         "_type_name": "Ailu::UI::Canvas",
         "_visibility": "kVisible",
+        "_guid": "",
+        "_property_visual_override_flags": 3435973836,
         "_slot_obj": {
             "_has_value": true,
             "_type_name": "Ailu::UI::CanvasSlot",
@@ -36,6 +38,8 @@
         "_children": [{
                 "_type_name": "Ailu::UI::ScrollView",
                 "_visibility": "kVisible",
+                "_guid": "",
+                "_property_visual_override_flags": 3435973836,
                 "_slot_obj": {
                     "_has_value": true,
                     "_type_name": "Ailu::UI::CanvasSlot",
@@ -60,6 +64,8 @@
                 "_children": [{
                         "_type_name": "Ailu::UI::VerticalBox",
                         "_visibility": "kVisible",
+                        "_guid": "",
+                        "_property_visual_override_flags": 3435973836,
                         "_slot_obj": {
                             "_has_value": true,
                             "_type_name": "Ailu::UI::CanvasSlot",
@@ -84,6 +90,8 @@
                         "_children": [{
                                 "_type_name": "Ailu::UI::Button",
                                 "_visibility": "kVisible",
+                                "_guid": "",
+                                "_property_visual_override_flags": 3435973836,
                                 "_slot_obj": {
                                     "_has_value": true,
                                     "_type_name": "Ailu::UI::LinearSlot",
@@ -112,6 +120,8 @@
                                         "_font_size": 10.0,
                                         "_text": "button",
                                         "_visibility": "kVisible",
+                                        "_guid": "",
+                                        "_property_visual_override_flags": 3435973836,
                                         "_slot_obj": {
                                             "_has_value": true,
                                             "_type_name": "Ailu::UI::LinearSlot",
@@ -142,6 +152,8 @@
                                 "_font_size": 14.0,
                                 "_text": "AAAAAAAA",
                                 "_visibility": "kVisible",
+                                "_guid": "",
+                                "_property_visual_override_flags": 3435973836,
                                 "_slot_obj": {
                                     "_has_value": true,
                                     "_type_name": "Ailu::UI::LinearSlot",
@@ -168,6 +180,8 @@
                                 "_range": [0.0, 1.0],
                                 "_value": 0.0,
                                 "_visibility": "kVisible",
+                                "_guid": "",
+                                "_property_visual_override_flags": 3435973836,
                                 "_slot_obj": {
                                     "_has_value": true,
                                     "_type_name": "Ailu::UI::LinearSlot",
@@ -194,6 +208,8 @@
                                 "_title_text": "CollapsibleView",
                                 "_is_collapsed": false,
                                 "_visibility": "kVisible",
+                                "_guid": "",
+                                "_property_visual_override_flags": 3435973836,
                                 "_slot_obj": {
                                     "_has_value": true,
                                     "_type_name": "Ailu::UI::LinearSlot",
@@ -217,6 +233,8 @@
                                 "_children": [{
                                         "_type_name": "Ailu::UI::HorizontalBox",
                                         "_visibility": "kVisible",
+                                        "_guid": "",
+                                        "_property_visual_override_flags": 3435973836,
                                         "_slot_obj": {
                                             "_has_value": true,
                                             "_type_name": "Ailu::UI::CanvasSlot",
@@ -246,6 +264,8 @@
                                                 "_font_size": 14.0,
                                                 "_text": "CollapsibleViewTitle",
                                                 "_visibility": "kVisible",
+                                                "_guid": "",
+                                                "_property_visual_override_flags": 3435973836,
                                                 "_slot_obj": {
                                                     "_has_value": true,
                                                     "_type_name": "Ailu::UI::LinearSlot",
@@ -271,6 +291,8 @@
                                     }, {
                                         "_type_name": "Ailu::UI::Canvas",
                                         "_visibility": "kVisible",
+                                        "_guid": "",
+                                        "_property_visual_override_flags": 3435973836,
                                         "_slot_obj": {
                                             "_has_value": true,
                                             "_type_name": "Ailu::UI::CanvasSlot",
@@ -295,6 +317,8 @@
                                         "_children": [{
                                                 "_type_name": "Ailu::UI::VerticalBox",
                                                 "_visibility": "kVisible",
+                                                "_guid": "",
+                                                "_property_visual_override_flags": 3435973836,
                                                 "_slot_obj": {
                                                     "_has_value": true,
                                                     "_type_name": "Ailu::UI::CanvasSlot",
@@ -319,6 +343,8 @@
                                                 "_children": [{
                                                         "_type_name": "Ailu::UI::Button",
                                                         "_visibility": "kVisible",
+                                                        "_guid": "",
+                                                        "_property_visual_override_flags": 3435973836,
                                                         "_slot_obj": {
                                                             "_has_value": true,
                                                             "_type_name": "Ailu::UI::LinearSlot",
@@ -347,6 +373,8 @@
                                                                 "_font_size": 14.0,
                                                                 "_text": "button",
                                                                 "_visibility": "kVisible",
+                                                                "_guid": "",
+                                                                "_property_visual_override_flags": 3435973836,
                                                                 "_slot_obj": {
                                                                     "_has_value": true,
                                                                     "_type_name": "Ailu::UI::LinearSlot",
@@ -377,6 +405,8 @@
                                                         "_font_size": 14.0,
                                                         "_text": "AAAAAAAA",
                                                         "_visibility": "kVisible",
+                                                        "_guid": "",
+                                                        "_property_visual_override_flags": 3435973836,
                                                         "_slot_obj": {
                                                             "_has_value": true,
                                                             "_type_name": "Ailu::UI::LinearSlot",
@@ -403,6 +433,8 @@
                                                         "_range": [0.0, 1.0],
                                                         "_value": 0.0,
                                                         "_visibility": "kVisible",
+                                                        "_guid": "",
+                                                        "_property_visual_override_flags": 3435973836,
                                                         "_slot_obj": {
                                                             "_has_value": true,
                                                             "_type_name": "Ailu::UI::LinearSlot",
@@ -430,6 +462,8 @@
                             }, {
                                 "_type_name": "Ailu::UI::Button",
                                 "_visibility": "kVisible",
+                                "_guid": "",
+                                "_property_visual_override_flags": 3435973836,
                                 "_slot_obj": {
                                     "_has_value": true,
                                     "_type_name": "Ailu::UI::LinearSlot",
@@ -458,6 +492,8 @@
                                         "_font_size": 10.0,
                                         "_text": "button",
                                         "_visibility": "kVisible",
+                                        "_guid": "",
+                                        "_property_visual_override_flags": 3435973836,
                                         "_slot_obj": {
                                             "_has_value": true,
                                             "_type_name": "Ailu::UI::LinearSlot",
@@ -485,6 +521,8 @@
                                 "_tint_color": [0.9998, 0.9998, 0.9998, 1.0],
                                 "_texture_guid": "0f4943a3-8df4-4917-8730-92c9de6ef6ce",
                                 "_visibility": "kVisible",
+                                "_guid": "",
+                                "_property_visual_override_flags": 3435973836,
                                 "_slot_obj": {
                                     "_has_value": true,
                                     "_type_name": "Ailu::UI::LinearSlot",

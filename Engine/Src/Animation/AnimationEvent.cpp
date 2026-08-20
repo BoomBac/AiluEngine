@@ -8,7 +8,7 @@
 namespace Ailu
 {
     void CollectAnimationEvents(const AnimationClip &clip, f32 previous_time, f32 current_time,
-                                Vector<AnimationEvent> &out_events)
+                                Vector<AnimationEvent> &out_events, bool looping)
     {
         const auto &events = clip.Events();
         const f32 duration = clip.Duration();
@@ -25,7 +25,7 @@ namespace Ailu
             }
         };
 
-        if (!clip.IsLooping())
+        if (!looping)
         {
             if (current_time > previous_time)
                 collect_range(previous_time, current_time, false);
@@ -52,5 +52,11 @@ namespace Ailu
             collect_range(previous, duration, false);
             collect_range(0.0f, current, true);
         }
+    }
+
+    void CollectAnimationEvents(const AnimationClip &clip, f32 previous_time, f32 current_time,
+                                Vector<AnimationEvent> &out_events)
+    {
+        CollectAnimationEvents(clip, previous_time, current_time, out_events, clip.IsLooping());
     }
 }

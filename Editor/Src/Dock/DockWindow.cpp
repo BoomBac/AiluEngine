@@ -278,10 +278,16 @@ namespace Ailu
                 }
                 else
                 {
-                    ui_mgr->UpdateInteractionZone(_resize_zone_handles[0], Vector4f(p.x, p.y - t, s.x, t));// Top
-                    ui_mgr->UpdateInteractionZone(_resize_zone_handles[1], Vector4f(p.x, p.y + s.y, s.x, t));// Bottom
-                    ui_mgr->UpdateInteractionZone(_resize_zone_handles[2], Vector4f(p.x - t, p.y, t, s.y));// Left
-                    ui_mgr->UpdateInteractionZone(_resize_zone_handles[3], Vector4f(p.x + s.x, p.y, t, s.y));// Right
+                    // HoverEdge() accepts the diagonal corner squares too. Extend each outer edge
+                    // through its adjacent corners so the UI input barrier covers the same area.
+                    auto update_zone = [this, ui_mgr](u32 index, const Vector4f &rect)
+                    {
+                        ui_mgr->UpdateInteractionZone(_resize_zone_handles[index], rect);
+                    };
+                    update_zone(0u, {p.x - t, p.y - t, s.x + 2.0f * t, t});// Top
+                    update_zone(1u, {p.x - t, p.y + s.y, s.x + 2.0f * t, t});// Bottom
+                    update_zone(2u, {p.x - t, p.y - t, t, s.y + 2.0f * t});// Left
+                    update_zone(3u, {p.x + s.x, p.y - t, t, s.y + 2.0f * t});// Right
                 }
 
                 _is_dirty = false;
@@ -363,6 +369,13 @@ namespace Ailu
             _is_dirty = true;
         }
 
+        void DockWindow::CaptureStandaloneRect()
+        {
+            _standalone_position = _position;
+            _standalone_size = _size;
+            _has_standalone_rect = true;
+        }
+
         void DockWindow::SetTabActive(bool is_active)
         {
             SetTitleBarVisibility(false);
@@ -371,6 +384,11 @@ namespace Ailu
 
         void DockWindow::RestoreStandaloneFromTab()
         {
+            if (_has_standalone_rect)
+            {
+                SetPosition(_standalone_position);
+                SetSize(_standalone_size);
+            }
             SetTitleBarVisibility(true);
             SetContentVisibility(true);
         }
@@ -490,8 +508,8 @@ namespace Ailu
             {
                 LOG_INFO("DockTab close...");
                 e._is_handled = true;
-                if (auto *primary_window = ActivePrimaryWindow())
-                    DockManager::Get().RequestRemoveDock(primary_window);
+                if (auto active_item = ActiveItem(); active_item && active_item->CanClose())
+                    active_item->RequestClose();
             };
             UI::UIManager::Get()->RegisterWidget(_tab_bar);
         }
@@ -514,6 +532,7 @@ namespace Ailu
                                        { return e.get() == item.get(); });
                 it != _tabs.end())
                 return false;
+            item->CaptureStandaloneRect();
             if (_tabs.empty())
             {
                 _size = item->Size();
@@ -773,6 +792,12 @@ namespace Ailu
             return UI::UIElement::IsPointInside(pos, _drag_area->GetArrangeRect());
         }
 
+        bool DockTab::HoverTabBar(Vector2f pos) const
+        {
+            return _is_visible && _tab_root != nullptr &&
+                   UI::UIElement::IsPointInside(pos, _tab_root->GetArrangeRect());
+        }
+
         bool DockTab::IsHover(Vector2f pos) const
         {
             if (_tabs.empty() || _active_index < 0 || _active_index >= static_cast<i32>(_tabs.size()))
@@ -806,8 +831,11 @@ namespace Ailu
             _tab_root->GetSlotAs<UI::CanvasSlot>().Size({_size.x, DockWindow::kTitleBarHeight});
             _tab_hb->GetSlot()->Size(_tab_root->GetSlot()->_size);
             bool tab_style_changed = false;
-            DockWindow *active_window = ActivePrimaryWindow();
-            const bool is_focused = active_window != nullptr && DockManager::Get().IsFocused(active_window);
+            const auto active_item = ActiveItem();
+            const bool is_focused = active_item && DockManager::Get().IsTabItemFocused(active_item.get());
+            const bool can_close = active_item && active_item->CanClose();
+            if (_btn_close->IsVisible() != can_close)
+                _btn_close->SetVisible(can_close);
             tab_style_changed |= SetColorIfChanged(_tab_root->_bg_color, g_editor_style._window_title_bar_color);
             tab_style_changed |= SetColorIfChanged(_tab_root->_border_color, is_focused ? g_editor_style._window_focus_border_color : g_editor_style._window_border_color);
             tab_style_changed |= ApplyDockBorderStyle(_tab_root, g_editor_style._window_title_bar_color,

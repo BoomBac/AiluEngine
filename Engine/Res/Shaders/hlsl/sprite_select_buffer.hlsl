@@ -37,6 +37,10 @@ struct sprite_instance_data
 StructuredBuffer<sprite_instance_data> g_sprite_instances : register(t10);
 TEXTURE2D(_MainTex)
 
+PerMaterialCBufferBegin
+    uint _base_instance_index;
+PerMaterialCBufferEnd
+
 struct VSInput
 {
     float2 position : POSITION;
@@ -53,7 +57,7 @@ struct PSInput
 
 PSInput VSMain(VSInput input)
 {
-    sprite_instance_data instance = g_sprite_instances[input.instance_id];
+    sprite_instance_data instance = g_sprite_instances[input.instance_id + _base_instance_index];
     float2 uv = input.uv;
     if ((instance.flags & 1u) != 0u) uv.x = 1.0f - uv.x;
     if ((instance.flags & 2u) != 0u) uv.y = 1.0f - uv.y;

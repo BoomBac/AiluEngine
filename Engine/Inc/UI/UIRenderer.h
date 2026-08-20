@@ -92,11 +92,14 @@ namespace Ailu
             void DrawWindowShadow(Window *window, Vector4f rect, Color color, Vector4f corner_radius);
             void DrawWindowText(Window *window, const String &text, Vector2f pos, f32 font_size = 14u, Color color = Colors::kWhite,
                                 Vector2f scale = Vector2f::kOne, Render::Font *font = nullptr);
-            void DrawVisual(Vector4f rect, Matrix4x4f matrix, const UIControlVisual &visual);
+            void DrawVisual(Vector4f rect, Matrix4x4f matrix, const UIControlVisual &visual,
+                            const UIElement *element = nullptr);
+            UIBrush ResolveBackdropBrush(const UIElement *element, const UIBrush &brush) const;
             void DrawText(const String &text, Vector2f pos, f32 font_size = 14u, Color color = Colors::kWhite,Vector2f scale = Vector2f::kOne, Render::Font *font = nullptr);
             void DrawText(const String &text, Vector2f pos, Matrix4x4f matrix,f32 font_size = 14u, Color color = Colors::kWhite,Vector2f scale = Vector2f::kOne, Render::Font *font = nullptr);
             void DrawTextLayout(const Render::TextLayoutResult &layout, Vector2f pos, Matrix4x4f matrix, f32 font_size = 14u, Color color = Colors::kWhite, Vector2f scale = Vector2f::kOne, Render::Font *font = nullptr);
-            void DrawImage(Render::Texture *texture, Vector4f rect, const ImageDrawOptions &opts = {});
+            void DrawImage(Render::Texture *texture, Vector4f rect, const ImageDrawOptions &opts = {},
+                           Render::Material *material = nullptr);
             void DrawLine(Vector2f a, Vector2f b, f32 thickness = 1.0f, Color color = Colors::kWhite, f32 depth = 0.0f);
             void DrawLine(Vector2f a, Vector2f b, Matrix4x4f matrix,f32 thickness = 1.0f, Color color = Colors::kWhite, f32 depth = 0.0f);
             void DrawBezier(Vector2f start, Vector2f start_tangent, Vector2f end_tangent, Vector2f end,

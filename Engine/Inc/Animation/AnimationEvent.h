@@ -9,6 +9,17 @@
 
 namespace Ailu
 {
+    inline u32 AnimationEventNameHash(StringView name)
+    {
+        u32 hash = 2166136261u;
+        for (const char ch : name)
+        {
+            hash ^= static_cast<u8>(ch);
+            hash *= 16777619u;
+        }
+        return hash;
+    }
+
     enum class EAnimationEventKind : u8
     {
         kGameplay,
@@ -41,6 +52,8 @@ namespace Ailu
     };
 
     class AnimationClip;
+    AILU_API void CollectAnimationEvents(const AnimationClip &clip, f32 previous_time, f32 current_time,
+                                         Vector<AnimationEvent> &out_events, bool looping);
     AILU_API void CollectAnimationEvents(const AnimationClip &clip, f32 previous_time, f32 current_time,
                                          Vector<AnimationEvent> &out_events);
 }

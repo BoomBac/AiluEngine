@@ -108,7 +108,7 @@ namespace Ailu::Render
     {
         if (g_pCommandPool == nullptr)
         {
-            g_pCommandPool = new CommandPool();
+            g_pCommandPool = AL_NEW_TAG(EMemoryTag::kRenderer, CommandPool);
             for (u32 i = 0; i < kCommandPoolPayloadCount; ++i)
                 g_pCommandPool->_payload_pool.Push(AL_NEW(CommandPayload));
         }
@@ -123,7 +123,6 @@ namespace Ailu::Render
             AL_DELETE(payload.value());
         }
 
-        delete g_pCommandPool;
-        g_pCommandPool = nullptr;
+        AL_DELETE(g_pCommandPool);
     }
 }// namespace Ailu

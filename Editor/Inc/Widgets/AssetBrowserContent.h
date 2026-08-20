@@ -6,6 +6,7 @@
 #include "Framework/Core/Containers/Map.h"
 #include "Framework/Core/Containers/Vector.h"
 #include "Framework/Core/String.h"
+#include "Framework/Math/Guid.h"
 #include "UI/TreeView.h"
 
 #include <filesystem>
@@ -16,6 +17,7 @@ namespace Ailu
     namespace fs = std::filesystem;
 
     class Asset;
+    class Type;
     enum class EAssetDomain : i32;
 
     namespace Editor
@@ -32,13 +34,16 @@ namespace Ailu
             enum class EType : u8
             {
                 kFolder,
-                kAsset
+                kAsset,
+                kSubAsset
             };
 
             EType _type = EType::kAsset;
             String _display_name;
             fs::path _sys_path;
             Asset *_asset = nullptr;
+            Guid _sub_asset_guid = Guid::EmptyGuid();
+            const Type *_sub_asset_type = nullptr;
         };
 
         // 逻辑路径辅助函数，供 AssetBrowser / AssetBrowserOperations 共用。
@@ -52,6 +57,8 @@ namespace Ailu
         {
         public:
             Vector<AssetBrowserEntry> Query(const fs::path &directory, const String &search_text) const;
+
+            Vector<AssetBrowserEntry> GetSubAssets(const Asset *owner) const;
 
             Vector<AssetBrowserRootDesc> GetRoots() const;
 

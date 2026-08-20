@@ -7,6 +7,7 @@
 #include "Render/Gizmo.h"
 #include <Framework/Common/Profiler.h>
 #include <Framework/Common/ResourceMgr.h>
+#include <Framework/Common/Allocator.hpp>
 #include <limits>
 
 namespace Ailu
@@ -27,11 +28,11 @@ namespace Ailu
             _msdf_mat = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/default_text.alasset"), "DefaultTextMaterial");
             _msdf_mat->SetTexture("_MainTex", s_default_font->_pages[0]._texture.get());
             _msdf_mat->EnableKeyword("_MSDF");
-            _default_block = new DrawerBlock(_bitmap_mat);
+            _default_block = AL_NEW_TAG(EMemoryTag::kUi, DrawerBlock, _bitmap_mat);
         }
         TextRenderer::~TextRenderer()
         {
-            delete _default_block; _default_block = nullptr;
+            AL_DELETE(_default_block);
         }
         void TextRenderer::DrawText(const String &text, Vector2f pos, f32 font_size, Vector2f scale, Color color, Font *font)
         {

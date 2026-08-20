@@ -139,6 +139,7 @@ float4 PSMain(PSInput input) : SV_TARGET
     
     // Tonemapping and gamma. Super ad-hoc, probably a better way to do this.
     lum *= 8.0;
+    lum *= _MainlightColor;
     //lum = pow(lum, 1.3.xxx);
     //lum /= (smoothstep(0.0, 0.2, clamp(sunDir.y, 0.0, 1.0))*2.0 + 0.15);
     //lum = jodieReinhardTonemap(lum);

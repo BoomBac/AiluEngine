@@ -31,6 +31,7 @@ namespace Ailu
         // 各具体 Asset 的创建逻辑，全部显式传入目标目录。
         bool CreateSceneAsset(const fs::path &directory, const String &name);
         bool CreateSpriteAsset(const fs::path &directory, const String &name);
+        bool CreateSpriteAtlasAsset(const fs::path &directory, const String &name);
         bool CreateMaterialAsset(const fs::path &directory, const String &name, Render::Shader *shader);
         bool CreateInputActionAsset(const fs::path &directory, const String &name);
         bool CreateAnimationClipAsset(const fs::path &directory, const String &name);

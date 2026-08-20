@@ -12,6 +12,37 @@ namespace Ailu
 
     namespace Editor
     {
+        enum class EGraphLinkRoute : u8
+        {
+            kPinBezier,
+            kStateTransition
+        };
+
+        enum class EGraphPinPresentation : u8
+        {
+            kFull,
+            kDotOnly,
+            kHoverOnly
+        };
+
+        struct GraphCanvasPresentation
+        {
+            EGraphLinkRoute _link_route = EGraphLinkRoute::kPinBezier;
+            EGraphPinPresentation _pin_presentation = EGraphPinPresentation::kFull;
+            bool _draw_direction_arrow = false;
+            bool _separate_bidirectional_links = false;
+            bool _node_as_link_target = false;
+            bool _allow_reroute = true;
+        };
+
+        struct GraphLinkGeometry
+        {
+            Vector2f _start = Vector2f::kZero;
+            Vector2f _control0 = Vector2f::kZero;
+            Vector2f _control1 = Vector2f::kZero;
+            Vector2f _end = Vector2f::kZero;
+        };
+
         struct GraphEditorStyle
         {
             Color _background_color = Color(0.035f, 0.038f, 0.045f, 1.0f);
@@ -49,6 +80,7 @@ namespace Ailu
             explicit GraphCanvas(GraphDocument *document);
 
             void SetDocument(GraphDocument *document);
+            void SetPresentation(const GraphCanvasPresentation &presentation);
             GraphDocument *Document() const { return _document; }
             void SetView(Vector2f view_offset, f32 zoom);
             Vector2f ViewOffset() const { return _view_offset; }
@@ -87,6 +119,7 @@ namespace Ailu
             void DrawComments(UI::UIRenderer &renderer);
             void DrawLinks(UI::UIRenderer &renderer);
             void DrawLink(UI::UIRenderer &renderer, const GraphLinkData &link);
+            void DrawArrow(UI::UIRenderer &renderer, const GraphLinkGeometry &geometry, Color color);
             void DrawPendingLink(UI::UIRenderer &renderer);
             void DrawNodes(UI::UIRenderer &renderer, const Vector<const GraphNodeData *> &visible_nodes);
             void DrawNode(UI::UIRenderer &renderer, const GraphNodeData &node);
@@ -142,7 +175,10 @@ namespace Ailu
             Vector4f GetNodeGraphRect(const GraphNodeData &node) const;
             Vector4f GetMarqueeGraphRect() const;
             Vector2f SnapGraphPosition(Vector2f position) const;
+            GraphLinkGeometry BuildLinkGeometry(const GraphLinkData &link) const;
             GraphConnectionResponse GetConnectionResponse(const Guid &target_pin_id) const;
+            const GraphPinData *FindCompatiblePinOnNode(const GraphNodeData &node) const;
+            bool ShouldDrawPin(const GraphNodeData &node, const GraphPinData &pin) const;
             bool IsPinCompatibleDragTarget(const Guid &pin_id) const;
             bool IsPinIncompatibleDragTarget(const Guid &pin_id) const;
 
@@ -158,6 +194,7 @@ namespace Ailu
 
         private:
             GraphDocument *_document = nullptr;
+            GraphCanvasPresentation _presentation;
             GraphEditorStyle _style;
             Vector2f _view_offset = Vector2f(40.0f, 40.0f);
             f32 _zoom = 1.0f;
