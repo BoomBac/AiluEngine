@@ -67,6 +67,8 @@ namespace Ailu::RHI::DX12
         void Release() final;
         Render::NativeHandle NativeResource() final { return {Render::RendererAPI::ERenderAPI::kDirectX12, _p_d3dres.Get()}; }
         void StateTranslation(RHICommandBuffer* rhi_cmd,EResourceState new_state,u32 sub_res) final;
+        void ApplyResourceBarrier(RHICommandBuffer *rhi_cmd, EResourceState before_state, EResourceState after_state,
+                                  u32 sub_res) final;
         void TrackResourceState(EResourceState new_state, u32 sub_res = kTotalSubRes) final;
         EResourceState CurrentResourceState(u32 sub_res = kTotalSubRes) const final;
         bool TryCurrentResourceState(EResourceState &out_state, u32 sub_res = kTotalSubRes) const final;
@@ -94,6 +96,8 @@ namespace Ailu::RHI::DX12
         D3DCubeMap(u16 width, bool mipmap_chain = true, ETextureFormat format = ETextureFormat::kRGBA32, bool linear = false, bool random_access = false);
         ~D3DCubeMap();
         Render::NativeHandle NativeResource() final { return {Render::RendererAPI::ERenderAPI::kDirectX12, _p_d3dres.Get()}; }
+        void ApplyResourceBarrier(RHICommandBuffer *rhi_cmd, EResourceState before_state, EResourceState after_state,
+                                  u32 sub_res) final;
         void TrackResourceState(EResourceState new_state, u32 sub_res = kTotalSubRes) final;
         EResourceState CurrentResourceState(u32 sub_res = kTotalSubRes) const final;
         bool TryCurrentResourceState(EResourceState &out_state, u32 sub_res = kTotalSubRes) const final;
@@ -123,6 +127,8 @@ namespace Ailu::RHI::DX12
         void Name(const String &new_name) final;
         void GenerateMipmap() final;
         void StateTranslation(RHICommandBuffer* rhi_cmd,EResourceState new_state,u32 sub_res) final;
+        void ApplyResourceBarrier(RHICommandBuffer *rhi_cmd, EResourceState before_state, EResourceState after_state,
+                                  u32 sub_res) final;
         void TrackResourceState(EResourceState new_state, u32 sub_res = kTotalSubRes) final;
         EResourceState CurrentResourceState(u32 sub_res = kTotalSubRes) const final;
         bool TryCurrentResourceState(EResourceState &out_state, u32 sub_res = kTotalSubRes) const final;
@@ -150,6 +156,8 @@ namespace Ailu::RHI::DX12
         ~D3DRenderTexture() final;
         Render::NativeHandle NativeResource() final { return {Render::RendererAPI::ERenderAPI::kDirectX12, _p_d3dres.Get()}; }
         void StateTranslation(RHICommandBuffer* rhi_cmd,EResourceState new_state,u32 sub_res) final;
+        void ApplyResourceBarrier(RHICommandBuffer *rhi_cmd, EResourceState before_state, EResourceState after_state,
+                                  u32 sub_res) final;
         void TrackResourceState(EResourceState new_state, u32 sub_res = kTotalSubRes) final;
         EResourceState CurrentResourceState(u32 sub_res = kTotalSubRes) const final;
         bool TryCurrentResourceState(EResourceState &out_state, u32 sub_res = kTotalSubRes) const final;
@@ -165,6 +173,8 @@ namespace Ailu::RHI::DX12
         TextureHandle ColorTexture(u16 view_index = kMainSRVIndex) final;
         TextureHandle DepthTexture(u16 view_index = kMainSRVIndex) final;
         void GenerateMipmap() final;
+        void GenerateMipmap(CommandBuffer *cmd) final;
+        void GenerateMipmap(CommandBuffer *cmd, u16 source_mip, u16 output_mip_count) final;
         void InsertUAVBarrier(RHICommandBuffer* rhi_cmd) final;
         void *ReadBack(u16 mipmap, u16 array_slice = 0, ECubemapFace face = ECubemapFace::kUnknown) final;
         void ReadBackAsync(std::function<void(void *)> callback, u16 mipmap, u16 array_slice = 0, ECubemapFace face = ECubemapFace::kUnknown) final;

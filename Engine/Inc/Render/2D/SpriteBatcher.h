@@ -26,6 +26,8 @@ namespace Ailu::Render
         void RenderWithMaterial(CommandBuffer *cmd, RenderTexture *color_target, RenderTexture *depth_target, Material *material);
         void RenderWithMaterial(CommandBuffer *cmd, Material *material);
 
+        GPUBuffer *InstanceBuffer() const { return _instance_buffer.get(); }
+
         void Clear();
         static Vector<SpriteBatch> BuildBatchesForTesting(const Vector<SpriteRenderData> &render_data);
 

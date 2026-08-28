@@ -7,6 +7,7 @@
 #include "Framework/Common/JobSystem.h"
 #include "Framework/Common/Log.h"
 #include "Framework/Common/Profiler.h"
+#include "Framework/Common/RenderDebugConfig.h"
 #include "RHI/DX12/D3DCommandBuffer.h"
 #include "RHI/DX12/D3DGPUTimer.h"
 #include "RHI/DX12/D3DSwapchain.h"
@@ -151,6 +152,10 @@ namespace Ailu::RHI::DX12
         cmd->AddKeepAliveObjects(std::move(group._keep_alive_objects));
         auto begin_time = std::chrono::high_resolution_clock::now();
         auto d3dcmd = static_cast<D3DCommandBuffer *>(cmd.get());
+        d3dcmd->BeginRecordingGroup(group._params._name, group._submission_index);
+        d3dcmd->BeginRenderGraphGroup(group._params._render_graph_resources);
+        for (auto *resource: group._params._render_graph_resources)
+            d3dcmd->MarkUsedResource(resource);
         for (RTHandle handle: group._params._released_temp_rts)
         {
             if (auto *rt = g_pRenderTexturePool->Get(handle); rt != nullptr)
@@ -904,6 +909,7 @@ namespace Ailu::RHI::DX12
     {
         SubmitParams params{cmd->Name()};
         params._released_temp_rts = cmd->TakeReleasedTempRTs();
+        params._render_graph_resources = cmd->TakeRenderGraphResources();
         params._rendering_states_data = cmd->TakeRenderingStatesData();
         auto keep_alive_objects = cmd->TakeKeepAliveObjects();
 #if AILU_ENABLE_FRAME_DEBUGGER
@@ -918,6 +924,12 @@ namespace Ailu::RHI::DX12
         auto keep_alive_objects = cmd->TakeKeepAliveObjects();
         auto rhi_cmd = RHICommandBufferPool::Get(cmd->Name());
         rhi_cmd->AddKeepAliveObjects(std::move(keep_alive_objects));
+        auto *d3d_cmd = static_cast<D3DCommandBuffer *>(rhi_cmd.get());
+        for (auto *resource: cmd->TakeRenderGraphResources())
+        {
+            d3d_cmd->RegisterRenderGraphResource(resource);
+            d3d_cmd->MarkUsedResource(resource);
+        }
         rhi_cmd->RecordingContext().AccumulateRenderingStatesData(cmd->TakeRenderingStatesData());
         for (auto *gfx_cmd: cmd->GetCommands()) { ProcessGpuCommand(gfx_cmd, rhi_cmd.get()); }
         ExecuteRHICommandBuffer(rhi_cmd.get());
@@ -934,14 +946,16 @@ namespace Ailu::RHI::DX12
 
     u64 D3DContext::ExecuteRHICommandBuffers(const Vector<RHICommandBuffer *> &cmds)
     {
+        const u64 state_submit_id = _resource_state_submit_id.fetch_add(1u, std::memory_order_relaxed) + 1u;
         Vector<ID3D12CommandList *> native_cmds;
         Vector<D3DCommandBuffer *> d3d_cmds;
         Vector<Ref<RHICommandBuffer>> reconcile_cmds;
         Vector<D3DCommandBuffer *> reconcile_d3d_cmds;
         native_cmds.reserve(cmds.size());
         d3d_cmds.reserve(cmds.size());
-        for (RHICommandBuffer *cmd: cmds)
+        for (u32 cmd_ordinal = 0u; cmd_ordinal < cmds.size(); ++cmd_ordinal)
         {
+            RHICommandBuffer *cmd = cmds[cmd_ordinal];
             if (cmd == nullptr || cmd->IsExecuted())
                 continue;
             auto d3dcmd = static_cast<D3DCommandBuffer *>(cmd);
@@ -960,6 +974,16 @@ namespace Ailu::RHI::DX12
                     {
                         ScheduledResourceState scheduled_state;
                         scheduled_state._global_state = snapshot._global_state;
+                        scheduled_state._is_render_graph_resource = snapshot._is_render_graph_resource;
+                        scheduled_state._last_command_buffer_ptr = d3dcmd;
+                        scheduled_state._last_command_buffer_name = d3dcmd->Name();
+                        scheduled_state._first_recording_group_name = snapshot._recording_group_name;
+                        scheduled_state._last_recording_group_name = snapshot._last_recording_group_name;
+                        scheduled_state._last_submission_frame = _frame_count;
+                        scheduled_state._last_state_submit_id = state_submit_id;
+                        scheduled_state._last_command_list_ordinal = cmd_ordinal;
+                        scheduled_state._first_group_submission_index = snapshot._first_group_submission_index;
+                        scheduled_state._last_group_submission_index = snapshot._last_group_submission_index;
                         scheduled_state._states = snapshot._initial_states;
                         _scheduled_resource_states.insert_or_assign(snapshot._resource_instance_id, std::move(scheduled_state));
                         state_it = _scheduled_resource_states.find(snapshot._resource_instance_id);
@@ -967,18 +991,132 @@ namespace Ailu::RHI::DX12
 
                     auto& scheduled_states = state_it->second._states;
                     AL_ASSERT(scheduled_states.size() == snapshot._initial_states.size());
-                    for (u32 sub_res = 0u; sub_res < scheduled_states.size(); ++sub_res)
+                    const bool states_match = scheduled_states == snapshot._initial_states;
+                    const bool is_render_graph_resource = snapshot._is_render_graph_resource;
+#if AILU_ENABLE_RESOURCE_STATE_TRACE
+                    const String resource_name = D3DResourceStateGuard::DebugObjectName(snapshot._resource);
+                    if (resource_name.find("_MainLightShadowMap") != String::npos ||
+                        resource_name.find("_AddLightShadowMaps") != String::npos ||
+                        resource_name.find("VolumetricFogAccumTexture") != String::npos)
                     {
-                        if (scheduled_states[sub_res] == snapshot._initial_states[sub_res]) continue;
-                        if (reconcile_cmd == nullptr)
+                        const u32 initial_state = snapshot._initial_states.empty() ? 0u :
+                            static_cast<u32>(snapshot._initial_states.front());
+                        const u32 final_state = snapshot._final_states.empty() ? 0u :
+                            static_cast<u32>(snapshot._final_states.front());
+                        LOG_WARNING("D3DContext resource state snapshot: frame={}, state_submit={}, cmd_ordinal={}/{}, "
+                                    "group_submission_range=[{}, {}], resource={}, ptr={}, instance={}, cmd_ptr={}, cmd={}, "
+                                    "resource_groups=[{}, {}], rg={}, previous_frame={}, previous_state_submit={}, "
+                                    "previous_cmd_ordinal={}, previous_group_submission_range=[{}, {}], previous_resource_groups=[{}, {}], "
+                                    "previous_rg={}, initial={}, final={}, scheduled={}, match={}, subresources={}",
+                                    _frame_count,
+                                    state_submit_id,
+                                    cmd_ordinal,
+                                    cmds.size(),
+                                    snapshot._first_group_submission_index,
+                                    snapshot._last_group_submission_index,
+                                    resource_name,
+                                    static_cast<const void *>(snapshot._resource),
+                                    snapshot._resource_instance_id,
+                                    static_cast<const void *>(d3dcmd),
+                                    d3dcmd->Name(),
+                                    snapshot._recording_group_name,
+                                    snapshot._last_recording_group_name,
+                                    is_render_graph_resource,
+                                    state_it->second._last_submission_frame,
+                                    state_it->second._last_state_submit_id,
+                                    state_it->second._last_command_list_ordinal,
+                                    state_it->second._first_group_submission_index,
+                                    state_it->second._last_group_submission_index,
+                                    state_it->second._first_recording_group_name,
+                                    state_it->second._last_recording_group_name,
+                                    state_it->second._is_render_graph_resource,
+                                    initial_state,
+                                    final_state,
+                                    scheduled_states.empty() ? 0u : static_cast<u32>(scheduled_states.front()),
+                                    states_match,
+                                    snapshot._initial_states.size());
+                    }
+#endif
+                    if (is_render_graph_resource)
+                    {
+                        // RenderGraph barriers are compiled and submitted in pass order.  A mismatch here means
+                        // the command buffer was recorded before an earlier ordered command buffer updated the
+                        // shared state.  The reconcile command below bridges that recording/submission boundary.
+#if AILU_ENABLE_RESOURCE_STATE_TRACE
+                        if (!states_match)
                         {
-                            reconcile_cmd = RHICommandBufferPool::Get("ResourceStateReconcile");
-                            reconcile_d3dcmd = static_cast<D3DCommandBuffer *>(reconcile_cmd.get());
+                            LOG_WARNING("D3DContext RG resource state mismatch, scheduling reconcile: frame={}, state_submit={}, "
+                                        "cmd_ordinal={}/{}, group_submission_range=[{}, {}], resource={}, ptr={}, instance={}, "
+                                        "cmd_ptr={}, cmd={}, resource_groups=[{}, {}], previous_frame={}, previous_state_submit={}, "
+                                        "previous_cmd_ordinal={}, previous_group_submission_range=[{}, {}], previous_cmd_ptr={}, "
+                                        "previous_cmd={}, previous_resource_groups=[{}, {}], global_state_ptr={}, subresources={}",
+                                        _frame_count,
+                                        state_submit_id,
+                                        cmd_ordinal,
+                                        cmds.size(),
+                                        snapshot._first_group_submission_index,
+                                        snapshot._last_group_submission_index,
+                                        resource_name,
+                                        static_cast<const void *>(snapshot._resource),
+                                        snapshot._resource_instance_id,
+                                        static_cast<const void *>(d3dcmd),
+                                        d3dcmd->Name(),
+                                        snapshot._recording_group_name,
+                                        snapshot._last_recording_group_name,
+                                        state_it->second._last_submission_frame,
+                                        state_it->second._last_state_submit_id,
+                                        state_it->second._last_command_list_ordinal,
+                                        state_it->second._first_group_submission_index,
+                                        state_it->second._last_group_submission_index,
+                                        state_it->second._last_command_buffer_ptr,
+                                        state_it->second._last_command_buffer_name,
+                                        state_it->second._first_recording_group_name,
+                                        state_it->second._last_recording_group_name,
+                                        static_cast<const void *>(snapshot._global_state),
+                                        snapshot._initial_states.size());
+                            u32 mismatch_count = 0u;
+                            for (u32 sub_res = 0u; sub_res < scheduled_states.size(); ++sub_res)
+                            {
+                                if (scheduled_states[sub_res] == snapshot._initial_states[sub_res]) continue;
+                                LOG_WARNING("D3DContext RG state mismatch detail: resource={}, sub_res={}, "
+                                            "scheduled={}, initial={}, final={}",
+                                            resource_name,
+                                            sub_res,
+                                            static_cast<u32>(scheduled_states[sub_res]),
+                                            static_cast<u32>(snapshot._initial_states[sub_res]),
+                                            static_cast<u32>(snapshot._final_states[sub_res]));
+                                ++mismatch_count;
+                            }
+                            LOG_WARNING("D3DContext RG resource state mismatch count: resource={}, count={}",
+                                        resource_name, mismatch_count);
                         }
-                        reconcile_d3dcmd->RecordResourceBarrier(snapshot._resource, scheduled_states[sub_res],
-                                                                snapshot._initial_states[sub_res], sub_res);
+#endif
+                    }
+                    if (!states_match)
+                    {
+                        for (u32 sub_res = 0u; sub_res < scheduled_states.size(); ++sub_res)
+                        {
+                            if (scheduled_states[sub_res] == snapshot._initial_states[sub_res]) continue;
+                            if (reconcile_cmd == nullptr)
+                            {
+                                reconcile_cmd = RHICommandBufferPool::Get("ResourceStateReconcile");
+                                reconcile_d3dcmd = static_cast<D3DCommandBuffer *>(reconcile_cmd.get());
+                            }
+                            reconcile_d3dcmd->RecordResourceBarrier(snapshot._resource, scheduled_states[sub_res],
+                                                                    snapshot._initial_states[sub_res], sub_res);
+                        }
                     }
                     scheduled_states = snapshot._final_states;
+                    state_it->second._is_render_graph_resource = is_render_graph_resource;
+                    state_it->second._last_command_buffer_ptr = d3dcmd;
+                    state_it->second._last_command_buffer_name = d3dcmd->Name();
+                    state_it->second._first_recording_group_name = snapshot._recording_group_name;
+                    state_it->second._last_recording_group_name = snapshot._last_recording_group_name;
+                    state_it->second._last_submission_frame = _frame_count;
+                    state_it->second._last_state_submit_id = state_submit_id;
+                    state_it->second._last_command_list_ordinal = cmd_ordinal;
+                    state_it->second._first_group_submission_index = snapshot._first_group_submission_index;
+                    state_it->second._last_group_submission_index = snapshot._last_group_submission_index;
                     if (snapshot._global_state != nullptr)
                         snapshot._global_state->SetStateFromSnapshot(snapshot._final_states);
                 }
@@ -1000,22 +1138,25 @@ namespace Ailu::RHI::DX12
         }
         if (native_cmds.empty())
             return _fence_value;
-        if (g_engine_config._enable_pix) 
-            PIXBeginEvent(m_commandQueue.Get(), 0u, L"RHICommandBufferBatch");
         u64 submitted_fence = 0u;
         auto submit_begin_time = std::chrono::high_resolution_clock::now();
         {
-            PROFILE_BLOCK_CPU("ExecuteCommandLists")
-            m_commandQueue->ExecuteCommandLists(static_cast<UINT>(native_cmds.size()), native_cmds.data());
+            std::lock_guard submit_lock(_command_submit_mtx);
+            if (g_engine_config._enable_pix)
+                PIXBeginEvent(m_commandQueue.Get(), 0u, L"RHICommandBufferBatch");
             {
-                std::lock_guard lock(_cmd_fence_mtx);
-                submitted_fence = ++_fence_value;
-                ThrowIfFailed(m_commandQueue->Signal(_p_cmd_buffer_fence.Get(), submitted_fence));
+                PROFILE_BLOCK_CPU("ExecuteCommandLists")
+                m_commandQueue->ExecuteCommandLists(static_cast<UINT>(native_cmds.size()), native_cmds.data());
+                {
+                    std::lock_guard lock(_cmd_fence_mtx);
+                    submitted_fence = ++_fence_value;
+                    ThrowIfFailed(m_commandQueue->Signal(_p_cmd_buffer_fence.Get(), submitted_fence));
+                }
             }
+            if (g_engine_config._enable_pix)
+                PIXEndEvent(m_commandQueue.Get());
         }
         auto submit_end_time = std::chrono::high_resolution_clock::now();
-        if (g_engine_config._enable_pix) 
-            PIXEndEvent(m_commandQueue.Get());
         auto &stats = d3d_cmds.front()->RecordingContext().RenderingStatesData();
         stats.CommandListCount += static_cast<u32>(native_cmds.size());
         ++stats.CommandSubmitCount;
@@ -1328,6 +1469,7 @@ namespace Ailu::RHI::DX12
 
     void D3DContext::WaitForGpu()
     {
+        std::lock_guard submit_lock(_command_submit_mtx);
         std::lock_guard lock(_cmd_fence_mtx);
         ++_fence_value;
         ThrowIfFailed(m_commandQueue->Signal(_p_cmd_buffer_fence.Get(), _fence_value));
@@ -1371,7 +1513,10 @@ namespace Ailu::RHI::DX12
             ExecuteRHICommandBuffer(cmd);
             for (auto &ctx: _render_windows)
             {
-                ctx->_swapchain->Present();
+                {
+                    PROFILE_BLOCK_CPU("Present")
+                    ctx->_swapchain->Present();
+                }
                 {
                     s_timer.MarkLocal();
                     //WaitForGpu();
@@ -1898,7 +2043,8 @@ namespace Ailu::RHI::DX12
                 capture_writer->RecordBarrierEvent(barrier_cap);
             }
 #endif
-            barrier_cmd->_res->StateTranslation(cmd_buffer, barrier_cmd->_after, barrier_cmd->_sub_res);
+            barrier_cmd->_res->ApplyResourceBarrier(cmd_buffer, barrier_cmd->_before, barrier_cmd->_after,
+                                                     barrier_cmd->_sub_res);
         }
         else if (cmd->GetCmdType() == EGpuCommandType::kUAVBarrier)
         {

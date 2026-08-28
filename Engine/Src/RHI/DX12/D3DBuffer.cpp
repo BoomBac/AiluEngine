@@ -161,8 +161,9 @@ namespace Ailu::RHI::DX12
         else
         {
             auto heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-            D3D12_RESOURCE_STATES init_state = D3DConvertUtils::FromALResState(_desc._init_state);
-            init_state = _desc._target & EGPUBufferTarget::kIndirectArguments ? D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT : init_state;
+            // D3D12 buffers are created in COMMON.  Keep this physical state equal to the RenderGraph
+            // lease boundary; all upload and usage transitions are emitted explicitly by the command stream.
+            D3D12_RESOURCE_STATES init_state = D3D12_RESOURCE_STATE_COMMON;
             ThrowIfFailed(d3d_conetxt->GetDevice()->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &res_desc, init_state, nullptr, IID_PPV_ARGS(_p_d3d_res.GetAddressOf())));
             NameAndLogResource(_p_d3d_res.Get(), DebugResourceName("buffer", _name));
             _state_guard = std::move(D3DResourceStateGuard(_p_d3d_res.Get(), init_state, 1u));
@@ -278,6 +279,17 @@ namespace Ailu::RHI::DX12
         auto d3dcmd = dynamic_cast<D3DCommandBuffer *>(rhi_cmd);
         d3dcmd->EnsureResourceState(_state_guard, D3DConvertUtils::FromALResState(new_state), sub_res);
         GpuResource::TrackResourceState(new_state, sub_res);
+    }
+
+    void D3DGPUBuffer::ApplyResourceBarrier(RHICommandBuffer *rhi_cmd, EResourceState before_state,
+                                             EResourceState after_state, u32 sub_res)
+    {
+        auto d3dcmd = static_cast<D3DCommandBuffer *>(rhi_cmd);
+        const auto before = D3DConvertUtils::FromALResState(before_state);
+        const auto after = D3DConvertUtils::FromALResState(after_state);
+        d3dcmd->ApplyResourceBarrier(_state_guard, before, after, sub_res);
+        if (_counter_buffer != nullptr)
+            d3dcmd->ApplyResourceBarrier(_counter_state_guard, before, after, sub_res);
     }
 
     void D3DGPUBuffer::TrackResourceState(EResourceState new_state, u32 sub_res)
@@ -479,10 +491,19 @@ namespace Ailu::RHI::DX12
                 // Create a Default Heap for the vertex buffer
                 _vertex_buffers[stream_index].Reset();
                 heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-                ThrowIfFailed(d3d_dev->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &res_desc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(_vertex_buffers[stream_index].GetAddressOf())));
+                ThrowIfFailed(d3d_dev->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &res_desc,
+                                                                D3D12_RESOURCE_STATE_COMMON, nullptr,
+                                                                IID_PPV_ARGS(_vertex_buffers[stream_index].GetAddressOf())));
                 NameAndLogResource(_vertex_buffers[stream_index].Get(), std::format("vb_{}_{}", _name.empty() ? "unnamed" : _name, stream_index));
                 auto d3dcmd = dynamic_cast<D3DCommandBuffer *>(rhi_cmd);
                 auto cmdlist = d3dcmd->NativeCmdList();
+                auto copy_dest_barrier = CD3DX12_RESOURCE_BARRIER::Transition(_vertex_buffers[stream_index].Get(),
+                                                                                D3D12_RESOURCE_STATE_COMMON,
+                                                                                D3D12_RESOURCE_STATE_COPY_DEST);
+                cmdlist->ResourceBarrier(1, &copy_dest_barrier);
+                D3DResourceStateGuard::LogBarrier(_vertex_buffers[stream_index].Get(),
+                                                  D3D12_RESOURCE_STATE_COMMON,
+                                                  D3D12_RESOURCE_STATE_COPY_DEST, 0);
                 cmdlist->CopyBufferRegion(_vertex_buffers[stream_index].Get(), 0, upload_heap.Get(), 0, _stream_data[i]._size);
                 D3DResourceStateGuard::LogBarrier(_vertex_buffers[stream_index].Get(),
                                                   D3D12_RESOURCE_STATE_COPY_DEST,

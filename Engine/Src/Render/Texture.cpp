@@ -1109,7 +1109,7 @@ namespace Ailu::Render
         u32 released_rt_num = 0;
         for (auto it = _pool.begin(); it != _pool.end();)
         {
-            if (!it->second._is_available)
+            if (!it->second._is_available || it->second._rt == nullptr || it->second._rt->IsReferenceByGpu())
             {
                 ++it;
                 continue;

@@ -664,7 +664,7 @@ namespace Ailu
             //rj默认会使用int存储，超过范围才会使用uint
             if (std::holds_alternative<i64>(node->value))
                 value = (u64) std::get<i64>(node->value);
-            else if (std::holds_alternative<i64>(node->value))
+            else if (std::holds_alternative<u64>(node->value))
                 value = std::get<u64>(node->value);
             else
                 AL_ASSERT_MSG(false, "not int type");

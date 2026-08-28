@@ -58,7 +58,7 @@ namespace Ailu::Render
             Vector4f grid_num = Vector4f((f32) _data._grid_num.x, (f32) _data._grid_num.y, (f32) _data._grid_num.z, 1.f);
             _voxelize_cs->SetVector("_grid_num", grid_num);
             //write to texture3d
-            _voxelize_cs->SetTexture("_VoxelTex", _voxel_tex.get());
+            _voxelize_cs->SetTexture(_fill_texture3d_kernel, "_VoxelTex", _voxel_tex.get());
             _voxelize_cs->SetBuffer("_VoxelBuffer", _voxel_buf.get());
             u16 x, y, z;
             _voxelize_cs->GetThreadNum(_fill_texture3d_kernel, x, y, z);

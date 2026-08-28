@@ -313,7 +313,7 @@ namespace Ailu
         void Load(const Path &sys_path) final;
         String SaveToString();
         bool LoadFromString(const String &json_text);
-        bool HasField(const String &name);
+        bool HasField(const String &name) override;
         bool IsCurrentNodeObject();
         Vector<String> GetCurrentObjectKeys();
     private:

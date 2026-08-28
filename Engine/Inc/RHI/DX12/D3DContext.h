@@ -58,6 +58,7 @@ namespace Ailu::RHI::DX12
         String _name;
         bool _is_end_frame = false;
         Vector<Render::RTHandle> _released_temp_rts;
+        Vector<Render::GpuResource *> _render_graph_resources;
         Render::CommandRenderingStatesData _rendering_states_data;
 #if AILU_ENABLE_FRAME_DEBUGGER
         Render::FrameDebugger::CapturePassMetadata _capture_pass_metadata;
@@ -249,6 +250,7 @@ namespace Ailu::RHI::DX12
         //std::atomic<u64> _fence_value[Render::RenderConstants::kFrameCount];
         ComPtr<ID3D12Fence> _p_cmd_buffer_fence;
         HANDLE _p_cmd_buffer_fence_event = nullptr;
+        std::mutex _command_submit_mtx;
         mutable std::mutex _cmd_fence_mtx;
         std::multimap<u64, ComPtr<ID3D12Resource>> _global_tracked_resource;
         std::mutex _resource_task_lock;
@@ -260,9 +262,20 @@ namespace Ailu::RHI::DX12
         struct ScheduledResourceState
         {
             D3DResourceStateGuard *_global_state = nullptr;
+            bool _is_render_graph_resource = false;
+            const void *_last_command_buffer_ptr = nullptr;
+            String _last_command_buffer_name;
+            String _first_recording_group_name;
+            String _last_recording_group_name;
+            u64 _last_submission_frame = 0u;
+            u64 _last_state_submit_id = 0u;
+            u32 _last_command_list_ordinal = 0u;
+            u32 _first_group_submission_index = 0u;
+            u32 _last_group_submission_index = 0u;
             Vector<D3D12_RESOURCE_STATES> _states;
         };
         HashMap<u64, ScheduledResourceState> _scheduled_resource_states;
+        std::atomic<u64> _resource_state_submit_id = 0u;
         //command signature
         ComPtr<ID3D12CommandSignature> _dispatch_cmd_sig;
         ComPtr<ID3D12CommandSignature> _draw_cmd_sig;

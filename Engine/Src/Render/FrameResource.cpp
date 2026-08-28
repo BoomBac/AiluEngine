@@ -140,6 +140,13 @@ namespace Ailu::Render
             gfx.WaitForFence(slot_fence);
         }
 
+        for (const auto &handle: _pending_texture_frees)
+            _texture_pool.Release(handle);
+        _pending_texture_frees.clear();
+        for (const auto &handle: _pending_buffer_frees)
+            _buffer_pool.Release(handle);
+        _pending_buffer_frees.clear();
+
         const u64 cur_frame = gfx.GetFrameCount();
         _active_allocator = _frame_allocators[_active_slot].get();
         _active_allocator->NewFrame(cur_frame);
@@ -178,8 +185,11 @@ namespace Ailu::Render
                 {
                     if (cur_frame - handle._last_access_frame_count > kMaxResourceStaleFrame)
                     {
-                        handle._is_available = true;
-                        ++released_count;
+                        if (handle._res != nullptr && !handle._res->IsReferenceByGpu())
+                        {
+                            handle._is_available = true;
+                            ++released_count;
+                        }
                     }
                 }
             }
@@ -190,8 +200,11 @@ namespace Ailu::Render
                 {
                     if (cur_frame - handle._last_access_frame_count > kMaxResourceStaleFrame)
                     {
-                        handle._is_available = true;
-                        ++released_count;
+                        if (handle._res != nullptr && !handle._res->IsReferenceByGpu())
+                        {
+                            handle._is_available = true;
+                            ++released_count;
+                        }
                     }
                 }
             }
@@ -255,11 +268,13 @@ namespace Ailu::Render
     }
     void FrameResourceManager::FreeTexture(TextureHandle handle)
     {
-        _texture_pool.Release(handle);
+        if (handle._res != nullptr)
+            _pending_texture_frees.emplace_back(handle);
     }
     void FrameResourceManager::FreeBuffer(BufferHandle handle)
     {
-        _buffer_pool.Release(handle);
+        if (handle._res != nullptr)
+            _pending_buffer_frees.emplace_back(handle);
     }
     void FrameResourceManager::CleanupStaleResources()
     {

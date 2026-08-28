@@ -104,19 +104,47 @@ namespace Ailu
             void InsertUAVBarrier(ID3D12Resource* resource);
             void EnsureResourceState(D3DResourceStateGuard& state_guard, D3D12_RESOURCE_STATES target_state,
                                      u32 sub_res = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
+            void ApplyResourceBarrier(D3DResourceStateGuard &state_guard, D3D12_RESOURCE_STATES before_state,
+                                      D3D12_RESOURCE_STATES after_state,
+                                      u32 sub_res = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
+            void RegisterRenderGraphResource(Render::GpuResource *resource);
+            void BeginRenderGraphGroup(const Vector<Render::GpuResource *> &resources);
+            bool IsRenderGraphResource(ID3D12Resource *resource) const;
             void RecordResourceBarrier(ID3D12Resource* resource, D3D12_RESOURCE_STATES before_state,
-                                       D3D12_RESOURCE_STATES after_state, u32 sub_res);
+                                        D3D12_RESOURCE_STATES after_state, u32 sub_res);
             struct ResourceStateSnapshot
             {
                 u64 _resource_instance_id = 0u;
                 ID3D12Resource* _resource = nullptr;
                 D3DResourceStateGuard* _global_state = nullptr;
+                String _recording_group_name;
+                String _last_recording_group_name;
+                bool _is_render_graph_resource = false;
+                u32 _first_group_submission_index = 0u;
+                u32 _last_group_submission_index = 0u;
                 Vector<D3D12_RESOURCE_STATES> _initial_states;
                 Vector<D3D12_RESOURCE_STATES> _final_states;
             };
             void GetResourceStateSnapshots(Vector<ResourceStateSnapshot>& out_snapshots) const;
             void CommitResourceStates();
             ID3D12GraphicsCommandList4 *NativeCmdList() { return _p_cmd.Get(); };
+            void BeginRecordingGroup(const String& name, u32 submission_index)
+            {
+                if (!_has_recorded_group)
+                {
+                    _first_recording_group_name = name;
+                    _first_group_submission_index = submission_index;
+                    _has_recorded_group = true;
+                }
+                _recording_group_name = name;
+                _last_group_submission_index = submission_index;
+            }
+            const String &RecordingGroupName() const
+            {
+                return _recording_group_name.empty() ? Name() : _recording_group_name;
+            }
+            u32 FirstGroupSubmissionIndex() const { return _first_group_submission_index; }
+            u32 LastGroupSubmissionIndex() const { return _last_group_submission_index; }
             void AllocConstBuffer(const String &name, u32 size, u8 *data);
             UploadBuffer::Allocation AllocConstBuffer(const u8* data, u32 size);
             void Clear() final;
@@ -214,8 +242,12 @@ namespace Ailu
             {
                 ID3D12Resource* _resource = nullptr;
                 D3DResourceStateGuard* _global_state = nullptr;
+                String _recording_group_name;
+                String _last_recording_group_name;
+                bool _is_render_graph_resource = false;
                 Vector<D3D12_RESOURCE_STATES> _initial_states;
                 Vector<D3D12_RESOURCE_STATES> _states;
+                Vector<u8> _initialized_subresources;
             };
 
             D3D12_COMMAND_LIST_TYPE _dx_cmd_type;
@@ -232,6 +264,13 @@ namespace Ailu
             Array<D3D12_VIEWPORT, Render::RenderConstants::kMaxMRTNum> _viewports;
             Array<D3D12_RECT, Render::RenderConstants::kMaxMRTNum> _scissors;
             Vector<GpuResource *> _used_resources;
+            String _first_recording_group_name;
+            String _recording_group_name;
+            u32 _first_group_submission_index = 0u;
+            u32 _last_group_submission_index = 0u;
+            bool _has_recorded_group = false;
+            std::unordered_set<ID3D12Resource *> _render_graph_resources;
+            std::unordered_set<ID3D12Resource *> _active_render_graph_resources;
             std::unordered_set<GpuResource *> _used_resource_set;
             bool _is_cmd_closed;
             bool _is_submitted;

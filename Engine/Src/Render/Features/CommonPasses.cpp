@@ -1,4 +1,4 @@
-﻿#include "Render/Features/CommonPasses.h"
+#include "Render/Features/CommonPasses.h"
 #include "Framework/Common/Profiler.h"
 #include "Framework/Common/Allocator.hpp"
 #include "Framework/Common/ResourceMgr.h"
@@ -214,6 +214,9 @@ namespace Ailu::Render
                           rendering_data._rg_handles._point_light_shadow_maps = builder.Write(rendering_data._rg_handles._point_light_shadow_maps,EResourceUsage::kDSV);
                       },
         [this](RDG::RenderGraph& graph, CommandBuffer *cmd, const RenderingData &rendering_data){
+            auto *main_light_shadow_map = graph.Resolve<RenderTexture>(rendering_data._rg_handles._main_light_shadow_map);
+            auto *add_light_shadow_maps = graph.Resolve<RenderTexture>(rendering_data._rg_handles._addi_shadow_maps);
+            auto *point_light_shadow_maps = graph.Resolve<RenderTexture>(rendering_data._rg_handles._point_light_shadow_maps);
             u32 obj_index = 0u;
             CBufferPerCameraData camera_data;
             //方向光阴影，只有一个
@@ -221,8 +224,8 @@ namespace Ailu::Render
             {
                 for (int i = 0; i < QuailtySetting::s_cascade_shadow_map_count; i++)
                 {
-                    u16 dsv_rt_index = _p_mainlight_shadow_map->CalculateViewIndex(Texture::ETextureViewType::kDSV, 0, i);
-                    cmd->SetRenderTarget(nullptr, _p_mainlight_shadow_map.get(), 0, dsv_rt_index);
+                    u16 dsv_rt_index = main_light_shadow_map->CalculateViewIndex(Texture::ETextureViewType::kDSV, 0, i);
+                    cmd->SetRenderTarget(nullptr, main_light_shadow_map, 0, dsv_rt_index);
                     cmd->ClearRenderTarget(kZFar, 0u);
                     camera_data._MatrixVP = rendering_data._cascade_shadow_data[i]._shadow_matrix;
                     cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &camera_data, RenderConstants::kPerCameraDataSize);
@@ -250,8 +253,8 @@ namespace Ailu::Render
                     auto &shadow_data = rendering_data._spot_shadow_data[i];
                     if (shadow_data._shadowmap_index < 0)
                         continue;
-                    u16 dsv_rt_index = _p_addlight_shadow_maps->CalculateViewIndex(Texture::ETextureViewType::kDSV, 0, shadow_data._shadowmap_index);
-                    cmd->SetRenderTarget(nullptr, _p_addlight_shadow_maps.get(), 0, dsv_rt_index);
+                    u16 dsv_rt_index = add_light_shadow_maps->CalculateViewIndex(Texture::ETextureViewType::kDSV, 0, shadow_data._shadowmap_index);
+                    cmd->SetRenderTarget(nullptr, add_light_shadow_maps, 0, dsv_rt_index);
                     cmd->ClearRenderTarget(kZFar, 0u);
                     camera_data._MatrixVP = rendering_data._spot_shadow_data[i]._shadow_matrix;
                     cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &camera_data, RenderConstants::kPerCameraDataSize);
@@ -276,8 +279,8 @@ namespace Ailu::Render
                     auto &shadow_data = rendering_data._area_shadow_data[i];
                     if (shadow_data._shadowmap_index < 0)
                         continue;
-                    u16 dsv_rt_index = _p_addlight_shadow_maps->CalculateViewIndex(Texture::ETextureViewType::kDSV, 0, shadow_data._shadowmap_index);
-                    cmd->SetRenderTarget(nullptr, _p_addlight_shadow_maps.get(), 0, dsv_rt_index);
+                    u16 dsv_rt_index = add_light_shadow_maps->CalculateViewIndex(Texture::ETextureViewType::kDSV, 0, shadow_data._shadowmap_index);
+                    cmd->SetRenderTarget(nullptr, add_light_shadow_maps, 0, dsv_rt_index);
                     cmd->ClearRenderTarget(kZFar, 0u);
                     camera_data._MatrixVP = rendering_data._area_shadow_data[i]._shadow_matrix;
                     cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &camera_data, RenderConstants::kPerCameraDataSize);
@@ -311,8 +314,9 @@ namespace Ailu::Render
                     {
                         //j + i * 6 定位到cubearray
                         u16 per_cube_slice_index = j + shadow_data._shadowmap_index * 6;
-                        u16 dsv_rt_index = _p_point_light_shadow_maps->CalculateViewIndex(Texture::ETextureViewType::kDSV, (ECubemapFace)(j + 1), 0, shadow_data._shadowmap_index);
-                        cmd->SetRenderTarget(nullptr, _p_point_light_shadow_maps.get(), 0, dsv_rt_index);
+                    u16 dsv_rt_index = point_light_shadow_maps->CalculateViewIndex(
+                        Texture::ETextureViewType::kDSV, static_cast<ECubemapFace>(j + 1), 0, shadow_data._shadowmap_index);
+                    cmd->SetRenderTarget(nullptr, point_light_shadow_maps, 0, dsv_rt_index);
                         cmd->ClearRenderTarget(kZFar, 0u);
                         Vector4f light_pos = rendering_data._point_shadow_data[shadow_data._shadowmap_index]._light_world_pos;
                         camera_data._CameraPos.xyz = light_pos.xyz;
@@ -339,12 +343,6 @@ namespace Ailu::Render
                     }
                 }
             }
-            Shader::SetGlobalTexture(RenderResourceName::kMainLightShadowMap, _p_mainlight_shadow_map.get());
-            Shader::SetGlobalTexture(RenderResourceName::kAddLightShadowMap, _p_addlight_shadow_maps.get());
-            Shader::SetGlobalTexture(RenderResourceName::kPointLightShadowMap, _p_point_light_shadow_maps.get());
-            ComputeShader::SetGlobalTexture(RenderResourceName::kMainLightShadowMap, _p_mainlight_shadow_map.get());
-            ComputeShader::SetGlobalTexture(RenderResourceName::kAddLightShadowMap, _p_addlight_shadow_maps.get());
-            ComputeShader::SetGlobalTexture(RenderResourceName::kPointLightShadowMap, _p_point_light_shadow_maps.get());
         });
     }
 
@@ -571,16 +569,15 @@ namespace Ailu::Render
     void Ailu::Render::CubeMapGenPass::OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data)
     {
         Texture *src_tex = _input_src ? _input_src : _src_cubemap.get();
+        const bool source_uses_graph_handle = !_is_src_cubemap ||
+                                              (_input_src != nullptr && _input_src->MipmapLevel() > 1u);
         if(!_is_src_cubemap)
         {
             graph.AddPass("GenCubeMap",RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder) { 
-                _src_texture_handle = builder.Import(src_tex);
-                builder.Read(_src_texture_handle);
                 _src_map_handle = builder.Import(_src_cubemap.get());
-                _src_map_handle = builder.Write(_src_map_handle);
-            }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data) {
+                _src_map_handle = builder.WriteRange(_src_map_handle, EResourceUsage::kWriteRTV, 0, 1, 0, 6);
+            }, [this, src_tex](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data) {
                         //image tp cubemap
-                auto *src_tex = graph.Resolve<Texture>(_src_texture_handle);
                 auto *dst_cubemap = graph.Resolve<RenderTexture>(_src_map_handle);
                 if (src_tex == nullptr || dst_cubemap == nullptr)
                     return;
@@ -592,31 +589,71 @@ namespace Ailu::Render
                     cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, _per_camera_cb[i].get());
                     cmd->DrawMesh(Mesh::s_cube.lock().get(), _p_gen_material, _per_obj_cb.get(), 0, 0, 1);
                 }
-                dst_cubemap->GenerateMipmap();
             });
         }
-        else
+        if (!_is_src_cubemap && _src_cubemap->MipmapLevel() > 1u)
         {
-            graph.AddPass("GenMipmap", RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
+            const u16 mipmap_count = _src_cubemap->MipmapLevel();
+            graph.AddPass("GenCubeMapMipmap0", RDG::PassDesc(RDG::EPassType::kCompute), [&, this, mipmap_count](RDG::RenderGraphBuilder &builder)
+            {
+                builder.ReadRange(_src_map_handle, EResourceUsage::kReadSRV, 0, 1, 0, 6);
+                _src_map_handle = builder.WriteRange(_src_map_handle, EResourceUsage::kWriteUAV, 1, std::min<u16>(4u, mipmap_count - 1u), 0, 6);
+            }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
+            {
+                if (auto *src_map = graph.Resolve<RenderTexture>(_src_map_handle); src_map != nullptr)
+                    src_map->GenerateMipmap(cmd, 0u, 4u);
+            });
+            if (mipmap_count > 5u)
+            {
+                graph.AddPass("GenCubeMapMipmap1", RDG::PassDesc(RDG::EPassType::kCompute), [&, this, mipmap_count](RDG::RenderGraphBuilder &builder)
+                {
+                    builder.ReadRange(_src_map_handle, EResourceUsage::kReadSRV, 4, 1, 0, 6);
+                    _src_map_handle = builder.WriteRange(_src_map_handle, EResourceUsage::kWriteUAV, 5,
+                                                         std::min<u16>(4u, mipmap_count - 5u), 0, 6);
+                }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
+                {
+                    if (auto *src_map = graph.Resolve<RenderTexture>(_src_map_handle); src_map != nullptr)
+                        src_map->GenerateMipmap(cmd, 4u, 4u);
+                });
+            }
+        }
+        else if (_is_src_cubemap && _input_src->MipmapLevel() > 1u)
+        {
+            const u16 mipmap_count = _input_src->MipmapLevel();
+            graph.AddPass("GenMipmap0", RDG::PassDesc(RDG::EPassType::kCompute), [&](RDG::RenderGraphBuilder &builder)
                           { 
                 _src_map_handle = builder.Import(_input_src);
-                builder.Read(_src_map_handle);
-                _src_map_handle = builder.Write(_src_map_handle); 
+                builder.ReadRange(_src_map_handle, EResourceUsage::kReadSRV, 0, 1, 0, 6);
+                _src_map_handle = builder.WriteRange(_src_map_handle, EResourceUsage::kWriteUAV, 1, std::min<u16>(4u, mipmap_count - 1u), 0, 6);
                           }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
                           { 
                               if (auto *src_map = graph.Resolve<RenderTexture>(_src_map_handle); src_map != nullptr)
-                                  src_map->GenerateMipmap(); });
+                                  src_map->GenerateMipmap(cmd, 0u, 4u); });
+            if (mipmap_count > 5u)
+            {
+                graph.AddPass("GenMipmap1", RDG::PassDesc(RDG::EPassType::kCompute), [&, this, mipmap_count](RDG::RenderGraphBuilder &builder)
+                              {
+                    builder.ReadRange(_src_map_handle, EResourceUsage::kReadSRV, 4, 1, 0, 6);
+                    _src_map_handle = builder.WriteRange(_src_map_handle, EResourceUsage::kWriteUAV, 5,
+                                                         std::min<u16>(4u, mipmap_count - 5u), 0, 6);
+                              }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
+                              {
+                                  if (auto *src_map = graph.Resolve<RenderTexture>(_src_map_handle); src_map != nullptr)
+                                      src_map->GenerateMipmap(cmd, 4u, 4u);
+                              });
+            }
         }
         //gen radiance map
         graph.AddPass("RadianceGen", RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
                 { 
-        _src_texture_handle = builder.Import(src_tex);
-        builder.Read(_src_texture_handle);
+        if (source_uses_graph_handle)
+            builder.Read(_src_map_handle);
         _radiance_handle = builder.Import(_radiance_map.get());
         _radiance_handle = builder.Write(_radiance_handle); },
-        [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
+        [this, source_uses_graph_handle](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
         {
-        auto *src_tex = graph.Resolve<Texture>(_src_texture_handle);
+        Texture *src_tex = source_uses_graph_handle ? graph.Resolve<Texture>(_src_map_handle)
+                                                    : (_input_src ? _input_src : _src_cubemap.get());
         auto *radiance_map = graph.Resolve<RenderTexture>(_radiance_handle);
         if (src_tex == nullptr || radiance_map == nullptr)
             return;
@@ -633,12 +670,15 @@ namespace Ailu::Render
         //filter envmap
         graph.AddPass("EnvmapGen", RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
                       { 
-        _src_texture_handle = builder.Import(src_tex);
-        builder.Read(_src_texture_handle);
+        if (source_uses_graph_handle)
+            builder.Read(_src_map_handle);
         _env_handle = builder.Import(_prefilter_cubemap.get());
-        _env_handle = builder.Write(_env_handle); }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
+        _env_handle = builder.Write(_env_handle); }, [this, source_uses_graph_handle](RDG::RenderGraph &graph,
+                                                                                        CommandBuffer *cmd,
+                                                                                        const RenderingData &data)
                       {
-        auto *src_tex = graph.Resolve<Texture>(_src_texture_handle);
+        Texture *src_tex = source_uses_graph_handle ? graph.Resolve<Texture>(_src_map_handle)
+                                                    : (_input_src ? _input_src : _src_cubemap.get());
         auto *prefilter_map = graph.Resolve<RenderTexture>(_env_handle);
         if (src_tex == nullptr || prefilter_map == nullptr)
             return;
@@ -817,11 +857,30 @@ namespace Ailu::Render
     {
         _p_lighting_material = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/deferred_lighting.alasset"), "DeferedGbufferLighting");
         _brdf_lut = ResourceMgr::Get().Load<Texture2D>(L"Textures/ibl_brdf_lut.alasset");
+        TextureDesc shadow_desc(1u, 1u, ERenderTargetFormat::kShadowMap);
+        shadow_desc._array_size = 1u;
+        shadow_desc._dimension = ETextureDimension::kTex2DArray;
+        _dummy_main_light_shadow_map = RenderTexture::Create(shadow_desc, "_DummyMainLightShadowMap");
+        _dummy_add_light_shadow_maps = RenderTexture::Create(shadow_desc, "_DummyAddLightShadowMaps");
+        shadow_desc._dimension = ETextureDimension::kCubeArray;
+        _dummy_point_light_shadow_map = RenderTexture::Create(shadow_desc, "_DummyPointLightShadowMap");
+
+        TextureDesc volumetric_desc;
+        volumetric_desc._width = 1u;
+        volumetric_desc._height = 1u;
+        volumetric_desc._depth = 1u;
+        volumetric_desc._format = EALGFormat::kALGFormatR16G16B16A16_FLOAT;
+        volumetric_desc._mip_num = 1u;
+        _dummy_volumetric_light = Texture3D::Create(volumetric_desc);
+        _dummy_volumetric_light->Name("_DummyVolumetricLight");
+        _dummy_volumetric_light->SetPixel(0u, 0u, 0u, Colors::kBlack, 0u);
+        _dummy_volumetric_light->Apply();
         _event = static_cast<ERenderPassEvent>(static_cast<u16>(ERenderPassEvent::kBeforeDeferedLighting) + 25u);
     }
 
     void Ailu::Render::DeferredLightingPass::OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data)
     {
+        const bool use_shadow_maps = rendering_data._camera != nullptr && rendering_data._camera->_is_render_shadow;
         graph.AddPass(_name, RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
                       { 
                           builder.Read(rendering_data._rg_handles._gbuffers[0]);
@@ -829,7 +888,7 @@ namespace Ailu::Render
                           builder.Read(rendering_data._rg_handles._gbuffers[2]);
                           builder.Read(rendering_data._rg_handles._gbuffers[3]);
                           builder.Read(rendering_data._rg_handles._depth_target);
-                          if (rendering_data._camera && rendering_data._camera->_is_render_shadow)
+                          if (use_shadow_maps)
                           {
                               builder.Read(rendering_data._rg_handles._main_light_shadow_map);
                               builder.Read(rendering_data._rg_handles._addi_shadow_maps);
@@ -837,6 +896,8 @@ namespace Ailu::Render
                           }
                           if (rendering_data._rg_handles._ao_tex.IsValid())
                               builder.Read(rendering_data._rg_handles._ao_tex);
+                          if (rendering_data._rg_handles._volumetric_fog_accum.IsValid())
+                              builder.Read(rendering_data._rg_handles._volumetric_fog_accum);
                           rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target);
                       },
                           [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
@@ -846,9 +907,33 @@ namespace Ailu::Render
                             _p_lighting_material->SetTexture("_GBuffer2", graph.Resolve<Texture>(data._rg_handles._gbuffers[2]));
                             _p_lighting_material->SetTexture("_GBuffer3", graph.Resolve<Texture>(data._rg_handles._gbuffers[3]));
                             _p_lighting_material->SetTexture("_CameraDepthTexture", graph.Resolve<Texture>(data._rg_handles._depth_target));
+                            if (data._camera != nullptr && data._camera->_is_render_shadow)
+                            {
+                                _p_lighting_material->SetTexture("_MainLightShadowMap",
+                                                                  graph.Resolve<Texture>(data._rg_handles._main_light_shadow_map));
+                                _p_lighting_material->SetTexture("_AddLightShadowMaps",
+                                                                  graph.Resolve<Texture>(data._rg_handles._addi_shadow_maps));
+                                _p_lighting_material->SetTexture("_PointLightShadowMap",
+                                                                  graph.Resolve<Texture>(data._rg_handles._point_light_shadow_maps));
+                            }
+                            else
+                            {
+                                _p_lighting_material->SetTexture("_MainLightShadowMap",
+                                                                  _dummy_main_light_shadow_map.get());
+                                _p_lighting_material->SetTexture("_AddLightShadowMaps",
+                                                                  _dummy_add_light_shadow_maps.get());
+                                _p_lighting_material->SetTexture("_PointLightShadowMap",
+                                                                  _dummy_point_light_shadow_map.get());
+                            }
                             _p_lighting_material->SetTexture("IBLLut", _brdf_lut.get());
-                            auto *occlusion_tex = data._rg_handles._ao_tex.IsValid() ? graph.Resolve<Texture>(data._rg_handles._ao_tex) : nullptr;
+                            auto *occlusion_tex = data._rg_handles._ao_tex.IsValid()
+                                ? graph.Resolve<Texture>(data._rg_handles._ao_tex) : nullptr;
                             _p_lighting_material->SetTexture("_OcclusionTex", occlusion_tex ? occlusion_tex : Texture::s_p_default_white);
+                            auto *volumetric_light = data._rg_handles._volumetric_fog_accum.IsValid()
+                                ? graph.Resolve<Texture>(data._rg_handles._volumetric_fog_accum) : nullptr;
+                            _p_lighting_material->SetTexture("_VolumetricLightTexture",
+                                                              volumetric_light ? volumetric_light
+                                                                               : _dummy_volumetric_light.get());
                             cmd->SetRenderTargetLoadAction(data._rg_handles._color_target, ELoadStoreAction::kNotCare);
                             cmd->SetRenderTarget(data._rg_handles._color_target);
                             cmd->DrawFullScreenQuad(_p_lighting_material.get());
@@ -902,12 +987,16 @@ namespace Ailu::Render
         _ms_lut = RenderTexture::Create(_mult_scatter_lut_size.x, _mult_scatter_lut_size.y, "_MultScatterLUT", ERenderTargetFormat::kRGBAHalf, false, false, true);
 
         auto cmd = CommandBufferPool::Get("SkyLutGen");
-        _p_lut_gen->SetTexture("_TransmittanceLUT", _tlut.get());
+        _p_lut_gen->SetTexture(_transmittance_lut_gen_kernel, "_TransmittanceLUT", _tlut.get());
         cmd->Dispatch(_p_lut_gen.get(), _transmittance_lut_gen_kernel, _transmittance_lut_size.x / 16, _transmittance_lut_size.y / 16, 1);
 
-        _p_lut_gen->SetTexture("_TexTransmittanceLUT", _tlut.get());
-        _p_lut_gen->SetTexture("_MultScatterLUT", _ms_lut.get());
+        _p_lut_gen->SetTexture(_mult_scatter_lut_gen_kernel, "_TexTransmittanceLUT", _tlut.get());
+        _p_lut_gen->SetTexture(_mult_scatter_lut_gen_kernel, "_MultScatterLUT", _ms_lut.get());
         cmd->Dispatch(_p_lut_gen.get(), _mult_scatter_lut_gen_kernel, _mult_scatter_lut_size.x / 16, _mult_scatter_lut_size.y / 16, 1);
+        // LUT generation is outside the render graph.  Return both persistent resources to the graph's
+        // fixed COMMON boundary instead of carrying the legacy command buffer state into graph compilation.
+        cmd->ResourceBarrier(_tlut.get(), EResourceState::kAllShaderResource, EResourceState::kCommon);
+        cmd->ResourceBarrier(_ms_lut.get(), EResourceState::kUnorderedAccess, EResourceState::kCommon);
         g_pGfxContext->ExecuteCommandBufferSync(cmd);
         CommandBufferPool::Release(cmd);
         _event = static_cast<ERenderPassEvent>(static_cast<u16>(ERenderPassEvent::kBeforeSkybox) + 25u);
@@ -915,37 +1004,36 @@ namespace Ailu::Render
 
     void Ailu::Render::SkyboxPass::OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data)
     {
-        static RDG::RGHandle sv_lut;
-        static RDG::RGHandle s_tlut;
         graph.AddPass("GenSkyLUT", RDG::PassDesc{RDG::EPassType::kCompute}, [&](RDG::RenderGraphBuilder &builder)
                       { 
-                          s_tlut = builder.Import(_tlut.get());
-                          builder.Read(s_tlut);
-                          builder.Read(builder.Import(_ms_lut.get()));
                           TextureDesc sky_lut_desc = TextureDesc(_sky_lut_size.x, _sky_lut_size.y, ERenderTargetFormat::kRGBAHalf);
                           sky_lut_desc._is_random_access = true;
-                          sv_lut = builder.AllocTexture(sky_lut_desc,"_SkyLightLUT");
-                          sv_lut = builder.Write(sv_lut,EResourceUsage::kWriteUAV);
+                          rendering_data._rg_handles._sky_view_lut = builder.AllocTexture(sky_lut_desc,
+                                                                                            "_SkyLightLUT");
+                          rendering_data._rg_handles._sky_view_lut = builder.Write(rendering_data._rg_handles._sky_view_lut,
+                                                                                    EResourceUsage::kWriteUAV);
                       }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data)
                       {
-                            _p_lut_gen->SetTexture("_TexTransmittanceLUT", _tlut.get());
-                            _p_lut_gen->SetTexture("_TexMultScatterLUT", _ms_lut.get());
-                            _p_lut_gen->SetTexture("_SkyLightLUT", graph.Resolve<RenderTexture>(sv_lut));
+                            _p_lut_gen->SetTexture(_sky_lut_gen_kernel, "_TexTransmittanceLUT", _tlut.get());
+                            _p_lut_gen->SetTexture(_sky_lut_gen_kernel, "_TexMultScatterLUT", _ms_lut.get());
+                            auto *sky_lut = graph.Resolve<RenderTexture>(
+                                rendering_data._rg_handles._sky_view_lut);
+                            _p_lut_gen->SetTexture(_sky_lut_gen_kernel, "_SkyLightLUT", sky_lut);
                             _p_lut_gen->SetVector("_MainLightPosition", rendering_data._mainlight_world_position);
                             cmd->Dispatch(_p_lut_gen.get(), _sky_lut_gen_kernel, _sky_lut_size.x / 16, _sky_lut_size.y / 16, 1);
         });
         graph.AddPass("DrawSkyBox", RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
                       { 
-                          builder.Read(s_tlut);
-                          builder.Read(sv_lut);
+                          builder.Read(rendering_data._rg_handles._sky_view_lut);
                           builder.Read(rendering_data._rg_handles._color_target, EResourceUsage::kWriteRTV);
                           builder.Read(rendering_data._rg_handles._depth_target, EResourceUsage::kDSV);
                           rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target);
                           rendering_data._rg_handles._depth_target = builder.Write(rendering_data._rg_handles._depth_target,EResourceUsage::kDSV);
                       }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data)
                       {
-                        _p_skybox_material->SetTexture("_TexSkyViewLUT", graph.Resolve<RenderTexture>(sv_lut));
-                        _p_skybox_material->SetTexture("_TexTransmittanceLUT", graph.Resolve<RenderTexture>(s_tlut));
+                        _p_skybox_material->SetTexture(
+                            "_TexSkyViewLUT", graph.Resolve<RenderTexture>(rendering_data._rg_handles._sky_view_lut));
+                        _p_skybox_material->SetTexture("_TexTransmittanceLUT", _tlut.get());
                         cmd->SetRenderTargetLoadAction(rendering_data._rg_handles._color_target, ELoadStoreAction::kNotCare);
                         cmd->SetRenderTargetLoadAction(rendering_data._rg_handles._depth_target, ELoadStoreAction::kNotCare);
                         cmd->SetRenderTarget(rendering_data._rg_handles._color_target, rendering_data._rg_handles._depth_target);
@@ -955,7 +1043,6 @@ namespace Ailu::Render
                             cmd->ClearRenderTarget(kZFar, 0u);
                         }
                         cmd->DrawMesh(Mesh::s_sphere.lock().get(), _p_skybox_material.get(), _p_cbuffer.get(), 0, 1);
-                        ComputeShader::SetGlobalTexture("_TexSkyViewLUT", graph.Resolve<RenderTexture>(sv_lut));
         });
     }
     void SkyboxPass::Execute(GraphicsContext *context, RenderingData &rendering_data)
@@ -967,9 +1054,9 @@ namespace Ailu::Render
             auto sv_lut = cmd->GetTempRT(_sky_lut_size.x, _sky_lut_size.y, "_SkyLightLUT", ERenderTargetFormat::kRGBAHalf, false, false, true);
 
 
-            _p_lut_gen->SetTexture("_TexTransmittanceLUT", _tlut.get());
-            _p_lut_gen->SetTexture("_TexMultScatterLUT", _ms_lut.get());
-            _p_lut_gen->SetTexture("_SkyLightLUT", sv_lut);
+            _p_lut_gen->SetTexture(_sky_lut_gen_kernel, "_TexTransmittanceLUT", _tlut.get());
+            _p_lut_gen->SetTexture(_sky_lut_gen_kernel, "_TexMultScatterLUT", _ms_lut.get());
+            _p_lut_gen->SetTexture(_sky_lut_gen_kernel, "_SkyLightLUT", sv_lut);
             _p_lut_gen->SetVector("_MainLightPosition", rendering_data._mainlight_world_position);
             cmd->Dispatch(_p_lut_gen.get(), _sky_lut_gen_kernel, _sky_lut_size.x / 16, _sky_lut_size.y / 16, 1);
 
@@ -1005,12 +1092,6 @@ namespace Ailu::Render
     //-------------------------------------------------------------GizmoPass-------------------------------------------------------------
     GizmoPass::GizmoPass() : RenderPass("GizmoPass")
     {
-        for (int i = 0; i < 20; i++)
-        {
-            _p_cbuffers.emplace_back(Ref<ConstantBuffer>(ConstantBuffer::Create(256)));
-        }
-        auto grid_plane_pos = MatrixScale(1000.0f, 1000.f, 1000.f);
-        memcpy(_p_cbuffers[0]->GetData(), &grid_plane_pos, sizeof(Matrix4x4f));
         _event = ERenderPassEvent::kAfterPostprocess;
     }
     static void GetScreenAxis(const RenderingData &rendering_data, Vector4f *out) 
@@ -1103,23 +1184,18 @@ namespace Ailu::Render
                         cmd->SetRenderTarget(rendering_data._rg_handles._color_target, rendering_data._rg_handles._depth_target);
 
                     Matrix4x4f grid_plane_pos = GetGridPlaneMatrix(rendering_data);
-                    memcpy(_p_cbuffers[0]->GetData(), &grid_plane_pos, sizeof(Matrix4x4f));
                     SetGridPlaneAxisMode(mat_gird_plane, rendering_data);
-                    cmd->DrawMesh(Mesh::s_plane.lock().get(), mat_gird_plane, _p_cbuffers[0].get(), 0, 0, 1);
+                    cmd->DrawMesh(Mesh::s_plane.lock().get(), mat_gird_plane, grid_plane_pos);
                     if (is_2d_grid)
                         cmd->SetRenderTarget(rendering_data._rg_handles._color_target, rendering_data._rg_handles._depth_target);
-                    u16 index = 1;
                     u16 entity_index = 0;
                     for (auto &light_comp: SceneMgr::Get().ActiveScene()->GetRegister().View<ECS::LightComponent>())
                     {
-                        if (index >= 20)
-                            break;
                         const auto &t = SceneMgr::Get().ActiveScene()->GetRegister().GetComponent<ECS::LightComponent, ECS::TransformComponent>(entity_index++);
                         auto world_pos = t->GetPosition();
                         auto m = MatrixTranslation(world_pos);
                         f32 scale = 2.0f;
                         m = MatrixScale(scale, scale, scale) * m;
-                        memcpy(_p_cbuffers[index]->GetData(), &m, sizeof(Matrix4x4f));
                         switch (light_comp._type)
                         {
                             case ECS::ELightType::kDirectional:
@@ -1147,14 +1223,11 @@ namespace Ailu::Render
                     entity_index = 0;
                     for (auto &light_comp: SceneMgr::Get().ActiveScene()->GetRegister().View<ECS::CLightProbe>())
                     {
-                        if (index >= 20)
-                            break;
                         const auto &t = SceneMgr::Get().ActiveScene()->GetRegister().GetComponent<ECS::CLightProbe, ECS::TransformComponent>(entity_index++);
                         auto world_pos = t->GetPosition();
                         auto m = MatrixTranslation(world_pos);
                         f32 scale = 2.0f;
                         m = MatrixScale(scale, scale, scale) * m;
-                        memcpy(_p_cbuffers[index]->GetData(), &m, sizeof(Matrix4x4f));
                         cmd->DrawMesh(Mesh::s_quad.lock().get(), mat_lightprobe, m);
                     }
                     entity_index = 0;
@@ -1165,8 +1238,7 @@ namespace Ailu::Render
                         auto m = MatrixTranslation(world_pos);
                         f32 scale = 2.0f;
                         m = MatrixScale(scale, scale, scale) * m;
-                        memcpy(_p_cbuffers[index]->GetData(), &m, sizeof(Matrix4x4f));
-                        cmd->DrawMesh(Mesh::s_quad.lock().get(), mat_camera, _p_cbuffers[index++].get(), 0, 0, 1);
+                        cmd->DrawMesh(Mesh::s_quad.lock().get(), mat_camera, m);
                     }
                     Gizmo::Submit(cmd, &rendering_data); 
                 });
@@ -1201,23 +1273,18 @@ namespace Ailu::Render
                 cmd->SetRenderTarget(rendering_data._camera_color_target_handle, rendering_data._camera_depth_target_handle);
 
             Matrix4x4f grid_plane_pos = GetGridPlaneMatrix(rendering_data);
-            memcpy(_p_cbuffers[0]->GetData(), &grid_plane_pos, sizeof(Matrix4x4f));
             SetGridPlaneAxisMode(mat_gird_plane, rendering_data);
-            cmd->DrawMesh(Mesh::s_plane.lock().get(), mat_gird_plane, _p_cbuffers[0].get(), 0, 0, 1);
+            cmd->DrawMesh(Mesh::s_plane.lock().get(), mat_gird_plane, grid_plane_pos);
             if (is_2d_grid)
                 cmd->SetRenderTarget(rendering_data._camera_color_target_handle, rendering_data._camera_depth_target_handle);
-            u16 index = 1;
             u16 entity_index = 0;
             for (auto &light_comp: SceneMgr::Get().ActiveScene()->GetRegister().View<ECS::LightComponent>())
             {
-                if (index >= 20)
-                    break;
                 const auto &t = SceneMgr::Get().ActiveScene()->GetRegister().GetComponent<ECS::LightComponent, ECS::TransformComponent>(entity_index++);
                 auto world_pos = t->GetPosition();
                 auto m = MatrixTranslation(world_pos);
                 f32 scale = 2.0f;
                 m = MatrixScale(scale, scale, scale) * m;
-                memcpy(_p_cbuffers[index]->GetData(), &m, sizeof(Matrix4x4f));
                 switch (light_comp._type)
                 {
                     case ECS::ELightType::kDirectional:
@@ -1245,14 +1312,11 @@ namespace Ailu::Render
             entity_index = 0;
             for (auto &light_comp: SceneMgr::Get().ActiveScene()->GetRegister().View<ECS::CLightProbe>())
             {
-                if (index >= 20)
-                    break;
                 const auto &t = SceneMgr::Get().ActiveScene()->GetRegister().GetComponent<ECS::CLightProbe, ECS::TransformComponent>(entity_index++);
                 auto world_pos = t->GetPosition();
                 auto m = MatrixTranslation(world_pos);
                 f32 scale = 2.0f;
                 m = MatrixScale(scale, scale, scale) * m;
-                memcpy(_p_cbuffers[index]->GetData(), &m, sizeof(Matrix4x4f));
                 cmd->DrawMesh(Mesh::s_quad.lock().get(), mat_lightprobe, m);
             }
             entity_index = 0;
@@ -1263,8 +1327,7 @@ namespace Ailu::Render
                 auto m = MatrixTranslation(world_pos);
                 f32 scale = 2.0f;
                 m = MatrixScale(scale, scale, scale) * m;
-                memcpy(_p_cbuffers[index]->GetData(), &m, sizeof(Matrix4x4f));
-                cmd->DrawMesh(Mesh::s_quad.lock().get(), mat_camera, _p_cbuffers[index++].get(), 0, 0, 1);
+                cmd->DrawMesh(Mesh::s_quad.lock().get(), mat_camera, m);
             }
             Gizmo::Submit(cmd.get(), &rendering_data);
         }
@@ -1592,8 +1655,6 @@ namespace Ailu::Render
                                       cmd->DrawMesh(obj._mesh, obj._material, obj_cb, obj._submesh_index, mv_pass, obj._instance_count);
                               }
                           }
-                        Shader::SetGlobalTexture("_MotionVectorTexture", graph.Resolve<Texture>(rendering_data._rg_handles._motion_vector_tex));
-                        ComputeShader::SetGlobalTexture("_MotionVectorTexture",graph.Resolve<Texture>(rendering_data._rg_handles._motion_vector_tex));
                       });
     }
 
@@ -1669,13 +1730,15 @@ namespace Ailu::Render
                                                                                0u, first_dispatch_mip_num);
                       }, [=](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data)
                       {
-                            _hzb_gen->SetTexture("_DepthInput", graph.Resolve<Texture>(rendering_data._rg_handles._depth_tex));
+                            auto *depth_tex = graph.Resolve<Texture>(rendering_data._rg_handles._depth_tex);
+                            auto *hzb_tex = graph.Resolve<Texture>(rendering_data._rg_handles._hzb);
+                            _hzb_gen->SetTexture(_hzb_kernel, "_DepthInput", depth_tex);
                             {
                                 _hzb_gen->SetInt("NumMipLevels", first_dispatch_mip_num);
-                                _hzb_gen->SetTexture("_HZ_Buffer_Mip1", graph.Resolve<Texture>(rendering_data._rg_handles._hzb), ECubemapFace::kUnknown, 0);
-                                _hzb_gen->SetTexture("_HZ_Buffer_Mip2", graph.Resolve<Texture>(rendering_data._rg_handles._hzb), ECubemapFace::kUnknown, 1);
-                                _hzb_gen->SetTexture("_HZ_Buffer_Mip3", graph.Resolve<Texture>(rendering_data._rg_handles._hzb), ECubemapFace::kUnknown, 2);
-                                _hzb_gen->SetTexture("_HZ_Buffer_Mip4", graph.Resolve<Texture>(rendering_data._rg_handles._hzb), ECubemapFace::kUnknown, 3);
+                                _hzb_gen->SetTexture(_hzb_kernel, "_HZ_Buffer_Mip1", hzb_tex, ECubemapFace::kUnknown, 0);
+                                _hzb_gen->SetTexture(_hzb_kernel, "_HZ_Buffer_Mip2", hzb_tex, ECubemapFace::kUnknown, 1);
+                                _hzb_gen->SetTexture(_hzb_kernel, "_HZ_Buffer_Mip3", hzb_tex, ECubemapFace::kUnknown, 2);
+                                _hzb_gen->SetTexture(_hzb_kernel, "_HZ_Buffer_Mip4", hzb_tex, ECubemapFace::kUnknown, 3);
                                 auto [x, y, z] = _hzb_gen->CalculateDispatchNum(_hzb_kernel, w, h, 1);
                                 cmd->Dispatch(_hzb_gen.get(), _hzb_kernel, x, y);
                             }
@@ -1690,11 +1753,12 @@ namespace Ailu::Render
                           }, [=](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data)
                           {
                                 _hzb_gen->SetInt("NumMipLevels", second_dispatch_mip_num);
-                                _hzb_gen->SetTexture("_DepthInput", graph.Resolve<Texture>(rendering_data._rg_handles._hzb), ECubemapFace::kUnknown, 3);
-                                _hzb_gen->SetTexture("_HZ_Buffer_Mip1", graph.Resolve<Texture>(rendering_data._rg_handles._hzb), ECubemapFace::kUnknown, 4);
-                                _hzb_gen->SetTexture("_HZ_Buffer_Mip2", graph.Resolve<Texture>(rendering_data._rg_handles._hzb), ECubemapFace::kUnknown, 5);
-                                _hzb_gen->SetTexture("_HZ_Buffer_Mip3", graph.Resolve<Texture>(rendering_data._rg_handles._hzb), ECubemapFace::kUnknown, 6);
-                                _hzb_gen->SetTexture("_HZ_Buffer_Mip4", graph.Resolve<Texture>(rendering_data._rg_handles._hzb), ECubemapFace::kUnknown, 7);
+                                auto *hzb_tex = graph.Resolve<Texture>(rendering_data._rg_handles._hzb);
+                                _hzb_gen->SetTexture(_hzb_kernel, "_DepthInput", hzb_tex, ECubemapFace::kUnknown, 3);
+                                _hzb_gen->SetTexture(_hzb_kernel, "_HZ_Buffer_Mip1", hzb_tex, ECubemapFace::kUnknown, 4);
+                                _hzb_gen->SetTexture(_hzb_kernel, "_HZ_Buffer_Mip2", hzb_tex, ECubemapFace::kUnknown, 5);
+                                _hzb_gen->SetTexture(_hzb_kernel, "_HZ_Buffer_Mip3", hzb_tex, ECubemapFace::kUnknown, 6);
+                                _hzb_gen->SetTexture(_hzb_kernel, "_HZ_Buffer_Mip4", hzb_tex, ECubemapFace::kUnknown, 7);
                                 //u16 base_w = w, base_h = h;
                                 auto [base_w, base_h] = Texture::CalculateMipSize(w, h, 4);
                                 auto [x, y, z] = _hzb_gen->CalculateDispatchNum(_hzb_kernel, base_w, base_h, 1);
@@ -1713,26 +1777,26 @@ namespace Ailu::Render
         cmd->Clear();
         {
             PROFILE_BLOCK_GPU(cmd.get(), "HZB")
-            _hzb_gen->SetTexture("_DepthInput", rendering_data._camera_depth_target_handle);
+            _hzb_gen->SetTexture(_hzb_kernel, "_DepthInput", rendering_data._camera_depth_target_handle);
             u16 mip = Texture::MaxMipmapCount(w, h);
             u16 first_dispatch_mip_num = std::min<u16>(4, mip);
             {
                 _hzb_gen->SetInt("NumMipLevels", first_dispatch_mip_num);
-                _hzb_gen->SetTexture("_HZ_Buffer_Mip1", hzb_rt, ECubemapFace::kUnknown, 0);
-                _hzb_gen->SetTexture("_HZ_Buffer_Mip2", hzb_rt, ECubemapFace::kUnknown, 1);
-                _hzb_gen->SetTexture("_HZ_Buffer_Mip3", hzb_rt, ECubemapFace::kUnknown, 2);
-                _hzb_gen->SetTexture("_HZ_Buffer_Mip4", hzb_rt, ECubemapFace::kUnknown, 3);
+                _hzb_gen->SetTexture(_hzb_kernel, "_HZ_Buffer_Mip1", hzb_rt, ECubemapFace::kUnknown, 0);
+                _hzb_gen->SetTexture(_hzb_kernel, "_HZ_Buffer_Mip2", hzb_rt, ECubemapFace::kUnknown, 1);
+                _hzb_gen->SetTexture(_hzb_kernel, "_HZ_Buffer_Mip3", hzb_rt, ECubemapFace::kUnknown, 2);
+                _hzb_gen->SetTexture(_hzb_kernel, "_HZ_Buffer_Mip4", hzb_rt, ECubemapFace::kUnknown, 3);
                 auto [x, y, z] = _hzb_gen->CalculateDispatchNum(_hzb_kernel, w, h, 1);
                 cmd->Dispatch(_hzb_gen.get(), _hzb_kernel, x, y);
             }
             if (u16 second_dispatch_mip_num = mip - first_dispatch_mip_num; second_dispatch_mip_num > 0)
             {
                 _hzb_gen->SetInt("NumMipLevels", second_dispatch_mip_num);
-                _hzb_gen->SetTexture("_DepthInput", hzb_rt, ECubemapFace::kUnknown, 3);
-                _hzb_gen->SetTexture("_HZ_Buffer_Mip1", hzb_rt, ECubemapFace::kUnknown, 4);
-                _hzb_gen->SetTexture("_HZ_Buffer_Mip2", hzb_rt, ECubemapFace::kUnknown, 5);
-                _hzb_gen->SetTexture("_HZ_Buffer_Mip3", hzb_rt, ECubemapFace::kUnknown, 6);
-                _hzb_gen->SetTexture("_HZ_Buffer_Mip4", hzb_rt, ECubemapFace::kUnknown, 7);
+                _hzb_gen->SetTexture(_hzb_kernel, "_DepthInput", hzb_rt, ECubemapFace::kUnknown, 3);
+                _hzb_gen->SetTexture(_hzb_kernel, "_HZ_Buffer_Mip1", hzb_rt, ECubemapFace::kUnknown, 4);
+                _hzb_gen->SetTexture(_hzb_kernel, "_HZ_Buffer_Mip2", hzb_rt, ECubemapFace::kUnknown, 5);
+                _hzb_gen->SetTexture(_hzb_kernel, "_HZ_Buffer_Mip3", hzb_rt, ECubemapFace::kUnknown, 6);
+                _hzb_gen->SetTexture(_hzb_kernel, "_HZ_Buffer_Mip4", hzb_rt, ECubemapFace::kUnknown, 7);
                 //u16 base_w = w, base_h = h;
                 auto [base_w, base_h] = Texture::CalculateMipSize(w, h, 4);
                 auto [x, y, z] = _hzb_gen->CalculateDispatchNum(_hzb_kernel, base_w, base_h, 1);

@@ -96,10 +96,48 @@ namespace Ailu::Render
     struct CommandBuffer::Impl
     {
     public:
-        Impl(): _commands(){}
+        explicit Impl(String name): _name(std::move(name)), _commands(){}
         ~Impl() = default;
 
     private:
+#ifdef _DEBUG
+        void ValidateRenderGraphBindings(const PipelineBindingSnapshot &bindings, const char *source) const
+        {
+            if (_render_graph == nullptr)
+                return;
+            for (u16 i = 0u; i < bindings._entry_count; ++i)
+            {
+                const auto &binding = bindings._entries[i];
+                if (binding._resource == nullptr || !_render_graph->ContainsResource(binding._resource)
+                    || std::find(_render_graph_resources.begin(), _render_graph_resources.end(), binding._resource)
+                        != _render_graph_resources.end())
+                    continue;
+                LOG_ERROR("Undeclared RenderGraph resource access: command_buffer={}, resource={}, resource_ptr={}, "
+                          "binding_slot={}, source={}", _name, binding._resource->Name(),
+                          static_cast<const void *>(binding._resource), binding._slot, source);
+                AL_ASSERT(false);
+            }
+        }
+
+        void ValidateRenderGraphBindings(const ComputeDispatchSnapshot &bindings, const char *source) const
+        {
+            if (_render_graph == nullptr)
+                return;
+            for (u16 i = 0u; i < bindings._entry_count; ++i)
+            {
+                const auto &binding = bindings._entries[i];
+                if (binding._resource == nullptr || !_render_graph->ContainsResource(binding._resource)
+                    || std::find(_render_graph_resources.begin(), _render_graph_resources.end(), binding._resource)
+                        != _render_graph_resources.end())
+                    continue;
+                LOG_ERROR("Undeclared RenderGraph resource access: command_buffer={}, resource={}, resource_ptr={}, "
+                          "binding_slot={}, source={}", _name, binding._resource->Name(),
+                          static_cast<const void *>(binding._resource), binding._slot, source);
+                AL_ASSERT(false);
+            }
+        }
+#endif
+
         void PushMaterialState(CommandDraw *cmd)
         {
             ++_rendering_states_data.MaterialCaptureCount;
@@ -122,16 +160,28 @@ namespace Ailu::Render
                     _command_resources.erase(it);
             }
             cmd->_material_draw_state = cmd->_mat->CaptureDrawState(cmd->_pass_index,
-                                                                      FrameResourceManager::Get().GetActiveFrameSlot(),
-                                                                      g_pGfxContext->GetFrameCount(),
-                                                                      *FrameResourceManager::Get().GetActiveFrameAllocator(),
-                                                                      &_command_resources, &_rendering_states_data);
+                                                                       FrameResourceManager::Get().GetActiveFrameSlot(),
+                                                                       g_pGfxContext->GetFrameCount(),
+                                                                       *FrameResourceManager::Get().GetActiveFrameAllocator(),
+                                                                       &_command_resources, &_rendering_states_data);
+#ifdef _DEBUG
+            ValidateRenderGraphBindings(cmd->_material_draw_state._bindings, "material_draw");
+#endif
         }
 
     public:
-        void SetRenderGraph(RDG::RenderGraph *render_graph)
+        void SetRenderGraph(RDG::RenderGraph *render_graph, const String &name)
         {
             _render_graph = render_graph;
+            _name = name;
+        }
+        void UseRenderGraphResource(GpuResource *resource)
+        {
+            if (resource == nullptr || std::find(_render_graph_resources.begin(), _render_graph_resources.end(), resource) !=
+                                             _render_graph_resources.end())
+                return;
+            _render_graph_resources.emplace_back(resource);
+            KeepAlive(resource);
         }
         void Clear()
         {
@@ -146,6 +196,8 @@ namespace Ailu::Render
             _command_resources.clear();
             _leased_temp_rts.clear();
             _released_temp_rts.clear();
+            _render_graph_resources.clear();
+            _render_graph = nullptr;
             _rendering_states_data.Reset();
         }
         void ClearRenderTarget(Color color, f32 depth, u8 stencil)
@@ -775,6 +827,9 @@ namespace Ailu::Render
             cmd->_arg_buffer = nullptr;
             cmd->_arg_offset = 0u;
             cmd->_cs->CaptureDispatchState(cmd->_kernel, cmd->_bindings, &_command_resources);
+#ifdef _DEBUG
+            ValidateRenderGraphBindings(cmd->_bindings, "compute_dispatch");
+#endif
             _commands.emplace_back(cmd);
         }
         void Dispatch(ComputeShader *cs, ComputeShaderKernelId kernel, GPUBuffer *arg_buffer, u16 arg_offset)
@@ -791,6 +846,9 @@ namespace Ailu::Render
             cmd->_group_num_y = 1u;
             cmd->_group_num_z = 1u;
             cmd->_cs->CaptureDispatchState(cmd->_kernel, cmd->_bindings, &_command_resources);
+#ifdef _DEBUG
+            ValidateRenderGraphBindings(cmd->_bindings, "compute_dispatch");
+#endif
             cmd->_arg_buffer = arg_buffer;
             cmd->_arg_offset = arg_offset;
             _commands.emplace_back(cmd);
@@ -902,7 +960,9 @@ namespace Ailu::Render
             cmd->_is_blas = true;
             _commands.emplace_back(cmd);
         }
+        String _name;
         Vector<GfxCommand *> _commands;
+        Vector<GpuResource *> _render_graph_resources;
         Vector<Ref<Object>> _keep_alive_objects;
         std::unordered_set<Object *> _keep_alive_set;
         Array<Rect, RenderConstants::kMaxMRTNum> _viewports;
@@ -917,8 +977,8 @@ namespace Ailu::Render
 
     CommandBuffer::CommandBuffer(String name)
     {
-        _name = std::move(name);
-        _impl = AL_NEW_TAG(EMemoryTag::kRenderer, Impl);
+        Name(name);
+        _impl = AL_NEW_TAG(EMemoryTag::kRenderer, Impl, std::move(name));
     }
     CommandBuffer::~CommandBuffer()
     {
@@ -926,7 +986,7 @@ namespace Ailu::Render
     }
     void CommandBuffer::SetRenderGraph(RDG::RenderGraph *render_graph)
     {
-        _impl->SetRenderGraph(render_graph);
+        _impl->SetRenderGraph(render_graph, Name());
     }
     void CommandBuffer::Clear()
     {
@@ -1058,6 +1118,10 @@ namespace Ailu::Render
     void CommandBuffer::Blit(const RDG::RGHandle &src, const RDG::RGHandle &dst, Material *mat, u16 pass_index)
     {
         _impl->Blit(src, dst, mat, pass_index);
+    }
+    void CommandBuffer::UseRenderGraphResource(GpuResource *resource)
+    {
+        _impl->UseRenderGraphResource(resource);
     }
     void CommandBuffer::DrawFullScreenQuad(Material *mat, u16 pass_index)
     {
@@ -1198,6 +1262,10 @@ namespace Ailu::Render
     Vector<GfxCommand *> CommandBuffer::TakeCommands()
     {
         return std::move(_impl->_commands);
+    }
+    Vector<GpuResource *> CommandBuffer::TakeRenderGraphResources()
+    {
+        return std::move(_impl->_render_graph_resources);
     }
 
     Vector<Ref<Object>> CommandBuffer::TakeKeepAliveObjects()

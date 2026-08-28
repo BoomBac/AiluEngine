@@ -79,6 +79,8 @@ namespace Ailu::Render
             return;
 
         _output_handle = graph.Import(_output_texture.get());
+        GPUBuffer *prev_reservoir = _use_reservoir_a ? _reservoir_b.get() : _reservoir_a.get();
+        GPUBuffer *curr_reservoir = _use_reservoir_a ? _reservoir_a.get() : _reservoir_b.get();
 
         _compute_shader->SetInt("_curr_reservoir_buffer_handle", _use_reservoir_a ? _reservoir_a->GetBindlessUAVIndex() : _reservoir_b->GetBindlessUAVIndex());
         _compute_shader->SetInt("_prev_reservoir_buffer_handle", _use_reservoir_a ? _reservoir_b->GetBindlessUAVIndex() : _reservoir_a->GetBindlessUAVIndex());
@@ -90,6 +92,11 @@ namespace Ailu::Render
             builder.Read(rendering_data._rg_handles._gbuffers[2]);
             builder.Read(rendering_data._rg_handles._gbuffers[3]);
             builder.Read(rendering_data._rg_handles._depth_tex);
+            builder.Read(builder.Import(light_data));
+            if (prev_reservoir != nullptr)
+                builder.Read(builder.Import(prev_reservoir), EResourceUsage::kWriteUAV);
+            if (curr_reservoir != nullptr)
+                (void) builder.Write(builder.Import(curr_reservoir), EResourceUsage::kWriteUAV);
             _output_handle = builder.Write(_output_handle, EResourceUsage::kWriteUAV);
         },
         [this, light_data](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
@@ -102,13 +109,18 @@ namespace Ailu::Render
             const u16 height = static_cast<u16>(data._height);
             auto [dispatch_x, dispatch_y, dispatch_z] = _compute_shader->CalculateDispatchNum(_kernel_ray_gen, width, height, 1);
 
-            _compute_shader->SetTexture("_GBuffer0", graph.Resolve<Texture>(data._rg_handles._gbuffers[0]));
-            _compute_shader->SetTexture("_GBuffer1", graph.Resolve<Texture>(data._rg_handles._gbuffers[1]));
-            _compute_shader->SetTexture("_GBuffer2", graph.Resolve<Texture>(data._rg_handles._gbuffers[2]));
-            _compute_shader->SetTexture("_GBuffer3", graph.Resolve<Texture>(data._rg_handles._gbuffers[3]));
-            _compute_shader->SetTexture("_CameraDepthTexture", graph.Resolve<Texture>(data._rg_handles._depth_tex));
-            _compute_shader->SetTexture("_GI_Texture", output);
-            _compute_shader->SetBuffer("_UnifiedLights", light_data);
+            _compute_shader->SetTexture(_kernel_ray_gen, "_GBuffer0",
+                                        graph.Resolve<Texture>(data._rg_handles._gbuffers[0]));
+            _compute_shader->SetTexture(_kernel_ray_gen, "_GBuffer1",
+                                        graph.Resolve<Texture>(data._rg_handles._gbuffers[1]));
+            _compute_shader->SetTexture(_kernel_ray_gen, "_GBuffer2",
+                                        graph.Resolve<Texture>(data._rg_handles._gbuffers[2]));
+            _compute_shader->SetTexture(_kernel_ray_gen, "_GBuffer3",
+                                        graph.Resolve<Texture>(data._rg_handles._gbuffers[3]));
+            _compute_shader->SetTexture(_kernel_ray_gen, "_CameraDepthTexture",
+                                        graph.Resolve<Texture>(data._rg_handles._depth_tex));
+            _compute_shader->SetTexture(_kernel_ray_gen, "_GI_Texture", output);
+            _compute_shader->SetBuffer(_kernel_ray_gen, "_UnifiedLights", light_data);
             _compute_shader->SetInt("_light_count", static_cast<i32>(_scene_rt_proxy->GetUnifiedLightCount()));
             _compute_shader->SetInts("_GI_TileOffset", {0, 0});
             _compute_shader->SetInts("_GI_TileSize", {static_cast<i32>(data._width), static_cast<i32>(data._height)});

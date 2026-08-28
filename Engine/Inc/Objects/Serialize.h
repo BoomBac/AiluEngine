@@ -247,6 +247,9 @@ namespace Ailu
         virtual void ReadUInt(u64 &v) = 0;
         virtual void ReadFloat(f64 &v) = 0;
         virtual void ReadString(String &v) = 0;
+        // Structured archives can omit fields when loading older documents.  The default keeps
+        // non-JSON archive implementations strict while allowing compatible optional-field checks.
+        virtual bool HasField(const String &name) { return true; }
     };
 
     ACLASS()

@@ -1,0 +1,5 @@
+#pragma once
+
+#ifndef AILU_ENABLE_RESOURCE_STATE_TRACE
+#define AILU_ENABLE_RESOURCE_STATE_TRACE 0
+#endif

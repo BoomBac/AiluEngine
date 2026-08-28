@@ -21,7 +21,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::Texture>(
 //Class Texture end...........................
 
 //Class Texture2D begin...........................
-#define TEXTURE_GEN_H_621_GENERATED_BODY \
+#define TEXTURE_GEN_H_622_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_Texture2D_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -37,7 +37,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::Texture2D
 //Class Texture2D end...........................
 
 //Class Texture3D begin...........................
-#define TEXTURE_GEN_H_656_GENERATED_BODY \
+#define TEXTURE_GEN_H_657_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_Texture3D_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -53,7 +53,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::Texture3D
 //Class Texture3D end...........................
 
 //Class CubeMap begin...........................
-#define TEXTURE_GEN_H_692_GENERATED_BODY \
+#define TEXTURE_GEN_H_693_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_CubeMap_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -69,7 +69,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::CubeMap>(
 //Class CubeMap end...........................
 
 //Class RenderTexture begin...........................
-#define TEXTURE_GEN_H_733_GENERATED_BODY \
+#define TEXTURE_GEN_H_734_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_RenderTexture_Type();\
                                 static const Type* GetPrivateStaticClass();\

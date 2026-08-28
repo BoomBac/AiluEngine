@@ -86,6 +86,11 @@ namespace Ailu::Render
         {
             AL_ASSERT(true);
         };
+        virtual void ApplyResourceBarrier(RHICommandBuffer *rhi_cmd, EResourceState before_state,
+                                           EResourceState after_state, u32 sub_res)
+        {
+            AL_ASSERT(true);
+        };
         virtual void InsertUAVBarrier(RHICommandBuffer* rhi_cmd) {AL_ASSERT(true);};
         virtual NativeHandle NativeResource() {AL_ASSERT(true); return {};}
         virtual void TrackResourceState(EResourceState new_state, u32 sub_res = kTotalSubRes);

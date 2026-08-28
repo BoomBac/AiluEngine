@@ -590,6 +590,7 @@ namespace Ailu
             //common
             virtual void CreateView() {};
             virtual void GenerateMipmap() {};
+            virtual void GenerateMipmap(CommandBuffer *cmd) { GenerateMipmap(); };
             [[nodiscard]] u16 CalculateViewIndex(ETextureViewType view_type, u16 mipmap, u16 array_slice) const;
             [[nodiscard]] u16 CalculateViewIndex(ETextureViewType view_type, ECubemapFace face, u16 mipmap, u16 array_slice) const;
             //for 2d/2d array/3d
@@ -812,6 +813,11 @@ namespace Ailu
             /// @return
             virtual TextureHandle DepthTexture(u16 view_index) { return 0; };
             virtual void GenerateMipmap() override;
+            virtual void GenerateMipmap(CommandBuffer *cmd) { GenerateMipmap(); };
+            virtual void GenerateMipmap(CommandBuffer *cmd, u16 source_mip, u16 output_mip_count)
+            {
+                GenerateMipmap(cmd);
+            };
             // Returned data is allocated with AL_ALLOC and must be released with AL_FREE.
             virtual void *ReadBack(u16 mipmap, u16 array_slice = 0, ECubemapFace face = ECubemapFace::kUnknown) { return nullptr; };
             virtual void ReadBackAsync(std::function<void(void *)> callback, u16 mipmap, u16 array_slice = 0, ECubemapFace face = ECubemapFace::kUnknown) {};

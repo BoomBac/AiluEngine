@@ -56,10 +56,10 @@ namespace Ailu::Render
         _shape_noise = Texture3D::Create(desc);
         _shape_noise->Name("VolumetricCloudsShapeNoise");
         _shape_noise->Apply();
-        _noise_gen->SetVector("_Size", Vector4f((f32) w, (f32) w, (f32) w, 0.f));
-        _noise_gen->SetTexture("_OutNoise3D", _shape_noise.get());
         u16 thread_size_x, thread_size_y, thread_size_z;
         auto shape_kernel = _noise_gen->FindKernel("ShapeNoiseMain");
+        _noise_gen->SetVector("_Size", Vector4f((f32) w, (f32) w, (f32) w, 0.f));
+        _noise_gen->SetTexture(shape_kernel, "_OutNoise3D", _shape_noise.get());
         _noise_gen->GetThreadNum(shape_kernel, thread_size_x, thread_size_y, thread_size_z);
         auto cmd = CommandBufferPool::Get("CloudNoiseGen");
         cmd->Dispatch(_noise_gen.get(), shape_kernel, w / thread_size_x, h / thread_size_y, d / thread_size_z);
@@ -70,9 +70,9 @@ namespace Ailu::Render
         _detail_noise = Texture3D::Create(desc);
         _detail_noise->Name("VolumetricCloudsDetailNoise");
         _detail_noise->Apply();
-        _noise_gen->SetVector("_Size", Vector4f((f32) w, (f32) w, (f32) w, 0.f));
-        _noise_gen->SetTexture("_OutNoise3D", _detail_noise.get());
         shape_kernel = _noise_gen->FindKernel("DetailNoiseMain");
+        _noise_gen->SetVector("_Size", Vector4f((f32) w, (f32) w, (f32) w, 0.f));
+        _noise_gen->SetTexture(shape_kernel, "_OutNoise3D", _detail_noise.get());
         cmd->Dispatch(_noise_gen.get(), shape_kernel, w / thread_size_x, h / thread_size_y, d / thread_size_z);
         TextureDesc curl_desc;
         curl_desc._width = 128;
@@ -84,9 +84,9 @@ namespace Ailu::Render
         _curl_noise = Texture2D::Create(curl_desc);
         _curl_noise->Apply();
         _curl_noise->Name("CurlNoise");
-        _noise_gen->SetVector("_Size", Vector4f(128.0f, 128.0f, 1.0f / 128.0f, 1.0f / 128.0f));
-        _noise_gen->SetTexture("_CurlOut", _curl_noise.get());
         auto curl_kernel = _noise_gen->FindKernel("CurlNoiseMain");
+        _noise_gen->SetVector("_Size", Vector4f(128.0f, 128.0f, 1.0f / 128.0f, 1.0f / 128.0f));
+        _noise_gen->SetTexture(curl_kernel, "_CurlOut", _curl_noise.get());
         _noise_gen->GetThreadNum(curl_kernel, thread_size_x, thread_size_y, thread_size_z);
         cmd->Dispatch(_noise_gen.get(), curl_kernel, 128 / thread_size_x, 128 / thread_size_y, 1);
         g_pGfxContext->ExecuteCommandBuffer(cmd);
@@ -135,6 +135,7 @@ namespace Ailu::Render
             _cloud_cur_handle = builder.Import(_is_cur_a ? _cloud_rt_a.get() : _cloud_rt_b.get());
             _cloud_history_handle = builder.Import(_is_cur_a ? _cloud_rt_b.get() : _cloud_rt_a.get());
             builder.Read(rendering_data._rg_handles._depth_tex);
+            builder.Read(rendering_data._rg_handles._sky_view_lut);
             builder.Read(_cloud_history_handle);
             _cloud_cur_handle = builder.Write(_cloud_cur_handle, EResourceUsage::kWriteUAV);
             }, [this, cur_offset](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
@@ -142,18 +143,20 @@ namespace Ailu::Render
             auto *cur_rt = graph.Resolve<RenderTexture>(_cloud_cur_handle);
             auto *history_rt = graph.Resolve<RenderTexture>(_cloud_history_handle);
             auto *depth_tex = graph.Resolve<Texture>(data._rg_handles._depth_tex);
-            if (cur_rt == nullptr || history_rt == nullptr || depth_tex == nullptr)
+            auto *sky_view_lut = graph.Resolve<Texture>(data._rg_handles._sky_view_lut);
+            if (cur_rt == nullptr || history_rt == nullptr || depth_tex == nullptr || sky_view_lut == nullptr)
                 return;
 
             auto rt_desc = data._camera_data._camera_color_target_desc;
-            _cloud_gen->SetTexture("_ShapeNoise", _shape_noise.get());
-            _cloud_gen->SetTexture("_NoiseTex", _blue_noise.get());
-            _cloud_gen->SetTexture("_DetailNoise", _detail_noise.get());
-            _cloud_gen->SetTexture("_WeatherMap", _weather_map.get());
+            _cloud_gen->SetTexture(_cloud_main_kernel, "_ShapeNoise", _shape_noise.get());
+            _cloud_gen->SetTexture(_cloud_main_kernel, "_NoiseTex", _blue_noise.get());
+            _cloud_gen->SetTexture(_cloud_main_kernel, "_DetailNoise", _detail_noise.get());
+            _cloud_gen->SetTexture(_cloud_main_kernel, "_WeatherMap", _weather_map.get());
             _cloud_gen->SetVector("_CloudTex_TexelSize", cur_rt->TexelSize());
-            _cloud_gen->SetTexture("_CameraDepthTexture", depth_tex);
+            _cloud_gen->SetTexture(_cloud_main_kernel, "_CameraDepthTexture", depth_tex);
+            _cloud_gen->SetTexture(_cloud_main_kernel, "_TexSkyViewLUT", sky_view_lut);
             _cloud_gen->SetVector("_pixel_offset", Vector4f((f32) cur_offset.x, (f32) cur_offset.y, 0.f, 0.f));
-            _cloud_gen->SetTexture("_CloudTex", cur_rt);
+            _cloud_gen->SetTexture(_cloud_main_kernel, "_CloudTex", cur_rt);
             {
                 auto [x, y, z] = _cloud_gen->CalculateDispatchNum(_cloud_main_kernel, rt_desc._width >> (_params._is_tile_render ? 2 : 0), rt_desc._height >> (_params._is_tile_render ? 2 : 0), 1);
                 cmd->Dispatch(_cloud_gen.get(), _cloud_main_kernel, x, y, 1);
@@ -170,7 +173,12 @@ namespace Ailu::Render
             }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
             {
                 auto rt_desc = data._camera_data._camera_color_target_desc;
-                _cloud_gen->SetTexture("_CloudHistoryTex", graph.Resolve<RenderTexture>(_cloud_history_handle));
+                _cloud_gen->SetTexture(_cloud_reprojection_kernel, "_CloudTex",
+                                       graph.Resolve<RenderTexture>(_cloud_cur_handle));
+                _cloud_gen->SetTexture(_cloud_reprojection_kernel, "_CloudHistoryTex",
+                                       graph.Resolve<RenderTexture>(_cloud_history_handle));
+                _cloud_gen->SetTexture(_cloud_reprojection_kernel, "_MotionVectorTexture",
+                                       graph.Resolve<Texture>(data._rg_handles._motion_vector_tex));
                 auto [x, y, z] = _cloud_gen->CalculateDispatchNum(_cloud_reprojection_kernel, rt_desc._width, rt_desc._height, 1);
                 cmd->Dispatch(_cloud_gen.get(), _cloud_reprojection_kernel, x, y, 1);
             });
@@ -230,14 +238,14 @@ namespace Ailu::Render
             auto cur_offset = kOffsetTable[g_pGfxContext->GetFrameCount() % 16];
             RenderTexture* cur_rt = _is_cur_a ? _cloud_rt_a.get() : _cloud_rt_b.get();
             RenderTexture* history_rt = _is_cur_a ? _cloud_rt_b.get() : _cloud_rt_a.get();
-            _cloud_gen->SetTexture("_ShapeNoise", _shape_noise.get());
-            _cloud_gen->SetTexture("_NoiseTex", _blue_noise.get());
-            _cloud_gen->SetTexture("_DetailNoise", _detail_noise.get());
-            _cloud_gen->SetTexture("_WeatherMap", _weather_map.get());
+            _cloud_gen->SetTexture(_cloud_main_kernel, "_ShapeNoise", _shape_noise.get());
+            _cloud_gen->SetTexture(_cloud_main_kernel, "_NoiseTex", _blue_noise.get());
+            _cloud_gen->SetTexture(_cloud_main_kernel, "_DetailNoise", _detail_noise.get());
+            _cloud_gen->SetTexture(_cloud_main_kernel, "_WeatherMap", _weather_map.get());
             _cloud_gen->SetVector("_CloudTex_TexelSize", cur_rt->TexelSize());
-            _cloud_gen->SetTexture("_CameraDepthTexture", rendering_data._camera_depth_tex_handle);
+            _cloud_gen->SetTexture(_cloud_main_kernel, "_CameraDepthTexture", rendering_data._camera_depth_tex_handle);
             _cloud_gen->SetVector("_pixel_offset", Vector4f((f32) cur_offset.x, (f32) cur_offset.y, 0.f, 0.f));
-            _cloud_gen->SetTexture("_CloudTex", cur_rt);
+            _cloud_gen->SetTexture(_cloud_main_kernel, "_CloudTex", cur_rt);
             {
                 auto [x, y, z] = _cloud_gen->CalculateDispatchNum(_cloud_main_kernel, rt_desc._width >> (_params._is_tile_render? 2 : 0), rt_desc._height >> (_params._is_tile_render? 2 : 0), 1);
                 cmd->Dispatch(_cloud_gen.get(), _cloud_main_kernel, x, y, 1);
@@ -246,7 +254,8 @@ namespace Ailu::Render
             {
                 //re-projection
                 {
-                    _cloud_gen->SetTexture("_CloudHistoryTex", history_rt);
+                    _cloud_gen->SetTexture(_cloud_reprojection_kernel, "_CloudTex", cur_rt);
+                    _cloud_gen->SetTexture(_cloud_reprojection_kernel, "_CloudHistoryTex", history_rt);
                     auto [x, y, z] = _cloud_gen->CalculateDispatchNum(_cloud_reprojection_kernel, rt_desc._width, rt_desc._height, 1);
                     cmd->Dispatch(_cloud_gen.get(), _cloud_reprojection_kernel, x, y, 1);
                 }

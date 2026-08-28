@@ -105,13 +105,14 @@ namespace Ailu::Render
             _terrain_gen->SetInt("lod", i);
             if (i == 0)
             {
-                _terrain_gen->SetTexture("HeightMap", ResourceMgr::Get().Get<Texture2D>(L"Textures/TerrainHeight"));
-                _terrain_gen->SetTexture("MinMaxMap", _minmax_height.get(), 0);
+                auto *terrain_height = ResourceMgr::Get().Get<Texture2D>(L"Textures/TerrainHeight");
+                _terrain_gen->SetTexture(_min_max_height_gen_kernel, "HeightMap", terrain_height);
+                _terrain_gen->SetTexture(_min_max_height_gen_kernel, "MinMaxMap", _minmax_height.get(), 0);
             }
             else
             {
-                _terrain_gen->SetTexture("HeightMap", _minmax_height.get(), i - 1);
-                _terrain_gen->SetTexture("MinMaxMap", _minmax_height.get(), i);
+                _terrain_gen->SetTexture(_min_max_height_gen_kernel, "HeightMap", _minmax_height.get(), i - 1);
+                _terrain_gen->SetTexture(_min_max_height_gen_kernel, "MinMaxMap", _minmax_height.get(), i);
             }
             auto [x, y, z] = _terrain_gen->CalculateDispatchNum(_min_max_height_gen_kernel, 1280u >> i, 1280u >> i, 1u);
             cmd->Dispatch(_terrain_gen, _min_max_height_gen_kernel, x, y);
@@ -133,7 +134,7 @@ namespace Ailu::Render
             _terrain_gen->SetFloat("control_factor",1.0f);
             //_terrain_gen->SetVector("camera_pos",rendering_data._camera->Position());
             _terrain_gen->SetFloat("max_height",*_max_height);
-            _terrain_gen->SetTexture("_MinMaxMap", _minmax_height.get());
+            _terrain_gen->SetTexture(_quad_tree_processor_kernel, "_MinMaxMap", _minmax_height.get());
             _terrain_gen->SetVector("camera_pos",_cam->Position());
             for (i32 i = kMaxLOD; i >=0 ;i--)
             {
@@ -147,7 +148,7 @@ namespace Ailu::Render
             //lod map
             cmd->CopyCounterValue(_final_node_buf.get(), _disp_args_buf.get(), 0u);
             _terrain_gen->SetBuffer(_gen_lod_map_kernel, "_input_final_nodes", _final_node_buf.get());
-            _terrain_gen->SetTexture("_LODMap",_lod_map.get());
+            _terrain_gen->SetTexture(_gen_lod_map_kernel, "_LODMap",_lod_map.get());
             cmd->Dispatch(_terrain_gen, _gen_lod_map_kernel, _disp_args_buf.get(), 0u);
             //patch gen
             const auto& vf = _cam->GetViewFrustum()._planes;
@@ -156,7 +157,7 @@ namespace Ailu::Render
             _terrain_gen->SetVectorArray("_frustum",_frustum.data(),6u);
             _terrain_gen->SetBuffer(_gen_patches_kernel, "_input_final_nodes", _final_node_buf.get());
             _terrain_gen->SetBuffer(_gen_patches_kernel, "_patch_list", _patches_buf.get());
-            _terrain_gen->SetTexture("_InputLODMap",_lod_map.get());
+            _terrain_gen->SetTexture(_gen_patches_kernel, "_InputLODMap",_lod_map.get());
             cmd->Dispatch(_terrain_gen, _gen_patches_kernel, _disp_args_buf.get(), 0u);
             //draw
             cmd->SetRenderTarget(rendering_data._camera_color_target_handle, rendering_data._camera_depth_target_handle);

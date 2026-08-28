@@ -1013,10 +1013,35 @@ namespace Ailu::Render
         }
     }
 
+    void ComputeShader::SetTexture(ComputeShaderKernelId kernel, const String &name, Texture *texture)
+    {
+        if (texture == nullptr || !IsKernelValid(kernel))
+            return;
+
+        u16 depth_slice = static_cast<u16>(-1);
+        if (texture->Dimension() == ETextureDimension::kTex3D)
+            depth_slice = dynamic_cast<Texture3D *>(texture)->Depth();
+        const ComputeBindParams params{ECubemapFace::kUnknown, 0u, depth_slice, UINT32_MAX, Texture::kMainSRVIndex};
+        const auto kernel_index = ResolveKernelIndex(kernel);
+        const auto &kernel_element = _kernels[kernel_index];
+        for (const auto &[variant_hash, variant] : kernel_element._variants)
+        {
+            if (!variant._bind_res_infos.contains(name))
+                continue;
+            SetResourceBinding(kernel, ShaderPropertyRegistry::Get().Intern(name), texture, params);
+            return;
+        }
+    }
+
     void ComputeShader::SetTexture(const String &name, RTHandle handle)
     {
         auto texture = g_pRenderTexturePool->Get(handle);
         SetTexture(name, texture);
+    }
+
+    void ComputeShader::SetTexture(ComputeShaderKernelId kernel, const String &name, RTHandle handle)
+    {
+        SetTexture(kernel, name, g_pRenderTexturePool->Get(handle));
     }
 
     void ComputeShader::SetTexture(const String &name, RTHandle handle, ECubemapFace face, u16 mipmap)
@@ -1024,6 +1049,12 @@ namespace Ailu::Render
         auto texture = g_pRenderTexturePool->Get(handle);
         SetTexture(name, texture,face,mipmap);
      }
+
+    void ComputeShader::SetTexture(ComputeShaderKernelId kernel, const String &name, RTHandle handle,
+                                   ECubemapFace face, u16 mipmap)
+    {
+        SetTexture(kernel, name, g_pRenderTexturePool->Get(handle), face, mipmap);
+    }
 
     void ComputeShader::SetTexture(u8 bind_slot, Texture *texture)
     {
@@ -1074,6 +1105,33 @@ namespace Ailu::Render
         }
         if (!is_set)
             LOG_WARNING("ComputeShader::SetTexture: texture with name {} not found on shader({})",name,_name);
+    }
+
+    void ComputeShader::SetTexture(ComputeShaderKernelId kernel, const String &name, Texture *texture, u16 mipmap)
+    {
+        SetTexture(kernel, name, texture, ECubemapFace::kUnknown, mipmap);
+    }
+
+    void ComputeShader::SetTexture(ComputeShaderKernelId kernel, const String &name, Texture *texture,
+                                   ECubemapFace face, u16 mipmap)
+    {
+        if (texture == nullptr || !IsKernelValid(kernel))
+            return;
+
+        const u32 sub_res = face == ECubemapFace::kUnknown ? texture->CalculateSubResIndex(mipmap, 0) :
+                                                             texture->CalculateSubResIndex(face, mipmap, 0);
+        u16 depth_slice = static_cast<u16>(-1);
+        if (texture->Dimension() == ETextureDimension::kTex3D)
+            depth_slice = dynamic_cast<Texture3D *>(texture)->Depth();
+        const auto &kernel_element = _kernels[ResolveKernelIndex(kernel)];
+        for (const auto &[variant_hash, variant] : kernel_element._variants)
+        {
+            if (!variant._bind_res_infos.contains(name))
+                continue;
+            SetResourceBinding(kernel, ShaderPropertyRegistry::Get().Intern(name), texture,
+                               ComputeBindParams{face, mipmap, depth_slice, sub_res});
+            return;
+        }
     }
 
     //void ComputeShader::SetTexture(const String &name, RDG::RGHandle handle)

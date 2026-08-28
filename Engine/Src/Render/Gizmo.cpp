@@ -377,6 +377,11 @@ namespace Ailu::Render
 
     void Gizmo::DrawTexture(const Rect &rect, Texture *tex)
     {
+        if (s_pInstance->_tex_screen_item_num >= kMaxDrawTextureNum)
+        {
+            LOG_WARNING("[Gizmo] screen texture draw list is full, texture draw is skipped");
+            return;
+        }
         s_pInstance->_draw_tex_items[s_pInstance->_tex_screen_item_num++] = {rect, tex};
     }
 

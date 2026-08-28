@@ -90,6 +90,14 @@ namespace Ailu::RHI::DX12
         GpuResource::TrackResourceState(new_state, sub_res);
     }
 
+    void D3DSwapchainTexture::ApplyResourceBarrier(RHICommandBuffer *rhi_cmd, Render::EResourceState before_state,
+                                                    Render::EResourceState after_state, u32 sub_res)
+    {
+        auto d3dcmd = static_cast<D3DCommandBuffer *>(rhi_cmd);
+        d3dcmd->ApplyResourceBarrier(*_state_guard[_cur_backbuf_index], D3DConvertUtils::FromALResState(before_state),
+                                     D3DConvertUtils::FromALResState(after_state), sub_res);
+    }
+
     void D3DSwapchainTexture::TrackResourceState(Render::EResourceState new_state, u32 sub_res)
     {
         _state_guard[_cur_backbuf_index]->TrackResourceState(D3DConvertUtils::FromALResState(new_state), sub_res);

@@ -406,6 +406,11 @@ namespace Ailu::Render
             if (feature->IsActive())
                 feature->AddRenderPasses(*this, _rendering_data);
         }
+        _rendering_data._rg_handles._volumetric_fog_accum = {};
+        auto *volumetric_fog = dynamic_cast<VolumetricFog *>(_fog);
+        if (_is_use_render_graph && volumetric_fog != nullptr && volumetric_fog->IsActive() &&
+            volumetric_fog->GetAccTexture() != nullptr)
+            _rendering_data._rg_handles._volumetric_fog_accum = _rd_graph->Import(volumetric_fog->GetAccTexture());
         std::stable_sort(_render_passes.begin(), _render_passes.end(), [](RenderPass *a, RenderPass *b) -> bool
                          { return *a < *b; });
         _target_tex = g_pRenderTexturePool->Get(_rendering_data._camera_color_target_handle);
@@ -433,7 +438,6 @@ namespace Ailu::Render
                     PROFILE_BLOCK_CPU(std::format("Record {}", pass->Name()).c_str())
                     pass->OnRecordRenderGraph(*_rd_graph, _rendering_data);
                 }
-                _rd_graph->Compile();
             }
         }
     }
@@ -925,25 +929,36 @@ namespace Ailu::Render
         }
         if (_is_use_render_graph)
         {
-            _rd_graph->Execute(*_p_context,_rendering_data);
             RenderTexture *final_target = output_target != nullptr ? output_target : _presentation_texture.get();
             if (final_target != nullptr)
             {
-                if (auto *src = _rd_graph->Resolve<Texture>(_rendering_data._rg_handles._color_target); src != nullptr)
+                const RDG::RGHandle source_handle = _rendering_data._rg_handles._color_target;
+                const RDG::RGHandle target_handle = _rd_graph->Import(final_target);
+                RDG::RGHandle output_handle;
+                _rd_graph->AddPass("FinalBlit", RDG::PassDesc(), [source_handle, target_handle, &output_handle](RDG::RenderGraphBuilder &builder)
                 {
-                    auto cmd = CommandBufferPool::Get("FinalBlit");
-                    {
-                        PROFILE_BLOCK_GPU(cmd.get(), cmd->Name())
-                        if (output_view_index >= 0)
-                            cmd->Blit(src, final_target, 0, (u16)output_view_index, nullptr);
-                        else
-                            cmd->Blit(src, final_target);
-                    }
-                    _p_context->ExecuteCommandBuffer(cmd);
-                    CommandBufferPool::Release(cmd);
-                    _target_tex = final_target;
-                }
+                    builder.Read(source_handle);
+                    output_handle = builder.Write(target_handle);
+                }, [source_handle, target_handle, output_view_index](RDG::RenderGraph &graph, CommandBuffer *cmd,
+                                                                       const RenderingData &)
+                {
+                    auto *src = graph.Resolve<Texture>(source_handle);
+                    auto *dst = graph.Resolve<RenderTexture>(target_handle);
+                    if (src == nullptr || dst == nullptr)
+                        return;
+                    if (output_view_index >= 0)
+                        cmd->Blit(src, dst, 0, static_cast<u16>(output_view_index), nullptr);
+                    else
+                        cmd->Blit(src, dst);
+                });
+                const RDG::RGHandle presentation_read_handle = output_handle;
+                _rd_graph->AddPass("PreparePresentation", RDG::PassDesc(), [presentation_read_handle](RDG::RenderGraphBuilder &builder)
+                {
+                    builder.Read(presentation_read_handle, EResourceUsage::kReadSRV);
+                }, [](RDG::RenderGraph &, CommandBuffer *, const RenderingData &) {});
+                _target_tex = final_target;
             }
+            _rd_graph->Execute(*_p_context,_rendering_data);
         }
         else
         {

@@ -108,12 +108,20 @@ namespace Ailu
             static auto mat_camera = ResourceMgr::Get().Get<Material>(L"Runtime/Material/CameraBillboard");
             static auto mat_gird_plane = ResourceMgr::Get().Get<Material>(L"Runtime/Material/GridPlane");
             static auto mat_lightprobe = ResourceMgr::Get().Get<Material>(L"Runtime/Material/LightProbeBillboard");
+            const auto read_sprite_resources = [this](RDG::RenderGraphBuilder &builder)
+            {
+                if (auto *instance_buffer = _sprite_batcher->InstanceBuffer(); instance_buffer != nullptr)
+                    builder.Read(builder.Import(instance_buffer));
+            };
+            if (rendering_data._scene != nullptr && rendering_data._camera != nullptr)
+                CollectSprites(*rendering_data._scene, *rendering_data._camera, false);
             graph.AddPass("PickBuffer", RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
-                          {
+                            {
                                      _color_handle = builder.Import(_color);
                                      _depth_handle = builder.Import(_depth);
                                      _color_handle = builder.Write(_color_handle);
                                      _depth_handle = builder.Write(_depth_handle,EResourceUsage::kDSV);
+                                     read_sprite_resources(builder);
                 }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data)
                 {
                       cmd->SetRenderTarget(_color_handle, _depth_handle);
@@ -214,11 +222,15 @@ namespace Ailu
             static RDG::RGHandle select_buf,select_buf_blur;
             if (Selection::SelectedEntities().size() == 0)
                 return;
+            if (rendering_data._scene != nullptr && rendering_data._camera != nullptr)
+                CollectSprites(*rendering_data._scene, *rendering_data._camera, true);
             graph.AddPass("SelectBuffer", RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
                           {
                     TextureDesc desc(_color->Width(), _color->Height(),ERenderTargetFormat::kDefault);
                     select_buf = builder.AllocTexture(desc,"select_buffer");
-                    select_buf = builder.Write(select_buf); }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data)
+                    select_buf = builder.Write(select_buf);
+                    read_sprite_resources(builder);
+                }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data)
                           {
                 if (auto &selected = Selection::SelectedEntities(); selected.size() > 0)
                 {
@@ -262,10 +274,11 @@ namespace Ailu
                     cmd->SetRenderTarget(select_buf_blur);
                     cmd->DrawFullScreenQuad(_editor_outline.get());
                 });
-            graph.AddPass("BlurOutline", RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
+                graph.AddPass("BlurOutline", RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
                           {
                     builder.Read(select_buf_blur);
-                    select_buf = builder.Write(select_buf); }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data)
+                    select_buf = builder.Write(select_buf);
+                }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data)
                           { 
                     _editor_outline->SetTexture("_SelectBuffer", graph.Resolve<Texture>(select_buf_blur));
                     cmd->SetRenderTarget(select_buf);
@@ -275,7 +288,7 @@ namespace Ailu
                           {
                     builder.Read(select_buf);
                     builder.Read(rendering_data._rg_handles._color_target);
-                    rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target); 
+                    rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target);
                 }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data)
                           { 
                     _editor_outline->SetTexture("_SelectBuffer", graph.Resolve<Texture>(select_buf));

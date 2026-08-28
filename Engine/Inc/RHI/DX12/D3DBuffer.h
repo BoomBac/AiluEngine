@@ -29,6 +29,8 @@ namespace Ailu::RHI::DX12
 		D3DGPUBuffer(BufferDesc desc);
 		~D3DGPUBuffer();
 		void StateTranslation(RHICommandBuffer* rhi_cmd,EResourceState new_state,u32 sub_res) final;
+		void ApplyResourceBarrier(RHICommandBuffer *rhi_cmd, EResourceState before_state, EResourceState after_state,
+		                          u32 sub_res) final;
 		void TrackResourceState(EResourceState new_state, u32 sub_res = Render::kTotalSubRes) final;
 		EResourceState CurrentResourceState(u32 sub_res = Render::kTotalSubRes) const final;
         bool TryCurrentResourceState(EResourceState &out_state, u32 sub_res = Render::kTotalSubRes) const final;

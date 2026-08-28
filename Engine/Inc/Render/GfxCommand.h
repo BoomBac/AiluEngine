@@ -311,44 +311,27 @@ namespace Ailu::Render
         }
     };
 
-    constexpr size_t MaxCommandValue(size_t lhs, size_t rhs)
+    template<typename... Values>
+    constexpr size_t MaxCommandValue(size_t first, Values... rest)
     {
-        return lhs > rhs ? lhs : rhs;
+        size_t result = first;
+        ((result = result > rest ? result : rest), ...);
+        return result;
     }
 
-    inline constexpr size_t kCommandPayloadSize = MaxCommandValue(sizeof(CommandSetTarget),
-        MaxCommandValue(sizeof(CommandClearTarget),
-        MaxCommandValue(sizeof(CommandDraw),
-        MaxCommandValue(sizeof(CommandDispatch),
-        MaxCommandValue(sizeof(CommandGpuResourceUpload),
-        MaxCommandValue(sizeof(CommandTranslateState),
-        MaxCommandValue(sizeof(CommandResourceBarrier),
-        MaxCommandValue(sizeof(CommandUAVBarrier),
-        MaxCommandValue(sizeof(CommandCustom),
-        MaxCommandValue(sizeof(CommandAllocConstBuffer),
-        MaxCommandValue(sizeof(CommandProfiler),
-        MaxCommandValue(sizeof(CommandCopyCounter),
-        MaxCommandValue(sizeof(CommandPresent),
-        MaxCommandValue(sizeof(CommandScissor),
-        MaxCommandValue(sizeof(CommandDispatchRays),
-        MaxCommandValue(sizeof(CommandReadBack), sizeof(CommandBuildAS)))))))))))))))));
+    inline constexpr size_t kCommandPayloadSize = MaxCommandValue(
+        sizeof(CommandSetTarget), sizeof(CommandClearTarget), sizeof(CommandDraw), sizeof(CommandDispatch),
+        sizeof(CommandGpuResourceUpload), sizeof(CommandTranslateState), sizeof(CommandResourceBarrier),
+        sizeof(CommandUAVBarrier), sizeof(CommandCustom), sizeof(CommandAllocConstBuffer), sizeof(CommandProfiler),
+        sizeof(CommandCopyCounter), sizeof(CommandPresent), sizeof(CommandScissor), sizeof(CommandDispatchRays),
+        sizeof(CommandReadBack), sizeof(CommandBuildAS));
 
-    inline constexpr size_t kCommandPayloadAlign = MaxCommandValue(alignof(CommandSetTarget),
-        MaxCommandValue(alignof(CommandClearTarget),
-        MaxCommandValue(alignof(CommandDraw),
-        MaxCommandValue(alignof(CommandDispatch),
-        MaxCommandValue(alignof(CommandGpuResourceUpload),
-        MaxCommandValue(alignof(CommandTranslateState),
-        MaxCommandValue(alignof(CommandResourceBarrier),
-        MaxCommandValue(alignof(CommandUAVBarrier),
-        MaxCommandValue(alignof(CommandCustom),
-        MaxCommandValue(alignof(CommandAllocConstBuffer),
-        MaxCommandValue(alignof(CommandProfiler),
-        MaxCommandValue(alignof(CommandCopyCounter),
-        MaxCommandValue(alignof(CommandPresent),
-        MaxCommandValue(alignof(CommandScissor), 
-        MaxCommandValue(alignof(CommandDispatchRays), 
-        MaxCommandValue(alignof(CommandReadBack), alignof(CommandBuildAS)))))))))))))))));
+    inline constexpr size_t kCommandPayloadAlign = MaxCommandValue(
+        alignof(CommandSetTarget), alignof(CommandClearTarget), alignof(CommandDraw), alignof(CommandDispatch),
+        alignof(CommandGpuResourceUpload), alignof(CommandTranslateState), alignof(CommandResourceBarrier),
+        alignof(CommandUAVBarrier), alignof(CommandCustom), alignof(CommandAllocConstBuffer), alignof(CommandProfiler),
+        alignof(CommandCopyCounter), alignof(CommandPresent), alignof(CommandScissor), alignof(CommandDispatchRays),
+        alignof(CommandReadBack), alignof(CommandBuildAS));
 
     struct alignas(kCommandPayloadAlign) CommandPayload
     {

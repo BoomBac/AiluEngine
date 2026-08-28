@@ -118,6 +118,7 @@ namespace Ailu
         CommandBuffer(String name);
         ~CommandBuffer() override;
         void SetRenderGraph(RDG::RenderGraph *render_graph);
+        void UseRenderGraphResource(GpuResource *resource);
 #if AILU_ENABLE_FRAME_DEBUGGER
         void SetCapturePassMetadata(const Render::FrameDebugger::CapturePassMetadata &metadata) { _capture_pass_metadata = metadata; }
         const Render::FrameDebugger::CapturePassMetadata &CapturePassMetadata() const { return _capture_pass_metadata; }
@@ -218,6 +219,7 @@ namespace Ailu
 
         // Move-out the internal command list for submission.
         Vector<GfxCommand *> TakeCommands();
+        Vector<GpuResource *> TakeRenderGraphResources();
         // Move-out the unique strong references required by asynchronous command recording.
         Vector<Ref<Object>> TakeKeepAliveObjects();
         // Move-out temporary RTs whose pool leases can be released after GPU submission.

@@ -1,4 +1,4 @@
-﻿#include "Render/Features/VolumetricFog.h"
+#include "Render/Features/VolumetricFog.h"
 #include "Render/Renderer.h"
 #include "Render/CommandBuffer.h"
 #include "Render/RenderGraph/RenderGraph.h"
@@ -56,7 +56,8 @@ namespace Ailu
             {
                 auto *cur_light = graph.Resolve<Texture3D>(_inject_handle);
                 auto *history_light = graph.Resolve<Texture3D>(_history_light_handle);
-                if (cur_light == nullptr || history_light == nullptr)
+                auto *main_light_shadow_map = graph.Resolve<Texture>(data._rg_handles._main_light_shadow_map);
+                if (cur_light == nullptr || history_light == nullptr || main_light_shadow_map == nullptr)
                     return;
                 const Camera* cam = Camera::sSelected? Camera::sSelected : data._camera;
                 _volumetric_fog->SetMatrix("_matrix_iv",MatrixInverse(cam->GetView()));
@@ -67,9 +68,12 @@ namespace Ailu
                 _volumetric_fog->SetFloat("_cam_far", cam->Far());
                 _volumetric_fog->SetVector("_cam_pos", cam->Position());
                 //_volumetric_fog->SetVector("_zmax_uv_scale", maxz_sample_uv_scale);
-                _volumetric_fog->SetTexture("_VolumetricLight", cur_light);
-                _volumetric_fog->SetTexture("_History_VolumetricLight", history_light);
-                auto [x,y,z] = _volumetric_fog->CalculateDispatchNum(_light_injection_kernel, cur_light->Width(), cur_light->Height(), cur_light->Depth());
+                _volumetric_fog->SetTexture(_light_injection_kernel, "_VolumetricLight", cur_light);
+                _volumetric_fog->SetTexture(_light_injection_kernel, "_History_VolumetricLight", history_light);
+                _volumetric_fog->SetTexture(_light_injection_kernel, RenderResourceName::kMainLightShadowMap,
+                                             main_light_shadow_map);
+                auto [x,y,z] = _volumetric_fog->CalculateDispatchNum(_light_injection_kernel, cur_light->Width(),
+                                                                      cur_light->Height(), cur_light->Depth());
                 cmd->Dispatch(_volumetric_fog, _light_injection_kernel, x, y, z);
                 _matrix_prev_p = cam->GetProjNoJitter();
                 _matrix_prev_v = cam->GetView();
@@ -78,8 +82,7 @@ namespace Ailu
             {
                 builder.Read(_inject_handle);
                 //builder.Read(s_max_z_handle);
-                _accum_handle = builder.Import(_accum_texture);
-                _accum_handle = builder.Write(_accum_handle, EResourceUsage::kWriteUAV);
+                _accum_handle = builder.Write(rendering_data._rg_handles._volumetric_fog_accum, EResourceUsage::kWriteUAV);
             },
             [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
             {
@@ -93,12 +96,11 @@ namespace Ailu
                 // _volumetric_fog->SetFloat("_cam_near", cam->Near());
                 // _volumetric_fog->SetFloat("_cam_far", cam->Far());
                 // _volumetric_fog->SetVector("_cam_pos", cam->Position());
-                _volumetric_fog->SetTexture("_VolumetricLight", cur_light);
-                _volumetric_fog->SetTexture("_FogAccum", accum_tex);
+                _volumetric_fog->SetTexture(_light_integration_kernel, "_VolumetricLight", cur_light);
+                _volumetric_fog->SetTexture(_light_integration_kernel, "_FogAccum", accum_tex);
                 //_volumetric_fog->SetTexture("_MaxZ_Texture", graph.Resolve<Texture>(s_max_z_handle));
                 auto [x,y,z] = _volumetric_fog->CalculateDispatchNum(_light_integration_kernel, cur_light->Width(), cur_light->Height(), cur_light->Depth());
                 cmd->Dispatch(_volumetric_fog, _light_integration_kernel, x, y, 1);
-                Shader::SetGlobalTexture("_VolumetricLightTexture", accum_tex);
             });
             if (_debug_voxel_pos)
             {
@@ -106,6 +108,7 @@ namespace Ailu
                             {
                     builder.Read(rendering_data._rg_handles._color_target, EResourceUsage::kWriteRTV);
                     builder.Read(rendering_data._rg_handles._depth_target, EResourceUsage::kDSV);
+                    builder.Read(_inject_handle);
                     rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target);
                     rendering_data._rg_handles._depth_target = builder.Write(rendering_data._rg_handles._depth_target, EResourceUsage::kDSV);
                 }, 
@@ -147,27 +150,26 @@ namespace Ailu
             _volumetric_light_a = Texture3D::Create(desc);
             _volumetric_light_a->Name("VolumetricLightTextureA");
             _volumetric_light_a->Apply();
-            _volumetric_light_a->CreateView();
             _volumetric_light_b = Texture3D::Create(desc);
             _volumetric_light_b->Name("VolumetricLightTextureB");
             _volumetric_light_b->Apply();
-            _volumetric_light_b->CreateView();
             _volumetric_fog_cs = ResourceMgr::Get().Load<ComputeShader>(L"Shaders/hlsl/Compute/volumetric_light.alasset");
             _max_z_cs = ResourceMgr::Get().Load<ComputeShader>(L"Shaders/hlsl/Compute/max_z.alasset");
             _accum_texture = Texture3D::Create(desc);
             _accum_texture->Name("VolumetricFogAccumTexture");
             _accum_texture->Apply();
-            _accum_texture->CreateView();
             _volumetric_fog_cs->SetFloat("_FogDensity", _fog_density);
             _volumetric_fog_cs->SetFloat("_temporal_blend_factor", _blend_factor);
             _volumetric_fog_cs->SetBool("_temporal_reprojection", _temporal_reprojection);
             _volumetric_fog_cs->SetFloat("_intensity", _intensity);
             _volumetric_fog_cs->SetFloat("_g", _g);
-            _volumetric_fog_cs->SetTexture("_BlueNoise", ResourceMgr::Get().Get<Texture2D>(EnginePath::kEngineTexturePathW + L"blue_noise.alasset"));
             _volumetric_fog_pass->_volumetric_fog = _volumetric_fog_cs.get();
             _volumetric_fog_pass->_max_z_cs = _max_z_cs.get();
             _volumetric_fog_pass->_light_injection_kernel = _volumetric_fog_cs->FindKernel("LightInjection");
             _volumetric_fog_pass->_light_integration_kernel = _volumetric_fog_cs->FindKernel("LightIntegration");
+            const auto blue_noise_path = EnginePath::kEngineTexturePathW + L"blue_noise.alasset";
+            auto *blue_noise = ResourceMgr::Get().Get<Texture2D>(blue_noise_path);
+            _volumetric_fog_cs->SetTexture(_volumetric_fog_pass->_light_injection_kernel, "_BlueNoise", blue_noise);
             _volumetric_fog_pass->_voxel_num = _voxel_num;
         }
         

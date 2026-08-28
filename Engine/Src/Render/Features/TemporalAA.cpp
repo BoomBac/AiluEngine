@@ -163,9 +163,9 @@ namespace Ailu::Render
                 _taa_gen->SetVector("_SourceTex_TexelSize",Vector4f(1.0f / rendering_data._width, 1.0f / rendering_data._height,(f32) rendering_data._width, (f32) rendering_data._height));
                 //_taa_gen->SetVector("_Params",_params);
                 _taa_gen->SetVector("_Jitter",_jitter);
-                _taa_gen->SetTexture("_CurrentColor",rendering_data._camera_opaque_tex_handle);
-                _taa_gen->SetTexture("_HistoryColor",history_target);
-                _taa_gen->SetTexture("_CurrentTarget",cur_target);
+                _taa_gen->SetTexture(_taa_kernel, "_CurrentColor",rendering_data._camera_opaque_tex_handle);
+                _taa_gen->SetTexture(_taa_kernel, "_HistoryColor",history_target);
+                _taa_gen->SetTexture(_taa_kernel, "_CurrentTarget",cur_target);
                 _taa_gen->SetFloat("_ClampQuality",_quality.x);
                 _taa_gen->SetFloat("_HistoryQuality",_quality.y);
                 _taa_gen->SetFloat("_MotionQuality",_quality.z);

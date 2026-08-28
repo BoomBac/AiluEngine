@@ -1,6 +1,8 @@
 #include "RHI/DX12/D3DCommandBuffer.h"
 #include "Ext/pix/Include/WinPixEventRuntime/pix3.h"
+#include "Framework/Common/RenderDebugConfig.h"
 #include "Framework/Common/ResourceMgr.h"
+#include "RHI/DX12/D3DBuffer.h"
 #include "RHI/DX12/D3DContext.h"
 #include "RHI/DX12/D3DTexture.h"
 #include "RHI/DX12/dxhelper.h"
@@ -46,6 +48,13 @@ namespace Ailu::RHI::DX12
         _used_resource_set.clear();
         _used_resources.clear();
         _local_resource_states.clear();
+        _render_graph_resources.clear();
+        _active_render_graph_resources.clear();
+        _first_recording_group_name.clear();
+        _recording_group_name.clear();
+        _first_group_submission_index = 0u;
+        _last_group_submission_index = 0u;
+        _has_recorded_group = false;
         _fence_value = 0u;
         _is_submitted = false;
         _is_executed = false;
@@ -128,21 +137,224 @@ namespace Ailu::RHI::DX12
         _p_cmd->ResourceBarrier(1u, &barrier);
     }
 
+    void D3DCommandBuffer::RegisterRenderGraphResource(Render::GpuResource *resource)
+    {
+        if (resource == nullptr)
+            return;
+        // Keep the command-wide set for lifetime/diagnostic ownership.  State tracking uses the active group set,
+        // because one RHI command can contain several groups.
+        const auto native_resource = resource->NativeResource();
+        if (native_resource._res != nullptr)
+        {
+            auto *native = static_cast<ID3D12Resource *>(native_resource._res);
+            _render_graph_resources.insert(native);
+            _active_render_graph_resources.insert(native);
+        }
+        if (auto *buffer = dynamic_cast<D3DGPUBuffer *>(resource); buffer != nullptr)
+        {
+            if (auto *counter = buffer->GetCounterBuffer(); counter != nullptr)
+            {
+                _render_graph_resources.insert(counter);
+                _active_render_graph_resources.insert(counter);
+            }
+        }
+    }
+
+    void D3DCommandBuffer::BeginRenderGraphGroup(const Vector<Render::GpuResource *> &resources)
+    {
+        // Do not let resources from a later group affect barrier recording for the current group.
+        _active_render_graph_resources.clear();
+        for (auto *resource: resources)
+            RegisterRenderGraphResource(resource);
+    }
+
+    bool D3DCommandBuffer::IsRenderGraphResource(ID3D12Resource *resource) const
+    {
+        return resource != nullptr && _active_render_graph_resources.contains(resource);
+    }
+
     void D3DCommandBuffer::RecordResourceBarrier(ID3D12Resource* resource, D3D12_RESOURCE_STATES before_state,
-                                                 D3D12_RESOURCE_STATES after_state, u32 sub_res)
+                                                  D3D12_RESOURCE_STATES after_state, u32 sub_res)
     {
         AL_ASSERT(resource != nullptr);
         if (before_state == after_state) return;
+#if AILU_ENABLE_RESOURCE_STATE_TRACE
+        const String resource_name = D3DResourceStateGuard::DebugObjectName(resource);
+        if (resource_name.find("_MainLightShadowMap") != String::npos ||
+            resource_name.find("_AddLightShadowMaps") != String::npos ||
+            resource_name.find("VolumetricFogAccumTexture") != String::npos)
+        {
+            LOG_WARNING("D3DCommandBuffer native barrier: cmd_ptr={}, cmd={}, group={}, group_submission_index={}, "
+                        "resource={}, ptr={}, sub_res={}, before={}, after={}",
+                        static_cast<const void *>(this),
+                        Name(),
+                        RecordingGroupName(),
+                        LastGroupSubmissionIndex(),
+                        resource_name,
+                        static_cast<const void *>(resource),
+                        sub_res,
+                        static_cast<u32>(before_state),
+                        static_cast<u32>(after_state));
+        }
+#endif
         const auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(resource, before_state, after_state, sub_res);
         _p_cmd->ResourceBarrier(1u, &barrier);
     }
 
+    void D3DCommandBuffer::ApplyResourceBarrier(D3DResourceStateGuard &state_guard, D3D12_RESOURCE_STATES before_state,
+                                                D3D12_RESOURCE_STATES after_state, u32 sub_res)
+    {
+        ID3D12Resource *resource = state_guard.NativeResource();
+        if (resource == nullptr)
+            return;
+
+        const u64 resource_instance_id = state_guard.InstanceId();
+        const bool is_render_graph_resource = IsRenderGraphResource(resource);
+#if AILU_ENABLE_RESOURCE_STATE_TRACE
+        const String resource_name = D3DResourceStateGuard::DebugObjectName(resource);
+        const bool is_trace_resource = resource_name.find("GBuffer0") != String::npos ||
+                                       resource_name.find("light probe") != String::npos ||
+                                       resource_name.find("_MainLightShadowMap") != String::npos ||
+                                       resource_name.find("_AddLightShadowMaps") != String::npos ||
+                                       resource_name.find("VolumetricFogAccumTexture") != String::npos;
+#endif
+#if AILU_ENABLE_RESOURCE_STATE_TRACE
+        if (is_trace_resource)
+        {
+            LOG_WARNING("D3DCommandBuffer barrier record: cmd_ptr={}, cmd={}, group={}, group_submission_index={}, "
+                        "rg={}, resource={}, ptr={}, instance={}, sub_res={}, before={}, after={}",
+                        static_cast<const void *>(this),
+                        Name(),
+                        RecordingGroupName(),
+                        LastGroupSubmissionIndex(),
+                        is_render_graph_resource,
+                        resource_name,
+                        static_cast<const void *>(resource),
+                        resource_instance_id,
+                        sub_res,
+                        static_cast<u32>(before_state),
+                        static_cast<u32>(after_state));
+        }
+#endif
+        auto it = _local_resource_states.find(resource_instance_id);
+        const bool has_local_state = it != _local_resource_states.end();
+#if AILU_ENABLE_RESOURCE_STATE_TRACE
+        if (is_trace_resource && has_local_state)
+        {
+            const auto &local_states = it->second._states;
+            const u32 previous_state = sub_res == D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES ||
+                                               sub_res >= local_states.size() ?
+                                           static_cast<u32>(local_states.front()) :
+                                           static_cast<u32>(local_states[sub_res]);
+            LOG_WARNING("D3DCommandBuffer resource barrier local state: cmd_ptr={}, group={}, group_submission_index={}, "
+                        "resource={}, sub_res={}, local_before={}, requested_before={}, requested_after={}",
+                        static_cast<const void *>(this),
+                        RecordingGroupName(),
+                        LastGroupSubmissionIndex(),
+                        resource_name,
+                        sub_res,
+                        previous_state,
+                        static_cast<u32>(before_state),
+                        static_cast<u32>(after_state));
+        }
+#endif
+        if (it == _local_resource_states.end())
+        {
+            LocalResourceState local_state;
+            local_state._resource = resource;
+            local_state._global_state = &state_guard;
+            local_state._recording_group_name = RecordingGroupName();
+            local_state._last_recording_group_name = RecordingGroupName();
+            local_state._is_render_graph_resource = is_render_graph_resource;
+            state_guard.SnapshotStates(local_state._states);
+            local_state._initialized_subresources.resize(local_state._states.size(), 1u);
+            local_state._initial_states = local_state._states;
+            it = _local_resource_states.emplace(resource_instance_id, std::move(local_state)).first;
+        }
+
+        auto &local_state = it->second;
+        if (is_render_graph_resource && !local_state._is_render_graph_resource)
+        {
+            local_state._is_render_graph_resource = true;
+            local_state._recording_group_name = RecordingGroupName();
+        }
+        local_state._last_recording_group_name = RecordingGroupName();
+        const u32 subresource_count = static_cast<u32>(local_state._states.size());
+        AL_ASSERT(subresource_count > 0u);
+        // A graph command list can begin in the middle of the compiled graph state timeline.  Seed that timeline
+        // only when this command list has not recorded the resource yet.  If an earlier non-graph command already
+        // touched it, the local state is the only valid Before state for the same native command list.
+        if (is_render_graph_resource && !has_local_state)
+        {
+            if (sub_res == D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES)
+            {
+                std::fill(local_state._initial_states.begin(), local_state._initial_states.end(), before_state);
+                std::fill(local_state._states.begin(), local_state._states.end(), before_state);
+            }
+            else
+            {
+                AL_ASSERT(sub_res < subresource_count);
+                local_state._initial_states[sub_res] = before_state;
+                local_state._states[sub_res] = before_state;
+            }
+        }
+        if (sub_res == D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES)
+        {
+            if (std::all_of(local_state._states.begin(), local_state._states.end(),
+                            [&](const auto state) { return state == local_state._states.front(); }))
+            {
+                RecordResourceBarrier(resource, local_state._states.front(), after_state, sub_res);
+            }
+            else
+            {
+                for (u32 index = 0u; index < subresource_count; ++index)
+                    RecordResourceBarrier(resource, local_state._states[index], after_state, index);
+            }
+            std::fill(local_state._states.begin(), local_state._states.end(), after_state);
+            return;
+        }
+
+        AL_ASSERT(sub_res < subresource_count);
+        const D3D12_RESOURCE_STATES recorded_before = local_state._states[sub_res];
+        RecordResourceBarrier(resource, recorded_before, after_state, sub_res);
+        local_state._states[sub_res] = after_state;
+    }
+
     void D3DCommandBuffer::EnsureResourceState(D3DResourceStateGuard& state_guard,
-                                               D3D12_RESOURCE_STATES target_state, u32 sub_res)
+                                                D3D12_RESOURCE_STATES target_state, u32 sub_res)
     {
         ID3D12Resource* resource = state_guard.NativeResource();
         if (resource == nullptr)
             return;
+#if AILU_ENABLE_RESOURCE_STATE_TRACE
+        const String resource_name = D3DResourceStateGuard::DebugObjectName(resource);
+        const bool is_trace_resource = resource_name.find("GBuffer0") != String::npos ||
+                                       resource_name.find("light probe") != String::npos ||
+                                       resource_name.find("_MainLightShadowMap") != String::npos ||
+                                       resource_name.find("_AddLightShadowMaps") != String::npos ||
+                                       resource_name.find("VolumetricFogAccumTexture") != String::npos;
+#endif
+#if AILU_ENABLE_RESOURCE_STATE_TRACE
+        if (is_trace_resource)
+        {
+            LOG_WARNING("D3DCommandBuffer EnsureResourceState: cmd_ptr={}, cmd={}, group={}, group_submission_index={}, "
+                        "rg={}, resource={}, ptr={}, instance={}, sub_res={}, target={}",
+                        static_cast<const void *>(this),
+                        Name(),
+                        RecordingGroupName(),
+                        LastGroupSubmissionIndex(),
+                        IsRenderGraphResource(resource),
+                        resource_name,
+                        static_cast<const void *>(resource),
+                        state_guard.InstanceId(),
+                        sub_res,
+                        static_cast<u32>(target_state));
+        }
+#endif
+        if (IsRenderGraphResource(resource))
+        {
+            return;
+        }
 
         const u64 resource_instance_id = state_guard.InstanceId();
         auto it = _local_resource_states.find(resource_instance_id);
@@ -151,15 +363,20 @@ namespace Ailu::RHI::DX12
             LocalResourceState local_state;
             local_state._resource = resource;
             local_state._global_state = &state_guard;
+            local_state._recording_group_name = RecordingGroupName();
+            local_state._last_recording_group_name = RecordingGroupName();
+            local_state._is_render_graph_resource = false;
             state_guard.SnapshotStates(local_state._states);
             local_state._initial_states = local_state._states;
+            local_state._initialized_subresources.resize(local_state._states.size(), 1u);
             it = _local_resource_states.emplace(resource_instance_id, std::move(local_state)).first;
         }
 
-        auto& states = it->second._states;
+        auto &local_state = it->second;
+        local_state._last_recording_group_name = RecordingGroupName();
+        auto& states = local_state._states;
         const u32 subresource_count = static_cast<u32>(states.size());
         AL_ASSERT(subresource_count > 0u);
-
         if (sub_res == D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES)
         {
             bool needs_transition = false;
@@ -176,20 +393,15 @@ namespace Ailu::RHI::DX12
             {
                 if (std::all_of(states.begin(), states.end(), [&](const auto state) { return state == states.front(); }))
                 {
-                    const auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(resource, states.front(), target_state,
-                                                                                D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
-                    _p_cmd->ResourceBarrier(1u, &barrier);
+                    RecordResourceBarrier(resource, states.front(), target_state, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
                 }
                 else
                 {
-                    Vector<D3D12_RESOURCE_BARRIER> barriers;
-                    barriers.reserve(subresource_count);
                     for (u32 i = 0u; i < subresource_count; ++i)
                     {
                         if (states[i] != target_state)
-                            barriers.emplace_back(CD3DX12_RESOURCE_BARRIER::Transition(resource, states[i], target_state, i));
+                            RecordResourceBarrier(resource, states[i], target_state, i);
                     }
-                    if (!barriers.empty()) _p_cmd->ResourceBarrier(static_cast<UINT>(barriers.size()), barriers.data());
                 }
                 std::fill(states.begin(), states.end(), target_state);
             }
@@ -199,8 +411,7 @@ namespace Ailu::RHI::DX12
         AL_ASSERT(sub_res < subresource_count);
         if (states[sub_res] == target_state) return;
 
-        const auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(resource, states[sub_res], target_state, sub_res);
-        _p_cmd->ResourceBarrier(1u, &barrier);
+        RecordResourceBarrier(resource, states[sub_res], target_state, sub_res);
         states[sub_res] = target_state;
     }
 
@@ -214,6 +425,11 @@ namespace Ailu::RHI::DX12
             snapshot._resource_instance_id = resource_instance_id;
             snapshot._resource = local_state._resource;
             snapshot._global_state = local_state._global_state;
+            snapshot._recording_group_name = local_state._recording_group_name;
+            snapshot._last_recording_group_name = local_state._last_recording_group_name;
+            snapshot._is_render_graph_resource = local_state._is_render_graph_resource;
+            snapshot._first_group_submission_index = FirstGroupSubmissionIndex();
+            snapshot._last_group_submission_index = LastGroupSubmissionIndex();
             snapshot._initial_states = local_state._initial_states;
             snapshot._final_states = local_state._states;
             out_snapshots.emplace_back(std::move(snapshot));

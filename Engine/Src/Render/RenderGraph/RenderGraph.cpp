@@ -4,6 +4,7 @@
 #include "Render/CommandBuffer.h"
 #include "Render/FrameResource.h"
 #include "Framework/Common/Profiler.h"
+#include "Framework/Common/RenderDebugConfig.h"
 #if AILU_ENABLE_FRAME_DEBUGGER
 #include "Render/FrameDebugger/FrameCaptureService.h"
 #include "Render/FrameDebugger/FrameCaptureTypes.h"
@@ -27,25 +28,69 @@ namespace Ailu
                 return static_cast<u32>(usage & flag) != 0u;
             }
 
-            EResourceState UsageToResourceState(EResourceUsage usage)
+            bool TryUsageToResourceState(EResourceUsage usage, EResourceState &out_state, String &out_error)
             {
+                constexpr u32 k_write_mask = static_cast<u32>(EResourceUsage::kWriteUAV) |
+                                              static_cast<u32>(EResourceUsage::kWriteRTV) |
+                                              static_cast<u32>(EResourceUsage::kDSV) |
+                                              static_cast<u32>(EResourceUsage::kCopyDst);
+                constexpr u32 k_read_mask = static_cast<u32>(EResourceUsage::kReadSRV) |
+                                             static_cast<u32>(EResourceUsage::kCopySrc) |
+                                             static_cast<u32>(EResourceUsage::kIndirectArgument);
+                constexpr u32 k_known_mask = k_write_mask | k_read_mask |
+                                              static_cast<u32>(EResourceUsage::kRaytracingAccel);
+
+                const u32 usage_bits = static_cast<u32>(usage);
+                const u32 write_bits = usage_bits & k_write_mask;
+                if (usage_bits == 0u)
+                {
+                    out_error = "access usage is kNone";
+                    return false;
+                }
+                if ((usage_bits & ~k_known_mask) != 0u)
+                {
+                    out_error = std::format("access usage contains unknown bits 0x{:X}", usage_bits & ~k_known_mask);
+                    return false;
+                }
+                if (write_bits != 0u && (write_bits & (write_bits - 1u)) != 0u)
+                {
+                    out_error = "multiple write usages cannot be combined";
+                    return false;
+                }
+                if (write_bits != 0u && (usage_bits & ~write_bits) != 0u)
+                {
+                    out_error = "a write usage cannot be combined with another usage";
+                    return false;
+                }
+                if (HasUsage(usage, EResourceUsage::kRaytracingAccel) && usage_bits !=
+                    static_cast<u32>(EResourceUsage::kRaytracingAccel))
+                {
+                    out_error = "RaytracingAccel cannot be combined with another usage";
+                    return false;
+                }
+
                 if (HasUsage(usage, EResourceUsage::kWriteUAV))
-                    return EResourceState::kUnorderedAccess;
-                if (HasUsage(usage, EResourceUsage::kWriteRTV))
-                    return EResourceState::kRenderTarget;
-                if (HasUsage(usage, EResourceUsage::kDSV))
-                    return EResourceState::kDepthWrite;
-                if (HasUsage(usage, EResourceUsage::kCopyDst))
-                    return EResourceState::kCopyDest;
-                if (HasUsage(usage, EResourceUsage::kCopySrc))
-                    return EResourceState::kCopySource;
-                if (HasUsage(usage, EResourceUsage::kIndirectArgument))
-                    return EResourceState::kIndirectArgument;
-                if (HasUsage(usage, EResourceUsage::kRaytracingAccel))
-                    return EResourceState::kRaytracingAccelerationStructure;
-                if (HasUsage(usage, EResourceUsage::kReadSRV))
-                    return EResourceState::kAllShaderResource;
-                return EResourceState::kCommon;
+                    out_state = EResourceState::kUnorderedAccess;
+                else if (HasUsage(usage, EResourceUsage::kWriteRTV))
+                    out_state = EResourceState::kRenderTarget;
+                else if (HasUsage(usage, EResourceUsage::kDSV))
+                    out_state = EResourceState::kDepthWrite;
+                else if (HasUsage(usage, EResourceUsage::kCopyDst))
+                    out_state = EResourceState::kCopyDest;
+                else if (HasUsage(usage, EResourceUsage::kRaytracingAccel))
+                    out_state = EResourceState::kRaytracingAccelerationStructure;
+                else
+                {
+                    u32 state_bits = 0u;
+                    if (HasUsage(usage, EResourceUsage::kReadSRV))
+                        state_bits |= static_cast<u32>(EResourceState::kAllShaderResource);
+                    if (HasUsage(usage, EResourceUsage::kCopySrc))
+                        state_bits |= static_cast<u32>(EResourceState::kCopySource);
+                    if (HasUsage(usage, EResourceUsage::kIndirectArgument))
+                        state_bits |= static_cast<u32>(EResourceState::kIndirectArgument);
+                    out_state = static_cast<EResourceState>(state_bits);
+                }
+                return true;
             }
         }
 
@@ -57,14 +102,29 @@ namespace Ailu
         {
         }
 
+        bool RenderGraph::ContainsResource(const GpuResource *resource) const
+        {
+            if (resource == nullptr)
+                return false;
+            const auto contains_resource = [resource](const auto &resources)
+            {
+                for (const auto &[id, node]: resources)
+                {
+                    if (node.GetResource() == resource)
+                        return true;
+                }
+                return false;
+            };
+            return contains_resource(_transient_resources) || contains_resource(_external_resources);
+        }
+
         void RenderGraph::EndFrame()
         {
             _transient_tex_handles.clear();
             _transient_buffer_handles.clear();
+            for (auto *pass: _passes)
+                _pass_pool.Release(pass);
             _passes.clear();
-            auto &res_mgr = FrameResourceManager::Get();
-            for (auto p: _sorted_passes)
-                _pass_pool.Release(p);
             for (auto& it: _transient_resources)
             {
                 auto& [id, node] = it;
@@ -202,7 +262,12 @@ namespace Ailu
                 auto& node = it->second;
                 if (!node._is_allocated)
                 {
-                    node._pool_tex_handle = FrameResourceManager::Get().AllocTexture(it -> second._tex_desc);
+                    node._pool_tex_handle = FrameResourceManager::Get().AllocTexture(it->second._tex_desc);
+                    if (node._pool_tex_handle._res == nullptr)
+                    {
+                        LOG_ERROR("RenderGraph::CreatePhysicsTexture: failed to allocate resource {}", node._name);
+                        return nullptr;
+                    }
                     node._pool_tex_handle._res->Name(node._name);
                     node._is_allocated = true;
                 }
@@ -220,6 +285,11 @@ namespace Ailu
                 if (!node._is_allocated)
                 {
                     node._pool_buffer_handle = FrameResourceManager::Get().AllocBuffer(it->second._buffer_desc);
+                    if (node._pool_buffer_handle._res == nullptr)
+                    {
+                        LOG_ERROR("RenderGraph::CreatePhysicsBuffer: failed to allocate resource {}", node._name);
+                        return nullptr;
+                    }
                     node._pool_buffer_handle._res->Name(node._name);
                     node._is_allocated = true;
                 }
@@ -229,14 +299,45 @@ namespace Ailu
             return nullptr;
         }
 
+        bool RenderGraph::PrepareResources()
+        {
+            PROFILE_BLOCK_CPU("RenderGraph::PrepareResources")
+            bool is_valid = true;
+            const auto prepare_handle = [&](RGHandle handle)
+            {
+                CreatePhysicalResources(handle);
+                auto *node = GetResourceNode(handle);
+                if (node == nullptr || node->GetResource() == nullptr)
+                {
+                    LOG_ERROR("RenderGraph::PrepareResources: unresolved resource {}.{}", handle._id, handle._version);
+                    is_valid = false;
+                }
+            };
+
+            for (const auto &compiled_pass: _compiled_passes)
+            {
+                if (compiled_pass._pass == nullptr)
+                    continue;
+                for (const auto &record: compiled_pass._pass->_input_access_records)
+                    prepare_handle(record._handle);
+                for (const auto &record: compiled_pass._pass->_output_access_records)
+                    prepare_handle(record._handle);
+            }
+            return is_valid;
+        }
+
 
         RGHandle RenderGraph::Import(GpuResource *external)
         {
             if (external == nullptr)
                 return RGHandle(0u);
-            auto initial_state = external->CurrentResourceState();
+            EResourceState initial_state = EResourceState::kCommon;
             if (auto *rt = dynamic_cast<RenderTexture *>(external); rt != nullptr && rt->IsSwapChain())
                 initial_state = EResourceState::kPresent;
+            else if (external->IsReady())
+            {
+                external->TryCurrentResourceState(initial_state);
+            }
             return Import(external, initial_state);
         }
 
@@ -252,24 +353,65 @@ namespace Ailu
             bool is_tex = res_type == EGpuResType::kTexture || res_type == EGpuResType::kRenderTexture;
             auto& external_pool = is_tex ? _external_tex_handles : _external_buffer_handles;
             std::lock_guard lock(_mutex);
+            const auto update_external_metadata = [&](ResourceNode &node)
+            {
+                node._extern_raw_res = external;
+                node._is_tex = is_tex;
+                node._is_render_output = res_type == EGpuResType::kRenderTexture;
+                node._is_external = true;
+                node._is_transient = false;
+                node._initial_state = initial_state;
+                node._mip_count = 1u;
+                node._array_slice_count = 1u;
+                node._is_depth_resource = false;
+
+                if (auto *texture = dynamic_cast<Texture *>(external); texture != nullptr)
+                {
+                    node._mip_count = std::max<u32>(1u, texture->MipmapLevel());
+                    switch (texture->Dimension())
+                    {
+                    case ETextureDimension::kCube:
+                        node._array_slice_count = 6u;
+                        break;
+                    case ETextureDimension::kCubeArray:
+                        if (auto *render_texture = dynamic_cast<RenderTexture *>(texture); render_texture != nullptr)
+                            node._array_slice_count = std::max<u32>(1u, render_texture->ArraySlice()) * 6u;
+                        break;
+                    case ETextureDimension::kTex2DArray:
+                        if (auto *render_texture = dynamic_cast<RenderTexture *>(texture); render_texture != nullptr)
+                            node._array_slice_count = std::max<u32>(1u, render_texture->ArraySlice());
+                        break;
+                    default:
+                        break;
+                    }
+
+                    switch (texture->PixelFormat())
+                    {
+                    case EALGFormat::kALGFormatD16_UNORM:
+                    case EALGFormat::kALGFormatD24S8_UINT:
+                    case EALGFormat::kALGFormatD32_FLOAT:
+                    case EALGFormat::kALGFormatD32_FLOAT_S8X24_UINT:
+                        node._is_depth_resource = true;
+                        break;
+                    default:
+                        break;
+                    }
+                }
+            };
             if (auto it = external_pool.find(external->Name()); it != external_pool.end())
             {
                 auto &existing = _external_resources[it->second._id];
                 if (existing._extern_raw_res != external)
+                {
                     LOG_WARNING("RenderGraph::Import: External resource name conflict, re-binding [{}]", external->Name());
-                existing._extern_raw_res = external;
-                existing._initial_state = initial_state;
+                }
+                update_external_metadata(existing);
                 return it->second;
             }
 
             RGHandle handle(s_next_handle_id++);
             ResourceNode node(external->Name());
-            node._extern_raw_res = external;
-            node._is_tex = res_type == EGpuResType::kTexture || res_type == EGpuResType::kRenderTexture;
-            node._is_render_output = res_type == EGpuResType::kRenderTexture;
-            node._is_external = true;
-            node._is_transient = false;
-            node._initial_state = initial_state;
+            update_external_metadata(node);
             external_pool[node._name] = handle;
             node._handle_ptr = &external_pool[node._name];
             ResetResourceNodeVersions(node);
@@ -343,74 +485,173 @@ namespace Ailu
             _is_compiled = false;
         }
 
-        EResourceState RenderGraph::InitialResourceState(const ResourceNode &node) const
+        bool RenderGraph::ValidateResourceAccesses()
         {
-            if (node._is_external)
+            bool is_valid = true;
+
+            const auto get_texture_subresource_counts = [](const ResourceNode &node, u32 &out_mip_count,
+                                                            u32 &out_slice_count)
             {
-                if (auto *rt = dynamic_cast<RenderTexture *>(node._extern_raw_res); rt != nullptr && rt->IsSwapChain())
-                    return EResourceState::kPresent;
+                out_mip_count = node._is_tex ? node._mip_count : 1u;
+                out_slice_count = node._is_tex ? node._array_slice_count : 1u;
+            };
+
+            const auto ranges_overlap = [](const ResourceAccess &lhs, const ResourceAccess &rhs)
+            {
+                if (lhs._all_sub_resources || rhs._all_sub_resources)
+                    return true;
+
+                const u64 lhs_mip_end = static_cast<u64>(lhs._mip_level) + lhs._mip_count;
+                const u64 rhs_mip_end = static_cast<u64>(rhs._mip_level) + rhs._mip_count;
+                const u64 lhs_slice_end = static_cast<u64>(lhs._array_slice) + lhs._array_slice_count;
+                const u64 rhs_slice_end = static_cast<u64>(rhs._array_slice) + rhs._array_slice_count;
+                return lhs._mip_level < rhs_mip_end && rhs._mip_level < lhs_mip_end &&
+                       lhs._array_slice < rhs_slice_end && rhs._array_slice < lhs_slice_end;
+            };
+
+            const auto validate_access = [&](const RenderPass *pass, RGHandle handle, const ResourceAccess &access, bool is_input)
+            {
+                auto *node = GetResourceNode(handle);
+                if (node == nullptr)
+                {
+                    LOG_ERROR("RenderGraph validation failed: pass={}, resource {}.{} does not exist", pass->_name,
+                              handle._id, handle._version);
+                    is_valid = false;
+                    return;
+                }
+                if (handle._version >= node->_versions.size())
+                {
+                    LOG_ERROR("RenderGraph validation failed: pass={}, resource {}.{} has an invalid version", pass->_name,
+                              node->_name, handle._version);
+                    is_valid = false;
+                    return;
+                }
+
+                EResourceState state = EResourceState::kCommon;
+                String state_error;
+                if (!TryUsageToResourceState(access._usage, state, state_error))
+                {
+                    LOG_ERROR("RenderGraph validation failed: pass={}, resource={}, version={}, usage={}, {}",
+                              pass->_name, node->_name, handle._version, static_cast<u32>(access._usage), state_error);
+                    is_valid = false;
+                    return;
+                }
+
+                if (node->_is_transient && is_input && handle._version == 0u &&
+                    node->_versions[handle._version]._producer == nullptr)
+                {
+                    LOG_ERROR("RenderGraph validation failed: pass={}, resource={} is read before its first write",
+                              pass->_name, node->_name);
+                    is_valid = false;
+                }
+
+                if (!node->_is_tex)
+                {
+                    if (!access._all_sub_resources)
+                    {
+                        LOG_ERROR("RenderGraph validation failed: pass={}, buffer={} cannot use a subresource range",
+                                  pass->_name, node->_name);
+                        is_valid = false;
+                    }
+                    if (node->_is_transient)
+                    {
+                        const auto &desc = node->_buffer_desc;
+                        if (HasUsage(access._usage, EResourceUsage::kReadSRV) && !desc._is_create_srv)
+                        {
+                            LOG_ERROR("RenderGraph validation failed: pass={}, buffer={} has no SRV", pass->_name, node->_name);
+                            is_valid = false;
+                        }
+                        if (HasUsage(access._usage, EResourceUsage::kWriteUAV) &&
+                            (!desc._is_create_uav || !desc._is_random_write))
+                        {
+                            LOG_ERROR("RenderGraph validation failed: pass={}, buffer={} has no UAV capability",
+                                      pass->_name, node->_name);
+                            is_valid = false;
+                        }
+                    }
+                    return;
+                }
+
+                u32 mip_count = 1u;
+                u32 slice_count = 1u;
+                get_texture_subresource_counts(*node, mip_count, slice_count);
+                if (!access._all_sub_resources &&
+                    (access._mip_count == 0u || access._array_slice_count == 0u || access._mip_level >= mip_count ||
+                     access._array_slice >= slice_count || access._mip_count > mip_count - access._mip_level ||
+                     access._array_slice_count > slice_count - access._array_slice))
+                {
+                    LOG_ERROR("RenderGraph validation failed: pass={}, texture={} has an invalid subresource range "
+                              "mip={} count={} slice={} count={}",
+                              pass->_name, node->_name, access._mip_level, access._mip_count, access._array_slice,
+                              access._array_slice_count);
+                    is_valid = false;
+                }
+
+                if (node->_is_transient)
+                {
+                    const auto &desc = node->_tex_desc;
+                    if (HasUsage(access._usage, EResourceUsage::kWriteRTV) && !desc._is_color_target)
+                    {
+                        LOG_ERROR("RenderGraph validation failed: pass={}, texture={} is not a color target",
+                                  pass->_name, node->_name);
+                        is_valid = false;
+                    }
+                    if (HasUsage(access._usage, EResourceUsage::kDSV) && !desc._is_depth_target)
+                    {
+                        LOG_ERROR("RenderGraph validation failed: pass={}, texture={} is not a depth target",
+                                  pass->_name, node->_name);
+                        is_valid = false;
+                    }
+                    if (HasUsage(access._usage, EResourceUsage::kWriteUAV) && !desc._is_random_access)
+                    {
+                        LOG_ERROR("RenderGraph validation failed: pass={}, texture={} has no UAV capability",
+                                  pass->_name, node->_name);
+                        is_valid = false;
+                    }
+                }
+            };
+
+            for (const auto *pass: _passes)
+            {
+                Vector<std::pair<RGHandle, ResourceAccess>> combined_accesses;
+                const auto collect_access = [&](const auto &record, bool is_input)
+                {
+                    validate_access(pass, record._handle, record._access, is_input);
+                    for (auto &[combined_handle, combined_access]: combined_accesses)
+                    {
+                        if (combined_handle == record._handle && ranges_overlap(combined_access, record._access))
+                        {
+                            combined_access._usage = combined_access._usage | record._access._usage;
+                            return;
+                        }
+                    }
+                    combined_accesses.emplace_back(record._handle, record._access);
+                };
+                for (const auto &record: pass->_input_access_records)
+                    collect_access(record, true);
+                for (const auto &record: pass->_output_access_records)
+                    collect_access(record, false);
+
+                for (const auto &[handle, access]: combined_accesses)
+                {
+                    EResourceState state = EResourceState::kCommon;
+                    String state_error;
+                    if (!TryUsageToResourceState(access._usage, state, state_error))
+                    {
+                        auto *node = GetResourceNode(handle);
+                        LOG_ERROR("RenderGraph validation failed: pass={}, resource={}, version={}, combined usage={}, {}",
+                                  pass->_name, node != nullptr ? node->_name : String("unknown"), handle._version,
+                                  static_cast<u32>(access._usage), state_error);
+                        is_valid = false;
+                    }
+                }
             }
-            if (auto *resource = node.GetResource(); resource != nullptr && resource->IsReady())
-                return resource->CurrentResourceState();
-            return node._initial_state;
+            return is_valid;
         }
 
-        Vector<u32> RenderGraph::ResolveAllBarrierSubResources(const ResourceNode &node) const
+        EResourceState RenderGraph::InitialResourceState(const ResourceNode &node) const
         {
-            Vector<u32> sub_resources;
-            if (!node._is_tex)
-                return sub_resources;
-
-            u32 mip_count = 1u;
-            u32 slice_count = 1u;
-            if (auto *texture = dynamic_cast<Texture *>(node.GetResource()); texture != nullptr)
-            {
-                mip_count = std::max<u32>(1u, texture->MipmapLevel());
-                switch (texture->Dimension())
-                {
-                case ETextureDimension::kCube:
-                    slice_count = 6u;
-                    break;
-                case ETextureDimension::kCubeArray:
-                    if (auto *rt = dynamic_cast<RenderTexture *>(texture); rt != nullptr)
-                        slice_count = std::max<u32>(1u, rt->ArraySlice()) * 6u;
-                    break;
-                case ETextureDimension::kTex2DArray:
-                    if (auto *rt = dynamic_cast<RenderTexture *>(texture); rt != nullptr)
-                        slice_count = std::max<u32>(1u, rt->ArraySlice());
-                    break;
-                default:
-                    slice_count = 1u;
-                    break;
-                }
-            }
-            else
-            {
-                mip_count = std::max<u32>(1u, node._tex_desc._mip_num);
-                switch (node._tex_desc._dimension)
-                {
-                case ETextureDimension::kCube:
-                    slice_count = 6u;
-                    break;
-                case ETextureDimension::kCubeArray:
-                    slice_count = std::max<u32>(1u, node._tex_desc._array_size) * 6u;
-                    break;
-                case ETextureDimension::kTex2DArray:
-                    slice_count = std::max<u32>(1u, node._tex_desc._array_size);
-                    break;
-                default:
-                    slice_count = 1u;
-                    break;
-                }
-            }
-
-            sub_resources.reserve(mip_count * slice_count);
-            for (u32 slice = 0u; slice < slice_count; ++slice)
-            {
-                for (u32 mip = 0u; mip < mip_count; ++mip)
-                    sub_resources.push_back(slice * mip_count + mip);
-            }
-            return sub_resources;
+            return node._initial_state;
         }
 
         Vector<u32> RenderGraph::ResolveBarrierSubResources(RGHandle handle, const ResourceAccess &access) const
@@ -423,7 +664,6 @@ namespace Ailu
             if (node == nullptr || !node->_is_tex)
                 return {kTotalSubRes};
 
-            auto *tex = dynamic_cast<Texture *>(node->GetResource());
             const u32 mip_count = std::max<u32>(1u, access._mip_count);
             const u32 slice_count = std::max<u32>(1u, access._array_slice_count);
             Vector<u32> sub_resources;
@@ -431,20 +671,17 @@ namespace Ailu
             for (u32 slice = access._array_slice; slice < access._array_slice + slice_count; ++slice)
             {
                 for (u32 mip = access._mip_level; mip < access._mip_level + mip_count; ++mip)
-                {
-                    if (tex != nullptr)
-                        sub_resources.push_back(tex->CalculateSubResIndex(static_cast<u16>(mip), static_cast<u16>(slice)));
-                    else
-                        sub_resources.push_back(slice * std::max<u32>(1u, node->_tex_desc._mip_num) + mip);
-                }
+                    sub_resources.push_back(slice * node->_mip_count + mip);
             }
             return sub_resources;
         }
 
         bool RenderGraph::CompileResourceBarriers()
         {
+            PROFILE_BLOCK_CPU("RenderGraph::CompileResourceBarriers")
             _compiled_passes.clear();
             _compiled_passes.reserve(_sorted_passes.size());
+            bool is_valid = true;
 
             HashMap<u32, EResourceState> total_states;
             HashMap<u32, HashMap<u32, EResourceState>> sub_resource_states;
@@ -455,9 +692,9 @@ namespace Ailu
                 if (node == nullptr)
                 {
                     LOG_ERROR("RenderGraph::CompileResourceBarriers: missing resource {}.{}", handle._id, handle._version);
+                    is_valid = false;
                     return nullptr;
                 }
-                CreatePhysicalResources(handle);
                 if (!total_states.contains(handle._id))
                     total_states[handle._id] = InitialResourceState(*node);
                 return node;
@@ -488,61 +725,83 @@ namespace Ailu
                 sub_resource_states[resource_id][sub_resource] = state;
             };
 
-            const auto initialize_sub_state = [&](ResourceNode *node, u32 resource_id, u32 sub_resource)
-            {
-                if (node == nullptr || sub_resource == kTotalSubRes)
-                    return;
-                if (auto sub_it = sub_resource_states.find(resource_id); sub_it != sub_resource_states.end())
-                {
-                    if (sub_it->second.contains(sub_resource))
-                        return;
-                }
-                auto *resource = node->GetResource();
-                EResourceState state = EResourceState::kCommon;
-                if (resource != nullptr && resource->IsReady() && resource->TryCurrentResourceState(state, sub_resource))
-                    sub_resource_states[resource_id][sub_resource] = state;
-            };
-
             const auto compile_access = [&](CompiledRenderPass &compiled_pass, RGHandle handle, const ResourceAccess &access)
             {
                 auto *node = resolve_node(handle);
                 if (node == nullptr)
                     return;
 
-                auto *resource = node->GetResource();
-                if (resource == nullptr)
+                EResourceState after = EResourceState::kCommon;
+                String state_error;
+                if (!TryUsageToResourceState(access._usage, after, state_error))
                 {
-                    LOG_ERROR("RenderGraph::CompileResourceBarriers: unresolved resource {}.{} in pass {}", handle._id, handle._version,
-                              compiled_pass._pass ? compiled_pass._pass->_name : "unknown");
+                    LOG_ERROR("RenderGraph::CompileResourceBarriers: invalid usage in pass={}, resource={}, version={}, {}",
+                              compiled_pass._pass ? compiled_pass._pass->_name : String("unknown"), node->_name,
+                              handle._version, state_error);
+                    is_valid = false;
                     return;
                 }
-
-                const EResourceState after = UsageToResourceState(access._usage);
-                Vector<u32> sub_resources = ResolveBarrierSubResources(handle, access);
-                if (access._all_sub_resources)
-                {
-                    EResourceState uniform_state = EResourceState::kCommon;
-                    const bool has_sub_states = [&]()
-                    {
-                        auto sub_it = sub_resource_states.find(handle._id);
-                        return sub_it != sub_resource_states.end() && !sub_it->second.empty();
-                    }();
-                    const bool has_uniform_state = !resource->IsReady() || resource->TryCurrentResourceState(uniform_state, kTotalSubRes);
-                    if (has_sub_states || !has_uniform_state)
-                        sub_resources = ResolveAllBarrierSubResources(*node);
-                }
+                // D3D12 depth-stencil resources can contain separate depth and stencil planes.  The
+                // render-target subresource index only covers mip/slice, so every access to a depth texture
+                // must transition every plane together or a later DSV access can observe a stale plane state.
+                const bool is_depth_access = node->_is_tex &&
+                    (node->_is_depth_resource || HasUsage(access._usage, EResourceUsage::kDSV));
+                const Vector<u32> sub_resources = is_depth_access ? Vector<u32>{kTotalSubRes} :
+                                                                  ResolveBarrierSubResources(handle, access);
                 for (const u32 sub_resource: sub_resources)
                 {
-                    initialize_sub_state(node, handle._id, sub_resource);
                     const EResourceState before = get_state(handle._id, sub_resource);
-                    if (before != after)
+#if AILU_ENABLE_RESOURCE_STATE_TRACE
+                    const bool is_trace_resource = node->_name.find("GBuffer0") != String::npos ||
+                                                   node->_name.find("light probe") != String::npos ||
+                                                   node->_name.find("_MainLightShadowMap") != String::npos ||
+                                                   node->_name.find("_AddLightShadowMaps") != String::npos ||
+                                                   node->_name.find("VolumetricFogAccumTexture") != String::npos;
+                    if (is_trace_resource)
                     {
-                        compiled_pass._pre_barriers.push_back({resource, before, after, sub_resource});
+                        LOG_WARNING("RenderGraph resource access: pass={}, resource={}, handle={}.{}, sub_res={}, "
+                                    "before={}, after={}, barrier={}, all_sub_resources={}, mip={}, "
+                                    "mip_count={}, slice={}, slice_count={}",
+                                    compiled_pass._pass ? compiled_pass._pass->_name : String("unknown"),
+                                    node->_name,
+                                    handle._id,
+                                    handle._version,
+                                    sub_resource,
+                                    static_cast<u32>(before),
+                                    static_cast<u32>(after),
+                                    before != after,
+                                    access._all_sub_resources,
+                                    access._mip_level,
+                                    access._mip_count,
+                                    access._array_slice,
+                                    access._array_slice_count);
                     }
-                    set_state(handle._id, sub_resource, after);
+#endif
+                    if (sub_resource == kTotalSubRes)
+                    {
+                        if (before != after)
+                        {
+                            compiled_pass._pre_barriers.push_back({handle, before, after, sub_resource});
+                        }
+                        else if (auto sub_it = sub_resource_states.find(handle._id);
+                                 sub_it != sub_resource_states.end())
+                        {
+                            for (const auto &[tracked_sub_resource, tracked_state]: sub_it->second)
+                            {
+                                if (tracked_state != after)
+                                    compiled_pass._pre_barriers.push_back(
+                                        {handle, tracked_state, after, tracked_sub_resource});
+                            }
+                        }
+                        set_state(handle._id, sub_resource, after);
+                    }
+                    else
+                    {
+                        if (before != after)
+                            compiled_pass._pre_barriers.push_back({handle, before, after, sub_resource});
+                        set_state(handle._id, sub_resource, after);
+                    }
                 }
-                if (access._all_sub_resources)
-                    set_state(handle._id, kTotalSubRes, after);
             };
 
             for (u32 pass_index = 0u; pass_index < _sorted_passes.size(); ++pass_index)
@@ -558,11 +817,94 @@ namespace Ailu
                     compile_access(compiled_pass, record._handle, record._access);
             }
 
-            for (auto &[resource_id, state]: total_states)
+            if (!is_valid)
             {
-                if (auto it = _external_resources.find(resource_id); it != _external_resources.end())
-                    it->second._initial_state = state;
+                _compiled_passes.clear();
+                return false;
             }
+
+            HashMap<u32, u32> resource_last_use_pass;
+            for (u32 pass_index = 0u; pass_index < _sorted_passes.size(); ++pass_index)
+            {
+                auto *pass = _sorted_passes[pass_index];
+                for (const auto &record: pass->_input_access_records)
+                {
+                    if (GetResourceNode(record._handle) != nullptr)
+                        resource_last_use_pass[record._handle._id] = pass_index;
+                }
+                for (const auto &record: pass->_output_access_records)
+                {
+                    if (GetResourceNode(record._handle) != nullptr)
+                        resource_last_use_pass[record._handle._id] = pass_index;
+                }
+            }
+
+            for (const auto &[resource_id, last_use_pass]: resource_last_use_pass)
+            {
+                auto *node = GetResourceNode(RGHandle(resource_id));
+                auto state_it = total_states.find(resource_id);
+                if (node == nullptr || state_it == total_states.end())
+                    continue;
+
+                const EResourceState initial_state = InitialResourceState(*node);
+                // Transient resources are leased from FrameResourceManager with COMMON as the pool boundary.
+                // Restore every resource to the state expected by the next lease at the end of the graph.
+                const EResourceState restore_state = node->_is_transient ? node->_initial_state : initial_state;
+                auto sub_state_it = sub_resource_states.find(resource_id);
+                if (sub_state_it != sub_resource_states.end() && !sub_state_it->second.empty() &&
+                    state_it->second == restore_state)
+                {
+                    for (const auto &[sub_resource, state]: sub_state_it->second)
+                    {
+                        if (state != restore_state)
+                        {
+#if AILU_ENABLE_RESOURCE_STATE_TRACE
+                            if (node->_name.find("GBuffer0") != String::npos ||
+                                node->_name.find("light probe") != String::npos ||
+                                node->_name.find("_MainLightShadowMap") != String::npos ||
+                                node->_name.find("_AddLightShadowMaps") != String::npos ||
+                                node->_name.find("VolumetricFogAccumTexture") != String::npos)
+                            {
+                                LOG_WARNING("RenderGraph resource post barrier: pass={}, resource={}, handle={}, "
+                                            "sub_res={}, before={}, after={}",
+                                            _compiled_passes[last_use_pass]._pass ?
+                                                _compiled_passes[last_use_pass]._pass->_name : String("unknown"),
+                                            node->_name,
+                                            resource_id,
+                                            sub_resource,
+                                            static_cast<u32>(state),
+                                            static_cast<u32>(restore_state));
+                            }
+#endif
+                            _compiled_passes[last_use_pass]._post_barriers.push_back(
+                                {RGHandle(resource_id), state, restore_state, sub_resource});
+                        }
+                    }
+                }
+                else if (state_it->second != restore_state)
+                {
+#if AILU_ENABLE_RESOURCE_STATE_TRACE
+                    if (node->_name.find("GBuffer0") != String::npos ||
+                        node->_name.find("light probe") != String::npos ||
+                        node->_name.find("_MainLightShadowMap") != String::npos ||
+                        node->_name.find("_AddLightShadowMaps") != String::npos ||
+                        node->_name.find("VolumetricFogAccumTexture") != String::npos)
+                    {
+                        LOG_WARNING("RenderGraph resource post barrier: pass={}, resource={}, handle={}, sub_res=all, "
+                                    "before={}, after={}",
+                                        _compiled_passes[last_use_pass]._pass ?
+                                        _compiled_passes[last_use_pass]._pass->_name : String("unknown"),
+                                    node->_name,
+                                    resource_id,
+                                    static_cast<u32>(state_it->second),
+                                    static_cast<u32>(restore_state));
+                    }
+#endif
+                    _compiled_passes[last_use_pass]._post_barriers.push_back(
+                        {RGHandle(resource_id), state_it->second, restore_state, kTotalSubRes});
+                }
+            }
+
             return true;
         }
 
@@ -570,59 +912,80 @@ namespace Ailu
         {
             PROFILE_BLOCK_CPU("RenderGraph::Compile")
 
+            _compile_stats = {};
+            _compile_stats._pass_count = static_cast<u32>(_passes.size());
+            const auto count_resources = [&](const auto &resources)
+            {
+                _compile_stats._resource_count += static_cast<u32>(resources.size());
+                for (const auto &[id, node]: resources)
+                    _compile_stats._resource_version_count += static_cast<u32>(node._versions.size());
+            };
+            count_resources(_transient_resources);
+            count_resources(_external_resources);
+
             _sorted_passes.clear();
+
+            if (!ValidateResourceAccesses())
+                return false;
 
             HashMap<RenderPass*, Vector<RenderPass*>> pass_dependencies;
             HashMap<RenderPass*, std::unordered_set<RenderPass*>> unique_dependencies;
             HashMap<RenderPass*, u32> in_degrees;
 
-            // 初始化
-            for (auto* pass : _passes)
-                in_degrees[pass] = 0;
-
-            const auto build_dependencies = [&](auto &resources)
             {
-                for (auto& [id, node] : resources)
-                {
-                    for (auto& ver : node._versions)
-                    {
-                        if (!ver._producer)
-                            continue;
+                PROFILE_BLOCK_CPU("RenderGraph::BuildDependency")
+                // 初始化
+                for (auto* pass : _passes)
+                    in_degrees[pass] = 0;
 
-                        for (auto* consumer : ver._consumers)
+                const auto build_dependencies = [&](auto &resources)
+                {
+                    for (auto& [id, node] : resources)
+                    {
+                        for (auto& ver : node._versions)
                         {
-                            if (consumer == ver._producer)
+                            if (!ver._producer)
                                 continue;
 
-                            auto &deps = unique_dependencies[ver._producer];
-                            if (deps.insert(consumer).second)
+                            for (auto* consumer : ver._consumers)
                             {
-                                pass_dependencies[ver._producer].push_back(consumer);
-                                in_degrees[consumer]++;
+                                if (consumer == ver._producer)
+                                    continue;
+
+                                auto &deps = unique_dependencies[ver._producer];
+                                if (deps.insert(consumer).second)
+                                {
+                                    pass_dependencies[ver._producer].push_back(consumer);
+                                    in_degrees[consumer]++;
+                                    _compile_stats._dependency_edge_count++;
+                                }
                             }
                         }
                     }
-                }
-            };
+                };
 
-            build_dependencies(_transient_resources);
-            build_dependencies(_external_resources);
+                build_dependencies(_transient_resources);
+                build_dependencies(_external_resources);
+            }
 
-            // 拓扑排序
-            Queue<RenderPass*> q;
-
-            for (auto& [pass, deg] : in_degrees)
-                if (deg == 0) q.push(pass);
-
-            while (!q.empty())
             {
-                auto* p = q.front(); q.pop();
-                _sorted_passes.push_back(p);
+                PROFILE_BLOCK_CPU("RenderGraph::TopologicalSort")
+                // 拓扑排序
+                Queue<RenderPass*> q;
 
-                for (auto* dep : pass_dependencies[p])
+                for (auto& [pass, deg] : in_degrees)
+                    if (deg == 0) q.push(pass);
+
+                while (!q.empty())
                 {
-                    if (--in_degrees[dep] == 0)
-                        q.push(dep);
+                    auto* p = q.front(); q.pop();
+                    _sorted_passes.push_back(p);
+
+                    for (auto* dep : pass_dependencies[p])
+                    {
+                        if (--in_degrees[dep] == 0)
+                            q.push(dep);
+                    }
                 }
             }
 
@@ -631,29 +994,36 @@ namespace Ailu
                 LOG_ERROR("RenderGraph::Compile: cycle detected!");
                 return false;
             }
+            _compile_stats._compiled_pass_count = static_cast<u32>(_sorted_passes.size());
 
-            //记录 version 生命周期（为 aliasing 准备）
-            for (i32 i = 0; i < (i32)_sorted_passes.size(); ++i)
             {
-                auto* pass = _sorted_passes[i];
-
-                for (auto& h : pass->_output_handles)
+                PROFILE_BLOCK_CPU("RenderGraph::AnalyzeResourceLifetime")
+                //记录 version 生命周期（为 aliasing 准备）
+                for (i32 i = 0; i < (i32)_sorted_passes.size(); ++i)
                 {
-                    auto* node = GetResourceNode(h);
-                    auto& ver = node->_versions[h._version];
-                    if (ver._first_use == -1)
-                        ver._first_use = i;
-                }
+                    auto* pass = _sorted_passes[i];
 
-                for (auto& h : pass->_input_handles)
-                {
-                    auto* node = GetResourceNode(h);
-                    auto& ver = node->_versions[h._version];
-                    ver._last_use = std::max<i16>(ver._last_use, i);
+                    for (auto& h : pass->_output_handles)
+                    {
+                        auto* node = GetResourceNode(h);
+                        auto& ver = node->_versions[h._version];
+                        if (ver._first_use == -1)
+                            ver._first_use = i;
+                    }
+
+                    for (auto& h : pass->_input_handles)
+                    {
+                        auto* node = GetResourceNode(h);
+                        auto& ver = node->_versions[h._version];
+                        ver._last_use = std::max<i16>(ver._last_use, i);
+                    }
                 }
             }
             if (!CompileResourceBarriers())
                 return false;
+            for (const auto &compiled_pass: _compiled_passes)
+                _compile_stats._barrier_count += static_cast<u32>(compiled_pass._pre_barriers.size() +
+                                                                   compiled_pass._post_barriers.size());
             if (_is_debug)
             {
                 _debug_passes.clear();
@@ -676,6 +1046,8 @@ namespace Ailu
         {
             if (!_is_compiled && !Compile())
                 return;
+            if (!PrepareResources())
+                return;
             PROFILE_BLOCK_CPU("RenderGraph::Execute")
             for (const auto &compiled_pass: _compiled_passes)
             {
@@ -684,10 +1056,6 @@ namespace Ailu
                     continue;
                 {
                     PROFILE_BLOCK_CPU(pass->_name)
-                    for (auto &handle: pass->_output_handles)
-                    {
-                        CreatePhysicalResources(handle);
-                    }
                     auto cmd = CommandBufferPool::Get(pass->_name);
                     cmd->SetRenderGraph(this);
 #if AILU_ENABLE_FRAME_DEBUGGER
@@ -699,9 +1067,19 @@ namespace Ailu
                         cmd->SetCapturePassMetadata(pass_meta);
                     }
 #endif
+                    for (const auto &record: pass->_input_access_records)
+                    {
+                        cmd->UseRenderGraphResource(Resolve<GpuResource>(record._handle));
+                    }
+                    for (const auto &record: pass->_output_access_records)
+                    {
+                        cmd->UseRenderGraphResource(Resolve<GpuResource>(record._handle));
+                    }
                     for (const auto &barrier: compiled_pass._pre_barriers)
                     {
-                        cmd->ResourceBarrier(barrier._resource, barrier._before, barrier._after, barrier._sub_resource);
+                        auto *resource = Resolve<GpuResource>(barrier._handle);
+                        if (resource != nullptr)
+                            cmd->ResourceBarrier(resource, barrier._before, barrier._after, barrier._sub_resource);
                     }
                     {
                         PROFILE_BLOCK_GPU(cmd.get(), pass->_name)
@@ -709,7 +1087,9 @@ namespace Ailu
                     }
                     for (const auto &barrier: compiled_pass._post_barriers)
                     {
-                        cmd->ResourceBarrier(barrier._resource, barrier._before, barrier._after, barrier._sub_resource);
+                        auto *resource = Resolve<GpuResource>(barrier._handle);
+                        if (resource != nullptr)
+                            cmd->ResourceBarrier(resource, barrier._before, barrier._after, barrier._sub_resource);
                     }
                     for (const auto &record: pass->_output_access_records)
                     {
@@ -876,28 +1256,48 @@ namespace Ailu
                 parts.emplace_back(node._is_tex ? "Texture" : "Buffer");
                 if (node._is_tex)
                 {
-                    if (node._tex_desc._fixed_size)
-                        parts.emplace_back(std::format("{}x{}x{}", node._tex_desc._width, node._tex_desc._height, node._tex_desc._depth));
+                    if (node._is_external)
+                    {
+                        parts.emplace_back(std::format("mip {}", node._mip_count));
+                        if (node._array_slice_count > 1u)
+                            parts.emplace_back(std::format("array {}", node._array_slice_count));
+                        if (node._is_render_output)
+                            parts.emplace_back("RT");
+                        if (node._is_depth_resource)
+                            parts.emplace_back("Depth");
+                    }
                     else
-                        parts.emplace_back(std::format("scale {:.2f}x{:.2f}", node._tex_desc._scale_w, node._tex_desc._scale_h));
-                    parts.emplace_back(std::format("mip {}", node._tex_desc._mip_num));
-                    if (node._tex_desc._array_size > 0u)
-                        parts.emplace_back(std::format("array {}", node._tex_desc._array_size));
-                    if (node._tex_desc._is_color_target)
-                        parts.emplace_back("RT");
-                    if (node._tex_desc._is_depth_target)
-                        parts.emplace_back("Depth");
-                    if (node._tex_desc._is_random_access)
-                        parts.emplace_back("UAV");
+                    {
+                        if (node._tex_desc._fixed_size)
+                            parts.emplace_back(std::format("{}x{}x{}", node._tex_desc._width, node._tex_desc._height,
+                                                           node._tex_desc._depth));
+                        else
+                            parts.emplace_back(std::format("scale {:.2f}x{:.2f}", node._tex_desc._scale_w, node._tex_desc._scale_h));
+                        parts.emplace_back(std::format("mip {}", node._tex_desc._mip_num));
+                        if (node._tex_desc._array_size > 0u)
+                            parts.emplace_back(std::format("array {}", node._tex_desc._array_size));
+                        if (node._tex_desc._is_color_target)
+                            parts.emplace_back("RT");
+                        if (node._tex_desc._is_depth_target)
+                            parts.emplace_back("Depth");
+                        if (node._tex_desc._is_random_access)
+                            parts.emplace_back("UAV");
+                    }
                 }
                 else
                 {
-                    parts.emplace_back(std::format("size {}", node._buffer_desc._size));
-                    parts.emplace_back(std::format("elem {}x{}", node._buffer_desc._element_num, node._buffer_desc._element_size));
-                    if (node._buffer_desc._is_create_srv)
-                        parts.emplace_back("SRV");
-                    if (node._buffer_desc._is_create_uav)
-                        parts.emplace_back("UAV");
+                    if (node._is_external)
+                        parts.emplace_back("external buffer");
+                    else
+                    {
+                        parts.emplace_back(std::format("size {}", node._buffer_desc._size));
+                        parts.emplace_back(std::format("elem {}x{}", node._buffer_desc._element_num,
+                                                       node._buffer_desc._element_size));
+                        if (node._buffer_desc._is_create_srv)
+                            parts.emplace_back("SRV");
+                        if (node._buffer_desc._is_create_uav)
+                            parts.emplace_back("UAV");
+                    }
                 }
                 return join_strings(parts, " | ");
             };
@@ -921,14 +1321,16 @@ namespace Ailu
                 Vector<String> items;
                 for (const auto &barrier: compiled_pass._pre_barriers)
                 {
-                    const String resource_name = barrier._resource != nullptr ? barrier._resource->Name() : String("null");
+                    const auto *node = GetResourceNode(barrier._handle);
+                    const String resource_name = node != nullptr ? node->_name : String("null");
                     const String sub_res = barrier._sub_resource == kTotalSubRes ? String("all") : std::format("sub {}", barrier._sub_resource);
                     items.emplace_back(std::format("{} [{}] {} -> {}", resource_name, sub_res, state_name(barrier._before),
                                                    state_name(barrier._after)));
                 }
                 for (const auto &barrier: compiled_pass._post_barriers)
                 {
-                    const String resource_name = barrier._resource != nullptr ? barrier._resource->Name() : String("null");
+                    const auto *node = GetResourceNode(barrier._handle);
+                    const String resource_name = node != nullptr ? node->_name : String("null");
                     const String sub_res = barrier._sub_resource == kTotalSubRes ? String("all") : std::format("sub {}", barrier._sub_resource);
                     items.emplace_back(std::format("post {} [{}] {} -> {}", resource_name, sub_res, state_name(barrier._before),
                                                    state_name(barrier._after)));

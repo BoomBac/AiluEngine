@@ -1,4 +1,4 @@
-﻿#include "Render/Features/SSAO.h"
+#include "Render/Features/SSAO.h"
 #include "Framework/Common/Profiler.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Render/CommandBuffer.h"
@@ -74,9 +74,12 @@ namespace Ailu::Render
                 _ssao_computer->SetFloat("_KernelSize", 2.5f);
                 _ssao_computer->SetFloat("_Space_Sigma", 10.1f);
                 _ssao_computer->SetFloat("_Range_Sigma", 0.31f);
-                _ssao_computer->SetTexture("_CameraNormalsTexture", graph.Resolve<Texture>(data._rg_handles._gbuffers[0]));
-                _ssao_computer->SetTexture("_CameraDepthTexture", graph.Resolve<Texture>(data._rg_handles._depth_tex));
-                _ssao_computer->SetTexture("_AOResult", graph.Resolve<Texture>(data._rg_handles._ao_tex));
+                _ssao_computer->SetTexture(_ssao_gen_kernel, "_CameraNormalsTexture",
+                                           graph.Resolve<Texture>(data._rg_handles._gbuffers[0]));
+                _ssao_computer->SetTexture(_ssao_gen_kernel, "_CameraDepthTexture",
+                                           graph.Resolve<Texture>(data._rg_handles._depth_tex));
+                _ssao_computer->SetTexture(_ssao_gen_kernel, "_AOResult",
+                                           graph.Resolve<Texture>(data._rg_handles._ao_tex));
                 {
                     auto [x,y,z] = _ssao_computer->CalculateDispatchNum(_ssao_gen_kernel,_is_cbr? w >> 1 : w,_is_cbr? h >> 1 : h,1);
                     cmd->Dispatch(_ssao_computer.get(), _ssao_gen_kernel, x, y, 1);
@@ -96,8 +99,10 @@ namespace Ailu::Render
                 _ssao_computer->SetFloat("_Range_Sigma", 0.31f);
                 {
                     auto [x,y,z] = _ssao_computer->CalculateDispatchNum(_ssao_blur_x_kernel, w, h, 1);
-                    _ssao_computer->SetTexture("_SourceTex", graph.Resolve<Texture>(data._rg_handles._ao_tex));
-                    _ssao_computer->SetTexture("_DenoiseResult", graph.Resolve<Texture>(blur_temp));
+                    _ssao_computer->SetTexture(_ssao_blur_x_kernel, "_SourceTex",
+                                               graph.Resolve<Texture>(data._rg_handles._ao_tex));
+                    _ssao_computer->SetTexture(_ssao_blur_x_kernel, "_DenoiseResult",
+                                               graph.Resolve<Texture>(blur_temp));
                     cmd->Dispatch(_ssao_computer.get(), _ssao_blur_x_kernel, x, y, 1);
                 }
             });
@@ -114,8 +119,9 @@ namespace Ailu::Render
                 _ssao_computer->SetFloat("_Range_Sigma", 0.31f);
                 {
                     auto [x,y,z] = _ssao_computer->CalculateDispatchNum(_ssao_blur_y_kernel, w, h, 1);
-                    _ssao_computer->SetTexture("_SourceTex", graph.Resolve<Texture>(blur_temp));
-                    _ssao_computer->SetTexture("_DenoiseResult", graph.Resolve<Texture>(data._rg_handles._ao_tex));
+                    _ssao_computer->SetTexture(_ssao_blur_y_kernel, "_SourceTex", graph.Resolve<Texture>(blur_temp));
+                    _ssao_computer->SetTexture(_ssao_blur_y_kernel, "_DenoiseResult",
+                                               graph.Resolve<Texture>(data._rg_handles._ao_tex));
                     cmd->Dispatch(_ssao_computer.get(), _ssao_blur_y_kernel, x, y, 1);
                 }
                 });
@@ -157,23 +163,24 @@ namespace Ailu::Render
                 _ssao_computer->SetFloat("_KernelSize", 2.5f);
                 _ssao_computer->SetFloat("_Space_Sigma", 10.1f);
                 _ssao_computer->SetFloat("_Range_Sigma", 0.31f);
-                _ssao_computer->SetTexture("_CameraNormalsTexture", rendering_data._gbuffers[0]);
-                _ssao_computer->SetTexture("_CameraDepthTexture", rendering_data._camera_depth_tex_handle);
-                _ssao_computer->SetTexture("_AOResult", ao_result);
+                _ssao_computer->SetTexture(_ssao_gen_kernel, "_CameraNormalsTexture", rendering_data._gbuffers[0]);
+                _ssao_computer->SetTexture(_ssao_gen_kernel, "_CameraDepthTexture",
+                                           rendering_data._camera_depth_tex_handle);
+                _ssao_computer->SetTexture(_ssao_gen_kernel, "_AOResult", ao_result);
                 {
                     auto [x,y,z] = _ssao_computer->CalculateDispatchNum(_ssao_gen_kernel,_is_cbr? w >> 1 : w,_is_cbr? h >> 1 : h,1);
                     cmd->Dispatch(_ssao_computer.get(), _ssao_gen_kernel, x, y, 1);
                 }
                 {
                     auto [x,y,z] = _ssao_computer->CalculateDispatchNum(_ssao_blur_x_kernel, w, h, 1);
-                    _ssao_computer->SetTexture("_SourceTex", ao_result);
-                    _ssao_computer->SetTexture("_DenoiseResult", blur_temp);
+                    _ssao_computer->SetTexture(_ssao_blur_x_kernel, "_SourceTex", ao_result);
+                    _ssao_computer->SetTexture(_ssao_blur_x_kernel, "_DenoiseResult", blur_temp);
                     cmd->Dispatch(_ssao_computer.get(), _ssao_blur_x_kernel, x, y, 1);
                 }
                 {
                     auto [x,y,z] = _ssao_computer->CalculateDispatchNum(_ssao_blur_y_kernel, w, h, 1);
-                    _ssao_computer->SetTexture("_SourceTex", blur_temp);
-                    _ssao_computer->SetTexture("_DenoiseResult", ao_result);
+                    _ssao_computer->SetTexture(_ssao_blur_y_kernel, "_SourceTex", blur_temp);
+                    _ssao_computer->SetTexture(_ssao_blur_y_kernel, "_DenoiseResult", ao_result);
                     cmd->Dispatch(_ssao_computer.get(), _ssao_blur_y_kernel, x, y, 1);
                 }
                 Shader::SetGlobalTexture("_OcclusionTex", ao_result);

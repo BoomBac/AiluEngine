@@ -140,6 +140,8 @@ namespace Ailu::Render
             RDG::RGHandle         _addi_shadow_maps;
             RDG::RGHandle         _point_light_shadow_maps;
             RDG::RGHandle         _ao_tex;
+            RDG::RGHandle         _volumetric_fog_accum;
+            RDG::RGHandle         _sky_view_lut;
         } _rg_handles;
         CommandBuffer *cmd;
         const CullResult *_cull_results;

@@ -89,7 +89,6 @@ namespace Ailu
         private:
             bool _is_src_cubemap = false;
             Texture *_input_src = nullptr;
-            RDG::RGHandle _src_texture_handle;
             RDG::RGHandle _src_map_handle;
             RDG::RGHandle _radiance_handle;
             RDG::RGHandle _env_handle;
@@ -135,6 +134,10 @@ namespace Ailu
         private:
             Ref<Texture2D> _brdf_lut;
             Ref<ComputeShader> _brdflut_gen;
+            Ref<RenderTexture> _dummy_main_light_shadow_map;
+            Ref<RenderTexture> _dummy_add_light_shadow_maps;
+            Ref<RenderTexture> _dummy_point_light_shadow_map;
+            Ref<Texture3D> _dummy_volumetric_light;
         };
 
         class SkyboxPass : public RenderPass
@@ -170,9 +173,6 @@ namespace Ailu
             void Execute(GraphicsContext *context, RenderingData &rendering_data) final;
             void BeginPass(GraphicsContext *context) final;
             void EndPass(GraphicsContext *context) final;
-
-        private:
-            Vector<Ref<ConstantBuffer>> _p_cbuffers;
         };
 
         class WireFramePass : public RenderPass

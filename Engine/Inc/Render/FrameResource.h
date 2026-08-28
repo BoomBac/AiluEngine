@@ -85,6 +85,8 @@ namespace Ailu::Render
         BufferPool _buffer_pool;
         Array<Scope<FrameAllocator>, kFrameResourceSlotCount> _frame_allocators{};
         Array<u64, kFrameResourceSlotCount> _frame_slot_fence_values{};
+        Vector<TextureHandle> _pending_texture_frees;
+        Vector<BufferHandle> _pending_buffer_frees;
         // 帧作用域的GPU上传缓冲区，按帧槽位双/三缓冲，随槽位fence复用
         Array<Scope<GpuResource>, kFrameResourceSlotCount> _frame_upload_buffers{};
         FrameAllocator* _active_allocator = nullptr;

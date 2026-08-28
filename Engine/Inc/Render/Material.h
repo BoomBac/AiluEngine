@@ -82,6 +82,8 @@ namespace Ailu::Render
         void SetMatrix(ShaderPropertyId property_id, const Matrix4x4f &matrix);
         void SetBuffer(const String& name,GPUBuffer* buffer);
         void SetBuffer(ShaderPropertyId property_id, GPUBuffer *buffer);
+        const Map<ShaderPropertyId, Texture *> &BoundTextures() const { return _bind_textures_by_id; }
+        const Map<ShaderPropertyId, GPUBuffer *> &BoundBuffers() const { return _bind_buffers_by_id; }
         float GetFloat(const String &name);
         float GetFloat(ShaderPropertyId property_id);
         void SetCullMode(ECullMode mode);

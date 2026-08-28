@@ -145,12 +145,12 @@ namespace Ailu::Render
             {
                 auto blur_x = cmd->GetTempRT(rendering_data._width, rendering_data._height, "blur_x", ERenderTargetFormat::kDefault, false, false, true);
                 auto blur_y = cmd->GetTempRT(rendering_data._width, rendering_data._height, "blur_y", ERenderTargetFormat::kDefault, false, false, true);
-                _cs_blur->SetTexture("_SourceTex", scene_color);
-                _cs_blur->SetTexture("_OutTex", blur_x);
+                _cs_blur->SetTexture(_blur_x_kernel, "_SourceTex", scene_color);
+                _cs_blur->SetTexture(_blur_x_kernel, "_OutTex", blur_x);
                 auto [group_num_x,group_num_y,group_num_z] = _cs_blur->CalculateDispatchNum(_blur_x_kernel,rendering_data._width,rendering_data._height,1u);
                 cmd->Dispatch(_cs_blur.get(), _blur_x_kernel, group_num_x, group_num_y, 1);
-                _cs_blur->SetTexture("_SourceTex", blur_x);
-                _cs_blur->SetTexture("_OutTex", blur_y);
+                _cs_blur->SetTexture(_blur_y_kernel, "_SourceTex", blur_x);
+                _cs_blur->SetTexture(_blur_y_kernel, "_OutTex", blur_y);
                 cmd->Dispatch(_cs_blur.get(), _blur_y_kernel, group_num_x, group_num_y, 1);
                 cmd->Blit(blur_y, rendering_data._camera_opaque_tex_handle);
                 cmd->ReleaseTempRT(blur_x);

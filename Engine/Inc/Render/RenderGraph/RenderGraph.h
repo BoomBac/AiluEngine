@@ -7,6 +7,8 @@
 #include "Render/Texture.h"
 #include "RenderGraphFwd.h"
 
+#include <algorithm>
+
 namespace Ailu::Render
 {
     struct RenderingData;
@@ -72,7 +74,8 @@ namespace Ailu::Render::RDG
         bool isRead() const
         {
             return static_cast<uint32_t>(_usage & (EResourceUsage::kReadSRV |
-                                                   EResourceUsage::kCopySrc | EResourceUsage::kIndirectArgument)) != 0;
+                                                   EResourceUsage::kCopySrc | EResourceUsage::kIndirectArgument |
+                                                   EResourceUsage::kRaytracingAccel)) != 0;
         }
     };
 
@@ -91,12 +94,11 @@ namespace Ailu::Render::RDG
 
     struct CompiledResourceBarrier
     {
-        GpuResource *_resource = nullptr;
+        RGHandle _handle{};
         EResourceState _before = EResourceState::kCommon;
         EResourceState _after = EResourceState::kCommon;
         u32 _sub_resource = kTotalSubRes;
     };
-
     struct CompiledRenderPass
     {
         RenderPass *_pass = nullptr;
@@ -104,6 +106,16 @@ namespace Ailu::Render::RDG
         Vector<CompiledResourceBarrier> _post_barriers;
         u32 _submission_index = 0u;
         bool _allow_parallel_recording = true;
+    };
+
+    struct RenderGraphCompileStats
+    {
+        u32 _pass_count = 0u;
+        u32 _compiled_pass_count = 0u;
+        u32 _resource_count = 0u;
+        u32 _resource_version_count = 0u;
+        u32 _dependency_edge_count = 0u;
+        u32 _barrier_count = 0u;
     };
 
     class AILU_API RenderPass
@@ -190,6 +202,8 @@ namespace Ailu::Render::RDG
         // 编译RenderGraph，解析资源依赖关系
         bool Compile();
 
+        const RenderGraphCompileStats &GetCompileStats() const { return _compile_stats; }
+
         void EndFrame();
 
         // 执行RenderGraph
@@ -205,6 +219,10 @@ namespace Ailu::Render::RDG
             return nullptr;
         }
 
+        // Every GPU access to a RenderGraph resource must be covered by the current pass declaration.  Persistent
+        // shader-global registries must not retain RenderGraph resources across passes, cameras, or graph executions.
+        bool ContainsResource(const GpuResource *resource) const;
+
     public:
         Vector<RenderPass> _debug_passes;
         bool _is_debug = false;
@@ -217,10 +235,11 @@ namespace Ailu::Render::RDG
         void CreatePhysicalResources(RGHandle handle);
         Texture *CreatePhysicsTexture(RGHandle handle);
         GPUBuffer *CreatePhysicsBuffer(RGHandle handle);
+        bool PrepareResources();
         bool CompileResourceBarriers();
+        bool ValidateResourceAccesses();
         EResourceState InitialResourceState(const ResourceNode &node) const;
         Vector<u32> ResolveBarrierSubResources(RGHandle handle, const ResourceAccess &access) const;
-        Vector<u32> ResolveAllBarrierSubResources(const ResourceNode &node) const;
 
         ResourceNode *GetResourceNode(RGHandle handle)
         {
@@ -256,19 +275,38 @@ namespace Ailu::Render::RDG
                 _is_tex = true;
                 _is_render_output = ((bool) desc._is_color_target) | ((bool) desc._is_depth_target);
                 _is_external = false;
-                if (desc._is_depth_target)
-                    _initial_state = EResourceState::kDepthWrite;
-                else if (desc._is_color_target)
-                    _initial_state = EResourceState::kRenderTarget;
-                else
-                    _initial_state = EResourceState::kCommon;
+                _mip_count = std::max<u32>(1u, desc._mip_num);
+                switch (desc._dimension)
+                {
+                case ETextureDimension::kCube:
+                    _array_slice_count = 6u;
+                    break;
+                case ETextureDimension::kCubeArray:
+                    _array_slice_count = std::max<u32>(1u, desc._array_size) * 6u;
+                    break;
+                case ETextureDimension::kTex2DArray:
+                    _array_slice_count = std::max<u32>(1u, desc._array_size);
+                    break;
+                default:
+                    _array_slice_count = 1u;
+                    break;
+                }
+                _is_depth_resource = desc._is_depth_target;
+                // Transient resources are leased from FrameResourceManager.  The pool contract is that a
+                // lease starts and ends in COMMON; the compiled graph owns every transition from that point.
+                _initial_state = EResourceState::kCommon;
             };
             ResourceNode(const BufferDesc &desc, StringView name) :_buffer_desc(desc), _name(name), _is_transient(true)
             {
                 _is_tex = false;
                 _is_render_output = false;
                 _is_external = false;
-                _initial_state = desc._init_state;
+                _mip_count = 1u;
+                _array_slice_count = 1u;
+                _is_depth_resource = false;
+                // D3D12 ignores a buffer's initial state and creates it in COMMON.  Keep the graph's
+                // structural contract identical to the physical resource contract.
+                _initial_state = EResourceState::kCommon;
             };
             GpuResource* GetResource() const
             {
@@ -308,6 +346,9 @@ namespace Ailu::Render::RDG
             bool _is_allocated = false;//是否创建了物理资源
             RGHandle *_handle_ptr = nullptr;
             EResourceState _initial_state = EResourceState::kCommon;
+            u32 _mip_count = 1u;
+            u32 _array_slice_count = 1u;
+            bool _is_depth_resource = false;
             Vector<ResourceVersion> _versions;
         };
         inline static std::atomic<u32> s_next_handle_id = 0u;
@@ -324,6 +365,7 @@ namespace Ailu::Render::RDG
         HashMap<String, RGHandle> _external_buffer_handles;
         HashMap<u32, ResourceNode> _external_resources;
         PassPool _pass_pool{64u};
+        RenderGraphCompileStats _compile_stats;
         bool _is_compiled = false;
     };
 
@@ -439,7 +481,10 @@ namespace Ailu::Render::RDG
         {
             return _graph->Import(res);
         }
-
+        RGHandle Import(GpuResource *res, EResourceState initial_state)
+        {
+            return _graph->Import(res, initial_state);
+        }
         void SetCallback(ExecuteFunction callback)
         {
             _pass->SetCallback(std::move(callback));

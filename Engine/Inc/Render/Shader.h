@@ -467,11 +467,18 @@ namespace Ailu::Render
         virtual void Bind(RHICommandBuffer *cmd, ComputeShaderKernelId kernel, const ComputeDispatchSnapshot &snapshot)
         { Bind(cmd, kernel); }
         void SetTexture(const String &name, Texture *texture);
+        void SetTexture(ComputeShaderKernelId kernel, const String &name, Texture *texture);
+        void SetTexture(ComputeShaderKernelId kernel, const String &name, RTHandle handle);
+        void SetTexture(ComputeShaderKernelId kernel, const String &name, RTHandle handle, ECubemapFace face,
+                        u16 mipmap);
         void SetTexture(u8 bind_slot, Texture *texture);
         void SetTexture(const String &name, RTHandle handle);
         void SetTexture(const String &name, RTHandle handle, ECubemapFace face, u16 mipmap);
         void SetTexture(const String &name, Texture *texture, u16 mipmap);
         void SetTexture(const String &name, Texture *texture, ECubemapFace face, u16 mipmap);
+        void SetTexture(ComputeShaderKernelId kernel, const String &name, Texture *texture, u16 mipmap);
+        void SetTexture(ComputeShaderKernelId kernel, const String &name, Texture *texture, ECubemapFace face,
+                        u16 mipmap);
         //void SetTexture(const String &name, RDG::RGHandle handle);
         //void SetTexture(const String &name, RDG::RGHandle handle, ECubemapFace face, u16 mipmap);
         void SetFloat(const String &name, f32 value);
