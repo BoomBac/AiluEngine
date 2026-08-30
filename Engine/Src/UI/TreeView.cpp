@@ -157,6 +157,11 @@ namespace Ailu
                     UpdateTreeViewRowBackground(this, row, false);
             };
 
+            OnKeyDown() += [this](UIEvent &e)
+            {
+                HandleKeyDown(e);
+            };
+
             _on_focus_gained += [this]()
             {
                 if (auto* row = dynamic_cast<TreeViewRow*>(FindRowForItem(_selected_item)))
@@ -180,6 +185,8 @@ namespace Ailu
                 {
                     if (click_target == row->GetExpandButton())
                     {
+                        RequestFocus();
+                        SetSelectedItem(row->GetItemId(), true);
                         ToggleExpanded(row->GetItemId());
                         e._is_handled = true;
                         return;
@@ -700,8 +707,77 @@ namespace Ailu
         // =========================================================================
         // Row Events
         // =========================================================================
+        void TreeView::HandleKeyDown(UIEvent &event)
+        {
+            if (_data_source == nullptr || _visible_items.empty())
+                return;
+
+            const TreeItemId selected = _selected_item;
+            i32 selected_index = -1;
+            for (i32 index = 0; index < static_cast<i32>(_visible_items.size()); ++index)
+            {
+                if (_visible_items[index]._id == selected)
+                {
+                    selected_index = index;
+                    break;
+                }
+            }
+
+            TreeItemId next_item = kInvalidTreeItemId;
+            switch (event._key_code)
+            {
+                case EKey::kUP:
+                    next_item = _visible_items[selected_index < 0 ? static_cast<i32>(_visible_items.size()) - 1 :
+                                               std::max(selected_index - 1, 0)]._id;
+                    break;
+                case EKey::kDOWN:
+                    next_item = _visible_items[selected_index < 0 ? 0 :
+                                               std::min(selected_index + 1,
+                                                        static_cast<i32>(_visible_items.size()) - 1)]._id;
+                    break;
+                case EKey::kLEFT:
+                    if (selected_index < 0)
+                        return;
+                    if (_visible_items[selected_index]._has_children && IsExpanded(selected))
+                    {
+                        RequestFocus();
+                        SetExpanded(selected, false);
+                        event._is_handled = true;
+                        return;
+                    }
+                    next_item = _data_source->GetParent(selected);
+                    break;
+                case EKey::kRIGHT:
+                {
+                    if (selected_index < 0)
+                        return;
+                    auto children = _data_source->GetChildren(selected);
+                    if (children.empty())
+                        return;
+                    if (!IsExpanded(selected))
+                    {
+                        RequestFocus();
+                        SetExpanded(selected, true);
+                        event._is_handled = true;
+                        return;
+                    }
+                    next_item = children.front();
+                    break;
+                }
+                default:
+                    return;
+            }
+
+            if (next_item == kInvalidTreeItemId)
+                return;
+            SetSelectedItem(next_item, true);
+            ScrollItemIntoView(next_item);
+            event._is_handled = true;
+        }
+
         void TreeView::OnRowClicked(TreeItemId item)
         {
+            RequestFocus();
             SetSelectedItem(item, true);
         }
 

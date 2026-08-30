@@ -218,6 +218,7 @@ public:                                                                   \
             void DeferredDestroy(Entity entity);
             void FlushDestroy();
             void ExecutePhase(ESystemPhase phase, f32 delta_time);
+            void WaitForSystems() const;
             void MarkSystemScheduleDirty();
 
             // --- Batch operations ---

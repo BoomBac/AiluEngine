@@ -3,6 +3,7 @@
 #define __SPRITE_ASSET_EDITOR_H__
 
 #include "Editors/AssetEditor.h"
+#include "Editors/TexturePreviewWidget.h"
 #include "UI/UIElement.h"
 #include "UI/Basic.h"
 #include "UI/Container.h"
@@ -104,10 +105,6 @@ namespace Ailu
             ~SpriteAssetEditor() override;
 
             void Update(f32 dt) override;
-            using AssetEditor::Open;
-            void Open(Render::Sprite* asset);
-            void Open(Render::SpriteAtlas* asset);
-            void Close();
 
             bool HasDraftChanges() const
             {
@@ -176,6 +173,8 @@ namespace Ailu
             static UI::Text* AddSectionTitle(UI::UIElement* parent, const String& title);
             static UI::HorizontalBox* AddPropertyRow(UI::UIElement* parent, const String& label);
 
+            bool OnOpen() override;
+            void OnClose() override;
             void OnBeforeSave() override;
             void OnAssetSaved() override;
             void OnAssetReloaded() override;
@@ -195,8 +194,6 @@ namespace Ailu
             SpriteAssetEditData _original;
             SpriteAssetEditData _editing;
 
-            Vector2f _preview_pan  = Vector2f(0.0f, 0.0f);
-            f32      _preview_zoom = 1.0f;
             bool     _show_grid    = true;
             bool     _show_pivot   = true;
             bool     _show_border  = true;
@@ -278,7 +275,7 @@ namespace Ailu
         // =========================================================================
         // SpritePreviewWidget
         // =========================================================================
-        class SpritePreviewWidget : public UI::UIElement
+        class SpritePreviewWidget : public TexturePreviewWidget
         {
         public:
             explicit SpritePreviewWidget(SpriteAssetEditor* editor);
@@ -287,25 +284,17 @@ namespace Ailu
         protected:
             void RenderImpl(UI::UIRenderer& r) override;
             void Update(f32 dt) override;
+            void DrawOverlay(UI::UIRenderer& r, const Vector4f& texture_rect) override;
 
         private:
-            void DrawBackground(UI::UIRenderer& r, const Vector4f& rect);
-            void DrawTexture(UI::UIRenderer& r, const Vector4f& rect);
             void DrawUvRectOverlay(UI::UIRenderer& r);
-            void DrawPixelGrid(UI::UIRenderer& r);
             void DrawPivotOverlay(UI::UIRenderer& r);
             void DrawBorderOverlay(UI::UIRenderer& r);
 
             SpriteEditorDragMode HitTest(const Vector2f& screen_pos) const;
 
-            Vector2f ScreenToPreview(const Vector2f& screen_pos) const;
-            Vector2f PreviewToScreen(const Vector2f& preview_pos) const;
-            Vector2f ScreenToTexturePixel(const Vector2f& screen_pos) const;
-            Vector2f TexturePixelToScreen(const Vector2f& tex_pixel) const;
-
             Vector4f GetUvRectInPixels() const;
             Vector4f GetUvRectInScreen() const;
-            Vector4f GetTextureDisplayRect() const;
 
             static constexpr f32 kHandleRadius = 6.0f;
             Vector<Vector4f> GetUvHandles() const;

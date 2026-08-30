@@ -5,11 +5,13 @@
 #include "Framework/Core/CoreMinimal.h"
 #include "Framework/Core/ReflectionMacros.h"
 #include "Framework/Math/ALMath.hpp"
-#include "Render/Material.h"
-#include "Render/Texture.h"
 
 namespace Ailu::Render
 {
+    class Texture;
+
+    class Material;
+
     AENUM()
     enum class ESpriteBlendMode
     {

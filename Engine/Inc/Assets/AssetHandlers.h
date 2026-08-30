@@ -62,6 +62,14 @@ namespace Ailu
         const Type *AssetType() const final;
         Scope<Asset> Load(const AssetLoadContext &context) final;
         bool Save(const AssetSaveContext &context) final;
+        bool ReloadInPlace(Asset &target, const Asset &source) final;
+    };
+
+    class AILU_API SkeletonAssetHandler : public IAssetHandler
+    {
+        const Type *AssetType() const final;
+        Scope<Asset> Load(const AssetLoadContext &context) final;
+        bool Save(const AssetSaveContext &context) final;
     };
 
     class AILU_API SkeletonMeshAssetHandler : public IAssetHandler
@@ -69,6 +77,7 @@ namespace Ailu
         const Type *AssetType() const final;
         Scope<Asset> Load(const AssetLoadContext &context) final;
         bool Save(const AssetSaveContext &context) final;
+        bool ReloadInPlace(Asset &target, const Asset &source) final;
     };
 
     class AILU_API SceneAssetHandler : public IAssetHandler

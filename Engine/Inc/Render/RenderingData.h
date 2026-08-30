@@ -2,12 +2,10 @@
 #ifndef __RENDERING_DATA_H__
 #define __RENDERING_DATA_H__
 
-#include "Buffer.h"
 #include "Framework/Core/CoreMinimal.h"
 #include "Framework/Core/Containers/Vector.h"
 #include "Framework/Core/Containers/Map.h"
 #include "Framework/Core/Containers/Array.h"
-#include "RendererAPI.h"
 #include "Texture.h"
 #include "RenderGraph/RenderGraphFwd.h"
 #include "generated/RenderingData.gen.h"
@@ -24,6 +22,8 @@ namespace Ailu::SceneManagement
 
 namespace Ailu::Render
 {
+    class ConstantBuffer;
+
     enum class EShaderingMode : u8
     {
         kShader,

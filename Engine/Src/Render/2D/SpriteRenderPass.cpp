@@ -3,6 +3,7 @@
 #include "Framework/Common/ResourceMgr.h"
 #include "Render/Camera.h"
 #include "Render/CommandBuffer.h"
+#include "Render/GraphicsContext.h"
 #include "Render/RenderGraph/RenderGraph.h"
 #include "Render/ResourcePool.h"
 #include "Scene/Scene.h"

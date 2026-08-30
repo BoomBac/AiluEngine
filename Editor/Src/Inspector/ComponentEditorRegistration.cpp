@@ -40,7 +40,7 @@ namespace Ailu
 
             registry.RegisterCustom<ECS::AnimatorComponent, AnimatorComponentEditor>("Animator", "Animation", 245);
 
-            registry.Register<ECS::CSkeletonMesh>("Skeleton Mesh", "Rendering", 250);
+            registry.RegisterCustom<ECS::CSkeletonMesh, StaticMeshComponentEditor>("Skeleton Mesh", "Rendering", 250);
 
             registry.RegisterCustom<ECS::CRigidBody, RigidBodyComponentEditor>("Rigid Body", "Physics", 300);
 

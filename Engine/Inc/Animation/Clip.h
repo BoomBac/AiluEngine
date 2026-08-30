@@ -42,6 +42,8 @@ namespace Ailu
         void FrameDuration(f32 frame_duration) { _frame_duration = frame_duration; }
         [[nodiscard]] bool IsLooping() const { return _is_looping; }
         void IsLooping(bool is_looping) { _is_looping = is_looping; };
+        [[nodiscard]] const Guid &PreviewMeshGuid() const { return _preview_mesh_guid; }
+        void PreviewMeshGuid(const Guid &guid) { _preview_mesh_guid = guid; }
         [[nodiscard]] f32 GetStartTime() const { return _start_time; }
         void StartTime(f32 start_time) { _start_time = start_time; }
         [[nodiscard]] f32 GetEndTime() const { return _end_time; }
@@ -57,6 +59,7 @@ namespace Ailu
         Vector<TransformTrack> _tracks;
         SpriteAnimationTrack _sprite_track;
         Vector<AnimationEvent> _events;
+        Guid _preview_mesh_guid = Guid::EmptyGuid();
 	};
 
     class AILU_API AnimationClipLibrary

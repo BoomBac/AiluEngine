@@ -774,7 +774,11 @@ namespace Ailu
         if (auto node = FindNode(); node != nullptr)
         {
             type = EStructedDataType::kStruct;
-            AL_ASSERT(std::holds_alternative<JsonArray>(node->value));
+            if (!std::holds_alternative<JsonArray>(node->value))
+            {
+                LOG_ERROR("JsonArchive::BeginArray: current value is not an array");
+                return 0u;
+            }
             auto &arr = std::get<JsonArray>(node->value);
             if (arr.empty())
                 return 0u;

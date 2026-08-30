@@ -3,7 +3,15 @@
 
 #include "Framework/Common/NonCopyable.h"
 #include "Render/Buffer.h"
-#include "Render/Material.h"
+
+namespace Ailu
+{
+    namespace Render
+    {
+        class Material;
+        class Texture;
+    }
+}
 
 namespace Ailu
 {

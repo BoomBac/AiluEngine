@@ -22,6 +22,7 @@
 
 #include "Render/RenderConstants.h"
 #include "Render/GraphicsContext.h"
+#include "Render/GfxCommand.h"
 #include "D3DResourceBase.h"
 #include "Platform/WinWindow.h"
 #include "Framework/Math/ALMath.hpp"

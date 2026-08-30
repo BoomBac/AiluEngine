@@ -9,6 +9,7 @@
 #include "UI/Widget.h"
 #include "UI/UIFramework.h"
 #include "UI/DragDrop.h"
+#include "Render/Material.h"
 #include <Framework/Common/Allocator.hpp>
 #include <Framework/Common/ResourceMgr.h>
 #include "Render/Shader.h"
@@ -316,7 +317,8 @@ namespace Ailu
                 if (entry._widget == nullptr || !entry._widget->IsPopup())
                     continue;
                 auto *submit_color = get_submit_color(entry._color);
-                SubmitPopupBackdrop(entry._widget, cmd, submit_color, entry._depth);
+                if (UIManager::Get()->ShouldRenderPopupBackdrop(entry._widget))
+                    SubmitPopupBackdrop(entry._widget, cmd, submit_color, entry._depth);
                 for (auto *block: GetWidgetFrameBlocks(entry._widget))
                     SubmitBlock(block, cmd, submit_color, entry._depth);
             }

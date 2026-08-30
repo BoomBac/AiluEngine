@@ -447,6 +447,8 @@ namespace Ailu::Render
         };
         AL_FORCE_INLINE static void SetGlobalTexture(const String &name, Texture *texture)
         {
+            if (!ValidatePersistentGlobalTexture(texture))
+                return;
             s_global_textures_bind_info[name] = texture;
         };
         static void SetGlobalTexture(const String &name, RTHandle texture);
@@ -458,6 +460,7 @@ namespace Ailu::Render
         {
             s_global_ints[name] = value;
         };
+        static bool ValidatePersistentGlobalTexture(Texture *texture);
     public:
         static Ref<ComputeShader> Create(const WString &sys_path);
         ComputeShader() = default;

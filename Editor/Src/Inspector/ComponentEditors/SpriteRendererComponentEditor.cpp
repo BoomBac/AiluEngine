@@ -28,20 +28,23 @@ namespace Ailu
 
             {
                 auto *dropdown = Editor::AddObjectAssetDropdownRow(context._content, "Sprite", Render::Sprite::StaticType(),
-                    ResourceMgr::Get().GetAssetGuid(comp->_sprite));
+                    comp->_sprite_guid.IsEmpty() ? ResourceMgr::Get().GetAssetGuid(comp->_sprite) : comp->_sprite_guid);
                 dropdown->_on_object_asset_selected += [comp](Asset *, Object *selected, const Guid &)
                 {
                     comp->_sprite = dynamic_cast<Render::Sprite *>(selected);
+                    comp->_sprite_guid = selected == nullptr ? Guid::EmptyGuid() : ResourceMgr::Get().GetAssetGuid(selected);
                     SceneMgr::Get().MarkCurSceneDirty();
                 };
             }
 
             {
                 auto *dropdown = Editor::AddObjectAssetDropdownRow(context._content, "Material", Render::Material::StaticType(),
-                    ResourceMgr::Get().GetAssetGuid(comp->_material.get()));
+                    comp->_material_guid.IsEmpty() ?
+                        ResourceMgr::Get().GetAssetGuid(comp->_material.get()) : comp->_material_guid);
                 dropdown->_on_object_asset_selected += [comp](Asset *, Object *selected, const Guid &)
                 {
                     comp->_material = selected == nullptr ? nullptr : std::dynamic_pointer_cast<Render::Material>(selected->SharedFromThis());
+                    comp->_material_guid = selected == nullptr ? Guid::EmptyGuid() : ResourceMgr::Get().GetAssetGuid(selected);
                     SceneMgr::Get().MarkCurSceneDirty();
                 };
             }

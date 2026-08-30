@@ -16,6 +16,8 @@ namespace Ailu
 
 namespace Ailu::Render
 {
+    class Camera;
+
     class AILU_API SpriteRenderPass : public RenderPass
     {
     public:

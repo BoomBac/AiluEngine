@@ -54,7 +54,7 @@ namespace Ailu
             SetPosition({140.0f, 70.0f});
             _document = MakeScope<GraphDocument>();
             _preview_asset = MakeScope<GraphAsset>("GraphEditorPreview");
-            Open(_preview_asset.get());
+            _document->Open(_preview_asset.get());
             BuildPreviewGraph();
             BuildContent();
         }
@@ -75,11 +75,11 @@ namespace Ailu
             }
         }
 
-        bool GraphEditorWindow::Open(GraphAsset *asset)
+        bool GraphEditorWindow::OnOpen()
         {
+            GraphAsset *asset = GetAssetObject<GraphAsset>();
             if (asset == nullptr)
                 return false;
-            BindAsset(ResourceMgr::Get().GetLinkedAsset(asset));
             _asset = asset;
             if (_document == nullptr)
                 _document = MakeScope<GraphDocument>();
@@ -367,7 +367,7 @@ namespace Ailu
         {
             GraphAsset *asset = GetAssetObject<GraphAsset>();
             if (asset != nullptr)
-                Open(asset);
+                OnOpen();
         }
 
         void GraphEditorWindow::RefreshDetails()

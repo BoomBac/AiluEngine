@@ -46,6 +46,29 @@ namespace Ailu
 
     namespace
     {
+        ScriptEntity MakeScriptEntity(SceneManagement::Scene *scene, ECS::Entity entity)
+        {
+            ScriptEntity result;
+            result._scene = scene;
+            result._entity = entity;
+            return result;
+        }
+
+        ScriptScene MakeScriptScene(SceneManagement::Scene *scene)
+        {
+            ScriptScene result;
+            result._scene = scene;
+            return result;
+        }
+
+        ScriptAssetValue MakeScriptAssetValue(const Guid &guid, const String &asset_type)
+        {
+            ScriptAssetValue result;
+            result._guid = guid;
+            result._asset_type = asset_type;
+            return result;
+        }
+
         String TrimScriptPropertyText(String text)
         {
             const auto is_space = [](char character) { return std::isspace(static_cast<unsigned char>(character)) != 0; };
@@ -500,8 +523,8 @@ namespace Ailu
         instance._resolved_script_path = prototype_key;
         instance._loaded_script_version = prototype_iter->second._version;
         instance._instance = _lua.create_table();
-        instance._instance["entity"] = ScriptEntity{key._scene, key._entity};
-        instance._instance["scene"] = ScriptScene{key._scene};
+        instance._instance["entity"] = MakeScriptEntity(key._scene, key._entity);
+        instance._instance["scene"] = MakeScriptScene(key._scene);
         SynchronizeScriptProperties(component, prototype_iter->second);
         InjectScriptProperties(component, key._scene, instance._instance);
         sol::table metatable = _lua.create_table();
@@ -552,7 +575,7 @@ namespace Ailu
 
         EnsurePhysicsContactBridge(scene);
 
-        const ScriptEntity handle{scene, entity};
+        const ScriptEntity handle = MakeScriptEntity(scene, entity);
         if (!handle.IsValid())
             return false;
 
@@ -652,8 +675,8 @@ namespace Ailu
             case ECS::EScriptPropertyType::kVector3: instance[property._name] = Vector3f(property._vector_value.x, property._vector_value.y, property._vector_value.z); break;
             case ECS::EScriptPropertyType::kVector4:
             case ECS::EScriptPropertyType::kColor: instance[property._name] = property._vector_value; break;
-            case ECS::EScriptPropertyType::kEntity: instance[property._name] = ScriptEntity{scene, scene->FindEntity(property._guid_value)}; break;
-            case ECS::EScriptPropertyType::kAsset: instance[property._name] = ScriptAssetValue{property._guid_value, property._asset_type}; break;
+            case ECS::EScriptPropertyType::kEntity: instance[property._name] = MakeScriptEntity(scene, scene->FindEntity(property._guid_value)); break;
+            case ECS::EScriptPropertyType::kAsset: instance[property._name] = MakeScriptAssetValue(property._guid_value, property._asset_type); break;
             }
         }
     }
@@ -749,7 +772,7 @@ namespace Ailu
             if (component == nullptr || component->_script_asset != script_asset)
                 continue;
             ClearSubscriptions(_instances.at(key));
-            if (!LoadComponentInstance(key, *component, {key._scene, key._entity}))
+            if (!LoadComponentInstance(key, *component, MakeScriptEntity(key._scene, key._entity)))
                 continue;
 
             ScriptInstance &instance = _instances.at(key);
@@ -907,8 +930,8 @@ namespace Ailu
         if (scene == nullptr || !scene->IsValidEntity(contact._entity_a) || !scene->IsValidEntity(contact._entity_b))
             return;
 
-        const ScriptEntity other_a{scene, contact._entity_b};
-        const ScriptEntity other_b{scene, contact._entity_a};
+        const ScriptEntity other_a = MakeScriptEntity(scene, contact._entity_b);
+        const ScriptEntity other_b = MakeScriptEntity(scene, contact._entity_a);
         const ScriptContact2D hit_a{contact._point, contact._normal, contact._shape_a, contact._shape_b,
                                     contact._object_type_b};
         const ScriptContact2D hit_b{contact._point, Vector2f{-contact._normal.x, -contact._normal.y}, contact._shape_b,

@@ -185,7 +185,7 @@ namespace Ailu
                     auto w = widget[i].get();
                     if (w->_visibility != EVisibility::kVisible || w->_is_receive_event == false || w->Parent() != e._window)
                         continue;
-                    if (modal_widget != nullptr && w != modal_widget)
+                    if (modal_widget != nullptr && w != modal_widget && !s_mgr->IsPopupAboveModal(w))
                         continue;
                     if (is_capture_sensitive_mouse_event && is_capture_owner_widget(w))
                     {
@@ -214,7 +214,7 @@ namespace Ailu
                         auto w = widget[i].get();
                         if (w->_visibility != EVisibility::kVisible || w->_is_receive_event == false || w->Parent() != e._window)
                             continue;
-                        if (modal_widget != nullptr && w != modal_widget)
+                        if (modal_widget != nullptr && w != modal_widget && !s_mgr->IsPopupAboveModal(w))
                             continue;
                         if (is_capture_owner_widget(w))
                         {

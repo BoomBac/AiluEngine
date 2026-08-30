@@ -33,8 +33,6 @@ namespace Ailu
             ~AudioClipEditor() override;
 
             void Update(f32 dt) override;
-            using AssetEditor::Open;
-            void Open(AudioClip *clip);
 
         private:
             void BuildToolbar(UI::HorizontalBox *toolbar);

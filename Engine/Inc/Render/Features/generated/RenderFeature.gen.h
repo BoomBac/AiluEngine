@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __RENDERFEATURE_GEN_H__
 //Class RenderPass begin...........................
-#define RENDERFEATURE_GEN_H_56_GENERATED_BODY \
+#define RENDERFEATURE_GEN_H_72_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_RenderPass_Type();\
                                 static const Type* GetPrivateStaticClass();\

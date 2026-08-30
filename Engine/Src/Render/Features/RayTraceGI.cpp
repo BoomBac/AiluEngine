@@ -1,5 +1,7 @@
 ﻿#include "Render/Features/RayTraceGI.h"
 #include "Framework/Common/ResourceMgr.h"
+#include "Render/GraphicsContext.h"
+#include "Render/Material.h"
 #include "Framework/Common/TimeMgr.h"
 #include "Scene/Scene.h"
 #include "Render/Renderer.h"

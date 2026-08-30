@@ -23,6 +23,9 @@ namespace Ailu
     {
         namespace
         {
+            thread_local RenderGraph *s_executing_graph = nullptr;
+            thread_local RenderPass *s_executing_pass = nullptr;
+
             bool HasUsage(EResourceUsage usage, EResourceUsage flag)
             {
                 return static_cast<u32>(usage & flag) != 0u;
@@ -118,8 +121,41 @@ namespace Ailu
             return contains_resource(_transient_resources) || contains_resource(_external_resources);
         }
 
+        bool RenderGraph::ValidatePersistentGlobalResource(const GpuResource *resource, StringView api_name)
+        {
+            if (s_executing_graph == nullptr || resource == nullptr || !s_executing_graph->ContainsResource(resource))
+                return true;
+
+            LOG_ERROR("RenderGraph resource cannot escape through persistent global registry: api={}, pass={}, resource={}, "
+                      "resource_ptr={}", api_name, s_executing_pass != nullptr ? s_executing_pass->_name : String("unknown"),
+                      resource->Name(), static_cast<const void *>(resource));
+            AL_ASSERT(false);
+            return false;
+        }
+
+        bool RenderGraph::PublishGlobalTexture(ShaderPropertyId property_id, RGHandle handle, RenderPass *producer)
+        {
+            auto *node = GetResourceNode(handle);
+            if (node == nullptr || producer == nullptr ||
+                std::find(producer->_output_handles.begin(), producer->_output_handles.end(), handle) == producer->_output_handles.end())
+            {
+                LOG_ERROR("RenderGraph::PublishGlobalTexture: property={} must be published from a pass output", property_id);
+                return false;
+            }
+            _global_textures[property_id] = {handle, producer};
+            return true;
+        }
+
+        RGHandle RenderGraph::ReadGlobalTexture(ShaderPropertyId property_id) const
+        {
+            if (const auto it = _global_textures.find(property_id); it != _global_textures.end())
+                return it->second._handle;
+            return {};
+        }
+
         void RenderGraph::EndFrame()
         {
+            _global_textures.clear();
             _transient_tex_handles.clear();
             _transient_buffer_handles.clear();
             for (auto *pass: _passes)
@@ -1083,7 +1119,11 @@ namespace Ailu
                     }
                     {
                         PROFILE_BLOCK_GPU(cmd.get(), pass->_name)
+                        s_executing_graph = this;
+                        s_executing_pass = pass;
                         pass->Execute(*this, cmd.get(), data);
+                        s_executing_pass = nullptr;
+                        s_executing_graph = nullptr;
                     }
                     for (const auto &barrier: compiled_pass._post_barriers)
                     {

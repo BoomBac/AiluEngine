@@ -3,6 +3,7 @@
 #include "Assets/PrefabAsset.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Render/2D/Sprite.h"
+#include "Render/Material.h"
 #include "Physics/2D/Physics2DComponents.h"
 #include "Scene/Component.h"
 #include "Scene/Scene.h"
@@ -88,12 +89,18 @@ namespace Ailu::SceneManagement
             const Guid &guid = ResourceMgr::Get().GetAssetGuid(object);
             return guid.IsEmpty() ? String{} : guid.ToString();
         };
-        auto fill_material_guids = [&asset_guid_string](const Vector<Ref<Material>> &materials, Vector<String> &guids)
+        auto fill_material_guids = [&asset_guid_string](const Vector<Ref<Material>> &materials,
+                                                        const Vector<Guid> &stored_guids, Vector<String> &guids)
         {
             guids.clear();
-            guids.reserve(materials.size());
-            for (const auto &material : materials)
-                guids.emplace_back(asset_guid_string(material.get()));
+            guids.reserve(std::max(materials.size(), stored_guids.size()));
+            for (u32 index = 0u; index < std::max(materials.size(), stored_guids.size()); ++index)
+            {
+                if (index < stored_guids.size() && !stored_guids[index].IsEmpty())
+                    guids.emplace_back(stored_guids[index].ToString());
+                else
+                    guids.emplace_back(index < materials.size() ? asset_guid_string(materials[index].get()) : String{});
+            }
         };
         auto mark_disabled = [&]<typename T>(StringView component_name)
         {
@@ -118,8 +125,10 @@ namespace Ailu::SceneManagement
         if (const auto *static_mesh = registry.GetComponent<ECS::StaticMeshComponent>(entity); static_mesh != nullptr)
         {
             entity_doc._has_static_mesh_component = true;
-            entity_doc._static_mesh_component._mesh_guid = asset_guid_string(static_mesh->_p_mesh.get());
-            fill_material_guids(static_mesh->_p_mats, entity_doc._static_mesh_component._material_guids);
+            entity_doc._static_mesh_component._mesh_guid = !static_mesh->_mesh_guid.IsEmpty()
+                ? static_mesh->_mesh_guid.ToString() : asset_guid_string(static_mesh->_p_mesh.get());
+            fill_material_guids(static_mesh->_p_mats, static_mesh->_material_guids,
+                                entity_doc._static_mesh_component._material_guids);
             mark_disabled.template operator()<ECS::StaticMeshComponent>("StaticMeshComponent");
         }
         if (const auto *light = registry.GetComponent<ECS::LightComponent>(entity); light != nullptr)
@@ -201,14 +210,17 @@ namespace Ailu::SceneManagement
         if (const auto *skeleton_mesh = registry.GetComponent<ECS::CSkeletonMesh>(entity); skeleton_mesh != nullptr)
         {
             entity_doc._has_skeleton_mesh_component = true;
-            entity_doc._skeleton_mesh_component._mesh_guid = asset_guid_string(skeleton_mesh->_p_mesh.get());
-            fill_material_guids(skeleton_mesh->_p_mats, entity_doc._skeleton_mesh_component._material_guids);
+            entity_doc._skeleton_mesh_component._mesh_guid = !skeleton_mesh->_mesh_guid.IsEmpty()
+                ? skeleton_mesh->_mesh_guid.ToString() : asset_guid_string(skeleton_mesh->_p_mesh.get());
+            fill_material_guids(skeleton_mesh->_p_mats, skeleton_mesh->_material_guids,
+                                entity_doc._skeleton_mesh_component._material_guids);
             mark_disabled.template operator()<ECS::CSkeletonMesh>("CSkeletonMesh");
         }
         if (const auto *animator = registry.GetComponent<ECS::AnimatorComponent>(entity); animator != nullptr)
         {
             entity_doc._has_animator_component = true;
             entity_doc._animator_component._controller_guid = animator->_controller.IsEmpty() ? String{} : animator->_controller.ToString();
+            entity_doc._animator_component._clip_guid = animator->_clip.IsEmpty() ? String{} : animator->_clip.ToString();
             entity_doc._animator_component._speed = animator->_speed;
             entity_doc._animator_component._play_on_awake = animator->_play_on_awake;
             mark_disabled.template operator()<ECS::AnimatorComponent>("AnimatorComponent");
@@ -223,8 +235,10 @@ namespace Ailu::SceneManagement
         if (const auto *sprite = registry.GetComponent<ECS::SpriteRendererComponent>(entity); sprite != nullptr)
         {
             entity_doc._has_sprite_renderer_component = true;
-            entity_doc._sprite_renderer_component._sprite_guid = asset_guid_string(sprite->_sprite);
-            entity_doc._sprite_renderer_component._material_guid = asset_guid_string(sprite->_material.get());
+            entity_doc._sprite_renderer_component._sprite_guid = !sprite->_sprite_guid.IsEmpty()
+                ? sprite->_sprite_guid.ToString() : asset_guid_string(sprite->_sprite);
+            entity_doc._sprite_renderer_component._material_guid = !sprite->_material_guid.IsEmpty()
+                ? sprite->_material_guid.ToString() : asset_guid_string(sprite->_material.get());
             entity_doc._sprite_renderer_component._color =
                 Vector4f(sprite->_color.r, sprite->_color.g, sprite->_color.b, sprite->_color.a);
             entity_doc._sprite_renderer_component._sorting_layer = sprite->_sorting_layer;

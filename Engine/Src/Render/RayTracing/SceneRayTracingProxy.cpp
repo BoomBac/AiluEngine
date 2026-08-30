@@ -2,6 +2,7 @@
 #include "Framework/Common/Profiler.h"
 #include "Framework/Math/MathHash.hpp"
 #include "Render/Mesh.h"
+#include "Render/Material.h"
 #include "Render/Texture.h"
 #include "pch.h"
 
@@ -78,6 +79,7 @@ namespace Ailu::Render
         };
 
         HashMap<EmissiveTriangleCacheKey, Vector<u32>, EmissiveTriangleCacheKeyHasher> s_emissive_triangle_cache;
+        const Vector<u32> kEmptyEmissiveTriangleIndices;
 
         bool HasEmissiveContribution(const Vector3f &emission_radiance, const Vector3f &texture_sample)
         {
@@ -121,9 +123,14 @@ namespace Ailu::Render
             return false;
         }
 
-        const Vector<u32> &GetEmissiveTriangleIndices(const Mesh &mesh, u16 submesh, StandardMaterial &material)
+        const Vector<u32> &GetEmissiveTriangleIndices(const Mesh &mesh, u16 submesh, Material &material)
         {
-            const auto emission_color = material.MainProperty(ETextureUsage::kEmission).GetValue<Color>();
+            if (!material.IsStandardLit())
+                return kEmptyEmissiveTriangleIndices;
+            const auto *emission_prop = material.MainProperty(ETextureUsage::kEmission);
+            if (emission_prop == nullptr)
+                return kEmptyEmissiveTriangleIndices;
+            const auto emission_color = emission_prop->GetValue<Color>();
             const Vector3f emission_radiance = emission_color.xyz;
             const auto *emission_texture = dynamic_cast<const Texture2D *>(material.MainTex(ETextureUsage::kEmission));
             EmissiveTriangleCacheKey cache_key{};
@@ -262,9 +269,13 @@ namespace Ailu::Render
                 if (submesh >= comp._p_mats.size())
                     break;
 
-                if (auto mat = dynamic_cast<StandardMaterial*>(comp._p_mats[submesh].get()); mat != nullptr)
+                auto *mat = comp._p_mats[submesh].get();
+                if (mat != nullptr && mat->IsStandardLit())
                 {
-                    auto emission_color = mat->MainProperty(ETextureUsage::kEmission).GetValue<Color>();
+                    const auto *emission_prop = mat->MainProperty(ETextureUsage::kEmission);
+                    if (emission_prop == nullptr)
+                        continue;
+                    auto emission_color = emission_prop->GetValue<Color>();
                     if (emission_color.x <= 0.0f && emission_color.y <= 0.0f && emission_color.z <= 0.0f)
                         continue;
                     const Vector3f emission_radiance = emission_color.xyz;
@@ -389,11 +400,8 @@ namespace Ailu::Render
                 continue;
             u16 material_class = 0u;
             auto mat = static_mesh._p_mats.empty() ? nullptr : static_mesh._p_mats[0].get();
-            if (auto std_mat = dynamic_cast<StandardMaterial*>(mat); std_mat != nullptr)
-            {
-                if (std_mat->MaterialID() == EMaterialID::kChecker)
-                    material_class = 1;
-            }
+            if (mat != nullptr && mat->IsStandardLit() && mat->MaterialID() == EMaterialID::kChecker)
+                material_class = 1;
             instance_keys.push_back({entity, mesh, material_class});
             for (u32 i = 0u; i < mesh->SubmeshCount(); ++i)
             {
@@ -745,30 +753,34 @@ namespace Ailu::Render
         dst._normal_tex             = RenderConstants::kInvalidBindlessHandle;
         dst._metallic_roughness_tex = RenderConstants::kInvalidBindlessHandle;
         dst._emission_tex           = RenderConstants::kInvalidBindlessHandle;
-        if (auto std_mat = dynamic_cast<StandardMaterial*>(src); std_mat != nullptr)
+        if (src != nullptr && src->IsStandardLit())
         {
-            auto prop = std_mat->MainProperty(ETextureUsage::kAlbedo);
-            dst._base_color        = prop.GetValue<Vector4f>().xyz;
-            if (auto base_color_tex = std_mat->MainTex(ETextureUsage::kAlbedo); base_color_tex)
+            const auto *albedo_prop = src->MainProperty(ETextureUsage::kAlbedo);
+            if (albedo_prop != nullptr)
+                dst._base_color = albedo_prop->GetValue<Vector4f>().xyz;
+            if (auto base_color_tex = src->MainTex(ETextureUsage::kAlbedo); base_color_tex)
             {
                 dst._base_color_tex = base_color_tex->GetBindlessSRVIndex();
             }
-            prop = std_mat->MainProperty(ETextureUsage::kMetallic);
-            dst._metallic          = prop.GetValue<f32>();
-            prop = std_mat->MainProperty(ETextureUsage::kRoughness);
-            dst._roughness         = std::max(0.03f,prop.GetValue<f32>());
-            if (auto normal_tex = std_mat->MainTex(ETextureUsage::kNormal); normal_tex)
+            const auto *metallic_prop = src->MainProperty(ETextureUsage::kMetallic);
+            if (metallic_prop != nullptr)
+                dst._metallic = metallic_prop->GetValue<f32>();
+            const auto *roughness_prop = src->MainProperty(ETextureUsage::kRoughness);
+            if (roughness_prop != nullptr)
+                dst._roughness = std::max(0.03f, roughness_prop->GetValue<f32>());
+            if (auto normal_tex = src->MainTex(ETextureUsage::kNormal); normal_tex)
             {
                 dst._normal_tex = normal_tex->GetBindlessSRVIndex();
             }
-            if (auto mr_tex = std_mat->MainTex(ETextureUsage::kRoughness); mr_tex)
+            if (auto mr_tex = src->MainTex(ETextureUsage::kRoughness); mr_tex)
             {
                 dst._metallic_roughness_tex = mr_tex->GetBindlessSRVIndex();
             }
-            prop = std_mat->MainProperty(ETextureUsage::kEmission);
-            dst._emission          = prop.GetValue<Color>().xyz;
-            dst._ior = std_mat->GetFloat("_IOR");
-            dst._transmission = std_mat->GetFloat("_Transmission");
+            const auto *emission_prop = src->MainProperty(ETextureUsage::kEmission);
+            if (emission_prop != nullptr)
+                dst._emission = emission_prop->GetValue<Color>().xyz;
+            dst._ior = src->GetFloat("_IOR");
+            dst._transmission = src->GetFloat("_Transmission");
         }
         //dst._base_color        = Vector3f::kOne;
         //dst._metallic          = src.metallic;

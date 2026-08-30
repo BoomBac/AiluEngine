@@ -350,7 +350,7 @@ namespace Ailu
 
             Ref<Render::Material> material = nullptr;
             if (shader == Render::Shader::s_p_defered_standart_lit.lock().get() || shader->Name() == "defered_standard_lit")
-                material = MakeRef<Render::StandardMaterial>(trimmed_name);
+                material = Render::Material::CreateStandard(trimmed_name);
             else
                 material = MakeRef<Render::Material>(shader, trimmed_name);
             ResourceMgr::Get().CreateAsset(asset_path, material);

@@ -22,7 +22,7 @@ Options:
     --type TYPE    Override auto-detected asset type.
     --name NAME    Override _asset_name (default: filename stem).
     --compute      For .hlsl files: use ComputeShader instead of Shader.
-    --srgb / --no-srgb   For Texture2D: set _is_srgb (default: true).
+    --srgb / --no-srgb   For Texture2D: set import _is_sRGB explicitly.
     --no-default-db      Skip default assetdb conflict avoidance.
     --output NAME  Override output filename stem.
 """
@@ -30,6 +30,7 @@ Options:
 import argparse
 import json
 import os
+import re
 import sys
 import uuid
 
@@ -122,7 +123,13 @@ _ASSET_TEMPLATES: dict[str, dict] = {
         "body": {
             "_file": "",
             "_inner_file_name": "",
-            "_is_combine_mesh": False,
+            "_import_setting": {
+                "_is_recalculate_normals": False,
+                "_import_flag": 1,
+                "_is_combine_mesh": False,
+                "_mesh_name": "",
+                "_animation_stack_index": 0,
+            },
         },
     },
     "SkeletonMesh": {
@@ -130,14 +137,24 @@ _ASSET_TEMPLATES: dict[str, dict] = {
         "body": {
             "_file": "",
             "_inner_file_name": "",
-            "_is_combine_mesh": False,
+            "_import_setting": {
+                "_is_recalculate_normals": False,
+                "_import_flag": 1,
+                "_is_combine_mesh": False,
+                "_mesh_name": "",
+                "_animation_stack_index": 0,
+            },
         },
     },
     "Texture2D": {
         "extension": ".alasset",
         "body": {
             "_file": "",
-            "_is_srgb": True,
+            "_import_setting": {
+                "_is_sRGB": True,
+                "_generate_mipmap": True,
+                "_is_readable": False,
+            },
         },
     },
     "Shader": {
@@ -219,6 +236,24 @@ _ASSET_TEMPLATES: dict[str, dict] = {
         },
     },
 }
+
+
+def InferTextureIsSRGB(source: str) -> bool:
+    """Infer whether a texture contains color data from its extension and filename."""
+    source_path = Path(source)
+    if source_path.suffix.lower() in {".hdr", ".exr"}:
+        return False
+
+    stem = source_path.stem.lower()
+    normalized_stem = re.sub(r"[^a-z0-9]+", "_", stem)
+    tokens = set(filter(None, normalized_stem.split("_")))
+    if tokens.intersection({"n", "m", "ao", "orm"}):
+        return False
+    if any(marker in stem for marker in (
+        "normal", "roughness", "metallic", "mask", "height", "depth", "lut", "noise", "weather"
+    )):
+        return False
+    return True
 
 
 def generate_guid_safe(existing_guids: set[str] | None) -> str:
@@ -327,14 +362,14 @@ def main():
         action="store_true",
         default=None,
         dest="is_srgb",
-        help="Set _is_srgb=true for Texture2D.",
+        help="Set import _is_sRGB=true for Texture2D.",
     )
     parser.add_argument(
         "--no-srgb",
         action="store_false",
         default=None,
         dest="is_srgb",
-        help="Set _is_srgb=false for Texture2D.",
+        help="Set import _is_sRGB=false for Texture2D.",
     )
     parser.add_argument(
         "--inner-name",
@@ -464,8 +499,9 @@ def main():
         body["_file"] = os.path.basename(source)
     if "_inner_file_name" in body and args.inner_name:
         body["_inner_file_name"] = args.inner_name
-    if "_is_srgb" in body and args.is_srgb is not None:
-        body["_is_srgb"] = args.is_srgb
+    if asset_type_key == "Texture2D":
+        is_srgb = args.is_srgb if args.is_srgb is not None else InferTextureIsSRGB(source)
+        body["_import_setting"]["_is_sRGB"] = is_srgb
     if "_shader_guid" in body and args.shader_guid:
         body["_shader_guid"] = args.shader_guid
     if "_clip_name" in body:

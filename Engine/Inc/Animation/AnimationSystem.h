@@ -6,6 +6,7 @@
 #include "Animation/AnimationEvent.h"
 #include "Animation/AnimationInstance.h"
 #include "Animation/BlendSpace.h"
+#include "Animation/SkeletonAsset.h"
 #include "Animation/Skeleton/SkeletonAnimationBinding.h"
 #include "Animation/SkinningSystem.h"
 #include "Animation/SpriteAnimationBinding.h"
@@ -42,6 +43,7 @@ namespace Ailu
             void SetTrigger(Entity entity, AnimationParameterId id);
             void ResetTrigger(Entity entity, AnimationParameterId id);
             void PlayState(Entity entity, u16 state_index);
+            void SetBindPoseValidationEnabled(bool enabled);
 
         private:
             enum class EParameterCommandType : u8
@@ -67,19 +69,27 @@ namespace Ailu
             void QueueCommand(Entity entity, ParameterCommand command);
             void ApplyCommands(Entity entity, AnimationInstance &instance, AnimatorComponent &animator,
                                const AnimationControllerAsset &controller_asset);
-            const AnimationClip *ResolveClip(Entity entity, const Guid &clip_id, Skeleton *skeleton,
-                                             SpriteAnimationBinding *sprite_binding,
-                                             SkeletonAnimationBinding *skeleton_binding);
+            const AnimationClip *ResolveClip(const Guid &clip_id);
             void ResolveMotionAssets(Entity entity, const AnimationControllerAsset &controller_asset,
                                      AnimationController &controller);
-            void CollectStateEvents(Entity entity, const AnimationControllerAsset &controller_asset,
-                                    const AnimationController &controller, u16 state_index, f32 previous_time,
-                                    f32 current_time, bool allow_cosmetic, bool loop, Skeleton *skeleton,
-                                    SpriteAnimationBinding *sprite_binding, SkeletonAnimationBinding *skeleton_binding);
 
-            Map<Entity, SkeletonPose> _skeleton_poses;
+            struct SkeletonRuntimeGroup
+            {
+                Ref<SkeletonAsset> _skeleton_asset;
+                SkeletonAnimationBinding _binding;
+                SkeletonPose _pose;
+                Vector<Matrix4x4f> _global_pose_palette;
+                Vector<Entity> _consumers;
+            };
+
+            struct AnimatorRuntime
+            {
+                AnimationEvaluation _evaluation;
+                Map<const SkeletonAsset *, SkeletonRuntimeGroup> _skeleton_groups;
+            };
+
+            Map<Entity, AnimatorRuntime> _animator_runtimes;
             Map<Entity, Vector<Matrix4x4f>> _matrix_palettes;
-            Map<Entity, SkeletonAnimationBinding> _skeleton_bindings;
             Map<Entity, SpriteAnimationBinding> _sprite_bindings;
             Map<Entity, AnimationController> _controllers;
             Map<Entity, Guid> _controller_ids;

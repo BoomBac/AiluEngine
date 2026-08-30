@@ -6,6 +6,7 @@
 #include "Assets/WidgetAsset.h"
 #include "Animation/AnimationControllerAsset.h"
 #include "Animation/Clip.h"
+#include "Animation/SkeletonAsset.h"
 #include "Audio/AudioClip.h"
 #include "Common/Selection.h"
 #include "Dock/DockManager.h"
@@ -26,7 +27,14 @@
 #include "Project/ProjectManager.h"
 #include "Render/2D/Sprite.h"
 #include "Render/2D/SpriteAtlas.h"
+#include "Render/Material.h"
 #include "Render/Mesh.h"
+#include "Render/Texture.h"
+#include "Editors/MeshAssetEditor.h"
+#include "Editors/SkeletonMeshAssetEditor.h"
+#include "Editors/SkeletonAssetEditor.h"
+#include "Editors/MaterialAssetEditor.h"
+#include "Editors/TextureAssetEditor.h"
 #include "Scene/PrefabSystem.h"
 #include "Scene/Scene.h"
 
@@ -41,26 +49,16 @@ namespace Ailu
             RegisterEditor<GraphAsset, GraphEditorWindow>();
             RegisterEditor<WidgetAsset, WidgetEditor>();
             RegisterEditor<Render::Sprite, SpriteAssetEditor>();
-
-            RegisterEditor(StaticClass<Render::SpriteAtlas>(), [](Asset *asset) -> Ref<DockWindow>
-            {
-                if (asset == nullptr)
-                    return nullptr;
-                if (asset->_p_obj == nullptr)
-                    ResourceMgr::Get().Load<Render::SpriteAtlas>(asset->_asset_path);
-                auto *atlas = asset->As<Render::SpriteAtlas>();
-                if (atlas == nullptr)
-                    return nullptr;
-
-                auto editor = MakeRef<SpriteAtlasEditor>();
-                editor->Open(atlas);
-                return editor;
-            });
+            RegisterEditor<Render::SpriteAtlas, SpriteAtlasEditor>();
+            RegisterEditor<Render::Mesh, MeshAssetEditor>();
+            RegisterEditor<Render::Texture2D, TextureAssetEditor>();
+            RegisterEditor<Render::Material, MaterialAssetEditor>();
 
             RegisterEditor<AnimationClip, AnimationClipEditor>();
             RegisterEditor<AnimationControllerAsset, AnimationControllerEditor>();
             RegisterEditor<InputActionAsset, InputActionAssetEditor>();
             RegisterEditor<AudioClip, AudioClipEditor>();
+            RegisterEditor<SkeletonAsset, SkeletonAssetEditor>();
 
             RegisterOpenHandler(StaticClass<SceneManagement::Scene>(), [](Asset *asset)
             {
@@ -112,11 +110,7 @@ namespace Ailu
                     LOG_ERROR(L"AssetBrowser: failed to open script {} in vscode", script_sys_path);
             });
 
-            RegisterOpenHandler(StaticClass<Render::Mesh>(), [](Asset *asset)
-            {
-                if (asset->_p_obj == nullptr)
-                    ResourceMgr::Get().Load<Render::Mesh>(asset->_asset_path);
-            });
+            RegisterEditor<Render::SkeletonMesh, SkeletonMeshAssetEditor>();
         }
 
         AssetEditorRegistry &AssetEditorRegistry::Get()

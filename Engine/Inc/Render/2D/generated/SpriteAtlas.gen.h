@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __SPRITEATLAS_GEN_H__
 //Class SpriteAtlas begin...........................
-#define SPRITEATLAS_GEN_H_12_GENERATED_BODY \
+#define SPRITEATLAS_GEN_H_13_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_SpriteAtlas_Type();\
                                 static const Type* GetPrivateStaticClass();\

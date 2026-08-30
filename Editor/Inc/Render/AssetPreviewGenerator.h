@@ -6,6 +6,7 @@ namespace Ailu
     namespace Render
     {
         class Mesh;
+        class Material;
         class RenderTexture;
         class Sprite;
     }
@@ -14,8 +15,11 @@ namespace Ailu
         class AssetPreviewGenerator
         {
         public:
-            static void GeneratorMeshSnapshot(u16 w, u16 h, Render::Mesh *mesh, Ref<Render::RenderTexture>& target);
-            static void GeneratorSpriteSnapshot(u16 w, u16 h, Render::Sprite *sprite, Ref<Render::RenderTexture>& target);
+            static constexpr u16 kDynamicPreviewSize = 128u;
+            static void GeneratorMeshSnapshot(u16 w, u16 h, Render::Mesh *mesh, Ref<Render::RenderTexture> &target);
+            static void GeneratorMaterialSnapshot(u16 w, u16 h, Render::Material *material,
+                                                   Ref<Render::RenderTexture>& target);
+            static void GeneratorSpriteSnapshot(u16 w, u16 h, Render::Sprite *sprite, Ref<Render::RenderTexture> &target);
             static void Shutdown();
         };
     }// namespace Editor

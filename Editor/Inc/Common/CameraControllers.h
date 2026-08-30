@@ -11,11 +11,9 @@ namespace Ailu
     using Math::Vector2f;
     using Math::Vector3f;
 
-    class PropertyInfo;
     namespace Render
     {
         class Camera;
-        class VolumeTexturePreviewPass;
     }
 
     namespace Editor
@@ -64,27 +62,42 @@ namespace Ailu
         public:
             OrbitCameraController() = default;
 
-            void Attach(Render::VolumeTexturePreviewPass *pass);
-            void BeginDrag(const Vector2f &local_pos);
-            void EndDrag();
-            void Drag(const Vector2f &local_pos);
+            void SetOrbit(const Vector3f &target, f32 yaw, f32 pitch, f32 distance);
+            void SetTarget(const Vector3f &target) { _target = target; }
+            void SetCameraPosition(const Vector3f &position);
+            void SetDistanceLimits(f32 min_distance, f32 max_distance);
+
+            Vector3f GetTarget() const { return _target; }
+            Vector3f GetCameraPosition() const;
+            Vector3f GetCameraForward() const;
+            Vector3f GetCameraRight() const;
+            Vector3f GetCameraUp() const;
+
+            void BeginOrbit(const Vector2f &local_pos);
+            void EndOrbit();
+            void Orbit(const Vector2f &local_pos);
+            void BeginPan(const Vector2f &local_pos);
+            void EndPan();
+            void Pan(const Vector2f &local_pos, const Vector2f &view_size, f32 vertical_fov);
             void Zoom(f32 scroll_delta);
 
         private:
-            void ApplyCameraPosition();
+            Vector3f GetCameraOffset() const;
+            void ClampDistance();
 
         private:
-            Render::VolumeTexturePreviewPass *_pass = nullptr;
-            PropertyInfo *_cam_pos_prop = nullptr;
-            bool _is_dragging = false;
-            Vector2f _last_mouse{0.f, 0.f};
+            Vector3f _target = Vector3f::kZero;
+            bool _is_orbiting = false;
+            bool _is_panning = false;
+            Vector2f _last_orbit_mouse{0.f, 0.f};
+            Vector2f _last_pan_mouse{0.f, 0.f};
             f32 _yaw = 0.f;
             f32 _pitch = 0.f;
             f32 _radius = 5.f;
             f32 _sensitivity = 0.01f;
-            f32 _zoom_step = 0.5f;
-            f32 _min_radius = 0.5f;
-            f32 _max_radius = 100.0f;
+            f32 _zoom_factor = 0.9f;
+            f32 _min_radius = 0.01f;
+            f32 _max_radius = 1000000.0f;
         };
 
         class CanvasCameraController : public ICameraController

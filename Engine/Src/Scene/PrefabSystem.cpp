@@ -3,6 +3,7 @@
 #include "Assets/PrefabAsset.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Render/2D/Sprite.h"
+#include "Render/Material.h"
 #include "Physics/2D/Physics2DComponents.h"
 #include "Scene/Component.h"
 #include "Scene/EntitySerializer.h"
@@ -215,6 +216,10 @@ namespace Ailu::SceneManagement
             if (entity_doc._has_static_mesh_component)
             {
                 auto &component = registry.AddComponent<ECS::StaticMeshComponent>(entity);
+                component._mesh_guid = entity_doc._static_mesh_component._mesh_guid.empty()
+                    ? Guid::EmptyGuid() : Guid(entity_doc._static_mesh_component._mesh_guid);
+                for (const String &guid : entity_doc._static_mesh_component._material_guids)
+                    component._material_guids.emplace_back(guid.empty() ? Guid::EmptyGuid() : Guid(guid));
                 if (!entity_doc._static_mesh_component._mesh_guid.empty())
                 {
                     const Guid mesh_guid(entity_doc._static_mesh_component._mesh_guid);
@@ -313,6 +318,8 @@ namespace Ailu::SceneManagement
                 auto &component = registry.AddComponent<ECS::AnimatorComponent>(entity);
                 if (!entity_doc._animator_component._controller_guid.empty())
                     component._controller = Guid(entity_doc._animator_component._controller_guid);
+                if (!entity_doc._animator_component._clip_guid.empty())
+                    component._clip = Guid(entity_doc._animator_component._clip_guid);
                 component._speed = entity_doc._animator_component._speed;
                 component._play_on_awake = entity_doc._animator_component._play_on_awake;
                 registry.SetComponentEnabled<ECS::AnimatorComponent>(entity,
@@ -328,6 +335,10 @@ namespace Ailu::SceneManagement
             if (entity_doc._has_sprite_renderer_component)
             {
                 auto &component = registry.AddComponent<ECS::SpriteRendererComponent>(entity);
+                component._sprite_guid = entity_doc._sprite_renderer_component._sprite_guid.empty()
+                    ? Guid::EmptyGuid() : Guid(entity_doc._sprite_renderer_component._sprite_guid);
+                component._material_guid = entity_doc._sprite_renderer_component._material_guid.empty()
+                    ? Guid::EmptyGuid() : Guid(entity_doc._sprite_renderer_component._material_guid);
                 if (!entity_doc._sprite_renderer_component._sprite_guid.empty())
                 {
                     const Guid sprite_guid(entity_doc._sprite_renderer_component._sprite_guid);
@@ -367,7 +378,9 @@ namespace Ailu::SceneManagement
             return {};
         result._root = root_it->second;
         const Guid prefab_asset_guid(prefab._header._guid);
-        scene.MutablePrefabInstances().emplace_back(PrefabInstance{prefab_asset_guid, scene.GetEntityGuid(result._root), {}});
+        PrefabInstance &instance = scene.MutablePrefabInstances().emplace_back();
+        instance._prefab_asset = prefab_asset_guid;
+        instance._root_entity = scene.GetEntityGuid(result._root);
         scene.MarkStructureChanged();
         return result;
     }
@@ -384,7 +397,12 @@ namespace Ailu::SceneManagement
                                            [tag, component, property](const PrefabOverride &override)
                                            { return IsSameOverride(override, tag->_prefab_entity, component, property); });
         if (existing == instance->_overrides.end())
-            instance->_overrides.emplace_back(PrefabOverride{tag->_prefab_entity, String(component), String(property)});
+        {
+            PrefabOverride &override = instance->_overrides.emplace_back();
+            override._prefab_entity = tag->_prefab_entity;
+            override._component = String(component);
+            override._property = String(property);
+        }
         scene.MarkEdited();
         return true;
     }
@@ -638,6 +656,10 @@ namespace Ailu::SceneManagement
             if (entity_doc._has_static_mesh_component && registry.GetComponent<ECS::StaticMeshComponent>(entity) == nullptr)
             {
                 auto &component = registry.AddComponent<ECS::StaticMeshComponent>(entity);
+                component._mesh_guid = entity_doc._static_mesh_component._mesh_guid.empty()
+                    ? Guid::EmptyGuid() : Guid(entity_doc._static_mesh_component._mesh_guid);
+                for (const String &guid : entity_doc._static_mesh_component._material_guids)
+                    component._material_guids.emplace_back(guid.empty() ? Guid::EmptyGuid() : Guid(guid));
                 if (!entity_doc._static_mesh_component._mesh_guid.empty())
                 {
                     const Guid mesh_guid(entity_doc._static_mesh_component._mesh_guid);
@@ -701,6 +723,10 @@ namespace Ailu::SceneManagement
             if (entity_doc._has_sprite_renderer_component && registry.GetComponent<ECS::SpriteRendererComponent>(entity) == nullptr)
             {
                 auto &component = registry.AddComponent<ECS::SpriteRendererComponent>(entity);
+                component._sprite_guid = entity_doc._sprite_renderer_component._sprite_guid.empty()
+                    ? Guid::EmptyGuid() : Guid(entity_doc._sprite_renderer_component._sprite_guid);
+                component._material_guid = entity_doc._sprite_renderer_component._material_guid.empty()
+                    ? Guid::EmptyGuid() : Guid(entity_doc._sprite_renderer_component._material_guid);
                 if (!entity_doc._sprite_renderer_component._sprite_guid.empty())
                 {
                     const Guid sprite_guid(entity_doc._sprite_renderer_component._sprite_guid);

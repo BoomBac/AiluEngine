@@ -458,7 +458,9 @@ namespace Ailu
                                 if (!s_sprite_previews.contains(sprite))
                                 {
                                     Ref<RenderTexture> preview_rt;
-                                    AssetPreviewGenerator::GeneratorSpriteSnapshot(256u, 256u, sprite, preview_rt);
+                                    AssetPreviewGenerator::GeneratorSpriteSnapshot(AssetPreviewGenerator::kDynamicPreviewSize,
+                                                                                    AssetPreviewGenerator::kDynamicPreviewSize,
+                                                                                    sprite, preview_rt);
                                     if (preview_rt)
                                         s_sprite_previews[sprite] = preview_rt;
                                 }

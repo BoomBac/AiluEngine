@@ -7,5 +7,12 @@
     },
     "_file": "WaterTest/YBot_Walking_M.fbx",
     "_inner_file_name": "Alpha_Joints",
-    "_is_combine_mesh": false
+    "_import_setting": {
+        "_is_recalculate_normals": false,
+        "_import_flag": 1,
+        "_is_combine_mesh": false,
+        "_mesh_name": "",
+        "_animation_stack_index": 0,
+        "_skeleton": "null"
+    }
 }

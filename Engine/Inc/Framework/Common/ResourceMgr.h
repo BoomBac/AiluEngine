@@ -7,18 +7,28 @@
 #include "Framework/Common/NonCopyable.h"
 #include "FileManager.h"
 #include "Assets/Asset.h"
+#include "Assets/DerivedDataCache.h"
 #include "Framework/Common/Utils.h"
 #include "Framework/Parser/AssetParser.h"
+#include "Animation/SkeletonAsset.h"
 #include "Objects/Type.h"
 #include "Path.h"
 #include "Render/Font.h"
-#include "Render/Material.h"
 #include "Render/Mesh.h"
+#include "Render/Shader.h"
 #include "Render/Texture.h"
 #include "Render/2D/SpriteAtlas.h"
 #include "Scene/Scene.h"
 #include <optional>
 #include <unordered_map>
+
+namespace Ailu
+{
+    namespace Render
+    {
+        class Material;
+    }
+}
 
 namespace Ailu
 {
@@ -189,6 +199,7 @@ namespace Ailu
         bool MoveAsset(Asset *p_asset, const WString &new_asset_path);
         bool SaveAsset(Asset *asset);
         bool ReloadAsset(Asset *asset);
+        bool ReimportAsset(Asset *asset);
         void SaveAllDirtyAssets();
         void SaveAllUnsavedAssets();
         //由 Editor 编辑操作标记 Asset 为 Dirty（revision 递增）。
@@ -279,7 +290,9 @@ namespace Ailu
         Ref<Material> GetEmbeddedMaterial(Mesh *mesh,u16 slot);
 
         // External resource loaders (used by asset handlers)
-        List<Ref<Mesh>> LoadExternalMesh(const WString &asset_path, const MeshImportSetting &setting, List<Ref<AnimationClip>> &clips);
+        List<Ref<Mesh>> LoadExternalMesh(const WString &asset_path, const MeshImportSetting &setting,
+                                         List<Ref<AnimationClip>> &clips,
+                                         Ref<SkeletonAsset> *out_skeleton_asset = nullptr);
         Ref<Texture2D> LoadExternalTexture(const WString &asset_path,const ImportSetting& settings);
         bool LoadExternalTexture(const WString &asset_path,Ref<Texture2D>& tex,const ImportSetting& settings);
         Ref<Shader> LoadExternalShader(const WString &asset_path);
@@ -380,8 +393,16 @@ namespace Ailu
 
             IAssetHandler *Find(const Type *asset_type) const
             {
-                auto iter = _handlers.find(asset_type);
-                return iter == _handlers.end() ? nullptr : iter->second.get();
+                // 支持按 BaseType 回退查找：序列化协议与基类一致的派生资产可复用基类 Handler
+                const Type *current_type = asset_type;
+                while (current_type != nullptr)
+                {
+                    auto iter = _handlers.find(current_type);
+                    if (iter != _handlers.end())
+                        return iter->second.get();
+                    current_type = current_type->BaseType();
+                }
+                return nullptr;
             }
 
         private:
@@ -417,9 +438,11 @@ namespace Ailu
         Queue<std::function<void()>> _sync_tasks;
         Queue<std::function<void()>> _async_tasks;
         Queue<Asset *> _pending_delete_assets;
+        Queue<Guid> _pending_artifact_cleanup_guids;
         HashMap<WString, ImportSetting*> _importers;
         Vector<AssetMountDomain> _asset_domains;
         AssetHandlerRegistry _asset_handler_registry;
+        Scope<DerivedDataCache> _derived_data_cache;
     };
 
     template<typename T>

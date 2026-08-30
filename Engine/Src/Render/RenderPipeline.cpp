@@ -1,4 +1,6 @@
 #include "Render/RenderPipeline.h"
+#include "Render/GraphicsContext.h"
+#include "Render/Material.h"
 #include "Framework/Common/Allocator.hpp"
 #include "Framework/Common/Application.h"
 #include "Framework/Common/JobSystem.h"

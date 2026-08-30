@@ -1,11 +1,12 @@
 #pragma once
 #ifndef __MESH_H__
 #define __MESH_H__
-#include "Animation/Skeleton.h"
+#include "Animation/SkeletonAsset.h"
 #include "Assets/Asset.h"
 #include "Framework/Math/ALMath.hpp"
 #include "Framework/Math/Geometry.h"
 #include "Framework/Core/CoreMinimal.h"
+#include "Assets/AssetRef.h"
 #include "Framework/Core/String.h"
 #include "Framework/Core/Containers/Vector.h"
 #include "Framework/Core/Containers/Array.h"
@@ -40,6 +41,7 @@ namespace Ailu
             struct ImportedMaterialInfo
             {
                 std::string _name;
+                u64 _source_id = 0u;
                 u16 _slot = 0;
                 std::array<std::string, 5> _textures;
                 Color _diffuse = Color(1.0f);
@@ -80,6 +82,8 @@ namespace Ailu
             explicit Mesh(String name);
             ~Mesh();
             virtual void Apply();
+            virtual void BuildDerivedData();
+            virtual void UploadGpuResources();
             virtual void Clear();
 
             Mesh(const Mesh &) = delete;
@@ -96,6 +100,10 @@ namespace Ailu
             void SetTangents(Vector<Vector4f> &&tangents);
             void SetColors(std::span<const Color> colors);
             void SetColors(Vector<Color> &&colors);
+            void SetBounds(std::span<const AABB> bounds);
+            void SetDerivedData(Vector<AABB> &&triangle_bounds, Vector<TriangleData> &&triangle_data,
+                                Vector<BVHNode> &&bvh_nodes, Vector<Vector2UInt> &&bvh_node_ranges,
+                                u32 triangle_count);
             void SetUVs(std::span<const Vector2f> uv, u8 channel = 0u);
             void SetUVs(Vector<Vector2f> &&uv, u8 channel = 0u);
 
@@ -119,6 +127,8 @@ namespace Ailu
 
             [[nodiscard]] const Ref<VertexBuffer> &GetVertexBuffer() const noexcept { return _vertex_buffer; }
             [[nodiscard]] const Ref<IndexBuffer> &GetIndexBuffer(u16 submesh_index = 0) const noexcept;
+            [[nodiscard]] i32 GetNormalStream() const noexcept { return _normal_stream; }
+            [[nodiscard]] i32 GetTangentStream() const noexcept { return _tangent_stream; }
             [[nodiscard]] i32 GetBindlessVertexStreamIndex(const std::string &semantic_name, u8 semantic_index = 0u) const noexcept;
             [[nodiscard]] u32 GetTriangleStart(u16 submesh_index) const noexcept;
             [[nodiscard]] u32 GetTriangleCount(u16 submesh_index) const noexcept;
@@ -131,6 +141,7 @@ namespace Ailu
 
             u32 GetVertexCount() const noexcept { return _vertex_count; }
             u32 GetTriangleCount() const noexcept { return _triangle_count; }
+            [[nodiscard]] bool HasDerivedData() const noexcept { return _derived_data_ready; }
             //-----------------------------------------
             // Imported Material Cache (Import Stage Only)
             //-----------------------------------------
@@ -167,12 +178,15 @@ namespace Ailu
             //-----------------------------------------
             Ref<VertexBuffer> _vertex_buffer;
             Vector<Ref<IndexBuffer>> _index_buffers;
+            i32 _normal_stream = -1;
+            i32 _tangent_stream = -1;
 
             //-----------------------------------------
             // Metadata
             //-----------------------------------------
             u32 _vertex_count = 0u;
             u32 _triangle_count = 0u;
+            bool _derived_data_ready = false;
         };
 
         ACLASS()
@@ -188,17 +202,35 @@ namespace Ailu
             void Clear() final;
             void SetBoneWeights(std::span<const Vector4f> bone_weights);
             void SetBoneIndices(std::span<const Vector4D<u32>> bone_indices);
+            bool RemapBoneIndices(std::span<const u16> bone_remap);
+            void SetMeshBindGlobalTransform(const Matrix4x4f &transform);
+            void RestoreBindPoseVertices();
+            void BuildSkinMatrixPalette(std::span<const Matrix4x4f> global_pose_palette,
+                                        Vector<Matrix4x4f> &out_palette) const;
+            void BuildMeshSpaceJointPositions(std::span<const Matrix4x4f> global_pose_palette,
+                                              Vector<Vector3f> &out_positions) const;
             [[nodiscard]] std::span<const Vector4D<u32>> GetBoneIndices() const noexcept { return _bone_indices; };
             [[nodiscard]] std::span<const Vector4f> GetBoneWeights() const noexcept { return _bone_weights; };
-            void SetSkeleton(const Skeleton &skeleton);
-            [[nodiscard]] Skeleton &GetSkeleton();
+            [[nodiscard]] std::span<const Vector3f> GetPreviousVertices() const noexcept { return _previous_vertices; };
+            [[nodiscard]] const Matrix4x4f &GetMeshBindGlobalTransform() const noexcept { return _mesh_bind_global; };
+            [[nodiscard]] const Matrix4x4f &GetMeshCurrentGlobalInverseTransform() const noexcept
+            {
+                return _mesh_current_global_inv;
+            };
+            void SetSkeletonAsset(Ref<SkeletonAsset> skeleton_asset) { _skeleton_asset = std::move(skeleton_asset); }
+            void SetSkeletonAsset(const Guid &guid, Ref<SkeletonAsset> skeleton_asset)
+            {
+                _skeleton_asset.Set(guid, std::move(skeleton_asset));
+            }
+            [[nodiscard]] const AssetRef<SkeletonAsset> &GetSkeletonAsset() const noexcept { return _skeleton_asset; }
 
         private:
-        private:
-            Skeleton _skeleton;
+            AssetRef<SkeletonAsset> _skeleton_asset;
             Vector<Vector4f> _bone_weights;
             Vector<Vector4D<u32>> _bone_indices;
             Vector<Vector3f> _previous_vertices;
+            Matrix4x4f _mesh_bind_global = Matrix4x4f::Identity();
+            Matrix4x4f _mesh_current_global_inv = Matrix4x4f::Identity();
         };
     }// namespace Render
 }// namespace Ailu::Render

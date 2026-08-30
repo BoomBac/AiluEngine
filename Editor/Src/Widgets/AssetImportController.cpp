@@ -1,11 +1,13 @@
 #include "Widgets/AssetImportController.h"
 
 #include "Common/EditorPopup.h"
+#include "Animation/SkeletonAsset.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Framework/Common/Utils.h"
 #include "Framework/Interface/IParser.h"
 #include "UI/Basic.h"
 #include "UI/Container.h"
+#include "UI/ObjectAssetDropdown.h"
 #include "UI/UIFramework.h"
 
 #include <memory>
@@ -133,17 +135,43 @@ namespace Ailu
                 auto setting = std::make_shared<MeshImportSetting>(MeshImportSetting::Default());
                 setting->_import_flag |= MeshImportSetting::kImportFlagMesh;
                 EditorPopup::ShowDialogAt(_popup_pos, "AssetBrowserMeshImportPrompt",
-                                          std::format("Import Mesh: {}", file_name), {320.0f, 180.0f},
+                                          std::format("Import Mesh: {}", file_name), {320.0f, 270.0f},
                                           [setting, file_name](UI::VerticalBox *content, UI::Text *)
                                           {
                                               auto *file_text = content->AddChild<Text>(std::format("File: {}", file_name));
                                               file_text->GetSlotAs<LinearSlot>().SizePolicy(ESizePolicy::kFill, ESizePolicy::kAuto);
                                               file_text->_horizontal_align = EAlignment::kLeft;
 
-                                              auto *materials = EditorPopup::AddCheckBoxRow(content, "Import Materials", setting->_is_import_material);
+                                              const bool import_mesh = (setting->_import_flag & MeshImportSetting::kImportFlagMesh) != 0;
+                                              auto *mesh = EditorPopup::AddCheckBoxRow(content, "Import Mesh", import_mesh);
+                                              mesh->_on_click += [setting](bool checked)
+                                              {
+                                                  if (checked)
+                                                      setting->_import_flag |= MeshImportSetting::kImportFlagMesh;
+                                                  else
+                                                      setting->_import_flag &= ~MeshImportSetting::kImportFlagMesh;
+                                              };
+
+                                              const bool import_skeleton =
+                                                  (setting->_import_flag & MeshImportSetting::kImportFlagSkeleton) != 0;
+                                              auto *skeleton = EditorPopup::AddCheckBoxRow(content, "Import Skeleton",
+                                                                                           import_skeleton);
+                                              skeleton->_on_click += [setting](bool checked)
+                                              {
+                                                  if (checked)
+                                                      setting->_import_flag |= MeshImportSetting::kImportFlagSkeleton;
+                                                  else
+                                                      setting->_import_flag &= ~MeshImportSetting::kImportFlagSkeleton;
+                                              };
+
+                                              const bool import_material = (setting->_import_flag & MeshImportSetting::kImportFlagMaterial) != 0;
+                                              auto *materials = EditorPopup::AddCheckBoxRow(content, "Import Materials", import_material);
                                               materials->_on_click += [setting](bool checked)
                                               {
-                                                  setting->_is_import_material = checked;
+                                                  if (checked)
+                                                      setting->_import_flag |= MeshImportSetting::kImportFlagMaterial;
+                                                  else
+                                                      setting->_import_flag &= ~MeshImportSetting::kImportFlagMaterial;
                                               };
 
                                               auto *combine_mesh = EditorPopup::AddCheckBoxRow(content, "Combine Meshes", setting->_is_combine_mesh);
@@ -160,6 +188,21 @@ namespace Ailu
                                                       setting->_import_flag |= MeshImportSetting::kImportFlagAnimation;
                                                   else
                                                       setting->_import_flag &= ~MeshImportSetting::kImportFlagAnimation;
+                                              };
+
+                                              auto *skeleton_row = content->AddChild<HorizontalBox>();
+                                              skeleton_row->GetSlotAs<LinearSlot>().SizePolicy(ESizePolicy::kFill, ESizePolicy::kAuto);
+                                              skeleton_row->AddChild<Text>("Skeleton")
+                                                  ->GetSlotAs<LinearSlot>().SizePolicy(ESizePolicy::kFill, ESizePolicy::kAuto)
+                                                  .FillRate(1.0f);
+                                              auto *skeleton_dropdown = skeleton_row->AddChild<ObjectAssetDropdown>(SkeletonAsset::StaticType());
+                                              skeleton_dropdown->GetSlotAs<LinearSlot>().SizePolicy(ESizePolicy::kFill, ESizePolicy::kAuto)
+                                                  .FillRate(1.0f);
+                                              skeleton_dropdown->SetAllowNone(true);
+                                              skeleton_dropdown->SetSelectedGuid(setting->_skeleton);
+                                              skeleton_dropdown->_on_object_asset_selected += [setting](Asset *, Object *, const Guid &guid)
+                                              {
+                                                  setting->_skeleton = guid;
                                               };
                                           },
                                           {

@@ -143,7 +143,7 @@ namespace Ailu
         {
             _input_asset = GetAssetObject<InputActionAsset>();
             if (_input_asset != nullptr)
-                Open(_input_asset);
+                OnOpen();
         }
 
         void InputActionAssetEditor::Update(f32 dt)
@@ -166,24 +166,18 @@ namespace Ailu
             }
         }
 
-        void InputActionAssetEditor::Open(InputActionAsset *asset)
+        bool InputActionAssetEditor::OnOpen()
         {
-            if (!asset)
-                return;
-            BindAsset(ResourceMgr::Get().GetLinkedAsset(asset));
-            _input_asset = asset;
+            _input_asset = GetAssetObject<InputActionAsset>();
+            if (_input_asset == nullptr)
+                return false;
             _last_edit_snapshot = CaptureAssetObject(GetAsset());
             if (!ActionMaps().empty())
                 SelectActionMap(0);
             else if (!Contexts().empty())
                 SelectContext(0);
             RefreshAllUI();
-        }
-
-        void InputActionAssetEditor::Close()
-        {
-            _input_asset = nullptr;
-            AssetEditor::Close();
+            return true;
         }
 
         void InputActionAssetEditor::BuildToolbar(UI::HorizontalBox *toolbar)

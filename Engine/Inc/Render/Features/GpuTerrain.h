@@ -1,8 +1,12 @@
 #include "./RenderFeature.h"
+#include "Framework/Core/Containers/Array.h"
+#include "Render/CoreType.h"
 #include "generated/GpuTerrain.gen.h"
 namespace Ailu::Render
 {
     class TerrainPass;
+    class Camera;
+    class GPUBuffer;
     ACLASS()
     class GpuTerrain : public RenderFeature
     {

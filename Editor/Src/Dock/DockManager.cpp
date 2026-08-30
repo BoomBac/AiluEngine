@@ -15,6 +15,7 @@
 #include <ranges>
 
 #include "Objects/JsonArchive.h"
+#include "Render/GraphicsContext.h"
 
 namespace Ailu
 {

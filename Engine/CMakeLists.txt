@@ -139,6 +139,8 @@ set(ANIM_MODULE
         Src/Animation/Curve.cpp
         Inc/Animation/Track.hpp
         Src/Animation/Track.cpp
+        Inc/Animation/AnimationKeyReducer.h
+        Src/Animation/AnimationKeyReducer.cpp
         Src/Animation/TransformTrack.cpp
         Src/Animation/Solver.cpp "Src/Animation/BlendSpace.cpp")
 set(IMNODE Ext/imnodes/imnodes.cpp Ext/imnodes/imnodes.h Ext/imnodes/imnodes_internal.h)

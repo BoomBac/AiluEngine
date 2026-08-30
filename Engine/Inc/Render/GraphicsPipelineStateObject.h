@@ -18,7 +18,6 @@
 #include "RenderingStates.h"
 #include "CoreType.h"
 #include "Shader.h"
-#include "Texture.h"
 #include "Render/FrameDebugger/FrameCaptureReason.h"
 
 

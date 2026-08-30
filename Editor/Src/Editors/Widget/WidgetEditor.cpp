@@ -1183,9 +1183,11 @@ namespace Ailu
                 RenameSelectedElement(Input::GetGlobalMousePos());
         }
 
-        void WidgetEditor::Open(WidgetAsset *asset)
+        bool WidgetEditor::OnOpen()
         {
-            BindAsset(ResourceMgr::Get().GetLinkedAsset(asset));
+            WidgetAsset *asset = GetAssetObject<WidgetAsset>();
+            if (asset == nullptr)
+                return false;
             SetPreviewMode(false);
             DestroyPreview();
             _asset = asset;
@@ -1209,6 +1211,7 @@ namespace Ailu
             _designer_needs_fit = true;
             RefreshPanels();
             RefreshDirtyState();
+            return true;
         }
 
         void WidgetEditor::OnClose()
@@ -1254,7 +1257,7 @@ namespace Ailu
         {
             _asset = GetAssetObject<WidgetAsset>();
             if (_asset != nullptr)
-                Open(_asset);
+                OnOpen();
         }
 
         void WidgetEditor::MarkDirty()

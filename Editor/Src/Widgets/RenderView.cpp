@@ -422,7 +422,19 @@ namespace Ailu
                     auto mat = ResourceMgr::Get().GetEmbeddedMaterial(mesh.get(), i);
                     mats.push_back(mat? mat : Render::Material::s_checker.lock());
                 }
-                auto new_entity = scene->AddObject(mesh, mats);
+                ECS::Entity new_entity = ECS::kInvalidEntity;
+                if (auto skeleton_mesh = asset->AsRef<Render::SkeletonMesh>(); skeleton_mesh != nullptr)
+                {
+                    new_entity = scene->AddObject();
+                    auto &component = scene->GetRegister().AddComponent<ECS::CSkeletonMesh>(new_entity);
+                    component._p_mesh = std::move(skeleton_mesh);
+                    component._p_mats = mats;
+                    component._transformed_aabbs.resize(component._p_mesh->SubmeshCount() + 1u);
+                }
+                else
+                {
+                    new_entity = scene->AddObject(mesh, mats);
+                }
                 scene->GetRegister().GetComponent<ECS::TransformComponent>(new_entity)->_local_transform._position = _drag_preview_pos;
             };
             _source->SetDropHandler(handler);
@@ -905,7 +917,9 @@ namespace Ailu
             _right_menu->SlotPadding() = UI::Padding(_content_root->Thickness());
             _right_menu->InvalidateLayout();
             _pass = AL_NEW_TAG(EMemoryTag::kEditor, Render::VolumeTexturePreviewPass);
-            _orbit_controller.Attach(_pass);
+            _orbit_controller.SetDistanceLimits(0.5f, 100.0f);
+            _orbit_controller.SetTarget(Vector3f::kZero);
+            _orbit_controller.SetCameraPosition(_pass->_camera_pos);
             auto pass_type = _pass->GetType();
             _right_menu->AddChild(UI::CompositeBuilder::BuildPropertyElement("CameraPos", pass_type->FindPropertyByName("_camera_pos"), _pass));
             UI::FloatFieldParams fparams;
@@ -930,25 +944,29 @@ namespace Ailu
                 {
                     Vector4f rect = e._current_target->GetArrangeRect();
                     Vector2f local_pos = e._mouse_position - rect.xy;
-                    _orbit_controller.BeginDrag(local_pos);
+                    _orbit_controller.SetCameraPosition(_pass->_camera_pos);
+                    _orbit_controller.BeginOrbit(local_pos);
                 }
             };
             _left_preview->OnMouseUp() += [this](UI::UIEvent &e)
             {
                 if (e._key_code == EKey::kLBUTTON)
                 {
-                    _orbit_controller.EndDrag();
+                    _orbit_controller.EndOrbit();
                 }
             };
             _left_preview->OnMouseMove() += [this](UI::UIEvent &e)
             {
                 Vector4f rect = e._current_target->GetArrangeRect();
                 Vector2f local_pos = e._mouse_position - rect.xy;
-                _orbit_controller.Drag(local_pos);
+                _orbit_controller.Orbit(local_pos);
+                _pass->_camera_pos = _orbit_controller.GetCameraPosition();
             };
             _left_preview->OnMouseScroll() += [this](UI::UIEvent &e)
             {
+                _orbit_controller.SetCameraPosition(_pass->_camera_pos);
                 _orbit_controller.Zoom(e._scroll_delta);
+                _pass->_camera_pos = _orbit_controller.GetCameraPosition();
             };
         }
 

@@ -193,11 +193,12 @@ namespace Ailu
             Dropdown();
             Dropdown(const Vector<String> &items);
             ~Dropdown() = default;
-            void SetSelectedIndex(i32 index);
+            void SetSelectedIndex(i32 index, bool notify = true);
             int GetSelectedIndex() const { return _selected_index; }
             String GetSelectedText() const;
             void SetItems(const Vector<String> &items) { _items = items; }
             void SetPopupBackdrop(Render::Texture *texture, const Vector4f &source_rect);
+            void SetPopupBackdropEnabled(bool enabled) { _render_popup_backdrop = enabled; }
             using PopupItemBuilder = std::function<Ref<UIElement>(i32)>;
             using PopupBuilder = std::function<Ref<UIElement>(Vector2f)>;
             void SetPopupItemBuilder(PopupItemBuilder builder) { _popup_item_builder = std::move(builder); }
@@ -227,6 +228,7 @@ namespace Ailu
             Text *_text;
             Text *_button;
             bool _is_dropdown_open = false;
+            bool _render_popup_backdrop = true;
             Render::Texture *_popup_backdrop_texture = nullptr;
             Vector4f _popup_backdrop_source_rect = Vector4f::kZero;
             PopupItemBuilder _popup_item_builder;

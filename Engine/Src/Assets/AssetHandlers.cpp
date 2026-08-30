@@ -2,10 +2,14 @@
 #include "Animation/AnimationControllerAsset.h"
 #include "Animation/BlendSpace.h"
 #include "Animation/Clip.h"
+#include "Animation/SkeletonAsset.h"
 #include "Animation/TransformTrack.h"
 #include "Assets/AssetDocument.h"
+#include "Assets/AssetArtifact.h"
+#include "Assets/MeshArtifact.h"
 #include "Assets/PrefabAsset.h"
 #include "Assets/ScriptAsset.h"
+#include "Assets/TextureArtifact.h"
 #include "Assets/WidgetAsset.h"
 #include "Audio/AudioClip.h"
 #include "Audio/AudioClipDocument.h"
@@ -21,6 +25,7 @@
 #include "Framework/Interface/IParser.h"
 #include "Framework/Math/Guid.h"
 #include "Framework/Parser/AssetParser.h"
+#include "Framework/Parser/GltfParser.h"
 #include "Graph/GraphAsset.h"
 #include "Input/InputActionAsset.h"
 #include "Input/InputComposite.h"
@@ -39,8 +44,11 @@
 #include "Scene/Scene.h"
 
 #include <algorithm>
+#include <chrono>
 #include <map>
 #include <sstream>
+#include <limits>
+#include <filesystem>
 
 namespace Ailu
 {
@@ -51,6 +59,38 @@ namespace
 {
     WString ResolveExternalAssetPath(const WString &asset_path, const WString &stored_external_path);
     WString MakeStoredExternalAssetPath(const WString &external_asset_path);
+
+    u64 ElapsedMicroseconds(const std::chrono::steady_clock::time_point start)
+    {
+        return static_cast<u64>(std::chrono::duration_cast<std::chrono::microseconds>(
+                                    std::chrono::steady_clock::now() - start)
+                                    .count());
+    }
+
+    u64 CalculateMeshDependencyHash(const WString &source_system_path)
+    {
+        const String extension = StringUtils::ToLower(fs::path(ToChar(source_system_path)).extension().string());
+        if (extension != ".gltf")
+            return 0u;
+
+        u64 dependency_hash = 14695981039346656037ull;
+        const fs::path source_path(source_system_path);
+        for (const String &uri : GltfParser::CollectExternalDependencyUris(source_system_path))
+        {
+            const fs::path dependency_path = (source_path.parent_path() / fs::path(ToWChar(uri))).lexically_normal();
+            SourceFingerprint fingerprint;
+            if (!CalculateSourceFingerprint(dependency_path.wstring(), fingerprint))
+                fingerprint = {};
+
+            const u64 entry_hash = HashArtifactDependency(uri, fingerprint);
+            for (u32 shift = 0u; shift < sizeof(entry_hash); ++shift)
+            {
+                dependency_hash ^= static_cast<u8>(entry_hash >> (shift * 8u));
+                dependency_hash *= 1099511628211ull;
+            }
+        }
+        return dependency_hash;
+    }
 }
 
 template<typename TDocument>
@@ -80,6 +120,25 @@ bool IAssetHandler::ReloadInPlace(Asset &target, const Asset &source)
             property.Deserialize(target_object, archive);
     }
     return true;
+}
+
+namespace
+{
+    void CopyMeshData(const Render::Mesh &source, Render::Mesh &target)
+    {
+        target.Clear();
+        target.SetVertices(source.GetVertices());
+        target.SetNormals(source.GetNormals());
+        target.SetTangents(source.GetTangents());
+        target.SetColors(source.GetColors());
+        for (u8 channel = 0u; channel < 2u; ++channel)
+            target.SetUVs(source.GetUVs(channel), channel);
+        target.SetBounds(source.BoundBox());
+        for (u16 submesh_index = 0u; submesh_index < source.SubmeshCount(); ++submesh_index)
+            target.AddSubmesh(source.GetIndices(submesh_index));
+        for (const auto &material : source.GetCacheMaterials())
+            target.AddCacheMaterial(material);
+    }
 }
 
 // ============================================================
@@ -553,7 +612,7 @@ Scope<Asset> SpriteAssetHandler::Load(const AssetLoadContext &context)
         texture = context._resource_mgr->Load<Texture2D>(document._texture);
 
     auto sprite = MakeRef<Sprite>(document._header._asset_name);
-    sprite->_texture = texture;
+    sprite->_texture.Set(document._texture, std::move(texture));
     sprite->_uv_rect = document._uv_rect;
     sprite->_pivot = document._pivot;
     // Sprite assets written before the uniform-size model stored the final width and height.
@@ -575,14 +634,11 @@ bool SpriteAssetHandler::Save(const AssetSaveContext &context)
 
     SpriteAssetDocument document;
     document._header = MakeAssetDocumentHeader(context._asset);
-    document._texture = Guid::EmptyGuid();
-    bool has_valid_texture = sprite->_texture != nullptr;
-    if (has_valid_texture)
-    {
-        auto guid = context._resource_mgr->GetAssetGuid(sprite->_texture.get());
-        document._header._dependencies.push_back(AssetDependency{guid, EAssetDependencyType::kHard});
-        document._texture = guid;
-    }
+    document._texture = sprite->_texture.GetGuid();
+    if (document._texture.IsEmpty() && sprite->_texture != nullptr)
+        document._texture = context._resource_mgr->GetAssetGuid(sprite->_texture.get());
+    if (!document._texture.IsEmpty())
+        document._header._dependencies.push_back(AssetDependency{document._texture, EAssetDependencyType::kHard});
     document._uv_rect = sprite->_uv_rect;
     document._pivot = sprite->_pivot;
     document._size = sprite->GetRenderSize();
@@ -611,7 +667,7 @@ Scope<Asset> SpriteAtlasAssetHandler::Load(const AssetLoadContext &context)
         texture = context._resource_mgr->Load<Texture2D>(document._texture);
 
     auto atlas = MakeRef<SpriteAtlas>(document._header._asset_name);
-    atlas->SetTexture(texture);
+    atlas->SetTexture(document._texture, std::move(texture));
     auto asset = MakeScope<Asset>(Guid(document._header._guid), SpriteAtlas::StaticType(), context._asset_path);
     asset->_p_obj = atlas;
     asset->_domain = context._resource_mgr->GetAssetPathDomain(asset->_asset_path);
@@ -623,7 +679,7 @@ Scope<Asset> SpriteAtlasAssetHandler::Load(const AssetLoadContext &context)
             sprite_guid = Guid::Generate();
 
         auto sprite = MakeRef<Sprite>(entry._name);
-        sprite->_texture = texture;
+        sprite->_texture.Set(document._texture, texture);
         sprite->_uv_rect = entry._uv_rect;
         sprite->_pivot = entry._pivot;
         sprite->_size = std::max(entry._size, 0.0001f);
@@ -643,13 +699,11 @@ bool SpriteAtlasAssetHandler::Save(const AssetSaveContext &context)
 
     SpriteAtlasAssetDocument document;
     document._header = MakeAssetDocumentHeader(context._asset);
-    document._texture = Guid::EmptyGuid();
-    if (atlas->Texture() != nullptr)
-    {
+    document._texture = atlas->TextureRef().GetGuid();
+    if (document._texture.IsEmpty() && atlas->Texture() != nullptr)
         document._texture = context._resource_mgr->GetAssetGuid(atlas->Texture().get());
-        if (!document._texture.IsEmpty())
-            document._header._dependencies.emplace_back(document._texture, EAssetDependencyType::kHard);
-    }
+    if (!document._texture.IsEmpty())
+        document._header._dependencies.emplace_back(document._texture, EAssetDependencyType::kHard);
 
     for (const auto &sprite : atlas->Sprites())
     {
@@ -733,7 +787,7 @@ bool SpriteAtlasAssetHandler::ReloadInPlace(Asset &target, const Asset &source)
     if (target_atlas == nullptr || source_atlas == nullptr)
         return false;
 
-    target_atlas->SetTexture(source_atlas->Texture());
+    target_atlas->SetTexture(source_atlas->TextureRef().GetGuid(), source_atlas->TextureRef().Get());
     auto &target_sprites = target_atlas->Sprites();
     const auto &source_sprites = source_atlas->Sprites();
     target_sprites.resize(source_sprites.size());
@@ -868,9 +922,6 @@ Scope<Asset> TextureAssetHandler::Load(const AssetLoadContext &context)
 {
     auto sys_path = context._system_path;
     WString data;
-    auto setting = context._import_setting ? dynamic_cast<const TextureImportSetting *>(context._import_setting) : &TextureImportSetting::Default();
-    auto tex_setting = setting ? *setting : TextureImportSetting::Default();
-
     if (!FileManager::ReadFile(sys_path, data))
         return nullptr;
 
@@ -879,10 +930,91 @@ Scope<Asset> TextureAssetHandler::Load(const AssetLoadContext &context)
         return nullptr;
     auto file = ToWChar(doc._file);
     auto resolved_file = ResolveExternalAssetPath(context._asset_path, file);
-    auto json_setting = tex_setting;
-    json_setting._is_sRGB = doc._is_srgb;
+    auto json_setting = doc._import_setting;
 
-    auto tex = context._resource_mgr->LoadExternalTexture(resolved_file, json_setting);
+    const WString source_system_path = context._resource_mgr->GetResSysPath(resolved_file);
+    AssetArtifactKey artifact_key;
+    SourceFingerprint source_fingerprint;
+    artifact_key._importer_version = 1u;
+    artifact_key._artifact_version = kTextureArtifactVersion;
+    artifact_key._import_setting_hash = HashTextureImportSetting(json_setting);
+
+    Ref<Texture2D> tex;
+    bool loaded_from_artifact = false;
+    u64 artifact_read_us = 0u;
+    u64 native_import_us = 0u;
+    u64 runtime_create_us = 0u;
+    u64 gpu_upload_us = 0u;
+    u64 artifact_write_us = 0u;
+    u64 artifact_size = 0u;
+    WString artifact_path;
+    Vector<u8> artifact_data;
+    const bool has_source_fingerprint = CalculateSourceFingerprint(source_system_path, source_fingerprint);
+    if (has_source_fingerprint)
+    {
+        artifact_key._source_hash = source_fingerprint._content_hash;
+        if (context._derived_data_cache != nullptr)
+            artifact_path = context._derived_data_cache->GetArtifactPath(Guid(doc._header._guid), artifact_key);
+        const auto artifact_read_start = std::chrono::steady_clock::now();
+        const bool artifact_loaded = context._derived_data_cache != nullptr &&
+                                     context._derived_data_cache->TryLoad(Guid(doc._header._guid), artifact_key,
+                                                                          artifact_data);
+        artifact_read_us = ElapsedMicroseconds(artifact_read_start);
+        if (artifact_loaded)
+        {
+            artifact_size = artifact_data.size();
+            const auto runtime_create_start = std::chrono::steady_clock::now();
+            TextureArtifact artifact;
+            if (DeserializeTextureArtifact(artifact_data, artifact_key, artifact))
+            {
+                tex = CreateTextureFromArtifact(artifact);
+                if (tex != nullptr)
+                {
+                    loaded_from_artifact = true;
+                    LOG_INFO(L"Texture artifact cache hit: {}", source_system_path);
+                }
+            }
+            runtime_create_us = ElapsedMicroseconds(runtime_create_start);
+            artifact_data.clear();
+        }
+    }
+
+    if (tex == nullptr)
+    {
+        LOG_INFO(L"Texture artifact cache miss: {}", source_system_path);
+        const auto native_import_start = std::chrono::steady_clock::now();
+        tex = context._resource_mgr->LoadExternalTexture(resolved_file, json_setting);
+        native_import_us = ElapsedMicroseconds(native_import_start);
+        if (tex != nullptr && has_source_fingerprint && context._derived_data_cache != nullptr)
+        {
+            const auto artifact_write_start = std::chrono::steady_clock::now();
+            TextureArtifact artifact;
+            Vector<u8> serialized_artifact;
+            if (BuildTextureArtifact(*tex, artifact) &&
+                SerializeTextureArtifact(artifact, artifact_key, serialized_artifact))
+            {
+                artifact_size = serialized_artifact.size();
+                context._derived_data_cache->Store(Guid(doc._header._guid), artifact_key, serialized_artifact);
+            }
+            artifact_write_us = ElapsedMicroseconds(artifact_write_start);
+        }
+    }
+    if (tex == nullptr)
+        return nullptr;
+    const String texture_name = !doc._header._asset_name.empty()
+        ? doc._header._asset_name
+        : ToChar(PathUtils::GetFileName(context._asset_path).c_str());
+    tex->Name(texture_name);
+    if (loaded_from_artifact)
+    {
+        const auto gpu_upload_start = std::chrono::steady_clock::now();
+        tex->Apply();
+        gpu_upload_us = ElapsedMicroseconds(gpu_upload_start);
+    }
+    LOG_INFO(L"Texture artifact {}: {} (artifact_path={}, artifact_read={} us, native_import={} us, "
+             L"runtime_create={} us, gpu_upload={} us, artifact_write={} us, artifact_size={} bytes)",
+             loaded_from_artifact ? L"hit" : L"miss", source_system_path, artifact_path, artifact_read_us,
+             native_import_us, runtime_create_us, gpu_upload_us, artifact_write_us, artifact_size);
     auto asset = MakeScope<Asset>(Guid(doc._header._guid),Texture2D::StaticType(),context._asset_path);
     asset->_external_asset_path = file;
     asset->_p_obj = tex;
@@ -903,7 +1035,7 @@ bool TextureAssetHandler::Save(const AssetSaveContext &context)
     {
         if (auto *tex_setting = dynamic_cast<const TextureImportSetting *>(setting))
         {
-            doc._is_srgb = tex_setting->_is_sRGB;
+            doc._import_setting = *tex_setting;
         }
     }
 
@@ -939,42 +1071,48 @@ Scope<Asset> MaterialAssetHandler::Load(const AssetLoadContext &context)
     if (!LoadAssetDocument(sys_path, doc))
         return nullptr;
 
-    Shader *shader = context._resource_mgr->Load<Shader>(Guid(doc._shader_guid)).get();
-    if (shader == nullptr)
-    {
-        LOG_ERROR(L"Load material with path: {} failed, shader {} is unavailable", sys_path, ToWChar(doc._shader_guid));
-        return nullptr;
-    }
+    const Guid shader_guid(doc._shader_guid);
+    Ref<Shader> shader_asset = shader_guid.IsEmpty() ? nullptr : context._resource_mgr->Load<Shader>(shader_guid);
+    Shader *shader = shader_asset.get();
+    if (shader == nullptr && !shader_guid.IsEmpty())
+        LOG_WARNING(L"Load material with path: {} has missing shader reference {}", sys_path, ToWChar(doc._shader_guid));
 
-    bool is_standard_mat = shader->Name() == "defered_standard_lit";
-    Ref<Material> mat = is_standard_mat
-        ? std::static_pointer_cast<Material>(MakeRef<StandardMaterial>(doc._header._asset_name))
-        : MakeRef<Material>(shader, doc._header._asset_name);
+    Ref<Material> mat = MakeRef<Material>(shader, doc._header._asset_name);
+    mat->SetShaderGuid(shader_guid);
 
     mat->SavedKeyworkds().clear();
     for (auto &kw : doc._keywords)
     {
         if (!kw.empty()) mat->SavedKeyworkds().insert(kw);
     }
-    mat->Construct(true);
-
-    for (auto &prop : doc._float_properties)
-        mat->SetFloat(prop._name, prop._value);
-    for (auto &prop : doc._vector_properties)
-        mat->SetVector(prop._name, prop._value);
-    for (auto &prop : doc._uint_properties)
-        mat->SetInt(prop._name, prop._value);
-    for (auto &prop : doc._int_vector_properties)
-        mat->SetVector(prop._name, prop._value);
+    if (shader != nullptr)
+    {
+        mat->Construct(true);
+        for (auto &prop : doc._float_properties)
+            mat->SetFloat(prop._name, prop._value);
+        for (auto &prop : doc._vector_properties)
+            mat->SetVector(prop._name, prop._value);
+        for (auto &prop : doc._uint_properties)
+            mat->SetInt(prop._name, prop._value);
+        for (auto &prop : doc._int_vector_properties)
+            mat->SetVector(prop._name, prop._value);
+    }
 
     for (auto &prop : doc._texture_properties)
     {
         if (prop._texture_guid.empty())
             continue;
-        auto texture_asset_path = ResourceMgr::Get().GuidToAssetPath(Guid(prop._texture_guid));
+        const Guid texture_guid(prop._texture_guid);
+        mat->SetTextureGuid(prop._name, texture_guid);
+        auto texture_asset_path = ResourceMgr::Get().GuidToAssetPath(texture_guid);
         if (!texture_asset_path.empty())
         {
-            mat->SetTexture(prop._name, context._resource_mgr->Load<Texture2D>(texture_asset_path).get());
+            Ref<Texture2D> texture = context._resource_mgr->Load<Texture2D>(texture_asset_path);
+            if (texture != nullptr)
+                mat->SetTexture(prop._name, texture.get());
+            else
+                LOG_WARNING("Load material: {}, property {} has missing texture reference {}", mat->Name(),
+                            prop._name, prop._texture_guid);
         }
         else
         {
@@ -982,12 +1120,10 @@ Scope<Asset> MaterialAssetHandler::Load(const AssetLoadContext &context)
         }
     }
 
-    mat->GetUint("_MaterialID");
-    if (is_standard_mat)
+    if (mat->IsStandardLit())
     {
-        auto standard_mat = static_cast<StandardMaterial *>(mat.get());
-        standard_mat->SurfaceType((ESurfaceType)standard_mat->GetUint("_surface"));
-        standard_mat->MaterialID((EMaterialID)standard_mat->GetUint("_MaterialID"));
+        mat->SurfaceType((ESurfaceType)mat->GetUint("_surface"));
+        mat->MaterialID((EMaterialID)mat->GetUint("_MaterialID"));
     }
 
     auto asset = MakeScope<Asset>(Guid(doc._header._guid),Material::StaticType(),context._asset_path);
@@ -1011,13 +1147,18 @@ bool MaterialAssetHandler::Save(const AssetSaveContext &context)
 
     MaterialAssetDocument doc;
     doc._header = MakeAssetDocumentHeader(context._asset);
-    doc._shader_guid = context._resource_mgr->GetAssetGuid(mat->GetShader()).ToString();
+    Guid shader_guid = mat->ShaderGuid();
+    if (shader_guid.IsEmpty() && mat->GetShader() != nullptr)
+        shader_guid = context._resource_mgr->GetAssetGuid(mat->GetShader());
+    doc._shader_guid = shader_guid.ToString();
+    if (!shader_guid.IsEmpty())
+        doc._header._dependencies.emplace_back(shader_guid, EAssetDependencyType::kHard);
     doc._keywords.assign(mat->SavedKeyworkds().begin(), mat->SavedKeyworkds().end());
 
-    auto float_props = mat->GetAllFloatValue();
-    auto vector_props = mat->GetAllVectorValue();
-    auto int_vector_props = mat->GetAllIntVectorValue();
-    auto uint_props = mat->GetAllUintValue();
+    auto float_props = mat->GetShader() != nullptr ? mat->GetAllFloatValue() : List<std::tuple<String, float>>{};
+    auto vector_props = mat->GetShader() != nullptr ? mat->GetAllVectorValue() : List<std::tuple<String, Vector4f>>{};
+    auto int_vector_props = mat->GetShader() != nullptr ? mat->GetAllIntVectorValue() : List<std::tuple<String, Vector4Int>>{};
+    auto uint_props = mat->GetShader() != nullptr ? mat->GetAllUintValue() : List<std::tuple<String, u32>>{};
 
     for (auto &[name, value] : uint_props)
     {
@@ -1052,27 +1193,37 @@ bool MaterialAssetHandler::Save(const AssetSaveContext &context)
         if (prop->_type == EShaderPropertyType::kTexture2D)
         {
             auto tex = reinterpret_cast<Texture *>(prop->_value_ptr);
-            Guid tex_guid;
+            Guid tex_guid = mat->TextureGuid(prop->_value_name);
             if (tex)
             {
                 Asset *linked_asset = context._resource_mgr->GetLinkedAsset(tex);
                 if (linked_asset && linked_asset->_asset_type == Texture2D::StaticType())
                     tex_guid = linked_asset->GetGuid();
-                else
+                else if (tex_guid.IsEmpty())
                 {
                     AL_ASSERT(true);
                     LOG_ERROR("Texture2D {} hasn't a linked asset or asset type error!", tex->Name());
-                    tex_guid = Guid::EmptyGuid();
                 }
-            }
-            else
-            {
-                tex_guid = Guid::EmptyGuid();
             }
             AssetTextureBinding entry;
             entry._name = prop->_value_name;
             entry._texture_guid = tex_guid == Guid::EmptyGuid() ? String{} : tex_guid.ToString();
             doc._texture_properties.push_back(entry);
+            if (!tex_guid.IsEmpty())
+                doc._header._dependencies.emplace_back(tex_guid, EAssetDependencyType::kHard);
+        }
+    }
+    if (props.empty())
+    {
+        for (const auto &[name, guid] : mat->TextureGuids())
+        {
+            if (guid.IsEmpty())
+                continue;
+            AssetTextureBinding entry;
+            entry._name = name;
+            entry._texture_guid = guid.ToString();
+            doc._texture_properties.push_back(std::move(entry));
+            doc._header._dependencies.emplace_back(guid, EAssetDependencyType::kHard);
         }
     }
 
@@ -1083,6 +1234,64 @@ bool MaterialAssetHandler::Save(const AssetSaveContext &context)
     }
     LOG_WARNING(L"Save material to {}", context._system_path);
     return true;
+}
+
+// ============================================================
+// SkeletonAssetHandler
+// ============================================================
+
+const Type *SkeletonAssetHandler::AssetType() const
+{
+    return SkeletonAsset::StaticType();
+}
+
+Scope<Asset> SkeletonAssetHandler::Load(const AssetLoadContext &context)
+{
+    SkeletonAssetDocument document;
+    if (!LoadAssetDocument(context._system_path, document))
+        return nullptr;
+
+    auto skeleton_asset = MakeRef<SkeletonAsset>();
+    skeleton_asset->Name(document._header._asset_name);
+    Skeleton &skeleton = skeleton_asset->GetSkeletonMutable();
+    skeleton.Clear();
+    for (const SkeletonJointDocument &joint_document : document._joints)
+    {
+        Joint joint;
+        joint._name = joint_document._name;
+        joint._parent = joint_document._parent;
+        joint._inv_bind_pos = joint_document._inverse_bind_pose;
+        skeleton.AddJoint(joint);
+        skeleton.SetBindPoseLocalTransform(skeleton.JointNum() - 1u, joint_document._bind_local_transform);
+    }
+    skeleton_asset->Rebuild();
+
+    auto asset = MakeScope<Asset>(Guid(document._header._guid), SkeletonAsset::StaticType(), context._asset_path);
+    asset->_p_obj = std::move(skeleton_asset);
+    asset->_domain = context._resource_mgr->GetAssetPathDomain(asset->_asset_path);
+    return asset;
+}
+
+bool SkeletonAssetHandler::Save(const AssetSaveContext &context)
+{
+    const SkeletonAsset *skeleton_asset = context._asset->As<SkeletonAsset>();
+    if (skeleton_asset == nullptr)
+        return false;
+
+    SkeletonAssetDocument document;
+    document._header = MakeAssetDocumentHeader(context._asset);
+    const Skeleton &skeleton = skeleton_asset->GetSkeleton();
+    document._joints.reserve(skeleton.JointNum());
+    for (u32 index = 0u; index < skeleton.JointNum(); ++index)
+    {
+        const Joint &joint = skeleton[index];
+        SkeletonJointDocument &joint_document = document._joints.emplace_back();
+        joint_document._name = joint._name;
+        joint_document._parent = joint._parent;
+        joint_document._inverse_bind_pose = joint._inv_bind_pos;
+        joint_document._bind_local_transform = skeleton.GetBindPose().GetLocalTransform(index);
+    }
+    return SaveAssetDocument(context._system_path, document);
 }
 
 // ============================================================
@@ -1109,17 +1318,115 @@ static Scope<Asset> LoadMeshImpl(const AssetLoadContext &context)
 
     auto file = ToWChar(doc._file);
     auto resolved_file = ResolveExternalAssetPath(context._asset_path, file);
-    MeshImportSetting setting;
+    MeshImportSetting setting = doc._import_setting;
     setting._import_flag |= MeshImportSetting::kImportFlagMesh;
-    setting._is_import_material = false;
     setting._mesh_name = doc._inner_file_name;
-    setting._is_combine_mesh = doc._is_combine_mesh;
+    if (!doc._skeleton.IsEmpty())
+        setting._skeleton = doc._skeleton;
 
-    auto &&mesh_list = std::move(context._resource_mgr->LoadExternalMesh(resolved_file, setting, clips));
-    AL_ASSERT(mesh_list.size() != 0);
+    const WString source_system_path = context._resource_mgr->GetResSysPath(resolved_file);
+    AssetArtifactKey artifact_key;
+    SourceFingerprint source_fingerprint;
+    artifact_key._importer_version = 3u;
+    artifact_key._artifact_version = kMeshArtifactVersion;
+    artifact_key._import_setting_hash = HashMeshImportSetting(setting);
+    artifact_key._dependency_hash = CalculateMeshDependencyHash(source_system_path);
+
+    List<Ref<Mesh>> mesh_list;
+    bool loaded_from_artifact = false;
+    u64 artifact_read_us = 0u;
+    u64 native_import_us = 0u;
+    u64 runtime_create_us = 0u;
+    u64 gpu_upload_us = 0u;
+    u64 artifact_write_us = 0u;
+    u64 artifact_size = 0u;
+    WString artifact_path;
+    if (CalculateSourceFingerprint(source_system_path, source_fingerprint))
+    {
+        artifact_key._source_hash = source_fingerprint._content_hash;
+        if (context._derived_data_cache != nullptr)
+            artifact_path = context._derived_data_cache->GetArtifactPath(Guid(doc._header._guid), artifact_key);
+        Vector<u8> artifact_data;
+        const auto artifact_read_start = std::chrono::steady_clock::now();
+        const bool artifact_loaded = context._derived_data_cache != nullptr &&
+                                     context._derived_data_cache->TryLoad(Guid(doc._header._guid), artifact_key,
+                                                                          artifact_data);
+        artifact_read_us = ElapsedMicroseconds(artifact_read_start);
+        if (artifact_loaded)
+        {
+            artifact_size = artifact_data.size();
+            const auto runtime_create_start = std::chrono::steady_clock::now();
+            MeshArtifact artifact;
+            if (DeserializeMeshArtifact(artifact_data, artifact_key, artifact))
+            {
+                auto mesh = CreateMeshFromArtifact(artifact);
+                if (mesh != nullptr)
+                {
+                    mesh_list.emplace_back(std::move(mesh));
+                    loaded_from_artifact = true;
+                    LOG_INFO(L"Mesh artifact cache hit: {}", source_system_path);
+                }
+            }
+            runtime_create_us = ElapsedMicroseconds(runtime_create_start);
+        }
+    }
+
+    if (!loaded_from_artifact)
+    {
+        LOG_INFO(L"Mesh artifact cache miss: {}", source_system_path);
+        const auto native_import_start = std::chrono::steady_clock::now();
+        mesh_list = std::move(context._resource_mgr->LoadExternalMesh(resolved_file, setting, clips));
+        native_import_us = ElapsedMicroseconds(native_import_start);
+        if (!mesh_list.empty() && artifact_key._source_hash != 0u && context._derived_data_cache != nullptr)
+        {
+            const auto artifact_write_start = std::chrono::steady_clock::now();
+            MeshArtifact artifact;
+            Vector<u8> serialized_artifact;
+            if (BuildMeshArtifact(*mesh_list.front(), artifact) &&
+                SerializeMeshArtifact(artifact, artifact_key, serialized_artifact))
+            {
+                artifact_size = serialized_artifact.size();
+                context._derived_data_cache->Store(Guid(doc._header._guid), artifact_key, serialized_artifact);
+            }
+            artifact_write_us = ElapsedMicroseconds(artifact_write_start);
+        }
+    }
+    if (mesh_list.empty())
+        return nullptr;
+    if (!doc._skeleton.IsEmpty())
+    {
+        Ref<SkeletonAsset> skeleton_asset = context._resource_mgr->GetRef<SkeletonAsset>(doc._skeleton);
+        if (skeleton_asset == nullptr)
+            skeleton_asset = context._resource_mgr->Load<SkeletonAsset>(doc._skeleton);
+        auto *skeleton_mesh = dynamic_cast<SkeletonMesh *>(mesh_list.front().get());
+        if (skeleton_mesh == nullptr)
+        {
+            LOG_ERROR("Mesh {} references an invalid SkeletonAsset {}", ToChar(context._asset_path),
+                      doc._skeleton.ToString());
+            return nullptr;
+        }
+        if (skeleton_asset != nullptr)
+            skeleton_mesh->SetSkeletonAsset(doc._skeleton, std::move(skeleton_asset));
+        else
+        {
+            skeleton_mesh->SetSkeletonAsset(doc._skeleton, nullptr);
+            LOG_WARNING("Mesh {} has missing SkeletonAsset reference {}", ToChar(context._asset_path),
+                        doc._skeleton.ToString());
+        }
+    }
+    if (loaded_from_artifact)
+    {
+        const auto gpu_upload_start = std::chrono::steady_clock::now();
+        mesh_list.front()->Apply();
+        gpu_upload_us = ElapsedMicroseconds(gpu_upload_start);
+    }
+    LOG_INFO(L"Mesh artifact {}: {} (artifact_path={}, artifact_read={} us, native_import={} us, "
+             L"runtime_create={} us, gpu_upload={} us, artifact_write={} us, artifact_size={} bytes)",
+             loaded_from_artifact ? L"hit" : L"miss", source_system_path, artifact_path, artifact_read_us,
+             native_import_us, runtime_create_us, gpu_upload_us, artifact_write_us, artifact_size);
 
     bool is_sk_mesh = dynamic_cast<SkeletonMesh *>(mesh_list.front().get()) != nullptr;
-    auto asset = MakeScope<Asset>(Guid(doc._header._guid),ComputeShader::StaticType(),context._asset_path);
+    auto asset = MakeScope<Asset>(Guid(doc._header._guid),Mesh::StaticType(),context._asset_path);
     asset->_asset_type = is_sk_mesh ? (const Type*)SkeletonMesh::StaticType() : (const Type*)Mesh::StaticType();
     asset->_external_asset_path = file;
     asset->_p_obj = mesh_list.front();
@@ -1135,6 +1442,17 @@ Scope<Asset> MeshAssetHandler::Load(const AssetLoadContext &context)
     return LoadMeshImpl(context);
 }
 
+bool MeshAssetHandler::ReloadInPlace(Asset &target, const Asset &source)
+{
+    auto *target_mesh = target.As<Render::Mesh>();
+    const auto *source_mesh = source.As<Render::Mesh>();
+    if (target_mesh == nullptr || source_mesh == nullptr || target_mesh == source_mesh)
+        return false;
+    CopyMeshData(*source_mesh, *target_mesh);
+    target_mesh->Apply();
+    return true;
+}
+
 bool MeshAssetHandler::Save(const AssetSaveContext &context)
 {
     MeshAssetDocument doc;
@@ -1146,8 +1464,15 @@ bool MeshAssetHandler::Save(const AssetSaveContext &context)
     {
         if (auto *mesh_setting = dynamic_cast<const MeshImportSetting *>(setting))
         {
-            doc._is_combine_mesh = mesh_setting->_is_combine_mesh;
+            doc._import_setting = *mesh_setting;
         }
+    }
+    if (const auto *skeleton_mesh = dynamic_cast<const SkeletonMesh *>(context._asset->_p_obj.get()))
+    {
+        const Guid &skeleton_guid = skeleton_mesh->GetSkeletonAsset().GetGuid();
+        doc._skeleton = skeleton_guid;
+        if (!skeleton_guid.IsEmpty())
+            doc._header._dependencies.emplace_back(skeleton_guid, EAssetDependencyType::kHard);
     }
 
     if (!SaveAssetDocument(context._system_path, doc))
@@ -1172,6 +1497,22 @@ Scope<Asset> SkeletonMeshAssetHandler::Load(const AssetLoadContext &context)
     return LoadMeshImpl(context);
 }
 
+bool SkeletonMeshAssetHandler::ReloadInPlace(Asset &target, const Asset &source)
+{
+    auto *target_mesh = target.As<Render::SkeletonMesh>();
+    const auto *source_mesh = source.As<Render::SkeletonMesh>();
+    if (target_mesh == nullptr || source_mesh == nullptr || target_mesh == source_mesh)
+        return false;
+    CopyMeshData(*source_mesh, *target_mesh);
+    target_mesh->SetBoneWeights(source_mesh->GetBoneWeights());
+    target_mesh->SetBoneIndices(source_mesh->GetBoneIndices());
+    target_mesh->SetMeshBindGlobalTransform(source_mesh->GetMeshBindGlobalTransform());
+    target_mesh->SetSkeletonAsset(source_mesh->GetSkeletonAsset().GetGuid(),
+                                  source_mesh->GetSkeletonAsset().Get());
+    target_mesh->Apply();
+    return true;
+}
+
 bool SkeletonMeshAssetHandler::Save(const AssetSaveContext &context)
 {
     // Same as MeshAssetHandler::Save - the document is identical
@@ -1184,8 +1525,15 @@ bool SkeletonMeshAssetHandler::Save(const AssetSaveContext &context)
     {
         if (auto *mesh_setting = dynamic_cast<const MeshImportSetting *>(setting))
         {
-            doc._is_combine_mesh = mesh_setting->_is_combine_mesh;
+            doc._import_setting = *mesh_setting;
         }
+    }
+    if (const auto *skeleton_mesh = dynamic_cast<const SkeletonMesh *>(context._asset->_p_obj.get()))
+    {
+        const Guid &skeleton_guid = skeleton_mesh->GetSkeletonAsset().GetGuid();
+        doc._skeleton = skeleton_guid;
+        if (!skeleton_guid.IsEmpty())
+            doc._header._dependencies.emplace_back(skeleton_guid, EAssetDependencyType::kHard);
     }
 
     if (!SaveAssetDocument(context._system_path, doc))
@@ -1268,7 +1616,10 @@ bool PrefabAssetHandler::Save(const AssetSaveContext &context)
                 add_dependency_string(guid);
         }
         if (document._has_animator_component)
+        {
             add_dependency_string(document._animator_component._controller_guid);
+            add_dependency_string(document._animator_component._clip_guid);
+        }
         if (document._has_sprite_renderer_component)
         {
             add_dependency_string(document._sprite_renderer_component._sprite_guid);
@@ -1408,6 +1759,11 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
         if (entity_doc._has_static_mesh_component)
         {
             auto &component = reg.AddComponent<ECS::StaticMeshComponent>(entity);
+            component._mesh_guid = entity_doc._static_mesh_component._mesh_guid.empty()
+                ? Guid::EmptyGuid() : Guid(entity_doc._static_mesh_component._mesh_guid);
+            component._material_guids.clear();
+            for (const String &guid : entity_doc._static_mesh_component._material_guids)
+                component._material_guids.emplace_back(guid.empty() ? Guid::EmptyGuid() : Guid(guid));
             reg.SetComponentEnabled<ECS::StaticMeshComponent>(entity, !is_component_disabled(entity_doc, "StaticMeshComponent"));
             if (!entity_doc._static_mesh_component._mesh_guid.empty())
             {
@@ -1507,6 +1863,11 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
         if (entity_doc._has_skeleton_mesh_component)
         {
             auto &component = reg.AddComponent<ECS::CSkeletonMesh>(entity);
+            component._mesh_guid = entity_doc._skeleton_mesh_component._mesh_guid.empty()
+                ? Guid::EmptyGuid() : Guid(entity_doc._skeleton_mesh_component._mesh_guid);
+            component._material_guids.clear();
+            for (const String &guid : entity_doc._skeleton_mesh_component._material_guids)
+                component._material_guids.emplace_back(guid.empty() ? Guid::EmptyGuid() : Guid(guid));
             reg.SetComponentEnabled<ECS::CSkeletonMesh>(entity, !is_component_disabled(entity_doc, "CSkeletonMesh"));
             if (!entity_doc._skeleton_mesh_component._mesh_guid.empty())
             {
@@ -1526,6 +1887,8 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
             reg.SetComponentEnabled<ECS::AnimatorComponent>(entity, !is_component_disabled(entity_doc, "AnimatorComponent"));
             if (!entity_doc._animator_component._controller_guid.empty())
                 component._controller = Guid(entity_doc._animator_component._controller_guid);
+            if (!entity_doc._animator_component._clip_guid.empty())
+                component._clip = Guid(entity_doc._animator_component._clip_guid);
             component._speed = entity_doc._animator_component._speed;
             component._play_on_awake = entity_doc._animator_component._play_on_awake;
         }
@@ -1539,6 +1902,10 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
         if (entity_doc._has_sprite_renderer_component)
         {
             auto &component = reg.AddComponent<ECS::SpriteRendererComponent>(entity);
+            component._sprite_guid = entity_doc._sprite_renderer_component._sprite_guid.empty()
+                ? Guid::EmptyGuid() : Guid(entity_doc._sprite_renderer_component._sprite_guid);
+            component._material_guid = entity_doc._sprite_renderer_component._material_guid.empty()
+                ? Guid::EmptyGuid() : Guid(entity_doc._sprite_renderer_component._material_guid);
             reg.SetComponentEnabled<ECS::SpriteRendererComponent>(entity,
                                                                   !is_component_disabled(entity_doc, "SpriteRendererComponent"));
             if (!entity_doc._sprite_renderer_component._sprite_guid.empty())
@@ -1792,30 +2159,45 @@ Scope<Asset> AnimationClipAssetHandler::Load(const AssetLoadContext &context)
     loaded_clip->Duration(doc._duration);
     loaded_clip->FrameRate(doc._frame_rate);
     const f32 frame_duration = doc._frame_duration > 0.0f ? doc._frame_duration
-        : ((doc._frame_count > 0u && doc._duration > 0.0f) ? (doc._duration / static_cast<f32>(doc._frame_count)) : 0.0f);
+        : ((doc._frame_count > 1u && doc._duration > 0.0f) ?
+           (doc._duration / static_cast<f32>(doc._frame_count - 1u)) : 0.0f);
     loaded_clip->FrameDuration(frame_duration);
     loaded_clip->IsLooping(doc._is_looping);
+    loaded_clip->PreviewMeshGuid(doc._preview_mesh_guid);
     loaded_clip->StartTime(0.0f);
     loaded_clip->EndTime(doc._duration);
 
     for (const auto &track_doc : doc._tracks)
     {
         auto &track = (*loaded_clip)[track_doc._joint_index];
-        track.Resize(track_doc._frames.size());
-        f32 cur_time = 0.0f;
-        for (u32 frame_index = 0u; frame_index < track_doc._frames.size(); ++frame_index)
+        auto &pos_track = track.GetPositionTrack();
+        pos_track.Resize(static_cast<u32>(track_doc._position_keys.size()));
+        for (u32 key_index = 0u; key_index < track_doc._position_keys.size(); ++key_index)
         {
-            const auto &frame_doc = track_doc._frames[frame_index];
-            auto pos_frame = TrackHelpers::FromVector(frame_doc._position);
-            pos_frame._time = cur_time;
-            auto rot_frame = TrackHelpers::FromQuaternion(frame_doc._rotation);
-            rot_frame._time = cur_time;
-            auto scale_frame = TrackHelpers::FromVector(frame_doc._scale);
-            scale_frame._time = cur_time;
-            track.GetPositionTrack()[frame_index] = pos_frame;
-            track.GetRotationTrack()[frame_index] = rot_frame;
-            track.GetScaleTrack()[frame_index] = scale_frame;
-            cur_time += frame_duration;
+            const auto &key_doc = track_doc._position_keys[key_index];
+            auto frame = TrackHelpers::FromVector(key_doc._value);
+            frame._time = key_doc._time;
+            pos_track[key_index] = frame;
+        }
+
+        auto &rot_track = track.GetRotationTrack();
+        rot_track.Resize(static_cast<u32>(track_doc._rotation_keys.size()));
+        for (u32 key_index = 0u; key_index < track_doc._rotation_keys.size(); ++key_index)
+        {
+            const auto &key_doc = track_doc._rotation_keys[key_index];
+            auto frame = TrackHelpers::FromQuaternion(key_doc._value);
+            frame._time = key_doc._time;
+            rot_track[key_index] = frame;
+        }
+
+        auto &scale_track = track.GetScaleTrack();
+        scale_track.Resize(static_cast<u32>(track_doc._scale_keys.size()));
+        for (u32 key_index = 0u; key_index < track_doc._scale_keys.size(); ++key_index)
+        {
+            const auto &key_doc = track_doc._scale_keys[key_index];
+            auto frame = TrackHelpers::FromVector(key_doc._value);
+            frame._time = key_doc._time;
+            scale_track[key_index] = frame;
         }
     }
     for (const auto &frame_doc : doc._sprite_frames)
@@ -1846,6 +2228,9 @@ bool AnimationClipAssetHandler::Save(const AssetSaveContext &context)
     doc._frame_rate = clip->FrameRate();
     doc._frame_duration = clip->FrameDuration();
     doc._is_looping = clip->IsLooping();
+    doc._preview_mesh_guid = clip->PreviewMeshGuid();
+    if (!doc._preview_mesh_guid.IsEmpty())
+        doc._header._dependencies.push_back(AssetDependency{doc._preview_mesh_guid, EAssetDependencyType::kHard});
     doc._tracks.reserve(clip->Size());
     doc._sprite_frames.reserve(clip->SpriteTrack().Frames().size());
     doc._events.reserve(clip->Events().size());
@@ -1859,14 +2244,29 @@ bool AnimationClipAssetHandler::Save(const AssetSaveContext &context)
 
         AnimationClipTrackDocument track_doc;
         track_doc._joint_index = clip->GetIdAtIndex(index);
-        track_doc._frames.reserve(pos_track.Size());
-        for (u32 frame_index = 0u; frame_index < pos_track.Size(); ++frame_index)
+        track_doc._position_keys.reserve(pos_track.Size());
+        for (u32 key_index = 0u; key_index < pos_track.Size(); ++key_index)
         {
-            AnimationClipFrameDocument frame_doc;
-            frame_doc._position = TrackHelpers::ToVector(pos_track[frame_index]);
-            frame_doc._rotation = TrackHelpers::ToQuaternion(rot_track[frame_index]);
-            frame_doc._scale = TrackHelpers::ToVector(scale_track[frame_index]);
-            track_doc._frames.emplace_back(std::move(frame_doc));
+            AnimationVectorKeyDocument key_doc;
+            key_doc._time = pos_track[key_index]._time;
+            key_doc._value = TrackHelpers::ToVector(pos_track[key_index]);
+            track_doc._position_keys.emplace_back(std::move(key_doc));
+        }
+        track_doc._rotation_keys.reserve(rot_track.Size());
+        for (u32 key_index = 0u; key_index < rot_track.Size(); ++key_index)
+        {
+            AnimationQuaternionKeyDocument key_doc;
+            key_doc._time = rot_track[key_index]._time;
+            key_doc._value = TrackHelpers::ToQuaternion(rot_track[key_index]);
+            track_doc._rotation_keys.emplace_back(std::move(key_doc));
+        }
+        track_doc._scale_keys.reserve(scale_track.Size());
+        for (u32 key_index = 0u; key_index < scale_track.Size(); ++key_index)
+        {
+            AnimationVectorKeyDocument key_doc;
+            key_doc._time = scale_track[key_index]._time;
+            key_doc._value = TrackHelpers::ToVector(scale_track[key_index]);
+            track_doc._scale_keys.emplace_back(std::move(key_doc));
         }
         doc._tracks.emplace_back(std::move(track_doc));
     }

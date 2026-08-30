@@ -30,6 +30,7 @@
 #include "Render/2D/Sprite.h"
 #include "Render/2D/SpriteAtlas.h"
 #include "Assets/AssetHandlers.h"
+#include <unordered_set>
 
 using namespace Ailu::Render;
 
@@ -40,6 +41,17 @@ namespace Ailu
 	{
 		ResourceMgr *g_pResourceMgr = nullptr;
 		const WString kEmptyWString;
+
+		String GetEmbeddedMaterialKey(const Mesh::ImportedMaterialInfo &material)
+		{
+			if (material._source_id != 0u)
+				return std::format("source:{}", material._source_id);
+			return std::format("value:{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
+				material._name, material._textures[0], material._textures[1], material._textures[2],
+				material._textures[3], material._textures[4], material._diffuse.r, material._diffuse.g,
+				material._diffuse.b, material._diffuse.a, material._emissive.r, material._emissive.g,
+				material._emissive.b, material._emissive.a, material._roughness);
+		}
 
 		std::optional<EMeshLoader> ResolveMeshLoader(const WString &path)
 		{
@@ -422,19 +434,25 @@ namespace Ailu
 	{
 		if (type_name.empty())
 			return nullptr;
-		return Type::Find(ToChar(type_name));
+		String name = ToChar(type_name);
+		// 兼容旧版 StandardMaterial 资产：该类型已删除，统一解析为 Material
+		if (name == "Ailu::Render::StandardMaterial")
+			return Material::StaticType();
+		return Type::Find(name);
 	}
 
 	int ResourceMgr::Initialize()
 	{
 		TimerBlock b("-----------------------------------------------------------ResourceMgr::Initialize");
 		AL_ASSERT(!s_engine_res_root_path.empty());
+		_derived_data_cache = MakeScope<DerivedDataCache>(s_project_library_root_path);
 		FileManager::SetCurPath(s_engine_res_root_path);
 		_lut_global_resources_by_type[Material::StaticType()] = {};
 		_lut_global_resources_by_type[Texture2D::StaticType()] = {};
 		_lut_global_resources_by_type[Texture3D::StaticType()] = {};
 		_lut_global_resources_by_type[Mesh::StaticType()] = {};
-		_lut_global_resources_by_type[SkeletonMesh::StaticType()] = {};
+        _lut_global_resources_by_type[SkeletonMesh::StaticType()] = {};
+        _lut_global_resources_by_type[SkeletonAsset::StaticType()] = {};
 		_lut_global_resources_by_type[Shader::StaticType()] = {};
 		_lut_global_resources_by_type[ComputeShader::StaticType()] = {};
 		_lut_global_resources_by_type[Scene::StaticType()] = {};
@@ -470,6 +488,11 @@ namespace Ailu
 		LoadAssetDB(_asset_domains[0]);
 		LoadAssetDB(_asset_domains[1]);
 		LoadAssetDB(_asset_domains[2]);
+		Vector<Guid> live_asset_guids;
+		live_asset_guids.reserve(_asset_db.size());
+		for (const auto &[guid, asset]: _asset_db)
+			live_asset_guids.emplace_back(guid);
+		_derived_data_cache->RemoveOrphanArtifacts(live_asset_guids);
 		_asset_handler_registry.Register(MakeScope<SpriteAssetHandler>());
 		_asset_handler_registry.Register(MakeScope<SpriteAtlasAssetHandler>());
 		_asset_handler_registry.Register(MakeScope<ScriptAssetHandler>());
@@ -479,6 +502,7 @@ namespace Ailu
 		_asset_handler_registry.Register(MakeScope<MaterialAssetHandler>());
 		_asset_handler_registry.Register(MakeScope<MeshAssetHandler>());
 		_asset_handler_registry.Register(MakeScope<SkeletonMeshAssetHandler>());
+		_asset_handler_registry.Register(MakeScope<SkeletonAssetHandler>());
 		_asset_handler_registry.Register(MakeScope<SceneAssetHandler>());
 		_asset_handler_registry.Register(MakeScope<PrefabAssetHandler>());
 		_asset_handler_registry.Register(MakeScope<AnimationClipAssetHandler>());
@@ -740,10 +764,21 @@ namespace Ailu
 		while (!_pending_delete_assets.empty())
 		{
 			Asset *asset = _pending_delete_assets.front();
-			UnregisterSubAssets(asset->GetGuid());
+			const Guid asset_guid = asset->GetGuid();
+			if (!_derived_data_cache || !_derived_data_cache->RemoveArtifacts(asset_guid))
+				_pending_artifact_cleanup_guids.push(asset_guid);
+			UnregisterSubAssets(asset_guid);
 			UnRegisterResource(asset->_asset_path);
 			UnRegisterAsset(asset);
 			_pending_delete_assets.pop();
+		}
+		const size_t pending_cleanup_count = _pending_artifact_cleanup_guids.size();
+		for (size_t index = 0u; index < pending_cleanup_count; ++index)
+		{
+			const Guid asset_guid = _pending_artifact_cleanup_guids.front();
+			_pending_artifact_cleanup_guids.pop();
+			if (!_derived_data_cache || !_derived_data_cache->RemoveArtifacts(asset_guid))
+				_pending_artifact_cleanup_guids.push(asset_guid);
 		}
 		while (!_sync_tasks.empty())
 		{
@@ -807,6 +842,7 @@ namespace Ailu
 		ctx._resource_mgr = this;
 		ctx._system_path = GetResSysPath(asset->_asset_path);
 		ctx._import_setting = GetImportSetting(asset->_asset_path);
+		ctx._derived_data_cache = _derived_data_cache.get();
 
 		Scope<Asset> reloaded = handler->Load(ctx);
 		if (reloaded == nullptr || reloaded->_p_obj == nullptr)
@@ -846,6 +882,16 @@ namespace Ailu
 		IndexSubAssets(asset, ctx._system_path);
 		RegisterEmbeddedMaterialSubAssets(asset);
 		return true;
+	}
+
+	bool ResourceMgr::ReimportAsset(Asset *asset)
+	{
+		if (asset == nullptr || asset->_asset_type == nullptr)
+			return false;
+
+		// The handler reads the serialized ImportSetting and derives its artifact key
+		// from it, so reimporting naturally invalidates stale derived data.
+		return ReloadAsset(asset);
 	}
 
 	void ResourceMgr::SaveAllDirtyAssets()
@@ -1007,7 +1053,8 @@ namespace Ailu
 
 	//TODO:移除
 	std::mutex g_mesh_load_mutex;
-	List<Ref<Mesh>> ResourceMgr::LoadExternalMesh(const WString &asset_path, const MeshImportSetting &setting, List<Ref<AnimationClip>> &clips)
+	List<Ref<Mesh>> ResourceMgr::LoadExternalMesh(const WString &asset_path, const MeshImportSetting &setting,
+		List<Ref<AnimationClip>> &clips, Ref<SkeletonAsset> *out_skeleton_asset)
 	{
 		std::unique_lock<std::mutex> lock(g_mesh_load_mutex);
 		auto loader = ResolveMeshLoader(asset_path);
@@ -1028,6 +1075,48 @@ namespace Ailu
 		parser->Parser(sys_path, setting);
 		List<Ref<Mesh>> mesh_list{};
 		parser->GetMeshes(mesh_list);
+		Ref<SkeletonAsset> skeleton_asset = parser->GetSkeletonAsset();
+		if (!setting._skeleton.IsEmpty() && skeleton_asset != nullptr)
+		{
+			Ref<SkeletonAsset> target_skeleton = GetRef<SkeletonAsset>(setting._skeleton);
+			if (target_skeleton == nullptr)
+				target_skeleton = Load<SkeletonAsset>(setting._skeleton);
+			if (target_skeleton == nullptr)
+			{
+				LOG_WARNING("Skeleton remap skipped: target SkeletonAsset {} could not be loaded", setting._skeleton.ToString());
+			}
+			else
+			{
+				const Skeleton &source = skeleton_asset->GetSkeleton();
+				const Skeleton &target = target_skeleton->GetSkeleton();
+				Vector<u16> bone_remap(source.JointNum(), Joint::kInvalidJointIndex);
+				for (u32 source_index = 0u; source_index < source.JointNum(); ++source_index)
+				{
+					const i32 target_index = Skeleton::GetJointIndexByName(target, source[source_index]._name);
+					if (target_index < 0)
+					{
+						LOG_ERROR("Skeleton remap failed: source bone '{}' does not exist in target skeleton '{}'",
+						          source[source_index]._name, target_skeleton->Name());
+						return {};
+					}
+					bone_remap[source_index] = static_cast<u16>(target_index);
+				}
+
+				for (const Ref<Mesh> &mesh : mesh_list)
+				{
+					auto *skeleton_mesh = dynamic_cast<SkeletonMesh *>(mesh.get());
+					if (skeleton_mesh == nullptr || !skeleton_mesh->RemapBoneIndices(bone_remap))
+					{
+						LOG_ERROR("Skeleton remap failed for mesh '{}'", mesh != nullptr ? mesh->Name() : String{});
+						return {};
+					}
+					skeleton_mesh->SetSkeletonAsset(setting._skeleton, target_skeleton);
+				}
+				skeleton_asset = std::move(target_skeleton);
+			}
+		}
+		if (out_skeleton_asset != nullptr)
+			*out_skeleton_asset = skeleton_asset;
 		for (auto &mesh: mesh_list)
 		{
 			mesh->Apply();
@@ -1103,6 +1192,11 @@ namespace Ailu
             LOG_ERROR(L"ResourceMgr::Load: Asset path is empty");
             return nullptr;
         }
+        if (settings == nullptr || !settings->_is_reimport)
+        {
+            if (IsAssetLoaded(normalized_asset_path))
+                return _global_resources.at(normalized_asset_path);
+        }
         LOG_WARNING(L"Begin load asset {}...", normalized_asset_path);
         TimeMgr timer;
         timer.Mark();
@@ -1114,7 +1208,7 @@ namespace Ailu
 		AssetDocumentHeader header;
 		if (!TryLoadAssetDocumentHeader(sys_path,header))
 			return nullptr;
-		auto src_type = Type::Find(header._asset_type);
+		auto src_type = FindAssetType(ToWChar(header._asset_type));
         auto asset_handler = _asset_handler_registry.Find(type);
         if (type == nullptr || !IsTypeCompatible(src_type, type))
         {
@@ -1133,7 +1227,9 @@ namespace Ailu
 		load_ctx._resource_mgr = this;
 		load_ctx._system_path = sys_path;
 		load_ctx._import_setting = settings;
-		if (type == StaticClass<Render::Texture2D>())
+		load_ctx._derived_data_cache = _derived_data_cache.get();
+		if (type == StaticClass<Render::Texture2D>() &&
+			dynamic_cast<const TextureImportSetting *>(load_ctx._import_setting) == nullptr)
 			load_ctx._import_setting = &TextureImportSetting::Default();
 
         if (!IsAssetLoaded(normalized_asset_path))
@@ -1209,6 +1305,45 @@ namespace Ailu
 		if (is_already_exist && !overwrite)
 		{
 			LOG_WARNING(L"CreateAsset: Asset: {} already exist!", normalized_asset_path);
+			return nullptr;
+		}
+		if (is_already_exist)
+		{
+			auto existing_guid = _asset_looktable.at(normalized_asset_path);
+			auto existing_it = _asset_db.find(existing_guid);
+			if (existing_it != _asset_db.end())
+			{
+				Asset *existing_asset = existing_it->second.get();
+				const Type *asset_type = obj != nullptr ? obj->GetType() : nullptr;
+				AL_ASSERT(asset_type != nullptr);
+
+				if (existing_asset->_p_obj != nullptr)
+					_object_to_asset.erase(existing_asset->_p_obj->ID());
+				UnregisterSubAssets(existing_asset->GetGuid());
+				UnRegisterResource(normalized_asset_path);
+				existing_asset->_p_obj = obj;
+				existing_asset->_asset_type = asset_type;
+				existing_asset->_name = ToChar(PathUtils::GetFileName(normalized_asset_path));
+				existing_asset->_addi_info.clear();
+				existing_asset->_external_asset_path.clear();
+				existing_asset->_dependencies.clear();
+				if (asset_type == Mesh::StaticType() || asset_type == SkeletonMesh::StaticType())
+					existing_asset->_addi_info = std::format(L"_{}", ToWChar(obj->Name().c_str()));
+				if (asset_type == Shader::StaticType())
+				{
+					Shader *shader = dynamic_cast<Shader *>(obj.get());
+					auto [vs, ps] = shader->GetShaderEntry();
+					existing_asset->_addi_info = std::format(L"_{}_{}", ToWChar(vs.c_str()), ToWChar(ps.c_str()));
+				}
+				if (obj != nullptr)
+					_object_to_asset[obj->ID()] = existing_asset;
+				RegisterResource(normalized_asset_path, obj);
+				RegisterEmbeddedMaterialSubAssets(existing_asset);
+				existing_asset->MarkDirty();
+				s_pending_save_assets.push(existing_asset);
+				return existing_asset;
+			}
+			_asset_looktable.erase(normalized_asset_path);
 		}
 		Guid new_guid = Guid::Generate();
 		Scope<Asset> new_asset = nullptr;
@@ -1252,7 +1387,7 @@ namespace Ailu
 
 	void ResourceMgr::DeleteAsset(Asset *asset)
 	{
-		if (ExistInAssetDB(asset))
+		if (asset != nullptr && ExistInAssetDB(asset))
 			_pending_delete_assets.push(asset);
 	}
 
@@ -1490,18 +1625,21 @@ namespace Ailu
 		if (mesh == nullptr || mesh->GetCacheMaterials().empty())
 			return;
 
-		if (GetEmbeddedMaterial(mesh, 0u) == nullptr)
-			CreateAndRegisterEmbeddedMaterial(mesh);
+		CreateAndRegisterEmbeddedMaterial(mesh);
 
 		const auto &cached_materials = mesh->GetCacheMaterials();
+		std::unordered_set<String> registered_material_keys;
 		for (u32 index = 0u; index < cached_materials.size(); ++index)
 		{
 			const auto material = GetEmbeddedMaterial(mesh, static_cast<u16>(index));
 			if (material == nullptr)
 				continue;
 
-			const Guid material_guid(std::format("{}:EmbeddedMaterial:{}", owner->GetGuid().ToString(), index));
 			const auto &cached_material = cached_materials[index];
+			if (!registered_material_keys.emplace(GetEmbeddedMaterialKey(cached_material)).second)
+				continue;
+
+			const Guid material_guid(std::format("{}:EmbeddedMaterial:{}", owner->GetGuid().ToString(), index));
 			const String material_name = std::format("{}/Material[{}]/{}", mesh->Name(), index, cached_material._name);
 			RegisterSubAsset(owner, material_guid, material, material_name);
 		}
@@ -1577,64 +1715,62 @@ namespace Ailu
 	{
 		if (mesh->GetCacheMaterials().empty())
 			return;
+
+		std::unordered_map<String, Ref<Material>> materials_by_key;
 		u16 index = 0u;
-		for (auto it = mesh->GetCacheMaterials().begin(); it != mesh->GetCacheMaterials().end(); it++)
+		for (const auto &material_info : mesh->GetCacheMaterials())
 		{
-			auto mat = MakeRef<StandardMaterial>("MAT_" + it->_name + "_embedded");
-			if (!it->_textures[0].empty())
+			const String material_key = GetEmbeddedMaterialKey(material_info);
+			Ref<Material> material;
+			if (auto existing = materials_by_key.find(material_key); existing != materials_by_key.end())
 			{
-				String tex_file_name = PathUtils::GetFileName(it->_textures[0]);
-				auto asset_path = ToWChar(std::format("EmbeddedMaterial/{}/{}/{}", mesh->Name(), index, tex_file_name));
-				auto tex = GetRef<Texture2D>(asset_path);
-				if (!tex)
-				{
-					auto setting = TextureImportSetting::Default();
-					tex = LoadExternalTexture(ToWChar(it->_textures[0]), setting);
-					if (tex)
-						RegisterResource(asset_path, tex);
-				}
-				if (tex)
-					mat->SetTexture(StandardMaterial::StandardPropertyName::kAlbedo._tex_name, tex.get());
+				material = existing->second;
 			}
-			if (!it->_textures[1].empty())
+			else
 			{
-				String tex_file_name = PathUtils::GetFileName(it->_textures[1]);
-				auto asset_path = ToWChar(std::format("EmbeddedMaterial/{}/{}/{}", mesh->Name(), index, tex_file_name));
-				auto tex = GetRef<Texture2D>(asset_path);
-				if (!tex)
+				material = GetEmbeddedMaterial(mesh, index);
+				if (material == nullptr)
 				{
-					auto setting = TextureImportSetting::Default();
-					setting._is_sRGB = false;
-					tex = LoadExternalTexture(ToWChar(it->_textures[1]), setting);
-					if (tex)
-						RegisterResource(asset_path, tex);
+					material = Material::CreateStandard("MAT_" + material_info._name + "_embedded");
+					for (u8 texture_index = 0u; texture_index < 3u; ++texture_index)
+					{
+						if (material_info._textures[texture_index].empty())
+							continue;
+
+						const String tex_file_name = PathUtils::GetFileName(material_info._textures[texture_index]);
+						const auto asset_path = ToWChar(std::format("EmbeddedMaterial/{}/{}/{}", mesh->Name(), index,
+							tex_file_name));
+						auto tex = GetRef<Texture2D>(asset_path);
+						if (!tex)
+						{
+							auto setting = TextureImportSetting::Default();
+							setting._is_sRGB = texture_index != 1u;
+							tex = LoadExternalTexture(ToWChar(material_info._textures[texture_index]), setting);
+							if (tex)
+								RegisterResource(asset_path, tex);
+						}
+						if (tex)
+						{
+							const auto property = texture_index == 0u
+								? StandardMaterialProperty::kAlbedo._tex_name
+								: texture_index == 1u ? StandardMaterialProperty::kNormal._tex_name
+													  : StandardMaterialProperty::kEmission._tex_name;
+							material->SetTexture(property, tex.get());
+						}
+					}
+					material->SetVector(StandardMaterialProperty::kAlbedo._value_name, material_info._diffuse);
+					material->SetFloat(StandardMaterialProperty::kRoughness._value_name, material_info._roughness);
+					material->SetVector(StandardMaterialProperty::kEmission._value_name, material_info._emissive);
 				}
-				if (tex)
-					mat->SetTexture(StandardMaterial::StandardPropertyName::kNormal._tex_name, tex.get());
+				if (material != nullptr)
+					materials_by_key.emplace(material_key, material);
 			}
-			if (!it->_textures[2].empty())
-			{
-				String tex_file_name = PathUtils::GetFileName(it->_textures[2]);
-				auto asset_path = ToWChar(std::format("EmbeddedMaterial/{}/{}/{}", mesh->Name(), index, tex_file_name));
-				auto tex = GetRef<Texture2D>(asset_path);
-				if (!tex)
-				{
-					auto setting = TextureImportSetting::Default();
-					tex = LoadExternalTexture(ToWChar(it->_textures[2]), setting);
-					if (tex)
-						RegisterResource(asset_path, tex);
-				}
-				if (tex)
-					mat->SetTexture(StandardMaterial::StandardPropertyName::kEmission._tex_name, tex.get());
-			}
-			mat->SetVector(StandardMaterial::StandardPropertyName::kAlbedo._value_name, it->_diffuse);
-			mat->SetFloat(StandardMaterial::StandardPropertyName::kRoughness._value_name, it->_roughness);
-			mat->SetVector(StandardMaterial::StandardPropertyName::kEmission._value_name, it->_emissive);
-			RegisterResource(ToWChar(std::format("EmbeddedMaterial/{}/{}", mesh->Name(), index)), mat);
+
+			if (material != nullptr)
+				RegisterResource(ToWChar(std::format("EmbeddedMaterial/{}/{}", mesh->Name(), index)), material, true);
 			++index;
 		}
 	}
-
 	Asset *ResourceMgr::RegisterAsset(Scope<Asset> &&asset, bool override)
 	{
 		std::lock_guard<std::mutex> lock(_asset_db_mutex);
@@ -1842,6 +1978,13 @@ namespace Ailu
 		TimeMgr time_mgr;
 		Ref<void> ret_res = nullptr;
 		Queue<std::tuple<WString, Ref<Object>>> loaded_objects;
+		std::unordered_set<WString> queued_asset_paths;
+		auto queue_asset = [&](const WString &asset_path, Ref<Object> object)
+		{
+			if (object == nullptr || !queued_asset_paths.emplace(asset_path).second)
+				return;
+			loaded_objects.push(std::make_tuple(asset_path, std::move(object)));
+		};
 		time_mgr.Mark();
 		WString created_asset_dir = NormalizeLogicalDirectoryPath(NormalizeAssetPath(target_dir, GetAssetPathDomain(target_dir, EAssetDomain::kProject)));
 		if (ExistInAssetDB(external_asset_path))
@@ -1852,25 +1995,46 @@ namespace Ailu
 		if (auto mesh_loader = ResolveMeshLoader(sys_path); mesh_loader.has_value())
 		{
 			auto mesh_import_setting = dynamic_cast<const MeshImportSetting *>(resolved_setting);
-			mesh_import_setting = mesh_import_setting ? mesh_import_setting : &MeshImportSetting::Default();
-			List<Ref<AnimationClip>> clips;
-			const WString mesh_source_path = *mesh_loader == EMeshLoader::kGltf ? sys_path : external_asset_path;
-			auto mesh_list = std::move(LoadExternalMesh(mesh_source_path, *mesh_import_setting, clips));
-			for (auto &mesh: mesh_list)
+            mesh_import_setting = mesh_import_setting ? mesh_import_setting : &MeshImportSetting::Default();
+            List<Ref<AnimationClip>> clips;
+            const WString mesh_source_path = *mesh_loader == EMeshLoader::kGltf ? sys_path : external_asset_path;
+			Ref<SkeletonAsset> skeleton_asset;
+			auto mesh_list = std::move(LoadExternalMesh(mesh_source_path, *mesh_import_setting, clips, &skeleton_asset));
+			std::unordered_set<u64> imported_material_ids;
+			std::unordered_set<String> material_asset_names;
+            if (skeleton_asset != nullptr && mesh_import_setting->ShouldImportSkeleton() &&
+                mesh_import_setting->_skeleton.IsEmpty())
+            {
+                const WString skeleton_asset_path = created_asset_dir +
+				std::format(L"{}_Skeleton.alasset", PathUtils::GetFileName(sys_path, false));
+				queue_asset(skeleton_asset_path, skeleton_asset);
+            }
+            for (auto &mesh: mesh_list)
 			{
 				WString imported_asset_path = created_asset_dir;
 				imported_asset_path.append(std::format(L"{}.alasset", ToWChar(mesh->Name().c_str())));
-				loaded_objects.push(std::make_tuple(imported_asset_path, mesh));
-				if (mesh_import_setting->_is_import_material)
+				queue_asset(imported_asset_path, mesh);
+				if (mesh_import_setting->ShouldImportMaterial())
 				{
 					for (auto it = mesh->GetCacheMaterials().begin(); it != mesh->GetCacheMaterials().end(); it++)
 					{
-						auto mat = MakeRef<StandardMaterial>("MAT_" + it->_name);
+						if (it->_source_id != 0u && !imported_material_ids.emplace(it->_source_id).second)
+							continue;
+						String material_asset_name = "MAT_" + it->_name;
+						if (!material_asset_names.emplace(material_asset_name).second)
+						{
+							material_asset_name = it->_source_id != 0u ?
+								std::format("{}_{}", material_asset_name, it->_source_id) :
+								std::format("{}_{}_{}", material_asset_name, mesh->Name(), it->_slot);
+							while (!material_asset_names.emplace(material_asset_name).second)
+								material_asset_name.append("_1");
+						}
+						auto mat = Material::CreateStandard(material_asset_name);
 						if (!it->_textures[0].empty())
 						{
 							auto albedo = ImportResource(ToWChar(it->_textures[0]), target_dir);
 							if (albedo != nullptr)
-								mat->SetTexture(StandardMaterial::StandardPropertyName::kAlbedo._tex_name, std::static_pointer_cast<Texture>(albedo).get());
+								mat->SetTexture(StandardMaterialProperty::kAlbedo._tex_name, std::static_pointer_cast<Texture>(albedo).get());
 						}
 						if (!it->_textures[1].empty())
 						{
@@ -1878,20 +2042,20 @@ namespace Ailu
 							normal_setting._is_sRGB = false;
 							auto normal = ImportResource(ToWChar(it->_textures[1]), target_dir, normal_setting);
 							if (normal != nullptr)
-								mat->SetTexture(StandardMaterial::StandardPropertyName::kNormal._tex_name, std::static_pointer_cast<Texture>(normal).get());
+								mat->SetTexture(StandardMaterialProperty::kNormal._tex_name, std::static_pointer_cast<Texture>(normal).get());
 						}
 						if (!it->_textures[2].empty())
 						{
 							auto emissive = ImportResource(ToWChar(it->_textures[2]), target_dir);
 							if (emissive != nullptr)
-								mat->SetTexture(StandardMaterial::StandardPropertyName::kEmission._tex_name, std::static_pointer_cast<Texture>(emissive).get());
+								mat->SetTexture(StandardMaterialProperty::kEmission._tex_name, std::static_pointer_cast<Texture>(emissive).get());
 						}
-						mat->SetVector(StandardMaterial::StandardPropertyName::kAlbedo._value_name, it->_diffuse);
-						mat->SetFloat(StandardMaterial::StandardPropertyName::kRoughness._value_name, it->_roughness);
-						mat->SetVector(StandardMaterial::StandardPropertyName::kEmission._value_name, it->_emissive);
+						mat->SetVector(StandardMaterialProperty::kAlbedo._value_name, it->_diffuse);
+						mat->SetFloat(StandardMaterialProperty::kRoughness._value_name, it->_roughness);
+						mat->SetVector(StandardMaterialProperty::kEmission._value_name, it->_emissive);
 						imported_asset_path = created_asset_dir;
 						imported_asset_path.append(std::format(L"{}.alasset", ToWChar(mat->_name.c_str())));
-						loaded_objects.push(std::make_tuple(imported_asset_path, mat));
+						queue_asset(imported_asset_path, mat);
 					}
 				}
 				else
@@ -1902,17 +2066,25 @@ namespace Ailu
 				//AnimationClipLibrary::AddClip(clip);
 				WString imported_asset_path = created_asset_dir;
 				imported_asset_path.append(std::format(L"{}.alasset", ToWChar(clip->Name().c_str())));
-				loaded_objects.push(std::make_tuple(imported_asset_path, clip));
+				queue_asset(imported_asset_path, clip);
 			}
 		}
-		else if (kHDRImageExt.contains(ext) || kLDRImageExt.contains(ext))
-		{
-			auto tex_import_setting = dynamic_cast<const TextureImportSetting *>(resolved_setting);
-			tex_import_setting = tex_import_setting ? tex_import_setting : &TextureImportSetting::Default();
-			auto tex = LoadExternalTexture(external_asset_path, *tex_import_setting);
-			WString imported_asset_path = created_asset_dir;
-			imported_asset_path.append(std::format(L"{}.alasset", ToWChar(tex->Name().c_str())));
-			loaded_objects.push(std::make_tuple(imported_asset_path, tex));
+        else if (kHDRImageExt.contains(ext) || kLDRImageExt.contains(ext))
+        {
+            auto tex_import_setting = dynamic_cast<const TextureImportSetting *>(resolved_setting);
+            tex_import_setting = tex_import_setting ? tex_import_setting : &TextureImportSetting::Default();
+            auto tex = LoadExternalTexture(external_asset_path, *tex_import_setting);
+            if (tex == nullptr)
+            {
+                LOG_ERROR(L"Failed to import texture {}", external_asset_path);
+            }
+            else
+            {
+                tex->Name(ToChar(p.stem().wstring()));
+                WString imported_asset_path = created_asset_dir;
+                imported_asset_path.append(std::format(L"{}.alasset", ToWChar(tex->Name().c_str())));
+				queue_asset(imported_asset_path, tex);
+            }
 		}
 		else if (kAudioExt.contains(ext))
 		{
@@ -1922,16 +2094,33 @@ namespace Ailu
 			clip->_load_mode = EAudioLoadMode::kMemory;
 			WString imported_asset_path = created_asset_dir;
 			imported_asset_path.append(std::format(L"{}.alasset", ToWChar(clip->Name().c_str())));
-			loaded_objects.push(std::make_tuple(imported_asset_path, clip));
+			queue_asset(imported_asset_path, clip);
 		}
 		else
 		{
 		}
+		Guid imported_skeleton_guid = Guid::EmptyGuid();
+		Ref<SkeletonAsset> imported_skeleton_asset;
+		Vector<SkeletonMesh *> imported_skeleton_meshes;
 		while (!loaded_objects.empty())
 		{
 			auto &[path, obj] = loaded_objects.front();
 			auto new_asset = CreateAsset(path, obj);
+			if (new_asset == nullptr)
+			{
+				loaded_objects.pop();
+				continue;
+			}
 			new_asset->_external_asset_path = MakeStoredExternalAssetPath(external_asset_path);
+			if (dynamic_cast<SkeletonAsset *>(obj.get()) != nullptr)
+			{
+				imported_skeleton_guid = new_asset->GetGuid();
+				imported_skeleton_asset = std::dynamic_pointer_cast<SkeletonAsset>(obj);
+			}
+			else if (auto *skeleton_mesh = dynamic_cast<SkeletonMesh *>(obj.get()))
+			{
+				imported_skeleton_meshes.emplace_back(skeleton_mesh);
+			}
 			if (obj->GetType() == Mesh::StaticType() || obj->GetType() == SkeletonMesh::StaticType())
 			{
 				auto mesh_import_setting = dynamic_cast<const MeshImportSetting *>(resolved_setting);
@@ -1947,6 +2136,11 @@ namespace Ailu
 			LOG_INFO(L"Create asset at path {}", path);
 			RegisterEmbeddedMaterialSubAssets(new_asset);
 			loaded_objects.pop();
+		}
+		if (!imported_skeleton_guid.IsEmpty())
+		{
+			for (auto *skeleton_mesh : imported_skeleton_meshes)
+				skeleton_mesh->SetSkeletonAsset(imported_skeleton_guid, imported_skeleton_asset);
 		}
 		OnAssetDataBaseChanged();
 		SaveAllUnsavedAssets();

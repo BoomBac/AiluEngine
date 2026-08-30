@@ -3,6 +3,7 @@
 
 #include "Framework/Common/Hash.hpp"
 #include "Framework/Common/ResourceMgr.h"
+#include "Render/Material.h"
 #include "Framework/Common/Utils.h"
 #include "Framework/Common/SystemInfo.h"
 #include "RHI/DX12/D3DShader.h"
@@ -12,6 +13,7 @@
 #include "Render/RenderQueue.h"
 #include "Render/Renderer.h"
 #include "Render/Shader.h"
+#include "Render/RenderGraph/RenderGraph.h"
 
 namespace Ailu::Render
 {
@@ -345,6 +347,8 @@ namespace Ailu::Render
 
     void Shader::SetGlobalTexture(const String &name, Texture *texture)
     {
+        if (!RDG::RenderGraph::ValidatePersistentGlobalResource(texture, "Shader::SetGlobalTexture"))
+            return;
         auto id = ShaderPropertyRegistry::Get().Intern(name);
         s_global_res_registry.SetTexture(id,texture);
     }
@@ -986,7 +990,12 @@ namespace Ailu::Render
     }
     void ComputeShader::SetGlobalTexture(const String &name, RTHandle texture)
     {
-        s_global_textures_bind_info[name] = g_pRenderTexturePool->Get(texture);
+        SetGlobalTexture(name, g_pRenderTexturePool->Get(texture));
+    }
+
+    bool ComputeShader::ValidatePersistentGlobalTexture(Texture *texture)
+    {
+        return RDG::RenderGraph::ValidatePersistentGlobalResource(texture, "ComputeShader::SetGlobalTexture");
     }
     void ComputeShader::Bind(RHICommandBuffer *cmd, ComputeShaderKernelId kernel)
     {

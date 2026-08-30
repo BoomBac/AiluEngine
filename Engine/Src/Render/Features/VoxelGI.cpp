@@ -4,6 +4,8 @@
 
 #include "Inc/Render/Features/VoxelGI.h"
 #include "Framework/Common/Profiler.h"
+#include "Render/Material.h"
+#include "Render/GraphicsContext.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Inc/Render/CommandBuffer.h"
 #include "Inc/Render/Renderer.h"

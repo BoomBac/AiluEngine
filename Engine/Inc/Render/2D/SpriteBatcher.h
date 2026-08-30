@@ -4,14 +4,18 @@
 
 #include "Framework/Core/CoreMinimal.h"
 #include "Framework/Core/Containers/Vector.h"
-#include "Render/Buffer.h"
-#include "Render/CommandBuffer.h"
-#include "Render/Material.h"
-#include "Render/Texture.h"
 #include "SpriteRenderData.h"
 
 namespace Ailu::Render
 {
+    class CommandBuffer;
+    class RenderTexture;
+    class Material;
+    class VertexBuffer;
+    class IndexBuffer;
+    class GPUBuffer;
+    class ConstantBuffer;
+
     class AILU_API SpriteBatcher
     {
     public:

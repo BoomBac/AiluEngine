@@ -37,6 +37,7 @@ namespace Ailu
             kBlueprint,
             kTreeItem,
             kCustomUserData,// 可扩展类型（调试等）
+            kAsset,// 单个通用资产
         };
 
 

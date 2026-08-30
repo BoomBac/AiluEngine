@@ -7,5 +7,11 @@
     },
     "_file": "WaterTest/water_plane.fbx",
     "_inner_file_name": "Plane",
-    "_is_combine_mesh": false
+    "_import_setting": {
+        "_is_recalculate_normals": false,
+        "_import_flag": 1,
+        "_is_combine_mesh": false,
+        "_mesh_name": "",
+        "_animation_stack_index": 0
+    }
 }

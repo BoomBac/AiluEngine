@@ -1,5 +1,7 @@
 #include "Render/Features/VolumetricFog.h"
 #include "Render/Renderer.h"
+#include "Render/GraphicsContext.h"
+#include "Render/Material.h"
 #include "Render/CommandBuffer.h"
 #include "Render/RenderGraph/RenderGraph.h"
 #include "Framework/Common/ResourceMgr.h"

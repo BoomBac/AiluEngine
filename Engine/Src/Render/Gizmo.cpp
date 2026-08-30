@@ -1,4 +1,5 @@
 #include "Render/Gizmo.h"
+#include "Render/GraphicsContext.h"
 #include "Framework/Common/Allocator.hpp"
 #include "Framework/Common/ResourceMgr.h"
 #include "Render/GraphicsPipelineStateObject.h"

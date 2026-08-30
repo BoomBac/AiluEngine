@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "Render/Buffer.h"
+#include "Render/GraphicsContext.h"
 #include "Render/Renderer.h"
 #include "RHI/DX12/D3DBuffer.h"
 #include "Framework/Core/CoreMinimal.h"

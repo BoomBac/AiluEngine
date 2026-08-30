@@ -1079,7 +1079,7 @@ namespace Ailu
                     if (popup != nullptr)
                     {
                         UIManager::Get()->ShowPopupAt(abs_rect.x, abs_rect.y + abs_rect.w, popup, [this]()
-                        { _is_dropdown_open = false; });
+                        { _is_dropdown_open = false; }, nullptr, false, _render_popup_backdrop);
                         _is_dropdown_open = true;
                         return;
                     }
@@ -1120,11 +1120,11 @@ namespace Ailu
                 if (_popup_backdrop_texture != nullptr && _popup_backdrop_source_rect.z > 1.0f && _popup_backdrop_source_rect.w > 1.0f)
                     list_view->SetBackdropSourceRect(_popup_backdrop_source_rect);
                 UIManager::Get()->ShowPopupAt(abs_rect.x, abs_rect.y + abs_rect.w, list_view, [this]()
-                                              { _is_dropdown_open = false; });
+                                              { _is_dropdown_open = false; }, nullptr, false, _render_popup_backdrop);
                 _is_dropdown_open = true;
             };
         }
-        void Dropdown::SetSelectedIndex(i32 index)
+        void Dropdown::SetSelectedIndex(i32 index, bool notify)
         {
             if (_selected_index == index)
             {
@@ -1133,7 +1133,8 @@ namespace Ailu
                 return;
             }
             _selected_index = index;
-            _on_selected_changed_delegate.Invoke(_selected_index);
+            if (notify)
+                _on_selected_changed_delegate.Invoke(_selected_index);
             if (_selected_index >= 0 && _selected_index < static_cast<i32>(_items.size()))
                 _text->SetText(_items[_selected_index]);
             if (_is_dropdown_open)

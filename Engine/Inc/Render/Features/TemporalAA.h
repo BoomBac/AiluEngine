@@ -4,6 +4,8 @@
 #include "RenderFeature.h"
 #include "Framework/Core/CoreMinimal.h"
 #include "Framework/Core/Containers/Map.h"
+#include "Framework/Math/ALMath.hpp"
+#include "Render/CoreType.h"
 #include <vector>
 #include "generated/TemporalAA.gen.h"
 

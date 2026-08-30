@@ -33,17 +33,13 @@ namespace Ailu
             constexpr f32 kRightPanelWidth   = 340.0f;
             constexpr f32 kInputHeight       = 22.0f;
             constexpr f32 kTexPreviewSize    = 64.0f;
-            constexpr f32 kZoomMin           = 0.1f;
-            constexpr f32 kZoomMax           = 32.0f;
-            constexpr f32 kZoomStep          = 1.1f;
+            constexpr f32 kSpriteZoomStep   = 1.1f;
             constexpr f32 kChessTileSize     = 16.0f;
 
             const Color kColorUvRect    = Color(0.2f, 0.8f, 1.0f, 1.0f);
             const Color kColorPivot     = Color(0.2f, 1.0f, 0.2f, 1.0f);
             const Color kColorBorder    = Color(1.0f, 0.6f, 0.0f, 1.0f);
             const Color kColorOverlay   = Color(0.0f, 0.0f, 0.0f, 0.5f);
-            const Color kColorChessA    = Color(0.75f, 0.75f, 0.75f, 1.0f);
-            const Color kColorChessB    = Color(0.55f, 0.55f, 0.55f, 1.0f);
 
             String GuidToString(const Guid& g) { return g.ToString().substr(0, 8) + "..."; }
             String FormatResolution(u16 w, u16 h) { return std::format("{} x {}", w, h); }
@@ -195,18 +191,69 @@ namespace Ailu
             _sprite_asset = GetAssetObject<Render::Sprite>();
             _sprite_atlas = GetAssetObject<Render::SpriteAtlas>();
             if (_sprite_asset != nullptr)
-                Open(_sprite_asset);
+                OnOpen();
             else if (_sprite_atlas != nullptr)
-                Open(_sprite_atlas);
+                OnOpen();
         }
 
         // =====================================================================
         // Open / Close
         // =====================================================================
-        void SpriteAssetEditor::Open(Sprite* asset)
+        bool SpriteAssetEditor::OnOpen()
         {
-            if (!asset) return;
-            BindAsset(ResourceMgr::Get().GetLinkedAsset(asset));
+            Sprite *asset = GetAssetObject<Sprite>();
+            Render::SpriteAtlas *atlas = GetAssetObject<Render::SpriteAtlas>();
+            if (asset == nullptr && atlas == nullptr)
+                return false;
+            if (asset == nullptr)
+            {
+                asset = nullptr;
+                _sprite_atlas = atlas;
+            }
+            if (atlas != nullptr)
+            {
+                _sprite_atlas = atlas;
+                _sprite_asset = nullptr;
+                _original = SpriteAssetEditData();
+                _editing = SpriteAssetEditData();
+                _texture = nullptr;
+                _supports_multiple_sprites = true;
+                _sprite_items.clear();
+                _selected_sprite_indices.clear();
+                _original_atlas_sprites = atlas->Sprites();
+                _original_atlas_sprite_guids.clear();
+                _selected_sprite_index = -1;
+                u32 sprite_index = 0u;
+                for (const auto &sprite_ref : atlas->Sprites())
+                {
+                    Sprite *sprite = sprite_ref.get();
+                    if (!sprite)
+                    {
+                        ++sprite_index;
+                        continue;
+                    }
+                    _sprite_asset = sprite;
+                    ReadFromAsset();
+                    _original = _editing;
+                    const String display_name = sprite->Name().empty()
+                        ? MakeAtlasSpriteName(sprite_index) : sprite->Name();
+                    _sprite_items.push_back(SpriteAssetEditItem{
+                        ResourceMgr::Get().GetAssetGuid(sprite), display_name, display_name, sprite, _original, _editing});
+                    _original_atlas_sprite_guids.push_back(ResourceMgr::Get().GetAssetGuid(sprite));
+                    ++sprite_index;
+                }
+                _selected_sprite_index = _sprite_items.empty() ? -1 : 0;
+                if (_selected_sprite_index >= 0)
+                    _selected_sprite_indices = {_selected_sprite_index};
+                LoadSelectedSprite();
+                _original_sprite_count = static_cast<u32>(_sprite_items.size());
+                OnTextureChanged();
+                StoreSelectedSprite();
+                SetTitle("Sprite Atlas Editor - " + atlas->Name());
+                RefreshAllUI();
+                return true;
+            }
+
             _sprite_asset = asset;
             _sprite_atlas = nullptr;
             _supports_multiple_sprites = false;
@@ -223,60 +270,10 @@ namespace Ailu
             OnTextureChanged();
             SetTitle("Sprite Editor - " + asset->Name());
             RefreshAllUI();
+            return true;
         }
 
-        void SpriteAssetEditor::Open(Render::SpriteAtlas* asset)
-        {
-            if (!asset)
-                return;
-
-            BindAsset(ResourceMgr::Get().GetLinkedAsset(asset));
-
-            _sprite_atlas = asset;
-            _sprite_asset = nullptr;
-            _original = SpriteAssetEditData();
-            _editing = SpriteAssetEditData();
-            _texture = nullptr;
-            _supports_multiple_sprites = true;
-            _sprite_items.clear();
-            _selected_sprite_indices.clear();
-            _original_atlas_sprites = asset->Sprites();
-            _original_atlas_sprite_guids.clear();
-            _selected_sprite_index = -1;
-            u32 sprite_index = 0u;
-            for (const auto &sprite_ref : asset->Sprites())
-            {
-                Sprite *sprite = sprite_ref.get();
-                if (!sprite)
-                {
-                    ++sprite_index;
-                    continue;
-                }
-                _sprite_asset = sprite;
-                ReadFromAsset();
-                _original = _editing;
-                const String display_name = sprite->Name().empty()
-                    ? MakeAtlasSpriteName(sprite_index) : sprite->Name();
-                _sprite_items.push_back(SpriteAssetEditItem{
-                    ResourceMgr::Get().GetAssetGuid(sprite), display_name, display_name, sprite, _original, _editing});
-                _original_atlas_sprite_guids.push_back(ResourceMgr::Get().GetAssetGuid(sprite));
-                ++sprite_index;
-            }
-
-            _selected_sprite_index = _sprite_items.empty() ? -1 : 0;
-            if (_selected_sprite_index >= 0)
-                _selected_sprite_indices = {_selected_sprite_index};
-            LoadSelectedSprite();
-            _original_sprite_count = static_cast<u32>(_sprite_items.size());
-            OnTextureChanged();
-            // Validation during opening is load-time normalization, not a user edit.
-            // Capture the normalized selection as the clean editor baseline.
-            StoreSelectedSprite();
-            SetTitle("Sprite Atlas Editor - " + asset->Name());
-            RefreshAllUI();
-        }
-
-        void SpriteAssetEditor::Close()
+        void SpriteAssetEditor::OnClose()
         {
             if (_sprite_atlas && IsDirty())
                 Revert();
@@ -290,7 +287,6 @@ namespace Ailu
             _selected_sprite_indices.clear();
             _selected_sprite_index = -1;
             _original_sprite_count = 0;
-            AssetEditor::Close();
         }
 
         void SpriteAssetEditor::ApplyEditData(const SpriteAssetEditData& data)
@@ -323,8 +319,13 @@ namespace Ailu
             if (ctrl && Input::IsKeyDownAccurate(EKey::kZ)) { if (g_pCommandMgr) g_pCommandMgr->Undo(); }
             if (ctrl && Input::IsKeyDownAccurate(EKey::kY)) { if (g_pCommandMgr) g_pCommandMgr->Redo(); }
             if (Input::IsKeyDownAccurate(EKey::kF)) FitTexture();
-            if (Input::IsKeyDownAccurate(EKey::k1)) { _preview_zoom = 1.0f; RefreshPreview(); }
-            if (Input::IsKeyDownAccurate(EKey::kG)) { _show_grid = !_show_grid; if (_chk_grid) _chk_grid->SetChecked(_show_grid); RefreshPreview(); }
+            if (Input::IsKeyDownAccurate(EKey::k1)) { if (_preview) _preview->ResetZoom(); RefreshPreview(); }
+            if (Input::IsKeyDownAccurate(EKey::kG)) {
+                _show_grid = !_show_grid;
+                if (_chk_grid) _chk_grid->SetChecked(_show_grid);
+                if (_preview) _preview->SetShowPixelGrid(_show_grid);
+                RefreshPreview();
+            }
             if (Input::IsKeyDownAccurate(EKey::kP)) { _show_pivot = !_show_pivot; if (_chk_pivot) _chk_pivot->SetChecked(_show_pivot); RefreshPreview(); }
             if (Input::IsKeyDownAccurate(EKey::kB)) { _show_border = !_show_border; if (_chk_border) _chk_border->SetChecked(_show_border); RefreshPreview(); }
             if (Input::IsKeyDownAccurate(EKey::kESCAPE))
@@ -342,7 +343,9 @@ namespace Ailu
             bool dirty = IsDirty();
             if (_btn_apply) _btn_apply->SetInteractiveEnabled(dirty);
             if (_btn_revert) _btn_revert->SetInteractiveEnabled(dirty);
-            if (_txt_zoom_label) _txt_zoom_label->SetText(std::format("{}%", (i32)std::round(_preview_zoom * 100.0f)));
+            if (_txt_zoom_label)
+                _txt_zoom_label->SetText(std::format("{}%", _preview ?
+                    (i32)std::round(_preview->GetZoom() * 100.0f) : 100));
             RefreshStatusBar();
         }
 
@@ -355,8 +358,8 @@ namespace Ailu
                 if (tw > 0.0f && th > 0.0f)
                 {
                     f32 zw = ps.z / tw, zh = ps.w / th;
-                    _preview_zoom = std::min(zw, zh);
-                    _preview_pan = Vector2f::kZero;
+                    _preview->SetZoom(std::min(zw, zh));
+                    _preview->SetPan(Vector2f::kZero);
                     RefreshPreview();
                 }
             }
@@ -368,9 +371,8 @@ namespace Ailu
         void SpriteAssetEditor::ReadFromAsset()
         {
             if (!_sprite_asset) return;
-            // Convert runtime Ref<Texture2D> to Guid for editor buffer
-            _editing._texture = Guid::EmptyGuid();
-            if (_sprite_asset->_texture)
+            _editing._texture = _sprite_asset->_texture.GetGuid();
+            if (_editing._texture.IsEmpty() && _sprite_asset->_texture)
             {
                 auto* linked = ResourceMgr::Get().GetLinkedAsset(_sprite_asset->_texture.get());
                 if (linked)
@@ -386,10 +388,10 @@ namespace Ailu
         {
             if (!_sprite_asset) return;
             // Convert Guid back to runtime Ref<Texture2D>
-            if (_editing._texture != Guid::EmptyGuid())
-                _sprite_asset->_texture = ResourceMgr::Get().GetRef<Texture2D>(_editing._texture);
-            else
-                _sprite_asset->_texture = nullptr;
+            Ref<Texture2D> texture;
+            if (!_editing._texture.IsEmpty())
+                texture = ResourceMgr::Get().GetRef<Texture2D>(_editing._texture);
+            _sprite_asset->_texture.Set(_editing._texture, std::move(texture));
             _sprite_asset->_uv_rect = _editing._uv_rect;
             _sprite_asset->_pivot   = _editing._pivot;
             _sprite_asset->_size    = _editing._size;
@@ -456,7 +458,7 @@ namespace Ailu
             Ref<Texture2D> atlas_texture;
             if (!atlas_texture_guid.IsEmpty())
                 atlas_texture = ResourceMgr::Get().GetRef<Texture2D>(atlas_texture_guid);
-            _sprite_atlas->SetTexture(atlas_texture);
+            _sprite_atlas->SetTexture(atlas_texture_guid, std::move(atlas_texture));
             for (auto &item : _sprite_items)
             {
                 if (!item._asset)
@@ -722,10 +724,13 @@ namespace Ailu
             while (has_name(name))
                 name = MakeAtlasSpriteName(++name_index);
             auto sprite = MakeRef<Sprite>(name);
-            if (_editing._texture != Guid::EmptyGuid())
-                sprite->_texture = ResourceMgr::Get().GetRef<Render::Texture2D>(_editing._texture);
+            if (!_editing._texture.IsEmpty())
+            {
+                Ref<Render::Texture2D> texture = ResourceMgr::Get().GetRef<Render::Texture2D>(_editing._texture);
+                sprite->_texture.Set(_editing._texture, std::move(texture));
+            }
             if (sprite->_texture != nullptr)
-                _sprite_atlas->SetTexture(sprite->_texture);
+                _sprite_atlas->SetTexture(sprite->_texture.GetGuid(), sprite->_texture.Get());
             sprite->_uv_rect = _editing._uv_rect;
             sprite->_pivot = _editing._pivot;
             sprite->_size = _editing._size;
@@ -876,8 +881,7 @@ namespace Ailu
             if (!_editing._texture.IsEmpty())
             {
                 auto texture = ResourceMgr::Get().GetRef<Texture2D>(_editing._texture);
-                if (texture != nullptr)
-                    _sprite_atlas->SetTexture(texture);
+                _sprite_atlas->SetTexture(_editing._texture, std::move(texture));
             }
 
             StoreSelectedSprite();
@@ -897,7 +901,7 @@ namespace Ailu
                 {
                     const String name = MakeAtlasSpriteName(index++);
                     auto sprite = MakeRef<Sprite>(name);
-                    sprite->_texture = _sprite_atlas->Texture();
+                    sprite->_texture.Set(_sprite_atlas->TextureRef().GetGuid(), _sprite_atlas->TextureRef().Get());
                     sprite->_uv_rect = Vector4f(static_cast<f32>(x) / texture_width,
                                                 1.0f - static_cast<f32>(y + cell_height) / texture_height,
                                                 static_cast<f32>(cell_width) / texture_width,
@@ -1013,7 +1017,7 @@ namespace Ailu
                 const u32 sprite_height = static_cast<u32>(rect.w - rect.y + 1);
                 const String name = MakeAtlasSpriteName(index++);
                 auto sprite = MakeRef<Sprite>(name);
-                sprite->_texture = atlas_texture;
+                sprite->_texture.Set(texture_guid, atlas_texture);
                 sprite->_uv_rect = Vector4f(static_cast<f32>(rect.x) / width,
                                             1.0f - static_cast<f32>(rect.y + static_cast<i32>(sprite_height)) / height,
                                             static_cast<f32>(sprite_width) / width,
@@ -1167,7 +1171,7 @@ namespace Ailu
             text += std::format("UV: {:.3f},{:.3f},{:.3f},{:.3f}   Z: {}%",
                                _editing._uv_rect.x, _editing._uv_rect.y,
                                _editing._uv_rect.z, _editing._uv_rect.w,
-                               (i32)std::round(_preview_zoom * 100.0f));
+                                _preview ? (i32)std::round(_preview->GetZoom() * 100.0f) : 100);
             _status_text->SetText(text);
         }
 
@@ -1188,6 +1192,11 @@ namespace Ailu
         {
             _texture = ResolveTexture();
             ValidateEditingData();
+            if (_preview)
+            {
+                _preview->SetTexture(_texture);
+                _preview->SetShowPixelGrid(_show_grid);
+            }
             if (_img_tex_preview) _img_tex_preview->SetTexture(_texture);
             RefreshPreview();
             RefreshAssetInfo();
@@ -1323,7 +1332,12 @@ namespace Ailu
 
             _chk_grid = toolbar->AddChild<UI::CheckBox>(); _chk_grid->SetChecked(true);
             _chk_grid->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFill).Size(Vector2f(20.0f, 0.0f));
-            _chk_grid->OnMouseClick() += [this](UI::UIEvent& e) { _show_grid = _chk_grid->IsChecked(); RefreshPreview(); e._is_handled = true; };
+            _chk_grid->OnMouseClick() += [this](UI::UIEvent& e) {
+                _show_grid = _chk_grid->IsChecked();
+                if (_preview) _preview->SetShowPixelGrid(_show_grid);
+                RefreshPreview();
+                e._is_handled = true;
+            };
             auto* grid_l = toolbar->AddChild<UI::Text>("Grid"); grid_l->_color = Color(0.7f, 0.7f, 0.7f, 1.0f);
             grid_l->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFill).Size(Vector2f(28.0f, 0.0f));
 
@@ -1353,7 +1367,7 @@ namespace Ailu
 
             _btn_1to1 = toolbar->AddChild<UI::Button>("1:1");
             _btn_1to1->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFill).Size(Vector2f(32.0f, 0.0f));
-            _btn_1to1->OnMouseClick() += [this](UI::UIEvent& e) { _preview_zoom = 1.0f; RefreshPreview(); e._is_handled = true; };
+            _btn_1to1->OnMouseClick() += [this](UI::UIEvent& e) { if (_preview) _preview->ResetZoom(); RefreshPreview(); e._is_handled = true; };
 
             auto* spacer = toolbar->AddChild<UI::Text>("");
             spacer->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
@@ -1802,6 +1816,7 @@ namespace Ailu
         // =====================================================================
         SpritePreviewWidget::SpritePreviewWidget(SpriteAssetEditor* editor) : _editor(editor)
         {
+            SetNavigationEnabled(false);
             SetWantsMouseEvents(true);
             SetInteractiveEnabled(true);
 
@@ -1834,16 +1849,8 @@ namespace Ailu
 
             OnMouseScroll() += [this](UI::UIEvent& e) {
                 if (!_editor) return;
-                f32 old_z = _editor->_preview_zoom;
-                if (e._scroll_delta > 0) _editor->_preview_zoom = std::min(_editor->_preview_zoom * kZoomStep, kZoomMax);
-                else if (e._scroll_delta < 0) _editor->_preview_zoom = std::max(_editor->_preview_zoom / kZoomStep, kZoomMin);
-                if (_editor->_preview_zoom != old_z) {
-                    auto c = GetContentRect();
-                    Vector2f ct = Vector2f(c.x + c.z*.5f, c.y + c.w*.5f);
-                    f32 r = _editor->_preview_zoom / old_z;
-                    _editor->_preview_pan.x = e._mouse_position.x - ct.x - (e._mouse_position.x - ct.x - _editor->_preview_pan.x) * r;
-                    _editor->_preview_pan.y = e._mouse_position.y - ct.y - (e._mouse_position.y - ct.y - _editor->_preview_pan.y) * r;
-                }
+                if (e._scroll_delta > 0) _editor->_preview->ZoomAt(e._mouse_position, kSpriteZoomStep);
+                else if (e._scroll_delta < 0) _editor->_preview->ZoomAt(e._mouse_position, 1.0f / kSpriteZoomStep);
                 _editor->RefreshPreview();
                 e._is_handled = true;
             };
@@ -1857,55 +1864,34 @@ namespace Ailu
             auto cr = GetContentRect();
             if (cr.z <= 0 || cr.w <= 0) return;
             r.PushScissor(cr);
-            DrawBackground(r, cr);
             if (_editor && _editor->_selected_sprite_indices.empty())
             {
+                DrawBackground(r, cr);
                 r.DrawText("No sprite selected.", Vector2f(cr.x + 16.0f, cr.y + cr.w * 0.5f - 8.0f),
                            Matrix4x4f::Identity(), 14.0f, Color(0.7f, 0.7f, 0.7f, 1.0f));
             }
             else if (_editor && _editor->_selected_sprite_indices.size() > 1u)
             {
+                DrawBackground(r, cr);
                 r.DrawText("Multiple selection preview is not supported.",
                            Vector2f(cr.x + 16.0f, cr.y + cr.w * 0.5f - 8.0f), Matrix4x4f::Identity(), 14.0f,
                            Color(1.0f, 0.75f, 0.25f, 1.0f));
             }
             else if (_editor && _editor->_texture) {
-                DrawTexture(r, cr);
-                if (_editor->_show_border) DrawBorderOverlay(r);
-                if (_editor->_show_pivot) DrawPivotOverlay(r);
-                DrawUvRectOverlay(r);
-                if (_editor->_show_grid && _editor->_preview_zoom >= 4.0f) DrawPixelGrid(r);
+                TexturePreviewWidget::RenderImpl(r);
+                r.PopScissor();
+                return;
             }
             r.PopScissor();
         }
 
-        void SpritePreviewWidget::DrawBackground(UI::UIRenderer& r, const Vector4f& rect)
+        void SpritePreviewWidget::DrawOverlay(UI::UIRenderer& r, const Vector4f&)
         {
-            if (!_editor) return;
-            UIBrush b; b._type = EUIBrushType::kColor;
-            switch (_editor->_background_mode) {
-            case 0: { i32 tx=(i32)std::ceil(rect.z/kChessTileSize)+1, ty=(i32)std::ceil(rect.w/kChessTileSize)+1; for(i32 y=0;y<ty;++y) for(i32 x=0;x<tx;++x){b._tint=((x+y)&1)?kColorChessB:kColorChessA; r.DrawQuad(Vector4f(rect.x+x*kChessTileSize,rect.y+y*kChessTileSize,kChessTileSize,kChessTileSize),b,-0.1f);} break; }
-            case 1: b._tint=Color(0.1f,0.1f,0.1f,1.0f); r.DrawQuad(rect,b,-0.1f); break;
-            case 2: b._tint=Color(0.8f,0.8f,0.8f,1.0f); r.DrawQuad(rect,b,-0.1f); break;
-            case 3: b._tint=Colors::kBlack; r.DrawQuad(rect,b,-0.1f); break;
-            case 4: b._tint=Colors::kWhite; r.DrawQuad(rect,b,-0.1f); break;
-            default: break;
-            }
-        }
-
-        void SpritePreviewWidget::DrawTexture(UI::UIRenderer& r, const Vector4f& rect)
-        {
-            auto* tex = _editor->_texture; if(!tex)return;
-            f32 tw=(f32)tex->Width(), th=(f32)tex->Height(); if(tw<=0||th<=0)return;
-            f32 z=_editor->_preview_zoom; Vector2f p=_editor->_preview_pan;
-            f32 cx=rect.x+rect.z*.5f, cy=rect.y+rect.w*.5f;
-            // Compute screen-space draw rect directly (avoid matrix construction issues)
-            f32 dw=tw*z, dh=th*z;
-            f32 dx=cx+p.x-dw*.5f, dy=cy+p.y-dh*.5f;
-            ImageDrawOptions o;
-            o._uv_rect=Vector4f(0,0,1,1);
-            o._tint=_editor->_show_alpha?Colors::kWhite:Color(1,1,1,1);
-            r.DrawImage(tex, Vector4f(dx, dy, dw, dh), o);
+            if (_editor == nullptr)
+                return;
+            if (_editor->_show_border) DrawBorderOverlay(r);
+            if (_editor->_show_pivot) DrawPivotOverlay(r);
+            DrawUvRectOverlay(r);
         }
 
         void SpritePreviewWidget::DrawUvRectOverlay(UI::UIRenderer& r)
@@ -1920,17 +1906,6 @@ namespace Ailu
             f32 rt=us.x+us.z; if(rt<cr.x+cr.z) r.DrawQuad(Vector4f(rt,us.y,cr.x+cr.z-rt,us.w),b,d);
             r.DrawBox(Vector2f(us.x,us.y),Vector2f(us.z,us.w),2.0f,kColorUvRect,d+0.1f);
             auto hs=GetUvHandles(); for(auto& h:hs){UIBrush hb;hb._type=EUIBrushType::kColor;hb._tint=kColorUvRect;r.DrawQuad(h,hb,d+0.2f);}
-        }
-
-        void SpritePreviewWidget::DrawPixelGrid(UI::UIRenderer& r)
-        {
-            if(!_editor||!_editor->_texture)return;
-            auto tr=GetTextureDisplayRect(); f32 tw=(f32)_editor->_texture->Width(),th=(f32)_editor->_texture->Height(),z=_editor->_preview_zoom;
-            if(z<4.0f)return; auto cr=GetContentRect();
-            f32 sx=std::max(0.0f,(cr.x-tr.x)/z),sy=std::max(0.0f,(cr.y-tr.y)/z),ex=std::min(tw,(cr.x+cr.z-tr.x)/z),ey=std::min(th,(cr.y+cr.w-tr.y)/z);
-            Color gc(1,1,1,0.15f);
-            for(f32 px=std::floor(sx);px<=ex;px+=1){Vector2f sp=TexturePixelToScreen(Vector2f(px,0));r.DrawLine(Vector2f(sp.x,cr.y),Vector2f(sp.x,cr.y+cr.w),0.5f,gc,0.8f);}
-            for(f32 py=std::floor(sy);py<=ey;py+=1){Vector2f sp=TexturePixelToScreen(Vector2f(0,py));r.DrawLine(Vector2f(cr.x,sp.y),Vector2f(cr.x+cr.z,sp.y),0.5f,gc,0.8f);}
         }
 
         void SpritePreviewWidget::DrawPivotOverlay(UI::UIRenderer& r)
@@ -1971,7 +1946,7 @@ namespace Ailu
             Vector2f tp=ScreenToTexturePixel(sp);
             auto& uv=_editor->_editing._uv_rect; auto& pv=_editor->_editing._pivot; auto& bd=_editor->_editing._border;
             f32 tw=(f32)_editor->_texture->Width(),th=(f32)_editor->_texture->Height();
-            f32 ux=uv.x*tw,uy=uv.y*th,uw=uv.z*tw,uh=uv.w*th,hr=kHandleRadius/std::max(_editor->_preview_zoom,0.1f);
+            f32 ux=uv.x*tw,uy=uv.y*th,uw=uv.z*tw,uh=uv.w*th,hr=kHandleRadius/std::max(GetZoom(),0.1f);
             auto d2=[](f32 x1,f32 y1,f32 x2,f32 y2){return (x1-x2)*(x1-x2)+(y1-y2)*(y1-y2);};
             auto ne=[](f32 v,f32 t){return std::abs(v-t);};
             auto ir=[](f32 v,f32 lo,f32 hi){return v>=lo&&v<=hi;};
@@ -1999,27 +1974,6 @@ namespace Ailu
             return SpriteEditorDragMode::kNone;
         }
 
-        Vector2f SpritePreviewWidget::ScreenToPreview(const Vector2f& sp) const {
-            auto c=GetContentRect(); f32 z=_editor?_editor->_preview_zoom:1.0f; Vector2f p=_editor?_editor->_preview_pan:Vector2f::kZero;
-            return Vector2f((sp.x-c.x-c.z*.5f-p.x)/z,(sp.y-c.y-c.w*.5f-p.y)/z);
-        }
-        Vector2f SpritePreviewWidget::PreviewToScreen(const Vector2f& pp) const {
-            auto c=GetContentRect(); f32 z=_editor?_editor->_preview_zoom:1.0f; Vector2f p=_editor?_editor->_preview_pan:Vector2f::kZero;
-            return Vector2f(c.x+c.z*.5f+p.x+pp.x*z,c.y+c.w*.5f+p.y+pp.y*z);
-        }
-        Vector2f SpritePreviewWidget::ScreenToTexturePixel(const Vector2f& sp) const {
-            auto c=GetContentRect(); f32 z=_editor?_editor->_preview_zoom:1.0f; Vector2f p=_editor?_editor->_preview_pan:Vector2f::kZero;
-            f32 tw=_editor&&_editor->_texture?(f32)_editor->_texture->Width():256.0f,th=_editor&&_editor->_texture?(f32)_editor->_texture->Height():256.0f;
-            f32 px=(sp.x-c.x-c.z*.5f-p.x)/z,py=(sp.y-c.y-c.w*.5f-p.y)/z;
-            return Vector2f(px+tw*.5f,py+th*.5f);
-        }
-        Vector2f SpritePreviewWidget::TexturePixelToScreen(const Vector2f& tp) const {
-            auto c=GetContentRect(); f32 z=_editor?_editor->_preview_zoom:1.0f; Vector2f p=_editor?_editor->_preview_pan:Vector2f::kZero;
-            f32 tw=_editor&&_editor->_texture?(f32)_editor->_texture->Width():256.0f,th=_editor&&_editor->_texture?(f32)_editor->_texture->Height():256.0f;
-            f32 px=tp.x-tw*.5f,py=tp.y-th*.5f;
-            return Vector2f(c.x+c.z*.5f+p.x+px*z,c.y+c.w*.5f+p.y+py*z);
-        }
-
         Vector4f SpritePreviewWidget::GetUvRectInPixels() const {
             if(!_editor||!_editor->_texture)return Vector4f(0,0,0,0);
             auto& uv=_editor->_editing._uv_rect; f32 tw=(f32)_editor->_texture->Width(),th=(f32)_editor->_texture->Height();
@@ -2027,11 +1981,6 @@ namespace Ailu
         }
         Vector4f SpritePreviewWidget::GetUvRectInScreen() const {
             auto pr=GetUvRectInPixels(); Vector2f tl=TexturePixelToScreen(Vector2f(pr.x,pr.y)),br=TexturePixelToScreen(Vector2f(pr.x+pr.z,pr.y+pr.w));
-            return Vector4f(std::min(tl.x,br.x),std::min(tl.y,br.y),std::abs(br.x-tl.x),std::abs(br.y-tl.y));
-        }
-        Vector4f SpritePreviewWidget::GetTextureDisplayRect() const {
-            if(!_editor||!_editor->_texture)return Vector4f(0,0,0,0);
-            Vector2f tl=TexturePixelToScreen(Vector2f(0,0)),br=TexturePixelToScreen(Vector2f((f32)_editor->_texture->Width(),(f32)_editor->_texture->Height()));
             return Vector4f(std::min(tl.x,br.x),std::min(tl.y,br.y),std::abs(br.x-tl.x),std::abs(br.y-tl.y));
         }
         Vector<Vector4f> SpritePreviewWidget::GetUvHandles() const {
@@ -2053,7 +2002,7 @@ namespace Ailu
             if(alt)snap=false; f32 ux=uv.x*tw,uy=uv.y*th,uw=uv.z*tw,uh=uv.w*th;
 
             switch(md){
-            case SpriteEditorDragMode::kPanView:{Vector2f sp=ScreenToPreview(_editor->_drag_start_mouse),cp=ScreenToPreview(mp);_editor->_preview_pan=_editor->_preview_pan+(cp-sp)*_editor->_preview_zoom;_editor->_drag_start_mouse=mp;break;}
+            case SpriteEditorDragMode::kPanView:{Vector2f sp=ScreenToPreview(_editor->_drag_start_mouse),cp=ScreenToPreview(mp);SetPan(GetPan()+(cp-sp)*GetZoom());_editor->_drag_start_mouse=mp;break;}
             case SpriteEditorDragMode::kMoveUvRect:{Vector2f stp=ScreenToTexturePixel(_editor->_drag_start_mouse);f32 dx=tp.x-stp.x,dy=tp.y-stp.y;uv.x=std::clamp(uv.x+dx/tw,0.0f,1.0f-uv.z);uv.y=std::clamp(uv.y+dy/th,0.0f,1.0f-uv.w);_editor->_drag_start_mouse=mp;break;}
             case SpriteEditorDragMode::kResizeUvLeft:{uv.x=std::clamp(tp.x/tw,0.0f,(ux+uw-1)/tw);uv.z=(ux+uw)/tw-uv.x;break;}
             case SpriteEditorDragMode::kResizeUvRight:{uv.z=std::clamp(tp.x/tw-uv.x,1.0f/tw,1.0f-uv.x);break;}

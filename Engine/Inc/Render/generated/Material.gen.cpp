@@ -42,42 +42,6 @@ return Ailu::Render::Material::StaticType();
 return Ailu::Render::Material::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_Material(&Ailu::Render::Material::StaticType, "Ailu::Render::Material");
-const Ailu::Type* Ailu::Render::Z_Construct_StandardMaterial_Type()
-{
-Ailu::Render::Material::StaticType();
-static std::unique_ptr<Ailu::Type> cur_type = nullptr;
-if(cur_type == nullptr)
-{
-TypeInitializer initializer;
-initializer._name = "StandardMaterial";
-initializer._size = sizeof(Ailu::Render::StandardMaterial);
-initializer._full_name = "Ailu::Render::StandardMaterial";
-initializer._is_class = true;
-initializer._is_abstract = false;
-initializer._namespace = "Ailu::Render";
-initializer._base_name = "Ailu::Render::Material";
-initializer._constructor = []()->Ailu::Render::StandardMaterial* {return new Ailu::Render::StandardMaterial;};
-cur_type = std::make_unique<Ailu::Type>(initializer);
-Ailu::Type::RegisterType(cur_type.get());
-}
-return cur_type.get();
-}
-
-const Ailu::Type* Ailu::Render::StandardMaterial::GetPrivateStaticClass()
-{
-	static const Ailu::Type* type = Z_Construct_StandardMaterial_Type();
-	return type;
-}
-
-template<> const Ailu::Type* Ailu::StaticClass<Ailu::Render::StandardMaterial>()
-{
-return Ailu::Render::StandardMaterial::StaticType();
-}
-    const Type *Ailu::Render::StandardMaterial::GetType()
-{
-return Ailu::Render::StandardMaterial::GetPrivateStaticClass();
-}
-ClassTypeRegister s_register_StandardMaterial(&Ailu::Render::StandardMaterial::StaticType, "Ailu::Render::StandardMaterial");
 static std::unique_ptr<Ailu::Enum> s_enum_type_EMaterialID = nullptr;
 //Enum EMaterialID begin...........................
 const Ailu::Enum* Z_Construct_Enum_Ailu_Render_EMaterialID_Type()

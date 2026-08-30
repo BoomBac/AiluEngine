@@ -6,6 +6,7 @@
 #include "Framework/Common/ResourceMgr.h"
 #include "Render/2D/Sprite.h"
 #include "Render/AssetPreviewGenerator.h"
+#include "Render/Material.h"
 #include "Render/Mesh.h"
 #include "Render/Texture.h"
 
@@ -22,29 +23,61 @@ namespace Ailu
 
             Ref<Render::Texture> GenerateMeshPreview(Asset *asset)
             {
-                if (asset == nullptr || asset->_p_obj == nullptr)
+                if (asset == nullptr)
                     return nullptr;
+
+                if (asset->_p_obj == nullptr)
+                {
+                    if (asset->_asset_type == Render::SkeletonMesh::StaticType())
+                        ResourceMgr::Get().Load<Render::SkeletonMesh>(asset->_asset_path);
+                    else
+                        ResourceMgr::Get().Load<Render::Mesh>(asset->_asset_path);
+                }
 
                 auto mesh = asset->As<Render::Mesh>();
                 if (mesh == nullptr)
                     return nullptr;
 
                 Ref<Render::RenderTexture> preview;
-                AssetPreviewGenerator::GeneratorMeshSnapshot(512u, 512u, mesh, preview);
+                AssetPreviewGenerator::GeneratorMeshSnapshot(AssetPreviewGenerator::kDynamicPreviewSize,
+                                                              AssetPreviewGenerator::kDynamicPreviewSize, mesh, preview);
                 return std::static_pointer_cast<Render::Texture>(preview);
             }
 
             Ref<Render::Texture> GenerateSpritePreview(Asset *asset)
             {
-                if (asset == nullptr || asset->_p_obj == nullptr)
+                if (asset == nullptr)
                     return nullptr;
+
+                if (asset->_p_obj == nullptr)
+                    ResourceMgr::Get().Load<Render::Sprite>(asset->_asset_path);
 
                 auto sprite = asset->As<Render::Sprite>();
                 if (sprite == nullptr)
                     return nullptr;
 
                 Ref<Render::RenderTexture> preview;
-                AssetPreviewGenerator::GeneratorSpriteSnapshot(256u, 256u, sprite, preview);
+                AssetPreviewGenerator::GeneratorSpriteSnapshot(AssetPreviewGenerator::kDynamicPreviewSize,
+                                                               AssetPreviewGenerator::kDynamicPreviewSize, sprite, preview);
+                return std::static_pointer_cast<Render::Texture>(preview);
+            }
+
+            Ref<Render::Texture> GenerateMaterialPreview(Asset *asset)
+            {
+                if (asset == nullptr)
+                    return nullptr;
+
+                if (asset->_p_obj == nullptr)
+                    ResourceMgr::Get().Load<Render::Material>(asset->_asset_path);
+
+                auto material = asset->As<Render::Material>();
+                if (material == nullptr)
+                    return nullptr;
+
+                Ref<Render::RenderTexture> preview;
+                AssetPreviewGenerator::GeneratorMaterialSnapshot(AssetPreviewGenerator::kDynamicPreviewSize,
+                                                                 AssetPreviewGenerator::kDynamicPreviewSize, material,
+                                                                 preview);
                 return std::static_pointer_cast<Render::Texture>(preview);
             }
 
@@ -69,8 +102,10 @@ namespace Ailu
         AssetTypeRegistry::AssetTypeRegistry()
         {
             RegisterPreview(Render::Mesh::StaticType(), GenerateMeshPreview);
+            RegisterPreview(Render::SkeletonMesh::StaticType(), GenerateMeshPreview);
             RegisterPreview(Render::Sprite::StaticType(), GenerateSpritePreview);
             RegisterPreview(Render::Texture2D::StaticType(), GetTexturePreview);
+            RegisterPreview(Render::Material::StaticType(), GenerateMaterialPreview);
 
             RegisterCreator({
                 "New Scene", "Create Scene", "NewScene", "Scene already exists.", L".almap",

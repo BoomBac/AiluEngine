@@ -10,6 +10,7 @@
 namespace Ailu
 {
     using Render::Mesh;
+    using Render::SkeletonMesh;
     class FbxParser : public IMeshParser
     {
     public:
@@ -18,6 +19,7 @@ namespace Ailu
         virtual ~FbxParser();
         void Parser(const WString &sys_path, const MeshImportSetting &import_setting) final;
         const List<Ref<AnimationClip>> &GetAnimationClips() const final { return _loaded_anims; }
+        Ref<SkeletonAsset> GetSkeletonAsset() const final { return _skeleton_asset; }
         void GetMeshes(List<Ref<Mesh>> &out_mesh) final
         {
             out_mesh = std::move(_loaded_meshes);
@@ -37,8 +39,10 @@ namespace Ailu
 
         void ParserFbxNode(FbxNode *node, Queue<FbxNode *> &mesh_node, Queue<FbxNode *> &skeleton_node);
         void ParserSkeleton(FbxNode *node, Skeleton &sk);
+        void BuildSkeletonBindPose(Queue<FbxNode *> mesh_nodes, Skeleton &sk);
+        void BuildMeshBindTransform(FbxNode *node, SkeletonMesh *skeleton_mesh);
         bool ParserMesh(FbxNode *node, List<Ref<Mesh>> &loaded_meshes);
-        bool ParserAnimation(FbxNode *node, Skeleton &sk);
+        bool ParserAnimation(Skeleton &sk);
         bool ReadNormal(fbxsdk::FbxNode *node, Vector<Vector3f> &normals);
         bool ReadVertex(fbxsdk::FbxNode *node, Vector<Vector3f>& positions, Vector<Vector4f>& weights, Vector<Vector4D<u32>>& bone_indices);
         bool ReadUVs(const fbxsdk::FbxMesh &fbx_mesh, Vector<Vector<Vector2f>> &uvs);
@@ -67,6 +71,9 @@ namespace Ailu
         List<Ref<Mesh>> _loaded_meshes;
         WString _cur_file_sys_path;
         Skeleton _cur_skeleton;
+        Ref<SkeletonAsset> _skeleton_asset;
+        Map<u16, FbxAMatrix> _skeleton_bind_globals;
+        Map<u16, FbxNode *> _skeleton_joint_nodes;
         MeshImportSetting _import_setting;
         //Record the location and its corresponding control point index,
         //when the normal mapping method is control point, we need to get the normal based on this information to generate the index mesh
@@ -76,7 +83,6 @@ namespace Ailu
         FbxTime _start_time;
         FbxTime _end_time;
         FbxAMatrix _cur_node_transform;
-
         inline static TimeMgr _time_mgr{};
     };
 }// namespace Ailu

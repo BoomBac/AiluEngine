@@ -1,0 +1,14 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "aca06c5f-4c83-405b-9924-4d89f480980f",
+        "_asset_type": "Ailu::Render::Texture2D",
+        "_asset_name": "SkeletonAsset"
+    },
+    "_file": "SkeletonAsset.png",
+    "_import_setting": {
+        "_is_sRGB": true,
+        "_generate_mipmap": true,
+        "_is_readable": false
+    }
+}

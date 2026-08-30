@@ -33,10 +33,15 @@ namespace Ailu
         if (sprite._guid == Guid::EmptyGuid())
         {
             component->_sprite = nullptr;
+            component->_sprite_guid = Guid::EmptyGuid();
             return;
         }
         const Asset *asset = ResourceMgr::Get().GetAsset(ResourceMgr::Get().GuidToAssetPath(sprite._guid));
-        if (asset != nullptr) component->_sprite = asset->As<Render::Sprite>();
+        if (asset != nullptr)
+        {
+            component->_sprite = asset->As<Render::Sprite>();
+            component->_sprite_guid = sprite._guid;
+        }
     }
     bool ScriptSpriteRenderer::IsVisible() const
     {

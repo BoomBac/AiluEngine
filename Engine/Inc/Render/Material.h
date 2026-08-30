@@ -11,6 +11,7 @@
 #include "Framework/Core/Containers/List.h"
 #include "Framework/Core/Containers/Queue.h"
 #include "Framework/Core/Containers/Array.h"
+#include "Framework/Core/Delegate.h"
 #include "Objects/Object.h"
 #include "Shader.h"
 #include "Texture.h"
@@ -26,6 +27,77 @@ namespace Ailu::Render
 {
     class FrameAllocator;
     struct FrameUploadAllocation;
+
+    enum class ETextureUsage : u8
+    {
+        kAlbedo = 0,
+        kNormal,
+        kEmission,
+        kRoughness,
+        kMetallic,
+        kSpecular,
+        kAnisotropy,
+        kNone
+    };
+
+    AENUM()
+    enum class EMaterialID
+    {
+        kStandard,
+        kSubsurface,
+        kChecker
+    };
+
+    AENUM()
+    enum class ESurfaceType
+    {
+        kOpaque,
+        kTransparent,
+        kAlphaTest
+    };
+
+    // Standard Lit 是 shader/property 约定，而不是独立的 Material C++ 类型。
+    // 该结构集中描述标准 Lit 材质的属性命名与 sampler mask 位约定。
+    struct StandardMaterialProperty
+    {
+        struct Info
+        {
+            String _group_name;
+            String _tex_name;
+            String _value_name;
+            u16 _mask_flag;
+        };
+        inline static const Info kAlbedo{"Albedo", "_AlbedoTex", "_AlbedoValue", 1};
+        inline static const Info kNormal{"Normal", "_NormalTex", "_NormalValue", 2};
+        inline static const Info kEmission{"Emission", "_EmissionTex", "_EmissionValue", 4};
+        inline static const Info kRoughness{"Roughness", "_RoughnessMetallicTex", "_RoughnessValue", 8};
+        inline static const Info kMetallic{"Metallic", "_RoughnessMetallicTex", "_MetallicValue", 8};
+        inline static const Info kSpecular{"Specular", "_SpecularTex", "_SpecularValue", 16};
+        inline static const Info kAnisotropy{"Anisotropy", "_AnisotropyTex", "_Anisotropy", 32};
+        static const Info &GetInfoByUsage(ETextureUsage usage)
+        {
+            switch (usage)
+            {
+                case ETextureUsage::kAlbedo:
+                    return kAlbedo;
+                case ETextureUsage::kNormal:
+                    return kNormal;
+                case ETextureUsage::kEmission:
+                    return kEmission;
+                case ETextureUsage::kRoughness:
+                    return kRoughness;
+                case ETextureUsage::kMetallic:
+                    return kMetallic;
+                case ETextureUsage::kSpecular:
+                    return kSpecular;
+                case ETextureUsage::kAnisotropy:
+                    return kAnisotropy;
+                default:
+                    break;
+            }
+            return kAlbedo;
+        }
+    };
 
     ACLASS()
     class AILU_API Material : public Object
@@ -69,7 +141,13 @@ namespace Ailu::Render
         Material(Material &&other) noexcept;
 
         ~Material();
+        // 创建不关联资产的运行时材质实例。
+        Ref<Material> CreateInstance() const;
+        // 创建一个使用标准 Lit shader 的 Material，等价于旧的 StandardMaterial("name")
+        static Ref<Material> CreateStandard(String name);
+        bool IsStandardLit() const;
         void ChangeShader(Shader *shader);
+        void SetActiveShader(Shader *shader);
         void SetFloat(const String &name, const float &f);
         void SetFloat(ShaderPropertyId property_id, const float &f);
         void SetInt(const String &name, i32 value);
@@ -101,6 +179,8 @@ namespace Ailu::Render
         virtual void SetTexture(ShaderPropertyId property_id, Texture *texture);
         virtual void SetTexture(const String &name, const WString &texture_path);
         virtual void SetTexture(const String &name, RTHandle texture);
+        //标准材质纹理绑定，自动维护 _SamplerMask
+        void SetTexture(ETextureUsage usage, Texture *tex);
         //开启一个关键字并关闭同组的其他关键字
         void EnableKeyword(const String &keyword);
         void DisableKeyword(const String &keyword);
@@ -108,13 +188,26 @@ namespace Ailu::Render
                                            const HashMap<ShaderPropertyId, CommandResourceBinding> *command_resources = nullptr,
                                            CommandRenderingStatesData *statistics = nullptr);
         [[nodiscard]] Shader *GetShader() const { return _p_shader; };
+        [[nodiscard]] Shader *GetActiveShader() const { return _p_active_shader; };
+        static ShaderPropertyId SurfacePropertyId() { return ShaderPropertyRegistry::Get().Intern("_surface"); }
+        DECLARE_EVENT_ROUTER(on_property_changed, ShaderPropertyId);
         bool IsReadyForDraw(u16 pass_index = 0) const;
+        [[nodiscard]] const Guid &ShaderGuid() const { return _shader_guid; }
+        void SetShaderGuid(const Guid &guid) { _shader_guid = guid; }
+        void SetTextureGuid(const String &name, const Guid &guid) { _texture_guids[name] = guid; }
+        [[nodiscard]] const Guid &TextureGuid(const String &name) const
+        {
+            auto iter = _texture_guids.find(name);
+            return iter != _texture_guids.end() ? iter->second : Guid::EmptyGuid();
+        }
+        [[nodiscard]] const Map<String, Guid> &TextureGuids() const { return _texture_guids; }
         List<std::tuple<String, float>> GetAllFloatValue();
         List<std::tuple<String, Vector4f>> GetAllVectorValue();
         List<std::tuple<String, Vector4Int>> GetAllIntVectorValue();
         List<std::tuple<String, u32>> GetAllUintValue();
         Vector<ShaderPropertyInfo *> &GetShaderProperty() { return _prop_views; };
         ShaderPropertyInfo *GetShaderProperty(const String &name);
+        ShaderPropertyInfo *GetShaderProperty(ShaderPropertyId property_id);
         //根据材质存储的关键字和传入shader的关键字，为每个Pass构建合法的关键字序列
         void ConstructKeywords(Shader *shader);
         /// 构造 drawcmd时调用，将当前状态推入队列,返回材质cbuf的绑定槽
@@ -128,6 +221,13 @@ namespace Ailu::Render
         u32 PropertyVersion() const { return _property_data_version + _resource_binding_version; }
         std::set<String>& SavedKeyworkds() { return _all_keywords; }
         virtual void Construct(bool first_time);
+        ESurfaceType SurfaceType() const;
+        void SurfaceType(ESurfaceType value);
+        EMaterialID MaterialID() const;
+        void MaterialID(EMaterialID value);
+        const Texture *MainTex(ETextureUsage usage) const;
+        const ShaderPropertyInfo *MainProperty(ETextureUsage usage) const;
+        bool IsTextureUsed(ETextureUsage usage) const;
     protected:
 
     private:
@@ -164,10 +264,18 @@ namespace Ailu::Render
             u64 _frame_count = static_cast<u64>(-1);
             PropertyBlockView _block;
         };
+        struct CachedPropertyValue
+        {
+            Vector<u8> _data;
+        };
         Vector<BindingCacheEntry> _binding_cache;
         Array<Vector<FramePropertyBlockCache>, RenderConstants::kFrameCount + 1u> _frame_property_block_cache;
     private:
         void UpdateBindTexture(u16 pass_index, ShaderVariantHash new_hash);
+        void ResolveStandardMaterialLayout();
+        void MarkTextureUsed(std::initializer_list<ETextureUsage> usages, bool used);
+        void SyncPropertyValue(ShaderPropertyId property_id);
+        void RebuildShaderState(bool first_time);
     protected:
         void MarkPropertyDataDirty() { ++_property_data_version; }
         void MarkResourceBindingsDirty() { ++_resource_binding_version; }
@@ -186,12 +294,15 @@ namespace Ailu::Render
         u16 _standard_pass_index = -1;
         u16 _render_queue = 2000;
         Vector<u16> _mat_cbuf_per_pass_size;
-        Shader *_p_shader;
-        Shader *_p_active_shader;
+        Shader *_p_shader = nullptr;
+        Shader *_p_active_shader = nullptr;
+        Guid _shader_guid = Guid::EmptyGuid();
+        Map<String, Guid> _texture_guids;
         //运行时每个pass的关键字信息
         Vector<PassVariantInfo> _pass_variants;
         //跟随材质持久化的关键字
         std::set<String> _all_keywords;
+        Map<ShaderPropertyId, CachedPropertyValue> _property_values;
         Map<String, ShaderPropertyInfo> _properties;
         Vector<ShaderPropertyInfo *> _prop_views;
         Vector<PropertyBlock> _property_blocks;
@@ -202,108 +313,15 @@ namespace Ailu::Render
         //非shader使用的变量
         Map<String, u32> _common_uint_property;
         Map<String, f32> _common_float_property;
+        Map<String, Vector4f> _common_vector_property;
         ECullMode _cull_mode = ECullMode::kBack;
-    };
-
-    enum class ETextureUsage : u8
-    {
-        kAlbedo = 0,
-        kNormal,
-        kEmission,
-        kRoughness,
-        kMetallic,
-        kSpecular,
-        kAnisotropy,
-        kNone
-    };
-
-    AENUM()
-    enum class EMaterialID
-    {
-        kStandard,
-        kSubsurface,
-        kChecker
-    };
-
-    AENUM()
-    enum class ESurfaceType
-    {
-        kOpaque,
-        kTransparent,
-        kAlphaTest
-    };
-
-    ACLASS()
-    class AILU_API StandardMaterial : public Material
-    {
-        GENERATED_BODY()
-    public:
-        struct StandardPropertyName
-        {
-            struct StandardPropertyNameInfo
-            {
-                String _group_name;
-                String _tex_name;
-                String _value_name;
-                u16 _mask_flag;
-            };
-            inline static const StandardPropertyNameInfo kAlbedo{"Albedo", "_AlbedoTex", "_AlbedoValue", 1};
-            inline static const StandardPropertyNameInfo kNormal{"Normal", "_NormalTex", "_NormalValue", 2};
-            inline static const StandardPropertyNameInfo kEmission{"Emission", "_EmissionTex", "_EmissionValue", 4};
-            inline static const StandardPropertyNameInfo kRoughness{"Roughness", "_RoughnessMetallicTex", "_RoughnessValue", 8};
-            inline static const StandardPropertyNameInfo kMetallic{"Metallic", "_RoughnessMetallicTex", "_MetallicValue", 8};
-            inline static const StandardPropertyNameInfo kSpecular{"Specular", "_SpecularTex", "_SpecularValue", 16};
-            inline static const StandardPropertyNameInfo kAnisotropy{"Anisotropy", "_AnisotropyTex", "_Anisotropy", 32};
-            static const StandardPropertyNameInfo &GetInfoByUsage(ETextureUsage usage)
-            {
-                switch (usage)
-                {
-                    case ETextureUsage::kAlbedo:
-                        return kAlbedo;
-                        break;
-                    case ETextureUsage::kNormal:
-                        return kNormal;
-                        break;
-                    case ETextureUsage::kEmission:
-                        return kEmission;
-                        break;
-                    case ETextureUsage::kRoughness:
-                        return kRoughness;
-                    case ETextureUsage::kMetallic:
-                        return kMetallic;
-                        break;
-                    case ETextureUsage::kSpecular:
-                        return kSpecular;
-                    case ETextureUsage::kAnisotropy:
-                        return kAnisotropy;
-                    default:
-                        break;
-                }
-                return kAlbedo;
-            }
-        };
-        StandardMaterial() = default;
-        explicit StandardMaterial(String name);
-        void Construct(bool first_time) final;
-        ~StandardMaterial();
-        void MarkTextureUsed(std::initializer_list<ETextureUsage> use_infos, bool b_use);
-        bool IsTextureUsed(ETextureUsage use_info);
-        virtual void SetTexture(const String &name, Texture *texture);
-        virtual void SetTexture(const String &name, const WString &texture_path);
-        virtual void SetTexture(const String &name, RTHandle texture);
-        void SetTexture(ETextureUsage usage, Texture *tex);
-        const Texture *MainTex(ETextureUsage usage) const;
-        const ShaderPropertyInfo &MainProperty(ETextureUsage usage);
-        const ESurfaceType &SurfaceType() const { return _surface; }
-        void SurfaceType(const ESurfaceType &value);
-        const EMaterialID &MaterialID() const { return _material_id; }
-        void MaterialID(const EMaterialID &value);
-
     private:
         ESurfaceType _surface = ESurfaceType::kOpaque;
         EMaterialID _material_id = EMaterialID::kStandard;
         u16 _sampler_mask_offset = 0u;
         u16 _material_id_offset = 0u;
+        u32 _sampler_mask = 0u;
+        bool _is_standard_lit = false;
     };
 }// namespace Ailu
 

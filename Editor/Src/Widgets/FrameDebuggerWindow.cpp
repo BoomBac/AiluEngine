@@ -6,6 +6,7 @@
 #include "UI/Container.h"
 #include "UI/UISlot.h"
 #include "Framework/Common/Log.h"
+#include "Render/CoreType.h"
 #include <format>
 
 using namespace Ailu::Render::FrameDebugger;

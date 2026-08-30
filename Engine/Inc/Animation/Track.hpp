@@ -126,7 +126,7 @@ namespace Ailu
         inline void Neighborhood(const Quaternion &a, Quaternion &b)
         {
             if (Quaternion::Dot(a, b) < 0)
-                b = -b;
+                b = Quaternion(-b.x, -b.y, -b.z, -b.w);
         }
         inline void Neighborhood(const VectorFrame& a,VectorFrame& b){}
         inline void Neighborhood(const QuaternionFrame& a,QuaternionFrame& b)
@@ -167,7 +167,10 @@ namespace Ailu
         }
         inline Quaternion Lerp(const Quaternion & a,const Quaternion& b,f32 t)
         {
-            return Math::Lerp(a,b,t);
+            Quaternion end = b;
+            if (Quaternion::Dot(a, end) < 0.0f)
+                end = Quaternion(-end.x, -end.y, -end.z, -end.w);
+            return Math::Lerp(a, end, t);
         }
         inline QuaternionFrame Lerp(const QuaternionFrame & a,const QuaternionFrame& b,f32 t)
         {
@@ -198,40 +201,44 @@ namespace Ailu
     template<typename T, u32 N>
     f32 Track<T, N>::GetEndTime()
     {
-        return _frames.back()._time;
+        return _frames.empty() ? 0.0f : _frames.back()._time;
     }
     template<typename T, u32 N>
     f32 Track<T, N>::GetStartTime()
     {
-        return _frames.front()._time;
+        return _frames.empty() ? 0.0f : _frames.front()._time;
     }
     template<typename T, u32 N>
     i32 Track<T, N>::FrameIndex(f32 time, bool is_looping)
     {
+        if (_frames.empty())
+            return -1;
+        if (_frames.size() == 1u)
+            return 0;
         if (is_looping)
         {
             f32 start_time = _frames[0]._time;
             f32 end_time = _frames[_frames.size() - 1]._time;
             f32 duration = end_time - start_time;
-            time = fmodf(time - start_time, end_time-start_time) ;
+            if (duration <= 0.0f)
+                return 0;
+            time = fmodf(time - start_time, duration);
             if (time < 0.0f)
-                time += end_time - start_time;
+                time += duration;
             time += start_time;
         }
         else
         {
             if (time <= _frames[0]._time)
                 return 0;
-            if (time >= _frames[_frames.size() - 2]._time) //插值需要最后一帧的数据
+            if (time >= _frames.back()._time)
                 return (u32)_frames.size() - 1;
         }
-        for (i32 i = (int)_frames.size() - 1; i >= 0; --i)
-        {
-            if (time > _frames[i]._time)
-                //return i + 1;
-                return i;
-        }
-        return 0;
+        const auto it = std::lower_bound(_frames.begin(), _frames.end(), time,
+                                         [](const Frame<N> &frame, f32 value) { return frame._time < value; });
+        if (it == _frames.begin())
+            return 0;
+        return static_cast<i32>(std::distance(_frames.begin(), it) - 1);
     }
     template<typename T, u32 N>
     f32 Track<T, N>::AdjustTimeToFitTrack(f32 time, bool is_looping)
@@ -307,14 +314,16 @@ namespace Ailu
     T Track<T, N>::EvaluateLinear(f32 time, bool is_looping)
     {
         i32 cur_frame = FrameIndex(time, is_looping);
-        if (cur_frame < 0 || cur_frame >= (i32)_frames.size() - 1)
+        if (cur_frame < 0)
             return T();
+        if (cur_frame >= (i32)_frames.size() - 1)
+            return _frames.back();
         i32 next_frame = cur_frame + 1;
         f32 track_time = AdjustTimeToFitTrack(time, is_looping);
         f32 cur_time = _frames[cur_frame]._time;
         f32 frame_delta = _frames[next_frame]._time - cur_time;
         if (frame_delta <= 0.0f)
-            return T();
+            return _frames[cur_frame];
         f32 t = (track_time - cur_time) / frame_delta;
         T start = _frames[cur_frame];//Cast(&_frames[cur_frame]._value[0]);
         T end = _frames[next_frame];//Cast(&_frames[next_frame]._value[0]);
@@ -324,14 +333,16 @@ namespace Ailu
     T Track<T, N>::EvaluateCubic(f32 time, bool is_looping)
     {
         i32 cur_frame = FrameIndex(time, is_looping);
-        if (cur_frame < 0 || cur_frame >= (i32)_frames.size() - 1)
+        if (cur_frame < 0)
             return T();
+        if (cur_frame >= (i32)_frames.size() - 1)
+            return _frames.back();
         i32 next_frame = cur_frame + 1;
         f32 track_time = AdjustTimeToFitTrack(time, is_looping);
         f32 cur_time = _frames[cur_frame]._time;
         f32 frame_delta = _frames[next_frame]._time - cur_time;
         if (frame_delta <= 0.0f)
-            return T();
+            return _frames[cur_frame];
         f32 t = (track_time - cur_time) / frame_delta;
         u64 flt_size = sizeof(f32);
         T p1 = _frames[cur_frame];//Cast(&_frames[cur_frame]._value[0]);

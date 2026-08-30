@@ -3,6 +3,8 @@
 #define __ANIMATION_CLIP_EDITOR_H__
 
 #include "Animation/AnimationEvent.h"
+#include "Animation/AnimationClipPreview.h"
+#include "Animation/AnimationTimeline.h"
 #include "Animation/Clip.h"
 #include "Editors/AssetEditor.h"
 #include "UI/Container.h"
@@ -14,6 +16,7 @@ namespace Ailu
     namespace Render
     {
         class Sprite;
+        class SkeletonMesh;
     }
 
     namespace UI
@@ -24,6 +27,7 @@ namespace Ailu
         class HorizontalBox;
         class InputBlock;
         class Image;
+        class ObjectAssetDropdown;
         class Text;
         class VerticalBox;
     }
@@ -37,9 +41,6 @@ namespace Ailu
             ~AnimationClipEditor() override = default;
 
             void Update(f32 dt) override;
-            using AssetEditor::Open;
-            void Open(AnimationClip *clip);
-            void Close();
 
         private:
             void MarkDirty();
@@ -52,6 +53,7 @@ namespace Ailu
             void RemoveFrame(u32 index);
             void RemoveEvent(u32 index);
             void ShowSpritePicker(u32 frame_index, UI::UIElement *anchor);
+            void SelectJoint(u16 joint_index);
 
             Vector<SpriteKeyFrame> &Frames() { return _clip->SpriteTrack().Frames(); }
             const Vector<SpriteKeyFrame> &Frames() const { return _clip->SpriteTrack().Frames(); }
@@ -65,6 +67,8 @@ namespace Ailu
             static UI::InputBlock *AddFloatInput(UI::UIElement *parent, const String &label, f32 value,
                                                  const std::function<void(f32)> &on_changed);
 
+            bool OnOpen() override;
+            void OnClose() override;
             void OnBeforeSave() override;
             void OnAssetSaved() override;
             void OnAssetReloaded() override;
@@ -76,6 +80,8 @@ namespace Ailu
 
             UI::VerticalBox *_timeline_root = nullptr;
             UI::VerticalBox *_events_root = nullptr;
+            AnimationTimeline *_animation_timeline = nullptr;
+            Scope<AnimationClipPreview> _animation_preview;
             UI::Image *_preview_image = nullptr;
             UI::Text *_txt_preview_time = nullptr;
             Ref<Render::Sprite> _preview_sprite;
@@ -86,10 +92,18 @@ namespace Ailu
             UI::InputBlock *_input_rate = nullptr;
             UI::InputBlock *_input_frame_duration = nullptr;
             UI::CheckBox *_check_looping = nullptr;
+            UI::CheckBox *_check_skeleton = nullptr;
+            UI::ObjectAssetDropdown *_preview_mesh_dropdown = nullptr;
             UI::Button *_btn_play = nullptr;
             UI::Button *_btn_stop = nullptr;
             String _last_edit_snapshot;
             bool _is_refreshing_ui = false;
+            Guid _preview_mesh_guid = Guid::EmptyGuid();
+            Ref<Render::SkeletonMesh> _preview_mesh;
+            bool _show_skeleton = false;
+            u16 _selected_joint = Joint::kInvalidJointIndex;
+            Vector2f _preview_mouse_down_position = Vector2f::kZero;
+            bool _preview_camera_dragged = false;
         };
     }// namespace Editor
 }// namespace Ailu

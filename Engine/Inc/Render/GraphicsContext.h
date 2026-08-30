@@ -1,9 +1,8 @@
 #pragma once
 #ifndef __GFX_CONTEXT_H__
 #define __GFX_CONTEXT_H__
-#include "GfxCommand.h"
 #include "Framework/Core/CoreMinimal.h"
-#include "GpuResource.h"
+#include "Framework/Core/Containers/Vector.h"
 #include <functional>
 
 
@@ -20,6 +19,8 @@ namespace Ailu
         class ComputeShader;
         class RayTracingShader;
         class RHICommandBuffer;
+        struct GfxCommand;
+        struct UploadParams;
         class AILU_API GraphicsContext
         {
             friend class GpuCommandWorker;

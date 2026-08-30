@@ -4,6 +4,8 @@
 #include "Render/CommandBuffer.h"
 #include <Framework/Common/ResourceMgr.h>
 #include <Render/Gizmo.h>
+#include <Render/GraphicsContext.h>
+#include <Render/Material.h>
 #include <Render/Renderer.h>
 #include "Physics/2D/Physics2DSystem.h"
 #include "Render/RenderGraph/RenderGraph.h"

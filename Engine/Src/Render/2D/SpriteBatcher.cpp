@@ -1,6 +1,8 @@
 #include "Render/2D/SpriteBatcher.h"
+#include "Render/Material.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Render/CommandBuffer.h"
+#include "Render/GraphicsContext.h"
 #include "Render/PipelineState.h"
 #include "Render/ShaderInterop.h"
 #include "pch.h"

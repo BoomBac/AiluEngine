@@ -418,6 +418,15 @@ namespace Ailu
             }
         }
 
+        void Register::WaitForSystems() const
+        {
+            for (const auto &system : _systems)
+            {
+                if (system)
+                    system->WaitFor();
+            }
+        }
+
         // ---------------------------------------------------------------------------
         // Batch operations
         // ---------------------------------------------------------------------------

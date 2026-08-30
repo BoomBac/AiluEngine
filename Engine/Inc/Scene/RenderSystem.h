@@ -2,7 +2,17 @@
 #ifndef __RENDER_SYSTEM_H__
 #define __RENDER_SYSTEM_H__
 #include "Entity.h"
-#include "Render/Material.h"
+#include "Render/AlgFormat.h"
+
+namespace Ailu
+{
+    namespace Render
+    {
+        class Material;
+        class CubeMap;
+    }
+}
+
 namespace Ailu
 {
     namespace ECS

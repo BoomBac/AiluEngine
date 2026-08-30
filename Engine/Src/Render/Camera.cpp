@@ -1,4 +1,5 @@
 #include "Render/Camera.h"
+#include "Render/GraphicsContext.h"
 #include "Render/Gizmo.h"
 #include "Render/Renderer.h"
 #include "Scene/Scene.h"

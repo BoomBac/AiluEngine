@@ -26,6 +26,7 @@
 #include "Render/Camera.h"
 #include "Render/AssetPreviewGenerator.h"
 #include "Render/CommonRenderPipeline.h"
+#include "Render/Material.h"
 #include "Render/Renderer.h"
 
 #include "Framework/Parser/TextParser.h"

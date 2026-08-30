@@ -140,6 +140,7 @@ namespace Ailu
             void OnRowClicked(TreeItemId item);
             void OnRowDoubleClicked(TreeItemId item);
             void OnRowContextMenu(TreeItemId item, Vector2f pos);
+            void HandleKeyDown(UIEvent &event);
             void HandleDrop(const DragPayload& payload, f32 x, f32 y, TreeItemId target);
             ETreeDropLocation ResolveDropLocation(TreeItemId target, f32 y) const;
             bool CanDropAt(TreeView *source_tree, TreeItemId source, TreeItemId target, ETreeDropLocation location) const;

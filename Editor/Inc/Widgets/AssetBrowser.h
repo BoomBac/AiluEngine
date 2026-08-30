@@ -66,6 +66,7 @@ namespace Ailu
             void UpdatePathButtons();
 
             void OpenAsset(Asset *asset);
+            void ShowDeleteSelectionConfirm(Vector2f popup_pos, Asset *fallback_asset = nullptr);
             void ShowBlankAreaContextMenu(Vector2f popup_pos);
             void ShowFolderContextMenu(const WString &folder_sys_path, Vector2f popup_pos, UI::UIElement *item_root, UI::Text *item_text);
             void ShowAssetContextMenu(Asset *asset, Vector2f popup_pos, UI::UIElement *item_root, UI::Text *item_text);

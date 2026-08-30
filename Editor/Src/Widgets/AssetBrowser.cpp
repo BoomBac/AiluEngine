@@ -1,6 +1,8 @@
 #include "Widgets/AssetBrowser.h"
 #include "Framework/Common/Allocator.hpp"
 
+#include "Animation/AnimationControllerAsset.h"
+#include "Animation/Clip.h"
 #include "Assets/AssetTypeRegistry.h"
 #include "Assets/PrefabAsset.h"
 #include "Assets/ScriptAsset.h"
@@ -15,7 +17,10 @@
 #include "Framework/Common/Utils.h"
 #include "Objects/JsonArchive.h"
 #include "Project/ProjectManager.h"
+#include "Render/2D/Sprite.h"
+#include "Render/Material.h"
 #include "Render/Mesh.h"
+#include "Render/Texture.h"
 #include "Scene/Scene.h"
 #include "UI/Basic.h"
 #include "UI/Container.h"
@@ -367,6 +372,11 @@ namespace Ailu
                 PasteClipboard();
                 return;
             }
+            if (Input::IsKeyJustPressed(EKey::kDELETE))
+            {
+                ShowDeleteSelectionConfirm(Input::GetGlobalMousePos());
+                return;
+            }
             if (!Input::IsKeyJustPressed(EKey::kF2))
                 return;
 
@@ -520,8 +530,10 @@ namespace Ailu
             const u32 entry_index = static_cast<u32>(&entry - _visible_entries.data());
             vb->OnMouseDown() += [this, folder_sys_path, item_path, entry_index, item_root = vb.get(), item_text = text](UI::UIEvent &e)
             {
-                SelectFolder(item_path, entry_index, item_root, item_text, e._key_code != EKey::kRBUTTON);
-                if (e._key_code != EKey::kRBUTTON)
+                const bool is_right_button = e._key_code == EKey::kRBUTTON;
+                if (!is_right_button || !IsSelected(item_path))
+                    SelectFolder(item_path, entry_index, item_root, item_text, !is_right_button);
+                if (!is_right_button)
                     return;
                 ShowFolderContextMenu(folder_sys_path, e._mouse_position, item_root, item_text);
                 e._is_handled = true;
@@ -578,8 +590,11 @@ namespace Ailu
             icon->_tint_color = tint;
             vb->OnMouseDown() += [this, asset, entry_index, item_root = vb.get(), item_text = text](UI::UIEvent &e)
             {
-                SelectAsset(asset, entry_index, item_root, item_text, e._key_code != EKey::kRBUTTON);
-                if (e._key_code != EKey::kRBUTTON)
+                const bool is_right_button = e._key_code == EKey::kRBUTTON;
+                const fs::path asset_path = fs::path(ResourceMgr::GetResSysPath(asset->_asset_path));
+                if (!is_right_button || !IsSelected(asset_path))
+                    SelectAsset(asset, entry_index, item_root, item_text, !is_right_button);
+                if (!is_right_button)
                     return;
                 ShowAssetContextMenu(asset, e._mouse_position, item_root, item_text);
                 e._is_handled = true;
@@ -656,8 +671,10 @@ namespace Ailu
             icon->SetTexture(AssetTypeRegistry::Get().GetIcon(entry._sub_asset_guid, sub_asset_type, sub_asset_object));
             root->OnMouseDown() += [this, entry, entry_index, item_root = root.get(), item_text = text](UI::UIEvent &e)
             {
-                SelectSubAsset(entry, entry_index, item_root, item_text, e._key_code != EKey::kRBUTTON);
-                if (e._key_code != EKey::kRBUTTON)
+                const bool is_right_button = e._key_code == EKey::kRBUTTON;
+                if (!is_right_button || !IsSelected(entry._sys_path, entry._sub_asset_guid))
+                    SelectSubAsset(entry, entry_index, item_root, item_text, !is_right_button);
+                if (!is_right_button)
                     return;
                 ShowAssetContextMenu(entry._asset, e._mouse_position, item_root, item_text);
                 e._is_handled = true;
@@ -880,7 +897,9 @@ namespace Ailu
                 return drag_data != nullptr ? drag_data->_assets : Vector<Asset *>();
             }
             if (payload._type == UI::EDragType::kMesh || payload._type == UI::EDragType::kScript ||
-                payload._type == UI::EDragType::kPrefab)
+                payload._type == UI::EDragType::kPrefab || payload._type == UI::EDragType::kTexture ||
+                payload._type == UI::EDragType::kMaterial || payload._type == UI::EDragType::kAsset ||
+                payload._type == UI::EDragType::kAnimation)
                 return {static_cast<Asset *>(payload._data)};
             return {};
         }
@@ -940,14 +959,24 @@ namespace Ailu
             {
                 Asset *dragged_asset = _asset_drag_data._assets.front();
                 drag_data = dragged_asset;
-                if (dragged_asset->_asset_type == StaticClass<Render::Mesh>())
+                if (dragged_asset->_asset_type == StaticClass<Render::Mesh>() ||
+                    dragged_asset->_asset_type == StaticClass<Render::SkeletonMesh>())
                     drag_type = UI::EDragType::kMesh;
                 else if (dragged_asset->_asset_type == ScriptAsset::StaticType())
                     drag_type = UI::EDragType::kScript;
                 else if (dragged_asset->_asset_type == PrefabAssetDocument::StaticType())
                     drag_type = UI::EDragType::kPrefab;
+                else if (dragged_asset->_asset_type == Render::Texture2D::StaticType())
+                    drag_type = UI::EDragType::kTexture;
+                else if (dragged_asset->_asset_type == Render::Material::StaticType())
+                    drag_type = UI::EDragType::kMaterial;
+                else if (dragged_asset->_asset_type == Render::Sprite::StaticType())
+                    drag_type = UI::EDragType::kAsset;
+                else if (dragged_asset->_asset_type == AnimationClip::StaticType() ||
+                         dragged_asset->_asset_type == AnimationControllerAsset::StaticType())
+                    drag_type = UI::EDragType::kAnimation;
                 else
-                    drag_data = &_asset_drag_data;
+                    drag_type = UI::EDragType::kAsset;
             }
             auto payload = UI::DragPayload{drag_type, drag_data};
             UI::DragDropManager::Get().BeginDrag(payload, display_name);
@@ -1196,6 +1225,29 @@ namespace Ailu
             EditorPopup::ShowActionMenuAt(popup_pos, actions);
         }
 
+        void AssetBrowser::ShowDeleteSelectionConfirm(Vector2f popup_pos, Asset *fallback_asset)
+        {
+            Vector<Asset *> assets = GetSelectedAssets();
+            if (assets.empty() && fallback_asset != nullptr)
+                assets.push_back(fallback_asset);
+            if (assets.empty())
+                return;
+
+            const String message = assets.size() == 1u ? std::format("Delete asset \"{}\"?", assets.front()->Name()) :
+                                                         std::format("Delete {} selected assets?", assets.size());
+            EditorPopup::ShowConfirmAt(popup_pos, message, [this, assets]()
+            {
+                bool deleted = false;
+                for (auto *asset: assets)
+                    deleted = _operations.DeleteAsset(asset) || deleted;
+                if (deleted)
+                {
+                    ClearSelection();
+                    _content_dirty = true;
+                }
+            });
+        }
+
         void AssetBrowser::ShowFolderContextMenu(const WString &folder_sys_path, Vector2f popup_pos, UI::UIElement *item_root,
                                                  UI::Text *item_text)
         {
@@ -1231,7 +1283,6 @@ namespace Ailu
             if (asset == nullptr)
                 return;
 
-            const String asset_name = asset->Name();
             Vector<PopupMenuAction> actions;
             if (AssetEditorRegistry::Get().CanOpen(asset->_asset_type))
             {
@@ -1250,14 +1301,9 @@ namespace Ailu
             {
                 _clipboard_assets = {asset};
             }});
-            actions.push_back({"Delete", [this, asset_name, asset, popup_pos]()
+            actions.push_back({"Delete", [this, asset, popup_pos]()
             {
-                EditorPopup::ShowConfirmAt(popup_pos, std::format("Delete asset \"{}\"?", asset_name),
-                                           [this, asset]()
-                                           {
-                                               if (_operations.DeleteAsset(asset))
-                                                   _content_dirty = true;
-                                           });
+                ShowDeleteSelectionConfirm(popup_pos, asset);
             }, true});
             EditorPopup::ShowActionMenuAt(popup_pos, actions);
         }

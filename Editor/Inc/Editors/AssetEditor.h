@@ -41,10 +41,6 @@ namespace Ailu
             virtual void OnAssetSaved() {}
             virtual void RefreshEditor() {}
 
-            // Transitional bridge for editors whose typed Open overload is still
-            // being migrated to AssetEditor::Open(Asset *).
-            void BindAsset(Asset *asset) { _asset = asset; }
-
             void RefreshTitle();
             void ShowClosePrompt();
 

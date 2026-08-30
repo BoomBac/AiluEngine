@@ -17,88 +17,146 @@ namespace Ailu::Render
         //AL_ASSERT(s_total_material_num < RenderConstants::kMaxMaterialDataCount);
         _name = name;
         _p_active_shader = _p_shader;
-        Construct(true);
-        shader->AddMaterialRef(this);
+        if (_p_active_shader != nullptr)
+        {
+            Construct(true);
+            _p_active_shader->AddMaterialRef(this);
+        }
         ++s_total_material_num;
     }
 
     Material &Material::operator=(const Material &other)
     {
-        //标准pass才会使用上面两个变量
-        _standard_pass_index = other._standard_pass_index;
-        _mat_cbuf_per_pass_size = other._mat_cbuf_per_pass_size;
-        _p_shader = other._p_shader;
-        _p_active_shader = other._p_active_shader;
-        for (auto &cbuf: other._property_blocks)
-        {
-            u32 buffer_size = cbuf._size;
-            _property_blocks.emplace_back(PropertyBlock());
-            _property_blocks.back()._data = AL_ALLOC_TAG(EMemoryTag::kRenderer, u8, buffer_size);
-            _property_blocks.back()._size = buffer_size;
-            memcpy(_property_blocks.back()._data, cbuf._data, buffer_size);
-        }
-        _bind_textures_by_id = other._bind_textures_by_id;
-        _bind_buffers_by_id = other._bind_buffers_by_id;
-        return *this;
+        if (this == &other)
+            return *this;
+        Material copy(other);
+        return *this = std::move(copy);
     }
 
     Material &Material::operator=(Material &&other) noexcept
     {
-        //标准pass才会使用上面两个变量
+        if (this == &other)
+            return *this;
+        if (_p_active_shader != nullptr)
+            _p_active_shader->RemoveMaterialRef(this);
         _name = other._name;
         _p_shader = other._p_shader;
         _p_active_shader = other._p_active_shader;
+        _shader_guid = other._shader_guid;
+        _texture_guids = std::move(other._texture_guids);
         _standard_pass_index = other._standard_pass_index;
+        _render_queue = other._render_queue;
         _mat_cbuf_per_pass_size = other._mat_cbuf_per_pass_size;
+        _pass_variants = std::move(other._pass_variants);
+        _all_keywords = std::move(other._all_keywords);
+        _property_values = std::move(other._property_values);
+        _properties = std::move(other._properties);
+        _prop_views = std::move(other._prop_views);
         _property_blocks = std::move(other._property_blocks);
-        other._property_blocks.clear();
+        _binding_cache.clear();
+        for (auto &cache : _frame_property_block_cache)
+            cache = {};
         _bind_textures_by_id = std::move(other._bind_textures_by_id);
-        other._bind_textures_by_id.clear();
         _bind_buffers_by_id = std::move(other._bind_buffers_by_id);
-        other._bind_buffers_by_id.clear();
+        _common_uint_property = std::move(other._common_uint_property);
+        _common_float_property = std::move(other._common_float_property);
+        _common_vector_property = std::move(other._common_vector_property);
+        _cull_mode = other._cull_mode;
+        _surface = other._surface;
+        _material_id = other._material_id;
+        _sampler_mask_offset = other._sampler_mask_offset;
+        _material_id_offset = other._material_id_offset;
+        _sampler_mask = other._sampler_mask;
+        _is_standard_lit = other._is_standard_lit;
+        _property_data_version = other._property_data_version;
+        _resource_binding_version = other._resource_binding_version;
+        other._p_shader = nullptr;
+        other._p_active_shader = nullptr;
         return *this;
     }
 
-    Material::Material(const Material &other)
+    Material::Material(const Material &other) : Material(other._p_shader, other._name)
     {
-        _name = other._name;
-        _p_shader = other._p_shader;
-        _p_active_shader = other._p_active_shader;
-        _standard_pass_index = other._standard_pass_index;
-        _mat_cbuf_per_pass_size = other._mat_cbuf_per_pass_size;
-        for (auto &cbuf: other._property_blocks)
+        if (_p_active_shader != other._p_active_shader)
         {
-            u32 buffer_size = cbuf._size;
-            _property_blocks.emplace_back(PropertyBlock());
-            _property_blocks.back()._data = AL_ALLOC_TAG(EMemoryTag::kRenderer, u8, buffer_size);
-            _property_blocks.back()._size = buffer_size;
-            memcpy(_property_blocks.back()._data, cbuf._data, buffer_size);
+            if (_p_active_shader != nullptr)
+                _p_active_shader->RemoveMaterialRef(this);
+            _p_active_shader = other._p_active_shader;
+            if (_p_active_shader != nullptr)
+                _p_active_shader->AddMaterialRef(this);
         }
+        _standard_pass_index = other._standard_pass_index;
+        _render_queue = other._render_queue;
+        _mat_cbuf_per_pass_size = other._mat_cbuf_per_pass_size;
+        _all_keywords = other._all_keywords;
+        _property_values = other._property_values;
+        _common_uint_property = other._common_uint_property;
+        _common_float_property = other._common_float_property;
+        _common_vector_property = other._common_vector_property;
+        _cull_mode = other._cull_mode;
+        _surface = other._surface;
+        _material_id = other._material_id;
+        _sampler_mask_offset = other._sampler_mask_offset;
+        _material_id_offset = other._material_id_offset;
+        _sampler_mask = other._sampler_mask;
+        _is_standard_lit = other._is_standard_lit;
         _bind_textures_by_id = other._bind_textures_by_id;
         _bind_buffers_by_id = other._bind_buffers_by_id;
+
+        _properties.clear();
+        _property_blocks.clear();
+        Construct(false);
+        _standard_pass_index = other._standard_pass_index;
+        _render_queue = other._render_queue;
+        _property_data_version = other._property_data_version;
+        _resource_binding_version = other._resource_binding_version;
     }
     Material::Material(Material &&other) noexcept
     {
+        _name = std::move(other._name);
         _p_shader = other._p_shader;
         _p_active_shader = other._p_active_shader;
+        _shader_guid = other._shader_guid;
+        _texture_guids = std::move(other._texture_guids);
         _standard_pass_index = other._standard_pass_index;
+        _render_queue = other._render_queue;
         _mat_cbuf_per_pass_size = other._mat_cbuf_per_pass_size;
+        _pass_variants = std::move(other._pass_variants);
+        _all_keywords = std::move(other._all_keywords);
+        _property_values = std::move(other._property_values);
+        _properties = std::move(other._properties);
+        _prop_views = std::move(other._prop_views);
         _property_blocks = std::move(other._property_blocks);
-        other._property_blocks.clear();
         _bind_textures_by_id = std::move(other._bind_textures_by_id);
-        other._bind_textures_by_id.clear();
         _bind_buffers_by_id = std::move(other._bind_buffers_by_id);
-        other._bind_buffers_by_id.clear();
+        _common_uint_property = std::move(other._common_uint_property);
+        _common_float_property = std::move(other._common_float_property);
+        _common_vector_property = std::move(other._common_vector_property);
+        _cull_mode = other._cull_mode;
+        _surface = other._surface;
+        _material_id = other._material_id;
+        _sampler_mask_offset = other._sampler_mask_offset;
+        _material_id_offset = other._material_id_offset;
+        _sampler_mask = other._sampler_mask;
+        _is_standard_lit = other._is_standard_lit;
+        _property_data_version = other._property_data_version;
+        _resource_binding_version = other._resource_binding_version;
+        other._p_shader = nullptr;
+        other._p_active_shader = nullptr;
     }
 
     Material::~Material()
     {
+        if (_p_active_shader != nullptr)
+            _p_active_shader->RemoveMaterialRef(this);
         --s_total_material_num;
     }
     MaterialDrawState Material::CaptureDrawState(u16 pass_index, u32 frame_slot, u64 frame_count, FrameAllocator &allocator,
                                                  const HashMap<ShaderPropertyId, CommandResourceBinding> *command_resources,
                                                  CommandRenderingStatesData *statistics)
     {
+        if (_p_active_shader == nullptr || pass_index >= _pass_variants.size())
+            return {};
         AL_ASSERT(pass_index < _pass_variants.size());
         const auto variant_hash = _pass_variants[pass_index]._variant_hash;
         const ShaderBindingLayout *binding_layout = _p_active_shader->GetBindingLayout(pass_index, variant_hash);
@@ -383,18 +441,46 @@ namespace Ailu::Render
 
     void Material::ChangeShader(Shader *shader)
     {
-        _p_shader->RemoveMaterialRef(this);
+        if (_p_shader == shader && _p_active_shader == shader)
+            return;
+        Shader *old_active_shader = _p_active_shader;
+        if (old_active_shader != nullptr)
+            old_active_shader->RemoveMaterialRef(this);
         _p_shader = shader;
-        _p_shader->AddMaterialRef(this);
-        _p_active_shader->RemoveMaterialRef(this);
         _p_active_shader = shader;
-        _p_active_shader->AddMaterialRef(this);
-        Construct(false);
+        if (_p_active_shader != nullptr)
+            _p_active_shader->AddMaterialRef(this);
+        if (_p_shader != nullptr)
+            Construct(false);
+        ResetMaterialCaches();
+    }
+
+    void Material::SetActiveShader(Shader *shader)
+    {
+        if (_p_active_shader == shader)
+            return;
+        if (_p_active_shader != nullptr)
+            _p_active_shader->RemoveMaterialRef(this);
+        _p_active_shader = shader;
+        if (_p_active_shader != nullptr)
+        {
+            _p_active_shader->AddMaterialRef(this);
+            Construct(false);
+        }
+        else
+        {
+            _pass_variants.clear();
+            _property_blocks.clear();
+            _properties.clear();
+            _prop_views.clear();
+        }
         ResetMaterialCaches();
     }
 
     bool Material::IsReadyForDraw(u16 pass_index) const
     {
+        if (_p_active_shader == nullptr || pass_index >= _pass_variants.size())
+            return false;
         return _p_active_shader->GetVariantState(pass_index, _pass_variants[pass_index]._variant_hash) == EShaderVariantState::kReady;
     }
 
@@ -406,9 +492,9 @@ namespace Ailu::Render
     void Material::SetFloat(ShaderPropertyId property_id, const float &f)
     {
         bool is_changed = false;
-        for (u16 pass_index = 0u; pass_index < _p_shader->_passes.size(); ++pass_index)
+        for (u16 pass_index = 0u; pass_index < _p_active_shader->_passes.size(); ++pass_index)
         {
-            const auto *layout = _p_shader->GetBindingLayout(pass_index, _pass_variants[pass_index]._variant_hash);
+            const auto *layout = _p_active_shader->GetBindingLayout(pass_index, _pass_variants[pass_index]._variant_hash);
             const auto *binding = layout == nullptr ? nullptr : layout->Find(property_id);
             if (binding != nullptr && binding->_resource_type & EBindResDescType::kCBufferFloat)
             {
@@ -421,7 +507,11 @@ namespace Ailu::Render
             }
         }
         if (is_changed)
+        {
+            SyncPropertyValue(property_id);
             MarkPropertyDataDirty();
+            _on_property_changed_router.Invoke(property_id);
+        }
     }
 
     void Material::SetInt(const String &name, i32 value)
@@ -433,9 +523,9 @@ namespace Ailu::Render
     void Material::SetInt(ShaderPropertyId property_id, i32 value)
     {
         bool is_changed = false;
-        for (u16 pass_index = 0u; pass_index < _p_shader->_passes.size(); ++pass_index)
+        for (u16 pass_index = 0u; pass_index < _p_active_shader->_passes.size(); ++pass_index)
         {
-            const auto *layout = _p_shader->GetBindingLayout(pass_index, _pass_variants[pass_index]._variant_hash);
+            const auto *layout = _p_active_shader->GetBindingLayout(pass_index, _pass_variants[pass_index]._variant_hash);
             const auto *binding = layout == nullptr ? nullptr : layout->Find(property_id);
             if (binding == nullptr)
                 continue;
@@ -460,7 +550,11 @@ namespace Ailu::Render
             }
         }
         if (is_changed)
+        {
+            SyncPropertyValue(property_id);
             MarkPropertyDataDirty();
+            _on_property_changed_router.Invoke(property_id);
+        }
     }
 
     void Material::SetVector(const String &name, const Vector4f &vector)
@@ -471,9 +565,9 @@ namespace Ailu::Render
     void Material::SetVector(ShaderPropertyId property_id, const Vector4f &vector)
     {
         bool is_changed = false;
-        for (u16 pass_index = 0u; pass_index < _p_shader->_passes.size(); ++pass_index)
+        for (u16 pass_index = 0u; pass_index < _p_active_shader->_passes.size(); ++pass_index)
         {
-            const auto *layout = _p_shader->GetBindingLayout(pass_index, _pass_variants[pass_index]._variant_hash);
+            const auto *layout = _p_active_shader->GetBindingLayout(pass_index, _pass_variants[pass_index]._variant_hash);
             const auto *binding = layout == nullptr ? nullptr : layout->Find(property_id);
             if (binding != nullptr && binding->_resource_type & EBindResDescType::kCBufferFloats)
             {
@@ -486,7 +580,11 @@ namespace Ailu::Render
             }
         }
         if (is_changed)
+        {
+            SyncPropertyValue(property_id);
             MarkPropertyDataDirty();
+            _on_property_changed_router.Invoke(property_id);
+        }
     }
 
     void Material::SetVector(const String &name, const Vector4Int &vector)
@@ -503,9 +601,9 @@ namespace Ailu::Render
     void Material::SetMatrix(ShaderPropertyId property_id, const Matrix4x4f &matrix)
     {
         bool is_changed = false;
-        for (u16 pass_index = 0u; pass_index < _p_shader->_passes.size(); ++pass_index)
+        for (u16 pass_index = 0u; pass_index < _p_active_shader->_passes.size(); ++pass_index)
         {
-            const auto *layout = _p_shader->GetBindingLayout(pass_index, _pass_variants[pass_index]._variant_hash);
+            const auto *layout = _p_active_shader->GetBindingLayout(pass_index, _pass_variants[pass_index]._variant_hash);
             const auto *binding = layout == nullptr ? nullptr : layout->Find(property_id);
             if (binding != nullptr && binding->_resource_type & EBindResDescType::kCBufferMatrix)
             {
@@ -518,7 +616,11 @@ namespace Ailu::Render
             }
         }
         if (is_changed)
+        {
+            SyncPropertyValue(property_id);
             MarkPropertyDataDirty();
+            _on_property_changed_router.Invoke(property_id);
+        }
     }
 
     float Material::GetFloat(const String &name)
@@ -528,9 +630,9 @@ namespace Ailu::Render
 
     float Material::GetFloat(ShaderPropertyId property_id)
     {
-        for (u16 pass_index = 0u; pass_index < _p_shader->_passes.size(); ++pass_index)
+        for (u16 pass_index = 0u; pass_index < _p_active_shader->_passes.size(); ++pass_index)
         {
-            const auto *layout = _p_shader->GetBindingLayout(pass_index, _pass_variants[pass_index]._variant_hash);
+            const auto *layout = _p_active_shader->GetBindingLayout(pass_index, _pass_variants[pass_index]._variant_hash);
             const auto *binding = layout == nullptr ? nullptr : layout->Find(property_id);
             if (binding != nullptr && binding->_resource_type & EBindResDescType::kCBufferFloat)
                 return *reinterpret_cast<float *>(_property_blocks[pass_index]._data + binding->_buffer_offset);
@@ -572,9 +674,9 @@ namespace Ailu::Render
 
     u32 Material::GetUint(ShaderPropertyId property_id)
     {
-        for (u16 pass_index = 0u; pass_index < _p_shader->_passes.size(); ++pass_index)
+        for (u16 pass_index = 0u; pass_index < _p_active_shader->_passes.size(); ++pass_index)
         {
-            const auto *layout = _p_shader->GetBindingLayout(pass_index, _pass_variants[pass_index]._variant_hash);
+            const auto *layout = _p_active_shader->GetBindingLayout(pass_index, _pass_variants[pass_index]._variant_hash);
             const auto *binding = layout == nullptr ? nullptr : layout->Find(property_id);
             if (binding != nullptr && binding->_resource_type & EBindResDescType::kCBufferUInt)
                 return *reinterpret_cast<u32 *>(_property_blocks[pass_index]._data + binding->_buffer_offset);
@@ -589,9 +691,9 @@ namespace Ailu::Render
 
     Vector4f Material::GetVector(ShaderPropertyId property_id)
     {
-        for (u16 pass_index = 0u; pass_index < _p_shader->_passes.size(); ++pass_index)
+        for (u16 pass_index = 0u; pass_index < _p_active_shader->_passes.size(); ++pass_index)
         {
-            const auto *layout = _p_shader->GetBindingLayout(pass_index, _pass_variants[pass_index]._variant_hash);
+            const auto *layout = _p_active_shader->GetBindingLayout(pass_index, _pass_variants[pass_index]._variant_hash);
             const auto *binding = layout == nullptr ? nullptr : layout->Find(property_id);
             if (binding != nullptr && binding->_resource_type & EBindResDescType::kCBufferFloats)
                 return *reinterpret_cast<Vector4f *>(_property_blocks[pass_index]._data + binding->_buffer_offset);
@@ -601,7 +703,27 @@ namespace Ailu::Render
 
     void Material::SetTexture(const String &name, Texture *texture)
     {
+        if (texture == nullptr)
+            _texture_guids[name] = Guid::EmptyGuid();
+        else if (Asset *linked_asset = ResourceMgr::Get().GetLinkedAsset(texture); linked_asset != nullptr)
+            _texture_guids[name] = linked_asset->GetGuid();
         SetTexture(ShaderPropertyRegistry::Get().Intern(name), texture);
+
+        if (!_is_standard_lit)
+            return;
+        if (name == StandardMaterialProperty::kAlbedo._tex_name)
+            MarkTextureUsed({ETextureUsage::kAlbedo}, texture != nullptr);
+        else if (name == StandardMaterialProperty::kEmission._tex_name)
+            MarkTextureUsed({ETextureUsage::kEmission}, texture != nullptr);
+        else if (name == StandardMaterialProperty::kRoughness._tex_name)
+            MarkTextureUsed({ETextureUsage::kRoughness}, texture != nullptr);
+        else if (name == StandardMaterialProperty::kMetallic._tex_name)
+            MarkTextureUsed({ETextureUsage::kMetallic}, texture != nullptr);
+        else if (name == StandardMaterialProperty::kSpecular._tex_name)
+            MarkTextureUsed({ETextureUsage::kSpecular}, texture != nullptr);
+        else if (name == StandardMaterialProperty::kNormal._tex_name)
+            MarkTextureUsed({ETextureUsage::kNormal}, texture != nullptr);
+        else {}
     }
 
     void Material::SetTexture(ShaderPropertyId property_id, Texture *texture)
@@ -616,14 +738,15 @@ namespace Ailu::Render
                 _properties[name]._value_ptr = reinterpret_cast<void *>(texture);
         }
         MarkResourceBindingsDirty();
+        _on_property_changed_router.Invoke(property_id);
     }
 
     void Material::SetVector(ShaderPropertyId property_id, const Vector4Int &vector)
     {
         bool is_changed = false;
-        for (u16 pass_index = 0u; pass_index < _p_shader->_passes.size(); ++pass_index)
+        for (u16 pass_index = 0u; pass_index < _p_active_shader->_passes.size(); ++pass_index)
         {
-            const auto *layout = _p_shader->GetBindingLayout(pass_index, _pass_variants[pass_index]._variant_hash);
+            const auto *layout = _p_active_shader->GetBindingLayout(pass_index, _pass_variants[pass_index]._variant_hash);
             const auto *binding = layout == nullptr ? nullptr : layout->Find(property_id);
             if (binding == nullptr)
                 continue;
@@ -648,7 +771,11 @@ namespace Ailu::Render
             }
         }
         if (is_changed)
+        {
+            SyncPropertyValue(property_id);
             MarkPropertyDataDirty();
+            _on_property_changed_router.Invoke(property_id);
+        }
     }
 
     void Material::SetTexture(const String &name, const WString &texture_path)
@@ -679,14 +806,16 @@ namespace Ailu::Render
             return;
         _bind_buffers_by_id[property_id] = buffer;
         MarkResourceBindingsDirty();
+        _on_property_changed_router.Invoke(property_id);
     }
 
     void Material::EnableKeyword(const String &keyword)
     {
-        u16 pass_index = 0;
+        if (_p_active_shader == nullptr)
+            return;
         if (_all_keywords.contains(keyword))
             return;
-        for (auto &p: _pass_variants)
+        for (u16 pass_index = 0u; pass_index < _pass_variants.size(); ++pass_index)
         {
             if (_p_active_shader->IsKeywordValid(pass_index, keyword))
             {
@@ -701,17 +830,17 @@ namespace Ailu::Render
                 _all_keywords.insert(keyword);
                 UpdateBindTexture(pass_index, _pass_variants[pass_index]._variant_hash);
             }
-            ++pass_index;
         }
         MarkResourceBindingsDirty();
     }
 
     void Material::DisableKeyword(const String &keyword)
     {
+        if (_p_active_shader == nullptr)
+            return;
         if (!_all_keywords.contains(keyword))
             return;
-        u16 pass_index = 0;
-        for (auto &p: _pass_variants)
+        for (u16 pass_index = 0u; pass_index < _pass_variants.size(); ++pass_index)
         {
             if (_p_active_shader->IsKeywordValid(pass_index, keyword))
             {
@@ -723,18 +852,19 @@ namespace Ailu::Render
                 }
             }
             _all_keywords.erase(keyword);
-            ++pass_index;
         }
         MarkResourceBindingsDirty();
     }
 
     void Material::RemoveTexture(const String &name)
     {
+        _texture_guids[name] = Guid::EmptyGuid();
         ShaderPropertyId property_id = ShaderPropertyRegistry::Get().Intern(name);
         if (auto it = _bind_textures_by_id.find(property_id); it != _bind_textures_by_id.end() && it->second == nullptr)
             return;
         _bind_textures_by_id[property_id] = nullptr;
         MarkResourceBindingsDirty();
+        _on_property_changed_router.Invoke(property_id);
     }
 
     List<std::tuple<String, float>> Material::GetAllFloatValue()
@@ -743,7 +873,7 @@ namespace Ailu::Render
         Map<String, f32> value_map{};
         for (auto &pass: _pass_variants)
         {
-            for (auto &[name, bind_info]: _p_shader->GetBindResInfo(pass_index, _pass_variants[pass_index]._variant_hash))
+            for (auto &[name, bind_info]: _p_active_shader->GetBindResInfo(pass_index, _pass_variants[pass_index]._variant_hash))
             {
                 if (!ShaderBindResourceInfo::s_reversed_res_name.contains(name) && bind_info._res_type & EBindResDescType::kCBufferFloat && ShaderBindResourceInfo::GetVariableSize(bind_info) == 4 && bind_info._bind_flag == ShaderBindResourceInfo::kBindFlagPerMaterial)
                 {
@@ -767,7 +897,7 @@ namespace Ailu::Render
         Map<String, Vector4f> value_map{};
         for (auto &pass: _pass_variants)
         {
-            for (auto &[name, bind_info]: _p_shader->GetBindResInfo(pass_index, _pass_variants[pass_index]._variant_hash))
+            for (auto &[name, bind_info]: _p_active_shader->GetBindResInfo(pass_index, _pass_variants[pass_index]._variant_hash))
             {
                 if (!ShaderBindResourceInfo::s_reversed_res_name.contains(name) && bind_info._res_type & EBindResDescType::kCBufferFloats && (ShaderBindResourceInfo::GetVariableSize(bind_info) == 16 || ShaderBindResourceInfo::GetVariableSize(bind_info) == 12) && bind_info._bind_flag == ShaderBindResourceInfo::kBindFlagPerMaterial)
                 {
@@ -801,7 +931,7 @@ namespace Ailu::Render
         Map<String, Vector4Int> value_map{};
         for (auto &pass: _pass_variants)
         {
-            for (auto &[name, bind_info]: _p_shader->GetBindResInfo(pass_index, _pass_variants[pass_index]._variant_hash))
+            for (auto &[name, bind_info]: _p_active_shader->GetBindResInfo(pass_index, _pass_variants[pass_index]._variant_hash))
             {
                 if (!ShaderBindResourceInfo::s_reversed_res_name.contains(name) &&
                     ShaderBindResourceInfo::GetVariableSize(bind_info) == 16 && bind_info._bind_flag == ShaderBindResourceInfo::kBindFlagPerMaterial)
@@ -842,7 +972,7 @@ namespace Ailu::Render
         u16 pass_index = 0;
         for (auto &pass: _pass_variants)
         {
-            for (auto &[name, bind_info]: _p_shader->GetBindResInfo(pass_index, _pass_variants[pass_index]._variant_hash))
+            for (auto &[name, bind_info]: _p_active_shader->GetBindResInfo(pass_index, _pass_variants[pass_index]._variant_hash))
             {
                 if (!ShaderBindResourceInfo::s_reversed_res_name.contains(name) && bind_info._res_type & EBindResDescType::kCBufferUInt && bind_info._bind_flag == ShaderBindResourceInfo::kBindFlagPerMaterial)
                 {
@@ -867,31 +997,56 @@ namespace Ailu::Render
 
     void Material::Construct(bool first_time)
     {
-        AL_ASSERT(_p_shader->PassCount() != 0);
-        _common_uint_property[kCullModeKey] = (u32) _p_shader->GetCullMode();
-        _cull_mode = _p_shader->GetCullMode();
-        ConstructKeywords(_p_shader);
-        static u8 s_unused_shader_prop_buf[256]{0};
-        u16 unused_shader_prop_buf_offset = 0u;
-        u16 pass_count = _p_shader->PassCount();
+        if (_p_active_shader == nullptr)
+            return;
+        AL_ASSERT(_p_active_shader->PassCount() != 0);
+
+        Map<ShaderPropertyId, CachedPropertyValue> cached_values = _property_values;
+        if (!first_time && !_properties.empty())
+        {
+            for (const auto &[name, property] : _properties)
+            {
+                if (property._value_ptr == nullptr || property._type == EShaderPropertyType::kTexture2D)
+                    continue;
+                u32 value_size = 0u;
+                switch (property._type)
+                {
+                    case EShaderPropertyType::kBool:
+                    case EShaderPropertyType::kEnum:
+                    case EShaderPropertyType::kFloat:
+                    case EShaderPropertyType::kRange:
+                        value_size = sizeof(f32);
+                        break;
+                    case EShaderPropertyType::kColor:
+                    case EShaderPropertyType::kVector:
+                        value_size = sizeof(Vector4f);
+                        break;
+                    default:
+                        break;
+                }
+                if (value_size == 0u)
+                    continue;
+                auto &cached = cached_values[property._property_id]._data;
+                cached.resize(value_size);
+                memcpy(cached.data(), property._value_ptr, value_size);
+            }
+        }
+
+        _common_uint_property[kCullModeKey] = (u32) _p_active_shader->GetCullMode();
+        _cull_mode = _p_active_shader->GetCullMode();
+        ConstructKeywords(_p_active_shader);
+        u16 pass_count = _p_active_shader->PassCount();
         //u16 cur_shader_cbuf_size = 0; //每个passcbuffer大小一致。
         Vector<u16> cbuf_size_per_passes(pass_count);
-        if (!first_time)
-        {
-            _properties.clear();
-        }
-        else
-        {
-            _mat_cbuf_per_pass_size.resize(pass_count);
-        }
         _prop_views.clear();
         _properties.clear();
+        _mat_cbuf_per_pass_size.clear();
         _mat_cbuf_per_pass_size.resize(pass_count);
+        _property_blocks.clear();
         _property_blocks.resize(pass_count);
-        Vector<Map<String, std::tuple<u8, Texture *>>> _tmp_textures_all_passes(pass_count);
         for (int i = 0; i < pass_count; i++)
         {
-            for (auto &bind_info: _p_shader->GetBindResInfo(i, _pass_variants[i]._variant_hash))
+            for (auto &bind_info: _p_active_shader->GetBindResInfo(i, _pass_variants[i]._variant_hash))
             {
                 if (bind_info.second._res_type == EBindResDescType::kTexture2D)
                 {
@@ -910,83 +1065,96 @@ namespace Ailu::Render
                 cbuf_size_per_passes[i] = 256;
             cbuf_size_per_passes[i] = AlignTo(cbuf_size_per_passes[i],256);
             AL_ASSERT(cbuf_size_per_passes[i] <= 256);
-            if (first_time)
-            {
-                _mat_cbuf_per_pass_size[i] = cbuf_size_per_passes[i];
-                //_p_cbufs[i].reset(ConstantBuffer::Create(_mat_cbuf_per_pass_size[i]));
-                //memset(_p_cbufs[i]->GetData(), 0, _mat_cbuf_per_pass_size[i]);
-                _property_blocks[i]._size = _mat_cbuf_per_pass_size[i];
-                _property_blocks[i]._data =
-                    AL_ALLOC_TAG(EMemoryTag::kRenderer, u8, _mat_cbuf_per_pass_size[i]);
-                memset(_property_blocks[i]._data, 0, _mat_cbuf_per_pass_size[i]);
-            }
-            else if (_mat_cbuf_per_pass_size[i] != cbuf_size_per_passes[i])
-            {
-                throw std::runtime_error("Material: " + _name + " shader cbuf size not equal!");
-                LOG_ERROR("Material: " + _name + " shader cbuf size not equal!");
-                //u8* new_cbuf_data = new u8[cur_shader_cbuf_size];
-                //memcpy(new_cbuf_data, _p_cbuf_cpu, _mat_cbuf_size);
-                //delete[] _p_cbuf_cpu; _p_cbuf_cpu = nullptr;
-                //_p_cbuf_cpu = new_cbuf_data;
-            }
-            else {}
+            _mat_cbuf_per_pass_size[i] = cbuf_size_per_passes[i];
+            _property_blocks[i]._size = cbuf_size_per_passes[i];
+            _property_blocks[i]._data = AL_ALLOC_TAG(EMemoryTag::kRenderer, u8, cbuf_size_per_passes[i]);
+            memset(_property_blocks[i]._data, 0, cbuf_size_per_passes[i]);
             //处理纹理和属性
-            auto &bind_info = _p_shader->GetBindResInfo(i, _pass_variants[i]._variant_hash);
-            for (auto &prop_info: _p_shader->GetShaderPropertyInfos(i))
+            auto &bind_info = _p_active_shader->GetBindResInfo(i, _pass_variants[i]._variant_hash);
+            for (auto &prop_info: _p_active_shader->GetShaderPropertyInfos(i))
             {
                 ShaderPropertyInfo cur_prop = prop_info;
                 if (prop_info._type == EShaderPropertyType::kTexture2D)
                 {
-                    _properties.insert(std::make_pair(prop_info._value_name, cur_prop));
-                    if (!first_time)
-                    {
-                        if (auto it = _bind_textures_by_id.find(prop_info._property_id); it != _bind_textures_by_id.end())
-                        {
-                            _properties[prop_info._value_name]._value_ptr = it->second;
-                            _bind_textures_by_id[prop_info._property_id] = it->second;
-                        }
-                    }
+                    if (auto it = _bind_textures_by_id.find(prop_info._property_id); it != _bind_textures_by_id.end())
+                        cur_prop._value_ptr = it->second;
                 }
-                else
+                else if (auto it = bind_info.find(prop_info._value_name); it != bind_info.end())
                 {
-                    if (auto it = bind_info.find(prop_info._value_name); it != bind_info.end())
-                    {
-                        cur_prop = prop_info;
-                        cur_prop._value_ptr = (void *) (_property_blocks[i]._data + ShaderBindResourceInfo::GetVariableOffset(bind_info.find(prop_info._value_name)->second));
-                    }
-                    else
-                    {
-                        _common_float_property[prop_info._value_name] = prop_info._default_value.z;
-                        cur_prop._value_ptr = (void *) (&_common_float_property[prop_info._value_name]);
-                    }
-                    //memcpy(prop._param, prop_info._param, sizeof(Vector4f));
-                    if (cur_prop._type == EShaderPropertyType::kFloat || cur_prop._type == EShaderPropertyType::kRange)
-                    {
-                        f32 *value = (f32 *) cur_prop._value_ptr;
-                        if (*value == 0.0f)
-                            *value = prop_info._default_value[0];
-                    }
-                    else if (cur_prop._type == EShaderPropertyType::kColor || cur_prop._type == EShaderPropertyType::kVector)
-                    {
-                        auto *value = (Vector4f *) cur_prop._value_ptr;
-                        if (*value == Vector4f::kZero)
-                            *value = prop_info._default_value;
-                    }
-                    else if (cur_prop._type == EShaderPropertyType::kBool || cur_prop._type == EShaderPropertyType::kEnum)
-                    {
-                        // f32 *value = (f32 *) cur_prop._value_ptr;
-                        // if (*value == 0.0f)
-                        //     *value = prop_info._param.z;
-                    }
-                    _properties.insert(std::make_pair(prop_info._value_name, cur_prop));
+                    const auto &binding = it->second;
+                    u8 *dst = _property_blocks[i]._data + ShaderBindResourceInfo::GetVariableOffset(binding);
+                    const u32 value_size = std::min<u32>(ShaderBindResourceInfo::GetVariableSize(binding), sizeof(Vector4f));
+                    if (auto cached = cached_values.find(prop_info._property_id); cached != cached_values.end())
+                        memcpy(dst, cached->second._data.data(), std::min<u32>(value_size, cached->second._data.size()));
+                    else if (prop_info._type == EShaderPropertyType::kFloat || prop_info._type == EShaderPropertyType::kRange)
+                        memcpy(dst, &prop_info._default_value.x, std::min<u32>(value_size, sizeof(f32)));
+                    else if (prop_info._type == EShaderPropertyType::kColor || prop_info._type == EShaderPropertyType::kVector)
+                        memcpy(dst, &prop_info._default_value, value_size);
+                    cur_prop._value_ptr = dst;
                 }
+                else if (prop_info._type == EShaderPropertyType::kFloat || prop_info._type == EShaderPropertyType::kRange)
+                {
+                    auto &value = _common_float_property[prop_info._value_name];
+                    if (auto cached = cached_values.find(prop_info._property_id); cached != cached_values.end())
+                        memcpy(&value, cached->second._data.data(), sizeof(value));
+                    else
+                        value = prop_info._default_value.x;
+                    cur_prop._value_ptr = &value;
+                }
+                else if (prop_info._type == EShaderPropertyType::kColor || prop_info._type == EShaderPropertyType::kVector)
+                {
+                    auto &value = _common_vector_property[prop_info._value_name];
+                    if (auto cached = cached_values.find(prop_info._property_id); cached != cached_values.end())
+                        memcpy(&value, cached->second._data.data(), sizeof(value));
+                    else
+                        value = prop_info._default_value;
+                    cur_prop._value_ptr = &value;
+                }
+                else if (prop_info._type == EShaderPropertyType::kBool || prop_info._type == EShaderPropertyType::kEnum)
+                {
+                    auto &value = _common_uint_property[prop_info._value_name];
+                    if (auto cached = cached_values.find(prop_info._property_id); cached != cached_values.end())
+                        memcpy(&value, cached->second._data.data(), sizeof(value));
+                    else
+                        value = static_cast<u32>(prop_info._default_value.x);
+                    cur_prop._value_ptr = &value;
+                }
+                _properties.insert(std::make_pair(prop_info._value_name, cur_prop));
             }
         }
-        _render_queue = _p_shader->RenderQueue(0);
+        _render_queue = _p_active_shader->RenderQueue(0);
         for (auto &it: _properties)
         {
             _prop_views.emplace_back(&it.second);
         }
+        _property_values.clear();
+        for (const auto &[name, property] : _properties)
+        {
+            if (property._value_ptr == nullptr || property._type == EShaderPropertyType::kTexture2D)
+                continue;
+            u32 value_size = 0u;
+            switch (property._type)
+            {
+                case EShaderPropertyType::kBool:
+                case EShaderPropertyType::kEnum:
+                case EShaderPropertyType::kFloat:
+                case EShaderPropertyType::kRange:
+                    value_size = sizeof(f32);
+                    break;
+                case EShaderPropertyType::kColor:
+                case EShaderPropertyType::kVector:
+                    value_size = sizeof(Vector4f);
+                    break;
+                default:
+                    break;
+            }
+            if (value_size == 0u)
+                continue;
+            auto &cached = _property_values[property._property_id]._data;
+            cached.resize(value_size);
+            memcpy(cached.data(), property._value_ptr, value_size);
+        }
+        ResolveStandardMaterialLayout();
         ResetMaterialCaches();
     }
 
@@ -1029,11 +1197,46 @@ namespace Ailu::Render
         return nullptr;
     }
 
+    ShaderPropertyInfo *Material::GetShaderProperty(ShaderPropertyId property_id)
+    {
+        return GetShaderProperty(ShaderPropertyRegistry::Get().GetName(property_id));
+    }
+
     void Material::ResetMaterialCaches()
     {
         _binding_cache.clear();
         for (auto &cache : _frame_property_block_cache)
             cache = {};
+    }
+
+    void Material::SyncPropertyValue(ShaderPropertyId property_id)
+    {
+        const String &name = ShaderPropertyRegistry::Get().GetName(property_id);
+        auto property = _properties.find(name);
+        if (property == _properties.end() || property->second._value_ptr == nullptr
+            || property->second._type == EShaderPropertyType::kTexture2D)
+            return;
+        u32 value_size = 0u;
+        switch (property->second._type)
+        {
+            case EShaderPropertyType::kBool:
+            case EShaderPropertyType::kEnum:
+            case EShaderPropertyType::kFloat:
+            case EShaderPropertyType::kRange:
+                value_size = sizeof(f32);
+                break;
+            case EShaderPropertyType::kColor:
+            case EShaderPropertyType::kVector:
+                value_size = sizeof(Vector4f);
+                break;
+            default:
+                break;
+        }
+        if (value_size == 0u)
+            return;
+        auto &cached = _property_values[property_id]._data;
+        cached.resize(value_size);
+        memcpy(cached.data(), property->second._value_ptr, value_size);
     }
 
     Material::PropertyBlockView Material::GetPropertyBlockForFrame(u16 pass_index, u32 frame_slot, u64 frame_count,
@@ -1076,175 +1279,68 @@ namespace Ailu::Render
         return cache._block;
     }
 
-    //-------------------------------------------StandardMaterial--------------------------------------------------------
+    //-------------------------------------------Standard Lit capability--------------------------------------------------------
     static void MarkTextureUsedHelper(u32 &mask, const ETextureUsage &usage, const bool &b_use)
     {
         switch (usage)
         {
             case ETextureUsage::kAlbedo:
-                mask = b_use ? mask | StandardMaterial::StandardPropertyName::kAlbedo._mask_flag : mask & (~StandardMaterial::StandardPropertyName::kAlbedo._mask_flag);
+                mask = b_use ? mask | StandardMaterialProperty::kAlbedo._mask_flag : mask & (~StandardMaterialProperty::kAlbedo._mask_flag);
                 break;
             case ETextureUsage::kNormal:
-                mask = b_use ? mask | StandardMaterial::StandardPropertyName::kNormal._mask_flag : mask & (~StandardMaterial::StandardPropertyName::kNormal._mask_flag);
+                mask = b_use ? mask | StandardMaterialProperty::kNormal._mask_flag : mask & (~StandardMaterialProperty::kNormal._mask_flag);
                 break;
             case ETextureUsage::kEmission:
-                mask = b_use ? mask | StandardMaterial::StandardPropertyName::kEmission._mask_flag : mask & (~StandardMaterial::StandardPropertyName::kEmission._mask_flag);
+                mask = b_use ? mask | StandardMaterialProperty::kEmission._mask_flag : mask & (~StandardMaterialProperty::kEmission._mask_flag);
                 break;
             case ETextureUsage::kRoughness:
-                mask = b_use ? mask | StandardMaterial::StandardPropertyName::kRoughness._mask_flag : mask & (~StandardMaterial::StandardPropertyName::kRoughness._mask_flag);
+                mask = b_use ? mask | StandardMaterialProperty::kRoughness._mask_flag : mask & (~StandardMaterialProperty::kRoughness._mask_flag);
                 break;
             case ETextureUsage::kMetallic:
-                mask = b_use ? mask | StandardMaterial::StandardPropertyName::kMetallic._mask_flag : mask & (~StandardMaterial::StandardPropertyName::kMetallic._mask_flag);
+                mask = b_use ? mask | StandardMaterialProperty::kMetallic._mask_flag : mask & (~StandardMaterialProperty::kMetallic._mask_flag);
                 break;
             case ETextureUsage::kSpecular:
-                mask = b_use ? StandardMaterial::StandardPropertyName::kSpecular._mask_flag : mask & (~StandardMaterial::StandardPropertyName::kSpecular._mask_flag);
+                mask = b_use ? StandardMaterialProperty::kSpecular._mask_flag : mask & (~StandardMaterialProperty::kSpecular._mask_flag);
+                break;
+            default:
                 break;
         }
     }
-    StandardMaterial::StandardMaterial(String name) : Material(Shader::s_p_defered_standart_lit.lock().get(), name)
+    Ref<Material> Material::CreateInstance() const
     {
-        Construct(true);
-        SetVector(StandardMaterial::StandardPropertyName::kAlbedo._value_name, Colors::kWhite);
-        SetFloat(StandardMaterial::StandardPropertyName::kRoughness._value_name, 1.0f);
-        SetFloat(StandardMaterial::StandardPropertyName::kMetallic._value_name, 0.0f);
-    }
-    StandardMaterial::~StandardMaterial()
-    {
-    }
-    void StandardMaterial::MarkTextureUsed(std::initializer_list<ETextureUsage> use_infos, bool b_use)
-    {
-        //40 根据shader中MaterialBuf计算，可能会有变动
-        u32 *sampler_mask = reinterpret_cast<u32 *>(_property_blocks[_standard_pass_index]._data + _sampler_mask_offset);
-        const u32 old_sampler_mask = *sampler_mask;
-        //*sampler_mask = 0;
-        for (auto &usage: use_infos)
-        {
-            MarkTextureUsedHelper(*sampler_mask, usage, b_use);
-        }
-        if (*sampler_mask != old_sampler_mask)
-            MarkPropertyDataDirty();
+        return MakeRef<Material>(*this);
     }
 
-    bool StandardMaterial::IsTextureUsed(ETextureUsage use_info)
+    Ref<Material> Material::CreateStandard(String name)
     {
-        u32 sampler_mask = *reinterpret_cast<u32 *>(_property_blocks[_standard_pass_index]._data + _sampler_mask_offset);
-        switch (use_info)
-        {
-            case ETextureUsage::kAlbedo:
-                return sampler_mask & StandardPropertyName::kAlbedo._mask_flag;
-            case ETextureUsage::kNormal:
-                return sampler_mask & StandardPropertyName::kNormal._mask_flag;
-            case ETextureUsage::kEmission:
-                return sampler_mask & StandardPropertyName::kEmission._mask_flag;
-            case ETextureUsage::kRoughness:
-                return sampler_mask & StandardPropertyName::kRoughness._mask_flag;
-            case ETextureUsage::kMetallic:
-                return sampler_mask & StandardPropertyName::kMetallic._mask_flag;
-            case ETextureUsage::kSpecular:
-                return sampler_mask & StandardPropertyName::kSpecular._mask_flag;
-        }
-        return false;
+        auto mat = MakeRef<Material>(Shader::s_p_defered_standart_lit.lock().get(), std::move(name));
+        mat->SetVector(StandardMaterialProperty::kAlbedo._value_name, Colors::kWhite);
+        mat->SetFloat(StandardMaterialProperty::kRoughness._value_name, 1.0f);
+        mat->SetFloat(StandardMaterialProperty::kMetallic._value_name, 0.0f);
+        return mat;
     }
-    void StandardMaterial::MaterialID(const EMaterialID &value)
+    bool Material::IsStandardLit() const
     {
-        if (_material_id == value)
+        return _is_standard_lit;
+    }
+    void Material::ResolveStandardMaterialLayout()
+    {
+        _sampler_mask_offset = 0u;
+        _material_id_offset = 0u;
+        _standard_pass_index = static_cast<u16>(-1);
+        // 通过 shader identity 识别标准 Lit，与旧 is_standard_mat 判定保持一致
+        auto standard_lit_shader = Shader::s_p_defered_standart_lit.lock().get();
+        const bool is_deferred_standard_lit = _p_shader == standard_lit_shader
+            || (_p_shader != nullptr && _p_shader->Name() == "defered_standard_lit");
+        const bool is_forward_standard_lit = _p_active_shader != nullptr
+            && _p_active_shader->Name() == "forward_standard_lit";
+        _is_standard_lit = is_deferred_standard_lit || is_forward_standard_lit;
+        if (!_is_standard_lit)
             return;
-        _material_id = value;
-        _common_uint_property["_MaterialID"] = (u32) _material_id;
-        if (_material_id_offset != 0)
+        //只有首个支持默认着色的pass承载 _SamplerMask / _MaterialID
+        for (i16 i = 0; i < _p_active_shader->PassCount(); i++)
         {
-            u32 id = _material_id == EMaterialID::kChecker ? static_cast<u32>(_material_id) : 0u;
-            memcpy(_property_blocks[_standard_pass_index]._data + _material_id_offset, &id, sizeof(u32));
-        }
-        MarkPropertyDataDirty();
-    }
-    void StandardMaterial::SurfaceType(const ESurfaceType &value)
-    {
-        if (_surface == value)
-            return;
-        _p_active_shader->RemoveMaterialRef(this);
-        if (value == ESurfaceType::kOpaque)
-        {
-            _p_active_shader = _p_shader;
-            _render_queue = Shader::kRenderQueueOpaque;
-            DisableKeyword("ALPHA_TEST");
-        }
-        else if (value == ESurfaceType::kTransparent)
-        {
-            DisableKeyword("ALPHA_TEST");
-            _p_active_shader = ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/forwardlit.alasset");
-            _render_queue = Shader::kRenderQueueTransparent;
-        }
-        else if (value == ESurfaceType::kAlphaTest)
-        {
-            if (_p_active_shader != _p_shader)
-                _p_active_shader = _p_shader;
-            EnableKeyword("ALPHA_TEST");
-            _render_queue = Shader::kRenderQueueAlphaTest;
-        }
-        _p_active_shader->AddMaterialRef(this);
-        _surface = value;
-        _common_uint_property[kSurfaceKey] = static_cast<u32>(_surface);
-        MarkResourceBindingsDirty();
-    }
-    void StandardMaterial::SetTexture(const String &name, Texture *texture)
-    {
-        bool use_tex = texture != nullptr;
-        if (name == StandardPropertyName::kAlbedo._tex_name) MarkTextureUsed({ETextureUsage::kAlbedo}, use_tex);
-        else if (name == StandardPropertyName::kEmission._tex_name)
-            MarkTextureUsed({ETextureUsage::kEmission}, use_tex);
-        else if (name == StandardPropertyName::kRoughness._tex_name)
-            MarkTextureUsed({ETextureUsage::kRoughness}, use_tex);
-        else if (name == StandardPropertyName::kMetallic._tex_name)
-            MarkTextureUsed({ETextureUsage::kMetallic}, use_tex);
-        else if (name == StandardPropertyName::kSpecular._tex_name)
-            MarkTextureUsed({ETextureUsage::kSpecular}, use_tex);
-        else if (name == StandardPropertyName::kNormal._tex_name)
-            MarkTextureUsed({ETextureUsage::kNormal}, use_tex);
-        else {};
-        Material::SetTexture(name, texture);
-    }
-
-    void StandardMaterial::SetTexture(const String &name, const WString &texture_path)
-    {
-        auto texture = ResourceMgr::Get().Get<Texture2D>(texture_path);
-        if (texture == nullptr)
-        {
-            LOG_ERROR("Cann't find texture: {} when set material {} texture{}!", ToChar(texture_path), _name, name);
-            return;
-        }
-        SetTexture(name, texture);
-    }
-
-    void StandardMaterial::SetTexture(const String &name, RTHandle texture)
-    {
-        auto raw_texture = g_pRenderTexturePool->Get(texture);
-        SetTexture(name, raw_texture);
-    }
-    const Texture *StandardMaterial::MainTex(ETextureUsage usage) const
-    {
-        auto &info = StandardPropertyName::GetInfoByUsage(usage);
-        auto &prop = _properties.at(info._tex_name);
-        AL_ASSERT(prop._type == EShaderPropertyType::kTexture2D);
-        return reinterpret_cast<Texture *>(prop._value_ptr);
-    }
-    const ShaderPropertyInfo &StandardMaterial::MainProperty(ETextureUsage usage)
-    {
-        auto &info = StandardPropertyName::GetInfoByUsage(usage);
-        return _properties[info._value_name];
-    }
-    void StandardMaterial::SetTexture(ETextureUsage usage, Texture *tex)
-    {
-        MarkTextureUsed({usage}, tex != nullptr);
-        auto &info = StandardPropertyName::GetInfoByUsage(usage);
-        SetTexture(info._tex_name, tex);
-    }
-    void StandardMaterial::Construct(bool first_time)
-    {
-        //只有首个pass支持默认着色
-        for (i16 i = 0; i < _p_shader->PassCount(); i++)
-        {
-            auto &cur_variant_bind_infos = _p_shader->GetBindResInfo(i, _pass_variants[i]._variant_hash);
+            auto &cur_variant_bind_infos = _p_active_shader->GetBindResInfo(i, _pass_variants[i]._variant_hash);
             auto it = cur_variant_bind_infos.find("_SamplerMask");
             if (it != cur_variant_bind_infos.end())
             {
@@ -1256,11 +1352,161 @@ namespace Ailu::Render
             {
                 _material_id_offset = ShaderBindResourceInfo::GetVariableOffset(it->second);
             }
-            if (_standard_pass_index != -1)
+            if (_standard_pass_index != static_cast<u16>(-1))
                 break;
         }
-        _material_id = (EMaterialID) _common_uint_property["_MaterialID"];
-        _surface = (ESurfaceType) _common_uint_property["_surface"];
+        if (_common_uint_property.contains("_MaterialID"))
+            _material_id = (EMaterialID) _common_uint_property["_MaterialID"];
+        if (_common_uint_property.contains("_surface"))
+            _surface = (ESurfaceType) _common_uint_property["_surface"];
+        if (_standard_pass_index != static_cast<u16>(-1))
+        {
+            auto *property_block = _property_blocks[_standard_pass_index]._data;
+            memcpy(property_block + _sampler_mask_offset, &_sampler_mask, sizeof(_sampler_mask));
+            u32 material_id = _material_id == EMaterialID::kChecker ? static_cast<u32>(_material_id) : 0u;
+            memcpy(property_block + _material_id_offset, &material_id, sizeof(material_id));
+        }
     }
-    //-------------------------------------------StandardMaterial--------------------------------------------------------
+    void Material::MarkTextureUsed(std::initializer_list<ETextureUsage> usages, bool b_use)
+    {
+        // 根据shader中MaterialBuf计算offset，可能会有变动
+        if (!_is_standard_lit || _standard_pass_index == static_cast<u16>(-1))
+            return;
+        const u32 old_sampler_mask = _sampler_mask;
+        //*sampler_mask = 0;
+        for (auto &usage: usages)
+        {
+            MarkTextureUsedHelper(_sampler_mask, usage, b_use);
+        }
+        if (_sampler_mask != old_sampler_mask)
+        {
+            memcpy(_property_blocks[_standard_pass_index]._data + _sampler_mask_offset, &_sampler_mask, sizeof(_sampler_mask));
+            MarkPropertyDataDirty();
+        }
+    }
+
+    bool Material::IsTextureUsed(ETextureUsage use_info) const
+    {
+        if (!_is_standard_lit || _standard_pass_index == static_cast<u16>(-1))
+            return false;
+        u32 sampler_mask = _sampler_mask;
+        switch (use_info)
+        {
+            case ETextureUsage::kAlbedo:
+                return sampler_mask & StandardMaterialProperty::kAlbedo._mask_flag;
+            case ETextureUsage::kNormal:
+                return sampler_mask & StandardMaterialProperty::kNormal._mask_flag;
+            case ETextureUsage::kEmission:
+                return sampler_mask & StandardMaterialProperty::kEmission._mask_flag;
+            case ETextureUsage::kRoughness:
+                return sampler_mask & StandardMaterialProperty::kRoughness._mask_flag;
+            case ETextureUsage::kMetallic:
+                return sampler_mask & StandardMaterialProperty::kMetallic._mask_flag;
+            case ETextureUsage::kSpecular:
+                return sampler_mask & StandardMaterialProperty::kSpecular._mask_flag;
+            default:
+                break;
+        }
+        return false;
+    }
+    EMaterialID Material::MaterialID() const
+    {
+        return _material_id;
+    }
+    void Material::MaterialID(EMaterialID value)
+    {
+        if (!_is_standard_lit)
+        {
+            LOG_WARNING("Material {} is not standard lit, MaterialID ignored!", _name);
+            return;
+        }
+        if (_material_id == value)
+            return;
+        _material_id = value;
+        _common_uint_property["_MaterialID"] = (u32) _material_id;
+        if (_standard_pass_index != static_cast<u16>(-1))
+        {
+            u32 id = _material_id == EMaterialID::kChecker ? static_cast<u32>(_material_id) : 0u;
+            memcpy(_property_blocks[_standard_pass_index]._data + _material_id_offset, &id, sizeof(u32));
+        }
+        SyncPropertyValue(ShaderPropertyRegistry::Get().Intern("_MaterialID"));
+        MarkPropertyDataDirty();
+    }
+    ESurfaceType Material::SurfaceType() const
+    {
+        return _surface;
+    }
+    void Material::SurfaceType(ESurfaceType value)
+    {
+        if (!_is_standard_lit)
+        {
+            LOG_WARNING("Material {} is not standard lit, SurfaceType ignored!", _name);
+            return;
+        }
+        if (_surface == value)
+            return;
+        Shader *new_active_shader = _p_shader;
+        if (value == ESurfaceType::kTransparent)
+            new_active_shader = ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/forwardlit.alasset");
+        if (new_active_shader == nullptr)
+        {
+            LOG_ERROR("Material {} cannot switch surface: forwardlit shader is unavailable!", _name);
+            return;
+        }
+
+        Shader *old_active_shader = _p_active_shader;
+        if (old_active_shader != new_active_shader)
+        {
+            old_active_shader->RemoveMaterialRef(this);
+            _p_active_shader = new_active_shader;
+            _p_active_shader->AddMaterialRef(this);
+        }
+        if (value == ESurfaceType::kAlphaTest)
+            _all_keywords.insert("ALPHA_TEST");
+        else
+            _all_keywords.erase("ALPHA_TEST");
+        _surface = value;
+        _common_uint_property[kSurfaceKey] = static_cast<u32>(_surface);
+        Construct(false);
+        if (value == ESurfaceType::kOpaque)
+            _render_queue = Shader::kRenderQueueOpaque;
+        else if (value == ESurfaceType::kTransparent)
+            _render_queue = Shader::kRenderQueueTransparent;
+        else if (value == ESurfaceType::kAlphaTest)
+            _render_queue = Shader::kRenderQueueAlphaTest;
+        MarkResourceBindingsDirty();
+        _on_property_changed_router.Invoke(SurfacePropertyId());
+    }
+    void Material::SetTexture(ETextureUsage usage, Texture *tex)
+    {
+        if (!_is_standard_lit)
+            return;
+        MarkTextureUsed({usage}, tex != nullptr);
+        const auto &info = StandardMaterialProperty::GetInfoByUsage(usage);
+        SetTexture(info._tex_name, tex);
+    }
+    const Texture *Material::MainTex(ETextureUsage usage) const
+    {
+        if (!_is_standard_lit)
+            return nullptr;
+        const auto &info = StandardMaterialProperty::GetInfoByUsage(usage);
+        auto it = _properties.find(info._tex_name);
+        if (it == _properties.end())
+            return nullptr;
+        const auto &prop = it->second;
+        if (prop._type != EShaderPropertyType::kTexture2D || prop._value_ptr == nullptr)
+            return nullptr;
+        return reinterpret_cast<const Texture *>(prop._value_ptr);
+    }
+    const ShaderPropertyInfo *Material::MainProperty(ETextureUsage usage) const
+    {
+        if (!_is_standard_lit)
+            return nullptr;
+        const auto &info = StandardMaterialProperty::GetInfoByUsage(usage);
+        auto it = _properties.find(info._value_name);
+        if (it == _properties.end())
+            return nullptr;
+        return &it->second;
+    }
+    //-------------------------------------------Standard Lit capability--------------------------------------------------------
 }// namespace Ailu

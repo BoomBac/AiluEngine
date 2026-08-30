@@ -56,6 +56,7 @@ namespace Ailu::Render
         Ref<RenderTexture> _cloud_rt_b;
         RDG::RGHandle _cloud_cur_handle{};
         RDG::RGHandle _cloud_history_handle{};
+        RDG::RGHandle _sky_view_lut_handle{};
         bool _is_cur_a;
     };
     ACLASS()

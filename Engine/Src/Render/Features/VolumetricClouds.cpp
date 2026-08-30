@@ -1,5 +1,7 @@
 ﻿#include "Render/Features/VolumetricClouds.h"
 #include "Inc/Framework/Common/Application.h"
+#include "Render/GraphicsContext.h"
+#include "Render/Material.h"
 #include "Inc/Framework/Common/JobSystem.h"
 #include "Inc/Framework/Common/Profiler.h"
 #include "Inc/Framework/Common/ResourceMgr.h"
@@ -135,7 +137,7 @@ namespace Ailu::Render
             _cloud_cur_handle = builder.Import(_is_cur_a ? _cloud_rt_a.get() : _cloud_rt_b.get());
             _cloud_history_handle = builder.Import(_is_cur_a ? _cloud_rt_b.get() : _cloud_rt_a.get());
             builder.Read(rendering_data._rg_handles._depth_tex);
-            builder.Read(rendering_data._rg_handles._sky_view_lut);
+            _sky_view_lut_handle = builder.ReadGlobalTexture(Shader::PropertyID("_TexSkyViewLUT"));
             builder.Read(_cloud_history_handle);
             _cloud_cur_handle = builder.Write(_cloud_cur_handle, EResourceUsage::kWriteUAV);
             }, [this, cur_offset](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
@@ -143,7 +145,7 @@ namespace Ailu::Render
             auto *cur_rt = graph.Resolve<RenderTexture>(_cloud_cur_handle);
             auto *history_rt = graph.Resolve<RenderTexture>(_cloud_history_handle);
             auto *depth_tex = graph.Resolve<Texture>(data._rg_handles._depth_tex);
-            auto *sky_view_lut = graph.Resolve<Texture>(data._rg_handles._sky_view_lut);
+            auto *sky_view_lut = graph.Resolve<Texture>(_sky_view_lut_handle);
             if (cur_rt == nullptr || history_rt == nullptr || depth_tex == nullptr || sky_view_lut == nullptr)
                 return;
 

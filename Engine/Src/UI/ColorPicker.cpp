@@ -1,4 +1,5 @@
 #include "UI/ColorPicker.h"
+#include "Render/Material.h"
 #include "UI/Basic.h"
 #include "Framework/Common/Input.h"
 #include "Framework/Common/ResourceMgr.h"

@@ -4,8 +4,6 @@
 
 #include "Framework/Math/ALMath.hpp"
 #include "GraphicsPipelineStateObject.h"
-#include "Material.h"
-#include "Mesh.h"
 #include "RendererAPI.h"
 #include "Texture.h"
 #include <mutex>
@@ -106,6 +104,8 @@ namespace Ailu
     class VertexBuffer;
     class IndexBuffer;
     class ConstantBuffer;
+    class Material;
+    class Mesh;
     class GPUBuffer;
     struct GfxCommand;
     using ReadbackCallback = std::function<void(const u8*,u32)>;//also define in GfxCommand.h

@@ -47,6 +47,11 @@ namespace Ailu
             Padding(f32 l, f32 t, f32 r, f32 b) : _l(l), _t(t), _r(r), _b(b) {};
             Padding(f32 v) : Padding(v, v, v, v) {};
             Padding(Vector4f v) : Padding(v.x, v.y, v.z, v.w) {};
+            bool operator==(const Padding &other) const
+            {
+                return _l == other._l && _t == other._t && _r == other._r && _b == other._b;
+            }
+            bool operator!=(const Padding &other) const { return !(*this == other); }
             void Serialize(FArchive &ar)
             {
                 Vector4f v{_l, _t, _r, _b};

@@ -225,7 +225,7 @@ namespace Ailu
         {
             _controller = GetAssetObject<AnimationControllerAsset>();
             if (_controller != nullptr)
-                Open(_controller);
+                OnOpen();
         }
 
         void AnimationControllerEditor::Update(f32 dt)
@@ -286,12 +286,11 @@ namespace Ailu
             }
         }
 
-        void AnimationControllerEditor::Open(AnimationControllerAsset *controller)
+        bool AnimationControllerEditor::OnOpen()
         {
-            if (!controller)
-                return;
-            BindAsset(ResourceMgr::Get().GetLinkedAsset(controller));
-            _controller = controller;
+            _controller = GetAssetObject<AnimationControllerAsset>();
+            if (_controller == nullptr)
+                return false;
             ReadFromAsset();
             _last_edit_snapshot = CaptureAssetObject(GetAsset());
             _selected_state = _editing_states.empty() ? -1 : 0;
@@ -300,9 +299,10 @@ namespace Ailu
             _graph_view_initialized = false;
             RefreshGraphFromController();
             RefreshAllUI();
+            return true;
         }
 
-        void AnimationControllerEditor::Close()
+        void AnimationControllerEditor::OnClose()
         {
             _controller = nullptr;
             _editing_parameters.clear();
@@ -313,7 +313,6 @@ namespace Ailu
             _graph_view_initialized = false;
             if (_graph_document != nullptr)
                 _graph_document->Close();
-            AssetEditor::Close();
         }
 
         void AnimationControllerEditor::ReadFromAsset()
@@ -433,7 +432,12 @@ namespace Ailu
                 if (output == nullptr || input == nullptr)
                     return;
                 const Guid link_id = Guid::Generate();
-                links.push_back({link_id, output->_id, input->_id, GraphFlag(EGraphLinkFlag::kNone)});
+                GraphLinkData link;
+                link._id = link_id;
+                link._output_pin = output->_id;
+                link._input_pin = input->_id;
+                link._flags = GraphFlag(EGraphLinkFlag::kNone);
+                links.emplace_back(std::move(link));
                 if (transition_index >= 0)
                     _transition_link_map[link_id] = transition_index;
             };

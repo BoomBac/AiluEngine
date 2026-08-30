@@ -6,6 +6,7 @@
 #define AILU_VOXELGI_H
 
 #include "../Buffer.h"
+#include "../RenderingData.h"
 #include "RenderFeature.h"
 
 namespace Ailu::Render

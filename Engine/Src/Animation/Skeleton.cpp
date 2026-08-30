@@ -1,5 +1,4 @@
 #include "Animation/Skeleton.h"
-#include "Framework/Common/Allocator.hpp"
 #include "pch.h"
 
 namespace Ailu
@@ -7,22 +6,7 @@ namespace Ailu
     // 构造函数
     Skeleton::Skeleton(const String &name) : _name(name) {};
     Skeleton::Skeleton() : Skeleton("Skeleton") {}
-    Skeleton::~Skeleton()
-    {
-        for (auto &it: _solvers)
-        {
-            AL_DELETE(it.second);
-        }
-    }
-    Map<String, Solver *> &Skeleton::GetSolvers()
-    {
-        return _solvers;
-    }
-    void Skeleton::AddSolver(const String &name, Solver *solver)
-    {
-        if (!_solvers.contains(name))
-            _solvers[name] = solver;
-    }
+    Skeleton::~Skeleton() = default;
     // 获取关节索引
     i32 Skeleton::GetJointIndexByName(const Skeleton &sk, const String &name)
     {
@@ -43,10 +27,26 @@ namespace Ailu
     // 添加关节
     void Skeleton::AddJoint(const Joint &joint)
     {
-        _joints.push_back(joint);
+        Joint new_joint = joint;
+        new_joint._self = static_cast<u16>(_joints.size());
+        _joints.push_back(std::move(new_joint));
         if (_bind_pose.Size() != _joints.size())
             _bind_pose.Resize((u32)_joints.size());
-        _bind_pose.SetParent(joint._self, joint._parent);
+        _bind_pose.SetParent(_joints.back()._self, _joints.back()._parent);
+    }
+
+    void Skeleton::SetBindPoseLocalTransform(u32 index, const Transform &transform)
+    {
+        if (index >= _bind_pose.Size())
+            return;
+        _bind_pose.SetLocalTransform(index, transform);
+    }
+
+    void Skeleton::GetBindMatrixPalette(Vector<Matrix4x4f> &out) const
+    {
+        out.resize(_joints.size());
+        for (const Joint &joint : _joints)
+            out[joint._self] = Math::MatrixInverse(joint._inv_bind_pos);
     }
 
     // 根据索引获取关节
@@ -70,6 +70,25 @@ namespace Ailu
     void Skeleton::Clear()
     {
         _joints.clear();
+        _bind_pose.Resize(0u);
+    }
+    void Skeleton::Rebuild()
+    {
+        _bind_pose.Resize(static_cast<u32>(_joints.size()));
+        for (u16 index = 0u; index < _joints.size(); ++index)
+        {
+            Joint &joint = _joints[index];
+            joint._self = index;
+            if (joint._parent >= _joints.size())
+                joint._parent = Joint::kInvalidJointIndex;
+            joint._children.clear();
+            _bind_pose.SetParent(index, joint._parent);
+        }
+        for (const Joint &joint : _joints)
+        {
+            if (joint._parent < _joints.size())
+                _joints[joint._parent]._children.emplace_back(joint._self);
+        }
     }
     const Pose &Skeleton::GetBindPose() const
     {
@@ -120,15 +139,13 @@ namespace Ailu
         ar << "_self:" << c._self << std::endl;
         ar.InsertIndent();
         ar << "_inv_bind_pos:" << c._inv_bind_pos.ToString() << std::endl;
-        ar.InsertIndent();
-        ar << "_node_inv_world_mat:" << c._node_inv_world_mat.ToString();
         ar.DecreaseIndent();
         //ar.NewLine();
         return ar;
     }
     Archive &operator>>(Archive &ar, Joint &c)
     {
-        Array<String, 5> bufs;
+        Array<String, 4> bufs;
         Map<String, String> kvs;
         for (u16 i = 0; i < bufs.size(); i++)
         {
@@ -141,7 +158,6 @@ namespace Ailu
         c._parent = (u16)std::stoul(kvs["_parent"]);
         c._self = (u16)std::stoul(kvs["_self"]);
         c._inv_bind_pos.FromString(kvs["_inv_bind_pos"]);
-        c._node_inv_world_mat.FromString(kvs["_node_inv_world_mat"]);
         return ar;
     }
     Archive &operator<<(Archive &ar, const Skeleton &sk)
@@ -153,12 +169,12 @@ namespace Ailu
         ar << "_joint_num:" << sk.JointNum() << std::endl;
         ar.InsertIndent();
         ar << "_joints:" << std::endl;
-        for (u16 i = 0; i < sk._joints.size() - 1; i++)
+        for (u16 i = 0; i < sk._joints.size(); ++i)
         {
             ar << sk._joints[i];
-            ar.NewLine();
+            if (i + 1u < sk._joints.size())
+                ar.NewLine();
         }
-        ar << sk._joints.back();
         ar.DecreaseIndent();
         return ar;
     }
@@ -178,6 +194,7 @@ namespace Ailu
         AL_ASSERT(su::BeginWith(bufs[2], "_joints"));
         for (auto &j: sk._joints)
             ar >> j;
+        sk.Rebuild();
         return ar;
     }
 

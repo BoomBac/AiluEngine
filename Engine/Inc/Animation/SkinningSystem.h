@@ -4,9 +4,8 @@
 
 #include "Framework/Core/Containers/Vector.h"
 #include "Framework/Core/SmartPtr.h"
+#include "Framework/Common/JobSystem.h"
 #include "Framework/Math/ALMath.hpp"
-
-#include <future>
 
 namespace Ailu::Render
 {
@@ -26,7 +25,7 @@ namespace Ailu::ECS
         void Clear();
 
     private:
-        Vector<Ref<std::future<void>>> _tasks;
+        Vector<Ref<WaitHandle>> _tasks;
     };
 }
 

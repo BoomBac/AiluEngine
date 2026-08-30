@@ -332,6 +332,30 @@ namespace Ailu
             return hb;
         }
 
+        Ref<UIElement> BuildGuidObjectAssetField(const String &label, PropertyInfo *property, void *instance,
+                                                 CompositeBuilder::Params *params, const Type *object_type, bool allow_none)
+        {
+            auto hb = MakeRef<UI::HorizontalBox>();
+            hb->AddChild<UI::Text>(label)->GetSlotAs<UI::LinearSlot>()
+                .SizePolicy(ESizePolicy::kFill, ESizePolicy::kAuto).FillRate(GetLabelFillRate(1)).Margin(kDefaultLabelMargin);
+            auto *dropdown = hb->AddChild<UI::ObjectAssetDropdown>(object_type);
+            dropdown->GetSlotAs<UI::LinearSlot>().SizePolicy(ESizePolicy::kFill, ESizePolicy::kAuto)
+                .FillRate(GetInputFillRate(1));
+            dropdown->SetAllowNone(allow_none);
+            dropdown->SetSelectedGuid(property->Get<Guid>(instance));
+            dropdown->_on_object_asset_selected += [property, instance, params](Asset *, Object *, const Guid &guid)
+            {
+                CompositeBuilder::SetPropertyValue(property, instance, guid, params);
+            };
+            auto *field = hb.get();
+            hb->AddPropertyObserver(std::move(property->AddObserver(instance, [field, property, instance](void *)
+            {
+                if (auto *asset_dropdown = field->ChildAt(1)->As<UI::ObjectAssetDropdown>(); asset_dropdown != nullptr)
+                    asset_dropdown->SetSelectedGuid(property->Get<Guid>(instance));
+            })));
+            return hb;
+        }
+
         template<typename VecT>
         Ref<UIElement> BuildVectorFieldImpl(const String &label, PropertyInfo *property, void *instance, CompositeBuilder::Params *params)
         {
@@ -528,7 +552,7 @@ namespace Ailu
                     return;
                 i32 idx = et->GetIndexByName(et->GetNameByEnum(data));
                 if (idx >= 0)
-                    field->ChildAt(1)->As<UI::Dropdown>()->SetSelectedIndex(idx);
+                    field->ChildAt(1)->As<UI::Dropdown>()->SetSelectedIndex(idx, false);
             })));
 
             return hb;
@@ -652,6 +676,13 @@ namespace Ailu
         Ref<UIElement> CompositeBuilder::BuildPropertyElement(const String &label, PropertyInfo *property, void *instance, Params *params)
         {
             InitBuilders();
+            if ((property->TypeName() == "Ailu::Guid" || property->TypeName() == "Guid") &&
+                dynamic_cast<ObjectAssetFieldParams *>(params) != nullptr)
+            {
+                const auto *asset_params = static_cast<ObjectAssetFieldParams *>(params);
+                return BuildGuidObjectAssetField(label, property, instance, params, asset_params->_object_type,
+                                                 asset_params->_allow_none);
+            }
             const Type *prop_type = property->GetType();
             auto it = s_builders.find(prop_type);
             if (it != s_builders.end())

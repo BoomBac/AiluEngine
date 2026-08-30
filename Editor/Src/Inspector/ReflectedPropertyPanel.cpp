@@ -1,4 +1,13 @@
 #include "Inspector/ReflectedPropertyPanel.h"
+#include "Animation/AnimationControllerAsset.h"
+#include "Animation/Clip.h"
+#include "Animation/SkeletonAsset.h"
+#include "Assets/PrefabAsset.h"
+#include "Render/2D/Sprite.h"
+#include "Render/Material.h"
+#include "Render/Mesh.h"
+#include "Render/Shader.h"
+#include "Render/Texture.h"
 #include "UI/Composite.h"
 #include "UI/Container.h"
 
@@ -34,6 +43,34 @@ namespace Ailu
 
         Scope<UI::CompositeBuilder::Params> ReflectedPropertyPanel::BuildParams(const PropertyInfo &property) const
         {
+            const Type *asset_type = nullptr;
+            const String &name = property.Name();
+            if (name == "_skeleton")
+                asset_type = SkeletonAsset::StaticType();
+            else if (name == "_shader_guid")
+                asset_type = Render::Shader::StaticType();
+            else if (name == "_texture" || name == "_texture_guid")
+                asset_type = Render::Texture2D::StaticType();
+            else if (name == "_preview_mesh_guid" || name == "_mesh_guid")
+                asset_type = Render::Mesh::StaticType();
+            else if (name == "_sprite" || name == "_sprite_guid")
+                asset_type = Render::Sprite::StaticType();
+            else if (name == "_material_guid")
+                asset_type = Render::Material::StaticType();
+            else if (name == "_controller_guid")
+                asset_type = AnimationControllerAsset::StaticType();
+            else if (name == "_clip_guid")
+                asset_type = AnimationClip::StaticType();
+            else if (name == "_prefab_asset")
+                asset_type = PrefabAssetDocument::StaticType();
+
+            if (asset_type != nullptr)
+            {
+                auto params = MakeScope<UI::ObjectAssetFieldParams>();
+                params->_object_type = asset_type;
+                params->_allow_none = true;
+                return params;
+            }
             const bool is_range = ReadMetaBool(property, "IsRange", false);
             if (!is_range)
                 return nullptr;

@@ -7,9 +7,21 @@
 //ZWrite: Off
 //Queue: Transparent
 //Blend: Src,OneMinusSrc
+//multi_compile _ ALPHA_TEST
+//pass end::
+//pass begin::
+//name: ShadowCaster
+//vert: VSMain
+//pixel: PSMain
+//Cull: Back
+//Queue: Opaque
+//ZWrite: On
+//multi_compile _ ALPHA_TEST
+//multi_compile _ CAST_POINT_SHADOW
 //pass end::
 //Properties
 //{
+//	_AlphaCulloff("AlphaCulloff",Range(0,1)) = 0
 //	_AlbedoTex("Albedo",Texture2D) = "white"
 //	_NormalTex("Normal",Texture2D) = "white"
 //	_EmissionTex("Emission",Texture2D) = "white"
@@ -28,6 +40,7 @@
 
 #include "standard_lit_common.hlsli"
 #include "lighting.hlsli"
+#include "shadow_caster.hlsli"
 
 StandardPSInput ForwardVSMain(StandardVSInput v)
 {
@@ -49,7 +62,11 @@ float4 ForwardPSMain(StandardPSInput input) : SV_TARGET
 {
 	SurfaceData surface_data;
 	InitSurfaceData(input, surface_data);
-    float alpha = surface_data.albedo.a;
+	float alpha = surface_data.albedo.a;
+	alpha = pow(alpha,0.4545);
+#ifdef ALPHA_TEST
+	clip(alpha - _AlphaCulloff);
+#endif
     float3 light = max(0.0, CalculateLightPBR(surface_data, input.world_pos,input.uv0));
     light += surface_data.emssive;
     return float4(light, alpha);

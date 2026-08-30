@@ -1965,7 +1965,7 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                                 static const Type* GetPrivateStaticClass();\
                             public:\
                                 static const Type *StaticType() {return GetPrivateStaticClass();};\
-                                const TGetTypeApiType  *GetType();
+                                virtual const TGetTypeApiType  *GetType();
                             )";
                         }
 

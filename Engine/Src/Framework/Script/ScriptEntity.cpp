@@ -14,6 +14,30 @@ namespace Ailu
     {
         Asset *ResolveScriptAsset(const Guid &guid);
 
+        template<typename T>
+        T MakeScriptHandle(SceneManagement::Scene *scene, ECS::Entity entity)
+        {
+            T result;
+            result._scene = scene;
+            result._entity = entity;
+            return result;
+        }
+
+        ScriptComponent MakeScriptComponent(SceneManagement::Scene *scene, ECS::Entity entity, const String &type_name)
+        {
+            ScriptComponent result = MakeScriptHandle<ScriptComponent>(scene, entity);
+            result._type_name = type_name;
+            return result;
+        }
+
+        ScriptAssetValue MakeScriptAssetValue(const Guid &guid, const String &asset_type)
+        {
+            ScriptAssetValue result;
+            result._guid = guid;
+            result._asset_type = asset_type;
+            return result;
+        }
+
         String NormalizeComponentProperty(String property)
         {
             if (!property.empty() && property.front() != '_')
@@ -361,31 +385,31 @@ namespace Ailu
         if (IsValid()) _scene->RenameEntity(_entity, name);
     }
     String ScriptEntity::GetGuid() const { return IsValid() ? _scene->GetEntityGuid(_entity).ToString() : String{}; }
-    ScriptTransform ScriptEntity::GetTransform() const { return {_scene, _entity}; }
+    ScriptTransform ScriptEntity::GetTransform() const { return MakeScriptHandle<ScriptTransform>(_scene, _entity); }
     std::optional<ScriptRigidBody2D> ScriptEntity::GetRigidBody2D() const
     {
         return IsValid() && _scene->GetRegister().HasComponent<ECS::RigidBody2DComponent>(_entity) ?
-                   std::optional<ScriptRigidBody2D>(ScriptRigidBody2D{_scene, _entity}) : std::nullopt;
+                   std::optional<ScriptRigidBody2D>(MakeScriptHandle<ScriptRigidBody2D>(_scene, _entity)) : std::nullopt;
     }
     std::optional<ScriptCollider2D> ScriptEntity::GetCollider2D() const
     {
         return IsValid() && _scene->GetRegister().HasComponent<ECS::Collider2DComponent>(_entity) ?
-                   std::optional<ScriptCollider2D>(ScriptCollider2D{_scene, _entity}) : std::nullopt;
+                   std::optional<ScriptCollider2D>(ScriptCollider2D(_scene, _entity)) : std::nullopt;
     }
     std::optional<ScriptSpriteRenderer> ScriptEntity::GetSprite() const
     {
         return IsValid() && _scene->GetRegister().HasComponent<ECS::SpriteRendererComponent>(_entity) ?
-                   std::optional<ScriptSpriteRenderer>(ScriptSpriteRenderer{_scene, _entity}) : std::nullopt;
+                   std::optional<ScriptSpriteRenderer>(MakeScriptHandle<ScriptSpriteRenderer>(_scene, _entity)) : std::nullopt;
     }
     std::optional<ScriptAnimator> ScriptEntity::GetAnimator() const
     {
         return IsValid() && _scene->GetRegister().HasComponent<ECS::AnimatorComponent>(_entity) ?
-                   std::optional<ScriptAnimator>(ScriptAnimator{_scene, _entity}) : std::nullopt;
+                   std::optional<ScriptAnimator>(ScriptAnimator(_scene, _entity)) : std::nullopt;
     }
     std::optional<ScriptAudioSource> ScriptEntity::GetAudio() const
     {
         return IsValid() && _scene->GetRegister().HasComponent<ECS::AudioSourceComponent>(_entity) ?
-                   std::optional<ScriptAudioSource>(ScriptAudioSource{_scene, _entity}) : std::nullopt;
+                   std::optional<ScriptAudioSource>(MakeScriptHandle<ScriptAudioSource>(_scene, _entity)) : std::nullopt;
     }
     void ScriptEntity::Destroy() const
     {
@@ -400,12 +424,12 @@ namespace Ailu
     ScriptComponent ScriptEntity::AddComponent(const String &type_name) const
     {
         if (!IsValid() || HasComponent(type_name) || !AddComponentByName(*_scene, _entity, type_name)) return {};
-        return {_scene, _entity, type_name};
+        return MakeScriptComponent(_scene, _entity, type_name);
     }
 
     ScriptComponent ScriptEntity::GetComponent(const String &type_name) const
     {
-        return HasComponent(type_name) ? ScriptComponent{_scene, _entity, type_name} : ScriptComponent{};
+        return HasComponent(type_name) ? MakeScriptComponent(_scene, _entity, type_name) : ScriptComponent{};
     }
 
     bool ScriptEntity::RemoveComponent(const String &type_name) const
@@ -424,15 +448,15 @@ namespace Ailu
         }
     }
 
-    ScriptAssetValue ScriptAssetValue::Sprite() { return {Guid::EmptyGuid(), "Sprite"}; }
-    ScriptAssetValue ScriptAssetValue::Texture2D() { return {Guid::EmptyGuid(), "Texture2D"}; }
-    ScriptAssetValue ScriptAssetValue::Material() { return {Guid::EmptyGuid(), "Material"}; }
-    ScriptAssetValue ScriptAssetValue::Mesh() { return {Guid::EmptyGuid(), "Mesh"}; }
-    ScriptAssetValue ScriptAssetValue::SkeletonMesh() { return {Guid::EmptyGuid(), "SkeletonMesh"}; }
-    ScriptAssetValue ScriptAssetValue::AnimationClip() { return {Guid::EmptyGuid(), "AnimationClip"}; }
-    ScriptAssetValue ScriptAssetValue::AudioClip() { return {Guid::EmptyGuid(), "AudioClip"}; }
-    ScriptAssetValue ScriptAssetValue::Script() { return {Guid::EmptyGuid(), "Script"}; }
-    ScriptAssetValue ScriptAssetValue::Prefab() { return {Guid::EmptyGuid(), "Prefab"}; }
+    ScriptAssetValue ScriptAssetValue::Sprite() { return MakeScriptAssetValue(Guid::EmptyGuid(), "Sprite"); }
+    ScriptAssetValue ScriptAssetValue::Texture2D() { return MakeScriptAssetValue(Guid::EmptyGuid(), "Texture2D"); }
+    ScriptAssetValue ScriptAssetValue::Material() { return MakeScriptAssetValue(Guid::EmptyGuid(), "Material"); }
+    ScriptAssetValue ScriptAssetValue::Mesh() { return MakeScriptAssetValue(Guid::EmptyGuid(), "Mesh"); }
+    ScriptAssetValue ScriptAssetValue::SkeletonMesh() { return MakeScriptAssetValue(Guid::EmptyGuid(), "SkeletonMesh"); }
+    ScriptAssetValue ScriptAssetValue::AnimationClip() { return MakeScriptAssetValue(Guid::EmptyGuid(), "AnimationClip"); }
+    ScriptAssetValue ScriptAssetValue::AudioClip() { return MakeScriptAssetValue(Guid::EmptyGuid(), "AudioClip"); }
+    ScriptAssetValue ScriptAssetValue::Script() { return MakeScriptAssetValue(Guid::EmptyGuid(), "Script"); }
+    ScriptAssetValue ScriptAssetValue::Prefab() { return MakeScriptAssetValue(Guid::EmptyGuid(), "Prefab"); }
 
     bool ScriptAssetValue::IsValid() const
     {

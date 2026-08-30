@@ -6,9 +6,38 @@
 #include "pch.h"
 
 #include <algorithm>
+#include <cmath>
+#include <set>
 
 namespace Ailu::ECS
 {
+    namespace
+    {
+        constexpr f32 kBindPoseMatrixTolerance = 1e-4f;
+        bool s_validate_bind_pose = false;
+        std::set<Entity> s_validated_bind_pose_entities;
+
+        f32 GetMatrixIdentityError(const Matrix4x4f &matrix)
+        {
+            f32 max_error = 0.0f;
+            for (u32 row = 0u; row < 4u; ++row)
+            {
+                for (u32 column = 0u; column < 4u; ++column)
+                {
+                    const f32 expected = row == column ? 1.0f : 0.0f;
+                    max_error = std::max(max_error, std::abs(matrix[row][column] - expected));
+                }
+            }
+            return max_error;
+        }
+    }
+
+    void AnimationSystem::SetBindPoseValidationEnabled(bool enabled)
+    {
+        s_validate_bind_pose = enabled;
+        s_validated_bind_pose_entities.clear();
+    }
+
     void AnimationSystem::QueueCommand(Entity entity, ParameterCommand command)
     {
         _pending_commands[entity].push_back(std::move(command));
@@ -109,30 +138,19 @@ namespace Ailu::ECS
         _pending_commands.erase(commands_iter);
     }
 
-    const AnimationClip *AnimationSystem::ResolveClip(Entity entity, const Guid &clip_id, Skeleton *skeleton,
-                                                       SpriteAnimationBinding *sprite_binding,
-                                                       SkeletonAnimationBinding *skeleton_binding)
+    const AnimationClip *AnimationSystem::ResolveClip(const Guid &clip_id)
     {
         if (clip_id.IsEmpty())
             return nullptr;
 
-        const AnimationClip *clip = skeleton_binding != nullptr ? skeleton_binding->FindClip(clip_id) : nullptr;
-        if (clip == nullptr && sprite_binding != nullptr)
-            clip = sprite_binding->FindClip(clip_id);
-        if (clip == nullptr)
+        ResourceMgr &resource_mgr = ResourceMgr::Get();
+        Ref<AnimationClip> loaded_clip = resource_mgr.GetRef<AnimationClip>(clip_id);
+        if (loaded_clip == nullptr)
         {
-            ResourceMgr::Get().Load<AnimationClip>(clip_id);
-            const Ref<AnimationClip> loaded_clip = ResourceMgr::Get().GetRef<AnimationClip>(clip_id);
-            clip = loaded_clip.get();
-            if (clip == nullptr)
-                return nullptr;
+            resource_mgr.Load<AnimationClip>(clip_id);
+            loaded_clip = resource_mgr.GetRef<AnimationClip>(clip_id);
         }
-
-        if (skeleton_binding != nullptr && skeleton != nullptr && skeleton_binding->FindClip(clip_id) == nullptr)
-            skeleton_binding->Resolve(clip_id, *clip, *skeleton);
-        if (sprite_binding != nullptr && sprite_binding->FindClip(clip_id) == nullptr)
-            sprite_binding->Resolve(clip_id, *clip);
-        return clip;
+        return loaded_clip.get();
     }
 
     void AnimationSystem::ResolveMotionAssets(Entity entity, const AnimationControllerAsset &controller_asset,
@@ -165,6 +183,8 @@ namespace Ailu::ECS
     void AnimationSystem::Update(Register &r, f32 delta_time)
     {
         PROFILE_BLOCK_CPU("AnimationSystem::Update")
+        if (_skinning_system == nullptr)
+            _skinning_system = MakeScope<SkinningSystem>();
         _skinning_system->Clear();
         _event_queue.Clear();
         const f32 dt = delta_time * TimeMgr::s_time_scale;
@@ -175,37 +195,63 @@ namespace Ailu::ECS
                 continue;
 
             AnimatorComponent *animator = r.GetComponent<AnimatorComponent>(entity);
-            if (animator == nullptr || animator->_controller.IsEmpty())
+            if (animator == nullptr)
                 continue;
 
-            CSkeletonMesh *skeleton_mesh = r.GetComponent<CSkeletonMesh>(entity);
-            SpriteRendererComponent *sprite_renderer = r.GetComponent<SpriteRendererComponent>(entity);
-            if (skeleton_mesh != nullptr && !r.IsComponentEnabled<CSkeletonMesh>(entity))
-                skeleton_mesh = nullptr;
-            if (sprite_renderer != nullptr && !r.IsComponentEnabled<SpriteRendererComponent>(entity))
-                sprite_renderer = nullptr;
+            const bool use_direct_clip = animator->_controller.IsEmpty();
+            const Guid source_id = use_direct_clip ? animator->_clip : animator->_controller;
+            AnimatorRuntime &runtime = _animator_runtimes[entity];
+            if (source_id.IsEmpty())
+            {
+                if (_controller_ids[entity] != source_id)
+                {
+                    if (animator->_instance != kInvalidAnimationInstanceHandle)
+                        _animation_instances.Destroy(animator->_instance);
+                    animator->_instance = kInvalidAnimationInstanceHandle;
+                    _controller_ids[entity] = source_id;
+                    _controller_assets.erase(entity);
+                    _controllers.erase(entity);
+                    _blend_space_assets.erase(entity);
+                    _sprite_bindings.erase(entity);
+                    _animator_runtimes.erase(entity);
+                    _matrix_palettes.erase(entity);
+                }
+                continue;
+            }
 
-            Skeleton *skeleton = skeleton_mesh != nullptr && skeleton_mesh->_p_mesh != nullptr ?
-                &skeleton_mesh->_p_mesh->GetSkeleton() : nullptr;
-            SkeletonAnimationBinding *skeleton_binding = skeleton != nullptr ? &_skeleton_bindings[entity] : nullptr;
-            SpriteAnimationBinding *sprite_binding = sprite_renderer != nullptr ? &_sprite_bindings[entity] : nullptr;
-
-            if (_controller_ids[entity] != animator->_controller)
+            if (_controller_ids[entity] != source_id)
             {
                 if (animator->_instance != kInvalidAnimationInstanceHandle)
                     _animation_instances.Destroy(animator->_instance);
                 animator->_instance = kInvalidAnimationInstanceHandle;
                 animator->_started = animator->_play_on_awake;
-                _controller_ids[entity] = animator->_controller;
-                _controller_assets[entity].reset();
+                _controller_ids[entity] = source_id;
+                _controller_assets.erase(entity);
                 _controllers.erase(entity);
                 _blend_space_assets.erase(entity);
             }
 
             if (_controller_assets[entity] == nullptr)
             {
-                ResourceMgr::Get().Load<AnimationControllerAsset>(animator->_controller);
-                _controller_assets[entity] = ResourceMgr::Get().GetRef<AnimationControllerAsset>(animator->_controller);
+                if (use_direct_clip)
+                {
+                    ResourceMgr::Get().Load<AnimationClip>(source_id);
+                    const Ref<AnimationClip> clip = ResourceMgr::Get().GetRef<AnimationClip>(source_id);
+                    if (clip != nullptr)
+                    {
+                        auto direct_controller = MakeRef<AnimationControllerAsset>("DirectClipController");
+                        AnimationState state;
+                        state._motion._asset = source_id;
+                        state._loop = clip->IsLooping();
+                        direct_controller->AddState(std::move(state));
+                        _controller_assets[entity] = std::move(direct_controller);
+                    }
+                }
+                else
+                {
+                    ResourceMgr::Get().Load<AnimationControllerAsset>(source_id);
+                    _controller_assets[entity] = ResourceMgr::Get().GetRef<AnimationControllerAsset>(source_id);
+                }
             }
             if (_controller_assets[entity] == nullptr)
                 continue;
@@ -225,7 +271,6 @@ namespace Ailu::ECS
 
             instance->_speed = std::max(animator->_speed, 0.0f);
             ResolveMotionAssets(entity, controller_asset, controller);
-
             const auto resolve_motion_duration = [&](u16 state_index) -> f32
             {
                 if (state_index >= controller_asset.States().size())
@@ -233,7 +278,7 @@ namespace Ailu::ECS
                 const auto &motion = controller_asset.States()[state_index]._motion;
                 if (motion._type == EAnimationMotionType::kClip)
                 {
-                    const AnimationClip *clip = ResolveClip(entity, motion._asset, skeleton, sprite_binding, skeleton_binding);
+                    const AnimationClip *clip = ResolveClip(motion._asset);
                     return clip != nullptr ? clip->Duration() : 0.0f;
                 }
                 const auto blend_iter = _blend_space_assets[entity].find(motion._asset);
@@ -241,7 +286,7 @@ namespace Ailu::ECS
                     return 0.0f;
                 for (const auto &sample : blend_iter->second->Samples())
                 {
-                    const AnimationClip *clip = ResolveClip(entity, sample._clip, skeleton, sprite_binding, skeleton_binding);
+                    const AnimationClip *clip = ResolveClip(sample._clip);
                     if (clip != nullptr)
                         return clip->Duration();
                 }
@@ -257,9 +302,9 @@ namespace Ailu::ECS
                 instance->_next_motion_duration = resolve_motion_duration(instance->_next_state);
 
             controller.Update(*instance, dt);
-            const AnimationEvaluation evaluation = controller.Evaluate(*instance);
-            for (u8 sample_index = 0u; sample_index < evaluation._sample_count; ++sample_index)
-                ResolveClip(entity, evaluation._samples[sample_index]._clip, skeleton, sprite_binding, skeleton_binding);
+            runtime._evaluation = controller.Evaluate(*instance);
+            for (u8 sample_index = 0u; sample_index < runtime._evaluation._sample_count; ++sample_index)
+                ResolveClip(runtime._evaluation._samples[sample_index]._clip);
 
             const auto collect_state_events = [&](u16 state_index, f32 previous_time, f32 current_time,
                                                   bool allow_cosmetic)
@@ -270,18 +315,15 @@ namespace Ailu::ECS
                 const f32 speed = state._speed * instance->_speed;
                 if (state._motion._type == EAnimationMotionType::kClip)
                 {
-                    const AnimationClip *clip = ResolveClip(entity, state._motion._asset, skeleton, sprite_binding,
-                                                            skeleton_binding);
+                    const AnimationClip *clip = ResolveClip(state._motion._asset);
                     if (clip == nullptr)
                         return;
                     _event_scratch.clear();
                     CollectAnimationEvents(*clip, previous_time * speed, current_time * speed, _event_scratch,
                                            state._loop);
                     for (const auto &event : _event_scratch)
-                    {
                         if (event._kind == EAnimationEventKind::kGameplay || allow_cosmetic)
                             _event_queue.Push(AnimationEventMessage{entity, event._event_id, event._kind});
-                    }
                     return;
                 }
 
@@ -322,20 +364,16 @@ namespace Ailu::ECS
                             break;
                         }
                     }
-                    const f32 previous_sample_time = previous_sample != nullptr ? previous_sample->_time : 0.0f;
-                    const AnimationClip *clip = ResolveClip(entity, current_sample._clip, skeleton, sprite_binding,
-                                                            skeleton_binding);
+                    const AnimationClip *clip = ResolveClip(current_sample._clip);
                     if (clip == nullptr)
                         continue;
                     _event_scratch.clear();
-                    CollectAnimationEvents(*clip, previous_sample_time, current_sample._time, _event_scratch,
-                                           state._loop);
+                    CollectAnimationEvents(*clip, previous_sample != nullptr ? previous_sample->_time : 0.0f,
+                                           current_sample._time, _event_scratch, state._loop);
                     const bool dominant = current_sample._weight >= dominant_weight;
                     for (const auto &event : _event_scratch)
-                    {
                         if (event._kind == EAnimationEventKind::kGameplay || (allow_cosmetic && dominant))
                             _event_queue.Push(AnimationEventMessage{entity, event._event_id, event._kind});
-                    }
                 }
             };
 
@@ -355,22 +393,136 @@ namespace Ailu::ECS
                                      transition_weight > 0.5f);
             }
 
-            if (skeleton_binding != nullptr && skeleton != nullptr)
+            for (auto &[skeleton_key, group] : runtime._skeleton_groups)
+                group._consumers.clear();
+            const auto collect_skeleton_meshes = [&](auto &&self, Entity current) -> void
             {
-                SkeletonPose &pose = _skeleton_poses[entity];
-                if (pose.Size() != skeleton->JointNum())
-                    pose = skeleton->GetBindPose();
-                skeleton_binding->Evaluate(evaluation, *skeleton, pose);
-                Vector<Matrix4x4f> &palette = _matrix_palettes[entity];
-                pose.GetMatrixPalette(palette);
-                for (auto &joint : *skeleton)
-                    palette[joint._self] = joint._inv_bind_pos * palette[joint._self] * joint._node_inv_world_mat;
-                _skinning_system->Submit(skeleton_mesh->_p_mesh.get(), palette, s_vertex_num_per_skin_task);
+                if (current != entity)
+                {
+                    if (r.GetComponent<AnimatorComponent>(current) != nullptr)
+                        return;
+                    if (r.GetComponent<CSkeletonMesh>(current) != nullptr)
+                    {
+                        auto *component = r.GetComponent<CSkeletonMesh>(current);
+                        if (r.IsComponentEnabled<CSkeletonMesh>(current) && component->_p_mesh != nullptr)
+                        {
+                            const AssetRef<SkeletonAsset> &skeleton_ref = component->_p_mesh->GetSkeletonAsset();
+                            const Ref<SkeletonAsset> &skeleton_asset = skeleton_ref.Get();
+                            if (skeleton_ref.IsResolved())
+                            {
+                                auto [group_iter, inserted] = runtime._skeleton_groups.try_emplace(skeleton_asset.get());
+                                group_iter->second._skeleton_asset = skeleton_asset;
+                                group_iter->second._consumers.emplace_back(current);
+                            }
+                        }
+                    }
+                }
+                else if (const auto *component = r.GetComponent<CSkeletonMesh>(current);
+                         component != nullptr && r.IsComponentEnabled<CSkeletonMesh>(current) &&
+                         component->_p_mesh != nullptr)
+                {
+                    const AssetRef<SkeletonAsset> &skeleton_ref = component->_p_mesh->GetSkeletonAsset();
+                    const Ref<SkeletonAsset> &skeleton_asset = skeleton_ref.Get();
+                    if (skeleton_ref.IsResolved())
+                    {
+                        auto [group_iter, inserted] = runtime._skeleton_groups.try_emplace(skeleton_asset.get());
+                        group_iter->second._skeleton_asset = skeleton_asset;
+                        group_iter->second._consumers.emplace_back(current);
+                    }
+                }
+
+                const CHierarchy *hierarchy = r.GetComponent<CHierarchy>(current);
+                if (hierarchy == nullptr)
+                    return;
+                for (Entity child = hierarchy->_first_child; child != kInvalidEntity;)
+                {
+                    const CHierarchy *child_hierarchy = r.GetComponent<CHierarchy>(child);
+                    const Entity next = child_hierarchy != nullptr ? child_hierarchy->_next_sibling : kInvalidEntity;
+                    self(self, child);
+                    child = next;
+                }
+            };
+            collect_skeleton_meshes(collect_skeleton_meshes, entity);
+
+            for (auto &[skeleton_key, group] : runtime._skeleton_groups)
+            {
+                if (group._consumers.empty() || group._skeleton_asset == nullptr)
+                    continue;
+                const Skeleton &skeleton = group._skeleton_asset->GetSkeleton();
+                for (u8 sample_index = 0u; sample_index < runtime._evaluation._sample_count; ++sample_index)
+                {
+                    const Guid &clip_id = runtime._evaluation._samples[sample_index]._clip;
+                    if (group._binding.FindClip(clip_id) == nullptr)
+                    {
+                        const AnimationClip *clip = ResolveClip(clip_id);
+                        if (clip != nullptr)
+                            group._binding.Resolve(clip_id, *clip, skeleton);
+                    }
+                }
+                if (group._pose.Size() != skeleton.JointNum())
+                    group._pose = skeleton.GetBindPose();
+                group._binding.Evaluate(runtime._evaluation, skeleton, group._pose);
+                group._pose.GetMatrixPalette(group._global_pose_palette);
+
+                for (const Entity mesh_entity : group._consumers)
+                {
+                    CSkeletonMesh *component = r.GetComponent<CSkeletonMesh>(mesh_entity);
+                    if (component == nullptr || component->_p_mesh == nullptr)
+                        continue;
+                    const bool validate_bind_pose = s_validate_bind_pose && !s_validated_bind_pose_entities.contains(mesh_entity);
+                    Vector<Matrix4x4f> &palette = _matrix_palettes[mesh_entity];
+                    component->_p_mesh->BuildSkinMatrixPalette(
+                        std::span<const Matrix4x4f>(group._global_pose_palette.data(), group._global_pose_palette.size()),
+                        palette);
+                    if (validate_bind_pose)
+                    {
+                        f32 max_error = 0.0f;
+                        Vector<Matrix4x4f> bind_palette;
+                        skeleton.GetBindPose().GetMatrixPalette(bind_palette);
+                        const Matrix4x4f &mesh_bind_global = component->_p_mesh->GetMeshBindGlobalTransform();
+                        const Matrix4x4f &mesh_current_global_inv =
+                            component->_p_mesh->GetMeshCurrentGlobalInverseTransform();
+                        for (const Joint &joint : skeleton)
+                            max_error = std::max(max_error, GetMatrixIdentityError(mesh_bind_global * joint._inv_bind_pos *
+                                                                                    bind_palette[joint._self] * mesh_current_global_inv));
+                        if (max_error < kBindPoseMatrixTolerance)
+                        {
+                            LOG_INFO("Skinning bind pose validation passed for entity {} (max error {})", mesh_entity, max_error);
+                        }
+                        else
+                        {
+                            LOG_ERROR("Skinning bind pose validation failed for entity {} (max error {})", mesh_entity, max_error);
+                        }
+                        s_validated_bind_pose_entities.emplace(mesh_entity);
+                    }
+                    _skinning_system->Submit(component->_p_mesh.get(), palette, s_vertex_num_per_skin_task);
+                }
             }
-            if (sprite_binding != nullptr)
-                sprite_binding->Evaluate(evaluation, *sprite_renderer);
+
+            if (SpriteRendererComponent *sprite_renderer = r.GetComponent<SpriteRendererComponent>(entity);
+                sprite_renderer != nullptr && r.IsComponentEnabled<SpriteRendererComponent>(entity))
+            {
+                SpriteAnimationBinding &sprite_binding = _sprite_bindings[entity];
+                for (u8 sample_index = 0u; sample_index < runtime._evaluation._sample_count; ++sample_index)
+                {
+                    const Guid &clip_id = runtime._evaluation._samples[sample_index]._clip;
+                    const AnimationClip *clip = ResolveClip(clip_id);
+                    if (clip != nullptr && sprite_binding.FindClip(clip_id) == nullptr)
+                        sprite_binding.Resolve(clip_id, *clip);
+                }
+                sprite_binding.Evaluate(runtime._evaluation, *sprite_renderer);
+            }
+        }
+
+        for (auto runtime_iter = _animator_runtimes.begin(); runtime_iter != _animator_runtimes.end();)
+        {
+            if (!_entities.contains(runtime_iter->first))
+                runtime_iter = _animator_runtimes.erase(runtime_iter);
+            else
+                ++runtime_iter;
         }
     }
+
 
     void AnimationSystem::OnPushEntity(Entity entity)
     {
@@ -379,6 +531,7 @@ namespace Ailu::ECS
 
     void AnimationSystem::WaitFor() const
     {
-        _skinning_system->WaitFor();
+        if (_skinning_system != nullptr)
+            _skinning_system->WaitFor();
     }
 }

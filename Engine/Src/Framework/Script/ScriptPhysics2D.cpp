@@ -28,9 +28,22 @@ namespace Ailu
 
     namespace
     {
+        ScriptEntity MakeScriptEntity(SceneManagement::Scene *scene, ECS::Entity entity)
+        {
+            ScriptEntity result;
+            result._scene = scene;
+            result._entity = entity;
+            return result;
+        }
+
         ScriptRaycastHit2D MakeScriptRaycastHit(SceneManagement::Scene &scene, const RaycastHit2D &hit)
         {
-            return {{&scene, hit._entity}, hit._point, hit._normal, hit._distance};
+            ScriptRaycastHit2D result;
+            result._entity = MakeScriptEntity(&scene, hit._entity);
+            result._point = hit._point;
+            result._normal = hit._normal;
+            result._distance = hit._distance;
+            return result;
         }
     }
 
@@ -88,7 +101,11 @@ namespace Ailu
         Physics2D::OverlapCircle(*scene, desc, hits);
         result.reserve(hits.size());
         for (const OverlapHit2D &hit : hits)
-            result.push_back(ScriptRaycastHit2D{ScriptEntity{scene, hit._entity}});
+        {
+            ScriptRaycastHit2D script_hit;
+            script_hit._entity = MakeScriptEntity(scene, hit._entity);
+            result.push_back(script_hit);
+        }
         return result;
     }
 
@@ -109,7 +126,11 @@ namespace Ailu
         Physics2D::OverlapBox(*scene, desc, hits);
         result.reserve(hits.size());
         for (const OverlapHit2D &hit : hits)
-            result.push_back(ScriptRaycastHit2D{ScriptEntity{scene, hit._entity}});
+        {
+            ScriptRaycastHit2D script_hit;
+            script_hit._entity = MakeScriptEntity(scene, hit._entity);
+            result.push_back(script_hit);
+        }
         return result;
     }
 }

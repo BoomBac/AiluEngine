@@ -2,6 +2,8 @@
 #define VOLUMETRIC_FOG_H
 #pragma once
 #include "RenderFeature.h"
+#include "Framework/Math/ALMath.hpp"
+#include "Render/CoreType.h"
 #include "generated/VolumetricFog.gen.h"
 namespace Ailu
 {

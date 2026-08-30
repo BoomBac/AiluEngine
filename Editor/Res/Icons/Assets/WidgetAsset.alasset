@@ -6,5 +6,9 @@
         "_asset_name": "WidgetAsset"
     },
     "_file": "WidgetAsset.png",
-    "_is_srgb": true
+    "_import_setting": {
+        "_is_sRGB": true,
+        "_generate_mipmap": true,
+        "_is_readable": false
+    }
 }

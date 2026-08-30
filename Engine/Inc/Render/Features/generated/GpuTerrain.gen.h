@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __GPUTERRAIN_GEN_H__
 //Class GpuTerrain begin...........................
-#define GPUTERRAIN_GEN_H_9_GENERATED_BODY \
+#define GPUTERRAIN_GEN_H_13_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_GpuTerrain_Type();\
                                 static const Type* GetPrivateStaticClass();\

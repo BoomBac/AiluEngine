@@ -6,13 +6,18 @@
 #define AILU_CANVAS_H
 
 #include "UIElement.h"
-#include "Render/Texture.h"
+#include "Framework/Core/Containers/Array.h"
+#include "Render/RenderConstants.h"
 #include "Objects/Serialize.h"
 #include "generated/Widget.gen.h"
 
 namespace Ailu
 {
     class Window;
+    namespace Render
+    {
+        class RenderTexture;
+    }
     namespace UI
     {
 

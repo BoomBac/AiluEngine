@@ -1,6 +1,7 @@
 #pragma once
 
 #include "UI/Container.h"
+#include "UI/DragDrop.h"
 #include "Framework/Math/Guid.h"
 
 namespace Ailu
@@ -44,6 +45,7 @@ namespace Ailu
                 Object *_object = nullptr;
                 Guid _guid = Guid::EmptyGuid();
                 String _name;
+                bool _is_missing = false;
             };
 
             static bool IsTypeCompatible(const Type *requested_type, const Type *actual_type);

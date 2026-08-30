@@ -1,6 +1,8 @@
 #include "Render/Renderer.h"
+#include "Render/GraphicsContext.h"
 #include "Framework/Common/Profiler.h"
 #include "Framework/Common/ResourceMgr.h"
+#include "Render/Material.h"
 #include "Framework/Common/TimeMgr.h"
 #include "Framework/Common/Application.h"
 #include "Render/Gizmo.h"
@@ -848,30 +850,34 @@ namespace Ailu::Render
         dst._normal_tex             = RenderConstants::kInvalidBindlessHandle;
         dst._metallic_roughness_tex = RenderConstants::kInvalidBindlessHandle;
         dst._emission_tex           = RenderConstants::kInvalidBindlessHandle;
-        if (auto std_mat = dynamic_cast<StandardMaterial*>(src); std_mat != nullptr)
+        if (src != nullptr && src->IsStandardLit())
         {
-            auto prop = std_mat->MainProperty(ETextureUsage::kAlbedo);
-            dst._base_color        = prop.GetValue<Vector4f>().xyz;
-            if (auto base_color_tex = std_mat->MainTex(ETextureUsage::kAlbedo); base_color_tex)
+            const auto *albedo_prop = src->MainProperty(ETextureUsage::kAlbedo);
+            if (albedo_prop != nullptr)
+                dst._base_color = albedo_prop->GetValue<Vector4f>().xyz;
+            if (auto base_color_tex = src->MainTex(ETextureUsage::kAlbedo); base_color_tex)
             {
                 dst._base_color_tex = base_color_tex->GetBindlessSRVIndex();
             }
-            prop = std_mat->MainProperty(ETextureUsage::kMetallic);
-            dst._metallic          = prop.GetValue<f32>();
-            prop = std_mat->MainProperty(ETextureUsage::kRoughness);
-            dst._roughness         = std::max(0.03f,prop.GetValue<f32>());
-            if (auto normal_tex = std_mat->MainTex(ETextureUsage::kNormal); normal_tex)
+            const auto *metallic_prop = src->MainProperty(ETextureUsage::kMetallic);
+            if (metallic_prop != nullptr)
+                dst._metallic = metallic_prop->GetValue<f32>();
+            const auto *roughness_prop = src->MainProperty(ETextureUsage::kRoughness);
+            if (roughness_prop != nullptr)
+                dst._roughness = std::max(0.03f, roughness_prop->GetValue<f32>());
+            if (auto normal_tex = src->MainTex(ETextureUsage::kNormal); normal_tex)
             {
                 dst._normal_tex = normal_tex->GetBindlessSRVIndex();
             }
-            if (auto mr_tex = std_mat->MainTex(ETextureUsage::kRoughness); mr_tex)
+            if (auto mr_tex = src->MainTex(ETextureUsage::kRoughness); mr_tex)
             {
                 dst._metallic_roughness_tex = mr_tex->GetBindlessSRVIndex();
             }
-            prop = std_mat->MainProperty(ETextureUsage::kEmission);
-            dst._emission          = prop.GetValue<Color>().xyz;
-            dst._ior = std_mat->GetFloat("_IOR");
-            dst._transmission = std_mat->GetFloat("_Transmission");
+            const auto *emission_prop = src->MainProperty(ETextureUsage::kEmission);
+            if (emission_prop != nullptr)
+                dst._emission = emission_prop->GetValue<Color>().xyz;
+            dst._ior = src->GetFloat("_IOR");
+            dst._transmission = src->GetFloat("_Transmission");
         }
         //dst._base_color        = Vector3f::kOne;
         //dst._metallic          = src.metallic;

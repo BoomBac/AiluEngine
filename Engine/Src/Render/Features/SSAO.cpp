@@ -1,5 +1,7 @@
 #include "Render/Features/SSAO.h"
 #include "Framework/Common/Profiler.h"
+#include "Render/GraphicsContext.h"
+#include "Render/Material.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Render/CommandBuffer.h"
 #include "Render/Renderer.h"

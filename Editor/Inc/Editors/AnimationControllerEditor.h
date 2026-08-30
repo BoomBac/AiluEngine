@@ -36,9 +36,6 @@ namespace Ailu
             ~AnimationControllerEditor() override = default;
 
             void Update(f32 dt) override;
-            using AssetEditor::Open;
-            void Open(AnimationControllerAsset *controller);
-            void Close();
 
         private:
             void ReadFromAsset();
@@ -70,6 +67,8 @@ namespace Ailu
             static UI::InputBlock *AddFloatInput(UI::UIElement *parent, const String &label, f32 value,
                                                  const std::function<void(f32)> &on_changed);
 
+            bool OnOpen() override;
+            void OnClose() override;
             void OnBeforeSave() override;
             void OnAssetSaved() override;
             void OnAssetReloaded() override;

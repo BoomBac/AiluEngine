@@ -5,6 +5,7 @@
 #include "Objects/JsonArchive.h"
 #include "Framework/Math/ALMath.hpp"
 #include "Framework/Math/Guid.h"
+#include "Framework/Math/Transform.h"
 #include <deque>
 #include <list>
 #include <map>
@@ -502,6 +503,38 @@ namespace Ailu
     };
 
     template<>
+    struct AILU_API SerializerWrapper<Matrix4x4f>
+    {
+        static void Serialize(void *data, FArchive &ar, const String *name = nullptr)
+        {
+            DATA_CHECK_S(Matrix4x4f)
+            auto &value = *static_cast<Matrix4x4f *>(data);
+            Vector<f32> values;
+            values.reserve(16u);
+            for (u32 row = 0u; row < 4u; ++row)
+                for (u32 column = 0u; column < 4u; ++column)
+                    values.emplace_back(value[row][column]);
+            SerializerWrapper<Vector<f32>>::Serialize(&values, ar, name);
+        }
+
+        static void Deserialize(void *data, FArchive &ar, const String *name = nullptr)
+        {
+            DATA_CHECK_DS(Matrix4x4f)
+            auto &value = *static_cast<Matrix4x4f *>(data);
+            Vector<f32> values;
+            SerializerWrapper<Vector<f32>>::Deserialize(&values, ar, name);
+            if (values.size() != 16u)
+            {
+                LOG_ERROR("SerializerWrapper<Matrix4x4f>::Deserialize: expected 16 values, got {}", values.size());
+                return;
+            }
+            for (u32 row = 0u; row < 4u; ++row)
+                for (u32 column = 0u; column < 4u; ++column)
+                    value[row][column] = values[row * 4u + column];
+        }
+    };
+
+    template<>
     struct AILU_API SerializerWrapper<Color>
     {
         static void Serialize(void *data, FArchive &ar, const String *name = nullptr)
@@ -544,6 +577,44 @@ namespace Ailu
         {
             DATA_CHECK_DS(Quaternion)
             SerializerWrapper<Vector4D<f32>>::Deserialize(&static_cast<Quaternion *>(data)->_quat, ar, name);
+        }
+    };
+
+    template<>
+    struct AILU_API SerializerWrapper<Transform>
+    {
+        static void Serialize(void *data, FArchive &ar, const String *name = nullptr)
+        {
+            DATA_CHECK_S(Transform)
+            auto *sar = dynamic_cast<FStructedArchive *>(&ar);
+            if (sar && name)
+                sar->BeginObject(*name);
+            auto &value = *static_cast<Transform *>(data);
+            static const String kPosition = "_position";
+            static const String kRotation = "_rotation";
+            static const String kScale = "_scale";
+            SerializerWrapper<Vector3f>::Serialize(&value._position, ar, &kPosition);
+            SerializerWrapper<Quaternion>::Serialize(&value._rotation, ar, &kRotation);
+            SerializerWrapper<Vector3f>::Serialize(&value._scale, ar, &kScale);
+            if (sar && name)
+                sar->EndObject();
+        }
+
+        static void Deserialize(void *data, FArchive &ar, const String *name = nullptr)
+        {
+            DATA_CHECK_DS(Transform)
+            auto *sar = dynamic_cast<FStructedArchive *>(&ar);
+            if (sar && name)
+                sar->BeginObject(*name);
+            auto &value = *static_cast<Transform *>(data);
+            static const String kPosition = "_position";
+            static const String kRotation = "_rotation";
+            static const String kScale = "_scale";
+            SerializerWrapper<Vector3f>::Deserialize(&value._position, ar, &kPosition);
+            SerializerWrapper<Quaternion>::Deserialize(&value._rotation, ar, &kRotation);
+            SerializerWrapper<Vector3f>::Deserialize(&value._scale, ar, &kScale);
+            if (sar && name)
+                sar->EndObject();
         }
     };
 

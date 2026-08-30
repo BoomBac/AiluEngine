@@ -1372,10 +1372,10 @@ namespace Ailu
         if (_import_setting._is_combine_mesh)
             CombineLoadedMeshes();
 
-        if ((_import_setting._import_flag & MeshImportSetting::kImportFlagAnimation) != 0u)
+        if (_import_setting.ShouldImportAnimation())
             LOG_WARNING("glTF animation import is not implemented yet for {}", ToChar(sys_path));
 
-        if ((_import_setting._import_flag & MeshImportSetting::kImportFlagMesh) == 0u)
+        if (!_import_setting.ShouldImportMesh())
             _loaded_meshes.clear();
 
         LOG_INFO(L"glTF file {} parsed with {} mesh", sys_path, _loaded_meshes.size());

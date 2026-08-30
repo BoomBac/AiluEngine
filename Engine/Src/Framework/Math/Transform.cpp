@@ -120,9 +120,7 @@ namespace Ailu
     {
         Quaternion bRot = b._rotation;
         if (Quaternion::Dot(a._rotation, bRot) < 0.0f)
-        {
-            bRot = -bRot;
-        }
+            bRot = Quaternion(-bRot.x, -bRot.y, -bRot.z, -bRot.w);
         return Transform(
                 Lerp(a._position, b._position, t),
                 Quaternion::NLerp(a._rotation, bRot, t),

@@ -40,7 +40,7 @@ namespace Ailu
                     if (asset_object == nullptr)
                         return nullptr;
                     auto editor = MakeRef<TEditor>();
-                    editor->Open(asset_object);
+                    editor->Open(asset);
                     return editor;
                 });
             }

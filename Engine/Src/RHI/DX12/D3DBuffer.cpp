@@ -516,10 +516,23 @@ namespace Ailu::RHI::DX12
             }
             else
             {
-                _vertex_buffers[stream_index].Reset();
-                ThrowIfFailed(d3d_dev->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &res_desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(_vertex_buffers[stream_index].GetAddressOf())));
-                NameAndLogResource(_vertex_buffers[stream_index].Get(), std::format("vb_dynamic_{}_{}", _name.empty() ? "unnamed" : _name, stream_index));
-                _vertex_buffers[stream_index]->Map(0, nullptr, reinterpret_cast<void **>(&_stream_data[stream_index]._data));
+                // Keep the old resource alive until the initial CPU data has been copied.  Skinning
+                // meshes use dynamic position/normal streams, but those streams still need their
+                // bind-pose data before the first animation update.
+                u8 *initial_data = _stream_data[stream_index]._data;
+                ComPtr<ID3D12Resource> dynamic_buffer;
+                ThrowIfFailed(d3d_dev->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &res_desc,
+                                                                D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
+                                                                IID_PPV_ARGS(dynamic_buffer.GetAddressOf())));
+                NameAndLogResource(dynamic_buffer.Get(), std::format("vb_dynamic_{}_{}",
+                                                                       _name.empty() ? "unnamed" : _name,
+                                                                       stream_index));
+                u8 *mapped_data = nullptr;
+                ThrowIfFailed(dynamic_buffer->Map(0, nullptr, reinterpret_cast<void **>(&mapped_data)));
+                if (initial_data != nullptr)
+                    memcpy(mapped_data, initial_data, _stream_data[stream_index]._size);
+                _vertex_buffers[stream_index] = std::move(dynamic_buffer);
+                _stream_data[stream_index]._data = mapped_data;
             }
             // Initialize the vertex buffer view.
             _buffer_views[stream_index].BufferLocation = _vertex_buffers[stream_index]->GetGPUVirtualAddress();

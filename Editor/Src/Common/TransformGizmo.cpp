@@ -5,6 +5,7 @@
 #include "Framework/Common/ResourceMgr.h"
 #include "Inc/Physics/Collision.h"
 #include "Render/Gizmo.h"
+#include "Render/Material.h"
 #include "Scene/Scene.h"
 #include "Scene/Component.h"
 

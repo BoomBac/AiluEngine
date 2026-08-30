@@ -61,13 +61,6 @@ namespace Ailu
             StopPreview();
         }
 
-        void AudioClipEditor::Open(AudioClip *clip)
-        {
-            if (clip == nullptr)
-                return;
-            AssetEditor::Open(ResourceMgr::Get().GetLinkedAsset(clip));
-        }
-
         bool AudioClipEditor::OnOpen()
         {
             _clip = GetAssetObject<AudioClip>();

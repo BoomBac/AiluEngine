@@ -1,8 +1,6 @@
 #include "Common/CameraControllers.h"
 
-#include "Objects/Type.h"
 #include "Render/Camera.h"
-#include "Render/Features/MiscPasses.h"
 
 #include <algorithm>
 #include <cmath>
@@ -64,71 +62,120 @@ namespace Ailu::Editor
         _target_pos = position;
     }
 
-    void OrbitCameraController::Attach(Render::VolumeTexturePreviewPass *pass)
+    void OrbitCameraController::SetOrbit(const Vector3f &target, f32 yaw, f32 pitch, f32 distance)
     {
-        _pass = pass;
-        _cam_pos_prop = nullptr;
-        if (_pass)
-        {
-            _cam_pos_prop = _pass->GetType()->FindPropertyByName("_camera_pos");
-            _radius = std::max(_min_radius, Magnitude(_pass->_camera_pos));
-        }
+        _target = target;
+        _yaw = yaw;
+        _pitch = std::clamp(pitch, -1.5f, 1.5f);
+        _radius = distance;
+        ClampDistance();
     }
 
-    void OrbitCameraController::BeginDrag(const Vector2f &local_pos)
+    void OrbitCameraController::SetCameraPosition(const Vector3f &position)
     {
-        _last_mouse = local_pos;
-        _is_dragging = true;
-        if (_pass)
-            _radius = std::max(_min_radius, Magnitude(_pass->_camera_pos));
-    }
-
-    void OrbitCameraController::EndDrag()
-    {
-        _is_dragging = false;
-    }
-
-    void OrbitCameraController::Drag(const Vector2f &local_pos)
-    {
-        if (!_is_dragging || !_pass || !_cam_pos_prop)
+        const Vector3f offset = position - _target;
+        const f32 distance = Magnitude(offset);
+        if (distance <= Math::kFloatEpsilon)
             return;
-        Vector2f delta = local_pos - _last_mouse;
-        _last_mouse = local_pos;
+        _radius = distance;
+        _yaw = std::atan2(offset.x, offset.z);
+        _pitch = std::clamp(std::asin(std::clamp(offset.y / distance, -1.0f, 1.0f)), -1.5f, 1.5f);
+        ClampDistance();
+    }
 
+    void OrbitCameraController::SetDistanceLimits(f32 min_distance, f32 max_distance)
+    {
+        _min_radius = std::max(min_distance, 0.001f);
+        _max_radius = std::max(max_distance, _min_radius);
+        ClampDistance();
+    }
+
+    Vector3f OrbitCameraController::GetCameraOffset() const
+    {
+        const f32 cos_pitch = std::cos(_pitch);
+        return Vector3f{_radius * cos_pitch * std::sin(_yaw), _radius * std::sin(_pitch),
+                        _radius * cos_pitch * std::cos(_yaw)};
+    }
+
+    Vector3f OrbitCameraController::GetCameraPosition() const
+    {
+        return _target + GetCameraOffset();
+    }
+
+    Vector3f OrbitCameraController::GetCameraForward() const
+    {
+        return Normalize(_target - GetCameraPosition());
+    }
+
+    Vector3f OrbitCameraController::GetCameraRight() const
+    {
+        Vector3f world_up = Vector3f::kUp;
+        const Vector3f forward = GetCameraForward();
+        if (std::abs(DotProduct(forward, world_up)) > 0.999f)
+            world_up = Vector3f::kForward;
+        return Normalize(CrossProduct(world_up, forward));
+    }
+
+    Vector3f OrbitCameraController::GetCameraUp() const
+    {
+        return CrossProduct(GetCameraForward(), GetCameraRight());
+    }
+
+    void OrbitCameraController::BeginOrbit(const Vector2f &local_pos)
+    {
+        _last_orbit_mouse = local_pos;
+        _is_orbiting = true;
+    }
+
+    void OrbitCameraController::EndOrbit()
+    {
+        _is_orbiting = false;
+    }
+
+    void OrbitCameraController::Orbit(const Vector2f &local_pos)
+    {
+        if (!_is_orbiting)
+            return;
+        const Vector2f delta = local_pos - _last_orbit_mouse;
+        _last_orbit_mouse = local_pos;
         _yaw += delta.x * _sensitivity;
-        _pitch += delta.y * _sensitivity;
-        _pitch = std::clamp(_pitch, -1.5f, 1.5f);
-        ApplyCameraPosition();
+        _pitch = std::clamp(_pitch + delta.y * _sensitivity, -1.5f, 1.5f);
+    }
+
+    void OrbitCameraController::BeginPan(const Vector2f &local_pos)
+    {
+        _last_pan_mouse = local_pos;
+        _is_panning = true;
+    }
+
+    void OrbitCameraController::EndPan()
+    {
+        _is_panning = false;
+    }
+
+    void OrbitCameraController::Pan(const Vector2f &local_pos, const Vector2f &view_size, f32 vertical_fov)
+    {
+        if (!_is_panning || view_size.y <= 1.0f)
+            return;
+        const Vector2f delta = local_pos - _last_pan_mouse;
+        _last_pan_mouse = local_pos;
+        const f32 world_per_pixel = 2.0f * _radius * std::tan(vertical_fov * 0.5f) / view_size.y;
+        _target -= GetCameraRight() * (delta.x * world_per_pixel);
+        _target += GetCameraUp() * (delta.y * world_per_pixel);
     }
 
     void OrbitCameraController::Zoom(f32 scroll_delta)
     {
-        if (!_pass || !_cam_pos_prop)
+        if (std::abs(scroll_delta) <= Math::kFloatEpsilon)
             return;
-        f32 delta = scroll_delta > 0.0f ? -_zoom_step : _zoom_step;
-        _radius = std::clamp(_radius + delta, _min_radius, _max_radius);
-
-        f32 len = Magnitude(_pass->_camera_pos);
-        if (len > 1e-6f)
-        {
-            auto pos = _pass->_camera_pos * (_radius / len);
-            _cam_pos_prop->Set(_pass, pos, PropertyInfo::EPropertyChangeSource::kUI);
-        }
+        const f32 steps = scroll_delta / 120.0f;
+        _radius *= std::pow(_zoom_factor, steps);
+        ClampDistance();
     }
 
-    void OrbitCameraController::ApplyCameraPosition()
+    void OrbitCameraController::ClampDistance()
     {
-        Vector3f pos;
-        f32 cp = std::cos(_pitch);
-        pos.x = _radius * cp * std::sin(_yaw);
-        pos.y = _radius * std::sin(_pitch);
-        pos.z = _radius * cp * std::cos(_yaw);
-
-        f32 len = Magnitude(pos);
-        LOG_INFO("Orbit Camera Pos: {}, len={}", pos.ToString(), len);
-        if (len > 1e-6f)
-            pos *= (_radius / len);
-        _cam_pos_prop->Set(_pass, pos, PropertyInfo::EPropertyChangeSource::kUI);
+        _radius = std::clamp(_radius, _min_radius, _max_radius);
     }
 
     void CanvasCameraController::Attach(Render::Camera *camera)

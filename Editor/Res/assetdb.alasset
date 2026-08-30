@@ -84,6 +84,11 @@
       "guid": "7943a6f3-55c5-4b33-bd95-efe909b02479",
       "path": "editor://Icons/Assets/InputActionAsset.alasset",
       "type": "Ailu::Render::Texture2D"
+    },
+    {
+      "guid": "aca06c5f-4c83-405b-9924-4d89f480980f",
+      "path": "editor://Icons/Assets/SkeletonAsset.alasset",
+      "type": "Ailu::Render::Texture2D"
     }
   ]
 }

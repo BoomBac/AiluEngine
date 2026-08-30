@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __ASSETCOMMON_GEN_H__
 //Struct AssetDependency begin...........................
-#define ASSETCOMMON_GEN_H_28_GENERATED_BODY \
+#define ASSETCOMMON_GEN_H_29_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_AssetDependency_Type();\
                                 static const Type* GetPrivateStaticClass();\

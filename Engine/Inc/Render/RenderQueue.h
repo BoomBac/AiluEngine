@@ -2,8 +2,6 @@
 #ifndef __RENDER_QUEUE__
 #define __RENDER_QUEUE__
 
-#include "Material.h"
-#include "Mesh.h"
 
 namespace Ailu
 {

@@ -8,6 +8,9 @@
 #include <Framework/Math/Guid.h>
 #include <Framework/Common/ResourceMgr.h>
 #include <Assets/AssetDocument.h>
+#include <Assets/AssetRef.h>
+#include <Assets/AssetArtifact.h>
+#include <Assets/DerivedDataCache.h>
 #include <Graph/GraphDocument.h>
 #include <Input/InputSystem.h>
 #include <Objects/JsonArchive.h>
@@ -20,11 +23,14 @@
 #include <UI/Container.h>
 #include <UI/Widget.h>
 
+
 #include <algorithm>
 #include <array>
 #include <atomic>
 #include <cstdint>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <mutex>
@@ -93,6 +99,11 @@ namespace Ailu::AnimationTests
     bool TestControllerTriggerConsumption();
     bool TestAnimationEventLoopWrap();
     bool TestSpriteAnimationTrackSampling();
+    bool TestTrackEndFrameSampling();
+    bool TestSparseTransformTrackSemantics();
+    bool TestSparseAnimationDocumentRoundtrip();
+    bool TestSkeletonAssetDocumentRoundtrip();
+    bool TestAnimationKeyReduction();
 }
 
 namespace
@@ -1122,6 +1133,99 @@ namespace
         return true;
     }
 
+    bool TestAssetRefStates()
+    {
+        AssetRef<Object> reference;
+        if (reference.IsAssigned() || reference.IsResolved() || reference.IsMissing())
+            return false;
+
+        const Guid guid = Guid::Generate();
+        reference.SetGuid(guid);
+        if (!reference.IsAssigned() || reference.IsResolved() || !reference.IsMissing() || reference.GetGuid() != guid)
+            return false;
+
+        auto object = MakeRef<Object>("Resolved");
+        reference.Set(guid, object);
+        if (!reference.IsAssigned() || !reference.IsResolved() || reference.IsMissing() || reference.Get() != object)
+            return false;
+
+        reference.Clear();
+        return !reference.IsAssigned() && !reference.IsResolved() && !reference.IsMissing() &&
+               reference.Get() == nullptr;
+    }
+
+    bool TestArtifactContainerRoundtrip()
+    {
+        AssetArtifactKey key;
+        key._source_hash = 0x123456789abcdef0ull;
+        key._import_setting_hash = 0x0fedcba987654321ull;
+        key._dependency_hash = 0x1122334455667788ull;
+        key._importer_version = 3u;
+        key._artifact_version = kTextureArtifactVersion;
+
+        const Vector<u8> source_data{1u, 2u, 3u, 5u, 8u};
+        AssetArtifactWriter writer;
+        writer.AddSection(42u, source_data, static_cast<u32>(source_data.size()), sizeof(u8));
+
+        Vector<u8> serialized;
+        if (!writer.Serialize(EAssetArtifactType::kTexture, kTextureArtifactVersion, key, serialized))
+            return false;
+
+        AssetArtifactReader reader;
+        if (!reader.Load(serialized, key, EAssetArtifactType::kTexture))
+            return false;
+        const auto section = reader.GetSectionData(42u);
+        if (section.size() != source_data.size() || !std::equal(section.begin(), section.end(), source_data.begin()))
+            return false;
+
+        AssetArtifactKey wrong_key = key;
+        ++wrong_key._source_hash;
+        if (reader.Load(serialized, wrong_key, EAssetArtifactType::kTexture))
+            return false;
+
+        serialized[0] ^= 0xffu;
+        return !reader.Load(serialized, key, EAssetArtifactType::kTexture);
+    }
+
+    bool TestDerivedDataCacheRoundtrip()
+    {
+        const std::filesystem::path root = std::filesystem::temp_directory_path() / "ailu_ddc_roundtrip";
+        std::error_code error;
+        std::filesystem::remove_all(root, error);
+
+        DerivedDataCache cache(root.wstring());
+        AssetArtifactKey key;
+        key._source_hash = 0xabcdef01u;
+        key._importer_version = 1u;
+        key._artifact_version = kTextureArtifactVersion;
+        AssetArtifactWriter writer;
+        const Vector<u8> source_data{9u, 7u, 5u, 3u, 1u};
+        writer.AddSection(7u, source_data, static_cast<u32>(source_data.size()), sizeof(u8));
+        Vector<u8> serialized;
+        const bool serialized_ok = writer.Serialize(EAssetArtifactType::kTexture, kTextureArtifactVersion, key,
+                                                    serialized);
+        if (!serialized_ok)
+            return false;
+
+        const Guid guid = Guid::Generate();
+        if (!cache.Store(guid, key, serialized) || !std::filesystem::exists(cache.GetArtifactPath(guid, key)))
+            return false;
+
+        Vector<u8> loaded;
+        if (!cache.TryLoad(guid, key, loaded) || loaded != serialized)
+            return false;
+
+        serialized[0] ^= 0xffu;
+        std::ofstream corrupted(cache.GetArtifactPath(guid, key), std::ios::binary | std::ios::trunc);
+        corrupted.write(reinterpret_cast<const char *>(serialized.data()),
+                        static_cast<std::streamsize>(serialized.size()));
+        corrupted.close();
+        loaded.clear();
+        const bool rejected_corrupted = !cache.TryLoad(guid, key, loaded);
+        std::filesystem::remove_all(root, error);
+        return rejected_corrupted;
+    }
+
     // =========================================================================
     // SceneAssetDocument 文档级测试（无需 GPU）。
     // 覆盖任务包 4：V2 场景文档自定义序列化往返 + V1 旧格式兼容反序列化。
@@ -1686,6 +1790,9 @@ namespace
 
         RunTest(result, "Guid::IsEmpty/IsValid", TestGuidIsEmptyIsValid);
         RunTest(result, "GuidHasher stable", TestGuidHasher);
+        RunTest(result, "AssetRef state transitions", TestAssetRefStates);
+        RunTest(result, "AssetArtifact container roundtrip", TestArtifactContainerRoundtrip);
+        RunTest(result, "DerivedDataCache roundtrip", TestDerivedDataCacheRoundtrip);
         RunTest(result, "SceneDocument V2 roundtrip", TestSceneDocumentV2Roundtrip);
         RunTest(result, "SceneDocument V1 legacy deserialize", TestSceneDocumentV1LegacyDeserialize);
         RunTest(result, "EntityReference IsValid", TestEntityReferenceIsValid);
@@ -1809,6 +1916,11 @@ namespace
         RunTest(result, "AnimationController trigger consumption", TestControllerTriggerConsumption);
         RunTest(result, "Animation event loop wrap", TestAnimationEventLoopWrap);
         RunTest(result, "Sprite animation track sampling", TestSpriteAnimationTrackSampling);
+        RunTest(result, "Track end frame sampling", TestTrackEndFrameSampling);
+        RunTest(result, "Sparse transform track semantics", TestSparseTransformTrackSemantics);
+        RunTest(result, "Sparse animation document roundtrip", TestSparseAnimationDocumentRoundtrip);
+        RunTest(result, "Skeleton asset document roundtrip", TestSkeletonAssetDocumentRoundtrip);
+        RunTest(result, "Animation key reduction", TestAnimationKeyReduction);
 
         std::cout << "========================================\n";
         std::cout << "Animation tests passed: " << result._passed << '\n';
@@ -1864,6 +1976,7 @@ namespace
         if (result._failed != 0u)
             std::exit(EXIT_FAILURE);
     }
+
 }
 
 int main(int argc, char **argv)
@@ -1880,6 +1993,16 @@ int main(int argc, char **argv)
         Allocator::Shutdown();
         LogMgr::Shutdown();
         return EXIT_SUCCESS;
+    }
+
+    if (argc == 2 && std::strcmp(argv[1], "--artifact-cache-tests") == 0)
+    {
+        TestResult result;
+        RunTest(result, "AssetArtifact container roundtrip", TestArtifactContainerRoundtrip);
+        RunTest(result, "DerivedDataCache roundtrip", TestDerivedDataCacheRoundtrip);
+        Allocator::Shutdown();
+        LogMgr::Shutdown();
+        return result._failed == 0u ? EXIT_SUCCESS : EXIT_FAILURE;
     }
 
     if (argc == 2 && std::strcmp(argv[1], "--ui-element-roundtrip") == 0)

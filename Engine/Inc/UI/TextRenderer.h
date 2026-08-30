@@ -14,6 +14,7 @@ namespace Ailu
     namespace Render
     {
         class CommandBuffer;
+        class RenderTexture;
     }
     namespace UI
     {

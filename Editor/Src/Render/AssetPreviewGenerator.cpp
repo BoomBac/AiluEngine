@@ -1,10 +1,13 @@
 #include "Render/AssetPreviewGenerator.h"
+#include "Framework/Common/ResourceMgr.h"
 #include "Render/Mesh.h"
 #include "Render/2D/Sprite.h"
 #include "Render/2D/SpriteBatcher.h"
 #include "Render/CommandBuffer.h"
 #include "Render/GraphicsContext.h"
+#include "Render/Material.h"
 #include "Render/ResourcePool.h"
+#include "Render/Shader.h"
 
 using namespace Ailu::Render;
 namespace Ailu
@@ -14,72 +17,127 @@ namespace Ailu
         namespace
         {
             Scope<SpriteBatcher> s_sprite_batcher;
+
+            void GenerateMeshSnapshotImpl(u16 w, u16 h, Render::Mesh *mesh, Render::Material *material,
+                                          const String &preview_name, Ref<Render::RenderTexture> &target)
+            {
+                if (mesh == nullptr || material == nullptr)
+                {
+                    LOG_ERROR("Invalid mesh or material for snapshot generation.");
+                    return;
+                }
+                if (mesh->BoundBox().empty())
+                {
+                    LOG_ERROR("Mesh has no bounds for snapshot generation: {}", mesh->Name());
+                    return;
+                }
+
+                if (target == nullptr)
+                    target = RenderTexture::Create(w, h, std::format("{}_preview", preview_name));
+                if (target == nullptr || target->Width() == 0u || target->Height() == 0u)
+                {
+                    LOG_ERROR("Failed to create mesh snapshot target: {}", preview_name);
+                    return;
+                }
+
+                auto cmd = CommandBufferPool::Get("GeneratorMeshSnapshot");
+                auto depth = cmd->GetTempRT(
+                        target->Width(), target->Height(),
+                        std::format("{}_temp_depth", target->Name()),
+                        ERenderTargetFormat::kDepth, false, false, false);
+
+                cmd->SetRenderTargetLoadAction(depth, ELoadStoreAction::kClear);
+                cmd->SetRenderTargetLoadAction(target.get(), ELoadStoreAction::kClear);
+                cmd->SetRenderTarget(target.get(), g_pRenderTexturePool->Get(depth));
+
+                const auto &aabb = mesh->BoundBox()[0];
+                Vector3f center = (aabb._min + aabb._max) * 0.5f;
+                Vector3f extents = (aabb._max - aabb._min) * 0.5f;
+                f32 radius = std::max(Magnitude(extents), 0.001f);
+
+                f32 fov = 90.0f * k2Radius;
+                f32 aspect = f32(target->Width()) / f32(target->Height());
+                f32 near_plane = 0.01f;
+                f32 far_plane = 1000.0f;
+
+                f32 distance = radius / tanf(fov * 0.5f) * 1.2f;
+                Vector3f view_dir = Normalize(Vector3f(-1, -1, -1));
+                Vector3f camera_pos = -view_dir * distance;
+                Vector3f up(0, 1, 0);
+                Matrix4x4f view, proj;
+                BuildViewMatrixLookToLH(view, camera_pos, view_dir, up);
+                BuildPerspectiveFovLHMatrix(proj, fov, aspect, near_plane, far_plane);
+                CBufferPerCameraData data{};
+                data._MatrixV = view;
+                data._MatrixP = proj;
+                data._MatrixVP = view * proj;
+                data._MatrixVP_NoJitter = data._MatrixVP;
+                data._CameraPos = Vector4f(camera_pos, 1.0f);
+                data._ScreenParams = Vector4f(1.0f / f32(target->Width()), 1.0f / f32(target->Height()),
+                                              f32(target->Width()), f32(target->Height()));
+                CBufferPerSceneData scene_data{};
+                scene_data._DirectionalLights[0]._LightDir = Normalize(Vector3f(-0.45f, -1.0f, -0.65f));
+                scene_data._DirectionalLights[0]._LightColor = Vector3f(1.0f, 1.0f, 1.0f);
+                scene_data._DirectionalLights[0]._shadowmap_index = -1;
+                scene_data._ActiveLightCount.x = 1.0f;
+                cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerScene, &scene_data, sizeof(scene_data));
+                cmd->SetGlobalTexture("_OcclusionTex", Texture::s_p_default_white);
+                cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &data, sizeof(data));
+                const Matrix4x4f world_matrix = MatrixTranslation(Vector3f(-center.x, -center.y, -center.z));
+                for (u16 i = 0; i < mesh->SubmeshCount(); i++)
+                    cmd->DrawMesh(mesh, material, world_matrix, i);
+
+                // The generated texture may be replaced immediately by AssetBrowser.  Submit
+                // synchronously so the old render target cannot be destroyed before execution.
+                GraphicsContext::Get().ExecuteCommandBufferSync(cmd);
+                cmd->ReleaseTempRT(depth);
+                CommandBufferPool::Release(cmd);
+            }
         }
 
-        void AssetPreviewGenerator::GeneratorMeshSnapshot(u16 w, u16 h, Render::Mesh *mesh,Ref<Render::RenderTexture> &target)
+        void AssetPreviewGenerator::GeneratorMeshSnapshot(u16 w, u16 h, Render::Mesh *mesh,
+                                                          Ref<Render::RenderTexture> &target)
         {
-            if (!mesh)
+            auto standard_material = Material::s_standard_forward_lit.lock();
+            String preview_name = "mesh";
+            if (mesh != nullptr)
+                preview_name = mesh->Name();
+            GenerateMeshSnapshotImpl(w, h, mesh, standard_material.get(), preview_name, target);
+        }
+
+        void AssetPreviewGenerator::GeneratorMaterialSnapshot(u16 w, u16 h, Render::Material *material,
+                                                               Ref<Render::RenderTexture> &target)
+        {
+            if (material == nullptr)
             {
-                LOG_ERROR("Invalid mesh for snapshot generation.");
+                LOG_ERROR("Invalid material for snapshot generation.");
                 return;
             }
-            if (target == nullptr)
-                target = RenderTexture::Create(w, h, std::format("{}_preview", mesh->Name()));
-            auto cmd = CommandBufferPool::Get("GeneratorMeshSnapshot");
-            auto depth = cmd->GetTempRT(
-                    target->Width(), target->Height(),
-                    std::format("{}_temp_depth", target->Name()),
-                    ERenderTargetFormat::kDepth, false, false, false);
+            auto sphere = Mesh::s_sphere.lock();
+            if (sphere == nullptr)
+            {
+                LOG_ERROR("Sphere mesh is unavailable for material snapshot generation.");
+                return;
+            }
 
-            cmd->SetRenderTargetLoadAction(depth, ELoadStoreAction::kClear);
-            cmd->SetRenderTargetLoadAction(target.get(), ELoadStoreAction::kClear);
-            cmd->SetRenderTarget(target.get(), g_pRenderTexturePool->Get(depth));
-
-            const auto &aabb = mesh->BoundBox()[0];
-            Vector3f center = (aabb._min + aabb._max) * 0.5f;
-            Vector3f extents = (aabb._max - aabb._min) * 0.5f;
-            f32 radius = Magnitude(extents);
-
-            f32 fov = 90.0f * k2Radius;
-            f32 aspect = f32(target->Width()) / f32(target->Height());
-            f32 nearPlane = 0.01f;
-            f32 farPlane = 1000.0f;
-
-            f32 distance = radius * tanf(fov * 0.5f) * 1.2f;// 稍留边距
-            Vector3f viewDir = Normalize(Vector3f(-1, -1, -1));
-            // The mesh is translated by -center below, so build the camera in the same
-            // centered coordinate system rather than leaving it in the asset's original space.
-            Vector3f cameraPos = -viewDir * distance;
-            Vector3f up(0, 1, 0);
-            Matrix4x4f view, proj;
-            BuildViewMatrixLookToLH(view, cameraPos, viewDir, up);
-            BuildPerspectiveFovLHMatrix(proj, fov, aspect, nearPlane, farPlane);
-            CBufferPerCameraData data{};
-            data._MatrixV = view;
-            data._MatrixP = proj;
-            data._MatrixVP = view * proj;
-            data._MatrixVP_NoJitter = data._MatrixVP;
-            data._CameraPos = Vector4f(cameraPos, 1.0f);
-            data._ScreenParams = Vector4f(1.0f / f32(target->Width()), 1.0f / f32(target->Height()),
-                                          f32(target->Width()), f32(target->Height()));
-            CBufferPerSceneData scene_data{};
-            scene_data._DirectionalLights[0]._LightDir = Normalize(Vector3f(-0.45f, -1.0f, -0.65f));
-            scene_data._DirectionalLights[0]._LightColor = Vector3f(1.0f, 1.0f, 1.0f);
-            scene_data._DirectionalLights[0]._shadowmap_index = -1;
-            scene_data._ActiveLightCount.x = 1.0f;
-            cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerScene, &scene_data, sizeof(scene_data));
-            cmd->SetGlobalTexture("_OcclusionTex", Texture::s_p_default_white);
-            cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &data, sizeof(data));
-            const Matrix4x4f world_matrix = MatrixTranslation(Vector3f(-center.x, -center.y, -center.z));
-            for (u16 i = 0; i < mesh->SubmeshCount(); i++)
-                cmd->DrawMesh(mesh, Material::s_standard_forward_lit.lock().get(), world_matrix, i);
-            // The generated texture may be replaced immediately by AssetBrowser.  Submit
-            // synchronously so the old render target cannot be destroyed before execution.
-            GraphicsContext::Get().ExecuteCommandBufferSync(cmd);
-            cmd->ReleaseTempRT(depth);
-            CommandBufferPool::Release(cmd);
+            Ref<Material> preview_material;
+            Material *draw_material = material;
+            if (material->IsStandardLit())
+            {
+                auto forward_shader = ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/forwardlit.alasset");
+                if (forward_shader != nullptr)
+                {
+                    preview_material = material->CreateInstance();
+                    if (preview_material != nullptr)
+                    {
+                        preview_material->SetActiveShader(forward_shader);
+                        preview_material->SetCullMode(material->GetCullMode());
+                        draw_material = preview_material.get();
+                    }
+                }
+            }
+            GenerateMeshSnapshotImpl(w, h, sphere.get(), draw_material, material->Name(), target);
         }
-
         void AssetPreviewGenerator::GeneratorSpriteSnapshot(u16 w, u16 h, Render::Sprite *sprite, Ref<Render::RenderTexture> &target)
         {
             if (!sprite || !sprite->_texture)

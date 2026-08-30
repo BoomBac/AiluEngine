@@ -7,7 +7,6 @@
 #define __PHYSICS_SYSTEM__
 
 #include "Scene/Entity.h"
-#include "Render/Material.h"
 #include "Scene/Component.h"
 #include "Physics/Collision.h"
 namespace Ailu

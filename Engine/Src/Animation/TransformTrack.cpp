@@ -59,26 +59,26 @@ namespace Ailu
     }
     bool TransformTrack::IsValid()
     {
-        return _pos_track.Size() > 1 ||
-               _rot_track.Size() > 1 ||
-               _scale_track.Size() > 1;
+        return _pos_track.Size() > 0 ||
+               _rot_track.Size() > 0 ||
+               _scale_track.Size() > 0;
     }
     f32 TransformTrack::GetStartTime()
     {
         f32 result = 0.0f;
         bool isSet = false;
-        if (_pos_track.Size() > 1) {
+        if (_pos_track.Size() > 0) {
             result = _pos_track.GetStartTime();
             isSet = true;
         }
-        if (_rot_track.Size() > 1) {
+        if (_rot_track.Size() > 0) {
             f32 rotationStart = _rot_track.GetStartTime();
             if (rotationStart < result || !isSet) {
                 result = rotationStart;
                 isSet = true;
             }
         }
-        if (_scale_track.Size() > 1) {
+        if (_scale_track.Size() > 0) {
             f32 scaleStart = _scale_track.GetStartTime();
             if (scaleStart < result || !isSet) {
                 result = scaleStart;
@@ -91,18 +91,18 @@ namespace Ailu
     {
         f32 result = 0.0f;
         bool isSet = false;
-        if (_pos_track.Size() > 1) {
+        if (_pos_track.Size() > 0) {
             result = _pos_track.GetEndTime();
             isSet = true;
         }
-        if (_rot_track.Size() > 1) {
+        if (_rot_track.Size() > 0) {
             f32 rotationEnd = _rot_track.GetEndTime();
             if (rotationEnd > result || !isSet) {
                 result = rotationEnd;
                 isSet = true;
             }
         }
-        if (_scale_track.Size() > 1) {
+        if (_scale_track.Size() > 0) {
             f32 scaleEnd = _scale_track.GetEndTime();
             if (scaleEnd > result || !isSet) {
                 result = scaleEnd;
@@ -114,17 +114,20 @@ namespace Ailu
     Transform TransformTrack::Evaluate(const Transform &ref, f32 time, bool looping)
     {
         Transform result = ref; // Assign default values
-        if (_pos_track.Size() > 1) { // Only if valid
-            auto res = _pos_track.Evaluate(time, looping);
-            memcpy(result._position.data, &res, sizeof(Vector3f));
+        if (_pos_track.Size() == 1) {
+            result._position = TrackHelpers::ToVector(_pos_track[0]);
+        } else if (_pos_track.Size() > 1) {
+            result._position = TrackHelpers::ToVector(_pos_track.Evaluate(time, looping));
         }
-        if (_rot_track.Size() > 1) { // Only if valid
-            auto res = _rot_track.Evaluate(time, looping);
-            memcpy(result._rotation._quat.data, &res, sizeof(Quaternion));
+        if (_rot_track.Size() == 1) {
+            result._rotation = TrackHelpers::ToQuaternion(_rot_track[0]);
+        } else if (_rot_track.Size() > 1) {
+            result._rotation = TrackHelpers::ToQuaternion(_rot_track.Evaluate(time, looping));
         }
-        if (_scale_track.Size() > 1) { // Only if valid
-            auto res = _scale_track.Evaluate(time, looping);
-            memcpy(result._scale.data, &res, sizeof(Vector3f));
+        if (_scale_track.Size() == 1) {
+            result._scale = TrackHelpers::ToVector(_scale_track[0]);
+        } else if (_scale_track.Size() > 1) {
+            result._scale = TrackHelpers::ToVector(_scale_track.Evaluate(time, looping));
         }
         return result;
     }

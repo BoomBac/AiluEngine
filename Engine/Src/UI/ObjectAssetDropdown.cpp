@@ -24,9 +24,45 @@ namespace Ailu
         ObjectAssetDropdown::ObjectAssetDropdown(const Type *object_type) : _object_type(object_type)
         {
             Name("ObjectAssetDropdown");
+            SetPopupBackdropEnabled(false);
             SetPopupBuilder([this](Vector2f anchor_size) { return BuildPopup(anchor_size); });
             SetOnPopupOpening([this]() { RefreshItems(); });
             _on_selected_changed += [this](i32 index) { SelectEntry(index, !_is_syncing_selection); };
+            DropHandler drop_handler;
+            drop_handler._can_drop = [this](const DragPayload &payload)
+            {
+                if (payload._data == nullptr)
+                    return false;
+                switch (payload._type)
+                {
+                case EDragType::kAsset:
+                case EDragType::kMesh:
+                case EDragType::kTexture:
+                case EDragType::kMaterial:
+                case EDragType::kPrefab:
+                case EDragType::kAudio:
+                case EDragType::kScript:
+                case EDragType::kShader:
+                case EDragType::kAnimation:
+                case EDragType::kPhysicsAsset:
+                case EDragType::kBlueprint:
+                {
+                    const auto *asset = static_cast<const Asset *>(payload._data);
+                    return asset != nullptr && IsTypeCompatible(_object_type, asset->_asset_type);
+                }
+                default:
+                    return false;
+                }
+            };
+            drop_handler._on_drop = [this](const DragPayload &payload, f32, f32)
+            {
+                const auto *asset = static_cast<const Asset *>(payload._data);
+                if (asset == nullptr || !IsTypeCompatible(_object_type, asset->_asset_type))
+                    return;
+                RefreshItems();
+                SetSelectedGuid(asset->GetGuid(), true);
+            };
+            SetDropHandler(std::move(drop_handler));
             RefreshItems();
         }
 
@@ -54,6 +90,8 @@ namespace Ailu
         void ObjectAssetDropdown::SetSelectedGuid(const Guid &guid, bool notify)
         {
             _selected_guid = guid;
+            if (!guid.IsEmpty() && FindEntryIndex(guid) < 0)
+                RefreshItems();
             const i32 index = FindEntryIndex(guid);
             _is_syncing_selection = !notify;
             Dropdown::SetSelectedIndex(index);
@@ -109,6 +147,14 @@ namespace Ailu
             }
 
             std::sort(_entries.begin(), _entries.end(), [](const Entry &lhs, const Entry &rhs) { return lhs._name < rhs._name; });
+            if (!_selected_guid.IsEmpty() && FindEntryIndex(_selected_guid) < 0)
+            {
+                Entry missing_entry;
+                missing_entry._guid = _selected_guid;
+                missing_entry._name = std::format("Missing: {} !", _selected_guid.ToString());
+                missing_entry._is_missing = true;
+                _entries.emplace_back(std::move(missing_entry));
+            }
             if (_allow_none)
             {
                 names.resize(1u);
@@ -153,9 +199,14 @@ namespace Ailu
                 return;
 
             Entry &entry = _entries[entry_index];
-            if (entry._object == nullptr && entry._asset != nullptr)
+            if (entry._is_missing)
+            {
+                _selected_guid = entry._guid;
+                return;
+            }
+            if (!entry._is_missing && entry._object == nullptr && entry._asset != nullptr)
                 entry._object = ResourceMgr::Get().Load(entry._asset->_asset_path, nullptr, entry._asset->_asset_type).get();
-            if (entry._object == nullptr && !entry._guid.IsEmpty())
+            if (!entry._is_missing && entry._object == nullptr && !entry._guid.IsEmpty())
                 entry._object = ResourceMgr::Get().Load<Object>(entry._guid).get();
             _selected_guid = entry._guid;
             if (notify)
@@ -264,6 +315,13 @@ namespace Ailu
             if (entry_index < 0 || entry_index >= static_cast<i32>(_entries.size()))
                 return row;
             Entry &entry = _entries[entry_index];
+            if (entry._is_missing)
+            {
+                auto *name = row->AddChild<Text>(entry._name);
+                name->GetSlotAs<LinearSlot>().SizePolicy(ESizePolicy::kFill, ESizePolicy::kFixed)
+                    .Size({0.0f, kItemHeight}).Margin(Padding(6.0f));
+                return row;
+            }
             if (Render::Texture *preview = GetPreviewTexture(entry); preview != nullptr)
             {
                 auto *image = row->AddChild<Image>(preview);

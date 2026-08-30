@@ -3,12 +3,28 @@
 #define __RENDER_PASS__
 #include "Framework/Common/NonCopyable.h"
 #include "Objects/Object.h"
-#include "Render/GraphicsContext.h"
-#include "Render/Material.h"
-#include "Render/Mesh.h"
-#include "Render/RenderingData.h"
 #include "Render/RenderGraph/RenderGraphFwd.h"
 #include "generated/RenderFeature.gen.h"
+
+namespace Ailu
+{
+    namespace Render
+    {
+        class GraphicsContext;
+        struct RenderingData;
+        class Material;
+        class Mesh;
+        class Texture;
+        class Texture2D;
+        class Texture3D;
+        class RenderTexture;
+        class Shader;
+        class ComputeShader;
+        class VertexBuffer;
+        class IndexBuffer;
+        class ConstantBuffer;
+    }
+}
 
 namespace Ailu
 {

@@ -2,6 +2,7 @@
 #ifndef __ASSET_BROWSER_CONTENT_H__
 #define __ASSET_BROWSER_CONTENT_H__
 
+#include "Assets/AssetCommon.h"
 #include "Framework/Core/CoreMinimal.h"
 #include "Framework/Core/Containers/Map.h"
 #include "Framework/Core/Containers/Vector.h"
@@ -18,8 +19,6 @@ namespace Ailu
 
     class Asset;
     class Type;
-    enum class EAssetDomain : i32;
-
     namespace Editor
     {
         struct AssetBrowserRootDesc

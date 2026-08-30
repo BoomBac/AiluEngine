@@ -60,6 +60,12 @@ namespace Ailu
     {
         GENERATED_BODY()
 
+        AnimationParameterDesc() = default;
+        AnimationParameterDesc(String name, u32 name_hash, EAnimationParameterType type)
+            : _name(std::move(name)), _name_hash(name_hash), _type(type)
+        {
+        }
+
         APROPERTY()
         String _name;
         APROPERTY()

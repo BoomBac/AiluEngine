@@ -19,6 +19,7 @@ namespace Ailu
         _tracks = source._tracks;
         _sprite_track = source._sprite_track;
         _events = source._events;
+        _preview_mesh_guid = source._preview_mesh_guid;
     }
     u16 AnimationClip::GetIdAtIndex(u32 index) const
     {

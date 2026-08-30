@@ -3,8 +3,17 @@
 
 #include "UIElement.h"
 #include "UI/Style/UIStyles.h"
-#include "Render/Material.h"
-#include "Render/Texture.h"
+#include "Framework/Core/Containers/Array.h"
+
+namespace Ailu
+{
+    namespace Render
+    {
+        class Material;
+        class Texture2D;
+    }
+}
+
 #include "generated/ColorPicker.gen.h"
 
 namespace Ailu {

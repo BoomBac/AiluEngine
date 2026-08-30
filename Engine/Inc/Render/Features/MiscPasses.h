@@ -2,6 +2,8 @@
 #define __MISC_PASSES_H__
 #pragma once
 #include "RenderFeature.h"
+#include "Render/RenderingData.h"
+#include <functional>
 #include "generated/MiscPasses.gen.h"
 
 namespace Ailu

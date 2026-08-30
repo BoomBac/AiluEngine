@@ -187,7 +187,7 @@ namespace Ailu
 
             struct ResolvedVertexLayout
             {
-                std::array<ResolvedVertexBinding, RenderConstants::kMaxVertexAttrNum> _bindings{};
+                std::array<ResolvedVertexBinding, 30> _bindings{};
                 u8 _binding_count = 0u;
                 bool _valid = false;
             };

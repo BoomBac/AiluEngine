@@ -13,6 +13,11 @@ namespace Ailu::SceneManagement
     struct AILU_API PrefabOverride
     {
         GENERATED_BODY()
+        PrefabOverride() = default;
+        PrefabOverride(Guid prefab_entity, String component, String property)
+            : _prefab_entity(prefab_entity), _component(std::move(component)), _property(std::move(property))
+        {
+        }
 
         APROPERTY()
         Guid _prefab_entity = Guid::EmptyGuid();
@@ -26,7 +31,6 @@ namespace Ailu::SceneManagement
     struct AILU_API PrefabInstance
     {
         GENERATED_BODY()
-
         APROPERTY()
         Guid _prefab_asset = Guid::EmptyGuid();
         APROPERTY()

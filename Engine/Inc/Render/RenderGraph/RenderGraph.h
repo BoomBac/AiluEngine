@@ -89,6 +89,12 @@ namespace Ailu::Render::RDG
     class RenderGraph;
     class RenderPass;
 
+    struct RGGlobalTextureBinding
+    {
+        RGHandle _handle{};
+        RenderPass *_producer = nullptr;
+    };
+
     using SetupFunction = std::function<void(RenderGraphBuilder &builder)>;
     using ExecuteFunction = std::function<void(RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)>;
 
@@ -223,6 +229,10 @@ namespace Ailu::Render::RDG
         // shader-global registries must not retain RenderGraph resources across passes, cameras, or graph executions.
         bool ContainsResource(const GpuResource *resource) const;
 
+        // Persistent Shader/ComputeShader global registries may only reference non-RG resources.  This guard is
+        // called from their setters while a RenderGraph pass callback is being recorded.
+        static bool ValidatePersistentGlobalResource(const GpuResource *resource, StringView api_name);
+
     public:
         Vector<RenderPass> _debug_passes;
         bool _is_debug = false;
@@ -238,6 +248,8 @@ namespace Ailu::Render::RDG
         bool PrepareResources();
         bool CompileResourceBarriers();
         bool ValidateResourceAccesses();
+        bool PublishGlobalTexture(ShaderPropertyId property_id, RGHandle handle, RenderPass *producer);
+        RGHandle ReadGlobalTexture(ShaderPropertyId property_id) const;
         EResourceState InitialResourceState(const ResourceNode &node) const;
         Vector<u32> ResolveBarrierSubResources(RGHandle handle, const ResourceAccess &access) const;
 
@@ -364,9 +376,12 @@ namespace Ailu::Render::RDG
         HashMap<String, RGHandle> _external_tex_handles;
         HashMap<String, RGHandle> _external_buffer_handles;
         HashMap<u32, ResourceNode> _external_resources;
+        // Current-graph globals keep handles only.  Persistent Shader/ComputeShader globals must never retain RG resources.
+        HashMap<ShaderPropertyId, RGGlobalTextureBinding> _global_textures;
         PassPool _pass_pool{64u};
         RenderGraphCompileStats _compile_stats;
         bool _is_compiled = false;
+
     };
 
     class AILU_API RenderGraphBuilder
@@ -496,6 +511,23 @@ namespace Ailu::Render::RDG
         RGHandle AllocBuffer(const BufferDesc &desc, const String &name)
         {
             return _graph->CreateResource(desc, name);
+        }
+
+        void SetGlobalTextureAfterPass(ShaderPropertyId property_id, RGHandle handle)
+        {
+            _graph->PublishGlobalTexture(property_id, handle, _pass);
+        }
+
+        RGHandle ReadGlobalTexture(ShaderPropertyId property_id, EResourceUsage usage = EResourceUsage::kReadSRV)
+        {
+            const RGHandle handle = _graph->ReadGlobalTexture(property_id);
+            if (!handle.IsValid())
+            {
+                LOG_ERROR("RenderGraphBuilder::ReadGlobalTexture: global texture property={} is not available", property_id);
+                return {};
+            }
+            Read(handle, usage);
+            return handle;
         }
 
     private:

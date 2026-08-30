@@ -8,9 +8,12 @@
 #include "Framework/Core/String.h"
 #include "Framework/Core/Containers/Vector.h"
 #include "Framework/Core/Containers/Map.h"
-#include "Texture.h"
+#include "Framework/Common/Path.h"
+#include "Framework/Math/ALMath.hpp"
 namespace Ailu::Render
 {
+    class Texture;
+
 
     struct FontChar
     {

@@ -18,14 +18,14 @@ namespace Ailu
 		Pose& operator=(const Pose& p);
 		explicit Pose(unsigned int numJoints);
 		void Resize(unsigned int size);
-		unsigned int Size();
+		unsigned int Size() const;
 		int GetParent(unsigned int index);
 		void SetParent(unsigned int index, int parent);
 		[[nodiscard]] Transform GetLocalTransform(unsigned int index) const;
 		void SetLocalTransform(unsigned int index,const Transform& transform);
 		[[nodiscard]] Transform GetGlobalTransform(unsigned int index) const;
 		Transform operator[](unsigned int index);
-		void GetMatrixPalette(Vector<Matrix4x4f>& out);
+		void GetMatrixPalette(Vector<Matrix4x4f>& out) const;
 		bool operator==(const Pose& other);
 		bool operator!=(const Pose& other);
         //返回search是否为root的子节点

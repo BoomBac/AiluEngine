@@ -3,6 +3,9 @@
 #define __COMMON_PASSES_H__
 
 #include "RenderFeature.h"
+#include "Render/RenderingData.h"
+#include <set>
+#include <unordered_map>
 
 namespace Ailu
 {

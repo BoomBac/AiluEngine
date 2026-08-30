@@ -11,7 +11,7 @@
                                 static const Type* GetPrivateStaticClass();\
                             public:\
                                 static const Type *StaticType() {return GetPrivateStaticClass();};\
-                                const Type  *GetType();
+                                virtual const Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu::SceneManagement{
 class Scene ;

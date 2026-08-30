@@ -738,7 +738,9 @@ bool TestEntityApi()
                     "Entity handle: OnUpdate dt should be 0.016");
 
     // Verify the current ScriptEntity API.
-    ScriptEntity handle{&scene, entity};
+    ScriptEntity handle;
+    handle._scene = &scene;
+    handle._entity = entity;
     all_ok &= Check(handle.IsValid(), "ScriptEntity::IsValid() should be true");
     all_ok &= Check(handle.GetName() == "HandleEntity",
                     "ScriptEntity::GetName() should return 'HandleEntity'");
@@ -747,7 +749,9 @@ bool TestEntityApi()
                     "ScriptEntity::GetTransform().GetLocalPosition() should return (1,2,3)");
 
     // Verify invalid handle
-    ScriptEntity invalid_handle{nullptr, ECS::kInvalidEntity};
+    ScriptEntity invalid_handle;
+    invalid_handle._scene = nullptr;
+    invalid_handle._entity = ECS::kInvalidEntity;
     all_ok &= Check(!invalid_handle.IsValid(), "Null ScriptEntity should report invalid");
 
     // Cleanup

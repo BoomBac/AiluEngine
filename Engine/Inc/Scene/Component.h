@@ -15,9 +15,16 @@
 #include "Objects/Type.h"
 #include "Render/Camera.h"
 #include "Render/Features/CommonPasses.h"
-#include "Render/Material.h"
 #include "Render/Mesh.h"
 #include "Render/2D/SpriteRenderData.h"
+
+namespace Ailu
+{
+    namespace Render
+    {
+        class Material;
+    }
+}
 
 #include "generated/Component.gen.h"
 
@@ -352,7 +359,9 @@ public:                                                                 \
         {
             DECLARE_COMPONENT(StaticMeshComponent, "Ailu.ECS.StaticMeshComponent")
             Ref<Mesh> _p_mesh;
+            Guid _mesh_guid = Guid::EmptyGuid();
             Vector<Ref<Material>> _p_mats;
+            Vector<Guid> _material_guids;
             Vector<AABB> _transformed_aabbs;
             EMotionVectorType _motion_vector_type = EMotionVectorType::kPerObject;
         };
@@ -361,7 +370,9 @@ public:                                                                 \
         {
             DECLARE_COMPONENT(CSkeletonMesh, "Ailu.ECS.CSkeletonMesh")
             Ref<SkeletonMesh> _p_mesh;
+            Guid _mesh_guid = Guid::EmptyGuid();
             Vector<Ref<Material>> _p_mats;
+            Vector<Guid> _material_guids;
             Vector<AABB> _transformed_aabbs;
             EMotionVectorType _motion_vector_type = EMotionVectorType::kPerObject;
         };
@@ -370,6 +381,7 @@ public:                                                                 \
         {
             DECLARE_COMPONENT(AnimatorComponent, "Ailu.ECS.AnimatorComponent")
             Guid _controller = Guid::EmptyGuid();
+            Guid _clip = Guid::EmptyGuid();
             f32 _speed = 1.0f;
             bool _play_on_awake = true;
             AnimationInstanceHandle _instance = kInvalidAnimationInstanceHandle;
@@ -464,7 +476,9 @@ public:                                                                 \
             DECLARE_COMPONENT(SpriteRendererComponent, "Ailu.ECS.SpriteRendererComponent")
 
             Render::Sprite* _sprite = nullptr;
+            Guid _sprite_guid = Guid::EmptyGuid();
             Ref<Render::Material> _material;
+            Guid _material_guid = Guid::EmptyGuid();
 
             Color _color = Colors::kWhite; // Runtime linear; JSON serialization stores sRGB.
 

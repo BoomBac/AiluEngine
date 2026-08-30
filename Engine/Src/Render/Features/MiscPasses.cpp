@@ -1,5 +1,7 @@
 ﻿#include "Render/Features/MiscPasses.h"
 #include "Render/CommandBuffer.h"
+#include "Render/GraphicsContext.h"
+#include "Render/Material.h"
 #include "Framework/Common/Profiler.h"
 #include "Framework/Common/ResourceMgr.h"
 

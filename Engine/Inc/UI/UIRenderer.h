@@ -11,6 +11,7 @@
 #include "Framework/Core/Containers/Map.h"
 #include "Framework/Core/Containers/Array.h"
 #include "DrawerBlock.h"
+#include "Render/Texture.h"
 #include "Style/UIStyleBasic.h"
 #include "Style/UIStyles.h"
 #include <functional>

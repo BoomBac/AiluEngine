@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "Render/Mesh.h"
+#include "Animation/SkeletonAsset.h"
 #include "Render/GraphicsContext.h"
 #include "Assets/Asset.h"
 #include "Framework/Common/Utils.h"
@@ -34,6 +35,10 @@ namespace Ailu::Render
 		_bounds.clear();
 		_imported_taterials.clear();
 		_vertex_count = 0;
+		_triangle_count = 0u;
+		_derived_data_ready = false;
+		_normal_stream = -1;
+		_tangent_stream = -1;
 		//TODO:release gpu data...
 	}
 	void Mesh::SetVertices(std::span<const Vector3f> vertices)
@@ -69,6 +74,20 @@ namespace Ailu::Render
 	void Mesh::SetColors(Vector<Color> &&colors)
 	{
 		_colors = std::move(colors);
+	}
+	void Mesh::SetBounds(std::span<const AABB> bounds)
+	{
+		_bounds.assign(bounds.begin(), bounds.end());
+	}
+	void Mesh::SetDerivedData(Vector<AABB> &&triangle_bounds, Vector<TriangleData> &&triangle_data,
+		Vector<BVHNode> &&bvh_nodes, Vector<Vector2UInt> &&bvh_node_ranges, u32 triangle_count)
+	{
+		_triangle_bounds = std::move(triangle_bounds);
+		_triangle_data = std::move(triangle_data);
+		_bvh_nodes = std::move(bvh_nodes);
+		_submesh_bvh_node_ranges = std::move(bvh_node_ranges);
+		_triangle_count = triangle_count;
+		_derived_data_ready = true;
 	}
 	void Mesh::AddSubmesh(std::span<const u32> indices)
 	{
@@ -229,6 +248,7 @@ namespace Ailu::Render
 				global_triangle_offset += triangle_count;
 			}
 		}
+		_derived_data_ready = true;
 	}
 	void Mesh::SetUVs(std::span<const Vector2f> uv, u8 channel)
 	{
@@ -258,11 +278,25 @@ namespace Ailu::Render
 		}
 		_uvs[channel] = std::move(uv);
 	}
+	void Mesh::BuildDerivedData()
+	{
+		GenerateTriangleBounds();
+	}
+
 	void Mesh::Apply()
+	{
+		if (!_derived_data_ready)
+			BuildDerivedData();
+		UploadGpuResources();
+	}
+
+	void Mesh::UploadGpuResources()
 	{
 		u8 count = 0;
 		Vector<VertexBufferLayoutDesc> desc_list;
 		u8 vert_index, normal_index, uv_index, tangent_index;
+		_normal_stream = -1;
+		_tangent_stream = -1;
 		if (_vertices.size())
 		{
 			desc_list.push_back({ "POSITION",EShaderDateType::kFloat3,count });
@@ -272,6 +306,7 @@ namespace Ailu::Render
 		{
 			desc_list.push_back({ "NORMAL",EShaderDateType::kFloat3,count });
 			normal_index = count++;
+			_normal_stream = normal_index;
 		}
 		if (_uvs[0].size())
 		{
@@ -282,10 +317,10 @@ namespace Ailu::Render
 		{
 			desc_list.push_back({ "TANGENT",EShaderDateType::kFloat4,count });
 			tangent_index = count++;
+			_tangent_stream = tangent_index;
 		}
 		if (!desc_list.empty())
 		{
-			GenerateTriangleBounds();
 			_vertex_buffer.reset(VertexBuffer::Create(desc_list, _name));
 			if (_vertices.size()) 
 				_vertex_buffer->SetStream(reinterpret_cast<u8 *>(_vertices.data()), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat3), vert_index, false);
@@ -335,6 +370,7 @@ namespace Ailu::Render
 		_bone_weights.clear();
 		_bone_indices.clear();
 		_previous_vertices.clear();
+        _skeleton_asset.Clear();
 	}
 
 	void SkeletonMesh::SetBoneWeights(std::span<const Vector4f> bone_weights)
@@ -347,11 +383,75 @@ namespace Ailu::Render
 		_bone_indices.assign(bone_indices.begin(), bone_indices.end());
 	}
 
+	bool SkeletonMesh::RemapBoneIndices(std::span<const u16> bone_remap)
+	{
+		for (auto &indices : _bone_indices)
+		{
+			for (u32 influence = 0u; influence < 4u; ++influence)
+			{
+				const u32 source_index = indices[influence];
+				if (source_index >= bone_remap.size() || bone_remap[source_index] == Joint::kInvalidJointIndex)
+					return false;
+				indices[influence] = bone_remap[source_index];
+			}
+		}
+		return true;
+	}
+
+	void SkeletonMesh::SetMeshBindGlobalTransform(const Matrix4x4f &transform)
+	{
+		_mesh_bind_global = transform;
+		_mesh_current_global_inv = Math::MatrixInverse(transform);
+	}
+
+	void SkeletonMesh::RestoreBindPoseVertices()
+	{
+		if (_vertex_buffer == nullptr || _vertices.empty())
+			return;
+		memcpy(_vertex_buffer->GetStream(0), _vertices.data(), _vertices.size() * sizeof(Vector3f));
+	}
+
+	void SkeletonMesh::BuildSkinMatrixPalette(std::span<const Matrix4x4f> global_pose_palette,
+	                                             Vector<Matrix4x4f> &out_palette) const
+	{
+		out_palette.clear();
+		if (!_skeleton_asset.IsResolved())
+			return;
+		const Skeleton &skeleton = _skeleton_asset->GetSkeleton();
+		if (global_pose_palette.size() != skeleton.JointNum())
+			return;
+		out_palette.resize(skeleton.JointNum());
+		for (const Joint &joint : skeleton)
+		{
+			out_palette[joint._self] = _mesh_bind_global * joint._inv_bind_pos *
+				global_pose_palette[joint._self] * _mesh_current_global_inv;
+		}
+	}
+
+	void SkeletonMesh::BuildMeshSpaceJointPositions(std::span<const Matrix4x4f> global_pose_palette,
+	                                                 Vector<Vector3f> &out_positions) const
+	{
+		out_positions.clear();
+		if (!_skeleton_asset.IsResolved())
+			return;
+		const Skeleton &skeleton = _skeleton_asset->GetSkeleton();
+		if (global_pose_palette.size() != skeleton.JointNum())
+			return;
+		out_positions.resize(skeleton.JointNum());
+		for (const Joint &joint : skeleton)
+			out_positions[joint._self] = TransformCoord(_mesh_current_global_inv,
+				TransformCoord(global_pose_palette[joint._self], Vector3f::kZero));
+	}
+
 	void SkeletonMesh::Apply()
 	{
+		if (!_derived_data_ready)
+			BuildDerivedData();
 		u8 count = 0;
 		Vector<VertexBufferLayoutDesc> desc_list;
-		u8 vert_index, normal_index, uv_index, tangent_index,prev_vert_index;
+		u8 vert_index = 0u, normal_index = 0u, uv_index = 0u, tangent_index = 0u, prev_vert_index = 0u;
+		_normal_stream = -1;
+		_tangent_stream = -1;
 		if (_vertices.size())
 		{
 			desc_list.push_back({ "POSITION",EShaderDateType::kFloat3,count });
@@ -361,6 +461,7 @@ namespace Ailu::Render
 		{
 			desc_list.push_back({ "NORMAL",EShaderDateType::kFloat3,count });
 			normal_index = count++;
+			_normal_stream = normal_index;
 		}
 		if (_uvs[0].size())
 		{
@@ -371,6 +472,7 @@ namespace Ailu::Render
 		{
 			desc_list.push_back({ "TANGENT",EShaderDateType::kFloat4,count });
 			tangent_index = count++;
+			_tangent_stream = tangent_index;
 		}
 		//is for gpu skinning
 		//if (_bone_indices)
@@ -395,10 +497,10 @@ namespace Ailu::Render
 		}
 		if (_normals.size()) _vertex_buffer->SetStream(reinterpret_cast<u8 *>(_normals.data()), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat3), normal_index, true);
 		if (_uvs[0].size()) _vertex_buffer->SetStream(reinterpret_cast<u8 *>(_uvs[0].data()), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat2), uv_index, false);
-		if (_tangents.size()) _vertex_buffer->SetStream(reinterpret_cast<u8 *>(_tangents.data()), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat4), tangent_index, false);
+		if (_tangents.size()) _vertex_buffer->SetStream(reinterpret_cast<u8 *>(_tangents.data()), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat4), tangent_index, true);
 		//if (_bone_indices) _p_vbuf->SetStream(reinterpret_cast<u8*>(_bone_indices), _vertex_count * ShaderDateTypeSize(EShaderDateType::kInt4), bone_index_index);
 		//if (_bone_weights) _p_vbuf->SetStream(reinterpret_cast<u8*>(_bone_weights), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat4), bone_weight_index);
-		_vertex_buffer->SetStream(reinterpret_cast<u8 *>(_previous_vertices.data()), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat3), tangent_index, true);
+		_vertex_buffer->SetStream(reinterpret_cast<u8 *>(_previous_vertices.data()), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat3), prev_vert_index, true);
 		GraphicsContext::Get().CreateResource(_vertex_buffer.get());
 		_index_buffers.resize(_submeshes.size());
 		_triangle_count = 0u;
@@ -414,7 +516,7 @@ namespace Ailu::Render
 			}
 		}
 		_triangle_count /= 3u;
-		if (_vertices.size())
+		if (_vertices.size() && !_derived_data_ready)
 		{
 			_triangle_data.resize(_triangle_count);
 			u64 tri_index = 0u;
@@ -436,14 +538,6 @@ namespace Ailu::Render
 				}
 			}
 		}
-	}
-	void SkeletonMesh::SetSkeleton(const Skeleton &skeleton)
-	{
-		_skeleton = skeleton;
-	}
-	Skeleton &SkeletonMesh::GetSkeleton()
-	{
-		return _skeleton;
 	}
 #pragma endregion
 	//----------------------------------------------------------------------SkinedMesh---------------------------------------------------------------------------

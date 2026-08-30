@@ -18,14 +18,13 @@ namespace Ailu
             GraphEditorWindow();
             ~GraphEditorWindow() override;
 
-            using AssetEditor::Open;
             void Update(f32 dt) override;
-            bool Open(GraphAsset *asset);
             void SaveDockLayoutState(JsonArchive &ar) override;
             void LoadDockLayoutState(JsonArchive &ar) override;
             void OnDockLayoutLoaded() override;
 
         protected:
+            bool OnOpen() override;
             void OnClose() override;
             void OnBeforeSave() override;
             void OnAssetSaved() override;

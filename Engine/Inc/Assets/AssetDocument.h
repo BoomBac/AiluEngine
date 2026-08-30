@@ -4,8 +4,10 @@
 
 #include "Animation/AnimationEvent.h"
 #include "Animation/BlendSpace.h"
+#include "Animation/Skeleton.h"
 #include "Framework/Math/Guid.h"
 #include "Framework/Math/ALMath.hpp"
+#include "Framework/Interface/IParser.h"
 #include "Graph/GraphTypes.h"
 #include "Objects/JsonArchive.h"
 #include "Objects/Object.h"
@@ -153,7 +155,34 @@ namespace Ailu
         APROPERTY()
         String _file;
         APROPERTY()
-        bool _is_srgb = true;
+        TextureImportSetting _import_setting;
+    };
+
+    ASTRUCT()
+    struct AILU_API SkeletonJointDocument
+    {
+        GENERATED_BODY()
+
+        APROPERTY()
+        String _name;
+        APROPERTY()
+        u16 _parent = Joint::kInvalidJointIndex;
+        APROPERTY()
+        Matrix4x4f _inverse_bind_pose = Matrix4x4f::Identity();
+        APROPERTY()
+        Transform _bind_local_transform;
+    };
+
+    ACLASS()
+    class AILU_API SkeletonAssetDocument : public Object
+    {
+        GENERATED_BODY()
+
+    public:
+        APROPERTY()
+        AssetDocumentHeader _header;
+        APROPERTY()
+        Vector<SkeletonJointDocument> _joints;
     };
 
     ACLASS()
@@ -169,7 +198,9 @@ namespace Ailu
         APROPERTY()
         String _inner_file_name;
         APROPERTY()
-        bool _is_combine_mesh = false;
+        MeshImportSetting _import_setting;
+        APROPERTY()
+        Guid _skeleton = Guid::EmptyGuid();
     };
 
     ACLASS()
@@ -197,16 +228,25 @@ namespace Ailu
     };
 
     ASTRUCT()
-    struct AILU_API AnimationClipFrameDocument
+    struct AILU_API AnimationVectorKeyDocument
     {
         GENERATED_BODY()
 
         APROPERTY()
-        Vector3f _position = Vector3f::kZero;
+        f32 _time = 0.0f;
         APROPERTY()
-        Quaternion _rotation;
+        Vector3f _value = Vector3f::kZero;
+    };
+
+    ASTRUCT()
+    struct AILU_API AnimationQuaternionKeyDocument
+    {
+        GENERATED_BODY()
+
         APROPERTY()
-        Vector3f _scale = Vector3f::kOne;
+        f32 _time = 0.0f;
+        APROPERTY()
+        Quaternion _value;
     };
 
     ASTRUCT()
@@ -217,7 +257,11 @@ namespace Ailu
         APROPERTY()
         u16 _joint_index = 0u;
         APROPERTY()
-        Vector<AnimationClipFrameDocument> _frames;
+        Vector<AnimationVectorKeyDocument> _position_keys;
+        APROPERTY()
+        Vector<AnimationQuaternionKeyDocument> _rotation_keys;
+        APROPERTY()
+        Vector<AnimationVectorKeyDocument> _scale_keys;
     };
 
     ASTRUCT()
@@ -264,6 +308,8 @@ namespace Ailu
         f32 _frame_duration = 0.0f;
         APROPERTY()
         bool _is_looping = true;
+        APROPERTY()
+        Guid _preview_mesh_guid = Guid::EmptyGuid();
         APROPERTY()
         Vector<AnimationClipTrackDocument> _tracks;
         APROPERTY()
@@ -748,6 +794,8 @@ namespace Ailu
 
         APROPERTY()
         String _controller_guid;
+        APROPERTY()
+        String _clip_guid;
         APROPERTY()
         f32 _speed = 1.0f;
         APROPERTY()

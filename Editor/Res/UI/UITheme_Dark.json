@@ -918,7 +918,7 @@
         "_expand_button_width": 16.0,
         "_normal_color": [0.1298, 0.1398, 0.1598, 1.0],
         "_hover_color": [0.1999, 0.2199, 0.28, 1.0],
-        "_selected_color": [0.18, 0.5199, 0.86, 0.4499],
+        "_selected_color": [0.8962, 0.461, 0.8374, 1.0],
         "_selected_unfocused_color": [0.28, 0.31, 0.3499, 0.4499],
         "_padding": [2.0, 1.0, 2.0, 1.0],
         "_font_size": 10.0

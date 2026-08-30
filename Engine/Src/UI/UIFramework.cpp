@@ -106,7 +106,7 @@ namespace Ailu::UI
             _widgets[i]->_sort_order = (u32)i;
         }
         w->_on_get_focus_delegate.Invoke();
-        LOG_INFO("{}: BringToFront", GetThreadName());
+        //LOG_INFO("{}: BringToFront", GetThreadName());
     }
 
     void UIManager::BringToFrontSilently(Widget *w)
@@ -176,7 +176,7 @@ namespace Ailu::UI
         ApplyFocusChange(old, nullptr);
     }
     void UIManager::ShowPopupAt(f32 x, f32 y, Ref<UIElement> root, std::function<void()> on_close, Window *win,
-                                bool is_modal)
+                                bool is_modal, bool render_backdrop)
     {
         if (!root)
             return;
@@ -264,7 +264,7 @@ namespace Ailu::UI
         popup_widget->_visibility = EVisibility::kVisible;
         RegisterWidget(popup_widget);
         BringToFront(popup_widget.get());
-        _popup_stack.push_back({popup_widget, on_close, is_modal});
+        _popup_stack.push_back({popup_widget, on_close, is_modal, render_backdrop});
     }
     void UIManager::HidePopup()
     {
@@ -324,6 +324,30 @@ namespace Ailu::UI
                 return it->_is_modal;
         }
         return false;
+    }
+    bool UIManager::IsPopupAboveModal(const Widget *widget) const
+    {
+        if (widget == nullptr)
+            return false;
+        for (auto it = _popup_stack.rbegin(); it != _popup_stack.rend(); ++it)
+        {
+            if (it->_widget.get() == widget)
+                return true;
+            if (it->_is_modal)
+                return false;
+        }
+        return false;
+    }
+    bool UIManager::ShouldRenderPopupBackdrop(const Widget *widget) const
+    {
+        if (widget == nullptr)
+            return false;
+        for (auto it = _popup_stack.rbegin(); it != _popup_stack.rend(); ++it)
+        {
+            if (it->_widget.get() == widget)
+                return it->_render_backdrop;
+        }
+        return true;
     }
     void UIManager::SetTheme(UITheme *theme) { _theme = theme; }
     void UIManager::Destroy(Ref<UIElement> element)

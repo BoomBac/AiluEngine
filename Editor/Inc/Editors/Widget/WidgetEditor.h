@@ -41,13 +41,12 @@ namespace Ailu
             ~WidgetEditor() override;
 
             void Update(f32 dt) override;
-            using AssetEditor::Open;
-            void Open(WidgetAsset *asset);
             void MarkDirty();
             void SetSelectedElement(UI::UIElement *element, bool sync_hierarchy = true);
             WidgetAsset *GetWidgetAsset() const { return _asset; }
 
         protected:
+            bool OnOpen() override;
             void OnBeforeSave() override;
             void OnAssetSaved() override;
             void OnAssetReloaded() override;

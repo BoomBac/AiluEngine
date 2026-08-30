@@ -5,6 +5,7 @@
 #include "UI/UIRenderer.h"
 #include "Render/CommandBuffer.h"
 #include "Render/Gizmo.h"
+#include "Render/Material.h"
 #include <Framework/Common/Profiler.h>
 #include <Framework/Common/ResourceMgr.h>
 #include <Framework/Common/Allocator.hpp>

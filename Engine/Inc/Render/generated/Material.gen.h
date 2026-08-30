@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __MATERIAL_GEN_H__
 //Class Material begin...........................
-#define MATERIAL_GEN_H_33_GENERATED_BODY \
+#define MATERIAL_GEN_H_105_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_Material_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -19,22 +19,6 @@ class Material ;
 template<>
 AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::Material>();
 //Class Material end...........................
-
-//Class StandardMaterial begin...........................
-#define MATERIAL_GEN_H_239_GENERATED_BODY \
-                            private: \
-                                friend const Type* Z_Construct_StandardMaterial_Type();\
-                                static const Type* GetPrivateStaticClass();\
-                            public:\
-                                static const Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual const Type  *GetType() override;
-                            namespace Ailu {class Type;}
-namespace Ailu::Render{
-class StandardMaterial ;
-}
-template<>
-AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::StandardMaterial>();
-//Class StandardMaterial end...........................
 
 //Enum EMaterialID begin...........................
 const Ailu::Enum* Z_Construct_Enum_Ailu_Render_EMaterialID_Type();

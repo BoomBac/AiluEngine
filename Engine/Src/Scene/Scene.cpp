@@ -13,6 +13,7 @@
 #include "Scene/RenderSystem.h"
 #include "Scene/EntitySerializer.h"
 #include "Scene/TransformSystem.h"
+#include "Render/Material.h"
 //#include "pch.h"
 #include <regex>
 
@@ -25,6 +26,35 @@ using namespace Ailu::Render;
 
 namespace Ailu::SceneManagement
 {
+    namespace
+    {
+        void InstantiateRuntimeMaterials(Scene &scene)
+        {
+            auto &registry = scene.GetRegister();
+            for (auto &component : registry.View<ECS::StaticMeshComponent>())
+            {
+                for (auto &material : component._p_mats)
+                {
+                    if (material != nullptr)
+                        material = material->CreateInstance();
+                }
+            }
+            for (auto &component : registry.View<ECS::CSkeletonMesh>())
+            {
+                for (auto &material : component._p_mats)
+                {
+                    if (material != nullptr)
+                        material = material->CreateInstance();
+                }
+            }
+            for (auto &component : registry.View<ECS::SpriteRendererComponent>())
+            {
+                if (component._material != nullptr)
+                    component._material = component._material->CreateInstance();
+            }
+        }
+    }
+
     #pragma region Scene----------------------------------------------------------------------------
     Scene::Scene(const String &name, bool create_render_resources) : Object(name)
     {
@@ -709,6 +739,7 @@ namespace Ailu::SceneManagement
 
     void Scene::Clear()
     {
+        _register.WaitForSystems();
         Vector<ECS::Entity> entities;
         u32 index = 0u;
         for (const auto &id_comp : _register.View<ECS::PersistentIdComponent>())
@@ -909,6 +940,7 @@ namespace Ailu::SceneManagement
 
     void Scene::EndUpdate()
     {
+        _register.WaitForSystems();
         _register.FlushDestroy();
         DeletePendingEntities();
     }
@@ -1194,6 +1226,7 @@ namespace Ailu::SceneManagement
         name.append("_copy");
         _runtime_scene->Name(name);
         _runtime_scene->RebuildEntityGuidIndex();
+        InstantiateRuntimeMaterials(*_runtime_scene);
         _runtime_scene_src = _p_current;
         _p_current = _runtime_scene;
         Camera::sMain = _runtime_scene->FindMainCamera();

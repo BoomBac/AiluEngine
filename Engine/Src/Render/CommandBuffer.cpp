@@ -4,6 +4,8 @@
 #include "Framework/Common/Allocator.hpp"
 #include "RHI/DX12/D3DCommandBuffer.h"
 #include "Render/CommandBuffer.h"
+#include "Render/GfxCommand.h"
+#include "Render/Material.h"
 #include "Render/GraphicsContext.h"
 #include "Render/Renderer.h"
 #include <Framework/Common/Application.h>

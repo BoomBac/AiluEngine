@@ -5,13 +5,13 @@
 #include "Objects/ReflectTemplate.h"
 #define __MISCPASSES_GEN_H__
 //Class VolumeTexturePreviewPass begin...........................
-#define MISCPASSES_GEN_H_14_GENERATED_BODY \
+#define MISCPASSES_GEN_H_16_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_VolumeTexturePreviewPass_Type();\
                                 static const Type* GetPrivateStaticClass();\
                             public:\
                                 static const Type *StaticType() {return GetPrivateStaticClass();};\
-                                const Type  *GetType();
+                                virtual const Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu::Render{
 class VolumeTexturePreviewPass ;

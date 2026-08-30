@@ -36,7 +36,7 @@ namespace Ailu
 		_parents.resize(size);
 		_joints.resize(size);
 	}
-	unsigned int Pose::Size() {
+	unsigned int Pose::Size() const {
 		return static_cast<int>(_joints.size());
 	}
 
@@ -61,7 +61,7 @@ namespace Ailu
 		return GetGlobalTransform(index);
 	}
 
-	void Pose::GetMatrixPalette(Vector<Matrix4x4f> &out)
+	void Pose::GetMatrixPalette(Vector<Matrix4x4f> &out) const
 	{
 		unsigned int size = Size();
 		if (out.size() != size) {

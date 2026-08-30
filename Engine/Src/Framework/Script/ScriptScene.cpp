@@ -8,15 +8,28 @@
 
 namespace Ailu
 {
+    namespace
+    {
+        ScriptEntity MakeScriptEntity(SceneManagement::Scene *scene, ECS::Entity entity)
+        {
+            ScriptEntity result;
+            result._scene = scene;
+            result._entity = entity;
+            return result;
+        }
+    }
+
     ScriptScene ScriptScene::CurrentScene()
     {
         auto *scene = SceneManagement::SceneMgr::Get().ActiveScene();
-        return {scene};
+        ScriptScene result;
+        result._scene = scene;
+        return result;
     }
     bool ScriptScene::IsValid() const { return _scene != nullptr; }
     ScriptEntity ScriptScene::FindEntity(const String &guid) const
     {
-        return IsValid() ? ScriptEntity{_scene, _scene->FindEntity(Guid(guid))} : ScriptEntity{};
+        return IsValid() ? MakeScriptEntity(_scene, _scene->FindEntity(Guid(guid))) : ScriptEntity{};
     }
     ScriptEntity ScriptScene::FindEntityByName(const String &name) const
     {
@@ -25,13 +38,16 @@ namespace Ailu
         for (const auto &tag : _scene->GetRegister().View<ECS::TagComponent>())
         {
             const ECS::Entity entity = _scene->GetRegister().GetEntity<ECS::TagComponent>(index++);
-            if (tag._name == name) return {_scene, entity};
+            if (tag._name == name) return MakeScriptEntity(_scene, entity);
         }
-        return {_scene, ECS::kInvalidEntity};
+        return MakeScriptEntity(_scene, ECS::kInvalidEntity);
     }
     ScriptEntity ScriptScene::Find(const String &name) const { return FindEntityByName(name); }
     ScriptEntity ScriptScene::FindGuid(const String &guid) const { return FindEntity(guid); }
-    ScriptEntity ScriptScene::CreateEntity(const String &name) const { return IsValid() ? ScriptEntity{_scene, _scene->AddObject(name)} : ScriptEntity{}; }
+    ScriptEntity ScriptScene::CreateEntity(const String &name) const
+    {
+        return IsValid() ? MakeScriptEntity(_scene, _scene->AddObject(name)) : ScriptEntity{};
+    }
     ScriptEntity ScriptScene::CreateEntity(const ScriptAssetValue &prefab) const
     {
         if (!IsValid() || prefab._guid.IsEmpty())
@@ -43,7 +59,7 @@ namespace Ailu
             return {};
 
         const SceneManagement::PrefabInstantiateResult result = SceneManagement::PrefabSystem::Instantiate(*_scene, *prefab_asset);
-        return result._root == ECS::kInvalidEntity ? ScriptEntity{} : ScriptEntity{_scene, result._root};
+        return result._root == ECS::kInvalidEntity ? ScriptEntity{} : MakeScriptEntity(_scene, result._root);
     }
     bool ScriptScene::DestroyEntity(const ScriptEntity &entity) const
     {
@@ -62,7 +78,13 @@ namespace Ailu
             const ECS::Entity entity = _scene->GetRegister().GetEntity<ECS::CCamera>(index++);
             const auto *tag = _scene->GetRegister().GetComponent<ECS::TagComponent>(entity);
             if (tag != nullptr && tag->_tag == "MainCamera" && _scene->IsEntityEnabled(entity) &&
-                _scene->GetRegister().IsComponentEnabled<ECS::CCamera>(entity)) return {_scene, entity};
+                _scene->GetRegister().IsComponentEnabled<ECS::CCamera>(entity))
+            {
+                ScriptCamera result;
+                result._scene = _scene;
+                result._entity = entity;
+                return result;
+            }
         }
         return {};
     }

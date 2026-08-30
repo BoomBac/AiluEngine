@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __UISLOT_GEN_H__
 //Class UISlot begin...........................
-#define UISLOT_GEN_H_70_GENERATED_BODY \
+#define UISLOT_GEN_H_75_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_UISlot_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -21,7 +21,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::UI::UISlot>();
 //Class UISlot end...........................
 
 //Class CanvasSlot begin...........................
-#define UISLOT_GEN_H_92_GENERATED_BODY \
+#define UISLOT_GEN_H_97_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_CanvasSlot_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -37,7 +37,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::UI::CanvasSlot>()
 //Class CanvasSlot end...........................
 
 //Class LinearSlot begin...........................
-#define UISLOT_GEN_H_115_GENERATED_BODY \
+#define UISLOT_GEN_H_120_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_LinearSlot_Type();\
                                 static const Type* GetPrivateStaticClass();\

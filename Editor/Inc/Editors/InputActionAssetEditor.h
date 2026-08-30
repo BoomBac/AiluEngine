@@ -38,9 +38,6 @@ namespace Ailu
             ~InputActionAssetEditor() override;
 
             void Update(f32 dt) override;
-            using AssetEditor::Open;
-            void Open(InputActionAsset *asset);
-            void Close();
 
 
         private:
@@ -104,6 +101,7 @@ namespace Ailu
             static UI::CheckBox *AddCheckBox(UI::UIElement *parent, const String &label, bool value,
                                              const std::function<void(bool)> &on_changed, f32 label_width = 92.0f);
 
+            bool OnOpen() override;
             void OnAssetSaved() override;
             void OnAssetReloaded() override;
 

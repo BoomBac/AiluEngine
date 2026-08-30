@@ -417,27 +417,27 @@ builder_file._meta = meta_file;
 builder_file._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<String>);
 builder_file._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<String>);
 initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_file));
-Meta meta_is_srgb;
-meta_is_srgb.Set("Category","");
-meta_is_srgb.Set("IsColor",false);
-meta_is_srgb.Set("IsRange",false);
-meta_is_srgb.Set("IsFloatRange",true);
-meta_is_srgb.Set("RangeMin",(f32)0);
-meta_is_srgb.Set("RangeMax",(f32)1);
-MemberBuilder builder_is_srgb;
-builder_is_srgb._name = "_is_srgb";
-builder_is_srgb._type_name = "bool";
-builder_is_srgb._offset = offsetof(Texture2DAssetDocument,_is_srgb);
-builder_is_srgb._is_const = false;
-builder_is_srgb._is_static = false;
-builder_is_srgb._is_public = true;
-builder_is_srgb._is_pointer = false;
-builder_is_srgb._is_ref = false;
-builder_is_srgb._is_template = false;
-builder_is_srgb._meta = meta_is_srgb;
-builder_is_srgb._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
-builder_is_srgb._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
-initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_is_srgb));
+Meta meta_import_setting;
+meta_import_setting.Set("Category","");
+meta_import_setting.Set("IsColor",false);
+meta_import_setting.Set("IsRange",false);
+meta_import_setting.Set("IsFloatRange",true);
+meta_import_setting.Set("RangeMin",(f32)0);
+meta_import_setting.Set("RangeMax",(f32)1);
+MemberBuilder builder_import_setting;
+builder_import_setting._name = "_import_setting";
+builder_import_setting._type_name = "Ailu::TextureImportSetting";
+builder_import_setting._offset = offsetof(Texture2DAssetDocument,_import_setting);
+builder_import_setting._is_const = false;
+builder_import_setting._is_static = false;
+builder_import_setting._is_public = true;
+builder_import_setting._is_pointer = false;
+builder_import_setting._is_ref = false;
+builder_import_setting._is_template = false;
+builder_import_setting._meta = meta_import_setting;
+builder_import_setting._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<TextureImportSetting>);
+builder_import_setting._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<TextureImportSetting>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_import_setting));
 cur_type = std::make_unique<Ailu::Type>(initializer);
 Ailu::Type::RegisterType(cur_type.get());
 }
@@ -459,6 +459,84 @@ return Ailu::Texture2DAssetDocument::StaticType();
 return Ailu::Texture2DAssetDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_Texture2DAssetDocument(&Ailu::Texture2DAssetDocument::StaticType, "Ailu::Texture2DAssetDocument");
+const Ailu::Type* Ailu::Z_Construct_SkeletonAssetDocument_Type()
+{
+Ailu::Object::StaticType();
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "SkeletonAssetDocument";
+initializer._size = sizeof(Ailu::SkeletonAssetDocument);
+initializer._full_name = "Ailu::SkeletonAssetDocument";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu";
+initializer._base_name = "Ailu::Object";
+initializer._constructor = []()->Ailu::SkeletonAssetDocument* {return new Ailu::SkeletonAssetDocument;};
+Meta meta_header;
+meta_header.Set("Category","");
+meta_header.Set("IsColor",false);
+meta_header.Set("IsRange",false);
+meta_header.Set("IsFloatRange",true);
+meta_header.Set("RangeMin",(f32)0);
+meta_header.Set("RangeMax",(f32)1);
+MemberBuilder builder_header;
+builder_header._name = "_header";
+builder_header._type_name = "Ailu::AssetDocumentHeader";
+builder_header._offset = offsetof(SkeletonAssetDocument,_header);
+builder_header._is_const = false;
+builder_header._is_static = false;
+builder_header._is_public = true;
+builder_header._is_pointer = false;
+builder_header._is_ref = false;
+builder_header._is_template = false;
+builder_header._meta = meta_header;
+builder_header._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<AssetDocumentHeader>);
+builder_header._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<AssetDocumentHeader>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_header));
+Meta meta_joints;
+meta_joints.Set("Category","");
+meta_joints.Set("IsColor",false);
+meta_joints.Set("IsRange",false);
+meta_joints.Set("IsFloatRange",true);
+meta_joints.Set("RangeMin",(f32)0);
+meta_joints.Set("RangeMax",(f32)1);
+MemberBuilder builder_joints;
+builder_joints._name = "_joints";
+builder_joints._type_name = "Vector<SkeletonJointDocument>";
+builder_joints._offset = offsetof(SkeletonAssetDocument,_joints);
+builder_joints._is_const = false;
+builder_joints._is_static = false;
+builder_joints._is_public = true;
+builder_joints._is_pointer = false;
+builder_joints._is_ref = false;
+builder_joints._is_template = true;
+builder_joints._meta = meta_joints;
+builder_joints._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<SkeletonJointDocument>>);
+builder_joints._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<SkeletonJointDocument>>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_joints));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+const Ailu::Type* Ailu::SkeletonAssetDocument::GetPrivateStaticClass()
+{
+	static const Ailu::Type* type = Z_Construct_SkeletonAssetDocument_Type();
+	return type;
+}
+
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::SkeletonAssetDocument>()
+{
+return Ailu::SkeletonAssetDocument::StaticType();
+}
+    const Type *Ailu::SkeletonAssetDocument::GetType()
+{
+return Ailu::SkeletonAssetDocument::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_SkeletonAssetDocument(&Ailu::SkeletonAssetDocument::StaticType, "Ailu::SkeletonAssetDocument");
 const Ailu::Type* Ailu::Z_Construct_MeshAssetDocument_Type()
 {
 Ailu::Object::StaticType();
@@ -537,27 +615,48 @@ builder_inner_file_name._meta = meta_inner_file_name;
 builder_inner_file_name._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<String>);
 builder_inner_file_name._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<String>);
 initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_inner_file_name));
-Meta meta_is_combine_mesh;
-meta_is_combine_mesh.Set("Category","");
-meta_is_combine_mesh.Set("IsColor",false);
-meta_is_combine_mesh.Set("IsRange",false);
-meta_is_combine_mesh.Set("IsFloatRange",true);
-meta_is_combine_mesh.Set("RangeMin",(f32)0);
-meta_is_combine_mesh.Set("RangeMax",(f32)1);
-MemberBuilder builder_is_combine_mesh;
-builder_is_combine_mesh._name = "_is_combine_mesh";
-builder_is_combine_mesh._type_name = "bool";
-builder_is_combine_mesh._offset = offsetof(MeshAssetDocument,_is_combine_mesh);
-builder_is_combine_mesh._is_const = false;
-builder_is_combine_mesh._is_static = false;
-builder_is_combine_mesh._is_public = true;
-builder_is_combine_mesh._is_pointer = false;
-builder_is_combine_mesh._is_ref = false;
-builder_is_combine_mesh._is_template = false;
-builder_is_combine_mesh._meta = meta_is_combine_mesh;
-builder_is_combine_mesh._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
-builder_is_combine_mesh._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
-initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_is_combine_mesh));
+Meta meta_import_setting;
+meta_import_setting.Set("Category","");
+meta_import_setting.Set("IsColor",false);
+meta_import_setting.Set("IsRange",false);
+meta_import_setting.Set("IsFloatRange",true);
+meta_import_setting.Set("RangeMin",(f32)0);
+meta_import_setting.Set("RangeMax",(f32)1);
+MemberBuilder builder_import_setting;
+builder_import_setting._name = "_import_setting";
+builder_import_setting._type_name = "Ailu::MeshImportSetting";
+builder_import_setting._offset = offsetof(MeshAssetDocument,_import_setting);
+builder_import_setting._is_const = false;
+builder_import_setting._is_static = false;
+builder_import_setting._is_public = true;
+builder_import_setting._is_pointer = false;
+builder_import_setting._is_ref = false;
+builder_import_setting._is_template = false;
+builder_import_setting._meta = meta_import_setting;
+builder_import_setting._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<MeshImportSetting>);
+builder_import_setting._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<MeshImportSetting>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_import_setting));
+Meta meta_skeleton;
+meta_skeleton.Set("Category","");
+meta_skeleton.Set("IsColor",false);
+meta_skeleton.Set("IsRange",false);
+meta_skeleton.Set("IsFloatRange",true);
+meta_skeleton.Set("RangeMin",(f32)0);
+meta_skeleton.Set("RangeMax",(f32)1);
+MemberBuilder builder_skeleton;
+builder_skeleton._name = "_skeleton";
+builder_skeleton._type_name = "Ailu::Guid";
+builder_skeleton._offset = offsetof(MeshAssetDocument,_skeleton);
+builder_skeleton._is_const = false;
+builder_skeleton._is_static = false;
+builder_skeleton._is_public = true;
+builder_skeleton._is_pointer = false;
+builder_skeleton._is_ref = false;
+builder_skeleton._is_template = false;
+builder_skeleton._meta = meta_skeleton;
+builder_skeleton._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Guid>);
+builder_skeleton._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Guid>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_skeleton));
 cur_type = std::make_unique<Ailu::Type>(initializer);
 Ailu::Type::RegisterType(cur_type.get());
 }
@@ -945,6 +1044,27 @@ builder_is_looping._meta = meta_is_looping;
 builder_is_looping._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
 builder_is_looping._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
 initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_is_looping));
+Meta meta_preview_mesh_guid;
+meta_preview_mesh_guid.Set("Category","");
+meta_preview_mesh_guid.Set("IsColor",false);
+meta_preview_mesh_guid.Set("IsRange",false);
+meta_preview_mesh_guid.Set("IsFloatRange",true);
+meta_preview_mesh_guid.Set("RangeMin",(f32)0);
+meta_preview_mesh_guid.Set("RangeMax",(f32)1);
+MemberBuilder builder_preview_mesh_guid;
+builder_preview_mesh_guid._name = "_preview_mesh_guid";
+builder_preview_mesh_guid._type_name = "Ailu::Guid";
+builder_preview_mesh_guid._offset = offsetof(AnimationClipAssetDocument,_preview_mesh_guid);
+builder_preview_mesh_guid._is_const = false;
+builder_preview_mesh_guid._is_static = false;
+builder_preview_mesh_guid._is_public = true;
+builder_preview_mesh_guid._is_pointer = false;
+builder_preview_mesh_guid._is_ref = false;
+builder_preview_mesh_guid._is_template = false;
+builder_preview_mesh_guid._meta = meta_preview_mesh_guid;
+builder_preview_mesh_guid._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Guid>);
+builder_preview_mesh_guid._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Guid>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_preview_mesh_guid));
 Meta meta_tracks;
 meta_tracks.Set("Category","");
 meta_tracks.Set("IsColor",false);
@@ -2499,104 +2619,279 @@ return Ailu::AssetTextureBinding::StaticType();
 return Ailu::AssetTextureBinding::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_AssetTextureBinding(&Ailu::AssetTextureBinding::StaticType, "Ailu::AssetTextureBinding");
-const Ailu::Type* Ailu::Z_Construct_AnimationClipFrameDocument_Type()
+const Ailu::Type* Ailu::Z_Construct_SkeletonJointDocument_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
 {
 TypeInitializer initializer;
-initializer._name = "AnimationClipFrameDocument";
-initializer._size = sizeof(Ailu::AnimationClipFrameDocument);
-initializer._full_name = "Ailu::AnimationClipFrameDocument";
+initializer._name = "SkeletonJointDocument";
+initializer._size = sizeof(Ailu::SkeletonJointDocument);
+initializer._full_name = "Ailu::SkeletonJointDocument";
 initializer._is_class = true;
 initializer._is_abstract = false;
 initializer._namespace = "Ailu";
 initializer._base_name = "";
-initializer._constructor = []()->Ailu::AnimationClipFrameDocument* {return new Ailu::AnimationClipFrameDocument;};
-Meta meta_position;
-meta_position.Set("Category","");
-meta_position.Set("IsColor",false);
-meta_position.Set("IsRange",false);
-meta_position.Set("IsFloatRange",true);
-meta_position.Set("RangeMin",(f32)0);
-meta_position.Set("RangeMax",(f32)1);
-MemberBuilder builder_position;
-builder_position._name = "_position";
-builder_position._type_name = "Vector3f";
-builder_position._offset = offsetof(AnimationClipFrameDocument,_position);
-builder_position._is_const = false;
-builder_position._is_static = false;
-builder_position._is_public = true;
-builder_position._is_pointer = false;
-builder_position._is_ref = false;
-builder_position._is_template = false;
-builder_position._meta = meta_position;
-builder_position._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector3f>);
-builder_position._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector3f>);
-initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_position));
-Meta meta_rotation;
-meta_rotation.Set("Category","");
-meta_rotation.Set("IsColor",false);
-meta_rotation.Set("IsRange",false);
-meta_rotation.Set("IsFloatRange",true);
-meta_rotation.Set("RangeMin",(f32)0);
-meta_rotation.Set("RangeMax",(f32)1);
-MemberBuilder builder_rotation;
-builder_rotation._name = "_rotation";
-builder_rotation._type_name = "Ailu::Math::Quaternion";
-builder_rotation._offset = offsetof(AnimationClipFrameDocument,_rotation);
-builder_rotation._is_const = false;
-builder_rotation._is_static = false;
-builder_rotation._is_public = true;
-builder_rotation._is_pointer = false;
-builder_rotation._is_ref = false;
-builder_rotation._is_template = false;
-builder_rotation._meta = meta_rotation;
-builder_rotation._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Quaternion>);
-builder_rotation._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Quaternion>);
-initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_rotation));
-Meta meta_scale;
-meta_scale.Set("Category","");
-meta_scale.Set("IsColor",false);
-meta_scale.Set("IsRange",false);
-meta_scale.Set("IsFloatRange",true);
-meta_scale.Set("RangeMin",(f32)0);
-meta_scale.Set("RangeMax",(f32)1);
-MemberBuilder builder_scale;
-builder_scale._name = "_scale";
-builder_scale._type_name = "Vector3f";
-builder_scale._offset = offsetof(AnimationClipFrameDocument,_scale);
-builder_scale._is_const = false;
-builder_scale._is_static = false;
-builder_scale._is_public = true;
-builder_scale._is_pointer = false;
-builder_scale._is_ref = false;
-builder_scale._is_template = false;
-builder_scale._meta = meta_scale;
-builder_scale._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector3f>);
-builder_scale._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector3f>);
-initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_scale));
+initializer._constructor = []()->Ailu::SkeletonJointDocument* {return new Ailu::SkeletonJointDocument;};
+Meta meta_name;
+meta_name.Set("Category","");
+meta_name.Set("IsColor",false);
+meta_name.Set("IsRange",false);
+meta_name.Set("IsFloatRange",true);
+meta_name.Set("RangeMin",(f32)0);
+meta_name.Set("RangeMax",(f32)1);
+MemberBuilder builder_name;
+builder_name._name = "_name";
+builder_name._type_name = "String";
+builder_name._offset = offsetof(SkeletonJointDocument,_name);
+builder_name._is_const = false;
+builder_name._is_static = false;
+builder_name._is_public = true;
+builder_name._is_pointer = false;
+builder_name._is_ref = false;
+builder_name._is_template = false;
+builder_name._meta = meta_name;
+builder_name._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<String>);
+builder_name._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<String>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_name));
+Meta meta_parent;
+meta_parent.Set("Category","");
+meta_parent.Set("IsColor",false);
+meta_parent.Set("IsRange",false);
+meta_parent.Set("IsFloatRange",true);
+meta_parent.Set("RangeMin",(f32)0);
+meta_parent.Set("RangeMax",(f32)1);
+MemberBuilder builder_parent;
+builder_parent._name = "_parent";
+builder_parent._type_name = "u16";
+builder_parent._offset = offsetof(SkeletonJointDocument,_parent);
+builder_parent._is_const = false;
+builder_parent._is_static = false;
+builder_parent._is_public = true;
+builder_parent._is_pointer = false;
+builder_parent._is_ref = false;
+builder_parent._is_template = false;
+builder_parent._meta = meta_parent;
+builder_parent._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<u16>);
+builder_parent._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<u16>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_parent));
+Meta meta_inverse_bind_pose;
+meta_inverse_bind_pose.Set("Category","");
+meta_inverse_bind_pose.Set("IsColor",false);
+meta_inverse_bind_pose.Set("IsRange",false);
+meta_inverse_bind_pose.Set("IsFloatRange",true);
+meta_inverse_bind_pose.Set("RangeMin",(f32)0);
+meta_inverse_bind_pose.Set("RangeMax",(f32)1);
+MemberBuilder builder_inverse_bind_pose;
+builder_inverse_bind_pose._name = "_inverse_bind_pose";
+builder_inverse_bind_pose._type_name = "Matrix4x4f";
+builder_inverse_bind_pose._offset = offsetof(SkeletonJointDocument,_inverse_bind_pose);
+builder_inverse_bind_pose._is_const = false;
+builder_inverse_bind_pose._is_static = false;
+builder_inverse_bind_pose._is_public = true;
+builder_inverse_bind_pose._is_pointer = false;
+builder_inverse_bind_pose._is_ref = false;
+builder_inverse_bind_pose._is_template = false;
+builder_inverse_bind_pose._meta = meta_inverse_bind_pose;
+builder_inverse_bind_pose._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Matrix4x4f>);
+builder_inverse_bind_pose._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Matrix4x4f>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_inverse_bind_pose));
+Meta meta_bind_local_transform;
+meta_bind_local_transform.Set("Category","");
+meta_bind_local_transform.Set("IsColor",false);
+meta_bind_local_transform.Set("IsRange",false);
+meta_bind_local_transform.Set("IsFloatRange",true);
+meta_bind_local_transform.Set("RangeMin",(f32)0);
+meta_bind_local_transform.Set("RangeMax",(f32)1);
+MemberBuilder builder_bind_local_transform;
+builder_bind_local_transform._name = "_bind_local_transform";
+builder_bind_local_transform._type_name = "Ailu::Transform";
+builder_bind_local_transform._offset = offsetof(SkeletonJointDocument,_bind_local_transform);
+builder_bind_local_transform._is_const = false;
+builder_bind_local_transform._is_static = false;
+builder_bind_local_transform._is_public = true;
+builder_bind_local_transform._is_pointer = false;
+builder_bind_local_transform._is_ref = false;
+builder_bind_local_transform._is_template = false;
+builder_bind_local_transform._meta = meta_bind_local_transform;
+builder_bind_local_transform._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Transform>);
+builder_bind_local_transform._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Transform>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_bind_local_transform));
 cur_type = std::make_unique<Ailu::Type>(initializer);
 Ailu::Type::RegisterType(cur_type.get());
 }
 return cur_type.get();
 }
 
-const Ailu::Type* Ailu::AnimationClipFrameDocument::GetPrivateStaticClass()
+const Ailu::Type* Ailu::SkeletonJointDocument::GetPrivateStaticClass()
 {
-	static const Ailu::Type* type = Z_Construct_AnimationClipFrameDocument_Type();
+	static const Ailu::Type* type = Z_Construct_SkeletonJointDocument_Type();
 	return type;
 }
 
-template<> const Ailu::Type* Ailu::StaticClass<Ailu::AnimationClipFrameDocument>()
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::SkeletonJointDocument>()
 {
-return Ailu::AnimationClipFrameDocument::StaticType();
+return Ailu::SkeletonJointDocument::StaticType();
 }
-    const Type *Ailu::AnimationClipFrameDocument::GetType()
+    const Type *Ailu::SkeletonJointDocument::GetType()
 {
-return Ailu::AnimationClipFrameDocument::GetPrivateStaticClass();
+return Ailu::SkeletonJointDocument::GetPrivateStaticClass();
 }
-ClassTypeRegister s_register_AnimationClipFrameDocument(&Ailu::AnimationClipFrameDocument::StaticType, "Ailu::AnimationClipFrameDocument");
+ClassTypeRegister s_register_SkeletonJointDocument(&Ailu::SkeletonJointDocument::StaticType, "Ailu::SkeletonJointDocument");
+const Ailu::Type* Ailu::Z_Construct_AnimationVectorKeyDocument_Type()
+{
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "AnimationVectorKeyDocument";
+initializer._size = sizeof(Ailu::AnimationVectorKeyDocument);
+initializer._full_name = "Ailu::AnimationVectorKeyDocument";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu";
+initializer._base_name = "";
+initializer._constructor = []()->Ailu::AnimationVectorKeyDocument* {return new Ailu::AnimationVectorKeyDocument;};
+Meta meta_time;
+meta_time.Set("Category","");
+meta_time.Set("IsColor",false);
+meta_time.Set("IsRange",false);
+meta_time.Set("IsFloatRange",true);
+meta_time.Set("RangeMin",(f32)0);
+meta_time.Set("RangeMax",(f32)1);
+MemberBuilder builder_time;
+builder_time._name = "_time";
+builder_time._type_name = "f32";
+builder_time._offset = offsetof(AnimationVectorKeyDocument,_time);
+builder_time._is_const = false;
+builder_time._is_static = false;
+builder_time._is_public = true;
+builder_time._is_pointer = false;
+builder_time._is_ref = false;
+builder_time._is_template = false;
+builder_time._meta = meta_time;
+builder_time._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_time._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_time));
+Meta meta_value;
+meta_value.Set("Category","");
+meta_value.Set("IsColor",false);
+meta_value.Set("IsRange",false);
+meta_value.Set("IsFloatRange",true);
+meta_value.Set("RangeMin",(f32)0);
+meta_value.Set("RangeMax",(f32)1);
+MemberBuilder builder_value;
+builder_value._name = "_value";
+builder_value._type_name = "Vector3f";
+builder_value._offset = offsetof(AnimationVectorKeyDocument,_value);
+builder_value._is_const = false;
+builder_value._is_static = false;
+builder_value._is_public = true;
+builder_value._is_pointer = false;
+builder_value._is_ref = false;
+builder_value._is_template = false;
+builder_value._meta = meta_value;
+builder_value._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector3f>);
+builder_value._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector3f>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_value));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+const Ailu::Type* Ailu::AnimationVectorKeyDocument::GetPrivateStaticClass()
+{
+	static const Ailu::Type* type = Z_Construct_AnimationVectorKeyDocument_Type();
+	return type;
+}
+
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::AnimationVectorKeyDocument>()
+{
+return Ailu::AnimationVectorKeyDocument::StaticType();
+}
+    const Type *Ailu::AnimationVectorKeyDocument::GetType()
+{
+return Ailu::AnimationVectorKeyDocument::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_AnimationVectorKeyDocument(&Ailu::AnimationVectorKeyDocument::StaticType, "Ailu::AnimationVectorKeyDocument");
+const Ailu::Type* Ailu::Z_Construct_AnimationQuaternionKeyDocument_Type()
+{
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "AnimationQuaternionKeyDocument";
+initializer._size = sizeof(Ailu::AnimationQuaternionKeyDocument);
+initializer._full_name = "Ailu::AnimationQuaternionKeyDocument";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu";
+initializer._base_name = "";
+initializer._constructor = []()->Ailu::AnimationQuaternionKeyDocument* {return new Ailu::AnimationQuaternionKeyDocument;};
+Meta meta_time;
+meta_time.Set("Category","");
+meta_time.Set("IsColor",false);
+meta_time.Set("IsRange",false);
+meta_time.Set("IsFloatRange",true);
+meta_time.Set("RangeMin",(f32)0);
+meta_time.Set("RangeMax",(f32)1);
+MemberBuilder builder_time;
+builder_time._name = "_time";
+builder_time._type_name = "f32";
+builder_time._offset = offsetof(AnimationQuaternionKeyDocument,_time);
+builder_time._is_const = false;
+builder_time._is_static = false;
+builder_time._is_public = true;
+builder_time._is_pointer = false;
+builder_time._is_ref = false;
+builder_time._is_template = false;
+builder_time._meta = meta_time;
+builder_time._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_time._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_time));
+Meta meta_value;
+meta_value.Set("Category","");
+meta_value.Set("IsColor",false);
+meta_value.Set("IsRange",false);
+meta_value.Set("IsFloatRange",true);
+meta_value.Set("RangeMin",(f32)0);
+meta_value.Set("RangeMax",(f32)1);
+MemberBuilder builder_value;
+builder_value._name = "_value";
+builder_value._type_name = "Ailu::Math::Quaternion";
+builder_value._offset = offsetof(AnimationQuaternionKeyDocument,_value);
+builder_value._is_const = false;
+builder_value._is_static = false;
+builder_value._is_public = true;
+builder_value._is_pointer = false;
+builder_value._is_ref = false;
+builder_value._is_template = false;
+builder_value._meta = meta_value;
+builder_value._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Quaternion>);
+builder_value._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Quaternion>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_value));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+const Ailu::Type* Ailu::AnimationQuaternionKeyDocument::GetPrivateStaticClass()
+{
+	static const Ailu::Type* type = Z_Construct_AnimationQuaternionKeyDocument_Type();
+	return type;
+}
+
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::AnimationQuaternionKeyDocument>()
+{
+return Ailu::AnimationQuaternionKeyDocument::StaticType();
+}
+    const Type *Ailu::AnimationQuaternionKeyDocument::GetType()
+{
+return Ailu::AnimationQuaternionKeyDocument::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_AnimationQuaternionKeyDocument(&Ailu::AnimationQuaternionKeyDocument::StaticType, "Ailu::AnimationQuaternionKeyDocument");
 const Ailu::Type* Ailu::Z_Construct_AnimationClipTrackDocument_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -2632,27 +2927,69 @@ builder_joint_index._meta = meta_joint_index;
 builder_joint_index._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<u16>);
 builder_joint_index._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<u16>);
 initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_joint_index));
-Meta meta_frames;
-meta_frames.Set("Category","");
-meta_frames.Set("IsColor",false);
-meta_frames.Set("IsRange",false);
-meta_frames.Set("IsFloatRange",true);
-meta_frames.Set("RangeMin",(f32)0);
-meta_frames.Set("RangeMax",(f32)1);
-MemberBuilder builder_frames;
-builder_frames._name = "_frames";
-builder_frames._type_name = "Vector<AnimationClipFrameDocument>";
-builder_frames._offset = offsetof(AnimationClipTrackDocument,_frames);
-builder_frames._is_const = false;
-builder_frames._is_static = false;
-builder_frames._is_public = true;
-builder_frames._is_pointer = false;
-builder_frames._is_ref = false;
-builder_frames._is_template = true;
-builder_frames._meta = meta_frames;
-builder_frames._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<AnimationClipFrameDocument>>);
-builder_frames._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<AnimationClipFrameDocument>>);
-initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_frames));
+Meta meta_position_keys;
+meta_position_keys.Set("Category","");
+meta_position_keys.Set("IsColor",false);
+meta_position_keys.Set("IsRange",false);
+meta_position_keys.Set("IsFloatRange",true);
+meta_position_keys.Set("RangeMin",(f32)0);
+meta_position_keys.Set("RangeMax",(f32)1);
+MemberBuilder builder_position_keys;
+builder_position_keys._name = "_position_keys";
+builder_position_keys._type_name = "Vector<AnimationVectorKeyDocument>";
+builder_position_keys._offset = offsetof(AnimationClipTrackDocument,_position_keys);
+builder_position_keys._is_const = false;
+builder_position_keys._is_static = false;
+builder_position_keys._is_public = true;
+builder_position_keys._is_pointer = false;
+builder_position_keys._is_ref = false;
+builder_position_keys._is_template = true;
+builder_position_keys._meta = meta_position_keys;
+builder_position_keys._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<AnimationVectorKeyDocument>>);
+builder_position_keys._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<AnimationVectorKeyDocument>>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_position_keys));
+Meta meta_rotation_keys;
+meta_rotation_keys.Set("Category","");
+meta_rotation_keys.Set("IsColor",false);
+meta_rotation_keys.Set("IsRange",false);
+meta_rotation_keys.Set("IsFloatRange",true);
+meta_rotation_keys.Set("RangeMin",(f32)0);
+meta_rotation_keys.Set("RangeMax",(f32)1);
+MemberBuilder builder_rotation_keys;
+builder_rotation_keys._name = "_rotation_keys";
+builder_rotation_keys._type_name = "Vector<AnimationQuaternionKeyDocument>";
+builder_rotation_keys._offset = offsetof(AnimationClipTrackDocument,_rotation_keys);
+builder_rotation_keys._is_const = false;
+builder_rotation_keys._is_static = false;
+builder_rotation_keys._is_public = true;
+builder_rotation_keys._is_pointer = false;
+builder_rotation_keys._is_ref = false;
+builder_rotation_keys._is_template = true;
+builder_rotation_keys._meta = meta_rotation_keys;
+builder_rotation_keys._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<AnimationQuaternionKeyDocument>>);
+builder_rotation_keys._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<AnimationQuaternionKeyDocument>>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_rotation_keys));
+Meta meta_scale_keys;
+meta_scale_keys.Set("Category","");
+meta_scale_keys.Set("IsColor",false);
+meta_scale_keys.Set("IsRange",false);
+meta_scale_keys.Set("IsFloatRange",true);
+meta_scale_keys.Set("RangeMin",(f32)0);
+meta_scale_keys.Set("RangeMax",(f32)1);
+MemberBuilder builder_scale_keys;
+builder_scale_keys._name = "_scale_keys";
+builder_scale_keys._type_name = "Vector<AnimationVectorKeyDocument>";
+builder_scale_keys._offset = offsetof(AnimationClipTrackDocument,_scale_keys);
+builder_scale_keys._is_const = false;
+builder_scale_keys._is_static = false;
+builder_scale_keys._is_public = true;
+builder_scale_keys._is_pointer = false;
+builder_scale_keys._is_ref = false;
+builder_scale_keys._is_template = true;
+builder_scale_keys._meta = meta_scale_keys;
+builder_scale_keys._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<AnimationVectorKeyDocument>>);
+builder_scale_keys._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<AnimationVectorKeyDocument>>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_scale_keys));
 cur_type = std::make_unique<Ailu::Type>(initializer);
 Ailu::Type::RegisterType(cur_type.get());
 }
@@ -5523,6 +5860,27 @@ builder_controller_guid._meta = meta_controller_guid;
 builder_controller_guid._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<String>);
 builder_controller_guid._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<String>);
 initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_controller_guid));
+Meta meta_clip_guid;
+meta_clip_guid.Set("Category","");
+meta_clip_guid.Set("IsColor",false);
+meta_clip_guid.Set("IsRange",false);
+meta_clip_guid.Set("IsFloatRange",true);
+meta_clip_guid.Set("RangeMin",(f32)0);
+meta_clip_guid.Set("RangeMax",(f32)1);
+MemberBuilder builder_clip_guid;
+builder_clip_guid._name = "_clip_guid";
+builder_clip_guid._type_name = "String";
+builder_clip_guid._offset = offsetof(SceneAnimatorComponentDocument,_clip_guid);
+builder_clip_guid._is_const = false;
+builder_clip_guid._is_static = false;
+builder_clip_guid._is_public = true;
+builder_clip_guid._is_pointer = false;
+builder_clip_guid._is_ref = false;
+builder_clip_guid._is_template = false;
+builder_clip_guid._meta = meta_clip_guid;
+builder_clip_guid._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<String>);
+builder_clip_guid._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<String>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_clip_guid));
 Meta meta_speed;
 meta_speed.Set("Category","");
 meta_speed.Set("IsColor",false);

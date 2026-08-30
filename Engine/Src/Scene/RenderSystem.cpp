@@ -1,4 +1,5 @@
 ﻿#include "Scene/RenderSystem.h"
+#include "Render/Material.h"
 #include "Framework/Common/Profiler.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Scene/Component.h"

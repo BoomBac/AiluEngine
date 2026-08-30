@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __SPRITE_GEN_H__
 //Class Sprite begin...........................
-#define SPRITE_GEN_H_14_GENERATED_BODY \
+#define SPRITE_GEN_H_15_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_Sprite_Type();\
                                 static const Type* GetPrivateStaticClass();\
