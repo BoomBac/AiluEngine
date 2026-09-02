@@ -61,7 +61,7 @@ namespace Ailu
                 frame_blocks.push_back(AL_NEW(DrawerBlock, _default_material,9600u));
             }
             _text_block = AL_NEW(DrawerBlock,MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/default_text.alasset"), "DefaultTextMaterial"));
-            _popup_backdrop_block = AL_NEW(DrawerBlock, _default_material, 8u);
+            _popup_backdrop_blocks.push_back(AL_NEW(DrawerBlock, _default_material, 8u));
             _text_renderer = MakeScope<TextRenderer>();
         }
         UIRenderer::~UIRenderer()
@@ -94,7 +94,9 @@ namespace Ailu
                 }
             }
             AL_DELETE(_text_block);
-            AL_DELETE(_popup_backdrop_block);
+            for (auto *block: _popup_backdrop_blocks)
+                AL_DELETE(block);
+            _popup_backdrop_blocks.clear();
         }
 
         void UIRenderer::Render(CommandBuffer *cmd)
@@ -312,6 +314,7 @@ namespace Ailu
                         block->ResetBuildData();
                 }
             }
+            _popup_backdrop_block_index = 0u;
             for (const auto &entry: submit_entries)
             {
                 if (entry._widget == nullptr || !entry._widget->IsPopup())
@@ -894,7 +897,7 @@ namespace Ailu
 
         void UIRenderer::SubmitPopupBackdrop(Widget *widget, CommandBuffer *cmd, RenderTexture *color, RenderTexture *depth)
         {
-            if (widget == nullptr || widget->Root() == nullptr || color == nullptr || _popup_backdrop_block == nullptr)
+            if (widget == nullptr || widget->Root() == nullptr || color == nullptr)
                 return;
             const f32 w = static_cast<f32>(color->Width());
             const f32 h = static_cast<f32>(color->Height());
@@ -903,7 +906,10 @@ namespace Ailu
             if (rect.z <= 1.0f || rect.w <= 1.0f)
                 return;
 
-            _popup_backdrop_block->ResetBuildData();
+            if (_popup_backdrop_block_index >= _popup_backdrop_blocks.size())
+                _popup_backdrop_blocks.push_back(AL_NEW(DrawerBlock, _default_material, 8u));
+            DrawerBlock *backdrop_block = _popup_backdrop_blocks[_popup_backdrop_block_index++];
+            backdrop_block->ResetBuildData();
             _frame_backdrop_blur_cache.erase(color);
 
             UIBrush brush;
@@ -911,9 +917,9 @@ namespace Ailu
             brush._texture = color;
             brush._tint = Color(1.0f, 1.0f, 1.0f, 0.92f);
             brush._uv_rect = {rect.x / w, rect.y / h, rect.z / w, rect.w / h};
-            AppendQuadToBlock(_popup_backdrop_block, rect, kIdentityMatrix, brush,
+            AppendQuadToBlock(backdrop_block, rect, kIdentityMatrix, brush,
                               is_modal ? Vector4f(0.0f) : Vector4f(10.0f), 0.0f);
-            SubmitBlock(_popup_backdrop_block, cmd, color, depth);
+            SubmitBlock(backdrop_block, cmd, color, depth);
         }
 
         void UIRenderer::SubmitBlock(DrawerBlock *b, CommandBuffer *cmd,RenderTexture* color,RenderTexture* depth)

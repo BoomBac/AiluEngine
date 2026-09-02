@@ -183,6 +183,7 @@ namespace Ailu
         void InputActionAssetEditor::BuildToolbar(UI::HorizontalBox *toolbar)
         {
             toolbar->SlotPadding() = UI::Padding(4.0f, 2.0f, 4.0f, 2.0f);
+            AddAssetMenu(toolbar);
 
             auto add_button = [toolbar](const String &text, f32 width)
             {

@@ -75,12 +75,6 @@ namespace Ailu
 			}
 		}
 
-		bool IsLikelyJsonAssetDocument(const WString &data)
-		{
-			const WString trimmed = StringUtils::Trim(data);
-			return !trimmed.empty() && trimmed.front() == L'{';
-		}
-
 		template<typename TDocument>
 		bool SaveAssetDocument(const WString &sys_path, TDocument &document)
 		{
@@ -121,22 +115,7 @@ namespace Ailu
 
 		bool TryLoadAssetDocumentHeader(const WString &sys_path, AssetDocumentHeader &header)
 		{
-			WString data;
-			if (!FileManager::ReadFile(sys_path, data) || !IsLikelyJsonAssetDocument(data))
-				return false;
-
-			AssetHeaderProbeDocument probe;
-			if (!LoadAssetDocument(sys_path, probe))
-				return false;
-			if (probe._header._format_version != kSerializedAssetDocumentVersion)
-			{
-				LOG_ERROR(L"Unsupported asset document version {} in {}", probe._header._format_version, sys_path);
-				return false;
-			}
-			if (probe._header._guid.empty() || probe._header._asset_type.empty())
-				return false;
-			header = probe._header;
-			return true;
+			return LoadAssetDocumentHeader(sys_path, header);
 		}
 
 		String GetLinkedAssetGuidString(Object *obj)
@@ -1207,7 +1186,12 @@ namespace Ailu
         AL_ASSERT(is_engine_asset);
 		AssetDocumentHeader header;
 		if (!TryLoadAssetDocumentHeader(sys_path,header))
+		{
+			if (FileManager::Exist(sys_path))
+				LOG_ERROR(L"Load asset {} failed: invalid asset document header (system path: {})", normalized_asset_path,
+				          sys_path);
 			return nullptr;
+		}
 		auto src_type = FindAssetType(ToWChar(header._asset_type));
         auto asset_handler = _asset_handler_registry.Find(type);
         if (type == nullptr || !IsTypeCompatible(src_type, type))

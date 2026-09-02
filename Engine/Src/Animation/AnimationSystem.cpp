@@ -1,5 +1,6 @@
 #include "Animation/AnimationSystem.h"
 
+#include "Framework/Common/FileManager.h"
 #include "Framework/Common/Profiler.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Scene/Component.h"
@@ -211,6 +212,7 @@ namespace Ailu::ECS
                     _controller_ids[entity] = source_id;
                     _controller_assets.erase(entity);
                     _controllers.erase(entity);
+                    _failed_direct_clips.erase(entity);
                     _blend_space_assets.erase(entity);
                     _sprite_bindings.erase(entity);
                     _animator_runtimes.erase(entity);
@@ -228,6 +230,7 @@ namespace Ailu::ECS
                 _controller_ids[entity] = source_id;
                 _controller_assets.erase(entity);
                 _controllers.erase(entity);
+                _failed_direct_clips.erase(entity);
                 _blend_space_assets.erase(entity);
             }
 
@@ -235,8 +238,21 @@ namespace Ailu::ECS
             {
                 if (use_direct_clip)
                 {
-                    ResourceMgr::Get().Load<AnimationClip>(source_id);
-                    const Ref<AnimationClip> clip = ResourceMgr::Get().GetRef<AnimationClip>(source_id);
+                    ResourceMgr &resource_mgr = ResourceMgr::Get();
+                    const WString asset_path = resource_mgr.GuidToAssetPath(source_id);
+                    const WString system_path = asset_path.empty() ? WString{} : ResourceMgr::GetResSysPath(asset_path);
+                    const bool file_exists = !system_path.empty() && FileManager::Exist(system_path);
+                    auto failed_iter = _failed_direct_clips.find(entity);
+                    if (failed_iter != _failed_direct_clips.end() && failed_iter->second._guid == source_id)
+                    {
+                        const bool asset_path_changed = asset_path != failed_iter->second._asset_path;
+                        const bool file_restored = file_exists && !failed_iter->second._file_exists;
+                        if (!asset_path_changed && !file_restored)
+                            continue;
+                        _failed_direct_clips.erase(failed_iter);
+                    }
+
+                    const Ref<AnimationClip> clip = resource_mgr.Load<AnimationClip>(source_id);
                     if (clip != nullptr)
                     {
                         auto direct_controller = MakeRef<AnimationControllerAsset>("DirectClipController");
@@ -245,6 +261,20 @@ namespace Ailu::ECS
                         state._loop = clip->IsLooping();
                         direct_controller->AddState(std::move(state));
                         _controller_assets[entity] = std::move(direct_controller);
+                    }
+                    else
+                    {
+                        _failed_direct_clips[entity] = FailedDirectClip{source_id, asset_path, file_exists};
+                        if (asset_path.empty())
+                        {
+                            LOG_ERROR("AnimationSystem: direct clip GUID {} is not registered in the asset database",
+                                      source_id.ToString());
+                        }
+                        else
+                        {
+                            LOG_ERROR("AnimationSystem: failed to load direct clip {} from {}", source_id.ToString(),
+                                      ToChar(system_path));
+                        }
                     }
                 }
                 else
@@ -520,6 +550,13 @@ namespace Ailu::ECS
                 runtime_iter = _animator_runtimes.erase(runtime_iter);
             else
                 ++runtime_iter;
+        }
+        for (auto failed_iter = _failed_direct_clips.begin(); failed_iter != _failed_direct_clips.end();)
+        {
+            if (!_entities.contains(failed_iter->first))
+                failed_iter = _failed_direct_clips.erase(failed_iter);
+            else
+                ++failed_iter;
         }
     }
 

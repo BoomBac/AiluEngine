@@ -176,7 +176,7 @@ namespace Ailu::UI
         ApplyFocusChange(old, nullptr);
     }
     void UIManager::ShowPopupAt(f32 x, f32 y, Ref<UIElement> root, std::function<void()> on_close, Window *win,
-                                bool is_modal, bool render_backdrop)
+                                bool is_modal, bool render_backdrop, u64 popup_group_id)
     {
         if (!root)
             return;
@@ -264,7 +264,7 @@ namespace Ailu::UI
         popup_widget->_visibility = EVisibility::kVisible;
         RegisterWidget(popup_widget);
         BringToFront(popup_widget.get());
-        _popup_stack.push_back({popup_widget, on_close, is_modal, render_backdrop});
+        _popup_stack.push_back({popup_widget, on_close, is_modal, render_backdrop, popup_group_id});
     }
     void UIManager::HidePopup()
     {
@@ -299,6 +299,38 @@ namespace Ailu::UI
         if (entry._on_close)
             entry._on_close();
     }
+    void UIManager::HidePopupGroup(u64 popup_group_id)
+    {
+        if (popup_group_id == 0u)
+            return;
+
+        while (true)
+        {
+            auto it = std::find_if(_popup_stack.rbegin(), _popup_stack.rend(),
+                                   [popup_group_id](const PopupEntry &entry)
+                                   { return entry._group_id == popup_group_id; });
+            if (it == _popup_stack.rend())
+                break;
+
+            const size_t index = static_cast<size_t>(std::distance(_popup_stack.begin(), it.base()) - 1);
+            if (index == _popup_stack.size() - 1u)
+            {
+                HidePopup();
+                continue;
+            }
+
+            PopupEntry entry = std::move(_popup_stack[index]);
+            _popup_stack.erase(_popup_stack.begin() + static_cast<std::ptrdiff_t>(index));
+            if (entry._widget)
+            {
+                entry._widget->_visibility = EVisibility::kHide;
+                UnRegisterWidget(entry._widget.get());
+                _pending_popup_destroy.push_back(entry._widget);
+            }
+            if (entry._on_close)
+                entry._on_close();
+        }
+    }
     Widget *UIManager::GetPopupWidget() const
     {
         if (_popup_stack.empty())
@@ -313,6 +345,28 @@ namespace Ailu::UI
                 return it->_widget.get();
         }
         return nullptr;
+    }
+    u64 UIManager::GetPopupGroupId(const Widget *widget) const
+    {
+        if (widget == nullptr)
+            return 0u;
+        for (auto it = _popup_stack.rbegin(); it != _popup_stack.rend(); ++it)
+        {
+            if (it->_widget.get() == widget)
+                return it->_group_id;
+        }
+        return 0u;
+    }
+    bool UIManager::IsPointInsidePopupGroup(u64 popup_group_id, Vector2f position) const
+    {
+        if (popup_group_id == 0u)
+            return false;
+        for (const auto &entry: _popup_stack)
+        {
+            if (entry._group_id == popup_group_id && entry._widget != nullptr && entry._widget->IsHover(position))
+                return true;
+        }
+        return false;
     }
     bool UIManager::IsPopupModal(const Widget *widget) const
     {

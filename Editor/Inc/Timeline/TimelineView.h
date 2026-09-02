@@ -10,6 +10,7 @@ namespace Ailu::Editor
         Vector<f32> _markers;
         Color _marker_color = Color(0.26f, 0.68f, 0.95f, 1.0f);
         bool _is_event_track = false;
+        u32 _selection_id = 0u;
     };
 
     class TimelineView : public UI::UIElement

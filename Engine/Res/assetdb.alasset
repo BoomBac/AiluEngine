@@ -56,11 +56,6 @@
       "type": "Ailu::Render::Texture2D"
     },
     {
-      "guid": "0f97befc-6131-4cd1-a041-c56ce694dce9",
-      "path": "engine://AnimClips/SimpleAnim.alasset",
-      "type": "Ailu::Render::SkeletonMesh"
-    },
-    {
       "guid": "10806073-d5d1-45c9-b7c4-bd55d68184e9",
       "path": "engine://Shaders/hlsl/Compute/volumetric_noise_generator.alasset",
       "type": "Ailu::Render::ComputeShader"
@@ -196,11 +191,6 @@
       "type": "Ailu::Render::Shader"
     },
     {
-      "guid": "61719aa4-e2e6-4ba7-bab7-5d6e6b78935f",
-      "path": "engine://WaterTest/Alpha_Joints.alasset",
-      "type": "Ailu::Render::SkeletonMesh"
-    },
-    {
       "guid": "687dd7a6-c8d4-40f1-8a33-694707d9c423",
       "path": "engine://Icons/directional_light.alasset",
       "type": "Ailu::Render::Texture2D"
@@ -251,11 +241,6 @@
       "type": "Ailu::Render::ComputeShader"
     },
     {
-      "guid": "7f0dc87f-001c-4dfd-8f3c-f6aca6fdc32f",
-      "path": "engine://AnimClips/Sk_YBot.alasset",
-      "type": "Ailu::Render::SkeletonMesh"
-    },
-    {
       "guid": "7fa3f1ac-fa22-4613-b60c-54cae46bdf4e",
       "path": "engine://breakfast_room/living_room.alasset",
       "type": "Ailu::Render::Mesh"
@@ -286,11 +271,6 @@
       "type": "Ailu::Render::ComputeShader"
     },
     {
-      "guid": "949381d0-6c70-457a-ac9b-afcb1eab3547",
-      "path": "engine://AnimClips/ik_test_leg_mesh.alasset",
-      "type": "Ailu::AnimationClip"
-    },
-    {
       "guid": "953c51c3-fcd0-49d0-89f9-151fdfbe0e33",
       "path": "engine://breakfast_room/Arcade.alasset",
       "type": "Ailu::Render::Mesh"
@@ -306,11 +286,6 @@
       "type": "Ailu::Render::Shader"
     },
     {
-      "guid": "a39101e3-586a-4b9d-ad20-e33970c21509",
-      "path": "engine://AnimClips/leg_mesh.alasset",
-      "type": "Ailu::Render::SkeletonMesh"
-    },
-    {
       "guid": "a40c454a-c967-4810-88c9-651706104062",
       "path": "engine://WaterTest/default_scene.almap",
       "type": "Ailu::SceneManagement::Scene"
@@ -324,11 +299,6 @@
       "guid": "a5e4a76d-c915-48a4-a940-5dba8a0c936e",
       "path": "engine://WaterTest/Grass_Wildgrass08_D.alasset",
       "type": "Ailu::Render::Texture2D"
-    },
-    {
-      "guid": "aaa391ce-746b-445d-9dda-c678ad8b41b7",
-      "path": "engine://AnimClips/anim_run.alasset",
-      "type": "Ailu::AnimationClip"
     },
     {
       "guid": "aab1797f-d730-4302-8982-7fc075364eba",

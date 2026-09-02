@@ -11,7 +11,7 @@
 
 namespace Ailu
 {
-    // 工具函数：拆分路径 "a.b.c" -> {"a", "b", "c"}
+    // Save-side compatibility helpers. Load-side navigation uses the RapidJSON node stack below.
     static Vector<String> SplitPath(const String &path)
     {
         Vector<String> result;
@@ -213,60 +213,6 @@ namespace Ailu
         std::visit(Visitor{dst, alloc}, src.value);
     }
 
-    static void FromRapidJsonValue(const rapidjson::Value &src, JsonArchive::JsonValue &dst)
-    {
-        if (src.IsNull())
-        {
-            dst = JsonArchive::JsonValue(std::monostate{});
-        }
-        else if (src.IsBool())
-        {
-            dst = JsonArchive::JsonValue(src.GetBool());
-        }
-        else if (src.IsInt64())
-        {
-            dst = JsonArchive::JsonValue(static_cast<i64>(src.GetInt64()));
-        }
-        else if (src.IsUint64())
-        {
-            dst = JsonArchive::JsonValue(static_cast<u64>(src.GetUint64()));
-        }
-        else if (src.IsDouble())
-        {
-            dst = JsonArchive::JsonValue(static_cast<f64>(src.GetDouble()));
-        }
-        else if (src.IsString())
-        {
-            dst = JsonArchive::JsonValue(String(src.GetString(), src.GetStringLength()));
-        }
-        else if (src.IsObject())
-        {
-            JsonArchive::JsonObject obj;
-            obj.reserve(src.MemberCount());
-            for (auto it = src.MemberBegin(); it != src.MemberEnd(); ++it)
-            {
-                String key(it->name.GetString(), it->name.GetStringLength());
-                JsonArchive::JsonValue val;
-                FromRapidJsonValue(it->value, val);
-                obj.InsertOrAssign(std::move(key), std::move(val));
-            }
-            dst = JsonArchive::JsonValue(std::move(obj));
-        }
-        else if (src.IsArray())
-        {
-            JsonArchive::JsonArray arr;
-            arr.reserve(src.Size());
-            for (auto &v: src.GetArray())
-            {
-                JsonArchive::JsonValue val;
-                FromRapidJsonValue(v, val);
-                arr.push_back(std::move(val));
-            }
-            dst = JsonArchive::JsonValue(std::move(arr));
-        }
-    }
-
-
     class JsonArchive::Impl
     {
     public:
@@ -305,22 +251,9 @@ namespace Ailu
             return !doc.HasParseError();
         }
 
-        bool Load(const WString &path, JsonArchive::JsonValue& dst)
+        bool LoadFromString(const String &json_text)
         {
-            FILE *fp;
-            if (_wfopen_s(&fp, path.c_str(), L"rb") != 0)
-            {
-                LOG_ERROR(L"JsonArchive::Impl open file({}) failed", path)
-                return false;
-            }
-            if (!fp) return false;
-
-            char *buffer = AL_ALLOC_TAG(EMemoryTag::kTemporary, char, 65536);
-            rapidjson::FileReadStream is(fp, buffer, sizeof(buffer));
-            doc.ParseStream(is);
-            fclose(fp);
-            AL_FREE(buffer);
-            FromRapidJsonValue(doc, dst);
+            doc.Parse(json_text.c_str());
             return !doc.HasParseError();
         }
 
@@ -377,15 +310,6 @@ namespace Ailu
             writer.SetFormatOptions(rapidjson::kFormatSingleLineArray);
             doc.Accept(writer);
             return String(buffer.GetString(), buffer.GetSize());
-        }
-
-        bool LoadFromString(const String &json_text, JsonArchive::JsonValue &dst)
-        {
-            doc.Parse(json_text.c_str());
-            if (doc.HasParseError())
-                return false;
-            FromRapidJsonValue(doc, dst);
-            return true;
         }
 
         const rapidjson::Value *GetNode(const String &path) const
@@ -636,69 +560,102 @@ namespace Ailu
 
     FArchive &JsonArchive::operator>>(bool &value)
     {
-        if (auto node = FindNode(); node != nullptr)
+        if (_is_loading)
         {
-            AL_ASSERT(std::holds_alternative<bool>(node->value));
-            value = std::get<bool>(node->value);
+            const auto *node = static_cast<const rapidjson::Value *>(FindReadNode());
+            if (node != nullptr && node->IsBool())
+                value = node->GetBool();
+            else
+                LOG_ERROR("Read bool from current JSON node failed");
         }
         else
-            LOG_ERROR("Read bool form key {},name {} failed", _cur_key, _cur_sub_name);
+        {
+            if (auto node = FindNode(); node != nullptr && std::holds_alternative<bool>(node->value))
+                value = std::get<bool>(node->value);
+        }
         return *this;
     }
 
     FArchive &JsonArchive::operator>>(String &value)
     {
-        if (auto node = FindNode(); node != nullptr)
+        if (_is_loading)
         {
-            AL_ASSERT(std::holds_alternative<String>(node->value));
-            value = std::get<String>(node->value);
+            const auto *node = static_cast<const rapidjson::Value *>(FindReadNode());
+            if (node != nullptr && node->IsString())
+                value.assign(node->GetString(), node->GetStringLength());
+            else
+                LOG_ERROR("Read String from current JSON node failed");
         }
         else
-            LOG_ERROR("Read String form key {},name {} failed", _cur_key, _cur_sub_name);
+        {
+            if (auto node = FindNode(); node != nullptr && std::holds_alternative<String>(node->value))
+                value = std::get<String>(node->value);
+        }
         return *this;
     }
     FArchive &JsonArchive::operator>>(u64 &value)
     {
-        if (auto node = FindNode(); node != nullptr)
+        if (_is_loading)
         {
-            //rj默认会使用int存储，超过范围才会使用uint
-            if (std::holds_alternative<i64>(node->value))
-                value = (u64) std::get<i64>(node->value);
-            else if (std::holds_alternative<u64>(node->value))
-                value = std::get<u64>(node->value);
+            const auto *node = static_cast<const rapidjson::Value *>(FindReadNode());
+            if (node != nullptr && node->IsUint64())
+                value = node->GetUint64();
+            else if (node != nullptr && node->IsInt64() && node->GetInt64() >= 0)
+                value = static_cast<u64>(node->GetInt64());
             else
-                AL_ASSERT_MSG(false, "not int type");
+                LOG_ERROR("Read u64 from current JSON node failed");
         }
         else
-            LOG_ERROR("Read u64 form key {},name {} failed", _cur_key, _cur_sub_name);
+        {
+            if (auto node = FindNode(); node != nullptr)
+            {
+                if (std::holds_alternative<i64>(node->value))
+                    value = static_cast<u64>(std::get<i64>(node->value));
+                else if (std::holds_alternative<u64>(node->value))
+                    value = std::get<u64>(node->value);
+            }
+        }
         return *this;
     }
     FArchive &JsonArchive::operator>>(i64 &value)
     {
-        if (auto node = FindNode(); node != nullptr)
+        if (_is_loading)
         {
-            AL_ASSERT(std::holds_alternative<i64>(node->value));
-            value = std::get<i64>(node->value);
+            const auto *node = static_cast<const rapidjson::Value *>(FindReadNode());
+            if (node != nullptr && node->IsInt64())
+                value = node->GetInt64();
+            else if (node != nullptr && node->IsUint64() && node->GetUint64() <= static_cast<u64>(INT64_MAX))
+                value = static_cast<i64>(node->GetUint64());
+            else
+                LOG_ERROR("Read i64 from current JSON node failed");
         }
         else
-            LOG_ERROR("Read i64 form key {},name {} failed", _cur_key, _cur_sub_name);
+        {
+            if (auto node = FindNode(); node != nullptr && std::holds_alternative<i64>(node->value))
+                value = std::get<i64>(node->value);
+        }
         return *this;
     }
     FArchive &JsonArchive::operator>>(f64 &value)
     {
-        if (auto node = FindNode(); node != nullptr)
+        if (_is_loading)
         {
-            if (std::holds_alternative<f64>(node->value))
-                value = std::get<f64>(node->value);
-            else if (std::holds_alternative<i64>(node->value))
-            {
-                value = static_cast<f64>(std::get<i64>(node->value));
-                LOG_WARNING("Read f64 from i64 type, key {},name {}", _cur_key, _cur_sub_name);
-            }
-            else {}
+            const auto *node = static_cast<const rapidjson::Value *>(FindReadNode());
+            if (node != nullptr && node->IsNumber())
+                value = node->GetDouble();
+            else
+                LOG_ERROR("Read f64 from current JSON node failed");
         }
         else
-            LOG_ERROR("Read f64 form key {},name {} failed", _cur_key, _cur_sub_name);
+        {
+            if (auto node = FindNode(); node != nullptr)
+            {
+                if (std::holds_alternative<f64>(node->value))
+                    value = std::get<f64>(node->value);
+                else if (std::holds_alternative<i64>(node->value))
+                    value = static_cast<f64>(std::get<i64>(node->value));
+            }
+        }
         return *this;
     }
     void JsonArchive::Deserialize(void *data, u64 size)
@@ -713,6 +670,28 @@ namespace Ailu
     {
         if (name.size() == 0)
             return;
+        if (_is_loading)
+        {
+            const auto *parent = static_cast<const rapidjson::Value *>(FindReadNode());
+            const rapidjson::Value *child = nullptr;
+            if (parent != nullptr && parent->IsObject())
+            {
+                const auto member = parent->FindMember(name.c_str());
+                if (member != parent->MemberEnd())
+                    child = &member->value;
+            }
+            else if (parent != nullptr && parent->IsArray())
+            {
+                u64 index = 0u;
+                const auto result = std::from_chars(name.data(), name.data() + name.size(), index);
+                if (result.ec == std::errc{} && index < parent->Size())
+                    child = &(*parent)[static_cast<rapidjson::SizeType>(index)];
+            }
+            if (child == nullptr)
+                LOG_ERROR("JsonArchive::BeginObject: JSON member {} not found", name);
+            _read_node_stack.push_back(child);
+            return;
+        }
         if (_cur_key.empty())
             _cur_key = name;
         else
@@ -727,6 +706,12 @@ namespace Ailu
 
     void JsonArchive::EndObject()
     {
+        if (_is_loading)
+        {
+            if (_read_node_stack.size() > 1u)
+                _read_node_stack.pop_back();
+            return;
+        }
         auto old_key = _cur_key;
         auto pos = _cur_key.rfind('.');
         if (pos == String::npos)
@@ -760,6 +745,25 @@ namespace Ailu
     }
 
 
+    void JsonArchive::BeginArrayElement(u32 index)
+    {
+        if (!_is_loading)
+            return;
+        const auto *parent = static_cast<const rapidjson::Value *>(FindReadNode());
+        const rapidjson::Value *child = nullptr;
+        if (parent != nullptr && parent->IsArray() && index < parent->Size())
+            child = &(*parent)[index];
+        if (child == nullptr)
+            LOG_ERROR("JsonArchive::BeginArrayElement: index {} is out of range", index);
+        _read_node_stack.push_back(child);
+    }
+
+    void JsonArchive::EndArrayElement()
+    {
+        if (_is_loading && _read_node_stack.size() > 1u)
+            _read_node_stack.pop_back();
+    }
+
     void JsonArchive::BeginArray(u64 size, EStructedDataType type)
     {
         JsonArray arr;
@@ -771,6 +775,17 @@ namespace Ailu
 
     u32 JsonArchive::BeginArray(EStructedDataType &type)
     {
+        if (_is_loading)
+        {
+            const auto *node = static_cast<const rapidjson::Value *>(FindReadNode());
+            if (node == nullptr || !node->IsArray())
+            {
+                LOG_ERROR("JsonArchive::BeginArray: current value is not an array");
+                return 0u;
+            }
+            type = Impl::GetArrayType(node);
+            return node->Size();
+        }
         if (auto node = FindNode(); node != nullptr)
         {
             type = EStructedDataType::kStruct;
@@ -780,27 +795,22 @@ namespace Ailu
                 return 0u;
             }
             auto &arr = std::get<JsonArray>(node->value);
-            if (arr.empty())
-                return 0u;
-            if (std::holds_alternative<String>(arr[0].value))
-                type = EStructedDataType::kString;
-            else if (std::holds_alternative<bool>(arr[0].value))
-                type = EStructedDataType::kBool;
-            else if (std::holds_alternative<f64>(arr[0].value))
-                type = EStructedDataType::kFloat;
-            else if (std::holds_alternative<u64>(arr[0].value))
-                type = EStructedDataType::kUInt;
-            else if (std::holds_alternative<i64>(arr[0].value))
-                type = EStructedDataType::kInt;
-            else {}
-            return (u32)arr.size();
+            if (!arr.empty())
+            {
+                if (std::holds_alternative<String>(arr[0].value)) type = EStructedDataType::kString;
+                else if (std::holds_alternative<bool>(arr[0].value)) type = EStructedDataType::kBool;
+                else if (std::holds_alternative<f64>(arr[0].value)) type = EStructedDataType::kFloat;
+                else if (std::holds_alternative<u64>(arr[0].value)) type = EStructedDataType::kUInt;
+                else if (std::holds_alternative<i64>(arr[0].value)) type = EStructedDataType::kInt;
+            }
+            return static_cast<u32>(arr.size());
         }
         return 0u;
     }
 
     void JsonArchive::EndArray()
     {
-
+        // Array elements are pushed and popped by BeginObject/EndObject.
     }
 
     void JsonArchive::WriteKey(const String &key)
@@ -862,12 +872,16 @@ namespace Ailu
     void JsonArchive::Load(const Path &sys_path)
     {
         Reset();
-        if (!_impl->Load(sys_path.wstring(),_root))
+        if (!_impl->Load(sys_path.wstring()))
         {
             LOG_ERROR("Failed to load JSON archive from {}", sys_path);
         }
         else
+        {
+            _is_loading = true;
+            _read_node_stack.push_back(&_impl->doc);
             _is_loaded = true;
+        }
     }
     String JsonArchive::SaveToString()
     {
@@ -880,16 +894,23 @@ namespace Ailu
     bool JsonArchive::LoadFromString(const String &json_text)
     {
         Reset();
-        if (!_impl->LoadFromString(json_text, _root))
+        if (!_impl->LoadFromString(json_text))
         {
             LOG_ERROR("Failed to load JSON archive from string");
             return false;
         }
+        _is_loading = true;
+        _read_node_stack.push_back(&_impl->doc);
         _is_loaded = true;
         return true;
     }
     bool JsonArchive::HasField(const String &name)
     {
+        if (_is_loading)
+        {
+            const auto *node = static_cast<const rapidjson::Value *>(FindReadNode());
+            return node != nullptr && node->IsObject() && node->HasMember(name.c_str());
+        }
         String key = _cur_key.empty() ? name : std::format("{}.{}", _cur_key, name);
         JsonValue *node = &_root;
 
@@ -924,6 +945,11 @@ namespace Ailu
 
     bool JsonArchive::IsCurrentNodeObject()
     {
+        if (_is_loading)
+        {
+            const auto *node = static_cast<const rapidjson::Value *>(FindReadNode());
+            return node != nullptr && node->IsObject();
+        }
         JsonValue *node = FindNode();
         return node != nullptr && std::holds_alternative<JsonObject>(node->value);
     }
@@ -931,6 +957,16 @@ namespace Ailu
     Vector<String> JsonArchive::GetCurrentObjectKeys()
     {
         Vector<String> keys;
+        if (_is_loading)
+        {
+            const auto *node = static_cast<const rapidjson::Value *>(FindReadNode());
+            if (node == nullptr || !node->IsObject())
+                return keys;
+            keys.reserve(node->MemberCount());
+            for (auto it = node->MemberBegin(); it != node->MemberEnd(); ++it)
+                keys.emplace_back(it->name.GetString(), it->name.GetStringLength());
+            return keys;
+        }
         JsonValue *node = FindNode();
         if (node == nullptr || !std::holds_alternative<JsonObject>(node->value))
             return keys;
@@ -976,6 +1012,11 @@ namespace Ailu
             pre_key = p;
         }
         return node;
+    }
+
+    const void *JsonArchive::FindReadNode() const
+    {
+        return _read_node_stack.empty() ? nullptr : _read_node_stack.back();
     }
 
 

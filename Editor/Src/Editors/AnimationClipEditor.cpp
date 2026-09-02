@@ -58,6 +58,7 @@ namespace Ailu
             toolbar->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed)
                     .Size(Vector2f(0.0f, kToolbarHeight));
             toolbar->SlotPadding() = UI::Padding(4.0f, 2.0f, 4.0f, 2.0f);
+            AddAssetMenu(toolbar);
             auto add_button = [toolbar](const String &text, f32 width)
             {
                 auto *button = toolbar->AddChild<UI::Button>(text);
@@ -630,16 +631,7 @@ namespace Ailu
                 _animation_preview->SetSelectedJoint(_selected_joint);
             if (_animation_timeline == nullptr || _clip == nullptr)
                 return;
-            u32 selected_track = 0u;
-            for (u32 track_index = 0u; track_index < _clip->Size(); ++track_index)
-            {
-                if (_clip->GetIdAtIndex(track_index) == joint_index)
-                {
-                    selected_track = track_index + 1u;
-                    break;
-                }
-            }
-            _animation_timeline->SetSelectedTrack(selected_track);
+            _animation_timeline->SetSelectedBone(joint_index);
         }
 
         void AnimationClipEditor::RefreshEvents()

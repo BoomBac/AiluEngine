@@ -1261,6 +1261,7 @@ namespace Ailu
         // =====================================================================
         void SpriteAssetEditor::BuildToolbar(UI::HorizontalBox* toolbar)
         {
+            AddAssetMenu(toolbar);
             toolbar->SlotPadding() = UI::Padding(4.0f, 2.0f, 4.0f, 2.0f);
 
             _btn_apply = toolbar->AddChild<UI::Button>("Save");

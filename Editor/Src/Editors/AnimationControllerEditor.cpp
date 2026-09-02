@@ -144,6 +144,7 @@ namespace Ailu
             toolbar->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed)
                     .Size(Vector2f(0.0f, kToolbarHeight));
             toolbar->SlotPadding() = UI::Padding(4.0f, 2.0f, 4.0f, 2.0f);
+            AddAssetMenu(toolbar);
             auto add_button = [toolbar](const String &text, f32 width)
             {
                 auto *button = toolbar->AddChild<UI::Button>(text);

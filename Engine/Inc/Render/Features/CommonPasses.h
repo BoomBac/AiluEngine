@@ -26,6 +26,10 @@ namespace Ailu
             u16 _error_shader_pass_id, _compiling_shader_pass_id;
             Map<u32, Ref<Material>> _transparent_replacement_materials;
             Shader *_forward_lit_shader;
+            Ref<Texture2D> _brdf_lut;
+            Ref<RenderTexture> _dummy_main_light_shadow_map;
+            Ref<RenderTexture> _dummy_add_light_shadow_maps;
+            Ref<RenderTexture> _dummy_point_light_shadow_maps;
         };
 
         class CopyColorPass : public RenderPass

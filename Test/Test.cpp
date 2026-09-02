@@ -104,6 +104,7 @@ namespace Ailu::AnimationTests
     bool TestSparseAnimationDocumentRoundtrip();
     bool TestSkeletonAssetDocumentRoundtrip();
     bool TestAnimationKeyReduction();
+    bool TestAnimationClipArtifactRoundtrip();
 }
 
 namespace
@@ -1921,6 +1922,7 @@ namespace
         RunTest(result, "Sparse animation document roundtrip", TestSparseAnimationDocumentRoundtrip);
         RunTest(result, "Skeleton asset document roundtrip", TestSkeletonAssetDocumentRoundtrip);
         RunTest(result, "Animation key reduction", TestAnimationKeyReduction);
+        RunTest(result, "Animation clip artifact roundtrip", TestAnimationClipArtifactRoundtrip);
 
         std::cout << "========================================\n";
         std::cout << "Animation tests passed: " << result._passed << '\n';

@@ -88,12 +88,20 @@ namespace Ailu
                 Map<const SkeletonAsset *, SkeletonRuntimeGroup> _skeleton_groups;
             };
 
+            struct FailedDirectClip
+            {
+                Guid _guid = Guid::EmptyGuid();
+                WString _asset_path;
+                bool _file_exists = false;
+            };
+
             Map<Entity, AnimatorRuntime> _animator_runtimes;
             Map<Entity, Vector<Matrix4x4f>> _matrix_palettes;
             Map<Entity, SpriteAnimationBinding> _sprite_bindings;
             Map<Entity, AnimationController> _controllers;
             Map<Entity, Guid> _controller_ids;
             Map<Entity, Ref<AnimationControllerAsset>> _controller_assets;
+            Map<Entity, FailedDirectClip> _failed_direct_clips;
             Map<Entity, Map<Guid, Ref<BlendSpaceAsset>>> _blend_space_assets;
             Map<Entity, Vector<ParameterCommand>> _pending_commands;
             AnimationInstancePool _animation_instances;

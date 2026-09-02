@@ -265,6 +265,7 @@ namespace Ailu
 
         void AudioClipEditor::BuildToolbar(UI::HorizontalBox *toolbar)
         {
+            AddAssetMenu(toolbar);
             toolbar->SlotPadding() = UI::Padding(4.0f, 2.0f, 4.0f, 2.0f);
 
             auto *save_button = toolbar->AddChild<UI::Button>("Save");

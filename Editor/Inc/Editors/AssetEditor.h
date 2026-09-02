@@ -6,6 +6,10 @@
 namespace Ailu
 {
     class Asset;
+    namespace UI
+    {
+        class HorizontalBox;
+    }
 
     namespace Editor
     {
@@ -41,6 +45,7 @@ namespace Ailu
             virtual void OnAssetSaved() {}
             virtual void RefreshEditor() {}
 
+            void AddAssetMenu(UI::HorizontalBox *toolbar);
             void RefreshTitle();
             void ShowClosePrompt();
 

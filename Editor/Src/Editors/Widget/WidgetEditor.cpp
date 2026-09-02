@@ -1582,6 +1582,7 @@ namespace Ailu
 
         void WidgetEditor::BuildToolbar(UI::HorizontalBox *toolbar)
         {
+            AddAssetMenu(toolbar);
             toolbar->SlotPadding() = UI::Padding(8.0f, 4.0f, 8.0f, 4.0f);
             _save_button = toolbar->AddChild<UI::Button>("Save");
             _save_button->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFill)

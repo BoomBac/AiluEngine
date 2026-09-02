@@ -48,10 +48,15 @@ namespace Ailu
             bool IsDebugReflectorVisible() const { return _is_debug_reflector_visible; }
             //弹出一个popup widget,位置基于当前窗口左上角，root则会被添加到popup widget的root(canvas)进行显示
             void ShowPopupAt(f32 x, f32 y, Ref<UIElement> root, std::function<void()> on_close = nullptr,
-                             Window *win = nullptr, bool is_modal = false, bool render_backdrop = true);
+                             Window *win = nullptr, bool is_modal = false, bool render_backdrop = true,
+                             u64 popup_group_id = 0u);
+            u64 CreatePopupGroup() { return _next_popup_group_id++; }
             void HidePopup();
+            void HidePopupGroup(u64 popup_group_id);
             Widget *GetPopupWidget() const;
             Widget *GetModalPopupWidget() const;
+            u64 GetPopupGroupId(const Widget *widget) const;
+            bool IsPointInsidePopupGroup(u64 popup_group_id, Vector2f position) const;
             bool IsPopupModal(const Widget *widget) const;
             bool IsPopupAboveModal(const Widget *widget) const;
             bool ShouldRenderPopupBackdrop(const Widget *widget) const;
@@ -89,10 +94,12 @@ namespace Ailu
                 std::function<void()> _on_close;
                 bool _is_modal = false;
                 bool _render_backdrop = true;
+                u64 _group_id = 0u;
             };
             Vector<PopupEntry> _popup_stack;
             Vector<Ref<Widget>> _pending_popup_destroy;
             Vector<Ref<UIElement>> _pending_destroy;
+            u64 _next_popup_group_id = 1u;
 
             Vector<InteractionZone> _interaction_zones;
             Vector<u32> _free_indices;

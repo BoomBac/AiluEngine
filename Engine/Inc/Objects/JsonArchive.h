@@ -290,6 +290,8 @@ namespace Ailu
         void Deserialize(void *data, u64 size) final;
 
         void BeginObject(const String &name) final;
+        void BeginArrayElement(u32 index);
+        void EndArrayElement();
         void EndObject() final;
 
         void BeginArray(u64 size, EStructedDataType type) final;
@@ -318,13 +320,18 @@ namespace Ailu
         Vector<String> GetCurrentObjectKeys();
     private:
         JsonValue *FindNode();
+        const void *FindReadNode() const;
         void Reset()
         {
             _cur_key.clear();
             _cur_sub_name.clear();
             while (!_cur_obj_nodes.empty())
                 _cur_obj_nodes.pop();
+            _read_node_stack.clear();
             _root = JsonObject{};
+            _is_loading = false;
+            _is_saving = false;
+            _is_loaded = false;
         }
     private:
         class Impl;
@@ -332,6 +339,7 @@ namespace Ailu
         bool _is_loading = false;
         bool _is_saving = false;
         bool _is_loaded = false;
+        Vector<const void *> _read_node_stack;
         String _cur_key, _cur_sub_name;
         struct JsonNode
         {

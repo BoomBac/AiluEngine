@@ -4,6 +4,7 @@
 
 #include "UI/Basic.h"
 #include "UI/Container.h"
+#include "UI/Menu.h"
 
 #include <functional>
 #include <memory>
@@ -18,6 +19,9 @@ namespace Ailu
             String _label;
             std::function<void()> _on_click;
             bool _is_destructive = false;
+            Vector<PopupMenuAction> _children;
+            bool _is_enabled = true;
+            bool _is_separator = false;
         };
 
         struct PopupDialogAction

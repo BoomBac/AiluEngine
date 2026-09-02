@@ -15,6 +15,7 @@ namespace Ailu::Editor
 
         void SetClip(AnimationClip *clip);
         void SetSkeleton(const Skeleton *skeleton);
+        void SetSelectedBone(u16 joint_index);
         AnimationClip *GetClip() const { return _clip; }
         const Skeleton *GetSkeleton() const { return _skeleton; }
 

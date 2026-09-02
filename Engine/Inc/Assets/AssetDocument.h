@@ -37,6 +37,8 @@ namespace Ailu
         Vector<AssetDependency> _dependencies;
     };
 
+    AILU_API bool LoadAssetDocumentHeader(const WString &sys_path, AssetDocumentHeader &header);
+
     ASTRUCT()
     struct AILU_API AssetNamedUIntProperty
     {

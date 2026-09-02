@@ -153,7 +153,8 @@ namespace Ailu
             };
             Vector<WidgetDrawerBlocks> _widget_drawer_blocks;
             DrawerBlock *_text_block;
-            DrawerBlock *_popup_backdrop_block;
+            Vector<DrawerBlock *> _popup_backdrop_blocks;
+            u32 _popup_backdrop_block_index = 0u;
             //暂时每个widget独立一个block,0保留为全局绘制
             u16 _cur_widget_index = 0u;
             DrawerBlock *_cur_widget_block = nullptr;

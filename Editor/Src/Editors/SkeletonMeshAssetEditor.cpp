@@ -239,6 +239,7 @@ namespace Ailu::Editor
 
     void SkeletonMeshAssetEditor::BuildToolbar(UI::HorizontalBox *toolbar)
     {
+        AddAssetMenu(toolbar);
         auto add_button = [toolbar](const String &text, f32 width)
         {
             auto *button = toolbar->AddChild<UI::Button>(text);

@@ -118,6 +118,14 @@ namespace Ailu::Render
         _compiling_shader_pass_id = 1;
         _forward_lit_shader = ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/forwardlit.alasset");
         AL_ASSERT(_forward_lit_shader != nullptr);
+        _brdf_lut = ResourceMgr::Get().Load<Texture2D>(L"Textures/ibl_brdf_lut.alasset");
+        TextureDesc shadow_desc(1u, 1u, ERenderTargetFormat::kShadowMap);
+        shadow_desc._array_size = 1u;
+        shadow_desc._dimension = ETextureDimension::kTex2DArray;
+        _dummy_main_light_shadow_map = RenderTexture::Create(shadow_desc, "_DummyForwardMainLightShadowMap");
+        _dummy_add_light_shadow_maps = RenderTexture::Create(shadow_desc, "_DummyForwardAddLightShadowMaps");
+        shadow_desc._dimension = ETextureDimension::kCubeArray;
+        _dummy_point_light_shadow_maps = RenderTexture::Create(shadow_desc, "_DummyForwardPointLightShadowMaps");
         _event = static_cast<ERenderPassEvent>(static_cast<u16>(ERenderPassEvent::kBeforeTransparent) + 25u);
     }
     ForwardPass::~ForwardPass()
@@ -126,14 +134,23 @@ namespace Ailu::Render
 
     void Ailu::Render::ForwardPass::OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData & rendering_data)
     {
+        const bool use_shadow_maps = rendering_data._camera != nullptr && rendering_data._camera->_is_render_shadow;
         graph.AddPass(_name, RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
                       { 
                           builder.Read(rendering_data._rg_handles._color_target, EResourceUsage::kWriteRTV);
                           builder.Read(rendering_data._rg_handles._depth_target, EResourceUsage::kDSV);
+                          if (use_shadow_maps)
+                          {
+                              builder.Read(rendering_data._rg_handles._main_light_shadow_map);
+                              builder.Read(rendering_data._rg_handles._addi_shadow_maps);
+                              builder.Read(rendering_data._rg_handles._point_light_shadow_maps);
+                          }
+                          if (rendering_data._rg_handles._ao_tex.IsValid())
+                              builder.Read(rendering_data._rg_handles._ao_tex);
                           rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target);
                           rendering_data._rg_handles._depth_target = builder.Write(rendering_data._rg_handles._depth_target,EResourceUsage::kDSV);
                       }, 
-        [this](RDG::RenderGraph& graph,CommandBuffer* cmd, const RenderingData &rendering_data){
+        [this, use_shadow_maps](RDG::RenderGraph& graph,CommandBuffer* cmd, const RenderingData &rendering_data){
         auto &all_renderable = *rendering_data._cull_results;
         u32 lowerBound = Shader::kRenderQueueOpaque, upperBound = Shader::kRenderQueueEnd;
         auto filtered = all_renderable | std::views::filter([lowerBound, upperBound](const auto &kv)
@@ -145,6 +162,22 @@ namespace Ailu::Render
         }
         if (obj_num == 0)
             return;
+        Texture *main_light_shadow_map = _dummy_main_light_shadow_map.get();
+        Texture *add_light_shadow_maps = _dummy_add_light_shadow_maps.get();
+        Texture *point_light_shadow_maps = _dummy_point_light_shadow_maps.get();
+        if (use_shadow_maps)
+        {
+            main_light_shadow_map = graph.Resolve<Texture>(rendering_data._rg_handles._main_light_shadow_map);
+            add_light_shadow_maps = graph.Resolve<Texture>(rendering_data._rg_handles._addi_shadow_maps);
+            point_light_shadow_maps = graph.Resolve<Texture>(rendering_data._rg_handles._point_light_shadow_maps);
+        }
+        auto *occlusion_tex = rendering_data._rg_handles._ao_tex.IsValid()
+            ? graph.Resolve<Texture>(rendering_data._rg_handles._ao_tex) : Texture::s_p_default_white;
+        cmd->SetGlobalTexture("IBLLut", _brdf_lut.get());
+        cmd->SetGlobalTexture("_OcclusionTex", occlusion_tex ? occlusion_tex : Texture::s_p_default_white);
+        cmd->SetGlobalTexture(RenderResourceName::kMainLightShadowMap, main_light_shadow_map);
+        cmd->SetGlobalTexture(RenderResourceName::kAddLightShadowMap, add_light_shadow_maps);
+        cmd->SetGlobalTexture(RenderResourceName::kPointLightShadowMap, point_light_shadow_maps);
         cmd->SetRenderTarget(rendering_data._rg_handles._color_target, rendering_data._rg_handles._depth_target);
             for (auto &it: all_renderable)
             {
@@ -192,6 +225,7 @@ namespace Ailu::Render
         auto cmd = CommandBufferPool::Get(_name);
         {
             PROFILE_BLOCK_GPU(cmd.get(), _name)
+            cmd->SetGlobalTexture("IBLLut", _brdf_lut.get());
             cmd->SetRenderTarget(rendering_data._camera_color_target_handle, rendering_data._camera_depth_target_handle);
             for (auto &it: all_renderable)
             {
@@ -957,7 +991,7 @@ namespace Ailu::Render
                                                                   graph.Resolve<Texture>(data._rg_handles._main_light_shadow_map));
                                 _p_lighting_material->SetTexture("_AddLightShadowMaps",
                                                                   graph.Resolve<Texture>(data._rg_handles._addi_shadow_maps));
-                                _p_lighting_material->SetTexture("_PointLightShadowMap",
+                                _p_lighting_material->SetTexture("_PointLightShadowMaps",
                                                                   graph.Resolve<Texture>(data._rg_handles._point_light_shadow_maps));
                             }
                             else
@@ -966,7 +1000,7 @@ namespace Ailu::Render
                                                                   _dummy_main_light_shadow_map.get());
                                 _p_lighting_material->SetTexture("_AddLightShadowMaps",
                                                                   _dummy_add_light_shadow_maps.get());
-                                _p_lighting_material->SetTexture("_PointLightShadowMap",
+                                _p_lighting_material->SetTexture("_PointLightShadowMaps",
                                                                   _dummy_point_light_shadow_map.get());
                             }
                             _p_lighting_material->SetTexture("IBLLut", _brdf_lut.get());

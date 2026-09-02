@@ -1218,7 +1218,9 @@ namespace Ailu
         void AssetBrowser::ShowBlankAreaContextMenu(Vector2f popup_pos)
         {
             Vector<PopupMenuAction> actions;
-            BuildCreateAssetActions(actions, _current_path, popup_pos);
+            Vector<PopupMenuAction> create_actions;
+            BuildCreateAssetActions(create_actions, _current_path, popup_pos);
+            actions.push_back({"Create", {}, false, std::move(create_actions)});
             if (!_clipboard_assets.empty())
                 actions.push_back({"Paste", [this]() { PasteClipboard(); }});
             actions.push_back({"Refresh", [this]() { _content_dirty = true; }});
@@ -1274,7 +1276,9 @@ namespace Ailu
                                                }
                                            });
             }, true});
-            BuildCreateAssetActions(actions, folder_path, popup_pos);
+            Vector<PopupMenuAction> create_actions;
+            BuildCreateAssetActions(create_actions, folder_path, popup_pos);
+            actions.push_back({"Create", {}, false, std::move(create_actions)});
             EditorPopup::ShowActionMenuAt(popup_pos, actions);
         }
 

@@ -1,8 +1,8 @@
 #include "Common/EditorPopup.h"
 
-#include "UI/Widget.h"
-#include "UI/UIFramework.h"
 #include "Framework/Common/KeyCode.h"
+#include "UI/UIFramework.h"
+#include "UI/Widget.h"
 
 namespace Ailu
 {
@@ -15,6 +15,19 @@ namespace Ailu
             inline const Vector4f kPropInnerMargin = {2.0f, 0.0f, 2.0f, 2.0f};
             inline constexpr f32 kPropLabelFill = 1.0f;
             inline constexpr f32 kPropValueFill = 3.0f;
+
+            UI::MenuEntry ToMenuEntry(const PopupMenuAction &action)
+            {
+                UI::MenuEntry entry;
+                entry._label = action._label;
+                entry._on_click = action._on_click;
+                entry._is_destructive = action._is_destructive;
+                entry._is_enabled = action._is_enabled;
+                entry._is_separator = action._is_separator;
+                for (const PopupMenuAction &child: action._children)
+                    entry._children.push_back(ToMenuEntry(child));
+                return entry;
+            }
 
             void ApplyPopupStyles(UI::UIElement *element)
             {
@@ -84,42 +97,11 @@ namespace Ailu
             if (actions.empty())
                 return;
 
-            constexpr f32 kMenuWidth = 180.0f;
-            constexpr f32 kRowHeight = 24.0f;
-            constexpr f32 kMaxHeight = 220.0f;
-
-            auto list_view = MakeRef<UI::ListView>();
-            list_view->Name("EditorPopupMenu");
-            UI::UIBrush transparent_brush;
-            transparent_brush._type = UI::EUIBrushType::kColor;
-            transparent_brush._tint = Colors::kTransparent;
-            list_view->SetBackgroundBrush(transparent_brush);
-            const f32 popup_height = std::min(kRowHeight * static_cast<f32>(actions.size()), kMaxHeight);
-            list_view->GetSlot()->Size({kMenuWidth, popup_height});
-            list_view->SetViewportHeight(popup_height);
-
-            for (const auto &action: actions)
-            {
-                auto item = MakeRef<UI::Text>(action._label);
-                item->GetSlot()->Size({kMenuWidth, kRowHeight});
-                item->SlotPadding() = UI::Padding(6.0f, 4.0f, 6.0f, 4.0f);
-                item->InvalidateLayout();
-                item->_horizontal_align = UI::EAlignment::kLeft;
-                item->_vertical_align = UI::EAlignment::kCenter;
-                if (action._is_destructive)
-                    item->_color = Colors::kRed;
-                item->OnMouseClick() += [on_click = action._on_click](UI::UIEvent &e)
-                {
-                    UI::UIManager::Get()->HidePopup();
-                    on_click();
-                    e._is_handled = true;
-                };
-                list_view->AddItem(item);
-                item->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed).Size({kMenuWidth, kRowHeight});
-            }
-
-            UI::UIManager::Get()->HidePopup();
-            UI::UIManager::Get()->ShowPopupAt(popup_pos.x, popup_pos.y, list_view);
+            Vector<UI::MenuEntry> entries;
+            entries.reserve(actions.size());
+            for (const PopupMenuAction &action: actions)
+                entries.push_back(ToMenuEntry(action));
+            UI::Menu::ShowAt(popup_pos, entries);
         }
 
         void EditorPopup::BeginInlineTextInput(UI::UIElement *parent, UI::Text *display, const String &initial_value,

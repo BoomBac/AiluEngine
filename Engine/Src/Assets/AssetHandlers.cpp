@@ -6,6 +6,7 @@
 #include "Animation/TransformTrack.h"
 #include "Assets/AssetDocument.h"
 #include "Assets/AssetArtifact.h"
+#include "Assets/AnimationClipArtifact.h"
 #include "Assets/MeshArtifact.h"
 #include "Assets/PrefabAsset.h"
 #include "Assets/ScriptAsset.h"
@@ -244,31 +245,6 @@ AssetDocumentHeader MakeAssetDocumentHeader(const Asset *asset)
     header._asset_type = asset->_asset_type ? asset->_asset_type->FullName() : String{};
     header._asset_name = asset->Name();
     return header;
-}
-
-bool TryLoadAssetDocumentHeader(const WString &sys_path, AssetDocumentHeader &header)
-{
-    WString data;
-    if (!FileManager::ReadFile(sys_path, data))
-        return false;
-
-    // Quick check: is it JSON?
-    const WString trimmed = StringUtils::Trim(data);
-    if (trimmed.empty() || trimmed.front() != L'{')
-        return false;
-
-    AssetHeaderProbeDocument probe;
-    if (!LoadAssetDocument(sys_path, probe))
-        return false;
-    if (probe._header._format_version != kSerializedAssetDocumentVersion)
-    {
-        LOG_ERROR(L"Unsupported asset document version {} in {}", probe._header._format_version, sys_path);
-        return false;
-    }
-    if (probe._header._guid.empty() || probe._header._asset_type.empty())
-        return false;
-    header = probe._header;
-    return true;
 }
 
 // ============================================================
@@ -821,10 +797,6 @@ const Type *ShaderAssetHandler::AssetType() const
 Scope<Asset> ShaderAssetHandler::Load(const AssetLoadContext &context)
 {
     auto sys_path = context._system_path;
-    WString data;
-    if (!FileManager::ReadFile(sys_path, data))
-        return nullptr;
-
     ShaderAssetDocument doc;
     if (!LoadAssetDocument(sys_path, doc))
         return nullptr;
@@ -867,10 +839,6 @@ const Type *ComputeShaderAssetHandler::AssetType() const
 Scope<Asset> ComputeShaderAssetHandler::Load(const AssetLoadContext &context)
 {
     auto sys_path = context._system_path;
-    WString data;
-    if (!FileManager::ReadFile(sys_path, data))
-        return nullptr;
-
     ComputeShaderAssetDocument doc;
     if (!LoadAssetDocument(sys_path, doc))
         return nullptr;
@@ -921,10 +889,6 @@ const Type *TextureAssetHandler::AssetType() const
 Scope<Asset> TextureAssetHandler::Load(const AssetLoadContext &context)
 {
     auto sys_path = context._system_path;
-    WString data;
-    if (!FileManager::ReadFile(sys_path, data))
-        return nullptr;
-
     Texture2DAssetDocument doc;
     if (!LoadAssetDocument(sys_path, doc))
         return nullptr;
@@ -1059,14 +1023,6 @@ const Type *MaterialAssetHandler::AssetType() const
 Scope<Asset> MaterialAssetHandler::Load(const AssetLoadContext &context)
 {
     WString sys_path = context._system_path;
-    // Read file
-    WString wdata;
-    if (!FileManager::ReadFile(sys_path, wdata))
-    {
-        LOG_ERROR(L"Load material with path: {} failed!", sys_path);
-        return nullptr;
-    }
-
     MaterialAssetDocument doc;
     if (!LoadAssetDocument(sys_path, doc))
         return nullptr;
@@ -1306,12 +1262,7 @@ const Type *MeshAssetHandler::AssetType() const
 static Scope<Asset> LoadMeshImpl(const AssetLoadContext &context)
 {
     auto sys_path = context._system_path;
-    WString data;
     List<Ref<AnimationClip>> clips;
-
-    if (!FileManager::ReadFile(sys_path, data))
-        return nullptr;
-
     MeshAssetDocument doc;
     if (!LoadAssetDocument(sys_path, doc))
         return nullptr;
@@ -1632,10 +1583,6 @@ bool PrefabAssetHandler::Save(const AssetSaveContext &context)
 Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
 {
     WString sys_path = context._system_path;
-    WString data;
-    if (!FileManager::ReadFile(sys_path, data))
-        return nullptr;
-
     SceneAssetDocument doc;
     if (!LoadAssetDocument(sys_path, doc))
         return nullptr;
@@ -2144,14 +2091,50 @@ const Type *AnimationClipAssetHandler::AssetType() const
 
 Scope<Asset> AnimationClipAssetHandler::Load(const AssetLoadContext &context)
 {
+    const auto load_start = std::chrono::steady_clock::now();
     WString sys_path = context._system_path;
-    WString data;
-    if (!FileManager::ReadFile(sys_path, data))
-        return nullptr;
+    AssetDocumentHeader header;
+    const bool has_header = LoadAssetDocumentHeader(sys_path, header);
+    AssetArtifactKey artifact_key;
+    artifact_key._importer_version = 1u;
+    artifact_key._artifact_version = kAnimationClipArtifactVersion;
+    SourceFingerprint source_fingerprint;
+    const bool has_source_fingerprint = CalculateSourceFingerprint(sys_path, source_fingerprint);
+    if (has_source_fingerprint)
+        artifact_key._source_hash = source_fingerprint._content_hash;
+
+    if (has_header && has_source_fingerprint && context._derived_data_cache != nullptr)
+    {
+        Vector<u8> artifact_data;
+        const auto artifact_read_start = std::chrono::steady_clock::now();
+        const bool artifact_loaded = context._derived_data_cache->TryLoad(Guid(header._guid), artifact_key, artifact_data);
+        const u64 artifact_read_us = ElapsedMicroseconds(artifact_read_start);
+        if (artifact_loaded)
+        {
+            AnimationClipArtifact artifact;
+            const auto runtime_create_start = std::chrono::steady_clock::now();
+            const bool artifact_valid = DeserializeAnimationClipArtifact(artifact_data, artifact_key, artifact);
+            Ref<AnimationClip> loaded_clip = artifact_valid ? CreateAnimationClipFromArtifact(artifact) : nullptr;
+            const u64 runtime_create_us = ElapsedMicroseconds(runtime_create_start);
+            if (loaded_clip != nullptr)
+            {
+                auto asset = MakeScope<Asset>(Guid(header._guid), AnimationClip::StaticType(), context._asset_path);
+                asset->_p_obj = loaded_clip;
+                asset->_domain = context._resource_mgr->GetAssetPathDomain(asset->_asset_path);
+                AnimationClipLibrary::AddClip(loaded_clip);
+                LOG_INFO(L"AnimationClip artifact cache hit: {} (read {} us, build {} us)", sys_path,
+                         artifact_read_us, runtime_create_us);
+                return asset;
+            }
+            LOG_WARNING(L"AnimationClip artifact rejected, rebuilding from JSON: {}", sys_path);
+        }
+    }
 
     AnimationClipAssetDocument doc;
+    const auto json_load_start = std::chrono::steady_clock::now();
     if (!LoadAssetDocument(sys_path, doc))
         return nullptr;
+    const u64 json_load_us = ElapsedMicroseconds(json_load_start);
 
     Ref<AnimationClip> loaded_clip = MakeRef<AnimationClip>();
     loaded_clip->Name(!doc._clip_name.empty() ? doc._clip_name : doc._header._asset_name);
@@ -2208,6 +2191,21 @@ Scope<Asset> AnimationClipAssetHandler::Load(const AssetLoadContext &context)
     {
         loaded_clip->RecalculateDuration();
     }
+
+    if (has_source_fingerprint && has_header && context._derived_data_cache != nullptr)
+    {
+        AnimationClipArtifact artifact;
+        Vector<u8> serialized_artifact;
+        if (BuildAnimationClipArtifact(*loaded_clip, artifact) &&
+            SerializeAnimationClipArtifact(artifact, artifact_key, serialized_artifact))
+        {
+            if (context._derived_data_cache->Store(Guid(header._guid), artifact_key, serialized_artifact))
+                LOG_INFO(L"AnimationClip artifact rebuilt: {} ({} bytes)", sys_path, serialized_artifact.size());
+        }
+    }
+
+    LOG_INFO(L"AnimationClip JSON load: {} (load {} us, total {} us)", sys_path, json_load_us,
+             ElapsedMicroseconds(load_start));
     
     auto asset = MakeScope<Asset>(Guid(doc._header._guid),AnimationClip::StaticType(),context._asset_path);
     asset->_p_obj = loaded_clip;

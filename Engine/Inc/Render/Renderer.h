@@ -54,7 +54,7 @@ namespace Ailu
             inline static const String kGBuffer3 = "_GBuffer3";
             inline static const String kMainLightShadowMap = "_MainLightShadowMap";
             inline static const String kAddLightShadowMap = "_AddLightShadowMaps";
-            inline static const String kPointLightShadowMap = "_PointLightShadowMap";
+            inline static const String kPointLightShadowMap = "_PointLightShadowMaps";
             inline static const String kHZB = "_HZB";
             inline static const String kMotionVectorTex = "_CameraMotionVector";
             inline static const String kMotionVectorDepth = "_CameraMotionDepth";

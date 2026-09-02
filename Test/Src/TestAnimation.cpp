@@ -4,6 +4,7 @@
 #include "Animation/Clip.h"
 #include "Animation/SpriteAnimationTrack.h"
 #include "Animation/TransformTrack.h"
+#include "Assets/AnimationClipArtifact.h"
 #include "Assets/AssetDocument.h"
 #include "Objects/JsonArchive.h"
 
@@ -381,5 +382,60 @@ namespace Ailu::AnimationTests
                 return false;
         }
         return curved_track.GetPositionTrack().Size() > 2u;
+    }
+
+    bool TestAnimationClipArtifactRoundtrip()
+    {
+        AnimationClip source;
+        source.Name("artifact_roundtrip");
+        source.FrameCount(60u);
+        source.Duration(2.0f);
+        source.FrameRate(30.0f);
+        source.FrameDuration(1.0f / 30.0f);
+        source.IsLooping(false);
+        source.PreviewMeshGuid(MakeClipId("00000000-0000-0000-0000-000000000021"));
+
+        TransformTrack &track = source[7u];
+        auto position = TrackHelpers::FromVector(Vector3f(1.0f, 2.0f, 3.0f));
+        position._time = 0.25f;
+        track.GetPositionTrack().Resize(1u);
+        track.GetPositionTrack()[0] = position;
+        auto rotation = TrackHelpers::FromQuaternion(Quaternion::AngleAxis(0.5f, Vector3f::kUp));
+        rotation._time = 0.5f;
+        track.GetRotationTrack().Resize(1u);
+        track.GetRotationTrack()[0] = rotation;
+        auto scale = TrackHelpers::FromVector(Vector3f(2.0f, 3.0f, 4.0f));
+        scale._time = 0.75f;
+        track.GetScaleTrack().Resize(1u);
+        track.GetScaleTrack()[0] = scale;
+        source.SpriteTrack().AddFrame({1.0f, MakeClipId("00000000-0000-0000-0000-000000000022")});
+        source.AddEvent({1.5f, 99u, EAnimationEventKind::kCosmetic});
+
+        AssetArtifactKey key;
+        key._source_hash = 0x1234u;
+        key._importer_version = 1u;
+        key._artifact_version = kAnimationClipArtifactVersion;
+        AnimationClipArtifact artifact;
+        Vector<u8> serialized;
+        if (!BuildAnimationClipArtifact(source, artifact) ||
+            !SerializeAnimationClipArtifact(artifact, key, serialized))
+            return false;
+
+        AnimationClipArtifact loaded_artifact;
+        if (!DeserializeAnimationClipArtifact(serialized, key, loaded_artifact))
+            return false;
+        Ref<AnimationClip> loaded = CreateAnimationClipFromArtifact(loaded_artifact);
+        if (loaded == nullptr || loaded->Name() != source.Name() || loaded->Size() != 1u ||
+            loaded->GetIdAtIndex(0u) != 7u || loaded->SpriteTrack().Frames().size() != 1u ||
+            loaded->Events().size() != 1u)
+            return false;
+
+        const TransformTrack &loaded_track = loaded->GetTrackAtIndex(0u);
+        const bool matches = NearlyEqual(loaded_track.GetPositionTrack()[0]._time, 0.25f) &&
+               NearlyEqual(loaded_track.GetPositionTrack()[0]._value[0], 1.0f) &&
+               NearlyEqual(loaded_track.GetRotationTrack()[0]._time, 0.5f) &&
+               NearlyEqual(loaded_track.GetScaleTrack()[0]._value[1], 3.0f);
+        loaded.reset();
+        return matches;
     }
 }

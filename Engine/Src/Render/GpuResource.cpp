@@ -44,7 +44,7 @@ namespace Ailu::Render
     GpuResource::~GpuResource()
     {
         s_total_mem_size -= _mem_size;
-        LOG_INFO("GpuResource::~GpuResource: {} released,mem size {}", _name, _mem_size);
+        //LOG_INFO("GpuResource::~GpuResource: {} released,mem size {}", _name, _mem_size);
         ResourceStateTracker::Get().RemoveResource(this);
     }
     void GpuResource::Apply()
@@ -123,7 +123,7 @@ namespace Ailu::Render
         tracked_states._cur_states.fill(res->_state);
         tracked_states._new_states.fill(res->_state);
         _res_state_map.insert_or_assign(res, tracked_states);
-        LOG_INFO("ResourceStateTracker::AddResource({}) {},num is {}", res->Name(),static_cast<const void*>(res), _res_state_map.size());
+        //LOG_INFO("ResourceStateTracker::AddResource({}) {},num is {}", res->Name(),static_cast<const void*>(res), _res_state_map.size());
     }
 
     void ResourceStateTracker::RemoveResource(GpuResource* res)
@@ -133,7 +133,7 @@ namespace Ailu::Render
 
         std::scoped_lock lock(_mutex);
         _res_state_map.erase(res);
-        LOG_INFO("ResourceStateTracker::RemoveResource({}) {},num is {}", res->Name(),static_cast<const void*>(res), _res_state_map.size());
+        //LOG_INFO("ResourceStateTracker::RemoveResource({}) {},num is {}", res->Name(),static_cast<const void*>(res), _res_state_map.size());
     }
 
     EResourceState ResourceStateTracker::GetResourceState(GpuResource* res, u32 sub_res) const

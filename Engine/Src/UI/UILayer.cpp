@@ -154,10 +154,17 @@ namespace Ailu
                 {
                     ue._key_code = static_cast<MouseButtonReleasedEvent *>(&e)->GetButton();
                     Widget *top_popup = s_mgr->GetPopupWidget();
+                    const u64 popup_group_id = s_mgr->GetPopupGroupId(top_popup);
+                    const bool is_popup_group_click = popup_group_id != 0u &&
+                                                       s_mgr->IsPointInsidePopupGroup(popup_group_id, ue._mouse_position);
                     if (ue._key_code != EKey::kRBUTTON && top_popup != nullptr && !s_mgr->IsPopupModal(top_popup) &&
-                        !top_popup->IsHover(ue._mouse_position))
+                        !is_popup_group_click &&
+                        (popup_group_id != 0u || !top_popup->IsHover(ue._mouse_position)))
                     {
-                        s_mgr->HidePopup();
+                        if (popup_group_id != 0u)
+                            s_mgr->HidePopupGroup(popup_group_id);
+                        else
+                            s_mgr->HidePopup();
                         // HidePopup clears the manager's capture target. Do not use the stale
                         // snapshot below, otherwise is_capture_owner_widget() may call GetParent()
                         // on an element that is already pending destruction.

@@ -6,6 +6,8 @@
 #include "Framework/Common/Input.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Framework/Common/Utils.h"
+#include "UI/Container.h"
+#include "UI/Menu.h"
 
 namespace Ailu
 {
@@ -54,6 +56,29 @@ namespace Ailu
 
             RefreshTitle();
             OnUpdate(dt);
+        }
+
+        void AssetEditor::AddAssetMenu(UI::HorizontalBox *toolbar)
+        {
+            if (toolbar == nullptr)
+                return;
+
+            auto *menu_button = toolbar->AddChild<UI::Button>("Asset");
+            menu_button->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFill)
+                .Size({54.0f, 0.0f}).Margin({0.0f, 0.0f, 2.0f, 0.0f});
+            menu_button->OnMouseClick() += [this, menu_button](UI::UIEvent &event)
+            {
+                Vector<UI::MenuEntry> file_entries;
+                file_entries.push_back({"Save", [this]() { Save(); }});
+                file_entries.push_back({"Discard Changes", [this]() { DiscardChanges(); }, true});
+                file_entries.push_back({"Close", [this]() { RequestClose(); }});
+
+                Vector<UI::MenuEntry> entries;
+                entries.push_back({"File", {}, false, {}, true, false});
+                entries.back()._children = std::move(file_entries);
+                UI::Menu::ShowAt(menu_button, entries);
+                event._is_handled = true;
+            };
         }
 
         void AssetEditor::RequestClose()

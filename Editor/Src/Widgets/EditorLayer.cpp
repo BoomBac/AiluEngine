@@ -41,6 +41,7 @@
 #include "UI/UIFramework.h"
 #include "UI/UILayer.h"
 #include "UI/UIRenderer.h"
+#include "UI/Menu.h"
 #include "UI/Widget.h"
 #include "Widgets/FrameDebuggerWindow.h"
 
@@ -1514,6 +1515,51 @@ namespace Ailu
             toolbar_border->Thickness({0.0f, 0.0f, 0.0f, 1.0f});
             auto *toolbar = toolbar_border->AddChild<UI::HorizontalBox>();
             toolbar->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
+
+            auto *menu_button = AddToolbarButton(toolbar, "Menu", 58.0f);
+            menu_button->OnMouseClick() += [this, menu_button](UI::UIEvent &e)
+            {
+                Vector<UI::MenuEntry> scene_entries;
+                scene_entries.push_back({"Open Scene", [this]()
+                {
+                    _editor_status_message = "Open Scene is not wired yet";
+                    LOG_INFO("EditorToolbar: Open Scene clicked");
+                }});
+                scene_entries.push_back({"Save All Assets", [this]() { SaveAllAssets(); }});
+
+                Vector<UI::MenuEntry> play_entries;
+                play_entries.push_back({"Play", [this]()
+                {
+                    if (!Application::Get()._is_playing_mode)
+                    {
+                        Selection::RemoveSlection();
+                        SceneMgr::Get().EnterPlayMode();
+                        DockManager::Get().ActivateDock(GameView::StaticType()->FullName());
+                        _editor_status_message = "Play mode";
+                    }
+                }});
+                play_entries.push_back({"Pause", [this]()
+                {
+                    _editor_status_message = "Pause is not wired yet";
+                    LOG_INFO("EditorToolbar: Pause clicked");
+                }});
+                play_entries.push_back({"Stop", [this]()
+                {
+                    if (Application::Get()._is_playing_mode)
+                    {
+                        Selection::RemoveSlection();
+                        SceneMgr::Get().ExitPlayMode();
+                        DockManager::Get().ActivateDock(SceneView::StaticType()->FullName());
+                        _editor_status_message = "Edit mode";
+                    }
+                }});
+
+                Vector<UI::MenuEntry> entries;
+                entries.push_back({"Scene", {}, false, std::move(scene_entries)});
+                entries.push_back({"Play Mode", {}, false, std::move(play_entries)});
+                UI::Menu::ShowAt(menu_button, entries);
+                e._is_handled = true;
+            };
 
             auto *open_scene = AddToolbarButton(toolbar, "Open Scene", 96.0f);
             open_scene->OnMouseClick() += [this](UI::UIEvent &e)

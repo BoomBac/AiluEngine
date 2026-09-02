@@ -236,6 +236,7 @@ namespace Ailu
 
         void GraphEditorWindow::BuildToolbar(UI::HorizontalBox *toolbar)
         {
+            AddAssetMenu(toolbar);
             auto add_button = [this, toolbar](const String &text, std::function<void()> callback) -> UI::Button *
             {
                 auto *button = toolbar->AddChild<UI::Button>(text);

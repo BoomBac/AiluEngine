@@ -76,6 +76,12 @@ namespace Ailu
             SerializerWrapper<Value>::Deserialize(std::addressof(value), ar, &name);
         }
 
+        template<typename Value>
+        void DeserializeValue(Value &value, FArchive &ar, const String *name)
+        {
+            SerializerWrapper<Value>::Deserialize(std::addressof(value), ar, name);
+        }
+
         template<typename Container, typename Value>
         void AppendValue(Container &container, Value &&value)
         {
@@ -153,11 +159,21 @@ namespace Ailu
             const u64 arr_size = sar->BeginArray(type);
             container->clear();
             ReserveIfSupported(*container, static_cast<size_t>(arr_size));
+            auto *json_ar = dynamic_cast<JsonArchive *>(sar);
             for (u64 i = 0; i < arr_size; ++i)
             {
                 Element item{};
-                const String item_name = MakeArrayReadItemName(i);
-                DeserializeValue(item, ar, item_name);
+                if (json_ar != nullptr)
+                {
+                    json_ar->BeginArrayElement(static_cast<u32>(i));
+                    DeserializeValue(item, ar, nullptr);
+                    json_ar->EndArrayElement();
+                }
+                else
+                {
+                    const String item_name = MakeArrayReadItemName(i);
+                    DeserializeValue(item, ar, item_name);
+                }
                 AppendValue(*container, std::move(item));
             }
 
@@ -265,8 +281,18 @@ namespace Ailu
             {
                 Key key{};
                 Value value{};
-                const String item_name = MakeArrayReadItemName(i);
-                DeserializeMapEntry(key, value, ar, item_name);
+                if (auto *json_ar = dynamic_cast<JsonArchive *>(sar); json_ar != nullptr)
+                {
+                    static const String kEmptyName;
+                    json_ar->BeginArrayElement(static_cast<u32>(i));
+                    DeserializeMapEntry(key, value, ar, kEmptyName);
+                    json_ar->EndArrayElement();
+                }
+                else
+                {
+                    const String item_name = MakeArrayReadItemName(i);
+                    DeserializeMapEntry(key, value, ar, item_name);
+                }
                 container->emplace(std::move(key), std::move(value));
             }
 
@@ -414,10 +440,20 @@ namespace Ailu
             FStructedArchive::EStructedDataType type{};
             const u64 arr_size = sar->BeginArray(type);
             const u64 read_count = std::min<u64>(arr_size, N);
+            auto *json_ar = dynamic_cast<JsonArchive *>(sar);
             for (u64 i = 0; i < read_count; ++i)
             {
-                const String item_name = Detail::MakeArrayReadItemName(i);
-                Detail::DeserializeValue((*array)[i], ar, item_name);
+                if (json_ar != nullptr)
+                {
+                    json_ar->BeginArrayElement(static_cast<u32>(i));
+                    Detail::DeserializeValue((*array)[i], ar, nullptr);
+                    json_ar->EndArrayElement();
+                }
+                else
+                {
+                    const String item_name = Detail::MakeArrayReadItemName(i);
+                    Detail::DeserializeValue((*array)[i], ar, item_name);
+                }
             }
             for (u64 i = read_count; i < N; ++i)
             {
@@ -437,23 +473,57 @@ namespace Ailu
     template<size_t N, typename VecType, typename T>
     static void SerializeVectorND(void *data, FArchive &ar, const String *name)
     {
-        Vector<T> tmp;
+        auto *sar = dynamic_cast<FStructedArchive *>(&ar);
+        if (sar == nullptr)
+            return;
         auto &value = *static_cast<VecType *>(data);
-        for (size_t i = 0; i < N; ++i)
-            tmp.push_back(value[(u32)i]);
-        SerializerWrapper<Vector<T>>::Serialize(&tmp, ar, name);
+        if (name)
+            sar->BeginObject(*name);
+        sar->BeginArray(N, FStructedArchive::GetStructedType<T>());
+        for (u32 i = 0u; i < N; ++i)
+        {
+            const String item_name = Detail::MakeArrayWriteItemName(i);
+            SerializerWrapper<T>::Serialize(&value[i], ar, &item_name);
+        }
+        sar->EndArray();
+        if (name)
+            sar->EndObject();
     }
 
     template<size_t N, typename VecType, typename T>
     static void DeserializeVectorND(void *data, FArchive &ar, const String *name)
     {
-        Vector<T> tmp;
-        SerializerWrapper<Vector<T>>::Deserialize(&tmp, ar, name);
+        auto *sar = dynamic_cast<FStructedArchive *>(&ar);
+        if (sar == nullptr)
+            return;
         auto &value = *static_cast<VecType *>(data);
-        for (size_t i = 0; i < N; ++i)
-            value[(u32)i] = i < tmp.size() ? tmp[i] : T{};
-        if (tmp.size() != N)
-            LOG_WARNING("DeserializeVectorND size mismatch, archive: {}, target: {}", tmp.size(), N);
+        if (name)
+            sar->BeginObject(*name);
+        FStructedArchive::EStructedDataType type{};
+        const u32 count = sar->BeginArray(type);
+        const u32 read_count = std::min<u32>(count, N);
+        auto *json_ar = dynamic_cast<JsonArchive *>(sar);
+        for (u32 i = 0u; i < read_count; ++i)
+        {
+            if (json_ar != nullptr)
+            {
+                json_ar->BeginArrayElement(i);
+                SerializerWrapper<T>::Deserialize(&value[i], ar, nullptr);
+                json_ar->EndArrayElement();
+            }
+            else
+            {
+                const String item_name = Detail::MakeArrayReadItemName(i);
+                SerializerWrapper<T>::Deserialize(&value[i], ar, &item_name);
+            }
+        }
+        for (u32 i = read_count; i < N; ++i)
+            value[i] = T{};
+        if (count != N)
+            LOG_WARNING("DeserializeVectorND size mismatch, archive: {}, target: {}", count, N);
+        sar->EndArray();
+        if (name)
+            sar->EndObject();
     }
 
 
@@ -521,16 +591,38 @@ namespace Ailu
         {
             DATA_CHECK_DS(Matrix4x4f)
             auto &value = *static_cast<Matrix4x4f *>(data);
-            Vector<f32> values;
-            SerializerWrapper<Vector<f32>>::Deserialize(&values, ar, name);
-            if (values.size() != 16u)
-            {
-                LOG_ERROR("SerializerWrapper<Matrix4x4f>::Deserialize: expected 16 values, got {}", values.size());
+            auto *sar = dynamic_cast<FStructedArchive *>(&ar);
+            if (sar == nullptr)
                 return;
+            if (name)
+                sar->BeginObject(*name);
+            FStructedArchive::EStructedDataType type{};
+            const u32 count = sar->BeginArray(type);
+            const u32 read_count = std::min<u32>(count, 16u);
+            auto *json_ar = dynamic_cast<JsonArchive *>(sar);
+            for (u32 index = 0u; index < read_count; ++index)
+            {
+                f32 component = 0.0f;
+                if (json_ar != nullptr)
+                {
+                    json_ar->BeginArrayElement(index);
+                    SerializerWrapper<f32>::Deserialize(&component, ar, nullptr);
+                    json_ar->EndArrayElement();
+                }
+                else
+                {
+                    const String item_name = Detail::MakeArrayReadItemName(index);
+                    SerializerWrapper<f32>::Deserialize(&component, ar, &item_name);
+                }
+                value[index / 4u][index % 4u] = component;
             }
-            for (u32 row = 0u; row < 4u; ++row)
-                for (u32 column = 0u; column < 4u; ++column)
-                    value[row][column] = values[row * 4u + column];
+            for (u32 index = read_count; index < 16u; ++index)
+                value[index / 4u][index % 4u] = 0.0f;
+            if (count != 16u)
+                LOG_ERROR("SerializerWrapper<Matrix4x4f>::Deserialize: expected 16 values, got {}", count);
+            sar->EndArray();
+            if (name)
+                sar->EndObject();
         }
     };
 
