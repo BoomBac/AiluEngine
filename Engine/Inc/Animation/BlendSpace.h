@@ -42,7 +42,10 @@ namespace Ailu
         void Is2D(bool value) { _is_2d = value; }
 
         void AddSample(BlendSpaceSample sample);
-        void AddSamples(f32 position, f32 time, f32 weight, bool loop, AnimationEvaluation &evaluation) const;
+        void AddSamples(f32 position, f32 time, f32 weight, bool loop, AnimationEvaluation &evaluation,
+                        bool normalized_time = false) const;
+        void AddSamples(Vector2f position, f32 time, f32 weight, bool loop, AnimationEvaluation &evaluation,
+                        bool normalized_time = false) const;
 
     private:
         APROPERTY()

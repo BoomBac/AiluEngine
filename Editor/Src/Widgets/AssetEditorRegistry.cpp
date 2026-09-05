@@ -5,6 +5,7 @@
 #include "Assets/ScriptAsset.h"
 #include "Assets/WidgetAsset.h"
 #include "Animation/AnimationControllerAsset.h"
+#include "Animation/BlendSpace.h"
 #include "Animation/Clip.h"
 #include "Animation/SkeletonAsset.h"
 #include "Audio/AudioClip.h"
@@ -13,6 +14,7 @@
 #include "Editors/AudioClipEditor.h"
 #include "Editors/AnimationClipEditor.h"
 #include "Editors/AnimationControllerEditor.h"
+#include "Editors/BlendSpaceAssetEditor.h"
 #include "Editors/InputActionAssetEditor.h"
 #include "Editors/SpriteAssetEditor.h"
 #include "Editors/SpriteAtlasEditor.h"
@@ -56,6 +58,7 @@ namespace Ailu
 
             RegisterEditor<AnimationClip, AnimationClipEditor>();
             RegisterEditor<AnimationControllerAsset, AnimationControllerEditor>();
+            RegisterEditor<BlendSpaceAsset, BlendSpaceAssetEditor>();
             RegisterEditor<InputActionAsset, InputActionAssetEditor>();
             RegisterEditor<AudioClip, AudioClipEditor>();
             RegisterEditor<SkeletonAsset, SkeletonAssetEditor>();

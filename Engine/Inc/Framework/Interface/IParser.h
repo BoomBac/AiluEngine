@@ -117,7 +117,9 @@ namespace Ailu
         APROPERTY(Hidden = true)
         String _mesh_name;//指定fbx的某个mesh进行导入，如果为空则导入所有mesh
         APROPERTY(Category = "Animation"; Order = 0)
-        i32 _animation_stack_index = 0;//默认只导入第一个 AnimationStack
+        i32 _animation_stack_index = 0;//默认只导入第一个有动画曲线的 AnimationStack
+        APROPERTY(Category = "Animation"; Order = 1)
+        bool _import_all_animation_stacks = false;//导入所有包含动画曲线的 AnimationStack
         APROPERTY(Category = "Mesh"; Order = 3)
         Guid _skeleton = Guid::EmptyGuid();
 

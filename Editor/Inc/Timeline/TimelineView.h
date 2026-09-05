@@ -78,6 +78,7 @@ namespace Ailu::Editor
         f32 _header_width = 160.0f;
         f32 _ruler_height = 24.0f;
         f32 _track_height = 24.0f;
+        bool _fit_time_range_pending = true;
         bool _is_scrubbing = false;
         bool _is_dragging_horizontal_scrollbar = false;
         bool _is_dragging_vertical_scrollbar = false;

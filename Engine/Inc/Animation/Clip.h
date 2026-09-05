@@ -9,6 +9,8 @@
 #include "generated/Clip.gen.h"
 namespace Ailu
 {
+    class Skeleton;
+
     ACLASS()
     class AILU_API AnimationClip : public Object
 	{
@@ -42,6 +44,9 @@ namespace Ailu
         void FrameDuration(f32 frame_duration) { _frame_duration = frame_duration; }
         [[nodiscard]] bool IsLooping() const { return _is_looping; }
         void IsLooping(bool is_looping) { _is_looping = is_looping; };
+        [[nodiscard]] const Guid &SkeletonGuid() const { return _skeleton_guid; }
+        void SkeletonGuid(const Guid &guid) { _skeleton_guid = guid; }
+        bool RemapToSkeleton(const Skeleton &source, const Skeleton &target);
         [[nodiscard]] const Guid &PreviewMeshGuid() const { return _preview_mesh_guid; }
         void PreviewMeshGuid(const Guid &guid) { _preview_mesh_guid = guid; }
         [[nodiscard]] f32 GetStartTime() const { return _start_time; }
@@ -59,6 +64,7 @@ namespace Ailu
         Vector<TransformTrack> _tracks;
         SpriteAnimationTrack _sprite_track;
         Vector<AnimationEvent> _events;
+        Guid _skeleton_guid = Guid::EmptyGuid();
         Guid _preview_mesh_guid = Guid::EmptyGuid();
 	};
 

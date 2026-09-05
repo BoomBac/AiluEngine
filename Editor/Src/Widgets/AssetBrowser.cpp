@@ -15,6 +15,7 @@
 #include "Framework/Common/Path.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Framework/Common/Utils.h"
+#include "Framework/Platform/Platform.h"
 #include "Objects/JsonArchive.h"
 #include "Project/ProjectManager.h"
 #include "Render/2D/Sprite.h"
@@ -32,6 +33,10 @@
 #include <algorithm>
 #include <cctype>
 #include <memory>
+#if AL_PLATFORM_WINDOWS
+#include <shellapi.h>
+#include <shlobj.h>
+#endif
 #include <tuple>
 
 namespace Ailu
@@ -1191,7 +1196,7 @@ namespace Ailu
                 {
                     actions.push_back({creator._menu_name, [this, target_directory, popup_pos, creator]()
                     {
-                        creator._create_dialog(target_directory, popup_pos);
+                        creator._create_dialog(target_directory, popup_pos, [this]() { _content_dirty = true; });
                     }});
                 }
                 else if (creator._create)
@@ -1223,6 +1228,10 @@ namespace Ailu
             actions.push_back({"Create", {}, false, std::move(create_actions)});
             if (!_clipboard_assets.empty())
                 actions.push_back({"Paste", [this]() { PasteClipboard(); }});
+            actions.push_back({"Open in File Explorer", [this]()
+            {
+                OpenInFileExplorer(_current_path);
+            }});
             actions.push_back({"Refresh", [this]() { _content_dirty = true; }});
             EditorPopup::ShowActionMenuAt(popup_pos, actions);
         }
@@ -1260,6 +1269,10 @@ namespace Ailu
             {
                 NavigateToPath(folder_sys_path);
             }});
+            actions.push_back({"Open in File Explorer", [this, folder_path]()
+            {
+                OpenInFileExplorer(folder_path);
+            }});
             actions.push_back({"Rename", [this, folder_sys_path, item_root, item_text]()
             {
                 BeginFolderRename(folder_sys_path, item_root, item_text);
@@ -1292,6 +1305,10 @@ namespace Ailu
             {
                 actions.push_back({"Open", [this, asset]() { OpenAsset(asset); }});
             }
+            actions.push_back({"Open in File Explorer", [this, asset]()
+            {
+                OpenInFileExplorer(fs::path(ResourceMgr::GetResSysPath(asset->_asset_path)), true);
+            }});
             if (asset->_asset_type == StaticClass<AudioClip>())
             {
                 actions.push_back({"Play Audio", [asset]() { PlayAudioClipAsset(asset); }});
@@ -1310,6 +1327,53 @@ namespace Ailu
                 ShowDeleteSelectionConfirm(popup_pos, asset);
             }, true});
             EditorPopup::ShowActionMenuAt(popup_pos, actions);
+        }
+
+        void AssetBrowser::OpenInFileExplorer(const fs::path &path, bool select_path)
+        {
+#if AL_PLATFORM_WINDOWS
+            if (path.empty())
+                return;
+
+            fs::path explorer_path = path;
+            std::error_code path_error;
+            if (select_path && !fs::exists(path, path_error))
+            {
+                if (path_error)
+                {
+                    LOG_WARNING(L"AssetBrowser: cannot inspect path {}", path.wstring());
+                    return;
+                }
+                explorer_path = path.parent_path();
+                select_path = false;
+            }
+            if (explorer_path.empty())
+                return;
+
+            if (select_path)
+            {
+                PIDLIST_ABSOLUTE item_id_list = ILCreateFromPathW(explorer_path.c_str());
+                if (item_id_list == nullptr)
+                {
+                    LOG_WARNING(L"AssetBrowser: create shell item for path failed, {}", explorer_path.wstring());
+                    return;
+                }
+                const HRESULT result = SHOpenFolderAndSelectItems(item_id_list, 0, nullptr, 0);
+                ILFree(item_id_list);
+                if (FAILED(result))
+                    LOG_WARNING(L"AssetBrowser: select path in File Explorer failed, {}", explorer_path.wstring());
+                return;
+            }
+
+            const HINSTANCE result = ShellExecuteW(nullptr, L"open", explorer_path.c_str(), nullptr, nullptr,
+                                                    SW_SHOWNORMAL);
+            if (reinterpret_cast<INT_PTR>(result) <= 32)
+                LOG_WARNING(L"AssetBrowser: open path in File Explorer failed, {}", explorer_path.wstring());
+#else
+            (void)path;
+            (void)select_path;
+            LOG_WARNING("AssetBrowser: opening paths in File Explorer is only supported on Windows.");
+#endif
         }
 
         void AssetBrowser::BeginFolderRename(const WString &folder_sys_path, UI::UIElement *item_root, UI::Text *item_text)

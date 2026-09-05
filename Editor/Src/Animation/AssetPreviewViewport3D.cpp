@@ -17,8 +17,10 @@ namespace Ailu::Editor
     namespace
     {
         constexpr f32 kPreviewFov = 60.0f;
+        constexpr f32 kPreviewNearPlane = 0.001f;
         constexpr f32 kPreviewFarPlane = 1000000.0f;
         constexpr f32 kPreviewGridAlpha = 2.0f;
+        constexpr f32 kPreviewGridFadeScale = 10.0f;
 
         bool GetMeshBounds(Render::Mesh *mesh, Vector3f &center, Vector3f &size)
         {
@@ -256,7 +258,7 @@ namespace Ailu::Editor
         const Vector3f view_dir = _orbit_controller.GetCameraForward();
         Matrix4x4f view, proj;
         BuildViewMatrixLookToLH(view, camera_pos, view_dir, _orbit_controller.GetCameraUp());
-        BuildPerspectiveFovLHMatrix(proj, fov, aspect, 0.01f, kPreviewFarPlane);
+        BuildPerspectiveFovLHMatrix(proj, fov, aspect, kPreviewNearPlane, kPreviewFarPlane);
 
         Render::CBufferPerCameraData camera_data{};
         camera_data._MatrixV = view;
@@ -284,13 +286,17 @@ namespace Ailu::Editor
                 {
                     _grid_material = MakeRef<Render::Material>(grid_source->GetShader(), "AssetPreviewViewport3DGrid");
                     _grid_material->SetFloat("_grid_alpha", kPreviewGridAlpha);
+                    _grid_material->SetFloat("_grid_fade_scale", kPreviewGridFadeScale);
                 }
             }
             auto grid_mesh = Render::Mesh::s_plane.lock();
             if (_grid_material != nullptr && grid_mesh != nullptr)
             {
                 _grid_material->SetVector("_grid_axis_mode", Vector4f(0.0f, 0.0f, 0.0f, 0.0f));
-                const Matrix4x4f grid_matrix = MatrixScale(1000.0f, 1000.0f, 1000.0f) *
+                const f32 camera_distance = Magnitude(_orbit_controller.GetCameraPosition() -
+                                                      _orbit_controller.GetTarget());
+                const f32 grid_size = std::max(1000.0f, std::max(radius * 20.0f, camera_distance * 4.0f));
+                const Matrix4x4f grid_matrix = MatrixScale(grid_size, grid_size, grid_size) *
                                                 MatrixTranslation(Vector3f(0.0f, -extents.y, 0.0f));
                 cmd->DrawMesh(grid_mesh.get(), _grid_material.get(), grid_matrix);
             }

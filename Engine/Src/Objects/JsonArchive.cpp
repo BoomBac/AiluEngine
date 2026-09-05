@@ -861,13 +861,15 @@ namespace Ailu
     {
         (*this) >> v;
     }
-    void JsonArchive::Save(const Path &sys_path)
+    bool JsonArchive::Save(const Path &sys_path)
     {
-        if (!_impl->Save(sys_path.wstring(), std::get<JsonObject>(_root.value)))
+        const bool saved = _impl->Save(sys_path.wstring(), std::get<JsonObject>(_root.value));
+        if (!saved)
         {
             LOG_ERROR("Failed to save JSON archive to {}", sys_path);
         }
         Reset();
+        return saved;
     }
     void JsonArchive::Load(const Path &sys_path)
     {

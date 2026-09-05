@@ -1,4 +1,5 @@
 #include "Animation/Clip.h"
+#include "Animation/Skeleton.h"
 #include "pch.h"
 
 namespace Ailu
@@ -19,7 +20,33 @@ namespace Ailu
         _tracks = source._tracks;
         _sprite_track = source._sprite_track;
         _events = source._events;
+        _skeleton_guid = source._skeleton_guid;
         _preview_mesh_guid = source._preview_mesh_guid;
+    }
+
+    bool AnimationClip::RemapToSkeleton(const Skeleton &source, const Skeleton &target)
+    {
+        if (source.JointNum() == 0u || target.JointNum() == 0u)
+            return false;
+
+        Vector<TransformTrack> remapped_tracks;
+        remapped_tracks.reserve(_tracks.size());
+        for (const TransformTrack &track : _tracks)
+        {
+            const u16 source_index = track.GetId();
+            if (source_index >= source.JointNum())
+                return false;
+
+            const i32 target_index = Skeleton::GetJointIndexByName(target, source[source_index]._name);
+            if (target_index < 0)
+                continue;
+
+            TransformTrack remapped_track = track;
+            remapped_track.SetId(static_cast<u16>(target_index));
+            remapped_tracks.emplace_back(std::move(remapped_track));
+        }
+        _tracks = std::move(remapped_tracks);
+        return true;
     }
     u16 AnimationClip::GetIdAtIndex(u32 index) const
     {

@@ -60,6 +60,7 @@ namespace Ailu
             void HandleFileDrop(UI::UIEvent &e);
 
             void NavigateToPath(const std::filesystem::path &path);
+            void OpenInFileExplorer(const std::filesystem::path &path, bool select_path = false);
             void RefreshDirectoryTree();
             void RefreshContent();
             void RefreshContentLayout();

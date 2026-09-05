@@ -7,6 +7,7 @@
 #include "Assets/ScriptAsset.h"
 #include "Assets/WidgetAsset.h"
 #include "Animation/AnimationControllerAsset.h"
+#include "Animation/BlendSpace.h"
 #include "Animation/Clip.h"
 #include "Common/EditorPopup.h"
 #include "Framework/Common/FileManager.h"
@@ -211,7 +212,8 @@ namespace Ailu
             return shaders;
         }
 
-        void ShowCreateMaterialDialog(Vector2f popup_pos, const fs::path &target_sys_path)
+        void ShowCreateMaterialDialog(Vector2f popup_pos, const fs::path &target_sys_path,
+                                      std::function<void()> on_created)
         {
             AssetBrowserOperations operations;
             auto material_name = std::make_shared<String>(operations.MakeUniqueEntryName(target_sys_path, "NewMaterial", L".alasset", false));
@@ -252,7 +254,8 @@ namespace Ailu
                                           shader_dropdown->SetSelectedIndex(*selected_shader_index);
                                       },
                                       {
-                                              {"OK", [target_sys_path, material_name, shaders, selected_shader_index, name_input]() -> std::optional<String>
+                                              {"OK", [target_sys_path, material_name, shaders, selected_shader_index, name_input,
+                                                       on_created]() -> std::optional<String>
                                                {
                                                    const String name = TrimNameCopy(*material_name);
                                                    if (auto error = ValidateEntryName(name); error.has_value())
@@ -266,6 +269,8 @@ namespace Ailu
 
                                                    if (!CreateMaterialAsset(target_sys_path, name, (*shaders)[*selected_shader_index].get()))
                                                        return String("Material already exists.");
+                                                   if (on_created)
+                                                       on_created();
                                                    return std::nullopt;
                                                }},
                                               {"Cancel", []() -> std::optional<String> { return std::nullopt; }}
@@ -353,7 +358,8 @@ namespace Ailu
                 material = Render::Material::CreateStandard(trimmed_name);
             else
                 material = MakeRef<Render::Material>(shader, trimmed_name);
-            ResourceMgr::Get().CreateAsset(asset_path, material);
+            if (ResourceMgr::Get().CreateAsset(asset_path, material) == nullptr)
+                return false;
             ResourceMgr::Get().SaveAllUnsavedAssets();
             return true;
         }
@@ -440,6 +446,25 @@ namespace Ailu
 
             auto controller = MakeRef<AnimationControllerAsset>(trimmed_name);
             if (ResourceMgr::Get().CreateAsset(asset_path, controller, false) == nullptr)
+                return false;
+            ResourceMgr::Get().SaveAllUnsavedAssets();
+            return true;
+        }
+
+        bool CreateBlendSpaceAsset(const fs::path &directory, const String &name)
+        {
+            const String trimmed_name = TrimNameCopy(name);
+            if (trimmed_name.empty())
+                return false;
+
+            AssetBrowserContent content;
+            const WString asset_path = AppendChildAssetPath(content.GetAssetDirectory(directory),
+                                                            ToWChar(trimmed_name.c_str()) + WString(L".alasset"));
+            if (ResourceMgr::Get().GetAsset(asset_path) != nullptr || fs::exists(ResourceMgr::GetResSysPath(asset_path)))
+                return false;
+
+            auto blend_space = MakeRef<BlendSpaceAsset>(trimmed_name);
+            if (ResourceMgr::Get().CreateAsset(asset_path, blend_space, false) == nullptr)
                 return false;
             ResourceMgr::Get().SaveAllUnsavedAssets();
             return true;
@@ -634,10 +659,25 @@ return script
             const WString asset_sys_path = ResourceMgr::GetResSysPath(asset->_asset_path);
             std::error_code remove_error;
             const bool removed = fs::remove(asset_sys_path, remove_error);
-            if (remove_error || !removed)
+            if (remove_error)
             {
                 LOG_WARNING("AssetBrowser: delete asset file failed, {}", remove_error.message());
                 return false;
+            }
+            if (!removed)
+            {
+                std::error_code exists_error;
+                if (fs::exists(asset_sys_path, exists_error))
+                {
+                    LOG_WARNING("AssetBrowser: delete asset file failed, file was not removed.");
+                    return false;
+                }
+                if (exists_error)
+                {
+                    LOG_WARNING("AssetBrowser: check asset file failed, {}", exists_error.message());
+                    return false;
+                }
+                LOG_INFO(L"AssetBrowser: asset file {} was already absent, removing stale registration.", asset_sys_path);
             }
 
             ResourceMgr::Get().DeleteAsset(asset);

@@ -205,8 +205,7 @@ bool SaveAssetDocument(const WString &sys_path, TDocument &document)
             prop.Serialize(&document, ar);
         }
     }
-    ar.Save(sys_path);
-    return true;
+    return ar.Save(sys_path);
 }
 
 template<typename TDocument>
@@ -2146,6 +2145,7 @@ Scope<Asset> AnimationClipAssetHandler::Load(const AssetLoadContext &context)
            (doc._duration / static_cast<f32>(doc._frame_count - 1u)) : 0.0f);
     loaded_clip->FrameDuration(frame_duration);
     loaded_clip->IsLooping(doc._is_looping);
+    loaded_clip->SkeletonGuid(doc._skeleton);
     loaded_clip->PreviewMeshGuid(doc._preview_mesh_guid);
     loaded_clip->StartTime(0.0f);
     loaded_clip->EndTime(doc._duration);
@@ -2226,7 +2226,10 @@ bool AnimationClipAssetHandler::Save(const AssetSaveContext &context)
     doc._frame_rate = clip->FrameRate();
     doc._frame_duration = clip->FrameDuration();
     doc._is_looping = clip->IsLooping();
+    doc._skeleton = clip->SkeletonGuid();
     doc._preview_mesh_guid = clip->PreviewMeshGuid();
+    if (!doc._skeleton.IsEmpty())
+        doc._header._dependencies.push_back(AssetDependency{doc._skeleton, EAssetDependencyType::kHard});
     if (!doc._preview_mesh_guid.IsEmpty())
         doc._header._dependencies.push_back(AssetDependency{doc._preview_mesh_guid, EAssetDependencyType::kHard});
     doc._tracks.reserve(clip->Size());

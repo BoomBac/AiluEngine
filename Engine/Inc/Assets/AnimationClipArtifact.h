@@ -14,6 +14,7 @@ namespace Ailu
     struct AILU_API AnimationClipArtifactDesc
     {
         String _clip_name;
+        Guid _skeleton_guid = Guid::EmptyGuid();
         Guid _preview_mesh_guid = Guid::EmptyGuid();
         u32 _frame_count = 0u;
         f32 _duration = 0.0f;

@@ -1,7 +1,9 @@
 #include "Editors/AnimationClipEditor.h"
 
 #include "Assets/Asset.h"
+#include "Common/EditorPopup.h"
 #include "Common/Undo.h"
+#include "Framework/Common/Application.h"
 #include "Framework/Common/Input.h"
 #include "Framework/Common/Log.h"
 #include "Framework/Common/ResourceMgr.h"
@@ -72,22 +74,6 @@ namespace Ailu
             add_frame->OnMouseClick() += [this](UI::UIEvent &e) { AddFrame(); e._is_handled = true; };
             auto *add_event = add_button("+ Event", 66.0f);
             add_event->OnMouseClick() += [this](UI::UIEvent &e) { AddEvent(); e._is_handled = true; };
-            _btn_play = add_button("Play", 52.0f);
-            _btn_play->OnMouseClick() += [this](UI::UIEvent &e)
-            {
-                _is_previewing = !_is_previewing;
-                _btn_play->SetText(_is_previewing ? "Pause" : "Play");
-                e._is_handled = true;
-            };
-            _btn_stop = add_button("Stop", 52.0f);
-            _btn_stop->OnMouseClick() += [this](UI::UIEvent &e)
-            {
-                _is_previewing = false;
-                _preview_time = 0.0f;
-                _btn_play->SetText("Play");
-                RefreshPreview();
-                e._is_handled = true;
-            };
             _txt_status = toolbar->AddChild<UI::Text>("Saved");
             StyleText(_txt_status, kMutedTextColor);
             _txt_status->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill)
@@ -139,6 +125,22 @@ namespace Ailu
                 if (_clip != nullptr)
                     _clip->IsLooping(value);
                 MarkDirty();
+            };
+            AddSectionTitle(info, "Skeleton");
+            auto *current_skeleton_row = AddPropertyRow(info, "Current");
+            _skeleton_dropdown = current_skeleton_row->AddChild<UI::ObjectAssetDropdown>(SkeletonAsset::StaticType());
+            _skeleton_dropdown->SetObjectType(SkeletonAsset::StaticType());
+            _skeleton_dropdown->SetAllowNone(true);
+            _skeleton_dropdown->GetSlotAs<UI::LinearSlot>()
+                    .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill)
+                    .Margin(Vector4f(2.0f, 1.0f, 2.0f, 1.0f));
+            _skeleton_dropdown->_on_object_asset_selected += [this](Asset *, Object *, const Guid &guid)
+            {
+                if (guid.IsEmpty() || !MapToSkeleton(guid))
+                {
+                    if (_skeleton_dropdown != nullptr && _clip != nullptr)
+                        _skeleton_dropdown->SetSelectedGuid(_clip->SkeletonGuid(), false);
+                }
             };
             auto *preview_mesh_row = AddPropertyRow(info, "Preview Mesh");
             _preview_mesh_dropdown =
@@ -254,28 +256,23 @@ namespace Ailu
             if (_is_previewing)
             {
                 if (_clip->Duration() <= 0.0f)
-                {
                     _is_previewing = false;
-                    if (_btn_play)
-                        _btn_play->SetText("Play");
-                }
                 else
                 {
-                    _preview_time += std::max(dt, 0.0f);
-                    if (_clip->IsLooping())
-                        _preview_time = std::fmod(_preview_time, _clip->Duration());
-                    else if (_preview_time >= _clip->Duration())
+                    f32 next_time = _preview_time + std::max(dt, 0.0f);
+                    if (next_time >= _clip->Duration())
                     {
-                        _preview_time = _clip->Duration();
-                        _is_previewing = false;
-                        if (_btn_play)
-                            _btn_play->SetText("Play");
+                        if (_preview_loop)
+                            next_time = std::fmod(next_time, _clip->Duration());
+                        else
+                        {
+                            next_time = _clip->Duration();
+                            _is_previewing = false;
+                        }
                     }
-                    if (_animation_timeline)
-                        _animation_timeline->SetCurrentTime(_preview_time);
-                    else
-                        RefreshPreview();
+                    SetPreviewTime(next_time);
                 }
+                RefreshPreviewControls();
             }
             if (_animation_preview != nullptr && _preview_image != nullptr && _animation_preview->IsRenderPending())
             {
@@ -291,10 +288,12 @@ namespace Ailu
                 return false;
             _is_previewing = false;
             _preview_time = 0.0f;
+            _preview_loop = _clip->IsLooping();
             _preview_sprite.reset();
             _preview_sprite_guid = Guid::EmptyGuid();
             _preview_mesh.reset();
             _preview_mesh_guid = _clip->PreviewMeshGuid();
+            _skeleton_asset.reset();
             _show_skeleton = false;
             _selected_joint = Joint::kInvalidJointIndex;
             if (_animation_preview)
@@ -318,6 +317,7 @@ namespace Ailu
             _preview_sprite_guid = Guid::EmptyGuid();
             _preview_mesh.reset();
             _preview_mesh_guid = Guid::EmptyGuid();
+            _skeleton_asset.reset();
             _show_skeleton = false;
             _selected_joint = Joint::kInvalidJointIndex;
             if (_animation_preview)
@@ -361,8 +361,8 @@ namespace Ailu
                 _clip->PreviewMeshGuid(_preview_mesh_guid);
             if (_preview_mesh_dropdown)
                 _preview_mesh_dropdown->SetSelectedGuid(_preview_mesh_guid, false);
-            if (_btn_play)
-                _btn_play->SetText(_is_previewing ? "Pause" : "Play");
+            RefreshSkeletonAsset();
+            RefreshPreviewControls();
             if (_txt_status)
                 _txt_status->SetText(IsDirty() ? "Modified" : "Saved");
             if (_animation_preview)
@@ -376,9 +376,90 @@ namespace Ailu
                 }
                 _animation_preview->SetMesh(_preview_mesh.get());
             }
+            RefreshSkeletonAsset();
             RefreshTimeline();
             RefreshEvents();
             _is_refreshing_ui = false;
+        }
+
+        void AnimationClipEditor::RefreshSkeletonAsset()
+        {
+            _skeleton_asset.reset();
+            if (_clip != nullptr && !_clip->SkeletonGuid().IsEmpty())
+            {
+                _skeleton_asset = ResourceMgr::Get().GetRef<SkeletonAsset>(_clip->SkeletonGuid());
+                if (_skeleton_asset == nullptr)
+                    _skeleton_asset = ResourceMgr::Get().Load<SkeletonAsset>(_clip->SkeletonGuid());
+            }
+            if (_skeleton_asset == nullptr && _clip != nullptr && _clip->SkeletonGuid().IsEmpty() &&
+                _preview_mesh != nullptr && _preview_mesh->GetSkeletonAsset().IsResolved())
+            {
+                _skeleton_asset = _preview_mesh->GetSkeletonAsset().Get();
+                if (_skeleton_asset != nullptr)
+                    _clip->SkeletonGuid(_preview_mesh->GetSkeletonAsset().GetGuid());
+            }
+
+            if (_skeleton_dropdown != nullptr)
+                _skeleton_dropdown->SetSelectedGuid(_clip != nullptr ? _clip->SkeletonGuid() : Guid::EmptyGuid(), false);
+        }
+
+        void AnimationClipEditor::ShowSkeletonMappingError(const String &message)
+        {
+            const Vector2f popup_size = {360.0f, 132.0f};
+            const auto &main_window = Application::Get().GetWindow();
+            const Vector2f window_size = {static_cast<f32>(main_window.GetWidth()),
+                                          static_cast<f32>(main_window.GetHeight())};
+            EditorPopup::ShowDialogAt(
+                (window_size - popup_size) * 0.5f, "AnimationClipSkeletonMappingError", "Skeleton Mapping Failed",
+                popup_size,
+                [message](UI::VerticalBox *content, UI::Text *)
+                {
+                    auto *text = content->AddChild<UI::Text>(message);
+                    text->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill)
+                        .Margin(Vector4f(8.0f));
+                },
+                {{"OK", []() -> std::optional<String> { return std::nullopt; }}});
+        }
+
+        bool AnimationClipEditor::MapToSkeleton(const Guid &target_guid)
+        {
+            if (_clip == nullptr || target_guid.IsEmpty())
+                return false;
+            RefreshSkeletonAsset();
+            if (_skeleton_asset == nullptr)
+            {
+                ShowSkeletonMappingError("Current skeleton is missing.");
+                return false;
+            }
+
+            Ref<SkeletonAsset> target_skeleton = ResourceMgr::Get().GetRef<SkeletonAsset>(target_guid);
+            if (target_skeleton == nullptr)
+                target_skeleton = ResourceMgr::Get().Load<SkeletonAsset>(target_guid);
+            if (target_skeleton == nullptr)
+            {
+                ShowSkeletonMappingError("Target skeleton is missing.");
+                return false;
+            }
+            if (target_guid == _clip->SkeletonGuid())
+                return true;
+            if (!_clip->RemapToSkeleton(_skeleton_asset->GetSkeleton(), target_skeleton->GetSkeleton()))
+            {
+                ShowSkeletonMappingError(std::format("Skeleton '{}' is incompatible with the current skeleton.",
+                                                     target_skeleton->Name()));
+                return false;
+            }
+
+            _clip->SkeletonGuid(target_guid);
+            _skeleton_asset = std::move(target_skeleton);
+            if (_preview_mesh != nullptr && _preview_mesh->GetSkeletonAsset().GetGuid() != target_guid)
+            {
+                _preview_mesh.reset();
+                _preview_mesh_guid = Guid::EmptyGuid();
+                _clip->PreviewMeshGuid(Guid::EmptyGuid());
+            }
+            MarkDirty();
+            RefreshAllUI();
+            return true;
         }
 
         void AnimationClipEditor::RefreshTimeline()
@@ -389,6 +470,9 @@ namespace Ailu
             _timeline_root->ClearChildren();
             _preview_image = nullptr;
             _txt_preview_time = nullptr;
+            _preview_time_slider = nullptr;
+            _preview_play_button = nullptr;
+            _preview_loop_button = nullptr;
             AddSectionTitle(_timeline_root, _clip != nullptr && _clip->Size() > 0u ?
                                              std::format("Animation Timeline ({} joints)", _clip->Size()) :
                                              std::format("Sprite Timeline ({} frames)", Frames().size()));
@@ -474,13 +558,73 @@ namespace Ailu
             };
             auto *preview_info = preview_area->AddChild<UI::VerticalBox>();
             preview_info->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed)
-                    .Size(Vector2f(0.0f, 58.0f));
-            _txt_preview_time = preview_info->AddChild<UI::Text>("Preview 0.000s");
-            StyleText(_txt_preview_time, Color(0.88f, 0.88f, 0.88f, 1.0f), 13.0f);
-            preview_info->AddChild<UI::Text>("Play/Pause and scrub the timeline to preview the clip.");
-            StyleText(preview_info->AddChild<UI::Text>(
-                          "Skeleton previews use a private mesh copy; sprite previews use atlas UV."),
-                      kMutedTextColor);
+                    .Size(Vector2f(0.0f, 56.0f));
+            auto *time_row = preview_info->AddChild<UI::HorizontalBox>();
+            time_row->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed)
+                    .Size(Vector2f(0.0f, 24.0f));
+            _txt_preview_time = time_row->AddChild<UI::Text>("0.000 / 1.000 s");
+            StyleText(_txt_preview_time, kMutedTextColor, 10.0f);
+            _txt_preview_time->GetSlotAs<UI::LinearSlot>()
+                    .SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFill)
+                    .Size(Vector2f(92.0f, 0.0f));
+            _preview_time_slider = time_row->AddChild<UI::Slider>(0.0f, 1.0f, 0.0f);
+            _preview_time_slider->GetSlotAs<UI::LinearSlot>()
+                    .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill)
+                    .Margin(Vector4f(4.0f, 2.0f, 4.0f, 2.0f));
+            _preview_time_slider->_on_value_change += [this](f32 value) { SetPreviewTime(value, false); };
+
+            auto *playback_row = preview_info->AddChild<UI::HorizontalBox>();
+            playback_row->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed)
+                    .Size(Vector2f(0.0f, 26.0f));
+            playback_row->SlotPadding() = UI::Padding(2.0f, 1.0f, 2.0f, 1.0f);
+            auto add_playback_button = [playback_row](const String &text, f32 width)
+            {
+                auto *button = playback_row->AddChild<UI::Button>(text);
+                button->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFill)
+                        .Size(Vector2f(width, 0.0f)).Margin(Vector4f(1.0f, 0.0f, 1.0f, 0.0f));
+                return button;
+            };
+            auto *reset_button = add_playback_button("|<", 32.0f);
+            reset_button->OnMouseClick() += [this](UI::UIEvent &event)
+            {
+                _is_previewing = false;
+                SetPreviewTime(0.0f);
+                RefreshPreviewControls();
+                event._is_handled = true;
+            };
+            auto *step_back_button = add_playback_button("<", 28.0f);
+            step_back_button->OnMouseClick() += [this](UI::UIEvent &event)
+            {
+                StepPreview(-1.0f);
+                event._is_handled = true;
+            };
+            _preview_play_button = add_playback_button("Play", 52.0f);
+            _preview_play_button->OnMouseClick() += [this](UI::UIEvent &event)
+            {
+                TogglePreviewPlayback();
+                event._is_handled = true;
+            };
+            auto *step_forward_button = add_playback_button(">", 28.0f);
+            step_forward_button->OnMouseClick() += [this](UI::UIEvent &event)
+            {
+                StepPreview(1.0f);
+                event._is_handled = true;
+            };
+            auto *end_button = add_playback_button(" >|", 32.0f);
+            end_button->OnMouseClick() += [this](UI::UIEvent &event)
+            {
+                _is_previewing = false;
+                SetPreviewTime(_clip != nullptr ? _clip->Duration() : 0.0f);
+                RefreshPreviewControls();
+                event._is_handled = true;
+            };
+            _preview_loop_button = add_playback_button(_preview_loop ? "Loop On" : "Loop Off", 64.0f);
+            _preview_loop_button->OnMouseClick() += [this](UI::UIEvent &event)
+            {
+                _preview_loop = !_preview_loop;
+                RefreshPreviewControls();
+                event._is_handled = true;
+            };
             auto *timeline_area = preview_timeline_split->AddChild<UI::VerticalBox>();
             if (_animation_preview != nullptr && _clip != nullptr && _clip->Size() > 0u)
             {
@@ -489,13 +633,14 @@ namespace Ailu
                         .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill)
                         .Margin(Vector4f(0.0f, 0.0f, 0.0f, 0.0f));
                 _animation_timeline->SetClip(_clip);
-                _animation_timeline->SetSkeleton(_preview_mesh != nullptr && _preview_mesh->GetSkeletonAsset().IsResolved() ?
-                                                     &_preview_mesh->GetSkeletonAsset()->GetSkeleton() : nullptr);
+                const Skeleton *skeleton = _skeleton_asset != nullptr ? &_skeleton_asset->GetSkeleton() : nullptr;
+                if (skeleton == nullptr && _preview_mesh != nullptr && _preview_mesh->GetSkeletonAsset().IsResolved())
+                    skeleton = &_preview_mesh->GetSkeletonAsset()->GetSkeleton();
+                _animation_timeline->SetSkeleton(skeleton);
                 _animation_timeline->SetCurrentTime(_preview_time);
                 _animation_timeline->_on_time_changed += [this](f32 time)
                 {
-                    _preview_time = time;
-                    RefreshPreview();
+                    SetPreviewTime(time);
                 };
                 _animation_timeline->_on_bone_selected += [this](u16 joint_index)
                 {
@@ -503,6 +648,7 @@ namespace Ailu
                 };
             }
             RefreshPreview();
+            RefreshPreviewControls();
             UI::VerticalBox *frames_root = nullptr;
             if (_clip == nullptr || _clip->Size() == 0u)
             {
@@ -587,9 +733,6 @@ namespace Ailu
                 _preview_image->SetTexture(_animation_preview->GetRenderTexture());
                 _preview_image->_uv_rect = Vector4f(0.0f, 0.0f, 1.0f, 1.0f);
                 _preview_image->InvalidatePaint();
-                if (_txt_preview_time != nullptr)
-                    _txt_preview_time->SetText(std::format("Preview {:.3f}s - {}", _preview_time,
-                                                            _preview_mesh->Name()));
                 return;
             }
             Guid sprite_guid = Guid::EmptyGuid();
@@ -619,9 +762,57 @@ namespace Ailu
             _preview_image->SetTexture(sprite != nullptr && sprite->_texture != nullptr ? sprite->_texture.get() : nullptr);
             _preview_image->_uv_rect = sprite != nullptr ? sprite->_uv_rect : Vector4f(0.0f, 0.0f, 1.0f, 1.0f);
             _preview_image->InvalidatePaint();
+        }
+
+        void AnimationClipEditor::SetPreviewTime(f32 time, bool refresh_slider)
+        {
+            const f32 duration = _clip != nullptr ? _clip->Duration() : 0.0f;
+            const f32 next_time = std::clamp(time, 0.0f, std::max(duration, 0.001f));
+            const bool changed = !NearbyEqual(next_time, _preview_time);
+            _preview_time = next_time;
+            if (refresh_slider && _preview_time_slider != nullptr)
+                _preview_time_slider->SetValue(_preview_time, false);
             if (_txt_preview_time != nullptr)
-                _txt_preview_time->SetText(std::format("Preview {:.3f}s{}", _preview_time,
-                                                        sprite != nullptr ? " - " + sprite->Name() : " - None"));
+                _txt_preview_time->SetText(std::format("{:.3f} / {:.3f} s", _preview_time, duration));
+            if (!changed)
+                return;
+            if (_animation_timeline != nullptr &&
+                !NearbyEqual(_animation_timeline->CurrentTime(), _preview_time))
+                _animation_timeline->SetCurrentTime(_preview_time);
+            RefreshPreview();
+        }
+
+        void AnimationClipEditor::RefreshPreviewControls()
+        {
+            const f32 duration = _clip != nullptr ? std::max(_clip->Duration(), 0.001f) : 0.001f;
+            if (_preview_time_slider != nullptr)
+            {
+                _preview_time_slider->_range = {0.0f, duration};
+                _preview_time_slider->SetValue(std::clamp(_preview_time, 0.0f, duration), false);
+            }
+            if (_txt_preview_time != nullptr)
+                _txt_preview_time->SetText(std::format("{:.3f} / {:.3f} s", _preview_time, duration));
+            if (_preview_play_button != nullptr)
+                _preview_play_button->SetText(_is_previewing ? "Pause" : "Play", false);
+            if (_preview_loop_button != nullptr)
+                _preview_loop_button->SetText(_preview_loop ? "Loop On" : "Loop Off", false);
+        }
+
+        void AnimationClipEditor::TogglePreviewPlayback()
+        {
+            if (_clip == nullptr || _clip->Duration() <= 0.0f)
+                return;
+            if (!_is_previewing && _preview_time >= _clip->Duration() - 0.0001f)
+                SetPreviewTime(0.0f);
+            _is_previewing = !_is_previewing;
+            RefreshPreviewControls();
+        }
+
+        void AnimationClipEditor::StepPreview(f32 direction)
+        {
+            _is_previewing = false;
+            SetPreviewTime(_preview_time + direction * (1.0f / 30.0f));
+            RefreshPreviewControls();
         }
 
         void AnimationClipEditor::SelectJoint(u16 joint_index)

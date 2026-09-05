@@ -64,11 +64,12 @@ namespace Ailu
 
         AddStateSample(instance, instance._current_state, instance._in_transition ?
                        1.0f - std::clamp(instance._transition_time / instance._transition_duration, 0.0f, 1.0f) : 1.0f,
-                       instance._state_time, evaluation);
+                       instance._state_time, instance._current_motion_duration, evaluation);
         if (instance._in_transition && instance._next_state != kInvalidAnimationState)
         {
             const f32 weight = std::clamp(instance._transition_time / instance._transition_duration, 0.0f, 1.0f);
-            AddStateSample(instance, instance._next_state, weight, instance._next_state_time, evaluation);
+            AddStateSample(instance, instance._next_state, weight, instance._next_state_time,
+                           instance._next_motion_duration, evaluation);
         }
         return evaluation;
     }
@@ -184,7 +185,8 @@ namespace Ailu
     }
 
     void AnimationController::AddStateSample(const AnimationInstance &instance, u16 state_index, f32 weight,
-                                             f32 state_time, AnimationEvaluation &evaluation) const
+                                             f32 state_time, f32 motion_duration,
+                                             AnimationEvaluation &evaluation) const
     {
         const auto &state = _asset->States()[state_index];
         if (weight <= 0.0f)
@@ -201,21 +203,29 @@ namespace Ailu
         if (blend_space_iter == _blend_spaces.end() || blend_space_iter->second == nullptr)
             return;
 
-        f32 position = 0.0f;
+        Vector2f position = Vector2f::kZero;
         u16 parameter_index = state._motion._parameter_index;
-        if (parameter_index == kInvalidAnimationParameter)
+        u16 parameter_y_index = state._motion._parameter_y_index;
+        for (u16 axis = 0u; axis < 2u; ++axis)
         {
+            u16 &axis_index = axis == 0u ? parameter_index : parameter_y_index;
+            if (axis_index != kInvalidAnimationParameter)
+                continue;
             for (u16 index = 0u; index < _asset->Parameters().size(); ++index)
             {
-                if (_asset->Parameters()[index]._type == EAnimationParameterType::kFloat)
+                if (_asset->Parameters()[index]._type == EAnimationParameterType::kFloat &&
+                    (axis == 0u || index != parameter_index))
                 {
-                    parameter_index = index;
+                    axis_index = index;
                     break;
                 }
             }
         }
         if (parameter_index < instance._float_parameters.size())
-            position = instance._float_parameters[parameter_index];
-        blend_space_iter->second->AddSamples(position, sample_time, weight, state._loop, evaluation);
+            position.x = instance._float_parameters[parameter_index];
+        if (parameter_y_index < instance._float_parameters.size())
+            position.y = instance._float_parameters[parameter_y_index];
+        const f32 phase = motion_duration > 0.0f ? sample_time / motion_duration : 0.0f;
+        blend_space_iter->second->AddSamples(position, phase, weight, state._loop, evaluation, true);
     }
 }

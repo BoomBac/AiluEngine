@@ -189,6 +189,7 @@ namespace Ailu
         HashBytes(hash, &setting._is_combine_mesh, sizeof(setting._is_combine_mesh));
         HashBytes(hash, setting._mesh_name.data(), setting._mesh_name.size());
         HashBytes(hash, &setting._animation_stack_index, sizeof(setting._animation_stack_index));
+        HashBytes(hash, &setting._import_all_animation_stacks, sizeof(setting._import_all_animation_stacks));
         const String skeleton_guid = setting._skeleton.ToString();
         const u32 skeleton_guid_length = static_cast<u32>(skeleton_guid.size());
         HashBytes(hash, &skeleton_guid_length, sizeof(skeleton_guid_length));

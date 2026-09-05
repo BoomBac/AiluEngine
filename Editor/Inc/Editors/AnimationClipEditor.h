@@ -6,6 +6,7 @@
 #include "Animation/AnimationClipPreview.h"
 #include "Animation/AnimationTimeline.h"
 #include "Animation/Clip.h"
+#include "Animation/SkeletonAsset.h"
 #include "Editors/AssetEditor.h"
 #include "UI/Container.h"
 
@@ -28,6 +29,7 @@ namespace Ailu
         class InputBlock;
         class Image;
         class ObjectAssetDropdown;
+        class Slider;
         class Text;
         class VerticalBox;
     }
@@ -48,6 +50,13 @@ namespace Ailu
             void RefreshTimeline();
             void RefreshEvents();
             void RefreshPreview();
+            void SetPreviewTime(f32 time, bool refresh_slider = true);
+            void RefreshPreviewControls();
+            void TogglePreviewPlayback();
+            void StepPreview(f32 direction);
+            void RefreshSkeletonAsset();
+            bool MapToSkeleton(const Guid &target_guid);
+            void ShowSkeletonMappingError(const String &message);
             void AddFrame();
             void AddEvent();
             void RemoveFrame(u32 index);
@@ -84,6 +93,9 @@ namespace Ailu
             Scope<AnimationClipPreview> _animation_preview;
             UI::Image *_preview_image = nullptr;
             UI::Text *_txt_preview_time = nullptr;
+            UI::Slider *_preview_time_slider = nullptr;
+            UI::Button *_preview_play_button = nullptr;
+            UI::Button *_preview_loop_button = nullptr;
             Ref<Render::Sprite> _preview_sprite;
             Guid _preview_sprite_guid = Guid::EmptyGuid();
             UI::Text *_txt_status = nullptr;
@@ -93,15 +105,16 @@ namespace Ailu
             UI::InputBlock *_input_frame_duration = nullptr;
             UI::CheckBox *_check_looping = nullptr;
             UI::CheckBox *_check_skeleton = nullptr;
+            UI::ObjectAssetDropdown *_skeleton_dropdown = nullptr;
             UI::ObjectAssetDropdown *_preview_mesh_dropdown = nullptr;
-            UI::Button *_btn_play = nullptr;
-            UI::Button *_btn_stop = nullptr;
             String _last_edit_snapshot;
             bool _is_refreshing_ui = false;
             Guid _preview_mesh_guid = Guid::EmptyGuid();
             Ref<Render::SkeletonMesh> _preview_mesh;
+            Ref<SkeletonAsset> _skeleton_asset;
             bool _show_skeleton = false;
             u16 _selected_joint = Joint::kInvalidJointIndex;
+            bool _preview_loop = true;
             Vector2f _preview_mouse_down_position = Vector2f::kZero;
             bool _preview_camera_dragged = false;
         };

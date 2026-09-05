@@ -3,6 +3,7 @@
 #include "Widgets/AssetBrowserOperations.h"
 
 #include "Assets/Asset.h"
+#include "Animation/BlendSpace.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Render/2D/Sprite.h"
 #include "Render/AssetPreviewGenerator.h"
@@ -125,7 +126,10 @@ namespace Ailu
             RegisterCreator({
                 "New Material", "Create Material", "NewMaterial", "Material already exists.", L".alasset",
                 nullptr,
-                [](const fs::path &directory, Vector2f popup_pos) { ShowCreateMaterialDialog(popup_pos, directory); }
+                [](const fs::path &directory, Vector2f popup_pos, std::function<void()> on_created)
+                {
+                    ShowCreateMaterialDialog(popup_pos, directory, std::move(on_created));
+                }
             });
             RegisterCreator({
                 "New Input Action Asset", "Create Input Action Asset", "NewInputActions", "Input Action Asset already exists.", L".alasset",
@@ -141,6 +145,11 @@ namespace Ailu
                 "New Animation Controller", "Create Animation Controller", "NewAnimationController",
                 "Animation Controller already exists.", L".alasset",
                 [](const fs::path &directory, const String &name) { return CreateAnimationControllerAsset(directory, name); },
+                nullptr
+            });
+            RegisterCreator({
+                "New Blend Space", "Create Blend Space", "NewBlendSpace", "Blend Space already exists.", L".alasset",
+                [](const fs::path &directory, const String &name) { return CreateBlendSpaceAsset(directory, name); },
                 nullptr
             });
             RegisterCreator({

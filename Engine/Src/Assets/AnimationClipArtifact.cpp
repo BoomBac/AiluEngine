@@ -131,6 +131,7 @@ namespace Ailu
     {
         out_artifact = {};
         out_artifact._desc._clip_name = clip.Name();
+        out_artifact._desc._skeleton_guid = clip.SkeletonGuid();
         out_artifact._desc._preview_mesh_guid = clip.PreviewMeshGuid();
         out_artifact._desc._frame_count = clip.FrameCount();
         out_artifact._desc._duration = clip.Duration();
@@ -182,6 +183,7 @@ namespace Ailu
     {
         Vector<u8> metadata;
         AppendString(metadata, artifact._desc._clip_name);
+        AppendGuid(metadata, artifact._desc._skeleton_guid);
         AppendGuid(metadata, artifact._desc._preview_mesh_guid);
         AppendValue(metadata, artifact._desc._frame_count);
         AppendValue(metadata, artifact._desc._duration);
@@ -255,6 +257,7 @@ namespace Ailu
         size_t offset = 0u;
         u8 is_looping = 0u;
         if (!ReadString(metadata, offset, out_artifact._desc._clip_name) ||
+            !ReadGuid(metadata, offset, out_artifact._desc._skeleton_guid) ||
             !ReadGuid(metadata, offset, out_artifact._desc._preview_mesh_guid) ||
             !ReadValue(metadata, offset, out_artifact._desc._frame_count) ||
             !ReadValue(metadata, offset, out_artifact._desc._duration) ||
@@ -330,6 +333,7 @@ namespace Ailu
         clip->FrameRate(artifact._desc._frame_rate);
         clip->FrameDuration(artifact._desc._frame_duration);
         clip->IsLooping(artifact._desc._is_looping);
+        clip->SkeletonGuid(artifact._desc._skeleton_guid);
         clip->PreviewMeshGuid(artifact._desc._preview_mesh_guid);
         clip->StartTime(0.0f);
         clip->EndTime(artifact._desc._duration);

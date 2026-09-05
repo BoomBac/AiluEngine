@@ -28,6 +28,7 @@ struct PSInput
 
 PerMaterialCBufferBegin
     float _grid_alpha;
+    float _grid_fade_scale;
     float4 _grid_axis_mode;
 PerMaterialCBufferEnd
 
@@ -109,13 +110,17 @@ const static float _GridAlpha = 0.25f;
 float4 PSMain(PSInput i) : SV_TARGET
 {
     float camera_height = GetCameraPlaneDistance(i.world_pos, i.world_normal);
-    float vis_small_grid = saturate(camera_height / 30.0f);
-    float vis_mid_grid =   saturate(camera_height / 100.0f);
+    float fade_scale = max(_grid_fade_scale, 1.0f);
+    float vis_small_grid = saturate(camera_height / (30.0f * fade_scale));
+    float vis_mid_grid =   saturate(camera_height / (100.0f * fade_scale));
     float4 grid_s = Grid(i.world_pos, i.world_normal,1,_GridWidth);
     float4 grid_m = Grid(i.world_pos, i.world_normal,0.1,_GridWidth * 10);
     float4 grid_l = Grid(i.world_pos, i.world_normal,0.01,_GridWidth * 100);
     float4 grid_color = lerp(lerp(grid_s,grid_m,vis_small_grid),grid_l,vis_mid_grid);
-    grid_color.a *= lerp(_GridAlpha,0.0,saturate(distance(GetCameraPositionWS(),i.world_pos) / lerp(lerp(30,200,vis_small_grid),3000,vis_mid_grid * vis_mid_grid)));
+    float fade_distance = lerp(lerp(30.0f, 200.0f, vis_small_grid), 3000.0f,
+                               vis_mid_grid * vis_mid_grid) * fade_scale;
+    grid_color.a *= lerp(_GridAlpha, 0.0f,
+                         saturate(distance(GetCameraPositionWS(), i.world_pos) / fade_distance));
     grid_color.a *= _grid_alpha;
     return grid_color;
 }

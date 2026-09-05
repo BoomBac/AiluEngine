@@ -1154,7 +1154,7 @@ namespace Ailu
                     w->_on_get_focus += [this](DockWindow *w)
                     {
                         RequestFocus(w);
-                        LOG_INFO("Focused dock node change to {}", _focused_node && _focused_node->_window ? _focused_node->_window->GetTitle() : "split/tab node");
+                        //LOG_INFO("Focused dock node change to {}", _focused_node && _focused_node->_window ? _focused_node->_window->GetTitle() : "split/tab node");
                     };
                     //same with AddDock
                     UI::UIManager::Get()->RegisterWidget(w->TitleWidgetRef());
@@ -1411,7 +1411,7 @@ namespace Ailu
             }
             dock->_on_get_focus += [this](DockWindow* w) {
                 RequestFocus(w);
-                LOG_INFO("Focused dock node changed!");
+                //LOG_INFO("Focused dock node changed!");
             };
             TryAddFloatNode(leaf_node);
         }

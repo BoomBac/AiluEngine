@@ -3,6 +3,7 @@
 #include "Animation/Skeleton/SkeletonAnimationBinding.h"
 #include "Animation/SkinningSystem.h"
 #include "Animation/AssetPreviewViewport3D.h"
+#include "Animation/BlendSpace.h"
 #include "Framework/Core/SmartPtr.h"
 
 namespace Ailu::Render
@@ -22,6 +23,8 @@ namespace Ailu::Editor
         ~AnimationClipPreview();
 
         void SetClip(AnimationClip *clip);
+        void SetBlendSpace(BlendSpaceAsset *blend_space, Vector2f input);
+        void SetBlendSpaceInput(Vector2f input, bool render = true);
         void SetMesh(Render::SkeletonMesh *mesh);
         void SetTime(f32 time);
         void SetShowSkeleton(bool show_skeleton);
@@ -47,6 +50,7 @@ namespace Ailu::Editor
 
     private:
         void RebuildPreviewMesh();
+        void ResolveBlendSpaceBindings();
         void EvaluatePose();
         void UpdateSkinning();
         void RenderPreview();
@@ -56,8 +60,12 @@ namespace Ailu::Editor
                                  const Vector3f &center, const Vector3f &extents);
 
         AnimationClip *_clip = nullptr;
+        BlendSpaceAsset *_blend_space = nullptr;
+        Vector2f _blend_space_input = Vector2f::kZero;
         Render::SkeletonMesh *_source_mesh = nullptr;
         Ref<Render::SkeletonMesh> _preview_mesh;
+        Vector<Ref<AnimationClip>> _blend_space_clips;
+        f32 _blend_space_duration = 0.0f;
         AssetPreviewViewport3D _viewport;
         Ref<Render::Mesh> _skeleton_sphere;
         Ref<Render::Mesh> _skeleton_cone;

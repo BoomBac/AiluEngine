@@ -41,6 +41,23 @@ namespace Ailu
 	{
 		ResourceMgr *g_pResourceMgr = nullptr;
 		const WString kEmptyWString;
+		constexpr WStringView kWindowsInvalidFileNameChars = L"<>:\"/\\|?*";
+
+		WString SanitizeAssetFileName(const WString &file_name)
+		{
+			WString sanitized;
+			sanitized.reserve(file_name.size());
+			for (const wchar_t character: file_name)
+			{
+				if (character < L' ' || kWindowsInvalidFileNameChars.find(character) != WStringView::npos)
+					sanitized.push_back(L'_');
+				else
+					sanitized.push_back(character);
+			}
+			while (!sanitized.empty() && (sanitized.back() == L' ' || sanitized.back() == L'.'))
+				sanitized.pop_back();
+			return sanitized.empty() ? L"Asset" : sanitized;
+		}
 
 		String GetEmbeddedMaterialKey(const Mesh::ImportedMaterialInfo &material)
 		{
@@ -89,8 +106,7 @@ namespace Ailu
 			{
 				prop.Serialize(&document, ar);
 			}
-			ar.Save(sys_path);
-			return true;
+			return ar.Save(sys_path);
 		}
 
 		template<typename TDocument>
@@ -1054,7 +1070,8 @@ namespace Ailu
 		parser->Parser(sys_path, setting);
 		List<Ref<Mesh>> mesh_list{};
 		parser->GetMeshes(mesh_list);
-		Ref<SkeletonAsset> skeleton_asset = parser->GetSkeletonAsset();
+		Ref<SkeletonAsset> source_skeleton_asset = parser->GetSkeletonAsset();
+		Ref<SkeletonAsset> skeleton_asset = source_skeleton_asset;
 		if (!setting._skeleton.IsEmpty() && skeleton_asset != nullptr)
 		{
 			Ref<SkeletonAsset> target_skeleton = GetRef<SkeletonAsset>(setting._skeleton);
@@ -1074,9 +1091,10 @@ namespace Ailu
 					const i32 target_index = Skeleton::GetJointIndexByName(target, source[source_index]._name);
 					if (target_index < 0)
 					{
-						LOG_ERROR("Skeleton remap failed: source bone '{}' does not exist in target skeleton '{}'",
+						LOG_WARNING("Skeleton remap: source bone '{}' does not exist in target skeleton '{}'; "
+						            "mesh remap will fail only if the bone is weighted",
 						          source[source_index]._name, target_skeleton->Name());
-						return {};
+						continue;
 					}
 					bone_remap[source_index] = static_cast<u16>(target_index);
 				}
@@ -1092,6 +1110,21 @@ namespace Ailu
 					skeleton_mesh->SetSkeletonAsset(setting._skeleton, target_skeleton);
 				}
 				skeleton_asset = std::move(target_skeleton);
+			}
+		}
+		if (!setting._skeleton.IsEmpty() && source_skeleton_asset != nullptr && skeleton_asset != source_skeleton_asset)
+		{
+			const Skeleton &source = source_skeleton_asset->GetSkeleton();
+			const Skeleton &target = skeleton_asset->GetSkeleton();
+			for (const Ref<AnimationClip> &clip : parser->GetAnimationClips())
+			{
+				if (!clip->RemapToSkeleton(source, target))
+				{
+					LOG_ERROR("Animation clip '{}' skeleton remap failed from '{}' to '{}'", clip->Name(),
+					          source_skeleton_asset->Name(), skeleton_asset->Name());
+					return {};
+				}
+				clip->SkeletonGuid(setting._skeleton);
 			}
 		}
 		if (out_skeleton_asset != nullptr)
@@ -1176,7 +1209,7 @@ namespace Ailu
             if (IsAssetLoaded(normalized_asset_path))
                 return _global_resources.at(normalized_asset_path);
         }
-        LOG_WARNING(L"Begin load asset {}...", normalized_asset_path);
+        //LOG_WARNING(L"Begin load asset {}...", normalized_asset_path);
         TimeMgr timer;
         timer.Mark();
         //using Loader = std::function<Scope<Asset>(ResourceMgr *, const WString &,const ImportSetting&)>;
@@ -1962,6 +1995,7 @@ namespace Ailu
 		TimeMgr time_mgr;
 		Ref<void> ret_res = nullptr;
 		Queue<std::tuple<WString, Ref<Object>>> loaded_objects;
+		Vector<Ref<AnimationClip>> imported_clips;
 		std::unordered_set<WString> queued_asset_paths;
 		auto queue_asset = [&](const WString &asset_path, Ref<Object> object)
 		{
@@ -1986,7 +2020,7 @@ namespace Ailu
 			auto mesh_list = std::move(LoadExternalMesh(mesh_source_path, *mesh_import_setting, clips, &skeleton_asset));
 			std::unordered_set<u64> imported_material_ids;
 			std::unordered_set<String> material_asset_names;
-            if (skeleton_asset != nullptr && mesh_import_setting->ShouldImportSkeleton() &&
+            if (skeleton_asset != nullptr && (mesh_import_setting->ShouldImportSkeleton() || !clips.empty()) &&
                 mesh_import_setting->_skeleton.IsEmpty())
             {
                 const WString skeleton_asset_path = created_asset_dir +
@@ -1996,7 +2030,8 @@ namespace Ailu
             for (auto &mesh: mesh_list)
 			{
 				WString imported_asset_path = created_asset_dir;
-				imported_asset_path.append(std::format(L"{}.alasset", ToWChar(mesh->Name().c_str())));
+				imported_asset_path.append(std::format(L"{}.alasset",
+					SanitizeAssetFileName(ToWChar(mesh->Name().c_str()))));
 				queue_asset(imported_asset_path, mesh);
 				if (mesh_import_setting->ShouldImportMaterial())
 				{
@@ -2038,7 +2073,8 @@ namespace Ailu
 						mat->SetFloat(StandardMaterialProperty::kRoughness._value_name, it->_roughness);
 						mat->SetVector(StandardMaterialProperty::kEmission._value_name, it->_emissive);
 						imported_asset_path = created_asset_dir;
-						imported_asset_path.append(std::format(L"{}.alasset", ToWChar(mat->_name.c_str())));
+						imported_asset_path.append(std::format(L"{}.alasset",
+							SanitizeAssetFileName(ToWChar(mat->_name.c_str()))));
 						queue_asset(imported_asset_path, mat);
 					}
 				}
@@ -2047,9 +2083,10 @@ namespace Ailu
 			}
 			for (auto &clip: clips)
 			{
-				//AnimationClipLibrary::AddClip(clip);
+				imported_clips.emplace_back(clip);
 				WString imported_asset_path = created_asset_dir;
-				imported_asset_path.append(std::format(L"{}.alasset", ToWChar(clip->Name().c_str())));
+				imported_asset_path.append(std::format(L"{}.alasset",
+					SanitizeAssetFileName(ToWChar(clip->Name().c_str()))));
 				queue_asset(imported_asset_path, clip);
 			}
 		}
@@ -2125,6 +2162,8 @@ namespace Ailu
 		{
 			for (auto *skeleton_mesh : imported_skeleton_meshes)
 				skeleton_mesh->SetSkeletonAsset(imported_skeleton_guid, imported_skeleton_asset);
+			for (const Ref<AnimationClip> &clip : imported_clips)
+				clip->SkeletonGuid(imported_skeleton_guid);
 		}
 		OnAssetDataBaseChanged();
 		SaveAllUnsavedAssets();

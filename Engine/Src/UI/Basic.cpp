@@ -410,15 +410,21 @@ namespace Ailu
 #pragma region Slider
         Slider::Slider() : Slider("Slider")
         {
-            OnMouseMove() += [this](UIEvent &e)
+            const auto update_value_from_mouse = [this](UIEvent &e)
             {
-                if (IsPressed())
+                if (IsPressed() || e._type == UIEvent::EType::kMouseDown)
                 {
                     auto lmpos = TransformCoord(_inv_matrix, {e._mouse_position, 0.0f});
                     f32 rel = (lmpos.x - (_content_rect.x + _dot_rect.z * 0.5f)) / (_content_rect.z - _dot_rect.z);
                     SetValue(Lerp(_range.x, _range.y, rel));
                 }
             };
+            OnMouseDown() += [update_value_from_mouse](UIEvent &e)
+            {
+                if (e._key_code == EKey::kLBUTTON)
+                    update_value_from_mouse(e);
+            };
+            OnMouseMove() += update_value_from_mouse;
         }
         Slider::Slider(const String &name) : UIElement(name)
         {
@@ -451,7 +457,10 @@ namespace Ailu
         UIElement *Slider::HitTest(Vector2f pos) 
         {
             Vector2f lpos = TransformCoord(_inv_matrix,Vector3f{pos,0.0f}).xy;
-            return IsPointInside(lpos, _dot_rect) ? this : nullptr;
+            Vector4f track_hit_rect = _bar_rect;
+            track_hit_rect.y -= 6.0f;
+            track_hit_rect.w += 12.0f;
+            return IsPointInside(lpos, track_hit_rect) || IsPointInside(lpos, _dot_rect) ? this : nullptr;
         }
         void Slider::RenderImpl(UIRenderer &r)
         {

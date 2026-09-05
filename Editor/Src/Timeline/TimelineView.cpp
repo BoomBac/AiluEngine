@@ -184,6 +184,7 @@ namespace Ailu::Editor
         _start_time = std::min(start_time, end_time);
         _end_time = std::max(end_time, _start_time + 0.001f);
         _current_time = std::clamp(_current_time, _start_time, _end_time);
+        _fit_time_range_pending = true;
         ClampView();
         InvalidatePaint();
     }
@@ -283,6 +284,22 @@ namespace Ailu::Editor
             _is_dragging_horizontal_scrollbar = false;
             _is_dragging_vertical_scrollbar = false;
             InvalidatePaint();
+        }
+        if (_fit_time_range_pending)
+        {
+            const Vector4f viewport = GetViewportRect();
+            const f32 visible_width = viewport.z - _header_width;
+            const f32 duration = _end_time - _start_time;
+            if (visible_width > 1.0f && duration > 0.0f)
+            {
+                _pixels_per_second = std::clamp(visible_width / duration, kMinPixelsPerSecond,
+                                                kMaxPixelsPerSecond);
+                _scroll_x = 0.0f;
+                _target_scroll_x = 0.0f;
+                _fit_time_range_pending = false;
+                ClampView();
+                InvalidatePaint();
+            }
         }
         ClampView();
         const f32 interpolation = std::clamp(std::max(dt, 0.0f) * _scroll_speed, 0.0f, 1.0f);

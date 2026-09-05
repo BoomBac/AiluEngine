@@ -1,0 +1,14 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "e219bdcb-db2c-4b33-95cc-d77023942d4e",
+        "_asset_type": "Ailu::Render::Texture2D",
+        "_asset_name": "BlendSpaceAsset"
+    },
+    "_file": "BlendSpaceAsset.png",
+    "_import_setting": {
+        "_is_sRGB": true,
+        "_generate_mipmap": true,
+        "_is_readable": false
+    }
+}

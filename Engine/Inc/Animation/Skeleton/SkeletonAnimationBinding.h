@@ -29,7 +29,8 @@ namespace Ailu
 
         const ClipBinding *FindBinding(const Guid &clip_id) const;
         void EnsureSkeleton(const Skeleton &skeleton);
-        void SampleClip(const ClipBinding &binding, f32 time, bool loop, SkeletonPose &out_pose) const;
+        void SampleClip(const ClipBinding &binding, f32 time, bool loop, bool normalized_time,
+                        SkeletonPose &out_pose) const;
 
         Vector<ClipBinding> _clips;
         Array<SkeletonPose, 4> _sample_poses;

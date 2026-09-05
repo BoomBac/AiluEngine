@@ -162,7 +162,7 @@ namespace Ailu::UI
         UIElement *old = _focus_target;
         _focus_target = element;
         ApplyFocusChange(old, element);
-        LOG_INFO("UIManager::SetFocus: foucs on {}", element ? element->Name() : "null");
+        //LOG_INFO("UIManager::SetFocus: foucs on {}", element ? element->Name() : "null");
     }
 
     void UIManager::ClearFocus(UIElement *element)

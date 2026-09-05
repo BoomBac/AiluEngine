@@ -311,6 +311,8 @@ namespace Ailu
         APROPERTY()
         bool _is_looping = true;
         APROPERTY()
+        Guid _skeleton = Guid::EmptyGuid();
+        APROPERTY()
         Guid _preview_mesh_guid = Guid::EmptyGuid();
         APROPERTY()
         Vector<AnimationClipTrackDocument> _tracks;

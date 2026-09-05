@@ -94,6 +94,7 @@ namespace Ailu::Editor::AIAssistantTests
 
 namespace Ailu::AnimationTests
 {
+    bool TestBlendSpace2DSampling();
     bool TestControllerEntryAndClipEvaluation();
     bool TestControllerCrossFadeWeights();
     bool TestControllerTriggerConsumption();
@@ -1912,6 +1913,7 @@ namespace
     {
         using namespace Ailu::AnimationTests;
         TestResult result;
+        RunTest(result, "BlendSpace 2D sampling", TestBlendSpace2DSampling);
         RunTest(result, "AnimationController entry and clip evaluation", TestControllerEntryAndClipEvaluation);
         RunTest(result, "AnimationController crossfade weights", TestControllerCrossFadeWeights);
         RunTest(result, "AnimationController trigger consumption", TestControllerTriggerConsumption);

@@ -9,6 +9,7 @@
 #include "Scene/Entity.h"
 
 #include <filesystem>
+#include <functional>
 #include <optional>
 
 namespace Ailu
@@ -36,6 +37,7 @@ namespace Ailu
         bool CreateInputActionAsset(const fs::path &directory, const String &name);
         bool CreateAnimationClipAsset(const fs::path &directory, const String &name);
         bool CreateAnimationControllerAsset(const fs::path &directory, const String &name);
+        bool CreateBlendSpaceAsset(const fs::path &directory, const String &name);
         bool CreateWidgetAsset(const fs::path &directory, const String &name);
         bool CreateFlowGraphAsset(const fs::path &directory, const String &name);
         bool CreateScriptAsset(const fs::path &directory, const String &name);
@@ -43,7 +45,8 @@ namespace Ailu
 
         Vector<Ref<Render::Shader>> CollectMaterialShaders();
         // 材质创建需要选择 Shader，使用自定义对话框，供 AssetTypeRegistry 注册为特殊 Creator。
-        void ShowCreateMaterialDialog(Vector2f popup_pos, const fs::path &target_directory);
+        void ShowCreateMaterialDialog(Vector2f popup_pos, const fs::path &target_directory,
+                                      std::function<void()> on_created);
 
         class AssetBrowserOperations
         {

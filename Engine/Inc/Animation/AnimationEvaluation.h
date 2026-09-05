@@ -12,6 +12,7 @@ namespace Ailu
         f32 _time = 0.0f;
         f32 _weight = 1.0f;
         bool _loop = true;
+        bool _normalized_time = false;
     };
 
     struct AILU_API AnimationEvaluation

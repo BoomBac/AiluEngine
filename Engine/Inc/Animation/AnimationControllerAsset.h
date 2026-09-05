@@ -85,6 +85,8 @@ namespace Ailu
         Guid _asset = Guid::EmptyGuid();
         APROPERTY()
         u16 _parameter_index = kInvalidAnimationParameter;
+        APROPERTY()
+        u16 _parameter_y_index = kInvalidAnimationParameter;
     };
 
     ASTRUCT()

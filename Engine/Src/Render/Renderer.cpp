@@ -552,7 +552,8 @@ namespace Ailu::Render
                     s_instance_data[obj_index]._local_to_world = render_world_matrix;
                     s_instance_data[obj_index]._world_to_local = world_to_local;
                     s_instance_data[obj_index]._object_id = obj_index;
-                    s_instance_data[obj_index]._material_id = materials.size() > i ? _material_data_lut[materials[i]->HashCode()] : 0u;
+                    s_instance_data[obj_index]._material_id = materials.size() > i && materials[i] != nullptr
+                        ? _material_data_lut[materials[i]->HashCode()] : 0u;
                     s_instance_data[obj_index]._global_triangle_offset = 0u;
                     auto range = s.GetBVHNodeRange(entity, static_cast<u16>(i));
                     s_instance_data[obj_index]._blas_node_start = range.x;
@@ -909,6 +910,8 @@ namespace Ailu::Render
         {
             for (auto& mat : static_mesh._p_mats)
             {
+                if (mat == nullptr)
+                    continue;
                 if (!_material_data_lut.contains(mat->HashCode()))
                 {
                     u32 idx = (u32)_material_data_cache.size();
@@ -1017,27 +1020,25 @@ namespace Ailu::Render
                 if (ViewFrustum::Conatin(vf, aabbs[i + 1]) || cam.IsCustomVP())
                 {
                     f32 dis = Distance(aabbs[i + 1].Center(), cam.Position());
-                    u32 queue_id;
-                    Material *used_mat = nullptr;
                     if (!materials.empty())
                     {
-                        used_mat = i < materials.size() && materials[i] != nullptr ? materials[i].get() : materials[0].get();
-                        if (used_mat)
+                        Material *used_mat = i < materials.size() ? materials[i].get() : nullptr;
+                        if (used_mat == nullptr)
+                            used_mat = materials[0].get();
+                        if (used_mat != nullptr)
                         {
-                            queue_id = used_mat->RenderQueue();
+                            const u32 queue_id = used_mat->RenderQueue();
                             if (!cur_cam_cull_results.contains(queue_id))
-                            {
                                 cur_cam_cull_results.insert(std::make_pair(queue_id, Vector<RenderableObjectData>()));
-                            }
+                            cur_cam_cull_results[queue_id].emplace_back(RenderableObjectData{
+                                    scene_render_obj_index,
+                                    dis,
+                                    (u16) i,
+                                    1,
+                                    comp._p_mesh.get(),
+                                    used_mat,
+                                    &registry.GetComponent<ECS::TransformComponent>(entity)->_render_world_matrix});
                         }
-                        cur_cam_cull_results[queue_id].emplace_back(RenderableObjectData{
-                                scene_render_obj_index,
-                                dis,
-                                (u16) i,
-                                1,
-                                comp._p_mesh.get(),
-                                used_mat,
-                                &registry.GetComponent<ECS::TransformComponent>(entity)->_render_world_matrix});
                     }
                 }
                 ++scene_render_obj_index;

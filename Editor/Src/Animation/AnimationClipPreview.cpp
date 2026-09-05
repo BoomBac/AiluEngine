@@ -128,9 +128,12 @@ namespace Ailu::Editor
 
     void AnimationClipPreview::SetClip(AnimationClip *clip)
     {
-        if (_clip == clip)
+        if (_clip == clip && _blend_space == nullptr)
             return;
         _clip = clip;
+        _blend_space = nullptr;
+        _blend_space_clips.clear();
+        _blend_space_duration = 0.0f;
         _binding.Clear();
         if (HasResolvedSkeleton())
             _pose = _preview_mesh->GetSkeletonAsset()->GetSkeleton().GetBindPose();
@@ -139,6 +142,41 @@ namespace Ailu::Editor
         _current_time = 0.0f;
         if (_clip != nullptr && HasResolvedSkeleton())
             _binding.Resolve(*_clip, _preview_mesh->GetSkeletonAsset()->GetSkeleton());
+    }
+
+    void AnimationClipPreview::SetBlendSpace(BlendSpaceAsset *blend_space, Vector2f input)
+    {
+        _clip = nullptr;
+        _blend_space = blend_space;
+        _blend_space_input = input;
+        _blend_space_clips.clear();
+        _blend_space_duration = 0.0f;
+        _binding.Clear();
+        if (HasResolvedSkeleton())
+        {
+            _pose = _preview_mesh->GetSkeletonAsset()->GetSkeleton().GetBindPose();
+            ResolveBlendSpaceBindings();
+        }
+        else
+        {
+            _pose = SkeletonPose();
+        }
+        _current_time = 0.0f;
+        EvaluatePose();
+        UpdateSkinning();
+        RenderPreview();
+    }
+
+    void AnimationClipPreview::SetBlendSpaceInput(Vector2f input, bool render)
+    {
+        if (_blend_space == nullptr || _blend_space_input == input)
+            return;
+        _blend_space_input = input;
+        if (!render)
+            return;
+        EvaluatePose();
+        UpdateSkinning();
+        RenderPreview();
     }
 
     void AnimationClipPreview::SetMesh(Render::SkeletonMesh *mesh)
@@ -340,6 +378,7 @@ namespace Ailu::Editor
         _preview_mesh.reset();
         _viewport.SetMesh(nullptr);
         _binding.Clear();
+        _blend_space_clips.clear();
         _pose = SkeletonPose();
         _palette.clear();
         if (_source_mesh == nullptr)
@@ -378,6 +417,31 @@ namespace Ailu::Editor
         {
             _binding.Resolve(*_clip, _preview_mesh->GetSkeletonAsset()->GetSkeleton());
         }
+        else if (_blend_space != nullptr)
+        {
+            ResolveBlendSpaceBindings();
+        }
+    }
+
+    void AnimationClipPreview::ResolveBlendSpaceBindings()
+    {
+        if (_blend_space == nullptr || !HasResolvedSkeleton())
+            return;
+        const Skeleton &skeleton = _preview_mesh->GetSkeletonAsset()->GetSkeleton();
+        _blend_space_duration = 0.0f;
+        for (const auto &sample : _blend_space->Samples())
+        {
+            if (sample._clip.IsEmpty())
+                continue;
+            Ref<AnimationClip> clip = ResourceMgr::Get().GetRef<AnimationClip>(sample._clip);
+            if (clip == nullptr)
+                clip = ResourceMgr::Get().Load<AnimationClip>(sample._clip);
+            if (clip == nullptr)
+                continue;
+            _blend_space_clips.push_back(clip);
+            _blend_space_duration = std::max(_blend_space_duration, clip->Duration());
+            _binding.Resolve(sample._clip, *clip, skeleton);
+        }
     }
 
     void AnimationClipPreview::EvaluatePose()
@@ -388,7 +452,31 @@ namespace Ailu::Editor
             return;
         }
         const Skeleton &skeleton = _preview_mesh->GetSkeletonAsset()->GetSkeleton();
-        if (_clip != nullptr)
+        if (_blend_space != nullptr)
+        {
+            if (_blend_space_clips.empty())
+                ResolveBlendSpaceBindings();
+            AnimationEvaluation evaluation;
+            _blend_space->AddSamples(_blend_space_input, 0.0f, 1.0f, true, evaluation);
+            f32 duration_sum = 0.0f;
+            f32 weight_sum = 0.0f;
+            for (u8 sample_index = 0u; sample_index < evaluation._sample_count; ++sample_index)
+            {
+                const auto &sample = evaluation._samples[sample_index];
+                const AnimationClip *clip = _binding.FindClip(sample._clip);
+                if (clip == nullptr || sample._weight <= 0.0f)
+                    continue;
+                duration_sum += clip->Duration() * sample._weight;
+                weight_sum += sample._weight;
+            }
+            if (weight_sum > 0.0f)
+                _blend_space_duration = duration_sum / weight_sum;
+            const f32 phase = _blend_space_duration > 0.0f ? _current_time / _blend_space_duration : 0.0f;
+            evaluation.Clear();
+            _blend_space->AddSamples(_blend_space_input, phase, 1.0f, true, evaluation, true);
+            _binding.Evaluate(evaluation, skeleton, _pose);
+        }
+        else if (_clip != nullptr)
         {
             if (_binding.FindClip(Guid::EmptyGuid()) != _clip)
                 _binding.Resolve(*_clip, skeleton);

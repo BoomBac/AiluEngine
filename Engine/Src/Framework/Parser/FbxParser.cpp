@@ -669,16 +669,66 @@ namespace Ailu
         const int stack_count = _p_cur_fbx_scene->GetSrcObjectCount<FbxAnimStack>();
         if (stack_count == 0)
             return true;
-        const int stack_index = std::clamp(_import_setting._animation_stack_index, 0, stack_count - 1);
-        FbxAnimStack *anim_stack = _p_cur_fbx_scene->GetSrcObject<FbxAnimStack>(stack_index);
+
+        Vector<FbxAnimStack *> animation_stacks;
+        animation_stacks.reserve(stack_count);
+        for (int stack_index = 0; stack_index < stack_count; ++stack_index)
+        {
+            FbxAnimStack *anim_stack = _p_cur_fbx_scene->GetSrcObject<FbxAnimStack>(stack_index);
+            if (anim_stack == nullptr)
+                continue;
+
+            FbxArray<FbxAnimCurve *> curves;
+            GetAllAnimCurves(anim_stack, curves);
+            bool has_animation_curve = false;
+            for (int curve_index = 0; curve_index < curves.GetCount(); ++curve_index)
+            {
+                if (curves[curve_index] != nullptr && curves[curve_index]->KeyGetCount() > 0)
+                {
+                    has_animation_curve = true;
+                    break;
+                }
+            }
+            if (!has_animation_curve)
+            {
+                LOG_INFO("FBX {} skip AnimationStack {} ({}) because it has no animation curves",
+                         ToChar(_cur_file_sys_path.data()), stack_index, String(anim_stack->GetName()));
+                continue;
+            }
+            animation_stacks.emplace_back(anim_stack);
+        }
+
+        if (animation_stacks.empty())
+            return true;
+
+        if (_import_setting._import_all_animation_stacks)
+        {
+            LOG_INFO("FBX {} importing all {} AnimationStacks with animation curves",
+                     ToChar(_cur_file_sys_path.data()), animation_stacks.size());
+            for (FbxAnimStack *anim_stack : animation_stacks)
+            {
+                if (!ParserAnimationStack(sk, anim_stack))
+                    return false;
+            }
+            return true;
+        }
+
+        const int stack_index = std::clamp(_import_setting._animation_stack_index, 0,
+                                           static_cast<i32>(animation_stacks.size()) - 1);
+        FbxAnimStack *anim_stack = animation_stacks[stack_index];
         if (anim_stack == nullptr)
             return false;
-        if (stack_count > 1)
-        {
-            const String fbx_path = ToChar(_cur_file_sys_path.data());
-            LOG_INFO("FBX {} has {} AnimationStacks; importing stack {} ({})", fbx_path, stack_count,
-                     stack_index, String(anim_stack->GetName()));
-        }
+        LOG_INFO("FBX {} importing AnimationStack {} ({}) from {} stacks with animation curves",
+                 ToChar(_cur_file_sys_path.data()), stack_index, String(anim_stack->GetName()),
+                 animation_stacks.size());
+        return ParserAnimationStack(sk, anim_stack);
+    }
+
+    bool FbxParser::ParserAnimationStack(Skeleton &sk, FbxAnimStack *anim_stack)
+    {
+        if (anim_stack == nullptr)
+            return false;
+
         _p_cur_fbx_scene->SetCurrentAnimationStack(anim_stack);
         const FbxTime::EMode time_mode = _p_cur_fbx_scene->GetGlobalSettings().GetTimeMode();
 
@@ -734,13 +784,7 @@ namespace Ailu
                     }
                 }
                 const Transform local_transform = FbxMatToTransform(current_local);
-                Transform animation_local = local_transform;
-                if (joint._parent == Joint::kInvalidJointIndex)
-                {
-                    // Root motion is not applied to the Animator entity. Keep the root joint anchored at
-                    // the bind position so CPU skinning cannot move the mesh away from its entity transform.
-                    animation_local._position = sk.GetBindPose().GetLocalTransform(joint._self)._position;
-                }
+                const Transform animation_local = local_transform;
                 memcpy(pos_track[frame_index]._value, animation_local._position.data, sizeof(Vector3f));
                 memcpy(rot_track[frame_index]._value, animation_local._rotation._quat.data, sizeof(Quaternion));
                 memcpy(scale_track[frame_index]._value, animation_local._scale.data, sizeof(Vector3f));

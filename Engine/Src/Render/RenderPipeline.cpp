@@ -341,6 +341,9 @@ namespace Ailu::Render
                     node._render_obj_handle = vis_obj._render_obj_handle;
                     node._submesh = vis_obj._submesh;
                     node._mesh = render_obj->_mesh;
+                    if (vis_obj._submesh >= render_obj->_materials.size() ||
+                        render_obj->_materials[vis_obj._submesh] == nullptr)
+                        continue;
                     node._mat = render_obj->_materials[vis_obj._submesh];
                     node._object_data._MatrixWorld = render_obj->_world_matrix;
                     node._object_data._MatrixInvWorld = MatrixInverse(render_obj->_world_matrix);

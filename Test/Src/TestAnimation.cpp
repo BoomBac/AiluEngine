@@ -1,6 +1,7 @@
 #include "Animation/AnimationController.h"
 #include "Animation/AnimationEvent.h"
 #include "Animation/AnimationKeyReducer.h"
+#include "Animation/BlendSpace.h"
 #include "Animation/Clip.h"
 #include "Animation/SpriteAnimationTrack.h"
 #include "Animation/TransformTrack.h"
@@ -32,6 +33,31 @@ namespace Ailu::AnimationTests
         {
             return std::abs(lhs - rhs) < 0.0001f;
         }
+    }
+
+    bool TestBlendSpace2DSampling()
+    {
+        BlendSpaceAsset blend_space;
+        blend_space.Is2D(true);
+        blend_space.Samples() = {
+            {MakeClipId("00000000-0000-0000-0000-000000000031"), {0.0f, 0.0f}},
+            {MakeClipId("00000000-0000-0000-0000-000000000032"), {1.0f, 0.0f}},
+            {MakeClipId("00000000-0000-0000-0000-000000000033"), {0.0f, 1.0f}},
+            {MakeClipId("00000000-0000-0000-0000-000000000034"), {1.0f, 1.0f}},
+        };
+
+        AnimationEvaluation evaluation;
+        blend_space.AddSamples({0.5f, 0.5f}, 0.25f, 1.0f, true, evaluation);
+        if (evaluation._sample_count != 4u)
+            return false;
+        for (u8 index = 0u; index < evaluation._sample_count; ++index)
+            if (!NearlyEqual(evaluation._samples[index]._weight, 0.25f))
+                return false;
+
+        evaluation.Clear();
+        blend_space.AddSamples({1.0f, 1.0f}, 0.25f, 1.0f, true, evaluation);
+        return evaluation._sample_count == 1u &&
+               evaluation._samples[0]._clip == MakeClipId("00000000-0000-0000-0000-000000000034");
     }
 
     bool TestControllerEntryAndClipEvaluation()

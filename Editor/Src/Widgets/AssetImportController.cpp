@@ -135,7 +135,7 @@ namespace Ailu
                 auto setting = std::make_shared<MeshImportSetting>(MeshImportSetting::Default());
                 setting->_import_flag |= MeshImportSetting::kImportFlagMesh;
                 EditorPopup::ShowDialogAt(_popup_pos, "AssetBrowserMeshImportPrompt",
-                                          std::format("Import Mesh: {}", file_name), {320.0f, 270.0f},
+                                          std::format("Import Mesh: {}", file_name), {320.0f, 300.0f},
                                           [setting, file_name](UI::VerticalBox *content, UI::Text *)
                                           {
                                               auto *file_text = content->AddChild<Text>(std::format("File: {}", file_name));
@@ -188,6 +188,13 @@ namespace Ailu
                                                       setting->_import_flag |= MeshImportSetting::kImportFlagAnimation;
                                                   else
                                                       setting->_import_flag &= ~MeshImportSetting::kImportFlagAnimation;
+                                              };
+
+                                              auto *all_animation_stacks = EditorPopup::AddCheckBoxRow(
+                                                  content, "Import All Animation Stacks", setting->_import_all_animation_stacks);
+                                              all_animation_stacks->_on_click += [setting](bool checked)
+                                              {
+                                                  setting->_import_all_animation_stacks = checked;
                                               };
 
                                               auto *skeleton_row = content->AddChild<HorizontalBox>();

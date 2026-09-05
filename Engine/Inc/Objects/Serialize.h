@@ -153,7 +153,7 @@ namespace Ailu
         virtual void Serialize(void *data, u64 size) = 0;
         virtual void Deserialize(void *data, u64 size) = 0;
 
-        virtual void Save(const Path & sys_path) = 0;
+        virtual bool Save(const Path & sys_path) = 0;
         virtual void Load(const Path &sys_path) = 0;
     };
 

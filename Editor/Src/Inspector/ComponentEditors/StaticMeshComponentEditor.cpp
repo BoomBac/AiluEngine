@@ -208,6 +208,43 @@ namespace Ailu
                     subscribe(nullptr, nullptr, nullptr, dropdown);
                 }
             }
+
+            void BuildMaterialSettings(UIElement *root, const Ref<Render::Material> &material,
+                                       Vector<MaterialPropertyBinding> &bindings)
+            {
+                if (root == nullptr || material == nullptr)
+                    return;
+
+                auto surface_dropdown = Editor::AddDropdownRow(root, "Surface Type",
+                    Vector<String>{"Opaque", "Transparent", "Alpha Test"});
+                surface_dropdown->SetSelectedIndex(static_cast<i32>(material->SurfaceType()));
+                surface_dropdown->_on_selected_changed += [material](i32 idx)
+                {
+                    material->SurfaceType(static_cast<Render::ESurfaceType>(idx));
+                    ResourceMgr::Get().MarkAssetDirty(material.get());
+                };
+                auto &surface_binding = bindings.emplace_back();
+                surface_binding._material = material.get();
+                surface_binding._property_id = Render::Material::SurfacePropertyId();
+                surface_binding._dropdown = surface_dropdown;
+                surface_binding._subscription = material->_on_property_changed.Subscribe(
+                    surface_binding._property_id, [material, surface_dropdown]
+                {
+                    const i32 surface_index = static_cast<i32>(material->SurfaceType());
+                    if (surface_dropdown->GetSelectedIndex() != surface_index)
+                        surface_dropdown->SetSelectedIndex(surface_index, false);
+                });
+
+                auto cull_dropdown = Editor::AddDropdownRow(root, "CullMode", Vector<String>{"Off", "Front", "Back"});
+                cull_dropdown->SetSelectedIndex(static_cast<i32>(material->GetCullMode()));
+                cull_dropdown->_on_selected_changed += [material](i32 idx)
+                {
+                    material->SetCullMode(static_cast<Render::ECullMode>(idx));
+                    ResourceMgr::Get().MarkAssetDirty(material.get());
+                };
+                for (auto &prop : material->GetShaderProperty())
+                    CreateMaterialPropWidget(root, *prop, material.get(), bindings);
+            }
         }// namespace
 
         template<typename TComponent, typename TMesh>
@@ -216,69 +253,95 @@ namespace Ailu
             auto *comp = context.GetComponent<TComponent>();
             if (comp == nullptr || context._content == nullptr)
                 return;
+            const auto request_rebuild = context._request_rebuild;
 
             {
                 auto *dropdown = Editor::AddObjectAssetDropdownRow(context._content, "Mesh", TMesh::StaticType(),
                                                                     comp->_mesh_guid.IsEmpty() ?
                                                                         ResourceMgr::Get().GetAssetGuid(comp->_p_mesh.get()) : comp->_mesh_guid);
-                dropdown->_on_object_asset_selected += [comp](Asset *, Object *selected, const Guid &)
+                dropdown->_on_object_asset_selected += [comp, request_rebuild](Asset *, Object *selected, const Guid &)
                 {
                     comp->_p_mesh = selected == nullptr ? nullptr :
                         std::dynamic_pointer_cast<TMesh>(selected->SharedFromThis());
                     comp->_mesh_guid = selected == nullptr ? Guid::EmptyGuid() : ResourceMgr::Get().GetAssetGuid(selected);
                     SceneMgr::Get().MarkCurSceneDirty();
+                    if (request_rebuild)
+                        request_rebuild();
                 };
             }
 
-            const u32 subindex = Selection::GetSelectedSubIndex(context._entity);
-            if (subindex >= comp->_p_mats.size())
-                return;
+            auto *materials_view = context._content->AddChild<CollapsibleView>("Materials");
+            materials_view->GetSlotAs<LinearSlot>().SizePolicy(ESizePolicy::kFill, ESizePolicy::kAuto);
+            auto *materials_content = static_cast<VerticalBox *>(materials_view->GetContent()->AddChild<VerticalBox>());
+            materials_content->SlotPadding() = Padding(2.0f, 2.0f, 2.0f, 2.0f);
 
-            auto *material_dropdown = Editor::AddObjectAssetDropdownRow(context._content,
-                std::format("Material[{}]", subindex), Render::Material::StaticType(),
-                subindex < comp->_material_guids.size() && !comp->_material_guids[subindex].IsEmpty()
-                    ? comp->_material_guids[subindex] : ResourceMgr::Get().GetAssetGuid(comp->_p_mats[subindex].get()));
-            material_dropdown->_on_object_asset_selected += [comp, subindex](Asset *, Object *selected, const Guid &)
+            const u32 mesh_slot_count = comp->_p_mesh != nullptr ? comp->_p_mesh->SubmeshCount() : 0u;
+            const u32 material_slot_count = std::max(mesh_slot_count,
+                static_cast<u32>(std::max(comp->_p_mats.size(), comp->_material_guids.size())));
+            const auto add_material_slot = [comp, request_rebuild](u32 slot_index)
             {
-                comp->_p_mats[subindex] = selected == nullptr ? nullptr :
-                    std::dynamic_pointer_cast<Render::Material>(selected->SharedFromThis());
-                if (comp->_material_guids.size() <= subindex)
-                    comp->_material_guids.resize(subindex + 1u, Guid::EmptyGuid());
-                comp->_material_guids[subindex] = selected == nullptr ? Guid::EmptyGuid() :
-                    ResourceMgr::Get().GetAssetGuid(selected);
+                const Ref<Render::Material> default_material = Render::Material::s_standard_defered_lit.lock();
+                if (comp->_p_mats.size() <= slot_index)
+                    comp->_p_mats.resize(slot_index + 1u, default_material);
+                else if (comp->_p_mats[slot_index] == nullptr)
+                    comp->_p_mats[slot_index] = default_material;
+                if (comp->_material_guids.size() <= slot_index)
+                    comp->_material_guids.resize(slot_index + 1u, Guid::EmptyGuid());
+                if (comp->_material_guids[slot_index].IsEmpty() && default_material != nullptr)
+                    comp->_material_guids[slot_index] = ResourceMgr::Get().GetAssetGuid(default_material.get());
                 SceneMgr::Get().MarkCurSceneDirty();
+                if (request_rebuild)
+                    request_rebuild();
             };
-            if (auto mat = comp->_p_mats[subindex]; mat != nullptr)
-            {
-                auto surface_dropdown = Editor::AddDropdownRow(context._content, "Surface Type",
-                    Vector<String>{"Opaque", "Transparent", "Alpha Test"});
-                surface_dropdown->SetSelectedIndex(static_cast<i32>(mat->SurfaceType()));
-                surface_dropdown->_on_selected_changed += [mat](i32 idx)
-                {
-                    mat->SurfaceType(static_cast<Render::ESurfaceType>(idx));
-                    ResourceMgr::Get().MarkAssetDirty(mat.get());
-                };
-                auto &surface_binding = bindings.emplace_back();
-                surface_binding._material = mat.get();
-                surface_binding._property_id = Render::Material::SurfacePropertyId();
-                surface_binding._dropdown = surface_dropdown;
-                surface_binding._subscription = mat->_on_property_changed.Subscribe(
-                    surface_binding._property_id, [mat, surface_dropdown]
-                {
-                    const i32 surface_index = static_cast<i32>(mat->SurfaceType());
-                    if (surface_dropdown->GetSelectedIndex() != surface_index)
-                        surface_dropdown->SetSelectedIndex(surface_index, false);
-                });
 
-                auto dropdown = Editor::AddDropdownRow(context._content, "CullMode", Vector<String>{"Off", "Front", "Back"});
-                dropdown->SetSelectedIndex(static_cast<i32>(mat->GetCullMode()));
-                dropdown->_on_selected_changed += [mat](i32 idx)
+            if (material_slot_count == 0u)
+            {
+                auto *add_button = Editor::AddButtonRow(materials_content, "Material", "Add");
+                add_button->OnMouseClick() += [add_material_slot](UIEvent &e)
                 {
-                    mat->SetCullMode(static_cast<Render::ECullMode>(idx));
-                    ResourceMgr::Get().MarkAssetDirty(mat.get());
+                    add_material_slot(0u);
+                    e._is_handled = true;
                 };
-                for (auto &prop : mat->GetShaderProperty())
-                    CreateMaterialPropWidget(context._content, *prop, mat.get(), bindings);
+            }
+            else
+            {
+                for (u32 slot_index = 0u; slot_index < material_slot_count; ++slot_index)
+                {
+                    if (slot_index >= comp->_p_mats.size())
+                    {
+                        auto *add_button = Editor::AddButtonRow(materials_content,
+                            std::format("Material[{}]", slot_index), "Add");
+                        add_button->OnMouseClick() += [add_material_slot, slot_index](UIEvent &e)
+                        {
+                            add_material_slot(slot_index);
+                            e._is_handled = true;
+                        };
+                        continue;
+                    }
+
+                    auto material = comp->_p_mats[slot_index];
+                    const Guid selected_guid = slot_index < comp->_material_guids.size() &&
+                            !comp->_material_guids[slot_index].IsEmpty()
+                        ? comp->_material_guids[slot_index] : ResourceMgr::Get().GetAssetGuid(material.get());
+                    auto *material_dropdown = Editor::AddObjectAssetDropdownRow(materials_content,
+                        std::format("Material[{}]", slot_index), Render::Material::StaticType(), selected_guid);
+                    material_dropdown->_on_object_asset_selected += [comp, slot_index, request_rebuild]
+                        (Asset *, Object *selected, const Guid &)
+                    {
+                        if (comp->_p_mats.size() <= slot_index)
+                            comp->_p_mats.resize(slot_index + 1u);
+                        comp->_p_mats[slot_index] = selected == nullptr ? nullptr :
+                            std::dynamic_pointer_cast<Render::Material>(selected->SharedFromThis());
+                        if (comp->_material_guids.size() <= slot_index)
+                            comp->_material_guids.resize(slot_index + 1u, Guid::EmptyGuid());
+                        comp->_material_guids[slot_index] = selected == nullptr ? Guid::EmptyGuid() :
+                            ResourceMgr::Get().GetAssetGuid(selected);
+                        SceneMgr::Get().MarkCurSceneDirty();
+                        if (request_rebuild)
+                            request_rebuild();
+                    };
+                    BuildMaterialSettings(materials_content, material, bindings);
+                }
             }
         }
 

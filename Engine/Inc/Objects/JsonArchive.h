@@ -311,7 +311,7 @@ namespace Ailu
         void ReadFloat(f64 &v) final;
         void ReadString(String &v) final;
 
-        void Save(const Path &sys_path) final;
+        bool Save(const Path &sys_path) final;
         void Load(const Path &sys_path) final;
         String SaveToString();
         bool LoadFromString(const String &json_text);

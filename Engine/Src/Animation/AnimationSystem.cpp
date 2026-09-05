@@ -301,11 +301,38 @@ namespace Ailu::ECS
 
             instance->_speed = std::max(animator->_speed, 0.0f);
             ResolveMotionAssets(entity, controller_asset, controller);
+            const auto resolve_blend_space_position = [&](const AnimationMotion &motion) -> Vector2f
+            {
+                Vector2f position = Vector2f::kZero;
+                u16 parameter_index = motion._parameter_index;
+                u16 parameter_y_index = motion._parameter_y_index;
+                for (u16 axis = 0u; axis < 2u; ++axis)
+                {
+                    u16 &axis_index = axis == 0u ? parameter_index : parameter_y_index;
+                    if (axis_index != kInvalidAnimationParameter)
+                        continue;
+                    for (u16 index = 0u; index < controller_asset.Parameters().size(); ++index)
+                    {
+                        if (controller_asset.Parameters()[index]._type == EAnimationParameterType::kFloat &&
+                            (axis == 0u || index != parameter_index))
+                        {
+                            axis_index = index;
+                            break;
+                        }
+                    }
+                }
+                if (parameter_index < instance->_float_parameters.size())
+                    position.x = instance->_float_parameters[parameter_index];
+                if (parameter_y_index < instance->_float_parameters.size())
+                    position.y = instance->_float_parameters[parameter_y_index];
+                return position;
+            };
             const auto resolve_motion_duration = [&](u16 state_index) -> f32
             {
                 if (state_index >= controller_asset.States().size())
                     return 0.0f;
-                const auto &motion = controller_asset.States()[state_index]._motion;
+                const auto &state = controller_asset.States()[state_index];
+                const auto &motion = state._motion;
                 if (motion._type == EAnimationMotionType::kClip)
                 {
                     const AnimationClip *clip = ResolveClip(motion._asset);
@@ -314,13 +341,27 @@ namespace Ailu::ECS
                 const auto blend_iter = _blend_space_assets[entity].find(motion._asset);
                 if (blend_iter == _blend_space_assets[entity].end() || blend_iter->second == nullptr)
                     return 0.0f;
+                const Vector2f position = resolve_blend_space_position(motion);
+                AnimationEvaluation evaluation;
+                blend_iter->second->AddSamples(position, 0.0f, 1.0f, state._loop, evaluation);
+                f32 duration_sum = 0.0f;
+                f32 weight_sum = 0.0f;
                 for (const auto &sample : blend_iter->second->Samples())
                 {
                     const AnimationClip *clip = ResolveClip(sample._clip);
-                    if (clip != nullptr)
-                        return clip->Duration();
+                    if (clip == nullptr)
+                        continue;
+                    for (u8 sample_index = 0u; sample_index < evaluation._sample_count; ++sample_index)
+                    {
+                        const auto &evaluated_sample = evaluation._samples[sample_index];
+                        if (evaluated_sample._clip != sample._clip || evaluated_sample._weight <= 0.0f)
+                            continue;
+                        duration_sum += clip->Duration() * evaluated_sample._weight;
+                        weight_sum += evaluated_sample._weight;
+                        break;
+                    }
                 }
-                return 0.0f;
+                return weight_sum > 0.0f ? duration_sum / weight_sum : 0.0f;
             };
 
             instance->_previous_state = instance->_current_state;
@@ -360,25 +401,14 @@ namespace Ailu::ECS
                 const auto blend_iter = _blend_space_assets[entity].find(state._motion._asset);
                 if (blend_iter == _blend_space_assets[entity].end() || blend_iter->second == nullptr)
                     return;
-                f32 position = 0.0f;
-                u16 parameter_index = state._motion._parameter_index;
-                if (parameter_index == kInvalidAnimationParameter)
-                {
-                    for (u16 index = 0u; index < controller_asset.Parameters().size(); ++index)
-                    {
-                        if (controller_asset.Parameters()[index]._type == EAnimationParameterType::kFloat)
-                        {
-                            parameter_index = index;
-                            break;
-                        }
-                    }
-                }
-                if (parameter_index < instance->_float_parameters.size())
-                    position = instance->_float_parameters[parameter_index];
+                const Vector2f position = resolve_blend_space_position(state._motion);
+                const f32 motion_duration = resolve_motion_duration(state_index);
+                const f32 previous_phase = motion_duration > 0.0f ? previous_time * speed / motion_duration : 0.0f;
+                const f32 current_phase = motion_duration > 0.0f ? current_time * speed / motion_duration : 0.0f;
                 AnimationEvaluation previous_evaluation;
                 AnimationEvaluation current_evaluation;
-                blend_iter->second->AddSamples(position, previous_time * speed, 1.0f, state._loop, previous_evaluation);
-                blend_iter->second->AddSamples(position, current_time * speed, 1.0f, state._loop, current_evaluation);
+                blend_iter->second->AddSamples(position, previous_phase, 1.0f, state._loop, previous_evaluation, true);
+                blend_iter->second->AddSamples(position, current_phase, 1.0f, state._loop, current_evaluation, true);
                 f32 dominant_weight = 0.0f;
                 for (u8 sample_index = 0u; sample_index < current_evaluation._sample_count; ++sample_index)
                     dominant_weight = std::max(dominant_weight, current_evaluation._samples[sample_index]._weight);
@@ -398,8 +428,13 @@ namespace Ailu::ECS
                     if (clip == nullptr)
                         continue;
                     _event_scratch.clear();
-                    CollectAnimationEvents(*clip, previous_sample != nullptr ? previous_sample->_time : 0.0f,
-                                           current_sample._time, _event_scratch, state._loop);
+                    const f32 previous_sample_time = previous_sample != nullptr ?
+                        (previous_sample->_normalized_time ? previous_sample->_time * clip->Duration() :
+                                                             previous_sample->_time) : 0.0f;
+                    const f32 current_sample_time = current_sample._normalized_time ?
+                        current_sample._time * clip->Duration() : current_sample._time;
+                    CollectAnimationEvents(*clip, previous_sample_time, current_sample_time, _event_scratch,
+                                           state._loop);
                     const bool dominant = current_sample._weight >= dominant_weight;
                     for (const auto &event : _event_scratch)
                         if (event._kind == EAnimationEventKind::kGameplay || (allow_cosmetic && dominant))

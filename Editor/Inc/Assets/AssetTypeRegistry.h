@@ -43,7 +43,7 @@ namespace Ailu
             // 简单文本输入创建；为空时表示该类型使用 _create_dialog。
             std::function<bool(const fs::path &, const String &)> _create;
             // 自定义创建（如 Material 需要选择 Shader）；优先于 _create 使用。
-            std::function<void(const fs::path &, Vector2f)> _create_dialog;
+            std::function<void(const fs::path &, Vector2f, std::function<void()>)> _create_dialog;
         };
 
         class AssetTypeRegistry
