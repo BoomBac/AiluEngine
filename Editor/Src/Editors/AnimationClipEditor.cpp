@@ -173,6 +173,65 @@ namespace Ailu
                 if (_animation_preview != nullptr)
                     _animation_preview->SetShowSkeleton(value);
             };
+            AddSectionTitle(info, "Root Motion");
+            auto *root_motion_row = AddPropertyRow(info, "Enabled");
+            _check_root_motion = root_motion_row->AddChild<UI::CheckBox>();
+            _check_root_motion->GetSlotAs<UI::LinearSlot>()
+                    .SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFill).Size(Vector2f(28.0f, 0.0f));
+            _check_root_motion->_on_click += [this](bool value)
+            {
+                if (_clip != nullptr)
+                    _clip->GetRootMotionSettings()._enabled = value;
+                MarkDirty();
+                RefreshPreview();
+            };
+            auto *root_bone_row = AddPropertyRow(info, "Root Bone");
+            _root_bone_dropdown = root_bone_row->AddChild<UI::Dropdown>(Vector<String>{"None"});
+            _root_bone_dropdown->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
+            _root_bone_dropdown->_on_selected_changed += [this](i32 index)
+            {
+                if (_clip == nullptr || _skeleton_asset == nullptr)
+                    return;
+                RootMotionSettings &settings = _clip->GetRootMotionSettings();
+                if (index <= 0 || index - 1 >= _skeleton_asset->GetSkeleton().JointNum())
+                {
+                    settings._root_bone_name.clear();
+                    settings._root_bone_index = -1;
+                }
+                else
+                {
+                    const Joint &joint = _skeleton_asset->GetSkeleton()[static_cast<u32>(index - 1)];
+                    settings._root_bone_name = joint._name;
+                    settings._root_bone_index = joint._self;
+                }
+                MarkDirty();
+                RefreshPreview();
+            };
+            auto *translation_row = AddPropertyRow(info, "Translation");
+            _translation_mode_dropdown = translation_row->AddChild<UI::Dropdown>(
+                Vector<String>{"None", "XZ", "XYZ"});
+            _translation_mode_dropdown->GetSlotAs<UI::LinearSlot>()
+                    .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
+            _translation_mode_dropdown->_on_selected_changed += [this](i32 index)
+            {
+                if (_clip != nullptr && index >= 0 && index <= 2)
+                    _clip->GetRootMotionSettings()._translation_mode =
+                        static_cast<ERootMotionTranslationMode>(index);
+                MarkDirty();
+                RefreshPreview();
+            };
+            auto *rotation_row = AddPropertyRow(info, "Rotation");
+            _rotation_mode_dropdown = rotation_row->AddChild<UI::Dropdown>(
+                Vector<String>{"None", "Yaw", "Full"});
+            _rotation_mode_dropdown->GetSlotAs<UI::LinearSlot>()
+                    .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
+            _rotation_mode_dropdown->_on_selected_changed += [this](i32 index)
+            {
+                if (_clip != nullptr && index >= 0 && index <= 2)
+                    _clip->GetRootMotionSettings()._rotation_mode = static_cast<ERootMotionRotationMode>(index);
+                MarkDirty();
+                RefreshPreview();
+            };
             AddSectionTitle(info, "Usage");
             auto *usage = info->AddChild<UI::Text>("Edit sprite frames and events in the timeline.\nSave writes JSON.");
             StyleText(usage, kMutedTextColor);
@@ -357,6 +416,14 @@ namespace Ailu
                 _check_looping->SetChecked(_clip != nullptr && _clip->IsLooping());
             if (_check_skeleton)
                 _check_skeleton->SetChecked(_show_skeleton);
+            if (_check_root_motion)
+                _check_root_motion->SetChecked(_clip != nullptr && _clip->GetRootMotionSettings()._enabled);
+            if (_translation_mode_dropdown)
+                _translation_mode_dropdown->SetSelectedIndex(
+                    _clip != nullptr ? static_cast<i32>(_clip->GetRootMotionSettings()._translation_mode) : 1, false);
+            if (_rotation_mode_dropdown)
+                _rotation_mode_dropdown->SetSelectedIndex(
+                    _clip != nullptr ? static_cast<i32>(_clip->GetRootMotionSettings()._rotation_mode) : 1, false);
             if (_clip != nullptr && _preview_mesh_guid != _clip->PreviewMeshGuid() && !_preview_mesh_guid.IsEmpty())
                 _clip->PreviewMeshGuid(_preview_mesh_guid);
             if (_preview_mesh_dropdown)
@@ -375,6 +442,7 @@ namespace Ailu
                         _preview_mesh = ResourceMgr::Get().Load<Render::SkeletonMesh>(_preview_mesh_guid);
                 }
                 _animation_preview->SetMesh(_preview_mesh.get());
+                _animation_preview->RefreshRootMotionTrajectory();
             }
             RefreshSkeletonAsset();
             RefreshTimeline();
@@ -401,6 +469,37 @@ namespace Ailu
 
             if (_skeleton_dropdown != nullptr)
                 _skeleton_dropdown->SetSelectedGuid(_clip != nullptr ? _clip->SkeletonGuid() : Guid::EmptyGuid(), false);
+            if (_root_bone_dropdown != nullptr)
+            {
+                Vector<String> names{"None"};
+                i32 selected = 0;
+                if (_skeleton_asset != nullptr && _clip != nullptr)
+                {
+                    const Skeleton &skeleton = _skeleton_asset->GetSkeleton();
+                    RootMotionSettings &settings = _clip->GetRootMotionSettings();
+                    if (settings._root_bone_name.empty())
+                    {
+                        for (const char *name : {"Root", "root", "Armature/root"})
+                        {
+                            const i32 index = Skeleton::GetJointIndexByName(skeleton, name);
+                            if (index >= 0)
+                            {
+                                settings._root_bone_name = skeleton[static_cast<u32>(index)]._name;
+                                settings._root_bone_index = index;
+                                break;
+                            }
+                        }
+                    }
+                    for (const Joint &joint : skeleton)
+                    {
+                        names.push_back(joint._name);
+                        if (!settings._root_bone_name.empty() && joint._name == settings._root_bone_name)
+                            selected = static_cast<i32>(joint._self) + 1;
+                    }
+                }
+                _root_bone_dropdown->SetItems(names);
+                _root_bone_dropdown->SetSelectedIndex(selected, false);
+            }
         }
 
         void AnimationClipEditor::ShowSkeletonMappingError(const String &message)
@@ -722,6 +821,7 @@ namespace Ailu
                 }
                 _animation_preview->SetClip(_clip);
                 _animation_preview->SetMesh(_preview_mesh.get());
+                _animation_preview->RefreshRootMotionTrajectory();
                 _animation_preview->SetShowSkeleton(_show_skeleton);
                 _animation_preview->SetSelectedJoint(_selected_joint);
                 _animation_preview->SetTime(_preview_time);

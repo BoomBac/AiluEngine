@@ -42,3 +42,171 @@ return Ailu::AnimationClip::StaticType();
 return Ailu::AnimationClip::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_AnimationClip(&Ailu::AnimationClip::StaticType, "Ailu::AnimationClip");
+const Ailu::Type* Ailu::Z_Construct_RootMotionSettings_Type()
+{
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "RootMotionSettings";
+initializer._size = sizeof(Ailu::RootMotionSettings);
+initializer._full_name = "Ailu::RootMotionSettings";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu";
+initializer._base_name = "";
+initializer._constructor = []()->Ailu::RootMotionSettings* {return new Ailu::RootMotionSettings;};
+Meta meta_enabled;
+meta_enabled.Set("Category","");
+meta_enabled.Set("IsColor",false);
+meta_enabled.Set("IsRange",false);
+meta_enabled.Set("IsFloatRange",true);
+meta_enabled.Set("RangeMin",(f32)0);
+meta_enabled.Set("RangeMax",(f32)1);
+MemberBuilder builder_enabled;
+builder_enabled._name = "_enabled";
+builder_enabled._type_name = "bool";
+builder_enabled._offset = offsetof(RootMotionSettings,_enabled);
+builder_enabled._is_const = false;
+builder_enabled._is_static = false;
+builder_enabled._is_public = false;
+builder_enabled._is_pointer = false;
+builder_enabled._is_ref = false;
+builder_enabled._is_template = false;
+builder_enabled._meta = meta_enabled;
+builder_enabled._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_enabled._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_enabled));
+Meta meta_root_bone_name;
+meta_root_bone_name.Set("Category","");
+meta_root_bone_name.Set("IsColor",false);
+meta_root_bone_name.Set("IsRange",false);
+meta_root_bone_name.Set("IsFloatRange",true);
+meta_root_bone_name.Set("RangeMin",(f32)0);
+meta_root_bone_name.Set("RangeMax",(f32)1);
+MemberBuilder builder_root_bone_name;
+builder_root_bone_name._name = "_root_bone_name";
+builder_root_bone_name._type_name = "String";
+builder_root_bone_name._offset = offsetof(RootMotionSettings,_root_bone_name);
+builder_root_bone_name._is_const = false;
+builder_root_bone_name._is_static = false;
+builder_root_bone_name._is_public = false;
+builder_root_bone_name._is_pointer = false;
+builder_root_bone_name._is_ref = false;
+builder_root_bone_name._is_template = false;
+builder_root_bone_name._meta = meta_root_bone_name;
+builder_root_bone_name._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<String>);
+builder_root_bone_name._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<String>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_root_bone_name));
+Meta meta_translation_mode;
+meta_translation_mode.Set("Category","");
+meta_translation_mode.Set("IsColor",false);
+meta_translation_mode.Set("IsRange",false);
+meta_translation_mode.Set("IsFloatRange",true);
+meta_translation_mode.Set("RangeMin",(f32)0);
+meta_translation_mode.Set("RangeMax",(f32)1);
+MemberBuilder builder_translation_mode;
+builder_translation_mode._name = "_translation_mode";
+builder_translation_mode._type_name = "Ailu::ERootMotionTranslationMode";
+builder_translation_mode._offset = offsetof(RootMotionSettings,_translation_mode);
+builder_translation_mode._is_const = false;
+builder_translation_mode._is_static = false;
+builder_translation_mode._is_public = false;
+builder_translation_mode._is_pointer = false;
+builder_translation_mode._is_ref = false;
+builder_translation_mode._is_template = false;
+builder_translation_mode._meta = meta_translation_mode;
+builder_translation_mode._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<ERootMotionTranslationMode>);
+builder_translation_mode._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<ERootMotionTranslationMode>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_translation_mode));
+Meta meta_rotation_mode;
+meta_rotation_mode.Set("Category","");
+meta_rotation_mode.Set("IsColor",false);
+meta_rotation_mode.Set("IsRange",false);
+meta_rotation_mode.Set("IsFloatRange",true);
+meta_rotation_mode.Set("RangeMin",(f32)0);
+meta_rotation_mode.Set("RangeMax",(f32)1);
+MemberBuilder builder_rotation_mode;
+builder_rotation_mode._name = "_rotation_mode";
+builder_rotation_mode._type_name = "Ailu::ERootMotionRotationMode";
+builder_rotation_mode._offset = offsetof(RootMotionSettings,_rotation_mode);
+builder_rotation_mode._is_const = false;
+builder_rotation_mode._is_static = false;
+builder_rotation_mode._is_public = false;
+builder_rotation_mode._is_pointer = false;
+builder_rotation_mode._is_ref = false;
+builder_rotation_mode._is_template = false;
+builder_rotation_mode._meta = meta_rotation_mode;
+builder_rotation_mode._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<ERootMotionRotationMode>);
+builder_rotation_mode._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<ERootMotionRotationMode>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_rotation_mode));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+const Ailu::Type* Ailu::RootMotionSettings::GetPrivateStaticClass()
+{
+	static const Ailu::Type* type = Z_Construct_RootMotionSettings_Type();
+	return type;
+}
+
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::RootMotionSettings>()
+{
+return Ailu::RootMotionSettings::StaticType();
+}
+    const Type *Ailu::RootMotionSettings::GetType()
+{
+return Ailu::RootMotionSettings::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_RootMotionSettings(&Ailu::RootMotionSettings::StaticType, "Ailu::RootMotionSettings");
+static std::unique_ptr<Ailu::Enum> s_enum_type_ERootMotionTranslationMode = nullptr;
+//Enum ERootMotionTranslationMode begin...........................
+const Ailu::Enum* Z_Construct_Enum_Ailu_ERootMotionTranslationMode_Type()
+{
+if(s_enum_type_ERootMotionTranslationMode == nullptr)
+{
+EnumInitializer initializer;
+initializer._name = "ERootMotionTranslationMode";
+initializer._namespace = "Ailu";
+initializer._full_name = "Ailu::ERootMotionTranslationMode";
+initializer._str_to_enum_lut["kNone"] = 0;
+initializer._str_to_enum_lut["kXZ"] = 1;
+initializer._str_to_enum_lut["kXYZ"] = 2;
+s_enum_type_ERootMotionTranslationMode = std::make_unique<Ailu::Enum>(initializer);
+Ailu::Enum::RegisterEnum(s_enum_type_ERootMotionTranslationMode.get());
+}
+return s_enum_type_ERootMotionTranslationMode.get();
+}
+static Ailu::EnumTypeRegister g_register_ERootMotionTranslationMode(Z_Construct_Enum_Ailu_ERootMotionTranslationMode_Type);
+template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::ERootMotionTranslationMode>()
+{
+return s_enum_type_ERootMotionTranslationMode.get();
+}
+//Enum ERootMotionTranslationMode end...........................
+
+static std::unique_ptr<Ailu::Enum> s_enum_type_ERootMotionRotationMode = nullptr;
+//Enum ERootMotionRotationMode begin...........................
+const Ailu::Enum* Z_Construct_Enum_Ailu_ERootMotionRotationMode_Type()
+{
+if(s_enum_type_ERootMotionRotationMode == nullptr)
+{
+EnumInitializer initializer;
+initializer._name = "ERootMotionRotationMode";
+initializer._namespace = "Ailu";
+initializer._full_name = "Ailu::ERootMotionRotationMode";
+initializer._str_to_enum_lut["kNone"] = 0;
+initializer._str_to_enum_lut["kYaw"] = 1;
+initializer._str_to_enum_lut["kFull"] = 2;
+s_enum_type_ERootMotionRotationMode = std::make_unique<Ailu::Enum>(initializer);
+Ailu::Enum::RegisterEnum(s_enum_type_ERootMotionRotationMode.get());
+}
+return s_enum_type_ERootMotionRotationMode.get();
+}
+static Ailu::EnumTypeRegister g_register_ERootMotionRotationMode(Z_Construct_Enum_Ailu_ERootMotionRotationMode_Type);
+template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::ERootMotionRotationMode>()
+{
+return s_enum_type_ERootMotionRotationMode.get();
+}
+//Enum ERootMotionRotationMode end...........................

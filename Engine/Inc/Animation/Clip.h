@@ -6,10 +6,44 @@
 #include "TransformTrack.h"
 #include "SpriteAnimationTrack.h"
 #include "AnimationEvent.h"
+#include "RootMotion.h"
 #include "generated/Clip.gen.h"
 namespace Ailu
 {
     class Skeleton;
+
+    AENUM()
+    enum class ERootMotionTranslationMode : u8
+    {
+        kNone,
+        kXZ,
+        kXYZ
+    };
+
+    AENUM()
+    enum class ERootMotionRotationMode : u8
+    {
+        kNone,
+        kYaw,
+        kFull
+    };
+
+    ASTRUCT()
+    struct AILU_API RootMotionSettings
+    {
+        GENERATED_BODY()
+
+        APROPERTY()
+        bool _enabled = false;
+        APROPERTY()
+        String _root_bone_name;
+        APROPERTY()
+        ERootMotionTranslationMode _translation_mode = ERootMotionTranslationMode::kXZ;
+        APROPERTY()
+        ERootMotionRotationMode _rotation_mode = ERootMotionRotationMode::kYaw;
+
+        i32 _root_bone_index = -1;
+    };
 
     ACLASS()
     class AILU_API AnimationClip : public Object
@@ -53,6 +87,14 @@ namespace Ailu
         void StartTime(f32 start_time) { _start_time = start_time; }
         [[nodiscard]] f32 GetEndTime() const { return _end_time; }
         void EndTime(f32 end_time) { _end_time = end_time; }
+        [[nodiscard]] const RootMotionSettings &GetRootMotionSettings() const { return _root_motion; }
+        RootMotionSettings &GetRootMotionSettings() { return _root_motion; }
+        void SetRootMotionSettings(const RootMotionSettings &settings) { _root_motion = settings; }
+        Transform SampleRootTransform(i32 root_bone_index, const Transform &reference, f32 time, bool looping) const;
+        RootMotionDelta ExtractRootMotion(f32 previous_time, f32 current_time,
+                                          const RootMotionSettings &settings) const;
+        RootMotionDelta ExtractRootMotion(f32 previous_time, f32 current_time, const RootMotionSettings &settings,
+                                          bool looping) const;
 	private:
         f32 _start_time;
         f32 _end_time;
@@ -66,6 +108,7 @@ namespace Ailu
         Vector<AnimationEvent> _events;
         Guid _skeleton_guid = Guid::EmptyGuid();
         Guid _preview_mesh_guid = Guid::EmptyGuid();
+        RootMotionSettings _root_motion;
 	};
 
     class AILU_API AnimationClipLibrary

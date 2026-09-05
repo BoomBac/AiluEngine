@@ -116,6 +116,7 @@ namespace Ailu::Editor
         _viewport.SetOverlayCallback([this](Render::CommandBuffer *command_buffer, const Matrix4x4f &world_matrix,
                                              const Vector3f &center, const Vector3f &extents)
         {
+            DrawRootMotionOverlay(command_buffer, world_matrix, center, extents);
             DrawSkeletonOverlay(command_buffer, world_matrix, center, extents);
         });
     }
@@ -135,6 +136,7 @@ namespace Ailu::Editor
         _blend_space_clips.clear();
         _blend_space_duration = 0.0f;
         _binding.Clear();
+        _root_motion_trajectory.clear();
         if (HasResolvedSkeleton())
             _pose = _preview_mesh->GetSkeletonAsset()->GetSkeleton().GetBindPose();
         else
@@ -142,6 +144,7 @@ namespace Ailu::Editor
         _current_time = 0.0f;
         if (_clip != nullptr && HasResolvedSkeleton())
             _binding.Resolve(*_clip, _preview_mesh->GetSkeletonAsset()->GetSkeleton());
+        BuildRootMotionTrajectory();
     }
 
     void AnimationClipPreview::SetBlendSpace(BlendSpaceAsset *blend_space, Vector2f input)
@@ -342,6 +345,12 @@ namespace Ailu::Editor
         RenderPreview();
     }
 
+    void AnimationClipPreview::RefreshRootMotionTrajectory()
+    {
+        BuildRootMotionTrajectory();
+        RenderPreview();
+    }
+
     void AnimationClipPreview::SetShowSkeleton(bool show_skeleton)
     {
         if (_show_skeleton == show_skeleton)
@@ -381,6 +390,7 @@ namespace Ailu::Editor
         _blend_space_clips.clear();
         _pose = SkeletonPose();
         _palette.clear();
+        _root_motion_trajectory.clear();
         if (_source_mesh == nullptr)
             return;
 
@@ -421,6 +431,127 @@ namespace Ailu::Editor
         {
             ResolveBlendSpaceBindings();
         }
+        BuildRootMotionTrajectory();
+    }
+
+    void AnimationClipPreview::BuildRootMotionTrajectory()
+    {
+        _root_motion_trajectory.clear();
+        if (_clip == nullptr || !_clip->GetRootMotionSettings()._enabled || !HasResolvedSkeleton() ||
+            _preview_mesh == nullptr || _clip->Duration() <= Math::kFloatEpsilon)
+            return;
+
+        const Skeleton &skeleton = _preview_mesh->GetSkeletonAsset()->GetSkeleton();
+        const RootMotionSettings &settings = _clip->GetRootMotionSettings();
+        i32 root_index = -1;
+        if (!settings._root_bone_name.empty())
+        {
+            for (const Joint &joint : skeleton)
+            {
+                if (joint._name == settings._root_bone_name)
+                {
+                    root_index = joint._self;
+                    break;
+                }
+            }
+        }
+        if (root_index < 0 && settings._root_bone_index >= 0 && settings._root_bone_index < skeleton.JointNum())
+            root_index = settings._root_bone_index;
+        if (root_index < 0)
+        {
+            constexpr std::array<std::string_view, 3> kRootNames{"Root", "root", "Armature/root"};
+            for (const auto root_name : kRootNames)
+            {
+                for (const Joint &joint : skeleton)
+                {
+                    if (joint._name == root_name)
+                    {
+                        root_index = joint._self;
+                        break;
+                    }
+                }
+                if (root_index >= 0)
+                    break;
+            }
+        }
+        if (root_index < 0)
+            return;
+
+        const Pose &bind_pose = skeleton.GetBindPose();
+        const Transform bind_root = bind_pose.GetLocalTransform(static_cast<u32>(root_index));
+        const f32 duration = _clip->Duration();
+        const u32 sample_count = std::max(2u, static_cast<u32>(std::ceil(duration * 30.0f)) + 1u);
+        _root_motion_trajectory.reserve(sample_count);
+        for (u32 sample_index = 0u; sample_index < sample_count; ++sample_index)
+        {
+            const f32 time = duration * static_cast<f32>(sample_index) / static_cast<f32>(sample_count - 1u);
+            const Transform root_local =
+                _clip->SampleRootTransform(static_cast<i32>(root_index), bind_root, time, false);
+            SkeletonPose sample_pose = bind_pose;
+            sample_pose.SetLocalTransform(static_cast<u32>(root_index), root_local);
+            Vector<Matrix4x4f> global_pose_palette;
+            sample_pose.GetMatrixPalette(global_pose_palette);
+            if (static_cast<u32>(root_index) >= global_pose_palette.size())
+                return;
+            const Vector3f root_position = TransformCoord(
+                _preview_mesh->GetMeshCurrentGlobalInverseTransform(),
+                TransformCoord(global_pose_palette[root_index], Vector3f::kZero));
+            _root_motion_trajectory.push_back(root_position);
+        }
+    }
+
+    void AnimationClipPreview::DrawRootMotionOverlay(Render::CommandBuffer *cmd, const Matrix4x4f &world_matrix,
+                                                     const Vector3f &center, const Vector3f &extents)
+    {
+        if (cmd == nullptr || _root_motion_trajectory.empty())
+            return;
+        auto material = Render::Material::s_standard_forward_lit.lock();
+        if (material == nullptr)
+            return;
+        if (_trajectory_cylinder == nullptr)
+            _trajectory_cylinder = Render::Mesh::s_cylinder.lock();
+        if (!IsDrawableMesh(_trajectory_cylinder.get()))
+            _trajectory_cylinder = ResourceMgr::Get().GetRef<Render::Mesh>(L"Meshs/src_res/cylinder.alasset");
+        if (!IsDrawableMesh(_trajectory_cylinder.get()))
+            _trajectory_cylinder = ResourceMgr::Get().Load<Render::Mesh>(L"Meshs/src_res/cylinder.alasset");
+        if (!IsDrawableMesh(_trajectory_cylinder.get()))
+            return;
+        if (_trajectory_material == nullptr)
+        {
+            _trajectory_material = material->CreateInstance();
+            _trajectory_material->SetVector("_AlbedoValue", Vector4f(1.0f, 0.42f, 0.08f, 1.0f));
+            _trajectory_material->SetFloat("_MetallicValue", 0.0f);
+            _trajectory_material->SetFloat("_RoughnessValue", 0.45f);
+        }
+
+        const f32 trajectory_radius = std::max(Magnitude(extents) * 0.012f, 0.003f);
+        for (u32 index = 1u; index < _root_motion_trajectory.size(); ++index)
+        {
+            const Vector3f start = TransformCoord(world_matrix, _root_motion_trajectory[index - 1u]);
+            const Vector3f end = TransformCoord(world_matrix, _root_motion_trajectory[index]);
+            const Vector3f direction = end - start;
+            if (Magnitude(direction) <= Math::kFloatEpsilon)
+                continue;
+            cmd->DrawMesh(_trajectory_cylinder.get(), _trajectory_material.get(),
+                          MakeBoneMatrix(_trajectory_cylinder.get(), start, direction, trajectory_radius,
+                                         BuildIdentityMatrix()));
+        }
+
+        if (_skeleton_sphere == nullptr)
+            _skeleton_sphere = Render::Mesh::s_sphere.lock();
+        if (!IsDrawableMesh(_skeleton_sphere.get()))
+            _skeleton_sphere = ResourceMgr::Get().GetRef<Render::Mesh>(L"Meshs/src_res/sphere.alasset");
+        if (!IsDrawableMesh(_skeleton_sphere.get()))
+            _skeleton_sphere = ResourceMgr::Get().Load<Render::Mesh>(L"Meshs/src_res/sphere.alasset");
+        if (!IsDrawableMesh(_skeleton_sphere.get()))
+            return;
+        const u32 current_index = _clip != nullptr && _clip->Duration() > Math::kFloatEpsilon ?
+            std::min(static_cast<u32>(_current_time / _clip->Duration() * (_root_motion_trajectory.size() - 1u)),
+                     static_cast<u32>(_root_motion_trajectory.size() - 1u)) : 0u;
+        const Vector3f current_position = TransformCoord(world_matrix, _root_motion_trajectory[current_index]);
+        cmd->DrawMesh(_skeleton_sphere.get(), _trajectory_material.get(),
+                      MakeJointMatrix(_skeleton_sphere.get(), current_position, trajectory_radius * 2.0f,
+                                      BuildIdentityMatrix()));
     }
 
     void AnimationClipPreview::ResolveBlendSpaceBindings()

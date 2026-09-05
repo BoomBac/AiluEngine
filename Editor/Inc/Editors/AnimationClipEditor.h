@@ -107,6 +107,10 @@ namespace Ailu
             UI::CheckBox *_check_skeleton = nullptr;
             UI::ObjectAssetDropdown *_skeleton_dropdown = nullptr;
             UI::ObjectAssetDropdown *_preview_mesh_dropdown = nullptr;
+            UI::Dropdown *_root_bone_dropdown = nullptr;
+            UI::Dropdown *_translation_mode_dropdown = nullptr;
+            UI::Dropdown *_rotation_mode_dropdown = nullptr;
+            UI::CheckBox *_check_root_motion = nullptr;
             String _last_edit_snapshot;
             bool _is_refreshing_ui = false;
             Guid _preview_mesh_guid = Guid::EmptyGuid();

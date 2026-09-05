@@ -62,14 +62,20 @@ namespace Ailu
         if (_asset == nullptr || !instance._initialized || instance._current_state >= _asset->States().size())
             return evaluation;
 
+        const f32 current_previous_time = instance._previous_state == instance._current_state ?
+                                               instance._previous_state_time :
+                                               (instance._previous_next_state == instance._current_state ?
+                                                    instance._previous_next_state_time : 0.0f);
         AddStateSample(instance, instance._current_state, instance._in_transition ?
                        1.0f - std::clamp(instance._transition_time / instance._transition_duration, 0.0f, 1.0f) : 1.0f,
-                       instance._state_time, instance._current_motion_duration, evaluation);
+                       instance._state_time, current_previous_time, instance._current_motion_duration, evaluation);
         if (instance._in_transition && instance._next_state != kInvalidAnimationState)
         {
             const f32 weight = std::clamp(instance._transition_time / instance._transition_duration, 0.0f, 1.0f);
+            const f32 next_previous_time = instance._previous_next_state == instance._next_state ?
+                                               instance._previous_next_state_time : 0.0f;
             AddStateSample(instance, instance._next_state, weight, instance._next_state_time,
-                           instance._next_motion_duration, evaluation);
+                           next_previous_time, instance._next_motion_duration, evaluation);
         }
         return evaluation;
     }
@@ -185,7 +191,7 @@ namespace Ailu
     }
 
     void AnimationController::AddStateSample(const AnimationInstance &instance, u16 state_index, f32 weight,
-                                             f32 state_time, f32 motion_duration,
+                                             f32 state_time, f32 previous_state_time, f32 motion_duration,
                                              AnimationEvaluation &evaluation) const
     {
         const auto &state = _asset->States()[state_index];
@@ -193,9 +199,13 @@ namespace Ailu
             return;
 
         const f32 sample_time = state_time * state._speed * instance._speed;
+        const f32 previous_sample_time = previous_state_time * state._speed * instance._speed;
         if (state._motion._type == EAnimationMotionType::kClip)
         {
-            evaluation.AddSample(AnimationSample{state._motion._asset, sample_time, weight, state._loop});
+            AnimationSample sample{state._motion._asset, sample_time, weight, state._loop};
+            sample._previous_time = previous_sample_time;
+            sample._has_previous_time = true;
+            evaluation.AddSample(sample);
             return;
         }
 
@@ -227,5 +237,22 @@ namespace Ailu
             position.y = instance._float_parameters[parameter_y_index];
         const f32 phase = motion_duration > 0.0f ? sample_time / motion_duration : 0.0f;
         blend_space_iter->second->AddSamples(position, phase, weight, state._loop, evaluation, true);
+        const f32 previous_phase = motion_duration > 0.0f ? previous_sample_time / motion_duration : 0.0f;
+        AnimationEvaluation previous_evaluation;
+        blend_space_iter->second->AddSamples(position, previous_phase, 1.0f, state._loop, previous_evaluation, true);
+        for (u8 sample_index = evaluation._sample_count; sample_index > 0u; --sample_index)
+        {
+            AnimationSample &sample = evaluation._samples[sample_index - 1u];
+            for (u8 previous_index = 0u; previous_index < previous_evaluation._sample_count; ++previous_index)
+            {
+                const AnimationSample &previous = previous_evaluation._samples[previous_index];
+                if (sample._clip == previous._clip)
+                {
+                    sample._previous_time = previous._time;
+                    sample._has_previous_time = true;
+                    break;
+                }
+            }
+        }
     }
 }

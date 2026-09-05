@@ -311,6 +311,8 @@ namespace Ailu
         APROPERTY()
         bool _is_looping = true;
         APROPERTY()
+        RootMotionSettings _root_motion;
+        APROPERTY()
         Guid _skeleton = Guid::EmptyGuid();
         APROPERTY()
         Guid _preview_mesh_guid = Guid::EmptyGuid();
@@ -804,6 +806,8 @@ namespace Ailu
         f32 _speed = 1.0f;
         APROPERTY()
         bool _play_on_awake = true;
+        APROPERTY()
+        u8 _root_motion_mode = 0u;
     };
 
     ASTRUCT()

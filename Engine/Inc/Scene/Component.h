@@ -7,6 +7,7 @@
 #include "Framework/Core/Containers/Array.h"
 
 #include "Animation/AnimationInstance.h"
+#include "Animation/RootMotion.h"
 #include "Audio/AudioHandle.h"
 #include "Entity.h"
 #include "Framework/Math/Guid.h"
@@ -384,6 +385,7 @@ public:                                                                 \
             Guid _clip = Guid::EmptyGuid();
             f32 _speed = 1.0f;
             bool _play_on_awake = true;
+            ERootMotionMode _root_motion_mode = ERootMotionMode::kDisabled;
             AnimationInstanceHandle _instance = kInvalidAnimationInstanceHandle;
             bool _started = false;
         };

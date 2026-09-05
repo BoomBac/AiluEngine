@@ -4,6 +4,7 @@
 #include "Animation/BlendSpace.h"
 #include "Animation/Clip.h"
 #include "Animation/SpriteAnimationTrack.h"
+#include "Animation/Skeleton/SkeletonAnimationBinding.h"
 #include "Animation/TransformTrack.h"
 #include "Assets/AnimationClipArtifact.h"
 #include "Assets/AssetDocument.h"
@@ -33,6 +34,107 @@ namespace Ailu::AnimationTests
         {
             return std::abs(lhs - rhs) < 0.0001f;
         }
+
+        AnimationClip MakeRootMotionClip()
+        {
+            AnimationClip clip;
+            clip.Duration(1.0f);
+            clip.StartTime(0.0f);
+            clip.EndTime(1.0f);
+            clip.IsLooping(true);
+            TransformTrack &track = clip[0u];
+            track.GetPositionTrack().Resize(2u);
+            track.GetPositionTrack()[0]._time = 0.0f;
+            track.GetPositionTrack()[0]._value[0] = 0.0f;
+            track.GetPositionTrack()[0]._value[1] = 1.0f;
+            track.GetPositionTrack()[0]._value[2] = 0.0f;
+            track.GetPositionTrack()[1]._time = 1.0f;
+            track.GetPositionTrack()[1]._value[0] = 2.0f;
+            track.GetPositionTrack()[1]._value[1] = 3.0f;
+            track.GetPositionTrack()[1]._value[2] = 4.0f;
+            return clip;
+        }
+
+        Skeleton MakeRootSkeleton()
+        {
+            Skeleton skeleton;
+            Joint root;
+            root._name = "Root";
+            root._parent = Joint::kInvalidJointIndex;
+            skeleton.AddJoint(root);
+            skeleton.SetBindPoseLocalTransform(0u, Transform(Vector3f::kZero, Quaternion::Identity(),
+                                                             Vector3f::kOne));
+            return skeleton;
+        }
+    }
+
+    bool TestRootMotionExtraction()
+    {
+        AnimationClip clip = MakeRootMotionClip();
+        RootMotionSettings settings;
+        settings._enabled = true;
+        settings._root_bone_index = 0;
+        settings._translation_mode = ERootMotionTranslationMode::kXZ;
+        settings._rotation_mode = ERootMotionRotationMode::kNone;
+
+        const RootMotionDelta delta = clip.ExtractRootMotion(0.0f, 0.5f, settings, false);
+        return NearlyEqual(delta._translation.x, 1.0f) && NearlyEqual(delta._translation.y, 0.0f) &&
+               NearlyEqual(delta._translation.z, 2.0f) && delta._rotation == Quaternion::Identity();
+    }
+
+    bool TestRootMotionLoopWrap()
+    {
+        AnimationClip clip = MakeRootMotionClip();
+        RootMotionSettings settings;
+        settings._enabled = true;
+        settings._root_bone_index = 0;
+        settings._translation_mode = ERootMotionTranslationMode::kXYZ;
+        settings._rotation_mode = ERootMotionRotationMode::kNone;
+
+        const RootMotionDelta delta = clip.ExtractRootMotion(0.98f, 0.02f, settings, true);
+        const bool matches = NearlyEqual(delta._translation.x, 0.08f) && NearlyEqual(delta._translation.y, 0.08f) &&
+                             NearlyEqual(delta._translation.z, 0.16f);
+        return matches;
+    }
+
+    bool TestRootMotionBindingModes()
+    {
+        AnimationClip clip = MakeRootMotionClip();
+        RootMotionSettings settings;
+        settings._enabled = true;
+        settings._root_bone_name = "Root";
+        settings._translation_mode = ERootMotionTranslationMode::kXZ;
+        settings._rotation_mode = ERootMotionRotationMode::kNone;
+        clip.SetRootMotionSettings(settings);
+        Skeleton skeleton = MakeRootSkeleton();
+        SkeletonAnimationBinding binding;
+        binding.Resolve(clip, skeleton);
+
+        AnimationEvaluation evaluation;
+        evaluation._root_motion_mode = ERootMotionMode::kApply;
+        AnimationSample sample;
+        sample._clip = Guid::EmptyGuid();
+        sample._time = 0.5f;
+        sample._previous_time = 0.0f;
+        sample._loop = false;
+        sample._has_previous_time = true;
+        evaluation.AddSample(sample);
+        const AnimationEvaluateResult result = binding.Evaluate(evaluation, skeleton);
+        const Transform root = result._pose.GetLocalTransform(0u);
+        if (!NearlyEqual(root._position.x, 0.0f) || !NearlyEqual(root._position.y, 2.0f) ||
+            !NearlyEqual(root._position.z, 0.0f) || !NearlyEqual(result._root_motion._translation.x, 1.0f) ||
+            !NearlyEqual(result._root_motion._translation.y, 0.0f) ||
+            !NearlyEqual(result._root_motion._translation.z, 2.0f))
+            return false;
+
+        evaluation._root_motion_mode = ERootMotionMode::kExtractOnly;
+        const AnimationEvaluateResult extract_only_result = binding.Evaluate(evaluation, skeleton);
+        const Transform extract_only_root = extract_only_result._pose.GetLocalTransform(0u);
+        return NearlyEqual(extract_only_root._position.x, 1.0f) && NearlyEqual(extract_only_root._position.y, 2.0f) &&
+               NearlyEqual(extract_only_root._position.z, 2.0f) &&
+               NearlyEqual(extract_only_result._root_motion._translation.x, 1.0f) &&
+               NearlyEqual(extract_only_result._root_motion._translation.y, 0.0f) &&
+               NearlyEqual(extract_only_result._root_motion._translation.z, 2.0f);
     }
 
     bool TestBlendSpace2DSampling()
@@ -225,6 +327,10 @@ namespace Ailu::AnimationTests
         document._duration = 3.5f;
         document._frame_rate = 30.0f;
         document._frame_duration = 1.0f / 30.0f;
+        document._root_motion._enabled = true;
+        document._root_motion._root_bone_name = "Root";
+        document._root_motion._translation_mode = ERootMotionTranslationMode::kXYZ;
+        document._root_motion._rotation_mode = ERootMotionRotationMode::kFull;
 
         AnimationClipTrackDocument track;
         track._joint_index = 12u;
@@ -245,6 +351,7 @@ namespace Ailu::AnimationTests
         document._tracks.push_back(track);
 
         JsonArchive save_archive;
+        Enum::InitTypeInfo();
         save_archive << document;
         const String json = save_archive.SaveToString();
         if (json.find("_position_keys") == String::npos || json.find("_rotation_keys") == String::npos ||
@@ -259,8 +366,13 @@ namespace Ailu::AnimationTests
 
         if (loaded_document._clip_name != document._clip_name ||
             loaded_document._frame_count != document._frame_count ||
-            !NearlyEqual(loaded_document._duration, document._duration) || loaded_document._tracks.size() != 1u)
+            !NearlyEqual(loaded_document._duration, document._duration) || loaded_document._tracks.size() != 1u ||
+            !loaded_document._root_motion._enabled || loaded_document._root_motion._root_bone_name != "Root" ||
+            loaded_document._root_motion._translation_mode != ERootMotionTranslationMode::kXYZ ||
+            loaded_document._root_motion._rotation_mode != ERootMotionRotationMode::kFull)
+        {
             return false;
+        }
 
         const AnimationClipTrackDocument &loaded_track = loaded_document._tracks[0];
         if (loaded_track._joint_index != track._joint_index || loaded_track._position_keys.size() != 2u ||
@@ -420,6 +532,10 @@ namespace Ailu::AnimationTests
         source.FrameDuration(1.0f / 30.0f);
         source.IsLooping(false);
         source.PreviewMeshGuid(MakeClipId("00000000-0000-0000-0000-000000000021"));
+        source.GetRootMotionSettings()._enabled = true;
+        source.GetRootMotionSettings()._root_bone_name = "Root";
+        source.GetRootMotionSettings()._translation_mode = ERootMotionTranslationMode::kXYZ;
+        source.GetRootMotionSettings()._rotation_mode = ERootMotionRotationMode::kFull;
 
         TransformTrack &track = source[7u];
         auto position = TrackHelpers::FromVector(Vector3f(1.0f, 2.0f, 3.0f));
@@ -453,7 +569,10 @@ namespace Ailu::AnimationTests
         Ref<AnimationClip> loaded = CreateAnimationClipFromArtifact(loaded_artifact);
         if (loaded == nullptr || loaded->Name() != source.Name() || loaded->Size() != 1u ||
             loaded->GetIdAtIndex(0u) != 7u || loaded->SpriteTrack().Frames().size() != 1u ||
-            loaded->Events().size() != 1u)
+            loaded->Events().size() != 1u || !loaded->GetRootMotionSettings()._enabled ||
+            loaded->GetRootMotionSettings()._root_bone_name != "Root" ||
+            loaded->GetRootMotionSettings()._translation_mode != ERootMotionTranslationMode::kXYZ ||
+            loaded->GetRootMotionSettings()._rotation_mode != ERootMotionRotationMode::kFull)
             return false;
 
         const TransformTrack &loaded_track = loaded->GetTrackAtIndex(0u);

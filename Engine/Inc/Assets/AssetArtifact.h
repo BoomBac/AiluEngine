@@ -16,7 +16,7 @@ namespace Ailu
     inline constexpr u16 kAssetArtifactContainerVersion = 1u;
     inline constexpr u32 kTextureArtifactVersion = 1u;
     inline constexpr u32 kMeshArtifactVersion = 2u;
-    inline constexpr u32 kAnimationClipArtifactVersion = 2u;
+    inline constexpr u32 kAnimationClipArtifactVersion = 3u;
 
     enum class EAssetArtifactType : u16
     {

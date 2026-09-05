@@ -52,6 +52,16 @@ namespace Ailu
                 component->_play_on_awake = value;
                 SceneManagement::SceneMgr::Get().MarkCurSceneDirty();
             };
+
+            auto *root_motion_mode = AddDropdownRow(context._content, "Root Motion",
+                                                    {"Disabled", "Extract Only", "Apply"});
+            root_motion_mode->SetSelectedIndex(static_cast<i32>(component->_root_motion_mode), false);
+            root_motion_mode->_on_selected_changed += [component](i32 index)
+            {
+                if (index >= 0 && index <= 2)
+                    component->_root_motion_mode = static_cast<ERootMotionMode>(index);
+                SceneManagement::SceneMgr::Get().MarkCurSceneDirty();
+            };
         }
     }// namespace Editor
 }// namespace Ailu

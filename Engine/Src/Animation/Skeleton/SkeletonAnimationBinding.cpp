@@ -4,6 +4,28 @@
 
 namespace Ailu
 {
+    namespace
+    {
+        i32 FindRootBone(const Skeleton &skeleton, const RootMotionSettings &settings)
+        {
+            if (!settings._root_bone_name.empty())
+            {
+                const i32 index = Skeleton::GetJointIndexByName(skeleton, settings._root_bone_name);
+                if (index >= 0)
+                    return index;
+            }
+            if (settings._root_bone_index >= 0 && settings._root_bone_index < skeleton.JointNum())
+                return settings._root_bone_index;
+            for (const char *name : {"Root", "root", "Armature/root"})
+            {
+                const i32 index = Skeleton::GetJointIndexByName(skeleton, name);
+                if (index >= 0)
+                    return index;
+            }
+            return -1;
+        }
+    }
+
     void SkeletonAnimationBinding::Resolve(const Guid &clip_id, const AnimationClip &clip, const Skeleton &skeleton)
     {
         EnsureSkeleton(skeleton);
@@ -33,9 +55,16 @@ namespace Ailu
     void SkeletonAnimationBinding::Evaluate(const AnimationEvaluation &evaluation, const Skeleton &skeleton,
                                             SkeletonPose &out_pose)
     {
+        out_pose = Evaluate(evaluation, skeleton)._pose;
+    }
+
+    AnimationEvaluateResult SkeletonAnimationBinding::Evaluate(const AnimationEvaluation &evaluation,
+                                                               const Skeleton &skeleton)
+    {
+        AnimationEvaluateResult result;
         if (_joint_count != skeleton.JointNum())
             EnsureSkeleton(skeleton);
-        out_pose = skeleton.GetBindPose();
+        result._pose = skeleton.GetBindPose();
 
         f32 accumulated_weight = 0.0f;
         for (u8 sample_index = 0u; sample_index < evaluation._sample_count; ++sample_index)
@@ -47,16 +76,31 @@ namespace Ailu
 
             SkeletonPose &sample_pose = _sample_poses[sample_index];
             sample_pose = skeleton.GetBindPose();
-            SampleClip(*binding, sample._time, sample._loop, sample._normalized_time, sample_pose);
+            const f32 current_time = sample._normalized_time ? sample._time * binding->_clip->Duration() : sample._time;
+            const f32 previous_time = sample._normalized_time ? sample._previous_time * binding->_clip->Duration() :
+                                                                  sample._previous_time;
+            const RootMotionDelta sample_root_motion = SampleClip(
+                *binding, skeleton, current_time, previous_time, sample._has_previous_time, sample._loop,
+                sample._normalized_time, evaluation._root_motion_mode, sample_pose);
 
             const f32 next_weight = accumulated_weight + sample._weight;
             const f32 blend_weight = next_weight > 0.0f ? sample._weight / next_weight : 0.0f;
             if (accumulated_weight <= 0.0f)
-                out_pose = sample_pose;
+            {
+                result._pose = sample_pose;
+                result._root_motion = sample_root_motion;
+            }
             else
-                Pose::Blend(out_pose, out_pose, sample_pose, blend_weight, Joint::kInvalidJointIndex);
+            {
+                Pose::Blend(result._pose, result._pose, sample_pose, blend_weight, Joint::kInvalidJointIndex);
+                result._root_motion._translation = result._root_motion._translation * (1.0f - blend_weight) +
+                                                   sample_root_motion._translation * blend_weight;
+                result._root_motion._rotation = Quaternion::SLerp(result._root_motion._rotation,
+                                                                   sample_root_motion._rotation, blend_weight);
+            }
             accumulated_weight = next_weight;
         }
+        return result;
     }
 
     void SkeletonAnimationBinding::Clear()
@@ -86,12 +130,12 @@ namespace Ailu
             pose = skeleton.GetBindPose();
     }
 
-    void SkeletonAnimationBinding::SampleClip(const ClipBinding &binding, f32 time, bool loop, bool normalized_time,
-                                              SkeletonPose &out_pose) const
+    RootMotionDelta SkeletonAnimationBinding::SampleClip(const ClipBinding &binding, const Skeleton &skeleton,
+                                                        f32 time, f32 previous_time, bool has_previous_time,
+                                                        bool loop, bool normalized_time, ERootMotionMode mode,
+                                                        SkeletonPose &out_pose) const
     {
         const AnimationClip &clip = *binding._clip;
-        if (normalized_time)
-            time *= clip.Duration();
         for (u32 track_index = 0u; track_index < clip.Size(); ++track_index)
         {
             const u16 joint_index = clip.GetIdAtIndex(track_index);
@@ -101,5 +145,62 @@ namespace Ailu
             const Transform local = out_pose.GetLocalTransform(joint_index);
             out_pose.SetLocalTransform(joint_index, track.Evaluate(local, time, loop));
         }
+        RootMotionDelta root_motion;
+        if (mode == ERootMotionMode::kDisabled || !clip.GetRootMotionSettings()._enabled)
+            return root_motion;
+
+        RootMotionSettings settings = clip.GetRootMotionSettings();
+        settings._root_bone_index = FindRootBone(skeleton, settings);
+        if (settings._root_bone_index < 0 || settings._root_bone_index >= skeleton.JointNum())
+            return root_motion;
+
+        if (has_previous_time)
+            root_motion = clip.ExtractRootMotion(previous_time, time, settings, loop);
+        if (mode != ERootMotionMode::kApply)
+            return root_motion;
+        const Transform current = out_pose.GetLocalTransform(settings._root_bone_index);
+        const Transform first = clip.SampleRootTransform(
+            settings._root_bone_index, skeleton.GetBindPose().GetLocalTransform(settings._root_bone_index),
+            clip.GetStartTime(), false);
+        Transform locked = current;
+        switch (settings._translation_mode)
+        {
+        case ERootMotionTranslationMode::kNone:
+            break;
+        case ERootMotionTranslationMode::kXZ:
+            locked._position.x = first._position.x;
+            locked._position.z = first._position.z;
+            break;
+        case ERootMotionTranslationMode::kXYZ:
+            locked._position = first._position;
+            break;
+        }
+        switch (settings._rotation_mode)
+        {
+        case ERootMotionRotationMode::kNone:
+            break;
+        case ERootMotionRotationMode::kYaw:
+        {
+            const Vector3f axis = Vector3f::kUp;
+            const auto twist = [](const Quaternion &rotation, const Vector3f &up)
+            {
+                const Quaternion normalized = Quaternion::NormalizedQ(rotation);
+                const Vector3f projected = up * DotProduct(Vector3f(normalized.x, normalized.y, normalized.z), up);
+                const Quaternion result(projected.x, projected.y, projected.z, normalized.w);
+                return Quaternion::LenSq(result) > Math::kFloatEpsilon ? Quaternion::NormalizedQ(result) :
+                                                                         Quaternion::Identity();
+            };
+            const Quaternion current_yaw = twist(current._rotation, axis);
+            const Quaternion first_yaw = twist(first._rotation, axis);
+            const Quaternion swing = Quaternion::Inverse(current_yaw) * current._rotation;
+            locked._rotation = first_yaw * swing;
+            break;
+        }
+        case ERootMotionRotationMode::kFull:
+            locked._rotation = first._rotation;
+            break;
+        }
+        out_pose.SetLocalTransform(settings._root_bone_index, locked);
+        return root_motion;
     }
 }

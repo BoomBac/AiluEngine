@@ -99,6 +99,9 @@ namespace Ailu::AnimationTests
     bool TestControllerCrossFadeWeights();
     bool TestControllerTriggerConsumption();
     bool TestAnimationEventLoopWrap();
+    bool TestRootMotionExtraction();
+    bool TestRootMotionLoopWrap();
+    bool TestRootMotionBindingModes();
     bool TestSpriteAnimationTrackSampling();
     bool TestTrackEndFrameSampling();
     bool TestSparseTransformTrackSemantics();
@@ -1918,6 +1921,9 @@ namespace
         RunTest(result, "AnimationController crossfade weights", TestControllerCrossFadeWeights);
         RunTest(result, "AnimationController trigger consumption", TestControllerTriggerConsumption);
         RunTest(result, "Animation event loop wrap", TestAnimationEventLoopWrap);
+        RunTest(result, "Root Motion extraction", TestRootMotionExtraction);
+        RunTest(result, "Root Motion loop wrap", TestRootMotionLoopWrap);
+        RunTest(result, "Root Motion binding modes", TestRootMotionBindingModes);
         RunTest(result, "Sprite animation track sampling", TestSpriteAnimationTrackSampling);
         RunTest(result, "Track end frame sampling", TestTrackEndFrameSampling);
         RunTest(result, "Sparse transform track semantics", TestSparseTransformTrackSemantics);

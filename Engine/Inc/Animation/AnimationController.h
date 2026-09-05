@@ -31,7 +31,7 @@ namespace Ailu
         bool TryStartTransition(AnimationInstance &instance, u16 transition_index) const;
         void ConsumeTriggers(AnimationInstance &instance, const AnimationTransition &transition) const;
         void AddStateSample(const AnimationInstance &instance, u16 state_index, f32 weight, f32 state_time,
-                            f32 motion_duration, AnimationEvaluation &evaluation) const;
+                            f32 previous_state_time, f32 motion_duration, AnimationEvaluation &evaluation) const;
 
         const AnimationControllerAsset *_asset = nullptr;
         Map<Guid, const BlendSpaceAsset *> _blend_spaces;

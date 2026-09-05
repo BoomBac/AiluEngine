@@ -223,6 +223,7 @@ namespace Ailu::SceneManagement
             entity_doc._animator_component._clip_guid = animator->_clip.IsEmpty() ? String{} : animator->_clip.ToString();
             entity_doc._animator_component._speed = animator->_speed;
             entity_doc._animator_component._play_on_awake = animator->_play_on_awake;
+            entity_doc._animator_component._root_motion_mode = static_cast<u8>(animator->_root_motion_mode);
             mark_disabled.template operator()<ECS::AnimatorComponent>("AnimatorComponent");
         }
         if (const auto *vxgi = registry.GetComponent<ECS::CVXGI>(entity); vxgi != nullptr)

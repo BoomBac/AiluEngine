@@ -91,6 +91,16 @@ namespace Ailu::ECS
         QueueCommand(entity, std::move(command));
     }
 
+    RootMotionDelta AnimationSystem::ConsumeRootMotion(Entity entity)
+    {
+        auto runtime_iter = _animator_runtimes.find(entity);
+        if (runtime_iter == _animator_runtimes.end())
+            return {};
+        RootMotionDelta result = runtime_iter->second._root_motion;
+        runtime_iter->second._root_motion = {};
+        return result;
+    }
+
     void AnimationSystem::ApplyCommands(Entity entity, AnimationInstance &instance, AnimatorComponent &animator,
                                          const AnimationControllerAsset &controller_asset)
     {
@@ -374,6 +384,8 @@ namespace Ailu::ECS
 
             controller.Update(*instance, dt);
             runtime._evaluation = controller.Evaluate(*instance);
+            runtime._evaluation._root_motion_mode = animator->_root_motion_mode;
+            runtime._root_motion = {};
             for (u8 sample_index = 0u; sample_index < runtime._evaluation._sample_count; ++sample_index)
                 ResolveClip(runtime._evaluation._samples[sample_index]._clip);
 
@@ -458,6 +470,7 @@ namespace Ailu::ECS
                                      transition_weight > 0.5f);
             }
 
+            bool root_motion_output_set = false;
             for (auto &[skeleton_key, group] : runtime._skeleton_groups)
                 group._consumers.clear();
             const auto collect_skeleton_meshes = [&](auto &&self, Entity current) -> void
@@ -526,7 +539,13 @@ namespace Ailu::ECS
                 }
                 if (group._pose.Size() != skeleton.JointNum())
                     group._pose = skeleton.GetBindPose();
-                group._binding.Evaluate(runtime._evaluation, skeleton, group._pose);
+                const AnimationEvaluateResult evaluation_result = group._binding.Evaluate(runtime._evaluation, skeleton);
+                group._pose = evaluation_result._pose;
+                if (!root_motion_output_set)
+                {
+                    runtime._root_motion = evaluation_result._root_motion;
+                    root_motion_output_set = true;
+                }
                 group._pose.GetMatrixPalette(group._global_pose_palette);
 
                 for (const Entity mesh_entity : group._consumers)

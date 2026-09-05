@@ -27,6 +27,7 @@ namespace Ailu::Editor
         void SetBlendSpaceInput(Vector2f input, bool render = true);
         void SetMesh(Render::SkeletonMesh *mesh);
         void SetTime(f32 time);
+        void RefreshRootMotionTrajectory();
         void SetShowSkeleton(bool show_skeleton);
         void SetShowGrid(bool show_grid);
         void SetWireframe(bool wireframe);
@@ -56,6 +57,9 @@ namespace Ailu::Editor
         void RenderPreview();
         bool HasResolvedSkeleton() const;
         bool BuildJointPositions(const Matrix4x4f &world_matrix, Vector<Vector3f> &joint_positions) const;
+        void BuildRootMotionTrajectory();
+        void DrawRootMotionOverlay(Render::CommandBuffer *command_buffer, const Matrix4x4f &world_matrix,
+                                   const Vector3f &center, const Vector3f &extents);
         void DrawSkeletonOverlay(Render::CommandBuffer *command_buffer, const Matrix4x4f &world_matrix,
                                  const Vector3f &center, const Vector3f &extents);
 
@@ -69,9 +73,12 @@ namespace Ailu::Editor
         AssetPreviewViewport3D _viewport;
         Ref<Render::Mesh> _skeleton_sphere;
         Ref<Render::Mesh> _skeleton_cone;
+        Ref<Render::Mesh> _trajectory_cylinder;
         Ref<Render::Material> _skeleton_joint_material;
         Ref<Render::Material> _skeleton_bone_material;
         Ref<Render::Material> _skeleton_selected_material;
+        Ref<Render::Material> _trajectory_material;
+        Vector<Vector3f> _root_motion_trajectory;
         SkeletonAnimationBinding _binding;
         SkeletonPose _pose;
         Vector<Matrix4x4f> _palette;

@@ -21,6 +21,7 @@ namespace Ailu
         f32 _frame_rate = 0.0f;
         f32 _frame_duration = 0.0f;
         bool _is_looping = true;
+        RootMotionSettings _root_motion;
         u32 _track_count = 0u;
         u32 _sprite_frame_count = 0u;
         u32 _event_count = 0u;

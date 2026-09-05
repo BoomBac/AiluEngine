@@ -1837,6 +1837,7 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
                 component._clip = Guid(entity_doc._animator_component._clip_guid);
             component._speed = entity_doc._animator_component._speed;
             component._play_on_awake = entity_doc._animator_component._play_on_awake;
+            component._root_motion_mode = static_cast<ERootMotionMode>(entity_doc._animator_component._root_motion_mode);
         }
         if (entity_doc._has_vxgi_component)
         {
@@ -2145,6 +2146,7 @@ Scope<Asset> AnimationClipAssetHandler::Load(const AssetLoadContext &context)
            (doc._duration / static_cast<f32>(doc._frame_count - 1u)) : 0.0f);
     loaded_clip->FrameDuration(frame_duration);
     loaded_clip->IsLooping(doc._is_looping);
+    loaded_clip->SetRootMotionSettings(doc._root_motion);
     loaded_clip->SkeletonGuid(doc._skeleton);
     loaded_clip->PreviewMeshGuid(doc._preview_mesh_guid);
     loaded_clip->StartTime(0.0f);
@@ -2226,6 +2228,7 @@ bool AnimationClipAssetHandler::Save(const AssetSaveContext &context)
     doc._frame_rate = clip->FrameRate();
     doc._frame_duration = clip->FrameDuration();
     doc._is_looping = clip->IsLooping();
+    doc._root_motion = clip->GetRootMotionSettings();
     doc._skeleton = clip->SkeletonGuid();
     doc._preview_mesh_guid = clip->PreviewMeshGuid();
     if (!doc._skeleton.IsEmpty())

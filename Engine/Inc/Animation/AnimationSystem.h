@@ -43,6 +43,7 @@ namespace Ailu
             void SetTrigger(Entity entity, AnimationParameterId id);
             void ResetTrigger(Entity entity, AnimationParameterId id);
             void PlayState(Entity entity, u16 state_index);
+            RootMotionDelta ConsumeRootMotion(Entity entity);
             void SetBindPoseValidationEnabled(bool enabled);
 
         private:
@@ -85,6 +86,7 @@ namespace Ailu
             struct AnimatorRuntime
             {
                 AnimationEvaluation _evaluation;
+                RootMotionDelta _root_motion;
                 Map<const SkeletonAsset *, SkeletonRuntimeGroup> _skeleton_groups;
             };
 

@@ -18,6 +18,7 @@ namespace Ailu
         const AnimationClip *FindClip(const Guid &clip_id) const;
 
         void Evaluate(const AnimationEvaluation &evaluation, const Skeleton &skeleton, SkeletonPose &out_pose);
+        AnimationEvaluateResult Evaluate(const AnimationEvaluation &evaluation, const Skeleton &skeleton);
         void Clear();
 
     private:
@@ -29,8 +30,9 @@ namespace Ailu
 
         const ClipBinding *FindBinding(const Guid &clip_id) const;
         void EnsureSkeleton(const Skeleton &skeleton);
-        void SampleClip(const ClipBinding &binding, f32 time, bool loop, bool normalized_time,
-                        SkeletonPose &out_pose) const;
+        RootMotionDelta SampleClip(const ClipBinding &binding, const Skeleton &skeleton, f32 time, f32 previous_time,
+                                   bool has_previous_time, bool loop, bool normalized_time, ERootMotionMode mode,
+                                   SkeletonPose &out_pose) const;
 
         Vector<ClipBinding> _clips;
         Array<SkeletonPose, 4> _sample_poses;

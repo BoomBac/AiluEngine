@@ -138,6 +138,7 @@ namespace Ailu
         out_artifact._desc._frame_rate = clip.FrameRate();
         out_artifact._desc._frame_duration = clip.FrameDuration();
         out_artifact._desc._is_looping = clip.IsLooping();
+        out_artifact._desc._root_motion = clip.GetRootMotionSettings();
         out_artifact._desc._track_count = clip.Size();
         out_artifact._desc._sprite_frame_count = static_cast<u32>(clip.SpriteTrack().Frames().size());
         out_artifact._desc._event_count = static_cast<u32>(clip.Events().size());
@@ -190,6 +191,10 @@ namespace Ailu
         AppendValue(metadata, artifact._desc._frame_rate);
         AppendValue(metadata, artifact._desc._frame_duration);
         AppendValue(metadata, static_cast<u8>(artifact._desc._is_looping));
+        AppendValue(metadata, static_cast<u8>(artifact._desc._root_motion._enabled));
+        AppendString(metadata, artifact._desc._root_motion._root_bone_name);
+        AppendValue(metadata, static_cast<u8>(artifact._desc._root_motion._translation_mode));
+        AppendValue(metadata, static_cast<u8>(artifact._desc._root_motion._rotation_mode));
         AppendValue(metadata, artifact._desc._track_count);
         AppendValue(metadata, artifact._desc._sprite_frame_count);
         AppendValue(metadata, artifact._desc._event_count);
@@ -256,6 +261,9 @@ namespace Ailu
         const auto metadata = reader.GetSectionData(kMetadataSection);
         size_t offset = 0u;
         u8 is_looping = 0u;
+        u8 root_motion_enabled = 0u;
+        u8 root_motion_translation = 0u;
+        u8 root_motion_rotation = 0u;
         if (!ReadString(metadata, offset, out_artifact._desc._clip_name) ||
             !ReadGuid(metadata, offset, out_artifact._desc._skeleton_guid) ||
             !ReadGuid(metadata, offset, out_artifact._desc._preview_mesh_guid) ||
@@ -264,11 +272,19 @@ namespace Ailu
             !ReadValue(metadata, offset, out_artifact._desc._frame_rate) ||
             !ReadValue(metadata, offset, out_artifact._desc._frame_duration) ||
             !ReadValue(metadata, offset, is_looping) ||
+            !ReadValue(metadata, offset, root_motion_enabled) ||
+            !ReadString(metadata, offset, out_artifact._desc._root_motion._root_bone_name) ||
+            !ReadValue(metadata, offset, root_motion_translation) ||
+            !ReadValue(metadata, offset, root_motion_rotation) ||
             !ReadValue(metadata, offset, out_artifact._desc._track_count) ||
             !ReadValue(metadata, offset, out_artifact._desc._sprite_frame_count) ||
             !ReadValue(metadata, offset, out_artifact._desc._event_count) || offset != metadata.size())
             return false;
         out_artifact._desc._is_looping = is_looping != 0u;
+        out_artifact._desc._root_motion._enabled = root_motion_enabled != 0u;
+        out_artifact._desc._root_motion._translation_mode =
+            static_cast<ERootMotionTranslationMode>(root_motion_translation);
+        out_artifact._desc._root_motion._rotation_mode = static_cast<ERootMotionRotationMode>(root_motion_rotation);
 
         const auto tracks = reader.GetSectionData(kTracksSection);
         offset = 0u;
@@ -333,6 +349,7 @@ namespace Ailu
         clip->FrameRate(artifact._desc._frame_rate);
         clip->FrameDuration(artifact._desc._frame_duration);
         clip->IsLooping(artifact._desc._is_looping);
+        clip->SetRootMotionSettings(artifact._desc._root_motion);
         clip->SkeletonGuid(artifact._desc._skeleton_guid);
         clip->PreviewMeshGuid(artifact._desc._preview_mesh_guid);
         clip->StartTime(0.0f);

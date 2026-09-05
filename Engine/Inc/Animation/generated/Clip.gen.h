@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __CLIP_GEN_H__
 //Class AnimationClip begin...........................
-#define CLIP_GEN_H_17_GENERATED_BODY \
+#define CLIP_GEN_H_51_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_AnimationClip_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -19,6 +19,40 @@ class AnimationClip ;
 template<>
 AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::AnimationClip>();
 //Class AnimationClip end...........................
+
+//Struct RootMotionSettings begin...........................
+#define CLIP_GEN_H_34_GENERATED_BODY \
+                            private: \
+                                friend const Type* Z_Construct_RootMotionSettings_Type();\
+                                static const Type* GetPrivateStaticClass();\
+                            public:\
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                const Type  *GetType();
+                            namespace Ailu {class Type;}
+namespace Ailu{
+struct RootMotionSettings ;
+}
+template<>
+AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::RootMotionSettings>();
+//Struct RootMotionSettings end...........................
+
+//Enum ERootMotionTranslationMode begin...........................
+const Ailu::Enum* Z_Construct_Enum_Ailu_ERootMotionTranslationMode_Type();
+namespace Ailu {
+enum class ERootMotionTranslationMode : u8;
+}
+template<>
+AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::ERootMotionTranslationMode>();
+//Enum ERootMotionTranslationMode end...........................
+
+//Enum ERootMotionRotationMode begin...........................
+const Ailu::Enum* Z_Construct_Enum_Ailu_ERootMotionRotationMode_Type();
+namespace Ailu {
+enum class ERootMotionRotationMode : u8;
+}
+template<>
+AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::ERootMotionRotationMode>();
+//Enum ERootMotionRotationMode end...........................
 
 #undef CURRENT_FILE_ID
 #define CURRENT_FILE_ID CLIP_GEN_H
