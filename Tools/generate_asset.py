@@ -22,7 +22,7 @@ Options:
     --type TYPE    Override auto-detected asset type.
     --name NAME    Override _asset_name (default: filename stem).
     --compute      For .hlsl files: use ComputeShader instead of Shader.
-    --srgb / --no-srgb   For Texture2D: set import _is_sRGB explicitly.
+    --srgb / --no-srgb   For Texture2D: set import _is_srgb explicitly.
     --no-default-db      Skip default assetdb conflict avoidance.
     --output NAME  Override output filename stem.
 """
@@ -151,7 +151,7 @@ _ASSET_TEMPLATES: dict[str, dict] = {
         "body": {
             "_file": "",
             "_import_setting": {
-                "_is_sRGB": True,
+                "_is_srgb": True,
                 "_generate_mipmap": True,
                 "_is_readable": False,
             },
@@ -362,14 +362,14 @@ def main():
         action="store_true",
         default=None,
         dest="is_srgb",
-        help="Set import _is_sRGB=true for Texture2D.",
+        help="Set import _is_srgb=true for Texture2D.",
     )
     parser.add_argument(
         "--no-srgb",
         action="store_false",
         default=None,
         dest="is_srgb",
-        help="Set import _is_sRGB=false for Texture2D.",
+        help="Set import _is_srgb=false for Texture2D.",
     )
     parser.add_argument(
         "--inner-name",
@@ -501,7 +501,7 @@ def main():
         body["_inner_file_name"] = args.inner_name
     if asset_type_key == "Texture2D":
         is_srgb = args.is_srgb if args.is_srgb is not None else InferTextureIsSRGB(source)
-        body["_import_setting"]["_is_sRGB"] = is_srgb
+        body["_import_setting"]["_is_srgb"] = is_srgb
     if "_shader_guid" in body and args.shader_guid:
         body["_shader_guid"] = args.shader_guid
     if "_clip_name" in body:

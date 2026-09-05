@@ -16,6 +16,7 @@
 #include "Render/FrameResource.h"
 #include "Render/FrameAllocator.h"
 #include "Render/RenderingStates.h"
+#include "Animation/SkinningSystem.h"
 
 #include "Render/RayTracing/RayTracingScene.h"
 #include "Render/RayTracing/RayTracingGeometry.h"
@@ -374,6 +375,19 @@ namespace Ailu::Render
         {
             SetRenderTarget(_render_graph->Resolve<RenderTexture>(color), index);
         }
+        VertexBuffer *ResolveSkinningVertexBuffer(Mesh *mesh, ConstantBuffer *per_obj_cb)
+        {
+            if (mesh == nullptr || per_obj_cb == nullptr)
+                return mesh != nullptr ? mesh->GetVertexBuffer().get() : nullptr;
+            const auto *object_data = ConstantBuffer::As<CBufferPerObjectData>(per_obj_cb);
+            if (object_data != nullptr && object_data->_ObjectID >= 0)
+            {
+                if (auto *skinned_buffer = ECS::SkinningSystem::ResolveVertexBuffer(
+                        mesh, static_cast<u32>(object_data->_ObjectID)); skinned_buffer != nullptr)
+                    return skinned_buffer;
+            }
+            return mesh->GetVertexBuffer().get();
+        }
         void DrawIndexed(VertexBuffer *vb, IndexBuffer *ib, ConstantBuffer *per_obj_cb, Material *mat, u16 pass_index, u32 index_start, u32 index_num)
         {
             auto cmd = CommandPool::Get().Alloc<CommandDraw>();
@@ -701,7 +715,7 @@ namespace Ailu::Render
         void DrawMesh(Mesh *mesh, Material *material, ConstantBuffer *per_obj_cb, u32 instance_count)
         {
             auto cmd = CommandPool::Get().Alloc<CommandDraw>();
-            cmd->_vb = mesh->GetVertexBuffer().get();
+            cmd->_vb = ResolveSkinningVertexBuffer(mesh, per_obj_cb);
             cmd->_ib = mesh->GetIndexBuffer().get();
             cmd->_per_obj_cb = per_obj_cb;
             cmd->_mat = material;
@@ -714,7 +728,7 @@ namespace Ailu::Render
         void DrawMesh(Mesh *mesh, Material *material, ConstantBuffer *per_obj_cb, u16 sub_mesh, u32 instance_count)
         {
             auto cmd = CommandPool::Get().Alloc<CommandDraw>();
-            cmd->_vb = mesh->GetVertexBuffer().get();
+            cmd->_vb = ResolveSkinningVertexBuffer(mesh, per_obj_cb);
             cmd->_ib = mesh->GetIndexBuffer(sub_mesh).get();
             cmd->_per_obj_cb = per_obj_cb;
             cmd->_mat = material;
@@ -727,7 +741,7 @@ namespace Ailu::Render
         void DrawMesh(Mesh *mesh, Material *material, ConstantBuffer *per_obj_cb, u16 sub_mesh, u16 pass_index, u32 instance_count)
         {
             auto cmd = CommandPool::Get().Alloc<CommandDraw>();
-            cmd->_vb = mesh->GetVertexBuffer().get();
+            cmd->_vb = ResolveSkinningVertexBuffer(mesh, per_obj_cb);
             cmd->_ib = mesh->GetIndexBuffer(sub_mesh).get();
             cmd->_per_obj_cb = per_obj_cb;
             cmd->_mat = material;

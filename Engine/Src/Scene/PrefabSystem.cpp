@@ -322,7 +322,7 @@ namespace Ailu::SceneManagement
                     component._clip = Guid(entity_doc._animator_component._clip_guid);
                 component._speed = entity_doc._animator_component._speed;
                 component._play_on_awake = entity_doc._animator_component._play_on_awake;
-                component._root_motion_mode = static_cast<ERootMotionMode>(entity_doc._animator_component._root_motion_mode);
+                component._root_motion_mode = DeserializeRootMotionMode(entity_doc._animator_component._root_motion_mode);
                 registry.SetComponentEnabled<ECS::AnimatorComponent>(entity,
                                                                        !is_component_disabled(entity_doc, "AnimatorComponent"));
             }

@@ -40,6 +40,56 @@
                 "_enabled": true
             }
         }, {
+            "_entity_guid": "0a800533-0e5f-4d79-8222-b14bfea1d598",
+            "_tag_component": {
+                "_name": "new_object_12",
+                "_tag": "Untagged",
+                "_layer_mask": 1
+            },
+            "_disabled_components": [],
+            "_transform_component": {
+                "_position": [0.0, 0.0, 0.0],
+                "_rotation": [0.0, -0.0, 0.0, 1.0],
+                "_scale": [1.0, 1.0, 1.0]
+            },
+            "_hierarchy_component": {
+                "_parent_guid": "107f149c-2207-418a-81b4-a43857b91e59",
+                "_sibling_index": 1,
+                "_inv_matrix_attach": "102.041,0,-1.05425e-05,0;0,102.041,0,0;1.05425e-05,0,102.041,0;-189.383,-0,1.95663e-05,1",
+                "_enabled": true
+            },
+            "_skeleton_mesh_component": {
+                "_mesh_guid": "96201f6a-188d-4466-a538-2e279150701c",
+                "_material_guids": ["0105c299-2cdf-4d30-819e-39a28ec53de8"],
+                "_anim_clip_guid": ""
+            }
+        }, {
+            "_entity_guid": "107f149c-2207-418a-81b4-a43857b91e59",
+            "_tag_component": {
+                "_name": "GameObject(16)",
+                "_tag": "Untagged",
+                "_layer_mask": 1
+            },
+            "_disabled_components": [],
+            "_transform_component": {
+                "_position": [-1.7853, 0.0, 0.488],
+                "_rotation": [0.0, -0.0, 0.0, 1.0],
+                "_scale": [0.0098, 0.0098, 0.0098]
+            },
+            "_hierarchy_component": {
+                "_parent_guid": "null",
+                "_sibling_index": 0,
+                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
+                "_enabled": true
+            },
+            "_animator_component": {
+                "_controller_guid": "",
+                "_clip_guid": "eeb08364-507a-4fd4-8c83-cfdbe2b5cfaa",
+                "_speed": 1.0,
+                "_play_on_awake": true,
+                "_root_motion_mode": 3
+            }
+        }, {
             "_entity_guid": "16c32b0b-1a12-4851-bfde-3677529f9dae",
             "_tag_component": {
                 "_name": "ground",
@@ -146,6 +196,30 @@
                 "_enabled": true
             }
         }, {
+            "_entity_guid": "38807698-db62-4115-adad-11cbf4fd266c",
+            "_tag_component": {
+                "_name": "new_object_12",
+                "_tag": "Untagged",
+                "_layer_mask": 1
+            },
+            "_disabled_components": [],
+            "_transform_component": {
+                "_position": [0.0, 0.0, 0.0],
+                "_rotation": [0.0, -0.0, 0.0, 1.0],
+                "_scale": [1.0, 1.0, 1.0]
+            },
+            "_hierarchy_component": {
+                "_parent_guid": "eb134ac1-7eda-4915-bd79-194f52a80e30",
+                "_sibling_index": 1,
+                "_inv_matrix_attach": "102.041,0,-1.05425e-05,0;0,102.041,0,0;1.05425e-05,0,102.041,0;0,0,0,1",
+                "_enabled": true
+            },
+            "_skeleton_mesh_component": {
+                "_mesh_guid": "96201f6a-188d-4466-a538-2e279150701c",
+                "_material_guids": ["0105c299-2cdf-4d30-819e-39a28ec53de8"],
+                "_anim_clip_guid": ""
+            }
+        }, {
             "_entity_guid": "3aae5101-baf7-4e97-9fd7-f46b9811d0a7",
             "_tag_component": {
                 "_name": "GameObject",
@@ -166,9 +240,10 @@
             },
             "_animator_component": {
                 "_controller_guid": "",
-                "_clip_guid": "",
+                "_clip_guid": "6f2af2de-ca15-4c11-b14d-e10e9a5fb7e3",
                 "_speed": 1.0,
-                "_play_on_awake": true
+                "_play_on_awake": true,
+                "_root_motion_mode": 0
             }
         }, {
             "_entity_guid": "407291e5-544f-43e2-9c04-3c50d9e3f786",
@@ -266,10 +341,11 @@
                 "_controller_guid": "9e5d5ac6-62e3-4a6c-a935-3a9a6a9f2f6a",
                 "_clip_guid": "",
                 "_speed": 1.0,
-                "_play_on_awake": true
+                "_play_on_awake": true,
+                "_root_motion_mode": 0
             },
             "_sprite_renderer_component": {
-                "_sprite_guid": "1a041038-6eba-4011-9394-d2544a4d98ef",
+                "_sprite_guid": "1658e14c-69c5-4b29-a0c8-cea476906aeb",
                 "_material_guid": "",
                 "_color": [1.0, 1.0, 1.0, 1.0],
                 "_sorting_layer": 0,
@@ -278,6 +354,30 @@
                 "_flip_x": false,
                 "_flip_y": false,
                 "_visible": true
+            }
+        }, {
+            "_entity_guid": "47b34f13-2e23-44de-9c53-a7da7a817899",
+            "_tag_component": {
+                "_name": "new_object_11",
+                "_tag": "Untagged",
+                "_layer_mask": 1
+            },
+            "_disabled_components": [],
+            "_transform_component": {
+                "_position": [1.0, 0.0, 0.0],
+                "_rotation": [0.0, -0.0, 0.0, 1.0],
+                "_scale": [1.0, 1.0, 1.0]
+            },
+            "_hierarchy_component": {
+                "_parent_guid": "107f149c-2207-418a-81b4-a43857b91e59",
+                "_sibling_index": 0,
+                "_inv_matrix_attach": "102.041,0,-1.05425e-05,0;0,102.041,0,0;1.05425e-05,0,102.041,0;-189.383,-0,1.95663e-05,1",
+                "_enabled": true
+            },
+            "_skeleton_mesh_component": {
+                "_mesh_guid": "8ca5f9bf-fd40-450f-823e-7d8c716e3d8b",
+                "_material_guids": ["0105c299-2cdf-4d30-819e-39a28ec53de8"],
+                "_anim_clip_guid": ""
             }
         }, {
             "_entity_guid": "55409c26-3026-4a3c-baaf-a5db3ebb3e94",
@@ -465,6 +565,30 @@
                 "_size": 10.0
             }
         }, {
+            "_entity_guid": "c840917a-6119-45d0-9760-c3372deca4c3",
+            "_tag_component": {
+                "_name": "new_object_11",
+                "_tag": "Untagged",
+                "_layer_mask": 1
+            },
+            "_disabled_components": [],
+            "_transform_component": {
+                "_position": [1.0, 0.0, 0.0],
+                "_rotation": [0.0, -0.0, 0.0, 1.0],
+                "_scale": [1.0, 1.0, 1.0]
+            },
+            "_hierarchy_component": {
+                "_parent_guid": "eb134ac1-7eda-4915-bd79-194f52a80e30",
+                "_sibling_index": 0,
+                "_inv_matrix_attach": "102.041,0,-1.05425e-05,0;0,102.041,0,0;1.05425e-05,0,102.041,0;0,0,0,1",
+                "_enabled": true
+            },
+            "_skeleton_mesh_component": {
+                "_mesh_guid": "8ca5f9bf-fd40-450f-823e-7d8c716e3d8b",
+                "_material_guids": ["0105c299-2cdf-4d30-819e-39a28ec53de8"],
+                "_anim_clip_guid": ""
+            }
+        }, {
             "_entity_guid": "e2592a43-4ac8-4d1a-82fc-d55b830e37f9",
             "_tag_component": {
                 "_name": "fish",
@@ -473,9 +597,9 @@
             },
             "_disabled_components": [],
             "_transform_component": {
-                "_position": [-3.2709, 2.1428, -1.4488],
+                "_position": [-3.2709, 2.1428, -1.4486],
                 "_rotation": [0.0, -0.0, 0.0, 1.0],
-                "_scale": [0.0842, 0.0842, 0.0842]
+                "_scale": [0.0297, 0.0297, 0.0297]
             },
             "_hierarchy_component": {
                 "_parent_guid": "null",
@@ -485,9 +609,36 @@
             },
             "_animator_component": {
                 "_controller_guid": "",
-                "_clip_guid": "",
+                "_clip_guid": "57093b91-ea31-4057-969a-93020674285b",
                 "_speed": 1.0,
-                "_play_on_awake": true
+                "_play_on_awake": true,
+                "_root_motion_mode": 0
+            }
+        }, {
+            "_entity_guid": "eb134ac1-7eda-4915-bd79-194f52a80e30",
+            "_tag_component": {
+                "_name": "GameObject(13)",
+                "_tag": "Untagged",
+                "_layer_mask": 1
+            },
+            "_disabled_components": [],
+            "_transform_component": {
+                "_position": [1.8559, 0.0, 0.0],
+                "_rotation": [0.0, -0.0, 0.0, 1.0],
+                "_scale": [0.0098, 0.0098, 0.0098]
+            },
+            "_hierarchy_component": {
+                "_parent_guid": "null",
+                "_sibling_index": 0,
+                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
+                "_enabled": true
+            },
+            "_animator_component": {
+                "_controller_guid": "",
+                "_clip_guid": "73a1bbe9-5730-4534-8fb3-3b920929065e",
+                "_speed": 1.0,
+                "_play_on_awake": true,
+                "_root_motion_mode": 0
             }
         }],
     "_prefab_instances": [{

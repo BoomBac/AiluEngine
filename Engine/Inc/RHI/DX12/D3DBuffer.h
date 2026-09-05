@@ -36,6 +36,11 @@ namespace Ailu::RHI::DX12
         bool TryCurrentResourceState(EResourceState &out_state, u32 sub_res = Render::kTotalSubRes) const final;
 		void InsertUAVBarrier(RHICommandBuffer* rhi_cmd) final;
 		void Name(const String &name) final;
+		ID3D12Resource *GetD3DResource() const { return _p_d3d_res.Get(); }
+		D3D12_GPU_VIRTUAL_ADDRESS GetGPUVirtualAddress() const
+		{
+			return _p_d3d_res != nullptr ? _p_d3d_res->GetGPUVirtualAddress() : 0u;
+		}
 		void ReadBack(u8 *dst, u32 size) final;
 		void ReadBackAsync(u8 *dst, u32 size, std::function<void()> on_complete);
 		void GetCounter(std::function<void(u32)> callback) final;
@@ -64,6 +69,9 @@ namespace Ailu::RHI::DX12
 		D3DVertexBuffer(VertexBufferLayout layout);
 		~D3DVertexBuffer();
 		void Name(const String& name) final;
+		void StateTranslation(RHICommandBuffer* rhi_cmd, EResourceState new_state, u32 sub_res) final;
+		void ApplyResourceBarrier(RHICommandBuffer *rhi_cmd, EResourceState before_state, EResourceState after_state,
+		                          u32 sub_res) final;
 		Render::NativeHandle NativeResource() final { return {Render::RendererAPI::ERenderAPI::kDirectX12, _vertex_buffers.empty() ? nullptr : _vertex_buffers[0].Get()}; }
 		Render::NativeHandle NativeResource(u16 stream_idx) { return {Render::RendererAPI::ERenderAPI::kDirectX12, _vertex_buffers.empty() ? nullptr : _vertex_buffers[stream_idx].Get()}; }
 	private:
@@ -72,6 +80,7 @@ namespace Ailu::RHI::DX12
 	private:
 		Vector<ComPtr<ID3D12Resource>> _vertex_buffers;
 		Vector<D3D12_VERTEX_BUFFER_VIEW> _buffer_views;
+		Vector<D3DResourceStateGuard> _state_guards;
 	};
 
 	class D3DIndexBuffer : public IndexBuffer

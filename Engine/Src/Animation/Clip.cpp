@@ -67,9 +67,9 @@ namespace Ailu
                 out_delta._translation += delta._translation;
             else
                 out_delta._translation += out_delta._rotation * delta._translation;
-            // Quaternion::operator* is the engine's standard composition operator; operator^ is
-            // a legacy non-standard operation and is not suitable for accumulating deltas here.
-            out_delta._rotation = Quaternion::NormalizedQ(out_delta._rotation * delta._rotation);
+            // operator* stores the right operand as the left multiplication argument. Reverse
+            // the expression to accumulate rotations in chronological order.
+            out_delta._rotation = Quaternion::NormalizedQ(delta._rotation * out_delta._rotation);
         }
     }
 

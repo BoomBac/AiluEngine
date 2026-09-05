@@ -81,6 +81,7 @@ namespace Ailu::Render
 		_buffer_layout = std::move(layout);
 		u16 stream_count = _buffer_layout.GetStreamCount();
 		_stream_data.resize(RenderConstants::kMaxVertexAttrNum);
+		_gpu_stream_buffers.resize(RenderConstants::kMaxVertexAttrNum);
 		_bindless_srv_indices.resize(RenderConstants::kMaxVertexAttrNum, -1);
 		_res_type = EGpuResType::kVertexBuffer;
 	}
@@ -103,6 +104,19 @@ namespace Ailu::Render
 		_vertices_count = size / _buffer_layout.GetStride(stream_index);
 		_stream_data[stream_index] = {data, size, is_dynamic};
 		_mem_size += size;
+	}
+	void VertexBuffer::SetGpuStream(GPUBuffer *buffer, u32 size, u8 stream_index)
+	{
+		if (buffer == nullptr || _buffer_layout.GetStride(stream_index) == 0u)
+		{
+			AL_ASSERT_MSG(false, "Try to set an invalid GPU vertex stream!");
+			return;
+		}
+		if (stream_index >= _gpu_stream_buffers.size())
+			_gpu_stream_buffers.resize(stream_index + 1u);
+		_gpu_stream_buffers[stream_index] = std::dynamic_pointer_cast<GPUBuffer>(buffer->SharedFromThis());
+		_stream_data[stream_index] = {nullptr, size, false};
+		_vertices_count = size / _buffer_layout.GetStride(stream_index);
 	}
 	const VertexBuffer::ResolvedVertexLayout& VertexBuffer::ResolveLayout(const VertexBufferLayout &layout)
 	{

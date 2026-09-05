@@ -21,7 +21,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::Mesh>();
 //Class Mesh end...........................
 
 //Class SkeletonMesh begin...........................
-#define MESH_GEN_H_195_GENERATED_BODY \
+#define MESH_GEN_H_196_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_SkeletonMesh_Type();\
                                 static const Type* GetPrivateStaticClass();\

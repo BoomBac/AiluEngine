@@ -45,6 +45,17 @@ namespace Ailu::RHI::DX12
             return resource->GpuResource::CurrentResourceState(sub_res);
         }
 
+        inline bool IsUploadHeapResource(ID3D12Resource *resource)
+        {
+            if (resource == nullptr)
+                return false;
+
+            D3D12_HEAP_PROPERTIES heap_properties{};
+            D3D12_HEAP_FLAGS heap_flags{};
+            return SUCCEEDED(resource->GetHeapProperties(&heap_properties, &heap_flags)) &&
+                   heap_properties.Type == D3D12_HEAP_TYPE_UPLOAD;
+        }
+
         inline D3D12_SHADER_RESOURCE_VIEW_DESC CreateRawBufferSrvDesc(u64 byte_size)
         {
             AL_ASSERT_MSG((byte_size % sizeof(u32)) == 0u, "Bindless ByteAddressBuffer requires 4-byte aligned size");
@@ -441,6 +452,7 @@ namespace Ailu::RHI::DX12
         u16 stream_count = _buffer_layout.GetStreamCount();
         _buffer_views.resize(stream_count);
         _vertex_buffers.resize(stream_count);
+		_state_guards.resize(stream_count);
     }
     D3DVertexBuffer::~D3DVertexBuffer()
     {
@@ -449,6 +461,34 @@ namespace Ailu::RHI::DX12
         if (g_pGfxContext)
             g_pGfxContext->WaitForFence(_fence_value);
     }
+	void D3DVertexBuffer::StateTranslation(RHICommandBuffer *rhi_cmd, EResourceState new_state, u32 sub_res)
+	{
+		auto *d3d_cmd = dynamic_cast<D3DCommandBuffer *>(rhi_cmd);
+		if (d3d_cmd == nullptr)
+			return;
+		const auto target_state = D3DConvertUtils::FromALResState(new_state);
+		for (u32 stream = 0u; stream < _vertex_buffers.size(); ++stream)
+		{
+			if (_vertex_buffers[stream] != nullptr && !IsUploadHeapResource(_vertex_buffers[stream].Get()))
+				d3d_cmd->EnsureResourceState(_state_guards[stream], target_state, sub_res);
+		}
+		GpuResource::TrackResourceState(new_state, sub_res);
+	}
+	void D3DVertexBuffer::ApplyResourceBarrier(RHICommandBuffer *rhi_cmd, EResourceState before_state,
+	                                            EResourceState after_state, u32 sub_res)
+	{
+		auto *d3d_cmd = dynamic_cast<D3DCommandBuffer *>(rhi_cmd);
+		if (d3d_cmd == nullptr)
+			return;
+		const auto before = D3DConvertUtils::FromALResState(before_state);
+		const auto after = D3DConvertUtils::FromALResState(after_state);
+		for (u32 stream = 0u; stream < _vertex_buffers.size(); ++stream)
+		{
+			if (_vertex_buffers[stream] != nullptr && !IsUploadHeapResource(_vertex_buffers[stream].Get()))
+				d3d_cmd->ApplyResourceBarrier(_state_guards[stream], before, after, sub_res);
+		}
+		GpuResource::TrackResourceState(after_state, sub_res);
+	}
 
     void D3DVertexBuffer::BindImpl(RHICommandBuffer *rhi_cmd, const BindParams &params)
     {
@@ -472,6 +512,22 @@ namespace Ailu::RHI::DX12
         auto d3d_dev = d3d_ctx->GetDevice();
         for (u16 i = 0; i < _stream_data.size(); i++)
         {
+            if (auto *gpu_stream = GetGpuStream(static_cast<u8>(i)); gpu_stream != nullptr)
+            {
+                auto *d3d_gpu_stream = dynamic_cast<D3DGPUBuffer *>(gpu_stream);
+                AL_ASSERT(d3d_gpu_stream != nullptr);
+                _vertex_buffers[i].Attach(d3d_gpu_stream->GetD3DResource());
+                if (_vertex_buffers[i] != nullptr)
+                    _vertex_buffers[i]->AddRef();
+                _buffer_views[i].BufferLocation = d3d_gpu_stream->GetGPUVirtualAddress();
+                _buffer_views[i].StrideInBytes = _buffer_layout.GetStride(i);
+                _buffer_views[i].SizeInBytes = static_cast<u32>(_stream_data[i]._size);
+                _buffer_layout_indexer.emplace(std::make_pair(std::make_pair(_buffer_layout[i].Name,
+                                                                              _buffer_layout[i]._semantic_index),
+                                                                  static_cast<u8>(i)));
+                _state_guards[i] = D3DResourceStateGuard(_vertex_buffers[i].Get(), D3D12_RESOURCE_STATE_GENERIC_READ, 1u);
+                continue;
+            }
             auto heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
             auto res_desc = CD3DX12_RESOURCE_DESC::Buffer(_stream_data[i]._size);
             u32 stream_index = i;
@@ -507,10 +563,10 @@ namespace Ailu::RHI::DX12
                 cmdlist->CopyBufferRegion(_vertex_buffers[stream_index].Get(), 0, upload_heap.Get(), 0, _stream_data[i]._size);
                 D3DResourceStateGuard::LogBarrier(_vertex_buffers[stream_index].Get(),
                                                   D3D12_RESOURCE_STATE_COPY_DEST,
-                                                  D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+                                                  D3D12_RESOURCE_STATE_GENERIC_READ,
                                                   0);
                 auto buf_state = CD3DX12_RESOURCE_BARRIER::Transition(_vertex_buffers[stream_index].Get(),
-                                                                      D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+                                                                      D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_GENERIC_READ);
                 cmdlist->ResourceBarrier(1, &buf_state);
                 d3d_ctx->TrackResource(upload_heap);
             }
@@ -534,11 +590,17 @@ namespace Ailu::RHI::DX12
                 _vertex_buffers[stream_index] = std::move(dynamic_buffer);
                 _stream_data[stream_index]._data = mapped_data;
             }
+            _state_guards[stream_index] = D3DResourceStateGuard(
+                _vertex_buffers[stream_index].Get(),
+                D3D12_RESOURCE_STATE_GENERIC_READ,
+                1u);
             // Initialize the vertex buffer view.
             _buffer_views[stream_index].BufferLocation = _vertex_buffers[stream_index]->GetGPUVirtualAddress();
             _buffer_views[stream_index].StrideInBytes = _buffer_layout.GetStride(stream_index);
             _buffer_views[stream_index].SizeInBytes = (u32) _stream_data[i]._size;
-            _buffer_layout_indexer.emplace(std::make_pair(std::make_pair(_buffer_layout[stream_index].Name, _buffer_layout[stream_index]._semantic_index), stream_index));
+            _buffer_layout_indexer.emplace(std::make_pair(std::make_pair(_buffer_layout[stream_index].Name,
+                                                                          _buffer_layout[stream_index]._semantic_index),
+                                                              static_cast<u8>(stream_index)));
 
             if (_bindless_srv_enabled)
             {
@@ -547,6 +609,7 @@ namespace Ailu::RHI::DX12
                                         _bindless_srv_indices[stream_index]);
             }
         }
+        GpuResource::TrackResourceState(EResourceState::kGenericRead);
         ++_view_version;
     }
 

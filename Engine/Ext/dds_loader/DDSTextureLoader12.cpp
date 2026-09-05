@@ -303,7 +303,7 @@ namespace
         }
         else
         {
-            const size_t bpp = BitsPerPixel(fmt);
+            const size_t bpp = LegacyBitsPerPixel(fmt);
             if (!bpp)
                 return E_INVALIDARG;
 
@@ -721,7 +721,7 @@ namespace
                     break;
 
                 default:
-                    if (BitsPerPixel(d3d10ext->dxgiFormat) == 0)
+                    if (LegacyBitsPerPixel(d3d10ext->dxgiFormat) == 0)
                     {
                         return HRESULT_E_NOT_SUPPORTED;
                     }
@@ -800,7 +800,7 @@ namespace
                 // Note there's no way for a legacy Direct3D 9 DDS to express a '1D' texture
             }
 
-            assert(BitsPerPixel(format) != 0);
+            assert(LegacyBitsPerPixel(format) != 0);
         }
 
         // Bound sizes (for security purposes we don't trust DDS file metadata larger than the Direct3D hardware requirements)
@@ -1268,7 +1268,7 @@ DXGI_FORMAT DirectX::GetDXGIFormat(const DDS_PIXELFORMAT &ddpf) noexcept
 //--------------------------------------------------------------------------------------
 // Return the BPP for a particular format
 //--------------------------------------------------------------------------------------
-size_t DirectX::BitsPerPixel(DXGI_FORMAT fmt) noexcept
+size_t DirectX::LegacyBitsPerPixel(DXGI_FORMAT fmt) noexcept
 {
     switch (fmt)
     {

@@ -39,7 +39,8 @@ namespace Ailu
                                               static_cast<u32>(EResourceUsage::kCopyDst);
                 constexpr u32 k_read_mask = static_cast<u32>(EResourceUsage::kReadSRV) |
                                              static_cast<u32>(EResourceUsage::kCopySrc) |
-                                             static_cast<u32>(EResourceUsage::kIndirectArgument);
+                                             static_cast<u32>(EResourceUsage::kIndirectArgument) |
+                                             static_cast<u32>(EResourceUsage::kVertexBuffer);
                 constexpr u32 k_known_mask = k_write_mask | k_read_mask |
                                               static_cast<u32>(EResourceUsage::kRaytracingAccel);
 
@@ -91,6 +92,8 @@ namespace Ailu
                         state_bits |= static_cast<u32>(EResourceState::kCopySource);
                     if (HasUsage(usage, EResourceUsage::kIndirectArgument))
                         state_bits |= static_cast<u32>(EResourceState::kIndirectArgument);
+                    if (HasUsage(usage, EResourceUsage::kVertexBuffer))
+                        state_bits |= static_cast<u32>(EResourceState::kVertexAndConstantBuffer);
                     out_state = static_cast<EResourceState>(state_bits);
                 }
                 return true;
@@ -103,6 +106,29 @@ namespace Ailu
 
         RenderGraph::~RenderGraph()
         {
+        }
+
+        void RenderGraph::AddVertexBufferReads(const Vector<RGHandle> &handles)
+        {
+            for (RenderPass *pass : _passes)
+            {
+                if (pass == nullptr || pass->_type != EPassType::kGraphics)
+                    continue;
+                for (const RGHandle handle : handles)
+                {
+                    if (!handle.IsValid() || std::find(pass->_input_handles.begin(), pass->_input_handles.end(), handle) !=
+                                                        pass->_input_handles.end())
+                        continue;
+                    ResourceAccess access;
+                    access._usage = EResourceUsage::kVertexBuffer;
+                    if (auto *node = GetResourceNode(handle); node != nullptr && handle._version < node->_versions.size())
+                        node->_versions[handle._version]._consumers.emplace_back(pass);
+                    pass->_input_handles.emplace_back(handle);
+                    pass->_input_accesses[handle] = access;
+                    pass->_input_access_records.emplace_back(ResourceAccessRecord{handle, access});
+                }
+            }
+            _is_compiled = false;
         }
 
         bool RenderGraph::ContainsResource(const GpuResource *resource) const
@@ -382,7 +408,7 @@ namespace Ailu
             if (external == nullptr)
                 return RGHandle(0u);
             auto res_type = external->GetResourceType();
-            if (res_type == EGpuResType::kVertexBuffer || res_type == EGpuResType::kIndexBuffer || res_type == EGpuResType::kConstBuffer || res_type == EGpuResType::kGraphicsPSO)
+            if (res_type == EGpuResType::kIndexBuffer || res_type == EGpuResType::kConstBuffer || res_type == EGpuResType::kGraphicsPSO)
             {
                 AL_ASSERT_MSG(false, "RenderGraph::Import: Unsupported resource type!");
             }
@@ -1249,6 +1275,8 @@ namespace Ailu
                     tokens.emplace_back("IndirectArg");
                 if (HasUsage(usage, EResourceUsage::kRaytracingAccel))
                     tokens.emplace_back("RTAS");
+                if (HasUsage(usage, EResourceUsage::kVertexBuffer))
+                    tokens.emplace_back("VertexBuffer");
                 return join_strings(tokens, "|");
             };
             const auto state_name = [](EResourceState state)

@@ -1,0 +1,11 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "8e2f6b6c-0f47-4c1f-a21d-68c8a22f3b4e",
+        "_asset_type": "Ailu::Render::ComputeShader",
+        "_asset_name": "compute_skinning",
+        "_dependencies": []
+    },
+    "_file": "compute_skinning.hlsl",
+    "_kernel": "Noname"
+}

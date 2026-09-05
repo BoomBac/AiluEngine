@@ -158,9 +158,13 @@ namespace Ailu
         HashBytes(hash, setting._name_id.data(), setting._name_id.size());
         HashBytes(hash, &setting._is_copy, sizeof(setting._is_copy));
         HashBytes(hash, &setting._is_reimport, sizeof(setting._is_reimport));
-        HashBytes(hash, &setting._is_sRGB, sizeof(setting._is_sRGB));
+        HashBytes(hash, &setting._content, sizeof(setting._content));
+        HashBytes(hash, &setting._is_srgb, sizeof(setting._is_srgb));
         HashBytes(hash, &setting._generate_mipmap, sizeof(setting._generate_mipmap));
         HashBytes(hash, &setting._is_readable, sizeof(setting._is_readable));
+        HashBytes(hash, &setting._max_size, sizeof(setting._max_size));
+        HashBytes(hash, &setting._compression, sizeof(setting._compression));
+        HashBytes(hash, &setting._compression_quality, sizeof(setting._compression_quality));
         return hash;
     }
 

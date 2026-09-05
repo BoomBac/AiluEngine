@@ -210,3 +210,4 @@ template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::ERootMotionRotationMode>()
 return s_enum_type_ERootMotionRotationMode.get();
 }
 //Enum ERootMotionRotationMode end...........................
+

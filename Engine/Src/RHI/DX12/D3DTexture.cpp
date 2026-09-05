@@ -67,10 +67,52 @@ namespace Ailu::RHI::DX12
     static u16 CalculateSubResourceNum(ID3D12Device* device,const D3D12_RESOURCE_DESC& desc)
     {
         UINT planeCount = D3D12GetFormatPlaneCount(device, desc.Format);
-        UINT arraySize = (desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D) 
-                        ? 1 
+        UINT arraySize = (desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D)
+                        ? 1
                         : desc.DepthOrArraySize;
         return (u16)(desc.MipLevels * arraySize * planeCount);
+    }
+
+    static bool CalculateTextureDataLayout(EALGFormat format, u16 width, u16 height, u64 &row_pitch, u64 &slice_pitch)
+    {
+        const u32 pixel_size = GetPixelByteSize(format);
+        if (pixel_size != 0u)
+        {
+            row_pitch = static_cast<u64>(width) * pixel_size;
+            slice_pitch = row_pitch * height;
+            return true;
+        }
+
+        u32 block_size = 0u;
+        switch (format)
+        {
+            case EALGFormat::kALGFormatBC1_UNORM:
+            case EALGFormat::kALGFormatBC1_UNORM_SRGB:
+            case EALGFormat::kALGFormatBC4_UNORM:
+            case EALGFormat::kALGFormatBC4_SNORM:
+                block_size = 8u;
+                break;
+            case EALGFormat::kALGFormatBC2_UNORM:
+            case EALGFormat::kALGFormatBC2_UNORM_SRGB:
+            case EALGFormat::kALGFormatBC3_UNORM:
+            case EALGFormat::kALGFormatBC3_UNORM_SRGB:
+            case EALGFormat::kALGFormatBC5_UNORM:
+            case EALGFormat::kALGFormatBC5_SNORM:
+            case EALGFormat::kALGFormatBC6H_UF16:
+            case EALGFormat::kALGFormatBC6H_SF16:
+            case EALGFormat::kALGFormatBC7_UNORM:
+            case EALGFormat::kALGFormatBC7_UNORM_SRGB:
+                block_size = 16u;
+                break;
+            default:
+                return false;
+        }
+
+        const u64 block_width = std::max<u64>(1u, (static_cast<u64>(width) + 3u) / 4u);
+        const u64 block_height = std::max<u64>(1u, (static_cast<u64>(height) + 3u) / 4u);
+        row_pitch = block_width * block_size;
+        slice_pitch = row_pitch * block_height;
+        return true;
     }
 #pragma region D3DTexture2D
     //----------------------------------------------------------------------------D3DTexture2DNew-----------------------------------------------------------------------
@@ -123,14 +165,34 @@ namespace Ailu::RHI::DX12
                                                             nullptr, IID_PPV_ARGS(pTextureUpload.GetAddressOf())));
             NameAndLogTextureResource(pTextureUpload.Get(), DebugTextureName("tex2d_upload", _name));
             Vector<D3D12_SUBRESOURCE_DATA> subres_datas = {};
+            const auto &imported_pixel_data = ImportedPixelData();
+            const auto &imported_subresources = ImportedSubresources();
+            const bool has_imported_data = !imported_subresources.empty();
+            AL_ASSERT(!has_imported_data || imported_subresources.size() == _mipmap_count);
             for (size_t i = 0; i < _mipmap_count; i++)
             {
-                u16 cur_mip_width = _width >> i;
-                u16 cur_mip_height = _height >> i;
-                D3D12_SUBRESOURCE_DATA subdata;
-                subdata.pData = _pixel_data[i];
-                subdata.RowPitch = _pixel_size * cur_mip_width;// pixel size/byte  * width
-                subdata.SlicePitch = subdata.RowPitch * cur_mip_height;
+                D3D12_SUBRESOURCE_DATA subdata{};
+                if (has_imported_data)
+                {
+                    const auto &source = imported_subresources[i];
+                    AL_ASSERT(source._offset <= imported_pixel_data.size());
+                    AL_ASSERT(source._size <= imported_pixel_data.size() - source._offset);
+                    auto [cur_mip_width, cur_mip_height] = CalculateMipSize(_width, _height, static_cast<u16>(i));
+                    u64 row_pitch = 0u;
+                    u64 slice_pitch = 0u;
+                    AL_ASSERT(CalculateTextureDataLayout(_pixel_format, cur_mip_width, cur_mip_height, row_pitch, slice_pitch));
+                    AL_ASSERT(source._size == slice_pitch);
+                    subdata.pData = imported_pixel_data.data() + source._offset;
+                    subdata.RowPitch = static_cast<LONG_PTR>(row_pitch);
+                    subdata.SlicePitch = static_cast<LONG_PTR>(slice_pitch);
+                }
+                else
+                {
+                    auto [cur_mip_width, cur_mip_height] = CalculateMipSize(_width, _height, static_cast<u16>(i));
+                    subdata.pData = _pixel_data[i];
+                    subdata.RowPitch = _pixel_size * cur_mip_width;
+                    subdata.SlicePitch = subdata.RowPitch * cur_mip_height;
+                }
                 subres_datas.emplace_back(subdata);
             }
             UpdateSubresources(p_cmdlist, _p_d3dres.Get(), pTextureUpload.Get(), 0, 0, subresourceCount, subres_datas.data());

@@ -39,6 +39,24 @@ namespace Ailu::ECS
         s_validated_bind_pose_entities.clear();
     }
 
+    void AnimationSystem::PrepareVisibleSkinning(const Render::CullResult &cull_results)
+    {
+        if (_skinning_system != nullptr)
+            _skinning_system->PrepareVisibleSkinning(cull_results);
+    }
+
+    void AnimationSystem::RecordSkinningRenderGraph(Render::RDG::RenderGraph &graph, Render::RenderingData &data)
+    {
+        if (_skinning_system != nullptr)
+            _skinning_system->RecordRenderGraph(graph, data);
+    }
+
+    const Vector<Render::RDG::RGHandle> &AnimationSystem::GetSkinningOutputHandles() const noexcept
+    {
+        static const Vector<Render::RDG::RGHandle> kEmptyHandles;
+        return _skinning_system != nullptr ? _skinning_system->GetRenderGraphOutputHandles() : kEmptyHandles;
+    }
+
     void AnimationSystem::QueueCommand(Entity entity, ParameterCommand command)
     {
         _pending_commands[entity].push_back(std::move(command));
@@ -196,7 +214,7 @@ namespace Ailu::ECS
         PROFILE_BLOCK_CPU("AnimationSystem::Update")
         if (_skinning_system == nullptr)
             _skinning_system = MakeScope<SkinningSystem>();
-        _skinning_system->Clear();
+        _skinning_system->BeginFrame();
         _event_queue.Clear();
         const f32 dt = delta_time * TimeMgr::s_time_scale;
 
@@ -227,6 +245,7 @@ namespace Ailu::ECS
                     _sprite_bindings.erase(entity);
                     _animator_runtimes.erase(entity);
                     _matrix_palettes.erase(entity);
+                    _pose_handles.erase(entity);
                 }
                 continue;
             }
@@ -305,12 +324,18 @@ namespace Ailu::ECS
 
             AnimationController &controller = _controllers[entity];
             controller.SetAsset(&controller_asset);
-            ApplyCommands(entity, *instance, *animator, controller_asset);
+            {
+                PROFILE_BLOCK_CPU("AnimationSystem::ApplyCommands")
+                ApplyCommands(entity, *instance, *animator, controller_asset);
+            }
             if (!animator->_started)
                 continue;
 
             instance->_speed = std::max(animator->_speed, 0.0f);
-            ResolveMotionAssets(entity, controller_asset, controller);
+            {
+                PROFILE_BLOCK_CPU("AnimationSystem::ResolveMotionAssets")
+                ResolveMotionAssets(entity, controller_asset, controller);
+            }
             const auto resolve_blend_space_position = [&](const AnimationMotion &motion) -> Vector2f
             {
                 Vector2f position = Vector2f::kZero;
@@ -339,6 +364,7 @@ namespace Ailu::ECS
             };
             const auto resolve_motion_duration = [&](u16 state_index) -> f32
             {
+                PROFILE_BLOCK_CPU("AnimationSystem::ResolveMotionDuration")
                 if (state_index >= controller_asset.States().size())
                     return 0.0f;
                 const auto &state = controller_asset.States()[state_index];
@@ -382,12 +408,18 @@ namespace Ailu::ECS
             if (instance->_in_transition)
                 instance->_next_motion_duration = resolve_motion_duration(instance->_next_state);
 
-            controller.Update(*instance, dt);
-            runtime._evaluation = controller.Evaluate(*instance);
-            runtime._evaluation._root_motion_mode = animator->_root_motion_mode;
-            runtime._root_motion = {};
-            for (u8 sample_index = 0u; sample_index < runtime._evaluation._sample_count; ++sample_index)
-                ResolveClip(runtime._evaluation._samples[sample_index]._clip);
+            {
+                PROFILE_BLOCK_CPU("AnimationSystem::ControllerUpdateAndEvaluate")
+                controller.Update(*instance, dt);
+                runtime._evaluation = controller.Evaluate(*instance);
+                runtime._evaluation._root_motion_mode = animator->_root_motion_mode;
+                runtime._root_motion = {};
+            }
+            {
+                PROFILE_BLOCK_CPU("AnimationSystem::ResolveEvaluationClips")
+                for (u8 sample_index = 0u; sample_index < runtime._evaluation._sample_count; ++sample_index)
+                    ResolveClip(runtime._evaluation._samples[sample_index]._clip);
+            }
 
             const auto collect_state_events = [&](u16 state_index, f32 previous_time, f32 current_time,
                                                   bool allow_cosmetic)
@@ -454,132 +486,178 @@ namespace Ailu::ECS
                 }
             };
 
-            const u16 current_state = instance->_current_state;
-            const f32 current_previous_time = instance->_previous_state == current_state ?
-                instance->_previous_state_time : instance->_previous_next_state_time;
-            const bool in_transition = instance->_in_transition && instance->_next_state != kInvalidAnimationState;
-            const f32 transition_weight = in_transition && instance->_transition_duration > 0.0f ?
-                std::clamp(instance->_transition_time / instance->_transition_duration, 0.0f, 1.0f) : 0.0f;
-            collect_state_events(current_state, current_previous_time, instance->_state_time,
-                                 !in_transition || transition_weight <= 0.5f);
-            if (in_transition)
             {
-                const f32 next_previous_time = instance->_previous_next_state == instance->_next_state ?
-                    instance->_previous_next_state_time : 0.0f;
-                collect_state_events(instance->_next_state, next_previous_time, instance->_next_state_time,
-                                     transition_weight > 0.5f);
+                PROFILE_BLOCK_CPU("AnimationSystem::CollectEvents")
+                const u16 current_state = instance->_current_state;
+                const f32 current_previous_time = instance->_previous_state == current_state ?
+                    instance->_previous_state_time : instance->_previous_next_state_time;
+                const bool in_transition = instance->_in_transition && instance->_next_state != kInvalidAnimationState;
+                const f32 transition_weight = in_transition && instance->_transition_duration > 0.0f ?
+                    std::clamp(instance->_transition_time / instance->_transition_duration, 0.0f, 1.0f) : 0.0f;
+                collect_state_events(current_state, current_previous_time, instance->_state_time,
+                                     !in_transition || transition_weight <= 0.5f);
+                if (in_transition)
+                {
+                    const f32 next_previous_time = instance->_previous_next_state == instance->_next_state ?
+                        instance->_previous_next_state_time : 0.0f;
+                    collect_state_events(instance->_next_state, next_previous_time, instance->_next_state_time,
+                                         transition_weight > 0.5f);
+                }
             }
 
             bool root_motion_output_set = false;
-            for (auto &[skeleton_key, group] : runtime._skeleton_groups)
-                group._consumers.clear();
-            const auto collect_skeleton_meshes = [&](auto &&self, Entity current) -> void
             {
-                if (current != entity)
+                PROFILE_BLOCK_CPU("AnimationSystem::CollectSkeletonMeshes")
+                for (auto &[skeleton_key, group] : runtime._skeleton_groups)
+                    group._consumers.clear();
+                const auto collect_skeleton_meshes = [&](auto &&self, Entity current) -> void
                 {
-                    if (r.GetComponent<AnimatorComponent>(current) != nullptr)
-                        return;
-                    if (r.GetComponent<CSkeletonMesh>(current) != nullptr)
+                    if (current != entity)
                     {
-                        auto *component = r.GetComponent<CSkeletonMesh>(current);
-                        if (r.IsComponentEnabled<CSkeletonMesh>(current) && component->_p_mesh != nullptr)
+                        if (r.GetComponent<AnimatorComponent>(current) != nullptr)
+                            return;
+                        if (r.GetComponent<CSkeletonMesh>(current) != nullptr)
                         {
-                            const AssetRef<SkeletonAsset> &skeleton_ref = component->_p_mesh->GetSkeletonAsset();
-                            const Ref<SkeletonAsset> &skeleton_asset = skeleton_ref.Get();
-                            if (skeleton_ref.IsResolved())
+                            auto *component = r.GetComponent<CSkeletonMesh>(current);
+                            if (r.IsComponentEnabled<CSkeletonMesh>(current) && component->_p_mesh != nullptr)
                             {
-                                auto [group_iter, inserted] = runtime._skeleton_groups.try_emplace(skeleton_asset.get());
-                                group_iter->second._skeleton_asset = skeleton_asset;
-                                group_iter->second._consumers.emplace_back(current);
+                                const AssetRef<SkeletonAsset> &skeleton_ref = component->_p_mesh->GetSkeletonAsset();
+                                const Ref<SkeletonAsset> &skeleton_asset = skeleton_ref.Get();
+                                if (skeleton_ref.IsResolved())
+                                {
+                                    auto [group_iter, inserted] = runtime._skeleton_groups.try_emplace(skeleton_asset.get());
+                                    group_iter->second._skeleton_asset = skeleton_asset;
+                                    group_iter->second._consumers.emplace_back(current);
+                                }
                             }
                         }
                     }
-                }
-                else if (const auto *component = r.GetComponent<CSkeletonMesh>(current);
-                         component != nullptr && r.IsComponentEnabled<CSkeletonMesh>(current) &&
-                         component->_p_mesh != nullptr)
-                {
-                    const AssetRef<SkeletonAsset> &skeleton_ref = component->_p_mesh->GetSkeletonAsset();
-                    const Ref<SkeletonAsset> &skeleton_asset = skeleton_ref.Get();
-                    if (skeleton_ref.IsResolved())
+                    else if (const auto *component = r.GetComponent<CSkeletonMesh>(current);
+                             component != nullptr && r.IsComponentEnabled<CSkeletonMesh>(current) &&
+                             component->_p_mesh != nullptr)
                     {
-                        auto [group_iter, inserted] = runtime._skeleton_groups.try_emplace(skeleton_asset.get());
-                        group_iter->second._skeleton_asset = skeleton_asset;
-                        group_iter->second._consumers.emplace_back(current);
-                    }
-                }
-
-                const CHierarchy *hierarchy = r.GetComponent<CHierarchy>(current);
-                if (hierarchy == nullptr)
-                    return;
-                for (Entity child = hierarchy->_first_child; child != kInvalidEntity;)
-                {
-                    const CHierarchy *child_hierarchy = r.GetComponent<CHierarchy>(child);
-                    const Entity next = child_hierarchy != nullptr ? child_hierarchy->_next_sibling : kInvalidEntity;
-                    self(self, child);
-                    child = next;
-                }
-            };
-            collect_skeleton_meshes(collect_skeleton_meshes, entity);
-
-            for (auto &[skeleton_key, group] : runtime._skeleton_groups)
-            {
-                if (group._consumers.empty() || group._skeleton_asset == nullptr)
-                    continue;
-                const Skeleton &skeleton = group._skeleton_asset->GetSkeleton();
-                for (u8 sample_index = 0u; sample_index < runtime._evaluation._sample_count; ++sample_index)
-                {
-                    const Guid &clip_id = runtime._evaluation._samples[sample_index]._clip;
-                    if (group._binding.FindClip(clip_id) == nullptr)
-                    {
-                        const AnimationClip *clip = ResolveClip(clip_id);
-                        if (clip != nullptr)
-                            group._binding.Resolve(clip_id, *clip, skeleton);
-                    }
-                }
-                if (group._pose.Size() != skeleton.JointNum())
-                    group._pose = skeleton.GetBindPose();
-                const AnimationEvaluateResult evaluation_result = group._binding.Evaluate(runtime._evaluation, skeleton);
-                group._pose = evaluation_result._pose;
-                if (!root_motion_output_set)
-                {
-                    runtime._root_motion = evaluation_result._root_motion;
-                    root_motion_output_set = true;
-                }
-                group._pose.GetMatrixPalette(group._global_pose_palette);
-
-                for (const Entity mesh_entity : group._consumers)
-                {
-                    CSkeletonMesh *component = r.GetComponent<CSkeletonMesh>(mesh_entity);
-                    if (component == nullptr || component->_p_mesh == nullptr)
-                        continue;
-                    const bool validate_bind_pose = s_validate_bind_pose && !s_validated_bind_pose_entities.contains(mesh_entity);
-                    Vector<Matrix4x4f> &palette = _matrix_palettes[mesh_entity];
-                    component->_p_mesh->BuildSkinMatrixPalette(
-                        std::span<const Matrix4x4f>(group._global_pose_palette.data(), group._global_pose_palette.size()),
-                        palette);
-                    if (validate_bind_pose)
-                    {
-                        f32 max_error = 0.0f;
-                        Vector<Matrix4x4f> bind_palette;
-                        skeleton.GetBindPose().GetMatrixPalette(bind_palette);
-                        const Matrix4x4f &mesh_bind_global = component->_p_mesh->GetMeshBindGlobalTransform();
-                        const Matrix4x4f &mesh_current_global_inv =
-                            component->_p_mesh->GetMeshCurrentGlobalInverseTransform();
-                        for (const Joint &joint : skeleton)
-                            max_error = std::max(max_error, GetMatrixIdentityError(mesh_bind_global * joint._inv_bind_pos *
-                                                                                    bind_palette[joint._self] * mesh_current_global_inv));
-                        if (max_error < kBindPoseMatrixTolerance)
+                        const AssetRef<SkeletonAsset> &skeleton_ref = component->_p_mesh->GetSkeletonAsset();
+                        const Ref<SkeletonAsset> &skeleton_asset = skeleton_ref.Get();
+                        if (skeleton_ref.IsResolved())
                         {
-                            LOG_INFO("Skinning bind pose validation passed for entity {} (max error {})", mesh_entity, max_error);
+                            auto [group_iter, inserted] = runtime._skeleton_groups.try_emplace(skeleton_asset.get());
+                            group_iter->second._skeleton_asset = skeleton_asset;
+                            group_iter->second._consumers.emplace_back(current);
+                        }
+                    }
+
+                    const CHierarchy *hierarchy = r.GetComponent<CHierarchy>(current);
+                    if (hierarchy == nullptr)
+                        return;
+                    for (Entity child = hierarchy->_first_child; child != kInvalidEntity;)
+                    {
+                        const CHierarchy *child_hierarchy = r.GetComponent<CHierarchy>(child);
+                        const Entity next = child_hierarchy != nullptr ? child_hierarchy->_next_sibling : kInvalidEntity;
+                        self(self, child);
+                        child = next;
+                    }
+                };
+                collect_skeleton_meshes(collect_skeleton_meshes, entity);
+            }
+
+            {
+                PROFILE_BLOCK_CPU("AnimationSystem::EvaluateSkeletonsAndSkinning")
+                for (auto &[skeleton_key, group] : runtime._skeleton_groups)
+                {
+                    if (group._consumers.empty() || group._skeleton_asset == nullptr)
+                        continue;
+                    const Skeleton &skeleton = group._skeleton_asset->GetSkeleton();
+                    {
+                        PROFILE_BLOCK_CPU("AnimationSystem::ResolveSkeletonBindings")
+                        for (u8 sample_index = 0u; sample_index < runtime._evaluation._sample_count; ++sample_index)
+                        {
+                            const Guid &clip_id = runtime._evaluation._samples[sample_index]._clip;
+                            if (group._binding.FindClip(clip_id) == nullptr)
+                            {
+                                const AnimationClip *clip = ResolveClip(clip_id);
+                                if (clip != nullptr)
+                                    group._binding.Resolve(clip_id, *clip, skeleton);
+                            }
+                        }
+                    }
+                    {
+                        PROFILE_BLOCK_CPU("AnimationSystem::EvaluateSkeletonPose")
+                        if (group._pose.Size() != skeleton.JointNum())
+                            group._pose = skeleton.GetBindPose();
+                        const AnimationEvaluateResult evaluation_result = group._binding.Evaluate(runtime._evaluation, skeleton);
+                        group._pose = evaluation_result._pose;
+                        if (!root_motion_output_set)
+                        {
+                            runtime._root_motion = evaluation_result._root_motion;
+                            root_motion_output_set = true;
+                        }
+                        group._pose.GetMatrixPalette(group._global_pose_palette);
+                    }
+
+                    for (const Entity mesh_entity : group._consumers)
+                    {
+                        PROFILE_BLOCK_CPU("AnimationSystem::BuildMeshSkinPalette")
+                        CSkeletonMesh *component = r.GetComponent<CSkeletonMesh>(mesh_entity);
+                        if (component == nullptr || component->_p_mesh == nullptr)
+                            continue;
+                        const bool validate_bind_pose =
+                            s_validate_bind_pose && !s_validated_bind_pose_entities.contains(mesh_entity);
+                        Vector<Matrix4x4f> &palette = _matrix_palettes[mesh_entity];
+                        component->_p_mesh->BuildSkinMatrixPalette(
+                            std::span<const Matrix4x4f>(group._global_pose_palette.data(), group._global_pose_palette.size()),
+                            palette);
+                        if (validate_bind_pose)
+                        {
+                            f32 max_error = 0.0f;
+                            Vector<Matrix4x4f> bind_palette;
+                            skeleton.GetBindPose().GetMatrixPalette(bind_palette);
+                            const Matrix4x4f &mesh_bind_global = component->_p_mesh->GetMeshBindGlobalTransform();
+                            const Matrix4x4f &mesh_current_global_inv =
+                                component->_p_mesh->GetMeshCurrentGlobalInverseTransform();
+                            for (const Joint &joint : skeleton)
+                                max_error = std::max(max_error, GetMatrixIdentityError(mesh_bind_global * joint._inv_bind_pos *
+                                                                                        bind_palette[joint._self] * mesh_current_global_inv));
+                            if (max_error < kBindPoseMatrixTolerance)
+                            {
+                                LOG_INFO("Skinning bind pose validation passed for entity {} (max error {})", mesh_entity,
+                                         max_error);
+                            }
+                            else
+                            {
+                                LOG_ERROR("Skinning bind pose validation failed for entity {} (max error {})", mesh_entity,
+                                          max_error);
+                            }
+                            s_validated_bind_pose_entities.emplace(mesh_entity);
+                        }
+                        if (_skinning_system->IsGpuSkinningEnabled())
+                        {
+                            PROFILE_BLOCK_CPU("AnimationSystem::UploadGpuSkinPose")
+                            PoseHandle &pose_handle = _pose_handles[mesh_entity];
+                            if (!pose_handle.IsValid())
+                                pose_handle = _skinning_system->CreatePoseHandle();
+                            _skinning_system->UploadPose(pose_handle,
+                                                         std::span<const Matrix4x4f>(palette.data(), palette.size()));
+                            _skinning_system->SetEntityPose(static_cast<u32>(mesh_entity), pose_handle);
                         }
                         else
                         {
-                            LOG_ERROR("Skinning bind pose validation failed for entity {} (max error {})", mesh_entity, max_error);
+                            PROFILE_BLOCK_CPU("AnimationSystem::SubmitCpuSkinning")
+                            _skinning_system->Submit(component->_p_mesh.get(), palette, s_vertex_num_per_skin_task);
                         }
-                        s_validated_bind_pose_entities.emplace(mesh_entity);
                     }
-                    _skinning_system->Submit(component->_p_mesh.get(), palette, s_vertex_num_per_skin_task);
+                }
+            }
+
+            if (animator->_root_motion_mode == ERootMotionMode::kApply && !runtime._root_motion.IsIdentity())
+            {
+                if (TransformComponent *transform = r.GetComponent<TransformComponent>(entity); transform != nullptr)
+                {
+                    const Transform &current = transform->_local_transform;
+                    const Vector3f position = current._position + current._rotation * runtime._root_motion._translation;
+                    const Quaternion rotation = Quaternion::NormalizedQ(
+                        runtime._root_motion._rotation * current._rotation);
+                    transform->SetLocalPosition(position);
+                    transform->SetLocalRotation(rotation);
                 }
             }
 
@@ -598,19 +676,31 @@ namespace Ailu::ECS
             }
         }
 
-        for (auto runtime_iter = _animator_runtimes.begin(); runtime_iter != _animator_runtimes.end();)
         {
-            if (!_entities.contains(runtime_iter->first))
-                runtime_iter = _animator_runtimes.erase(runtime_iter);
-            else
-                ++runtime_iter;
-        }
-        for (auto failed_iter = _failed_direct_clips.begin(); failed_iter != _failed_direct_clips.end();)
-        {
-            if (!_entities.contains(failed_iter->first))
-                failed_iter = _failed_direct_clips.erase(failed_iter);
-            else
-                ++failed_iter;
+            PROFILE_BLOCK_CPU("AnimationSystem::Cleanup")
+            for (auto runtime_iter = _animator_runtimes.begin(); runtime_iter != _animator_runtimes.end();)
+            {
+                if (!_entities.contains(runtime_iter->first))
+                    runtime_iter = _animator_runtimes.erase(runtime_iter);
+                else
+                    ++runtime_iter;
+            }
+            for (auto failed_iter = _failed_direct_clips.begin(); failed_iter != _failed_direct_clips.end();)
+            {
+                if (!_entities.contains(failed_iter->first))
+                    failed_iter = _failed_direct_clips.erase(failed_iter);
+                else
+                    ++failed_iter;
+            }
+            for (auto pose_iter = _pose_handles.begin(); pose_iter != _pose_handles.end();)
+            {
+                // _entities only contains entities matching the AnimationSystem signature (AnimatorComponent).
+                // Skinning poses are keyed by SkeletonMesh consumers, which may be hierarchy children instead.
+                if (!r.IsAlive(pose_iter->first) || r.GetComponent<CSkeletonMesh>(pose_iter->first) == nullptr)
+                    pose_iter = _pose_handles.erase(pose_iter);
+                else
+                    ++pose_iter;
+            }
         }
     }
 

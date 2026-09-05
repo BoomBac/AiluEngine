@@ -22,8 +22,26 @@ namespace Ailu
     {
         kDisabled,
         kExtractOnly,
-        kApply
+        kApply,
+        kInPlace
     };
+
+    inline constexpr u8 kRootMotionModeCount = 4u;
+
+    inline bool IsValidRootMotionMode(ERootMotionMode mode)
+    {
+        return static_cast<u8>(mode) < kRootMotionModeCount;
+    }
+
+    inline ERootMotionMode DeserializeRootMotionMode(u8 value)
+    {
+        return value < kRootMotionModeCount ? static_cast<ERootMotionMode>(value) : ERootMotionMode::kDisabled;
+    }
+
+    inline u8 SerializeRootMotionMode(ERootMotionMode mode)
+    {
+        return IsValidRootMotionMode(mode) ? static_cast<u8>(mode) : static_cast<u8>(ERootMotionMode::kDisabled);
+    }
 }
 
 #endif // __ROOT_MOTION_H__

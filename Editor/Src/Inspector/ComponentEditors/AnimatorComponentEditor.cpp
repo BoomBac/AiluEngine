@@ -54,11 +54,11 @@ namespace Ailu
             };
 
             auto *root_motion_mode = AddDropdownRow(context._content, "Root Motion",
-                                                    {"Disabled", "Extract Only", "Apply"});
+                                                    {"Disabled", "Extract Only", "Apply", "In Place"});
             root_motion_mode->SetSelectedIndex(static_cast<i32>(component->_root_motion_mode), false);
             root_motion_mode->_on_selected_changed += [component](i32 index)
             {
-                if (index >= 0 && index <= 2)
+                if (index >= 0 && index <= 3)
                     component->_root_motion_mode = static_cast<ERootMotionMode>(index);
                 SceneManagement::SceneMgr::Get().MarkCurSceneDirty();
             };

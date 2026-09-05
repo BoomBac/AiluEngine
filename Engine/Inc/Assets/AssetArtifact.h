@@ -14,7 +14,8 @@ namespace Ailu
 
     inline constexpr u32 kAssetArtifactMagic = 0x41494C55u;
     inline constexpr u16 kAssetArtifactContainerVersion = 1u;
-    inline constexpr u32 kTextureArtifactVersion = 1u;
+    inline constexpr u32 kTextureImporterVersion = 2u;
+    inline constexpr u32 kTextureArtifactVersion = 3u;
     inline constexpr u32 kMeshArtifactVersion = 2u;
     inline constexpr u32 kAnimationClipArtifactVersion = 3u;
 

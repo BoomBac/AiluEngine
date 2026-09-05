@@ -95,10 +95,10 @@ namespace Ailu
                                               file_text->GetSlotAs<LinearSlot>().SizePolicy(ESizePolicy::kFill, ESizePolicy::kAuto);
                                               file_text->_horizontal_align = EAlignment::kLeft;
 
-                                              auto *srgb = EditorPopup::AddCheckBoxRow(content, "sRGB", setting->_is_sRGB);
+                                              auto *srgb = EditorPopup::AddCheckBoxRow(content, "sRGB", setting->_is_srgb);
                                               srgb->_on_click += [setting](bool checked)
                                               {
-                                                  setting->_is_sRGB = checked;
+                                                  setting->_is_srgb = checked;
                                               };
 
                                               auto *mipmap = EditorPopup::AddCheckBoxRow(content, "Generate Mipmap", setting->_generate_mipmap);

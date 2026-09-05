@@ -10,10 +10,8 @@
                                 friend const Type* Z_Construct_ScriptAssetValue_Type();\
                                 static const Type* GetPrivateStaticClass();\
                             public:\
-                                ScriptAssetValue() = default;\
-                                ScriptAssetValue(Guid guid, String asset_type) : _guid(guid), _asset_type(std::move(asset_type)) {}\
                                 static const Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual const Type  *GetType();
+                                const Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu{
 struct ScriptAssetValue ;

@@ -116,6 +116,10 @@ namespace Ailu
     void PropertyInfo::Deserialize(void *instance, FArchive &ar) const
     {
         AL_ASSERT(_deserialize_fn != nullptr);
+        if (auto *structured_archive = dynamic_cast<FStructedArchive *>(&ar);
+            structured_archive != nullptr && structured_archive->IsLoading() &&
+            !structured_archive->HasField(_name))
+            return;
         const String &name = _name;
         _deserialize_fn(reinterpret_cast<u8 *>(instance) + _offset, ar, &name);
     }

@@ -115,6 +115,33 @@ namespace Ailu
                 if (auto *instance_buffer = _sprite_batcher->InstanceBuffer(); instance_buffer != nullptr)
                     builder.Read(builder.Import(instance_buffer));
             };
+            const auto read_light_probe_resources = [](RDG::RenderGraphBuilder &builder)
+            {
+                auto *scene = SceneMgr::Get().ActiveScene();
+                if (scene == nullptr)
+                    return;
+                auto &registry = scene->GetRegister();
+                for (auto &probe: registry.View<ECS::CLightProbe>())
+                {
+                    Texture *source = nullptr;
+                    switch (probe._src_type)
+                    {
+                    case 0:
+                        source = probe._cubemap.get();
+                        break;
+                    case 1:
+                        source = probe._pass != nullptr ? probe._pass->_radiance_map.get() : nullptr;
+                        break;
+                    case 2:
+                        source = probe._pass != nullptr ? probe._pass->_prefilter_cubemap.get() : nullptr;
+                        break;
+                    default:
+                        break;
+                    }
+                    if (source != nullptr)
+                        builder.Read(builder.Import(source));
+                }
+            };
             if (rendering_data._scene != nullptr && rendering_data._camera != nullptr)
                 CollectSprites(*rendering_data._scene, *rendering_data._camera, false);
             graph.AddPass("PickBuffer", RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
@@ -123,20 +150,18 @@ namespace Ailu
                                      _depth_handle = builder.Import(_depth);
                                      _color_handle = builder.Write(_color_handle);
                                      _depth_handle = builder.Write(_depth_handle,EResourceUsage::kDSV);
+                                     builder.Read(rendering_data._rg_handles._color_target, EResourceUsage::kWriteRTV);
+                                     builder.Read(rendering_data._rg_handles._depth_target, EResourceUsage::kDSV);
+                                     rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target);
+                                     rendering_data._rg_handles._depth_target = builder.Write(rendering_data._rg_handles._depth_target,
+                                                                                             EResourceUsage::kDSV);
                                      read_sprite_resources(builder);
+                                     read_light_probe_resources(builder);
                 }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data)
                 {
-                      cmd->SetRenderTarget(_color_handle, _depth_handle);
                 ECS::Register &r = SceneMgr::Get().ActiveScene()->GetRegister();
-             for (const auto &queue_data: *rendering_data._cull_results)
-                {
-                    auto &[queue, objs] = queue_data;
-                    for (auto &obj: objs)
-                    {
-                        cmd->DrawMesh(obj._mesh, _pick_gen.get(), (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, 0, obj._instance_count);
-                    }
-                }
-                RecordSpritePick(cmd, rendering_data);
+                cmd->SetRenderTarget(rendering_data._rg_handles._color_target,
+                                     rendering_data._rg_handles._depth_target);
                 if (auto &selected = Editor::Selection::SelectedEntities(); selected.size() > 0)
                 {
                     for (auto entity: selected)
@@ -160,6 +185,16 @@ namespace Ailu
                         }
                     }
                 }
+                cmd->SetRenderTarget(_color_handle, _depth_handle);
+             for (const auto &queue_data: *rendering_data._cull_results)
+                {
+                    auto &[queue, objs] = queue_data;
+                    for (auto &obj: objs)
+                    {
+                        cmd->DrawMesh(obj._mesh, _pick_gen.get(), (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, 0, obj._instance_count);
+                    }
+                }
+                RecordSpritePick(cmd, rendering_data);
                 u16 entity_index = 0;
                 for (auto &light_comp: r.View<ECS::LightComponent>())
                 {

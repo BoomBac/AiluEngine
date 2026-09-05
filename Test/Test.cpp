@@ -102,6 +102,7 @@ namespace Ailu::AnimationTests
     bool TestRootMotionExtraction();
     bool TestRootMotionLoopWrap();
     bool TestRootMotionBindingModes();
+    bool TestAnimatorRootMotionModeSerialization();
     bool TestSpriteAnimationTrackSampling();
     bool TestTrackEndFrameSampling();
     bool TestSparseTransformTrackSemantics();
@@ -1924,6 +1925,7 @@ namespace
         RunTest(result, "Root Motion extraction", TestRootMotionExtraction);
         RunTest(result, "Root Motion loop wrap", TestRootMotionLoopWrap);
         RunTest(result, "Root Motion binding modes", TestRootMotionBindingModes);
+        RunTest(result, "Animator root motion mode serialization", TestAnimatorRootMotionModeSerialization);
         RunTest(result, "Sprite animation track sampling", TestSpriteAnimationTrackSampling);
         RunTest(result, "Track end frame sampling", TestTrackEndFrameSampling);
         RunTest(result, "Sparse transform track semantics", TestSparseTransformTrackSemantics);

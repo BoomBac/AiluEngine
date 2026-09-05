@@ -11,6 +11,7 @@
 #include "Assets/PrefabAsset.h"
 #include "Assets/ScriptAsset.h"
 #include "Assets/TextureArtifact.h"
+#include "Assets/TextureImporter.h"
 #include "Assets/WidgetAsset.h"
 #include "Audio/AudioClip.h"
 #include "Audio/AudioClipDocument.h"
@@ -898,7 +899,7 @@ Scope<Asset> TextureAssetHandler::Load(const AssetLoadContext &context)
     const WString source_system_path = context._resource_mgr->GetResSysPath(resolved_file);
     AssetArtifactKey artifact_key;
     SourceFingerprint source_fingerprint;
-    artifact_key._importer_version = 1u;
+    artifact_key._importer_version = kTextureImporterVersion;
     artifact_key._artifact_version = kTextureArtifactVersion;
     artifact_key._import_setting_hash = HashTextureImportSetting(json_setting);
 
@@ -944,22 +945,17 @@ Scope<Asset> TextureAssetHandler::Load(const AssetLoadContext &context)
 
     if (tex == nullptr)
     {
-        LOG_INFO(L"Texture artifact cache miss: {}", source_system_path);
-        const auto native_import_start = std::chrono::steady_clock::now();
-        tex = context._resource_mgr->LoadExternalTexture(resolved_file, json_setting);
-        native_import_us = ElapsedMicroseconds(native_import_start);
-        if (tex != nullptr && has_source_fingerprint && context._derived_data_cache != nullptr)
+        TextureArtifact artifact;
+        TextureImporter importer;
+        if (importer.Import(source_system_path, json_setting, artifact))
         {
-            const auto artifact_write_start = std::chrono::steady_clock::now();
-            TextureArtifact artifact;
-            Vector<u8> serialized_artifact;
-            if (BuildTextureArtifact(*tex, artifact) &&
-                SerializeTextureArtifact(artifact, artifact_key, serialized_artifact))
+            tex = CreateTextureFromArtifact(artifact);
+            if (tex != nullptr && has_source_fingerprint && context._derived_data_cache != nullptr)
             {
-                artifact_size = serialized_artifact.size();
-                context._derived_data_cache->Store(Guid(doc._header._guid), artifact_key, serialized_artifact);
+                Vector<u8> serialized_artifact;
+                if (SerializeTextureArtifact(artifact, artifact_key, serialized_artifact))
+                    context._derived_data_cache->Store(Guid(doc._header._guid), artifact_key, serialized_artifact);
             }
-            artifact_write_us = ElapsedMicroseconds(artifact_write_start);
         }
     }
     if (tex == nullptr)
@@ -968,12 +964,9 @@ Scope<Asset> TextureAssetHandler::Load(const AssetLoadContext &context)
         ? doc._header._asset_name
         : ToChar(PathUtils::GetFileName(context._asset_path).c_str());
     tex->Name(texture_name);
-    if (loaded_from_artifact)
-    {
-        const auto gpu_upload_start = std::chrono::steady_clock::now();
-        tex->Apply();
-        gpu_upload_us = ElapsedMicroseconds(gpu_upload_start);
-    }
+    const auto gpu_upload_start = std::chrono::steady_clock::now();
+    tex->Apply();
+    gpu_upload_us = ElapsedMicroseconds(gpu_upload_start);
     LOG_INFO(L"Texture artifact {}: {} (artifact_path={}, artifact_read={} us, native_import={} us, "
              L"runtime_create={} us, gpu_upload={} us, artifact_write={} us, artifact_size={} bytes)",
              loaded_from_artifact ? L"hit" : L"miss", source_system_path, artifact_path, artifact_read_us,
@@ -1837,7 +1830,7 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
                 component._clip = Guid(entity_doc._animator_component._clip_guid);
             component._speed = entity_doc._animator_component._speed;
             component._play_on_awake = entity_doc._animator_component._play_on_awake;
-            component._root_motion_mode = static_cast<ERootMotionMode>(entity_doc._animator_component._root_motion_mode);
+            component._root_motion_mode = DeserializeRootMotionMode(entity_doc._animator_component._root_motion_mode);
         }
         if (entity_doc._has_vxgi_component)
         {
@@ -2096,7 +2089,7 @@ Scope<Asset> AnimationClipAssetHandler::Load(const AssetLoadContext &context)
     AssetDocumentHeader header;
     const bool has_header = LoadAssetDocumentHeader(sys_path, header);
     AssetArtifactKey artifact_key;
-    artifact_key._importer_version = 1u;
+    artifact_key._importer_version = kTextureImporterVersion;
     artifact_key._artifact_version = kAnimationClipArtifactVersion;
     SourceFingerprint source_fingerprint;
     const bool has_source_fingerprint = CalculateSourceFingerprint(sys_path, source_fingerprint);

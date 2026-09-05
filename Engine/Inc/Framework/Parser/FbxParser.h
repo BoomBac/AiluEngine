@@ -15,8 +15,10 @@ namespace Ailu
     {
     public:
         inline static constexpr u16 kMaxInfluenceBoneNum = 4;
+        inline static bool s_validate_import = false;
         FbxParser();
         virtual ~FbxParser();
+        static void SetValidateImportEnabled(bool enabled) { s_validate_import = enabled; }
         void Parser(const WString &sys_path, const MeshImportSetting &import_setting) final;
         const List<Ref<AnimationClip>> &GetAnimationClips() const final { return _loaded_anims; }
         Ref<SkeletonAsset> GetSkeletonAsset() const final { return _skeleton_asset; }
@@ -36,6 +38,8 @@ namespace Ailu
             Vector<Vector4D<u32>> _bone_indices;
         };
         void ParserImpl(WString sys_path);
+        void ConfigureIOSettings();
+        void DestroyCurrentScene();
 
         void ParserFbxNode(FbxNode *node, Queue<FbxNode *> &mesh_node, Queue<FbxNode *> &skeleton_node);
         void ParserSkeleton(FbxNode *node, Skeleton &sk);
@@ -48,6 +52,7 @@ namespace Ailu
         bool ReadVertex(fbxsdk::FbxNode *node, Vector<Vector3f>& positions, Vector<Vector4f>& weights, Vector<Vector4D<u32>>& bone_indices);
         bool ReadUVs(const fbxsdk::FbxMesh &fbx_mesh, Vector<Vector<Vector2f>> &uvs);
         bool ReadTangent(const fbxsdk::FbxMesh &fbx_mesh, Vector<Vector3f>& tangents);
+        bool CalculateNormals(Mesh *mesh);
         bool CalculateTangant(Mesh *mesh);
         void GenerateIndexdMesh(RawMeshData* mesh_data,Mesh *out_mesh);
         void FillCameraArray(FbxScene *pScene, FbxArray<FbxNode *> &pCameraArray);

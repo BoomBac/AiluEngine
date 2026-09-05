@@ -21,7 +21,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::ImportSetting>()
 //Struct ImportSetting end...........................
 
 //Struct TextureImportSetting begin...........................
-#define IPARSER_GEN_H_72_GENERATED_BODY \
+#define IPARSER_GEN_H_99_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_TextureImportSetting_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -37,7 +37,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::TextureImportSet
 //Struct TextureImportSetting end...........................
 
 //Struct MeshImportSetting begin...........................
-#define IPARSER_GEN_H_90_GENERATED_BODY \
+#define IPARSER_GEN_H_125_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_MeshImportSetting_Type();\
                                 static const Type* GetPrivateStaticClass();\

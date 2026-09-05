@@ -181,7 +181,7 @@ struct DDS_HEADER_DXT10
                                     const uint8_t **bitData,
                                     size_t *bitSize) noexcept;
 
-    size_t BitsPerPixel(_In_ DXGI_FORMAT fmt) noexcept;
+    size_t LegacyBitsPerPixel(_In_ DXGI_FORMAT fmt) noexcept;
     DXGI_FORMAT GetDXGIFormat(const DDS_PIXELFORMAT &ddpf) noexcept;
     // Standard version
     HRESULT __cdecl LoadDDSTextureFromMemory(

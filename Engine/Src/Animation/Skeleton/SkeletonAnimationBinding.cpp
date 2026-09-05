@@ -22,6 +22,11 @@ namespace Ailu
                 if (index >= 0)
                     return index;
             }
+            for (const Joint &joint : skeleton)
+            {
+                if (joint._parent == Joint::kInvalidJointIndex)
+                    return joint._self;
+            }
             return -1;
         }
     }
@@ -95,8 +100,12 @@ namespace Ailu
                 Pose::Blend(result._pose, result._pose, sample_pose, blend_weight, Joint::kInvalidJointIndex);
                 result._root_motion._translation = result._root_motion._translation * (1.0f - blend_weight) +
                                                    sample_root_motion._translation * blend_weight;
-                result._root_motion._rotation = Quaternion::SLerp(result._root_motion._rotation,
-                                                                   sample_root_motion._rotation, blend_weight);
+                Quaternion target_rotation = sample_root_motion._rotation;
+                if (Quaternion::Dot(result._root_motion._rotation, target_rotation) < 0.0f)
+                    target_rotation = Quaternion(-target_rotation.x, -target_rotation.y, -target_rotation.z,
+                                                 -target_rotation.w);
+                result._root_motion._rotation = Quaternion::NormalizedQ(
+                    result._root_motion._rotation * (1.0f - blend_weight) + target_rotation * blend_weight);
             }
             accumulated_weight = next_weight;
         }
@@ -146,7 +155,8 @@ namespace Ailu
             out_pose.SetLocalTransform(joint_index, track.Evaluate(local, time, loop));
         }
         RootMotionDelta root_motion;
-        if (mode == ERootMotionMode::kDisabled || !clip.GetRootMotionSettings()._enabled)
+        const bool in_place = mode == ERootMotionMode::kInPlace;
+        if (mode == ERootMotionMode::kDisabled || (!clip.GetRootMotionSettings()._enabled && !in_place))
             return root_motion;
 
         RootMotionSettings settings = clip.GetRootMotionSettings();
@@ -154,9 +164,10 @@ namespace Ailu
         if (settings._root_bone_index < 0 || settings._root_bone_index >= skeleton.JointNum())
             return root_motion;
 
-        if (has_previous_time)
+        if (has_previous_time && settings._enabled)
             root_motion = clip.ExtractRootMotion(previous_time, time, settings, loop);
-        if (mode != ERootMotionMode::kApply)
+        const bool lock_root = mode == ERootMotionMode::kApply || in_place;
+        if (!lock_root)
             return root_motion;
         const Transform current = out_pose.GetLocalTransform(settings._root_bone_index);
         const Transform first = clip.SampleRootTransform(
@@ -192,8 +203,11 @@ namespace Ailu
             };
             const Quaternion current_yaw = twist(current._rotation, axis);
             const Quaternion first_yaw = twist(first._rotation, axis);
-            const Quaternion swing = Quaternion::Inverse(current_yaw) * current._rotation;
-            locked._rotation = first_yaw * swing;
+            // Quaternion::operator* evaluates as right * left in expression order.
+            // Spell these in reverse so the mathematical order remains
+            // inverse(current_yaw) * current and first_yaw * swing.
+            const Quaternion swing = current._rotation * Quaternion::Inverse(current_yaw);
+            locked._rotation = swing * first_yaw;
             break;
         }
         case ERootMotionRotationMode::kFull:
@@ -201,6 +215,6 @@ namespace Ailu
             break;
         }
         out_pose.SetLocalTransform(settings._root_bone_index, locked);
-        return root_motion;
+        return mode == ERootMotionMode::kApply ? root_motion : RootMotionDelta{};
     }
 }

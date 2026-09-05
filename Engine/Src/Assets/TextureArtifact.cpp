@@ -74,8 +74,6 @@ namespace Ailu
             TextureArtifactSubresource subresource;
             subresource._offset = out_artifact._pixel_data.size();
             subresource._size = size;
-            subresource._row_pitch = static_cast<u32>(width) * pixel_size;
-            subresource._slice_pitch = static_cast<u32>(size);
             out_artifact._subresources.emplace_back(subresource);
             const auto *begin = static_cast<const u8 *>(pixel_data);
             out_artifact._pixel_data.insert(out_artifact._pixel_data.end(), begin, begin + size);
@@ -102,8 +100,6 @@ namespace Ailu
         {
             AppendValue(subresource_data, subresource._offset);
             AppendValue(subresource_data, subresource._size);
-            AppendValue(subresource_data, subresource._row_pitch);
-            AppendValue(subresource_data, subresource._slice_pitch);
         }
 
         AssetArtifactWriter writer;
@@ -125,7 +121,7 @@ namespace Ailu
         const std::span<const u8> desc_data = reader.GetSectionData(kTextureArtifactDescSection);
         const std::span<const u8> subresource_data = reader.GetSectionData(kTextureArtifactSubresourceSection);
         const std::span<const u8> pixel_data = reader.GetSectionData(kTextureArtifactPixelDataSection);
-        if (desc_data.empty() || subresource_data.size() % (sizeof(u64) * 2u + sizeof(u32) * 2u) != 0u)
+        if (desc_data.empty() || subresource_data.size() % (sizeof(u64) * 2u) != 0u)
             return false;
 
         size_t offset = 0u;
@@ -151,15 +147,13 @@ namespace Ailu
         out_artifact._desc._is_readable = is_readable != 0u;
         out_artifact._desc._is_random_access = is_random_access != 0u;
 
-        constexpr size_t kSubresourceSize = sizeof(u64) * 2u + sizeof(u32) * 2u;
+        constexpr size_t kSubresourceSize = sizeof(u64) * 2u;
         out_artifact._subresources.resize(subresource_data.size() / kSubresourceSize);
         offset = 0u;
         for (TextureArtifactSubresource &subresource : out_artifact._subresources)
         {
             if (!ReadValue(subresource_data, offset, subresource._offset) ||
                 !ReadValue(subresource_data, offset, subresource._size) ||
-                !ReadValue(subresource_data, offset, subresource._row_pitch) ||
-                !ReadValue(subresource_data, offset, subresource._slice_pitch) ||
                 subresource._offset > pixel_data.size() || subresource._size > pixel_data.size() - subresource._offset)
             {
                 return false;
@@ -187,11 +181,11 @@ namespace Ailu
         auto texture = Texture2D::Create(desc);
         if (texture == nullptr)
             return nullptr;
-        for (u16 mip = 0u; mip < artifact._subresources.size(); ++mip)
-        {
-            const auto &subresource = artifact._subresources[mip];
-            texture->SetPixelData(const_cast<u8 *>(artifact._pixel_data.data()), mip, subresource._offset);
-        }
+        Vector<Render::TextureSubresourceData> subresources;
+        subresources.reserve(artifact._subresources.size());
+        for (const TextureArtifactSubresource &subresource : artifact._subresources)
+            subresources.emplace_back(Render::TextureSubresourceData{subresource._offset, subresource._size});
+        texture->SetImportedPixelData(artifact._pixel_data, std::move(subresources));
         return texture;
     }
 }

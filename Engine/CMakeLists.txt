@@ -30,6 +30,11 @@ set(AILU_LUA_GENERATED_INCLUDE_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated/lua_inc
 
 # Physics2D uses Box2D as its sole runtime backend. Keep it an implementation detail of Engine.
 add_subdirectory(${ENGINE_ROOT_PATH}/Ext/box2d)
+set(BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+set(BUILD_SAMPLE OFF CACHE BOOL "" FORCE)
+set(BUILD_DX11 OFF CACHE BOOL "" FORCE)
+set(BUILD_DX12 OFF CACHE BOOL "" FORCE)
+add_subdirectory(${ENGINE_ROOT_PATH}/Ext/DirectXTex EXCLUDE_FROM_ALL)
 
 set(AILU_LUA_SCRIPTING_ENABLED 0)
 if (AILU_ENABLE_LUA_SCRIPTING)
@@ -274,7 +279,7 @@ d2d1.lib;dwrite.lib;d3d11.lib;
 imm32.lib;dwmapi.lib;
         ${ENGINE_ROOT_PATH}/Ext/dxc/lib/x64/dxcompiler.lib;d3dcompiler.lib;dxguid.lib;
         ${AILU_FBXSDK_LINK_LIB}) # ;msvcrtd.lib
-target_link_libraries(Engine PRIVATE box2d::box2d)
+target_link_libraries(Engine PRIVATE box2d::box2d DirectXTex)
 if (AILU_LUA_SCRIPTING_ENABLED)
         if (AILU_LUA_LIBRARY)
                 target_link_libraries(Engine PUBLIC ${AILU_LUA_LIBRARY})

@@ -1,5 +1,6 @@
 #include "Framework/Common/ResourceMgr.h"
 #include "Framework/Common/Allocator.hpp"
+#include "Assets/AssetArtifact.h"
 #include "Assets/AssetDocument.h"
 #include "Assets/ScriptAsset.h"
 #include "Assets/WidgetAsset.h"
@@ -281,6 +282,60 @@ namespace Ailu
 				normalized.push_back(L'/');
 			return normalized;
 		}
+
+		struct FbxSourceImportCacheEntry
+		{
+			Vector<std::weak_ptr<Mesh>> _meshes;
+			Vector<std::weak_ptr<AnimationClip>> _clips;
+			std::weak_ptr<SkeletonAsset> _skeleton_asset;
+			bool _has_skeleton_asset = false;
+		};
+
+		std::unordered_map<String, FbxSourceImportCacheEntry> s_fbx_source_import_cache;
+
+		Ref<Mesh> CloneImportedMesh(const Ref<Mesh> &source)
+		{
+			if (source == nullptr)
+				return nullptr;
+			Ref<Mesh> clone = dynamic_cast<SkeletonMesh *>(source.get()) != nullptr ?
+				std::static_pointer_cast<Mesh>(MakeRef<SkeletonMesh>(source->Name())) : MakeRef<Mesh>(source->Name());
+			clone->SetVertices(Vector<Vector3f>(source->GetVertices().begin(), source->GetVertices().end()));
+			clone->SetNormals(Vector<Vector3f>(source->GetNormals().begin(), source->GetNormals().end()));
+			clone->SetTangents(Vector<Vector4f>(source->GetTangents().begin(), source->GetTangents().end()));
+			for (u8 channel = 0u; channel < Mesh::kMaxUVChannels; ++channel)
+				clone->SetUVs(Vector<Vector2f>(source->GetUVs(channel).begin(), source->GetUVs(channel).end()), channel);
+			for (u16 submesh_index = 0u; submesh_index < source->SubmeshCount(); ++submesh_index)
+				clone->AddSubmesh(source->GetIndices(submesh_index));
+			clone->SetBounds(source->BoundBox());
+			for (const auto &material : source->GetCacheMaterials())
+				clone->AddCacheMaterial(material);
+			if (auto *source_skeleton_mesh = dynamic_cast<SkeletonMesh *>(source.get()))
+			{
+				auto *skeleton_mesh = dynamic_cast<SkeletonMesh *>(clone.get());
+				skeleton_mesh->SetBoneIndices(Vector<Vector4D<u32>>(source_skeleton_mesh->GetBoneIndices().begin(),
+				                                                  source_skeleton_mesh->GetBoneIndices().end()));
+				skeleton_mesh->SetBoneWeights(Vector<Vector4f>(source_skeleton_mesh->GetBoneWeights().begin(),
+				                                                  source_skeleton_mesh->GetBoneWeights().end()));
+				skeleton_mesh->SetMeshBindGlobalTransform(source_skeleton_mesh->GetMeshBindGlobalTransform());
+				skeleton_mesh->SetSkeletonAsset(source_skeleton_mesh->GetSkeletonAsset().GetGuid(),
+				                               source_skeleton_mesh->GetSkeletonAsset().Get());
+			}
+			return clone;
+		}
+
+		String MakeFbxSourceCacheKey(const WString &system_path, const SourceFingerprint &fingerprint,
+			const MeshImportSetting &setting)
+		{
+			MeshImportSetting source_setting = setting;
+			source_setting._name_id.clear();
+			source_setting._is_copy = false;
+			source_setting._is_reimport = false;
+			source_setting._mesh_name.clear();
+			source_setting._is_combine_mesh = false;
+			source_setting._skeleton = Guid::EmptyGuid();
+			return std::format("{}|{}|{}|{}|{}", ToChar(system_path), fingerprint._content_hash,
+			                   fingerprint._file_size, fingerprint._last_write_time, HashMeshImportSetting(source_setting));
+		}
 	}// namespace
 
 	void ResourceMgr::Init()
@@ -291,6 +346,7 @@ namespace Ailu
 
 	void ResourceMgr::Shutdown()
 	{
+		s_fbx_source_import_cache.clear();
 		AL_DELETE(g_pResourceMgr);
 	}
 
@@ -562,6 +618,7 @@ namespace Ailu
 								  this);
 		Vector<WString> compute_shader_pathes = {
 				L"Shaders/hlsl/Compute/cs_mipmap_gen.alasset",
+				L"Shaders/hlsl/Compute/compute_skinning.alasset",
 				L"Shaders/hlsl/Compute/voxelize.alasset",
 				L"Shaders/hlsl/Compute/ssao_cs.alasset",
 				L"Shaders/hlsl/Compute/taa.alasset",
@@ -622,7 +679,7 @@ namespace Ailu
 			Texture::s_p_default_normal = default_normal.get();
 			//Load<Texture2D>(EnginePath::kEngineTexturePathW + L"small_cave_1k.alasset");
 			TextureImportSetting setting;
-			setting._is_sRGB = false;
+			setting._is_srgb = false;
 			setting._generate_mipmap = false;
 			auto lut1 = LoadExternalTexture(EnginePath::kEngineTexturePathW + L"ltc_1.dds", setting);
 			auto lut2 = LoadExternalTexture(EnginePath::kEngineTexturePathW + L"ltc_2.dds", setting);
@@ -636,11 +693,11 @@ namespace Ailu
 			JobSystem::Get().Dispatch([this](ResourceMgr *mgr)
 									  { 
 										  auto setting = TextureImportSetting::Default();
-										  setting._is_sRGB = false;
+										  setting._is_srgb = false;
 										  setting._generate_mipmap = false;
 										  auto terrain_map = LoadExternalTexture(EnginePath::kEngineTexturePathW + L"terrain_height.png", setting); 
 										  RegisterResource(L"Textures/TerrainHeight", terrain_map);
-										  setting._is_sRGB = true;
+										  setting._is_srgb = true;
 										  setting._generate_mipmap = true;
 										  terrain_map = LoadExternalTexture(EnginePath::kEngineTexturePathW + L"terrain_color.png", setting); 
 										  RegisterResource(L"Textures/TerrainDiffuse", terrain_map); }, this);
@@ -735,7 +792,7 @@ namespace Ailu
 		for (auto &p: _default_font->_pages)
 		{
 			auto setting = TextureImportSetting::Default();
-			setting._is_sRGB = false;
+			setting._is_srgb = false;
 			setting._generate_mipmap = false;
 			p._texture = LoadExternalTexture(p._file, setting);
 			RegisterResource(PathUtils::ExtractAssetPath(p._file), p._texture);
@@ -1067,10 +1124,92 @@ namespace Ailu
 		}
 
 		auto sys_path = ResourceMgr::GetResSysPath(asset_path);
-		parser->Parser(sys_path, setting);
 		List<Ref<Mesh>> mesh_list{};
-		parser->GetMeshes(mesh_list);
-		Ref<SkeletonAsset> source_skeleton_asset = parser->GetSkeletonAsset();
+		List<Ref<AnimationClip>> imported_clips;
+		Ref<SkeletonAsset> source_skeleton_asset;
+		bool source_cache_hit = false;
+		String source_cache_key;
+		const bool use_source_cache = *loader == EMeshLoader::kFbx && !setting._is_combine_mesh;
+		if (use_source_cache)
+		{
+			SourceFingerprint fingerprint;
+			if (CalculateSourceFingerprint(sys_path, fingerprint))
+			{
+				source_cache_key = MakeFbxSourceCacheKey(sys_path, fingerprint, setting);
+				auto cache_iter = s_fbx_source_import_cache.find(source_cache_key);
+				if (cache_iter != s_fbx_source_import_cache.end())
+				{
+					const auto &entry = cache_iter->second;
+					source_cache_hit = !entry._has_skeleton_asset || !entry._skeleton_asset.expired();
+					for (const auto &cached_mesh : entry._meshes)
+					{
+						auto source_mesh = cached_mesh.lock();
+						if (source_mesh == nullptr)
+						{
+							source_cache_hit = false;
+							break;
+						}
+						mesh_list.emplace_back(CloneImportedMesh(source_mesh));
+					}
+					for (const auto &cached_clip : entry._clips)
+					{
+						auto source_clip = cached_clip.lock();
+						if (source_clip == nullptr)
+						{
+							source_cache_hit = false;
+							break;
+						}
+						auto clip = MakeRef<AnimationClip>();
+						clip->CopyFrom(*source_clip);
+						imported_clips.emplace_back(std::move(clip));
+					}
+					if (source_cache_hit && entry._has_skeleton_asset)
+						source_skeleton_asset = entry._skeleton_asset.lock();
+					if (!source_cache_hit)
+					{
+						mesh_list.clear();
+						imported_clips.clear();
+					}
+				}
+			}
+		}
+		if (!source_cache_hit)
+		{
+			MeshImportSetting source_setting = setting;
+			if (use_source_cache)
+			{
+				source_setting._mesh_name.clear();
+				source_setting._skeleton = Guid::EmptyGuid();
+				source_setting._is_combine_mesh = false;
+			}
+			parser->Parser(sys_path, source_setting);
+			parser->GetMeshes(mesh_list);
+			source_skeleton_asset = parser->GetSkeletonAsset();
+			for (const Ref<AnimationClip> &clip : parser->GetAnimationClips())
+				imported_clips.emplace_back(clip);
+			if (use_source_cache && !source_cache_key.empty())
+			{
+				FbxSourceImportCacheEntry entry;
+				entry._has_skeleton_asset = source_skeleton_asset != nullptr;
+				if (entry._has_skeleton_asset)
+					entry._skeleton_asset = source_skeleton_asset;
+				for (const Ref<Mesh> &mesh : mesh_list)
+					entry._meshes.emplace_back(mesh);
+				for (const Ref<AnimationClip> &clip : imported_clips)
+					entry._clips.emplace_back(clip);
+				s_fbx_source_import_cache[source_cache_key] = std::move(entry);
+			}
+		}
+		if (!setting._mesh_name.empty() && !setting._is_combine_mesh)
+		{
+			for (auto mesh_iter = mesh_list.begin(); mesh_iter != mesh_list.end();)
+			{
+				if (*mesh_iter == nullptr || (*mesh_iter)->Name() != setting._mesh_name)
+					mesh_iter = mesh_list.erase(mesh_iter);
+				else
+					++mesh_iter;
+			}
+		}
 		Ref<SkeletonAsset> skeleton_asset = source_skeleton_asset;
 		if (!setting._skeleton.IsEmpty() && skeleton_asset != nullptr)
 		{
@@ -1116,7 +1255,7 @@ namespace Ailu
 		{
 			const Skeleton &source = source_skeleton_asset->GetSkeleton();
 			const Skeleton &target = skeleton_asset->GetSkeleton();
-			for (const Ref<AnimationClip> &clip : parser->GetAnimationClips())
+			for (const Ref<AnimationClip> &clip : imported_clips)
 			{
 				if (!clip->RemapToSkeleton(source, target))
 				{
@@ -1133,7 +1272,7 @@ namespace Ailu
 		{
 			mesh->Apply();
 		}
-		for (auto &clip: parser->GetAnimationClips())
+		for (auto &clip: imported_clips)
 			clips.emplace_back(clip);
 		return mesh_list;
 	}
@@ -1761,7 +1900,7 @@ namespace Ailu
 						if (!tex)
 						{
 							auto setting = TextureImportSetting::Default();
-							setting._is_sRGB = texture_index != 1u;
+							setting._is_srgb = texture_index != 1u;
 							tex = LoadExternalTexture(ToWChar(material_info._textures[texture_index]), setting);
 							if (tex)
 								RegisterResource(asset_path, tex);
@@ -2058,7 +2197,7 @@ namespace Ailu
 						if (!it->_textures[1].empty())
 						{
 							auto normal_setting = TextureImportSetting::Default();
-							normal_setting._is_sRGB = false;
+							normal_setting._is_srgb = false;
 							auto normal = ImportResource(ToWChar(it->_textures[1]), target_dir, normal_setting);
 							if (normal != nullptr)
 								mat->SetTexture(StandardMaterialProperty::kNormal._tex_name, std::static_pointer_cast<Texture>(normal).get());

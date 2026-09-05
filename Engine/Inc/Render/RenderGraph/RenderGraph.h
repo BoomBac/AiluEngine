@@ -75,7 +75,7 @@ namespace Ailu::Render::RDG
         {
             return static_cast<uint32_t>(_usage & (EResourceUsage::kReadSRV |
                                                    EResourceUsage::kCopySrc | EResourceUsage::kIndirectArgument |
-                                                   EResourceUsage::kRaytracingAccel)) != 0;
+                                                   EResourceUsage::kRaytracingAccel | EResourceUsage::kVertexBuffer)) != 0;
         }
     };
 
@@ -207,6 +207,9 @@ namespace Ailu::Render::RDG
 
         // 编译RenderGraph，解析资源依赖关系
         bool Compile();
+
+        // Make the compute output a declared consumer of all graphics passes.
+        void AddVertexBufferReads(const Vector<RGHandle> &handles);
 
         const RenderGraphCompileStats &GetCompileStats() const { return _compile_stats; }
 

@@ -25,7 +25,8 @@ namespace Ailu
             kCopySrc = 1 << 4,         // 拷贝源
             kCopyDst = 1 << 5,         // 拷贝目标
             kIndirectArgument = 1 << 6,// 间接绘制参数
-            kRaytracingAccel = 1 << 7  // 光追加速结构
+            kRaytracingAccel = 1 << 7, // 光追加速结构
+            kVertexBuffer = 1 << 8     // IA vertex buffer
         };
 
         inline EResourceUsage operator|(EResourceUsage a, EResourceUsage b)

@@ -20,6 +20,8 @@ namespace Ailu
     {
         DATA_CHECK_DS(String)
         FStructedArchive *sar = dynamic_cast<FStructedArchive *>(&ar);
+        if (sar && name && sar->IsLoading() && !sar->HasField(*name))
+            return;
         if (sar && name)
             sar->BeginObject(*name);
         ar >> *static_cast<String *>(data);
@@ -44,6 +46,8 @@ namespace Ailu
     {
         DATA_CHECK_DS(WString)
         FStructedArchive *sar = dynamic_cast<FStructedArchive *>(&ar);
+        if (sar && name && sar->IsLoading() && !sar->HasField(*name))
+            return;
         if (sar && name)
             sar->BeginObject(*name);
         String value;
@@ -69,6 +73,8 @@ namespace Ailu
     {
         DATA_CHECK_DS(Guid)
         FStructedArchive *sar = dynamic_cast<FStructedArchive *>(&ar);
+        if (sar && name && sar->IsLoading() && !sar->HasField(*name))
+            return;
         if (sar && name)
             sar->BeginObject(*name);
         String value;

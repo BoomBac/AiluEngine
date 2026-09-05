@@ -93,7 +93,11 @@ namespace Ailu::Render
 	{
 		Vector<u32> index_data;
 		index_data.assign(indices.begin(), indices.end());
-		_submeshes.emplace_back(index_data);
+		_submeshes.emplace_back(std::move(index_data));
+	}
+	void Mesh::AddSubmesh(Vector<u32> &&indices)
+	{
+		_submeshes.emplace_back(std::move(indices));
 	}
 	std::span<const u32> Mesh::GetIndices(u16 submesh_index) const noexcept
 	{
@@ -378,9 +382,19 @@ namespace Ailu::Render
 		_bone_weights.assign(bone_weights.begin(), bone_weights.end());
 	}
 
+	void SkeletonMesh::SetBoneWeights(Vector<Vector4f> &&bone_weights)
+	{
+		_bone_weights = std::move(bone_weights);
+	}
+
 	void SkeletonMesh::SetBoneIndices(std::span<const Vector4D<u32>> bone_indices)
 	{
 		_bone_indices.assign(bone_indices.begin(), bone_indices.end());
+	}
+
+	void SkeletonMesh::SetBoneIndices(Vector<Vector4D<u32>> &&bone_indices)
+	{
+		_bone_indices = std::move(bone_indices);
 	}
 
 	bool SkeletonMesh::RemapBoneIndices(std::span<const u16> bone_remap)
@@ -450,6 +464,7 @@ namespace Ailu::Render
 		u8 count = 0;
 		Vector<VertexBufferLayoutDesc> desc_list;
 		u8 vert_index = 0u, normal_index = 0u, uv_index = 0u, tangent_index = 0u, prev_vert_index = 0u;
+		u8 bone_index_index = 0u, bone_weight_index = 0u;
 		_normal_stream = -1;
 		_tangent_stream = -1;
 		if (_vertices.size())
@@ -474,17 +489,16 @@ namespace Ailu::Render
 			tangent_index = count++;
 			_tangent_stream = tangent_index;
 		}
-		//is for gpu skinning
-		//if (_bone_indices)
-		//{
-		//	desc_list.push_back({ "BONEINDEX",EShaderDateType::kInt4,count });
-		//	bone_index_index = count++;
-		//}
-		//if (_bone_weights)
-		//{
-		//	desc_list.push_back({ "BONEWEIGHT",EShaderDateType::kFloat4,count });
-		//	bone_weight_index = count++;
-		//}
+		if (!_bone_indices.empty())
+		{
+			desc_list.push_back({ RenderConstants::kSemanticBoneIndex, EShaderDateType::kuInt4, count });
+			bone_index_index = count++;
+		}
+		if (!_bone_weights.empty())
+		{
+			desc_list.push_back({ RenderConstants::kSemanticBoneWeight, EShaderDateType::kFloat4, count });
+			bone_weight_index = count++;
+		}
 		{
 			desc_list.push_back({ "TEXCOORD",EShaderDateType::kFloat3,count ,1});
 			prev_vert_index = count++;
@@ -498,8 +512,12 @@ namespace Ailu::Render
 		if (_normals.size()) _vertex_buffer->SetStream(reinterpret_cast<u8 *>(_normals.data()), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat3), normal_index, true);
 		if (_uvs[0].size()) _vertex_buffer->SetStream(reinterpret_cast<u8 *>(_uvs[0].data()), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat2), uv_index, false);
 		if (_tangents.size()) _vertex_buffer->SetStream(reinterpret_cast<u8 *>(_tangents.data()), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat4), tangent_index, true);
-		//if (_bone_indices) _p_vbuf->SetStream(reinterpret_cast<u8*>(_bone_indices), _vertex_count * ShaderDateTypeSize(EShaderDateType::kInt4), bone_index_index);
-		//if (_bone_weights) _p_vbuf->SetStream(reinterpret_cast<u8*>(_bone_weights), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat4), bone_weight_index);
+		if (!_bone_indices.empty())
+			_vertex_buffer->SetStream(reinterpret_cast<u8 *>(_bone_indices.data()),
+				_vertex_count * ShaderDateTypeSize(EShaderDateType::kuInt4), bone_index_index, false);
+		if (!_bone_weights.empty())
+			_vertex_buffer->SetStream(reinterpret_cast<u8 *>(_bone_weights.data()),
+				_vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat4), bone_weight_index, false);
 		_vertex_buffer->SetStream(reinterpret_cast<u8 *>(_previous_vertices.data()), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat3), prev_vert_index, true);
 		GraphicsContext::Get().CreateResource(_vertex_buffer.get());
 		_index_buffers.resize(_submeshes.size());

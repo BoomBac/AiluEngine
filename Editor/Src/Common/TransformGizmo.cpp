@@ -221,6 +221,10 @@ namespace Ailu
             if (_target_scene != scene || _target_entity != entity)
                 SetTarget(scene, entity);
         }
+        // The built-in gizmo meshes are normalized to a 1x1 range. These transforms
+        // describe their previous 2x2 primitive dimensions, so restore that scale here.
+        constexpr f32 kGizmoPrimitiveMeshScale = 2.0f;
+
         static Matrix4x4f MakeGizmoCylinder(const Vector3f &axis, const Vector3f &origin, f32 axis_length, f32 axis_radius)
         {
             Vector3f dir = Normalize(axis);
@@ -246,7 +250,9 @@ namespace Ailu
             }
 
             // Scale and translate.
-            Matrix4x4f scl = MatrixScale(axis_radius, axis_length * 0.5f, axis_radius);
+            Matrix4x4f scl = MatrixScale(axis_radius * kGizmoPrimitiveMeshScale,
+                                         axis_length * 0.5f * kGizmoPrimitiveMeshScale,
+                                         axis_radius * kGizmoPrimitiveMeshScale);
             Matrix4x4f translate = MatrixTranslation(0, axis_length * 0.5f, 0);
             return scl * translate * orient * MatrixTranslation(origin);
         }
@@ -275,7 +281,9 @@ namespace Ailu
             }
 
             // Scale and translate.
-            Matrix4x4f scl = MatrixScale(axis_radius, axis_radius, axis_radius);
+            Matrix4x4f scl = MatrixScale(axis_radius * kGizmoPrimitiveMeshScale,
+                                         axis_radius * kGizmoPrimitiveMeshScale,
+                                         axis_radius * kGizmoPrimitiveMeshScale);
             Matrix4x4f translate = MatrixTranslation(0, height, 0);
 
             return scl * translate * orient * MatrixTranslation(origin);
@@ -301,7 +309,9 @@ namespace Ailu
             orient[2][2] = sub_axisb.z;
 
             size *= 0.5f;
-            Matrix4x4f scl = MatrixScale(size, 0.1f, size);
+            Matrix4x4f scl = MatrixScale(size * kGizmoPrimitiveMeshScale,
+                                         0.1f * kGizmoPrimitiveMeshScale,
+                                         size * kGizmoPrimitiveMeshScale);
             return scl * orient * MatrixTranslation(origin + sub_axisa * size + sub_axisb * size);
         }
 
@@ -350,6 +360,15 @@ namespace Ailu
 
         static Plane s_drag_plane;
         static Plane s_rotate_plane[3];
+
+        static Plane MakeScaleDragPlane(Render::Camera *cam, const Vector3f &origin, const Vector3f &axis_dir)
+        {
+            Vector3f view_dir = cam != nullptr ? Normalize(cam->Position() - origin) : Vector3f::kForward;
+            Vector3f plane_normal = view_dir - axis_dir * DotProduct(view_dir, axis_dir);
+            if (Magnitude(plane_normal) <= kEpsilon)
+                plane_normal = view_dir;
+            return Plane(origin, Normalize(plane_normal));
+        }
 
         u32 TransformGizmo::PickAxis(Vector3f start, Vector3f dir) const
         {
@@ -417,6 +436,16 @@ namespace Ailu
             return s * kVirualRayLen;// _axis_length;
         }
 
+        f32 TransformGizmo::ComputeScaleAxisParamS(Vector2f mouse_pos, const Vector3f &origin,
+                                                   const Vector3f &axis_dir) const
+        {
+            Ray ray = MakeGizmoMouseRay(_cam, mouse_pos);
+            auto hit = CollisionDetection::Intersect(ray, s_drag_plane);
+            if (!hit._is_collision)
+                return 0.0f;
+            return DotProduct(hit._point - origin, axis_dir);
+        }
+
         void TransformGizmo::BeginDrag(Vector2f mouse_pos)
         {
             auto *target = Target();
@@ -454,17 +483,32 @@ namespace Ailu
                 if (_drag_axis & EAxis::kAxisX)
                 {
                     auto axis_dir = GetAxisDirWorld(0);
-                    _drag_axis_ctx[_drag_axis_num++] = {axis_dir, ComputeAxisParamS(mouse_pos, _drag_origin, axis_dir)};
+                    if (_mode == EGizmoMode::kScale && _drag_axis_num == 0u)
+                        s_drag_plane = MakeScaleDragPlane(_cam, _drag_origin, axis_dir);
+                    const f32 start_s = _mode == EGizmoMode::kScale
+                                                ? ComputeScaleAxisParamS(mouse_pos, _drag_origin, axis_dir)
+                                                : ComputeAxisParamS(mouse_pos, _drag_origin, axis_dir);
+                    _drag_axis_ctx[_drag_axis_num++] = {axis_dir, start_s};
                 }
                 if (_drag_axis & EAxis::kAxisY)
                 {
                     auto axis_dir = GetAxisDirWorld(1);
-                    _drag_axis_ctx[_drag_axis_num++] = {axis_dir, ComputeAxisParamS(mouse_pos, _drag_origin, axis_dir)};
+                    if (_mode == EGizmoMode::kScale && _drag_axis_num == 0u)
+                        s_drag_plane = MakeScaleDragPlane(_cam, _drag_origin, axis_dir);
+                    const f32 start_s = _mode == EGizmoMode::kScale
+                                                ? ComputeScaleAxisParamS(mouse_pos, _drag_origin, axis_dir)
+                                                : ComputeAxisParamS(mouse_pos, _drag_origin, axis_dir);
+                    _drag_axis_ctx[_drag_axis_num++] = {axis_dir, start_s};
                 }
                 if (_drag_axis & EAxis::kAxisZ)
                 {
                     auto axis_dir = GetAxisDirWorld(2);
-                    _drag_axis_ctx[_drag_axis_num++] = {axis_dir, ComputeAxisParamS(mouse_pos, _drag_origin, axis_dir)};
+                    if (_mode == EGizmoMode::kScale && _drag_axis_num == 0u)
+                        s_drag_plane = MakeScaleDragPlane(_cam, _drag_origin, axis_dir);
+                    const f32 start_s = _mode == EGizmoMode::kScale
+                                                ? ComputeScaleAxisParamS(mouse_pos, _drag_origin, axis_dir)
+                                                : ComputeAxisParamS(mouse_pos, _drag_origin, axis_dir);
+                    _drag_axis_ctx[_drag_axis_num++] = {axis_dir, start_s};
                 }
                 _drag_start_pos = _drag_origin;// Simplified: use world movement as the drag basis.
                 if (_drag_axis_num == 2)
@@ -661,66 +705,51 @@ namespace Ailu
                         if (_drag_axis_num == 1)
                         {
                             const auto &ctx = _drag_axis_ctx[0];
-                            f32 s_now = abs(ComputeAxisParamS(mouse_pos, _drag_origin, ctx._drag_axis_dir) - kVirualRayLen * 0.5f);
-                            f32 s_start = abs(ctx._drag_start_s - kVirualRayLen * 0.5f);
-                            f32 delta_s = s_now > s_start ? 1.0f + (s_now - s_start) / (_axis_length * _dis_scale)
-                                                          : 1.0f - (s_start - s_now) / (_axis_length * _dis_scale);
+                            const f32 s_now = ComputeScaleAxisParamS(mouse_pos, _drag_origin, ctx._drag_axis_dir);
+                            const f32 delta_s = s_now - ctx._drag_start_s;
+                            const f32 scale_denominator = std::max(_axis_length * _dis_scale, kEpsilon);
+                            const f32 scale_factor = std::max(0.001f, 1.0f + delta_s / scale_denominator);
 
-                            world_scale[_drag_axis >> 1] = delta_s;
+                            world_scale[_drag_axis >> 1] = scale_factor;
                             Vector2f p = mouse_pos + Vector2f{20, 20};
-                            Render::Gizmo::DrawText(std::format("start_s: {},now s: {}", ctx._drag_start_s,s_now), p, 10u, Colors::kCyan);
-                            _drag_scale_factor[_drag_axis >> 1] = delta_s;
+                            Render::Gizmo::DrawText(std::format("start_s: {},now s: {}", ctx._drag_start_s, s_now),
+                                                    p, 10u, Colors::kCyan);
                             Vector3f target_scale = _drag_start_scale * world_scale;
                             if (IsSnapActive())
                                 target_scale = _drag_start_scale + SnapVector(target_scale - _drag_start_scale, _scale_snap_step);
                             target->SetLocalScale(target_scale);
+                            _drag_scale_factor[_drag_axis >> 1] = _drag_start_scale[_drag_axis >> 1] != 0.0f
+                                                                          ? target_scale[_drag_axis >> 1] /
+                                                                                    _drag_start_scale[_drag_axis >> 1]
+                                                                          : scale_factor;
                         }
                         else if (_drag_axis_num == 3)// Uniform scale uses screen-space movement.
                         {
-                            // Screen-space drag distance.
-                            Vector2f v = _drag_start_mouse_pos - _mouse_pos;
-                            float pixel_distance = Magnitude(v);
+                            // Scale along the radial direction from the gizmo center to the press point.
+                            // This makes the center handle respond to horizontal, vertical, and diagonal drags.
+                            Vector2f drag_dir = _drag_start_target_delta;
+                            if (Magnitude(drag_dir) > kEpsilon)
+                                drag_dir = Normalize(drag_dir);
+                            else
+                                drag_dir = Vector2f{0.0f, -1.0f};
+                            const f32 pixel_delta = DotProduct(_mouse_pos - _drag_start_mouse_pos, drag_dir);
+                            const f32 reference_pixels = std::max(_axis_length * 100.0f, 1.0f);
+                            const f32 scale_factor = std::max(0.001f, 1.0f + pixel_delta / reference_pixels);
+                            world_scale = Vector3f(scale_factor);
 
-                            // Project the camera-to-gizmo direction onto screen space for a stable sign.
-                            Vector3f gizmo_dir_ws = Normalize(_drag_start_pos - _cam->Position());
-                            Vector2f gizmo_dir_ss = Normalize(Vector2f(DotProduct(gizmo_dir_ws, _cam->Right()), -DotProduct(gizmo_dir_ws, _cam->Up())));
-                            Render::Gizmo::DrawLine(Vector2f{500.0f, 500.0f}, Vector2f{500.0f, 500.0f}  + gizmo_dir_ss);
-                            Vector2f drag_dir = Normalize(v);
-                            float proj = DotProduct(gizmo_dir_ss, drag_dir);
-
-                            // Avoid tiny jitter.
-                            if (fabs(proj) < 0.1f)
-                                proj = 0.0f;
-
-                            // Map screen distance to world-space distance.
-                            // Compute the world units represented by one screen pixel.
-                            Ray ray0 = MakeGizmoMouseRay(_cam, _drag_start_mouse_pos);
-                            Ray ray1 = MakeGizmoMouseRay(_cam, _drag_start_mouse_pos + Vector2f(1, 1));
-
-                            // Intersect on the gizmo plane.
-                            Vector3f hit0 = CollisionDetection::Intersect(ray0, s_drag_plane)._point;
-                            Vector3f hit1 = CollisionDetection::Intersect(ray1, s_drag_plane)._point;
-
-                            // World units per pixel.
-                            float world_per_pixel = Magnitude(hit1 - hit0);
-
-                            // Current scale distance in world space.
-                            float world_distance = pixel_distance * world_per_pixel * proj;
-
-                            // Adjust based on gizmo size or scene scale.
-                            float s = world_distance * 0.5f;// Scale tuning.
-
-                            // Uniform scale on all three axes.
-                            world_scale = Vector3f(s);
-
-                            // Apply to target.
-                            Vector3f target_scale = _drag_start_scale + world_scale;
+                            Vector3f target_scale = _drag_start_scale * world_scale;
                             if (IsSnapActive())
-                                target_scale = _drag_start_scale + SnapVector(target_scale - _drag_start_scale, _scale_snap_step);
+                            {
+                                target_scale = _drag_start_scale +
+                                               SnapVector(target_scale - _drag_start_scale, _scale_snap_step);
+                            }
                             target->SetLocalScale(target_scale);
-                            _drag_scale_factor = Vector3f::kOne + world_scale;
+                            _drag_scale_factor = Vector3f(
+                                    _drag_start_scale.x != 0.0f ? target_scale.x / _drag_start_scale.x : scale_factor,
+                                    _drag_start_scale.y != 0.0f ? target_scale.y / _drag_start_scale.y : scale_factor,
+                                    _drag_start_scale.z != 0.0f ? target_scale.z / _drag_start_scale.z : scale_factor);
                             Vector2f p = mouse_pos + Vector2f{20, 20};
-                            Render::Gizmo::DrawText(std::format("now s: {}", s), p, 10u, Colors::kCyan);
+                            Render::Gizmo::DrawText(std::format("scale: {}", scale_factor), p, 10u, Colors::kCyan);
                         }
                         else {}
                         // With hierarchy, world_delta should be converted to local space before adding to local position.
@@ -813,7 +842,9 @@ namespace Ailu
                 const f32 s = _scale_center_obb->_half_axis_length.x * 2.0f;
                 if (!Is2DMode())
                 {
-                    Render::Gizmo::DrawMesh(Render::Mesh::s_cube.lock().get(), MatrixScale(s,s,s)* MatrixTranslation(_cur_target_pos),
+                    const f32 cube_scale = s * kGizmoPrimitiveMeshScale;
+                    Render::Gizmo::DrawMesh(Render::Mesh::s_cube.lock().get(),
+                                            MatrixScale(cube_scale, cube_scale, cube_scale) * MatrixTranslation(_cur_target_pos),
                                             _translate_axis[0]._mat.get());
                 }
             }
@@ -823,7 +854,8 @@ namespace Ailu
                 {
                     if (Is2DMode() && axis._axis != Get2DHiddenAxisMask())
                         continue;
-                    f32 scale_factor = _scaled_axis_length * (_hover_axis & axis._axis ? 1.2f : 1.05f);
+                    f32 scale_factor = _scaled_axis_length * (_hover_axis & axis._axis ? 1.2f : 1.05f) *
+                                       kGizmoPrimitiveMeshScale;
                     //Render::Gizmo::DrawCircle(_cur_target_pos, _scaled_axis_length, 36u, _hover_axis & axis._axis ? kHoverColor : kNormalColors[axis._index],MakeCircle(axis._dir));
                     Vector3f ring_axis = Is2DMode() ? -_cam->Forward() : axis._dir;
                     auto rmat = Quaternion::ToMat4f(_drag_rot);

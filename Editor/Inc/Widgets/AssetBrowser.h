@@ -70,7 +70,8 @@ namespace Ailu
             void ShowDeleteSelectionConfirm(Vector2f popup_pos, Asset *fallback_asset = nullptr);
             void ShowBlankAreaContextMenu(Vector2f popup_pos);
             void ShowFolderContextMenu(const WString &folder_sys_path, Vector2f popup_pos, UI::UIElement *item_root, UI::Text *item_text);
-            void ShowAssetContextMenu(Asset *asset, Vector2f popup_pos, UI::UIElement *item_root, UI::Text *item_text);
+            void ShowAssetContextMenu(Asset *asset, const std::filesystem::path &asset_sys_path, Vector2f popup_pos,
+                                      UI::UIElement *item_root, UI::Text *item_text);
             void BuildCreateAssetActions(Vector<PopupMenuAction> &actions, const std::filesystem::path &target_directory, Vector2f popup_pos);
             void BeginFolderRename(const WString &folder_sys_path, UI::UIElement *item_root, UI::Text *item_text);
             void BeginAssetRename(Asset *asset, UI::UIElement *item_root, UI::Text *item_text);

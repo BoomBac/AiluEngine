@@ -127,14 +127,94 @@ namespace Ailu::AnimationTests
             !NearlyEqual(result._root_motion._translation.z, 2.0f))
             return false;
 
+        TransformTrack &rotation_track = clip[0u];
+        rotation_track.GetRotationTrack().Resize(2u);
+        rotation_track.GetRotationTrack()[0] = TrackHelpers::FromQuaternion(Quaternion::Identity());
+        rotation_track.GetRotationTrack()[0]._time = 0.0f;
+        rotation_track.GetRotationTrack()[1] =
+            TrackHelpers::FromQuaternion(Quaternion::RadiusAxis(0.5f, Vector3f::kUp));
+        rotation_track.GetRotationTrack()[1]._time = 1.0f;
+        settings._rotation_mode = ERootMotionRotationMode::kYaw;
+        clip.SetRootMotionSettings(settings);
+        const AnimationEvaluateResult rotated_result = binding.Evaluate(evaluation, skeleton);
+        const Transform rotated_root = rotated_result._pose.GetLocalTransform(0u);
+        if (!Quaternion::IsSameOrientation(rotated_root._rotation, Quaternion::Identity()) ||
+            !Quaternion::IsSameOrientation(rotated_result._root_motion._rotation,
+                                            Quaternion::RadiusAxis(0.25f, Vector3f::kUp)))
+            return false;
+
+        settings._rotation_mode = ERootMotionRotationMode::kNone;
+        clip.SetRootMotionSettings(settings);
+
         evaluation._root_motion_mode = ERootMotionMode::kExtractOnly;
         const AnimationEvaluateResult extract_only_result = binding.Evaluate(evaluation, skeleton);
         const Transform extract_only_root = extract_only_result._pose.GetLocalTransform(0u);
-        return NearlyEqual(extract_only_root._position.x, 1.0f) && NearlyEqual(extract_only_root._position.y, 2.0f) &&
-               NearlyEqual(extract_only_root._position.z, 2.0f) &&
-               NearlyEqual(extract_only_result._root_motion._translation.x, 1.0f) &&
-               NearlyEqual(extract_only_result._root_motion._translation.y, 0.0f) &&
-               NearlyEqual(extract_only_result._root_motion._translation.z, 2.0f);
+        if (!NearlyEqual(extract_only_root._position.x, 1.0f) ||
+            !NearlyEqual(extract_only_root._position.y, 2.0f) ||
+            !NearlyEqual(extract_only_root._position.z, 2.0f) ||
+            !NearlyEqual(extract_only_result._root_motion._translation.x, 1.0f) ||
+            !NearlyEqual(extract_only_result._root_motion._translation.y, 0.0f) ||
+            !NearlyEqual(extract_only_result._root_motion._translation.z, 2.0f))
+            return false;
+
+        RootMotionSettings in_place_settings = clip.GetRootMotionSettings();
+        in_place_settings._enabled = false;
+        in_place_settings._root_bone_name.clear();
+        in_place_settings._root_bone_index = -1;
+        clip.SetRootMotionSettings(in_place_settings);
+        evaluation._root_motion_mode = ERootMotionMode::kInPlace;
+        const AnimationEvaluateResult in_place_result = binding.Evaluate(evaluation, skeleton);
+        const Transform in_place_root = in_place_result._pose.GetLocalTransform(0u);
+        return NearlyEqual(in_place_root._position.x, 0.0f) && NearlyEqual(in_place_root._position.y, 2.0f) &&
+               NearlyEqual(in_place_root._position.z, 0.0f) && in_place_result._root_motion.IsIdentity();
+    }
+
+    bool TestAnimatorRootMotionModeSerialization()
+    {
+        const String component_name = "_animator_component";
+        const String missing_mode_json = R"({
+            "_animator_component": {
+                "_controller_guid": "",
+                "_clip_guid": "",
+                "_speed": 1.0,
+                "_play_on_awake": true
+            }
+        })";
+        JsonArchive missing_archive;
+        if (!missing_archive.LoadFromString(missing_mode_json))
+            return false;
+        SceneAnimatorComponentDocument missing_mode;
+        SerializerWrapper<SceneAnimatorComponentDocument>::Deserialize(&missing_mode, missing_archive, &component_name);
+        if (missing_mode._root_motion_mode != static_cast<u8>(ERootMotionMode::kDisabled))
+            return false;
+
+        const String invalid_mode_json = R"({
+            "_animator_component": {
+                "_controller_guid": "",
+                "_clip_guid": "",
+                "_speed": 1.0,
+                "_play_on_awake": true,
+                "_root_motion_mode": 204
+            }
+        })";
+        JsonArchive invalid_archive;
+        if (!invalid_archive.LoadFromString(invalid_mode_json))
+            return false;
+        SceneAnimatorComponentDocument invalid_mode;
+        SerializerWrapper<SceneAnimatorComponentDocument>::Deserialize(&invalid_mode, invalid_archive, &component_name);
+        if (invalid_mode._root_motion_mode != static_cast<u8>(ERootMotionMode::kDisabled))
+            return false;
+
+        SceneAnimatorComponentDocument source;
+        source._root_motion_mode = static_cast<u8>(ERootMotionMode::kInPlace);
+        JsonArchive save_archive;
+        SerializerWrapper<SceneAnimatorComponentDocument>::Serialize(&source, save_archive, &component_name);
+        JsonArchive load_archive;
+        if (!load_archive.LoadFromString(save_archive.SaveToString()))
+            return false;
+        SceneAnimatorComponentDocument loaded;
+        SerializerWrapper<SceneAnimatorComponentDocument>::Deserialize(&loaded, load_archive, &component_name);
+        return loaded._root_motion_mode == static_cast<u8>(ERootMotionMode::kInPlace);
     }
 
     bool TestBlendSpace2DSampling()

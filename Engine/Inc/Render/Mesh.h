@@ -108,6 +108,7 @@ namespace Ailu
             void SetUVs(Vector<Vector2f> &&uv, u8 channel = 0u);
 
             void AddSubmesh(std::span<const u32> indices);
+            void AddSubmesh(Vector<u32> &&indices);
             void SetVerticesCount(u32 count) { _vertex_count = count; }
             //-----------------------------------------
             // Accessors
@@ -201,7 +202,9 @@ namespace Ailu
             void Apply() final;
             void Clear() final;
             void SetBoneWeights(std::span<const Vector4f> bone_weights);
+            void SetBoneWeights(Vector<Vector4f> &&bone_weights);
             void SetBoneIndices(std::span<const Vector4D<u32>> bone_indices);
+            void SetBoneIndices(Vector<Vector4D<u32>> &&bone_indices);
             bool RemapBoneIndices(std::span<const u16> bone_remap);
             void SetMeshBindGlobalTransform(const Matrix4x4f &transform);
             void RestoreBindPoseVertices();

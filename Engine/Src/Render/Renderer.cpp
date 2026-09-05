@@ -20,6 +20,7 @@
 #include "Render/RenderPipeline.h"
 #include "Render/RenderingData.h"
 #include "Render/CommandBuffer.h"
+#include "Animation/AnimationSystem.h"
 
 #include "Render/RenderGraph/RenderGraph.h"
 
@@ -312,6 +313,9 @@ namespace Ailu::Render
         }
         
         Cull(*SceneMgr::Get().ActiveScene(),cam);
+        if (auto *animation_system = SceneMgr::Get().ActiveScene()->GetRegister().GetSystem<ECS::AnimationSystem>();
+            animation_system != nullptr)
+            animation_system->PrepareVisibleSkinning(_cull_results[cam.HashCode()]);
         PrepareCamera(cam);
         _rendering_data._scene = &s;
         PrepareMaterial(*SceneMgr::Get().ActiveScene());//不需要tick，之后再优化
@@ -434,6 +438,9 @@ namespace Ailu::Render
         if (_is_use_render_graph)
         {
             _rendering_data._postprocess_input = nullptr;//taa关闭时，这个不赋值会导致bloom输入为空
+            if (auto *animation_system = SceneMgr::Get().ActiveScene()->GetRegister().GetSystem<ECS::AnimationSystem>();
+                animation_system != nullptr)
+                animation_system->RecordSkinningRenderGraph(*_rd_graph, _rendering_data);
             {
                 for (auto *pass: _render_passes)
                 {
@@ -441,6 +448,9 @@ namespace Ailu::Render
                     pass->OnRecordRenderGraph(*_rd_graph, _rendering_data);
                 }
             }
+            if (auto *animation_system = SceneMgr::Get().ActiveScene()->GetRegister().GetSystem<ECS::AnimationSystem>();
+                animation_system != nullptr)
+                _rd_graph->AddVertexBufferReads(animation_system->GetSkinningOutputHandles());
         }
     }
     void Renderer::EndScene(const Scene &s)
@@ -1037,7 +1047,8 @@ namespace Ailu::Render
                                     1,
                                     comp._p_mesh.get(),
                                     used_mat,
-                                    &registry.GetComponent<ECS::TransformComponent>(entity)->_render_world_matrix});
+                                    &registry.GetComponent<ECS::TransformComponent>(entity)->_render_world_matrix,
+                                    static_cast<u32>(entity)});
                         }
                     }
                 }

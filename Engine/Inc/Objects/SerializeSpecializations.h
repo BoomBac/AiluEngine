@@ -203,7 +203,8 @@ namespace Ailu
             static const String value_name = "value";
             DeserializeValue(key, ar, key_name);
             DeserializeValue(value, ar, value_name);
-            sar->EndObject();
+            if (!name.empty())
+                sar->EndObject();
         }
 
         template<typename Container, typename Key, typename Value>

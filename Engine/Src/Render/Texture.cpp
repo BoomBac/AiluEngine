@@ -533,6 +533,14 @@ namespace Ailu::Render
         memcpy(_pixel_data[mipmap], data + offset, w * h * _pixel_size);
     }
 
+    void Texture2D::SetImportedPixelData(Vector<u8> pixel_data, Vector<TextureSubresourceData> subresources)
+    {
+        AL_ASSERT(subresources.size() == _mipmap_count);
+        _imported_pixel_data = std::move(pixel_data);
+        _imported_subresources = std::move(subresources);
+        _is_data_filled.assign(_mipmap_count, true);
+    }
+
     void Texture2D::EncodeToPng(const Path &path)
     {
         AL_ASSERT(_is_data_filled[0]);

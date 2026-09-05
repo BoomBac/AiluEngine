@@ -33,7 +33,9 @@
 #include <algorithm>
 #include <cctype>
 #include <memory>
+#include <thread>
 #if AL_PLATFORM_WINDOWS
+#include <objbase.h>
 #include <shellapi.h>
 #include <shlobj.h>
 #endif
@@ -588,20 +590,20 @@ namespace Ailu
             if (asset == nullptr)
                 return;
             const String display_name = entry._display_name;
+            const fs::path asset_sys_path = entry._sys_path;
             auto [vb, icon, text] = CreateEntryWidgetRoot(display_name);
             const u32 entry_index = static_cast<u32>(&entry - _visible_entries.data());
             Color tint = asset->_p_obj ? Colors::kWhite : Colors::kGray;
             icon->Name(asset->Name());
             icon->_tint_color = tint;
-            vb->OnMouseDown() += [this, asset, entry_index, item_root = vb.get(), item_text = text](UI::UIEvent &e)
+            vb->OnMouseDown() += [this, asset, asset_sys_path, entry_index, item_root = vb.get(), item_text = text](UI::UIEvent &e)
             {
                 const bool is_right_button = e._key_code == EKey::kRBUTTON;
-                const fs::path asset_path = fs::path(ResourceMgr::GetResSysPath(asset->_asset_path));
-                if (!is_right_button || !IsSelected(asset_path))
+                if (!is_right_button || !IsSelected(asset_sys_path))
                     SelectAsset(asset, entry_index, item_root, item_text, !is_right_button);
                 if (!is_right_button)
                     return;
-                ShowAssetContextMenu(asset, e._mouse_position, item_root, item_text);
+                ShowAssetContextMenu(asset, asset_sys_path, e._mouse_position, item_root, item_text);
                 e._is_handled = true;
             };
             icon->SetTexture(AssetTypeRegistry::Get().GetIcon(asset));
@@ -681,7 +683,7 @@ namespace Ailu
                     SelectSubAsset(entry, entry_index, item_root, item_text, !is_right_button);
                 if (!is_right_button)
                     return;
-                ShowAssetContextMenu(entry._asset, e._mouse_position, item_root, item_text);
+                ShowAssetContextMenu(entry._asset, entry._sys_path, e._mouse_position, item_root, item_text);
                 e._is_handled = true;
             };
             root->OnMouseEnter() += [this, item_root = root.get()](UI::UIEvent &e)
@@ -1295,7 +1297,8 @@ namespace Ailu
             EditorPopup::ShowActionMenuAt(popup_pos, actions);
         }
 
-        void AssetBrowser::ShowAssetContextMenu(Asset *asset, Vector2f popup_pos, UI::UIElement *item_root, UI::Text *item_text)
+        void AssetBrowser::ShowAssetContextMenu(Asset *asset, const fs::path &asset_sys_path, Vector2f popup_pos,
+                                                UI::UIElement *item_root, UI::Text *item_text)
         {
             if (asset == nullptr)
                 return;
@@ -1305,9 +1308,9 @@ namespace Ailu
             {
                 actions.push_back({"Open", [this, asset]() { OpenAsset(asset); }});
             }
-            actions.push_back({"Open in File Explorer", [this, asset]()
+            actions.push_back({"Open in File Explorer", [this, asset_sys_path]()
             {
-                OpenInFileExplorer(fs::path(ResourceMgr::GetResSysPath(asset->_asset_path)), true);
+                OpenInFileExplorer(asset_sys_path, true);
             }});
             if (asset->_asset_type == StaticClass<AudioClip>())
             {
@@ -1335,7 +1338,7 @@ namespace Ailu
             if (path.empty())
                 return;
 
-            fs::path explorer_path = path;
+            fs::path explorer_path = fs::path(PathUtils::ToPlatformPath(path.wstring()));
             std::error_code path_error;
             if (select_path && !fs::exists(path, path_error))
             {
@@ -1352,16 +1355,35 @@ namespace Ailu
 
             if (select_path)
             {
-                PIDLIST_ABSOLUTE item_id_list = ILCreateFromPathW(explorer_path.c_str());
-                if (item_id_list == nullptr)
+                const fs::path target_path = explorer_path;
+                std::thread([target_path]()
                 {
-                    LOG_WARNING(L"AssetBrowser: create shell item for path failed, {}", explorer_path.wstring());
-                    return;
-                }
-                const HRESULT result = SHOpenFolderAndSelectItems(item_id_list, 0, nullptr, 0);
-                ILFree(item_id_list);
-                if (FAILED(result))
-                    LOG_WARNING(L"AssetBrowser: select path in File Explorer failed, {}", explorer_path.wstring());
+                    const HRESULT com_result = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+                    const bool should_uninitialize = com_result == S_OK || com_result == S_FALSE;
+                    if (SUCCEEDED(com_result) || com_result == RPC_E_CHANGED_MODE)
+                    {
+                        PIDLIST_ABSOLUTE item_id_list = ILCreateFromPathW(target_path.c_str());
+                        if (item_id_list != nullptr)
+                        {
+                            const HRESULT select_result = SHOpenFolderAndSelectItems(item_id_list, 0, nullptr, 0);
+                            ILFree(item_id_list);
+                            if (should_uninitialize)
+                                CoUninitialize();
+                            if (SUCCEEDED(select_result))
+                                return;
+                        }
+                        else if (should_uninitialize)
+                        {
+                            CoUninitialize();
+                        }
+                    }
+
+                    const std::wstring arguments = std::format(L"/select,\"{}\"", target_path.wstring());
+                    const HINSTANCE fallback_result = ShellExecuteW(nullptr, L"open", L"explorer.exe", arguments.c_str(),
+                                                                     nullptr, SW_SHOWNORMAL);
+                    if (reinterpret_cast<INT_PTR>(fallback_result) <= 32)
+                        LOG_WARNING(L"AssetBrowser: select path in File Explorer failed, {}", target_path.wstring());
+                }).detach();
                 return;
             }
 

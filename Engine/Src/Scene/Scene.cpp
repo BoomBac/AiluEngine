@@ -655,7 +655,7 @@ namespace Ailu::SceneManagement
     }
     ECS::Entity Scene::DuplicateEntity(ECS::Entity e)
     {
-        ECS::Entity new_one = EntitySerializer::CloneEntity(*this, e);
+        ECS::Entity new_one = EntitySerializer::CloneSubtree(*this, e);
         LOG_INFO("Duplicate entity {}", e);
         TouchStructure();
         return new_one;

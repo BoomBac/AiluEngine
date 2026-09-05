@@ -304,17 +304,28 @@ namespace Ailu
                 return false;
 
             const bool added = _mgrs[type_id]->CopyComponent(source, target);
-            if (!added)
-                return true;
-
             const u32 target_index = EntityIndex(target);
-            _entity_signatures[target_index].set(type_id, true);
-            if (type_id < static_cast<ComponentTypeId>(_on_comp_add_callback.size()))
+            const auto source_disabled = _disabled_components.find(source);
+            if (source_disabled != _disabled_components.end() && source_disabled->second.test(type_id))
+                _disabled_components[target].set(type_id, true);
+            else if (const auto target_disabled = _disabled_components.find(target);
+                     target_disabled != _disabled_components.end())
             {
-                for (auto &callback : _on_comp_add_callback[type_id])
-                    callback(target);
+                target_disabled->second.set(type_id, false);
+                if (target_disabled->second.none())
+                    _disabled_components.erase(target_disabled);
             }
-            EntitySignatureChanged(target);
+
+            if (added)
+            {
+                _entity_signatures[target_index].set(type_id, true);
+                if (type_id < static_cast<ComponentTypeId>(_on_comp_add_callback.size()))
+                {
+                    for (auto &callback : _on_comp_add_callback[type_id])
+                        callback(target);
+                }
+                EntitySignatureChanged(target);
+            }
             return true;
         }
 

@@ -59,6 +59,7 @@ namespace Ailu::Render
         Mesh *_mesh;
         Material *_material;
         const Matrix4x4f *_world_matrix;
+        u32 _entity = 0u;
     };
 
     using CullResult = Map<u32, Vector<RenderableObjectData>>;

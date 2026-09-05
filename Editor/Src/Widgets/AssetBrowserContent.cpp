@@ -217,7 +217,7 @@ namespace Ailu
                 if (!IsAssetInDirectory(asset_dir, asset_directory, is_searching))
                     continue;
 
-                const String asset_display_name = asset->_p_obj ? asset->_p_obj->Name() : asset->Name();
+                const String asset_display_name = asset->Name();
                 if (is_searching && !ContainsSearchText(asset_display_name, search_text) && !ContainsSearchText(ToChar(asset->_asset_path.c_str()), search_text))
                     continue;
                 assets.push_back(asset);
@@ -230,7 +230,7 @@ namespace Ailu
             {
                 AssetBrowserEntry entry;
                 entry._type = AssetBrowserEntry::EType::kAsset;
-                entry._display_name = asset->_p_obj ? asset->_p_obj->Name() : asset->Name();
+                entry._display_name = asset->Name();
                 entry._sys_path = fs::path(ResourceMgr::GetResSysPath(asset->_asset_path));
                 entry._asset = asset;
                 entries.push_back(std::move(entry));

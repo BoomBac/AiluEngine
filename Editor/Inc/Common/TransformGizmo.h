@@ -83,6 +83,7 @@ namespace Ailu
 
             // 计算当前鼠标射线下，沿轴的参数s值 * kVirualRayLen,也就是世界空间的长度
             float ComputeAxisParamS(Vector2f mouse_pos, const Vector3f &origin, const Vector3f &axisDir) const;
+            float ComputeScaleAxisParamS(Vector2f mouse_pos, const Vector3f &origin, const Vector3f &axis_dir) const;
 
         private:
             SceneManagement::Scene *_target_scene = nullptr;

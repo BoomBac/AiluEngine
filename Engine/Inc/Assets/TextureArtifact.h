@@ -23,13 +23,12 @@ namespace Ailu
         bool _is_random_access = false;
     };
 
-    struct AILU_API TextureArtifactSubresource
+    struct TextureArtifactSubresource
     {
         u64 _offset = 0u;
         u64 _size = 0u;
-        u32 _row_pitch = 0u;
-        u32 _slice_pitch = 0u;
     };
+
 
     struct AILU_API TextureArtifact
     {
@@ -38,7 +37,6 @@ namespace Ailu
         Vector<u8> _pixel_data;
     };
 
-    AILU_API bool BuildTextureArtifact(const Render::Texture2D &texture, TextureArtifact &out_artifact);
     AILU_API bool SerializeTextureArtifact(const TextureArtifact &artifact, const AssetArtifactKey &key,
                                            Vector<u8> &out_data);
     AILU_API bool DeserializeTextureArtifact(std::span<const u8> data, const AssetArtifactKey &key,

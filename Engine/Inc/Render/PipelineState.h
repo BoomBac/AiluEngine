@@ -346,7 +346,7 @@ namespace Ailu
             }
 
         private:
-            static constexpr u8 kMaxStreamCount = 6;
+            static constexpr u8 kMaxStreamCount = 10;
             u8 _stream_count = 0;
             std::vector<VertexBufferLayoutDesc> _buffer_descs;
             u8 _stride[kMaxStreamCount]{};

@@ -264,7 +264,7 @@ namespace Ailu
             TimerBlock t("LoadEditorResource");
             TextureImportSetting color_tex_setting, normal_tex_setting;
             color_tex_setting._generate_mipmap = false;
-            normal_tex_setting._is_sRGB = false;
+            normal_tex_setting._is_srgb = false;
             auto& job_sys = JobSystem::Get();
             Vector<WString> texture_sys_path = {
                     EnginePath::kEngineIconPathW + L"folder.alasset",

@@ -28,6 +28,8 @@ namespace Ailu::SceneManagement
 
     private:
         static void CopyComponents(Scene &scene, ECS::Entity source, ECS::Entity target);
+        static void RemapEntityReferences(Scene &scene, const HashMap<ECS::Entity, ECS::Entity> &entity_map);
+        static void ResetRuntimeComponentState(Scene &scene, ECS::Entity target);
         static void CollectSubtree(const Scene &scene, ECS::Entity entity, Vector<ECS::Entity> &entities);
         static String AcquireDuplicateName(const Scene &scene, StringView source_name);
     };

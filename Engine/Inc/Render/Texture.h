@@ -495,7 +495,7 @@ namespace Ailu
         };
 
         //------------
-        class CommandBuffer;
+        class CommandBuffer; struct TextureSubresourceData;
         using TextureHandle = size_t;
 
         ACLASS()
@@ -641,11 +641,16 @@ namespace Ailu
             void SetPixel(u16 x, u16 y, Color color, u16 mipmap);
             void SetPixel32(u16 x, u16 y, Color32 color, u16 mipmap);
             void SetPixelData(u8 *data, u16 mipmap, u64 offset = 0u);
+            void SetImportedPixelData(Vector<u8> pixel_data, Vector<TextureSubresourceData> subresources);
+            const Vector<u8> &ImportedPixelData() const { return _imported_pixel_data; }
+            const Vector<TextureSubresourceData> &ImportedSubresources() const { return _imported_subresources; }
             void EncodeToPng(const Path &path);
             Vector4f TexelSize() const { return _texel_size; }
 
         private:
             Vector4f _texel_size;
+            Vector<u8> _imported_pixel_data;
+            Vector<TextureSubresourceData> _imported_subresources;
 
         private:
             void Construct(const TextureDesc &initializer);
@@ -937,6 +942,15 @@ namespace Ailu
                 h = CombineHashes(h, std::hash<int>()(static_cast<int>(desc._dimension)));
                 return h;
             }
+        };
+    }
+
+    namespace Render
+    {
+        struct TextureSubresourceData
+        {
+            u64 _offset = 0u;
+            u64 _size = 0u;
         };
     }
 }// namespace Ailu

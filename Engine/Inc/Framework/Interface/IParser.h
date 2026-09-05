@@ -65,6 +65,33 @@ namespace Ailu
         //virtual void operator delete[](void* ptr) = 0;)
     };
 
+    enum class ETextureContent : u8
+    {
+        kColor,
+        kNormal,
+        kData,
+        kHdr
+    };
+
+    enum class ETextureCompression : u8
+    {
+        kAuto,
+        kNone,
+        kBc1,
+        kBc3,
+        kBc4,
+        kBc5,
+        kBc6H,
+        kBc7
+    };
+
+    enum class ETextureCompressionQuality : u8
+    {
+        kFast,
+        kNormal,
+        kHigh
+    };
+
     // 默认纹理导入设置：sRGB(伽马空间)，生成 mipmap，不可读
     ASTRUCT()
     struct AILU_API TextureImportSetting : public ImportSetting
@@ -78,11 +105,19 @@ namespace Ailu
             return s_default;
         }
         APROPERTY(Category = "Texture"; Order = 0)
-        bool _is_sRGB = true;
+        ETextureContent _content = ETextureContent::kColor;
         APROPERTY(Category = "Texture"; Order = 1)
-        bool _generate_mipmap = true;
+        bool _is_srgb = true;
         APROPERTY(Category = "Texture"; Order = 2)
+        bool _generate_mipmap = true;
+        APROPERTY(Category = "Texture"; Order = 3)
         bool _is_readable = false;
+        APROPERTY(Category = "Texture"; Order = 4)
+        u32 _max_size = 0u;
+        APROPERTY(Category = "Compression"; Order = 0)
+        ETextureCompression _compression = ETextureCompression::kAuto;
+        APROPERTY(Category = "Compression"; Order = 1)
+        ETextureCompressionQuality _compression_quality = ETextureCompressionQuality::kNormal;
     };
     ASTRUCT()
     struct AILU_API MeshImportSetting : public ImportSetting

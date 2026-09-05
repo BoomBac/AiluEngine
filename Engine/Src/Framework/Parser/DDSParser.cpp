@@ -50,7 +50,7 @@ namespace Ailu
         TextureDesc desc;
         desc._width = load_data._width;
         desc._height = load_data._height;
-        desc._is_linear = !import_settings._is_sRGB;
+        desc._is_linear = !import_settings._is_srgb;
         desc._mip_num = import_settings._generate_mipmap? Texture::MaxMipmapCount(desc._width,desc._height) : 1;
         desc._is_readable = import_settings._is_readable;
         desc._format = ConvertTextureFormatToPixelFormat(load_data._format);
@@ -146,7 +146,7 @@ namespace Ailu
                     break;
 
                 default:
-                    if (BitsPerPixel(d3d10ext->dxgiFormat) == 0)
+                    if (LegacyBitsPerPixel(d3d10ext->dxgiFormat) == 0)
                     {
                         error_code = HRESULT_E_NOT_SUPPORTED;
                         break;
@@ -232,7 +232,7 @@ namespace Ailu
                 // Note there's no way for a legacy Direct3D 9 DDS to express a '1D' texture
             }
 
-            assert(BitsPerPixel(format) != 0);
+            assert(LegacyBitsPerPixel(format) != 0);
         }
         data._format = DXGIToETextureFormat(format);
         u8* raw_data = AL_ALLOC_TAG(EMemoryTag::kTemporary, u8, bitSize);
@@ -253,7 +253,7 @@ namespace Ailu
             TextureDesc desc;
             desc._width = load_data._width;
             desc._height = load_data._height;
-            desc._is_linear = !import_settings._is_sRGB;
+            desc._is_linear = !import_settings._is_srgb;
             desc._mip_num = import_settings._generate_mipmap? Texture::MaxMipmapCount(desc._width,desc._height) : 1;
             desc._is_readable = import_settings._is_readable;
             desc._format = ConvertTextureFormatToPixelFormat(load_data._format);

@@ -332,6 +332,8 @@ namespace Ailu
         static void Deserialize(void *data, FArchive &ar, const String *name = nullptr)
         {
             FStructedArchive *sar = dynamic_cast<FStructedArchive *>(&ar);
+            if (sar && name && sar->IsLoading() && !sar->HasField(*name))
+                return;
             if (sar && name) sar->BeginObject(*name);
 
             if constexpr (std::is_enum_v<T>)

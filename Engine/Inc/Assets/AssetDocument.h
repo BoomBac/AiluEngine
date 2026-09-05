@@ -798,6 +798,29 @@ namespace Ailu
     {
         GENERATED_BODY()
 
+        inline static const String kControllerGuid = "_controller_guid";
+        inline static const String kClipGuid = "_clip_guid";
+        inline static const String kSpeed = "_speed";
+        inline static const String kPlayOnAwake = "_play_on_awake";
+        inline static const String kRootMotionMode = "_root_motion_mode";
+
+        void Deserialize(FArchive &ar)
+        {
+            auto *json_ar = dynamic_cast<JsonArchive *>(&ar);
+            if (json_ar == nullptr || json_ar->HasField(kControllerGuid))
+                SerializerWrapper<String>::Deserialize(&_controller_guid, ar, &kControllerGuid);
+            if (json_ar == nullptr || json_ar->HasField(kClipGuid))
+                SerializerWrapper<String>::Deserialize(&_clip_guid, ar, &kClipGuid);
+            if (json_ar == nullptr || json_ar->HasField(kSpeed))
+                SerializerWrapper<f32>::Deserialize(&_speed, ar, &kSpeed);
+            if (json_ar == nullptr || json_ar->HasField(kPlayOnAwake))
+                SerializerWrapper<bool>::Deserialize(&_play_on_awake, ar, &kPlayOnAwake);
+            if (json_ar == nullptr || json_ar->HasField(kRootMotionMode))
+                SerializerWrapper<u8>::Deserialize(&_root_motion_mode, ar, &kRootMotionMode);
+
+            _root_motion_mode = SerializeRootMotionMode(DeserializeRootMotionMode(_root_motion_mode));
+        }
+
         APROPERTY()
         String _controller_guid;
         APROPERTY()

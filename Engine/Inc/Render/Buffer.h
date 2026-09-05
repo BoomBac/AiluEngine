@@ -196,8 +196,13 @@ namespace Ailu
             VertexBuffer(VertexBufferLayout layout);
             virtual ~VertexBuffer() = default;
             void SetStream(u8 *data, u32 size, u8 stream_index, bool is_dynamic);
+            void SetGpuStream(GPUBuffer *buffer, u32 size, u8 stream_index);
             void SetData(u8 *data, u32 size, u8 stream_index, u32 offset);
             u8 *GetStream(u8 index) { return _stream_data[index]._data; };
+            [[nodiscard]] GPUBuffer *GetGpuStream(u8 index) const noexcept
+            {
+                return index < _gpu_stream_buffers.size() ? _gpu_stream_buffers[index].get() : nullptr;
+            }
             void SetLayout(VertexBufferLayout layout) { _buffer_layout = std::move(layout); };
             void EnableBindlessSRV(bool enable = true) { _bindless_srv_enabled = enable; }
             [[nodiscard]] const VertexBufferLayout &GetLayout() const { return _buffer_layout; };
@@ -218,6 +223,7 @@ namespace Ailu
                 bool _is_dynamic;
             };
             Vector<StreamData> _stream_data;
+            Vector<Ref<GPUBuffer>> _gpu_stream_buffers;
             std::map<std::pair<String, u8>, u8> _buffer_layout_indexer;
             Vector<i32> _bindless_srv_indices;
             bool _bindless_srv_enabled = true;

@@ -45,6 +45,9 @@ namespace Ailu
             void PlayState(Entity entity, u16 state_index);
             RootMotionDelta ConsumeRootMotion(Entity entity);
             void SetBindPoseValidationEnabled(bool enabled);
+            void PrepareVisibleSkinning(const Render::CullResult &cull_results);
+            void RecordSkinningRenderGraph(Render::RDG::RenderGraph &graph, Render::RenderingData &data);
+            [[nodiscard]] const Vector<Render::RDG::RGHandle> &GetSkinningOutputHandles() const noexcept;
 
         private:
             enum class EParameterCommandType : u8
@@ -99,6 +102,7 @@ namespace Ailu
 
             Map<Entity, AnimatorRuntime> _animator_runtimes;
             Map<Entity, Vector<Matrix4x4f>> _matrix_palettes;
+            Map<Entity, PoseHandle> _pose_handles;
             Map<Entity, SpriteAnimationBinding> _sprite_bindings;
             Map<Entity, AnimationController> _controllers;
             Map<Entity, Guid> _controller_ids;

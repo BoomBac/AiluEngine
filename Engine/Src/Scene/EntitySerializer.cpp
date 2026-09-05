@@ -23,9 +23,23 @@ namespace Ailu::SceneManagement
         const String target_name = AcquireDuplicateName(scene, source_name);
         ECS::Entity target = scene.AddObject(target_name);
         CopyComponents(scene, source, target);
-        scene.GetRegister().GetComponent<ECS::TagComponent>(target)->_name = target_name;
+        auto *target_tag = scene.GetRegister().GetComponent<ECS::TagComponent>(target);
+        target_tag->_name = target_name;
+        target_tag->_prefab_entity = Guid::EmptyGuid();
 
         const auto *source_hierarchy = scene.GetRegister().GetComponent<ECS::CHierarchy>(source);
+        auto *target_hierarchy = scene.GetRegister().GetComponent<ECS::CHierarchy>(target);
+        if (source_hierarchy != nullptr && target_hierarchy != nullptr && !source_hierarchy->_enabled)
+            scene.SetEntityEnabled(target, false);
+        scene.GetRegister().SetComponentEnabled<ECS::CHierarchy>(target,
+            scene.GetRegister().IsComponentEnabled<ECS::CHierarchy>(source));
+        scene.GetRegister().SetComponentEnabled<ECS::PersistentIdComponent>(target,
+            scene.GetRegister().IsComponentEnabled<ECS::PersistentIdComponent>(source));
+
+        HashMap<ECS::Entity, ECS::Entity> entity_map;
+        entity_map.emplace(source, target);
+        RemapEntityReferences(scene, entity_map);
+
         if (source_hierarchy != nullptr && source_hierarchy->_parent != ECS::kInvalidEntity)
             scene.Reparent(target, source_hierarchy->_parent, false);
         return target;
@@ -48,9 +62,21 @@ namespace Ailu::SceneManagement
             const String target_name = source == source_root ? AcquireDuplicateName(scene, source_name) : source_name;
             ECS::Entity target = scene.AddObject(target_name);
             CopyComponents(scene, source, target);
-            scene.GetRegister().GetComponent<ECS::TagComponent>(target)->_name = target_name;
+            const auto *source_hierarchy = scene.GetRegister().GetComponent<ECS::CHierarchy>(source);
+            auto *target_hierarchy = scene.GetRegister().GetComponent<ECS::CHierarchy>(target);
+            if (source_hierarchy != nullptr && target_hierarchy != nullptr && !source_hierarchy->_enabled)
+                scene.SetEntityEnabled(target, false);
+            scene.GetRegister().SetComponentEnabled<ECS::CHierarchy>(target,
+                scene.GetRegister().IsComponentEnabled<ECS::CHierarchy>(source));
+            scene.GetRegister().SetComponentEnabled<ECS::PersistentIdComponent>(target,
+                scene.GetRegister().IsComponentEnabled<ECS::PersistentIdComponent>(source));
+            auto *target_tag = scene.GetRegister().GetComponent<ECS::TagComponent>(target);
+            target_tag->_name = target_name;
+            target_tag->_prefab_entity = Guid::EmptyGuid();
             entity_map.emplace(source, target);
         }
+
+        RemapEntityReferences(scene, entity_map);
 
         for (ECS::Entity source : source_entities)
         {
@@ -223,7 +249,7 @@ namespace Ailu::SceneManagement
             entity_doc._animator_component._clip_guid = animator->_clip.IsEmpty() ? String{} : animator->_clip.ToString();
             entity_doc._animator_component._speed = animator->_speed;
             entity_doc._animator_component._play_on_awake = animator->_play_on_awake;
-            entity_doc._animator_component._root_motion_mode = static_cast<u8>(animator->_root_motion_mode);
+            entity_doc._animator_component._root_motion_mode = SerializeRootMotionMode(animator->_root_motion_mode);
             mark_disabled.template operator()<ECS::AnimatorComponent>("AnimatorComponent");
         }
         if (const auto *vxgi = registry.GetComponent<ECS::CVXGI>(entity); vxgi != nullptr)
@@ -331,11 +357,66 @@ namespace Ailu::SceneManagement
         auto &registry = scene.GetRegister();
         const ECS::ComponentTypeId persistent_id_type = ECS::PersistentIdComponent::StaticComponentTypeId();
         const ECS::ComponentTypeId hierarchy_type = ECS::CHierarchy::StaticComponentTypeId();
+        const ECS::ComponentTypeId light_probe_type = ECS::CLightProbe::StaticComponentTypeId();
         for (ECS::ComponentTypeId type_id : registry.GetEntityComponentTypes(source))
         {
-            if (type_id != persistent_id_type && type_id != hierarchy_type)
-                registry.CopyComponent(source, target, type_id);
+            if (type_id == persistent_id_type || type_id == hierarchy_type)
+                continue;
+            if (type_id == light_probe_type)
+            {
+                const auto *source_component = registry.GetComponent<ECS::CLightProbe>(source);
+                auto &target_component = registry.AddComponent<ECS::CLightProbe>(target);
+                target_component._size = source_component->_size;
+                target_component._is_update_every_tick = source_component->_is_update_every_tick;
+                target_component._is_dirty = true;
+                target_component._src_type = source_component->_src_type;
+                target_component._mipmap = source_component->_mipmap;
+                registry.SetComponentEnabled<ECS::CLightProbe>(target, registry.IsComponentEnabled<ECS::CLightProbe>(source));
+                continue;
+            }
+            registry.CopyComponent(source, target, type_id);
         }
+        ResetRuntimeComponentState(scene, target);
+    }
+
+    void EntitySerializer::RemapEntityReferences(Scene &scene, const HashMap<ECS::Entity, ECS::Entity> &entity_map)
+    {
+        HashMap<Guid, Guid, GuidHasher> guid_map;
+        guid_map.reserve(entity_map.size());
+        for (const auto &[source, target] : entity_map)
+            guid_map.emplace(scene.GetEntityGuid(source), scene.GetEntityGuid(target));
+
+        auto &registry = scene.GetRegister();
+        for (const auto &[source, target] : entity_map)
+        {
+            const auto *source_script = registry.GetComponent<ECS::ScriptComponent>(source);
+            auto *target_script = registry.GetComponent<ECS::ScriptComponent>(target);
+            if (source_script == nullptr || target_script == nullptr)
+                continue;
+            for (ECS::ScriptPropertyData &property : target_script->_properties)
+            {
+                if (property._type != ECS::EScriptPropertyType::kEntity)
+                    continue;
+                const auto guid_it = guid_map.find(property._guid_value);
+                if (guid_it != guid_map.end())
+                {
+                    property._guid_value = guid_it->second;
+                    property._is_orphan = false;
+                }
+            }
+        }
+    }
+
+    void EntitySerializer::ResetRuntimeComponentState(Scene &scene, ECS::Entity target)
+    {
+        auto &registry = scene.GetRegister();
+        if (auto *animator = registry.GetComponent<ECS::AnimatorComponent>(target); animator != nullptr)
+        {
+            animator->_instance = kInvalidAnimationInstanceHandle;
+            animator->_started = false;
+        }
+        if (auto *audio_source = registry.GetComponent<ECS::AudioSourceComponent>(target); audio_source != nullptr)
+            audio_source->_runtime_handle = AudioHandle::Invalid();
     }
 
     void EntitySerializer::CollectSubtree(const Scene &scene, ECS::Entity entity, Vector<ECS::Entity> &entities)
