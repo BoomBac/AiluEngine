@@ -16,6 +16,7 @@ EnumInitializer initializer;
 initializer._name = "EDataType";
 initializer._namespace = "Ailu";
 initializer._full_name = "Ailu::EDataType";
+initializer._size = sizeof(Ailu::EDataType);
 initializer._str_to_enum_lut["kInt8"] = 0;
 initializer._str_to_enum_lut["kInt16"] = 1;
 initializer._str_to_enum_lut["kInt32"] = 2;

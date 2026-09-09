@@ -49,7 +49,7 @@ namespace Ailu
             auto d3dcmd = static_cast<RHI::DX12::D3DCommandBuffer *>(cmd);
             auto dxcmd = d3dcmd->NativeCmdList();
             auto bind_heap = g_descriptor_mgr->GetBindHeap();
-            dxcmd->SetDescriptorHeaps(1u, &bind_heap);
+            d3dcmd->SetDescriptorHeap(bind_heap, 1024);
             for (auto &it: _imgui_used_rt)
                 it->StateTranslation(cmd, EResourceState::kPixelShaderResource, kTotalSubRes);
             _imgui_used_rt.clear();

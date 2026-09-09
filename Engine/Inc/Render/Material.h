@@ -2,6 +2,7 @@
 #ifndef __MATERIAL_H__
 #define __MATERIAL_H__
 #include "Buffer.h"
+#include "Assets/AssetRegistry.h"
 #include "Framework/Common/Reflect.h"
 #include "Framework/Common/Allocator.hpp"
 #include "Framework/Core/CoreMinimal.h"
@@ -129,6 +130,13 @@ namespace Ailu::Render
             GpuResource *_upload_buffer = nullptr;// 帧上传缓冲区，用于烘焙进binding snapshot并做资源追踪
             u64 _gpu_handle = 0u;                  // GPU虚拟地址
         };
+        struct AssetSnapshot
+        {
+            Ref<const Shader> _shader;
+            Map<ShaderPropertyId, Ref<const Texture>> _textures;
+            u64 _shader_revision = 0u;
+            Map<ShaderPropertyId, u64> _texture_revisions;
+        };
         inline static std::weak_ptr<Material> s_standard_defered_lit;
         inline static std::weak_ptr<Material> s_standard_forward_lit;
         inline static std::weak_ptr<Material> s_checker;
@@ -193,8 +201,19 @@ namespace Ailu::Render
         DECLARE_EVENT_ROUTER(on_property_changed, ShaderPropertyId);
         bool IsReadyForDraw(u16 pass_index = 0) const;
         [[nodiscard]] const Guid &ShaderGuid() const { return _shader_guid; }
-        void SetShaderGuid(const Guid &guid) { _shader_guid = guid; }
-        void SetTextureGuid(const String &name, const Guid &guid) { _texture_guids[name] = guid; }
+        void SetShaderGuid(const Guid &guid)
+        {
+            _shader_guid = guid;
+            UpdateShaderHandle();
+        }
+        void SetTextureGuid(const String &name, const Guid &guid)
+        {
+            _texture_guids[name] = guid;
+            UpdateTextureHandle(ShaderPropertyRegistry::Get().Intern(name), guid);
+        }
+        [[nodiscard]] AssetSnapshot CaptureAssetSnapshots() const;
+        // Command construction calls this before CaptureDrawState; render recording only consumes the snapshot.
+        void RefreshAssetReferences();
         [[nodiscard]] const Guid &TextureGuid(const String &name) const
         {
             auto iter = _texture_guids.find(name);
@@ -271,6 +290,8 @@ namespace Ailu::Render
         Vector<BindingCacheEntry> _binding_cache;
         Array<Vector<FramePropertyBlockCache>, RenderConstants::kFrameCount + 1u> _frame_property_block_cache;
     private:
+        void UpdateShaderHandle();
+        void UpdateTextureHandle(ShaderPropertyId property_id, const Guid &guid);
         void UpdateBindTexture(u16 pass_index, ShaderVariantHash new_hash);
         void ResolveStandardMaterialLayout();
         void MarkTextureUsed(std::initializer_list<ETextureUsage> usages, bool used);
@@ -297,7 +318,9 @@ namespace Ailu::Render
         Shader *_p_shader = nullptr;
         Shader *_p_active_shader = nullptr;
         Guid _shader_guid = Guid::EmptyGuid();
+        AssetHandle<Shader> _shader_handle;
         Map<String, Guid> _texture_guids;
+        Map<ShaderPropertyId, AssetHandle<Texture>> _texture_handles_by_id;
         //运行时每个pass的关键字信息
         Vector<PassVariantInfo> _pass_variants;
         //跟随材质持久化的关键字

@@ -604,6 +604,7 @@ EnumInitializer initializer;
 initializer._name = "EDockArea";
 initializer._namespace = "Ailu::Editor";
 initializer._full_name = "Ailu::Editor::EDockArea";
+initializer._size = sizeof(Ailu::Editor::EDockArea);
 initializer._str_to_enum_lut["kFloat"] = 0;
 initializer._str_to_enum_lut["kCenter"] = 1;
 initializer._str_to_enum_lut["kLeft"] = 2;

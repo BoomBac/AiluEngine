@@ -1,6 +1,7 @@
 #include "Render/RayTracing/SceneRayTracingProxy.h"
 #include "Framework/Common/Profiler.h"
 #include "Framework/Math/MathHash.hpp"
+#include "Animation/SkinningSystem.h"
 #include "Render/Mesh.h"
 #include "Render/Material.h"
 #include "Render/Texture.h"
@@ -256,7 +257,8 @@ namespace Ailu::Render
             return light;
         }
 
-        Vector<UnifiedLightData> BuildUnifiedLight(const ECS::StaticMeshComponent  &comp, u32 scene_triangle_offset, u32 base_instance_index)
+        template<typename T>
+        Vector<UnifiedLightData> BuildUnifiedLight(const T &comp, u32 scene_triangle_offset, u32 base_instance_index)
         {
             (void)scene_triangle_offset;
             if (!comp._p_mesh)
@@ -321,12 +323,25 @@ namespace Ailu::Render
     }
 
 
-    void SceneRayTracingProxy::Sync(const SceneManagement::Scene *scene)
+    void SceneRayTracingProxy::Sync(const SceneManagement::Scene *scene, Vector<PrimitiveData> *primitive_data,
+                                    GPUBuffer *primitive_buffer, const Vector<ScenePrimitive> *scene_primitives)
     {
         PROFILE_BLOCK_CPU("SceneRayTracingProxy::Sync")
+        _scene_primitive_data = primitive_data;
+        _scene_primitive_buffer = primitive_buffer;
+        _scene_primitives = scene_primitives;
         SyncLightCache(scene);
         if (scene == nullptr)
             return;
+
+        if (_scene_primitive_data == nullptr || _scene_primitive_buffer == nullptr || _scene_primitives == nullptr)
+        {
+            LOG_WARNING("SceneRayTracingProxy: scene primitive data is unavailable, skipping hardware ray tracing scene sync.");
+            ClearSlot(FrontSlot());
+            ClearSlot(BackSlot());
+            _has_pending_swap = false;
+            return;
+        }
 
         TrySwapBuffers();
 
@@ -380,36 +395,51 @@ namespace Ailu::Render
         UpdateUnifiedLights(*scene);
     }
 
-    Vector<SceneRayTracingProxy::SceneInstanceKey> SceneRayTracingProxy::CollectInstanceKeys(const SceneManagement::Scene &scene, Vector<Matrix4x4f> &transforms,Vector<Material*> &materials) const
+    Vector<SceneRayTracingProxy::SceneInstanceKey> SceneRayTracingProxy::CollectInstanceKeys(const SceneManagement::Scene &scene,
+                                                                                             Vector<Matrix4x4f> &transforms,
+                                                                                             Vector<Material*> &materials) const
     {
         Vector<SceneInstanceKey> instance_keys;
         const auto &reg = scene.GetRegister();
-        u64 entity_index = 0u;
-        for (const auto &static_mesh : reg.View<ECS::StaticMeshComponent>())
+        auto append_instance_keys = [&](auto &renderables, bool is_skinned)
         {
-            const auto entity = reg.GetEntity<ECS::StaticMeshComponent>(entity_index);
-            const auto *transform_comp = reg.GetComponent<ECS::StaticMeshComponent, ECS::TransformComponent>(entity_index);
-            ++entity_index;
-            if (static_mesh._p_mesh == nullptr || transform_comp == nullptr)
-                continue;
-
-            auto *mesh = static_mesh._p_mesh.get();
-            if (mesh->SubmeshCount() == 0u || mesh->GetVertexBuffer() == nullptr)
-                continue;
-            if (mesh->GetVertices().empty())
-                continue;
-            u16 material_class = 0u;
-            auto mat = static_mesh._p_mats.empty() ? nullptr : static_mesh._p_mats[0].get();
-            if (mat != nullptr && mat->IsStandardLit() && mat->MaterialID() == EMaterialID::kChecker)
-                material_class = 1;
-            instance_keys.push_back({entity, mesh, material_class});
-            for (u32 i = 0u; i < mesh->SubmeshCount(); ++i)
+            using ComponentType = std::remove_cvref_t<decltype(*renderables.begin())>;
+            u64 entity_index = 0u;
+            for (const auto &renderable : renderables)
             {
-                transforms.push_back(transform_comp->GetWorldMatrix());
-                auto mat = static_mesh._p_mats.size() > i ? static_mesh._p_mats[i].get() : nullptr;
-                materials.push_back(mat);
+                const auto entity = reg.GetEntity<ComponentType>(entity_index);
+                const auto *transform_comp = reg.GetComponent<ComponentType, ECS::TransformComponent>(entity_index);
+                ++entity_index;
+                if (!scene.IsEntityEnabled(entity) || !reg.IsComponentEnabled<ComponentType>(entity) ||
+                    renderable._p_mesh == nullptr || transform_comp == nullptr)
+                    continue;
+
+                auto *mesh = renderable._p_mesh.get();
+                if (mesh->SubmeshCount() == 0u || mesh->GetVertexBuffer() == nullptr || mesh->GetVertices().empty())
+                    continue;
+                auto *vertex_buffer = is_skinned ? ECS::SkinningSystem::ResolveVertexBuffer(mesh, static_cast<u32>(entity)) : nullptr;
+                if (vertex_buffer == nullptr)
+                    vertex_buffer = mesh->GetVertexBuffer().get();
+
+                SceneInstanceKey instance_key;
+                instance_key._entity = entity;
+                instance_key._mesh = mesh;
+                instance_key._vertex_buffer = vertex_buffer;
+                auto mat = renderable._p_mats.empty() ? nullptr : renderable._p_mats[0].get();
+                if (mat != nullptr && mat->IsStandardLit() && mat->MaterialID() == EMaterialID::kChecker)
+                    instance_key._material_class = 1u;
+                instance_keys.push_back(instance_key);
+                for (u32 submesh_index = 0u; submesh_index < mesh->SubmeshCount(); ++submesh_index)
+                {
+                    transforms.push_back(transform_comp->GetRenderWorldMatrix());
+                    auto submesh_material = renderable._p_mats.size() > submesh_index
+                        ? renderable._p_mats[submesh_index].get() : nullptr;
+                    materials.push_back(submesh_material);
+                }
             }
-        }
+        };
+        append_instance_keys(reg.View<ECS::StaticMeshComponent>(), false);
+        append_instance_keys(reg.View<ECS::CSkeletonMesh>(), true);
         return instance_keys;
     }
 
@@ -421,7 +451,8 @@ namespace Ailu::Render
         for (u64 index = 0u; index < instance_keys.size(); ++index)
         {
             if (slot._instance_keys[index]._entity != instance_keys[index]._entity ||
-                slot._instance_keys[index]._mesh != instance_keys[index]._mesh)
+                slot._instance_keys[index]._mesh != instance_keys[index]._mesh ||
+                slot._instance_keys[index]._vertex_buffer != instance_keys[index]._vertex_buffer)
             {
                 return true;
             }
@@ -429,14 +460,16 @@ namespace Ailu::Render
         return false;
     }
 
-    Vector<Ref<RayTracingGeometry>> SceneRayTracingProxy::AcquireGeometry(Mesh *mesh)
+    Vector<Ref<RayTracingGeometry>> SceneRayTracingProxy::AcquireGeometry(Mesh *mesh, VertexBuffer *vertex_buffer)
     {
-        if (mesh == nullptr)
+        if (mesh == nullptr || vertex_buffer == nullptr)
             return {};
 
-        if (auto it = _mesh_geometry_cache.find(mesh); it != _mesh_geometry_cache.end())
+        if (auto it = _mesh_geometry_cache.find(mesh); it != _mesh_geometry_cache.end() &&
+            it->second._vertex_buffer == vertex_buffer)
             return it->second._geometries;
         CachedGeometry cached_geometry;
+        cached_geometry._vertex_buffer = vertex_buffer;
         cached_geometry._geometries.reserve(mesh->SubmeshCount());
         for (u32 submesh_index = 0u; submesh_index < mesh->SubmeshCount(); ++submesh_index)
         {
@@ -448,7 +481,7 @@ namespace Ailu::Render
             }
 
             RayTracingGeometryDesc desc{};
-            desc._vertex_buffer = mesh->GetVertexBuffer().get();
+            desc._vertex_buffer = vertex_buffer;
             desc._index_buffer.push_back(submesh_ib.get());
             desc._vertex_stride = desc._vertex_buffer->GetLayout().GetStride(0);
             desc._vertex_count = desc._vertex_buffer->GetVertexCount();
@@ -473,8 +506,8 @@ namespace Ailu::Render
 
         Vector<SceneInstanceKey> valid_instance_keys;
         valid_instance_keys.reserve(instance_keys.size());
-        slot._instance_datas.clear();
-        slot._instance_datas.reserve(transforms.size());
+        slot._instances.clear();
+        slot._instances.reserve(transforms.size());
         u32 transform_offset = 0u;
 
         for (u64 index = 0u; index < instance_keys.size(); ++index)
@@ -488,7 +521,7 @@ namespace Ailu::Render
                 return false;
             }
 
-            auto geometries = AcquireGeometry(instance_keys[index]._mesh);
+            auto geometries = AcquireGeometry(instance_keys[index]._mesh, instance_keys[index]._vertex_buffer);
             if (geometries.empty())
             {
                 LOG_WARNING(std::format("SceneRayTracingProxy: geometry acquisition failed for mesh {}, postponing swap.", mesh->Name()));
@@ -523,16 +556,26 @@ namespace Ailu::Render
                 RayTracingInstance instance = {};
                 instance._geometry = geometries[submesh_index].get();
                 instance._transform = transform;
-                instance._instance_id = static_cast<u32>(slot._instance_datas.size());
+                u32 primitive_index = RenderConstants::kInvalidBindlessHandle;
+                for (const auto &primitive : *_scene_primitives)
+                {
+                    if (primitive._entity_id == static_cast<u32>(instance_keys[index]._entity) && primitive._mesh == mesh &&
+                        primitive._submesh_index == submesh_index)
+                    {
+                        primitive_index = primitive._primitive_index;
+                        break;
+                    }
+                }
+                if (primitive_index == RenderConstants::kInvalidBindlessHandle || primitive_index >= _scene_primitive_data->size())
+                {
+                    LOG_WARNING("SceneRayTracingProxy: failed to resolve a ray tracing instance to a scene primitive.");
+                    ClearSlot(slot);
+                    return false;
+                }
+                instance._instance_id = primitive_index;
                 instance._hit_group_offset = instance_keys[index]._material_class;
                 slot._scene->AddInstance(instance);
-                ObjectInstanceData inst_data = {};
-                inst_data._local_to_world = transform;
-                inst_data._world_to_local = MatrixInverse(transform);
-                const Vector3f inv_scale = Vector3f::kOne / transform.LossyScale();
-                inst_data._max_inv_scale = std::max(inv_scale.x, std::max(inv_scale.y, inv_scale.z));
-                inst_data._object_id = static_cast<u32>(slot._instance_datas.size());
-                slot._instance_datas.push_back(inst_data);
+                slot._instances.push_back({primitive_index, transform});
             }
 
             transform_offset += submesh_count;
@@ -559,29 +602,35 @@ namespace Ailu::Render
 
     void SceneRayTracingProxy::UpdateTransforms(ProxyBufferSlot &slot, const Vector<Matrix4x4f> &transforms)
     {
-        if (slot._scene == nullptr || transforms.size() != slot._instance_datas.size())
+        if (slot._scene == nullptr || transforms.size() != slot._instances.size() || _scene_primitive_data == nullptr)
             return;
 
         bool any_transform_changed = false;
         for (u64 index = 0u; index < transforms.size(); ++index)
         {
-            if (slot._instance_datas[index]._local_to_world == transforms[index])
+            auto &instance = slot._instances[index];
+            if (instance._transform == transforms[index])
                 continue;
 
-            slot._instance_datas[index]._local_to_world = transforms[index];
-            slot._instance_datas[index]._world_to_local = MatrixInverse(transforms[index]);
+            if (instance._primitive_index >= _scene_primitive_data->size())
+            {
+                LOG_WARNING("SceneRayTracingProxy: scene primitive index is out of range while updating transforms.");
+                continue;
+            }
+            auto &primitive_data = (*_scene_primitive_data)[instance._primitive_index];
+            primitive_data._prev_local_to_world = primitive_data._local_to_world;
+            primitive_data._local_to_world = transforms[index];
+            primitive_data._world_to_local = MatrixInverse(transforms[index]);
             const Vector3f inv_scale = Vector3f::kOne / transforms[index].LossyScale();
-            slot._instance_datas[index]._max_inv_scale = std::max(inv_scale.x, std::max(inv_scale.y, inv_scale.z));
+            primitive_data._max_inv_scale = std::max(inv_scale.x, std::max(inv_scale.y, inv_scale.z));
+            instance._transform = transforms[index];
             slot._scene->UpdateInstance(index, transforms[index]);
             any_transform_changed = true;
         }
 
         if (any_transform_changed)
         {
-            if (slot._instance_data != nullptr)
-            {
-                slot._instance_data->SetData(reinterpret_cast<const u8 *>(slot._instance_datas.data()), static_cast<u32>(slot._instance_datas.size() * sizeof(ObjectInstanceData)));
-            }
+            _scene_primitive_buffer->SetData(*_scene_primitive_data);
             slot._scene->Update();
         }
     }
@@ -661,35 +710,46 @@ namespace Ailu::Render
         {
             for (u32 submesh_index = 0u; submesh_index < instance_keys[instance_index]._mesh->SubmeshCount(); ++submesh_index)
             {
-                if (rendering_instance_index >= slot._instance_datas.size())
+                if (rendering_instance_index >= slot._instances.size())
                 {
-                    LOG_WARNING("SceneRayTracingProxy: instance data count does not match packed geometry count, aborting buffer rebuild.");
+                    LOG_WARNING("SceneRayTracingProxy: instance count does not match packed geometry count, aborting buffer rebuild.");
+                    return false;
+                }
+                const u32 primitive_index = slot._instances[rendering_instance_index]._primitive_index;
+                if (primitive_index >= _scene_primitive_data->size())
+                {
+                    LOG_WARNING("SceneRayTracingProxy: scene primitive index is out of range while rebuilding packed buffers.");
                     return false;
                 }
                 const auto &range = slot._mesh_ranges[instance_keys[instance_index]._mesh][submesh_index];
                 auto *mesh = instance_keys[instance_index]._mesh;
-                const i32 position_bindless_idx = mesh ? mesh->GetBindlessVertexStreamIndex("POSITION") : -1;
-                const i32 normal_bindless_idx = mesh ? mesh->GetBindlessVertexStreamIndex("NORMAL") : -1;
-                const i32 uv_bindless_idx = mesh ? mesh->GetBindlessVertexStreamIndex("TEXCOORD") : -1;
-                const i32 tangent_bindless_idx = mesh ? mesh->GetBindlessVertexStreamIndex("TANGENT") : -1;
+                const i32 position_bindless_idx = mesh ? mesh->GetBindlessVertexStreamIndex(EVertexSemantic::kPosition,
+                                                                                          instance_keys[instance_index]._vertex_buffer) : -1;
+                const i32 normal_bindless_idx = mesh ? mesh->GetBindlessVertexStreamIndex(EVertexSemantic::kNormal,
+                                                                                         instance_keys[instance_index]._vertex_buffer) : -1;
+                const i32 uv_bindless_idx = mesh ? mesh->GetBindlessVertexStreamIndex(EVertexSemantic::kTexcoord0,
+                                                                                      instance_keys[instance_index]._vertex_buffer) : -1;
+                const i32 tangent_bindless_idx = mesh ? mesh->GetBindlessVertexStreamIndex(EVertexSemantic::kTangent,
+                                                                                             instance_keys[instance_index]._vertex_buffer) : -1;
                 auto index_buffer = mesh ? mesh->GetIndexBuffer(static_cast<u16>(submesh_index)).get() : nullptr;
-                slot._instance_datas[rendering_instance_index]._global_triangle_offset = range._triangle_offset;
-                slot._instance_datas[rendering_instance_index]._position_bindless_idx = position_bindless_idx >= 0 ? static_cast<u32>(position_bindless_idx) : RenderConstants::kInvalidBindlessHandle;
-                slot._instance_datas[rendering_instance_index]._normal_bindless_idx = normal_bindless_idx >= 0 ? static_cast<u32>(normal_bindless_idx) : RenderConstants::kInvalidBindlessHandle;
-                slot._instance_datas[rendering_instance_index]._uv_bindless_idx = uv_bindless_idx >= 0 ? static_cast<u32>(uv_bindless_idx) : RenderConstants::kInvalidBindlessHandle;
-                slot._instance_datas[rendering_instance_index]._tangent_bindless_idx = tangent_bindless_idx >= 0 ? static_cast<u32>(tangent_bindless_idx) : RenderConstants::kInvalidBindlessHandle;
-                slot._instance_datas[rendering_instance_index]._index_bindless_idx = index_buffer ? static_cast<u32>(index_buffer->GetBindlessSRVIndex()) : RenderConstants::kInvalidBindlessHandle;
-                slot._instance_datas[rendering_instance_index]._submesh_triangle_offset = 0u;
-                slot._instance_datas[rendering_instance_index]._submesh_triangle_count = mesh ? mesh->GetTriangleCount(static_cast<u16>(submesh_index)) : 0u;
-                u32 mat_id = _materials[rendering_instance_index]? _material_data_lut[_materials[rendering_instance_index]->HashCode()] : 0u;
-                slot._instance_datas[rendering_instance_index]._material_id = mat_id; // TODO: material ID assignment
+                auto &primitive_data = (*_scene_primitive_data)[primitive_index];
+                primitive_data._global_triangle_offset = range._triangle_offset;
+                primitive_data._position_bindless_idx = position_bindless_idx >= 0 ? static_cast<u32>(position_bindless_idx) : RenderConstants::kInvalidBindlessHandle;
+                primitive_data._normal_bindless_idx = normal_bindless_idx >= 0 ? static_cast<u32>(normal_bindless_idx) : RenderConstants::kInvalidBindlessHandle;
+                primitive_data._uv_bindless_idx = uv_bindless_idx >= 0 ? static_cast<u32>(uv_bindless_idx) : RenderConstants::kInvalidBindlessHandle;
+                primitive_data._tangent_bindless_idx = tangent_bindless_idx >= 0 ? static_cast<u32>(tangent_bindless_idx) : RenderConstants::kInvalidBindlessHandle;
+                primitive_data._index_bindless_idx = index_buffer ? static_cast<u32>(index_buffer->GetBindlessSRVIndex()) : RenderConstants::kInvalidBindlessHandle;
+                primitive_data._submesh_triangle_offset = 0u;
+                primitive_data._submesh_triangle_count = mesh ? mesh->GetTriangleCount(static_cast<u16>(submesh_index)) : 0u;
+                primitive_data._material_id = rendering_instance_index < _materials.size() && _materials[rendering_instance_index] != nullptr ?
+                    _material_data_lut[_materials[rendering_instance_index]->HashCode()] : 0u;
                 ++rendering_instance_index;
             }
         }
 
-        if (rendering_instance_index != slot._instance_datas.size())
+        if (rendering_instance_index != slot._instances.size())
         {
-            LOG_WARNING("SceneRayTracingProxy: packed geometry count does not match instance data count, aborting buffer rebuild.");
+            LOG_WARNING("SceneRayTracingProxy: packed geometry count does not match instance count, aborting buffer rebuild.");
             return false;
         }
 
@@ -698,12 +758,11 @@ namespace Ailu::Render
         slot._uv_data = CreateStructuredBuffer(merged_uvs, "SceneRayTracingProxy_UVData");
         slot._tangent_data = CreateStructuredBuffer(merged_tangents, "SceneRayTracingProxy_TangentData");
         slot._indices_data = CreateStructuredBuffer(merged_indices, "SceneRayTracingProxy_IndexData");
-        slot._instance_data = CreateStructuredBuffer(slot._instance_datas, "SceneRayTracingProxy_InstanceData");
+        _scene_primitive_buffer->SetData(*_scene_primitive_data);
         return slot._vertex_data != nullptr &&
                slot._normal_data != nullptr &&
                slot._uv_data != nullptr &&
-               slot._indices_data != nullptr &&
-               slot._instance_data != nullptr;
+               slot._indices_data != nullptr;
     }
 
     bool SceneRayTracingProxy::IsSlotReady(ProxyBufferSlot &slot)
@@ -716,8 +775,7 @@ namespace Ailu::Render
 
         return slot._vertex_data != nullptr && slot._vertex_data->IsReady() &&
                slot._normal_data != nullptr && slot._normal_data->IsReady() &&
-               slot._indices_data != nullptr && slot._indices_data->IsReady() &&
-               slot._instance_data != nullptr && slot._instance_data->IsReady();
+               slot._indices_data != nullptr && slot._indices_data->IsReady();
     }
 
     void SceneRayTracingProxy::TrySwapBuffers()
@@ -739,12 +797,13 @@ namespace Ailu::Render
     {
         slot._mesh_ranges.clear();
         slot._instance_keys.clear();
-        slot._instance_datas.clear();
+        slot._instances.clear();
         slot._scene = nullptr;
         slot._vertex_data = nullptr;
         slot._normal_data = nullptr;
+        slot._uv_data = nullptr;
+        slot._tangent_data = nullptr;
         slot._indices_data = nullptr;
-        slot._instance_data = nullptr;
     }
 
     static void FillMaterialData(Material* src, MaterialData& dst)
@@ -807,19 +866,26 @@ namespace Ailu::Render
     {
         PROFILE_BLOCK_CPU("Renderer::PrepareMaterial")
 
-        for (auto& static_mesh : s.GetRegister().View<ECS::StaticMeshComponent>())
+        auto collect_materials = [this](auto &renderables)
         {
-            for (auto& mat : static_mesh._p_mats)
+            for (auto &renderable : renderables)
             {
-                if (!_material_data_lut.contains(mat->HashCode()))
+                for (auto &material : renderable._p_mats)
                 {
-                    u32 idx = (u32)_material_data_cache.size();
-                    _material_data_lut[mat->HashCode()] = idx;
-                    _material_data_cache.push_back(MaterialData());
+                    if (material == nullptr)
+                        continue;
+                    if (!_material_data_lut.contains(material->HashCode()))
+                    {
+                        const u32 material_index = static_cast<u32>(_material_data_cache.size());
+                        _material_data_lut[material->HashCode()] = material_index;
+                        _material_data_cache.push_back(MaterialData());
+                    }
+                    FillMaterialData(material.get(), _material_data_cache[_material_data_lut[material->HashCode()]]);
                 }
-                FillMaterialData(mat.get(), _material_data_cache[_material_data_lut[mat->HashCode()]]);
             }
-        }
+        };
+        collect_materials(s.GetRegister().View<ECS::StaticMeshComponent>());
+        collect_materials(s.GetRegister().View<ECS::CSkeletonMesh>());
         _material_buffer->SetData(
             (u8*)_material_data_cache.data(),
             (u32)(_material_data_cache.size() * sizeof(MaterialData)));
@@ -845,20 +911,25 @@ namespace Ailu::Render
 
         u32 scene_triangle_offset = 0u;
         u32 instance_index_offset = 0u;
-        for (const auto &mesh_comp : scene.GetRegister().View<ECS::StaticMeshComponent>())
+        auto append_mesh_lights = [this, &scene_triangle_offset, &instance_index_offset](auto &mesh_components)
         {
-            const auto lights = BuildUnifiedLight(mesh_comp, scene_triangle_offset, instance_index_offset);
-            auto light_num = static_cast<u32>(lights.size());
-            _unified_light_data_cache.insert(_unified_light_data_cache.end(), lights.begin(), lights.end());
-            _unified_light_config_cpu._light_count += light_num;
-            _unified_light_config_cpu._finite_light_count += light_num;
-            _unified_light_config_cpu._triangle_light_count += light_num;
-            if (mesh_comp._p_mesh)
+            for (const auto &mesh_comp : mesh_components)
             {
-                scene_triangle_offset += mesh_comp._p_mesh->GetTriangleCount();
-                instance_index_offset += mesh_comp._p_mesh->SubmeshCount();
+                const auto lights = BuildUnifiedLight(mesh_comp, scene_triangle_offset, instance_index_offset);
+                const auto light_num = static_cast<u32>(lights.size());
+                _unified_light_data_cache.insert(_unified_light_data_cache.end(), lights.begin(), lights.end());
+                _unified_light_config_cpu._light_count += light_num;
+                _unified_light_config_cpu._finite_light_count += light_num;
+                _unified_light_config_cpu._triangle_light_count += light_num;
+                if (mesh_comp._p_mesh)
+                {
+                    scene_triangle_offset += mesh_comp._p_mesh->GetTriangleCount();
+                    instance_index_offset += mesh_comp._p_mesh->SubmeshCount();
+                }
             }
-        }
+        };
+        append_mesh_lights(scene.GetRegister().View<ECS::StaticMeshComponent>());
+        append_mesh_lights(scene.GetRegister().View<ECS::CSkeletonMesh>());
 
         const u64 required_size = std::max<u64>(1u, _unified_light_data_cache.capacity()) * sizeof(UnifiedLightData);
         if (_unified_light_buffer == nullptr || _unified_light_buffer->GetSize() < required_size)

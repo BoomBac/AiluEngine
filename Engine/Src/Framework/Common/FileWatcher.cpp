@@ -2,7 +2,6 @@
 #include "Framework/Common/Path.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Framework/Script/ScriptSystem.h"
-#include "Render/GraphicsContext.h"
 #include "Render/RayTracing/RayTracingShader.h"
 #include "Render/Shader.h"
 #include <algorithm>
@@ -201,7 +200,7 @@ namespace Ailu
                     if (source_file == sys_path)
                     {
                         match_file = true;
-                        Render::GraphicsContext::Get().CompileShaderAsync(shader.get());
+                        ResourceMgr::Get().MarkAssetForReload(ResourceMgr::Get().GetLinkedAsset(shader.get()));
                         ++count;
                         break;
                     }
@@ -219,7 +218,7 @@ namespace Ailu
             auto cs = ResourceMgr::IterToRefPtr<Render::ComputeShader>(it);
             if (cs && cs->IsDependencyFile(sys_path))
             {
-                Render::GraphicsContext::Get().CompileShaderAsync(cs.get());
+                ResourceMgr::Get().MarkAssetForReload(ResourceMgr::Get().GetLinkedAsset(cs.get()));
                 ++count;
             }
         }
@@ -233,8 +232,9 @@ namespace Ailu
         {
             if (shader != nullptr && shader->IsDependencyFile(sys_path))
             {
-                Render::GraphicsContext::Get().CompileShaderAsync(shader);
-                ++count;
+                // Ray tracing shaders are currently runtime-only objects, not registered assets.
+                // Do not compile from the watcher callback; their asset-backed migration owns reload.
+                LOG_WARNING(L"Ray tracing shader dependency changed: {}. It is not yet asset-backed.", sys_path);
             }
         }
         return count;
@@ -250,7 +250,7 @@ namespace Ailu
             auto linked_asset = ResourceMgr::Get().GetLinkedAsset(tex.get());
             if (linked_asset && !linked_asset->_external_asset_path.empty() && cur_asset_path == linked_asset->_external_asset_path)
             {
-                LOG_WARNING(L"Texture2d {} has changed,but reload not support yet", linked_asset->_asset_path);
+                ResourceMgr::Get().MarkAssetForReload(linked_asset);
                 ++count;
             }
         }

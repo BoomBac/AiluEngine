@@ -57,7 +57,7 @@ namespace Ailu
         out_artifact._desc._mip_count = mip_count;
         out_artifact._desc._format = texture.PixelFormat();
         out_artifact._desc._dimension = texture.Dimension();
-        out_artifact._desc._is_linear = texture.sRGB();
+        out_artifact._desc._is_linear = !texture.sRGB();
         out_artifact._desc._is_readable = texture.Readble();
         const u32 pixel_size = GetPixelByteSize(texture.PixelFormat());
         if (pixel_size == 0u)

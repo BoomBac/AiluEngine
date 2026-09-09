@@ -14,7 +14,7 @@ namespace Ailu::RHI::DX12
 	#pragma region DescriptorPage
 	//-----------------------------------------------------------DescriptorPage-----------------------------------------------------------------
 	DescriptorPage::DescriptorPage(u16 id, D3D12_DESCRIPTOR_HEAP_TYPE type, u16 num,D3D12_DESCRIPTOR_HEAP_FLAGS flag)
-		: _id(id), _type(type), _available_num(num),_flag(flag)
+		: _id(id), _type(type), _flag(flag), _available_num(num), _desc_size(0u), _generations(num, 0u)
 	{
 		auto p_device = static_cast<D3DContext&>(GraphicsContext::Get()).GetDevice();
 		_desc_size = p_device->GetDescriptorHandleIncrementSize(type);
@@ -32,6 +32,8 @@ namespace Ailu::RHI::DX12
 		_type = other._type;
 		_available_num = other._available_num;
 		_desc_size = other._desc_size;
+		_flag = other._flag;
+		_generations = std::move(other._generations);
 		_heap = other._heap;
 		_lut_free_block_by_offset = std::move(other._lut_free_block_by_offset);
 		_lut_free_block_by_size = std::move(other._lut_free_block_by_size);
@@ -55,6 +57,11 @@ namespace Ailu::RHI::DX12
 			u16 new_block_offset = offset_it->first;
 			u16 new_block_size = free_block_info._size;
 			u16 ret_offset = new_block_offset;
+			for (u16 i = 0u; i < num; ++i)
+			{
+				if (++_generations[ret_offset + i] == 0u)
+					_generations[ret_offset + i] = 1u;
+			}
 			_lut_free_block_by_offset.erase(offset_it);
 			_lut_free_block_by_size.erase(size_it);
 			new_block_offset += num;
@@ -304,7 +311,7 @@ namespace Ailu::RHI::DX12
 		{
 			_page_free_space_lut[type].erase(page_it);
 			_page_free_space_lut[type].emplace(std::make_pair(page.AvailableDescriptorNum(), page.PageID()));
-			return GPUVisibleDescriptorAllocation(offset,num,&page);
+			return GPUVisibleDescriptorAllocation(offset, num, page.Generation(offset), &page);
 		}
 		return GPUVisibleDescriptorAllocation();
 	}
@@ -341,6 +348,7 @@ namespace Ailu::RHI::DX12
         LOG_WARNING("GPUVisibleDescriptorAllocator add new page to {}",_pages.size());
 		DescriptorPage new_page(static_cast<u16>(_pages.size()), type, num,D3D12_DESCRIPTOR_HEAP_FLAG_NONE);
 		_pages.emplace_back(std::move(new_page));
+		_descriptor_caches.emplace_back(Vector<CachedDescriptor>(num));
 		return _page_free_space_lut[type].emplace(std::make_pair(num, static_cast<u16>(_pages.size() - 1)));
 	}
 
@@ -363,8 +371,7 @@ namespace Ailu::RHI::DX12
 		auto cmd_heap_id = cmd->GetDescriptorHeapId();
 		if (cmd_heap_id != _p_page->PageID())
 		{
-			cmd->NativeCmdList()->SetDescriptorHeaps(1, _p_page->GetHeap().GetAddressOf());
-			cmd->SetDescriptorHeapId(_p_page->PageID());
+			cmd->SetDescriptorHeap(_p_page->GetHeap().Get(), _p_page->PageID());
 		}
 	}
 	D3D12_GPU_DESCRIPTOR_HANDLE GPUVisibleDescriptorAllocator::GetBindlessSRVBaseGpuHandle() const
@@ -478,62 +485,83 @@ namespace Ailu::RHI::DX12
 		return GetMainHeapCpuHandle(_bindless_uav_base_index + bindless_index);
 	}
 
-	D3D12_GPU_DESCRIPTOR_HANDLE GPUVisibleDescriptorAllocator::GetBindGpuHandle(const GPUVisibleDescriptorAllocation& alloc)
+	void GPUVisibleDescriptorAllocator::RecordDescriptorCopy(bool allocation)
 	{
-		std::lock_guard lock(_mainheap_mutex);
-		if (_ring_cursor + alloc.DescriptorNum() > kMainHeapDescriptorNum)
-		{
-			_ring_cursor = _ring_base_index;
-		}
-		D3D12_CPU_DESCRIPTOR_HANDLE dst_handle = _main_heap->GetCPUDescriptorHandleForHeapStart();
-		dst_handle.ptr += (SIZE_T)_desc_size * (SIZE_T)_ring_cursor;
-		auto[src_handle,gh] = alloc.At(0u);
-		_device->CopyDescriptorsSimple(alloc.DescriptorNum(), dst_handle, src_handle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-		D3D12_GPU_DESCRIPTOR_HANDLE ret_handle = _main_heap->GetGPUDescriptorHandleForHeapStart();
-		ret_handle.ptr += (SIZE_T)_desc_size * (SIZE_T)_ring_cursor;
-		_ring_cursor += alloc.DescriptorNum();
-		return ret_handle;
+		auto &stats = Render::RenderingStates::RenderData();
+		++stats.DescriptorCopyCount;
+		if (allocation)
+			++stats.DescriptorAllocationCount;
 	}
-	std::tuple<D3D12_CPU_DESCRIPTOR_HANDLE,D3D12_GPU_DESCRIPTOR_HANDLE> GPUVisibleDescriptorAllocator::GetBindHandle(const GPUVisibleDescriptorAllocation& alloc)
+
+	std::tuple<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE>
+	GPUVisibleDescriptorAllocator::GetOrCopy(const GPUVisibleDescriptorAllocation& alloc)
 	{
-		std::lock_guard lock(_mainheap_mutex);
+		auto &stats = Render::RenderingStates::RenderData();
+		++stats.DescriptorCacheLookupCount;
+		const DescriptorId descriptor_id = alloc.GetId();
+		if (descriptor_id._heap_index >= _descriptor_caches.size())
+			_descriptor_caches.resize(descriptor_id._heap_index + 1u);
+		if (_descriptor_caches[descriptor_id._heap_index].size() <= descriptor_id._descriptor_index)
+			_descriptor_caches[descriptor_id._heap_index].resize(descriptor_id._descriptor_index + 1u);
+
+		CachedDescriptor &cached = _descriptor_caches[descriptor_id._heap_index][descriptor_id._descriptor_index];
+		const u64 frame_id = Application::Get().GetFrameCount();
+		if (alloc.DescriptorNum() == 1u && cached._frame_id == frame_id && cached._heap_epoch == _heap_epoch &&
+			cached._generation == descriptor_id._generation)
+		{
+			++stats.DescriptorCacheHitCount;
+			return {cached._cpu_handle, cached._gpu_handle};
+		}
+
+		++stats.DescriptorCacheMissCount;
 		if (_ring_cursor + alloc.DescriptorNum() > kMainHeapDescriptorNum)
 		{
 			_ring_cursor = _ring_base_index;
+			++_heap_epoch;
 		}
-		D3D12_CPU_DESCRIPTOR_HANDLE dst_handle = _main_heap->GetCPUDescriptorHandleForHeapStart();
-		dst_handle.ptr += (SIZE_T)_desc_size * (SIZE_T)_ring_cursor;
-		auto[src_handle,gh] = alloc.At(0u);
-		_device->CopyDescriptorsSimple(alloc.DescriptorNum(), dst_handle, src_handle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 		D3D12_CPU_DESCRIPTOR_HANDLE ret_cpu_handle = _main_heap->GetCPUDescriptorHandleForHeapStart();
 		ret_cpu_handle.ptr += (SIZE_T)_desc_size * (SIZE_T)_ring_cursor;
+		const auto src_handle = std::get<0>(alloc.At(0u));
+		_device->CopyDescriptorsSimple(alloc.DescriptorNum(), ret_cpu_handle, src_handle,
+			D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 		D3D12_GPU_DESCRIPTOR_HANDLE ret_gpu_handle = _main_heap->GetGPUDescriptorHandleForHeapStart();
 		ret_gpu_handle.ptr += (SIZE_T)_desc_size * (SIZE_T)_ring_cursor;
 		_ring_cursor += alloc.DescriptorNum();
-		return std::make_tuple(ret_cpu_handle,ret_gpu_handle);
+		RecordDescriptorCopy(true);
+
+		if (alloc.DescriptorNum() == 1u)
+		{
+			cached._frame_id = frame_id;
+			cached._heap_epoch = _heap_epoch;
+			cached._generation = descriptor_id._generation;
+			cached._cpu_handle = ret_cpu_handle;
+			cached._gpu_handle = ret_gpu_handle;
+		}
+		return {ret_cpu_handle, ret_gpu_handle};
+	}
+
+	D3D12_GPU_DESCRIPTOR_HANDLE GPUVisibleDescriptorAllocator::GetBindGpuHandle(const GPUVisibleDescriptorAllocation& alloc)
+	{
+		std::lock_guard lock(_mainheap_mutex);
+		return std::get<1>(GetOrCopy(alloc));
+	}
+
+	std::tuple<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE>
+	GPUVisibleDescriptorAllocator::GetBindHandle(const GPUVisibleDescriptorAllocation& alloc)
+	{
+		std::lock_guard lock(_mainheap_mutex);
+		return GetOrCopy(alloc);
 	}
 
 	void GPUVisibleDescriptorAllocator::CommitDescriptorsForDraw(D3DCommandBuffer* cmd,u16 slot,const GPUVisibleDescriptorAllocation& alloc)
 	{
-		auto cmd_heap_id = cmd->GetDescriptorHeapId();
-		auto d3dcmd = cmd->NativeCmdList();
-		if (cmd_heap_id != 1024u)
-		{
-			d3dcmd->SetDescriptorHeaps(1, _main_heap.GetAddressOf());
-			cmd->SetDescriptorHeapId(1024u);
-		}
-		d3dcmd->SetGraphicsRootDescriptorTable(slot, GetBindGpuHandle(alloc));
+		cmd->SetDescriptorHeap(_main_heap.Get(), 1024u);
+		cmd->SetGraphicsRootDescriptorTable(slot, GetBindGpuHandle(alloc));
 	}
 	void GPUVisibleDescriptorAllocator::CommitDescriptorsForDispatch(D3DCommandBuffer* cmd,u16 slot,const GPUVisibleDescriptorAllocation& alloc)
 	{
-		auto cmd_heap_id = cmd->GetDescriptorHeapId();
-		auto d3dcmd = cmd->NativeCmdList();
-		if (cmd_heap_id != 1024u)
-		{
-			d3dcmd->SetDescriptorHeaps(1, _main_heap.GetAddressOf());
-			cmd->SetDescriptorHeapId(1024u);
-		}
-		d3dcmd->SetComputeRootDescriptorTable(slot, GetBindGpuHandle(alloc));
+		cmd->SetDescriptorHeap(_main_heap.Get(), 1024u);
+		cmd->NativeCmdList()->SetComputeRootDescriptorTable(slot, GetBindGpuHandle(alloc));
 	}
 	#pragma endregion
 

@@ -1,5 +1,6 @@
 #include "Render/2D/Sprite.h"
 #include "Render/2D/SpriteRenderPass.h"
+#include "Render/Material.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Render/Camera.h"
 #include "Render/CommandBuffer.h"
@@ -100,14 +101,38 @@ namespace Ailu::Render
                 !sprite_renderer._visible)
                 continue;
 
-            // Sprite pointer is stored directly on the component
-            const Sprite *sprite = sprite_renderer._sprite;
-            if (!sprite)
+            Guid sprite_guid = sprite_renderer._sprite_guid;
+            if (sprite_guid.IsEmpty() && sprite_renderer._sprite != nullptr)
+            {
+                if (Asset *asset = ResourceMgr::Get().GetLinkedAsset(sprite_renderer._sprite); asset != nullptr)
+                    sprite_guid = asset->GetGuid();
+            }
+            if (sprite_renderer._sprite_handle_guid != sprite_guid)
+            {
+                sprite_renderer._sprite_handle_guid = sprite_guid;
+                sprite_renderer._sprite_handle = sprite_guid.IsEmpty()
+                    ? AssetHandle<Sprite>{}
+                    : ResourceMgr::Get().GetOrCreateAssetHandle<Sprite>(sprite_guid);
+            }
+            Ref<const Sprite> sprite_snapshot = sprite_renderer._sprite_handle.Resolve();
+            if (sprite_snapshot == nullptr)
                 continue;
 
-            // Sprite stores texture as direct Ref<Texture2D>
-            Texture *texture_ptr = sprite->_texture.get();
-            if (!texture_ptr)
+            const Sprite *sprite = sprite_snapshot.get();
+
+            if (sprite_renderer._material_handle_guid != sprite_renderer._material_guid)
+            {
+                sprite_renderer._material_handle_guid = sprite_renderer._material_guid;
+                sprite_renderer._material_handle = sprite_renderer._material_guid.IsEmpty()
+                    ? AssetHandle<Material>{}
+                    : ResourceMgr::Get().GetOrCreateAssetHandle<Material>(sprite_renderer._material_guid);
+            }
+            Ref<const Material> material_snapshot = sprite_renderer._material_handle.Resolve();
+            if (material_snapshot == nullptr && sprite_renderer._material != nullptr)
+                material_snapshot = sprite_renderer._material;
+
+            const Ref<const Texture2D> texture_snapshot = sprite->_texture.Handle().Resolve();
+            if (texture_snapshot == nullptr)
                 continue;
 
             SpriteRenderData render_data;
@@ -116,8 +141,11 @@ namespace Ailu::Render
             render_data._color = sprite_renderer._color;
             render_data._size = sprite->GetRenderSize();
             render_data._pivot = sprite->_pivot;
-            render_data._texture = texture_ptr;
-            render_data._material = sprite_renderer._material.get();
+            render_data._texture_snapshot = texture_snapshot;
+            render_data._texture = const_cast<Texture2D *>(texture_snapshot.get());
+            render_data._sprite_snapshot = std::move(sprite_snapshot);
+            render_data._material_snapshot = std::move(material_snapshot);
+            render_data._material = const_cast<Material *>(render_data._material_snapshot.get());
             render_data._sorting_layer = sprite_renderer._sorting_layer;
             render_data._order_in_layer = sprite_renderer._order_in_layer;
             render_data._blend_mode = sprite_renderer._blend_mode;

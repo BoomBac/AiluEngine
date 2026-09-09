@@ -16,6 +16,7 @@ EnumInitializer initializer;
 initializer._name = "EShadingMode";
 initializer._namespace = "Ailu::Render";
 initializer._full_name = "Ailu::Render::EShadingMode";
+initializer._size = sizeof(Ailu::Render::EShadingMode);
 initializer._str_to_enum_lut["kLit"] = 1;
 initializer._str_to_enum_lut["kWireframe"] = 2;
 initializer._str_to_enum_lut["kLitWireframe"] = 3;

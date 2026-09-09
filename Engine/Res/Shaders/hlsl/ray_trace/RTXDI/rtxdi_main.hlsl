@@ -161,7 +161,7 @@ bool HitWorld(float3 ray_origin,float3 ray_dir,bool is_debug,out HitRecord rec,o
     if (hit_anything)
         return true;
     TriangleHitCandidate best_hit;
-    ObjectInstanceData best_inst;
+    PrimitiveData best_inst;
     if (!TraverseSceneClosest(ray_origin, ray_dir, rec, best_hit, best_inst))
         return hit_anything;
 
@@ -212,7 +212,7 @@ bool IsOccluded(float3 origin, float3 dir, float max_t)
         rec.t = remaining_t;
 
         TriangleHitCandidate best_hit;
-        ObjectInstanceData best_inst;
+    PrimitiveData best_inst;
         if (!TraverseSceneClosest(ray_origin, dir, rec, best_hit, best_inst))
             return false;
 

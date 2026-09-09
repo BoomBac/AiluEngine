@@ -972,6 +972,7 @@ static void GenerateEnumTypeInfo(const AiluHeadTool::EnumInfo &enum_info, std::o
     file << std::format("initializer._name = \"{}\"", enum_info._name) << ";" << std::endl;
     file << std::format("initializer._namespace = \"{}\"", enum_info._namespace) << ";" << std::endl;
     file << std::format("initializer._full_name = \"{}\"", full_name) << ";" << std::endl;
+    file << std::format("initializer._size = sizeof({});", full_name) << std::endl;
     for (auto &mem: enum_info._members)
     {
         auto &[name, id] = mem;

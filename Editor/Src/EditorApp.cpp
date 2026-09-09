@@ -373,5 +373,6 @@ namespace Ailu
                 _file_change_dispatcher.Dispatch(event);
             }
         }
+
     }// namespace Editor
 }// namespace Ailu

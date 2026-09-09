@@ -73,6 +73,7 @@ namespace Ailu
             void QueueCommand(Entity entity, ParameterCommand command);
             void ApplyCommands(Entity entity, AnimationInstance &instance, AnimatorComponent &animator,
                                const AnimationControllerAsset &controller_asset);
+            Ref<const AnimationClip> ResolveClipSnapshot(const Guid &clip_id);
             const AnimationClip *ResolveClip(const Guid &clip_id);
             void ResolveMotionAssets(Entity entity, const AnimationControllerAsset &controller_asset,
                                      AnimationController &controller);

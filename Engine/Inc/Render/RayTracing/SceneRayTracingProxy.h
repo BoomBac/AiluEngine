@@ -16,7 +16,8 @@ namespace Ailu::Render
     {
     public:
         SceneRayTracingProxy();
-        void Sync(const SceneManagement::Scene *scene);
+        void Sync(const SceneManagement::Scene *scene, Vector<PrimitiveData> *primitive_data = nullptr,
+                  GPUBuffer *primitive_buffer = nullptr, const Vector<ScenePrimitive> *scene_primitives = nullptr);
         void SyncLightCache(const SceneManagement::Scene *scene);
 
         RayTracingScene *GetScene() const { return FrontSlot()._scene.get(); }
@@ -25,23 +26,31 @@ namespace Ailu::Render
         GPUBuffer *GetIndexData() const { return FrontSlot()._indices_data.get(); }
         GPUBuffer *GetUVData() const { return FrontSlot()._uv_data.get(); }
         GPUBuffer *GetTangentData() const { return FrontSlot()._tangent_data.get(); }
-        GPUBuffer *GetInstanceData() const { return FrontSlot()._instance_data.get(); }
+        GPUBuffer *GetPrimitiveData() const
+        {
+            return _scene_primitive_buffer;
+        }
         GPUBuffer *GetMaterialData() const { return _material_buffer.get(); }
         GPUBuffer *GetUnifiedLightData() const { return _unified_light_buffer.get(); }
         ConstantBuffer *GetUnifiedLightConfig() const { return _unified_light_config.get(); }
         u32 GetUnifiedLightCount() const { return _unified_light_config_cpu._light_count; }
-        bool HasRenderableScene() const { return FrontSlot()._scene != nullptr && FrontSlot()._scene->InstanceCount() > 0u; }
+        bool HasRenderableScene() const
+        {
+            return _scene_primitive_buffer != nullptr && FrontSlot()._scene != nullptr && FrontSlot()._scene->InstanceCount() > 0u;
+        }
 
     private:
         struct CachedGeometry
         {
             Vector<Ref<RayTracingGeometry>> _geometries;
+            VertexBuffer *_vertex_buffer = nullptr;
         };
 
         struct SceneInstanceKey
         {
             ECS::Entity _entity = ECS::kInvalidEntity;
             Mesh *_mesh = nullptr;
+            VertexBuffer *_vertex_buffer = nullptr;
             u16 _material_class = 0u;
         };
 
@@ -51,23 +60,28 @@ namespace Ailu::Render
             u32 _vertex_offset = 0u;
         };
 
+        struct RTInstanceRef
+        {
+            u32 _primitive_index = 0u;
+            Matrix4x4f _transform = {};
+        };
+
         struct ProxyBufferSlot
         {
             HashMap<Mesh *, Vector<GeometryRange>> _mesh_ranges;
             Vector<SceneInstanceKey> _instance_keys;
-            Vector<ObjectInstanceData> _instance_datas;
+            Vector<RTInstanceRef> _instances;
             Ref<RayTracingScene> _scene;
             Ref<GPUBuffer> _vertex_data;
             Ref<GPUBuffer> _normal_data;
             Ref<GPUBuffer> _uv_data;
             Ref<GPUBuffer> _tangent_data;
             Ref<GPUBuffer> _indices_data;
-            Ref<GPUBuffer> _instance_data;
         };
 
         Vector<SceneInstanceKey> CollectInstanceKeys(const SceneManagement::Scene &scene, Vector<Matrix4x4f> &transforms, Vector<Material*> &materials) const;
         bool NeedsStructureRebuild(const ProxyBufferSlot &slot, const Vector<SceneInstanceKey> &instance_keys) const;
-        Vector<Ref<RayTracingGeometry>> AcquireGeometry(Mesh *mesh);
+        Vector<Ref<RayTracingGeometry>> AcquireGeometry(Mesh *mesh, VertexBuffer *vertex_buffer);
         void StartRebuild(const Vector<SceneInstanceKey> &instance_keys, const Vector<Matrix4x4f> &transforms);
         bool Rebuild(ProxyBufferSlot &slot, const Vector<SceneInstanceKey> &instance_keys, const Vector<Matrix4x4f> &transforms);
         void UpdateTransforms(ProxyBufferSlot &slot, const Vector<Matrix4x4f> &transforms);
@@ -97,6 +111,9 @@ namespace Ailu::Render
         Ref<GPUBuffer> _unified_light_buffer;
         Ref<ConstantBuffer> _unified_light_config;
         UnifiedLightBufferConfig _unified_light_config_cpu = {};
+        Vector<PrimitiveData> *_scene_primitive_data = nullptr;
+        GPUBuffer *_scene_primitive_buffer = nullptr;
+        const Vector<ScenePrimitive> *_scene_primitives = nullptr;
     };
 }
 

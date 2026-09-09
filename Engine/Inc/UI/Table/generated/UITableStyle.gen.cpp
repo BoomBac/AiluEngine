@@ -653,6 +653,7 @@ EnumInitializer initializer;
 initializer._name = "EUITableStyleOverride";
 initializer._namespace = "Ailu::UI";
 initializer._full_name = "Ailu::UI::EUITableStyleOverride";
+initializer._size = sizeof(Ailu::UI::EUITableStyleOverride);
 initializer._str_to_enum_lut["kNone"] = 0;
 initializer._str_to_enum_lut["kBackground"] = 1;
 initializer._str_to_enum_lut["kHeader"] = 2;

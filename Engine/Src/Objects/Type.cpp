@@ -311,6 +311,7 @@ namespace Ailu
         _full_name = initializer._full_name.empty() ? initializer._name : initializer._full_name;
         _is_class = false;
         _is_enum = true;
+        _size = initializer._size;
         _str_to_enum_lut = initializer._str_to_enum_lut;
         for (auto &pair: _str_to_enum_lut)
         {

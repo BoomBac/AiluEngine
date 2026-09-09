@@ -340,7 +340,8 @@ namespace Ailu::RHI::DX12
             auto &desc = it->second;//if (desc._res_type == EBindResDescType::kCBufferAttribute) continue;
             if (desc._res_type == EBindResDescType::kConstBuffer)
             {
-                if (desc._name == RenderConstants::kCBufNamePerObject) cbuf_mask |= 0x01;
+                if (desc._name == RenderConstants::kCBufNamePrimitiveDraw) cbuf_mask |= 0x01;
+                else if (desc._name == RenderConstants::kCBufNamePerObject) cbuf_mask |= 0x10;
                 else if (desc._name == RenderConstants::kCBufNamePerMaterial)
                     cbuf_mask |= 0x02;
                 else if (desc._name == RenderConstants::kCBufNamePerCamera)
@@ -351,6 +352,11 @@ namespace Ailu::RHI::DX12
         }
         u8 root_param_index = 0;
         if (cbuf_mask & 0x01)
+        {
+            variant_bind_res_info[RenderConstants::kCBufNamePrimitiveDraw]._bind_slot = root_param_index;
+            rootParameters[root_param_index++].InitAsConstants(4u, 0u);
+        }
+        else if (cbuf_mask & 0x10)
         {
             variant_bind_res_info[RenderConstants::kCBufNamePerObject]._bind_slot = root_param_index;
             rootParameters[root_param_index++].InitAsConstantBufferView(0u);
@@ -550,13 +556,20 @@ namespace Ailu::RHI::DX12
             {
                 D3D12_SIGNATURE_PARAMETER_DESC input_desc{};
                 ref_vs->GetInputParameterDesc(i, &input_desc);
-                EShaderDateType data_type = D3DConvertUtils::GetShaderDataType(input_desc.SemanticName, input_desc.Mask);
-                _pass_elements[pass_index]._variants[variant_hash]._vertex_input_layout[i] = D3D12_INPUT_ELEMENT_DESC{input_desc.SemanticName, 0, D3DConvertUtils::GetGXGIFormatByShaderDataType(data_type), i, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0};
+                const EVertexSemantic semantic = Render::RenderConstants::GetVertexSemantic(input_desc.SemanticName,
+                                                                                               static_cast<u8>(input_desc.SemanticIndex));
+                EShaderDateType data_type = D3DConvertUtils::GetShaderDataType(semantic, input_desc.Mask);
                 if (data_type != EShaderDateType::kNone)
                 {
-                    vb_input_desc.emplace_back(input_desc.SemanticName, data_type, input_desc.Register, input_desc.SemanticIndex);
+                    const u32 layout_index = static_cast<u32>(vb_input_desc.size());
+                    _pass_elements[pass_index]._variants[variant_hash]._vertex_input_layout[layout_index] =
+                        D3D12_INPUT_ELEMENT_DESC{Render::RenderConstants::GetVertexSemanticName(semantic),
+                                                  Render::RenderConstants::GetVertexSemanticIndex(semantic),
+                                                  D3DConvertUtils::GetGXGIFormatByShaderDataType(data_type), i, 0,
+                                                  D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0};
+                    vb_input_desc.emplace_back(semantic, data_type, input_desc.Register);
                 }
-                else
+                else if (semantic != EVertexSemantic::kVertexIndex && semantic != EVertexSemantic::kInstanceID)
                 {
                     LOG_WARNING("LoadShaderReflection {} skip input element: {}", _name, input_desc.SemanticName);
                 }

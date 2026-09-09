@@ -16,6 +16,7 @@ EnumInitializer initializer;
 initializer._name = "EDragType";
 initializer._namespace = "Ailu::UI";
 initializer._full_name = "Ailu::UI::EDragType";
+initializer._size = sizeof(Ailu::UI::EDragType);
 initializer._str_to_enum_lut["kNone"] = 0;
 initializer._str_to_enum_lut["kMesh"] = 1;
 initializer._str_to_enum_lut["kTexture"] = 2;

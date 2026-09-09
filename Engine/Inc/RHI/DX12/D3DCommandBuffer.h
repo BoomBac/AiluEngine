@@ -75,25 +75,76 @@ namespace Ailu
 
             struct GraphicsStateCache
             {
+                struct VertexBufferState
+                {
+                    D3D12_GPU_VIRTUAL_ADDRESS _location = 0u;
+                    u32 _size = 0u;
+                    u32 _stride = 0u;
+                };
+
+                struct IndexBufferState
+                {
+                    D3D12_GPU_VIRTUAL_ADDRESS _location = 0u;
+                    u32 _size = 0u;
+                    DXGI_FORMAT _format = DXGI_FORMAT_UNKNOWN;
+                    bool _valid = false;
+                };
+
+                struct GraphicsRootSlotState
+                {
+                    const void *_resource = nullptr;
+                    const void *_native_resource = nullptr;
+                    u64 _gpu_handle = 0u;
+                    u32 _resource_type = 0u;
+                    u16 _view_index = 0u;
+                    u32 _sub_resource = UINT32_MAX;
+                    bool _is_compute = false;
+                };
+
+                struct RenderTargetState
+                {
+                    std::array<D3D12_CPU_DESCRIPTOR_HANDLE, Render::RenderConstants::kMaxMRTNum> _rtvs{};
+                    D3D12_CPU_DESCRIPTOR_HANDLE _dsv{};
+                    u8 _rt_count = 0u;
+                    bool _has_dsv = false;
+                    bool _valid = false;
+                };
+
+                struct ViewportState
+                {
+                    std::array<D3D12_VIEWPORT, Render::RenderConstants::kMaxMRTNum> _viewports{};
+                    u8 _count = 0u;
+                    bool _valid = false;
+                };
+
+                struct ScissorState
+                {
+                    std::array<D3D12_RECT, Render::RenderConstants::kMaxMRTNum> _scissors{};
+                    u8 _count = 0u;
+                    bool _valid = false;
+                };
+
                 const void *_pso = nullptr;
-                const void *_vb = nullptr;
-                const void *_ib = nullptr;
-                const void *_vb_layout = nullptr;
-                u64 _vb_view_version = 0u;
-                u64 _ib_view_version = 0u;
-                std::array<u64, 32> _slot_hashes{};
-                u32 _slot_mask = 0u;
+                ID3D12RootSignature *_root_signature = nullptr;
+                D3D12_PRIMITIVE_TOPOLOGY _primitive_topology = D3D_PRIMITIVE_TOPOLOGY_UNDEFINED;
+                IndexBufferState _index_buffer;
+                std::array<VertexBufferState, 32> _vertex_buffers{};
+                u32 _vertex_buffer_valid_mask = 0u;
+                std::array<GraphicsRootSlotState, 32> _root_slots{};
+                u64 _graphics_root_valid_mask = 0u;
+                u64 _graphics_descriptor_table_mask = 0u;
+                ID3D12DescriptorHeap *_cbv_srv_uav_heap = nullptr;
+                std::array<u8, 32> _native_root_slot_types{};
+                std::array<u64, 32> _native_root_slot_values{};
+                u64 _native_root_valid_mask = 0u;
+                u64 _native_descriptor_table_mask = 0u;
+                RenderTargetState _render_targets;
+                ViewportState _viewport;
+                ScissorState _scissor;
 
                 void Reset()
                 {
-                    _pso = nullptr;
-                    _vb = nullptr;
-                    _ib = nullptr;
-                    _vb_layout = nullptr;
-                    _vb_view_version = 0u;
-                    _ib_view_version = 0u;
-                    _slot_hashes.fill(0u);
-                    _slot_mask = 0u;
+                    *this = GraphicsStateCache{};
                 }
             };
 
@@ -175,51 +226,294 @@ namespace Ailu
             bool IsGraphicsPSOActive(const void *pso) const { return _graphics_state_cache._pso == pso; }
             void SetGraphicsPSOActive(const void *pso)
             {
-                if (_graphics_state_cache._pso != pso)
+                _graphics_state_cache._pso = pso;
+            }
+            bool SetGraphicsPipelineState(const void *pso, ID3D12PipelineState *native_pso)
+            {
+                if (_graphics_state_cache._pso == pso)
+                    return false;
+                _graphics_state_cache._pso = pso;
+                _p_cmd->SetPipelineState(native_pso);
+                return true;
+            }
+            bool SetGraphicsRootSignature(ID3D12RootSignature *root_signature)
+            {
+                if (_graphics_state_cache._root_signature == root_signature)
+                    return false;
+                _graphics_state_cache._root_signature = root_signature;
+                _graphics_state_cache._graphics_root_valid_mask = 0u;
+                _graphics_state_cache._graphics_descriptor_table_mask = 0u;
+                _graphics_state_cache._native_root_valid_mask = 0u;
+                _graphics_state_cache._native_descriptor_table_mask = 0u;
+                _p_cmd->SetGraphicsRootSignature(root_signature);
+                return true;
+            }
+            bool SetPrimitiveTopology(D3D12_PRIMITIVE_TOPOLOGY topology)
+            {
+                if (_graphics_state_cache._primitive_topology == topology)
+                    return false;
+                _graphics_state_cache._primitive_topology = topology;
+                _p_cmd->IASetPrimitiveTopology(topology);
+                return true;
+            }
+            bool SetDescriptorHeap(ID3D12DescriptorHeap *heap, i16 heap_id)
+            {
+                if (_graphics_state_cache._cbv_srv_uav_heap == heap)
                 {
-                    _graphics_state_cache._pso = pso;
-                    // The input layout belongs to the PSO.  A vertex buffer can therefore
-                    // require a different set of IA slots after a PSO switch.
-                    _graphics_state_cache._vb = nullptr;
-                    _graphics_state_cache._ib = nullptr;
-                    _graphics_state_cache._vb_layout = nullptr;
-                    _graphics_state_cache._vb_view_version = 0u;
-                    _graphics_state_cache._ib_view_version = 0u;
-                    _graphics_state_cache._slot_hashes.fill(0u);
-                    _graphics_state_cache._slot_mask = 0u;
+                    _cur_cbv_heap_id = heap_id;
+                    return false;
                 }
+                _graphics_state_cache._cbv_srv_uav_heap = heap;
+                _graphics_state_cache._graphics_root_valid_mask &=
+                    ~_graphics_state_cache._graphics_descriptor_table_mask;
+                _graphics_state_cache._native_root_valid_mask &=
+                    ~_graphics_state_cache._native_descriptor_table_mask;
+                _cur_cbv_heap_id = heap_id;
+                _p_cmd->SetDescriptorHeaps(1u, &heap);
+                return true;
+            }
+            bool SetGraphicsRootConstantBufferView(u16 slot, D3D12_GPU_VIRTUAL_ADDRESS address)
+            {
+                if (slot >= 32u)
+                    return false;
+                const u64 slot_bit = 1ull << slot;
+                if ((_graphics_state_cache._native_root_valid_mask & slot_bit) != 0u &&
+                    _graphics_state_cache._native_root_slot_types[slot] == 1u &&
+                    _graphics_state_cache._native_root_slot_values[slot] == address)
+                {
+                    return false;
+                }
+                _graphics_state_cache._native_root_slot_types[slot] = 1u;
+                _graphics_state_cache._native_root_slot_values[slot] = address;
+                _graphics_state_cache._native_root_valid_mask |= slot_bit;
+                _graphics_state_cache._native_descriptor_table_mask &= ~slot_bit;
+                _p_cmd->SetGraphicsRootConstantBufferView(slot, address);
+                return true;
+            }
+            bool SetGraphicsRootDescriptorTable(u16 slot, D3D12_GPU_DESCRIPTOR_HANDLE handle)
+            {
+                if (slot >= 32u)
+                    return false;
+                const u64 slot_bit = 1ull << slot;
+                if ((_graphics_state_cache._native_root_valid_mask & slot_bit) != 0u &&
+                    _graphics_state_cache._native_root_slot_types[slot] == 2u &&
+                    _graphics_state_cache._native_root_slot_values[slot] == handle.ptr)
+                {
+                    return false;
+                }
+                _graphics_state_cache._native_root_slot_types[slot] = 2u;
+                _graphics_state_cache._native_root_slot_values[slot] = handle.ptr;
+                _graphics_state_cache._native_root_valid_mask |= slot_bit;
+                _graphics_state_cache._native_descriptor_table_mask |= slot_bit;
+                _p_cmd->SetGraphicsRootDescriptorTable(slot, handle);
+                return true;
             }
             bool IsVertexBufferActive(const void *vb, const void *layout, u64 view_version) const
             {
-                return _graphics_state_cache._vb == vb && _graphics_state_cache._vb_layout == layout &&
-                       _graphics_state_cache._vb_view_version == view_version;
+                return _active_vb == vb && _active_vb_layout == layout && _active_vb_view_version == view_version;
             }
             void SetVertexBufferActive(const void *vb, const void *layout, u64 view_version)
             {
-                _graphics_state_cache._vb = vb;
-                _graphics_state_cache._vb_layout = layout;
-                _graphics_state_cache._vb_view_version = view_version;
+                _active_vb = vb;
+                _active_vb_layout = layout;
+                _active_vb_view_version = view_version;
             }
             bool IsIndexBufferActive(const void *ib, u64 view_version) const
             {
-                return _graphics_state_cache._ib == ib && _graphics_state_cache._ib_view_version == view_version;
+                return _active_ib == ib && _active_ib_view_version == view_version;
             }
             void SetIndexBufferActive(const void *ib, u64 view_version)
             {
-                _graphics_state_cache._ib = ib;
-                _graphics_state_cache._ib_view_version = view_version;
+                _active_ib = ib;
+                _active_ib_view_version = view_version;
             }
-            u32 GraphicsSlotMask() const { return _graphics_state_cache._slot_mask; }
-            bool IsGraphicsSlotUpToDate(u16 slot, u64 binding_hash) const
+            u64 GraphicsSlotMask() const { return _graphics_state_cache._graphics_root_valid_mask; }
+            bool IsGraphicsSlotUpToDate(u16 slot, const Render::PipelineResource &resource) const
             {
-                return (_graphics_state_cache._slot_mask & (1u << slot)) != 0u && _graphics_state_cache._slot_hashes[slot] == binding_hash;
+                if (slot >= 32u)
+                    return false;
+                const auto &state = _graphics_state_cache._root_slots[slot];
+                const u64 slot_bit = 1ull << slot;
+                return (_graphics_state_cache._graphics_root_valid_mask & slot_bit) != 0u &&
+                       state._resource == resource._p_resource &&
+                       state._native_resource == resource._addi_info._native_res_ptr &&
+                       state._gpu_handle == resource._addi_info._gpu_handle &&
+                       state._resource_type == static_cast<u32>(resource._res_type) &&
+                       state._view_index == resource._addi_info._view_index &&
+                       state._sub_resource == resource._addi_info._sub_res &&
+                       state._is_compute == resource._is_compute;
             }
-            void UpdateGraphicsSlot(u16 slot, u64 binding_hash)
+            void UpdateGraphicsSlot(u16 slot, const Render::PipelineResource &resource, bool is_descriptor_table)
             {
-                _graphics_state_cache._slot_mask |= (1u << slot);
-                _graphics_state_cache._slot_hashes[slot] = binding_hash;
+                if (slot >= 32u)
+                    return;
+                auto &state = _graphics_state_cache._root_slots[slot];
+                state._resource = resource._p_resource;
+                state._native_resource = resource._addi_info._native_res_ptr;
+                state._gpu_handle = resource._addi_info._gpu_handle;
+                state._resource_type = static_cast<u32>(resource._res_type);
+                state._view_index = resource._addi_info._view_index;
+                state._sub_resource = resource._addi_info._sub_res;
+                state._is_compute = resource._is_compute;
+                const u64 slot_bit = 1ull << slot;
+                _graphics_state_cache._graphics_root_valid_mask |= slot_bit;
+                if (is_descriptor_table)
+                    _graphics_state_cache._graphics_descriptor_table_mask |= slot_bit;
+                else
+                    _graphics_state_cache._graphics_descriptor_table_mask &= ~slot_bit;
             }
-            void ResetGraphicsStateCache() { _graphics_state_cache.Reset(); }
+            u32 SetVertexBuffers(u32 first_slot, u32 count, const D3D12_VERTEX_BUFFER_VIEW *views)
+            {
+                if (count == 0u || views == nullptr || first_slot >= 32u || first_slot + count > 32u)
+                    return 0u;
+                u32 dirty_mask = 0u;
+                for (u32 i = 0u; i < count; ++i)
+                {
+                    const u32 slot = first_slot + i;
+                    const auto &view = views[i];
+                    const auto &cached = _graphics_state_cache._vertex_buffers[slot];
+                    if ((_graphics_state_cache._vertex_buffer_valid_mask & (1u << slot)) == 0u ||
+                        cached._location != view.BufferLocation || cached._size != view.SizeInBytes ||
+                        cached._stride != view.StrideInBytes)
+                    {
+                        dirty_mask |= 1u << slot;
+                    }
+                }
+                if (dirty_mask == 0u)
+                    return 0u;
+                u32 native_call_count = 0u;
+                u32 i = 0u;
+                while (i < count)
+                {
+                    const u32 slot = first_slot + i;
+                    if ((dirty_mask & (1u << slot)) == 0u)
+                    {
+                        ++i;
+                        continue;
+                    }
+                    const u32 run_start = i++;
+                    while (i < count && (dirty_mask & (1u << (first_slot + i))) != 0u)
+                        ++i;
+                    _p_cmd->IASetVertexBuffers(first_slot + run_start, i - run_start, views + run_start);
+                    ++native_call_count;
+                }
+                for (u32 j = 0u; j < count; ++j)
+                {
+                    const u32 slot = first_slot + j;
+                    if ((dirty_mask & (1u << slot)) == 0u)
+                        continue;
+                    const auto &view = views[j];
+                    auto &cached = _graphics_state_cache._vertex_buffers[slot];
+                    cached._location = view.BufferLocation;
+                    cached._size = view.SizeInBytes;
+                    cached._stride = view.StrideInBytes;
+                    _graphics_state_cache._vertex_buffer_valid_mask |= 1u << slot;
+                }
+                return native_call_count;
+            }
+            bool SetIndexBuffer(const D3D12_INDEX_BUFFER_VIEW &view)
+            {
+                const auto &cached = _graphics_state_cache._index_buffer;
+                if (cached._location == view.BufferLocation && cached._size == view.SizeInBytes &&
+                    cached._format == view.Format && cached._valid)
+                {
+                    return false;
+                }
+                _graphics_state_cache._index_buffer._location = view.BufferLocation;
+                _graphics_state_cache._index_buffer._size = view.SizeInBytes;
+                _graphics_state_cache._index_buffer._format = view.Format;
+                _graphics_state_cache._index_buffer._valid = true;
+                _p_cmd->IASetIndexBuffer(&view);
+                return true;
+            }
+            bool SetRenderTargets(u32 color_count, const D3D12_CPU_DESCRIPTOR_HANDLE *rtvs,
+                                  const D3D12_CPU_DESCRIPTOR_HANDLE *dsv)
+            {
+                if (color_count > Render::RenderConstants::kMaxMRTNum)
+                    return false;
+                if (color_count != 0u && rtvs == nullptr)
+                    return false;
+                auto &state = _graphics_state_cache._render_targets;
+                bool is_same = state._valid && state._rt_count == color_count && state._has_dsv == (dsv != nullptr);
+                if (is_same)
+                {
+                    for (u32 i = 0u; i < color_count; ++i)
+                        is_same = is_same && state._rtvs[i].ptr == rtvs[i].ptr;
+                    if (is_same && dsv != nullptr)
+                        is_same = state._dsv.ptr == dsv->ptr;
+                }
+                if (is_same)
+                    return false;
+                state._valid = true;
+                state._rt_count = static_cast<u8>(color_count);
+                state._has_dsv = dsv != nullptr;
+                state._dsv = dsv != nullptr ? *dsv : D3D12_CPU_DESCRIPTOR_HANDLE{};
+                for (u32 i = 0u; i < color_count; ++i)
+                    state._rtvs[i] = rtvs[i];
+                _p_cmd->OMSetRenderTargets(color_count, color_count == 0u ? nullptr : state._rtvs.data(), FALSE,
+                                            state._has_dsv ? &state._dsv : nullptr);
+                return true;
+            }
+            bool SetViewports(u32 count, const D3D12_VIEWPORT *viewports)
+            {
+                if (count > Render::RenderConstants::kMaxMRTNum || (count != 0u && viewports == nullptr))
+                    return false;
+                auto &state = _graphics_state_cache._viewport;
+                bool is_same = state._valid && state._count == count;
+                if (is_same)
+                {
+                    for (u32 i = 0u; i < count; ++i)
+                    {
+                        const auto &a = state._viewports[i];
+                        const auto &b = viewports[i];
+                        is_same = is_same && a.TopLeftX == b.TopLeftX && a.TopLeftY == b.TopLeftY &&
+                                  a.Width == b.Width && a.Height == b.Height && a.MinDepth == b.MinDepth &&
+                                  a.MaxDepth == b.MaxDepth;
+                    }
+                }
+                if (is_same)
+                    return false;
+                state._valid = true;
+                state._count = static_cast<u8>(count);
+                for (u32 i = 0u; i < count; ++i)
+                    state._viewports[i] = viewports[i];
+                _p_cmd->RSSetViewports(count, count == 0u ? nullptr : state._viewports.data());
+                return true;
+            }
+            bool SetScissors(u32 count, const D3D12_RECT *scissors)
+            {
+                if (count > Render::RenderConstants::kMaxMRTNum || (count != 0u && scissors == nullptr))
+                    return false;
+                auto &state = _graphics_state_cache._scissor;
+                bool is_same = state._valid && state._count == count;
+                if (is_same)
+                {
+                    for (u32 i = 0u; i < count; ++i)
+                    {
+                        const auto &a = state._scissors[i];
+                        const auto &b = scissors[i];
+                        is_same = is_same && a.left == b.left && a.top == b.top && a.right == b.right &&
+                                  a.bottom == b.bottom;
+                    }
+                }
+                if (is_same)
+                    return false;
+                state._valid = true;
+                state._count = static_cast<u8>(count);
+                for (u32 i = 0u; i < count; ++i)
+                    state._scissors[i] = scissors[i];
+                _p_cmd->RSSetScissorRects(count, count == 0u ? nullptr : state._scissors.data());
+                return true;
+            }
+            void ResetGraphicsStateCache()
+            {
+                _graphics_state_cache.Reset();
+                _active_vb = nullptr;
+                _active_vb_layout = nullptr;
+                _active_vb_view_version = 0u;
+                _active_ib = nullptr;
+                _active_ib_view_version = 0u;
+            }
             CommandBufferStatistics &Statistics() { return _statistics; }
             void PushProfiler(Render::CommandProfiler *profiler) { _profiler_stack.emplace_back(profiler); }
             Render::CommandProfiler *TopProfiler()
@@ -277,6 +571,11 @@ namespace Ailu
             i16 _cur_cbv_heap_id;
             u64 _fence_value;
             GraphicsStateCache _graphics_state_cache;
+            const void *_active_vb = nullptr;
+            const void *_active_vb_layout = nullptr;
+            u64 _active_vb_view_version = 0u;
+            const void *_active_ib = nullptr;
+            u64 _active_ib_view_version = 0u;
             CommandBufferStatistics _statistics;
             Vector<Render::CommandProfiler *> _profiler_stack;
             std::unordered_set<GpuResource *> _active_render_targets;

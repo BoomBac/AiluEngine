@@ -16,6 +16,7 @@ EnumInitializer initializer;
 initializer._name = "EALGFormat";
 initializer._namespace = "Ailu";
 initializer._full_name = "Ailu::EALGFormat";
+initializer._size = sizeof(Ailu::EALGFormat);
 initializer._str_to_enum_lut["kALGFormatUNKOWN"] = 0;
 initializer._str_to_enum_lut["kALGFormatR32G32B32A32_TYPELESS"] = 1;
 initializer._str_to_enum_lut["kALGFormatR32G32B32A32_FLOAT"] = 2;

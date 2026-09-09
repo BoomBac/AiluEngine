@@ -8,6 +8,7 @@
 #include "Objects/Object.h"
 #include "Objects/Type.h"
 #include "AssetCommon.h"
+#include "AssetArtifact.h"
 //#include "generated/Asset.gen.h"
 
 namespace Ailu
@@ -66,10 +67,13 @@ namespace Ailu
         WString _external_asset_path;
         const Type *_asset_type = nullptr;
         Ref<Object> _p_obj;
+        // Produced by the handler together with this runtime snapshot.  ResourceMgr transfers
+        // it to the AssetSlot only when the candidate is successfully published.
+        AssetArtifactKey _artifact_key;
         struct RuntimeDependency
         {
             Guid _guid = Guid::EmptyGuid();
-            EAssetDependencyType _type = EAssetDependencyType::kHard;
+            EAssetDependencyType _type = EAssetDependencyType::kRuntime;
             Asset *_asset = nullptr;
         };
 

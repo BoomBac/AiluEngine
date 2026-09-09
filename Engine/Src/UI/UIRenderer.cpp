@@ -212,7 +212,7 @@ namespace Ailu
                 if (auto it = composite_target_handles.find(color); it != composite_target_handles.end())
                     return g_pRenderTexturePool->Get(it->second);
                 RTHandle handle = cmd->GetTempRT(color->Width(), color->Height(), std::format("UI_Composite_{}", composite_target_handles.size()),
-                                                 ERenderTargetFormat::kDefault, false, false, false);
+                                                 ERenderTargetFormat::kDefault, false, true, false);
                 _pending_backdrop_blur_release_handles.push_back(handle);
                 composite_target_handles[color] = handle;
                 auto *composite = g_pRenderTexturePool->Get(handle);

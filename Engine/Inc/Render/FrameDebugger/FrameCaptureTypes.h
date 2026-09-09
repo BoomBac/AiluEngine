@@ -314,7 +314,7 @@ struct CaptureGraphicsStateCache
     PipelineBindingKey _slot_keys[32];
     u32 _slot_last_event_ids[32]{};
     u32 _valid_slot_mask = 0u;
-    u32 _pso_invalidated_slot_mask = 0u;
+    u32 _root_signature_invalidated_slot_mask = 0u;
     u32 _command_list_reset_slot_mask = 0u;
     u64 _last_pso_capture_id = 0u;
     bool _pso_ever_bound = false;

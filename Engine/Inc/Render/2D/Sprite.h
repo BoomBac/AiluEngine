@@ -2,13 +2,13 @@
 #include "Framework/Math/ALMath.hpp"
 #include "Assets/AssetRef.h"
 #include "Objects/Object.h"
+#include "Render/Texture.h"
 #include "generated/Sprite.gen.h"
 
 namespace Ailu
 {
     namespace Render
     {
-        class Texture2D;
         ACLASS()
         class AILU_API Sprite : public Object
         {

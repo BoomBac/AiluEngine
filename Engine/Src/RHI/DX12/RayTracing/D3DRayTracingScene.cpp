@@ -222,6 +222,7 @@ namespace Ailu::RHI::DX12
         srv_desc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
         srv_desc.RaytracingAccelerationStructure.Location = _tlas_gpu_address;
         dev->CreateShaderResourceView(nullptr, &srv_desc, srv_cpu);
+        _tlas_srv_alloc.MarkWritten();
 
         _instance_descs.clear();
         _instance_descs.resize(_instance_capacity);

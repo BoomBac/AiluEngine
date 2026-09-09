@@ -345,12 +345,6 @@ namespace Ailu::Render
                         render_obj->_materials[vis_obj._submesh] == nullptr)
                         continue;
                     node._mat = render_obj->_materials[vis_obj._submesh];
-                    node._object_data._MatrixWorld = render_obj->_world_matrix;
-                    node._object_data._MatrixInvWorld = MatrixInverse(render_obj->_world_matrix);
-                    node._object_data._MatrixWorld_Pre = render_obj->_prev_world_matrix;
-                    node._object_data._ObjectID = (i32)node._game_obj_handle;
-                    node._object_data._MotionVectorParam.x = render_obj->_motion_type == ECS::EMotionVectorType::kPerObject ? 1.0f : 0.0f;//dynamic object
-                    node._object_data._MotionVectorParam.y = render_obj->_motion_type == ECS::EMotionVectorType::kForceZero ? 1.0f : 0.0f;//force off
                     view_entity.PushRenderNode(node);
                 }
             }

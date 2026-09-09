@@ -20,7 +20,9 @@
 #include "Render/RenderPipeline.h"
 #include "Render/RenderingData.h"
 #include "Render/CommandBuffer.h"
+#include "Render/FrameResource.h"
 #include "Animation/AnimationSystem.h"
+#include "Animation/SkinningSystem.h"
 
 #include "Render/RenderGraph/RenderGraph.h"
 
@@ -107,6 +109,13 @@ namespace Ailu::Render
         _owned_features.clear();
         AL_DELETE(_rd_graph);
         Profiler::Shutdown();
+    }
+
+    void Renderer::SetupFrameResource(FrameResource *prev_fr, FrameResource *cur_fr)
+    {
+        _prev_fs = prev_fr;
+        _cur_fs = cur_fr;
+        FrameResource::SetActive(cur_fr);
     }
 
     void Renderer::Render(const Camera &cam, const Scene &s)
@@ -312,13 +321,16 @@ namespace Ailu::Render
             _rendering_data._gbuffers[3] = RenderTexture::GetTempRT(pixel_width, pixel_height, "GBuffer3", ERenderTargetFormat::kRGBAHalf);
         }
         
+        PrepareMaterial(*SceneMgr::Get().ActiveScene());
+        BuildScenePrimitives(*SceneMgr::Get().ActiveScene());
         Cull(*SceneMgr::Get().ActiveScene(),cam);
         if (auto *animation_system = SceneMgr::Get().ActiveScene()->GetRegister().GetSystem<ECS::AnimationSystem>();
             animation_system != nullptr)
             animation_system->PrepareVisibleSkinning(_cull_results[cam.HashCode()]);
+        RefreshScenePrimitiveVertexBuffers();
+        Cull(*SceneMgr::Get().ActiveScene(), cam);
         PrepareCamera(cam);
         _rendering_data._scene = &s;
-        PrepareMaterial(*SceneMgr::Get().ActiveScene());//不需要tick，之后再优化
         PrepareScene(*SceneMgr::Get().ActiveScene());
         PrepareLight(*SceneMgr::Get().ActiveScene());
         if (_rendering_data._pre_width != pixel_width || _rendering_data._pre_height != pixel_height)
@@ -455,27 +467,6 @@ namespace Ailu::Render
     }
     void Renderer::EndScene(const Scene &s)
     {
-        u16 obj_index = 0;
-        u64 entity_index = 0u;
-        for (auto &static_mesh: s.GetRegister().View<ECS::StaticMeshComponent>())
-        {
-            const ECS::Entity entity = s.GetRegister().GetEntity<ECS::StaticMeshComponent>(entity_index++);
-            if (!s.IsEntityEnabled(entity) || !s.GetRegister().IsComponentEnabled<ECS::StaticMeshComponent>(entity))
-                continue;
-            if (static_mesh._p_mesh)
-            {
-                auto &aabbs = static_mesh._transformed_aabbs;
-                Vector3f center;
-                u16 submesh_count = static_mesh._p_mesh->SubmeshCount();
-                auto &materials = static_mesh._p_mats;
-                auto *obj_cb = ConstantBuffer::As<CBufferPerObjectData>(_cur_fs->GetObjCB(obj_index));
-                for (int i = 0; i < submesh_count; i++)
-                {
-                    obj_cb->_MatrixWorld_Pre = obj_cb->_MatrixWorld;
-                    ++obj_index;
-                }
-            }
-        }
         _render_passes.clear();
         _rendering_data.Reset();
         //RENDER GRAPH
@@ -524,74 +515,106 @@ namespace Ailu::Render
     //	_events_after_tick.remove(e);
     //}
 
-    Vector<ObjectInstanceData> s_instance_data(RenderConstants::kMaxRenderObjectCount);
+    void Renderer::BuildScenePrimitives(const Scene &s)
+    {
+        _scene_primitives.clear();
+        _primitive_data.clear();
+        auto &r = s.GetRegister();
+
+        auto append_primitives = [this, &s, &r](auto &renderables, bool is_skinned)
+        {
+            using ComponentType = std::remove_cvref_t<decltype(*renderables.begin())>;
+            u64 entity_index = 0u;
+            for (auto &renderable : renderables)
+            {
+                const ECS::Entity entity = r.GetEntity<ComponentType>(entity_index);
+                if (!s.IsEntityEnabled(entity) || !r.IsComponentEnabled<ComponentType>(entity) || !renderable._p_mesh)
+                {
+                    ++entity_index;
+                    continue;
+                }
+                auto *mesh = renderable._p_mesh.get();
+                if (mesh->GetVertexBuffer() == nullptr)
+                {
+                    ++entity_index;
+                    continue;
+                }
+                const auto &transform = r.GetComponent<ComponentType, ECS::TransformComponent>(entity_index);
+                const Matrix4x4f &local_to_world = transform->GetRenderWorldMatrix();
+                const Matrix4x4f world_to_local = MatrixInverse(local_to_world);
+                const Vector3f inv_scale = Vector3f::kOne / transform->_local_transform._scale;
+                VertexBuffer *vertex_buffer = is_skinned ? ECS::SkinningSystem::ResolveVertexBuffer(mesh, static_cast<u32>(entity)) : nullptr;
+                if (vertex_buffer == nullptr)
+                    vertex_buffer = mesh->GetVertexBuffer().get();
+                for (u16 submesh_index = 0u; submesh_index < mesh->SubmeshCount(); ++submesh_index)
+                {
+                    const u32 primitive_index = static_cast<u32>(_primitive_data.size());
+                    Material *material = renderable._p_mats.size() > submesh_index && renderable._p_mats[submesh_index]
+                        ? renderable._p_mats[submesh_index].get() : nullptr;
+                    PrimitiveData data{};
+                    data._local_to_world = local_to_world;
+                    data._world_to_local = world_to_local;
+                    data._prev_local_to_world = transform->_prev_render_world_matrix;
+                    data._max_inv_scale = std::max(inv_scale.x, std::max(inv_scale.y, inv_scale.z));
+                    data._entity_id = static_cast<u32>(entity);
+                    data._material_id = material ? _material_data_lut[material->HashCode()] : 0u;
+                    data._submesh_id = submesh_index;
+                    data._flags = is_skinned ? kPrimitiveSkinned : kPrimitiveNone;
+                    data._flags |= renderable._motion_vector_type == ECS::EMotionVectorType::kPerObject ? kPrimitivePerObjectMotion : 0u;
+                    data._flags |= renderable._motion_vector_type == ECS::EMotionVectorType::kForceZero ? kPrimitiveForceZeroMotion : 0u;
+                    const auto range = s.GetBVHNodeRange(entity, submesh_index);
+                    data._blas_node_start = range.x;
+                    data._blas_node_count = range.y;
+                    const i32 position_index = mesh->GetBindlessVertexStreamIndex(EVertexSemantic::kPosition, vertex_buffer);
+                    const i32 normal_index = mesh->GetBindlessVertexStreamIndex(EVertexSemantic::kNormal, vertex_buffer);
+                    const i32 uv_index = mesh->GetBindlessVertexStreamIndex(EVertexSemantic::kTexcoord0, vertex_buffer);
+                    const i32 tangent_index = mesh->GetBindlessVertexStreamIndex(EVertexSemantic::kTangent, vertex_buffer);
+                    data._position_bindless_idx = position_index >= 0 ? static_cast<u32>(position_index) : RenderConstants::kInvalidBindlessHandle;
+                    data._normal_bindless_idx = normal_index >= 0 ? static_cast<u32>(normal_index) : RenderConstants::kInvalidBindlessHandle;
+                    data._uv_bindless_idx = uv_index >= 0 ? static_cast<u32>(uv_index) : RenderConstants::kInvalidBindlessHandle;
+                    data._tangent_bindless_idx = tangent_index >= 0 ? static_cast<u32>(tangent_index) : RenderConstants::kInvalidBindlessHandle;
+                    auto *index_buffer = mesh->GetIndexBuffer(submesh_index).get();
+                    data._index_bindless_idx = index_buffer ? static_cast<u32>(index_buffer->GetBindlessSRVIndex()) : RenderConstants::kInvalidBindlessHandle;
+                    data._submesh_triangle_count = mesh->GetTriangleCount(submesh_index);
+                    _scene_primitives.emplace_back(ScenePrimitive{primitive_index, static_cast<u32>(entity), mesh, material,
+                        vertex_buffer, index_buffer,
+                        renderable._transformed_aabbs[submesh_index + 1u], submesh_index, static_cast<u16>(data._flags)});
+                    _primitive_data.emplace_back(data);
+                }
+                ++entity_index;
+            }
+        };
+
+        append_primitives(s.GetRegister().View<ECS::StaticMeshComponent>(), false);
+        append_primitives(s.GetRegister().View<ECS::CSkeletonMesh>(), true);
+        AL_ASSERT(_primitive_data.size() <= RenderConstants::kMaxRenderObjectCount);
+        auto *primitive_buffer = _cur_fs->GetScenePrimitiveBuffer(s.HashCode());
+        primitive_buffer->SetData(_primitive_data);
+        _rendering_data._scene_primitive_buffer = primitive_buffer;
+        _rendering_data._primitive_data = &_primitive_data;
+        _rendering_data._scene_primitives = &_scene_primitives;
+        Shader::SetGlobalBuffer("g_primitive_data", primitive_buffer);
+        ComputeShader::SetGlobalBuffer("g_primitive_data", primitive_buffer);
+        _cur_fs->ResetPrimitiveIndices();
+        Shader::SetGlobalBuffer("g_instance_primitive_indices", _cur_fs->GetPrimitiveIndexBuffer());
+    }
+
+    void Renderer::RefreshScenePrimitiveVertexBuffers()
+    {
+        for (auto &primitive : _scene_primitives)
+        {
+            if ((primitive._flags & kPrimitiveSkinned) == 0u)
+                continue;
+            if (auto *vertex_buffer = ECS::SkinningSystem::ResolveVertexBuffer(primitive._mesh, primitive._entity_id);
+                vertex_buffer != nullptr)
+            {
+                primitive._vertex_buffer = vertex_buffer;
+            }
+        }
+    }
 
     void Renderer::PrepareScene(const Scene &s)
     {
-        u16 obj_index = 0;
-        u64 entity_index = 0;
-        auto &r = s.GetRegister();
-
-        for (auto &static_mesh: s.GetRegister().View<ECS::StaticMeshComponent>())
-        {
-            const auto entity = r.GetEntity<ECS::StaticMeshComponent>(entity_index);
-            if (!s.IsEntityEnabled(entity) || !r.IsComponentEnabled<ECS::StaticMeshComponent>(entity))
-            {
-                ++entity_index;
-                continue;
-            }
-            if (static_mesh._p_mesh)
-            {
-                auto &aabbs = static_mesh._transformed_aabbs;
-                Vector3f center;
-                u16 submesh_count = static_mesh._p_mesh->SubmeshCount();
-                auto &materials = static_mesh._p_mats;
-                const auto &transf_comp = r.GetComponent<ECS::StaticMeshComponent, ECS::TransformComponent>(entity_index);
-                const auto &render_world_matrix = transf_comp->GetRenderWorldMatrix();
-                auto world_to_local = MatrixInverse(render_world_matrix);
-                for (int i = 0; i < submesh_count; i++)
-                {
-                    auto *obj_cb = ConstantBuffer::As<CBufferPerObjectData>(_cur_fs->GetObjCB(obj_index));
-                    obj_cb->_MatrixWorld = render_world_matrix;
-                    obj_cb->_MatrixWorld_Pre = transf_comp->_prev_render_world_matrix;
-                    obj_cb->_MatrixInvWorld = world_to_local;
-                    obj_cb->_ObjectID = (i32) entity;
-                    obj_cb->_SubmeshID = i;
-                    obj_cb->_MotionVectorParam.x = static_mesh._motion_vector_type == ECS::EMotionVectorType::kPerObject? 1.0f : 0.0f; //dynamic object
-                    obj_cb->_MotionVectorParam.y = static_mesh._motion_vector_type == ECS::EMotionVectorType::kForceZero? 1.0f : 0.0f; //force off
-                    s_instance_data[obj_index]._local_to_world = render_world_matrix;
-                    s_instance_data[obj_index]._world_to_local = world_to_local;
-                    s_instance_data[obj_index]._object_id = obj_index;
-                    s_instance_data[obj_index]._material_id = materials.size() > i && materials[i] != nullptr
-                        ? _material_data_lut[materials[i]->HashCode()] : 0u;
-                    s_instance_data[obj_index]._global_triangle_offset = 0u;
-                    auto range = s.GetBVHNodeRange(entity, static_cast<u16>(i));
-                    s_instance_data[obj_index]._blas_node_start = range.x;
-                    s_instance_data[obj_index]._blas_node_count = range.y;
-                    auto *mesh = static_mesh._p_mesh.get();
-                    const i32 position_bindless_idx = mesh ? mesh->GetBindlessVertexStreamIndex("POSITION") : -1;
-                    const i32 normal_bindless_idx = mesh ? mesh->GetBindlessVertexStreamIndex("NORMAL") : -1;
-                    const i32 uv_bindless_idx = mesh ? mesh->GetBindlessVertexStreamIndex("TEXCOORD") : -1;
-                    const i32 tangent_bindless_idx = mesh ? mesh->GetBindlessVertexStreamIndex("TANGENT") : -1;
-                    s_instance_data[obj_index]._position_bindless_idx = position_bindless_idx >= 0 ? static_cast<u32>(position_bindless_idx) : Render::RenderConstants::kInvalidBindlessHandle;
-                    s_instance_data[obj_index]._normal_bindless_idx = normal_bindless_idx >= 0 ? static_cast<u32>(normal_bindless_idx) : Render::RenderConstants::kInvalidBindlessHandle;
-                    s_instance_data[obj_index]._uv_bindless_idx = uv_bindless_idx >= 0 ? static_cast<u32>(uv_bindless_idx) : Render::RenderConstants::kInvalidBindlessHandle;
-                    s_instance_data[obj_index]._tangent_bindless_idx = tangent_bindless_idx >= 0 ? static_cast<u32>(tangent_bindless_idx) : Render::RenderConstants::kInvalidBindlessHandle;
-                    auto index_buffer = mesh->GetIndexBuffer(i).get();
-                    s_instance_data[obj_index]._index_bindless_idx = index_buffer ? static_cast<u32>(index_buffer->GetBindlessSRVIndex()) : Render::RenderConstants::kInvalidBindlessHandle;
-                    s_instance_data[obj_index]._submesh_triangle_offset = 0u;
-                    s_instance_data[obj_index]._submesh_triangle_count = mesh->GetTriangleCount(i);
-                    s_instance_data[obj_index]._reserved0 = 0u;
-                    Vector3f inv_scale = Vector3f::kOne / transf_comp->_local_transform._scale;
-                    s_instance_data[obj_index]._max_inv_scale = std::max(inv_scale.x,std::max(inv_scale.y,inv_scale.z));
-                    ++obj_index;
-                }
-            }
-            ++entity_index;
-        }
-        auto inst_buffer = _cur_fs->GetSceneInstanceBuffer(s.HashCode());
-        inst_buffer->SetData(reinterpret_cast<const u8 *>(s_instance_data.data()), (u32) (s_instance_data.size() * sizeof(ObjectInstanceData)));
-        ComputeShader::SetGlobalBuffer("g_instance_data", inst_buffer);
         auto scene_data_buffer = s.GetSceneMeshDataBuffer();
         ComputeShader::SetGlobalBuffer("g_scene", scene_data_buffer);
         ComputeShader::SetGlobalBuffer("g_tlas_buffer", s.GetTLASBuffer());
@@ -600,37 +623,8 @@ namespace Ailu::Render
         ComputeShader::SetGlobalInt("_scene_bindless_idx", scene_data_buffer ? scene_data_buffer->GetBindlessSRVIndex() : RenderConstants::kInvalidBindlessHandle);
         ComputeShader::SetGlobalInt("_tlas_count", s.GetTLASNodeCount());
         ComputeShader::SetGlobalInt("_blas_count", s.GetBLASNodeCount());
-        ComputeShader::SetGlobalInt("_inst_count", obj_index);
+        ComputeShader::SetGlobalInt("_inst_count", static_cast<u32>(_primitive_data.size()));
         ComputeShader::SetGlobalInt("_tri_count", s.TriangleCount());
-        entity_index = 0u;
-        for (auto &static_mesh: s.GetRegister().View<ECS::CSkeletonMesh>())
-        {
-            const auto entity = r.GetEntity<ECS::CSkeletonMesh>(entity_index);
-            if (!s.IsEntityEnabled(entity) || !r.IsComponentEnabled<ECS::CSkeletonMesh>(entity))
-            {
-                ++entity_index;
-                continue;
-            }
-            if (static_mesh._p_mesh)
-            {
-                auto &aabbs = static_mesh._transformed_aabbs;
-                Vector3f center;
-                u16 submesh_count = static_mesh._p_mesh->SubmeshCount();
-                auto &materials = static_mesh._p_mats;
-                for (int i = 0; i < submesh_count; i++)
-                {
-                    const auto &t = r.GetComponent<ECS::CSkeletonMesh, ECS::TransformComponent>(entity_index);
-                    auto *obj_cb = ConstantBuffer::As<CBufferPerObjectData>(_cur_fs->GetObjCB(obj_index));
-                    obj_cb->_MatrixWorld = t->GetRenderWorldMatrix();
-                    obj_cb->_MatrixWorld_Pre = t->_prev_render_world_matrix;
-                    obj_cb->_MatrixInvWorld = MatrixInverse(t->GetRenderWorldMatrix());
-                    obj_cb->_ObjectID = (i32)r.GetEntity<ECS::CSkeletonMesh>(entity_index);
-                    ++obj_index;
-                }
-            }
-            ++entity_index;
-        };
-        _rendering_data._p_per_object_cbuf = _cur_fs->GetObjCB();
         _rendering_data._p_per_scene_cbuf = _cur_fs->GetSceneCB(s.HashCode());
         auto scene_data = ConstantBuffer::As<CBufferPerSceneData>(_rendering_data._p_per_scene_cbuf);
         f32 cascade_shaodw_max_dis = (f32) QuailtySetting::s_main_light_shaodw_distance * QuailtySetting::s_cascade_shadow_map_split[QuailtySetting::s_cascade_shadow_map_count - 1];
@@ -916,21 +910,26 @@ namespace Ailu::Render
     {
         PROFILE_BLOCK_CPU("Renderer_PrepareMaterial")
 
-        for (auto& static_mesh : s.GetRegister().View<ECS::StaticMeshComponent>())
+        auto collect_materials = [this](auto &renderables)
         {
-            for (auto& mat : static_mesh._p_mats)
+            for (auto &renderable : renderables)
             {
-                if (mat == nullptr)
-                    continue;
-                if (!_material_data_lut.contains(mat->HashCode()))
+                for (auto &material : renderable._p_mats)
                 {
-                    u32 idx = (u32)_material_data_cache.size();
-                    _material_data_lut[mat->HashCode()] = idx;
-                    _material_data_cache.push_back(MaterialData());
+                    if (material == nullptr)
+                        continue;
+                    if (!_material_data_lut.contains(material->HashCode()))
+                    {
+                        const u32 material_index = static_cast<u32>(_material_data_cache.size());
+                        _material_data_lut[material->HashCode()] = material_index;
+                        _material_data_cache.push_back(MaterialData());
+                    }
+                    FillMaterialData(material.get(), _material_data_cache[_material_data_lut[material->HashCode()]]);
                 }
-                FillMaterialData(mat.get(), _material_data_cache[_material_data_lut[mat->HashCode()]]);
             }
-        }
+        };
+        collect_materials(s.GetRegister().View<ECS::StaticMeshComponent>());
+        collect_materials(s.GetRegister().View<ECS::CSkeletonMesh>());
         _cur_fs->GetMaterialBuffer()->SetData(
             (u8*)_material_data_cache.data(),
             (u32)(_material_data_cache.size() * sizeof(MaterialData)));
@@ -1005,84 +1004,34 @@ namespace Ailu::Render
         EndScene(s);
     }
 
-    template<typename T>
-    void static CullObject(T &comp, const ViewFrustum &vf, CullResult &cur_cam_cull_results, u16 &scene_render_obj_index, const u64 &entity_index, const Camera &cam, const Scene &s)
-    {
-        using ComponentType = std::remove_cvref_t<T>;
-        const auto &registry = s.GetRegister();
-        const ECS::Entity entity = registry.GetEntity<ComponentType>(entity_index);
-        if (!s.IsEntityEnabled(entity) || !registry.IsComponentEnabled<ComponentType>(entity))
-            return;
-
-        if (comp._p_mesh)
-        {
-            auto &aabbs = comp._transformed_aabbs;
-            Vector3f center;
-            u16 submesh_count = comp._p_mesh->SubmeshCount();
-            auto &materials = comp._p_mats;
-            if (!cam.IsCustomVP() && !ViewFrustum::Conatin(vf, aabbs[0]))
-            {
-                ++scene_render_obj_index;
-                return;
-            }
-            for (int i = 0; i < submesh_count; i++)
-            {
-                if (ViewFrustum::Conatin(vf, aabbs[i + 1]) || cam.IsCustomVP())
-                {
-                    f32 dis = Distance(aabbs[i + 1].Center(), cam.Position());
-                    if (!materials.empty())
-                    {
-                        Material *used_mat = i < materials.size() ? materials[i].get() : nullptr;
-                        if (used_mat == nullptr)
-                            used_mat = materials[0].get();
-                        if (used_mat != nullptr)
-                        {
-                            const u32 queue_id = used_mat->RenderQueue();
-                            if (!cur_cam_cull_results.contains(queue_id))
-                                cur_cam_cull_results.insert(std::make_pair(queue_id, Vector<RenderableObjectData>()));
-                            cur_cam_cull_results[queue_id].emplace_back(RenderableObjectData{
-                                    scene_render_obj_index,
-                                    dis,
-                                    (u16) i,
-                                    1,
-                                    comp._p_mesh.get(),
-                                    used_mat,
-                                    &registry.GetComponent<ECS::TransformComponent>(entity)->_render_world_matrix,
-                                    static_cast<u32>(entity)});
-                        }
-                    }
-                }
-                ++scene_render_obj_index;
-            }
-        }
-    }
     void Renderer::Cull(const Scene &s, const Camera &cam)
     {
         if (_cull_results.contains(cam.HashCode()))
             _cull_results[cam.HashCode()].clear();
         else
             _cull_results.insert(std::make_pair(cam.HashCode(), CullResult()));
-        u16 scene_render_obj_index = 0u;
-        u64 entity_index = 0u;
         auto &cur_cam_cull_results = _cull_results[cam.HashCode()];
         const Camera& cull_cam = Camera::sSelected? *Camera::sSelected : cam;
         auto &vf = cull_cam.GetViewFrustum();
-        for (auto &comp: s.GetAllStaticRenderable())
+        for (const ScenePrimitive &primitive : _scene_primitives)
         {
-            CullObject(comp, vf, cur_cam_cull_results, scene_render_obj_index, entity_index, cull_cam, s);
-            ++entity_index;
-        }
-        entity_index = 0u;
-        for (auto &comp: s.GetAllSkinedRenderable())
-        {
-            CullObject(comp, vf, cur_cam_cull_results, scene_render_obj_index, entity_index, cull_cam, s);
-            ++entity_index;
+            if ((!cull_cam.IsCustomVP() && !ViewFrustum::Conatin(vf, primitive._world_bounds)) || primitive._material == nullptr)
+                continue;
+            const u32 queue_id = primitive._material->RenderQueue();
+            if (!cur_cam_cull_results.contains(queue_id))
+                cur_cam_cull_results.insert(std::make_pair(queue_id, Vector<RenderableObjectData>()));
+            cur_cam_cull_results[queue_id].emplace_back(RenderableObjectData{primitive._primitive_index,
+                Distance(primitive._world_bounds.Center(), cull_cam.Position()), primitive._submesh_index, primitive._mesh,
+                primitive._material, primitive._vertex_buffer, primitive._index_buffer, primitive._flags, primitive._entity_id});
         }
         for (auto &it: cur_cam_cull_results)
         {
             auto &objs = it.second;
-            std::sort(objs.begin(), objs.end(), [this](const RenderableObjectData &a, const RenderableObjectData &b)
-                      { return a._distance_to_cam < b._distance_to_cam; });
+            const bool is_transparent = it.first >= Shader::kRenderQueueTransparent;
+            std::sort(objs.begin(), objs.end(), [is_transparent](const RenderableObjectData &a, const RenderableObjectData &b)
+            {
+                return is_transparent ? a._distance_to_cam > b._distance_to_cam : a._distance_to_cam < b._distance_to_cam;
+            });
         }
     }
     void Renderer::StableSort(Vector<RenderPass *> list)

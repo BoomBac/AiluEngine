@@ -178,25 +178,15 @@ namespace Ailu::Editor
         _mesh = GetAssetObject<Render::Mesh>();
         if (_mesh == nullptr)
             return false;
-        auto *setting = ResourceMgr::Get().GetImportSetting(GetAsset()->_asset_path);
-        _import_setting = dynamic_cast<MeshImportSetting *>(setting);
-        if (_import_setting == nullptr)
-        {
-            _import_setting = AL_NEW(MeshImportSetting, MeshImportSetting::Default());
-            ResourceMgr::Get().SetImportSetting(GetAsset()->_asset_path, _import_setting);
-        }
+        const auto *setting = dynamic_cast<const MeshImportSetting *>(
+            ResourceMgr::Get().GetImportSetting(GetAsset()->_asset_path));
+        SetEditorImportSetting(setting != nullptr ? *setting : MeshImportSetting::Default());
         _preview.SetMesh(_mesh);
         _preview.SetShowGrid(_show_grid);
         _preview.SetWireframe(_wireframe);
         RefreshAllUI();
         _preview.Render();
         return true;
-    }
-
-    void MeshAssetEditor::OnBeforeSave()
-    {
-        if (_import_setting != nullptr && GetAsset() != nullptr)
-            ResourceMgr::Get().SetImportSetting(GetAsset()->_asset_path, _import_setting);
     }
 
     void MeshAssetEditor::OnAssetSaved()
@@ -250,10 +240,13 @@ namespace Ailu::Editor
 
     void MeshAssetEditor::RefreshImportSettings()
     {
-        if (_import_panel == nullptr || _import_root == nullptr || _import_setting == nullptr)
+        if (_import_panel == nullptr || _import_root == nullptr)
+            return;
+        auto *setting = dynamic_cast<MeshImportSetting *>(GetEditorImportSetting());
+        if (setting == nullptr)
             return;
         _import_root->ClearChildren();
-        _import_panel->Build({MeshImportSetting::StaticType(), _import_setting, _import_root, {}, {},
+        _import_panel->Build({MeshImportSetting::StaticType(), setting, _import_root, {}, {},
                               [this](const PropertyInfo &) { MarkDirty(); }});
     }
 
@@ -271,12 +264,7 @@ namespace Ailu::Editor
             return;
         if (IsDirty() && !Save())
             return;
-        if (ResourceMgr::Get().ReimportAsset(GetAsset()))
-        {
-            _mesh = GetAssetObject<Render::Mesh>();
-            RefreshAllUI();
-            RefreshPreview();
-        }
+        ResourceMgr::Get().ReimportAsset(GetAsset());
     }
 
     void MeshAssetEditor::FocusPreview()

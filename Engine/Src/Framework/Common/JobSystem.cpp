@@ -7,6 +7,10 @@
 
 #include "Render/GraphicsContext.h"
 
+#ifdef _WIN32
+#include <combaseapi.h>
+#endif
+
 namespace Ailu
 {
     void Job::OnComplete(std::exception_ptr exception)
@@ -208,6 +212,15 @@ namespace Ailu
     {
         SetThreadName(std::format("JobWorker_{0}", index));
         s_worker_thread_id = index;
+#ifdef _WIN32
+        const HRESULT com_result = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+        const bool should_uninitialize = com_result == S_OK || com_result == S_FALSE;
+        if (FAILED(com_result) && com_result != RPC_E_CHANGED_MODE)
+        {
+            LOG_WARNING("JobSystem::WorkerThread: COM initialization failed (HRESULT=0x{:08x})",
+                        static_cast<u32>(com_result));
+        }
+#endif
         while (!_stop)
         {
             Job *job = nullptr;
@@ -235,6 +248,10 @@ namespace Ailu
                 //    continue;
             }
         }
+#ifdef _WIN32
+        if (should_uninitialize)
+            CoUninitialize();
+#endif
     }
     bool JobSystem::HasPendingJob() const
     {

@@ -1334,7 +1334,7 @@ namespace Ailu
                 if (key_e.GetKeyCode() == EKey::kF11)
                 {
                     LOG_INFO("Capture frame...");
-                    g_pGfxContext->TakeCapture();
+                    g_pGfxContext->TakePixCapture();
                 }
                 if (key_e.GetKeyCode() == EKey::kS)
                 {
@@ -2007,6 +2007,12 @@ namespace Ailu
             {
                 RenderPipeline::Get().GetRenderer()->GetRenderGraph()._is_debug = true;
             }
+            ImGui::SameLine();
+            if (ImGui::Button("Capture PIX"))
+                g_pGfxContext->TakePixCapture();
+            ImGui::SameLine();
+            if (ImGui::Button("Capture RenderDoc"))
+                g_pGfxContext->TakeRenderDocCapture();
             if (is_packaging_player)
                 ImGui::BeginDisabled();
             if (ImGui::Button(is_packaging_player ? "Packaging Player..." : "Build/Package Player"))

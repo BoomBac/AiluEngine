@@ -6,23 +6,23 @@
 
 namespace Ailu
 {
-    void SpriteAnimationBinding::Resolve(const Guid &clip_id, const AnimationClip &clip)
+    void SpriteAnimationBinding::Resolve(const Guid &clip_id, Ref<const AnimationClip> clip)
     {
         for (auto &binding : _clips)
         {
             if (binding._clip_id == clip_id)
             {
-                binding._clip = &clip;
+                binding._clip = std::move(clip);
                 return;
             }
         }
-        _clips.push_back(ClipBinding{clip_id, &clip});
+        _clips.push_back(ClipBinding{clip_id, std::move(clip)});
     }
 
     const AnimationClip *SpriteAnimationBinding::FindClip(const Guid &clip_id) const
     {
         const ClipBinding *binding = FindClipBinding(clip_id);
-        return binding != nullptr ? binding->_clip : nullptr;
+        return binding != nullptr ? binding->_clip.get() : nullptr;
     }
 
     void SpriteAnimationBinding::Evaluate(const AnimationEvaluation &evaluation, ECS::SpriteRendererComponent &renderer)

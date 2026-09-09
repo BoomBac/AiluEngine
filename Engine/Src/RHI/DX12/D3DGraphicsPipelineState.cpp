@@ -14,22 +14,6 @@ using namespace Ailu::Render;
 
 namespace Ailu::RHI::DX12
 {
-    namespace
-    {
-        u64 BuildBindingHash(const PipelineResource &resource)
-        {
-            const auto type_hash = static_cast<u64>(resource._res_type);
-            const auto resource_ptr = static_cast<u64>(reinterpret_cast<uintptr_t>(resource._p_resource));
-            const auto native_ptr = static_cast<u64>(reinterpret_cast<uintptr_t>(resource._addi_info._native_res_ptr));
-            u64 hash = resource_ptr ^ (type_hash << 48) ^ (static_cast<u64>(resource._slot) << 40);
-            hash ^= resource._addi_info._gpu_handle;
-            hash ^= native_ptr >> 4;
-            hash ^= static_cast<u64>(resource._addi_info._view_index) << 16;
-            hash ^= static_cast<u64>(resource._addi_info._sub_res);
-            return hash;
-        }
-    }
-
     D3DGraphicsPipelineState::D3DGraphicsPipelineState(const GraphicsPipelineStateInitializer &initializer) : GraphicsPipelineStateObject(initializer)
     {
         memset(&_d3d_pso_desc, 0, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));//置空，否则编译不加 /sdl时创建pso时会有空指针
@@ -90,8 +74,8 @@ namespace Ailu::RHI::DX12
         for (u32 i = 0; i < _d3d_pso_desc.InputLayout.NumElements; i++)
         {
             D3D12_INPUT_ELEMENT_DESC desc = *(_d3d_pso_desc.InputLayout.pInputElementDescs + i);
-            desc.SemanticName = layout_descs[i].Name.c_str();
-            desc.SemanticIndex = (u32) layout_descs[i]._semantic_index;
+            desc.SemanticName = Render::RenderConstants::GetVertexSemanticName(layout_descs[i]._semantic);
+            desc.SemanticIndex = Render::RenderConstants::GetVertexSemanticIndex(layout_descs[i]._semantic);
             v.push_back(desc);
         }
         _d3d_pso_desc.NumRenderTargets = _state_desc._rt_state._color_rt[0] == EALGFormat::kALGFormatUNKOWN ? 0 : _state_desc._rt_state._color_rt_num;
@@ -139,22 +123,21 @@ namespace Ailu::RHI::DX12
         auto native_cmd = d3dcmd->NativeCmdList();
         const bool is_same_pso = d3dcmd->IsGraphicsPSOActive(this);
         auto& recording_ctx = d3dcmd->RecordingContext();
-        if (!is_same_pso)
+        const bool is_root_signature_changed = d3dcmd->SetGraphicsRootSignature(_p_sig.Get());
+        const bool is_pso_changed = d3dcmd->SetGraphicsPipelineState(this, _p_plstate.Get());
+        d3dcmd->SetPrimitiveTopology(_d3d_topology);
+        if (is_pso_changed)
         {
             if (_state_desc._depth_stencil_state._b_front_stencil)
                 native_cmd->OMSetStencilRef(_state_desc._depth_stencil_state._stencil_ref_value);
-            native_cmd->SetGraphicsRootSignature(_p_sig.Get());
-            native_cmd->SetPipelineState(_p_plstate.Get());
-            native_cmd->IASetPrimitiveTopology(_d3d_topology);
-            d3dcmd->SetGraphicsPSOActive(this);
             recording_ctx.RenderingStatesData().GfxPsoBindCount++;
         }
 #if AILU_ENABLE_FRAME_DEBUGGER
         auto *capture_writer = rhi_cmd->CaptureWriter();
-        if (capture_writer && !is_same_pso)
+        if (capture_writer && is_root_signature_changed)
         {
             auto &cap_cache = capture_writer->StateCache();
-            cap_cache._pso_invalidated_slot_mask = cap_cache._valid_slot_mask;
+            cap_cache._root_signature_invalidated_slot_mask = cap_cache._valid_slot_mask;
             cap_cache._valid_slot_mask = 0u;
             cap_cache._pso_ever_bound = false;
         }
@@ -168,7 +151,6 @@ namespace Ailu::RHI::DX12
             if (slot >= 32u)
                 continue;
             resolved_slot_mask |= 1u << slot;
-            const u64 binding_hash = BuildBindingHash(res);
 #if AILU_ENABLE_FRAME_DEBUGGER
             if (capture_writer)
             {
@@ -210,12 +192,12 @@ namespace Ailu::RHI::DX12
                 if (type_it != _bind_res_desc_type_lut.end())
                     binding_cap._shader_resource_type = (u32)type_it->second;
                 const bool is_slot_valid = (cap_cache._valid_slot_mask & (1u << slot)) != 0u;
-                const bool is_slot_up_to_date = d3dcmd->IsGraphicsSlotUpToDate(slot, binding_hash);
+                const bool is_slot_up_to_date = d3dcmd->IsGraphicsSlotUpToDate(slot, res);
                 binding_cap._cache_result = is_slot_up_to_date ? (u8)Render::FrameDebugger::EBindingCacheResult::kSkipped
                                                                 : (u8)Render::FrameDebugger::EBindingCacheResult::kBound;
                 if (!is_slot_valid)
-                    binding_cap._invalid_reasons = (cap_cache._pso_invalidated_slot_mask & (1u << slot)) != 0u
-                        ? (u32)Render::FrameDebugger::EBindingInvalidReason::kPsoChanged
+                    binding_cap._invalid_reasons = (cap_cache._root_signature_invalidated_slot_mask & (1u << slot)) != 0u
+                        ? (u32)Render::FrameDebugger::EBindingInvalidReason::kRootSignatureChanged
                         : (u32)Render::FrameDebugger::EBindingInvalidReason::kSlotUninitialized;
                 else if (!is_slot_up_to_date)
                 {
@@ -241,10 +223,18 @@ namespace Ailu::RHI::DX12
                 cap_cache._valid_slot_mask |= (1u << slot);
             }
 #endif
-            if (!d3dcmd->IsGraphicsSlotUpToDate(slot, binding_hash))
+            const bool is_descriptor_table = res._res_type == EBindResDescType::kBuffer ||
+                                             res._res_type == EBindResDescType::kRWBuffer ||
+                                             res._res_type == EBindResDescType::kTexture2D ||
+                                             res._res_type == EBindResDescType::kTexture2DArray ||
+                                             res._res_type == EBindResDescType::kCubeMap ||
+                                             res._res_type == EBindResDescType::kUAVTexture2D ||
+                                             res._res_type == EBindResDescType::kTexture3D ||
+                                             res._res_type == EBindResDescType::kRWTexture3D;
+            if (!d3dcmd->IsGraphicsSlotUpToDate(slot, res))
             {
                 BindResource(rhi_cmd, res);
-                d3dcmd->UpdateGraphicsSlot(slot, binding_hash);
+                d3dcmd->UpdateGraphicsSlot(slot, res, is_descriptor_table);
                 ++recording_ctx.RenderingStatesData().GfxResBindCount;
                 ++recording_ctx.RenderingStatesData().ActualRootSlotBindCount;
             }
@@ -253,9 +243,8 @@ namespace Ailu::RHI::DX12
                 ++recording_ctx.RenderingStatesData().SkippedRootSlotBindCount;
             }
         }
-        // A draw may intentionally omit optional bindings that were used by the previous draw
-        // with the same PSO. Those root slots remain valid until the PSO changes, where the cache
-        // is reset by SetGraphicsPSOActive().
+        // A draw may intentionally omit optional bindings that were used by the previous draw.
+        // Those root slots remain valid until the root signature changes or the command list resets.
 #if AILU_ENABLE_FRAME_DEBUGGER
         if (capture_writer)
         {

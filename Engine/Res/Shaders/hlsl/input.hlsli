@@ -7,6 +7,7 @@ struct StandardVSInput
 	float3 normal : NORMAL;
 	float2 uv0 : TEXCOORD;
 	float4 tangent : TANGENT;
+	uint instance_id : SV_INSTANCEID;
 };
 
 struct StandardPSInput

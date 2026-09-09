@@ -20,7 +20,7 @@ namespace Ailu::Render
         Vector<Ref<Sprite>>& Sprites() { return _sprites; }
         void SetTexture(const Ref<Texture2D>& texture) { _texture = texture; }
         void SetTexture(const Guid &guid, Ref<Texture2D> texture) { _texture.Set(guid, std::move(texture)); }
-        const Ref<Texture2D>& Texture() const { return _texture; }
+        Ref<Texture2D> Texture() const { return _texture.Get(); }
         const AssetRef<Texture2D> &TextureRef() const { return _texture; }
 
     private:

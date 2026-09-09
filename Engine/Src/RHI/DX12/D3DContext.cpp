@@ -589,7 +589,8 @@ namespace Ailu::RHI::DX12
         }
         *ppAdapter = pAdapter4;
     }
-    static RENDERDOC_API_1_1_2 *g_rdc_api = nullptr;
+    static RENDERDOC_API_1_1_2 *s_rdc_api = nullptr;
+    static HMODULE s_rdc_module = nullptr;
 
     static inline bool IsDirectXRaytracingSupported(IDXGIAdapter4 *adapter)
     {
@@ -601,34 +602,48 @@ namespace Ailu::RHI::DX12
                featureSupportData.RaytracingTier != D3D12_RAYTRACING_TIER_NOT_SUPPORTED;
     }
 
-    static void RdcLoadLatestRdcGpuCapturerLibrary()
+    static bool RdcLoadLatestRdcGpuCapturerLibrary()
     {
-        HKEY hKey = HKEY_LOCAL_MACHINE;                                                                        // 根键
-        LPCWSTR subKey = L"SOFTWARE\\Classes\\CLSID\\{5D6BF029-A6BA-417A-8523-120492B1DCE3}\\InprocServer32\\";// 子键路径
-        //LPCWSTR valueName = L"YourValue";     // 值名称
-        wchar_t value[256];              // 存储结果
-        DWORD bufferSize = sizeof(value);// 缓冲区大小
-        // 获取值
-        LONG result = RegGetValue(hKey, subKey,
-                                  nullptr,//default name
-                                  RRF_RT_REG_SZ, nullptr, value, &bufferSize);
-        if (!g_engine_config._enable_pix)
-            return;
-        if (result == ERROR_SUCCESS)
+        if (s_rdc_module != nullptr && s_rdc_api != nullptr)
+            return true;
+
+        HMODULE module = GetModuleHandleW(L"renderdoc.dll");
+        if (module == nullptr)
         {
-            if (HMODULE mod = LoadLibrary(value))
-            {
-                pRENDERDOC_GetAPI RENDERDOC_GetAPI = (pRENDERDOC_GetAPI) GetProcAddress(mod, "RENDERDOC_GetAPI");
-                int ret = RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_1_2, (void **) &g_rdc_api);
-                AL_ASSERT(ret == 1);
-                g_rdc_api->SetCaptureFilePathTemplate("RenderDocCapture/Capture");
-                g_rdc_api->MaskOverlayBits(RENDERDOC_OverlayBits::eRENDERDOC_Overlay_None, RENDERDOC_OverlayBits::eRENDERDOC_Overlay_None);
-            }
-            else
-                LOG_ERROR("RenderDoc Lode Error: {}", GetLastError());
+            HKEY h_key = HKEY_LOCAL_MACHINE;
+            LPCWSTR sub_key = L"SOFTWARE\\Classes\\CLSID\\{5D6BF029-A6BA-417A-8523-120492B1DCE3}\\InprocServer32\\";
+            wchar_t value[256] = {};
+            DWORD buffer_size = sizeof(value);
+            LONG result = RegGetValue(h_key, sub_key, nullptr, RRF_RT_REG_SZ, nullptr, value, &buffer_size);
+            if (result != ERROR_SUCCESS)
+                return false;
+            module = LoadLibraryW(value);
         }
-        else
-            LOG_ERROR(L"Failed to get renderdoc dll path. Error: {}", result)
+
+        if (module == nullptr)
+            return false;
+
+        auto get_api = reinterpret_cast<pRENDERDOC_GetAPI>(GetProcAddress(module, "RENDERDOC_GetAPI"));
+        if (get_api == nullptr)
+        {
+            LOG_ERROR("RenderDoc API entry point was not found. Error: {}", GetLastError());
+            return false;
+        }
+
+        int ret = get_api(eRENDERDOC_API_Version_1_1_2, reinterpret_cast<void **>(&s_rdc_api));
+        if (ret != 1 || s_rdc_api == nullptr)
+        {
+            LOG_ERROR("RenderDoc API initialization failed.");
+            s_rdc_api = nullptr;
+            return false;
+        }
+
+        s_rdc_module = module;
+        s_rdc_api->SetCaptureFilePathTemplate("RenderDocCapture/Capture");
+        s_rdc_api->MaskOverlayBits(RENDERDOC_OverlayBits::eRENDERDOC_Overlay_None,
+                                    RENDERDOC_OverlayBits::eRENDERDOC_Overlay_None);
+        LOG_INFO("RenderDoc API loaded.");
+        return true;
     };
 
     static void EnableShaderBasedValidation()
@@ -830,10 +845,8 @@ namespace Ailu::RHI::DX12
     D3DContext::D3DContext()
     {
         if (g_engine_config._enable_pix)
-        {
             PIXLoadLatestWinPixGpuCapturerLibrary();
-            //RdcLoadLatestRdcGpuCapturerLibrary();
-        }
+        RdcLoadLatestRdcGpuCapturerLibrary();
         _cmd_worker = MakeScope<GpuCommandWorker>(this);
     }
 
@@ -1448,10 +1461,60 @@ namespace Ailu::RHI::DX12
 
     void D3DContext::TakeCapture()
     {
-        //g_rdc_api->TriggerCapture();
-        //if (!g_rdc_api->IsTargetControlConnected())
-        //    g_rdc_api->LaunchReplayUI(1, nullptr);
-        _is_next_frame_capture = true;
+        TakePixCapture();
+    }
+
+    void D3DContext::TakePixCapture()
+    {
+        if (!g_engine_config._enable_pix)
+        {
+            LOG_WARNING("PIX capture is disabled.");
+            return;
+        }
+        if (_is_renderdoc_capture_pending || (s_rdc_api != nullptr && s_rdc_api->IsFrameCapturing()))
+        {
+            LOG_WARNING("RenderDoc capture is active or pending; PIX capture was ignored.");
+            return;
+        }
+        if (_is_pix_capture_pending || _is_pix_frame_capturing)
+        {
+            LOG_WARNING("PIX capture is already active or pending.");
+            return;
+        }
+        _is_pix_capture_pending = true;
+    }
+
+    void D3DContext::TakeRenderDocCapture()
+    {
+        if (s_rdc_api == nullptr && !RdcLoadLatestRdcGpuCapturerLibrary())
+        {
+            LOG_WARNING("RenderDoc is not available. Launch the Editor through RenderDoc or install RenderDoc first.");
+            return;
+        }
+        if (_is_pix_capture_pending || _is_pix_frame_capturing)
+        {
+            LOG_WARNING("PIX capture is active or pending; RenderDoc capture was ignored.");
+            return;
+        }
+        if (_is_renderdoc_capture_pending || s_rdc_api->IsFrameCapturing())
+        {
+            LOG_WARNING("RenderDoc capture is already active or pending.");
+            return;
+        }
+
+        auto *window = Application::FocusedWindow();
+        if (window == nullptr || window->GetNativeWindowPtr() == nullptr)
+        {
+            LOG_WARNING("RenderDoc capture requires a focused window.");
+            return;
+        }
+
+        s_rdc_api->SetActiveWindow(reinterpret_cast<RENDERDOC_DevicePointer>(m_device.Get()),
+                                   reinterpret_cast<RENDERDOC_WindowHandle>(window->GetNativeWindowPtr()));
+        _renderdoc_capture_count_before = s_rdc_api->GetNumCaptures();
+        s_rdc_api->TriggerCapture();
+        _is_renderdoc_capture_pending = true;
+        LOG_INFO("RenderDoc capture requested for the next frame.");
     }
 
     void D3DContext::ResizeSwapChain(void *window_handle, const u32 width, const u32 height)
@@ -1497,9 +1560,8 @@ namespace Ailu::RHI::DX12
         {
             std::lock_guard<std::mutex> lock(_render_windows_mtx);
 #ifdef DEAR_IMGUI
-            auto dxcmd = cmd->NativeCmdList();
             auto rtv_handle = *_render_windows[0]->_swapchain->TargetCPUHandle(cmd);
-            dxcmd->OMSetRenderTargets(1, &rtv_handle, FALSE, nullptr);
+            cmd->SetRenderTargets(1u, &rtv_handle, nullptr);
             //dxcmd->ClearRenderTargetView(rtv_handle, Colors::kBlack, 0, nullptr);
             ImGuiRenderer::Get().Render(cmd);
 #endif// DEAR_IMGUI
@@ -1524,7 +1586,7 @@ namespace Ailu::RHI::DX12
                     //if (Application::Get().GetFrameCount() % 60 == 0)
                     Render::RenderingStates::RenderData().GpuLatency = s_timer.GetElapsedSinceLastLocalMark();
                 }
-                if (_is_cur_frame_capturing) { EndCapture(); }
+                if (_is_pix_frame_capturing) { EndPixCapture(); }
                 {
                     u32 new_pack_size = ctx->_new_backbuffer_size.load();
                     if (new_pack_size != 0u)
@@ -1602,12 +1664,12 @@ namespace Ailu::RHI::DX12
         //         }
         // #endif
         //CommandBufferPool::ReleaseAll();
-        if (_is_next_frame_capture)
+        if (_is_pix_capture_pending)
         {
-            BeginCapture();
-            _is_next_frame_capture = false;
-            _is_cur_frame_capturing = true;
+            _is_pix_capture_pending = false;
+            _is_pix_frame_capturing = BeginPixCapture();
         }
+        TryOpenRenderDocCapture();
         //if (Application::Get().GetFrameCount() % 60 == 0)
         {
             auto& rd = Render::RenderingStates::RenderData();
@@ -1616,32 +1678,88 @@ namespace Ailu::RHI::DX12
         }
         s_timer.MarkLocal();
     }
-    void D3DContext::BeginCapture()
+    bool D3DContext::BeginPixCapture()
+    {
+        if (!g_engine_config._enable_pix)
+        {
+            LOG_WARNING("PIX capture is disabled.");
+            return false;
+        }
+
+        LOG_WARNING("Begin PIX capture...");
+        static PIXCaptureParameters s_params{};
+        auto *window = Application::FocusedWindow();
+        if (window == nullptr || window->GetNativeWindowPtr() == nullptr)
+        {
+            LOG_WARNING("PIX capture requires a focused window.");
+            return false;
+        }
+        PIXSetTargetWindow((HWND) window->GetNativeWindowPtr());
+        _pix_capture_name = std::format(L"{}_{}{}", L"NewCapture", ToWChar(TimeMgr::CurrentTime("%Y-%m-%d_%H%M%S")), L".wpix");
+        s_params.GpuCaptureParameters.FileName = _pix_capture_name.data();
+        HRESULT result = PIXBeginCapture(PIX_CAPTURE_GPU, &s_params);
+        if (FAILED(result))
+        {
+            LOG_ERROR("PIXBeginCapture failed: {}", result);
+            return false;
+        }
+        return true;
+    }
+
+    void D3DContext::EndPixCapture()
     {
         if (g_engine_config._enable_pix)
         {
-            LOG_WARNING("Begin take capture...");
-            static PIXCaptureParameters parms{};
-            static u32 s_capture_count = 0u;
-            PIXSetTargetWindow((HWND) Application::FocusedWindow()->GetNativeWindowPtr());
-            _cur_capture_name = std::format(L"{}_{}{}", L"NewCapture", ToWChar(TimeMgr::CurrentTime("%Y-%m-%d_%H%M%S")), L".wpix");
-            parms.GpuCaptureParameters.FileName = _cur_capture_name.data();
-            PIXBeginCapture(PIX_CAPTURE_GPU, &parms);
-            _is_next_frame_capture = true;
+            HRESULT result = PIXEndCapture(false);
+            _is_pix_frame_capturing = false;
+            if (FAILED(result) && result != E_PENDING)
+            {
+                LOG_ERROR("PIXEndCapture failed: {}", result);
+                return;
+            }
+            PIXOpenCaptureInUI(_pix_capture_name.data());
+        }
+    }
+
+    void D3DContext::TryOpenRenderDocCapture()
+    {
+        if (!_is_renderdoc_capture_pending || s_rdc_api == nullptr)
+            return;
+
+        const u32 capture_count = s_rdc_api->GetNumCaptures();
+        if (capture_count <= _renderdoc_capture_count_before)
+            return;
+
+        const u32 capture_index = capture_count - 1u;
+        u32 path_length = 0u;
+        if (s_rdc_api->GetCapture(capture_index, nullptr, &path_length, nullptr) == 0u || path_length == 0u)
+        {
+            LOG_ERROR("RenderDoc capture completed, but its file path could not be queried.");
+            _is_renderdoc_capture_pending = false;
+            return;
+        }
+
+        Vector<char> capture_path(path_length, '\0');
+        if (s_rdc_api->GetCapture(capture_index, capture_path.data(), &path_length, nullptr) == 0u)
+        {
+            LOG_ERROR("RenderDoc capture completed, but its file path could not be read.");
+            _is_renderdoc_capture_pending = false;
+            return;
+        }
+
+        if (s_rdc_api->IsTargetControlConnected())
+        {
+            s_rdc_api->ShowReplayUI();
         }
         else
-            LOG_WARNING("No available gpu debug enabled!");
-    }
-    void D3DContext::EndCapture()
-    {
-        if (g_engine_config._enable_pix)
         {
-            PIXEndCapture(true);
-            _is_cur_frame_capturing = false;
-            PIXOpenCaptureInUI(_cur_capture_name.data());
-            //ShellExecute(NULL, L"open", _cur_capture_name.data(), NULL, NULL, SW_SHOWNORMAL);
+            const u32 replay_pid = s_rdc_api->LaunchReplayUI(1u, capture_path.data());
+            if (replay_pid == 0u)
+                LOG_WARNING("RenderDoc capture saved, but its Replay UI could not be launched.");
         }
+        _is_renderdoc_capture_pending = false;
     }
+
     void D3DContext::ResizeSwapChainImpl(const u32 width, const u32 height)
     {
         if (width == _render_windows[_cur_ctx_index]->_width && height == _render_windows[_cur_ctx_index]->_height) return;
@@ -1948,9 +2066,9 @@ namespace Ailu::RHI::DX12
                     d3dcmd->_depth = drt->TargetCPUHandle(d3dcmd, set_cmd->_depth_index);
                     d3dcmd->_scissors[0] = D3DConvertUtils::ToD3DRect(set_cmd->_viewports[0]);
                     d3dcmd->_viewports[0] = D3DConvertUtils::ToD3DViewport(set_cmd->_viewports[0]);
-                    dxcmd->OMSetRenderTargets(0, nullptr, 0, d3dcmd->_depth);
-                    dxcmd->RSSetScissorRects(1, d3dcmd->_scissors.data());
-                    dxcmd->RSSetViewports(1, d3dcmd->_viewports.data());
+                    d3dcmd->SetRenderTargets(0u, nullptr, d3dcmd->_depth);
+                    d3dcmd->SetScissors(1u, d3dcmd->_scissors.data());
+                    d3dcmd->SetViewports(1u, d3dcmd->_viewports.data());
                     d3dcmd->MarkUsedResource(set_cmd->_depth_target);
                 }
             }
@@ -1988,9 +2106,9 @@ namespace Ailu::RHI::DX12
                     handles[i] = *d3dcmd->_colors[i];
                 }
                 if (is_depth_valid) d3dcmd->MarkUsedResource(set_cmd->_depth_target);
-                dxcmd->RSSetScissorRects(set_cmd->_color_target_num, d3dcmd->_scissors.data());
-                dxcmd->RSSetViewports(set_cmd->_color_target_num, d3dcmd->_viewports.data());
-                dxcmd->OMSetRenderTargets(d3dcmd->_color_count, handles, false, d3dcmd->_depth);
+                d3dcmd->SetScissors(set_cmd->_color_target_num, d3dcmd->_scissors.data());
+                d3dcmd->SetViewports(set_cmd->_color_target_num, d3dcmd->_viewports.data());
+                d3dcmd->SetRenderTargets(d3dcmd->_color_count, handles, d3dcmd->_depth);
             }
         }
         else if (cmd->GetCmdType() == EGpuCommandType::kCustom)
@@ -2003,7 +2121,7 @@ namespace Ailu::RHI::DX12
             auto scissor_cmd = static_cast<CommandScissor *>(cmd);
             D3D12_RECT d3d_rects[RenderConstants::kMaxMRTNum]{};
             for (u32 i = 0; i < scissor_cmd->_num; ++i) { d3d_rects[i] = D3DConvertUtils::ToD3DRect(scissor_cmd->_rects[i]); }
-            dxcmd->RSSetScissorRects(scissor_cmd->_num, d3d_rects);
+            d3dcmd->SetScissors(scissor_cmd->_num, d3d_rects);
         }
         else if (cmd->GetCmdType() == EGpuCommandType::kResourceUpload)
         {
@@ -2192,6 +2310,8 @@ namespace Ailu::RHI::DX12
                 params._params._vb_binder._layout = &material_state._shader->PipelineInputLayout(material_state._pass_index,
                                                                                                       material_state._variant_hash);
                 pso->Bind(cmd_buffer, params);
+                if (draw_cmd->_is_scene_primitive_draw)
+                    dxcmd->SetGraphicsRoot32BitConstants(0u, 4u, &draw_cmd->_primitive_draw_data, 0u);
                 bool is_produced = draw_cmd->_vb == nullptr;
                 const void *layout = params._params._vb_binder._layout;
                 const u64 vb_view_version = draw_cmd->_vb == nullptr ? 0u : draw_cmd->_vb->GetViewVersion();
@@ -2213,10 +2333,9 @@ namespace Ailu::RHI::DX12
                 else if (!is_produced)
                 {
                     ++d3dcmd->Statistics()._vb_bind_cache_miss_count;
-                    const auto &previous_graphics_state = d3dcmd->_graphics_state_cache;
-                    const void *previous_vb = previous_graphics_state._vb;
-                    const void *previous_vb_layout = previous_graphics_state._vb_layout;
-                    const u64 previous_vb_view_version = previous_graphics_state._vb_view_version;
+                    const void *previous_vb = d3dcmd->_active_vb;
+                    const void *previous_vb_layout = d3dcmd->_active_vb_layout;
+                    const u64 previous_vb_view_version = d3dcmd->_active_vb_view_version;
                     draw_cmd->_vb->Bind(d3dcmd, params);
 #if AILU_ENABLE_FRAME_DEBUGGER
                     if (capture_writer)
@@ -2246,9 +2365,8 @@ namespace Ailu::RHI::DX12
                 const u64 ib_view_version = draw_cmd->_ib == nullptr ? 0u : draw_cmd->_ib->GetViewVersion();
                 if (is_indexed_draw && (!d3dcmd->IsIndexBufferActive(draw_cmd->_ib, ib_view_version)))
                 {
-                    const auto &previous_graphics_state = d3dcmd->_graphics_state_cache;
-                    const void *previous_ib = previous_graphics_state._ib;
-                    const u64 previous_ib_view_version = previous_graphics_state._ib_view_version;
+                    const void *previous_ib = d3dcmd->_active_ib;
+                    const u64 previous_ib_view_version = d3dcmd->_active_ib_view_version;
                     draw_cmd->_ib->Bind(d3dcmd, params);
 #if AILU_ENABLE_FRAME_DEBUGGER
                     if (capture_writer)

@@ -6,9 +6,13 @@
         "_asset_name": "Grass_Wildgrass08_N.alasset"
     },
     "_import_setting": {
+        "_content": "kColor",
         "_is_srgb": false,
         "_generate_mipmap": true,
-        "_is_readable": false
+        "_is_readable": false,
+        "_max_size": "k2048x2048",
+        "_compression": "kAuto",
+        "_compression_quality": "kFast"
     },
     "_file": "WaterTest/Grass_Wildgrass08_N.tga"
 }

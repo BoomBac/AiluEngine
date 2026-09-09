@@ -628,6 +628,7 @@ namespace Ailu
         String _name;
         String _namespace;
         String _full_name;
+        u32 _size = 0u;
         Map<String, u32> _str_to_enum_lut;
     };
 

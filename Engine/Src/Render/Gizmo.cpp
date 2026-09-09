@@ -20,8 +20,8 @@ namespace Ailu::Render
     Gizmo::Gizmo()
     {
         VertexBufferLayout layout = {
-                {"POSITION", EShaderDateType::kFloat3, 0},
-                {"COLOR", EShaderDateType::kFloat4, 1},
+                {EVertexSemantic::kPosition, EShaderDateType::kFloat3, 0},
+                {EVertexSemantic::kColor, EShaderDateType::kFloat4, 1},
         };
         _world_vbuf.reset(VertexBuffer::Create(layout));
         _screen_vbuf.reset(VertexBuffer::Create(layout));
@@ -41,7 +41,7 @@ namespace Ailu::Render
         for(u32 i = 0; i < kMaxDrawTextureNum;i++)
         {
             _tex_screen_vbufs[i].reset(VertexBuffer::Create({
-                {"POSITION", EShaderDateType::kFloat2, 0},
+                {EVertexSemantic::kPosition, EShaderDateType::kFloat2, 0},
             }));
             _tex_screen_vbufs[i]->SetStream(nullptr, 6 * sizeof(Vector2f), 0, true);
             _tex_screen_vbufs[i]->Name("GizmoTextureBuffer");

@@ -8,8 +8,12 @@
     },
     "_file": "GraphAsset.png",
     "_import_setting": {
+        "_content": "kColor",
         "_is_srgb": true,
-        "_generate_mipmap": true,
-        "_is_readable": false
+        "_generate_mipmap": false,
+        "_is_readable": false,
+        "_max_size": "k2048x2048",
+        "_compression": "kNone",
+        "_compression_quality": "kFast"
     }
 }

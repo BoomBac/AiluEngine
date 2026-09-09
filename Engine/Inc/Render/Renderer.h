@@ -88,7 +88,7 @@ namespace Ailu
             RenderTexture *TargetTexture();
             void AddFeature(RenderFeature *feature) { _features.emplace_back(feature); };
             void SetShadingMode(EShadingMode mode) { _mode = mode; }
-            void SetupFrameResource(FrameResource* prev_fr,FrameResource *cur_fr) { _prev_fs = prev_fr;_cur_fs = cur_fr; }
+            void SetupFrameResource(FrameResource *prev_fr, FrameResource *cur_fr);
             RDG::RenderGraph& GetRenderGraph() { return *_rd_graph; }
         public:
             bool _is_render_light_probe = false;
@@ -96,6 +96,8 @@ namespace Ailu
             bool _is_use_render_graph = true;
             bool _is_use_raytracing = false;
         private:
+            void BuildScenePrimitives(const Scene &s);
+            void RefreshScenePrimitiveVertexBuffers();
             void PrepareScene(const Scene &s);
             void PrepareLight(const Scene &s);
             void PrepareCamera(const Camera &cam);
@@ -116,6 +118,8 @@ namespace Ailu
             RTHandle _camera_depth_handle;
             RTHandle _camera_depth_tex_handle;
             Map<u64, CullResult> _cull_results;
+            Vector<ScenePrimitive> _scene_primitives;
+            Vector<PrimitiveData> _primitive_data;
             //CBufferPerSceneData _per_scene_cbuf_data;
             //CBufferPerCameraData _per_cam_cbuf_data;
 

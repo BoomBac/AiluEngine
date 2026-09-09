@@ -56,6 +56,27 @@ initializer._is_abstract = false;
 initializer._namespace = "Ailu";
 initializer._base_name = "ImportSetting";
 initializer._constructor = []()->Ailu::TextureImportSetting* {return new Ailu::TextureImportSetting;};
+Meta meta_content;
+meta_content.Set("Category","Texture");
+meta_content.Set("IsColor",false);
+meta_content.Set("IsRange",false);
+meta_content.Set("IsFloatRange",true);
+meta_content.Set("RangeMin",(f32)0);
+meta_content.Set("RangeMax",(f32)1);
+MemberBuilder builder_content;
+builder_content._name = "_content";
+builder_content._type_name = "Ailu::ETextureContent";
+builder_content._offset = offsetof(TextureImportSetting,_content);
+builder_content._is_const = false;
+builder_content._is_static = false;
+builder_content._is_public = true;
+builder_content._is_pointer = false;
+builder_content._is_ref = false;
+builder_content._is_template = false;
+builder_content._meta = meta_content;
+builder_content._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<ETextureContent>);
+builder_content._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<ETextureContent>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_content));
 Meta meta_is_srgb;
 meta_is_srgb.Set("Category","Texture");
 meta_is_srgb.Set("IsColor",false);
@@ -119,6 +140,69 @@ builder_is_readable._meta = meta_is_readable;
 builder_is_readable._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
 builder_is_readable._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
 initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_is_readable));
+Meta meta_max_size;
+meta_max_size.Set("Category","Texture");
+meta_max_size.Set("IsColor",false);
+meta_max_size.Set("IsRange",false);
+meta_max_size.Set("IsFloatRange",true);
+meta_max_size.Set("RangeMin",(f32)0);
+meta_max_size.Set("RangeMax",(f32)1);
+MemberBuilder builder_max_size;
+builder_max_size._name = "_max_size";
+builder_max_size._type_name = "Ailu::ETextureMaxSize";
+builder_max_size._offset = offsetof(TextureImportSetting,_max_size);
+builder_max_size._is_const = false;
+builder_max_size._is_static = false;
+builder_max_size._is_public = true;
+builder_max_size._is_pointer = false;
+builder_max_size._is_ref = false;
+builder_max_size._is_template = false;
+builder_max_size._meta = meta_max_size;
+builder_max_size._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<ETextureMaxSize>);
+builder_max_size._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<ETextureMaxSize>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_max_size));
+Meta meta_compression;
+meta_compression.Set("Category","Compression");
+meta_compression.Set("IsColor",false);
+meta_compression.Set("IsRange",false);
+meta_compression.Set("IsFloatRange",true);
+meta_compression.Set("RangeMin",(f32)0);
+meta_compression.Set("RangeMax",(f32)1);
+MemberBuilder builder_compression;
+builder_compression._name = "_compression";
+builder_compression._type_name = "Ailu::ETextureCompression";
+builder_compression._offset = offsetof(TextureImportSetting,_compression);
+builder_compression._is_const = false;
+builder_compression._is_static = false;
+builder_compression._is_public = true;
+builder_compression._is_pointer = false;
+builder_compression._is_ref = false;
+builder_compression._is_template = false;
+builder_compression._meta = meta_compression;
+builder_compression._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<ETextureCompression>);
+builder_compression._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<ETextureCompression>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_compression));
+Meta meta_compression_quality;
+meta_compression_quality.Set("Category","Compression");
+meta_compression_quality.Set("IsColor",false);
+meta_compression_quality.Set("IsRange",false);
+meta_compression_quality.Set("IsFloatRange",true);
+meta_compression_quality.Set("RangeMin",(f32)0);
+meta_compression_quality.Set("RangeMax",(f32)1);
+MemberBuilder builder_compression_quality;
+builder_compression_quality._name = "_compression_quality";
+builder_compression_quality._type_name = "Ailu::ETextureCompressionQuality";
+builder_compression_quality._offset = offsetof(TextureImportSetting,_compression_quality);
+builder_compression_quality._is_const = false;
+builder_compression_quality._is_static = false;
+builder_compression_quality._is_public = true;
+builder_compression_quality._is_pointer = false;
+builder_compression_quality._is_ref = false;
+builder_compression_quality._is_template = false;
+builder_compression_quality._meta = meta_compression_quality;
+builder_compression_quality._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<ETextureCompressionQuality>);
+builder_compression_quality._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<ETextureCompressionQuality>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_compression_quality));
 cur_type = std::make_unique<Ailu::Type>(initializer);
 Ailu::Type::RegisterType(cur_type.get());
 }
@@ -323,3 +407,120 @@ return Ailu::MeshImportSetting::StaticType();
 return Ailu::MeshImportSetting::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_MeshImportSetting(&Ailu::MeshImportSetting::StaticType, "Ailu::MeshImportSetting");
+static std::unique_ptr<Ailu::Enum> s_enum_type_ETextureContent = nullptr;
+//Enum ETextureContent begin...........................
+const Ailu::Enum* Z_Construct_Enum_Ailu_ETextureContent_Type()
+{
+if(s_enum_type_ETextureContent == nullptr)
+{
+EnumInitializer initializer;
+initializer._name = "ETextureContent";
+initializer._namespace = "Ailu";
+initializer._full_name = "Ailu::ETextureContent";
+initializer._size = sizeof(Ailu::ETextureContent);
+initializer._str_to_enum_lut["kColor"] = 0;
+initializer._str_to_enum_lut["kNormal"] = 1;
+initializer._str_to_enum_lut["kData"] = 2;
+initializer._str_to_enum_lut["kHdr"] = 3;
+s_enum_type_ETextureContent = std::make_unique<Ailu::Enum>(initializer);
+Ailu::Enum::RegisterEnum(s_enum_type_ETextureContent.get());
+}
+return s_enum_type_ETextureContent.get();
+}
+static Ailu::EnumTypeRegister g_register_ETextureContent(Z_Construct_Enum_Ailu_ETextureContent_Type);
+template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::ETextureContent>()
+{
+return s_enum_type_ETextureContent.get();
+}
+//Enum ETextureContent end...........................
+
+static std::unique_ptr<Ailu::Enum> s_enum_type_ETextureCompression = nullptr;
+//Enum ETextureCompression begin...........................
+const Ailu::Enum* Z_Construct_Enum_Ailu_ETextureCompression_Type()
+{
+if(s_enum_type_ETextureCompression == nullptr)
+{
+EnumInitializer initializer;
+initializer._name = "ETextureCompression";
+initializer._namespace = "Ailu";
+initializer._full_name = "Ailu::ETextureCompression";
+initializer._size = sizeof(Ailu::ETextureCompression);
+initializer._str_to_enum_lut["kAuto"] = 0;
+initializer._str_to_enum_lut["kNone"] = 1;
+initializer._str_to_enum_lut["kBc1"] = 2;
+initializer._str_to_enum_lut["kBc3"] = 3;
+initializer._str_to_enum_lut["kBc4"] = 4;
+initializer._str_to_enum_lut["kBc5"] = 5;
+initializer._str_to_enum_lut["kBc6H"] = 6;
+initializer._str_to_enum_lut["kBc7"] = 7;
+s_enum_type_ETextureCompression = std::make_unique<Ailu::Enum>(initializer);
+Ailu::Enum::RegisterEnum(s_enum_type_ETextureCompression.get());
+}
+return s_enum_type_ETextureCompression.get();
+}
+static Ailu::EnumTypeRegister g_register_ETextureCompression(Z_Construct_Enum_Ailu_ETextureCompression_Type);
+template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::ETextureCompression>()
+{
+return s_enum_type_ETextureCompression.get();
+}
+//Enum ETextureCompression end...........................
+
+static std::unique_ptr<Ailu::Enum> s_enum_type_ETextureCompressionQuality = nullptr;
+//Enum ETextureCompressionQuality begin...........................
+const Ailu::Enum* Z_Construct_Enum_Ailu_ETextureCompressionQuality_Type()
+{
+if(s_enum_type_ETextureCompressionQuality == nullptr)
+{
+EnumInitializer initializer;
+initializer._name = "ETextureCompressionQuality";
+initializer._namespace = "Ailu";
+initializer._full_name = "Ailu::ETextureCompressionQuality";
+initializer._size = sizeof(Ailu::ETextureCompressionQuality);
+initializer._str_to_enum_lut["kFast"] = 0;
+initializer._str_to_enum_lut["kNormal"] = 1;
+initializer._str_to_enum_lut["kHigh"] = 2;
+s_enum_type_ETextureCompressionQuality = std::make_unique<Ailu::Enum>(initializer);
+Ailu::Enum::RegisterEnum(s_enum_type_ETextureCompressionQuality.get());
+}
+return s_enum_type_ETextureCompressionQuality.get();
+}
+static Ailu::EnumTypeRegister g_register_ETextureCompressionQuality(Z_Construct_Enum_Ailu_ETextureCompressionQuality_Type);
+template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::ETextureCompressionQuality>()
+{
+return s_enum_type_ETextureCompressionQuality.get();
+}
+//Enum ETextureCompressionQuality end...........................
+
+static std::unique_ptr<Ailu::Enum> s_enum_type_ETextureMaxSize = nullptr;
+//Enum ETextureMaxSize begin...........................
+const Ailu::Enum* Z_Construct_Enum_Ailu_ETextureMaxSize_Type()
+{
+if(s_enum_type_ETextureMaxSize == nullptr)
+{
+EnumInitializer initializer;
+initializer._name = "ETextureMaxSize";
+initializer._namespace = "Ailu";
+initializer._full_name = "Ailu::ETextureMaxSize";
+initializer._size = sizeof(Ailu::ETextureMaxSize);
+initializer._str_to_enum_lut["k32x32"] = 32;
+initializer._str_to_enum_lut["k64x64"] = 64;
+initializer._str_to_enum_lut["k128x128"] = 128;
+initializer._str_to_enum_lut["k256x256"] = 256;
+initializer._str_to_enum_lut["k512x512"] = 512;
+initializer._str_to_enum_lut["k1024x1024"] = 1024;
+initializer._str_to_enum_lut["k2048x2048"] = 2048;
+initializer._str_to_enum_lut["k4096x4096"] = 4096;
+initializer._str_to_enum_lut["k8192x8192"] = 8192;
+initializer._str_to_enum_lut["k16384x16384"] = 16384;
+s_enum_type_ETextureMaxSize = std::make_unique<Ailu::Enum>(initializer);
+Ailu::Enum::RegisterEnum(s_enum_type_ETextureMaxSize.get());
+}
+return s_enum_type_ETextureMaxSize.get();
+}
+static Ailu::EnumTypeRegister g_register_ETextureMaxSize(Z_Construct_Enum_Ailu_ETextureMaxSize_Type);
+template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::ETextureMaxSize>()
+{
+return s_enum_type_ETextureMaxSize.get();
+}
+//Enum ETextureMaxSize end...........................
+

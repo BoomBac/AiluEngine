@@ -66,6 +66,8 @@ namespace Ailu
             virtual void CompileShaderAsync(RayTracingShader *shader) = 0;
 
             virtual void TakeCapture() = 0;
+            virtual void TakePixCapture() = 0;
+            virtual void TakeRenderDocCapture() = 0;
             virtual void ResizeSwapChain(void* window_handle,const u32 width, const u32 height) = 0;
             virtual IGPUTimer *GetTimer() = 0;
             //主窗口的后缓index

@@ -5,6 +5,7 @@
 #include "Framework/Core/Containers/Vector.h"
 #include "Framework/Core/Containers/Map.h"
 #include "Framework/Core/Containers/Queue.h"
+#include "Render/RenderingStates.h"
 #include <d3dx12.h>
 #include <mutex>
 /*
@@ -16,6 +17,22 @@
 using Microsoft::WRL::ComPtr;
 namespace Ailu::RHI::DX12
 {
+	struct DescriptorId
+	{
+		u32 _heap_index = 0u;
+		u32 _descriptor_index = 0u;
+		u32 _generation = 0u;
+	};
+
+	struct CachedDescriptor
+	{
+		u64 _frame_id = 0u;
+		u32 _heap_epoch = 0u;
+		u32 _generation = 0u;
+		D3D12_CPU_DESCRIPTOR_HANDLE _cpu_handle{};
+		D3D12_GPU_DESCRIPTOR_HANDLE _gpu_handle{};
+	};
+
 	#pragma region CPUDescriptorScope
 	struct DescriptorPage
 	{
@@ -32,6 +49,7 @@ namespace Ailu::RHI::DX12
 		u16 DescriptorSize() const { return _desc_size; }
 		u16 PageID() const { return _id; }
 		D3D12_DESCRIPTOR_HEAP_TYPE PageType() const { return _type; }
+		u32 Generation(u16 index) const { return _generations[index]; }
 		std::tuple<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE> GetDescriptorHandle(u16 index = 0) const;
 		inline D3D12_GPU_DESCRIPTOR_HANDLE GetGPUDescriptorHandle(u16 index = 0) const;
 		inline D3D12_CPU_DESCRIPTOR_HANDLE GetCPUDescriptorHandle(u16 index = 0) const;
@@ -45,6 +63,7 @@ namespace Ailu::RHI::DX12
 		D3D12_DESCRIPTOR_HEAP_FLAGS _flag;
 		u16 _available_num;
 		u16 _desc_size;
+		Vector<u32> _generations;
 		using OffsetType = u16;
 		using SizeType = u16;
 		struct FreeBlockInfo;
@@ -166,11 +185,13 @@ namespace Ailu::RHI::DX12
 		GPUVisibleDescriptorAllocation():
 			  _inner_page_offset(0)
 			,_descriptor_num(0)
+			,_generation(0u)
 			,_p_page(nullptr)
 		{}
-		GPUVisibleDescriptorAllocation(u16 inner_page_offset, u16 descriptor_num,DescriptorPage* p_page)
+		GPUVisibleDescriptorAllocation(u16 inner_page_offset, u16 descriptor_num, u32 generation, DescriptorPage* p_page)
 			: _inner_page_offset(inner_page_offset)
 			, _descriptor_num(descriptor_num)
+			, _generation(generation)
 			, _p_page(p_page)
 		{}
 		GPUVisibleDescriptorAllocation(const GPUVisibleDescriptorAllocation& other) = delete;
@@ -179,18 +200,22 @@ namespace Ailu::RHI::DX12
 		{
 			_inner_page_offset = other._inner_page_offset;
 			_descriptor_num = other._descriptor_num;
+			_generation = other._generation;
 			_p_page = other._p_page;
 			other._inner_page_offset = 0;
 			other._descriptor_num = 0;
+			other._generation = 0u;
 			other._p_page = nullptr;
 		}
 		GPUVisibleDescriptorAllocation& operator=(GPUVisibleDescriptorAllocation&& other) noexcept
 		{
 			_inner_page_offset = other._inner_page_offset;
 			_descriptor_num = other._descriptor_num;
+			_generation = other._generation;
 			_p_page = other._p_page;
 			other._inner_page_offset = 0;
 			other._descriptor_num = 0;
+			other._generation = 0u;
 			other._p_page = nullptr;
 			return *this;
 		}
@@ -199,6 +224,9 @@ namespace Ailu::RHI::DX12
 		DescriptorPage* Page() const { return _p_page; }
 		u16 PageOffset() const { return _inner_page_offset; }
 		u16 DescriptorNum() const { return _descriptor_num; }
+		u32 Generation() const { return _generation; }
+		DescriptorId GetId() const { return {PageID(), _inner_page_offset, _generation}; }
+		void MarkWritten() { ++_generation; }
 		std::tuple<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE> At(u16 index) const
 		{
 			return _p_page->GetDescriptorHandle(_inner_page_offset + index);
@@ -214,6 +242,7 @@ namespace Ailu::RHI::DX12
 		DescriptorPage* _p_page;
 		u16 _inner_page_offset;
 		u16 _descriptor_num;
+		u32 _generation;
 	};
 	class GPUVisibleDescriptorAllocator
 	{
@@ -259,6 +288,9 @@ namespace Ailu::RHI::DX12
 		void CommitDescriptorsForDispatch(D3DCommandBuffer* cmd,u16 slot,const GPUVisibleDescriptorAllocation& alloc);
 	private:
 		std::multimap<u16, u16>::iterator AddNewPage(D3D12_DESCRIPTOR_HEAP_TYPE type, u16 num = kMaxDescriptorNumPerPage);
+		std::tuple<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE> GetOrCopy(
+			const GPUVisibleDescriptorAllocation& alloc);
+		void RecordDescriptorCopy(bool allocation);
 		ComPtr<ID3D12DescriptorHeap> _main_heap;
 		u16 _desc_size;
 		Vector<DescriptorPage> _pages;
@@ -286,6 +318,8 @@ namespace Ailu::RHI::DX12
 		Vector<u8> _bindless_srv_inuse;
 		Vector<u8> _bindless_uav_inuse;
 		ID3D12Device* _device;
+		Vector<Vector<CachedDescriptor>> _descriptor_caches;
+		u32 _heap_epoch = 0u;
 	};
 
 	class D3DDescriptorMgr

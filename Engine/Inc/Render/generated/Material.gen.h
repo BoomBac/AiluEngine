@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __MATERIAL_GEN_H__
 //Class Material begin...........................
-#define MATERIAL_GEN_H_105_GENERATED_BODY \
+#define MATERIAL_GEN_H_106_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_Material_Type();\
                                 static const Type* GetPrivateStaticClass();\

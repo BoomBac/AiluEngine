@@ -67,7 +67,7 @@ float3 HitLoadBindlessFloat3(ByteAddressBuffer buffer, uint byte_offset)
     return asfloat(buffer.Load3(byte_offset));
 }
 
-bool LoadTraversalTriangleFromOriginalMesh(ObjectInstanceData inst, uint scene_triangle_index, out TriangleData tri)
+bool LoadTraversalTriangleFromOriginalMesh(PrimitiveData inst, uint scene_triangle_index, out TriangleData tri)
 {
     tri = (TriangleData)0;
 
@@ -177,7 +177,7 @@ void InitTraversalRayCtx(float3 ray_origin, float3 ray_dir, out TraversalRayCtx 
     ray_ctx.parallel = step(abs(ray_dir), float3(1e-8, 1e-8, 1e-8));
 }
 
-void InitInstanceRayCtx(TraversalRayCtx world_ray, ObjectInstanceData inst, float ray_tmax_world, out InstanceRayCtx inst_ray)
+void InitInstanceRayCtx(TraversalRayCtx world_ray, PrimitiveData inst, float ray_tmax_world, out InstanceRayCtx inst_ray)
 {
     inst_ray.origin = mul(inst._world_to_local, float4(world_ray.origin, 1)).xyz;
     inst_ray.dir = mul(inst._world_to_local, float4(world_ray.dir, 0)).xyz;
@@ -248,7 +248,7 @@ void PushTLASChildrenNearFirst(LBVHNode node, TraversalRayCtx ray_ctx, inout uin
     PushNearFirst(left, right, hl, hr, lmin, rmin, stack, sp);
 }
 
-void PushBLASChildrenNearFirst(LBVHNode node, ObjectInstanceData inst, InstanceRayCtx ray_ctx, inout uint stack[MAX_STACK], inout int sp)
+void PushBLASChildrenNearFirst(LBVHNode node, PrimitiveData inst, InstanceRayCtx ray_ctx, inout uint stack[MAX_STACK], inout int sp)
 {
     uint left = node._left_or_tri_offset_or_inst_idx + inst._blas_node_start;
     uint right = uint(-node._neg_right_or_tri_count) + inst._blas_node_start;
@@ -259,7 +259,7 @@ void PushBLASChildrenNearFirst(LBVHNode node, ObjectInstanceData inst, InstanceR
     PushNearFirst(left, right, hl, hr, lmin, rmin, stack, sp);
 }
 
-bool TraverseBLASClosest(ObjectInstanceData inst, TraversalRayCtx world_ray, inout HitRecord rec, out TriangleHitCandidate best_hit)
+bool TraverseBLASClosest(PrimitiveData inst, TraversalRayCtx world_ray, inout HitRecord rec, out TriangleHitCandidate best_hit)
 {
     InstanceRayCtx inst_ray;
     InitInstanceRayCtx(world_ray, inst, rec.t, inst_ray);
@@ -331,7 +331,7 @@ bool TraverseBLASClosest(ObjectInstanceData inst, TraversalRayCtx world_ray, ino
     return best_hit.tri_idx != -1;
 }
 
-bool TraverseBLASAny(ObjectInstanceData inst, TraversalRayCtx world_ray, float ray_tmax_world)
+bool TraverseBLASAny(PrimitiveData inst, TraversalRayCtx world_ray, float ray_tmax_world)
 {
     InstanceRayCtx inst_ray;
     InitInstanceRayCtx(world_ray, inst, ray_tmax_world, inst_ray);
@@ -391,7 +391,7 @@ bool TraverseBLASAny(ObjectInstanceData inst, TraversalRayCtx world_ray, float r
     return false;
 }
 
-bool TraverseSceneClosest(float3 ray_origin, float3 ray_dir, inout HitRecord rec, out TriangleHitCandidate best_hit, out ObjectInstanceData best_inst)
+bool TraverseSceneClosest(float3 ray_origin, float3 ray_dir, inout HitRecord rec, out TriangleHitCandidate best_hit, out PrimitiveData best_inst)
 {
     TraversalRayCtx world_ray;
     InitTraversalRayCtx(ray_origin, ray_dir, world_ray);
@@ -404,7 +404,7 @@ bool TraverseSceneClosest(float3 ray_origin, float3 ray_dir, inout HitRecord rec
     best_hit.bary = 0.0.xx;
     best_hit.world_t = rec.t;
     best_hit.world_pos = 0.0.xxx;
-    best_inst = (ObjectInstanceData)0;
+    best_inst = (PrimitiveData)0;
 
     while (tlas_sp > 0)
     {
@@ -420,7 +420,7 @@ bool TraverseSceneClosest(float3 ray_origin, float3 ray_dir, inout HitRecord rec
         if (tlas_node._neg_right_or_tri_count > 0)
         {
             int inst_id = tlas_node._left_or_tri_offset_or_inst_idx;
-            ObjectInstanceData inst = g_instance_data[inst_id];
+            PrimitiveData inst = g_primitive_data[inst_id];
 
             TriangleHitCandidate inst_hit;
             if (TraverseBLASClosest(inst, world_ray, rec, inst_hit))
@@ -461,7 +461,7 @@ bool TraverseSceneAny(float3 ray_origin, float3 ray_dir, float ray_tmax_world)
         if (tlas_node._neg_right_or_tri_count > 0)
         {
             int inst_id = tlas_node._left_or_tri_offset_or_inst_idx;
-            if (TraverseBLASAny(g_instance_data[inst_id], world_ray, ray_tmax_world))
+            if (TraverseBLASAny(g_primitive_data[inst_id], world_ray, ray_tmax_world))
                 return true;
         }
         else

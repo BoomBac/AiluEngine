@@ -49,6 +49,9 @@ namespace Ailu::Render
     }
     void GpuResource::Apply()
     {
+        // Async resource creation may be checked by UI/render code before the upload command runs.
+        // Register it as pending so IsReady() returns false without treating it as a missing resource.
+        ResourceStateTracker::Get().AddResource(this, 0xFFFFFFFFFFFFFFFFu);
         GraphicsContext::Get().CreateResource(this);
     }
     void GpuResource::ApplySync()

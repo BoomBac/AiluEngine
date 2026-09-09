@@ -16,6 +16,7 @@ EnumInitializer initializer;
 initializer._name = "EThreadStatus";
 initializer._namespace = "Ailu::Core";
 initializer._full_name = "Ailu::Core::EThreadStatus";
+initializer._size = sizeof(Ailu::Core::EThreadStatus);
 initializer._str_to_enum_lut["kNotStarted"] = 0;
 initializer._str_to_enum_lut["kRunning"] = 1;
 initializer._str_to_enum_lut["kIdle"] = 2;

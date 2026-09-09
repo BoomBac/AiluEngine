@@ -17,6 +17,16 @@ namespace Ailu::Render
         //AL_ASSERT(s_total_material_num < RenderConstants::kMaxMaterialDataCount);
         _name = name;
         _p_active_shader = _p_shader;
+        if (Asset *linked_asset = ResourceMgr::Get().GetLinkedAsset(_p_shader); linked_asset != nullptr)
+        {
+            _shader_guid = linked_asset->GetGuid();
+            UpdateShaderHandle();
+        }
+        else
+        {
+            _shader_guid = Guid::EmptyGuid();
+            _shader_handle = {};
+        }
         if (_p_active_shader != nullptr)
         {
             Construct(true);
@@ -43,7 +53,9 @@ namespace Ailu::Render
         _p_shader = other._p_shader;
         _p_active_shader = other._p_active_shader;
         _shader_guid = other._shader_guid;
+        _shader_handle = other._shader_handle;
         _texture_guids = std::move(other._texture_guids);
+        _texture_handles_by_id = std::move(other._texture_handles_by_id);
         _standard_pass_index = other._standard_pass_index;
         _render_queue = other._render_queue;
         _mat_cbuf_per_pass_size = other._mat_cbuf_per_pass_size;
@@ -85,6 +97,10 @@ namespace Ailu::Render
             if (_p_active_shader != nullptr)
                 _p_active_shader->AddMaterialRef(this);
         }
+        _shader_guid = other._shader_guid;
+        _shader_handle = other._shader_handle;
+        _texture_guids = other._texture_guids;
+        _texture_handles_by_id = other._texture_handles_by_id;
         _standard_pass_index = other._standard_pass_index;
         _render_queue = other._render_queue;
         _mat_cbuf_per_pass_size = other._mat_cbuf_per_pass_size;
@@ -117,7 +133,9 @@ namespace Ailu::Render
         _p_shader = other._p_shader;
         _p_active_shader = other._p_active_shader;
         _shader_guid = other._shader_guid;
+        _shader_handle = other._shader_handle;
         _texture_guids = std::move(other._texture_guids);
+        _texture_handles_by_id = std::move(other._texture_handles_by_id);
         _standard_pass_index = other._standard_pass_index;
         _render_queue = other._render_queue;
         _mat_cbuf_per_pass_size = other._mat_cbuf_per_pass_size;
@@ -151,6 +169,51 @@ namespace Ailu::Render
             _p_active_shader->RemoveMaterialRef(this);
         --s_total_material_num;
     }
+
+    void Material::UpdateShaderHandle()
+    {
+        _shader_handle = _shader_guid.IsEmpty() ? AssetHandle<Shader>{}
+                                                : ResourceMgr::Get().GetOrCreateAssetHandle<Shader>(_shader_guid);
+    }
+
+    void Material::UpdateTextureHandle(ShaderPropertyId property_id, const Guid &guid)
+    {
+        if (guid.IsEmpty())
+            _texture_handles_by_id.erase(property_id);
+        else
+            _texture_handles_by_id[property_id] = ResourceMgr::Get().GetOrCreateAssetHandle<Texture>(guid);
+    }
+
+    Material::AssetSnapshot Material::CaptureAssetSnapshots() const
+    {
+        AssetSnapshot snapshot;
+        snapshot._shader = _shader_handle.Resolve();
+        snapshot._shader_revision = _shader_handle.GetRevision();
+        for (const auto &[property_id, handle]: _texture_handles_by_id)
+        {
+            Ref<const Texture> texture = handle.Resolve();
+            if (texture == nullptr)
+                continue;
+            snapshot._texture_revisions[property_id] = handle.GetRevision();
+            snapshot._textures[property_id] = std::move(texture);
+        }
+        return snapshot;
+    }
+
+    void Material::RefreshAssetReferences()
+    {
+        AssetSnapshot snapshot = CaptureAssetSnapshots();
+        if (snapshot._shader != nullptr && snapshot._shader.get() != _p_shader)
+            ChangeShader(const_cast<Shader *>(snapshot._shader.get()));
+
+        for (const auto &[property_id, texture]: snapshot._textures)
+        {
+            auto bound_texture = _bind_textures_by_id.find(property_id);
+            if (bound_texture == _bind_textures_by_id.end() || bound_texture->second != texture.get())
+                SetTexture(property_id, const_cast<Texture *>(texture.get()));
+        }
+    }
+
     MaterialDrawState Material::CaptureDrawState(u16 pass_index, u32 frame_slot, u64 frame_count, FrameAllocator &allocator,
                                                  const HashMap<ShaderPropertyId, CommandResourceBinding> *command_resources,
                                                  CommandRenderingStatesData *statistics)
@@ -448,6 +511,16 @@ namespace Ailu::Render
             old_active_shader->RemoveMaterialRef(this);
         _p_shader = shader;
         _p_active_shader = shader;
+        if (Asset *linked_asset = ResourceMgr::Get().GetLinkedAsset(_p_shader); linked_asset != nullptr)
+        {
+            _shader_guid = linked_asset->GetGuid();
+            UpdateShaderHandle();
+        }
+        else
+        {
+            _shader_guid = Guid::EmptyGuid();
+            _shader_handle = {};
+        }
         if (_p_active_shader != nullptr)
             _p_active_shader->AddMaterialRef(this);
         if (_p_shader != nullptr)
@@ -731,6 +804,10 @@ namespace Ailu::Render
         if (auto it = _bind_textures_by_id.find(property_id); it != _bind_textures_by_id.end() && it->second == texture)
             return;
         _bind_textures_by_id[property_id] = texture;
+        if (Asset *linked_asset = ResourceMgr::Get().GetLinkedAsset(texture); linked_asset != nullptr)
+            _texture_handles_by_id[property_id] = ResourceMgr::Get().GetOrCreateAssetHandle<Texture>(linked_asset->GetGuid());
+        else
+            _texture_handles_by_id.erase(property_id);
         const auto &name = ShaderPropertyRegistry::Get().GetName(property_id);
         if (!name.empty())
         {

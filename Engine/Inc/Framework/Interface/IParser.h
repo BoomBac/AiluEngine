@@ -58,6 +58,7 @@ namespace Ailu
             _name_id = name_id;
             _is_copy = is_copy;
         }
+        virtual Scope<ImportSetting> Clone() const { return MakeScope<ImportSetting>(*this); }
         virtual ~ImportSetting() = default;
         //virtual void* operator new(size_t size) = 0;
         //virtual void* operator new[](size_t size) = 0;
@@ -65,6 +66,7 @@ namespace Ailu
         //virtual void operator delete[](void* ptr) = 0;)
     };
 
+    AENUM()
     enum class ETextureContent : u8
     {
         kColor,
@@ -73,6 +75,7 @@ namespace Ailu
         kHdr
     };
 
+    AENUM()
     enum class ETextureCompression : u8
     {
         kAuto,
@@ -85,11 +88,27 @@ namespace Ailu
         kBc7
     };
 
+    AENUM()
     enum class ETextureCompressionQuality : u8
     {
         kFast,
         kNormal,
         kHigh
+    };
+
+    AENUM()
+    enum class ETextureMaxSize : u32
+    {
+        k32x32 = 32,
+        k64x64 = 64,
+        k128x128 = 128,
+        k256x256 = 256,
+        k512x512 = 512,
+        k1024x1024 = 1024,
+        k2048x2048 = 2048,
+        k4096x4096 = 4096,
+        k8192x8192 = 8192,
+        k16384x16384 = 16384
     };
 
     // 默认纹理导入设置：sRGB(伽马空间)，生成 mipmap，不可读
@@ -99,6 +118,7 @@ namespace Ailu
         GENERATED_BODY()
 
     public:
+        Scope<ImportSetting> Clone() const override { return MakeScope<TextureImportSetting>(*this); }
         static TextureImportSetting &Default()
         {
             static TextureImportSetting s_default;
@@ -113,7 +133,7 @@ namespace Ailu
         APROPERTY(Category = "Texture"; Order = 3)
         bool _is_readable = false;
         APROPERTY(Category = "Texture"; Order = 4)
-        u32 _max_size = 0u;
+        ETextureMaxSize _max_size = ETextureMaxSize::k2048x2048;
         APROPERTY(Category = "Compression"; Order = 0)
         ETextureCompression _compression = ETextureCompression::kAuto;
         APROPERTY(Category = "Compression"; Order = 1)
@@ -125,6 +145,7 @@ namespace Ailu
         GENERATED_BODY()
 
     public:
+        Scope<ImportSetting> Clone() const override { return MakeScope<MeshImportSetting>(*this); }
         inline static u8 kImportFlagMesh = 1;
         inline static u8 kImportFlagAnimation = 2;
         inline static u8 kImportFlagMaterial = 4;
@@ -181,6 +202,7 @@ namespace Ailu
     struct AILU_API ShaderImportSetting : public ImportSetting
     {
     public:
+        Scope<ImportSetting> Clone() const override { return MakeScope<ShaderImportSetting>(*this); }
         static ShaderImportSetting &Default()
         {
             static ShaderImportSetting s_default;

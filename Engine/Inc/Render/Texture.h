@@ -270,12 +270,21 @@ namespace Ailu
             }
             return EALGFormat::kALGFormatUNKOWN;
         }
+
+        static EALGFormat ResolveRenderTexturePixelFormat(ERenderTargetFormat format, bool is_linear, bool random_access)
+        {
+            const EALGFormat pixel_format = ConvertRenderTextureFormatToPixelFormat(format);
+            if (!is_linear && !random_access && pixel_format == EALGFormat::kALGFormatR8G8B8A8_UNORM)
+                return EALGFormat::kALGFormatR8G8B8A8_UNORM_SRGB;
+            return pixel_format;
+        }
         
         static ERenderTargetFormat ConvertPixelFormatFormatToRenderTexture(EALGFormat format)
         {
             switch (format)
             {
                 case EALGFormat::kALGFormatR8G8B8A8_UNORM:
+                case EALGFormat::kALGFormatR8G8B8A8_UNORM_SRGB:
                     return ERenderTargetFormat::kDefault;
                 case EALGFormat::kALGFormatR11G11B10_FLOAT:
                     return ERenderTargetFormat::kDefaultHDR;

@@ -96,6 +96,7 @@ float3 TransformToViewSpace(float3 obj_pos)
     return mul(_MatrixV,float4(obj_pos,1.0f)).xyz;
 }
 
+#if !defined(AL_SCENE_PRIMITIVE)
 float3 GetObjectWorldPos()
 {
 	return float3(_MatrixWorld[0][3],_MatrixWorld[1][3],_MatrixWorld[2][3]);
@@ -138,6 +139,7 @@ float3 TransformNormal(float3 object_normal)
     float3x3 normal_matrix = transpose((float3x3)_MatrixInvWorld);
     return normalize(mul(normal_matrix, object_normal));
 }
+#endif
 
 // Transforms vector from world space to view space
 float3 TransformWorldToViewDir(float3 dir_ws, bool doNormalize = false)

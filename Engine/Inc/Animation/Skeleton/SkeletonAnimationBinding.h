@@ -12,6 +12,9 @@ namespace Ailu
     class AILU_API SkeletonAnimationBinding
     {
     public:
+        void Resolve(const Guid &clip_id, Ref<const AnimationClip> clip, const Skeleton &skeleton);
+        void Resolve(Ref<const AnimationClip> clip, const Skeleton &skeleton);
+        // Editor previews may receive a non-owning mutable clip. Copy it into an immutable binding snapshot.
         void Resolve(const Guid &clip_id, const AnimationClip &clip, const Skeleton &skeleton);
         void Resolve(const AnimationClip &clip, const Skeleton &skeleton);
 
@@ -25,7 +28,7 @@ namespace Ailu
         struct ClipBinding
         {
             Guid _clip_id = Guid::EmptyGuid();
-            const AnimationClip *_clip = nullptr;
+            Ref<const AnimationClip> _clip;
         };
 
         const ClipBinding *FindBinding(const Guid &clip_id) const;

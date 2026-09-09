@@ -7,6 +7,7 @@
 
 #include "Render/Texture.h"
 
+#include <cstring>
 #include <type_traits>
 
 namespace Ailu
@@ -513,6 +514,37 @@ namespace Ailu
             return hb;
         }
 
+        static u64 GetEnumValue(PropertyInfo *property, void *instance)
+        {
+            u64 value = 0u;
+            const u32 size = property->GetType()->Size();
+            const u32 copy_size = std::min(size, static_cast<u32>(sizeof(value)));
+            memcpy(&value, &property->Get<u8>(instance), copy_size);
+            return value;
+        }
+
+        static void SetEnumValue(PropertyInfo *property, void *instance, u64 value, CompositeBuilder::Params *params)
+        {
+            switch (property->GetType()->Size())
+            {
+                case sizeof(u8):
+                    CompositeBuilder::SetPropertyValue(property, instance, static_cast<u8>(value), params);
+                    break;
+                case sizeof(u16):
+                    CompositeBuilder::SetPropertyValue(property, instance, static_cast<u16>(value), params);
+                    break;
+                case sizeof(u32):
+                    CompositeBuilder::SetPropertyValue(property, instance, static_cast<u32>(value), params);
+                    break;
+                case sizeof(u64):
+                    CompositeBuilder::SetPropertyValue(property, instance, value, params);
+                    break;
+                default:
+                    LOG_WARNING("Unsupported enum size: {}", property->GetType()->Size());
+                    break;
+            }
+        }
+
         static Ref<UIElement> BuildEnumField(const String &label, PropertyInfo *property, void *instance, CompositeBuilder::Params *params)
         {
             const auto *enum_type = dynamic_cast<const Enum *>(property->GetType());
@@ -522,7 +554,7 @@ namespace Ailu
             auto hb = MakeRef<UI::HorizontalBox>();
             hb->AddChild<UI::Text>(label)->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto).Margin(kDefaultLabelMargin);
 
-            u32 current_value = property->Get<u32>(instance);
+            const u64 current_value = GetEnumValue(property, instance);
             const auto &enum_names = enum_type->GetEnumNames();
             Vector<String> items;
             items.reserve(enum_names.size());
@@ -533,26 +565,45 @@ namespace Ailu
             dropdown->GetSlotAs<UI::LinearSlot>().Margin({10.0f, 0.0f, 2.0f, 2.0f}).CrossAlignment(UI::EAlignment::kRight)
                     .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto).FillRate(GetInputFillRate(3));
 
-            i32 selected_index = enum_type->GetIndexByName(enum_type->GetNameByEnum(current_value));
-            if (selected_index < 0)
-                selected_index = 0;
+            i32 selected_index = 0;
+            const String &current_name = enum_type->GetNameByEnum(current_value);
+            for (i32 index = 0; index < static_cast<i32>(enum_names.size()); ++index)
+            {
+                if (*enum_names[index] == current_name)
+                {
+                    selected_index = index;
+                    break;
+                }
+            }
             dropdown->SetSelectedIndex(selected_index);
 
-            dropdown->_on_selected_changed += [property, instance, params](i32 idx)
+            dropdown->_on_selected_changed += [property, instance, params, enum_type](i32 idx)
             {
-                CompositeBuilder::SetPropertyValue(property, instance, static_cast<u32>(idx), params);
+                const auto &names = enum_type->GetEnumNames();
+                if (idx < 0 || idx >= static_cast<i32>(names.size()))
+                    return;
+                const i32 value = enum_type->GetIndexByName(*names[idx]);
+                if (value >= 0)
+                    SetEnumValue(property, instance, static_cast<u32>(value), params);
             };
 
             auto *field = hb.get();
             hb->AddPropertyObserver(std::move(property->AddObserver(instance, [field, property, instance](void *)
             {
-                auto data = property->Get<u32>(instance);
+                const u64 data = GetEnumValue(property, instance);
                 const auto *et = dynamic_cast<const Enum *>(property->GetType());
                 if (et == nullptr)
                     return;
-                i32 idx = et->GetIndexByName(et->GetNameByEnum(data));
-                if (idx >= 0)
-                    field->ChildAt(1)->As<UI::Dropdown>()->SetSelectedIndex(idx, false);
+                const String &current_name = et->GetNameByEnum(data);
+                const auto &names = et->GetEnumNames();
+                for (i32 index = 0; index < static_cast<i32>(names.size()); ++index)
+                {
+                    if (*names[index] == current_name)
+                    {
+                        field->ChildAt(1)->As<UI::Dropdown>()->SetSelectedIndex(index, false);
+                        break;
+                    }
+                }
             })));
 
             return hb;

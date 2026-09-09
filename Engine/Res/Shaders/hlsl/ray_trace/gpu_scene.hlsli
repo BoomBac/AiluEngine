@@ -6,7 +6,7 @@
 #include "../../../../Inc/Render/ShaderInterop.h"
 #endif
 
-StructuredBuffer<ObjectInstanceData> g_instance_data : register(t1);
+StructuredBuffer<PrimitiveData> g_primitive_data : register(t1);
 StructuredBuffer<UnifiedLightData> _UnifiedLights : register(t2);
 
 StructuredBuffer<TriangleData> g_scene;

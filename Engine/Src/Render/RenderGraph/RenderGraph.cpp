@@ -124,7 +124,6 @@ namespace Ailu
                     if (auto *node = GetResourceNode(handle); node != nullptr && handle._version < node->_versions.size())
                         node->_versions[handle._version]._consumers.emplace_back(pass);
                     pass->_input_handles.emplace_back(handle);
-                    pass->_input_accesses[handle] = access;
                     pass->_input_access_records.emplace_back(ResourceAccessRecord{handle, access});
                 }
             }
@@ -511,27 +510,19 @@ namespace Ailu
 
         RGHandle RenderGraph::GetTexture(const String &name)
         {
-            if (_external_tex_handles.find(name) != _external_tex_handles.end())
-            {
-                return _external_tex_handles[name];
-            }
-            if (_transient_tex_handles.find(name) != _transient_tex_handles.end())
-            {
-                return _transient_tex_handles[name];
-            }
+            if (auto iter = _external_tex_handles.find(name); iter != _external_tex_handles.end())
+                return iter->second;
+            if (auto iter = _transient_tex_handles.find(name); iter != _transient_tex_handles.end())
+                return iter->second;
             return RGHandle(0u);
         }
 
         RGHandle RenderGraph::GetBuffer(const String &name)
         {
-            if (_external_buffer_handles.find(name) != _external_buffer_handles.end())
-            {
-                return _external_buffer_handles[name];
-            }
-            if (_transient_buffer_handles.find(name) != _transient_buffer_handles.end())
-            {
-                return _transient_buffer_handles[name];
-            }
+            if (auto iter = _external_buffer_handles.find(name); iter != _external_buffer_handles.end())
+                return iter->second;
+            if (auto iter = _transient_buffer_handles.find(name); iter != _transient_buffer_handles.end())
+                return iter->second;
             return RGHandle(0u);
         }
 
@@ -571,7 +562,9 @@ namespace Ailu
                        lhs._array_slice < rhs_slice_end && rhs._array_slice < lhs_slice_end;
             };
 
-            const auto validate_access = [&](const RenderPass *pass, RGHandle handle, const ResourceAccess &access, bool is_input)
+            String state_error;
+            const auto validate_access = [&](const RenderPass *pass, RGHandle handle, const ResourceAccess &access,
+                                             bool is_input) -> ResourceNode *
             {
                 auto *node = GetResourceNode(handle);
                 if (node == nullptr)
@@ -579,24 +572,24 @@ namespace Ailu
                     LOG_ERROR("RenderGraph validation failed: pass={}, resource {}.{} does not exist", pass->_name,
                               handle._id, handle._version);
                     is_valid = false;
-                    return;
+                    return nullptr;
                 }
                 if (handle._version >= node->_versions.size())
                 {
                     LOG_ERROR("RenderGraph validation failed: pass={}, resource {}.{} has an invalid version", pass->_name,
                               node->_name, handle._version);
                     is_valid = false;
-                    return;
+                    return node;
                 }
 
                 EResourceState state = EResourceState::kCommon;
-                String state_error;
+                state_error.clear();
                 if (!TryUsageToResourceState(access._usage, state, state_error))
                 {
                     LOG_ERROR("RenderGraph validation failed: pass={}, resource={}, version={}, usage={}, {}",
                               pass->_name, node->_name, handle._version, static_cast<u32>(access._usage), state_error);
                     is_valid = false;
-                    return;
+                    return node;
                 }
 
                 if (node->_is_transient && is_input && handle._version == 0u &&
@@ -631,7 +624,7 @@ namespace Ailu
                             is_valid = false;
                         }
                     }
-                    return;
+                    return node;
                 }
 
                 u32 mip_count = 1u;
@@ -671,41 +664,52 @@ namespace Ailu
                         is_valid = false;
                     }
                 }
+                return node;
+            };
+
+            const auto validate_access_pair = [&](const RenderPass *pass, const ResourceAccessRecord &lhs,
+                                                  const ResourceAccessRecord &rhs)
+            {
+                if (lhs._handle._id != rhs._handle._id || lhs._handle._version != rhs._handle._version ||
+                    !ranges_overlap(lhs._access, rhs._access))
+                    return;
+
+                auto *node = GetResourceNode(lhs._handle);
+                const EResourceUsage combined_usage = lhs._access._usage | rhs._access._usage;
+                EResourceState state = EResourceState::kCommon;
+                state_error.clear();
+                if (!TryUsageToResourceState(combined_usage, state, state_error))
+                {
+                    LOG_ERROR("RenderGraph validation failed: pass={}, resource={}, version={}, combined usage={}, {}",
+                              pass->_name, node != nullptr ? node->_name : String("unknown"), lhs._handle._version,
+                              static_cast<u32>(combined_usage), state_error);
+                    is_valid = false;
+                }
             };
 
             for (const auto *pass: _passes)
             {
-                Vector<std::pair<RGHandle, ResourceAccess>> combined_accesses;
-                const auto collect_access = [&](const auto &record, bool is_input)
-                {
-                    validate_access(pass, record._handle, record._access, is_input);
-                    for (auto &[combined_handle, combined_access]: combined_accesses)
-                    {
-                        if (combined_handle == record._handle && ranges_overlap(combined_access, record._access))
-                        {
-                            combined_access._usage = combined_access._usage | record._access._usage;
-                            return;
-                        }
-                    }
-                    combined_accesses.emplace_back(record._handle, record._access);
-                };
                 for (const auto &record: pass->_input_access_records)
-                    collect_access(record, true);
+                    validate_access(pass, record._handle, record._access, true);
                 for (const auto &record: pass->_output_access_records)
-                    collect_access(record, false);
+                    validate_access(pass, record._handle, record._access, false);
 
-                for (const auto &[handle, access]: combined_accesses)
+                for (size_t lhs_index = 0u; lhs_index < pass->_input_access_records.size(); ++lhs_index)
                 {
-                    EResourceState state = EResourceState::kCommon;
-                    String state_error;
-                    if (!TryUsageToResourceState(access._usage, state, state_error))
-                    {
-                        auto *node = GetResourceNode(handle);
-                        LOG_ERROR("RenderGraph validation failed: pass={}, resource={}, version={}, combined usage={}, {}",
-                                  pass->_name, node != nullptr ? node->_name : String("unknown"), handle._version,
-                                  static_cast<u32>(access._usage), state_error);
-                        is_valid = false;
-                    }
+                    for (size_t rhs_index = lhs_index + 1u; rhs_index < pass->_input_access_records.size(); ++rhs_index)
+                        validate_access_pair(pass, pass->_input_access_records[lhs_index],
+                                             pass->_input_access_records[rhs_index]);
+                }
+                for (size_t lhs_index = 0u; lhs_index < pass->_output_access_records.size(); ++lhs_index)
+                {
+                    for (size_t rhs_index = lhs_index + 1u; rhs_index < pass->_output_access_records.size(); ++rhs_index)
+                        validate_access_pair(pass, pass->_output_access_records[lhs_index],
+                                             pass->_output_access_records[rhs_index]);
+                }
+                for (const auto &input_record: pass->_input_access_records)
+                {
+                    for (const auto &output_record: pass->_output_access_records)
+                        validate_access_pair(pass, input_record, output_record);
                 }
             }
             return is_valid;
@@ -716,28 +720,6 @@ namespace Ailu
             return node._initial_state;
         }
 
-        Vector<u32> RenderGraph::ResolveBarrierSubResources(RGHandle handle, const ResourceAccess &access) const
-        {
-            if (access._all_sub_resources)
-                return {kTotalSubRes};
-
-            auto *self = const_cast<RenderGraph *>(this);
-            const auto *node = self->GetResourceNode(handle);
-            if (node == nullptr || !node->_is_tex)
-                return {kTotalSubRes};
-
-            const u32 mip_count = std::max<u32>(1u, access._mip_count);
-            const u32 slice_count = std::max<u32>(1u, access._array_slice_count);
-            Vector<u32> sub_resources;
-            sub_resources.reserve(mip_count * slice_count);
-            for (u32 slice = access._array_slice; slice < access._array_slice + slice_count; ++slice)
-            {
-                for (u32 mip = access._mip_level; mip < access._mip_level + mip_count; ++mip)
-                    sub_resources.push_back(slice * node->_mip_count + mip);
-            }
-            return sub_resources;
-        }
-
         bool RenderGraph::CompileResourceBarriers()
         {
             PROFILE_BLOCK_CPU("RenderGraph::CompileResourceBarriers")
@@ -745,53 +727,85 @@ namespace Ailu
             _compiled_passes.reserve(_sorted_passes.size());
             bool is_valid = true;
 
-            HashMap<u32, EResourceState> total_states;
-            HashMap<u32, HashMap<u32, EResourceState>> sub_resource_states;
+            const auto reset_compile_indices = [](auto &resources)
+            {
+                for (auto &[id, node]: resources)
+                    node._compile_index = ResourceNode::kInvalidCompileIndex;
+            };
+            reset_compile_indices(_transient_resources);
+            reset_compile_indices(_external_resources);
 
-            const auto resolve_node = [&](RGHandle handle) -> ResourceNode *
+            struct TrackedResourceState
+            {
+                ResourceNode *_node = nullptr;
+                u32 _resource_id = 0u;
+                u32 _last_use_pass = 0u;
+                EResourceState _total_state = EResourceState::kCommon;
+                u32 _sub_resource_offset = 0u;
+                u32 _sub_resource_count = 0u;
+                bool _is_expanded = false;
+            };
+            Vector<TrackedResourceState> resource_states;
+            resource_states.reserve(_transient_resources.size() + _external_resources.size());
+            Vector<EResourceState> sub_resource_states;
+
+            const auto track_resource = [&](ResourceNode &node) -> TrackedResourceState &
+            {
+                if (node._compile_index == ResourceNode::kInvalidCompileIndex)
+                {
+                    node._compile_index = static_cast<u32>(resource_states.size());
+                    auto &tracked_state = resource_states.emplace_back();
+                    tracked_state._node = &node;
+                    tracked_state._total_state = InitialResourceState(node);
+                }
+                return resource_states[node._compile_index];
+            };
+
+            const auto get_state = [&](ResourceNode &node, u32 sub_resource)
+            {
+                auto &tracked_state = track_resource(node);
+                if (sub_resource == kTotalSubRes)
+                    return tracked_state._total_state;
+                if (!tracked_state._is_expanded)
+                    return tracked_state._total_state;
+                return sub_resource_states[tracked_state._sub_resource_offset + sub_resource];
+            };
+
+            const auto set_state = [&](ResourceNode &node, u32 sub_resource, EResourceState state)
+            {
+                auto &tracked_state = track_resource(node);
+                if (sub_resource == kTotalSubRes)
+                {
+                    tracked_state._total_state = state;
+                    tracked_state._sub_resource_offset = 0u;
+                    tracked_state._sub_resource_count = 0u;
+                    tracked_state._is_expanded = false;
+                    return;
+                }
+                if (!tracked_state._is_expanded)
+                {
+                    tracked_state._sub_resource_offset = static_cast<u32>(sub_resource_states.size());
+                    tracked_state._sub_resource_count = node._mip_count * node._array_slice_count;
+                    sub_resource_states.resize(tracked_state._sub_resource_offset + tracked_state._sub_resource_count,
+                                               tracked_state._total_state);
+                    tracked_state._is_expanded = true;
+                }
+                sub_resource_states[tracked_state._sub_resource_offset + sub_resource] = state;
+            };
+
+            const auto compile_access = [&](CompiledRenderPass &compiled_pass, u32 pass_index, RGHandle handle,
+                                            const ResourceAccess &access)
             {
                 auto *node = GetResourceNode(handle);
                 if (node == nullptr)
                 {
                     LOG_ERROR("RenderGraph::CompileResourceBarriers: missing resource {}.{}", handle._id, handle._version);
                     is_valid = false;
-                    return nullptr;
-                }
-                if (!total_states.contains(handle._id))
-                    total_states[handle._id] = InitialResourceState(*node);
-                return node;
-            };
-
-            const auto get_state = [&](u32 resource_id, u32 sub_resource)
-            {
-                auto total_it = total_states.find(resource_id);
-                const EResourceState total_state = total_it != total_states.end() ? total_it->second : EResourceState::kCommon;
-                if (sub_resource == kTotalSubRes)
-                    return total_state;
-                if (auto sub_it = sub_resource_states.find(resource_id); sub_it != sub_resource_states.end())
-                {
-                    if (auto state_it = sub_it->second.find(sub_resource); state_it != sub_it->second.end())
-                        return state_it->second;
-                }
-                return total_state;
-            };
-
-            const auto set_state = [&](u32 resource_id, u32 sub_resource, EResourceState state)
-            {
-                if (sub_resource == kTotalSubRes)
-                {
-                    total_states[resource_id] = state;
-                    sub_resource_states[resource_id].clear();
                     return;
                 }
-                sub_resource_states[resource_id][sub_resource] = state;
-            };
-
-            const auto compile_access = [&](CompiledRenderPass &compiled_pass, RGHandle handle, const ResourceAccess &access)
-            {
-                auto *node = resolve_node(handle);
-                if (node == nullptr)
-                    return;
+                auto &tracked_state = track_resource(*node);
+                tracked_state._resource_id = handle._id;
+                tracked_state._last_use_pass = pass_index;
 
                 EResourceState after = EResourceState::kCommon;
                 String state_error;
@@ -808,11 +822,9 @@ namespace Ailu
                 // must transition every plane together or a later DSV access can observe a stale plane state.
                 const bool is_depth_access = node->_is_tex &&
                     (node->_is_depth_resource || HasUsage(access._usage, EResourceUsage::kDSV));
-                const Vector<u32> sub_resources = is_depth_access ? Vector<u32>{kTotalSubRes} :
-                                                                  ResolveBarrierSubResources(handle, access);
-                for (const u32 sub_resource: sub_resources)
+                const auto compile_sub_resource = [&](u32 sub_resource)
                 {
-                    const EResourceState before = get_state(handle._id, sub_resource);
+                    const EResourceState before = get_state(*node, sub_resource);
 #if AILU_ENABLE_RESOURCE_STATE_TRACE
                     const bool is_trace_resource = node->_name.find("GBuffer0") != String::npos ||
                                                    node->_name.find("light probe") != String::npos ||
@@ -845,23 +857,44 @@ namespace Ailu
                         {
                             compiled_pass._pre_barriers.push_back({handle, before, after, sub_resource});
                         }
-                        else if (auto sub_it = sub_resource_states.find(handle._id);
-                                 sub_it != sub_resource_states.end())
+                        else if (const auto &tracked_state = track_resource(*node); tracked_state._is_expanded)
                         {
-                            for (const auto &[tracked_sub_resource, tracked_state]: sub_it->second)
+                            for (u32 tracked_sub_resource = 0u;
+                                 tracked_sub_resource < tracked_state._sub_resource_count; ++tracked_sub_resource)
                             {
-                                if (tracked_state != after)
+                                const EResourceState current_state = sub_resource_states[tracked_state._sub_resource_offset +
+                                                                                           tracked_sub_resource];
+                                if (current_state != after)
                                     compiled_pass._pre_barriers.push_back(
-                                        {handle, tracked_state, after, tracked_sub_resource});
+                                        {handle, current_state, after, tracked_sub_resource});
                             }
                         }
-                        set_state(handle._id, sub_resource, after);
+                        set_state(*node, sub_resource, after);
                     }
                     else
                     {
                         if (before != after)
                             compiled_pass._pre_barriers.push_back({handle, before, after, sub_resource});
-                        set_state(handle._id, sub_resource, after);
+                        set_state(*node, sub_resource, after);
+                    }
+                };
+
+                if (is_depth_access || access._all_sub_resources || !node->_is_tex)
+                {
+                    compile_sub_resource(kTotalSubRes);
+                }
+                else
+                {
+                    const u32 mip_count = std::max<u32>(1u, access._mip_count);
+                    const u32 slice_count = std::max<u32>(1u, access._array_slice_count);
+                    for (u32 slice = 0u; slice < slice_count; ++slice)
+                    {
+                        const u32 array_slice = access._array_slice + slice;
+                        for (u32 mip = 0u; mip < mip_count; ++mip)
+                        {
+                            const u32 mip_level = access._mip_level + mip;
+                            compile_sub_resource(array_slice * node->_mip_count + mip_level);
+                        }
                     }
                 }
             };
@@ -872,11 +905,14 @@ namespace Ailu
                 auto &compiled_pass = _compiled_passes.emplace_back();
                 compiled_pass._pass = pass;
                 compiled_pass._submission_index = pass_index;
+                const size_t access_count = pass->_input_access_records.size() + pass->_output_access_records.size();
+                compiled_pass._pre_barriers.reserve(access_count);
+                compiled_pass._post_barriers.reserve(access_count);
 
                 for (const auto &record: pass->_input_access_records)
-                    compile_access(compiled_pass, record._handle, record._access);
+                    compile_access(compiled_pass, pass_index, record._handle, record._access);
                 for (const auto &record: pass->_output_access_records)
-                    compile_access(compiled_pass, record._handle, record._access);
+                    compile_access(compiled_pass, pass_index, record._handle, record._access);
             }
 
             if (!is_valid)
@@ -885,39 +921,24 @@ namespace Ailu
                 return false;
             }
 
-            HashMap<u32, u32> resource_last_use_pass;
-            for (u32 pass_index = 0u; pass_index < _sorted_passes.size(); ++pass_index)
+            for (const auto &tracked_state: resource_states)
             {
-                auto *pass = _sorted_passes[pass_index];
-                for (const auto &record: pass->_input_access_records)
-                {
-                    if (GetResourceNode(record._handle) != nullptr)
-                        resource_last_use_pass[record._handle._id] = pass_index;
-                }
-                for (const auto &record: pass->_output_access_records)
-                {
-                    if (GetResourceNode(record._handle) != nullptr)
-                        resource_last_use_pass[record._handle._id] = pass_index;
-                }
-            }
-
-            for (const auto &[resource_id, last_use_pass]: resource_last_use_pass)
-            {
-                auto *node = GetResourceNode(RGHandle(resource_id));
-                auto state_it = total_states.find(resource_id);
-                if (node == nullptr || state_it == total_states.end())
+                auto *node = tracked_state._node;
+                if (node == nullptr)
                     continue;
+                const u32 resource_id = tracked_state._resource_id;
+                const u32 last_use_pass = tracked_state._last_use_pass;
 
                 const EResourceState initial_state = InitialResourceState(*node);
                 // Transient resources are leased from FrameResourceManager with COMMON as the pool boundary.
                 // Restore every resource to the state expected by the next lease at the end of the graph.
                 const EResourceState restore_state = node->_is_transient ? node->_initial_state : initial_state;
-                auto sub_state_it = sub_resource_states.find(resource_id);
-                if (sub_state_it != sub_resource_states.end() && !sub_state_it->second.empty() &&
-                    state_it->second == restore_state)
+                if (tracked_state._is_expanded && tracked_state._sub_resource_count != 0u &&
+                    tracked_state._total_state == restore_state)
                 {
-                    for (const auto &[sub_resource, state]: sub_state_it->second)
+                    for (u32 sub_resource = 0u; sub_resource < tracked_state._sub_resource_count; ++sub_resource)
                     {
+                        const EResourceState state = sub_resource_states[tracked_state._sub_resource_offset + sub_resource];
                         if (state != restore_state)
                         {
 #if AILU_ENABLE_RESOURCE_STATE_TRACE
@@ -943,7 +964,7 @@ namespace Ailu
                         }
                     }
                 }
-                else if (state_it->second != restore_state)
+                else if (tracked_state._total_state != restore_state)
                 {
 #if AILU_ENABLE_RESOURCE_STATE_TRACE
                     if (node->_name.find("GBuffer0") != String::npos ||
@@ -958,12 +979,12 @@ namespace Ailu
                                         _compiled_passes[last_use_pass]._pass->_name : String("unknown"),
                                     node->_name,
                                     resource_id,
-                                    static_cast<u32>(state_it->second),
+                                    static_cast<u32>(tracked_state._total_state),
                                     static_cast<u32>(restore_state));
                     }
 #endif
                     _compiled_passes[last_use_pass]._post_barriers.push_back(
-                        {RGHandle(resource_id), state_it->second, restore_state, kTotalSubRes});
+                        {RGHandle(resource_id), tracked_state._total_state, restore_state, kTotalSubRes});
                 }
             }
 

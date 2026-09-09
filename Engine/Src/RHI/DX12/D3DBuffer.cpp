@@ -228,6 +228,7 @@ namespace Ailu::RHI::DX12
                             AL_ASSERT(uav_desc.Buffer.StructureByteStride > 0);
                     }
                     p_device->CreateUnorderedAccessView(_p_d3d_res.Get(), is_with_counter ? _counter_buffer.Get() : nullptr, &uav_desc, cpu_handle);
+                    _uav_alloc.MarkWritten();
                     ReleaseBindlessUavIndex(_bindless_uav_index);
                     CreateBindlessBufferUav(p_device, _p_d3d_res.Get(), _mem_size, _bindless_uav_index);
                 }
@@ -266,6 +267,7 @@ namespace Ailu::RHI::DX12
                     AL_ASSERT(srv_desc.Buffer.StructureByteStride > 0);
             }
             p_device->CreateShaderResourceView(is_raytracing_as? nullptr : _p_d3d_res.Get(), &srv_desc, cpu_handle);
+            _srv_alloc.MarkWritten();
 
             if (!is_raytracing_as)
             {
@@ -493,15 +495,23 @@ namespace Ailu::RHI::DX12
     void D3DVertexBuffer::BindImpl(RHICommandBuffer *rhi_cmd, const BindParams &params)
     {
         auto *d3d_cmd = static_cast<D3DCommandBuffer *>(rhi_cmd);
-        auto *cmd_list = d3d_cmd->NativeCmdList();
 
         const auto &layout = *params._params._vb_binder._layout;
         const auto &resolved = ResolveLayout(layout);
 
+        if (resolved._is_slot_contiguous)
+        {
+            std::array<D3D12_VERTEX_BUFFER_VIEW, 30> views;
+            for (u8 i = 0u; i < resolved._binding_count; ++i)
+                views[i] = _buffer_views[resolved._bindings[i]._stream_index];
+            d3d_cmd->SetVertexBuffers(resolved._first_slot, resolved._binding_count, views.data());
+            return;
+        }
+
         for (u8 i = 0u; i < resolved._binding_count; ++i)
         {
             const auto &binding = resolved._bindings[i];
-            cmd_list->IASetVertexBuffers(binding._slot, 1u, &_buffer_views[binding._stream_index]);
+            d3d_cmd->SetVertexBuffers(binding._slot, 1u, &_buffer_views[binding._stream_index]);
         }
     }
     
@@ -522,9 +532,7 @@ namespace Ailu::RHI::DX12
                 _buffer_views[i].BufferLocation = d3d_gpu_stream->GetGPUVirtualAddress();
                 _buffer_views[i].StrideInBytes = _buffer_layout.GetStride(i);
                 _buffer_views[i].SizeInBytes = static_cast<u32>(_stream_data[i]._size);
-                _buffer_layout_indexer.emplace(std::make_pair(std::make_pair(_buffer_layout[i].Name,
-                                                                              _buffer_layout[i]._semantic_index),
-                                                                  static_cast<u8>(i)));
+                _buffer_layout_indexer.emplace(_buffer_layout[i]._semantic, static_cast<u8>(i));
                 _state_guards[i] = D3DResourceStateGuard(_vertex_buffers[i].Get(), D3D12_RESOURCE_STATE_GENERIC_READ, 1u);
                 continue;
             }
@@ -598,9 +606,7 @@ namespace Ailu::RHI::DX12
             _buffer_views[stream_index].BufferLocation = _vertex_buffers[stream_index]->GetGPUVirtualAddress();
             _buffer_views[stream_index].StrideInBytes = _buffer_layout.GetStride(stream_index);
             _buffer_views[stream_index].SizeInBytes = (u32) _stream_data[i]._size;
-            _buffer_layout_indexer.emplace(std::make_pair(std::make_pair(_buffer_layout[stream_index].Name,
-                                                                          _buffer_layout[stream_index]._semantic_index),
-                                                              static_cast<u8>(stream_index)));
+            _buffer_layout_indexer.emplace(_buffer_layout[stream_index]._semantic, static_cast<u8>(stream_index));
 
             if (_bindless_srv_enabled)
             {
@@ -684,7 +690,7 @@ namespace Ailu::RHI::DX12
     {
         GpuResource::BindImpl(rhi_cmd, params);
         auto d3dcmd = dynamic_cast<D3DCommandBuffer *>(rhi_cmd);
-        d3dcmd->NativeCmdList()->IASetIndexBuffer(&_index_buf_view);
+        d3dcmd->SetIndexBuffer(_index_buf_view);
     }
 
     void D3DIndexBuffer::Name(const String &name)
@@ -734,7 +740,7 @@ namespace Ailu::RHI::DX12
         if (params._is_compute_pipeline)
             cmd->SetComputeRootConstantBufferView(params._slot, _alloc._gpu_ptr);
         else
-            cmd->SetGraphicsRootConstantBufferView(params._slot, _alloc._gpu_ptr);
+            d3dcmd->SetGraphicsRootConstantBufferView(params._slot, _alloc._gpu_ptr);
     }
     void D3DConstantBuffer::Reset()
     {

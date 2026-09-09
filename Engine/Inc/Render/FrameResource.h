@@ -23,32 +23,43 @@ namespace Ailu::Render
         void *_cpu_ptr = nullptr;      // CPU可写指针
         u64 _gpu_handle = 0u;          // GPU虚拟地址
     };
+    struct PrimitiveIndexAllocation
+    {
+        u32 *_cpu_ptr = nullptr;
+        u32 _offset = 0u;
+        u32 _count = 0u;
+    };
     class FrameResource : public Object, public NonCopyable
     {
     public:
         FrameResource();
         ~FrameResource() override;
-        Vector<ConstantBuffer *>* GetObjCB();
-        ConstantBuffer * GetObjCB(u32 index);
         ConstantBuffer * GetMatCB(u32 index);
         ConstantBuffer * GetCameraCB(u64 hash);
         ConstantBuffer * GetSceneCB(u64 hash);
-        GPUBuffer *GetSceneInstanceBuffer(u64 hash);
+        GPUBuffer *GetScenePrimitiveBuffer(u64 hash);
+        PrimitiveIndexAllocation AllocatePrimitiveIndices(u32 count);
+        void ResetPrimitiveIndices();
+        void UploadPrimitiveIndices();
+        GPUBuffer *GetPrimitiveIndexBuffer() const { return _primitive_index_buffer.get(); }
+        static FrameResource *Active() { return s_active; }
+        static void SetActive(FrameResource *frame_resource) { s_active = frame_resource; }
         GPUBuffer *GetMaterialBuffer() {return _material_buffer ? _material_buffer.get() : nullptr; };
     private:
-        Vector<ConstantBuffer *> _obj_cbs;
         Vector<ConstantBuffer *> _mat_cbs;
         Vector<ConstantBuffer *> _camera_cbs;
         Vector<ConstantBuffer *> _scene_cbs;
-        Vector<Ref<ConstantBuffer>> _obj_cb_refs;
         Vector<Ref<ConstantBuffer>> _mat_cb_refs;
         Vector<Ref<ConstantBuffer>> _camera_cb_refs;
         Vector<Ref<ConstantBuffer>> _scene_cb_refs;
-        Vector<Ref<GPUBuffer>> _scene_instance_buffers;
+        Vector<Ref<GPUBuffer>> _scene_primitive_buffers;
+        Vector<u32> _primitive_indices;
+        Ref<GPUBuffer> _primitive_index_buffer;
         Ref<GPUBuffer> _material_buffer;//for ray tracing material data
         Map<u64,u64> _camera_cb_lut;
         Map<u64,u64> _scene_cb_lut;
-        Map<u64, u64> _scene_inst_buffer_lut;
+        Map<u64, u64> _scene_primitive_buffer_lut;
+        inline static FrameResource *s_active = nullptr;
     };
     class FrameAllocator;
     class FrameResourceManager

@@ -2,6 +2,7 @@
 #ifndef __COMPONENT_H__
 #define __COMPONENT_H__
 #include "Framework/Core/CoreMinimal.h"
+#include "Assets/AssetRegistry.h"
 #include "Framework/Core/String.h"
 #include "Framework/Core/Containers/Vector.h"
 #include "Framework/Core/Containers/Array.h"
@@ -479,8 +480,12 @@ public:                                                                 \
 
             Render::Sprite* _sprite = nullptr;
             Guid _sprite_guid = Guid::EmptyGuid();
+            mutable Guid _sprite_handle_guid = Guid::EmptyGuid();
+            mutable AssetHandle<Render::Sprite> _sprite_handle;
             Ref<Render::Material> _material;
             Guid _material_guid = Guid::EmptyGuid();
+            mutable Guid _material_handle_guid = Guid::EmptyGuid();
+            mutable AssetHandle<Render::Material> _material_handle;
 
             Color _color = Colors::kWhite; // Runtime linear; JSON serialization stores sRGB.
 

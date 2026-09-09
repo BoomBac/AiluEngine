@@ -144,6 +144,9 @@ namespace Ailu::Render
         void PushMaterialState(CommandDraw *cmd)
         {
             ++_rendering_states_data.MaterialCaptureCount;
+            // This is the frontend command-construction boundary. Resolve handles here so
+            // deferred DX12 recording consumes only the captured MaterialDrawState snapshot.
+            cmd->_mat->RefreshAssetReferences();
             const ShaderPropertyId per_obj_id = ShaderPropertyRegistry::Get().Intern(RenderConstants::kCBufNamePerObject);
             if (cmd->_per_obj_cb != nullptr)
             {
@@ -429,6 +432,21 @@ namespace Ailu::Render
             PushMaterialState(cmd);
             cmd->_index_start = index_start;
             cmd->_index_num = index_num;
+            _commands.push_back(cmd);
+        }
+        void DrawSceneMesh(VertexBuffer *vb, IndexBuffer *ib, Material *material, u16 submesh_index, u16 pass_index,
+                           const CBufferPrimitiveDrawData &draw_data, u32 instance_count)
+        {
+            auto cmd = CommandPool::Get().Alloc<CommandDraw>();
+            cmd->_vb = vb;
+            cmd->_ib = ib;
+            cmd->_mat = material;
+            cmd->_sub_mesh = submesh_index;
+            cmd->_pass_index = pass_index;
+            cmd->_primitive_draw_data = draw_data;
+            cmd->_is_scene_primitive_draw = true;
+            cmd->_instance_count = instance_count;
+            PushMaterialState(cmd);
             _commands.push_back(cmd);
         }
         void SetViewport(Rect viewport)
@@ -1187,6 +1205,11 @@ namespace Ailu::Render
     void CommandBuffer::DrawMesh(Mesh *mesh, Material *material, const CBufferPerObjectData &per_obj_data, u16 sub_mesh, u16 pass_index, u32 instance_count)
     {
         _impl->DrawMesh(mesh,material,per_obj_data,sub_mesh,pass_index,instance_count);
+    }
+    void CommandBuffer::DrawSceneMesh(VertexBuffer *vb, IndexBuffer *ib, Material *material, u16 submesh_index, u16 pass_index,
+                                      const CBufferPrimitiveDrawData &draw_data, u32 instance_count)
+    {
+        _impl->DrawSceneMesh(vb, ib, material, submesh_index, pass_index, draw_data, instance_count);
     }
     
     void CommandBuffer::DrawMeshIndirect(Mesh *mesh,u16 sub_mesh, Material *material ,u16 pass_index,GPUBuffer* arg_buffer,u32 arg_offset)

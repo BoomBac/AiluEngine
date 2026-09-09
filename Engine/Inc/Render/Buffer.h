@@ -12,6 +12,8 @@
 #include "PipelineState.h"
 #include "Framework/Common/Misc.h"
 #include "Framework/Math/ALMath.hpp"
+#include "Render/ShaderInterop.h"
+#include <atomic>
 #include <functional>
 
 namespace Ailu
@@ -76,6 +78,12 @@ namespace Ailu
             i32 _base_vertex_location;
             u32 _start_index_location;
             u32 _start_instance_location;
+        };
+
+        struct PrimitiveIndirectDrawArguments
+        {
+            CBufferPrimitiveDrawData _primitive_draw_data{};
+            DrawIndexedArguments _draw_arguments{};
         };
 
         struct BufferDesc
@@ -179,6 +187,13 @@ namespace Ailu
         class VertexBuffer : public GpuResource
         {
         private:
+            enum class EResolvedVertexLayoutState : u8
+            {
+                kEmpty,
+                kBuilding,
+                kReady
+            };
+
             struct ResolvedVertexBinding
             {
                 u8 _slot = 0u;
@@ -189,7 +204,9 @@ namespace Ailu
             {
                 std::array<ResolvedVertexBinding, 30> _bindings{};
                 u8 _binding_count = 0u;
-                bool _valid = false;
+                u8 _first_slot = 0u;
+                bool _is_slot_contiguous = false;
+                std::atomic<EResolvedVertexLayoutState> _state = EResolvedVertexLayoutState::kEmpty;
             };
         public:
             static VertexBuffer *Create(VertexBufferLayout layout, const String &name = std::format("vertex_buffer_{}", s_global_buffer_index++));
@@ -224,7 +241,7 @@ namespace Ailu
             };
             Vector<StreamData> _stream_data;
             Vector<Ref<GPUBuffer>> _gpu_stream_buffers;
-            std::map<std::pair<String, u8>, u8> _buffer_layout_indexer;
+            std::map<EVertexSemantic, u8> _buffer_layout_indexer;
             Vector<i32> _bindless_srv_indices;
             bool _bindless_srv_enabled = true;
             u64 _view_version = 0u;

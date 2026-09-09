@@ -160,6 +160,8 @@ namespace Ailu::RHI::DX12
         void RegisterWindow(Window *window);
         void UnRegisterWindow(Window *window);
         void TakeCapture() final;
+        void TakePixCapture() final;
+        void TakeRenderDocCapture() final;
         void ResizeSwapChain(void *window_handle, const u32 width, const u32 height) final;
         virtual u64 GetFrameCount() const final { return _frame_count; };
         IGPUTimer* GetTimer() final { return _p_gpu_timer.get(); }
@@ -196,8 +198,9 @@ namespace Ailu::RHI::DX12
         void Destroy();
         void LoadPipeline();
         void LoadAssets();
-        void BeginCapture();
-        void EndCapture();
+        bool BeginPixCapture();
+        void EndPixCapture();
+        void TryOpenRenderDocCapture();
         void ResizeSwapChainImpl(const u32 width, const u32 height);
         void PresentImpl(D3DCommandBuffer* cmd);
 #ifdef _DIRECT_WRITE
@@ -256,9 +259,11 @@ namespace Ailu::RHI::DX12
         std::multimap<u64, ComPtr<ID3D12Resource>> _global_tracked_resource;
         std::mutex _resource_task_lock;
         float m_aspectRatio;
-        bool _is_next_frame_capture = false;
-        bool _is_cur_frame_capturing = false;
-        WString _cur_capture_name;
+        std::atomic<bool> _is_pix_capture_pending = false;
+        std::atomic<bool> _is_pix_frame_capturing = false;
+        std::atomic<bool> _is_renderdoc_capture_pending = false;
+        std::atomic<u32> _renderdoc_capture_count_before = 0u;
+        WString _pix_capture_name;
         Scope<GpuCommandWorker> _cmd_worker;
         struct ScheduledResourceState
         {

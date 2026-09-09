@@ -160,6 +160,8 @@ namespace Ailu
         void DrawIndexedInstanced(VertexBuffer *vb, IndexBuffer *ib, ConstantBuffer *per_obj_cb, Material *mat,
                                   u16 pass_index, u32 instance_count, u32 start_instance = 0u, u32 index_start = 0u,
                                   u32 index_num = 0u);
+        void DrawSceneMesh(VertexBuffer *vb, IndexBuffer *ib, Material *material, u16 submesh_index, u16 pass_index,
+                           const CBufferPrimitiveDrawData &draw_data, u32 instance_count = 1u);
 
         void SetViewport(Rect iewport);
         void SetScissorRect(Rect rect,u16 index = 0u);

@@ -8,8 +8,6 @@
 
 namespace Ailu
 {
-    struct TextureImportSetting;
-
     namespace Render
     {
         class Texture2D;
@@ -39,7 +37,6 @@ namespace Ailu
         protected:
             bool OnOpen() override;
             void OnClose() override;
-            void OnBeforeSave() override;
             void OnAssetSaved() override;
             void OnAssetReloaded() override;
 
@@ -57,7 +54,6 @@ namespace Ailu
             void MarkDirty();
 
             Render::Texture2D *_texture = nullptr;
-            TextureImportSetting *_import_setting = nullptr;
             Scope<ReflectedPropertyPanel> _import_panel;
             TexturePreviewWidget *_preview = nullptr;
             UI::VerticalBox *_info_root = nullptr;

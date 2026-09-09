@@ -398,6 +398,23 @@ namespace Ailu
 
     namespace RHI::DX12
     {
+        static bool IsShaderCacheCurrent(const WString &cache_path, const WString &source_path,
+                                         std::set<WString> &include_files)
+        {
+            if (!FileManager::Exist(cache_path) || !FileManager::IsFileNewer(cache_path, source_path))
+                return false;
+
+            if (!ParseIncludeDependencies(source_path, include_files))
+                return false;
+
+            for (const WString &include_file: include_files)
+            {
+                if (!FileManager::Exist(include_file) || !FileManager::IsFileNewer(cache_path, include_file))
+                    return false;
+            }
+            return true;
+        }
+
         bool CreateFromFileDXC(const D3DShaderCompileDesc &desc, D3DShaderCompileOutput &output)
         {
             Vector<String> keyword_str;
@@ -416,14 +433,13 @@ namespace Ailu
             auto working = Application::GetWorkingPath();
             WString cached_shader_blob_path = working + std::format(L"cache/shader_cache/dxc/{}.dxil", hash);
             WString cached_reflection_blob_path = working + std::format(L"cache/shader_cache/dxc/{}.rft", hash);
+            std::set<WString> cached_include_files;
 
-            if (desc._is_load_cache &&
-                FileManager::Exist(cached_shader_blob_path) &&
-                FileManager::IsFileNewer(cached_shader_blob_path, desc._filename))
+            if (desc._is_load_cache && IsShaderCacheCurrent(cached_shader_blob_path, desc._filename, cached_include_files))
             {
                 const bool load_shader_succeed = LoadBlobFromFile(cached_shader_blob_path, output._byte_code);
                 AL_ASSERT(load_shader_succeed);
-                ParseIncludeDependencies(desc._filename, output._include_files);
+                output._include_files = std::move(cached_include_files);
 
                 if (FileManager::Exist(cached_reflection_blob_path))
                 {
@@ -589,11 +605,12 @@ namespace Ailu
             u64 shader_hash = std::hash<String>{}(unique_str);
             auto working_path = Application::GetWorkingPath();
             WString cached_blob_path = working_path + std::format(L"cache/shader_cache/fxc/{}.cso", shader_hash);
-            if (desc._is_load_cache && FileManager::Exist(cached_blob_path) && FileManager::IsFileNewer(cached_blob_path, desc._filename))
+            std::set<WString> cached_include_files;
+            if (desc._is_load_cache && IsShaderCacheCurrent(cached_blob_path, desc._filename, cached_include_files))
             {
                 LOG_INFO(L"[D3DShader compiler]: load cache: {},entry : {}", desc._filename, ToWChar(desc._entry_point));
                 AL_ASSERT(LoadBlobFromFile(cached_blob_path, output._byte_code));
-                ParseIncludeDependencies(desc._filename, output._include_files);
+                output._include_files = std::move(cached_include_files);
             }
             else
             {

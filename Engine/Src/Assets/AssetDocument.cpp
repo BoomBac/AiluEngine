@@ -102,11 +102,12 @@ namespace Ailu
         private:
             static EAssetDependencyType ParseDependencyType(const Ailu::String &name)
             {
-                if (name == "kSoft")
-                    return EAssetDependencyType::kSoft;
-                if (name == "kEditorOnly")
-                    return EAssetDependencyType::kEditorOnly;
-                return EAssetDependencyType::kHard;
+                if (name == "kBuild")
+                    return EAssetDependencyType::kBuild;
+                if (name == "kBuildAndRuntime")
+                    return EAssetDependencyType::kBuildAndRuntime;
+                // Legacy kHard/kSoft/kEditorOnly documents all represented a reference only.
+                return EAssetDependencyType::kRuntime;
             }
 
             bool SetFormatVersion(unsigned value)

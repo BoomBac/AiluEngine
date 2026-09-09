@@ -50,7 +50,8 @@ enum class EBindingInvalidReason : u32
     kNativeResourceChanged = 1u << 6u,
     kViewIndexChanged = 1u << 7u,
     kSubResourceChanged = 1u << 8u,
-    kDescriptorHeapChanged = 1u << 9u
+    kDescriptorHeapChanged = 1u << 9u,
+    kRootSignatureChanged = 1u << 10u
 };
 
 constexpr EBindingInvalidReason operator|(EBindingInvalidReason a, EBindingInvalidReason b) { return EBindingInvalidReason((u32)a | (u32)b); }

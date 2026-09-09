@@ -1,4 +1,5 @@
 #include "Framework/Common/ResourceMgr.h"
+#include "Assets/AssetRef.h"
 #include "Framework/Common/Allocator.hpp"
 #include "Assets/AssetArtifact.h"
 #include "Assets/AssetDocument.h"
@@ -338,16 +339,21 @@ namespace Ailu
 		}
 	}// namespace
 
-	void ResourceMgr::Init()
-	{
-		AL_ASSERT_MSG(g_pResourceMgr == nullptr, "ResourceMgr already init!");
-		g_pResourceMgr = AL_NEW_TAG(EMemoryTag::kResource, ResourceMgr);
-	}
+        void ResourceMgr::Init()
+        {
+                AL_ASSERT_MSG(g_pResourceMgr == nullptr, "ResourceMgr already init!");
+                g_pResourceMgr = AL_NEW_TAG(EMemoryTag::kResource, ResourceMgr);
+                AssetReferenceRuntime::SetHandleResolver([](const Guid &guid)
+                {
+                    return ResourceMgr::Get().GetOrCreateAssetHandle<Object>(guid);
+                });
+        }
 
-	void ResourceMgr::Shutdown()
-	{
-		s_fbx_source_import_cache.clear();
-		AL_DELETE(g_pResourceMgr);
+        void ResourceMgr::Shutdown()
+        {
+                s_fbx_source_import_cache.clear();
+                AssetReferenceRuntime::SetHandleResolver({});
+                AL_DELETE(g_pResourceMgr);
 	}
 
 	ResourceMgr &ResourceMgr::Get()
@@ -832,6 +838,30 @@ namespace Ailu
 			if (!_derived_data_cache || !_derived_data_cache->RemoveArtifacts(asset_guid))
 				_pending_artifact_cleanup_guids.push(asset_guid);
 		}
+                // A save commonly emits several file notifications. Keep only the latest reason and
+                // wait for a quiet interval before invoking the loader; its ArtifactKey validation
+                // then determines whether source import work is actually necessary.
+                Vector<std::pair<Guid, EAssetUpdateReason>> reload_requests;
+                {
+                        std::lock_guard<std::mutex> lock(_asset_db_mutex);
+                        const auto now = std::chrono::steady_clock::now();
+                        for (auto iter = _pending_reload_requests.begin(); iter != _pending_reload_requests.end();)
+                        {
+                                if (now - iter->second._last_dirty < std::chrono::milliseconds(150))
+                                {
+                                        ++iter;
+                                        continue;
+                                }
+                                reload_requests.emplace_back(iter->first, iter->second._reason);
+                                iter = _pending_reload_requests.erase(iter);
+                        }
+                }
+                for (const auto &[guid, reason]: reload_requests)
+                {
+                        auto iter = _asset_db.find(guid);
+                        if (iter != _asset_db.end())
+                                ReloadAsset(iter->second.get(), reason);
+                }
 		while (!_sync_tasks.empty())
 		{
 			_sync_tasks.front()();
@@ -880,8 +910,13 @@ namespace Ailu
 		return true;
 	}
 
-	bool ResourceMgr::ReloadAsset(Asset *asset)
-	{
+        bool ResourceMgr::ReloadAsset(Asset *asset)
+        {
+                return ReloadAsset(asset, EAssetUpdateReason::kArtifactChanged);
+        }
+
+        bool ResourceMgr::ReloadAsset(Asset *asset, EAssetUpdateReason reason, bool force_reimport)
+        {
 		if (asset == nullptr || asset->_asset_type == nullptr || asset->_asset_path.empty())
 			return false;
 
@@ -889,50 +924,62 @@ namespace Ailu
 		if (handler == nullptr)
 			return false;
 
+		auto handle = _asset_registry.GetOrCreateHandle<Object>(asset->GetGuid());
+		const u64 requested_revision = _asset_registry.MarkUpdating(handle);
+
 		AssetLoadContext ctx;
 		ctx._asset_path = asset->_asset_path;
 		ctx._resource_mgr = this;
 		ctx._system_path = GetResSysPath(asset->_asset_path);
-		ctx._import_setting = GetImportSetting(asset->_asset_path);
-		ctx._derived_data_cache = _derived_data_cache.get();
+                ctx._import_setting = GetImportSetting(asset->_asset_path);
+                ctx._derived_data_cache = _derived_data_cache.get();
+                ctx._force_reimport = force_reimport;
+		AssetDocumentHeader header;
+		const bool has_header = LoadAssetDocumentHeader(ctx._system_path, header);
 
 		Scope<Asset> reloaded = handler->Load(ctx);
 		if (reloaded == nullptr || reloaded->_p_obj == nullptr)
-			return false;
-
-		// Keep the runtime object address stable whenever the asset handler supports in-place reload.
-		// Scene components and editor previews may hold raw pointers to these objects, so replacing
-		// the payload must be the fallback, not the normal reload path.
-		const bool reload_in_place = handler->ReloadInPlace(*asset, *reloaded);
-
-		// Keep the Asset wrapper stable.  AssetEditor refreshes its typed pointer from this
-		// stable wrapper after reload.  For types without in-place support, replace the
-		// resource payload and rebuild the object lookup table as before.
 		{
+                        _asset_registry.MarkUpdateFailed(handle, "Asset handler did not create a candidate snapshot",
+                                                         requested_revision);
+			return false;
+		}
+
+                // Reload always publishes a fresh runtime object. Existing Ref<Object> and registry
+                // snapshots retain the last known good version until their users release them.
+                Ref<const Object> candidate = reloaded->_p_obj;
+                if (!_asset_registry.Publish(handle, candidate, reloaded->_artifact_key, reason, requested_revision))
+                {
+                        _asset_registry.MarkUpdateFailed(handle, "Asset slot became invalid before publish", requested_revision);
+                        return false;
+                }
+                {
 			std::lock_guard<std::mutex> lock(_asset_db_mutex);
-			if (!reload_in_place)
-			{
-				if (asset->_p_obj != nullptr)
-					_object_to_asset.erase(asset->_p_obj->ID());
-				asset->_p_obj = std::move(reloaded->_p_obj);
-				asset->_asset_type = reloaded->_asset_type;
-			}
+			if (asset->_p_obj != nullptr)
+				_object_to_asset.erase(asset->_p_obj->ID());
+			asset->_p_obj = std::move(reloaded->_p_obj);
+			asset->_asset_type = reloaded->_asset_type;
 			asset->_name = reloaded->_name;
 			asset->_addi_info = reloaded->_addi_info;
 			asset->_external_asset_path = reloaded->_external_asset_path;
-			if (!reload_in_place)
-			{
-				_object_to_asset[asset->_p_obj->ID()] = asset;
-				_global_resources[asset->_asset_path] = asset->_p_obj;
-				RebuildResourceLookups();
-			}
-		}
-
+			_object_to_asset[asset->_p_obj->ID()] = asset;
+                        _global_resources[asset->_asset_path] = asset->_p_obj;
+                        RebuildResourceLookups();
+                }
+		if (has_header)
+			_asset_registry.SetDependencies(handle, header._dependencies);
 		asset->RestoreRevision(asset->GetRevision());
 		asset->MarkSaved(asset->GetRevision());
 		UnregisterSubAssets(asset->GetGuid());
 		IndexSubAssets(asset, ctx._system_path);
 		RegisterEmbeddedMaterialSubAssets(asset);
+		Vector<AssetReloadedCallback> reload_callbacks;
+		reload_callbacks.reserve(_asset_reload_listeners.size());
+		for (const auto &listener : _asset_reload_listeners)
+			if (listener._callback)
+				reload_callbacks.emplace_back(listener._callback);
+		for (auto &callback : reload_callbacks)
+			callback(asset);
 		return true;
 	}
 
@@ -943,8 +990,23 @@ namespace Ailu
 
 		// The handler reads the serialized ImportSetting and derives its artifact key
 		// from it, so reimporting naturally invalidates stale derived data.
-		return ReloadAsset(asset);
-	}
+                return ReloadAsset(asset, EAssetUpdateReason::kManualReimport, true);
+        }
+
+        void ResourceMgr::MarkAssetForReload(Asset *asset)
+        {
+            MarkAssetForReload(asset, EAssetUpdateReason::kSourceChanged);
+        }
+
+        void ResourceMgr::MarkAssetForReload(Asset *asset, EAssetUpdateReason reason)
+        {
+            if (asset == nullptr || asset->GetGuid().IsEmpty())
+                return;
+            std::lock_guard<std::mutex> lock(_asset_db_mutex);
+            PendingAssetReload &request = _pending_reload_requests[asset->GetGuid()];
+            request._reason = reason;
+            request._last_dirty = std::chrono::steady_clock::now();
+        }
 
 	void ResourceMgr::SaveAllDirtyAssets()
 	{
@@ -1394,9 +1456,11 @@ namespace Ailu
             out_asset = std::move(asset_handler->Load(load_ctx));
             if (out_asset != nullptr)
             {
-                RegisterResource(normalized_asset_path, out_asset->_p_obj);
-                Asset *registered_asset = RegisterAsset(std::move(out_asset));
-                RegisterEmbeddedMaterialSubAssets(registered_asset);
+				RegisterResource(normalized_asset_path, out_asset->_p_obj);
+				Asset *registered_asset = RegisterAsset(std::move(out_asset));
+				auto handle = _asset_registry.GetOrCreateHandle<Object>(registered_asset->GetGuid());
+				_asset_registry.SetDependencies(handle, header._dependencies);
+				RegisterEmbeddedMaterialSubAssets(registered_asset);
                 LOG_WARNING(L"Load asset {} succeed after {} ms", normalized_asset_path, timer.GetElapsedSinceLastMark());
             }
             else
@@ -1981,6 +2045,10 @@ namespace Ailu
 			_object_to_asset[cache_asset->_p_obj->ID()] = cache_asset;
 		}
 		_asset_looktable[asset_path] = guid;
+		auto handle = _asset_registry.GetOrCreateHandle<Object>(guid);
+		if (cache_asset->_p_obj != nullptr)
+                        _asset_registry.Publish(handle, std::static_pointer_cast<const Object>(cache_asset->_p_obj),
+                                                cache_asset->_artifact_key);
 		return cache_asset;
 	}
 
@@ -1994,6 +2062,7 @@ namespace Ailu
 				_object_to_asset.erase(asset->_p_obj->ID());
 			}
 			_asset_looktable.erase(asset->_asset_path);
+			_asset_registry.Unregister(asset->GetGuid());
 			_asset_db.erase(asset->GetGuid());
 		}
 	}
@@ -2285,13 +2354,13 @@ namespace Ailu
 			{
 				auto mesh_import_setting = dynamic_cast<const MeshImportSetting *>(resolved_setting);
 				mesh_import_setting = mesh_import_setting ? mesh_import_setting : &MeshImportSetting::Default();
-				_importers[new_asset->_asset_path] = AL_NEW(MeshImportSetting, (*mesh_import_setting));
+				SetImportSetting(new_asset->_asset_path, *mesh_import_setting);
 			}
 			else if (obj->GetType() == Texture2D::StaticType() || obj->GetType() == Texture3D::StaticType())
 			{
 				auto tex_import_setting = dynamic_cast<const TextureImportSetting *>(resolved_setting);
 				tex_import_setting = tex_import_setting ? tex_import_setting : &TextureImportSetting::Default();
-				_importers[new_asset->_asset_path] = AL_NEW(TextureImportSetting, (*tex_import_setting));
+				SetImportSetting(new_asset->_asset_path, *tex_import_setting);
 			}
 			LOG_INFO(L"Create asset at path {}", path);
 			RegisterEmbeddedMaterialSubAssets(new_asset);
@@ -2314,21 +2383,41 @@ namespace Ailu
 		return _asset_handler_registry.Find(asset_type);
 	}
 
-	ImportSetting *ResourceMgr::GetImportSetting(const WString &asset_path) const
+	u64 ResourceMgr::AddAssetReloadedListener(AssetReloadedCallback callback)
 	{
-		auto it = _importers.find(asset_path);
-		return it != _importers.end() ? it->second : nullptr;
+		if (!callback)
+			return 0u;
+
+		const u64 listener_id = _next_asset_reload_listener_id++;
+		_asset_reload_listeners.emplace_back(AssetReloadListener{listener_id, std::move(callback)});
+		return listener_id;
 	}
 
-	void ResourceMgr::SetImportSetting(const WString &asset_path, ImportSetting *setting)
+	void ResourceMgr::RemoveAssetReloadedListener(u64 listener_id)
 	{
-		// Clean up old setting if it exists
+		if (listener_id == 0u)
+			return;
+
+		_asset_reload_listeners.erase(
+			std::remove_if(_asset_reload_listeners.begin(), _asset_reload_listeners.end(),
+				[listener_id](const AssetReloadListener &listener) { return listener._id == listener_id; }),
+			_asset_reload_listeners.end());
+	}
+
+	const ImportSetting *ResourceMgr::GetImportSetting(const WString &asset_path) const
+	{
 		auto it = _importers.find(asset_path);
-		if (it != _importers.end() && it->second != setting)
-		{
-			AL_DELETE(it->second);
-		}
-		_importers[asset_path] = setting;
+		return it != _importers.end() ? it->second.get() : nullptr;
+	}
+
+	void ResourceMgr::SetImportSetting(const WString &asset_path, Scope<ImportSetting> setting)
+	{
+		_importers[asset_path] = std::move(setting);
+	}
+
+	void ResourceMgr::SetImportSetting(const WString &asset_path, const ImportSetting &setting)
+	{
+		SetImportSetting(asset_path, setting.Clone());
 	}
 
 	void ResourceMgr::OnAssetDataBaseChanged()

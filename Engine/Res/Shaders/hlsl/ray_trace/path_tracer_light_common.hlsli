@@ -110,7 +110,7 @@ TriangleData LoadTriangleAreaLightData(SampleLightData light)
     //if (light._instance_index == 0xffffffffu || light._instance_index >= _inst_count)
         return (TriangleData)0;
 
-    ObjectInstanceData inst = g_instance_data[light._instance_index];
+    PrimitiveData inst = g_primitive_data[light._instance_index];
     TriangleData tri;
     LoadHitTriangleData(light._tri_index,inst._position_bindless_idx,inst._normal_bindless_idx,inst._uv_bindless_idx,inst._index_bindless_idx, tri);
     tri.v0 = mul(inst._local_to_world, float4(tri.v0, 1.0)).xyz;

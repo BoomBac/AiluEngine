@@ -16,6 +16,7 @@ EnumInitializer initializer;
 initializer._name = "EInterpolationType";
 initializer._namespace = "Ailu";
 initializer._full_name = "Ailu::EInterpolationType";
+initializer._size = sizeof(Ailu::EInterpolationType);
 initializer._str_to_enum_lut["kConstant"] = 0;
 initializer._str_to_enum_lut["kLinear"] = 1;
 initializer._str_to_enum_lut["kCubic"] = 2;

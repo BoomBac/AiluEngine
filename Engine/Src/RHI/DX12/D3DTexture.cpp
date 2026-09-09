@@ -217,6 +217,7 @@ namespace Ailu::RHI::DX12
             srv_desc.Texture2D.MipLevels = _mipmap_count;
             srv_desc.Texture2D.MostDetailedMip = 0;
             p_device->CreateShaderResourceView(_p_d3dres.Get(), &srv_desc, cpu_handle);
+            alloc.MarkWritten();
             view_info._gpu_handle = gpu_handle;
             view_info._gpu_alloc = std::move(alloc);
             _views[kMainSRVIndex] = std::move(view_info);
@@ -342,6 +343,7 @@ namespace Ailu::RHI::DX12
             srv_desc.Texture2D.MipLevels = 1;
             srv_desc.Texture2D.MostDetailedMip = mipmap;
             p_device->CreateShaderResourceView(_p_d3dres.Get(), &srv_desc, cpu_handle);
+            alloc.MarkWritten();
         }
         else if (view_type == kUAV)
         {
@@ -350,6 +352,7 @@ namespace Ailu::RHI::DX12
             slice_uav_desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
             slice_uav_desc.Texture2D.MipSlice = mipmap;
             p_device->CreateUnorderedAccessView(_p_d3dres.Get(), nullptr, &slice_uav_desc, cpu_handle);
+            alloc.MarkWritten();
         }
         else { AL_ASSERT(false); }
         view_info._gpu_handle = gpu_handle;
@@ -514,6 +517,7 @@ namespace Ailu::RHI::DX12
             else
                 AL_ASSERT(false);
             p_device->CreateShaderResourceView(_p_d3dres.Get(), &view_desc, cpu_handle);
+            alloc.MarkWritten();
             view_info._gpu_handle = gpu_handle;
             view_info._gpu_alloc = std::move(alloc);
             _views[kMainSRVIndex] = std::move(view_info);
@@ -556,6 +560,7 @@ namespace Ailu::RHI::DX12
             srv_desc.Texture2DArray.MostDetailedMip = mipmap;
 
             p_device->CreateShaderResourceView(_p_d3dres.Get(), &srv_desc, cpu_handle);
+            alloc.MarkWritten();
         }
         else if (view_type == kUAV)
         {
@@ -566,6 +571,7 @@ namespace Ailu::RHI::DX12
             slice_uav_desc.Texture2DArray.FirstArraySlice = ((u16) face - 1) * array_slice;
             slice_uav_desc.Texture2DArray.MipSlice = mipmap;
             p_device->CreateUnorderedAccessView(_p_d3dres.Get(), nullptr, &slice_uav_desc, cpu_handle);
+            alloc.MarkWritten();
         }
         else { AL_ASSERT(false); }
         view_info._gpu_handle = gpu_handle;
@@ -799,6 +805,7 @@ namespace Ailu::RHI::DX12
             srv_desc.Texture3D.MipLevels = _mipmap_count;
             srv_desc.Texture3D.MostDetailedMip = 0;
             p_device->CreateShaderResourceView(_p_d3dres.Get(), &srv_desc, cpu_handle);
+            alloc.MarkWritten();
             view_info._gpu_handle = gpu_handle;
             view_info._gpu_alloc = std::move(alloc);
             _views[kMainSRVIndex] = std::move(view_info);
@@ -863,6 +870,7 @@ namespace Ailu::RHI::DX12
             srv_desc.Texture3D.MipLevels = 1;
             srv_desc.Texture3D.MostDetailedMip = mipmap;
             p_device->CreateShaderResourceView(_p_d3dres.Get(), &srv_desc, cpu_handle);
+            alloc.MarkWritten();
         }
         else if (view_type == kUAV)
         {
@@ -873,6 +881,7 @@ namespace Ailu::RHI::DX12
             slice_uav_desc.Texture3D.FirstWSlice = 0;
             slice_uav_desc.Texture3D.WSize = -1;
             p_device->CreateUnorderedAccessView(_p_d3dres.Get(), nullptr, &slice_uav_desc, cpu_handle);
+            alloc.MarkWritten();
         }
         else { AL_ASSERT(false); }
         view_info._gpu_handle = gpu_handle;
@@ -1099,6 +1108,7 @@ namespace Ailu::RHI::DX12
             else
                 AL_ASSERT(false);
             p_device->CreateShaderResourceView(_p_d3dres.Get(), &view_desc, cpu_handle);
+            alloc.MarkWritten();
             view_info._gpu_handle = gpu_handle;
             view_info._gpu_alloc = std::move(alloc);
             _views[kMainSRVIndex] = std::move(view_info);
@@ -1242,6 +1252,7 @@ namespace Ailu::RHI::DX12
             }
             else { AL_ASSERT(false); }
             p_device->CreateShaderResourceView(_p_d3dres.Get(), &view_desc, cpu_handle);
+            alloc.MarkWritten();
             view_info._gpu_handle = gpu_handle;
             view_info._gpu_alloc = std::move(alloc);
             _views[view_index] = std::move(view_info);
@@ -1263,6 +1274,7 @@ namespace Ailu::RHI::DX12
             }
             else { AL_ASSERT(false); }
             p_device->CreateUnorderedAccessView(_p_d3dres.Get(), nullptr, &view_desc, cpu_handle);
+            alloc.MarkWritten();
             view_info._gpu_handle = gpu_handle;
             view_info._gpu_alloc = std::move(alloc);
             _views[view_index] = std::move(view_info);
@@ -1336,6 +1348,7 @@ namespace Ailu::RHI::DX12
             view_desc.Texture2DArray.MipLevels = 1;
             view_desc.Texture2DArray.MostDetailedMip = mipmap;
             p_device->CreateShaderResourceView(_p_d3dres.Get(), &view_desc, cpu_handle);
+            alloc.MarkWritten();
             view_info._gpu_handle = gpu_handle;
             view_info._gpu_alloc = std::move(alloc);
             _views[view_index] = std::move(view_info);
@@ -1352,6 +1365,7 @@ namespace Ailu::RHI::DX12
             view_desc.Texture2DArray.ArraySize = 1;
             view_desc.Texture2DArray.MipSlice = mipmap;
             p_device->CreateUnorderedAccessView(_p_d3dres.Get(), nullptr, &view_desc, cpu_handle);
+            alloc.MarkWritten();
             view_info._gpu_handle = gpu_handle;
             view_info._gpu_alloc = std::move(alloc);
             _views[view_index] = std::move(view_info);

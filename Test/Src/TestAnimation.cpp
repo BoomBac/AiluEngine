@@ -99,13 +99,13 @@ namespace Ailu::AnimationTests
 
     bool TestRootMotionBindingModes()
     {
-        AnimationClip clip = MakeRootMotionClip();
+        Ref<AnimationClip> clip = MakeRef<AnimationClip>(MakeRootMotionClip());
         RootMotionSettings settings;
         settings._enabled = true;
         settings._root_bone_name = "Root";
         settings._translation_mode = ERootMotionTranslationMode::kXZ;
         settings._rotation_mode = ERootMotionRotationMode::kNone;
-        clip.SetRootMotionSettings(settings);
+        clip->SetRootMotionSettings(settings);
         Skeleton skeleton = MakeRootSkeleton();
         SkeletonAnimationBinding binding;
         binding.Resolve(clip, skeleton);
@@ -127,7 +127,7 @@ namespace Ailu::AnimationTests
             !NearlyEqual(result._root_motion._translation.z, 2.0f))
             return false;
 
-        TransformTrack &rotation_track = clip[0u];
+        TransformTrack &rotation_track = (*clip)[0u];
         rotation_track.GetRotationTrack().Resize(2u);
         rotation_track.GetRotationTrack()[0] = TrackHelpers::FromQuaternion(Quaternion::Identity());
         rotation_track.GetRotationTrack()[0]._time = 0.0f;
@@ -135,7 +135,7 @@ namespace Ailu::AnimationTests
             TrackHelpers::FromQuaternion(Quaternion::RadiusAxis(0.5f, Vector3f::kUp));
         rotation_track.GetRotationTrack()[1]._time = 1.0f;
         settings._rotation_mode = ERootMotionRotationMode::kYaw;
-        clip.SetRootMotionSettings(settings);
+        clip->SetRootMotionSettings(settings);
         const AnimationEvaluateResult rotated_result = binding.Evaluate(evaluation, skeleton);
         const Transform rotated_root = rotated_result._pose.GetLocalTransform(0u);
         if (!Quaternion::IsSameOrientation(rotated_root._rotation, Quaternion::Identity()) ||
@@ -144,7 +144,7 @@ namespace Ailu::AnimationTests
             return false;
 
         settings._rotation_mode = ERootMotionRotationMode::kNone;
-        clip.SetRootMotionSettings(settings);
+        clip->SetRootMotionSettings(settings);
 
         evaluation._root_motion_mode = ERootMotionMode::kExtractOnly;
         const AnimationEvaluateResult extract_only_result = binding.Evaluate(evaluation, skeleton);
@@ -157,11 +157,11 @@ namespace Ailu::AnimationTests
             !NearlyEqual(extract_only_result._root_motion._translation.z, 2.0f))
             return false;
 
-        RootMotionSettings in_place_settings = clip.GetRootMotionSettings();
+        RootMotionSettings in_place_settings = clip->GetRootMotionSettings();
         in_place_settings._enabled = false;
         in_place_settings._root_bone_name.clear();
         in_place_settings._root_bone_index = -1;
-        clip.SetRootMotionSettings(in_place_settings);
+        clip->SetRootMotionSettings(in_place_settings);
         evaluation._root_motion_mode = ERootMotionMode::kInPlace;
         const AnimationEvaluateResult in_place_result = binding.Evaluate(evaluation, skeleton);
         const Transform in_place_root = in_place_result._pose.GetLocalTransform(0u);

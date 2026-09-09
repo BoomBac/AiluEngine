@@ -52,6 +52,7 @@ EnumInitializer initializer;
 initializer._name = "ERenderPassEvent";
 initializer._namespace = "Ailu::Render";
 initializer._full_name = "Ailu::Render::ERenderPassEvent";
+initializer._size = sizeof(Ailu::Render::ERenderPassEvent);
 initializer._str_to_enum_lut["KBeforeRender"] = 0;
 initializer._str_to_enum_lut["kBeforeShaodwMap"] = 50;
 initializer._str_to_enum_lut["kAfterShadowMap"] = 100;

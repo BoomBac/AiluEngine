@@ -2,6 +2,7 @@
 
 #include "Dock/DockWindow.h"
 #include "Assets/Asset.h"
+#include "Framework/Interface/IParser.h"
 
 namespace Ailu
 {
@@ -17,7 +18,7 @@ namespace Ailu
         {
         public:
             AssetEditor(const String &title, Vector2f size);
-            ~AssetEditor() override = default;
+            ~AssetEditor() override;
 
             bool Open(Asset *asset);
             virtual void Close();
@@ -45,13 +46,19 @@ namespace Ailu
             virtual void OnAssetSaved() {}
             virtual void RefreshEditor() {}
 
+            void SetEditorImportSetting(const ImportSetting &setting);
+            ImportSetting *GetEditorImportSetting() const { return _editor_import_setting.get(); }
             void AddAssetMenu(UI::HorizontalBox *toolbar);
             void RefreshTitle();
             void ShowClosePrompt();
 
         private:
+            void HandleAssetReloaded(Asset *asset);
+
             String _editor_title;
             Asset *_asset = nullptr;
+            Scope<ImportSetting> _editor_import_setting;
+            u64 _asset_reload_listener_id = 0u;
         };
     }// namespace Editor
 }// namespace Ailu

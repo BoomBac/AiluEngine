@@ -28,18 +28,17 @@ using Ailu::Render::ETopology;
 using Ailu::Render::ShaderVariantHash;
 using Ailu::Render::ECullMode;
 using Ailu::Render::EFillMode;
+using Ailu::Render::EVertexSemantic;
 
 namespace Ailu::RHI::DX12
 {
     namespace D3DConvertUtils
     {
-        static EShaderDateType GetShaderDataType(const char *semantic, u8 mask)
+        static EShaderDateType GetShaderDataType(EVertexSemantic semantic, u8 mask)
         {
-            String set_str(semantic);
-            if (su::Equal(set_str, Render::RenderConstants::kSemanticPosition) || su::Equal(set_str, Render::RenderConstants::kSemanticNormal) || 
-            su::Equal(set_str, Render::RenderConstants::kSemanticTangent) || su::Equal(set_str, Render::RenderConstants::kSemanticColor) || 
-            su::Equal(set_str, Render::RenderConstants::kSemanticTexcoord) || su::Equal(set_str, Render::RenderConstants::kSemanticBoneWeight) || 
-            su::BeginWith(set_str, Render::RenderConstants::kSemanticTexcoord))
+            if (semantic == EVertexSemantic::kPosition || semantic == EVertexSemantic::kNormal ||
+                semantic == EVertexSemantic::kTangent || semantic == EVertexSemantic::kColor ||
+                semantic == EVertexSemantic::kBoneWeight || Render::RenderConstants::IsTexcoordSemantic(semantic))
             {
                 if (mask == 15)//1111b
                     return EShaderDateType::kFloat4;
@@ -52,7 +51,7 @@ namespace Ailu::RHI::DX12
                 else
                     return EShaderDateType::kNone;
             }
-            else if (su::Equal(set_str, Render::RenderConstants::kSemanticBoneIndex))
+            else if (semantic == EVertexSemantic::kBoneIndex)
             {
                 if (mask == 15)
                     return EShaderDateType::kuInt4;
@@ -65,7 +64,7 @@ namespace Ailu::RHI::DX12
                 else
                     return EShaderDateType::kNone;
             }
-            else if (su::Equal(set_str, Render::RenderConstants::kSemanticVertexIndex) || su::Equal(set_str, Render::RenderConstants::kSemanticInstanceID))
+            else if (semantic == EVertexSemantic::kVertexIndex || semantic == EVertexSemantic::kInstanceID)
                 return EShaderDateType::kNone;
             return EShaderDateType::kNone;
         }
@@ -100,8 +99,11 @@ namespace Ailu::RHI::DX12
             for (auto &it: layout)
             {
 
-                desc_arr[layout_index++] = D3D12_INPUT_ELEMENT_DESC{it.Name.c_str(), 0,
-                                                                    GetGXGIFormatByShaderDataType(it.Type), it.Stream, it.Offset, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0};
+                desc_arr[layout_index++] = D3D12_INPUT_ELEMENT_DESC{
+                    Render::RenderConstants::GetVertexSemanticName(it._semantic),
+                    Render::RenderConstants::GetVertexSemanticIndex(it._semantic),
+                    GetGXGIFormatByShaderDataType(it.Type), it.Stream, it.Offset,
+                    D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0};
             }
             return std::make_tuple(desc_arr, layout_index + 1);
         }

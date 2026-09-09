@@ -91,7 +91,10 @@ namespace Ailu::RHI::DX12
         u32 desc_count = 0u;
         for (const auto &desc: layout)
         {
-            cache_desc[desc_count++] = {desc.Name.c_str(), 0, ShaderDataTypeToDGXIFormat(desc.Type), desc.Stream, desc.Offset, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0};
+            cache_desc[desc_count++] = {Render::RenderConstants::GetVertexSemanticName(desc._semantic),
+                                        Render::RenderConstants::GetVertexSemanticIndex(desc._semantic),
+                                        ShaderDataTypeToDGXIFormat(desc.Type), desc.Stream, desc.Offset,
+                                        D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0};
         }
         return std::make_tuple<D3D12_INPUT_ELEMENT_DESC *, u32>(&cache_desc[0], std::move(desc_count));
     }

@@ -61,7 +61,7 @@ namespace Ailu::RHI::DX12
 #if AILU_ENABLE_FRAME_DEBUGGER
         SetCaptureWriter(nullptr);
 #endif
-        _graphics_state_cache.Reset();
+        ResetGraphicsStateCache();
         _recording_context.Clear();
         _statistics.Reset();
         _profiler_stack.clear();

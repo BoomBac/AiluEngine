@@ -6,6 +6,7 @@
 #include "Framework/Core/Containers/Vector.h"
 #include "Framework/Core/Containers/Map.h"
 #include "Framework/Core/Containers/Array.h"
+#include "Framework/Math/Geometry.h"
 #include "Texture.h"
 #include "RenderGraph/RenderGraphFwd.h"
 #include "generated/RenderingData.gen.h"
@@ -23,6 +24,7 @@ namespace Ailu::SceneManagement
 namespace Ailu::Render
 {
     class ConstantBuffer;
+    class GPUBuffer;
 
     enum class EShaderingMode : u8
     {
@@ -50,15 +52,32 @@ namespace Ailu::Render
 
     class Mesh;
     class Material;
+    class VertexBuffer;
+    class IndexBuffer;
+
+    struct ScenePrimitive
+    {
+        u32 _primitive_index = 0u;
+        u32 _entity_id = 0u;
+        Mesh *_mesh = nullptr;
+        Material *_material = nullptr;
+        VertexBuffer *_vertex_buffer = nullptr;
+        IndexBuffer *_index_buffer = nullptr;
+        AABB _world_bounds{};
+        u16 _submesh_index = 0u;
+        u16 _flags = 0u;
+    };
+
     struct RenderableObjectData
     {
-        u16 _scene_id;//index per object buffer
+        u32 _primitive_index = 0u;
         f32 _distance_to_cam;
         u16 _submesh_index;
-        u32 _instance_count;
         Mesh *_mesh;
         Material *_material;
-        const Matrix4x4f *_world_matrix;
+        VertexBuffer *_vertex_buffer = nullptr;
+        IndexBuffer *_index_buffer = nullptr;
+        u16 _flags = 0u;
         u32 _entity = 0u;
     };
 
@@ -110,7 +129,9 @@ namespace Ailu::Render
         u8 _addi_shadow_num = 0, _addi_point_shadow_num = 0;
         ConstantBuffer *_p_per_scene_cbuf;
         ConstantBuffer *_p_per_camera_cbuf;
-        Vector<ConstantBuffer *> *_p_per_object_cbuf;
+        GPUBuffer *_scene_primitive_buffer = nullptr;
+        Vector<PrimitiveData> *_primitive_data = nullptr;
+        const Vector<ScenePrimitive> *_scene_primitives = nullptr;
         RTHandle _camera_color_target_handle;
         RTHandle _camera_depth_target_handle;
         RTHandle _final_rt_handle;

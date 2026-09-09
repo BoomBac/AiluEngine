@@ -262,6 +262,7 @@ namespace Ailu::Render
         static void SetGlobalTexture(const String &name, Texture *texture);
         static void SetGlobalTexture(const String &name, RTHandle handle);
         static void SetGlobalBuffer(const String &name, ConstantBuffer *buffer);
+        static void SetGlobalBuffer(const String &name, GPUBuffer *buffer);
         static void SetGlobalMatrix(const String &name, Matrix4x4f *matrix);
         static void SetGlobalMatrixArray(const String &name, Matrix4x4f *matrix, u32 num);
         static void EnableGlobalKeyword(const String &keyword);

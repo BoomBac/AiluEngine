@@ -6,9 +6,13 @@
         "_asset_name": "small_cave_1k"
     },
     "_import_setting": {
+        "_content": "kColor",
         "_is_srgb": false,
         "_generate_mipmap": true,
-        "_is_readable": false
+        "_is_readable": false,
+        "_max_size": "k2048x2048",
+        "_compression": "kAuto",
+        "_compression_quality": "kFast"
     },
     "_file": "small_cave_1k.hdr"
 }

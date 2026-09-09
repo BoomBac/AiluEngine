@@ -31,6 +31,11 @@ namespace Ailu::Render
         u64 MaterialCBufferCacheHitCount = 0u;
         u64 ResourceMarkRequestCount = 0u;
         u64 UniqueResourceMarkCount = 0u;
+        u64 DescriptorCacheLookupCount = 0u;
+        u64 DescriptorCacheHitCount = 0u;
+        u64 DescriptorCacheMissCount = 0u;
+        u64 DescriptorCopyCount = 0u;
+        u64 DescriptorAllocationCount = 0u;
         u32 CommandGroupCount = 0u;
         u32 CommandListCount = 0u;
         u32 CommandSubmitCount = 0u;
@@ -73,6 +78,11 @@ namespace Ailu::Render
         u64 MaterialCBufferCacheHitCount = 0u;
         u64 ResourceMarkRequestCount = 0u;
         u64 UniqueResourceMarkCount = 0u;
+        u64 DescriptorCacheLookupCount = 0u;
+        u64 DescriptorCacheHitCount = 0u;
+        u64 DescriptorCacheMissCount = 0u;
+        u64 DescriptorCopyCount = 0u;
+        u64 DescriptorAllocationCount = 0u;
         u32 CommandGroupCount = 0u;
         u32 CommandListCount = 0u;
         u32 CommandSubmitCount = 0u;
@@ -111,6 +121,11 @@ namespace Ailu::Render
             MaterialCBufferCacheHitCount += other.MaterialCBufferCacheHitCount;
             ResourceMarkRequestCount += other.ResourceMarkRequestCount;
             UniqueResourceMarkCount += other.UniqueResourceMarkCount;
+            DescriptorCacheLookupCount += other.DescriptorCacheLookupCount;
+            DescriptorCacheHitCount += other.DescriptorCacheHitCount;
+            DescriptorCacheMissCount += other.DescriptorCacheMissCount;
+            DescriptorCopyCount += other.DescriptorCopyCount;
+            DescriptorAllocationCount += other.DescriptorAllocationCount;
             CommandGroupCount += other.CommandGroupCount;
             CommandListCount += other.CommandListCount;
             CommandSubmitCount += other.CommandSubmitCount;
@@ -148,6 +163,11 @@ namespace Ailu::Render
             data.MaterialCBufferCacheHitCount += MaterialCBufferCacheHitCount;
             data.ResourceMarkRequestCount += ResourceMarkRequestCount;
             data.UniqueResourceMarkCount += UniqueResourceMarkCount;
+            data.DescriptorCacheLookupCount += DescriptorCacheLookupCount;
+            data.DescriptorCacheHitCount += DescriptorCacheHitCount;
+            data.DescriptorCacheMissCount += DescriptorCacheMissCount;
+            data.DescriptorCopyCount += DescriptorCopyCount;
+            data.DescriptorAllocationCount += DescriptorAllocationCount;
             data.CommandGroupCount += CommandGroupCount;
             data.CommandListCount += CommandListCount;
             data.CommandSubmitCount += CommandSubmitCount;

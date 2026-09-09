@@ -52,8 +52,8 @@ namespace Ailu::Render
     {
         // POSITION on stream 0, TEXCOORD on stream 1
         VertexBufferLayout layout{
-            {"POSITION", EShaderDateType::kFloat2, 0, 0},
-            {"TEXCOORD", EShaderDateType::kFloat2, 1, 0}
+            {EVertexSemantic::kPosition, EShaderDateType::kFloat2, 0},
+            {EVertexSemantic::kTexcoord0, EShaderDateType::kFloat2, 1}
         };
 
         auto *vb = VertexBuffer::Create(layout, "SpriteUnitQuadVB");

@@ -16,6 +16,7 @@ EnumInitializer initializer;
 initializer._name = "ERenderLayer";
 initializer._namespace = "Ailu::RHI::Ailu::Ailu::Render";
 initializer._full_name = "Ailu::RHI::Ailu::Ailu::Render::ERenderLayer";
+initializer._size = sizeof(Ailu::Render::ERenderLayer);
 initializer._str_to_enum_lut["kDefault"] = 1;
 initializer._str_to_enum_lut["kSkyBox"] = 8;
 s_enum_type_ERenderLayer = std::make_unique<Ailu::Enum>(initializer);

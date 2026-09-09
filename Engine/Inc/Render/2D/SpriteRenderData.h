@@ -12,6 +12,8 @@ namespace Ailu::Render
 
     class Material;
 
+    class Sprite;
+
     AENUM()
     enum class ESpriteBlendMode
     {
@@ -60,7 +62,12 @@ namespace Ailu::Render
         Vector2f _pivot = Vector2f(0.5f, 0.5f);
 
         Texture *_texture = nullptr;
+        // Captured while building the render proxy. The raw pointer above is only a binding key;
+        // this snapshot keeps the selected texture version alive through deferred rendering.
+        Ref<const Texture> _texture_snapshot;
         Material *_material = nullptr;
+        Ref<const Sprite> _sprite_snapshot;
+        Ref<const Material> _material_snapshot;
 
         i16 _sorting_layer = 0;
         i32 _order_in_layer = 0;

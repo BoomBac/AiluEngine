@@ -205,11 +205,11 @@ namespace Ailu::ECS
             if (desc_it == desc.end())
                 continue;
 
-            if (desc_it->Name == "POSITION")
+            if (desc_it->_semantic == Render::EVertexSemantic::kPosition)
                 entry._vertex_buffer->SetGpuStream(entry._position_buffer.get(), stream_size, stream);
-            else if (desc_it->Name == "NORMAL" && entry._normal_buffer != nullptr)
+            else if (desc_it->_semantic == Render::EVertexSemantic::kNormal && entry._normal_buffer != nullptr)
                 entry._vertex_buffer->SetGpuStream(entry._normal_buffer.get(), stream_size, stream);
-            else if (desc_it->Name == "TANGENT" && entry._tangent_buffer != nullptr)
+            else if (desc_it->_semantic == Render::EVertexSemantic::kTangent && entry._tangent_buffer != nullptr)
                 entry._vertex_buffer->SetGpuStream(entry._tangent_buffer.get(), stream_size, stream);
             else if (auto *gpu_stream = source->GetGpuStream(stream); gpu_stream != nullptr)
                 entry._vertex_buffer->SetGpuStream(gpu_stream, stream_size, stream);
@@ -232,11 +232,11 @@ namespace Ailu::ECS
         if (pose_it == _pose_offsets.end())
             return {};
 
-        const i32 position_srv = mesh->GetBindlessVertexStreamIndex("POSITION");
-        const i32 normal_srv = mesh->GetBindlessVertexStreamIndex("NORMAL");
-        const i32 tangent_srv = mesh->GetBindlessVertexStreamIndex("TANGENT");
-        const i32 bone_index_srv = mesh->GetBindlessVertexStreamIndex(Render::RenderConstants::kSemanticBoneIndex);
-        const i32 bone_weight_srv = mesh->GetBindlessVertexStreamIndex(Render::RenderConstants::kSemanticBoneWeight);
+        const i32 position_srv = mesh->GetBindlessVertexStreamIndex(Render::EVertexSemantic::kPosition);
+        const i32 normal_srv = mesh->GetBindlessVertexStreamIndex(Render::EVertexSemantic::kNormal);
+        const i32 tangent_srv = mesh->GetBindlessVertexStreamIndex(Render::EVertexSemantic::kTangent);
+        const i32 bone_index_srv = mesh->GetBindlessVertexStreamIndex(Render::EVertexSemantic::kBoneIndex);
+        const i32 bone_weight_srv = mesh->GetBindlessVertexStreamIndex(Render::EVertexSemantic::kBoneWeight);
         if (position_srv == kInvalidBindlessIndex || bone_index_srv == kInvalidBindlessIndex ||
             bone_weight_srv == kInvalidBindlessIndex)
             return {};

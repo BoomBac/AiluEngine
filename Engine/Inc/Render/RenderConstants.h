@@ -4,10 +4,112 @@
 #include "AlgFormat.h"
 #include "ShaderInterop.h"
 #include <cstdint>
+#include <cstring>
 #include "generated/RenderConstants.gen.h"
 
 namespace Ailu::Render
 {
+    enum class EVertexSemantic : u8
+    {
+        kUnknown = 0u,
+        kPosition,
+        kNormal,
+        kTangent,
+        kColor,
+        kBoneIndex,
+        kBoneWeight,
+        kTexcoord0,
+        kTexcoord1,
+        kTexcoord2,
+        kTexcoord3,
+        kTexcoord4,
+        kTexcoord5,
+        kTexcoord6,
+        kTexcoord7,
+        kTexcoord8,
+        kTexcoord9,
+        kVertexIndex,
+        kInstanceID
+    };
+
+    namespace RenderConstants
+    {
+        constexpr bool IsTexcoordSemantic(EVertexSemantic semantic) noexcept
+        {
+            const u8 value = static_cast<u8>(semantic);
+            return value >= static_cast<u8>(EVertexSemantic::kTexcoord0) &&
+                   value <= static_cast<u8>(EVertexSemantic::kTexcoord9);
+        }
+
+        constexpr u8 GetVertexSemanticIndex(EVertexSemantic semantic) noexcept
+        {
+            return IsTexcoordSemantic(semantic) ? static_cast<u8>(semantic) - static_cast<u8>(EVertexSemantic::kTexcoord0) : 0u;
+        }
+
+        constexpr const char *GetVertexSemanticName(EVertexSemantic semantic) noexcept
+        {
+            switch (semantic)
+            {
+                case EVertexSemantic::kPosition:
+                    return "POSITION";
+                case EVertexSemantic::kNormal:
+                    return "NORMAL";
+                case EVertexSemantic::kTangent:
+                    return "TANGENT";
+                case EVertexSemantic::kColor:
+                    return "COLOR";
+                case EVertexSemantic::kBoneIndex:
+                    return "BONEINDEX";
+                case EVertexSemantic::kBoneWeight:
+                    return "BONEWEIGHT";
+                case EVertexSemantic::kTexcoord0:
+                case EVertexSemantic::kTexcoord1:
+                case EVertexSemantic::kTexcoord2:
+                case EVertexSemantic::kTexcoord3:
+                case EVertexSemantic::kTexcoord4:
+                case EVertexSemantic::kTexcoord5:
+                case EVertexSemantic::kTexcoord6:
+                case EVertexSemantic::kTexcoord7:
+                case EVertexSemantic::kTexcoord8:
+                case EVertexSemantic::kTexcoord9:
+                    return "TEXCOORD";
+                case EVertexSemantic::kVertexIndex:
+                    return "SV_VERTEXID";
+                case EVertexSemantic::kInstanceID:
+                    return "SV_INSTANCEID";
+                default:
+                    return "";
+            }
+        }
+
+        inline EVertexSemantic GetVertexSemantic(const char *semantic_name, u8 semantic_index = 0u) noexcept
+        {
+            if (semantic_name == nullptr)
+                return EVertexSemantic::kUnknown;
+            if (std::strcmp(semantic_name, "POSITION") == 0)
+                return EVertexSemantic::kPosition;
+            if (std::strcmp(semantic_name, "NORMAL") == 0)
+                return EVertexSemantic::kNormal;
+            if (std::strcmp(semantic_name, "TANGENT") == 0)
+                return EVertexSemantic::kTangent;
+            if (std::strcmp(semantic_name, "COLOR") == 0)
+                return EVertexSemantic::kColor;
+            if (std::strcmp(semantic_name, "BONEINDEX") == 0)
+                return EVertexSemantic::kBoneIndex;
+            if (std::strcmp(semantic_name, "BONEWEIGHT") == 0)
+                return EVertexSemantic::kBoneWeight;
+            if (std::strcmp(semantic_name, "TEXCOORD") == 0 && semantic_index < 10u)
+                return static_cast<EVertexSemantic>(static_cast<u8>(EVertexSemantic::kTexcoord0) + semantic_index);
+            if (std::strcmp(semantic_name, "SV_VERTEXID") == 0 ||
+                std::strcmp(semantic_name, "SV_VertexID") == 0)
+                return EVertexSemantic::kVertexIndex;
+            if (std::strcmp(semantic_name, "SV_INSTANCEID") == 0 ||
+                std::strcmp(semantic_name, "SV_InstanceID") == 0)
+                return EVertexSemantic::kInstanceID;
+            return EVertexSemantic::kUnknown;
+        }
+    }
+
     AENUM()
     enum class EColorRange
     {
@@ -54,17 +156,8 @@ namespace Ailu::Render
         inline const static String kLibModel_6_3 = "lib_6_3";
         inline const static String kLibModel_6_6 = "lib_6_6";
 
-        inline const static String kSemanticPosition = "POSITION";
-        inline const static String kSemanticColor = "COLOR";
-        inline const static String kSemanticTangent = "TANGENT";
-        inline const static String kSemanticNormal = "NORMAL";
-        inline const static String kSemanticTexcoord = "TEXCOORD";
-        inline const static String kSemanticBoneWeight = "BONEWEIGHT";
-        inline const static String kSemanticBoneIndex = "BONEINDEX";
-        inline const static String kSemanticVertexIndex = "SV_VERTEXID";
-        inline const static String kSemanticInstanceID = "SV_INSTANCEID";
-
         inline const static String kCBufNamePerObject = "CBufferPerObjectData";
+        inline const static String kCBufNamePrimitiveDraw = "CBufferPrimitiveDrawData";
         inline const static String kCBufNamePerMaterial = "CBufferPerMaterialData";
         inline const static String kCBufNamePerScene = "CBufferPerSceneData";
         inline const static String kCBufNamePerCamera = "CBufferPerCameraData";

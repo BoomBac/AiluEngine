@@ -114,7 +114,7 @@ namespace Ailu::RHI::DX12
         m_raytracing_shader->SetBuffer("VertexBuffer", m_sceneProxy->GetVertexData());
         m_raytracing_shader->SetBuffer("NormalBuffer", m_sceneProxy->GetNormalData());
         m_raytracing_shader->SetBuffer("IndexBuffer", m_sceneProxy->GetIndexData());
-        m_raytracing_shader->SetBuffer("InstanceGeometryBuffer", m_sceneProxy->GetInstanceData());
+        m_raytracing_shader->SetBuffer("InstanceGeometryBuffer", m_sceneProxy->GetPrimitiveData());
         m_raytracing_shader->SetBuffer("g_rayGenCB", g_rayGenData.get());
         m_raytracing_shader->SetBuffer("g_perSceneData", g_perSceneData.get());
         m_raytracing_shader->SetBuffer("g_perCamData", g_perCamData.get());

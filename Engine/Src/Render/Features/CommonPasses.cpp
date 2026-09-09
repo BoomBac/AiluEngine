@@ -17,6 +17,7 @@
 #include "Framework/Common/EngineConfig.h"
 
 #include "Render/Renderer.h"
+#include "Render/FrameResource.h"
 #include "Render/RenderGraph/RenderGraph.h"
 
 /* 模版说明
@@ -31,9 +32,11 @@ namespace Ailu::Render
     {
         struct QueuedDrawItem
         {
+            VertexBuffer *_vertex_buffer = nullptr;
+            IndexBuffer *_index_buffer = nullptr;
             Mesh *_mesh = nullptr;
             Material *_material = nullptr;
-            ConstantBuffer *_per_obj_cb = nullptr;
+            CBufferPrimitiveDrawData _primitive_draw_data{};
             u16 _submesh_index = 0u;
             u16 _pass_index = 0u;
             u32 _instance_count = 1u;
@@ -42,25 +45,43 @@ namespace Ailu::Render
             uintptr_t _material_ptr = 0u;
             uintptr_t _mesh_ptr = 0u;
             ShaderVariantHash _variant_hash = 0u;
+            u8 _blend_state_hash = 0u;
+            u8 _raster_state_hash = 0u;
+            u8 _depth_stencil_state_hash = 0u;
+            u8 _topology_hash = 0u;
+            u16 _stencil_ref = 0u;
             bool _force_alpha_test = false;
         };
 
-        QueuedDrawItem MakeQueuedDrawItem(u32 render_queue, Mesh *mesh, Material *material, ConstantBuffer *per_obj_cb,
-                                          u16 submesh_index, u16 pass_index, u32 instance_count, bool force_alpha_test = false)
+        QueuedDrawItem MakeQueuedDrawItem(u32 render_queue, const RenderableObjectData &object, Material *material,
+                                          u16 pass_index, bool force_alpha_test = false)
         {
             QueuedDrawItem item{};
-            item._mesh = mesh;
+            item._vertex_buffer = object._vertex_buffer;
+            item._index_buffer = object._index_buffer;
+            item._mesh = object._mesh;
             item._material = material;
-            item._per_obj_cb = per_obj_cb;
-            item._submesh_index = submesh_index;
+            item._primitive_draw_data._primitive_base = object._primitive_index;
+            item._submesh_index = object._submesh_index;
             item._pass_index = pass_index;
-            item._instance_count = instance_count;
+            item._instance_count = 1u;
             item._render_queue = render_queue;
             item._shader_ptr = reinterpret_cast<uintptr_t>(material->GetShader());
             item._material_ptr = reinterpret_cast<uintptr_t>(material);
-            item._mesh_ptr = reinterpret_cast<uintptr_t>(mesh);
+            item._mesh_ptr = reinterpret_cast<uintptr_t>(object._mesh);
             item._variant_hash = material->ActiveVariantHash(pass_index);
+            item._stencil_ref = (object._flags & kPrimitivePerObjectMotion) ? 1u : 0u;
             item._force_alpha_test = force_alpha_test;
+            if (const auto *shader = material->GetActiveShader(); shader != nullptr)
+            {
+                auto raster_state = shader->PipelineRasterizerState(pass_index);
+                raster_state._cull_mode = material->GetCullMode();
+                raster_state.Hash(RasterizerState::_s_hash_obj.GenHash(raster_state));
+                item._blend_state_hash = shader->PipelineBlendState(pass_index).Hash();
+                item._raster_state_hash = raster_state.Hash();
+                item._depth_stencil_state_hash = shader->PipelineDepthStencilState(pass_index).Hash();
+                item._topology_hash = static_cast<u8>(shader->PipelineTopology(pass_index));
+            }
             if (force_alpha_test)
             {
                 auto keywords = material->ActiveKeywords(pass_index);
@@ -72,18 +93,33 @@ namespace Ailu::Render
 
         bool CompareQueuedDrawItem(const QueuedDrawItem &lhs, const QueuedDrawItem &rhs)
         {
-            return std::tie(lhs._render_queue, lhs._shader_ptr, lhs._pass_index, lhs._variant_hash, lhs._material_ptr, lhs._mesh_ptr, lhs._submesh_index)
-                 < std::tie(rhs._render_queue, rhs._shader_ptr, rhs._pass_index, rhs._variant_hash, rhs._material_ptr, rhs._mesh_ptr, rhs._submesh_index);
+            return std::tie(lhs._render_queue, lhs._shader_ptr, lhs._pass_index, lhs._variant_hash, lhs._material_ptr, lhs._mesh_ptr,
+                            lhs._vertex_buffer, lhs._index_buffer, lhs._submesh_index, lhs._blend_state_hash,
+                            lhs._raster_state_hash, lhs._depth_stencil_state_hash, lhs._topology_hash, lhs._stencil_ref,
+                            lhs._force_alpha_test)
+                 < std::tie(rhs._render_queue, rhs._shader_ptr, rhs._pass_index, rhs._variant_hash, rhs._material_ptr, rhs._mesh_ptr,
+                            rhs._vertex_buffer, rhs._index_buffer, rhs._submesh_index, rhs._blend_state_hash,
+                            rhs._raster_state_hash, rhs._depth_stencil_state_hash, rhs._topology_hash, rhs._stencil_ref,
+                            rhs._force_alpha_test);
         }
 
         void EmitQueuedDraws(CommandBuffer *cmd, Vector<QueuedDrawItem> &items)
         {
             EngineConfig &config = Ailu::g_engine_config;
-            if (config.EnableCpuStateBatchedSubmission && items.size() > 1u)
+            const bool can_sort = std::all_of(items.begin(), items.end(), [](const QueuedDrawItem &item)
+            {
+                return item._render_queue < Shader::kRenderQueueTransparent;
+            });
+            if (config.EnableCpuStateBatchedSubmission && can_sort && items.size() > 1u)
                 std::stable_sort(items.begin(), items.end(), CompareQueuedDrawItem);
 
-            for (auto &item: items)
+            for (u32 item_index = 0u; item_index < items.size();)
             {
+                auto &item = items[item_index];
+                u32 batch_end = item_index + 1u;
+                while (batch_end < items.size() && CompareQueuedDrawItem(item, items[batch_end]) == false
+                       && CompareQueuedDrawItem(items[batch_end], item) == false)
+                    ++batch_end;
                 bool was_alpha_test = false;
                 float alpha_cutoff = 0.0f;
                 if (item._force_alpha_test)
@@ -93,14 +129,37 @@ namespace Ailu::Render
                     item._material->EnableKeyword("ALPHA_TEST");
                     item._material->SetFloat("_AlphaCulloff", 0.5f);
                 }
-                cmd->DrawMesh(item._mesh, item._material, item._per_obj_cb, item._submesh_index, item._pass_index, item._instance_count);
+                const u32 instance_count = batch_end - item_index;
+                CBufferPrimitiveDrawData draw_data = item._primitive_draw_data;
+                bool is_contiguous = true;
+                for (u32 index = item_index + 1u; index < batch_end; ++index)
+                {
+                    if (items[index]._primitive_draw_data._primitive_base != draw_data._primitive_base + index - item_index)
+                    {
+                        is_contiguous = false;
+                        break;
+                    }
+                }
+                if (!is_contiguous)
+                {
+                    auto allocation = FrameResource::Active()->AllocatePrimitiveIndices(instance_count);
+                    for (u32 index = 0u; index < instance_count; ++index)
+                        allocation._cpu_ptr[index] = items[item_index + index]._primitive_draw_data._primitive_base;
+                    draw_data._instance_index_offset = allocation._offset;
+                    draw_data._flags |= kPrimitiveDrawUseInstanceIndex;
+                }
+                item._material->GetShader()->_stencil_ref = item._stencil_ref;
+                cmd->DrawSceneMesh(item._vertex_buffer, item._index_buffer, item._material, item._submesh_index, item._pass_index,
+                                   draw_data, instance_count);
                 if (item._force_alpha_test)
                 {
                     item._material->SetFloat("_AlphaCulloff", alpha_cutoff);
                     if (!was_alpha_test)
                         item._material->DisableKeyword("ALPHA_TEST");
                 }
+                item_index = batch_end;
             }
+            FrameResource::Active()->UploadPrimitiveIndices();
         }
 
         void EmitQueuedDraws(const Ref<CommandBuffer> &cmd, Vector<QueuedDrawItem> &items)
@@ -187,9 +246,11 @@ namespace Ailu::Render
                     for (auto &obj: objs)
                     {
                         if (obj._material == nullptr)
-                            cmd->DrawMesh(obj._mesh, shader_state_mat.get(), (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, _error_shader_pass_id, obj._instance_count);
+                            cmd->DrawSceneMesh(obj._vertex_buffer, obj._index_buffer, shader_state_mat.get(), obj._submesh_index,
+                                               _error_shader_pass_id, CBufferPrimitiveDrawData{obj._primitive_index}, 1u);
                         else
-                            cmd->DrawMesh(obj._mesh, obj._material, (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, 0, obj._instance_count);
+                            cmd->DrawSceneMesh(obj._vertex_buffer, obj._index_buffer, obj._material, obj._submesh_index, 0u,
+                                               CBufferPrimitiveDrawData{obj._primitive_index}, 1u);
                     }
                 }
             } });
@@ -235,9 +296,11 @@ namespace Ailu::Render
                     for (auto &obj: objs)
                     {
                         if (obj._material == nullptr)
-                            cmd->DrawMesh(obj._mesh, shader_state_mat.get(), (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, _error_shader_pass_id, obj._instance_count);
+                            cmd->DrawSceneMesh(obj._vertex_buffer, obj._index_buffer, shader_state_mat.get(), obj._submesh_index,
+                                               _error_shader_pass_id, CBufferPrimitiveDrawData{obj._primitive_index}, 1u);
                         else
-                            cmd->DrawMesh(obj._mesh, obj._material, (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, 0, obj._instance_count);
+                            cmd->DrawSceneMesh(obj._vertex_buffer, obj._index_buffer, obj._material, obj._submesh_index, 0u,
+                                               CBufferPrimitiveDrawData{obj._primitive_index}, 1u);
                     }
                 }
             }
@@ -301,7 +364,7 @@ namespace Ailu::Render
                             if (i16 shadow_pass = shadow_material->GetActiveShader()->FindPass("ShadowCaster"); shadow_pass != -1)
                             {
                                 shadow_material->DisableKeyword("CAST_POINT_SHADOW");
-                                draw_items.emplace_back(MakeQueuedDrawItem(queue, obj._mesh, shadow_material, (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, (u16) shadow_pass, obj._instance_count,
+                                draw_items.emplace_back(MakeQueuedDrawItem(queue, obj, shadow_material, (u16) shadow_pass,
                                                                            obj._material->SurfaceType() == ESurfaceType::kTransparent));
                             }
                         }
@@ -332,7 +395,7 @@ namespace Ailu::Render
                             if (i16 shadow_pass = shadow_material->GetActiveShader()->FindPass("ShadowCaster"); shadow_pass != -1)
                             {
                                 shadow_material->DisableKeyword("CAST_POINT_SHADOW");
-                                draw_items.emplace_back(MakeQueuedDrawItem(queue, obj._mesh, shadow_material, (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, (u16) shadow_pass, obj._instance_count,
+                                draw_items.emplace_back(MakeQueuedDrawItem(queue, obj, shadow_material, (u16) shadow_pass,
                                                                            obj._material->SurfaceType() == ESurfaceType::kTransparent));
                             }
                         }
@@ -360,7 +423,7 @@ namespace Ailu::Render
                             if (i16 shadow_pass = shadow_material->GetActiveShader()->FindPass("ShadowCaster"); shadow_pass != -1)
                             {
                                 shadow_material->DisableKeyword("CAST_POINT_SHADOW");
-                                draw_items.emplace_back(MakeQueuedDrawItem(queue, obj._mesh, shadow_material, (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, (u16) shadow_pass, obj._instance_count,
+                                draw_items.emplace_back(MakeQueuedDrawItem(queue, obj, shadow_material, (u16) shadow_pass,
                                                                            obj._material->SurfaceType() == ESurfaceType::kTransparent));
                             }
                         }
@@ -403,7 +466,7 @@ namespace Ailu::Render
                                 if (i16 shadow_pass = shadow_material->GetActiveShader()->FindPass("ShadowCaster"); shadow_pass != -1)
                                 {
                                     shadow_material->EnableKeyword("CAST_POINT_SHADOW");
-                                    draw_items.emplace_back(MakeQueuedDrawItem(queue, obj._mesh, shadow_material, (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, (u16) shadow_pass, obj._instance_count,
+                                    draw_items.emplace_back(MakeQueuedDrawItem(queue, obj, shadow_material, (u16) shadow_pass,
                                                                                obj._material->SurfaceType() == ESurfaceType::kTransparent));
                                 }
                             }
@@ -447,7 +510,7 @@ namespace Ailu::Render
                             if (i16 shadow_pass = shadow_material->GetActiveShader()->FindPass("ShadowCaster"); shadow_pass != -1)
                             {
                                 shadow_material->DisableKeyword("CAST_POINT_SHADOW");
-                                draw_items.emplace_back(MakeQueuedDrawItem(queue, obj._mesh, shadow_material, (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, (u16) shadow_pass, obj._instance_count,
+                                draw_items.emplace_back(MakeQueuedDrawItem(queue, obj, shadow_material, (u16) shadow_pass,
                                                                            obj._material->SurfaceType() == ESurfaceType::kTransparent));
                             }
                         }
@@ -478,7 +541,7 @@ namespace Ailu::Render
                             if (i16 shadow_pass = shadow_material->GetActiveShader()->FindPass("ShadowCaster"); shadow_pass != -1)
                             {
                                 shadow_material->DisableKeyword("CAST_POINT_SHADOW");
-                                draw_items.emplace_back(MakeQueuedDrawItem(queue, obj._mesh, shadow_material, (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, (u16) shadow_pass, obj._instance_count,
+                                draw_items.emplace_back(MakeQueuedDrawItem(queue, obj, shadow_material, (u16) shadow_pass,
                                                                            obj._material->SurfaceType() == ESurfaceType::kTransparent));
                             }
                         }
@@ -506,7 +569,7 @@ namespace Ailu::Render
                             if (i16 shadow_pass = shadow_material->GetActiveShader()->FindPass("ShadowCaster"); shadow_pass != -1)
                             {
                                 shadow_material->DisableKeyword("CAST_POINT_SHADOW");
-                                draw_items.emplace_back(MakeQueuedDrawItem(queue, obj._mesh, shadow_material, (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, (u16) shadow_pass, obj._instance_count,
+                                draw_items.emplace_back(MakeQueuedDrawItem(queue, obj, shadow_material, (u16) shadow_pass,
                                                                            obj._material->SurfaceType() == ESurfaceType::kTransparent));
                             }
                         }
@@ -548,7 +611,7 @@ namespace Ailu::Render
                             if (i16 shadow_pass = shadow_material->GetActiveShader()->FindPass("ShadowCaster"); shadow_pass != -1)
                             {
                                 shadow_material->EnableKeyword("CAST_POINT_SHADOW");
-                                draw_items.emplace_back(MakeQueuedDrawItem(queue, obj._mesh, shadow_material, (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, (u16) shadow_pass, obj._instance_count,
+                                draw_items.emplace_back(MakeQueuedDrawItem(queue, obj, shadow_material, (u16) shadow_pass,
                                                                            obj._material->SurfaceType() == ESurfaceType::kTransparent));
                             }
                             }
@@ -882,9 +945,8 @@ namespace Ailu::Render
                                 break;
                             for (auto &obj: objs)
                             {
-                                auto obj_cb = (*rendering_data._p_per_object_cbuf)[obj._scene_id];
-                                obj._material->GetShader()->_stencil_ref = ConstantBuffer::As<CBufferPerObjectData>(obj_cb)->_MotionVectorParam.x ? 1 : 0;
-                                draw_items.emplace_back(MakeQueuedDrawItem(queue, obj._mesh, obj._material, obj_cb, obj._submesh_index, 0u, obj._instance_count));
+                                obj._material->GetShader()->_stencil_ref = (obj._flags & kPrimitivePerObjectMotion) ? 1 : 0;
+                                draw_items.emplace_back(MakeQueuedDrawItem(queue, obj, obj._material, 0u));
                             }
                         }
                         EmitQueuedDraws(cmd, draw_items);
@@ -908,9 +970,8 @@ namespace Ailu::Render
                     break;
                 for (auto &obj: objs)
                 {
-                    auto obj_cb = (*rendering_data._p_per_object_cbuf)[obj._scene_id];
-                    obj._material->GetShader()->_stencil_ref = ConstantBuffer::As<CBufferPerObjectData>(obj_cb)->_MotionVectorParam.x ? 1 : 0;
-                    draw_items.emplace_back(MakeQueuedDrawItem(queue, obj._mesh, obj._material, obj_cb, obj._submesh_index, 0u, obj._instance_count));
+                    obj._material->GetShader()->_stencil_ref = (obj._flags & kPrimitivePerObjectMotion) ? 1 : 0;
+                    draw_items.emplace_back(MakeQueuedDrawItem(queue, obj, obj._material, 0u));
                 }
             }
             EmitQueuedDraws(cmd.get(), draw_items);
@@ -1562,7 +1623,8 @@ namespace Ailu::Render
                                     mat->ChangeShader(ResourceMgr::Get().Get<Shader>(shader_name_w));
                                     _wireframe_mats[obj._material->Name()] = mat;
                                 }
-                                cmd->DrawMesh(obj._mesh, _wireframe_mats[obj._material->Name()].get(), (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, 0, obj._instance_count);
+                                cmd->DrawSceneMesh(obj._vertex_buffer, obj._index_buffer, _wireframe_mats[obj._material->Name()].get(),
+                                                   obj._submesh_index, 0u, CBufferPrimitiveDrawData{obj._primitive_index}, 1u);
                             }
                         }
         });
@@ -1596,7 +1658,8 @@ namespace Ailu::Render
                         mat->ChangeShader(ResourceMgr::Get().Get<Shader>(shader_name_w));
                         _wireframe_mats[obj._material->Name()] = mat;
                     }
-                    cmd->DrawMesh(obj._mesh, _wireframe_mats[obj._material->Name()].get(), (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, 0, obj._instance_count);
+                    cmd->DrawSceneMesh(obj._vertex_buffer, obj._index_buffer, _wireframe_mats[obj._material->Name()].get(),
+                                       obj._submesh_index, 0u, CBufferPrimitiveDrawData{obj._primitive_index}, 1u);
                 }
             }
         }
@@ -1623,8 +1686,8 @@ namespace Ailu::Render
         _ui_default_mat->SetTexture("_MainTex", Texture::s_p_default_white);
         _ui_default_mat->SetVector("_Color", Colors::kWhite);
         Vector<VertexBufferLayoutDesc> desc_list;
-        desc_list.push_back({"POSITION", EShaderDateType::kFloat3, 0});
-        desc_list.push_back({"TEXCOORD", EShaderDateType::kFloat2, 1});
+        desc_list.push_back({EVertexSemantic::kPosition, EShaderDateType::kFloat3, 0});
+        desc_list.push_back({EVertexSemantic::kTexcoord0, EShaderDateType::kFloat2, 1});
         _obj_cb.reset(ConstantBuffer::Create(RenderConstants::kPerObjectDataSize));
         _vbuf.reset(VertexBuffer::Create(desc_list, "ui_vbuf"));
         _ibuf.reset(IndexBuffer::Create(nullptr, vertex_count, "ui_ibuf", true));
@@ -1726,13 +1789,13 @@ namespace Ailu::Render
                               auto &[queue, objs] = it;
                               for (auto &obj: objs)
                               {
-                                  auto obj_cb = (*rendering_data._p_per_object_cbuf)[obj._scene_id];
-                                  if (ConstantBuffer::As<CBufferPerObjectData>(obj_cb)->_MotionVectorParam.x < 1)
+                                  if ((obj._flags & kPrimitivePerObjectMotion) == 0u)
                                       continue;
                                   //obj._material->GetShader()->_stencil_ref = ConstantBuffer::As<CBufferPerObjectData>(obj_cb)->_MotionVectorParam.x? 1 : 0;
                                   i16 mv_pass = obj._material->GetActiveShader()->FindPass("MotionVector");
                                   if (mv_pass != -1)
-                                      cmd->DrawMesh(obj._mesh, obj._material, obj_cb, obj._submesh_index, mv_pass, obj._instance_count);
+                                      cmd->DrawSceneMesh(obj._vertex_buffer, obj._index_buffer, obj._material, obj._submesh_index,
+                                                         mv_pass, CBufferPrimitiveDrawData{obj._primitive_index}, 1u);
                               }
                           }
                       });
@@ -1757,13 +1820,13 @@ namespace Ailu::Render
                 auto &[queue, objs] = it;
                 for (auto &obj: objs)
                 {
-                    auto obj_cb = (*rendering_data._p_per_object_cbuf)[obj._scene_id];
-                    if (ConstantBuffer::As<CBufferPerObjectData>(obj_cb)->_MotionVectorParam.x < 1)
+                    if ((obj._flags & kPrimitivePerObjectMotion) == 0u)
                         continue;
                     //obj._material->GetShader()->_stencil_ref = ConstantBuffer::As<CBufferPerObjectData>(obj_cb)->_MotionVectorParam.x? 1 : 0;
                     i16 mv_pass = obj._material->GetActiveShader()->FindPass("MotionVector");
                     if (mv_pass != -1)
-                        cmd->DrawMesh(obj._mesh, obj._material, obj_cb, obj._submesh_index, mv_pass, obj._instance_count);
+                        cmd->DrawSceneMesh(obj._vertex_buffer, obj._index_buffer, obj._material, obj._submesh_index,
+                                           mv_pass, CBufferPrimitiveDrawData{obj._primitive_index}, 1u);
                 }
             }
         }
@@ -1917,7 +1980,7 @@ namespace Ailu::Render
                 {
                     if (i16 shadow_pass = obj._material->GetActiveShader()->FindPass("DepthOnly"); shadow_pass != -1)
                     {
-                        draw_items.emplace_back(MakeQueuedDrawItem(queue, obj._mesh, obj._material, (*data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, (u16) shadow_pass, obj._instance_count));
+                        draw_items.emplace_back(MakeQueuedDrawItem(queue, obj, obj._material, (u16) shadow_pass));
                     }
                 }
             }

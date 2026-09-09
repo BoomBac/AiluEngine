@@ -16,6 +16,7 @@ EnumInitializer initializer;
 initializer._name = "EColorRange";
 initializer._namespace = "Ailu::Render";
 initializer._full_name = "Ailu::Render::EColorRange";
+initializer._size = sizeof(Ailu::Render::EColorRange);
 initializer._str_to_enum_lut["kLDR"] = 0;
 initializer._str_to_enum_lut["kHDR"] = 1;
 s_enum_type_EColorRange = std::make_unique<Ailu::Enum>(initializer);

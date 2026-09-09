@@ -21,7 +21,7 @@ namespace Ailu
     class AILU_API SpriteAnimationBinding
     {
     public:
-        void Resolve(const Guid &clip_id, const AnimationClip &clip);
+        void Resolve(const Guid &clip_id, Ref<const AnimationClip> clip);
         const AnimationClip *FindClip(const Guid &clip_id) const;
         void Evaluate(const AnimationEvaluation &evaluation, ECS::SpriteRendererComponent &renderer);
         void Clear();
@@ -30,7 +30,7 @@ namespace Ailu
         struct ClipBinding
         {
             Guid _clip_id = Guid::EmptyGuid();
-            const AnimationClip *_clip = nullptr;
+            Ref<const AnimationClip> _clip;
         };
 
         struct SpriteBinding

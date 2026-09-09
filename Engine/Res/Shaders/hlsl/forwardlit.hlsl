@@ -38,23 +38,26 @@
 //}
 //info end
 
+#define AL_SCENE_PRIMITIVE 1
 #include "standard_lit_common.hlsli"
+#include "primitive.hlsli"
 #include "lighting.hlsli"
 #include "shadow_caster.hlsli"
 
 StandardPSInput ForwardVSMain(StandardVSInput v)
 {
 	StandardPSInput result;
-	result.position = TransformToClipSpace(v.position);
+	const PrimitiveData primitive = LoadPrimitive(v.instance_id);
+	result.position = TransformPrimitiveToClipSpace(primitive, v.position);
 	result.normal = v.normal;
 	result.uv0 = v.uv0;
 	v.tangent.xyz *= v.tangent.w;
-	float3 T = TransformNormal(v.tangent.xyz);
-	float3 B = TransformNormal(cross(v.tangent.xyz, v.normal));
-	float3 N = TransformNormal(v.normal);
+	float3 T = TransformPrimitiveNormal(primitive, v.tangent.xyz);
+	float3 B = TransformPrimitiveNormal(primitive, cross(v.tangent.xyz, v.normal));
+	float3 N = TransformPrimitiveNormal(primitive, v.normal);
 	result.btn = float3x3(T, B, N);
 	result.normal = N;
-	result.world_pos = TransformObjectToWorld(v.position);
+	result.world_pos = TransformPrimitiveToWorld(primitive, v.position);
 	return result;
 }
 

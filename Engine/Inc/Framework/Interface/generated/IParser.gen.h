@@ -21,7 +21,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::ImportSetting>()
 //Struct ImportSetting end...........................
 
 //Struct TextureImportSetting begin...........................
-#define IPARSER_GEN_H_99_GENERATED_BODY \
+#define IPARSER_GEN_H_118_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_TextureImportSetting_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -37,7 +37,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::TextureImportSet
 //Struct TextureImportSetting end...........................
 
 //Struct MeshImportSetting begin...........................
-#define IPARSER_GEN_H_125_GENERATED_BODY \
+#define IPARSER_GEN_H_145_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_MeshImportSetting_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -51,6 +51,42 @@ struct MeshImportSetting ;
 template<>
 AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::MeshImportSetting>();
 //Struct MeshImportSetting end...........................
+
+//Enum ETextureContent begin...........................
+const Ailu::Enum* Z_Construct_Enum_Ailu_ETextureContent_Type();
+namespace Ailu {
+enum class ETextureContent : u8;
+}
+template<>
+AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::ETextureContent>();
+//Enum ETextureContent end...........................
+
+//Enum ETextureCompression begin...........................
+const Ailu::Enum* Z_Construct_Enum_Ailu_ETextureCompression_Type();
+namespace Ailu {
+enum class ETextureCompression : u8;
+}
+template<>
+AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::ETextureCompression>();
+//Enum ETextureCompression end...........................
+
+//Enum ETextureCompressionQuality begin...........................
+const Ailu::Enum* Z_Construct_Enum_Ailu_ETextureCompressionQuality_Type();
+namespace Ailu {
+enum class ETextureCompressionQuality : u8;
+}
+template<>
+AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::ETextureCompressionQuality>();
+//Enum ETextureCompressionQuality end...........................
+
+//Enum ETextureMaxSize begin...........................
+const Ailu::Enum* Z_Construct_Enum_Ailu_ETextureMaxSize_Type();
+namespace Ailu {
+enum class ETextureMaxSize : u32;
+}
+template<>
+AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::ETextureMaxSize>();
+//Enum ETextureMaxSize end...........................
 
 #undef CURRENT_FILE_ID
 #define CURRENT_FILE_ID IPARSER_GEN_H

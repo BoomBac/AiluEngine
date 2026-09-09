@@ -220,30 +220,28 @@ namespace Ailu
     {
         struct VertexBufferLayoutDesc
         {
-            std::string Name;
+            EVertexSemantic _semantic;
             EShaderDateType Type;
             u8 Size;
             u8 Offset;
             u8 Stream;
-            u8 _semantic_index;
 
-            VertexBufferLayoutDesc(std::string name, EShaderDateType type, u8 stream, u8 index = 0u) :
-                Name(name), Type(type), Size(ShaderDateTypeSize(Type)), Stream(stream), Offset(0u), _semantic_index(index) {}
+            VertexBufferLayoutDesc(EVertexSemantic semantic, EShaderDateType type, u8 stream) :
+                _semantic(semantic), Type(type), Size(ShaderDateTypeSize(Type)), Stream(stream), Offset(0u) {}
 
             bool operator==(const VertexBufferLayoutDesc &other) const
             {
-                return (Name == other.Name && Type == other.Type && Size == other.Size && Offset == other.Offset && Stream == other.Stream) &&
-                       (_semantic_index == other._semantic_index);
+                return _semantic == other._semantic && Type == other.Type && Size == other.Size && Offset == other.Offset &&
+                       Stream == other.Stream;
             }
 
             VertexBufferLayoutDesc &operator=(const VertexBufferLayoutDesc &other)
             {
-                Name = other.Name;
+                _semantic = other._semantic;
                 Type = other.Type;
                 Size = other.Size;
                 Offset = other.Offset;
                 Stream = other.Stream;
-                _semantic_index = other._semantic_index;
                 return *this;
             }
         };

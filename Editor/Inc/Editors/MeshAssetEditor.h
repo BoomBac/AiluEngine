@@ -14,8 +14,6 @@ namespace Ailu
         class Mesh;
     }
 
-    struct MeshImportSetting;
-
     namespace UI
     {
         class Button;
@@ -41,7 +39,6 @@ namespace Ailu
 
         protected:
             bool OnOpen() override;
-            void OnBeforeSave() override;
             void OnAssetSaved() override;
             void OnAssetReloaded() override;
 
@@ -60,7 +57,6 @@ namespace Ailu
             void MarkDirty();
 
             Render::Mesh *_mesh = nullptr;
-            MeshImportSetting *_import_setting = nullptr;
             AssetPreviewViewport3D _preview;
             Scope<ReflectedPropertyPanel> _import_panel;
 

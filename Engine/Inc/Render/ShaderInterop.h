@@ -125,13 +125,42 @@ namespace Ailu::Render
         uint _reserved0;
     };
 
-    struct ObjectInstanceData
+#ifdef __cplusplus
+    enum EPrimitiveFlags : uint
+    {
+        kPrimitiveNone = 0u,
+        kPrimitivePerObjectMotion = 1u << 0u,
+        kPrimitiveForceZeroMotion = 1u << 1u,
+        kPrimitiveSkinned = 1u << 2u
+    };
+#else
+    static const uint kPrimitiveNone = 0u;
+    static const uint kPrimitivePerObjectMotion = 1u << 0u;
+    static const uint kPrimitiveForceZeroMotion = 1u << 1u;
+    static const uint kPrimitiveSkinned = 1u << 2u;
+#endif
+
+#ifdef __cplusplus
+    enum EPrimitiveDrawFlags : uint
+    {
+        kPrimitiveDrawNone = 0u,
+        kPrimitiveDrawUseInstanceIndex = 1u << 0u
+    };
+#else
+    static const uint kPrimitiveDrawNone = 0u;
+    static const uint kPrimitiveDrawUseInstanceIndex = 1u << 0u;
+#endif
+
+    struct PrimitiveData
     {
         float4x4 _local_to_world;
         float4x4 _world_to_local;
+        float4x4 _prev_local_to_world;
         float _max_inv_scale;
-        uint _object_id;
+        uint _entity_id;
         uint _material_id;
+        uint _submesh_id;
+        uint _flags;
         uint _global_triangle_offset;
         uint _blas_node_start;
         uint _blas_node_count;
@@ -144,6 +173,16 @@ namespace Ailu::Render
         uint _submesh_triangle_count;
         uint _reserved0;
     };
+
+#if defined(__cplusplus) || defined(AL_SCENE_PRIMITIVE)
+    AL_SHADER_INTEROP_CBUFFER_BEGIN(CBufferPrimitiveDrawData, b0)
+    {
+        uint _primitive_base;
+        uint _instance_index_offset;
+        uint _flags;
+        uint _reserved0;
+    } AL_SHADER_INTEROP_CBUFFER_END
+#endif
 
     struct TriangleData
     {
@@ -200,6 +239,7 @@ namespace Ailu::Render
         float _neg_right_or_tri_count;
     };
 
+#if !defined(AL_SCENE_PRIMITIVE)
     AL_SHADER_INTEROP_CBUFFER_BEGIN(CBufferPerObjectData, b0)
     {
         float4x4 _MatrixWorld;
@@ -211,6 +251,7 @@ namespace Ailu::Render
         uint _SubmeshID;
         float _cbo_paddings[10];// Padding so the constant buffer is 256-byte aligned.
     } AL_SHADER_INTEROP_CBUFFER_END
+#endif
 
     AL_SHADER_INTEROP_CBUFFER_BEGIN(CBufferPerSceneData, b2)
     {
@@ -279,6 +320,7 @@ namespace Ailu::Render
     } AL_SHADER_INTEROP_CBUFFER_END
 
 #ifdef __cplusplus
+    static_assert((sizeof(PrimitiveData) % 16) == 0, "PrimitiveData must preserve StructuredBuffer element alignment");
     //	struct ScenePerMaterialData
     //	{
     //		float4 _BaseColor;
@@ -292,7 +334,10 @@ namespace Ailu::Render
     //        float _AlphaCulloff;
     //		float padding2[51]; // Padding so the constant buffer is 256-byte aligned.
     //	};
+    static_assert(sizeof(CBufferPrimitiveDrawData) == 16, "Primitive draw root constants must be 16 bytes");
+#if !defined(AL_SCENE_PRIMITIVE)
     static_assert((sizeof(CBufferPerObjectData) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
+#endif
     static_assert((sizeof(CBufferPerSceneData) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
     //static_assert((sizeof(ScenePerMaterialData) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
     static_assert((sizeof(CBufferPerCameraData) % 256) == 0, "Constant Buffer size must be 256-byte aligned");

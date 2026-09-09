@@ -6,6 +6,8 @@
 #include "Framework/Core/CoreMinimal.h"
 #include "Framework/Common/Assert.h"
 #include "Framework/Common/Allocator.hpp"
+#include <algorithm>
+#include <thread>
 
 namespace Ailu::Render
 {
@@ -123,23 +125,58 @@ namespace Ailu::Render
 		auto hash = layout.Hash();
 		AL_ASSERT(hash < 64);
 		auto &resolved = _resolved_layouts[hash];
-		if (resolved._valid)
+		if (resolved._state.load(std::memory_order_acquire) == EResolvedVertexLayoutState::kReady)
 			return resolved;
+
+		auto expected_state = EResolvedVertexLayoutState::kEmpty;
+		if (!resolved._state.compare_exchange_strong(expected_state, EResolvedVertexLayoutState::kBuilding,
+		                                            std::memory_order_acq_rel, std::memory_order_acquire))
+		{
+			while (resolved._state.load(std::memory_order_acquire) != EResolvedVertexLayoutState::kReady)
+				std::this_thread::yield();
+			return resolved;
+		}
+
+		std::array<ResolvedVertexBinding, 30> bindings{};
+		u8 binding_count = 0u;
 
 		for (const auto &layout_ele : layout)
 		{
-			const auto it = _buffer_layout_indexer.find({layout_ele.Name, layout_ele._semantic_index});
+			const auto it = _buffer_layout_indexer.find(layout_ele._semantic);
 			if (it == _buffer_layout_indexer.end())
 			{
-				LOG_WARNING("Invalid vertex layout element {}{}", layout_ele.Name, layout_ele._semantic_index);
+				LOG_WARNING("Invalid vertex layout element {}{}", RenderConstants::GetVertexSemanticName(layout_ele._semantic),
+							RenderConstants::GetVertexSemanticIndex(layout_ele._semantic));
 				continue;
 			}
-			auto &binding = resolved._bindings[resolved._binding_count++];
+			AL_ASSERT(binding_count < bindings.size());
+			auto &binding = bindings[binding_count++];
 			binding._slot = layout_ele.Stream;
 			binding._stream_index = it->second;
 		}
 
-		resolved._valid = true;
+		std::sort(bindings.begin(), bindings.begin() + binding_count,
+		          [](const ResolvedVertexBinding &lhs, const ResolvedVertexBinding &rhs) { return lhs._slot < rhs._slot; });
+		u8 first_slot = 0u;
+		bool is_slot_contiguous = false;
+		if (binding_count != 0u)
+		{
+			first_slot = bindings[0]._slot;
+			is_slot_contiguous = true;
+			for (u8 i = 1u; i < binding_count; ++i)
+			{
+				if (bindings[i]._slot != first_slot + i)
+				{
+					is_slot_contiguous = false;
+					break;
+				}
+			}
+		}
+		resolved._bindings = bindings;
+		resolved._binding_count = binding_count;
+		resolved._first_slot = first_slot;
+		resolved._is_slot_contiguous = is_slot_contiguous;
+		resolved._state.store(EResolvedVertexLayoutState::kReady, std::memory_order_release);
 		return resolved;
 	}
 

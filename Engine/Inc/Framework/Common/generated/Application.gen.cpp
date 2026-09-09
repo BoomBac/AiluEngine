@@ -16,6 +16,7 @@ EnumInitializer initializer;
 initializer._name = "EApplicationState";
 initializer._namespace = "Ailu";
 initializer._full_name = "Ailu::EApplicationState";
+initializer._size = sizeof(Ailu::EApplicationState);
 initializer._str_to_enum_lut["EApplicationState_None"] = 0;
 initializer._str_to_enum_lut["EApplicationState_Running"] = 1;
 initializer._str_to_enum_lut["EApplicationState_Pause"] = 2;

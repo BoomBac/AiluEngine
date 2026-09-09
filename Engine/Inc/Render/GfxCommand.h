@@ -123,6 +123,8 @@ namespace Ailu::Render
         Material *_mat;
         u16 _pass_index;
         ConstantBuffer *_per_obj_cb;
+        CBufferPrimitiveDrawData _primitive_draw_data{};
+        bool _is_scene_primitive_draw = false;
         u32 _instance_count;
         u32 _start_instance;
         u16 _sub_mesh;

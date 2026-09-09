@@ -69,7 +69,6 @@ namespace Ailu::Render
         f32 _sqr_distance;
         Material* _mat;
         Mesh* _mesh;
-        CBufferPerObjectData _object_data;
     };
     
     struct ViewEntity

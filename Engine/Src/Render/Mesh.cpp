@@ -126,18 +126,27 @@ namespace Ailu::Render
 		}
 		return _index_buffers[submesh_index];
 	}
-	i32 Mesh::GetBindlessVertexStreamIndex(const std::string &semantic_name, u8 semantic_index) const noexcept
-	{
-		if (_vertex_buffer == nullptr)
-			return -1;
+        i32 Mesh::GetBindlessVertexStreamIndex(EVertexSemantic semantic) const noexcept
+        {
+                return GetBindlessVertexStreamIndex(semantic, _vertex_buffer.get());
+        }
+        i32 Mesh::GetBindlessVertexStreamIndex(EVertexSemantic semantic,
+                const VertexBuffer *vertex_buffer) const noexcept
+        {
+                if (_vertex_buffer == nullptr || vertex_buffer == nullptr)
+                        return -1;
 
-		for (const auto &desc : _vertex_buffer->GetLayout().GetBufferDesc())
-		{
-			if (desc.Name == semantic_name && desc._semantic_index == semantic_index)
-				return _vertex_buffer->GetBindlessSRVIndex(desc.Stream);
-		}
-		return -1;
-	}
+                for (const auto &desc : _vertex_buffer->GetLayout().GetBufferDesc())
+                {
+                        if (desc._semantic == semantic)
+                        {
+                                if (auto *gpu_stream = vertex_buffer->GetGpuStream(desc.Stream); gpu_stream != nullptr)
+                                        return gpu_stream->GetBindlessSRVIndex();
+                                return vertex_buffer->GetBindlessSRVIndex(desc.Stream);
+                        }
+                }
+                return -1;
+        }
 	u32 Mesh::GetTriangleStart(u16 submesh_index) const noexcept
 	{
 		if (submesh_index >= (u16)_submeshes.size())
@@ -301,25 +310,25 @@ namespace Ailu::Render
 		u8 vert_index, normal_index, uv_index, tangent_index;
 		_normal_stream = -1;
 		_tangent_stream = -1;
-		if (_vertices.size())
+                        if (_vertices.size())
 		{
-			desc_list.push_back({ "POSITION",EShaderDateType::kFloat3,count });
+			desc_list.push_back({ EVertexSemantic::kPosition, EShaderDateType::kFloat3, count });
 			vert_index = count++;
 		}
 		if (_normals.size())
 		{
-			desc_list.push_back({ "NORMAL",EShaderDateType::kFloat3,count });
+			desc_list.push_back({ EVertexSemantic::kNormal, EShaderDateType::kFloat3, count });
 			normal_index = count++;
 			_normal_stream = normal_index;
 		}
 		if (_uvs[0].size())
 		{
-			desc_list.push_back({ "TEXCOORD",EShaderDateType::kFloat2,count });
+			desc_list.push_back({ EVertexSemantic::kTexcoord0, EShaderDateType::kFloat2, count });
 			uv_index = count++;
 		}
 		if (_tangents.size())
 		{
-			desc_list.push_back({ "TANGENT",EShaderDateType::kFloat4,count });
+			desc_list.push_back({ EVertexSemantic::kTangent, EShaderDateType::kFloat4, count });
 			tangent_index = count++;
 			_tangent_stream = tangent_index;
 		}
@@ -469,38 +478,38 @@ namespace Ailu::Render
 		_tangent_stream = -1;
 		if (_vertices.size())
 		{
-			desc_list.push_back({ "POSITION",EShaderDateType::kFloat3,count });
+			desc_list.push_back({ EVertexSemantic::kPosition, EShaderDateType::kFloat3, count });
 			vert_index = count++;
 		}
 		if (_normals.size())
 		{
-			desc_list.push_back({ "NORMAL",EShaderDateType::kFloat3,count });
+			desc_list.push_back({ EVertexSemantic::kNormal, EShaderDateType::kFloat3, count });
 			normal_index = count++;
 			_normal_stream = normal_index;
 		}
 		if (_uvs[0].size())
 		{
-			desc_list.push_back({ "TEXCOORD",EShaderDateType::kFloat2,count });
+			desc_list.push_back({ EVertexSemantic::kTexcoord0, EShaderDateType::kFloat2, count });
 			uv_index = count++;
 		}
 		if (_tangents.size())
 		{
-			desc_list.push_back({ "TANGENT",EShaderDateType::kFloat4,count });
+			desc_list.push_back({ EVertexSemantic::kTangent, EShaderDateType::kFloat4, count });
 			tangent_index = count++;
 			_tangent_stream = tangent_index;
 		}
 		if (!_bone_indices.empty())
 		{
-			desc_list.push_back({ RenderConstants::kSemanticBoneIndex, EShaderDateType::kuInt4, count });
+			desc_list.push_back({ EVertexSemantic::kBoneIndex, EShaderDateType::kuInt4, count });
 			bone_index_index = count++;
 		}
 		if (!_bone_weights.empty())
 		{
-			desc_list.push_back({ RenderConstants::kSemanticBoneWeight, EShaderDateType::kFloat4, count });
+			desc_list.push_back({ EVertexSemantic::kBoneWeight, EShaderDateType::kFloat4, count });
 			bone_weight_index = count++;
 		}
 		{
-			desc_list.push_back({ "TEXCOORD",EShaderDateType::kFloat3,count ,1});
+			desc_list.push_back({ EVertexSemantic::kTexcoord1, EShaderDateType::kFloat3, count });
 			prev_vert_index = count++;
 		}
 		_vertex_buffer.reset(VertexBuffer::Create(desc_list, _name));

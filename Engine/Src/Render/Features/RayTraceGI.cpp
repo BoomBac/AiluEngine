@@ -55,7 +55,7 @@ namespace Ailu
 
             if (_gi_pass->CanUseHardwareRayTracing())
             {
-                _gi_pass->PrepareHardwareRayTracingScene();
+                _gi_pass->PrepareHardwareRayTracingScene(rendering_data);
             }
 
             _gi_pass->_debug_line_mat->SetInt("_debug_hit_box_idx", _debug_hit_box);
@@ -123,13 +123,14 @@ namespace Ailu
             return _use_hardware_ray_tracing && g_pGfxContext != nullptr && g_pGfxContext->IsHardwareRayTracingSupported() && _gi_raytracing_shader != nullptr;
         }
 
-        void GIPass::PrepareHardwareRayTracingScene()
+        void GIPass::PrepareHardwareRayTracingScene(const RenderingData &rendering_data)
         {
             auto *scene = SceneManagement::SceneMgr::Get().ActiveScene();
             if (scene == nullptr || _scene_rt_proxy == nullptr)
                 return;
 
-            _scene_rt_proxy->Sync(scene);
+            _scene_rt_proxy->Sync(scene, rendering_data._primitive_data, rendering_data._scene_primitive_buffer,
+                                  rendering_data._scene_primitives);
         }
 
         void GIPass::UpdateRayGenData(const RenderingData &rendering_data)
@@ -219,7 +220,7 @@ namespace Ailu
                             builder.Read(builder.Import(rt_scene, EResourceState::kRaytracingAccelerationStructure), EResourceUsage::kRaytracingAccel);
                         if (use_hardware_ray_tracing && _scene_rt_proxy != nullptr)
                         {
-                            if (auto *instance_data = _scene_rt_proxy->GetInstanceData(); instance_data != nullptr)
+                            if (auto *instance_data = _scene_rt_proxy->GetPrimitiveData(); instance_data != nullptr)
                                 builder.Read(builder.Import(instance_data));
                             if (auto *material_data = _scene_rt_proxy->GetMaterialData(); material_data != nullptr)
                                 builder.Read(builder.Import(material_data));
@@ -253,7 +254,7 @@ namespace Ailu
                         g_perCamData->SetData((const u8 *) data._p_per_camera_cbuf->GetData(), sizeof(CBufferPerCameraData));
             
                         _gi_raytracing_shader->SetScene(rt_scene);
-                        _gi_raytracing_shader->SetBuffer("rt_instance_data", _scene_rt_proxy->GetInstanceData());
+                        _gi_raytracing_shader->SetBuffer("g_primitive_data", _scene_rt_proxy->GetPrimitiveData());
                         _gi_raytracing_shader->SetBuffer("g_rayGenCB", _raygen_data.get());
                         _gi_raytracing_shader->SetBuffer("g_perSceneData", data._p_per_scene_cbuf);
                         _gi_raytracing_shader->SetBuffer("g_perCamData", g_perCamData.get());

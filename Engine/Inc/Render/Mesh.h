@@ -130,7 +130,9 @@ namespace Ailu
             [[nodiscard]] const Ref<IndexBuffer> &GetIndexBuffer(u16 submesh_index = 0) const noexcept;
             [[nodiscard]] i32 GetNormalStream() const noexcept { return _normal_stream; }
             [[nodiscard]] i32 GetTangentStream() const noexcept { return _tangent_stream; }
-            [[nodiscard]] i32 GetBindlessVertexStreamIndex(const std::string &semantic_name, u8 semantic_index = 0u) const noexcept;
+            [[nodiscard]] i32 GetBindlessVertexStreamIndex(EVertexSemantic semantic) const noexcept;
+            [[nodiscard]] i32 GetBindlessVertexStreamIndex(EVertexSemantic semantic,
+                                                           const VertexBuffer *vertex_buffer) const noexcept;
             [[nodiscard]] u32 GetTriangleStart(u16 submesh_index) const noexcept;
             [[nodiscard]] u32 GetTriangleCount(u16 submesh_index) const noexcept;
             [[nodiscard]] u32 GetBVHNodeStart(u16 submesh_index) const noexcept;

@@ -67,7 +67,7 @@ namespace Ailu
         private:
             bool MakesureTarget(const RenderingData& rendering_data);
             bool CanUseHardwareRayTracing() const;
-            void PrepareHardwareRayTracingScene();
+            void PrepareHardwareRayTracingScene(const RenderingData &rendering_data);
             void UpdateRayGenData(const RenderingData &rendering_data);
         private:
             ComputeShader *_gi_compute_shader;

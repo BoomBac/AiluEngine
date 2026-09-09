@@ -10,11 +10,14 @@
 //Fill: Wireframe
 //pass end::
 //info end
+#define AL_SCENE_PRIMITIVE 1
 #include "common.hlsli"
+#include "primitive.hlsli"
 
 struct VSInput
 {
 	float3 position : POSITION;
+	uint instance_id : SV_INSTANCEID;
 };
 
 struct PSInput
@@ -25,7 +28,7 @@ struct PSInput
 PSInput VSMain(VSInput v)
 {
 	PSInput result;
-	result.position = TransformToClipSpace(v.position);
+	result.position = TransformPrimitiveToClipSpace(LoadPrimitive(v.instance_id), v.position);
 	return result;
 }
 

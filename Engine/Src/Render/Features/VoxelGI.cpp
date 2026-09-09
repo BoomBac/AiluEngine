@@ -50,8 +50,8 @@ namespace Ailu::Render
                         {
                             cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, _cam_cbuf);
                             cmd->SetGlobalBuffer("g_voxel_data_block", _voxel_buf.get());
-                            cmd->DrawMesh(obj._mesh, obj._material, (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index,
-                                              _voxel_pass_index, 1u);
+                            cmd->DrawSceneMesh(obj._vertex_buffer, obj._index_buffer, obj._material, obj._submesh_index,
+                                               _voxel_pass_index, CBufferPrimitiveDrawData{obj._primitive_index}, 1u);
                         }
                     }
                 }

@@ -18,6 +18,35 @@ namespace Ailu
     namespace Render
     {
         using SceneManagement::SceneMgr;
+
+        namespace
+        {
+            const ScenePrimitive *FindScenePrimitive(const RenderingData &rendering_data, ECS::Entity entity, u16 submesh_index)
+            {
+                if (rendering_data._scene_primitives == nullptr)
+                    return nullptr;
+                const auto &primitives = *rendering_data._scene_primitives;
+                const auto it = std::find_if(primitives.begin(), primitives.end(), [entity, submesh_index](const ScenePrimitive &primitive)
+                {
+                    return primitive._entity_id == static_cast<u32>(entity) && primitive._submesh_index == submesh_index;
+                });
+                return it != primitives.end() ? &*it : nullptr;
+            }
+
+            void DrawSelectedScenePrimitive(CommandBuffer *cmd, const RenderingData &rendering_data, ECS::Entity entity,
+                                            u16 submesh_index, Material *material)
+            {
+                const auto *primitive = FindScenePrimitive(rendering_data, entity, submesh_index);
+                if (primitive == nullptr || primitive->_vertex_buffer == nullptr || primitive->_index_buffer == nullptr)
+                    return;
+                const CBufferPrimitiveDrawData draw_data{primitive->_primitive_index};
+                cmd->DrawSceneMesh(primitive->_vertex_buffer, primitive->_index_buffer, material, submesh_index, 0u,
+                                   draw_data, 1u);
+                cmd->DrawSceneMesh(primitive->_vertex_buffer, primitive->_index_buffer, material, submesh_index, 1u,
+                                   draw_data, 1u);
+            }
+        }
+
         PickPass::PickPass() : RenderPass("PickPass")
         {
             _pick_gen = MakeScope<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/pick_buffer.hlsl"), "Runtime/PickGen");
@@ -191,7 +220,8 @@ namespace Ailu
                     auto &[queue, objs] = queue_data;
                     for (auto &obj: objs)
                     {
-                        cmd->DrawMesh(obj._mesh, _pick_gen.get(), (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, 0, obj._instance_count);
+                        cmd->DrawSceneMesh(obj._vertex_buffer, obj._index_buffer, _pick_gen.get(), obj._submesh_index, 0u,
+                                           CBufferPrimitiveDrawData{obj._primitive_index}, 1u);
                     }
                 }
                 RecordSpritePick(cmd, rendering_data);
@@ -277,17 +307,15 @@ namespace Ailu
                     for (auto entity: selected)
                     {
                         const auto &t = r.GetComponent<ECS::TransformComponent>(entity);
-                        if (auto comp = r.GetComponent<ECS::StaticMeshComponent>(entity); comp != nullptr)
+                        if (r.GetComponent<ECS::StaticMeshComponent>(entity) != nullptr)
                         {
                             auto submesh = Selection::GetSelectedSubIndex(entity);
-                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t->GetWorldMatrix(), submesh, 0, 1);
-                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t->GetWorldMatrix(), submesh, 1, 1);
+                            DrawSelectedScenePrimitive(cmd, rendering_data, entity, submesh, _select_gen.get());
                         }
                         else if (auto comp = r.GetComponent<ECS::CSkeletonMesh>(entity); comp != nullptr)
                         {
                             auto submesh = Selection::GetSelectedSubIndex(entity);
-                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t->GetWorldMatrix(), submesh, 0, 1);
-                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t->GetWorldMatrix(), submesh, 1, 1);
+                            DrawSelectedScenePrimitive(cmd, rendering_data, entity, submesh, _select_gen.get());
                             Gizmo::DrawAABB(comp->_transformed_aabbs[0], Colors::kGreen);
                         }
                         if (auto c = r.GetComponent<ECS::CCollider>(entity))
@@ -379,7 +407,8 @@ namespace Ailu
                     auto &[queue, objs] = queue_data;
                     for (auto &obj: objs)
                     {
-                        cmd->DrawMesh(obj._mesh, _pick_gen.get(), (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, 0, obj._instance_count);
+                        cmd->DrawSceneMesh(obj._vertex_buffer, obj._index_buffer, _pick_gen.get(), obj._submesh_index, 0u,
+                                           CBufferPrimitiveDrawData{obj._primitive_index}, 1u);
                     }
                 }
                 u16 entity_index = 0;
@@ -451,17 +480,15 @@ namespace Ailu
                     for (auto entity: selected)
                     {
                         const auto &t = r.GetComponent<ECS::TransformComponent>(entity);
-                        if (auto comp = r.GetComponent<ECS::StaticMeshComponent>(entity); comp != nullptr)
+                        if (r.GetComponent<ECS::StaticMeshComponent>(entity) != nullptr)
                         {
                             auto submesh = Selection::GetSelectedSubIndex(entity);
-                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t->GetWorldMatrix(), submesh, 0, 1);
-                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t->GetWorldMatrix(), submesh, 1, 1);
+                            DrawSelectedScenePrimitive(cmd.get(), rendering_data, entity, submesh, _select_gen.get());
                         }
                         else if (auto comp = r.GetComponent<ECS::CSkeletonMesh>(entity); comp != nullptr)
                         {
                             auto submesh = Selection::GetSelectedSubIndex(entity);
-                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t->GetWorldMatrix(), submesh, 0, 1);
-                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t->GetWorldMatrix(), submesh, 1, 1);
+                            DrawSelectedScenePrimitive(cmd.get(), rendering_data, entity, submesh, _select_gen.get());
                             Gizmo::DrawAABB(comp->_transformed_aabbs[0],Colors::kGreen);
                         }
                         if (auto c = r.GetComponent<ECS::CCollider>(entity))

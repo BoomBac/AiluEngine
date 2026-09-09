@@ -129,7 +129,7 @@ namespace Ailu
             bool _has_skin = false;
         };
 
-        struct PrimitiveData
+        struct GltfPrimitiveBuildData
         {
             Vector<Vector3f> _positions;
             Vector<Vector3f> _normals;
@@ -1193,7 +1193,7 @@ namespace Ailu
             if (instance._has_skin)
                 LOG_WARNING("glTF skin data is currently loaded as static mesh: {}", mesh_name);
 
-            Vector<PrimitiveData> primitive_data_list;
+            Vector<GltfPrimitiveBuildData> primitive_data_list;
             primitive_data_list.reserve(mesh_def._primitives.size());
             for (u16 primitive_index = 0u; primitive_index < mesh_def._primitives.size(); ++primitive_index)
             {
@@ -1213,7 +1213,7 @@ namespace Ailu
                     continue;
                 }
 
-                PrimitiveData primitive_data;
+                GltfPrimitiveBuildData primitive_data;
                 primitive_data._material = BuildMaterialInfo(document, primitive, primitive_index, mesh_name, sys_path);
                 primitive_data._positions.resize(raw_positions.size());
                 for (size_t index = 0u; index < raw_positions.size(); ++index)

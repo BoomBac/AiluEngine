@@ -134,8 +134,6 @@ namespace Ailu::Render::RDG
             {
                 pass->_input_handles.clear();
                 pass->_output_handles.clear();
-                pass->_input_accesses.clear();
-                pass->_output_accesses.clear();
                 pass->_input_access_records.clear();
                 pass->_output_access_records.clear();
                 pass->_callback = nullptr;
@@ -174,8 +172,6 @@ namespace Ailu::Render::RDG
         EPassType _type;
         Vector<RGHandle> _input_handles; // 输入资源句柄
         Vector<RGHandle> _output_handles;// 输出资源句柄
-        HashMap<RGHandle, ResourceAccess> _input_accesses;
-        HashMap<RGHandle, ResourceAccess> _output_accesses;
         Vector<ResourceAccessRecord> _input_access_records;
         Vector<ResourceAccessRecord> _output_access_records;
         ExecuteFunction _callback;
@@ -254,14 +250,13 @@ namespace Ailu::Render::RDG
         bool PublishGlobalTexture(ShaderPropertyId property_id, RGHandle handle, RenderPass *producer);
         RGHandle ReadGlobalTexture(ShaderPropertyId property_id) const;
         EResourceState InitialResourceState(const ResourceNode &node) const;
-        Vector<u32> ResolveBarrierSubResources(RGHandle handle, const ResourceAccess &access) const;
 
         ResourceNode *GetResourceNode(RGHandle handle)
         {
-            if (_external_resources.contains(handle._id))
-                return &_external_resources[handle._id];
-            if (_transient_resources.contains(handle._id))
-                return &_transient_resources[handle._id];
+            if (auto iter = _external_resources.find(handle._id); iter != _external_resources.end())
+                return &iter->second;
+            if (auto iter = _transient_resources.find(handle._id); iter != _transient_resources.end())
+                return &iter->second;
             return nullptr;
         }
         //export to a .dot file for graphviz
@@ -364,6 +359,8 @@ namespace Ailu::Render::RDG
             u32 _mip_count = 1u;
             u32 _array_slice_count = 1u;
             bool _is_depth_resource = false;
+            static constexpr u32 kInvalidCompileIndex = ~0u;
+            u32 _compile_index = kInvalidCompileIndex;
             Vector<ResourceVersion> _versions;
         };
         inline static std::atomic<u32> s_next_handle_id = 0u;
@@ -406,22 +403,6 @@ namespace Ailu::Render::RDG
 
                 _pass->Read(handle);
                 _pass->_input_access_records.push_back({handle, accessor});
-                if (auto it = _pass->_input_accesses.find(handle); it != _pass->_input_accesses.end())
-                {
-                    it->second._usage = it->second._usage | accessor._usage;
-                    it->second._load = accessor._load;
-                    it->second._store = accessor._store;
-                    it->second._clear_value = accessor._clear_value;
-                    it->second._mip_level = accessor._mip_level;
-                    it->second._mip_count = accessor._mip_count;
-                    it->second._array_slice = accessor._array_slice;
-                    it->second._array_slice_count = accessor._array_slice_count;
-                    it->second._all_sub_resources = it->second._all_sub_resources && accessor._all_sub_resources;
-                }
-                else
-                {
-                    _pass->_input_accesses.emplace(handle, accessor);
-                }
                 return;
             }
             LOG_ERROR("RenderGraphBuilder::Read: Attempted to read from a resource that does not exist in the graph.");
@@ -439,22 +420,6 @@ namespace Ailu::Render::RDG
                 ver._producer = _pass;
                 _pass->Write(new_handle);
                 _pass->_output_access_records.push_back({new_handle, accessor});
-                if (auto it = _pass->_output_accesses.find(new_handle); it != _pass->_output_accesses.end())
-                {
-                    it->second._usage = it->second._usage | accessor._usage;
-                    it->second._load = accessor._load;
-                    it->second._store = accessor._store;
-                    it->second._clear_value = accessor._clear_value;
-                    it->second._mip_level = accessor._mip_level;
-                    it->second._mip_count = accessor._mip_count;
-                    it->second._array_slice = accessor._array_slice;
-                    it->second._array_slice_count = accessor._array_slice_count;
-                    it->second._all_sub_resources = it->second._all_sub_resources && accessor._all_sub_resources;
-                }
-                else
-                {
-                    _pass->_output_accesses.emplace(new_handle, accessor);
-                }
                 return new_handle;
             }
             LOG_ERROR("RenderGraphBuilder::Write: Attempted to write to a resource that does not exist in the graph.");

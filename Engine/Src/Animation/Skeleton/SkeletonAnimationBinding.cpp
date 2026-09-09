@@ -31,7 +31,7 @@ namespace Ailu
         }
     }
 
-    void SkeletonAnimationBinding::Resolve(const Guid &clip_id, const AnimationClip &clip, const Skeleton &skeleton)
+    void SkeletonAnimationBinding::Resolve(const Guid &clip_id, Ref<const AnimationClip> clip, const Skeleton &skeleton)
     {
         EnsureSkeleton(skeleton);
 
@@ -39,11 +39,23 @@ namespace Ailu
         {
             if (binding._clip_id == clip_id)
             {
-                binding._clip = &clip;
+                binding._clip = std::move(clip);
                 return;
             }
         }
-        _clips.push_back(ClipBinding{clip_id, &clip});
+        _clips.push_back(ClipBinding{clip_id, std::move(clip)});
+    }
+
+    void SkeletonAnimationBinding::Resolve(Ref<const AnimationClip> clip, const Skeleton &skeleton)
+    {
+        Resolve(Guid::EmptyGuid(), std::move(clip), skeleton);
+    }
+
+    void SkeletonAnimationBinding::Resolve(const Guid &clip_id, const AnimationClip &clip, const Skeleton &skeleton)
+    {
+        Ref<AnimationClip> snapshot = MakeRef<AnimationClip>();
+        snapshot->CopyFrom(clip);
+        Resolve(clip_id, std::move(snapshot), skeleton);
     }
 
     void SkeletonAnimationBinding::Resolve(const AnimationClip &clip, const Skeleton &skeleton)
@@ -54,7 +66,7 @@ namespace Ailu
     const AnimationClip *SkeletonAnimationBinding::FindClip(const Guid &clip_id) const
     {
         const ClipBinding *binding = FindBinding(clip_id);
-        return binding != nullptr ? binding->_clip : nullptr;
+        return binding != nullptr ? binding->_clip.get() : nullptr;
     }
 
     void SkeletonAnimationBinding::Evaluate(const AnimationEvaluation &evaluation, const Skeleton &skeleton,

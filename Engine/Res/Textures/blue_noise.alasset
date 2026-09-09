@@ -8,8 +8,12 @@
     },
     "_file": "blue_noise.jpg",
     "_import_setting": {
+        "_content": "kColor",
         "_is_srgb": false,
         "_generate_mipmap": true,
-        "_is_readable": false
+        "_is_readable": false,
+        "_max_size": "k2048x2048",
+        "_compression": "kAuto",
+        "_compression_quality": "kFast"
     }
 }

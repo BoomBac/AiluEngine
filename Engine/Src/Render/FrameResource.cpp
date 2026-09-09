@@ -12,12 +12,6 @@ namespace Ailu::Render
 #pragma region FrameResource
     FrameResource::FrameResource() : Object("FrameResource")
     {
-        for (u32 i = 0; i < RenderConstants::kMaxRenderObjectCount; ++i)
-        {
-            auto cb = Ref<ConstantBuffer>(ConstantBuffer::Create(RenderConstants::kPerObjectDataSize));
-            _obj_cb_refs.emplace_back(cb);
-            _obj_cbs.emplace_back(cb.get());
-        }
         BufferDesc desc;
         desc._element_num = RenderConstants::kMaxMaterialDataCount;
         desc._element_size = sizeof(MaterialData);
@@ -26,18 +20,20 @@ namespace Ailu::Render
         desc._target = EGPUBufferTarget::kConstant | EGPUBufferTarget::kStructured;
         _material_buffer = GPUBuffer::Create(desc);
         _material_buffer->Name(std::format("GlobalMaterialBuffer"));
+        desc._element_num = RenderConstants::kMaxRenderObjectCount;
+        desc._element_size = sizeof(u32);
+        desc._is_random_write = false;
+        desc._size = desc._element_num * desc._element_size;
+        // This is a frame-slot scoped upload buffer.  Keeping it on an upload
+        // heap makes every allocation visible to draws recorded in this slot
+        // without issuing a GPU copy for each non-contiguous batch.
+        desc._target = EGPUBufferTarget::kConstant | EGPUBufferTarget::kStructured;
+        _primitive_index_buffer = GPUBuffer::Create(desc);
+        _primitive_index_buffer->Name("FramePrimitiveIndexBuffer");
+        _primitive_indices.reserve(RenderConstants::kMaxRenderObjectCount);
     }
     FrameResource::~FrameResource()
     {
-    }
-    ConstantBuffer *FrameResource::GetObjCB(u32 index)
-    {
-        AL_ASSERT(index < _obj_cbs.size());
-        return _obj_cbs[index];
-    }
-    Vector<ConstantBuffer *>* FrameResource::GetObjCB()
-    {
-        return &_obj_cbs;
     }
     ConstantBuffer *FrameResource::GetMatCB(u32 index)
     {
@@ -69,24 +65,40 @@ namespace Ailu::Render
         }
         return _scene_cbs[_scene_cb_lut[hash]];
     }
-    GPUBuffer *FrameResource::GetSceneInstanceBuffer(u64 hash)
+    GPUBuffer *FrameResource::GetScenePrimitiveBuffer(u64 hash)
     {
-        if (!_scene_inst_buffer_lut.contains(hash))
+        if (!_scene_primitive_buffer_lut.contains(hash))
         {
             BufferDesc desc;
             desc._element_num = RenderConstants::kMaxRenderObjectCount;
-            desc._element_size = sizeof(ObjectInstanceData);
+            desc._element_size = sizeof(PrimitiveData);
             desc._is_random_write = false;
             desc._size = desc._element_size * desc._element_num;
-            desc._target = EGPUBufferTarget::kConstant | EGPUBufferTarget::kStructured;
+            desc._target = EGPUBufferTarget::kStructured;
             auto buf = GPUBuffer::Create(desc);
-            buf->Name(std::format("SceneInstanceBuffer_{}", hash));
-            _scene_instance_buffers.push_back(buf);
-            _scene_inst_buffer_lut[hash] = _scene_instance_buffers.size() - 1;
+            buf->Name(std::format("ScenePrimitiveBuffer_{}", hash));
+            _scene_primitive_buffers.push_back(buf);
+            _scene_primitive_buffer_lut[hash] = _scene_primitive_buffers.size() - 1;
 
-            return &*_scene_instance_buffers.back();
+            return &*_scene_primitive_buffers.back();
         }
-        return &*_scene_instance_buffers[_scene_inst_buffer_lut[hash]];
+        return &*_scene_primitive_buffers[_scene_primitive_buffer_lut[hash]];
+    }
+    PrimitiveIndexAllocation FrameResource::AllocatePrimitiveIndices(u32 count)
+    {
+        AL_ASSERT(_primitive_indices.size() + count <= RenderConstants::kMaxRenderObjectCount);
+        const u32 offset = static_cast<u32>(_primitive_indices.size());
+        _primitive_indices.resize(offset + count);
+        return PrimitiveIndexAllocation{_primitive_indices.data() + offset, offset, count};
+    }
+    void FrameResource::ResetPrimitiveIndices()
+    {
+        _primitive_indices.clear();
+    }
+    void FrameResource::UploadPrimitiveIndices()
+    {
+        if (!_primitive_indices.empty())
+            _primitive_index_buffer->SetData(_primitive_indices);
     }
 #pragma endregion
 

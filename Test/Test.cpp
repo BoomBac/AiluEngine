@@ -10,6 +10,7 @@
 #include <Assets/AssetDocument.h>
 #include <Assets/AssetRef.h>
 #include <Assets/AssetArtifact.h>
+#include <Assets/AssetRegistry.h>
 #include <Assets/DerivedDataCache.h>
 #include <Graph/GraphDocument.h>
 #include <Input/InputSystem.h>
@@ -1141,23 +1142,60 @@ namespace
 
     bool TestAssetRefStates()
     {
+        AssetRegistry registry;
+        AssetReferenceRuntime::SetHandleResolver([&registry](const Guid &guid)
+        {
+            return registry.GetOrCreateHandle<Object>(guid);
+        });
+
         AssetRef<Object> reference;
         if (reference.IsAssigned() || reference.IsResolved() || reference.IsMissing())
+        {
+            AssetReferenceRuntime::SetHandleResolver({});
             return false;
+        }
 
         const Guid guid = Guid::Generate();
         reference.SetGuid(guid);
         if (!reference.IsAssigned() || reference.IsResolved() || !reference.IsMissing() || reference.GetGuid() != guid)
+        {
+            AssetReferenceRuntime::SetHandleResolver({});
             return false;
+        }
 
         auto object = MakeRef<Object>("Resolved");
-        reference.Set(guid, object);
-        if (!reference.IsAssigned() || !reference.IsResolved() || reference.IsMissing() || reference.Get() != object)
+        const AssetHandle<Object> handle = registry.GetOrCreateHandle<Object>(guid);
+        if (!registry.Publish(handle, object, {}))
+        {
+            AssetReferenceRuntime::SetHandleResolver({});
             return false;
+        }
+        if (!reference.IsAssigned() || !reference.IsResolved() || reference.IsMissing() || reference.Get() != object)
+        {
+            AssetReferenceRuntime::SetHandleResolver({});
+            return false;
+        }
+
+        AssetRef<Object> transient_reference;
+        Ref<Object> transient_object = MakeRef<Object>("Transient");
+        transient_reference = transient_object;
+        if (!transient_reference.IsResolved())
+        {
+            AssetReferenceRuntime::SetHandleResolver({});
+            return false;
+        }
+        transient_object.reset();
+        if (transient_reference.IsResolved())
+        {
+            AssetReferenceRuntime::SetHandleResolver({});
+            return false;
+        }
 
         reference.Clear();
-        return !reference.IsAssigned() && !reference.IsResolved() && !reference.IsMissing() &&
-               reference.Get() == nullptr;
+        const bool result = !reference.IsAssigned() && !reference.IsResolved() && !reference.IsMissing() &&
+                            reference.Get() == nullptr;
+        AssetReferenceRuntime::SetHandleResolver({});
+        return result;
     }
 
     bool TestArtifactContainerRoundtrip()
@@ -1790,6 +1828,132 @@ namespace
                resource_mgr.GetAssetGuid(sprite.get()) == sprite_guid;
     }
 
+    bool TestAssetRegistrySnapshotPublish()
+    {
+        AssetRegistry registry;
+        const auto handle = registry.GetOrCreateHandle<Object>(Guid::Generate());
+        const Ref<Object> first = MakeRef<Object>("first");
+        const Ref<Object> second = MakeRef<Object>("second");
+        AssetArtifactKey first_key;
+        first_key._source_hash = 11u;
+        if (!registry.Publish(handle, first, first_key) || handle.GetRevision() != 1u ||
+            registry.GetArtifactKey(handle) != first_key)
+            return false;
+
+        const Ref<const Object> first_snapshot = handle.Resolve();
+        if (!registry.Publish(handle, second, {}) || handle.GetRevision() != 2u)
+            return false;
+
+        return handle.IsValid() && first_snapshot == first && handle.Resolve() == second;
+    }
+
+    bool TestAssetRegistryFailedUpdateKeepsSnapshot()
+    {
+        AssetRegistry registry;
+        const auto handle = registry.GetOrCreateHandle<Object>(Guid::Generate());
+        const Ref<Object> snapshot = MakeRef<Object>("last-known-good");
+        if (!registry.Publish(handle, snapshot, {}))
+            return false;
+
+        (void)registry.MarkUpdating(handle);
+        registry.MarkUpdateFailed(handle, "synthetic load failure");
+        return registry.GetState(handle) == EAssetLoadState::kReady && handle.Resolve() == snapshot &&
+               handle.GetRevision() == 1u;
+    }
+
+    bool TestAssetRegistryRejectsStaleUpdate()
+    {
+        AssetRegistry registry;
+        const auto handle = registry.GetOrCreateHandle<Object>(Guid::Generate());
+        const Ref<Object> stable = MakeRef<Object>("stable");
+        if (!registry.Publish(handle, stable, {}))
+            return false;
+        const u64 first_request = registry.MarkUpdating(handle);
+        const u64 second_request = registry.MarkUpdating(handle);
+        const Ref<Object> first = MakeRef<Object>("first");
+        const Ref<Object> second = MakeRef<Object>("second");
+        if (registry.Publish(handle, first, {}, EAssetUpdateReason::kSourceChanged, first_request))
+            return false;
+        registry.MarkUpdateFailed(handle, "stale request", first_request);
+        return registry.GetState(handle) == EAssetLoadState::kUpdating && handle.Resolve() == stable &&
+               registry.Publish(handle, second, {}, EAssetUpdateReason::kSourceChanged, second_request) &&
+               handle.Resolve() == second;
+    }
+
+    bool TestAssetRegistryConcurrentResolve()
+    {
+        AssetRegistry registry;
+        const auto handle = registry.GetOrCreateHandle<Object>(Guid::Generate());
+        const Ref<Object> first = MakeRef<Object>("first");
+        const Ref<Object> second = MakeRef<Object>("second");
+        if (!registry.Publish(handle, first, {}))
+            return false;
+
+        std::atomic<bool> snapshot_acquired = false;
+        std::atomic<bool> published = false;
+        Ref<const Object> old_snapshot;
+        std::thread resolver([&]()
+        {
+            old_snapshot = handle.Resolve();
+            snapshot_acquired.store(true, std::memory_order_release);
+            while (!published.load(std::memory_order_acquire))
+                std::this_thread::yield();
+        });
+
+        while (!snapshot_acquired.load(std::memory_order_acquire))
+            std::this_thread::yield();
+        const bool publish_succeeded = registry.Publish(handle, second, {});
+        published.store(true, std::memory_order_release);
+        resolver.join();
+
+        return publish_succeeded && old_snapshot == first && handle.Resolve() == second;
+    }
+
+    bool TestAssetRegistrySlotReuseInvalidatesHandle()
+    {
+        AssetRegistry registry;
+        const Guid first_guid = Guid::Generate();
+        const auto first_handle = registry.GetOrCreateHandle<Object>(first_guid);
+        registry.Unregister(first_guid);
+        const auto second_handle = registry.GetOrCreateHandle<Object>(Guid::Generate());
+        return !first_handle.IsValid() && second_handle.IsValid() && first_handle._index == second_handle._index &&
+               first_handle._slot_generation != second_handle._slot_generation;
+    }
+
+    bool TestAssetRegistryPublishEvent()
+    {
+        AssetRegistry registry;
+        const auto handle = registry.GetOrCreateHandle<Object>(Guid::Generate());
+        AssetPublishedEvent event;
+        const u64 listener_id = registry.AddPublishedListener([&event](const AssetPublishedEvent &published)
+        {
+            event = published;
+        });
+        const Ref<Object> snapshot = MakeRef<Object>("event");
+        registry.Publish(handle, snapshot, {}, EAssetUpdateReason::kManualReimport);
+        registry.RemovePublishedListener(listener_id);
+        return event._asset.IsValid() && event._old_revision == 0u && event._new_revision == 1u &&
+               event._reason == EAssetUpdateReason::kManualReimport;
+    }
+
+    bool TestAssetRegistryDependencyGraph()
+    {
+        AssetRegistry registry;
+        const Guid material_guid = Guid::Generate();
+        const Guid first_texture_guid = Guid::Generate();
+        const Guid second_texture_guid = Guid::Generate();
+        const auto material_handle = registry.GetOrCreateHandle<Object>(material_guid);
+        const auto first_texture_handle = registry.GetOrCreateHandle<Object>(first_texture_guid);
+        const auto second_texture_handle = registry.GetOrCreateHandle<Object>(second_texture_guid);
+        registry.SetDependencies(material_handle, {{first_texture_guid, EAssetDependencyType::kRuntime}});
+        registry.SetDependencies(material_handle, {{second_texture_guid, EAssetDependencyType::kRuntime}});
+        const Vector<AssetDependency> dependencies = registry.GetDependencies(material_handle);
+        const Vector<AssetDependency> old_dependents = registry.GetDependents(first_texture_handle);
+        const Vector<AssetDependency> dependents = registry.GetDependents(second_texture_handle);
+        return dependencies.size() == 1u && dependencies[0]._guid == second_texture_guid && old_dependents.empty() &&
+               dependents.size() == 1u && dependents[0]._guid == material_guid;
+    }
+
     void RunEntityGuidUnitTests()
     {
         TestResult result;
@@ -1811,6 +1975,13 @@ namespace
         RunTest(result, "WidgetAsset clone and duplicate Guid", TestWidgetAssetCloneAndDuplicateGuid);
         RunTest(result, "SpriteAtlas document serialization roundtrip", TestSpriteAtlasDocumentSerializationRoundtrip);
         RunTest(result, "SpriteAtlas SubAsset GUID lookup", TestSpriteAtlasSubAssetGuidLookup);
+        RunTest(result, "AssetRegistry snapshot publish", TestAssetRegistrySnapshotPublish);
+        RunTest(result, "AssetRegistry failed update keeps snapshot", TestAssetRegistryFailedUpdateKeepsSnapshot);
+        RunTest(result, "AssetRegistry rejects stale update", TestAssetRegistryRejectsStaleUpdate);
+        RunTest(result, "AssetRegistry concurrent resolve", TestAssetRegistryConcurrentResolve);
+        RunTest(result, "AssetRegistry slot reuse invalidates handle", TestAssetRegistrySlotReuseInvalidatesHandle);
+        RunTest(result, "AssetRegistry publish event", TestAssetRegistryPublishEvent);
+        RunTest(result, "AssetRegistry dependency graph", TestAssetRegistryDependencyGraph);
 
         std::cout << "========================================\n";
         std::cout << "Entity GUID unit tests passed: " << result._passed << '\n';
@@ -2012,6 +2183,22 @@ int main(int argc, char **argv)
         TestResult result;
         RunTest(result, "AssetArtifact container roundtrip", TestArtifactContainerRoundtrip);
         RunTest(result, "DerivedDataCache roundtrip", TestDerivedDataCacheRoundtrip);
+        Allocator::Shutdown();
+        LogMgr::Shutdown();
+        return result._failed == 0u ? EXIT_SUCCESS : EXIT_FAILURE;
+    }
+
+    if (argc == 2 && std::strcmp(argv[1], "--asset-registry-tests") == 0)
+    {
+        TestResult result;
+        RunTest(result, "AssetRegistry snapshot publish", TestAssetRegistrySnapshotPublish);
+        RunTest(result, "AssetRegistry failed update keeps snapshot", TestAssetRegistryFailedUpdateKeepsSnapshot);
+        RunTest(result, "AssetRegistry rejects stale update", TestAssetRegistryRejectsStaleUpdate);
+        RunTest(result, "AssetRegistry concurrent resolve", TestAssetRegistryConcurrentResolve);
+        RunTest(result, "AssetRegistry slot reuse invalidates handle", TestAssetRegistrySlotReuseInvalidatesHandle);
+        RunTest(result, "AssetRegistry publish event", TestAssetRegistryPublishEvent);
+        RunTest(result, "AssetRegistry dependency graph", TestAssetRegistryDependencyGraph);
+        RunTest(result, "AssetRef resolves registry snapshot", TestAssetRefStates);
         Allocator::Shutdown();
         LogMgr::Shutdown();
         return result._failed == 0u ? EXIT_SUCCESS : EXIT_FAILURE;

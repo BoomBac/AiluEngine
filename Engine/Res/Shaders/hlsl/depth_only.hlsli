@@ -1,13 +1,16 @@
 #ifndef __DEPTH_ONLY__
 #define __DEPTH_ONLY__
 
+#define AL_SCENE_PRIMITIVE 1
 #include "standard_lit_common.hlsli"
 #include "common.hlsli"
+#include "primitive.hlsli"
 
 struct DepthVSInput
 {
 	float3 position : POSITION;
 	float2 uv : TEXCOORD;
+	uint instance_id : SV_INSTANCEID;
 };
 
 struct DepthPSInput
@@ -20,8 +23,9 @@ struct DepthPSInput
 DepthPSInput DepthOnlyVSMain(DepthVSInput v)
 {
 	DepthPSInput result;
-	result.world_pos = TransformObjectToWorld(v.position).xyz;
-	result.position = TransformToClipSpace(v.position);
+	const PrimitiveData primitive = LoadPrimitive(v.instance_id);
+	result.world_pos = TransformPrimitiveToWorld(primitive, v.position).xyz;
+	result.position = TransformPrimitiveToClipSpace(primitive, v.position);
 	result.uv = v.uv;
 	return result;
 }

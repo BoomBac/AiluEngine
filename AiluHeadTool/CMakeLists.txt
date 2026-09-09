@@ -31,7 +31,7 @@ target_compile_definitions(AiluHeadTool PUBLIC UNICODE _UNICODE $<$<CONFIG:Debug
 set_target_properties (AiluHeadTool PROPERTIES OUTPUT_NAME "AiluHeadTool")
 # 编译器参数
 if (MSVC)
-target_compile_options(AiluHeadTool PUBLIC /MP /wd4819)
+target_compile_options(AiluHeadTool PUBLIC /wd4819 /FS)
 endif()
 #target_link_libraries(AiluHeadTool PRIVATE
 #        $<$<CONFIG:Debug>:${ENGINE_LIB_ROOT}/Debug/Engine_d.lib>

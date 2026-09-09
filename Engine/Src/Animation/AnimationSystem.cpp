@@ -167,19 +167,25 @@ namespace Ailu::ECS
         _pending_commands.erase(commands_iter);
     }
 
-    const AnimationClip *AnimationSystem::ResolveClip(const Guid &clip_id)
+    Ref<const AnimationClip> AnimationSystem::ResolveClipSnapshot(const Guid &clip_id)
     {
         if (clip_id.IsEmpty())
             return nullptr;
 
         ResourceMgr &resource_mgr = ResourceMgr::Get();
-        Ref<AnimationClip> loaded_clip = resource_mgr.GetRef<AnimationClip>(clip_id);
+        AssetHandle<AnimationClip> handle = resource_mgr.GetOrCreateAssetHandle<AnimationClip>(clip_id);
+        Ref<const AnimationClip> loaded_clip = handle.Resolve();
         if (loaded_clip == nullptr)
         {
             resource_mgr.Load<AnimationClip>(clip_id);
-            loaded_clip = resource_mgr.GetRef<AnimationClip>(clip_id);
+            loaded_clip = handle.Resolve();
         }
-        return loaded_clip.get();
+        return loaded_clip;
+    }
+
+    const AnimationClip *AnimationSystem::ResolveClip(const Guid &clip_id)
+    {
+        return ResolveClipSnapshot(clip_id).get();
     }
 
     void AnimationSystem::ResolveMotionAssets(Entity entity, const AnimationControllerAsset &controller_asset,
@@ -522,7 +528,7 @@ namespace Ailu::ECS
                             if (r.IsComponentEnabled<CSkeletonMesh>(current) && component->_p_mesh != nullptr)
                             {
                                 const AssetRef<SkeletonAsset> &skeleton_ref = component->_p_mesh->GetSkeletonAsset();
-                                const Ref<SkeletonAsset> &skeleton_asset = skeleton_ref.Get();
+                                const Ref<SkeletonAsset> skeleton_asset = skeleton_ref.Get();
                                 if (skeleton_ref.IsResolved())
                                 {
                                     auto [group_iter, inserted] = runtime._skeleton_groups.try_emplace(skeleton_asset.get());
@@ -537,7 +543,7 @@ namespace Ailu::ECS
                              component->_p_mesh != nullptr)
                     {
                         const AssetRef<SkeletonAsset> &skeleton_ref = component->_p_mesh->GetSkeletonAsset();
-                        const Ref<SkeletonAsset> &skeleton_asset = skeleton_ref.Get();
+                        const Ref<SkeletonAsset> skeleton_asset = skeleton_ref.Get();
                         if (skeleton_ref.IsResolved())
                         {
                             auto [group_iter, inserted] = runtime._skeleton_groups.try_emplace(skeleton_asset.get());
@@ -558,6 +564,10 @@ namespace Ailu::ECS
                     }
                 };
                 collect_skeleton_meshes(collect_skeleton_meshes, entity);
+                std::erase_if(runtime._skeleton_groups, [](const auto &entry)
+                {
+                    return entry.second._consumers.empty();
+                });
             }
 
             {
@@ -572,12 +582,9 @@ namespace Ailu::ECS
                         for (u8 sample_index = 0u; sample_index < runtime._evaluation._sample_count; ++sample_index)
                         {
                             const Guid &clip_id = runtime._evaluation._samples[sample_index]._clip;
-                            if (group._binding.FindClip(clip_id) == nullptr)
-                            {
-                                const AnimationClip *clip = ResolveClip(clip_id);
-                                if (clip != nullptr)
-                                    group._binding.Resolve(clip_id, *clip, skeleton);
-                            }
+                            const Ref<const AnimationClip> clip = ResolveClipSnapshot(clip_id);
+                            if (clip != nullptr)
+                                group._binding.Resolve(clip_id, clip, skeleton);
                         }
                     }
                     {
@@ -668,9 +675,9 @@ namespace Ailu::ECS
                 for (u8 sample_index = 0u; sample_index < runtime._evaluation._sample_count; ++sample_index)
                 {
                     const Guid &clip_id = runtime._evaluation._samples[sample_index]._clip;
-                    const AnimationClip *clip = ResolveClip(clip_id);
-                    if (clip != nullptr && sprite_binding.FindClip(clip_id) == nullptr)
-                        sprite_binding.Resolve(clip_id, *clip);
+                    const Ref<const AnimationClip> clip = ResolveClipSnapshot(clip_id);
+                    if (clip != nullptr)
+                        sprite_binding.Resolve(clip_id, clip);
                 }
                 sprite_binding.Evaluate(runtime._evaluation, *sprite_renderer);
             }

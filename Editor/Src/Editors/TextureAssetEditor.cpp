@@ -38,7 +38,11 @@ namespace Ailu::Editor
 
         String FormatFormat(EALGFormat format)
         {
-            return std::format("{} (0x{:04X})", static_cast<u16>(format), static_cast<u16>(format));
+            const String &format_name = StaticEnum<EALGFormat>()->GetNameByEnum(format);
+            constexpr StringView kFormatPrefix = "kALGFormat";
+            if (format_name.starts_with(kFormatPrefix))
+                return format_name.substr(kFormatPrefix.size());
+            return format_name;
         }
 
         String FormatDimension(Render::ETextureDimension dimension)
@@ -179,13 +183,9 @@ namespace Ailu::Editor
         _texture = GetAssetObject<Render::Texture2D>();
         if (_texture == nullptr)
             return false;
-        auto *setting = ResourceMgr::Get().GetImportSetting(GetAsset()->_asset_path);
-        _import_setting = dynamic_cast<TextureImportSetting *>(setting);
-        if (_import_setting == nullptr)
-        {
-            _import_setting = AL_NEW(TextureImportSetting, TextureImportSetting::Default());
-            ResourceMgr::Get().SetImportSetting(GetAsset()->_asset_path, _import_setting);
-        }
+        const auto *setting = dynamic_cast<const TextureImportSetting *>(
+            ResourceMgr::Get().GetImportSetting(GetAsset()->_asset_path));
+        SetEditorImportSetting(setting != nullptr ? *setting : TextureImportSetting::Default());
         _preview->SetTexture(_texture);
         RefreshAllUI();
         return true;
@@ -194,14 +194,7 @@ namespace Ailu::Editor
     void TextureAssetEditor::OnClose()
     {
         _texture = nullptr;
-        _import_setting = nullptr;
         if (_preview) _preview->SetTexture(nullptr);
-    }
-
-    void TextureAssetEditor::OnBeforeSave()
-    {
-        if (_import_setting != nullptr && GetAsset() != nullptr)
-            ResourceMgr::Get().SetImportSetting(GetAsset()->_asset_path, _import_setting);
     }
 
     void TextureAssetEditor::OnAssetSaved()
@@ -243,10 +236,13 @@ namespace Ailu::Editor
 
     void TextureAssetEditor::RefreshImportSettings()
     {
-        if (_import_panel == nullptr || _import_root == nullptr || _import_setting == nullptr)
+        if (_import_panel == nullptr || _import_root == nullptr)
+            return;
+        auto *setting = dynamic_cast<TextureImportSetting *>(GetEditorImportSetting());
+        if (setting == nullptr)
             return;
         _import_root->ClearChildren();
-        _import_panel->Build({TextureImportSetting::StaticType(), _import_setting, _import_root, {}, {},
+        _import_panel->Build({TextureImportSetting::StaticType(), setting, _import_root, {}, {},
                               [this](const PropertyInfo &) { MarkDirty(); }});
     }
 
@@ -287,12 +283,7 @@ namespace Ailu::Editor
             return;
         if (IsDirty() && !Save())
             return;
-        if (ResourceMgr::Get().ReimportAsset(GetAsset()))
-        {
-            _texture = GetAssetObject<Render::Texture2D>();
-            RefreshAllUI();
-            RefreshPreview();
-        }
+        ResourceMgr::Get().ReimportAsset(GetAsset());
     }
 
     void TextureAssetEditor::MarkDirty()

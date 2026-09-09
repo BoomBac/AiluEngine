@@ -220,7 +220,7 @@ void MyRaygenShader()
 
 uint3 GetTriangleIndices(in MyAttributes attr)
 {
-    ObjectInstanceData instance_desc = g_instance_data[InstanceID()];
+    PrimitiveData instance_desc = g_primitive_data[InstanceID()];
     ByteAddressBuffer index_buffer = g_bindless_index_buffer[instance_desc._index_bindless_idx];
     uint tri_idx = instance_desc._submesh_triangle_offset + PrimitiveIndex();
     return index_buffer.Load3(tri_idx * 12u);
@@ -233,7 +233,7 @@ float4 LoadBindlessFloat4(ByteAddressBuffer buffer, uint byte_offset)
 
 float3 LoadInstancePosition(in MyAttributes attr)
 {
-    ObjectInstanceData instance_desc = g_instance_data[InstanceID()];
+    PrimitiveData instance_desc = g_primitive_data[InstanceID()];
     uint3 tri_indices = GetTriangleIndices(attr);
     ByteAddressBuffer position_buffer = g_bindless_vertex_buffer[instance_desc._position_bindless_idx];
     float3 v0 = LoadBindlessFloat3(position_buffer, tri_indices.x * 12u);
@@ -245,7 +245,7 @@ float3 LoadInstancePosition(in MyAttributes attr)
 
 float3 LoadInstanceNormal(in MyAttributes attr)
 {
-    ObjectInstanceData instance_desc = g_instance_data[InstanceID()];
+    PrimitiveData instance_desc = g_primitive_data[InstanceID()];
     float3 barycentrics = float3(1 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
     uint3 tri_indices = GetTriangleIndices(attr);
     ByteAddressBuffer normal_buffer = g_bindless_vertex_buffer[instance_desc._normal_bindless_idx];
@@ -256,7 +256,7 @@ float3 LoadInstanceNormal(in MyAttributes attr)
 
 float2 LoadInstanceUV(in MyAttributes attr)
 {
-    ObjectInstanceData instance_desc = g_instance_data[InstanceID()];
+    PrimitiveData instance_desc = g_primitive_data[InstanceID()];
     float3 barycentrics = float3(1 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
     uint3 tri_indices = GetTriangleIndices(attr);
     ByteAddressBuffer uv_buffer = g_bindless_vertex_buffer[instance_desc._uv_bindless_idx];
@@ -268,7 +268,7 @@ float2 LoadInstanceUV(in MyAttributes attr)
 
 float3 LoadInstanceTangent(in MyAttributes attr)
 {
-    ObjectInstanceData instance_desc = g_instance_data[InstanceID()];
+    PrimitiveData instance_desc = g_primitive_data[InstanceID()];
     float3 barycentrics = float3(1 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
     uint3 tri_indices = GetTriangleIndices(attr);
     ByteAddressBuffer tangent_buffer = g_bindless_vertex_buffer[instance_desc._tangent_bindless_idx];
@@ -538,14 +538,14 @@ float3 SampleAreaLight(ShaderArealLightData light,float3 x,float3 n,RandomCtx ct
 
 void LoadBaseSurfaceData(
     in MyAttributes attr,
-    out ObjectInstanceData inst_data,
+    out PrimitiveData inst_data,
     out MaterialData mat_data,
     out float2 uv,
     out float3 world_pos,
     out float3 geometric_normal,
     out bool front_face)
 {
-    inst_data = g_instance_data[InstanceID()];
+    inst_data = g_primitive_data[InstanceID()];
     float3x3 normal_matrix = transpose((float3x3)inst_data._world_to_local);
     geometric_normal = normalize(mul(normal_matrix, LoadInstanceNormal(attr)));
     uv = LoadInstanceUV(attr);
@@ -554,7 +554,7 @@ void LoadBaseSurfaceData(
     front_face = dot(WorldRayDirection(), geometric_normal) < 0.0f;
 }
 
-float3 ComputeGrassNormal(in MyAttributes attr, ObjectInstanceData inst_data, MaterialData mat_data, float2 uv, float3 world_pos)
+float3 ComputeGrassNormal(in MyAttributes attr, PrimitiveData inst_data, MaterialData mat_data, float2 uv, float3 world_pos)
 {
     float3 tangent_local = normalize(LoadInstanceTangent(attr));
     float3 normal_local = normalize(LoadInstanceNormal(attr));
@@ -590,7 +590,7 @@ void WriteSurfaceHitPayload(inout RayPayload payload, Material mat, float3 world
 [shader("closesthit")]
 void MyClosestHitShader0(inout RayPayload payload, in MyAttributes attr)
 {
-    ObjectInstanceData inst_data;
+    PrimitiveData inst_data;
     MaterialData mat_data;
     float2 uv;
     float3 world_pos;
@@ -605,7 +605,7 @@ void MyClosestHitShader0(inout RayPayload payload, in MyAttributes attr)
 [shader("closesthit")]
 void MyClosestHitShader1(inout RayPayload payload, in MyAttributes attr)
 {
-    ObjectInstanceData inst_data;
+    PrimitiveData inst_data;
     MaterialData mat_data;
     float2 uv;
     float3 world_pos;

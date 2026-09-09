@@ -9,12 +9,12 @@ namespace Ailu
         DrawerBlock::DrawerBlock(Ref<Render::Material> mat, u32 vert_num) : _max_vert_num(vert_num), _mat(mat)
         {
             Vector<VertexBufferLayoutDesc> desc_list;
-            desc_list.emplace_back(RenderConstants::kSemanticPosition, EShaderDateType::kFloat3, 0);
-            desc_list.emplace_back(RenderConstants::kSemanticTexcoord, EShaderDateType::kFloat2, 1);
-            desc_list.emplace_back(RenderConstants::kSemanticColor, EShaderDateType::kFloat4, 2);
-            desc_list.emplace_back(RenderConstants::kSemanticTexcoord, EShaderDateType::kFloat4, 3, 1);
-            desc_list.emplace_back(RenderConstants::kSemanticTexcoord, EShaderDateType::kFloat4, 4, 2);
-            desc_list.emplace_back(RenderConstants::kSemanticTexcoord, EShaderDateType::kFloat4, 5, 3);
+            desc_list.emplace_back(EVertexSemantic::kPosition, EShaderDateType::kFloat3, 0);
+            desc_list.emplace_back(EVertexSemantic::kTexcoord0, EShaderDateType::kFloat2, 1);
+            desc_list.emplace_back(EVertexSemantic::kColor, EShaderDateType::kFloat4, 2);
+            desc_list.emplace_back(EVertexSemantic::kTexcoord1, EShaderDateType::kFloat4, 3);
+            desc_list.emplace_back(EVertexSemantic::kTexcoord2, EShaderDateType::kFloat4, 4);
+            desc_list.emplace_back(EVertexSemantic::kTexcoord3, EShaderDateType::kFloat4, 5);
             _vbuf = Ref<VertexBuffer>(VertexBuffer::Create(desc_list, std::format("block({})_vbuf", s_id_gen)));
             _vbuf->EnableBindlessSRV(false);
             _ibuf = Ref<IndexBuffer>(IndexBuffer::Create(nullptr, vert_num, std::format("block({})_ibuf", s_id_gen), true));

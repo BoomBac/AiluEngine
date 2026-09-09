@@ -77,6 +77,7 @@ EnumInitializer initializer;
 initializer._name = "ECollisionChannel2D";
 initializer._namespace = "Ailu";
 initializer._full_name = "Ailu::ECollisionChannel2D";
+initializer._size = sizeof(Ailu::ECollisionChannel2D);
 initializer._str_to_enum_lut["kWorldStatic"] = 0;
 initializer._str_to_enum_lut["kWorldDynamic"] = 1;
 initializer._str_to_enum_lut["kPlayer"] = 2;

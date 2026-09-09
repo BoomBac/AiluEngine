@@ -72,19 +72,37 @@ list(REMOVE_DUPLICATES AILU_REFLECTION_OUTPUTS)
 
 add_subdirectory("AiluHeadTool")
 
+# Remove stale Visual Studio clean manifests produced by the old OUTPUT rule.
+# Only manifests that explicitly contain reflection files are affected.
+if (CMAKE_GENERATOR MATCHES "Visual Studio")
+	file(GLOB_RECURSE AILU_LEGACY_CLEAN_LOGS "${CMAKE_BINARY_DIR}/*Build.CppClean.log")
+	foreach(clean_log IN LISTS AILU_LEGACY_CLEAN_LOGS)
+		file(STRINGS "${clean_log}" reflection_clean_entries
+			REGEX "generated[/\\\\].+\\.gen\\.(h|cpp)")
+		if(reflection_clean_entries)
+			file(REMOVE "${clean_log}")
+		endif()
+	endforeach()
+endif()
+
+set(AILU_REFLECTION_STAMP "${CMAKE_CURRENT_BINARY_DIR}/ailu_reflection_codegen.stamp")
+
+# The generated files live in the source tree and are checked in.  Use a build
+# tree stamp as the custom-command output so CMake clean never removes them.
 add_custom_command(
-	OUTPUT ${AILU_REFLECTION_OUTPUTS}
+	OUTPUT "${AILU_REFLECTION_STAMP}"
 	COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:AiluHeadTool>/AHT"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different "${AILU_AHT_CONFIG_FILE}" "$<TARGET_FILE_DIR:AiluHeadTool>/AHT/aht.ini"
 	COMMAND ${CMAKE_COMMAND} -E touch "$<TARGET_FILE_DIR:AiluHeadTool>/AHT/cache.txt"
 	COMMAND ${CMAKE_COMMAND} -E touch "$<TARGET_FILE_DIR:AiluHeadTool>/AHT/class_ns_map.txt"
 	COMMAND $<TARGET_FILE:AiluHeadTool>
-	DEPENDS AiluHeadTool ${AILU_REFLECTION_INPUT_HEADERS} "${AILU_AHT_CONFIG_FILE}"
+	COMMAND ${CMAKE_COMMAND} -E touch "${AILU_REFLECTION_STAMP}"
+	DEPENDS AiluHeadTool ${AILU_REFLECTION_INPUT_HEADERS} ${AILU_REFLECTION_OUTPUTS} "${AILU_AHT_CONFIG_FILE}"
 	WORKING_DIRECTORY "$<TARGET_FILE_DIR:AiluHeadTool>"
 	COMMENT "Generating reflection code with AiluHeadTool"
 	VERBATIM)
 
-add_custom_target(ailu_reflection_codegen DEPENDS ${AILU_REFLECTION_OUTPUTS})
+add_custom_target(ailu_reflection_codegen DEPENDS "${AILU_REFLECTION_STAMP}")
 
 # 直接运行已编译好的 AiluHeadTool.exe（不触发 AiluHeadTool 的编译）
 set(AILU_AHT_EXE_DIR "${CMAKE_SOURCE_DIR}/AiluHeadTool/bin/x64" CACHE PATH "Directory containing pre-built AiluHeadTool.exe")

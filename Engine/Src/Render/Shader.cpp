@@ -428,6 +428,11 @@ namespace Ailu::Render
         auto id = ShaderPropertyRegistry::Get().Intern(name);
         s_global_res_registry.SetBuffer(id,buffer);
     }
+    void Shader::SetGlobalBuffer(const String &name, GPUBuffer *buffer)
+    {
+        auto id = ShaderPropertyRegistry::Get().Intern(name);
+        s_global_res_registry.SetBuffer(id, buffer);
+    }
 
 
     void *Shader::GetByteCode(EShaderType type, u16 pass_index, ShaderVariantHash variant_hash)

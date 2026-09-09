@@ -7,6 +7,7 @@
 #include "Framework/Common/NonCopyable.h"
 #include "FileManager.h"
 #include "Assets/Asset.h"
+#include "Assets/AssetRegistry.h"
 #include "Assets/DerivedDataCache.h"
 #include "Framework/Common/Utils.h"
 #include "Framework/Parser/AssetParser.h"
@@ -19,6 +20,7 @@
 #include "Render/Texture.h"
 #include "Render/2D/SpriteAtlas.h"
 #include "Scene/Scene.h"
+#include <chrono>
 #include <optional>
 #include <unordered_map>
 
@@ -200,6 +202,9 @@ namespace Ailu
         bool SaveAsset(Asset *asset);
         bool ReloadAsset(Asset *asset);
         bool ReimportAsset(Asset *asset);
+        // File watchers only enqueue this operation. Tick performs the actual handler load and Publish.
+        void MarkAssetForReload(Asset *asset);
+        void MarkAssetForReload(Asset *asset, EAssetUpdateReason reason);
         void SaveAllDirtyAssets();
         void SaveAllUnsavedAssets();
         //由 Editor 编辑操作标记 Asset 为 Dirty（revision 递增）。
@@ -226,6 +231,14 @@ namespace Ailu
         const Guid &GetAssetGuid(Object *obj) const;
         const WString &GuidToAssetPath(const Guid &guid) const;
 
+        template<typename T>
+        AssetHandle<T> GetOrCreateAssetHandle(const Guid &guid)
+        {
+            return _asset_registry.GetOrCreateHandle<T>(guid);
+        }
+
+        [[nodiscard]] const AssetRegistry &GetAssetRegistry() const { return _asset_registry; }
+
         Asset *GetAsset(const WString &asset_path) const;
         Vector<Asset *> GetAssets(const ISearchFilter &filter) const;
         Asset *RegisterAsset(Scope<Asset> &&asset, bool override = true);
@@ -233,6 +246,9 @@ namespace Ailu
         void RegisterResource(const WString &asset_path, Ref<Object> obj, bool override = true);
         void UnRegisterResource(const WString &asset_path);
 
+        using AssetReloadedCallback = std::function<void(Asset *)>;
+        u64 AddAssetReloadedListener(AssetReloadedCallback callback);
+        void RemoveAssetReloadedListener(u64 listener_id);
         void AddAssetChangedListener(std::function<void()> callback) { _asset_changed_callbacks.emplace_back(callback); };
         void RemoveAssetChangedListener(std::function<void()> callback)
         {
@@ -300,8 +316,9 @@ namespace Ailu
         void CreateAndRegisterEmbeddedMaterial(Mesh* mesh);
 
         // Import settings management
-        ImportSetting* GetImportSetting(const WString &asset_path) const;
-        void SetImportSetting(const WString &asset_path, ImportSetting *setting);
+        const ImportSetting *GetImportSetting(const WString &asset_path) const;
+        void SetImportSetting(const WString &asset_path, Scope<ImportSetting> setting);
+        void SetImportSetting(const WString &asset_path, const ImportSetting &setting);
 
         // Handler lookup (used by GetAssetLoader lambda which needs public access)
         IAssetHandler* FindAssetHandler(const Type *asset_type) const;
@@ -311,6 +328,19 @@ namespace Ailu
         Ref<Font> _default_font;
 
     private:
+        struct PendingAssetReload
+        {
+            EAssetUpdateReason _reason = EAssetUpdateReason::kSourceChanged;
+            std::chrono::steady_clock::time_point _last_dirty = std::chrono::steady_clock::now();
+        };
+
+        struct AssetReloadListener
+        {
+            u64 _id = 0u;
+            AssetReloadedCallback _callback;
+        };
+
+        bool ReloadAsset(Asset *asset, EAssetUpdateReason reason, bool force_reimport = false);
         static WString GetAssetTypeName(const Type *type);
         static const Type *FindAssetType(const WString &type_name);
 
@@ -438,11 +468,15 @@ namespace Ailu
         Queue<std::function<void()>> _sync_tasks;
         Queue<std::function<void()>> _async_tasks;
         Queue<Asset *> _pending_delete_assets;
+        HashMap<Guid, PendingAssetReload, GuidHasher> _pending_reload_requests;
         Queue<Guid> _pending_artifact_cleanup_guids;
-        HashMap<WString, ImportSetting*> _importers;
+        HashMap<WString, Scope<ImportSetting>> _importers;
         Vector<AssetMountDomain> _asset_domains;
         AssetHandlerRegistry _asset_handler_registry;
+        AssetRegistry _asset_registry;
         Scope<DerivedDataCache> _derived_data_cache;
+        Vector<AssetReloadListener> _asset_reload_listeners;
+        u64 _next_asset_reload_listener_id = 1u;
     };
 
     template<typename T>

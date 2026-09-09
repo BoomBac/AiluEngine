@@ -18,6 +18,12 @@ namespace Ailu
         {
         }
 
+        AssetEditor::~AssetEditor()
+        {
+            if (_asset_reload_listener_id != 0u)
+                ResourceMgr::Get().RemoveAssetReloadedListener(_asset_reload_listener_id);
+        }
+
         bool AssetEditor::Open(Asset *asset)
         {
             if (asset == nullptr)
@@ -31,6 +37,8 @@ namespace Ailu
                 _asset = nullptr;
                 return false;
             }
+            _asset_reload_listener_id = ResourceMgr::Get().AddAssetReloadedListener(
+                [this](Asset *reloaded_asset) { HandleAssetReloaded(reloaded_asset); });
             RefreshTitle();
             RefreshEditor();
             return true;
@@ -38,7 +46,13 @@ namespace Ailu
 
         void AssetEditor::Close()
         {
+            if (_asset_reload_listener_id != 0u)
+            {
+                ResourceMgr::Get().RemoveAssetReloadedListener(_asset_reload_listener_id);
+                _asset_reload_listener_id = 0u;
+            }
             OnClose();
+            _editor_import_setting.reset();
             _asset = nullptr;
             RefreshTitle();
         }
@@ -104,6 +118,8 @@ namespace Ailu
                 return false;
 
             OnBeforeSave();
+            if (_editor_import_setting != nullptr)
+                ResourceMgr::Get().SetImportSetting(_asset->_asset_path, *_editor_import_setting);
             if (!ResourceMgr::Get().SaveAsset(_asset))
                 return false;
 
@@ -123,10 +139,22 @@ namespace Ailu
             if (!ResourceMgr::Get().ReloadAsset(_asset))
                 return false;
 
+            return true;
+        }
+
+        void AssetEditor::SetEditorImportSetting(const ImportSetting &setting)
+        {
+            _editor_import_setting = setting.Clone();
+        }
+
+        void AssetEditor::HandleAssetReloaded(Asset *asset)
+        {
+            if (asset == nullptr || asset != _asset)
+                return;
+
             OnAssetReloaded();
             RefreshTitle();
             RefreshEditor();
-            return true;
         }
 
         void AssetEditor::RefreshTitle()
