@@ -217,7 +217,7 @@ namespace Ailu
                         if (unified_light_data != nullptr)
                             builder.Read(builder.Import(unified_light_data));
                         if (rt_scene != nullptr)
-                            builder.Read(builder.Import(rt_scene, EResourceState::kRaytracingAccelerationStructure), EResourceUsage::kRaytracingAccel);
+                            builder.Read(builder.Import(rt_scene), EResourceUsage::kRaytracingAccel);
                         if (use_hardware_ray_tracing && _scene_rt_proxy != nullptr)
                         {
                             if (auto *instance_data = _scene_rt_proxy->GetPrimitiveData(); instance_data != nullptr)

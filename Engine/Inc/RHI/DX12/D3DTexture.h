@@ -6,7 +6,7 @@
 #include <map>
 
 #include "Framework/Math/ALMath.hpp"
-#include "RHI/DX12/D3DResourceBase.h"
+#include "RHI/DX12/D3DResource.h"
 #include "RHI/DX12/DescriptorManager.h"
 #include "Render/Texture.h"
 using Microsoft::WRL::ComPtr;
@@ -66,18 +66,13 @@ namespace Ailu::RHI::DX12
         ~D3DTexture2D();
         void Release() final;
         Render::NativeHandle NativeResource() final { return {Render::RendererAPI::ERenderAPI::kDirectX12, _p_d3dres.Get()}; }
-        void StateTranslation(RHICommandBuffer* rhi_cmd,EResourceState new_state,u32 sub_res) final;
-        void ApplyResourceBarrier(RHICommandBuffer *rhi_cmd, EResourceState before_state, EResourceState after_state,
-                                  u32 sub_res) final;
-        void TrackResourceState(EResourceState new_state, u32 sub_res = kTotalSubRes) final;
-        EResourceState CurrentResourceState(u32 sub_res = kTotalSubRes) const final;
-        bool TryCurrentResourceState(EResourceState &out_state, u32 sub_res = kTotalSubRes) const final;
+        void RequireState(RHICommandBuffer *rhi_cmd, EResourceState state, u32 sub_res = kTotalSubRes) final;
         //for texture2d(s)
         void CreateView(ETextureViewType view_type, u16 mipmap, u16 array_slice = 0) final;
         TextureHandle GetView(ETextureViewType view_type, u16 mipmap, u16 array_slice = 0) const final;
         void ReleaseView(ETextureViewType view_type, u16 mipmap, u16 array_slice = 0) final;
         void Name(const String &new_name) final;
-        void InsertUAVBarrier(RHICommandBuffer* rhi_cmd) final;
+        void UavBarrier(RHICommandBuffer* rhi_cmd) final;
         D3D12_GPU_DESCRIPTOR_HANDLE GetMainGPUSRVHandle() const { return _views.at(0)._gpu_handle; };
         void GenerateMipmap() final;
         
@@ -85,8 +80,7 @@ namespace Ailu::RHI::DX12
         void UploadImpl(GraphicsContext* ctx,RHICommandBuffer* rhi_cmd,UploadParams* params) final;
         void BindImpl(RHICommandBuffer* rhi_cmd, const BindParams& params) final;
     private:
-        D3DResourceStateGuard _state_guard;
-        ComPtr<ID3D12Resource> _p_d3dres;
+        D3DResource _p_d3dres;
         Map<u16, D3DTextureViewInfo> _views;
     };
 
@@ -96,22 +90,18 @@ namespace Ailu::RHI::DX12
         D3DCubeMap(u16 width, bool mipmap_chain = true, ETextureFormat format = ETextureFormat::kRGBA32, bool linear = false, bool random_access = false);
         ~D3DCubeMap();
         Render::NativeHandle NativeResource() final { return {Render::RendererAPI::ERenderAPI::kDirectX12, _p_d3dres.Get()}; }
-        void ApplyResourceBarrier(RHICommandBuffer *rhi_cmd, EResourceState before_state, EResourceState after_state,
-                                  u32 sub_res) final;
-        void TrackResourceState(EResourceState new_state, u32 sub_res = kTotalSubRes) final;
-        EResourceState CurrentResourceState(u32 sub_res = kTotalSubRes) const final;
-        bool TryCurrentResourceState(EResourceState &out_state, u32 sub_res = kTotalSubRes) const final;
+        void RequireState(RHICommandBuffer *rhi_cmd, EResourceState state, u32 sub_res = kTotalSubRes) final;
         void CreateView(ETextureViewType view_type, ECubemapFace face, u16 mipmap, u16 array_slice = 0) final;
         TextureHandle GetView(ETextureViewType view_type, ECubemapFace face, u16 mipmap, u16 array_slice = 0) const final;
         void ReleaseView(ETextureViewType view_type, ECubemapFace face, u16 mipmap, u16 array_slice = 0) final;
-        void InsertUAVBarrier(RHICommandBuffer* rhi_cmd) final;
+        void UavBarrier(RHICommandBuffer* rhi_cmd) final;
+        const D3DResource &Resource() const { return _p_d3dres; }
 
         private:
         void UploadImpl(GraphicsContext* ctx,RHICommandBuffer* rhi_cmd,UploadParams* params) final;
         void BindImpl(RHICommandBuffer* rhi_cmd, const BindParams& params) final;
     private:
-        ComPtr<ID3D12Resource> _p_d3dres;
-        D3DResourceStateGuard _state_guard;
+        D3DResource _p_d3dres;
         Map<u16, D3DTextureViewInfo> _views;
     };
 
@@ -126,19 +116,14 @@ namespace Ailu::RHI::DX12
         void ReleaseView(ETextureViewType view_type, u16 mipmap, u16 dpeth_slice) final;
         void Name(const String &new_name) final;
         void GenerateMipmap() final;
-        void StateTranslation(RHICommandBuffer* rhi_cmd,EResourceState new_state,u32 sub_res) final;
-        void ApplyResourceBarrier(RHICommandBuffer *rhi_cmd, EResourceState before_state, EResourceState after_state,
-                                  u32 sub_res) final;
-        void TrackResourceState(EResourceState new_state, u32 sub_res = kTotalSubRes) final;
-        EResourceState CurrentResourceState(u32 sub_res = kTotalSubRes) const final;
-        bool TryCurrentResourceState(EResourceState &out_state, u32 sub_res = kTotalSubRes) const final;
-        void InsertUAVBarrier(RHICommandBuffer* rhi_cmd) final;
+        void RequireState(RHICommandBuffer *rhi_cmd, EResourceState state, u32 sub_res = kTotalSubRes) final;
+        void UavBarrier(RHICommandBuffer* rhi_cmd) final;
+        const D3DResource &Resource() const { return _p_d3dres; }
     private:
         void UploadImpl(GraphicsContext* ctx,RHICommandBuffer* rhi_cmd,UploadParams* params) final;
         void BindImpl(RHICommandBuffer* rhi_cmd, const BindParams& params) final;
     private:
-        ComPtr<ID3D12Resource> _p_d3dres;
-        D3DResourceStateGuard _state_guard;
+        D3DResource _p_d3dres;
         Map<u16, D3DTextureViewInfo> _views;
         //gen mipmap for 1~4
         Ref<ComputeShader> _p_mipmapgen_cs0 = nullptr;
@@ -155,12 +140,7 @@ namespace Ailu::RHI::DX12
         D3DRenderTexture(const TextureDesc &desc);
         ~D3DRenderTexture() final;
         Render::NativeHandle NativeResource() final { return {Render::RendererAPI::ERenderAPI::kDirectX12, _p_d3dres.Get()}; }
-        void StateTranslation(RHICommandBuffer* rhi_cmd,EResourceState new_state,u32 sub_res) final;
-        void ApplyResourceBarrier(RHICommandBuffer *rhi_cmd, EResourceState before_state, EResourceState after_state,
-                                  u32 sub_res) final;
-        void TrackResourceState(EResourceState new_state, u32 sub_res = kTotalSubRes) final;
-        EResourceState CurrentResourceState(u32 sub_res = kTotalSubRes) const final;
-        bool TryCurrentResourceState(EResourceState &out_state, u32 sub_res = kTotalSubRes) const final;
+        void RequireState(RHICommandBuffer *rhi_cmd, EResourceState state, u32 sub_res = kTotalSubRes) final;
         //for texture2d(s)
         void CreateView(ETextureViewType view_type, u16 mipmap, u16 array_slice = 0) final;
         TextureHandle GetView(ETextureViewType view_type, u16 mipmap, u16 array_slice = 0) const final;
@@ -175,7 +155,8 @@ namespace Ailu::RHI::DX12
         void GenerateMipmap() final;
         void GenerateMipmap(CommandBuffer *cmd) final;
         void GenerateMipmap(CommandBuffer *cmd, u16 source_mip, u16 output_mip_count) final;
-        void InsertUAVBarrier(RHICommandBuffer* rhi_cmd) final;
+        void UavBarrier(RHICommandBuffer* rhi_cmd) final;
+        const D3DResource &Resource() const { return _p_d3dres; }
         void *ReadBack(u16 mipmap, u16 array_slice = 0, ECubemapFace face = ECubemapFace::kUnknown) final;
         void ReadBackAsync(std::function<void(void *)> callback, u16 mipmap, u16 array_slice = 0, ECubemapFace face = ECubemapFace::kUnknown) final;
         D3D12_CPU_DESCRIPTOR_HANDLE *TargetCPUHandle(RHICommandBuffer *cmd, u16 index);
@@ -185,8 +166,7 @@ namespace Ailu::RHI::DX12
         void BindImpl(RHICommandBuffer* rhi_cmd, const BindParams& params) final;
     private:
         D3D12_RESOURCE_DESC _tex_desc{};
-        ComPtr<ID3D12Resource> _p_d3dres;
-        D3DResourceStateGuard _state_guard;
+        D3DResource _p_d3dres;
         Map<u16, D3DTextureViewInfo> _views;
     };
 }// namespace Ailu

@@ -3,7 +3,7 @@
 #define __D3D_RAY_TRACING_SCENE_H__
 #include <wrl/client.h>
 #include "d3dx12.h"
-#include "RHI/DX12/D3DResourceBase.h"
+#include "RHI/DX12/D3DResource.h"
 #include "RHI/DX12/DescriptorManager.h"
 #include "Render/RayTracing/RayTracingScene.h"
 
@@ -31,12 +31,9 @@ namespace Ailu::RHI::DX12
         bool NeedRecreateBuildResource() const final;
         void PrepareBuild(bool is_rebuild) final;
     private:
-        ComPtr<ID3D12Resource> _scratch_resource;
-        ComPtr<ID3D12Resource> _instance_descs_resource;
-        ComPtr<ID3D12Resource> _tlas_resource;
-        D3DResourceStateGuard _scratch_state_guard;
-        D3DResourceStateGuard _instance_descs_state_guard;
-        D3DResourceStateGuard _tlas_state_guard;
+        D3DResource _scratch_resource;
+        D3DResource _instance_descs_resource;
+        D3DResource _tlas_resource;
         GPUVisibleDescriptorAllocation _tlas_srv_alloc;
         D3D12_GPU_VIRTUAL_ADDRESS _tlas_gpu_address = 0u;
         void* _mapped_instance_descs = nullptr;

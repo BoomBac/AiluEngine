@@ -11,11 +11,9 @@ namespace Ailu::RHI::DX12
     {
         void CreateBufferResource(D3DContext* ctx,
                                   u64 size,
-                                  D3D12_RESOURCE_STATES init_state,
                                   bool allow_uav,
                                   const String& name,
-                                  ComPtr<ID3D12Resource>& resource,
-                                  D3DResourceStateGuard& state_guard)
+                                  D3DResource &resource)
         {
             auto desc = CD3DX12_RESOURCE_DESC::Buffer(size);
             if (allow_uav)
@@ -26,11 +24,12 @@ namespace Ailu::RHI::DX12
                 &heap_prop,
                 D3D12_HEAP_FLAG_NONE,
                 &desc,
-                init_state,
+                D3D12_RESOURCE_STATE_COMMON,
                 nullptr,
-                IID_PPV_ARGS(resource.ReleaseAndGetAddressOf())));
+                IID_PPV_ARGS(resource.GetAddressOf())));
             resource->SetName(ToWChar(name).c_str());
-            state_guard = D3DResourceStateGuard(resource.Get(), init_state, 1u);
+            resource._subresource_count = 1u;
+            resource.ResetStateId();
         }
     }
 
@@ -85,20 +84,16 @@ namespace Ailu::RHI::DX12
         _scratch_buffer_size = static_cast<u32>(bottomLevelPrebuildInfo.ScratchDataSizeInBytes);
         CreateBufferResource(dynamic_cast<D3DContext *>(ctx),
                              bottomLevelPrebuildInfo.ScratchDataSizeInBytes,
-                             D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
                              true,
                              std::format("blas_{}_scratch", _desc._vertex_buffer->Name()),
-                             _scratch_resource,
-                             _scratch_state_guard);
+                             _scratch_resource);
         _mem_size += static_cast<u32>(bottomLevelPrebuildInfo.ScratchDataSizeInBytes);
 
         CreateBufferResource(dynamic_cast<D3DContext *>(ctx),
                              bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes,
-                             D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
                              true,
                              std::format("blas_{}", _desc._vertex_buffer->Name()),
-                             _blas_resource,
-                             _blas_state_guard);
+                             _blas_resource);
         _blas_gpu_address = _blas_resource->GetGPUVirtualAddress();
         _native_resource = {Render::RendererAPI::ERenderAPI::kDirectX12, _blas_resource.Get()};
         _mem_size += static_cast<u32>(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes);

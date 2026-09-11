@@ -3,7 +3,7 @@
 #define __D3DBUFFER_H__
 #include "Render/Buffer.h"
 
-#include "D3DResourceBase.h"
+#include "D3DResource.h"
 #include "DescriptorManager.h"
 #include "RHI/DX12/GPUResourceManager.h"
 #include <map>
@@ -28,37 +28,32 @@ namespace Ailu::RHI::DX12
     public:
 		D3DGPUBuffer(BufferDesc desc);
 		~D3DGPUBuffer();
-		void StateTranslation(RHICommandBuffer* rhi_cmd,EResourceState new_state,u32 sub_res) final;
-		void ApplyResourceBarrier(RHICommandBuffer *rhi_cmd, EResourceState before_state, EResourceState after_state,
-		                          u32 sub_res) final;
-		void TrackResourceState(EResourceState new_state, u32 sub_res = Render::kTotalSubRes) final;
-		EResourceState CurrentResourceState(u32 sub_res = Render::kTotalSubRes) const final;
-        bool TryCurrentResourceState(EResourceState &out_state, u32 sub_res = Render::kTotalSubRes) const final;
-		void InsertUAVBarrier(RHICommandBuffer* rhi_cmd) final;
 		void Name(const String &name) final;
 		ID3D12Resource *GetD3DResource() const { return _p_d3d_res.Get(); }
 		D3D12_GPU_VIRTUAL_ADDRESS GetGPUVirtualAddress() const
 		{
-			return _p_d3d_res != nullptr ? _p_d3d_res->GetGPUVirtualAddress() : 0u;
+			return _p_d3d_res ? _p_d3d_res->GetGPUVirtualAddress() : 0u;
 		}
 		void ReadBack(u8 *dst, u32 size) final;
 		void ReadBackAsync(u8 *dst, u32 size, std::function<void()> on_complete);
 		void GetCounter(std::function<void(u32)> callback) final;
 		void SetCounter(u32 counter) final;
-		ID3D12Resource* GetCounterBuffer() {return _counter_buffer.Get();}
+		ID3D12Resource* GetCounterBuffer() { return _counter_buffer.Get(); }
+		const D3DResource &Resource() const { return _p_d3d_res; }
+		const D3DResource &CounterResource() const { return _counter_buffer; }
+		void RequireState(RHICommandBuffer *rhi_cmd, EResourceState state, u32 sub_res = Render::kTotalSubRes) final;
+		void UavBarrier(RHICommandBuffer *rhi_cmd) final;
 		Render::NativeHandle NativeResource() final { return {Render::RendererAPI::ERenderAPI::kDirectX12, _p_d3d_res.Get()}; }
 	protected:
 		void OnDataChanged() final;
 	public:
-		D3DResourceStateGuard _state_guard;
-		D3DResourceStateGuard _counter_state_guard;
+		D3DResource _p_d3d_res;
+		D3DResource _counter_buffer;
 	private:
         void BindImpl(RHICommandBuffer* rhi_cmd, const BindParams& params) final;
         void UploadImpl(GraphicsContext* ctx,RHICommandBuffer* rhi_cmd,UploadParams* params) final;
     private:
         GPUVisibleDescriptorAllocation _uav_alloc,_srv_alloc,_counter_uav;
-        ComPtr<ID3D12Resource> _p_d3d_res;
-        ComPtr<ID3D12Resource> _counter_buffer;
         D3D12_GPU_VIRTUAL_ADDRESS _gpu_ptr;
         void *_mapped_data = nullptr;
     };
@@ -69,18 +64,15 @@ namespace Ailu::RHI::DX12
 		D3DVertexBuffer(VertexBufferLayout layout);
 		~D3DVertexBuffer();
 		void Name(const String& name) final;
-		void StateTranslation(RHICommandBuffer* rhi_cmd, EResourceState new_state, u32 sub_res) final;
-		void ApplyResourceBarrier(RHICommandBuffer *rhi_cmd, EResourceState before_state, EResourceState after_state,
-		                          u32 sub_res) final;
+		void RequireState(RHICommandBuffer *rhi_cmd, EResourceState state, u32 sub_res = Render::kTotalSubRes) final;
 		Render::NativeHandle NativeResource() final { return {Render::RendererAPI::ERenderAPI::kDirectX12, _vertex_buffers.empty() ? nullptr : _vertex_buffers[0].Get()}; }
 		Render::NativeHandle NativeResource(u16 stream_idx) { return {Render::RendererAPI::ERenderAPI::kDirectX12, _vertex_buffers.empty() ? nullptr : _vertex_buffers[stream_idx].Get()}; }
 	private:
         void BindImpl(RHICommandBuffer* rhi_cmd, const BindParams& params) final;
         void UploadImpl(GraphicsContext* ctx,RHICommandBuffer* rhi_cmd,UploadParams* params) final;
 	private:
-		Vector<ComPtr<ID3D12Resource>> _vertex_buffers;
+		Vector<D3DResource> _vertex_buffers;
 		Vector<D3D12_VERTEX_BUFFER_VIEW> _buffer_views;
-		Vector<D3DResourceStateGuard> _state_guards;
 	};
 
 	class D3DIndexBuffer : public IndexBuffer
@@ -91,11 +83,13 @@ namespace Ailu::RHI::DX12
         void UploadImpl(GraphicsContext* ctx,RHICommandBuffer* rhi_cmd,UploadParams* params) final;
 		void Name(const String& name) final;
         void Resize(u32 new_size) final;
+		void RequireState(RHICommandBuffer *rhi_cmd, EResourceState state, u32 sub_res = Render::kTotalSubRes) final;
 		Render::NativeHandle NativeResource() final { return {Render::RendererAPI::ERenderAPI::kDirectX12, _index_buf.Get()}; }
+		const D3DResource &Resource() const { return _index_buf; }
 	private:
         void BindImpl(RHICommandBuffer* rhi_cmd, const BindParams& params) final;
 	private:
-		ComPtr<ID3D12Resource> _index_buf;
+		D3DResource _index_buf;
 		D3D12_INDEX_BUFFER_VIEW _index_buf_view;
 	};
 

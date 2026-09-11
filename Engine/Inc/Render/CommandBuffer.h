@@ -56,7 +56,7 @@ namespace Ailu
         virtual ~RHICommandBuffer() {};
         virtual void Clear() { _keep_alive_objects.clear(); };
         virtual bool IsReady() const { return true; }
-        virtual void InsertUAVBarrier() {}
+        virtual void UavBarrier() {}
         void AddKeepAliveObjects(Vector<Ref<Object>> &&objects)
         {
             for (auto &object : objects)
@@ -118,7 +118,6 @@ namespace Ailu
         CommandBuffer(String name);
         ~CommandBuffer() override;
         void SetRenderGraph(RDG::RenderGraph *render_graph);
-        void UseRenderGraphResource(GpuResource *resource);
 #if AILU_ENABLE_FRAME_DEBUGGER
         void SetCapturePassMetadata(const Render::FrameDebugger::CapturePassMetadata &metadata) { _capture_pass_metadata = metadata; }
         const Render::FrameDebugger::CapturePassMetadata &CapturePassMetadata() const { return _capture_pass_metadata; }
@@ -213,18 +212,13 @@ namespace Ailu
         /// @param dst_offset
         void CopyCounterValue(GPUBuffer *src, GPUBuffer *dst, u32 dst_offset);
 
-        void StateTransition(GpuResource *res, EResourceState new_state, u32 sub_res = kTotalSubRes);
-        void ResourceBarrier(GpuResource *res, EResourceState before, EResourceState after, u32 sub_res = kTotalSubRes);
-        void InsertUAVBarrier(GpuResource *res = nullptr);
-        /// @brief Submit a contiguous block of barriers as a single batched command. High frequency paths
-        /// (RenderGraph compiled passes) must use this instead of the per-barrier overloads.
-        void ResourceBarriers(const ResourceBarrierDesc *barriers, u32 count);
+        void RequireState(GpuResource *res, EResourceState state, u32 sub_res = kTotalSubRes);
+        void UavBarrier(GpuResource *res = nullptr);
 
         void ReadbackBuffer(GPUBuffer* buffer,bool is_counter,u32 size,ReadbackCallback callback);
 
         // Move-out the internal command list for submission.
         Vector<GfxCommand *> TakeCommands();
-        Vector<GpuResource *> TakeRenderGraphResources();
         // Move-out the unique strong references required by asynchronous command recording.
         Vector<Ref<Object>> TakeKeepAliveObjects();
         // Move-out temporary RTs whose pool leases can be released after GPU submission.

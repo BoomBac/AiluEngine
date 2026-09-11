@@ -724,14 +724,6 @@ namespace Ailu
             ETextureFormat _format;
         };
 
-        enum class ETextureResState : u8
-        {
-            kDefault,
-            kColorTagret,
-            kShaderResource,
-            kDepthTarget
-        };
-
         class RenderTexture;
         struct RTHandle
         {

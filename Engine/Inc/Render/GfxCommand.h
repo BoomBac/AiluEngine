@@ -40,10 +40,8 @@ namespace Ailu::Render
         kDraw,
         kDispatch,
         kResourceUpload,
-        kTransResourceState,
-        kResourceBarrier,
-        kResourceBarriers,
-        kUAVBarrier,
+        kRequireResourceState,
+        kUavBarrier,
         kAllocConstBuffer,
         kCommandProfiler,
         kCopyCounter,
@@ -167,42 +165,23 @@ namespace Ailu::Render
             SafeResetCommand(this);
         }
     };
-    struct CommandTranslateState : public TypedGfxCommand<EGpuCommandType::kTransResourceState>
+    struct CommandRequireResourceState : public TypedGfxCommand<EGpuCommandType::kRequireResourceState>
     {
         GpuResource *_res;
-        EResourceState _new_state;
+        EResourceState _state;
         u32 _sub_res;
-        CommandTranslateState() : _res(nullptr), _new_state(EResourceState::kCommon), _sub_res(UINT32_MAX) {}
-        CommandTranslateState(GpuResource *res, EResourceState new_state, u32 sub_res = UINT32_MAX) : _res(res), _new_state(new_state), _sub_res(sub_res) {}
+        CommandRequireResourceState() : _res(nullptr), _state(EResourceState::kCommon), _sub_res(kTotalSubRes) {}
+        CommandRequireResourceState(GpuResource *res, EResourceState state, u32 sub_res = kTotalSubRes)
+            : _res(res), _state(state), _sub_res(sub_res) {}
         void Reset() {
             SafeResetCommand(this);
         }
     };
-    struct CommandResourceBarrier : public TypedGfxCommand<EGpuCommandType::kResourceBarrier>
+    struct CommandUavBarrier : public TypedGfxCommand<EGpuCommandType::kUavBarrier>
     {
         GpuResource *_res;
-        EResourceState _before;
-        EResourceState _after;
-        u32 _sub_res;
-        CommandResourceBarrier() : _res(nullptr), _before(EResourceState::kCommon), _after(EResourceState::kCommon), _sub_res(kTotalSubRes) {}
-        CommandResourceBarrier(GpuResource *res, EResourceState before, EResourceState after, u32 sub_res = kTotalSubRes)
-            : _res(res), _before(before), _after(after), _sub_res(sub_res) {}
-        void Reset() {
-            SafeResetCommand(this);
-        }
-    };
-    /// @brief Batched barrier submission. Holds one contiguous array so a whole pass worth of barriers costs a
-    /// single command object instead of one pooled payload per barrier.
-    struct CommandResourceBarriers : public TypedGfxCommand<EGpuCommandType::kResourceBarriers>
-    {
-        Vector<ResourceBarrierDesc> _barriers;
-        void Reset() { _barriers.clear(); }
-    };
-    struct CommandUAVBarrier : public TypedGfxCommand<EGpuCommandType::kUAVBarrier>
-    {
-        GpuResource *_res;
-        CommandUAVBarrier() : _res(nullptr) {}
-        explicit CommandUAVBarrier(GpuResource *res) : _res(res) {}
+        CommandUavBarrier() : _res(nullptr) {}
+        explicit CommandUavBarrier(GpuResource *res) : _res(res) {}
         void Reset() {
             SafeResetCommand(this);
         }
@@ -331,15 +310,15 @@ namespace Ailu::Render
 
     inline constexpr size_t kCommandPayloadSize = MaxCommandValue(
         sizeof(CommandSetTarget), sizeof(CommandClearTarget), sizeof(CommandDraw), sizeof(CommandDispatch),
-        sizeof(CommandGpuResourceUpload), sizeof(CommandTranslateState), sizeof(CommandResourceBarrier),
-        sizeof(CommandResourceBarriers), sizeof(CommandUAVBarrier), sizeof(CommandCustom), sizeof(CommandAllocConstBuffer), sizeof(CommandProfiler),
+        sizeof(CommandGpuResourceUpload), sizeof(CommandRequireResourceState), sizeof(CommandUavBarrier),
+        sizeof(CommandCustom), sizeof(CommandAllocConstBuffer), sizeof(CommandProfiler),
         sizeof(CommandCopyCounter), sizeof(CommandPresent), sizeof(CommandScissor), sizeof(CommandDispatchRays),
         sizeof(CommandReadBack), sizeof(CommandBuildAS));
 
     inline constexpr size_t kCommandPayloadAlign = MaxCommandValue(
         alignof(CommandSetTarget), alignof(CommandClearTarget), alignof(CommandDraw), alignof(CommandDispatch),
-        alignof(CommandGpuResourceUpload), alignof(CommandTranslateState), alignof(CommandResourceBarrier),
-        alignof(CommandResourceBarriers), alignof(CommandUAVBarrier), alignof(CommandCustom), alignof(CommandAllocConstBuffer), alignof(CommandProfiler),
+        alignof(CommandGpuResourceUpload), alignof(CommandRequireResourceState), alignof(CommandUavBarrier),
+        alignof(CommandCustom), alignof(CommandAllocConstBuffer), alignof(CommandProfiler),
         alignof(CommandCopyCounter), alignof(CommandPresent), alignof(CommandScissor), alignof(CommandDispatchRays),
         alignof(CommandReadBack), alignof(CommandBuildAS));
 

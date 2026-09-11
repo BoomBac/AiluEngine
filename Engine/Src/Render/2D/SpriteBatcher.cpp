@@ -164,7 +164,6 @@ namespace Ailu::Render
         desc._element_size = sizeof(SpriteInstanceData);
         desc._size = new_capacity * sizeof(SpriteInstanceData);
         desc._target = EGPUBufferTarget::kStructured;
-        desc._init_state = EResourceState::kCommon;
         _instance_buffer = GPUBuffer::Create(desc, "SpriteInstanceBuffer");
         GraphicsContext::Get().CreateResource(_instance_buffer.get());
     }

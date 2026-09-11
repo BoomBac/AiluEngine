@@ -51,7 +51,7 @@ namespace Ailu
             auto bind_heap = g_descriptor_mgr->GetBindHeap();
             d3dcmd->SetDescriptorHeap(bind_heap, 1024);
             for (auto &it: _imgui_used_rt)
-                it->StateTranslation(cmd, EResourceState::kPixelShaderResource, kTotalSubRes);
+                it->RequireState(cmd, EResourceState::kPixelShaderResource, kTotalSubRes);
             _imgui_used_rt.clear();
 
             ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), dxcmd);

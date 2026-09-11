@@ -103,44 +103,6 @@ namespace Ailu::Render
         ~Impl() = default;
 
     private:
-#ifdef _DEBUG
-        void ValidateRenderGraphBindings(const PipelineBindingSnapshot &bindings, const char *source) const
-        {
-            if (_render_graph == nullptr)
-                return;
-            for (u16 i = 0u; i < bindings._entry_count; ++i)
-            {
-                const auto &binding = bindings._entries[i];
-                if (binding._resource == nullptr || !_render_graph->ContainsResource(binding._resource)
-                    || std::find(_render_graph_resources.begin(), _render_graph_resources.end(), binding._resource)
-                        != _render_graph_resources.end())
-                    continue;
-                LOG_ERROR("Undeclared RenderGraph resource access: command_buffer={}, resource={}, resource_ptr={}, "
-                          "binding_slot={}, source={}", _name, binding._resource->Name(),
-                          static_cast<const void *>(binding._resource), binding._slot, source);
-                AL_ASSERT(false);
-            }
-        }
-
-        void ValidateRenderGraphBindings(const ComputeDispatchSnapshot &bindings, const char *source) const
-        {
-            if (_render_graph == nullptr)
-                return;
-            for (u16 i = 0u; i < bindings._entry_count; ++i)
-            {
-                const auto &binding = bindings._entries[i];
-                if (binding._resource == nullptr || !_render_graph->ContainsResource(binding._resource)
-                    || std::find(_render_graph_resources.begin(), _render_graph_resources.end(), binding._resource)
-                        != _render_graph_resources.end())
-                    continue;
-                LOG_ERROR("Undeclared RenderGraph resource access: command_buffer={}, resource={}, resource_ptr={}, "
-                          "binding_slot={}, source={}", _name, binding._resource->Name(),
-                          static_cast<const void *>(binding._resource), binding._slot, source);
-                AL_ASSERT(false);
-            }
-        }
-#endif
-
         void PushMaterialState(CommandDraw *cmd)
         {
             ++_rendering_states_data.MaterialCaptureCount;
@@ -170,9 +132,6 @@ namespace Ailu::Render
                                                                        g_pGfxContext->GetFrameCount(),
                                                                        *FrameResourceManager::Get().GetActiveFrameAllocator(),
                                                                        &_command_resources, &_rendering_states_data);
-#ifdef _DEBUG
-            ValidateRenderGraphBindings(cmd->_material_draw_state._bindings, "material_draw");
-#endif
         }
 
     public:
@@ -180,14 +139,6 @@ namespace Ailu::Render
         {
             _render_graph = render_graph;
             _name = name;
-        }
-        void UseRenderGraphResource(GpuResource *resource)
-        {
-            if (resource == nullptr || std::find(_render_graph_resources.begin(), _render_graph_resources.end(), resource) !=
-                                             _render_graph_resources.end())
-                return;
-            _render_graph_resources.emplace_back(resource);
-            KeepAlive(resource);
         }
         void Clear()
         {
@@ -202,7 +153,6 @@ namespace Ailu::Render
             _command_resources.clear();
             _leased_temp_rts.clear();
             _released_temp_rts.clear();
-            _render_graph_resources.clear();
             _render_graph = nullptr;
             _rendering_states_data.Reset();
         }
@@ -579,20 +529,11 @@ namespace Ailu::Render
                 case EGpuCommandType::kResourceUpload:
                     KeepAlive(static_cast<CommandGpuResourceUpload *>(command)->_res);
                     break;
-                case EGpuCommandType::kTransResourceState:
-                    KeepAlive(static_cast<CommandTranslateState *>(command)->_res);
+                case EGpuCommandType::kRequireResourceState:
+                    KeepAlive(static_cast<CommandRequireResourceState *>(command)->_res);
                     break;
-                case EGpuCommandType::kResourceBarrier:
-                    KeepAlive(static_cast<CommandResourceBarrier *>(command)->_res);
-                    break;
-                case EGpuCommandType::kResourceBarriers:
-                {
-                    for (const auto &barrier: static_cast<CommandResourceBarriers *>(command)->_barriers)
-                        KeepAlive(barrier._resource);
-                    break;
-                }
-                case EGpuCommandType::kUAVBarrier:
-                    KeepAlive(static_cast<CommandUAVBarrier *>(command)->_res);
+                case EGpuCommandType::kUavBarrier:
+                    KeepAlive(static_cast<CommandUavBarrier *>(command)->_res);
                     break;
                 case EGpuCommandType::kCopyCounter:
                 {
@@ -867,9 +808,6 @@ namespace Ailu::Render
             cmd->_arg_buffer = nullptr;
             cmd->_arg_offset = 0u;
             cmd->_cs->CaptureDispatchState(cmd->_kernel, cmd->_bindings, &_command_resources);
-#ifdef _DEBUG
-            ValidateRenderGraphBindings(cmd->_bindings, "compute_dispatch");
-#endif
             _commands.emplace_back(cmd);
         }
         void Dispatch(ComputeShader *cs, ComputeShaderKernelId kernel, GPUBuffer *arg_buffer, u16 arg_offset)
@@ -886,9 +824,6 @@ namespace Ailu::Render
             cmd->_group_num_y = 1u;
             cmd->_group_num_z = 1u;
             cmd->_cs->CaptureDispatchState(cmd->_kernel, cmd->_bindings, &_command_resources);
-#ifdef _DEBUG
-            ValidateRenderGraphBindings(cmd->_bindings, "compute_dispatch");
-#endif
             cmd->_arg_buffer = arg_buffer;
             cmd->_arg_offset = arg_offset;
             _commands.emplace_back(cmd);
@@ -937,43 +872,19 @@ namespace Ailu::Render
         {
             SetRenderTargetLoadAction(_render_graph->Resolve<RenderTexture>(handle), action);
         }
-        void StateTransition(GpuResource *res, EResourceState new_state, u32 sub_res)
+        void RequireState(GpuResource *res, EResourceState state, u32 sub_res)
         {
-            auto cmd = CommandPool::Get().Alloc<CommandTranslateState>();
+            auto cmd = CommandPool::Get().Alloc<CommandRequireResourceState>();
             cmd->_res = res;
-            cmd->_new_state = new_state;
+            cmd->_state = state;
             cmd->_sub_res = sub_res;
             _commands.emplace_back(cmd);
         }
 
-        void ResourceBarrier(GpuResource *res, EResourceState before, EResourceState after, u32 sub_res)
+        void UavBarrier(GpuResource *res)
         {
-            if (res == nullptr || before == after)
-                return;
-            auto cmd = CommandPool::Get().Alloc<CommandResourceBarrier>();
+            auto cmd = CommandPool::Get().Alloc<CommandUavBarrier>();
             cmd->_res = res;
-            cmd->_before = before;
-            cmd->_after = after;
-            cmd->_sub_res = sub_res;
-            _commands.emplace_back(cmd);
-        }
-
-        void InsertUAVBarrier(GpuResource *res)
-        {
-            auto cmd = CommandPool::Get().Alloc<CommandUAVBarrier>();
-            cmd->_res = res;
-            _commands.emplace_back(cmd);
-        }
-
-        void ResourceBarriers(const ResourceBarrierDesc *barriers, u32 count)
-        {
-            if (barriers == nullptr || count == 0u)
-                return;
-            auto cmd = CommandPool::Get().Alloc<CommandResourceBarriers>();
-            if (cmd == nullptr)
-                return;
-            // One allocation for the whole pass worth of barriers; entries are never appended one by one.
-            cmd->_barriers.assign(barriers, barriers + count);
             _commands.emplace_back(cmd);
         }
 
@@ -1014,7 +925,6 @@ namespace Ailu::Render
         }
         String _name;
         Vector<GfxCommand *> _commands;
-        Vector<GpuResource *> _render_graph_resources;
         Vector<Ref<Object>> _keep_alive_objects;
         std::unordered_set<Object *> _keep_alive_set;
         Array<Rect, RenderConstants::kMaxMRTNum> _viewports;
@@ -1171,10 +1081,6 @@ namespace Ailu::Render
     {
         _impl->Blit(src, dst, mat, pass_index);
     }
-    void CommandBuffer::UseRenderGraphResource(GpuResource *resource)
-    {
-        _impl->UseRenderGraphResource(resource);
-    }
     void CommandBuffer::DrawFullScreenQuad(Material *mat, u16 pass_index)
     {
         _impl->DrawFullScreenQuad(mat, pass_index);
@@ -1281,24 +1187,14 @@ namespace Ailu::Render
     {
         _impl->SetRenderTargetLoadAction(handle, action);
     }
-    void CommandBuffer::StateTransition(GpuResource* res,EResourceState new_state,u32 sub_res)
+    void CommandBuffer::RequireState(GpuResource *res, EResourceState state, u32 sub_res)
     {
-        _impl->StateTransition(res, new_state, sub_res);
+        _impl->RequireState(res, state, sub_res);
     }
 
-    void CommandBuffer::ResourceBarrier(GpuResource *res, EResourceState before, EResourceState after, u32 sub_res)
+    void CommandBuffer::UavBarrier(GpuResource *res)
     {
-        _impl->ResourceBarrier(res, before, after, sub_res);
-    }
-
-    void CommandBuffer::InsertUAVBarrier(GpuResource *res)
-    {
-        _impl->InsertUAVBarrier(res);
-    }
-
-    void CommandBuffer::ResourceBarriers(const ResourceBarrierDesc *barriers, u32 count)
-    {
-        _impl->ResourceBarriers(barriers, count);
+        _impl->UavBarrier(res);
     }
 
     void CommandBuffer::BuildAS(RayTracingScene* scene,bool is_update)
@@ -1324,10 +1220,6 @@ namespace Ailu::Render
     Vector<GfxCommand *> CommandBuffer::TakeCommands()
     {
         return std::move(_impl->_commands);
-    }
-    Vector<GpuResource *> CommandBuffer::TakeRenderGraphResources()
-    {
-        return std::move(_impl->_render_graph_resources);
     }
 
     Vector<Ref<Object>> CommandBuffer::TakeKeepAliveObjects()

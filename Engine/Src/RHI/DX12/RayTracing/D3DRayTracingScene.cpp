@@ -30,11 +30,9 @@ namespace Ailu::RHI::DX12
 
         void CreateDefaultBufferResource(D3DContext* ctx,
                                          u64 size,
-                                         D3D12_RESOURCE_STATES init_state,
                                          bool allow_uav,
                                          const String& name,
-                                         ComPtr<ID3D12Resource>& resource,
-                                         D3DResourceStateGuard& state_guard)
+                                         D3DResource &resource)
         {
             auto desc = CD3DX12_RESOURCE_DESC::Buffer(size);
             if (allow_uav)
@@ -45,19 +43,19 @@ namespace Ailu::RHI::DX12
                 &heap_prop,
                 D3D12_HEAP_FLAG_NONE,
                 &desc,
-                init_state,
+                D3D12_RESOURCE_STATE_COMMON,
                 nullptr,
-                IID_PPV_ARGS(resource.ReleaseAndGetAddressOf())));
+                IID_PPV_ARGS(resource.GetAddressOf())));
             resource->SetName(ToWChar(name).c_str());
-            state_guard = D3DResourceStateGuard(resource.Get(), init_state, 1u);
+            resource._subresource_count = 1u;
+            resource.ResetStateId();
         }
 
         void CreateUploadBufferResource(D3DContext* ctx,
                                         const void* data,
                                         u64 size,
                                         const String& name,
-                                        ComPtr<ID3D12Resource>& resource,
-                                        D3DResourceStateGuard& state_guard,
+                                        D3DResource &resource,
                                         void** mapped_data = nullptr)
         {
             auto desc = CD3DX12_RESOURCE_DESC::Buffer(size);
@@ -68,9 +66,8 @@ namespace Ailu::RHI::DX12
                 &desc,
                 D3D12_RESOURCE_STATE_GENERIC_READ,
                 nullptr,
-                IID_PPV_ARGS(resource.ReleaseAndGetAddressOf())));
+                IID_PPV_ARGS(resource.GetAddressOf())));
             resource->SetName(ToWChar(name).c_str());
-            state_guard = D3DResourceStateGuard(resource.Get(), D3D12_RESOURCE_STATE_GENERIC_READ, 1u);
 
             void* mapped = nullptr;
             ThrowIfFailed(resource->Map(0, nullptr, &mapped));
@@ -79,6 +76,7 @@ namespace Ailu::RHI::DX12
                 *mapped_data = mapped;
             else
                 resource->Unmap(0, nullptr);
+            resource.ResetStateId();
         }
 
         void FillInstanceDesc(const Render::RayTracingInstance& instance, D3D12_RAYTRACING_INSTANCE_DESC& instance_desc)
@@ -137,7 +135,7 @@ namespace Ailu::RHI::DX12
 
     void D3DRayTracingScene::PrepareBuild(bool is_rebuild)
     {
-        if (_instances.empty() || _tlas_resource == nullptr || _instance_descs_resource == nullptr)
+        if (_instances.empty() || !_tlas_resource || !_instance_descs_resource)
             return;
 
         _native_resource = {Render::RendererAPI::ERenderAPI::kDirectX12, _tlas_resource.Get()};
@@ -196,20 +194,16 @@ namespace Ailu::RHI::DX12
 
         CreateDefaultBufferResource(dynamic_cast<D3DContext *>(ctx),
                         topLevelPrebuildInfo.ScratchDataSizeInBytes,
-                        D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
                         true,
                         "scene_scratch_buffer",
-                        _scratch_resource,
-                        _scratch_state_guard);
+                        _scratch_resource);
         _mem_size += static_cast<u32>(topLevelPrebuildInfo.ScratchDataSizeInBytes);
 
         CreateDefaultBufferResource(dynamic_cast<D3DContext *>(ctx),
                         topLevelPrebuildInfo.ResultDataMaxSizeInBytes,
-                        D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
                         true,
                         "scene_tlas_buffer",
-                        _tlas_resource,
-                        _tlas_state_guard);
+                        _tlas_resource);
         _tlas_gpu_address = _tlas_resource->GetGPUVirtualAddress();
         _native_resource = {Render::RendererAPI::ERenderAPI::kDirectX12, _tlas_resource.Get()};
         _mem_size += static_cast<u32>(topLevelPrebuildInfo.ResultDataMaxSizeInBytes);
@@ -236,7 +230,6 @@ namespace Ailu::RHI::DX12
                                    instance_descs_size,
                                    "scene_instance_descs_buffer",
                                    _instance_descs_resource,
-                                   _instance_descs_state_guard,
                                    &_mapped_instance_descs);
         _mem_size += instance_descs_size;
         

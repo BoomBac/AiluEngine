@@ -98,20 +98,17 @@ namespace Ailu::Render::RDG
     using SetupFunction = std::function<void(RenderGraphBuilder &builder)>;
     using ExecuteFunction = std::function<void(RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)>;
 
-    struct CompiledResourceBarrier
+    struct CompiledResourceUsage
     {
         RGHandle _handle{};
-        EResourceState _before = EResourceState::kCommon;
-        EResourceState _after = EResourceState::kCommon;
+        EResourceState _required_state = EResourceState::kCommon;
         u32 _sub_resource = kTotalSubRes;
-        /// UAV hazard barrier instead of a state transition; _before/_after are not meaningful then.
-        bool _is_uav_barrier = false;
     };
     struct CompiledRenderPass
     {
         RenderPass *_pass = nullptr;
-        Vector<CompiledResourceBarrier> _pre_barriers;
-        Vector<CompiledResourceBarrier> _post_barriers;
+        Vector<CompiledResourceUsage> _resource_usages;
+        Vector<CompiledResourceUsage> _final_resource_usages;
         u32 _submission_index = 0u;
         bool _allow_parallel_recording = true;
     };
@@ -123,7 +120,7 @@ namespace Ailu::Render::RDG
         u32 _resource_count = 0u;
         u32 _resource_version_count = 0u;
         u32 _dependency_edge_count = 0u;
-        u32 _barrier_count = 0u;
+        u32 _usage_count = 0u;
     };
 
     class AILU_API RenderPass
@@ -194,7 +191,6 @@ namespace Ailu::Render::RDG
         RGHandle CreateResource(const TextureDesc &desc, const String &name);
         RGHandle CreateResource(const BufferDesc &desc, const String &name);
         RGHandle Import(GpuResource *external);
-        RGHandle Import(GpuResource *external, EResourceState initial_state);
         GpuResource *Export(RGHandle handle);
 
         RGHandle GetTexture(const String &name);
@@ -247,11 +243,10 @@ namespace Ailu::Render::RDG
         Texture *CreatePhysicsTexture(RGHandle handle);
         GPUBuffer *CreatePhysicsBuffer(RGHandle handle);
         bool PrepareResources();
-        bool CompileResourceBarriers();
+        bool CompileResourceUsages();
         bool ValidateResourceAccesses();
         bool PublishGlobalTexture(ShaderPropertyId property_id, RGHandle handle, RenderPass *producer);
         RGHandle ReadGlobalTexture(ShaderPropertyId property_id) const;
-        EResourceState InitialResourceState(const ResourceNode &node) const;
 
         ResourceNode *GetResourceNode(RGHandle handle)
         {
@@ -304,9 +299,6 @@ namespace Ailu::Render::RDG
                     break;
                 }
                 _is_depth_resource = desc._is_depth_target;
-                // Transient resources are leased from FrameResourceManager.  The pool contract is that a
-                // lease starts and ends in COMMON; the compiled graph owns every transition from that point.
-                _initial_state = EResourceState::kCommon;
             };
             ResourceNode(const BufferDesc &desc, StringView name) :_buffer_desc(desc), _name(name), _is_transient(true)
             {
@@ -316,9 +308,6 @@ namespace Ailu::Render::RDG
                 _mip_count = 1u;
                 _array_slice_count = 1u;
                 _is_depth_resource = false;
-                // D3D12 ignores a buffer's initial state and creates it in COMMON.  Keep the graph's
-                // structural contract identical to the physical resource contract.
-                _initial_state = EResourceState::kCommon;
             };
             GpuResource* GetResource() const
             {
@@ -357,7 +346,6 @@ namespace Ailu::Render::RDG
             };
             bool _is_allocated = false;//是否创建了物理资源
             RGHandle *_handle_ptr = nullptr;
-            EResourceState _initial_state = EResourceState::kCommon;
             u32 _mip_count = 1u;
             u32 _array_slice_count = 1u;
             bool _is_depth_resource = false;
@@ -465,10 +453,6 @@ namespace Ailu::Render::RDG
         RGHandle Import(GpuResource *res)
         {
             return _graph->Import(res);
-        }
-        RGHandle Import(GpuResource *res, EResourceState initial_state)
-        {
-            return _graph->Import(res, initial_state);
         }
         void SetCallback(ExecuteFunction callback)
         {

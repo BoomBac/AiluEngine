@@ -121,19 +121,6 @@ namespace Ailu
             return (static_cast<u32>(current_state) & required_bits) == required_bits;
         }
 
-        /// @brief Fully resolved barrier request. The RenderGraph resolves handles to resources while recording a
-        /// pass, so the deferred DX12 recording path never has to touch graph state on the worker thread.
-        /// A batch is submitted as one command and becomes one native ID3D12GraphicsCommandList::ResourceBarrier call.
-        struct ResourceBarrierDesc
-        {
-            GpuResource *_resource = nullptr;
-            EResourceState _before = EResourceState::kCommon;
-            EResourceState _after = EResourceState::kCommon;
-            u32 _sub_resource = kTotalSubRes;
-            /// When set, the entry is a UAV hazard barrier; _before/_after are ignored.
-            bool _is_uav_barrier = false;
-        };
-
         enum class EGpuResType
         {
             kBuffer,

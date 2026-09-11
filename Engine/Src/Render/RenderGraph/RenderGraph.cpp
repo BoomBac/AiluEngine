@@ -392,20 +392,6 @@ namespace Ailu
         {
             if (external == nullptr)
                 return RGHandle(0u);
-            EResourceState initial_state = EResourceState::kCommon;
-            if (auto *rt = dynamic_cast<RenderTexture *>(external); rt != nullptr && rt->IsSwapChain())
-                initial_state = EResourceState::kPresent;
-            else if (external->IsReady())
-            {
-                external->TryCurrentResourceState(initial_state);
-            }
-            return Import(external, initial_state);
-        }
-
-        RGHandle RenderGraph::Import(GpuResource *external, EResourceState initial_state)
-        {
-            if (external == nullptr)
-                return RGHandle(0u);
             auto res_type = external->GetResourceType();
             if (res_type == EGpuResType::kIndexBuffer || res_type == EGpuResType::kConstBuffer || res_type == EGpuResType::kGraphicsPSO)
             {
@@ -421,7 +407,6 @@ namespace Ailu
                 node._is_render_output = res_type == EGpuResType::kRenderTexture;
                 node._is_external = true;
                 node._is_transient = false;
-                node._initial_state = initial_state;
                 node._mip_count = 1u;
                 node._array_slice_count = 1u;
                 node._is_depth_resource = false;
@@ -715,244 +700,53 @@ namespace Ailu
             return is_valid;
         }
 
-        EResourceState RenderGraph::InitialResourceState(const ResourceNode &node) const
+        bool RenderGraph::CompileResourceUsages()
         {
-            return node._initial_state;
-        }
-
-        bool RenderGraph::CompileResourceBarriers()
-        {
-            PROFILE_BLOCK_CPU("RenderGraph::CompileResourceBarriers")
+            PROFILE_BLOCK_CPU("RenderGraph::CompileResourceUsages")
             _compiled_passes.clear();
             _compiled_passes.reserve(_sorted_passes.size());
             bool is_valid = true;
 
-            const auto reset_compile_indices = [](auto &resources)
-            {
-                for (auto &[id, node]: resources)
-                    node._compile_index = ResourceNode::kInvalidCompileIndex;
-            };
-            reset_compile_indices(_transient_resources);
-            reset_compile_indices(_external_resources);
-
-            struct TrackedResourceState
-            {
-                ResourceNode *_node = nullptr;
-                u32 _resource_id = 0u;
-                u32 _last_use_pass = 0u;
-                EResourceState _total_state = EResourceState::kCommon;
-                u32 _sub_resource_offset = 0u;
-                u32 _sub_resource_count = 0u;
-                bool _is_expanded = false;
-                // Pass that last wrote through a UAV and whose writes are not ordered yet.  D3D12 only needs an
-                // explicit UAV barrier when the next access reuses the UAV without a transition in between; a
-                // transition of its own serialises the outstanding writes.
-                i32 _uav_write_pass = -1;
-            };
-            Vector<TrackedResourceState> resource_states;
-            resource_states.reserve(_transient_resources.size() + _external_resources.size());
-            Vector<EResourceState> sub_resource_states;
-
-            const auto track_resource = [&](ResourceNode &node) -> TrackedResourceState &
-            {
-                if (node._compile_index == ResourceNode::kInvalidCompileIndex)
-                {
-                    node._compile_index = static_cast<u32>(resource_states.size());
-                    auto &tracked_state = resource_states.emplace_back();
-                    tracked_state._node = &node;
-                    tracked_state._total_state = InitialResourceState(node);
-                }
-                return resource_states[node._compile_index];
-            };
-
-            const auto get_state = [&](ResourceNode &node, u32 sub_resource)
-            {
-                auto &tracked_state = track_resource(node);
-                if (sub_resource == kTotalSubRes)
-                    return tracked_state._total_state;
-                if (!tracked_state._is_expanded)
-                    return tracked_state._total_state;
-                return sub_resource_states[tracked_state._sub_resource_offset + sub_resource];
-            };
-
-            const auto set_state = [&](ResourceNode &node, u32 sub_resource, EResourceState state)
-            {
-                auto &tracked_state = track_resource(node);
-                if (sub_resource == kTotalSubRes)
-                {
-                    tracked_state._total_state = state;
-                    tracked_state._sub_resource_offset = 0u;
-                    tracked_state._sub_resource_count = 0u;
-                    tracked_state._is_expanded = false;
-                    return;
-                }
-                if (!tracked_state._is_expanded)
-                {
-                    tracked_state._sub_resource_offset = static_cast<u32>(sub_resource_states.size());
-                    tracked_state._sub_resource_count = node._mip_count * node._array_slice_count;
-                    sub_resource_states.resize(tracked_state._sub_resource_offset + tracked_state._sub_resource_count,
-                                               tracked_state._total_state);
-                    tracked_state._is_expanded = true;
-                }
-                sub_resource_states[tracked_state._sub_resource_offset + sub_resource] = state;
-            };
-
-            const auto compile_access = [&](CompiledRenderPass &compiled_pass, u32 pass_index, RGHandle handle,
-                                            const ResourceAccess &access)
+            const auto compile_access = [&](CompiledRenderPass &compiled_pass, RGHandle handle, const ResourceAccess &access)
             {
                 auto *node = GetResourceNode(handle);
                 if (node == nullptr)
                 {
-                    LOG_ERROR("RenderGraph::CompileResourceBarriers: missing resource {}.{}", handle._id, handle._version);
+                    LOG_ERROR("RenderGraph::CompileResourceUsages: missing resource {}.{}", handle._id, handle._version);
                     is_valid = false;
                     return;
                 }
-                auto &tracked_state = track_resource(*node);
-                tracked_state._resource_id = handle._id;
-                tracked_state._last_use_pass = pass_index;
 
-                EResourceState after = EResourceState::kCommon;
+                EResourceState required_state = EResourceState::kCommon;
                 String state_error;
-                if (!TryUsageToResourceState(access._usage, after, state_error))
+                if (!TryUsageToResourceState(access._usage, required_state, state_error))
                 {
-                    LOG_ERROR("RenderGraph::CompileResourceBarriers: invalid usage in pass={}, resource={}, version={}, {}",
+                    LOG_ERROR("RenderGraph::CompileResourceUsages: invalid usage in pass={}, resource={}, version={}, {}",
                               compiled_pass._pass ? compiled_pass._pass->_name : String("unknown"), node->_name,
                               handle._version, state_error);
                     is_valid = false;
                     return;
                 }
-                const bool is_uav_write = HasUsage(access._usage, EResourceUsage::kWriteUAV);
-                // Set when this access emitted a real transition for at least one sub-resource.  A transition
-                // already orders the outstanding UAV writes, so no separate UAV barrier is required.
-                bool emitted_transition = false;
-                // D3D12 depth-stencil resources can contain separate depth and stencil planes.  The
-                // render-target subresource index only covers mip/slice, so every access to a depth texture
-                // must transition every plane together or a later DSV access can observe a stale plane state.
+
                 const bool is_depth_access = node->_is_tex &&
                     (node->_is_depth_resource || HasUsage(access._usage, EResourceUsage::kDSV));
-                const auto compile_sub_resource = [&](u32 sub_resource)
-                {
-                    const EResourceState before = get_state(*node, sub_resource);
-#if AILU_ENABLE_RESOURCE_STATE_TRACE
-                    const bool is_trace_resource = node->_name.find("GBuffer0") != String::npos ||
-                                                   node->_name.find("light probe") != String::npos ||
-                                                   node->_name.find("_MainLightShadowMap") != String::npos ||
-                                                   node->_name.find("_AddLightShadowMaps") != String::npos ||
-                                                   node->_name.find("VolumetricFogAccumTexture") != String::npos;
-                    if (is_trace_resource)
-                    {
-                        LOG_WARNING("RenderGraph resource access: pass={}, resource={}, handle={}.{}, sub_res={}, "
-                                    "before={}, after={}, barrier={}, all_sub_resources={}, mip={}, "
-                                    "mip_count={}, slice={}, slice_count={}",
-                                    compiled_pass._pass ? compiled_pass._pass->_name : String("unknown"),
-                                    node->_name,
-                                    handle._id,
-                                    handle._version,
-                                    sub_resource,
-                                    static_cast<u32>(before),
-                                    static_cast<u32>(after),
-                                    before != after,
-                                    access._all_sub_resources,
-                                    access._mip_level,
-                                    access._mip_count,
-                                    access._array_slice,
-                                    access._array_slice_count);
-                    }
-#endif
-                    if (sub_resource == kTotalSubRes)
-                    {
-                        auto &state = track_resource(*node);
-                        if (!state._is_expanded)
-                        {
-                            // A wider read-only state already satisfies a narrower read requirement.  Keep the
-                            // wider tracked state instead of narrowing it, otherwise the mirrored transition
-                            // comes straight back on the next access.
-                            if (!IsResourceStateCompatible(before, after))
-                            {
-                                compiled_pass._pre_barriers.push_back({handle, before, after, sub_resource, false});
-                                state._total_state = after;
-                                emitted_transition = true;
-                            }
-                            return;
-                        }
-
-                        // The tracked state is expanded per sub-resource, so every entry has to satisfy the
-                        // whole-resource request before the state can be collapsed again.
-                        for (u32 tracked_sub_resource = 0u;
-                             tracked_sub_resource < state._sub_resource_count; ++tracked_sub_resource)
-                        {
-                            const u32 tracked_index = state._sub_resource_offset + tracked_sub_resource;
-                            const EResourceState current_state = sub_resource_states[tracked_index];
-                            if (IsResourceStateCompatible(current_state, after))
-                                continue;
-                            compiled_pass._pre_barriers.push_back(
-                                {handle, current_state, after, tracked_sub_resource, false});
-                            sub_resource_states[tracked_index] = after;
-                            emitted_transition = true;
-                        }
-                        bool is_uniform = true;
-                        for (u32 tracked_sub_resource = 1u;
-                             tracked_sub_resource < state._sub_resource_count; ++tracked_sub_resource)
-                        {
-                            if (sub_resource_states[state._sub_resource_offset + tracked_sub_resource] !=
-                                sub_resource_states[state._sub_resource_offset])
-                            {
-                                is_uniform = false;
-                                break;
-                            }
-                        }
-                        if (is_uniform)
-                            set_state(*node, kTotalSubRes, sub_resource_states[state._sub_resource_offset]);
-                    }
-                    else
-                    {
-                        if (!IsResourceStateCompatible(before, after))
-                        {
-                            compiled_pass._pre_barriers.push_back({handle, before, after, sub_resource, false});
-                            set_state(*node, sub_resource, after);
-                            emitted_transition = true;
-                        }
-                    }
-                };
-
                 if (is_depth_access || access._all_sub_resources || !node->_is_tex)
                 {
-                    compile_sub_resource(kTotalSubRes);
-                }
-                else
-                {
-                    const u32 mip_count = std::max<u32>(1u, access._mip_count);
-                    const u32 slice_count = std::max<u32>(1u, access._array_slice_count);
-                    for (u32 slice = 0u; slice < slice_count; ++slice)
-                    {
-                        const u32 array_slice = access._array_slice + slice;
-                        for (u32 mip = 0u; mip < mip_count; ++mip)
-                        {
-                            const u32 mip_level = access._mip_level + mip;
-                            compile_sub_resource(array_slice * node->_mip_count + mip_level);
-                        }
-                    }
+                    compiled_pass._resource_usages.push_back({handle, required_state, kTotalSubRes});
+                    return;
                 }
 
-                // Unordered-access hazard.  An access that stays in kUnorderedAccess emits no transition, so the
-                // writes of an earlier pass are still outstanding.  D3D12 requires an explicit UAV barrier for
-                // that case and only when the previous writer is a different pass; an access that already
-                // transitioned the resource has serialised the writes by itself.
-                auto &uav_state = track_resource(*node);
-                if (is_uav_write)
+                const u32 mip_count = std::max<u32>(1u, access._mip_count);
+                const u32 slice_count = std::max<u32>(1u, access._array_slice_count);
+                for (u32 slice = 0u; slice < slice_count; ++slice)
                 {
-                    const bool is_cross_pass_write =
-                        uav_state._uav_write_pass >= 0 && uav_state._uav_write_pass != static_cast<i32>(pass_index);
-                    if (is_cross_pass_write && !emitted_transition)
+                    const u32 array_slice = access._array_slice + slice;
+                    for (u32 mip = 0u; mip < mip_count; ++mip)
                     {
-                        compiled_pass._pre_barriers.push_back(
-                            {handle, EResourceState::kUnorderedAccess, EResourceState::kUnorderedAccess, kTotalSubRes, true});
+                        const u32 mip_level = access._mip_level + mip;
+                        compiled_pass._resource_usages.push_back(
+                            {handle, required_state, array_slice * node->_mip_count + mip_level});
                     }
-                    uav_state._uav_write_pass = static_cast<i32>(pass_index);
-                }
-                else if (emitted_transition)
-                {
-                    uav_state._uav_write_pass = -1;
                 }
             };
 
@@ -963,93 +757,37 @@ namespace Ailu
                 compiled_pass._pass = pass;
                 compiled_pass._submission_index = pass_index;
                 const size_t access_count = pass->_input_access_records.size() + pass->_output_access_records.size();
-                compiled_pass._pre_barriers.reserve(access_count);
-                compiled_pass._post_barriers.reserve(access_count);
+                compiled_pass._resource_usages.reserve(access_count);
 
                 for (const auto &record: pass->_input_access_records)
-                    compile_access(compiled_pass, pass_index, record._handle, record._access);
+                    compile_access(compiled_pass, record._handle, record._access);
                 for (const auto &record: pass->_output_access_records)
-                    compile_access(compiled_pass, pass_index, record._handle, record._access);
+                    compile_access(compiled_pass, record._handle, record._access);
+            }
+
+            HashMap<u32, u32> transient_last_usage_passes;
+            HashMap<u32, RGHandle> transient_last_usage_handles;
+            for (u32 pass_index = 0u; pass_index < _compiled_passes.size(); ++pass_index)
+            {
+                for (const auto &usage: _compiled_passes[pass_index]._resource_usages)
+                {
+                    const auto *node = GetResourceNode(usage._handle);
+                    if (node == nullptr || !node->_is_transient)
+                        continue;
+                    transient_last_usage_passes[usage._handle._id] = pass_index;
+                    transient_last_usage_handles[usage._handle._id] = usage._handle;
+                }
+            }
+            for (const auto &[resource_id, pass_index]: transient_last_usage_passes)
+            {
+                _compiled_passes[pass_index]._final_resource_usages.push_back(
+                    {transient_last_usage_handles.at(resource_id), EResourceState::kCommon, kTotalSubRes});
             }
 
             if (!is_valid)
             {
                 _compiled_passes.clear();
                 return false;
-            }
-
-            for (const auto &tracked_state: resource_states)
-            {
-                auto *node = tracked_state._node;
-                if (node == nullptr)
-                    continue;
-                const u32 resource_id = tracked_state._resource_id;
-                const u32 last_use_pass = tracked_state._last_use_pass;
-
-                const EResourceState initial_state = InitialResourceState(*node);
-                // Transient resources are leased from FrameResourceManager with COMMON as the pool boundary.
-                // Restore every resource to the state expected by the next lease at the end of the graph.
-                const EResourceState restore_state = node->_is_transient ? node->_initial_state : initial_state;
-                // Ordinary imported resources that end the frame in a pure read state keep it: the next import
-                // reads that state back, so a COMMON park would only be undone by the mirrored COMMON -> X
-                // transition at the start of the following frame.  Resources left in a write state still go
-                // back to COMMON, because that transition is also what orders their outstanding writes.
-                if (!node->_is_transient && restore_state == EResourceState::kCommon &&
-                    !tracked_state._is_expanded && IsReadOnlyResourceState(tracked_state._total_state))
-                    continue;
-                if (tracked_state._is_expanded && tracked_state._sub_resource_count != 0u &&
-                    tracked_state._total_state == restore_state)
-                {
-                    for (u32 sub_resource = 0u; sub_resource < tracked_state._sub_resource_count; ++sub_resource)
-                    {
-                        const EResourceState state = sub_resource_states[tracked_state._sub_resource_offset + sub_resource];
-                        if (state != restore_state)
-                        {
-#if AILU_ENABLE_RESOURCE_STATE_TRACE
-                            if (node->_name.find("GBuffer0") != String::npos ||
-                                node->_name.find("light probe") != String::npos ||
-                                node->_name.find("_MainLightShadowMap") != String::npos ||
-                                node->_name.find("_AddLightShadowMaps") != String::npos ||
-                                node->_name.find("VolumetricFogAccumTexture") != String::npos)
-                            {
-                                LOG_WARNING("RenderGraph resource post barrier: pass={}, resource={}, handle={}, "
-                                            "sub_res={}, before={}, after={}",
-                                            _compiled_passes[last_use_pass]._pass ?
-                                                _compiled_passes[last_use_pass]._pass->_name : String("unknown"),
-                                            node->_name,
-                                            resource_id,
-                                            sub_resource,
-                                            static_cast<u32>(state),
-                                            static_cast<u32>(restore_state));
-                            }
-#endif
-                            _compiled_passes[last_use_pass]._post_barriers.push_back(
-                                {RGHandle(resource_id), state, restore_state, sub_resource});
-                        }
-                    }
-                }
-                else if (tracked_state._total_state != restore_state)
-                {
-#if AILU_ENABLE_RESOURCE_STATE_TRACE
-                    if (node->_name.find("GBuffer0") != String::npos ||
-                        node->_name.find("light probe") != String::npos ||
-                        node->_name.find("_MainLightShadowMap") != String::npos ||
-                        node->_name.find("_AddLightShadowMaps") != String::npos ||
-                        node->_name.find("VolumetricFogAccumTexture") != String::npos)
-                    {
-                        LOG_WARNING("RenderGraph resource post barrier: pass={}, resource={}, handle={}, sub_res=all, "
-                                    "before={}, after={}",
-                                        _compiled_passes[last_use_pass]._pass ?
-                                        _compiled_passes[last_use_pass]._pass->_name : String("unknown"),
-                                    node->_name,
-                                    resource_id,
-                                    static_cast<u32>(tracked_state._total_state),
-                                    static_cast<u32>(restore_state));
-                    }
-#endif
-                    _compiled_passes[last_use_pass]._post_barriers.push_back(
-                        {RGHandle(resource_id), tracked_state._total_state, restore_state, kTotalSubRes});
-                }
             }
 
             return true;
@@ -1166,11 +904,10 @@ namespace Ailu
                     }
                 }
             }
-            if (!CompileResourceBarriers())
+            if (!CompileResourceUsages())
                 return false;
             for (const auto &compiled_pass: _compiled_passes)
-                _compile_stats._barrier_count += static_cast<u32>(compiled_pass._pre_barriers.size() +
-                                                                   compiled_pass._post_barriers.size());
+                _compile_stats._usage_count += static_cast<u32>(compiled_pass._resource_usages.size());
             if (_is_debug)
             {
                 _debug_passes.clear();
@@ -1196,27 +933,6 @@ namespace Ailu
             if (!PrepareResources())
                 return;
             PROFILE_BLOCK_CPU("RenderGraph::Execute")
-            // Resolved barrier staging area, reused across passes.  The batched command copies it, so this
-            // never allocates once it has grown to the widest pass of the graph.
-            thread_local Vector<ResourceBarrierDesc> s_barrier_batch;
-            const auto submit_compiled_barriers =
-                [&](CommandBuffer &cmd, const Vector<CompiledResourceBarrier> &barriers)
-            {
-                if (barriers.empty())
-                    return;
-                s_barrier_batch.clear();
-                if (s_barrier_batch.capacity() < barriers.size())
-                    s_barrier_batch.reserve(barriers.size());
-                for (const auto &barrier: barriers)
-                {
-                    auto *resource = Resolve<GpuResource>(barrier._handle);
-                    if (resource == nullptr)
-                        continue;
-                    s_barrier_batch.push_back({resource, barrier._before, barrier._after, barrier._sub_resource,
-                                               barrier._is_uav_barrier});
-                }
-                cmd.ResourceBarriers(s_barrier_batch.data(), static_cast<u32>(s_barrier_batch.size()));
-            };
             for (const auto &compiled_pass: _compiled_passes)
             {
                 auto *pass = compiled_pass._pass;
@@ -1235,15 +951,10 @@ namespace Ailu
                         cmd->SetCapturePassMetadata(pass_meta);
                     }
 #endif
-                    for (const auto &record: pass->_input_access_records)
+                    for (const auto &usage: compiled_pass._resource_usages)
                     {
-                        cmd->UseRenderGraphResource(Resolve<GpuResource>(record._handle));
+                        cmd->RequireState(Resolve<GpuResource>(usage._handle), usage._required_state, usage._sub_resource);
                     }
-                    for (const auto &record: pass->_output_access_records)
-                    {
-                        cmd->UseRenderGraphResource(Resolve<GpuResource>(record._handle));
-                    }
-                    submit_compiled_barriers(*cmd, compiled_pass._pre_barriers);
                     {
                         PROFILE_BLOCK_GPU(cmd.get(), pass->_name)
                         s_executing_graph = this;
@@ -1252,7 +963,8 @@ namespace Ailu
                         s_executing_pass = nullptr;
                         s_executing_graph = nullptr;
                     }
-                    submit_compiled_barriers(*cmd, compiled_pass._post_barriers);
+                    for (const auto &usage: compiled_pass._final_resource_usages)
+                        cmd->RequireState(Resolve<GpuResource>(usage._handle), usage._required_state, usage._sub_resource);
                     context.ExecuteCommandBuffer(cmd);
                     CommandBufferPool::Release(cmd);
                 }
@@ -1474,27 +1186,17 @@ namespace Ailu
                 std::sort(items.begin(), items.end());
                 return join_strings(items, "\n");
             };
-            const auto build_barrier_list = [&](const CompiledRenderPass &compiled_pass)
+            const auto build_usage_list = [&](const CompiledRenderPass &compiled_pass)
             {
                 Vector<String> items;
-                for (const auto &barrier: compiled_pass._pre_barriers)
+                for (const auto &usage: compiled_pass._resource_usages)
                 {
-                    const auto *node = GetResourceNode(barrier._handle);
+                    const auto *node = GetResourceNode(usage._handle);
                     const String resource_name = node != nullptr ? node->_name : String("null");
-                    const String sub_res = barrier._sub_resource == kTotalSubRes ? String("all") : std::format("sub {}", barrier._sub_resource);
-                    if (barrier._is_uav_barrier)
-                        items.emplace_back(std::format("{} [{}] UAV barrier", resource_name, sub_res));
-                    else
-                        items.emplace_back(std::format("{} [{}] {} -> {}", resource_name, sub_res, state_name(barrier._before),
-                                                       state_name(barrier._after)));
-                }
-                for (const auto &barrier: compiled_pass._post_barriers)
-                {
-                    const auto *node = GetResourceNode(barrier._handle);
-                    const String resource_name = node != nullptr ? node->_name : String("null");
-                    const String sub_res = barrier._sub_resource == kTotalSubRes ? String("all") : std::format("sub {}", barrier._sub_resource);
-                    items.emplace_back(std::format("post {} [{}] {} -> {}", resource_name, sub_res, state_name(barrier._before),
-                                                   state_name(barrier._after)));
+                    const String sub_res = usage._sub_resource == kTotalSubRes ? String("all") :
+                                           std::format("sub {}", usage._sub_resource);
+                    items.emplace_back(std::format("{} [{}] {}", resource_name, sub_res,
+                                                   state_name(usage._required_state)));
                 }
                 std::sort(items.begin(), items.end());
                 return join_strings(items, "\n");
@@ -1578,7 +1280,7 @@ namespace Ailu
                 const String pass_id = pass_node_id(i);
                 const String reads = build_pass_resource_list(pass, true);
                 const String writes = build_pass_resource_list(pass, false);
-                const String barriers = i < _compiled_passes.size() ? build_barrier_list(_compiled_passes[i]) : String("none");
+                const String usages = i < _compiled_passes.size() ? build_usage_list(_compiled_passes[i]) : String("none");
                 buffer.append(std::format(
                     "        {} [label=<"
                     "<TABLE BORDER=\"1\" CELLBORDER=\"0\" CELLSPACING=\"0\">"
@@ -1586,7 +1288,7 @@ namespace Ailu
                     "<TR><TD ALIGN=\"LEFT\">Type: {} | in {} | out {}</TD></TR>"
                     "<TR><TD ALIGN=\"LEFT\">Reads:<BR ALIGN=\"LEFT\"/>{}</TD></TR>"
                     "<TR><TD ALIGN=\"LEFT\">Writes:<BR ALIGN=\"LEFT\"/>{}</TD></TR>"
-                    "<TR><TD ALIGN=\"LEFT\">Barriers:<BR ALIGN=\"LEFT\"/>{}</TD></TR>"
+                    "<TR><TD ALIGN=\"LEFT\">Usages:<BR ALIGN=\"LEFT\"/>{}</TD></TR>"
                     "</TABLE>>];\n",
                     pass_id,
                     pass_type_color(pass->_type),
@@ -1597,7 +1299,7 @@ namespace Ailu
                     pass->_output_access_records.size(),
                     escape_html(reads),
                     escape_html(writes),
-                    escape_html(barriers)));
+                    escape_html(usages)));
                 if (i + 1u < _sorted_passes.size())
                     buffer.append(std::format("        {} -> {} [style=dashed, color=\"#B0B0B0\", arrowhead=normal, label=\"order\"];\n", pass_id, pass_node_id(i + 1u)));
             }

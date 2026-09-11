@@ -3,7 +3,7 @@
 #define __D3D_RAY_TRACING_GEOMETRY_H__
 #include <wrl/client.h>
 #include "d3dx12.h"
-#include "RHI/DX12/D3DResourceBase.h"
+#include "RHI/DX12/D3DResource.h"
 #include "Render/RayTracing/RayTracingGeometry.h"
 
 using Microsoft::WRL::ComPtr;
@@ -24,10 +24,8 @@ namespace Ailu::RHI::DX12
     private:
         void UploadImpl(GraphicsContext* ctx,RHICommandBuffer* rhi_cmd,UploadParams* params) final;
     private:
-        ComPtr<ID3D12Resource> _scratch_resource;
-        ComPtr<ID3D12Resource> _blas_resource;
-        D3DResourceStateGuard _scratch_state_guard;
-        D3DResourceStateGuard _blas_state_guard;
+        D3DResource _scratch_resource;
+        D3DResource _blas_resource;
         D3D12_GPU_VIRTUAL_ADDRESS _blas_gpu_address = 0u;
         D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS _inputs;
         Vector<D3D12_RAYTRACING_GEOMETRY_DESC> _geometry_descs;

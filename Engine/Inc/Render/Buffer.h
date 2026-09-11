@@ -105,10 +105,9 @@ namespace Ailu
             };
 
             EALGFormat _format;
-            EResourceState _init_state;
             EGPUBufferTarget _target;
             BufferDesc() : _size(0), _element_num(1u), _element_size(0u), _flags(0), _format(EALGFormat::kALGFormatUNKOWN),
-                           _target(EGPUBufferTarget::kConstant), _init_state(EResourceState::kCommon)
+                           _target(EGPUBufferTarget::kConstant)
             {
                 _is_readable = false;
                 _is_random_write = true;

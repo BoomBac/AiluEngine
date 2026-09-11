@@ -23,7 +23,8 @@
 #include "Render/RenderConstants.h"
 #include "Render/GraphicsContext.h"
 #include "Render/GfxCommand.h"
-#include "D3DResourceBase.h"
+#include "D3DResource.h"
+#include "D3DQueueResourceStateTracker.h"
 #include "Platform/WinWindow.h"
 #include "Framework/Math/ALMath.hpp"
 #include "Framework/Common/TimeMgr.h"
@@ -59,7 +60,6 @@ namespace Ailu::RHI::DX12
         String _name;
         bool _is_end_frame = false;
         Vector<Render::RTHandle> _released_temp_rts;
-        Vector<Render::GpuResource *> _render_graph_resources;
         Render::CommandRenderingStatesData _rendering_states_data;
 #if AILU_ENABLE_FRAME_DEBUGGER
         Render::FrameDebugger::CapturePassMetadata _capture_pass_metadata;
@@ -170,11 +170,17 @@ namespace Ailu::RHI::DX12
 
         ID3D12Device5* GetDevice() { return m_device.Get(); };
         void TrackResource(ComPtr<ID3D12Resource> resource);
+        void SetExternalState(const D3DResource &resource, Render::EResourceState state,
+                              u32 sub_res = Render::kTotalSubRes)
+        {
+            std::lock_guard submit_lock(_command_submit_mtx);
+            _queue_state_tracker.SetExternalState(resource, state, sub_res);
+        }
 
         void ReadBack(GpuResource* res,u8* data,u32 size);
 
-        void ReadBack(ID3D12Resource* res,D3DResourceStateGuard& state_guard,u8* data, u32 size);
-        void ReadBackAsync(ID3D12Resource* res,D3DResourceStateGuard& state_guard,u32 size,std::function<void(const u8*)> callback);
+        void ReadBack(const D3DResource &resource, u8 *data, u32 size);
+        void ReadBackAsync(const D3DResource &resource, u32 size, std::function<void(const u8*)> callback);
         void ReadBackAsync(GpuResource* res,std::function<void(u8*)> callback);
         void CreateResource(GpuResource* res) final;
         void CreateResource(GpuResource* res,UploadParams* params) final;
@@ -265,23 +271,7 @@ namespace Ailu::RHI::DX12
         std::atomic<u32> _renderdoc_capture_count_before = 0u;
         WString _pix_capture_name;
         Scope<GpuCommandWorker> _cmd_worker;
-        struct ScheduledResourceState
-        {
-            D3DResourceStateGuard *_global_state = nullptr;
-            bool _is_render_graph_resource = false;
-            const void *_last_command_buffer_ptr = nullptr;
-            String _last_command_buffer_name;
-            String _first_recording_group_name;
-            String _last_recording_group_name;
-            u64 _last_submission_frame = 0u;
-            u64 _last_state_submit_id = 0u;
-            u32 _last_command_list_ordinal = 0u;
-            u32 _first_group_submission_index = 0u;
-            u32 _last_group_submission_index = 0u;
-            Vector<D3D12_RESOURCE_STATES> _states;
-        };
-        HashMap<u64, ScheduledResourceState> _scheduled_resource_states;
-        std::atomic<u64> _resource_state_submit_id = 0u;
+        D3DQueueResourceStateTracker _queue_state_tracker;
         //command signature
         ComPtr<ID3D12CommandSignature> _dispatch_cmd_sig;
         ComPtr<ID3D12CommandSignature> _draw_cmd_sig;

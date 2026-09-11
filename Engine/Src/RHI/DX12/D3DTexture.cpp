@@ -26,24 +26,6 @@ namespace Ailu::RHI::DX12
             //LOG_INFO("D3D12 resource created: name={}, ptr={}", name, static_cast<const void*>(resource));
         }
 
-        inline bool TryCurrentResourceStateFromGuard(const D3DResourceStateGuard &state_guard, EResourceState &out_state, u32 sub_res)
-        {
-            const u32 d3d_sub_res = sub_res == kTotalSubRes ? D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES : sub_res;
-            D3D12_RESOURCE_STATES state = D3D12_RESOURCE_STATE_COMMON;
-            if (!state_guard.TryCurState(state, d3d_sub_res))
-                return false;
-            out_state = D3DConvertUtils::ToALResState(state);
-            return true;
-        }
-
-        inline EResourceState CurrentResourceStateFromGuard(const GpuResource *resource,
-                                                            const D3DResourceStateGuard &state_guard, u32 sub_res)
-        {
-            EResourceState state = EResourceState::kCommon;
-            if (TryCurrentResourceStateFromGuard(state_guard, state, sub_res))
-                return state;
-            return resource->GpuResource::CurrentResourceState(sub_res);
-        }
     }
 
     static DXGI_FORMAT GetCompatibleSRVFormat(DXGI_FORMAT dx_format)
@@ -150,10 +132,11 @@ namespace Ailu::RHI::DX12
             }
         }
         CD3DX12_HEAP_PROPERTIES heap_prop(D3D12_HEAP_TYPE_DEFAULT);
-        D3D12_RESOURCE_STATES init_state = is_data_filed ? D3D12_RESOURCE_STATE_COPY_DEST : D3D12_RESOURCE_STATE_COMMON;
+        constexpr D3D12_RESOURCE_STATES init_state = D3D12_RESOURCE_STATE_COMMON;
         ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &textureDesc, init_state, nullptr, IID_PPV_ARGS(_p_d3dres.GetAddressOf())));
         NameAndLogTextureResource(_p_d3dres.Get(), DebugTextureName("tex2d", _name));
-        _state_guard = std::move(D3DResourceStateGuard(_p_d3dres.Get(), init_state,CalculateSubResourceNum(p_device,textureDesc)));
+        _p_d3dres._subresource_count = CalculateSubResourceNum(p_device, textureDesc);
+        _p_d3dres.ResetStateId();
         if (is_data_filed)
         {
             ComPtr<ID3D12Resource> pTextureUpload;
@@ -195,18 +178,15 @@ namespace Ailu::RHI::DX12
                 }
                 subres_datas.emplace_back(subdata);
             }
+            d3dcmd->RequireState(_p_d3dres, EResourceState::kCopyDest);
             UpdateSubresources(p_cmdlist, _p_d3dres.Get(), pTextureUpload.Get(), 0, 0, subresourceCount, subres_datas.data());
             constexpr auto shader_resource_state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE |
                                                     D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-            d3dcmd->EnsureResourceState(_state_guard, shader_resource_state);
-            d3dcmd->ApplyResourceBarrier(_state_guard, shader_resource_state, D3D12_RESOURCE_STATE_COMMON);
-            _state = EResourceState::kCommon;
+            d3dcmd->RequireState(_p_d3dres, D3DConvertUtils::ToALResState(shader_resource_state));
             d3d_ctx->TrackResource(pTextureUpload);
         }
-        else
-            _state = D3DConvertUtils::ToALResState(init_state);
-        auto& desc_mgr = D3DDescriptorMgr::Get();
         {
+            auto &desc_mgr = D3DDescriptorMgr::Get();
             D3DTextureViewInfo view_info(ETextureViewType::kSRV, false);
             GPUVisibleDescriptorAllocation alloc = desc_mgr.AllocGPU(1u);
             auto [cpu_handle, gpu_handle] = alloc.At(0);
@@ -224,17 +204,18 @@ namespace Ailu::RHI::DX12
 
             _bindless_srv_index = desc_mgr.AllocBindlessSRVIndex();
             p_device->CreateShaderResourceView(_p_d3dres.Get(), &srv_desc, desc_mgr.GetBindlessSRVCpuHandle(_bindless_srv_index));
+            CreateView(ETextureViewType::kSRV, 0);
+            if (_is_random_access)
+            {
+                D3D12_UNORDERED_ACCESS_VIEW_DESC slice_uav_desc{};
+                slice_uav_desc.Format = ConvertToDXGIFormat(_pixel_format);
+                slice_uav_desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+                _bindless_uav_index = desc_mgr.AllocBindlessUAVIndex();
+                p_device->CreateUnorderedAccessView(_p_d3dres.Get(), nullptr, &slice_uav_desc,
+                                                     desc_mgr.GetBindlessUAVCpuHandle(_bindless_uav_index));
+            }
+            Texture2D::CreateView();
         }
-        CreateView(ETextureViewType::kSRV, 0);
-        if (_is_random_access)
-        {
-            D3D12_UNORDERED_ACCESS_VIEW_DESC slice_uav_desc{};
-            slice_uav_desc.Format = ConvertToDXGIFormat(_pixel_format);
-            slice_uav_desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-            _bindless_uav_index = desc_mgr.AllocBindlessUAVIndex();
-            p_device->CreateUnorderedAccessView(_p_d3dres.Get(), nullptr, &slice_uav_desc, desc_mgr.GetBindlessUAVCpuHandle(_bindless_uav_index));
-        }
-        Texture2D::CreateView();
     }
 
     void D3DTexture2D::Release()
@@ -255,39 +236,10 @@ namespace Ailu::RHI::DX12
         }
     }
 
-    void D3DTexture2D::StateTranslation(RHICommandBuffer* rhi_cmd,EResourceState new_state,u32 sub_res)
+    void D3DTexture2D::RequireState(RHICommandBuffer *rhi_cmd, EResourceState state, u32 sub_res)
     {
         auto d3dcmd = static_cast<D3DCommandBuffer *>(rhi_cmd);
-        d3dcmd->EnsureResourceState(_state_guard, D3DConvertUtils::FromALResState(new_state), sub_res);
-        GpuResource::TrackResourceState(new_state, sub_res);
-    }
-
-    void D3DTexture2D::ApplyResourceBarrier(RHICommandBuffer *rhi_cmd, EResourceState before_state,
-                                             EResourceState after_state, u32 sub_res)
-    {
-        auto d3dcmd = static_cast<D3DCommandBuffer *>(rhi_cmd);
-        d3dcmd->ApplyResourceBarrier(_state_guard, D3DConvertUtils::FromALResState(before_state),
-                                     D3DConvertUtils::FromALResState(after_state), sub_res);
-    }
-
-    void D3DTexture2D::TrackResourceState(EResourceState new_state, u32 sub_res)
-    {
-        _state_guard.TrackResourceState(D3DConvertUtils::FromALResState(new_state), sub_res);
-        GpuResource::TrackResourceState(new_state, sub_res);
-    }
-
-    EResourceState D3DTexture2D::CurrentResourceState(u32 sub_res) const
-    {
-        return CurrentResourceStateFromGuard(this, _state_guard, sub_res);
-    }
-
-    bool D3DTexture2D::TryCurrentResourceState(EResourceState &out_state, u32 sub_res) const
-    {
-        if (TryCurrentResourceStateFromGuard(_state_guard, out_state, sub_res))
-            return true;
-        if (sub_res == kTotalSubRes)
-            return false;
-        return GpuResource::TryCurrentResourceState(out_state, sub_res);
+        d3dcmd->RequireState(_p_d3dres, state, sub_res);
     }
 
     void D3DTexture2D::BindImpl(RHICommandBuffer *rhi_cmd, const BindParams &params)
@@ -301,15 +253,13 @@ namespace Ailu::RHI::DX12
             if (view_type == ETextureViewType::kSRV)
             {
                 const auto state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-                d3dcmd->EnsureResourceState(_state_guard, state, bp._sub_res);
-                GpuResource::TrackResourceState(D3DConvertUtils::ToALResState(state), bp._sub_res);
+                d3dcmd->RequireState(_p_d3dres, D3DConvertUtils::ToALResState(state), bp._sub_res);
                 if (params._is_compute_pipeline) _views[bp._view_idx]._gpu_alloc.CommitDescriptorsForDispatch(d3dcmd, params._slot);
                 else _views[bp._view_idx]._gpu_alloc.CommitDescriptorsForDraw(d3dcmd, params._slot);
             }
             else if (view_type == ETextureViewType::kUAV)
             {
-                d3dcmd->EnsureResourceState(_state_guard, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, bp._sub_res);
-                GpuResource::TrackResourceState(EResourceState::kUnorderedAccess, bp._sub_res);
+                d3dcmd->RequireState(_p_d3dres, EResourceState::kUnorderedAccess, bp._sub_res);
                 _views[bp._view_idx]._gpu_alloc.CommitDescriptorsForDispatch(d3dcmd, params._slot);
             }
             else { AL_ASSERT(false); }
@@ -379,10 +329,10 @@ namespace Ailu::RHI::DX12
         if (_p_d3dres) _p_d3dres->SetName(ToWChar(new_name).c_str());
     }
 
-    void D3DTexture2D::InsertUAVBarrier(RHICommandBuffer *rhi_cmd)
+    void D3DTexture2D::UavBarrier(RHICommandBuffer *rhi_cmd)
     {
         auto d3dcmd = static_cast<D3DCommandBuffer *>(rhi_cmd);
-        d3dcmd->InsertUAVBarrier(_state_guard.NativeResource());
+        d3dcmd->UavBarrier(_p_d3dres);
     }
 
     void D3DTexture2D::GenerateMipmap()
@@ -434,9 +384,8 @@ namespace Ailu::RHI::DX12
             s_mipmap_gen->SetTexture(s_mipmap_gen_2d_kernel, "OutMip4", this, ECubemapFace::kUnknown, 12);
             cmd->Dispatch(s_mipmap_gen, s_mipmap_gen_2d_kernel, std::max(mip9w / 8, 1), std::max(mip9h / 8, 1), 1);
         }
-        // Left in the shader-resource state: the caller samples the generated chain next, so parking it in
-        // COMMON would only buy the mirrored COMMON -> kAllShaderResource transition on the next bind.
-        cmd->StateTransition(this, D3DConvertUtils::ToALResState(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
+        // Leave the generated chain in a shader-resource state for the next caller.
+        cmd->RequireState(this, D3DConvertUtils::ToALResState(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
         GraphicsContext::Get().ExecuteCommandBuffer(cmd);
         CommandBufferPool::Release(cmd);
     }
@@ -470,7 +419,7 @@ namespace Ailu::RHI::DX12
         textureDesc.SampleDesc.Quality = 0;
         textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
         CD3DX12_HEAP_PROPERTIES heap_prop(D3D12_HEAP_TYPE_DEFAULT);
-        auto init_state = D3D12_RESOURCE_STATE_COPY_DEST;
+        constexpr auto init_state = D3D12_RESOURCE_STATE_COMMON;
         ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &textureDesc, init_state, nullptr, IID_PPV_ARGS(_p_d3dres.GetAddressOf())));
         NameAndLogTextureResource(_p_d3dres.Get(), DebugTextureName("cubemap", _name));
         const u32 subresourceCount = textureDesc.DepthOrArraySize * textureDesc.MipLevels;
@@ -493,13 +442,13 @@ namespace Ailu::RHI::DX12
                 cubemap_datas.emplace_back(subdata);
             }
         }
-        _state_guard = std::move(D3DResourceStateGuard(_p_d3dres.Get(), init_state,CalculateSubResourceNum(p_device,textureDesc)));
+        _p_d3dres._subresource_count = CalculateSubResourceNum(p_device, textureDesc);
+        _p_d3dres.ResetStateId();
+        d3dcmd->RequireState(_p_d3dres, EResourceState::kCopyDest);
         UpdateSubresources(p_cmdlist, _p_d3dres.Get(), pTextureUpload.Get(), 0, 0, subresourceCount, cubemap_datas.data());
         constexpr auto shader_resource_state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE |
                                                 D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-        d3dcmd->EnsureResourceState(_state_guard, shader_resource_state);
-        d3dcmd->ApplyResourceBarrier(_state_guard, shader_resource_state, D3D12_RESOURCE_STATE_COMMON);
-        _state = EResourceState::kCommon;
+        d3dcmd->RequireState(_p_d3dres, D3DConvertUtils::ToALResState(shader_resource_state));
         d3d_ctx->TrackResource(pTextureUpload);
         //Main srv
         {
@@ -593,12 +542,10 @@ namespace Ailu::RHI::DX12
         _views.erase(idx);
     }
 
-    void D3DCubeMap::ApplyResourceBarrier(RHICommandBuffer *rhi_cmd, EResourceState before_state,
-                                           EResourceState after_state, u32 sub_res)
+    void D3DCubeMap::RequireState(RHICommandBuffer *rhi_cmd, EResourceState state, u32 sub_res)
     {
         auto d3dcmd = static_cast<D3DCommandBuffer *>(rhi_cmd);
-        d3dcmd->ApplyResourceBarrier(_state_guard, D3DConvertUtils::FromALResState(before_state),
-                                     D3DConvertUtils::FromALResState(after_state), sub_res);
+        d3dcmd->RequireState(_p_d3dres, state, sub_res);
     }
 
     void D3DCubeMap::BindImpl(RHICommandBuffer *rhi_cmd, const BindParams &params)
@@ -612,45 +559,23 @@ namespace Ailu::RHI::DX12
             if (view_type == ETextureViewType::kSRV)
             {
                 const auto state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-                d3dcmd->EnsureResourceState(_state_guard, state, bp._sub_res);
-                GpuResource::TrackResourceState(D3DConvertUtils::ToALResState(state), bp._sub_res);
+                d3dcmd->RequireState(_p_d3dres, D3DConvertUtils::ToALResState(state), bp._sub_res);
                 if (params._is_compute_pipeline) _views[bp._view_idx]._gpu_alloc.CommitDescriptorsForDispatch(d3dcmd, params._slot);
                 else _views[bp._view_idx]._gpu_alloc.CommitDescriptorsForDraw(d3dcmd, params._slot);
             }
             else if (view_type == ETextureViewType::kUAV)
             {
-                d3dcmd->EnsureResourceState(_state_guard, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, bp._sub_res);
-                GpuResource::TrackResourceState(EResourceState::kUnorderedAccess, bp._sub_res);
+                d3dcmd->RequireState(_p_d3dres, EResourceState::kUnorderedAccess, bp._sub_res);
                 _views[bp._view_idx]._gpu_alloc.CommitDescriptorsForDispatch(d3dcmd, params._slot);
             }
             else { AL_ASSERT(false); }
         }
     }
 
-    void D3DCubeMap::InsertUAVBarrier(RHICommandBuffer *rhi_cmd)
+    void D3DCubeMap::UavBarrier(RHICommandBuffer *rhi_cmd)
     {
         auto d3dcmd = static_cast<D3DCommandBuffer *>(rhi_cmd);
-        d3dcmd->InsertUAVBarrier(_state_guard.NativeResource());
-    }
-
-    void D3DCubeMap::TrackResourceState(EResourceState new_state, u32 sub_res)
-    {
-        _state_guard.TrackResourceState(D3DConvertUtils::FromALResState(new_state), sub_res);
-        GpuResource::TrackResourceState(new_state, sub_res);
-    }
-
-    EResourceState D3DCubeMap::CurrentResourceState(u32 sub_res) const
-    {
-        return CurrentResourceStateFromGuard(this, _state_guard, sub_res);
-    }
-
-    bool D3DCubeMap::TryCurrentResourceState(EResourceState &out_state, u32 sub_res) const
-    {
-        if (TryCurrentResourceStateFromGuard(_state_guard, out_state, sub_res))
-            return true;
-        if (sub_res == kTotalSubRes)
-            return false;
-        return GpuResource::TryCurrentResourceState(out_state, sub_res);
+        d3dcmd->UavBarrier(_p_d3dres);
     }
 #pragma endregion
     //----------------------------------------------------------------------------D3DCubeMap-----------------------------------------------------------------------------
@@ -706,12 +631,14 @@ namespace Ailu::RHI::DX12
             }
         }
         CD3DX12_HEAP_PROPERTIES heap_prop(D3D12_HEAP_TYPE_DEFAULT);
-        auto init_state = is_data_filed ? D3D12_RESOURCE_STATE_COPY_DEST : D3D12_RESOURCE_STATE_COMMON;
+        constexpr auto init_state = D3D12_RESOURCE_STATE_COMMON;
         ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &textureDesc, init_state, nullptr, IID_PPV_ARGS(_p_d3dres.GetAddressOf())));
         NameAndLogTextureResource(_p_d3dres.Get(), DebugTextureName("tex3d", _name));
-        _state_guard = std::move(D3DResourceStateGuard(_p_d3dres.Get(), init_state,CalculateSubResourceNum(p_device,textureDesc)));
+        _p_d3dres._subresource_count = CalculateSubResourceNum(p_device, textureDesc);
+        _p_d3dres.ResetStateId();
         if (is_data_filed)
         {
+            d3dcmd->RequireState(_p_d3dres, EResourceState::kCopyDest);
             // 2. 创建上传缓冲区
             UINT64 uploadBufferSize;
             p_device->GetCopyableFootprints(&textureDesc, 0, _mipmap_count, 0, nullptr, nullptr, nullptr, &uploadBufferSize);
@@ -788,13 +715,9 @@ namespace Ailu::RHI::DX12
             uploadBuffer->Unmap(0, nullptr);
             constexpr auto shader_resource_state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE |
                                                     D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-            d3dcmd->EnsureResourceState(_state_guard, shader_resource_state);
-            d3dcmd->ApplyResourceBarrier(_state_guard, shader_resource_state, D3D12_RESOURCE_STATE_COMMON);
-            _state = EResourceState::kCommon;
+            d3dcmd->RequireState(_p_d3dres, D3DConvertUtils::ToALResState(shader_resource_state));
             d3d_ctx->TrackResource(uploadBuffer);
         }
-        else
-            _state = D3DConvertUtils::ToALResState(init_state);
         {
             D3DTextureViewInfo view_info(ETextureViewType::kSRV, false);
             GPUVisibleDescriptorAllocation alloc = D3DDescriptorMgr::Get().AllocGPU(1u);
@@ -827,15 +750,13 @@ namespace Ailu::RHI::DX12
             if (view_type == ETextureViewType::kSRV)
             {
                 const auto state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-                d3dcmd->EnsureResourceState(_state_guard, state, bp._sub_res);
-                GpuResource::TrackResourceState(D3DConvertUtils::ToALResState(state), bp._sub_res);
+                d3dcmd->RequireState(_p_d3dres, D3DConvertUtils::ToALResState(state), bp._sub_res);
                 if (params._is_compute_pipeline) _views[bp._view_idx]._gpu_alloc.CommitDescriptorsForDispatch(d3dcmd, params._slot);
                 else _views[bp._view_idx]._gpu_alloc.CommitDescriptorsForDraw(d3dcmd, params._slot);
             }
             else if (view_type == ETextureViewType::kUAV)
             {
-                d3dcmd->EnsureResourceState(_state_guard, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, bp._sub_res);
-                GpuResource::TrackResourceState(EResourceState::kUnorderedAccess, bp._sub_res);
+                d3dcmd->RequireState(_p_d3dres, EResourceState::kUnorderedAccess, bp._sub_res);
                 _views[bp._view_idx]._gpu_alloc.CommitDescriptorsForDispatch(d3dcmd, params._slot);
             }
             else { AL_ASSERT(false); }
@@ -921,7 +842,7 @@ namespace Ailu::RHI::DX12
         _p_mipmapgen_cs0->SetTexture(_mipmap_gen_3d_kernel, "_OutMip4", this, 4);
         //保证线程数和第一级输出的mipmap像素数一一对应
         cmd->Dispatch(_p_mipmapgen_cs0.get(), _mipmap_gen_3d_kernel, mip1w / thread_num_x, mip1h / thread_num_y, mip1d / thread_num_z);
-        cmd->InsertUAVBarrier(this);
+        cmd->UavBarrier(this);
         if (_mipmap_count > 4)
         {
             auto [mip5w, mip5h, mip5d] = CalculateMipSize(_width, _height, _depth, 5);
@@ -939,9 +860,9 @@ namespace Ailu::RHI::DX12
             // Kept: the dispatch binds this resource as SRV and UAV views at once, so the tracked state after
             // the dispatch is not guaranteed to still be kUnorderedAccess.  Without that guarantee the
             // transition below would be a no-op and the mip writes would stay unordered.
-            cmd->InsertUAVBarrier(this);
+            cmd->UavBarrier(this);
         }
-        cmd->StateTransition(this, D3DConvertUtils::ToALResState(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
+        cmd->RequireState(this, D3DConvertUtils::ToALResState(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
         GraphicsContext::Get().ExecuteCommandBuffer(cmd);
         CommandBufferPool::Release(cmd);
     }
@@ -954,65 +875,22 @@ namespace Ailu::RHI::DX12
         else return 0;
     }
 
-    void D3DTexture3D::StateTranslation(RHICommandBuffer *rhi_cmd, EResourceState new_state, u32 sub_res) 
-    { 
-        auto d3dcmd = static_cast<D3DCommandBuffer *>(rhi_cmd);
-        d3dcmd->EnsureResourceState(_state_guard, D3DConvertUtils::FromALResState(new_state), sub_res);
-        GpuResource::TrackResourceState(new_state, sub_res);
-    }
-
-    void D3DTexture3D::ApplyResourceBarrier(RHICommandBuffer *rhi_cmd, EResourceState before_state,
-                                             EResourceState after_state, u32 sub_res)
+    void D3DTexture3D::RequireState(RHICommandBuffer *rhi_cmd, EResourceState state, u32 sub_res)
     {
         auto d3dcmd = static_cast<D3DCommandBuffer *>(rhi_cmd);
-        d3dcmd->ApplyResourceBarrier(_state_guard, D3DConvertUtils::FromALResState(before_state),
-                                     D3DConvertUtils::FromALResState(after_state), sub_res);
+        d3dcmd->RequireState(_p_d3dres, state, sub_res);
     }
 
-    void D3DTexture3D::TrackResourceState(EResourceState new_state, u32 sub_res)
-    {
-        _state_guard.TrackResourceState(D3DConvertUtils::FromALResState(new_state), sub_res);
-        GpuResource::TrackResourceState(new_state, sub_res);
-    }
-
-    EResourceState D3DTexture3D::CurrentResourceState(u32 sub_res) const
-    {
-        return CurrentResourceStateFromGuard(this, _state_guard, sub_res);
-    }
-
-    bool D3DTexture3D::TryCurrentResourceState(EResourceState &out_state, u32 sub_res) const
-    {
-        if (TryCurrentResourceStateFromGuard(_state_guard, out_state, sub_res))
-            return true;
-        if (sub_res == kTotalSubRes)
-            return false;
-        return GpuResource::TryCurrentResourceState(out_state, sub_res);
-    }
-
-    void D3DTexture3D::InsertUAVBarrier(RHICommandBuffer *rhi_cmd)
+    void D3DTexture3D::UavBarrier(RHICommandBuffer *rhi_cmd)
     {
         auto d3dcmd = static_cast<D3DCommandBuffer *>(rhi_cmd);
-        d3dcmd->InsertUAVBarrier(_state_guard.NativeResource());
+        d3dcmd->UavBarrier(_p_d3dres);
     }
     //----------------------------------------------------------------------------D3D3DTexture-----------------------------------------------------------------------------
 #pragma endregion
 
 #pragma region D3DRenderTexture
     //--------------------------------------------------------------------------D3DRenderTexture---------------------------------------------------------------------------
-    static D3D12_RESOURCE_STATES ConvertToD3DResourceState(ETextureResState state)
-    {
-        switch (state)
-        {
-            case ETextureResState::kColorTagret:
-                return D3D12_RESOURCE_STATE_RENDER_TARGET;
-            case ETextureResState::kShaderResource:
-                return D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-            case ETextureResState::kDepthTarget:
-                return D3D12_RESOURCE_STATE_DEPTH_WRITE;
-        }
-        return D3D12_RESOURCE_STATES::D3D12_RESOURCE_STATE_COMMON;
-    }
-
     D3DRenderTexture::D3DRenderTexture(const TextureDesc &desc) : RenderTexture(desc) {}
 
     D3DRenderTexture::~D3DRenderTexture() 
@@ -1064,13 +942,12 @@ namespace Ailu::RHI::DX12
         else
             memcpy(clear_value.Color, _clear_color.Data(), sizeof(_clear_color));
         CD3DX12_HEAP_PROPERTIES heap_prop(D3D12_HEAP_TYPE_DEFAULT);
-        // RenderGraph transient textures are pooled.  COMMON is the stable lease boundary; compiled graph
-        // barriers select the first and last state for every use.
+        // RenderGraph transient textures are pooled. COMMON is the stable lease boundary for each physical resource.
         auto init_state = D3D12_RESOURCE_STATE_COMMON;
         ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &_tex_desc, init_state, &clear_value, IID_PPV_ARGS(_p_d3dres.GetAddressOf())));
         NameAndLogTextureResource(_p_d3dres.Get(), DebugTextureName("rt", _name));
-        _state_guard = std::move(D3DResourceStateGuard(_p_d3dres.Get(), init_state,CalculateSubResourceNum(p_device,_tex_desc)));
-        _state = D3DConvertUtils::ToALResState(init_state);
+        _p_d3dres._subresource_count = CalculateSubResourceNum(p_device, _tex_desc);
+        _p_d3dres.ResetStateId();
         u16 view_slice_count = std::max<u16>(1, _slice_num);
         //Main srv
         {
@@ -1159,15 +1036,13 @@ namespace Ailu::RHI::DX12
             if (view_type == ETextureViewType::kSRV)
             {
                 const auto state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-                d3dcmd->EnsureResourceState(_state_guard, state, bp._sub_res);
-                GpuResource::TrackResourceState(D3DConvertUtils::ToALResState(state), bp._sub_res);
+                d3dcmd->RequireState(_p_d3dres, D3DConvertUtils::ToALResState(state), bp._sub_res);
                 if (params._is_compute_pipeline) _views[bp._view_idx]._gpu_alloc.CommitDescriptorsForDispatch(d3dcmd, params._slot);
                 else _views[bp._view_idx]._gpu_alloc.CommitDescriptorsForDraw(d3dcmd, params._slot);
             }
             else if (view_type == ETextureViewType::kUAV)
             {
-                d3dcmd->EnsureResourceState(_state_guard, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, bp._sub_res);
-                GpuResource::TrackResourceState(EResourceState::kUnorderedAccess, bp._sub_res);
+                d3dcmd->RequireState(_p_d3dres, EResourceState::kUnorderedAccess, bp._sub_res);
                 _views[bp._view_idx]._gpu_alloc.CommitDescriptorsForDispatch(d3dcmd, params._slot);
             }
             else { AL_ASSERT(false); }
@@ -1392,9 +1267,7 @@ namespace Ailu::RHI::DX12
     {
         auto cmd = CommandBufferPool::Get("MipmapGen");
         GenerateMipmap(cmd.get());
-        // GenerateMipmap(CommandBuffer*) already leaves the texture in the shader-resource state, which is the
-        // state the filtered result is sampled in.  Importing the texture into a RenderGraph now picks that state
-        // up directly instead of paying for a COMMON park followed by the mirrored transition back.
+        // GenerateMipmap(CommandBuffer*) leaves the texture in the shader-resource state for the next use.
         GraphicsContext::Get().ExecuteCommandBuffer(cmd);
         CommandBufferPool::Release(cmd);
     }
@@ -1403,16 +1276,16 @@ namespace Ailu::RHI::DX12
     {
         if (cmd == nullptr)
             return;
-        cmd->StateTransition(this, D3DConvertUtils::ToALResState(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
+        cmd->RequireState(this, D3DConvertUtils::ToALResState(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
         static ComputeShader *s_mipmap_gen = ResourceMgr::Get().Get<ComputeShader>(L"Shaders/hlsl/Compute/cs_mipmap_gen.alasset");
         static const ComputeShaderKernelId s_mipmap_gen_2d_kernel = s_mipmap_gen->FindKernel("MipmapGen2D");
         GenerateMipmap(cmd, 0u, std::min<u16>(_mipmap_count > 1u ? _mipmap_count - 1u : 0u, 4u));
         if (_mipmap_count > 5u)
         {
-            cmd->StateTransition(this, D3DConvertUtils::ToALResState(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
+            cmd->RequireState(this, D3DConvertUtils::ToALResState(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
             GenerateMipmap(cmd, 4u, std::min<u16>(_mipmap_count - 5u, 4u));
         }
-        cmd->StateTransition(this, D3DConvertUtils::ToALResState(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
+        cmd->RequireState(this, D3DConvertUtils::ToALResState(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
     }
 
     void D3DRenderTexture::GenerateMipmap(CommandBuffer *cmd, u16 source_mip, u16 output_mip_count)
@@ -1477,7 +1350,6 @@ namespace Ailu::RHI::DX12
         //                                     nullptr, IID_PPV_ARGS(readback_buf.GetAddressOf()));
         // auto cmd = CommandBufferPool::Get("Readback", ECommandBufferType::kCommandBufTypeCopy);
         // auto d3d_cmd = static_cast<D3DCommandBuffer *>(cmd.get())->NativeCmdList();
-        // _state_guard.MakesureResourceState(d3d_cmd, _p_d3dres.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE);
         // // bufferFootprint.Footprint.RowPitch = static_cast<u32>(_pixel_size * w);
         // // bufferFootprint.Footprint.Format = ConvertToDXGIFormat(_pixel_format);
         // const CD3DX12_TEXTURE_COPY_LOCATION copyDest(readback_buf.Get(), bufferFootprint);
@@ -1534,45 +1406,16 @@ namespace Ailu::RHI::DX12
         if (_p_d3dres) _p_d3dres->SetName(ToWChar(value).c_str());
     }
 
-    void D3DRenderTexture::InsertUAVBarrier(RHICommandBuffer *rhi_cmd)
+    void D3DRenderTexture::UavBarrier(RHICommandBuffer *rhi_cmd)
     {
         auto d3dcmd = static_cast<D3DCommandBuffer *>(rhi_cmd);
-        d3dcmd->InsertUAVBarrier(_state_guard.NativeResource());
+        d3dcmd->UavBarrier(_p_d3dres);
     }
 
-    void D3DRenderTexture::StateTranslation(RHICommandBuffer *rhi_cmd, EResourceState new_state, u32 sub_res) 
+    void D3DRenderTexture::RequireState(RHICommandBuffer *rhi_cmd, EResourceState state, u32 sub_res)
     { 
         auto d3dcmd = static_cast<D3DCommandBuffer *>(rhi_cmd);
-        d3dcmd->EnsureResourceState(_state_guard, D3DConvertUtils::FromALResState(new_state), sub_res);
-        GpuResource::TrackResourceState(new_state, sub_res);
-    }
-
-    void D3DRenderTexture::ApplyResourceBarrier(RHICommandBuffer *rhi_cmd, EResourceState before_state,
-                                                 EResourceState after_state, u32 sub_res)
-    {
-        auto d3dcmd = static_cast<D3DCommandBuffer *>(rhi_cmd);
-        d3dcmd->ApplyResourceBarrier(_state_guard, D3DConvertUtils::FromALResState(before_state),
-                                     D3DConvertUtils::FromALResState(after_state), sub_res);
-    }
-
-    void D3DRenderTexture::TrackResourceState(EResourceState new_state, u32 sub_res)
-    {
-        _state_guard.TrackResourceState(D3DConvertUtils::FromALResState(new_state), sub_res);
-        GpuResource::TrackResourceState(new_state, sub_res);
-    }
-
-    EResourceState D3DRenderTexture::CurrentResourceState(u32 sub_res) const
-    {
-        return CurrentResourceStateFromGuard(this, _state_guard, sub_res);
-    }
-
-    bool D3DRenderTexture::TryCurrentResourceState(EResourceState &out_state, u32 sub_res) const
-    {
-        if (TryCurrentResourceStateFromGuard(_state_guard, out_state, sub_res))
-            return true;
-        if (sub_res == kTotalSubRes)
-            return false;
-        return GpuResource::TryCurrentResourceState(out_state, sub_res);
+        d3dcmd->RequireState(_p_d3dres, state, sub_res);
     }
 
     TextureHandle D3DRenderTexture::ColorTexture(u16 view_index)
@@ -1600,8 +1443,7 @@ namespace Ailu::RHI::DX12
         if (!_views.contains(index)) return nullptr;
         const auto state = _depth_bit > 0 ? D3D12_RESOURCE_STATE_DEPTH_WRITE : D3D12_RESOURCE_STATE_RENDER_TARGET;
         auto d3dcmd = static_cast<D3DCommandBuffer *>(cmd);
-        d3dcmd->EnsureResourceState(_state_guard, state);
-        GpuResource::TrackResourceState(D3DConvertUtils::ToALResState(state));
+        d3dcmd->RequireState(_p_d3dres, D3DConvertUtils::ToALResState(state));
         return &_views[index]._cpu_handle;
     }
 #pragma endregion

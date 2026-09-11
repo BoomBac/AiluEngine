@@ -20,3 +20,6 @@
 [submodule "box2d"]
 	path = Engine/Ext/box2d
 	url = https://github.com/erincatto/box2d.git
+[submodule "Engine/Ext/DirectXTex"]
+	path = Engine/Ext/DirectXTex
+	url = https://github.com/microsoft/DirectXTex.git

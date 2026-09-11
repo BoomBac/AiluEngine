@@ -35,6 +35,11 @@ set(BUILD_SAMPLE OFF CACHE BOOL "" FORCE)
 set(BUILD_DX11 OFF CACHE BOOL "" FORCE)
 set(BUILD_DX12 OFF CACHE BOOL "" FORCE)
 add_subdirectory(${ENGINE_ROOT_PATH}/Ext/DirectXTex EXCLUDE_FROM_ALL)
+if(MSVC AND TARGET DirectXTex)
+        # Keep the Debug CRT compatible with the Debug engine, but optimize the BC codecs.
+        set_property(TARGET DirectXTex PROPERTY MSVC_RUNTIME_CHECKS "")
+        target_compile_options(DirectXTex PRIVATE "$<$<CONFIG:Debug>:/O2>")
+endif()
 
 set(AILU_LUA_SCRIPTING_ENABLED 0)
 if (AILU_ENABLE_LUA_SCRIPTING)
@@ -121,7 +126,11 @@ set(RENDER_MODULE
         Src/Render/GfxCommand.cpp
 )
 set(RHI_DX12
-        Inc/RHI/DX12/D3DResourceBase.h
+        Inc/RHI/DX12/D3DResource.h
+        Inc/RHI/DX12/D3DResourceStateTracker.h
+        Src/RHI/DX12/D3DResourceStateTracker.cpp
+        Inc/RHI/DX12/D3DQueueResourceStateTracker.h
+        Src/RHI/DX12/D3DQueueResourceStateTracker.cpp
         Inc/RHI/DX12/GPUResourceManager.h
         Src/RHI/DX12/GPUResourceManager.cpp
         Inc/RHI/DX12/Page.h

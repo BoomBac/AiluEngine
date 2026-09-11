@@ -874,22 +874,22 @@ namespace Ailu
             auto *blur_x_rt = g_pRenderTexturePool->Get(blur_x);
             auto *blur_y_rt = g_pRenderTexturePool->Get(blur_y);
 
-            cmd->StateTransition(downsample_rt, EResourceState::kRenderTarget);
+            cmd->RequireState(downsample_rt, EResourceState::kRenderTarget);
             cmd->Blit(source, downsample);
-            cmd->StateTransition(downsample_rt, EResourceState::kNonPixelShaderResource);
-            cmd->StateTransition(blur_x_rt, EResourceState::kUnorderedAccess);
+            cmd->RequireState(downsample_rt, EResourceState::kNonPixelShaderResource);
+            cmd->RequireState(blur_x_rt, EResourceState::kUnorderedAccess);
             _backdrop_blur_cs->SetTexture(_backdrop_blur_x_kernel, "_SourceTex", downsample);
             _backdrop_blur_cs->SetTexture(_backdrop_blur_x_kernel, "_OutTex", blur_x);
             auto [group_num_x, group_num_y, group_num_z] = _backdrop_blur_cs->CalculateDispatchNum(_backdrop_blur_x_kernel, blur_width, blur_height, 1u);
             cmd->Dispatch(_backdrop_blur_cs.get(), _backdrop_blur_x_kernel, group_num_x, group_num_y, 1u);
             // The following transition out of kUnorderedAccess already orders the dispatch writes; an explicit
             // UAV barrier before it is redundant.
-            cmd->StateTransition(blur_x_rt, EResourceState::kNonPixelShaderResource);
-            cmd->StateTransition(blur_y_rt, EResourceState::kUnorderedAccess);
+            cmd->RequireState(blur_x_rt, EResourceState::kNonPixelShaderResource);
+            cmd->RequireState(blur_y_rt, EResourceState::kUnorderedAccess);
             _backdrop_blur_cs->SetTexture(_backdrop_blur_y_kernel, "_SourceTex", blur_x);
             _backdrop_blur_cs->SetTexture(_backdrop_blur_y_kernel, "_OutTex", blur_y);
             cmd->Dispatch(_backdrop_blur_cs.get(), _backdrop_blur_y_kernel, group_num_x, group_num_y, 1u);
-            cmd->StateTransition(blur_y_rt, EResourceState::kPixelShaderResource);
+            cmd->RequireState(blur_y_rt, EResourceState::kPixelShaderResource);
 
             _frame_backdrop_blur_cache[source] = blur_y_rt;
             return blur_y_rt;

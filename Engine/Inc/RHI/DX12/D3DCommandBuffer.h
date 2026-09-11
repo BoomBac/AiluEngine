@@ -2,7 +2,8 @@
 #ifndef __D3D_COMMAND_BUF_H__
 #define __D3D_COMMAND_BUF_H__
 
-#include "D3DResourceBase.h"
+#include "D3DResource.h"
+#include "D3DResourceStateTracker.h"
 #include "Render/CommandBuffer.h"
 #include "Render/GpuResource.h"
 #include "Render/RenderingStates.h"
@@ -10,9 +11,7 @@
 #include "UploadBuffer.h"
 #include <array>
 #include <atomic>
-#include <unordered_map>
 #include <unordered_set>
-#include <unordered_map>
 #include <d3dx12.h>
 #include <wrl/client.h>
 
@@ -151,21 +150,14 @@ namespace Ailu
         public:
             D3DCommandBuffer(String name, ECommandBufferType type);
             bool IsReady() const final;
-            void InsertUAVBarrier() final;
-            void InsertUAVBarrier(ID3D12Resource* resource);
-            void EnsureResourceState(D3DResourceStateGuard& state_guard, D3D12_RESOURCE_STATES target_state,
-                                     u32 sub_res = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
-            void ApplyResourceBarrier(D3DResourceStateGuard &state_guard, D3D12_RESOURCE_STATES before_state,
-                                      D3D12_RESOURCE_STATES after_state,
-                                      u32 sub_res = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
-            void RegisterRenderGraphResource(Render::GpuResource *resource);
-            void BeginRenderGraphGroup(const Vector<Render::GpuResource *> &resources);
-            bool IsRenderGraphResource(ID3D12Resource *resource) const;
-            void RecordResourceBarrier(ID3D12Resource* resource, D3D12_RESOURCE_STATES before_state,
-                                        D3D12_RESOURCE_STATES after_state, u32 sub_res);
-            /// @brief Submit a whole block of engine barriers as a single native ResourceBarrier call.
-            /// Resource state tracking is identical to the per-barrier path; only the native submission is batched.
-            void RecordResourceBarriers(const Render::ResourceBarrierDesc *barriers, u32 count);
+            void UavBarrier() final;
+            void UavBarrier(const D3DResource &resource);
+            void AliasingBarrier(const D3DResource &before, const D3DResource &after);
+            void RequireState(const D3DResource &resource, Render::EResourceState state,
+                              u32 sub_res = Render::kTotalSubRes);
+            void RecordQueueTransition(const D3DResource &resource, Render::EResourceState before_state,
+                                        Render::EResourceState after_state, u32 sub_res);
+            const D3DResourceStateTracker &StateTracker() const { return _state_tracker; }
             /// @brief While a batch is open, barrier recording only appends to the internal cache.
             void BeginResourceBarrierBatch() { _is_batching_barriers = true; }
             void EndResourceBarrierBatch()
@@ -173,21 +165,6 @@ namespace Ailu
                 _is_batching_barriers = false;
                 FlushResourceBarriers();
             }
-            struct ResourceStateSnapshot
-            {
-                u64 _resource_instance_id = 0u;
-                ID3D12Resource* _resource = nullptr;
-                D3DResourceStateGuard* _global_state = nullptr;
-                String _recording_group_name;
-                String _last_recording_group_name;
-                bool _is_render_graph_resource = false;
-                u32 _first_group_submission_index = 0u;
-                u32 _last_group_submission_index = 0u;
-                Vector<D3D12_RESOURCE_STATES> _initial_states;
-                Vector<D3D12_RESOURCE_STATES> _final_states;
-            };
-            void GetResourceStateSnapshots(Vector<ResourceStateSnapshot>& out_snapshots) const;
-            void CommitResourceStates();
             ID3D12GraphicsCommandList4 *NativeCmdList() { return _p_cmd.Get(); };
             void BeginRecordingGroup(const String& name, u32 submission_index)
             {
@@ -232,15 +209,7 @@ namespace Ailu
             void PostExecute();
             void AddPostSubmitCallback(std::function<void(u64)> callback) { _post_submit_callbacks.emplace_back(std::move(callback)); }
             void RunPostSubmitCallbacks(u64 fence_value);
-            /// @brief old -> COPY_DEST -> Copy -> old.  Passing restore_state=false stops after the copy and
-            /// leaves the resource in COPY_DEST for the caller to transition, which removes one barrier.
-            ///
-            /// Only valid for callers that own the declared resource state afterwards.  Resources leased from
-            /// FrameResourceManager and resources that the RenderGraph imports must keep the restoring default:
-            /// the compiled graph declares their initial state up front, so leaving them in COPY_DEST would make
-            /// the first compiled transition disagree with the real state.
-            void UploadDataToBuffer(void *src, u64 src_size, ID3D12Resource *dst, D3DResourceStateGuard &state_guard,
-                                    bool restore_state = true);
+            void UploadDataToBuffer(void *src, u64 src_size, const D3DResource &resource);
             bool IsGraphicsPSOActive(const void *pso) const { return _graphics_state_cache._pso == pso; }
             void SetGraphicsPSOActive(const void *pso)
             {
@@ -551,18 +520,6 @@ namespace Ailu
             void FlushResourceBarriers();
 
         private:
-            struct LocalResourceState
-            {
-                ID3D12Resource* _resource = nullptr;
-                D3DResourceStateGuard* _global_state = nullptr;
-                String _recording_group_name;
-                String _last_recording_group_name;
-                bool _is_render_graph_resource = false;
-                Vector<D3D12_RESOURCE_STATES> _initial_states;
-                Vector<D3D12_RESOURCE_STATES> _states;
-                Vector<u8> _initialized_subresources;
-            };
-
             D3D12_COMMAND_LIST_TYPE _dx_cmd_type;
             ComPtr<ID3D12GraphicsCommandList4> _p_cmd;
             ComPtr<ID3D12CommandAllocator> _p_alloc;
@@ -582,8 +539,6 @@ namespace Ailu
             u32 _first_group_submission_index = 0u;
             u32 _last_group_submission_index = 0u;
             bool _has_recorded_group = false;
-            std::unordered_set<ID3D12Resource *> _render_graph_resources;
-            std::unordered_set<ID3D12Resource *> _active_render_graph_resources;
             std::unordered_set<GpuResource *> _used_resource_set;
             bool _is_cmd_closed;
             bool _is_submitted;
@@ -598,7 +553,7 @@ namespace Ailu
             CommandBufferStatistics _statistics;
             Vector<Render::CommandProfiler *> _profiler_stack;
             std::unordered_set<GpuResource *> _active_render_targets;
-            std::unordered_map<u64, LocalResourceState> _local_resource_states;
+            D3DResourceStateTracker _state_tracker;
             Vector<std::function<void(u64)>> _post_submit_callbacks;
             // Reusable native barrier scratch buffer. Reserved up front so a batched submission never allocates.
             Vector<D3D12_RESOURCE_BARRIER> _barrier_cache;

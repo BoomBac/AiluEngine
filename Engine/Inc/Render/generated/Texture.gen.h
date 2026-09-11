@@ -69,7 +69,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::CubeMap>(
 //Class CubeMap end...........................
 
 //Class RenderTexture begin...........................
-#define TEXTURE_GEN_H_748_GENERATED_BODY \
+#define TEXTURE_GEN_H_740_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_RenderTexture_Type();\
                                 static const Type* GetPrivateStaticClass();\

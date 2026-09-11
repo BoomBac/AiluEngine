@@ -26,25 +26,6 @@ namespace Ailu::RHI::DX12
             //LOG_INFO("D3D12 resource created: name={}, ptr={}", name, static_cast<const void*>(resource));
         }
 
-        inline bool TryCurrentResourceStateFromGuard(const D3DResourceStateGuard &state_guard, EResourceState &out_state, u32 sub_res)
-        {
-            const u32 d3d_sub_res = sub_res == Render::kTotalSubRes ? D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES : sub_res;
-            D3D12_RESOURCE_STATES state = D3D12_RESOURCE_STATE_COMMON;
-            if (!state_guard.TryCurState(state, d3d_sub_res))
-                return false;
-            out_state = D3DConvertUtils::ToALResState(state);
-            return true;
-        }
-
-        inline EResourceState CurrentResourceStateFromGuard(const GpuResource *resource,
-                                                            const D3DResourceStateGuard &state_guard, u32 sub_res)
-        {
-            EResourceState state = EResourceState::kCommon;
-            if (TryCurrentResourceStateFromGuard(state_guard, state, sub_res))
-                return state;
-            return resource->GpuResource::CurrentResourceState(sub_res);
-        }
-
         inline bool IsUploadHeapResource(ID3D12Resource *resource)
         {
             if (resource == nullptr)
@@ -164,6 +145,8 @@ namespace Ailu::RHI::DX12
             ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &res_desc,
                                                             D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(_p_d3d_res.GetAddressOf())));
             NameAndLogResource(_p_d3d_res.Get(), DebugResourceName("cb", _name));
+            _p_d3d_res._subresource_count = 1u;
+            _p_d3d_res.ResetStateId();
             _p_d3d_res->Map(0, nullptr, reinterpret_cast<void **>(&_mapped_data));
             _gpu_ptr = _p_d3d_res->GetGPUVirtualAddress();
             if (_data)
@@ -177,10 +160,11 @@ namespace Ailu::RHI::DX12
             D3D12_RESOURCE_STATES init_state = D3D12_RESOURCE_STATE_COMMON;
             ThrowIfFailed(d3d_conetxt->GetDevice()->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &res_desc, init_state, nullptr, IID_PPV_ARGS(_p_d3d_res.GetAddressOf())));
             NameAndLogResource(_p_d3d_res.Get(), DebugResourceName("buffer", _name));
-            _state_guard = std::move(D3DResourceStateGuard(_p_d3d_res.Get(), init_state, 1u));
+            _p_d3d_res._subresource_count = 1u;
+            _p_d3d_res.ResetStateId();
             if (_data)
             {
-                d3dcmd->UploadDataToBuffer(_data, _fill_data_size, _p_d3d_res.Get(), _state_guard);
+                d3dcmd->UploadDataToBuffer(_data, _fill_data_size, _p_d3d_res);
             }
             if (_desc._is_random_write)
             {
@@ -200,10 +184,11 @@ namespace Ailu::RHI::DX12
                             nullptr,
                             IID_PPV_ARGS(_counter_buffer.GetAddressOf()));
                         NameAndLogResource(_counter_buffer.Get(), DebugResourceName("counter", _name));
-                    _counter_state_guard = std::move(D3DResourceStateGuard(_counter_buffer.Get(), D3D12_RESOURCE_STATE_COMMON, 1u));
-                    d3dcmd->UploadDataToBuffer(&_counter, sizeof(u32), _counter_buffer.Get(), _counter_state_guard);
+                    _counter_buffer._subresource_count = 1u;
+                    _counter_buffer.ResetStateId();
+                    d3dcmd->UploadDataToBuffer(&_counter, sizeof(u32), _counter_buffer);
                     if (_desc._target & EGPUBufferTarget::kIndirectArguments)
-                        d3dcmd->EnsureResourceState(_counter_state_guard, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT);
+                        d3dcmd->RequireState(_counter_buffer, EResourceState::kIndirectArgument);
                 }
                 if (_desc._is_create_uav)
                 {
@@ -280,6 +265,8 @@ namespace Ailu::RHI::DX12
     {
         GpuResource::BindImpl(rhi_cmd, params);
         auto d3dcmd = dynamic_cast<D3DCommandBuffer *>(rhi_cmd);
+        RequireState(rhi_cmd, params._is_random_access ? EResourceState::kUnorderedAccess :
+                                                          EResourceState::kAllShaderResource);
         GPUVisibleDescriptorAllocation *alloc = params._is_random_access ? &_uav_alloc : &_srv_alloc;
         auto [ch, gh] = alloc->At(0);
         if (params._is_compute_pipeline)
@@ -287,71 +274,51 @@ namespace Ailu::RHI::DX12
         else
             alloc->CommitDescriptorsForDraw(d3dcmd, params._slot);
     }
-    void D3DGPUBuffer::StateTranslation(RHICommandBuffer *rhi_cmd, EResourceState new_state, u32 sub_res)
+    void D3DGPUBuffer::RequireState(RHICommandBuffer *rhi_cmd, EResourceState state, u32 sub_res)
     {
         auto d3dcmd = dynamic_cast<D3DCommandBuffer *>(rhi_cmd);
-        d3dcmd->EnsureResourceState(_state_guard, D3DConvertUtils::FromALResState(new_state), sub_res);
-        GpuResource::TrackResourceState(new_state, sub_res);
+        if (d3dcmd == nullptr)
+            return;
+        if (_p_d3d_res && !IsUploadHeapResource(_p_d3d_res.Get()))
+            d3dcmd->RequireState(_p_d3d_res, state, sub_res);
+        if (_counter_buffer && (state == EResourceState::kUnorderedAccess ||
+                                state == EResourceState::kIndirectArgument))
+            d3dcmd->RequireState(_counter_buffer, state, sub_res);
     }
 
-    void D3DGPUBuffer::ApplyResourceBarrier(RHICommandBuffer *rhi_cmd, EResourceState before_state,
-                                             EResourceState after_state, u32 sub_res)
-    {
-        auto d3dcmd = static_cast<D3DCommandBuffer *>(rhi_cmd);
-        const auto before = D3DConvertUtils::FromALResState(before_state);
-        const auto after = D3DConvertUtils::FromALResState(after_state);
-        d3dcmd->ApplyResourceBarrier(_state_guard, before, after, sub_res);
-        if (_counter_buffer != nullptr)
-            d3dcmd->ApplyResourceBarrier(_counter_state_guard, before, after, sub_res);
-    }
-
-    void D3DGPUBuffer::TrackResourceState(EResourceState new_state, u32 sub_res)
-    {
-        _state_guard.TrackResourceState(D3DConvertUtils::FromALResState(new_state), sub_res);
-        GpuResource::TrackResourceState(new_state, sub_res);
-    }
-
-    EResourceState D3DGPUBuffer::CurrentResourceState(u32 sub_res) const
-    {
-        return CurrentResourceStateFromGuard(this, _state_guard, sub_res);
-    }
-
-    bool D3DGPUBuffer::TryCurrentResourceState(EResourceState &out_state, u32 sub_res) const
-    {
-        if (TryCurrentResourceStateFromGuard(_state_guard, out_state, sub_res))
-            return true;
-        if (sub_res == Render::kTotalSubRes)
-            return false;
-        return GpuResource::TryCurrentResourceState(out_state, sub_res);
-    }
-
-    void D3DGPUBuffer::InsertUAVBarrier(RHICommandBuffer *rhi_cmd)
+    void D3DGPUBuffer::UavBarrier(RHICommandBuffer *rhi_cmd)
     {
         auto d3dcmd = dynamic_cast<D3DCommandBuffer *>(rhi_cmd);
-        d3dcmd->InsertUAVBarrier(_state_guard.NativeResource());
+        d3dcmd->UavBarrier(_p_d3d_res);
+        if (_counter_buffer)
+            d3dcmd->UavBarrier(_counter_buffer);
     }
 
     void D3DGPUBuffer::OnDataChanged()
     {
-        if (IsReady())
+        if (_mapped_data)
         {
-            if (_mapped_data)//upload buffer
-            {
-                memcpy(_mapped_data, _data, _fill_data_size);
-            }
-            else
-            {
-                auto cmd = RHICommandBufferPool::Get("ChangeData");
-                auto d3dcmd = dynamic_cast<D3DCommandBuffer *>(cmd.get());
-                d3dcmd->UploadDataToBuffer(_data, _fill_data_size, _p_d3d_res.Get(), _state_guard);
-                if (_counter_buffer)
-                    d3dcmd->UploadDataToBuffer(&_counter, sizeof(u32), _counter_buffer.Get(), _counter_state_guard);
-                GraphicsContext::Get().ExecuteRHICommandBuffer(cmd.get());
-                RHICommandBufferPool::Release(cmd);
-            }
+            memcpy(_mapped_data, _data, _fill_data_size);
+            return;
         }
-        else
+
+        // The initial SetData can happen before the asynchronous resource-create command is recorded.
+        // UploadImpl will consume the CPU copy once the physical resource exists.
+        if (!_p_d3d_res)
+            return;
+        if (!IsReady())
+        {
             LOG_WARNING("D3DGPUBuffer::OnDataChanged: buffer({}) not ready for rendering!",_name);
+            return;
+        }
+
+        auto cmd = RHICommandBufferPool::Get("ChangeData");
+        auto d3dcmd = dynamic_cast<D3DCommandBuffer *>(cmd.get());
+        d3dcmd->UploadDataToBuffer(_data, _fill_data_size, _p_d3d_res);
+        if (_counter_buffer)
+            d3dcmd->UploadDataToBuffer(&_counter, sizeof(u32), _counter_buffer);
+        GraphicsContext::Get().ExecuteRHICommandBuffer(cmd.get());
+        RHICommandBufferPool::Release(cmd);
     }
 
     void D3DGPUBuffer::ReadBack(u8 *dst, u32 size)
@@ -363,9 +330,7 @@ namespace Ailu::RHI::DX12
         // }
         // auto cmd = CommandBufferPool::Get();
         // auto dxcmd = static_cast<D3DCommandBuffer *>(cmd.get())->NativeCmdList();
-        // _state_guard.MakesureResourceState(dxcmd, _p_d3d_res.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE);
         // dxcmd->CopyResource(_p_d3d_res_readback.Get(), _p_d3d_res.Get());
-        // _state_guard.MakesureResourceState(dxcmd, _p_d3d_res.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
         // g_pGfxContext->ExecuteAndWaitCommandBuffer(cmd);
         // D3D12_RANGE readbackBufferRange{0, _desc._size};
         // u8 *data;
@@ -389,9 +354,7 @@ namespace Ailu::RHI::DX12
         // }
         // auto cmd = CommandBufferPool::Get();
         // auto dxcmd = static_cast<D3DCommandBuffer *>(cmd.get())->NativeCmdList();
-        // _state_guard.MakesureResourceState(dxcmd, _p_d3d_res.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE);
         // dxcmd->CopyResource(_p_d3d_res_readback.Get(), _p_d3d_res.Get());
-        // _state_guard.MakesureResourceState(dxcmd, _p_d3d_res.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
         // g_pGfxContext->ExecuteCommandBuffer(cmd);
 
         // std::async(std::launch::async, [=]()
@@ -431,7 +394,7 @@ namespace Ailu::RHI::DX12
     {
         if (!_is_ready_for_rendering)
             return;
-        static_cast<D3DContext &>(GraphicsContext::Get()).ReadBackAsync(_counter_buffer.Get(), _counter_state_guard,4u,[=](const u8* data){
+        static_cast<D3DContext &>(GraphicsContext::Get()).ReadBackAsync(_counter_buffer, 4u, [=](const u8* data){
             callback(*reinterpret_cast<const u32*>(data));
         });
     }
@@ -442,7 +405,7 @@ namespace Ailu::RHI::DX12
         GPUBuffer::SetCounter(counter);
         auto cmd = RHICommandBufferPool::Get();
         auto d3dcmd = static_cast<D3DCommandBuffer *>(cmd.get());
-        d3dcmd->UploadDataToBuffer(&_counter,sizeof(u32),_counter_buffer.Get(),_counter_state_guard);
+        d3dcmd->UploadDataToBuffer(&_counter, sizeof(u32), _counter_buffer);
         GraphicsContext::Get().ExecuteRHICommandBuffer(cmd.get());
         RHICommandBufferPool::Release(cmd);
     }
@@ -454,7 +417,6 @@ namespace Ailu::RHI::DX12
         u16 stream_count = _buffer_layout.GetStreamCount();
         _buffer_views.resize(stream_count);
         _vertex_buffers.resize(stream_count);
-		_state_guards.resize(stream_count);
     }
     D3DVertexBuffer::~D3DVertexBuffer()
     {
@@ -463,38 +425,22 @@ namespace Ailu::RHI::DX12
         if (g_pGfxContext)
             g_pGfxContext->WaitForFence(_fence_value);
     }
-	void D3DVertexBuffer::StateTranslation(RHICommandBuffer *rhi_cmd, EResourceState new_state, u32 sub_res)
-	{
-		auto *d3d_cmd = dynamic_cast<D3DCommandBuffer *>(rhi_cmd);
-		if (d3d_cmd == nullptr)
-			return;
-		const auto target_state = D3DConvertUtils::FromALResState(new_state);
-		for (u32 stream = 0u; stream < _vertex_buffers.size(); ++stream)
-		{
-			if (_vertex_buffers[stream] != nullptr && !IsUploadHeapResource(_vertex_buffers[stream].Get()))
-				d3d_cmd->EnsureResourceState(_state_guards[stream], target_state, sub_res);
-		}
-		GpuResource::TrackResourceState(new_state, sub_res);
-	}
-	void D3DVertexBuffer::ApplyResourceBarrier(RHICommandBuffer *rhi_cmd, EResourceState before_state,
-	                                            EResourceState after_state, u32 sub_res)
-	{
-		auto *d3d_cmd = dynamic_cast<D3DCommandBuffer *>(rhi_cmd);
-		if (d3d_cmd == nullptr)
-			return;
-		const auto before = D3DConvertUtils::FromALResState(before_state);
-		const auto after = D3DConvertUtils::FromALResState(after_state);
-		for (u32 stream = 0u; stream < _vertex_buffers.size(); ++stream)
-		{
-			if (_vertex_buffers[stream] != nullptr && !IsUploadHeapResource(_vertex_buffers[stream].Get()))
-				d3d_cmd->ApplyResourceBarrier(_state_guards[stream], before, after, sub_res);
-		}
-		GpuResource::TrackResourceState(after_state, sub_res);
-	}
+    void D3DVertexBuffer::RequireState(RHICommandBuffer *rhi_cmd, EResourceState state, u32 sub_res)
+    {
+        auto *d3d_cmd = dynamic_cast<D3DCommandBuffer *>(rhi_cmd);
+        if (d3d_cmd == nullptr)
+            return;
+        for (u32 stream = 0u; stream < _vertex_buffers.size(); ++stream)
+        {
+            if (_vertex_buffers[stream] && !IsUploadHeapResource(_vertex_buffers[stream].Get()))
+                d3d_cmd->RequireState(_vertex_buffers[stream], state, sub_res);
+        }
+    }
 
     void D3DVertexBuffer::BindImpl(RHICommandBuffer *rhi_cmd, const BindParams &params)
     {
         auto *d3d_cmd = static_cast<D3DCommandBuffer *>(rhi_cmd);
+        RequireState(rhi_cmd, EResourceState::kVertexAndConstantBuffer);
 
         const auto &layout = *params._params._vb_binder._layout;
         const auto &resolved = ResolveLayout(layout);
@@ -526,14 +472,11 @@ namespace Ailu::RHI::DX12
             {
                 auto *d3d_gpu_stream = dynamic_cast<D3DGPUBuffer *>(gpu_stream);
                 AL_ASSERT(d3d_gpu_stream != nullptr);
-                _vertex_buffers[i].Attach(d3d_gpu_stream->GetD3DResource());
-                if (_vertex_buffers[i] != nullptr)
-                    _vertex_buffers[i]->AddRef();
+                _vertex_buffers[i] = d3d_gpu_stream->Resource();
                 _buffer_views[i].BufferLocation = d3d_gpu_stream->GetGPUVirtualAddress();
                 _buffer_views[i].StrideInBytes = _buffer_layout.GetStride(i);
                 _buffer_views[i].SizeInBytes = static_cast<u32>(_stream_data[i]._size);
                 _buffer_layout_indexer.emplace(_buffer_layout[i]._semantic, static_cast<u8>(i));
-                _state_guards[i] = D3DResourceStateGuard(_vertex_buffers[i].Get(), D3D12_RESOURCE_STATE_GENERIC_READ, 1u);
                 continue;
             }
             auto heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
@@ -561,21 +504,10 @@ namespace Ailu::RHI::DX12
                 NameAndLogResource(_vertex_buffers[stream_index].Get(), std::format("vb_{}_{}", _name.empty() ? "unnamed" : _name, stream_index));
                 auto d3dcmd = dynamic_cast<D3DCommandBuffer *>(rhi_cmd);
                 auto cmdlist = d3dcmd->NativeCmdList();
-                auto copy_dest_barrier = CD3DX12_RESOURCE_BARRIER::Transition(_vertex_buffers[stream_index].Get(),
-                                                                                D3D12_RESOURCE_STATE_COMMON,
-                                                                                D3D12_RESOURCE_STATE_COPY_DEST);
-                cmdlist->ResourceBarrier(1, &copy_dest_barrier);
-                D3DResourceStateGuard::LogBarrier(_vertex_buffers[stream_index].Get(),
-                                                  D3D12_RESOURCE_STATE_COMMON,
-                                                  D3D12_RESOURCE_STATE_COPY_DEST, 0);
+                _vertex_buffers[stream_index].ResetStateId();
+                d3dcmd->RequireState(_vertex_buffers[stream_index], EResourceState::kCopyDest);
                 cmdlist->CopyBufferRegion(_vertex_buffers[stream_index].Get(), 0, upload_heap.Get(), 0, _stream_data[i]._size);
-                D3DResourceStateGuard::LogBarrier(_vertex_buffers[stream_index].Get(),
-                                                  D3D12_RESOURCE_STATE_COPY_DEST,
-                                                  D3D12_RESOURCE_STATE_GENERIC_READ,
-                                                  0);
-                auto buf_state = CD3DX12_RESOURCE_BARRIER::Transition(_vertex_buffers[stream_index].Get(),
-                                                                      D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_GENERIC_READ);
-                cmdlist->ResourceBarrier(1, &buf_state);
+                d3dcmd->RequireState(_vertex_buffers[stream_index], EResourceState::kGenericRead);
                 d3d_ctx->TrackResource(upload_heap);
             }
             else
@@ -595,13 +527,9 @@ namespace Ailu::RHI::DX12
                 ThrowIfFailed(dynamic_buffer->Map(0, nullptr, reinterpret_cast<void **>(&mapped_data)));
                 if (initial_data != nullptr)
                     memcpy(mapped_data, initial_data, _stream_data[stream_index]._size);
-                _vertex_buffers[stream_index] = std::move(dynamic_buffer);
+                _vertex_buffers[stream_index] = D3DResource(std::move(dynamic_buffer), 1u);
                 _stream_data[stream_index]._data = mapped_data;
             }
-            _state_guards[stream_index] = D3DResourceStateGuard(
-                _vertex_buffers[stream_index].Get(),
-                D3D12_RESOURCE_STATE_GENERIC_READ,
-                1u);
             // Initialize the vertex buffer view.
             _buffer_views[stream_index].BufferLocation = _vertex_buffers[stream_index]->GetGPUVirtualAddress();
             _buffer_views[stream_index].StrideInBytes = _buffer_layout.GetStride(stream_index);
@@ -615,7 +543,6 @@ namespace Ailu::RHI::DX12
                                         _bindless_srv_indices[stream_index]);
             }
         }
-        GpuResource::TrackResourceState(EResourceState::kGenericRead);
         ++_view_version;
     }
 
@@ -658,7 +585,7 @@ namespace Ailu::RHI::DX12
                     &res_desc,
                     D3D12_RESOURCE_STATE_GENERIC_READ,
                     nullptr,
-                    IID_PPV_ARGS(&_index_buf)));
+                    IID_PPV_ARGS(_index_buf.GetAddressOf())));
                 NameAndLogResource(_index_buf.Get(), DebugResourceName("ib", _name));
 
             // Copy the triangle data to the vertex buffer.
@@ -674,6 +601,8 @@ namespace Ailu::RHI::DX12
             NameAndLogResource(_index_buf.Get(), DebugResourceName("ib_dynamic", _name));
             _index_buf->Map(0, nullptr, reinterpret_cast<void **>(&_data));
         }
+        _index_buf._subresource_count = 1u;
+        _index_buf.ResetStateId();
         // Initialize the vertex buffer view.
         _index_buf_view.BufferLocation = _index_buf->GetGPUVirtualAddress();
         _index_buf_view.Format = DXGI_FORMAT_R32_UINT;
@@ -690,7 +619,14 @@ namespace Ailu::RHI::DX12
     {
         GpuResource::BindImpl(rhi_cmd, params);
         auto d3dcmd = dynamic_cast<D3DCommandBuffer *>(rhi_cmd);
+        RequireState(rhi_cmd, EResourceState::kIndexBuffer);
         d3dcmd->SetIndexBuffer(_index_buf_view);
+    }
+
+    void D3DIndexBuffer::RequireState(RHICommandBuffer *rhi_cmd, EResourceState state, u32 sub_res)
+    {
+        if (_index_buf && !IsUploadHeapResource(_index_buf.Get()))
+            static_cast<D3DCommandBuffer *>(rhi_cmd)->RequireState(_index_buf, state, sub_res);
     }
 
     void D3DIndexBuffer::Name(const String &name)

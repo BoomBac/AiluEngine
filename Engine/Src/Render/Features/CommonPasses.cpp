@@ -1132,10 +1132,9 @@ namespace Ailu::Render
         _p_lut_gen->SetTexture(_mult_scatter_lut_gen_kernel, "_TexTransmittanceLUT", _tlut.get());
         _p_lut_gen->SetTexture(_mult_scatter_lut_gen_kernel, "_MultScatterLUT", _ms_lut.get());
         cmd->Dispatch(_p_lut_gen.get(), _mult_scatter_lut_gen_kernel, _mult_scatter_lut_size.x / 16, _mult_scatter_lut_size.y / 16, 1);
-        // LUT generation is outside the render graph.  Return both persistent resources to the graph's
-        // fixed COMMON boundary instead of carrying the legacy command buffer state into graph compilation.
-        cmd->ResourceBarrier(_tlut.get(), EResourceState::kAllShaderResource, EResourceState::kCommon);
-        cmd->ResourceBarrier(_ms_lut.get(), EResourceState::kUnorderedAccess, EResourceState::kCommon);
+        // LUT generation is outside the render graph; publish both persistent resources at COMMON.
+        cmd->RequireState(_tlut.get(), EResourceState::kCommon);
+        cmd->RequireState(_ms_lut.get(), EResourceState::kCommon);
         g_pGfxContext->ExecuteCommandBufferSync(cmd);
         CommandBufferPool::Release(cmd);
         _event = static_cast<ERenderPassEvent>(static_cast<u16>(ERenderPassEvent::kBeforeSkybox) + 25u);

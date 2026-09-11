@@ -76,26 +76,20 @@ namespace Ailu::Render
     class AILU_API GpuResource : public Object
     {
         GENERATED_BODY()
-        friend class ResourceStateTracker;
     public:
         static u64 TotalMemSize() { return s_total_mem_size; }
     public:
         GpuResource();
         virtual ~GpuResource() override;
-        virtual void StateTranslation(RHICommandBuffer* rhi_cmd,EResourceState new_state,u32 sub_res)
+        virtual void RequireState(RHICommandBuffer *rhi_cmd, EResourceState state, u32 sub_res = kTotalSubRes)
         {
-            AL_ASSERT(true);
-        };
-        virtual void ApplyResourceBarrier(RHICommandBuffer *rhi_cmd, EResourceState before_state,
-                                           EResourceState after_state, u32 sub_res)
+            AL_ASSERT(rhi_cmd != nullptr);
+        }
+        virtual void UavBarrier(RHICommandBuffer *rhi_cmd)
         {
-            AL_ASSERT(true);
-        };
-        virtual void InsertUAVBarrier(RHICommandBuffer* rhi_cmd) {AL_ASSERT(true);};
+            AL_ASSERT(rhi_cmd != nullptr);
+        }
         virtual NativeHandle NativeResource() {AL_ASSERT(true); return {};}
-        virtual void TrackResourceState(EResourceState new_state, u32 sub_res = kTotalSubRes);
-        virtual EResourceState CurrentResourceState(u32 sub_res = kTotalSubRes) const;
-        virtual bool TryCurrentResourceState(EResourceState &out_state, u32 sub_res = kTotalSubRes) const;
         void Apply();
         void ApplySync();
         void Upload(GraphicsContext* ctx,RHICommandBuffer* rhi_cmd,UploadParams* params);
@@ -103,6 +97,11 @@ namespace Ailu::Render
         u64 GetSize() const {return _mem_size;}
         u64 GetFenceValue() const {return _fence_value;}
         void Track(u64 fence = 0u);
+        void SetCreatedFence(u64 fence)
+        {
+            _created_fence = fence;
+            _is_ready_for_rendering = false;
+        }
         bool MarkUsedByCommand(u64 command_epoch);
         bool IsReferenceByGpu() const;
         EGpuResType GetResourceType() const {return _res_type;}
@@ -116,30 +115,10 @@ namespace Ailu::Render
         inline static u64 s_total_mem_size = 0u;
         u64 _mem_size = 0u;
         u64 _fence_value = 0u;
+        u64 _created_fence = ~u64(0);
         u64 _last_marked_command_epoch = 0u;
-        EResourceState _state = EResourceState::kCommon;
         EGpuResType _res_type;
         bool _is_ready_for_rendering = false;
-    };
-
-    class ResourceStateTracker
-    {
-    public:
-        static ResourceStateTracker& Get();
-        void AddResource(GpuResource* res, u64 created_fence);
-        void RemoveResource(GpuResource* res);
-        EResourceState GetResourceState(GpuResource* res, u32 sub_res = kTotalSubRes) const;
-        void UpdateResourceState(GpuResource* res, EResourceState new_state, u32 sub_res = kTotalSubRes);
-        u64 GetCreatedFence(GpuResource* res) const;
-    private:
-        struct States
-        {
-            u64 _created_fence;
-            Array<EResourceState, 64> _cur_states;
-            Array<EResourceState, 64> _new_states;
-        };
-        HashMap<GpuResource*, States> _res_state_map;
-        mutable std::mutex _mutex;
     };
 }// namespace Ailu
 

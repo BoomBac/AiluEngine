@@ -20,14 +20,10 @@ namespace Ailu::Render
             return "kDispatch";
         case EGpuCommandType::kResourceUpload:
             return "kResourceUpload";
-        case EGpuCommandType::kTransResourceState:
-            return "kTransResourceState";
-        case EGpuCommandType::kResourceBarrier:
-            return "kResourceBarrier";
-        case EGpuCommandType::kResourceBarriers:
-            return "kResourceBarriers";
-        case EGpuCommandType::kUAVBarrier:
-            return "kUAVBarrier";
+        case EGpuCommandType::kRequireResourceState:
+            return "kRequireResourceState";
+        case EGpuCommandType::kUavBarrier:
+            return "kUavBarrier";
         case EGpuCommandType::kAllocConstBuffer:
             return "kAllocConstBuffer";
         case EGpuCommandType::kCommandProfiler:
@@ -66,17 +62,11 @@ namespace Ailu::Render
         case EGpuCommandType::kResourceUpload:
             static_cast<CommandGpuResourceUpload *>(cmd)->~CommandGpuResourceUpload();
             break;
-        case EGpuCommandType::kTransResourceState:
-            static_cast<CommandTranslateState *>(cmd)->~CommandTranslateState();
+        case EGpuCommandType::kRequireResourceState:
+            static_cast<CommandRequireResourceState *>(cmd)->~CommandRequireResourceState();
             break;
-        case EGpuCommandType::kResourceBarrier:
-            static_cast<CommandResourceBarrier *>(cmd)->~CommandResourceBarrier();
-            break;
-        case EGpuCommandType::kResourceBarriers:
-            static_cast<CommandResourceBarriers *>(cmd)->~CommandResourceBarriers();
-            break;
-        case EGpuCommandType::kUAVBarrier:
-            static_cast<CommandUAVBarrier *>(cmd)->~CommandUAVBarrier();
+        case EGpuCommandType::kUavBarrier:
+            static_cast<CommandUavBarrier *>(cmd)->~CommandUavBarrier();
             break;
         case EGpuCommandType::kAllocConstBuffer:
             static_cast<CommandAllocConstBuffer *>(cmd)->~CommandAllocConstBuffer();
