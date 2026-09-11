@@ -163,6 +163,16 @@ namespace Ailu
             bool IsRenderGraphResource(ID3D12Resource *resource) const;
             void RecordResourceBarrier(ID3D12Resource* resource, D3D12_RESOURCE_STATES before_state,
                                         D3D12_RESOURCE_STATES after_state, u32 sub_res);
+            /// @brief Submit a whole block of engine barriers as a single native ResourceBarrier call.
+            /// Resource state tracking is identical to the per-barrier path; only the native submission is batched.
+            void RecordResourceBarriers(const Render::ResourceBarrierDesc *barriers, u32 count);
+            /// @brief While a batch is open, barrier recording only appends to the internal cache.
+            void BeginResourceBarrierBatch() { _is_batching_barriers = true; }
+            void EndResourceBarrierBatch()
+            {
+                _is_batching_barriers = false;
+                FlushResourceBarriers();
+            }
             struct ResourceStateSnapshot
             {
                 u64 _resource_instance_id = 0u;
@@ -222,7 +232,15 @@ namespace Ailu
             void PostExecute();
             void AddPostSubmitCallback(std::function<void(u64)> callback) { _post_submit_callbacks.emplace_back(std::move(callback)); }
             void RunPostSubmitCallbacks(u64 fence_value);
-            void UploadDataToBuffer(void *src, u64 src_size, ID3D12Resource *dst, D3DResourceStateGuard &state_guard);
+            /// @brief old -> COPY_DEST -> Copy -> old.  Passing restore_state=false stops after the copy and
+            /// leaves the resource in COPY_DEST for the caller to transition, which removes one barrier.
+            ///
+            /// Only valid for callers that own the declared resource state afterwards.  Resources leased from
+            /// FrameResourceManager and resources that the RenderGraph imports must keep the restoring default:
+            /// the compiled graph declares their initial state up front, so leaving them in COPY_DEST would make
+            /// the first compiled transition disagree with the real state.
+            void UploadDataToBuffer(void *src, u64 src_size, ID3D12Resource *dst, D3DResourceStateGuard &state_guard,
+                                    bool restore_state = true);
             bool IsGraphicsPSOActive(const void *pso) const { return _graphics_state_cache._pso == pso; }
             void SetGraphicsPSOActive(const void *pso)
             {
@@ -530,6 +548,7 @@ namespace Ailu
         private:
             void Close();
             void MarkSubmitted(u64 fence_value);
+            void FlushResourceBarriers();
 
         private:
             struct LocalResourceState
@@ -581,6 +600,9 @@ namespace Ailu
             std::unordered_set<GpuResource *> _active_render_targets;
             std::unordered_map<u64, LocalResourceState> _local_resource_states;
             Vector<std::function<void(u64)>> _post_submit_callbacks;
+            // Reusable native barrier scratch buffer. Reserved up front so a batched submission never allocates.
+            Vector<D3D12_RESOURCE_BARRIER> _barrier_cache;
+            bool _is_batching_barriers = false;
         };
     }// namespace ::RHI::DX12
 }// namespace Ailu

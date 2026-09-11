@@ -64,6 +64,11 @@ namespace Ailu::Render
     }
     void GpuResource::TrackResourceState(EResourceState new_state, u32 sub_res)
     {
+        // D3D12 read states are bit sets, so a wider read-only state already satisfies a narrower read-only
+        // request and the barrier is dropped.  Tracking the narrower state here would make _state disagree
+        // with the physical resource, which RenderGraph import reads back through TryCurrentResourceState.
+        if (sub_res == kTotalSubRes && _state != new_state && IsResourceStateCompatible(_state, new_state))
+            return;
         _state = new_state;
         ResourceStateTracker::Get().UpdateResourceState(this, new_state, sub_res);
     }

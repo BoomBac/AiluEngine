@@ -10,5 +10,6 @@
     "EnableIncrementalGraphicsBinding": true,
     "_enable_compute_skinning": true,
     "_enable_d3d12_debug_layer": true,
+    "_enable_rdc": false,
     "_enable_pix": true
 }

@@ -34,7 +34,7 @@
                 }
             },
             "_hierarchy_component": {
-                "_parent_guid": "null",
+                "_parent_guid": "",
                 "_sibling_index": 0,
                 "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
                 "_enabled": true
@@ -77,7 +77,7 @@
                 "_scale": [0.0098, 0.0098, 0.0098]
             },
             "_hierarchy_component": {
-                "_parent_guid": "null",
+                "_parent_guid": "",
                 "_sibling_index": 0,
                 "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
                 "_enabled": true
@@ -103,7 +103,7 @@
                 "_scale": [1.0, 1.0, 1.0]
             },
             "_hierarchy_component": {
-                "_parent_guid": "null",
+                "_parent_guid": "",
                 "_sibling_index": 0,
                 "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
                 "_enabled": true
@@ -190,7 +190,7 @@
                 "_material_guids": ["4f6e2fa4-c9af-4800-9ff9-70874abfbd50"]
             },
             "_hierarchy_component": {
-                "_parent_guid": "null",
+                "_parent_guid": "",
                 "_sibling_index": 0,
                 "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
                 "_enabled": true
@@ -233,7 +233,7 @@
                 "_scale": [0.0098, 0.0098, 0.0098]
             },
             "_hierarchy_component": {
-                "_parent_guid": "null",
+                "_parent_guid": "",
                 "_sibling_index": 0,
                 "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
                 "_enabled": true
@@ -268,7 +268,7 @@
                         "_float_value": 1.6598,
                         "_string_value": "",
                         "_vector_value": [0.0, 0.0, 0.0, 0.0],
-                        "_guid_value": "null",
+                        "_guid_value": "",
                         "_is_orphan": false
                     }, {
                         "_name": "jump_speed",
@@ -278,7 +278,7 @@
                         "_float_value": 4.51,
                         "_string_value": "",
                         "_vector_value": [0.0, 0.0, 0.0, 0.0],
-                        "_guid_value": "null",
+                        "_guid_value": "",
                         "_is_orphan": false
                     }, {
                         "_name": "sprite_asset",
@@ -303,7 +303,7 @@
                     }]
             },
             "_hierarchy_component": {
-                "_parent_guid": "null",
+                "_parent_guid": "",
                 "_sibling_index": 0,
                 "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
                 "_enabled": true
@@ -393,7 +393,7 @@
                 "_scale": [1.0, 1.0, 1.0]
             },
             "_hierarchy_component": {
-                "_parent_guid": "null",
+                "_parent_guid": "",
                 "_sibling_index": 0,
                 "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
                 "_enabled": true
@@ -420,7 +420,7 @@
                 "_properties": []
             },
             "_hierarchy_component": {
-                "_parent_guid": "null",
+                "_parent_guid": "",
                 "_sibling_index": 0,
                 "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
                 "_enabled": true
@@ -551,7 +551,7 @@
                 "_scale": [1.0, 1.0, 1.0]
             },
             "_hierarchy_component": {
-                "_parent_guid": "null",
+                "_parent_guid": "",
                 "_sibling_index": 0,
                 "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
                 "_enabled": true
@@ -602,7 +602,7 @@
                 "_scale": [0.0297, 0.0297, 0.0297]
             },
             "_hierarchy_component": {
-                "_parent_guid": "null",
+                "_parent_guid": "",
                 "_sibling_index": 0,
                 "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
                 "_enabled": true
@@ -628,7 +628,7 @@
                 "_scale": [0.0098, 0.0098, 0.0098]
             },
             "_hierarchy_component": {
-                "_parent_guid": "null",
+                "_parent_guid": "",
                 "_sibling_index": 0,
                 "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
                 "_enabled": true

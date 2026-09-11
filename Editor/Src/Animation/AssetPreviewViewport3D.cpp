@@ -1,6 +1,7 @@
 #include "Animation/AssetPreviewViewport3D.h"
 
 #include "Framework/Common/ResourceMgr.h"
+#include "Render/AssetPreviewMaterial.h"
 #include "Render/CommandBuffer.h"
 #include "Render/GraphicsContext.h"
 #include "Render/Material.h"
@@ -61,15 +62,7 @@ namespace Ailu::Editor
         _material = material;
         _preview_material.reset();
         if (_material != nullptr)
-        {
-            _preview_material = _material->CreateInstance();
-            auto forward_shader = ResourceMgr::Get().Get<Render::Shader>(L"Shaders/hlsl/forwardlit.alasset");
-            if (_preview_material != nullptr && _material->IsStandardLit() && forward_shader != nullptr)
-            {
-                _preview_material->SetActiveShader(forward_shader);
-                _preview_material->SetCullMode(_material->GetCullMode());
-            }
-        }
+            _preview_material = CreatePerObjectPreviewMaterial(_material);
         _render_pending = true;
     }
 
@@ -223,11 +216,13 @@ namespace Ailu::Editor
             return;
 
         auto standard_material = Render::Material::s_standard_forward_lit.lock();
-        Render::Material *material = _material != nullptr ? _preview_material.get() : standard_material.get();
+        if (_default_preview_material == nullptr && standard_material != nullptr)
+            _default_preview_material = CreatePerObjectPreviewMaterial(standard_material.get());
+        Render::Material *material = _material != nullptr ? _preview_material.get() : _default_preview_material.get();
         if (_wireframe)
         {
             if (_wireframe_material == nullptr)
-                _wireframe_material = ResourceMgr::Get().GetRef<Render::Material>(L"Runtime/Material/Wireframe");
+                _wireframe_material = CreatePerObjectPreviewWireframeMaterial();
             if (_wireframe_material != nullptr)
                 material = _wireframe_material.get();
         }

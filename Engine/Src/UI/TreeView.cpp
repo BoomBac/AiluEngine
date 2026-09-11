@@ -5,6 +5,8 @@
 #include "Framework/Common/Input.h"
 #include "Framework/Common/Application.h"
 
+#include <algorithm>
+
 namespace Ailu
 {
     namespace UI
@@ -106,10 +108,22 @@ namespace Ailu
                 return brush;
             }
 
+            bool IsControlDown()
+            {
+                return Input::IsKeyDown(EKey::kCONTROL) || Input::IsKeyDown(EKey::kLCONTROL) ||
+                       Input::IsKeyDown(EKey::kRCONTROL);
+            }
+
+            bool IsShiftDown()
+            {
+                return Input::IsKeyDown(EKey::kSHIFT) || Input::IsKeyDown(EKey::kLSHIFT) ||
+                       Input::IsKeyDown(EKey::kRSHIFT);
+            }
+
             void UpdateTreeViewRowBackground(TreeView* tree, TreeViewRow* row, bool is_hovered)
             {
                 Color bg_color = tree->_normal_color;
-                if (row->GetItemId() == tree->GetSelectedItem())
+                if (tree->IsItemSelected(row->GetItemId()))
                     bg_color = tree->IsFocused() ? tree->_selected_color : tree->_selected_unfocused_color;
                 else if (is_hovered)
                     bg_color = tree->_hover_color;
@@ -186,7 +200,7 @@ namespace Ailu
                     if (click_target == row->GetExpandButton())
                     {
                         RequestFocus();
-                        SetSelectedItem(row->GetItemId(), true);
+                        OnRowClicked(row->GetItemId());
                         ToggleExpanded(row->GetItemId());
                         e._is_handled = true;
                         return;
@@ -250,7 +264,7 @@ namespace Ailu
                     {
                         TreeItemId id = row->GetItemId();
                         // Update selection first if needed
-                        if (_selected_item != id)
+                        if (!IsItemSelected(id))
                             SetSelectedItem(id, true);
                         OnRowContextMenu(id, e._mouse_position);
                         e._is_handled = true;
@@ -356,6 +370,7 @@ namespace Ailu
         {
             _data_source = data_source;
             ClearSelection(false);
+            _selection_anchor = kInvalidTreeItemId;
             ClearExpansionState();
             _hovered_row = nullptr;
             _visible_items.clear();
@@ -412,13 +427,16 @@ namespace Ailu
                 }
             }
 
-            // Validate selection
-            if (_selected_item != kInvalidTreeItemId && !_data_source->IsValid(_selected_item))
+            // Preserve valid selected items and remove items that disappeared from the data source.
+            Vector<TreeItemId> valid_selected_items;
+            for (TreeItemId id : _selected_items)
             {
-                _selected_item = kInvalidTreeItemId;
-                if (!_is_suppress_selection_notify)
-                    _on_selection_changed_delegate.Invoke(kInvalidTreeItemId);
+                if (_data_source->IsValid(id) && _data_source->GetPresentation(id)._selectable)
+                    valid_selected_items.push_back(id);
             }
+            SetSelectionInternal(valid_selected_items, _selected_item, true);
+            if (_selection_anchor != kInvalidTreeItemId && !_data_source->IsValid(_selection_anchor))
+                _selection_anchor = _selected_item;
             InvalidateHierarchy();
         }
 
@@ -556,30 +574,105 @@ namespace Ailu
         // =========================================================================
         void TreeView::SetSelectedItem(TreeItemId item, bool notify)
         {
-            if (!_data_source) return;
+            if (item != kInvalidTreeItemId && (!_data_source || !_data_source->IsValid(item) ||
+                                               !_data_source->GetPresentation(item)._selectable))
+                return;
+
+            Vector<TreeItemId> items;
             if (item != kInvalidTreeItemId)
+                items.push_back(item);
+            _selection_anchor = item;
+            SetSelectionInternal(items, item, notify);
+        }
+
+        void TreeView::SetSelectedItems(const Vector<TreeItemId> &items, bool notify)
+        {
+            Vector<TreeItemId> valid_items;
+            valid_items.reserve(items.size());
+            for (TreeItemId item : items)
             {
-                if (!_data_source->IsValid(item)) return;
-                auto pres = _data_source->GetPresentation(item);
-                if (!pres._selectable) return;
+                if (item == kInvalidTreeItemId || !_data_source || !_data_source->IsValid(item) ||
+                    !_data_source->GetPresentation(item)._selectable)
+                    continue;
+                if (std::find(valid_items.begin(), valid_items.end(), item) == valid_items.end())
+                    valid_items.push_back(item);
             }
-            if (item == _selected_item) return;
+            if (!_is_multi_select_enabled && valid_items.size() > 1u)
+                valid_items.resize(1u);
 
-            TreeItemId previous_selected_item = _selected_item;
-            _selected_item = item;
+            const TreeItemId active_item = valid_items.empty() ? kInvalidTreeItemId : valid_items.front();
+            _selection_anchor = active_item;
+            SetSelectionInternal(valid_items, active_item, notify);
+        }
 
-            if (auto* row = dynamic_cast<TreeViewRow*>(FindRowForItem(previous_selected_item)))
-                UpdateTreeViewRowBackground(this, row, row == _hovered_row);
-            if (auto* row = dynamic_cast<TreeViewRow*>(FindRowForItem(_selected_item)))
-                UpdateTreeViewRowBackground(this, row, row == _hovered_row);
+        bool TreeView::IsItemSelected(TreeItemId item) const
+        {
+            return std::find(_selected_items.begin(), _selected_items.end(), item) != _selected_items.end();
+        }
+
+        void TreeView::SetMultiSelectEnabled(bool enabled)
+        {
+            if (_is_multi_select_enabled == enabled)
+                return;
+            _is_multi_select_enabled = enabled;
+            if (!_is_multi_select_enabled && _selected_items.size() > 1u)
+            {
+                const TreeItemId active_item = _selected_item != kInvalidTreeItemId ?
+                                                   _selected_item : _selected_items.front();
+                SetSelectedItem(active_item, true);
+            }
+        }
+
+        void TreeView::SetSelectionInternal(const Vector<TreeItemId> &items, TreeItemId active_item, bool notify)
+        {
+            Vector<TreeItemId> next_items;
+            next_items.reserve(items.size());
+            for (TreeItemId item : items)
+            {
+                if (item == kInvalidTreeItemId)
+                    continue;
+                if (!_data_source || !_data_source->IsValid(item) || !_data_source->GetPresentation(item)._selectable)
+                    continue;
+                if (std::find(next_items.begin(), next_items.end(), item) == next_items.end())
+                    next_items.push_back(item);
+            }
+            if (!_is_multi_select_enabled && next_items.size() > 1u)
+                next_items.resize(1u);
+
+            if (next_items.empty())
+                active_item = kInvalidTreeItemId;
+            else if (std::find(next_items.begin(), next_items.end(), active_item) == next_items.end())
+                active_item = next_items.front();
+
+            if (next_items == _selected_items && active_item == _selected_item)
+                return;
+
+            const Vector<TreeItemId> previous_selected_items = _selected_items;
+            _selected_items = std::move(next_items);
+            _selected_item = active_item;
+
+            for (TreeItemId item : previous_selected_items)
+            {
+                if (!IsItemSelected(item))
+                {
+                    if (auto* row = dynamic_cast<TreeViewRow*>(FindRowForItem(item)))
+                        UpdateTreeViewRowBackground(this, row, row == _hovered_row);
+                }
+            }
+            for (TreeItemId item : _selected_items)
+            {
+                if (auto* row = dynamic_cast<TreeViewRow*>(FindRowForItem(item)))
+                    UpdateTreeViewRowBackground(this, row, row == _hovered_row);
+            }
 
             if (notify && !_is_suppress_selection_notify)
-                _on_selection_changed_delegate.Invoke(item);
+                _on_selection_changed_delegate.Invoke(_selected_item);
         }
 
         void TreeView::ClearSelection(bool notify)
         {
-            SetSelectedItem(kInvalidTreeItemId, notify);
+            _selection_anchor = kInvalidTreeItemId;
+            SetSelectionInternal({}, kInvalidTreeItemId, notify);
         }
 
         // =========================================================================
@@ -778,6 +871,65 @@ namespace Ailu
         void TreeView::OnRowClicked(TreeItemId item)
         {
             RequestFocus();
+            if (!_data_source || !_data_source->IsValid(item) || !_data_source->GetPresentation(item)._selectable)
+                return;
+            if (!_is_multi_select_enabled)
+            {
+                SetSelectedItem(item, true);
+                return;
+            }
+
+            const bool control_down = IsControlDown();
+            const bool shift_down = IsShiftDown();
+            if (shift_down && _selection_anchor != kInvalidTreeItemId)
+            {
+                i32 item_index = -1;
+                i32 anchor_index = -1;
+                for (i32 index = 0; index < static_cast<i32>(_visible_items.size()); ++index)
+                {
+                    if (_visible_items[index]._id == item)
+                        item_index = index;
+                    if (_visible_items[index]._id == _selection_anchor)
+                        anchor_index = index;
+                }
+                if (item_index >= 0 && anchor_index >= 0)
+                {
+                    Vector<TreeItemId> next_items;
+                    if (control_down)
+                        next_items = _selected_items;
+                    const i32 begin = std::min(anchor_index, item_index);
+                    const i32 end = std::max(anchor_index, item_index);
+                    for (i32 index = begin; index <= end; ++index)
+                    {
+                        const TreeItemId range_item = _visible_items[index]._id;
+                        if (!IsItemSelected(range_item))
+                            next_items.push_back(range_item);
+                    }
+                    SetSelectionInternal(next_items, item, true);
+                    return;
+                }
+            }
+
+            if (control_down)
+            {
+                Vector<TreeItemId> next_items = _selected_items;
+                const auto selected_it = std::find(next_items.begin(), next_items.end(), item);
+                const bool is_removing = selected_it != next_items.end();
+                if (is_removing)
+                    next_items.erase(selected_it);
+                else
+                    next_items.push_back(item);
+
+                TreeItemId active_item = _selected_item;
+                if (!is_removing)
+                    active_item = item;
+                else if (active_item == item)
+                    active_item = next_items.empty() ? kInvalidTreeItemId : next_items.back();
+                _selection_anchor = item;
+                SetSelectionInternal(next_items, active_item, true);
+                return;
+            }
+
             SetSelectedItem(item, true);
         }
 

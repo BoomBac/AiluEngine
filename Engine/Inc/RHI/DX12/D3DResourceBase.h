@@ -157,12 +157,16 @@ namespace Ailu::RHI::DX12
 
         static void LogBarrier(ID3D12Resource *resource, D3D12_RESOURCE_STATES before, D3D12_RESOURCE_STATES after, u32 sub_res)
         {
+            /*
             LOG_WARNING("D3D12 barrier: resource={}, ptr={}, subRes={}, before=0x{:X}, after=0x{:X}", DebugObjectName(resource),
-                        static_cast<const void *>(resource), sub_res, static_cast<u32>(before), static_cast<u32>(after));
+static_cast<const void *>(resource), sub_res, static_cast<u32>(before), static_cast<u32>(after));
+*/
         }
 
         static void LogUAVBarrier(ID3D12Resource *resource)
-        { LOG_WARNING("D3D12 UAV barrier: resource={}, ptr={}", DebugObjectName(resource), static_cast<const void *>(resource)); }
+        { 
+            //LOG_WARNING("D3D12 UAV barrier: resource={}, ptr={}", DebugObjectName(resource), static_cast<const void *>(resource)); 
+        }
 
         static void InsertUAVBarrier(ID3D12GraphicsCommandList *cmd, ID3D12Resource *resource = nullptr)
         {
@@ -265,6 +269,19 @@ namespace Ailu::RHI::DX12
     {
         static ::Ailu::Render::EResourceState ToALResState(D3D12_RESOURCE_STATES state) { return (::Ailu::Render::EResourceState) state; };
         static D3D12_RESOURCE_STATES FromALResState(::Ailu::Render::EResourceState state) { return (D3D12_RESOURCE_STATES) state; };
+
+        // See Render::IsResourceStateCompatible.  D3D12 read states are bit sets, so a resource already in a wider
+        // read state (D3D12_RESOURCE_STATE_GENERIC_READ covers shader resource, vertex/index buffer and indirect
+        // argument) satisfies a narrower read requirement without a transition.
+        inline bool IsReadOnlyState(D3D12_RESOURCE_STATES state)
+        {
+            return ::Ailu::Render::IsReadOnlyResourceState(ToALResState(state));
+        }
+
+        inline bool IsStateCompatible(D3D12_RESOURCE_STATES current_state, D3D12_RESOURCE_STATES required_state)
+        {
+            return ::Ailu::Render::IsResourceStateCompatible(ToALResState(current_state), ToALResState(required_state));
+        }
     }// namespace D3DConvertUtils
 }// namespace Ailu::RHI::DX12
 

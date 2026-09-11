@@ -210,18 +210,32 @@ namespace Ailu
             _tree_view = vb->AddChild<TreeView>();
             _tree_view->Name("WorldOutlineTree");
             _tree_view->GetSlotAs<LinearSlot>().SizePolicy(ESizePolicy::kFill, ESizePolicy::kFill);
+            _tree_view->SetMultiSelectEnabled(true);
         }
 
         void WorldOutline::BindTreeEvents()
         {
-            _tree_view->_on_selection_changed += [this](TreeItemId item)
+            _tree_view->_on_selection_changed += [this](TreeItemId)
             {
-                auto entity = SceneTreeDataSource::ToEntity(item);
                 auto* scene = SceneMgr::Get().ActiveScene();
-                if (scene && scene->IsValidEntity(entity))
+                if (!scene)
+                    return;
+
+                List<ECS::Entity> selected_entities;
+                for (TreeItemId selected_item : _tree_view->GetSelectedItems())
                 {
-                    Selection::SetSelection(entity);
+                    auto selected_entity = SceneTreeDataSource::ToEntity(selected_item);
+                    if (scene->IsValidEntity(selected_entity))
+                        selected_entities.push_back(selected_entity);
                 }
+
+                const List<ECS::Entity> previous_entities = Selection::SelectedEntities();
+                if (previous_entities == selected_entities)
+                    return;
+                for (ECS::Entity previous_entity : previous_entities)
+                    Selection::RemoveSlection(previous_entity);
+                for (ECS::Entity selected_entity : selected_entities)
+                    Selection::AddSelection(selected_entity);
             };
 
             _tree_view->_on_item_double_clicked += [this](TreeItemId item)
@@ -333,18 +347,24 @@ namespace Ailu
         void WorldOutline::SyncSelectionFromEngine()
         {
             auto* scene = SceneMgr::Get().ActiveScene();
-            ECS::Entity entity = Selection::FirstEntity();
-
-            if (!scene || !scene->IsValidEntity(entity))
+            if (!scene)
             {
                 _tree_view->ClearSelection(false);
             }
             else
             {
-                auto item = SceneTreeDataSource::ToTreeItem(entity);
-                _tree_view->ExpandParents(item);
-                _tree_view->SetSelectedItem(item, false);
-                _tree_view->ScrollItemIntoView(item);
+                Vector<TreeItemId> selected_items;
+                for (ECS::Entity entity : Selection::SelectedEntities())
+                {
+                    if (!scene->IsValidEntity(entity))
+                        continue;
+                    const TreeItemId item = SceneTreeDataSource::ToTreeItem(entity);
+                    selected_items.push_back(item);
+                    _tree_view->ExpandParents(item);
+                }
+                _tree_view->SetSelectedItems(selected_items, false);
+                if (!selected_items.empty())
+                    _tree_view->ScrollItemIntoView(selected_items.front());
             }
         }
 
@@ -360,18 +380,78 @@ namespace Ailu
             if (auto* hier = reg.GetComponent<ECS::CHierarchy>(entity))
                 has_parent = (hier->_parent != ECS::kInvalidEntity);
 
+            Vector<ECS::Entity> selected_entities;
+            for (TreeItemId selected_item : _tree_view->GetSelectedItems())
+            {
+                const ECS::Entity selected_entity = SceneTreeDataSource::ToEntity(selected_item);
+                if (scene->IsValidEntity(selected_entity))
+                    selected_entities.push_back(selected_entity);
+            }
+            bool context_entity_selected = false;
+            for (ECS::Entity selected_entity : selected_entities)
+            {
+                if (selected_entity == entity)
+                {
+                    context_entity_selected = true;
+                    break;
+                }
+            }
+            if (!context_entity_selected)
+                selected_entities.push_back(entity);
+
             Vector<PopupMenuAction> actions;
 
             actions.push_back({"Rename", [this, entity]() { BeginEntityRename(entity); }});
 
-            actions.push_back({"Duplicate", [scene, entity]()
+            actions.push_back({"Duplicate", [scene, selected_entities]()
             {
-                scene->DuplicateEntity(entity);
+                Vector<ECS::Entity> duplicate_roots;
+                for (ECS::Entity selected_entity : selected_entities)
+                {
+                    if (!scene->IsValidEntity(selected_entity))
+                        continue;
+
+                    bool has_selected_ancestor = false;
+                    for (ECS::Entity potential_ancestor : selected_entities)
+                    {
+                        if (potential_ancestor != selected_entity &&
+                            scene->IsDescendantOf(selected_entity, potential_ancestor))
+                        {
+                            has_selected_ancestor = true;
+                            break;
+                        }
+                    }
+                    if (!has_selected_ancestor)
+                        duplicate_roots.push_back(selected_entity);
+                }
+
+                Vector<ECS::Entity> duplicated_entities;
+                for (ECS::Entity duplicate_root : duplicate_roots)
+                {
+                    const ECS::Entity duplicated_entity = scene->DuplicateEntity(duplicate_root);
+                    if (duplicated_entity != ECS::kInvalidEntity)
+                        duplicated_entities.push_back(duplicated_entity);
+                }
+
+                for (ECS::Entity selected_entity : selected_entities)
+                    Selection::RemoveSlection(selected_entity);
+                for (ECS::Entity duplicated_entity : duplicated_entities)
+                    Selection::AddSelection(duplicated_entity);
             }});
 
-            actions.push_back({"Copy Entity GUID", [scene, entity]()
+            actions.push_back({selected_entities.size() > 1u ? "Copy Entity GUIDs" : "Copy Entity GUID",
+                               [scene, selected_entities]()
             {
-                ImGui::SetClipboardText(scene->GetEntityGuid(entity).ToString().c_str());
+                String guids;
+                for (ECS::Entity selected_entity : selected_entities)
+                {
+                    if (!scene->IsValidEntity(selected_entity))
+                        continue;
+                    if (!guids.empty())
+                        guids.push_back('\n');
+                    guids += scene->GetEntityGuid(selected_entity).ToString();
+                }
+                ImGui::SetClipboardText(guids.c_str());
             }});
 
             actions.push_back({"Create Empty Child", [scene, entity]()
@@ -389,14 +469,21 @@ namespace Ailu
                 }});
             }
 
-            actions.push_back({"Delete", [scene, entity, entity_name]()
+            actions.push_back({"Delete", [scene, selected_entities, entity_name]()
             {
+                const String message = selected_entities.size() > 1u
+                    ? std::format("Delete {} selected entities?", selected_entities.size())
+                    : std::format("Delete '{}'?", entity_name);
                 EditorPopup::ShowConfirmAt(Input::GetGlobalMousePos(),
-                    std::format("Delete '{}'?", entity_name),
-                    [scene, entity]()
+                    message,
+                    [scene, selected_entities]()
                     {
-                        Selection::RemoveSlection(entity);
-                        scene->RemoveObject(entity);
+                        for (ECS::Entity selected_entity : selected_entities)
+                        {
+                            Selection::RemoveSlection(selected_entity);
+                            if (scene->IsValidEntity(selected_entity))
+                                scene->RemoveObject(selected_entity);
+                        }
                     }, "Delete");
             }, true});
 

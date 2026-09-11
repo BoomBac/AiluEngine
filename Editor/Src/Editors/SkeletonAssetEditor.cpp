@@ -5,6 +5,7 @@
 #include "Common/AssetEditorLayout.h"
 #include "Framework/Common/Input.h"
 #include "Framework/Common/ResourceMgr.h"
+#include "Render/AssetPreviewMaterial.h"
 #include "Render/CommandBuffer.h"
 #include "Render/Material.h"
 #include "Render/Mesh.h"
@@ -589,19 +590,19 @@ namespace Ailu::Editor
 
         if (_skeleton_joint_material == nullptr)
         {
-            _skeleton_joint_material = material->CreateInstance();
+            _skeleton_joint_material = CreatePerObjectPreviewMaterial(material.get());
             if (_skeleton_joint_material != nullptr)
                 _skeleton_joint_material->SetVector("_AlbedoValue", Vector4f(0.18f, 0.72f, 1.0f, 1.0f));
         }
         if (_skeleton_bone_material == nullptr)
         {
-            _skeleton_bone_material = material->CreateInstance();
+            _skeleton_bone_material = CreatePerObjectPreviewMaterial(material.get());
             if (_skeleton_bone_material != nullptr)
                 _skeleton_bone_material->SetVector("_AlbedoValue", Vector4f(0.08f, 0.34f, 0.62f, 1.0f));
         }
         if (_skeleton_selected_material == nullptr)
         {
-            _skeleton_selected_material = material->CreateInstance();
+            _skeleton_selected_material = CreatePerObjectPreviewMaterial(material.get());
             if (_skeleton_selected_material != nullptr)
                 _skeleton_selected_material->SetVector("_AlbedoValue", Vector4f(1.0f, 0.72f, 0.08f, 1.0f));
         }

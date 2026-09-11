@@ -59,6 +59,120 @@ using namespace Ailu::Render;
 
 namespace Ailu::RHI::DX12
 {
+    namespace
+    {
+        // The D3D12 debug layer message store is drained once per frame from Present().  Every bound below
+        // exists so a broken frame cannot make the diagnostic itself the bottleneck: the InfoQueue query is
+        // cheap, but a single bad resource can emit thousands of identical messages per frame while writing one
+        // log line costs orders of magnitude more than reading one message.
+        constexpr UINT64 kMaxDebugMessagesPerDrain = 64u;
+        constexpr u32 kMaxDebugMessageKinds = 16u;
+        // Accumulated counts are flushed on a frame interval instead of every frame, so a persistent problem
+        // costs a bounded number of lines per second rather than per frame.
+        constexpr u32 kDebugMessageLogIntervalFrames = 60u;
+
+        struct DebugMessageKind
+        {
+            D3D12_MESSAGE_SEVERITY _severity = D3D12_MESSAGE_SEVERITY_WARNING;
+            D3D12_MESSAGE_ID _id = D3D12_MESSAGE_ID_UNKNOWN;
+            u64 _count = 0u;
+            String _sample;
+        };
+
+        // Set in Init() while the debug layer is enabled, cleared in the destructor.  Null means the debug layer
+        // is off and the per-frame drain collapses to a single branch.
+        ComPtr<ID3D12InfoQueue> s_debug_message_queue;
+        Array<DebugMessageKind, kMaxDebugMessageKinds> s_debug_message_kinds;
+        u32 s_debug_message_kind_count = 0u;
+        u32 s_debug_message_frames_since_log = 0u;
+        u64 s_debug_message_unlisted_count = 0u;
+
+        void DrainD3DDebugLayerMessages()
+        {
+            const u32 frames_since_log = ++s_debug_message_frames_since_log;
+            if (s_debug_message_queue != nullptr)
+            {
+                const UINT64 stored_count = s_debug_message_queue->GetNumStoredMessages();
+                if (stored_count != 0u)
+                {
+                    const UINT64 read_count = std::min<UINT64>(stored_count, kMaxDebugMessagesPerDrain);
+                    thread_local Vector<u8> message_storage;
+                    for (UINT64 index = 0u; index < read_count; ++index)
+                    {
+                        SIZE_T message_size = 0u;
+                        if (FAILED(s_debug_message_queue->GetMessage(index, nullptr, &message_size)) || message_size == 0u)
+                            continue;
+                        if (message_storage.size() < message_size)
+                            message_storage.resize(message_size);
+                        auto *message = reinterpret_cast<D3D12_MESSAGE *>(message_storage.data());
+                        if (FAILED(s_debug_message_queue->GetMessage(index, message, &message_size)))
+                            continue;
+
+                        // Collapse repeats of the same (severity, id); the sample text is kept once.
+                        u32 kind_index = s_debug_message_kind_count;
+                        for (u32 i = 0u; i < s_debug_message_kind_count; ++i)
+                        {
+                            if (s_debug_message_kinds[i]._severity == message->Severity &&
+                                s_debug_message_kinds[i]._id == message->ID)
+                            {
+                                kind_index = i;
+                                break;
+                            }
+                        }
+                        if (kind_index == s_debug_message_kind_count)
+                        {
+                            if (s_debug_message_kind_count >= kMaxDebugMessageKinds)
+                            {
+                                ++s_debug_message_unlisted_count;
+                                continue;
+                            }
+                            auto &kind = s_debug_message_kinds[s_debug_message_kind_count++];
+                            kind._severity = message->Severity;
+                            kind._id = message->ID;
+                            kind._sample.assign(message->pDescription,
+                                                message->DescriptionByteLength > 0u
+                                                    ? static_cast<size_t>(message->DescriptionByteLength - 1u)
+                                                    : 0u);
+                        }
+                        ++s_debug_message_kinds[kind_index]._count;
+                    }
+                    // Anything past the read cap, plus whatever the store itself had to discard at its own
+                    // message-count limit, is counted but not described.
+                    s_debug_message_unlisted_count +=
+                        (stored_count - read_count) +
+                        s_debug_message_queue->GetNumMessagesDiscardedByMessageCountLimit();
+
+                    // ID3D12InfoQueue only exposes a whole-store clear, so messages appended between the count
+                    // above and this call are dropped.  That window is a few microseconds wide, the store is
+                    // capped anyway, and the debug layer still streams every message to OutputDebugString, so
+                    // the Visual Studio output window stays complete and a persistent problem reappears on the
+                    // next frame.
+                    s_debug_message_queue->ClearStoredMessages();
+                }
+            }
+
+            if (frames_since_log < kDebugMessageLogIntervalFrames)
+                return;
+            s_debug_message_frames_since_log = 0u;
+            if (s_debug_message_kind_count == 0u && s_debug_message_unlisted_count == 0u)
+                return;
+
+            for (u32 i = 0u; i < s_debug_message_kind_count; ++i)
+            {
+                const auto &kind = s_debug_message_kinds[i];
+                LOG_WARNING("D3D12 debug layer: severity={}, id={}, count={}, sample={}",
+                            static_cast<u32>(kind._severity), static_cast<u32>(kind._id), kind._count, kind._sample);
+            }
+            if (s_debug_message_unlisted_count > 0u)
+                LOG_WARNING("D3D12 debug layer: {} further messages of other kinds suppressed",
+                            s_debug_message_unlisted_count);
+
+            s_debug_message_kinds = {};
+            s_debug_message_kind_count = 0u;
+            s_debug_message_unlisted_count = 0u;
+        }
+    }// namespace
+
 #pragma region GpuCommandWorker
 
     GpuCommandWorker::GpuCommandWorker(GraphicsContext *context) : _ctx(context), _is_stop(false), _worker_thread(nullptr) {}
@@ -233,6 +347,9 @@ namespace Ailu::RHI::DX12
             case EGpuCommandType::kReadBack: cost += 12u; break;
             case EGpuCommandType::kTransResourceState: cost += 4u; break;
             case EGpuCommandType::kResourceBarrier: cost += 3u; break;
+            case EGpuCommandType::kResourceBarriers:
+                cost += 1u + 3u * static_cast<u32>(static_cast<const CommandResourceBarriers *>(command)->_barriers.size());
+                break;
             default: cost += 1u; break;
             }
         }
@@ -846,12 +963,14 @@ namespace Ailu::RHI::DX12
     {
         if (g_engine_config._enable_pix)
             PIXLoadLatestWinPixGpuCapturerLibrary();
-        RdcLoadLatestRdcGpuCapturerLibrary();
+        if (g_engine_config._enable_rdc)
+            RdcLoadLatestRdcGpuCapturerLibrary();
         _cmd_worker = MakeScope<GpuCommandWorker>(this);
     }
 
     D3DContext::~D3DContext()
     {
+        s_debug_message_queue.Reset();
         Destroy();
         LOG_INFO("D3DContext Destroy");
     }
@@ -1269,6 +1388,8 @@ namespace Ailu::RHI::DX12
         ComPtr<ID3D12InfoQueue> infoQueue;
         if (SUCCEEDED(m_device->QueryInterface(IID_PPV_ARGS(&infoQueue))))
         {
+            // Kept alive for the per-frame drain in Present(); null when the debug layer is disabled.
+            s_debug_message_queue = infoQueue;
             // 中断条件（BREAK）设置
             infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, TRUE);// 严重错误
             infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, TRUE);     // 普通错误，如你遇到的 Reset 错误
@@ -1381,6 +1502,9 @@ namespace Ailu::RHI::DX12
         Vector<GfxCommand *> cmds{CommandPool::Get().Alloc<CommandPresent>()};
         _cmd_worker->Push(std::move(cmds), SubmitParams{"Present", true});
         if (!Application::Get()._is_multi_thread_rendering.load()) { _cmd_worker->RunSync(); }
+        // Frameboundary drain: the debug layer store is drained here so a state error cannot hide until exit,
+        // and so an undrained store cannot grow without bound across the session.
+        DrainD3DDebugLayerMessages();
     }
 
     void D3DContext::SetMultiThreadRendering(bool enabled)
@@ -2163,6 +2287,34 @@ namespace Ailu::RHI::DX12
 #endif
             barrier_cmd->_res->ApplyResourceBarrier(cmd_buffer, barrier_cmd->_before, barrier_cmd->_after,
                                                      barrier_cmd->_sub_res);
+        }
+        else if (cmd->GetCmdType() == EGpuCommandType::kResourceBarriers)
+        {
+            auto *batch_cmd = static_cast<CommandResourceBarriers *>(cmd);
+#if AILU_ENABLE_FRAME_DEBUGGER
+            auto *capture_writer = cmd_buffer->CaptureWriter();
+            if (capture_writer != nullptr)
+            {
+                for (const auto &barrier: batch_cmd->_barriers)
+                {
+                    Render::FrameDebugger::ResourceBarrierCapture barrier_cap;
+                    barrier_cap._is_uav = barrier._is_uav_barrier;
+                    if (barrier._resource != nullptr)
+                    {
+                        barrier_cap._resource_id = capture_writer->RegisterObject(
+                            barrier._resource, CaptureObjectTypeForResource(barrier._resource),
+                            capture_writer->InternString(barrier._resource->Name()));
+                        barrier_cap._resource_name = capture_writer->InternString(barrier._resource->Name());
+                    }
+                    barrier_cap._before = (u32) barrier._before;
+                    barrier_cap._after = (u32) barrier._after;
+                    barrier_cap._sub_resource = barrier._sub_resource;
+                    capture_writer->RecordBarrierEvent(barrier_cap);
+                }
+            }
+#endif
+            static_cast<D3DCommandBuffer *>(cmd_buffer)->RecordResourceBarriers(batch_cmd->_barriers.data(),
+                                                                                static_cast<u32>(batch_cmd->_barriers.size()));
         }
         else if (cmd->GetCmdType() == EGpuCommandType::kUAVBarrier)
         {

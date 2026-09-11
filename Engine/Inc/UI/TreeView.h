@@ -85,6 +85,11 @@ namespace Ailu
 
             void SetSelectedItem(TreeItemId item, bool notify = true);
             TreeItemId GetSelectedItem() const { return _selected_item; }
+            void SetSelectedItems(const Vector<TreeItemId> &items, bool notify = true);
+            const Vector<TreeItemId> &GetSelectedItems() const { return _selected_items; }
+            bool IsItemSelected(TreeItemId item) const;
+            void SetMultiSelectEnabled(bool enabled);
+            bool IsMultiSelectEnabled() const { return _is_multi_select_enabled; }
             void ClearSelection(bool notify = true);
 
             void SetExpanded(TreeItemId item, bool expanded);
@@ -140,6 +145,7 @@ namespace Ailu
             void OnRowClicked(TreeItemId item);
             void OnRowDoubleClicked(TreeItemId item);
             void OnRowContextMenu(TreeItemId item, Vector2f pos);
+            void SetSelectionInternal(const Vector<TreeItemId> &items, TreeItemId active_item, bool notify);
             void HandleKeyDown(UIEvent &event);
             void HandleDrop(const DragPayload& payload, f32 x, f32 y, TreeItemId target);
             ETreeDropLocation ResolveDropLocation(TreeItemId target, f32 y) const;
@@ -150,7 +156,9 @@ namespace Ailu
             Vector<VisibleTreeItem> _visible_items;
             std::unordered_set<TreeItemId> _expanded_items;
             HashMap<TreeItemId, UIElement*> _item_rows;
+            Vector<TreeItemId> _selected_items;
             TreeItemId _selected_item = kInvalidTreeItemId;
+            TreeItemId _selection_anchor = kInvalidTreeItemId;
             VerticalBox* _content_box = nullptr;
             UIElement* _hovered_row = nullptr;
             Border* _empty_drop_handler = nullptr;
@@ -165,6 +173,7 @@ namespace Ailu
             TreeExternalCanDropCallback _external_can_drop_callback;
             TreeExternalDropCallback _external_drop_callback;
             bool _expand_on_row_click = false;
+            bool _is_multi_select_enabled = false;
 
             // Drag initiation tracking
             TreeItemId _drag_pending_item = kInvalidTreeItemId;

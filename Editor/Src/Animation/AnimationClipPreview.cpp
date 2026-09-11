@@ -1,6 +1,7 @@
 #include "Animation/AnimationClipPreview.h"
 
 #include "Framework/Common/ResourceMgr.h"
+#include "Render/AssetPreviewMaterial.h"
 #include "Render/CommandBuffer.h"
 #include "Render/GraphicsContext.h"
 #include "Render/Material.h"
@@ -518,7 +519,9 @@ namespace Ailu::Editor
             return;
         if (_trajectory_material == nullptr)
         {
-            _trajectory_material = material->CreateInstance();
+            _trajectory_material = CreatePerObjectPreviewMaterial(material.get());
+            if (_trajectory_material == nullptr)
+                return;
             _trajectory_material->SetVector("_AlbedoValue", Vector4f(1.0f, 0.42f, 0.08f, 1.0f));
             _trajectory_material->SetFloat("_MetallicValue", 0.0f);
             _trajectory_material->SetFloat("_RoughnessValue", 0.45f);
@@ -672,26 +675,31 @@ namespace Ailu::Editor
             {
                 if (_skeleton_joint_material == nullptr)
                 {
-                    _skeleton_joint_material = material->CreateInstance();
+                    _skeleton_joint_material = CreatePerObjectPreviewMaterial(material.get());
+                    if (_skeleton_joint_material == nullptr)
+                        return;
                     _skeleton_joint_material->SetVector("_AlbedoValue", Vector4f(0.18f, 0.72f, 1.0f, 1.0f));
                     _skeleton_joint_material->SetFloat("_MetallicValue", 0.0f);
                     _skeleton_joint_material->SetFloat("_RoughnessValue", 0.55f);
                 }
                 if (_skeleton_bone_material == nullptr)
                 {
-                    _skeleton_bone_material = material->CreateInstance();
+                    _skeleton_bone_material = CreatePerObjectPreviewMaterial(material.get());
+                    if (_skeleton_bone_material == nullptr)
+                        return;
                     _skeleton_bone_material->SetVector("_AlbedoValue", Vector4f(0.08f, 0.34f, 0.62f, 1.0f));
                     _skeleton_bone_material->SetFloat("_MetallicValue", 0.0f);
                     _skeleton_bone_material->SetFloat("_RoughnessValue", 0.65f);
                 }
                 if (_skeleton_selected_material == nullptr)
                 {
-                    _skeleton_selected_material = material->CreateInstance();
+                    _skeleton_selected_material = CreatePerObjectPreviewMaterial(material.get());
+                    if (_skeleton_selected_material == nullptr)
+                        return;
                     _skeleton_selected_material->SetVector("_AlbedoValue", Vector4f(1.0f, 0.72f, 0.08f, 1.0f));
                     _skeleton_selected_material->SetFloat("_MetallicValue", 0.0f);
                     _skeleton_selected_material->SetFloat("_RoughnessValue", 0.4f);
                 }
-
                 Vector<Vector3f> joint_positions;
                 const Skeleton &skeleton = _preview_mesh->GetSkeletonAsset()->GetSkeleton();
                 if (!BuildJointPositions(world_matrix, joint_positions))

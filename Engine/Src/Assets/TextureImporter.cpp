@@ -77,7 +77,7 @@ namespace Ailu
 
     bool TextureImporter::Import(const WString &source_path, const TextureImportSetting &setting, TextureArtifact &out_artifact)
     {
-        const String extension = ToChar(std::filesystem::path(source_path).extension().wstring());
+        const String extension = su::ToLower(ToChar(std::filesystem::path(source_path).extension().wstring()));
         DirectX::ScratchImage decoded;
         const HRESULT load_result = su::EndWith(extension, ".dds") ? DirectX::LoadFromDDSFile(source_path.c_str(), DirectX::DDS_FLAGS_NONE, nullptr, decoded) :
             su::EndWith(extension, ".tga") ? DirectX::LoadFromTGAFile(source_path.c_str(), nullptr, decoded) :

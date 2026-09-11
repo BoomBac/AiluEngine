@@ -1,5 +1,6 @@
 #include "Render/AssetPreviewGenerator.h"
 #include "Framework/Common/ResourceMgr.h"
+#include "Render/AssetPreviewMaterial.h"
 #include "Render/Mesh.h"
 #include "Render/2D/Sprite.h"
 #include "Render/2D/SpriteBatcher.h"
@@ -99,10 +100,11 @@ namespace Ailu
                                                           Ref<Render::RenderTexture> &target)
         {
             auto standard_material = Material::s_standard_forward_lit.lock();
+            auto preview_material = CreatePerObjectPreviewMaterial(standard_material.get());
             String preview_name = "mesh";
             if (mesh != nullptr)
                 preview_name = mesh->Name();
-            GenerateMeshSnapshotImpl(w, h, mesh, standard_material.get(), preview_name, target);
+            GenerateMeshSnapshotImpl(w, h, mesh, preview_material.get(), preview_name, target);
         }
 
         void AssetPreviewGenerator::GeneratorMaterialSnapshot(u16 w, u16 h, Render::Material *material,
@@ -120,23 +122,8 @@ namespace Ailu
                 return;
             }
 
-            Ref<Material> preview_material;
-            Material *draw_material = material;
-            if (material->IsStandardLit())
-            {
-                auto forward_shader = ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/forwardlit.alasset");
-                if (forward_shader != nullptr)
-                {
-                    preview_material = material->CreateInstance();
-                    if (preview_material != nullptr)
-                    {
-                        preview_material->SetActiveShader(forward_shader);
-                        preview_material->SetCullMode(material->GetCullMode());
-                        draw_material = preview_material.get();
-                    }
-                }
-            }
-            GenerateMeshSnapshotImpl(w, h, sphere.get(), draw_material, material->Name(), target);
+            auto preview_material = CreatePerObjectPreviewMaterial(material);
+            GenerateMeshSnapshotImpl(w, h, sphere.get(), preview_material.get(), material->Name(), target);
         }
         void AssetPreviewGenerator::GeneratorSpriteSnapshot(u16 w, u16 h, Render::Sprite *sprite, Ref<Render::RenderTexture> &target)
         {

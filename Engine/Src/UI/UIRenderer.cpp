@@ -882,13 +882,13 @@ namespace Ailu
             _backdrop_blur_cs->SetTexture(_backdrop_blur_x_kernel, "_OutTex", blur_x);
             auto [group_num_x, group_num_y, group_num_z] = _backdrop_blur_cs->CalculateDispatchNum(_backdrop_blur_x_kernel, blur_width, blur_height, 1u);
             cmd->Dispatch(_backdrop_blur_cs.get(), _backdrop_blur_x_kernel, group_num_x, group_num_y, 1u);
-            cmd->InsertUAVBarrier(blur_x_rt);
+            // The following transition out of kUnorderedAccess already orders the dispatch writes; an explicit
+            // UAV barrier before it is redundant.
             cmd->StateTransition(blur_x_rt, EResourceState::kNonPixelShaderResource);
             cmd->StateTransition(blur_y_rt, EResourceState::kUnorderedAccess);
             _backdrop_blur_cs->SetTexture(_backdrop_blur_y_kernel, "_SourceTex", blur_x);
             _backdrop_blur_cs->SetTexture(_backdrop_blur_y_kernel, "_OutTex", blur_y);
             cmd->Dispatch(_backdrop_blur_cs.get(), _backdrop_blur_y_kernel, group_num_x, group_num_y, 1u);
-            cmd->InsertUAVBarrier(blur_y_rt);
             cmd->StateTransition(blur_y_rt, EResourceState::kPixelShaderResource);
 
             _frame_backdrop_blur_cache[source] = blur_y_rt;

@@ -216,6 +216,9 @@ namespace Ailu
         void StateTransition(GpuResource *res, EResourceState new_state, u32 sub_res = kTotalSubRes);
         void ResourceBarrier(GpuResource *res, EResourceState before, EResourceState after, u32 sub_res = kTotalSubRes);
         void InsertUAVBarrier(GpuResource *res = nullptr);
+        /// @brief Submit a contiguous block of barriers as a single batched command. High frequency paths
+        /// (RenderGraph compiled passes) must use this instead of the per-barrier overloads.
+        void ResourceBarriers(const ResourceBarrierDesc *barriers, u32 count);
 
         void ReadbackBuffer(GPUBuffer* buffer,bool is_counter,u32 size,ReadbackCallback callback);
 

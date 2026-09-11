@@ -29,6 +29,7 @@ namespace Ailu::RHI::DX12
         _fence_value = 0u;
         _used_resources.reserve(64u);
         _local_resource_states.reserve(64u);
+        _barrier_cache.reserve(64u);
         _is_executed = false;
         _p_cmd->SetName(std::format(L"CmdList_{}", _id).c_str());
         _p_alloc->SetName(std::format(L"CmdAllocator_{}", _id).c_str());
@@ -58,6 +59,8 @@ namespace Ailu::RHI::DX12
         _fence_value = 0u;
         _is_submitted = false;
         _is_executed = false;
+        _barrier_cache.clear();
+        _is_batching_barriers = false;
 #if AILU_ENABLE_FRAME_DEBUGGER
         SetCaptureWriter(nullptr);
 #endif
@@ -133,8 +136,81 @@ namespace Ailu::RHI::DX12
 
     void D3DCommandBuffer::InsertUAVBarrier(ID3D12Resource* resource)
     {
-        const auto barrier = CD3DX12_RESOURCE_BARRIER::UAV(resource);
-        _p_cmd->ResourceBarrier(1u, &barrier);
+        _barrier_cache.emplace_back(CD3DX12_RESOURCE_BARRIER::UAV(resource));
+        if (!_is_batching_barriers)
+            FlushResourceBarriers();
+    }
+
+    void D3DCommandBuffer::FlushResourceBarriers()
+    {
+        if (_barrier_cache.empty())
+            return;
+
+        // A batch can legitimately hold several transitions for the same subresource, e.g. a pass that reads a
+        // resource and then writes it.  Nothing is recorded between them, so the intermediate state is never
+        // observable and the chain collapses to its endpoints.  D3D12 additionally flags a repeated subresource
+        // inside one ResourceBarrier call, so collapsing both satisfies the debug layer and removes driver work.
+        u32 write_index = 0u;
+        for (u32 read_index = 0u; read_index < _barrier_cache.size(); ++read_index)
+        {
+            const D3D12_RESOURCE_BARRIER incoming = _barrier_cache[read_index];
+            if (incoming.Type == D3D12_RESOURCE_BARRIER_TYPE_TRANSITION)
+            {
+                bool merged = false;
+                for (u32 probe = write_index; probe-- > 0u;)
+                {
+                    D3D12_RESOURCE_BARRIER &existing = _barrier_cache[probe];
+                    if (existing.Type != D3D12_RESOURCE_BARRIER_TYPE_TRANSITION ||
+                        existing.Transition.pResource != incoming.Transition.pResource ||
+                        existing.Transition.Subresource != incoming.Transition.Subresource)
+                        continue;
+                    // The chain has to be contiguous, otherwise the two transitions describe different timelines.
+                    if (existing.Transition.StateAfter != incoming.Transition.StateBefore)
+                        break;
+                    existing.Transition.StateAfter = incoming.Transition.StateAfter;
+                    merged = true;
+                    break;
+                }
+                if (merged)
+                    continue;
+            }
+            _barrier_cache[write_index++] = incoming;
+        }
+        _barrier_cache.resize(write_index);
+
+        // A chain that folds back onto its own source state carries no information at all.
+        _barrier_cache.erase(std::remove_if(_barrier_cache.begin(), _barrier_cache.end(),
+                                            [](const D3D12_RESOURCE_BARRIER &barrier)
+                                            {
+                                                return barrier.Type == D3D12_RESOURCE_BARRIER_TYPE_TRANSITION &&
+                                                       barrier.Transition.StateBefore == barrier.Transition.StateAfter;
+                                            }),
+                              _barrier_cache.end());
+        if (_barrier_cache.empty())
+            return;
+
+        // Surviving entries keep their recording order; D3D12 executes the array in order.
+        _p_cmd->ResourceBarrier(static_cast<UINT>(_barrier_cache.size()), _barrier_cache.data());
+        _barrier_cache.clear();
+    }
+
+    void D3DCommandBuffer::RecordResourceBarriers(const Render::ResourceBarrierDesc *barriers, u32 count)
+    {
+        if (barriers == nullptr || count == 0u)
+            return;
+
+        BeginResourceBarrierBatch();
+        for (u32 i = 0u; i < count; ++i)
+        {
+            const auto &barrier = barriers[i];
+            if (barrier._resource == nullptr)
+                continue;
+            if (barrier._is_uav_barrier)
+                barrier._resource->InsertUAVBarrier(this);
+            else
+                barrier._resource->ApplyResourceBarrier(this, barrier._before, barrier._after, barrier._sub_resource);
+        }
+        EndResourceBarrierBatch();
     }
 
     void D3DCommandBuffer::RegisterRenderGraphResource(Render::GpuResource *resource)
@@ -197,8 +273,9 @@ namespace Ailu::RHI::DX12
                         static_cast<u32>(after_state));
         }
 #endif
-        const auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(resource, before_state, after_state, sub_res);
-        _p_cmd->ResourceBarrier(1u, &barrier);
+        _barrier_cache.emplace_back(CD3DX12_RESOURCE_BARRIER::Transition(resource, before_state, after_state, sub_res));
+        if (!_is_batching_barriers)
+            FlushResourceBarriers();
     }
 
     void D3DCommandBuffer::ApplyResourceBarrier(D3DResourceStateGuard &state_guard, D3D12_RESOURCE_STATES before_state,
@@ -303,19 +380,31 @@ namespace Ailu::RHI::DX12
             if (std::all_of(local_state._states.begin(), local_state._states.end(),
                             [&](const auto state) { return state == local_state._states.front(); }))
             {
-                RecordResourceBarrier(resource, local_state._states.front(), after_state, sub_res);
+                // A wider read-only current state already satisfies a narrower read-only request.  Keep the wider
+                // tracked state: narrowing it here only forces the mirrored transition on the next access.
+                const D3D12_RESOURCE_STATES uniform_state = local_state._states.front();
+                if (!D3DConvertUtils::IsStateCompatible(uniform_state, after_state))
+                {
+                    RecordResourceBarrier(resource, uniform_state, after_state, sub_res);
+                    std::fill(local_state._states.begin(), local_state._states.end(), after_state);
+                }
+                return;
             }
-            else
+            for (u32 index = 0u; index < subresource_count; ++index)
             {
-                for (u32 index = 0u; index < subresource_count; ++index)
-                    RecordResourceBarrier(resource, local_state._states[index], after_state, index);
+                const D3D12_RESOURCE_STATES current_state = local_state._states[index];
+                if (D3DConvertUtils::IsStateCompatible(current_state, after_state))
+                    continue;
+                RecordResourceBarrier(resource, current_state, after_state, index);
+                local_state._states[index] = after_state;
             }
-            std::fill(local_state._states.begin(), local_state._states.end(), after_state);
             return;
         }
 
         AL_ASSERT(sub_res < subresource_count);
         const D3D12_RESOURCE_STATES recorded_before = local_state._states[sub_res];
+        if (D3DConvertUtils::IsStateCompatible(recorded_before, after_state))
+            return;
         RecordResourceBarrier(resource, recorded_before, after_state, sub_res);
         local_state._states[sub_res] = after_state;
     }
@@ -379,37 +468,36 @@ namespace Ailu::RHI::DX12
         AL_ASSERT(subresource_count > 0u);
         if (sub_res == D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES)
         {
-            bool needs_transition = false;
-            for (const auto state : states)
+            // Bind paths ask for a specific read state on every bind.  When the resource is already in a wider
+            // read state (e.g. GENERIC_READ covering shader resource + vertex/index buffer + indirect argument)
+            // the request is already satisfied, so no barrier is emitted and the wider state is kept.
+            const auto needs_transition = [&](D3D12_RESOURCE_STATES state)
             {
-                if (state != target_state)
-                {
-                    needs_transition = true;
-                    break;
-                }
+                return !D3DConvertUtils::IsStateCompatible(state, target_state);
+            };
+
+            if (std::none_of(states.begin(), states.end(), needs_transition))
+                return;
+
+            if (std::all_of(states.begin(), states.end(), [&](const auto state) { return state == states.front(); }))
+            {
+                RecordResourceBarrier(resource, states.front(), target_state, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
+                std::fill(states.begin(), states.end(), target_state);
+                return;
             }
 
-            if (needs_transition)
+            for (u32 i = 0u; i < subresource_count; ++i)
             {
-                if (std::all_of(states.begin(), states.end(), [&](const auto state) { return state == states.front(); }))
-                {
-                    RecordResourceBarrier(resource, states.front(), target_state, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
-                }
-                else
-                {
-                    for (u32 i = 0u; i < subresource_count; ++i)
-                    {
-                        if (states[i] != target_state)
-                            RecordResourceBarrier(resource, states[i], target_state, i);
-                    }
-                }
-                std::fill(states.begin(), states.end(), target_state);
+                if (!needs_transition(states[i]))
+                    continue;
+                RecordResourceBarrier(resource, states[i], target_state, i);
+                states[i] = target_state;
             }
             return;
         }
 
         AL_ASSERT(sub_res < subresource_count);
-        if (states[sub_res] == target_state) return;
+        if (D3DConvertUtils::IsStateCompatible(states[sub_res], target_state)) return;
 
         RecordResourceBarrier(resource, states[sub_res], target_state, sub_res);
         states[sub_res] = target_state;
@@ -446,14 +534,20 @@ namespace Ailu::RHI::DX12
         }
     }
 
-    void D3DCommandBuffer::UploadDataToBuffer(void* src,u64 src_size,ID3D12Resource* dst,D3DResourceStateGuard& state_guard)
+    void D3DCommandBuffer::UploadDataToBuffer(void* src,u64 src_size,ID3D12Resource* dst,D3DResourceStateGuard& state_guard,
+                                              bool restore_state)
     {
         auto alloc = _upload_buf->Allocate(src_size,256);
         alloc.SetData(src,src_size);
-        auto old_state = state_guard.CurState();
+        D3D12_RESOURCE_STATES old_state = D3D12_RESOURCE_STATE_COMMON;
+        if (restore_state)
+            old_state = state_guard.CurState();
         EnsureResourceState(state_guard, D3D12_RESOURCE_STATE_COPY_DEST);
         _p_cmd->CopyBufferRegion(dst, 0u, alloc._page_res, alloc._offset, src_size);
-        EnsureResourceState(state_guard, old_state);
+        // Callers that own the following transition (RenderGraph managed resources) keep the resource in
+        // COPY_DEST: the copy is still ordered, and undoing the transition only to redo it costs a barrier.
+        if (restore_state)
+            EnsureResourceState(state_guard, old_state);
     }
 
     void D3DCommandBuffer::ResetRenderTarget()

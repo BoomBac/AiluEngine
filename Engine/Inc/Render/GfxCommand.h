@@ -42,6 +42,7 @@ namespace Ailu::Render
         kResourceUpload,
         kTransResourceState,
         kResourceBarrier,
+        kResourceBarriers,
         kUAVBarrier,
         kAllocConstBuffer,
         kCommandProfiler,
@@ -190,6 +191,13 @@ namespace Ailu::Render
             SafeResetCommand(this);
         }
     };
+    /// @brief Batched barrier submission. Holds one contiguous array so a whole pass worth of barriers costs a
+    /// single command object instead of one pooled payload per barrier.
+    struct CommandResourceBarriers : public TypedGfxCommand<EGpuCommandType::kResourceBarriers>
+    {
+        Vector<ResourceBarrierDesc> _barriers;
+        void Reset() { _barriers.clear(); }
+    };
     struct CommandUAVBarrier : public TypedGfxCommand<EGpuCommandType::kUAVBarrier>
     {
         GpuResource *_res;
@@ -324,14 +332,14 @@ namespace Ailu::Render
     inline constexpr size_t kCommandPayloadSize = MaxCommandValue(
         sizeof(CommandSetTarget), sizeof(CommandClearTarget), sizeof(CommandDraw), sizeof(CommandDispatch),
         sizeof(CommandGpuResourceUpload), sizeof(CommandTranslateState), sizeof(CommandResourceBarrier),
-        sizeof(CommandUAVBarrier), sizeof(CommandCustom), sizeof(CommandAllocConstBuffer), sizeof(CommandProfiler),
+        sizeof(CommandResourceBarriers), sizeof(CommandUAVBarrier), sizeof(CommandCustom), sizeof(CommandAllocConstBuffer), sizeof(CommandProfiler),
         sizeof(CommandCopyCounter), sizeof(CommandPresent), sizeof(CommandScissor), sizeof(CommandDispatchRays),
         sizeof(CommandReadBack), sizeof(CommandBuildAS));
 
     inline constexpr size_t kCommandPayloadAlign = MaxCommandValue(
         alignof(CommandSetTarget), alignof(CommandClearTarget), alignof(CommandDraw), alignof(CommandDispatch),
         alignof(CommandGpuResourceUpload), alignof(CommandTranslateState), alignof(CommandResourceBarrier),
-        alignof(CommandUAVBarrier), alignof(CommandCustom), alignof(CommandAllocConstBuffer), alignof(CommandProfiler),
+        alignof(CommandResourceBarriers), alignof(CommandUAVBarrier), alignof(CommandCustom), alignof(CommandAllocConstBuffer), alignof(CommandProfiler),
         alignof(CommandCopyCounter), alignof(CommandPresent), alignof(CommandScissor), alignof(CommandDispatchRays),
         alignof(CommandReadBack), alignof(CommandBuildAS));
 

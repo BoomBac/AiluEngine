@@ -14,6 +14,8 @@ namespace Ailu
 {
     namespace Render
     {
+        class GpuResource;
+
         AENUM()
         enum class EResourceUsage : u32
         {
@@ -85,6 +87,52 @@ namespace Ailu
         {
             return (static_cast<u32>(a) & static_cast<u32>(b)) != 0;
         }
+
+        // States that may still have writes in flight.  Everything outside this mask is a pure read state,
+        // whose numeric value is a bit set of the read capabilities the resource currently offers.
+        inline constexpr u32 kWriteResourceStateMask =
+            static_cast<u32>(EResourceState::kRenderTarget) |
+            static_cast<u32>(EResourceState::kUnorderedAccess) |
+            static_cast<u32>(EResourceState::kDepthWrite) |
+            static_cast<u32>(EResourceState::kCopyDest) |
+            static_cast<u32>(EResourceState::kResolveDest) |
+            static_cast<u32>(EResourceState::kVideoDecodeWrite) |
+            static_cast<u32>(EResourceState::kVideoProcessWrite) |
+            static_cast<u32>(EResourceState::kVideoEncodeWrite);
+
+        // kCommon (0) is deliberately not a read-only state: D3D12 requires an explicit transition out of it.
+        inline bool IsReadOnlyResourceState(EResourceState state)
+        {
+            const u32 bits = static_cast<u32>(state);
+            return bits != 0u && (bits & kWriteResourceStateMask) == 0u;
+        }
+
+        // A read-only state is a superset of the read capabilities it grants, so a resource already sitting in a
+        // wider read state (e.g. kGenericRead) satisfies a narrower read requirement (e.g. kAllShaderResource,
+        // kVertexAndConstantBuffer, kIndexBuffer, kIndirectArgument) without a transition.  The wider state is
+        // kept as the tracked state: narrowing it just forces the mirrored transition on the next access.
+        inline bool IsResourceStateCompatible(EResourceState current_state, EResourceState required_state)
+        {
+            if (current_state == required_state)
+                return true;
+            if (!IsReadOnlyResourceState(current_state) || !IsReadOnlyResourceState(required_state))
+                return false;
+            const u32 required_bits = static_cast<u32>(required_state);
+            return (static_cast<u32>(current_state) & required_bits) == required_bits;
+        }
+
+        /// @brief Fully resolved barrier request. The RenderGraph resolves handles to resources while recording a
+        /// pass, so the deferred DX12 recording path never has to touch graph state on the worker thread.
+        /// A batch is submitted as one command and becomes one native ID3D12GraphicsCommandList::ResourceBarrier call.
+        struct ResourceBarrierDesc
+        {
+            GpuResource *_resource = nullptr;
+            EResourceState _before = EResourceState::kCommon;
+            EResourceState _after = EResourceState::kCommon;
+            u32 _sub_resource = kTotalSubRes;
+            /// When set, the entry is a UAV hazard barrier; _before/_after are ignored.
+            bool _is_uav_barrier = false;
+        };
 
         enum class EGpuResType
         {

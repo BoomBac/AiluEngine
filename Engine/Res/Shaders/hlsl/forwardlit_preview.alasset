@@ -1,0 +1,12 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "6ef76e10-12ae-440b-937c-c1f34d6d5a02",
+        "_asset_type": "Ailu::Render::Shader",
+        "_asset_name": "forwardlit_preview",
+        "_dependencies": []
+    },
+    "_file": "forwardlit_preview.hlsl",
+    "_vs_entry": "ForwardVSMain",
+    "_ps_entry": "ForwardPSMain"
+}

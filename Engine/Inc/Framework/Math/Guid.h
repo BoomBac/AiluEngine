@@ -12,6 +12,7 @@ namespace Ailu
     public:
         static Guid Generate();
         Guid();
+        // An empty Guid is represented only by an empty string; legacy sentinels are normalized on construction.
         explicit Guid(std::string guid);
         [[nodiscard]] const String & ToString() const;
         bool operator ==(const Guid& other) const;

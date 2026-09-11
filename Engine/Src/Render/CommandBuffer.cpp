@@ -585,6 +585,12 @@ namespace Ailu::Render
                 case EGpuCommandType::kResourceBarrier:
                     KeepAlive(static_cast<CommandResourceBarrier *>(command)->_res);
                     break;
+                case EGpuCommandType::kResourceBarriers:
+                {
+                    for (const auto &barrier: static_cast<CommandResourceBarriers *>(command)->_barriers)
+                        KeepAlive(barrier._resource);
+                    break;
+                }
                 case EGpuCommandType::kUAVBarrier:
                     KeepAlive(static_cast<CommandUAVBarrier *>(command)->_res);
                     break;
@@ -959,6 +965,18 @@ namespace Ailu::Render
             _commands.emplace_back(cmd);
         }
 
+        void ResourceBarriers(const ResourceBarrierDesc *barriers, u32 count)
+        {
+            if (barriers == nullptr || count == 0u)
+                return;
+            auto cmd = CommandPool::Get().Alloc<CommandResourceBarriers>();
+            if (cmd == nullptr)
+                return;
+            // One allocation for the whole pass worth of barriers; entries are never appended one by one.
+            cmd->_barriers.assign(barriers, barriers + count);
+            _commands.emplace_back(cmd);
+        }
+
         void ReadbackBuffer(GPUBuffer *buffer, bool is_counter, u32 size, ReadbackCallback callback)
         {
             auto cmd = CommandPool::Get().Alloc<CommandReadBack>();
@@ -1276,6 +1294,11 @@ namespace Ailu::Render
     void CommandBuffer::InsertUAVBarrier(GpuResource *res)
     {
         _impl->InsertUAVBarrier(res);
+    }
+
+    void CommandBuffer::ResourceBarriers(const ResourceBarrierDesc *barriers, u32 count)
+    {
+        _impl->ResourceBarriers(barriers, count);
     }
 
     void CommandBuffer::BuildAS(RayTracingScene* scene,bool is_update)

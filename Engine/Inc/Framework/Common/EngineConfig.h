@@ -32,6 +32,8 @@ namespace Ailu
         APROPERTY(Category = "Debug")
         bool _enable_d3d12_debug_layer;
         APROPERTY(Category = "Debug")
+        bool _enable_rdc;
+        APROPERTY(Category = "Debug")
         bool _enable_pix;
     };
     extern AILU_API EngineConfig g_engine_config;

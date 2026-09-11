@@ -51,6 +51,7 @@ namespace Ailu::Editor
         Render::Mesh *_mesh = nullptr;
         Render::Material *_material = nullptr;
         Ref<Render::Material> _preview_material;
+        Ref<Render::Material> _default_preview_material;
         Ref<Render::Material> _grid_material;
         Ref<Render::Material> _wireframe_material;
         Ref<Render::RenderTexture> _render_texture;

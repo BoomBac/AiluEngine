@@ -434,8 +434,9 @@ namespace Ailu::RHI::DX12
             s_mipmap_gen->SetTexture(s_mipmap_gen_2d_kernel, "OutMip4", this, ECubemapFace::kUnknown, 12);
             cmd->Dispatch(s_mipmap_gen, s_mipmap_gen_2d_kernel, std::max(mip9w / 8, 1), std::max(mip9h / 8, 1), 1);
         }
+        // Left in the shader-resource state: the caller samples the generated chain next, so parking it in
+        // COMMON would only buy the mirrored COMMON -> kAllShaderResource transition on the next bind.
         cmd->StateTransition(this, D3DConvertUtils::ToALResState(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
-        cmd->ResourceBarrier(this, EResourceState::kAllShaderResource, EResourceState::kCommon);
         GraphicsContext::Get().ExecuteCommandBuffer(cmd);
         CommandBufferPool::Release(cmd);
     }
@@ -935,10 +936,12 @@ namespace Ailu::RHI::DX12
             _p_mipmapgen_cs1->SetTexture(_mipmap_gen_3d_kernel, "_OutMip3", this, 7);
             _p_mipmapgen_cs1->SetTexture(_mipmap_gen_3d_kernel, "_OutMip4", this, 8);
             cmd->Dispatch(_p_mipmapgen_cs1.get(), _mipmap_gen_3d_kernel, mip5w / thread_num_x, mip5h / thread_num_y, mip5d / thread_num_z);
+            // Kept: the dispatch binds this resource as SRV and UAV views at once, so the tracked state after
+            // the dispatch is not guaranteed to still be kUnorderedAccess.  Without that guarantee the
+            // transition below would be a no-op and the mip writes would stay unordered.
             cmd->InsertUAVBarrier(this);
         }
         cmd->StateTransition(this, D3DConvertUtils::ToALResState(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
-        cmd->ResourceBarrier(this, EResourceState::kAllShaderResource, EResourceState::kCommon);
         GraphicsContext::Get().ExecuteCommandBuffer(cmd);
         CommandBufferPool::Release(cmd);
     }
@@ -1389,7 +1392,9 @@ namespace Ailu::RHI::DX12
     {
         auto cmd = CommandBufferPool::Get("MipmapGen");
         GenerateMipmap(cmd.get());
-        cmd->ResourceBarrier(this, EResourceState::kAllShaderResource, EResourceState::kCommon);
+        // GenerateMipmap(CommandBuffer*) already leaves the texture in the shader-resource state, which is the
+        // state the filtered result is sampled in.  Importing the texture into a RenderGraph now picks that state
+        // up directly instead of paying for a COMMON park followed by the mirrored transition back.
         GraphicsContext::Get().ExecuteCommandBuffer(cmd);
         CommandBufferPool::Release(cmd);
     }

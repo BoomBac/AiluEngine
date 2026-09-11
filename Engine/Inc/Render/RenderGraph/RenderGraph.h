@@ -104,6 +104,8 @@ namespace Ailu::Render::RDG
         EResourceState _before = EResourceState::kCommon;
         EResourceState _after = EResourceState::kCommon;
         u32 _sub_resource = kTotalSubRes;
+        /// UAV hazard barrier instead of a state transition; _before/_after are not meaningful then.
+        bool _is_uav_barrier = false;
     };
     struct CompiledRenderPass
     {
