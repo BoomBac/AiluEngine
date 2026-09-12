@@ -194,8 +194,7 @@ namespace Ailu::Render
                 return nullptr;
             case RendererAPI::ERenderAPI::kDirectX12:
             {
-                auto shader = MakeRef<RHI::DX12::D3DShader>(sys_path);
-                return shader;
+                return AdoptGpuResource(new RHI::DX12::D3DShader(sys_path));
             }
         }
         AL_ASSERT_MSG(false, "Unsupported render api!");
@@ -978,7 +977,7 @@ namespace Ailu::Render
                 return nullptr;
             case RendererAPI::ERenderAPI::kDirectX12:
             {
-                auto shader = MakeRef<RHI::DX12::D3DComputeShader>(sys_path);
+                auto shader = AdoptGpuResource(new RHI::DX12::D3DComputeShader(sys_path));
                 s_global_variant_update_map[shader->ID()] = true;
                 return shader;
             }
@@ -1653,9 +1652,9 @@ namespace Ailu::Render
                 entry = &captured[captured_count++];
                 entry->_slot = slot;
             }
-            if (entry->_resource != nullptr && entry->_priority > priority)
+            if (entry->_resource.IsValid() && entry->_priority > priority)
                 return;
-            entry->_resource = resource;
+            entry->_resource = resource->Handle();
             entry->_resource_type = resource_type;
             entry->_priority = priority;
             entry->_face = static_cast<u16>(params._face);
@@ -1727,7 +1726,7 @@ namespace Ailu::Render
                     entry = &captured[captured_count++];
                     entry->_slot = bind_info._bind_slot;
                 }
-                entry->_resource = command_binding._resource;
+                entry->_resource = command_binding._resource != nullptr ? command_binding._resource->Handle() : GpuResourceHandle{};
                 entry->_resource_type = command_binding._resource_type == EBindResDescType::kConstBufferRaw
                     ? EBindResDescType::kConstBufferRaw : bind_info._res_type;
                 entry->_priority = PipelineResource::kPriorityCmd;

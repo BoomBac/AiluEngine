@@ -14,7 +14,7 @@ namespace Ailu::Render
                 AL_ASSERT_MSG(false, "None render api used!");
                 return nullptr;
             case RendererAPI::ERenderAPI::kDirectX12:
-                return MakeRef<RHI::DX12::D3DRayTracingScene>();
+                return AdoptGpuResource(new RHI::DX12::D3DRayTracingScene());
         }
         AL_ASSERT_MSG(false, "Unsupported render api!");
         return nullptr;
@@ -117,8 +117,6 @@ namespace Ailu::Render
         const bool need_recreate_resource = _is_need_rebuild && NeedRecreateBuildResource();
         if (need_recreate_resource)
         {
-            if (IsReferenceByGpu())
-                GraphicsContext::Get().WaitForFence(_fence_value);
             _is_ready_for_rendering = false;
             ApplySync();
         }

@@ -181,11 +181,6 @@
       "type": "Ailu::Render::Shader"
     },
     {
-      "guid": "d0e71d7e-674d-4f46-b805-cee3c40c2e62",
-      "path": "engine://Shaders/hlsl/wireframe_preview.alasset",
-      "type": "Ailu::Render::Shader"
-    },
-    {
       "guid": "58ec7c7a-220d-4d5c-a84d-dcc7faaf38e5",
       "path": "engine://WaterTest/MAT_Grass.alasset",
       "type": "Ailu::Render::Material"
@@ -288,11 +283,6 @@
     {
       "guid": "D390A432-7AD9-475D-B1A5-726EB91072FB",
       "path": "engine://Shaders/hlsl/forwardlit.alasset",
-      "type": "Ailu::Render::Shader"
-    },
-    {
-      "guid": "6ef76e10-12ae-440b-937c-c1f34d6d5a02",
-      "path": "engine://Shaders/hlsl/forwardlit_preview.alasset",
       "type": "Ailu::Render::Shader"
     },
     {

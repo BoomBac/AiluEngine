@@ -36,6 +36,8 @@ namespace Ailu::Render
             return "kPresent";
         case EGpuCommandType::kScissorRect:
             return "kScissorRect";
+        case EGpuCommandType::kDestroyGpuResource:
+            return "kDestroyGpuResource";
         case EGpuCommandType::kCustom:
             return "kCustom";
         default:
@@ -85,6 +87,9 @@ namespace Ailu::Render
             break;
         case EGpuCommandType::kScissorRect:
             static_cast<CommandScissor *>(cmd)->~CommandScissor();
+            break;
+        case EGpuCommandType::kDestroyGpuResource:
+            static_cast<CommandDestroyGpuResource *>(cmd)->~CommandDestroyGpuResource();
             break;
         case EGpuCommandType::kCustom:
             static_cast<CommandCustom *>(cmd)->~CommandCustom();

@@ -2,6 +2,7 @@
 #ifndef __GFX_PIPELINE_STATE_H__
 #define __GFX_PIPELINE_STATE_H__
 
+#include <atomic>
 #include <utility>
 
 #include "AlgFormat.h"
@@ -99,7 +100,7 @@ namespace Ailu::Render
         };
 
     public:
-        static Scope<GraphicsPipelineStateObject> Create(const GraphicsPipelineStateInitializer &initializer);
+        static Ref<GraphicsPipelineStateObject> Create(const GraphicsPipelineStateInitializer &initializer);
         static PSOHash ConstructPSOHash(u8 input_layout, u64 shader, u8 blend_state, u8 raster_state, u8 ds_state, u8 rt_state);
         static void ConstructPSOHash(PSOHash &hash, u8 input_layout, u64 shader, u8 blend_state, u8 raster_state, u8 ds_state, u8 rt_state);
         static PSOHash ConstructPSOHash(const GraphicsPipelineStateInitializer &initializer, u16 pass_index = 0, ShaderVariantHash variant_hash = 0);
@@ -139,7 +140,7 @@ namespace Ailu::Render
         static void Shutdown();
         static GraphicsPipelineStateMgr &Get();
         static void BuildPSOCache();
-        static void AddPSO(Scope<GraphicsPipelineStateObject> p_gpso);
+        static void AddPSO(Ref<GraphicsPipelineStateObject> p_gpso);
         static void UpdateAllPSOObject();
         GraphicsPipelineStateMgr();
         ~GraphicsPipelineStateMgr();
@@ -167,11 +168,9 @@ namespace Ailu::Render
         void ProcessCompiledShader(const ShaderCompiledInfo &info);
         GraphicsPipelineStateObject *CreatePSO(const PSOCreateRequest &request);
 
-        Scope<GraphicsPipelineStateObject> _gizmo_line_pso;
-        Scope<GraphicsPipelineStateObject> _gizmo_tex_pso;
-        Vector<Scope<GraphicsPipelineStateObject>> _update_pso{};
+        Vector<Ref<GraphicsPipelineStateObject>> _update_pso{};
         std::mutex _pso_lock;
-        HashMap<PSOHash, Scope<GraphicsPipelineStateObject>, PSOHash::HashFunc> _pso_library{};
+        HashMap<PSOHash, Ref<GraphicsPipelineStateObject>, PSOHash::HashFunc> _pso_library{};
         u32 s_reserved_pso_id = 32u;
         Core::LockFreeQueue<ShaderCompiledInfo, 256> _shader_compiled_queue;
         Core::LockFreeQueue<PSOCreateRequest, 1024> _pso_create_queue;
@@ -180,6 +179,9 @@ namespace Ailu::Render
     class AILU_API CommandRecordingContext
     {
     public:
+        // 因为 PSO 还没建好而丢掉绘制的累计次数：录制时报 miss 只是异步补建 PSO，
+        // 这一帧的绘制是真的丢了。只画一次的地方（资源预览）必须据此重绘，否则只会得到空图。
+        static u64 PSOMissCount() { return s_pso_miss_count.load(std::memory_order_relaxed); }
         void Clear();
         void ConfigureShader(Shader* shader, u16 pass_index, ShaderVariantHash variant_hash, const u64 &shader_hash);
         void ConfigureShader(Shader* shader, const u64 &shader_hash);
@@ -234,6 +236,7 @@ namespace Ailu::Render
 #endif
         Vector<PipelineResource> _resolved_bind_res;
         RenderTargetState _render_target_state;
+        inline static std::atomic<u64> s_pso_miss_count{0u};
         PSOHash _cur_pos_hash{};
         u64 _hash_shader = 0u;            // 4~35 32
         u8 _hash_input_layout = 0u;       //0~3 4

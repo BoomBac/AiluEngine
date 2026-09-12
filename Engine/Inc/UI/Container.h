@@ -98,6 +98,8 @@ namespace Ailu
             void SetViewportHeight(f32 height) { GetSlot()->Size({GetSlot()->_size.x, height}); }
             void SetViewportWidth(f32 w) { GetSlot()->Size({w, GetSlot()->_size.y}); }
             void ResetScrollOffset() { _current_offset = Vector2f::kZero; _target_offset = Vector2f::kZero; InvalidateLayout(); }
+            /// 内容真正可用的视口尺寸（扣掉滚动条占位）。外部做内容布局时用它，而不是 GetContentRect().zw。
+            Vector2f GetViewportSize() const { return GetScrollViewportSize(); }
             Vector2f MeasureDesiredSize() override;
             UIElement *HitTest(Vector2f pos) override;
 

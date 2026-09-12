@@ -36,6 +36,8 @@ namespace Ailu::RHI::DX12
 
         void RequireState(const D3DResource &resource, Render::EResourceState state, u32 subresource);
         void Clear();
+        /// @brief 释放跟踪器持有的资源强引用，但保留状态条目。
+        void ReleaseRecordedResources();
 
         const StateMap &States() const { return _states; }
         const Vector<ResourceTransition> &Transitions() const { return _transitions; }

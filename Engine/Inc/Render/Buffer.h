@@ -208,7 +208,7 @@ namespace Ailu
                 std::atomic<EResolvedVertexLayoutState> _state = EResolvedVertexLayoutState::kEmpty;
             };
         public:
-            static VertexBuffer *Create(VertexBufferLayout layout, const String &name = std::format("vertex_buffer_{}", s_global_buffer_index++));
+            static Ref<VertexBuffer> Create(VertexBufferLayout layout, const String &name = std::format("vertex_buffer_{}", s_global_buffer_index++));
             VertexBuffer(VertexBufferLayout layout);
             virtual ~VertexBuffer() = default;
             void SetStream(u8 *data, u32 size, u8 stream_index, bool is_dynamic);
@@ -250,7 +250,7 @@ namespace Ailu
         class IndexBuffer : public GpuResource
         {
         public:
-            static IndexBuffer *Create(u32 *indices, u32 count, const String &name = std::format("index_buffer_{}", s_global_buffer_index++), bool is_dynamic = false);
+            static Ref<IndexBuffer> Create(u32 *indices, u32 count, const String &name = std::format("index_buffer_{}", s_global_buffer_index++), bool is_dynamic = false);
             IndexBuffer(u32 *indices, u32 count, bool is_dynamic);
             virtual ~IndexBuffer() = default;
             /// @brief 返回当前索引的数量
@@ -276,7 +276,7 @@ namespace Ailu
         class ConstantBuffer : public GpuResource
         {
         public:
-            static ConstantBuffer *Create(u32 size, const String &name = std::format("const_buffer_{}", s_global_buffer_index++));
+            static Ref<ConstantBuffer> Create(u32 size, const String &name = std::format("const_buffer_{}", s_global_buffer_index++));
             static void Release(ConstantBuffer *ptr);
             ConstantBuffer() { _res_type = EGpuResType::kConstBuffer; };
             virtual ~ConstantBuffer() = default;

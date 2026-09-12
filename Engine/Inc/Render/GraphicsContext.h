@@ -69,6 +69,8 @@ namespace Ailu
             virtual void TakePixCapture() = 0;
             virtual void TakeRenderDocCapture() = 0;
             virtual void ResizeSwapChain(void* window_handle,const u32 width, const u32 height) = 0;
+            /// @brief 在帧边界应用待处理的交换链 resize（此时没有命令缓冲在录制）
+            virtual void ApplyPendingSwapChainResizes() {};
             virtual IGPUTimer *GetTimer() = 0;
             //主窗口的后缓index
             virtual const u32 CurBackbufIndex() const = 0;

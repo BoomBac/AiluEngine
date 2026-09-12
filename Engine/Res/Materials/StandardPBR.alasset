@@ -4,7 +4,10 @@
         "_guid": "4f6e2fa4-c9af-4800-9ff9-70874abfbd50",
         "_asset_type": "Ailu::Render::Material",
         "_asset_name": "StandardPBR",
-        "_dependencies": []
+        "_dependencies": [{
+                "_guid": "60fb44b6-864f-4c6a-b49b-f4b26829b57d",
+                "_type": "kSoft"
+            }]
     },
     "_shader_guid": "60fb44b6-864f-4c6a-b49b-f4b26829b57d",
     "_keywords": [],

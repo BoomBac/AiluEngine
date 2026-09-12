@@ -272,17 +272,39 @@ namespace Ailu
             _search_input->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFixed).Size({180.0f, 22.0f});
             _search_input->_on_content_changed += [this](String value)
             {
+                fs::path selected_asset_directory;
+                if (!_search_text.empty() && value.empty())
+                {
+                    for (const auto &selected_entry: _selected_entries)
+                    {
+                        if (selected_entry._asset != nullptr)
+                        {
+                            selected_asset_directory =
+                                fs::path(ResourceMgr::GetResSysPath(selected_entry._asset->_asset_path)).parent_path();
+                            break;
+                        }
+                    }
+                }
+
                 String lowered = std::move(value);
                 std::transform(lowered.begin(), lowered.end(), lowered.begin(), [](unsigned char c)
                 {
                     return static_cast<char>(std::tolower(c));
                 });
                 _search_text = std::move(lowered);
+                if (!selected_asset_directory.empty())
+                    NavigateToPath(selected_asset_directory);
                 _content_dirty = true;
             };
             _search_input->SetContent("", false);
             _icon_area = _right->AddChild<UI::ScrollView>();
             _icon_area->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill).CrossAlignment(UI::EAlignment::kFill);
+            _selected_path_title = _right->AddChild<UI::Text>();
+            _selected_path_title->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed)
+                .Size({0.0f, 20.0f});
+            _selected_path_title->_color = Colors::kGray;
+            _selected_path_title->_horizontal_align = EAlignment::kLeft;
+            _selected_path_title->SlotPadding() = UI::Padding(4.0f, 0.0f, 4.0f, 0.0f);
             auto slider = _right->AddChild<UI::Slider>();
             slider->_range = {50.0f, 200.0f};
             slider->SetValue(64.0f);
@@ -774,7 +796,10 @@ namespace Ailu
             _selected_asset = nullptr;
             _selected_folder_path.clear();
             if (_selected_entries.empty())
+            {
+                UpdateSelectedPathDisplay();
                 return;
+            }
 
             const SelectedEntry *primary = &_selected_entries.back();
             if (_selection_anchor >= 0 && _selection_anchor < static_cast<i32>(_visible_entries.size()))
@@ -795,6 +820,7 @@ namespace Ailu
             _selected_asset = primary->_asset;
             if (_selected_asset == nullptr)
                 _selected_folder_path = primary->_path.wstring();
+            UpdateSelectedPathDisplay();
         }
 
         void AssetBrowser::SelectEntry(const fs::path &path, Asset *asset, u32 index, UI::UIElement *root, UI::Text *text,
@@ -879,6 +905,28 @@ namespace Ailu
             _selected_item_text = nullptr;
             _selected_asset = nullptr;
             _selected_folder_path.clear();
+            UpdateSelectedPathDisplay();
+        }
+
+        void AssetBrowser::UpdateSelectedPathDisplay()
+        {
+            if (_selected_path_title == nullptr)
+                return;
+            if (_selected_entries.empty())
+            {
+                _selected_path_title->SetText("");
+                return;
+            }
+
+            const SelectedEntry &first = _selected_entries.front();
+            String path;
+            if (first._asset != nullptr)
+                path = ToChar(FormatLogicalAssetPath(first._asset->_asset_path));
+            else
+                path = ToChar(_content.GetAssetDirectory(first._path));
+            if (_selected_entries.size() > 1u)
+                path += "...";
+            _selected_path_title->SetText(path);
         }
 
         Vector<Asset *> AssetBrowser::GetSelectedAssets() const
@@ -986,6 +1034,13 @@ namespace Ailu
                     drag_type = UI::EDragType::kAsset;
             }
             auto payload = UI::DragPayload{drag_type, drag_data};
+            auto *dragged_mesh = asset != nullptr ? asset->As<Render::Mesh>() : nullptr;
+            LOG_INFO("[AssetBrowser] BeginAssetDrag asset={} selected={} type={} data={} obj={} mesh={} vb={} ib={}",
+                     asset != nullptr ? asset->Name() : "<null>", _asset_drag_data._assets.size(),
+                     StaticEnum<UI::EDragType>()->GetNameByEnum(drag_type), drag_data,
+                     asset != nullptr ? asset->_p_obj.get() : nullptr, dragged_mesh,
+                     dragged_mesh != nullptr ? dragged_mesh->GetVertexBuffer().get() : nullptr,
+                     dragged_mesh != nullptr && dragged_mesh->SubmeshCount() > 0u ? dragged_mesh->GetIndexBuffer().get() : nullptr);
             UI::DragDropManager::Get().BeginDrag(payload, display_name);
         }
 
@@ -1003,7 +1058,7 @@ namespace Ailu
 
         void AssetBrowser::RefreshContentLayout()
         {
-            const Vector2f parent_size = _icon_area->GetContentRect().zw;
+            const Vector2f parent_size = _icon_area->GetViewportSize();
             const f32 cell_width = _is_list_view ? parent_size.x : std::max(kIconCellMinWidth, _icon_size + kIconCellPadding * 2.0f + kIconCellGap);
             const f32 icon_draw_size = _is_list_view ? kListIconSize : std::max(1.0f, _icon_size);
             const f32 cell_height = _is_list_view ? kListRowHeight : icon_draw_size + kIconLabelHeight + kIconCellPadding * 2.0f;
@@ -1145,10 +1200,20 @@ namespace Ailu
             HandleShortcuts();
             AssetTypeRegistry::Get().BeginFrame();
 
+            // 启动时预览可能因为 GPU 资源还没就绪而只能先用静态图标；等它就绪后重建一次，
+            // 把图标换成真正的预览（AssetTypeRegistry 在重试成功后会抬高版本号）。
+            if (const u32 preview_revision = AssetTypeRegistry::Get().PreviewRevision(); preview_revision != _preview_revision)
+            {
+                _preview_revision = preview_revision;
+                _content_dirty = true;
+            }
+
             if (_directory_tree_dirty)
                 RefreshDirectoryTree();
 
-            const Vector2f content_size = _icon_area->GetContentRect().zw;
+            // 用 ScrollView 真正给 Canvas 的可用视口（有滚动条时要扣掉条宽），
+            // 这样列数/省略宽度和实际排布宽度一致；同时滚动条出现/消失也会被发现。
+            const Vector2f content_size = _icon_area->GetViewportSize();
             if (content_size.x <= 0.0f || content_size.y <= 0.0f)
                 return;
 

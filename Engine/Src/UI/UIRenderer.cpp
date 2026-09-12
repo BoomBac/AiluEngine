@@ -48,7 +48,7 @@ namespace Ailu
         }
         UIRenderer::UIRenderer()
         {
-            _obj_cb.reset(ConstantBuffer::Create(Render::RenderConstants::kPerObjectDataSize));
+            _obj_cb = ConstantBuffer::Create(Render::RenderConstants::kPerObjectDataSize);
             _default_material = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/default_ui.alasset"), "DefaultUIMaterial");
             _default_material->SetTexture("_MainTex", Render::Texture::s_p_default_white);
             _shadow_material = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/ui_shadow.alasset"), "UIShadowMaterial");

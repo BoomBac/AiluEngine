@@ -65,6 +65,7 @@ namespace Ailu
             void RefreshContent();
             void RefreshContentLayout();
             void UpdatePathButtons();
+            void UpdateSelectedPathDisplay();
 
             void OpenAsset(Asset *asset);
             void ShowDeleteSelectionConfirm(Vector2f popup_pos, Asset *fallback_asset = nullptr);
@@ -119,10 +120,13 @@ namespace Ailu
             UI::ScrollView *_icon_area = nullptr;
             UI::Canvas * _icon_content = nullptr;
             UI::Text *_path_title = nullptr;
+            UI::Text *_selected_path_title = nullptr;
 
             bool _content_dirty = true;
             bool _layout_dirty = true;
             bool _directory_tree_dirty = true;
+            // AssetTypeRegistry::PreviewRevision 的快照：预览从"占位图标"变成真预览后要重建一次
+            u32 _preview_revision = 0u;
             f32 _icon_size = 64.0f;
             UI::UIElement *_hover_item = nullptr;
             std::filesystem::path _current_path;

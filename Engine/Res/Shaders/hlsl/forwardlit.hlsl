@@ -8,6 +8,7 @@
 //Queue: Transparent
 //Blend: Src,OneMinusSrc
 //multi_compile _ ALPHA_TEST
+//multi_compile _ PER_OBJECT_CB
 //pass end::
 //pass begin::
 //name: ShadowCaster
@@ -38,26 +39,39 @@
 //}
 //info end
 
+//PER_OBJECT_CB：资产预览等非场景绘制路径没有 scene primitive 缓冲，切回 per-object cbuffer
+#if defined(PER_OBJECT_CB)
+#include "standard_lit_common.hlsli"
+#include "lighting.hlsli"
+#else
 #define AL_SCENE_PRIMITIVE 1
 #include "standard_lit_common.hlsli"
 #include "primitive.hlsli"
 #include "lighting.hlsli"
 #include "shadow_caster.hlsli"
+#endif
 
 StandardPSInput ForwardVSMain(StandardVSInput v)
 {
 	StandardPSInput result;
+	v.tangent.xyz *= v.tangent.w;
+#if defined(PER_OBJECT_CB)
+	result.position = TransformToClipSpace(v.position);
+	result.world_pos = TransformObjectToWorld(v.position);
+	float3 T = TransformNormal(v.tangent.xyz);
+	float3 B = TransformNormal(cross(v.tangent.xyz, v.normal));
+	float3 N = TransformNormal(v.normal);
+#else
 	const PrimitiveData primitive = LoadPrimitive(v.instance_id);
 	result.position = TransformPrimitiveToClipSpace(primitive, v.position);
-	result.normal = v.normal;
-	result.uv0 = v.uv0;
-	v.tangent.xyz *= v.tangent.w;
+	result.world_pos = TransformPrimitiveToWorld(primitive, v.position);
 	float3 T = TransformPrimitiveNormal(primitive, v.tangent.xyz);
 	float3 B = TransformPrimitiveNormal(primitive, cross(v.tangent.xyz, v.normal));
 	float3 N = TransformPrimitiveNormal(primitive, v.normal);
-	result.btn = float3x3(T, B, N);
+#endif
 	result.normal = N;
-	result.world_pos = TransformPrimitiveToWorld(primitive, v.position);
+	result.uv0 = v.uv0;
+	result.btn = float3x3(T, B, N);
 	return result;
 }
 

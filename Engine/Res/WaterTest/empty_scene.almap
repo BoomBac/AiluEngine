@@ -403,6 +403,29 @@
                 "_is_update_every_tick": false
             }
         }, {
+            "_entity_guid": "63ff2d47-c1a3-460b-bf6e-9c4027b5ef45",
+            "_tag_component": {
+                "_name": "new_object_20",
+                "_tag": "Untagged",
+                "_layer_mask": 1
+            },
+            "_disabled_components": [],
+            "_transform_component": {
+                "_position": [5.9303, 0.3774, -0.1924],
+                "_rotation": [0.0, 0.0, 0.0, 1.0],
+                "_scale": [1.0, 1.0, 1.0]
+            },
+            "_static_mesh_component": {
+                "_mesh_guid": "2ff30e48-6661-479b-a90c-863e606734f6",
+                "_material_guids": ["e3891c79-694a-4968-bb84-49c409a611ce"]
+            },
+            "_hierarchy_component": {
+                "_parent_guid": "",
+                "_sibling_index": 0,
+                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
+                "_enabled": true
+            }
+        }, {
             "_entity_guid": "66e94a31-af92-4a12-a79e-a4f852fe72d3",
             "_tag_component": {
                 "_name": "enemy_c3",
@@ -599,7 +622,7 @@
             "_transform_component": {
                 "_position": [-3.2709, 2.1428, -1.4486],
                 "_rotation": [0.0, -0.0, 0.0, 1.0],
-                "_scale": [0.0297, 0.0297, 0.0297]
+                "_scale": [0.0296, 0.0296, 0.0296]
             },
             "_hierarchy_component": {
                 "_parent_guid": "",

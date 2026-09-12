@@ -24,7 +24,7 @@ namespace Ailu
         ObjectAssetDropdown::ObjectAssetDropdown(const Type *object_type) : _object_type(object_type)
         {
             Name("ObjectAssetDropdown");
-            SetPopupBackdropEnabled(false);
+            SetPopupBackdropEnabled(true);
             SetPopupBuilder([this](Vector2f anchor_size) { return BuildPopup(anchor_size); });
             SetOnPopupOpening([this]() { RefreshItems(); });
             _on_selected_changed += [this](i32 index) { SelectEntry(index, !_is_syncing_selection); };
@@ -234,7 +234,7 @@ namespace Ailu
             popup->Name("ObjectAssetDropdownPopup");
             popup->GetSlot()->Size({std::max(anchor_size.x, 280.0f), kPopupHeight});
             UIBrush backdrop;
-            backdrop._type = EUIBrushType::kBackdropBlur;
+            backdrop._type = EUIBrushType::kColor;
             backdrop._tint = Color(0.16f, 0.18f, 0.21f, 0.46f);
             auto &popup_style = popup->GetStyleOverride();
             popup_style.SetBackground(backdrop);

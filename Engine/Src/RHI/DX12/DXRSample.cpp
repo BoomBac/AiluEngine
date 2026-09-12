@@ -34,9 +34,9 @@ namespace Ailu::RHI::DX12
 
     void DXRSample::Init(u16 w, u16 h)
     {
-        g_rayGenData.reset(ConstantBuffer::Create(sizeof(RayGenConstantBuffer), "RayGenData"));
-        g_perSceneData.reset(ConstantBuffer::Create(sizeof(CBufferPerSceneData), "PerSceneData"));
-        g_perCamData.reset(ConstantBuffer::Create(sizeof(CBufferPerCameraData), "PerCamData"));
+        g_rayGenData = ConstantBuffer::Create(sizeof(RayGenConstantBuffer), "RayGenData");
+        g_perSceneData = ConstantBuffer::Create(sizeof(CBufferPerSceneData), "PerSceneData");
+        g_perCamData = ConstantBuffer::Create(sizeof(CBufferPerCameraData), "PerCamData");
 
         m_rayGenCB.viewport = {-1.0f, -1.0f, 1.0f, 1.0f};
         f32 border = 0.1f;

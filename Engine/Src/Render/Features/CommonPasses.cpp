@@ -667,7 +667,7 @@ namespace Ailu::Render
         //BuildPerspectiveFovLHMatrix(proj, 2.0 * atan((f32)size / ((f32)size - 0.5)), 1.0, 1.0, 100000);
         float scale = 20.0f;
         MatrixScale(_world_mat, scale, scale, scale);
-        _per_obj_cb.reset(ConstantBuffer::Create(RenderConstants::kPerObjectDataSize));
+        _per_obj_cb = ConstantBuffer::Create(RenderConstants::kPerObjectDataSize);
         _per_obj_cb->SetData(reinterpret_cast<const u8 *>(&_world_mat), sizeof(Matrix4x4f));
         Vector3f targets[] =
                 {
@@ -692,7 +692,7 @@ namespace Ailu::Render
             BuildViewMatrixLookToLH(view, center, targets[i], ups[i]);
             _camera_data[i]._MatrixVP = view * proj;
             _camera_data[i]._CameraPos = {0.0f, 0.f, 0.f, 0.f};
-            _per_camera_cb[i].reset(ConstantBuffer::Create(RenderConstants::kPerCameraDataSize));
+            _per_camera_cb[i] = ConstantBuffer::Create(RenderConstants::kPerCameraDataSize);
             memcpy(_per_camera_cb[i]->GetData(), &_camera_data[i], RenderConstants::kPerCameraDataSize);
         }
         f32 mipmap_level = _prefilter_cubemap->MipmapLevel();
@@ -1120,7 +1120,7 @@ namespace Ailu::Render
         _p_skybox_material->SetCullMode(ECullMode::kFront);
         Matrix4x4f world_mat;
         MatrixScale(world_mat, 1000000.f, 1000000.f, 1000000.f);
-        _p_cbuffer.reset(ConstantBuffer::Create(RenderConstants::kPerObjectDataSize));
+        _p_cbuffer = ConstantBuffer::Create(RenderConstants::kPerObjectDataSize);
         _p_cbuffer->SetData(reinterpret_cast<u8 *>(&world_mat), sizeof(Matrix4x4f));
         _tlut = RenderTexture::Create(_transmittance_lut_size.x, _transmittance_lut_size.y, "_TransmittanceLUT", ERenderTargetFormat::kRGBAHalf, false, false, true);
         _ms_lut = RenderTexture::Create(_mult_scatter_lut_size.x, _mult_scatter_lut_size.y, "_MultScatterLUT", ERenderTargetFormat::kRGBAHalf, false, false, true);
@@ -1687,9 +1687,9 @@ namespace Ailu::Render
         Vector<VertexBufferLayoutDesc> desc_list;
         desc_list.push_back({EVertexSemantic::kPosition, EShaderDateType::kFloat3, 0});
         desc_list.push_back({EVertexSemantic::kTexcoord0, EShaderDateType::kFloat2, 1});
-        _obj_cb.reset(ConstantBuffer::Create(RenderConstants::kPerObjectDataSize));
-        _vbuf.reset(VertexBuffer::Create(desc_list, "ui_vbuf"));
-        _ibuf.reset(IndexBuffer::Create(nullptr, vertex_count, "ui_ibuf", true));
+        _obj_cb = ConstantBuffer::Create(RenderConstants::kPerObjectDataSize);
+        _vbuf = VertexBuffer::Create(desc_list, "ui_vbuf");
+        _ibuf = IndexBuffer::Create(nullptr, vertex_count, "ui_ibuf", true);
         f32 box_w = 180.f, box_h = 30.f;
         Vector3f *vertices = AL_ALLOC_TAG(EMemoryTag::kTemporary, Vector3f, 4);
         vertices[0] = {-box_w * 0.5f, box_h * 0.5f, 0.0f};

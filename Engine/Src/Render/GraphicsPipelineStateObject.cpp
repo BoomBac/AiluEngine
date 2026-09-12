@@ -14,7 +14,7 @@ namespace Ailu::Render
 {
 #pragma region GraphicsPipelineStateObject
     //------------------------------------------------------------------------------GraphicsPipelineStateObject---------------------------------------------------------------------------------
-    Scope<GraphicsPipelineStateObject> GraphicsPipelineStateObject::Create(const GraphicsPipelineStateInitializer &initializer)
+    Ref<GraphicsPipelineStateObject> GraphicsPipelineStateObject::Create(const GraphicsPipelineStateInitializer &initializer)
     {
         switch (Renderer::GetAPI())
         {
@@ -22,7 +22,7 @@ namespace Ailu::Render
                 AL_ASSERT_MSG(false, "None render api used!");
                 return nullptr;
             case RendererAPI::ERenderAPI::kDirectX12:
-                return std::move(MakeScope<RHI::DX12::D3DGraphicsPipelineState>(initializer));
+                return AdoptGpuResource(new RHI::DX12::D3DGraphicsPipelineState(initializer));
         }
         AL_ASSERT_MSG(false, "Unsupported render api!");
         return nullptr;
@@ -304,7 +304,7 @@ namespace Ailu::Render
         }
     }
 
-    void GraphicsPipelineStateMgr::AddPSO(Scope<GraphicsPipelineStateObject> p_gpso)
+    void GraphicsPipelineStateMgr::AddPSO(Ref<GraphicsPipelineStateObject> p_gpso)
     {
         std::lock_guard<std::mutex> lock(g_pPSOMgr->_pso_lock);
         auto it = g_pPSOMgr->_pso_library.find(p_gpso->Hash());
@@ -440,6 +440,7 @@ namespace Ailu::Render
             _current_pso = GraphicsPipelineStateMgr::Get().FindReadyPSO(_cur_pos_hash);
             if (_current_pso == nullptr)
             {
+                ++s_pso_miss_count;
                 if (!_pso_request_submitted)
                 {
                     GraphicsPipelineStateMgr::Get().RequestPSOCreation(
@@ -554,16 +555,14 @@ namespace Ailu::Render
         if (!g_pPSOMgr->_update_pso.empty())
         {
             std::lock_guard<std::mutex> lock(g_pPSOMgr->_pso_lock);
-            Vector<Scope<GraphicsPipelineStateObject>> temp;
+            Vector<Ref<GraphicsPipelineStateObject>> temp;
             for (auto &it: g_pPSOMgr->_update_pso)
             {
                 auto hash = it->Hash();
                 if (g_pPSOMgr->_pso_library.contains(hash))
                 {
                     auto exist_pso = g_pPSOMgr->_pso_library[hash].get();
-                    if (!exist_pso->IsReferenceByGpu()) g_pPSOMgr->_pso_library[hash] = std::move(it);
-                    else
-                        temp.push_back(std::move(it));
+                    g_pPSOMgr->_pso_library[hash] = std::move(it);
                 }
                 else
                     g_pPSOMgr->_pso_library.insert(std::make_pair(hash, std::move(it)));

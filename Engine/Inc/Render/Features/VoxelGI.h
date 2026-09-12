@@ -29,7 +29,7 @@ namespace Ailu::Render
         Ref<Shader> _standard_lit_forward;
         VoxelGIData _data;
         Vector3Int _pre_grid_num;
-        ConstantBuffer *_cam_cbuf;
+        Ref<ConstantBuffer> _cam_cbuf;
         Ref<ComputeShader> _voxelize_cs;
         ComputeShaderKernelId _fill_texture3d_kernel = kInvalidComputeShaderKernelId;
         Ref<GPUBuffer> _voxel_buf = nullptr;

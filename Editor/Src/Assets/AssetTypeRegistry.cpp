@@ -22,10 +22,25 @@ namespace Ailu
             constexpr const wchar_t *kAssetIconDirectory = L"editor://Icons/Assets/";
             constexpr const wchar_t *kDefaultAssetIconName = L"default.alasset";
 
-            Ref<Render::Texture> GenerateMeshPreview(Asset *asset)
+            // 这些 provider 都在 AssetBrowser 建 item widget 时被调用，而那时贴图/顶点缓冲
+            // /shader 变体经常还在异步创建。生成器返回 false 时保留 target 交给上层的重试，
+            // 等资源就绪后再渲染到同一张贴图上（图标会自己变好）。
+            AssetPreviewResult FinishPreview(Ref<Render::RenderTexture> &target, bool is_ready)
+            {
+                AssetPreviewResult result;
+                if (!is_ready)
+                {
+                    result._needs_retry = target != nullptr;
+                    return result;
+                }
+                result._texture = std::static_pointer_cast<Render::Texture>(target);
+                return result;
+            }
+
+            AssetPreviewResult GenerateMeshPreview(Asset *asset, Ref<Render::RenderTexture> &target)
             {
                 if (asset == nullptr)
-                    return nullptr;
+                    return {};
 
                 if (asset->_p_obj == nullptr)
                 {
@@ -37,60 +52,60 @@ namespace Ailu
 
                 auto mesh = asset->As<Render::Mesh>();
                 if (mesh == nullptr)
-                    return nullptr;
+                    return {};
 
-                Ref<Render::RenderTexture> preview;
-                AssetPreviewGenerator::GeneratorMeshSnapshot(AssetPreviewGenerator::kDynamicPreviewSize,
-                                                              AssetPreviewGenerator::kDynamicPreviewSize, mesh, preview);
-                return std::static_pointer_cast<Render::Texture>(preview);
+                const bool is_ready = AssetPreviewGenerator::GeneratorMeshSnapshot(
+                        AssetPreviewGenerator::kDynamicPreviewSize, AssetPreviewGenerator::kDynamicPreviewSize, mesh, target);
+                return FinishPreview(target, is_ready);
             }
 
-            Ref<Render::Texture> GenerateSpritePreview(Asset *asset)
+            AssetPreviewResult GenerateSpritePreview(Asset *asset, Ref<Render::RenderTexture> &target)
             {
                 if (asset == nullptr)
-                    return nullptr;
+                    return {};
 
                 if (asset->_p_obj == nullptr)
                     ResourceMgr::Get().Load<Render::Sprite>(asset->_asset_path);
 
                 auto sprite = asset->As<Render::Sprite>();
                 if (sprite == nullptr)
-                    return nullptr;
+                    return {};
 
-                Ref<Render::RenderTexture> preview;
-                AssetPreviewGenerator::GeneratorSpriteSnapshot(AssetPreviewGenerator::kDynamicPreviewSize,
-                                                               AssetPreviewGenerator::kDynamicPreviewSize, sprite, preview);
-                return std::static_pointer_cast<Render::Texture>(preview);
+                const bool is_ready = AssetPreviewGenerator::GeneratorSpriteSnapshot(
+                        AssetPreviewGenerator::kDynamicPreviewSize, AssetPreviewGenerator::kDynamicPreviewSize, sprite, target);
+                return FinishPreview(target, is_ready);
             }
 
-            Ref<Render::Texture> GenerateMaterialPreview(Asset *asset)
+            AssetPreviewResult GenerateMaterialPreview(Asset *asset, Ref<Render::RenderTexture> &target)
             {
                 if (asset == nullptr)
-                    return nullptr;
+                    return {};
 
                 if (asset->_p_obj == nullptr)
                     ResourceMgr::Get().Load<Render::Material>(asset->_asset_path);
 
                 auto material = asset->As<Render::Material>();
                 if (material == nullptr)
-                    return nullptr;
+                    return {};
 
-                Ref<Render::RenderTexture> preview;
-                AssetPreviewGenerator::GeneratorMaterialSnapshot(AssetPreviewGenerator::kDynamicPreviewSize,
-                                                                 AssetPreviewGenerator::kDynamicPreviewSize, material,
-                                                                 preview);
-                return std::static_pointer_cast<Render::Texture>(preview);
+                const bool is_ready = AssetPreviewGenerator::GeneratorMaterialSnapshot(
+                        AssetPreviewGenerator::kDynamicPreviewSize, AssetPreviewGenerator::kDynamicPreviewSize, material, target);
+                return FinishPreview(target, is_ready);
             }
 
-            Ref<Render::Texture> GetTexturePreview(Asset *asset)
+            AssetPreviewResult GetTexturePreview(Asset *asset, Ref<Render::RenderTexture> &target)
             {
+                (void) target;
                 if (asset == nullptr)
-                    return nullptr;
+                    return {};
 
                 auto texture = asset->AsRef<Render::Texture2D>();
                 if (texture == nullptr)
                     texture = ResourceMgr::Get().Load<Render::Texture2D>(asset->_asset_path);
-                return texture == nullptr ? nullptr : std::static_pointer_cast<Render::Texture>(texture);
+                AssetPreviewResult result;
+                // 贴图本身不需要渲染，等它上传完自己就显示了，无需重试
+                result._texture = texture == nullptr ? nullptr : std::static_pointer_cast<Render::Texture>(texture);
+                return result;
             }
         }
 
@@ -186,19 +201,16 @@ namespace Ailu
             if (asset == nullptr || asset->_asset_type == nullptr)
                 return GetStaticIcon(nullptr);
 
-            if (auto provider_it = _preview_providers.find(asset->_asset_type); provider_it != _preview_providers.end())
-            {
-                Ref<Render::Texture> preview = provider_it->second(asset);
-                if (preview != nullptr)
-                {
-                    auto cache_it = _preview_cache.find(asset);
-                    if (cache_it != _preview_cache.end() && cache_it->second != preview)
-                        RetirePreview(cache_it->second);
-                    _preview_cache[asset] = preview;
-                    return preview.get();
-                }
-            }
+            if (_preview_providers.find(asset->_asset_type) == _preview_providers.end())
+                return GetStaticIcon(asset->_asset_type);
 
+            if (auto cache_it = _preview_cache.find(asset); cache_it != _preview_cache.end() && cache_it->second != nullptr)
+                return cache_it->second.get();
+
+            // 预览生成会同步提交命令缓冲，不能在 UI 构建（RenderPass 录制中）期间做，
+            // 否则拿到的是一张空贴图（黑图标）。这里只登记，真正的生成在 BeginFrame 里做；
+            // 生成成功后会抬高版本号，AssetBrowser 据此重建 item 换成真预览。
+            _pending_previews.try_emplace(asset, PendingPreview{nullptr, kPreviewRetryDelayFrames, nullptr, nullptr});
             return GetStaticIcon(asset->_asset_type);
         }
 
@@ -211,19 +223,17 @@ namespace Ailu
                 cache_it->second != nullptr)
                 return cache_it->second.get();
 
-            if (auto provider_it = _preview_providers.find(type); provider_it != _preview_providers.end())
+            if (_preview_providers.find(type) == _preview_providers.end())
+                return GetStaticIcon(type);
+
+            // 同 GetIcon(Asset*)：不在 UI 构建期间渲染，登记后先返回静态图标
+            if (_pending_sub_previews.find(guid) == _pending_sub_previews.end())
             {
-                Asset preview_asset(type, L"");
-                preview_asset._p_obj = object;
-                Ref<Render::Texture> preview = provider_it->second(&preview_asset);
-                if (preview != nullptr)
-                {
-                    auto cache_it = _sub_asset_preview_cache.find(guid);
-                    if (cache_it != _sub_asset_preview_cache.end() && cache_it->second != preview)
-                        RetirePreview(cache_it->second);
-                    _sub_asset_preview_cache[guid] = preview;
-                    return preview.get();
-                }
+                PendingPreview pending;
+                pending._frames_to_wait = kPreviewRetryDelayFrames;
+                pending._object = object;
+                pending._type = type;
+                _pending_sub_previews.emplace(guid, std::move(pending));
             }
 
             return GetStaticIcon(type);
@@ -250,6 +260,105 @@ namespace Ailu
         {
             _retired_previews[_retired_preview_index].clear();
             _retired_preview_index = (_retired_preview_index + 1u) % Render::RenderConstants::kFrameCount;
+            RetryPendingPreviews();
+        }
+
+        void AssetTypeRegistry::CachePreview(Asset *asset, const Ref<Render::Texture> &preview)
+        {
+            if (asset == nullptr || preview == nullptr)
+                return;
+            auto cache_it = _preview_cache.find(asset);
+            if (cache_it != _preview_cache.end() && cache_it->second != preview)
+                RetirePreview(cache_it->second);
+            _preview_cache[asset] = preview;
+        }
+
+        // 预览生成统一放在这里（每帧 UI 构建之前、RenderPass 之外）：输入资源（贴图/顶点缓冲
+        // /shader 变体）是异步就绪的，没就绪就下一帧再来；生成成功的一律进缓存并抬高版本号，
+        // AssetBrowser 据此重建一次 item 换上真预览（UI 永远不会拿到还没渲染过的空贴图）。
+        void AssetTypeRegistry::RetryPendingPreviews()
+        {
+            bool any_generated = false;
+
+            for (auto it = _pending_previews.begin(); it != _pending_previews.end();)
+            {
+                Asset *asset = it->first;
+                PendingPreview &pending = it->second;
+                if (pending._frames_to_wait > 0u)
+                {
+                    --pending._frames_to_wait;
+                    ++it;
+                    continue;
+                }
+
+                auto provider_it = (asset != nullptr && asset->_asset_type != nullptr)
+                                           ? _preview_providers.find(asset->_asset_type)
+                                           : _preview_providers.end();
+                if (provider_it == _preview_providers.end())
+                {
+                    it = _pending_previews.erase(it);
+                    continue;
+                }
+
+                AssetPreviewResult result = provider_it->second(asset, pending._target);
+                if (result._texture != nullptr)
+                {
+                    CachePreview(asset, result._texture);
+                    any_generated = true;
+                    it = _pending_previews.erase(it);
+                    continue;
+                }
+                if (result._needs_retry)
+                {
+                    ++it;
+                    continue;
+                }
+                it = _pending_previews.erase(it);
+            }
+
+            for (auto it = _pending_sub_previews.begin(); it != _pending_sub_previews.end();)
+            {
+                PendingPreview &pending = it->second;
+                if (pending._frames_to_wait > 0u)
+                {
+                    --pending._frames_to_wait;
+                    ++it;
+                    continue;
+                }
+
+                const Type *type = pending._type;
+                auto provider_it = (pending._object != nullptr && type != nullptr)
+                                           ? _preview_providers.find(type)
+                                           : _preview_providers.end();
+                if (provider_it == _preview_providers.end())
+                {
+                    it = _pending_sub_previews.erase(it);
+                    continue;
+                }
+
+                Asset preview_asset(type, L"");
+                preview_asset._p_obj = pending._object;
+                AssetPreviewResult result = provider_it->second(&preview_asset, pending._target);
+                if (result._texture != nullptr)
+                {
+                    auto cache_it = _sub_asset_preview_cache.find(it->first);
+                    if (cache_it != _sub_asset_preview_cache.end() && cache_it->second != result._texture)
+                        RetirePreview(cache_it->second);
+                    _sub_asset_preview_cache[it->first] = result._texture;
+                    any_generated = true;
+                    it = _pending_sub_previews.erase(it);
+                    continue;
+                }
+                if (result._needs_retry)
+                {
+                    ++it;
+                    continue;
+                }
+                it = _pending_sub_previews.erase(it);
+            }
+
+            if (any_generated)
+                ++_preview_revision;
         }
 
         Render::Texture *AssetTypeRegistry::GetStaticIcon(const Type *type)

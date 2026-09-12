@@ -334,7 +334,7 @@ namespace Ailu::Render
 		}
 		if (!desc_list.empty())
 		{
-			_vertex_buffer.reset(VertexBuffer::Create(desc_list, _name));
+			_vertex_buffer = VertexBuffer::Create(desc_list, _name);
 			if (_vertices.size()) 
 				_vertex_buffer->SetStream(reinterpret_cast<u8 *>(_vertices.data()), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat3), vert_index, false);
 			if (_normals.size()) 
@@ -352,7 +352,7 @@ namespace Ailu::Render
 			auto &submesh = _submeshes[i];
 			if (submesh._indices.size())
 			{
-				_index_buffers[i].reset(IndexBuffer::Create(submesh._indices.data(), (u32)submesh._indices.size()));
+				_index_buffers[i] = IndexBuffer::Create(submesh._indices.data(), (u32)submesh._indices.size());
 				String ib_name = std::format("{}_{}", _name, i);
 				_index_buffers[i]->Name(ib_name);
 				GraphicsContext::Get().CreateResource(_index_buffers[i].get());
@@ -512,7 +512,7 @@ namespace Ailu::Render
 			desc_list.push_back({ EVertexSemantic::kTexcoord1, EShaderDateType::kFloat3, count });
 			prev_vert_index = count++;
 		}
-		_vertex_buffer.reset(VertexBuffer::Create(desc_list, _name));
+		_vertex_buffer = VertexBuffer::Create(desc_list, _name);
 		if (_vertices.size()) 
 		{
 			_vertex_buffer->SetStream(reinterpret_cast<u8 *>(_vertices.data()), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat3), vert_index, true);
@@ -537,7 +537,7 @@ namespace Ailu::Render
 			if (submesh._indices.size())
 			{
 				_triangle_count += (u32) submesh._indices.size();
-				_index_buffers[i].reset(IndexBuffer::Create(submesh._indices.data(), (u32)submesh._indices.size()));
+			_index_buffers[i] = IndexBuffer::Create(submesh._indices.data(), (u32)submesh._indices.size());
 				_index_buffers[i]->Name(std::format("{}_{}", _name, i));
 				GraphicsContext::Get().CreateResource(_index_buffers[i].get());
 			}

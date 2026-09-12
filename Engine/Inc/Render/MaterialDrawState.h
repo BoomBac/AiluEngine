@@ -3,6 +3,7 @@
 #define __MATERIAL_DRAW_STATE_H__
 
 #include "CoreType.h"
+#include "GpuResource.h"
 #include "PipelineState.h"
 #include <type_traits>
 
@@ -12,7 +13,7 @@ namespace Ailu::Render
 
     struct PipelineBindingSnapshotEntry
     {
-        GpuResource *_resource = nullptr;
+        GpuResourceHandle _resource;
         EBindResDescType _resource_type = EBindResDescType::kUnknown;
         u16 _slot = 0u;
         u16 _priority = 0u;
@@ -36,7 +37,7 @@ namespace Ailu::Render
 
     struct ComputeBindingSnapshotEntry
     {
-        GpuResource *_resource = nullptr;
+        GpuResourceHandle _resource;
         EBindResDescType _resource_type = EBindResDescType::kUnknown;
         u16 _slot = 0u;
         u16 _priority = 0u;
@@ -60,8 +61,7 @@ namespace Ailu::Render
 
     struct MaterialDrawState
     {
-        Shader *_shader = nullptr;
-        const ShaderBindingLayout *_binding_layout = nullptr;
+        ShaderHandle _shader;
         u16 _pass_index = 0u;
         u32 _variant_hash = 0u;
         bool _is_ready = false;

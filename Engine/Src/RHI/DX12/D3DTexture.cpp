@@ -221,7 +221,6 @@ namespace Ailu::RHI::DX12
     void D3DTexture2D::Release()
     {
         Texture2D::Release();
-        if (g_pGfxContext) g_pGfxContext->WaitForFence(_fence_value);
         _p_d3dres.Reset();
         _views.clear();
         if (_bindless_srv_index >= 0)
@@ -397,7 +396,7 @@ namespace Ailu::RHI::DX12
     D3DCubeMap::D3DCubeMap(u16 width, bool mipmap_chain, ETextureFormat format, bool linear, bool random_access)
         : CubeMap(width, mipmap_chain, format, linear, random_access) {}
 
-    D3DCubeMap::~D3DCubeMap() { g_pGfxContext->WaitForFence(_fence_value); }
+    D3DCubeMap::~D3DCubeMap() = default;
 
     void D3DCubeMap::UploadImpl(GraphicsContext *ctx, RHICommandBuffer *rhi_cmd, UploadParams *params)
     {
@@ -592,7 +591,7 @@ namespace Ailu::RHI::DX12
         _mipmap_gen_3d_kernel = _p_mipmapgen_cs0->FindKernel("MipmapGen3D");
     }
 
-    D3DTexture3D::~D3DTexture3D() { g_pGfxContext->WaitForFence(_fence_value); }
+    D3DTexture3D::~D3DTexture3D() = default;
 
     void D3DTexture3D::UploadImpl(GraphicsContext *ctx, RHICommandBuffer *rhi_cmd, UploadParams *params)
     {
@@ -895,7 +894,6 @@ namespace Ailu::RHI::DX12
 
     D3DRenderTexture::~D3DRenderTexture() 
     { 
-        g_pGfxContext->WaitForFence(_fence_value);
     }
 
     void D3DRenderTexture::UploadImpl(GraphicsContext *ctx, RHICommandBuffer *rhi_cmd, UploadParams *params)

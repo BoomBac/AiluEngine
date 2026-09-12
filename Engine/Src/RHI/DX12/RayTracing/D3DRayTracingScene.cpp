@@ -102,8 +102,6 @@ namespace Ailu::RHI::DX12
             _mapped_instance_descs = nullptr;
         }
         D3DDescriptorMgr::Get().Free(std::move(_tlas_srv_alloc));
-        if (::Ailu::Render::g_pGfxContext)
-            ::Ailu::Render::g_pGfxContext->WaitForFence(_fence_value);
     }
 
     const D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC& D3DRayTracingScene::GetBuildDesc(bool is_update)

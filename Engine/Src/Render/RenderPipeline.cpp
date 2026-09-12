@@ -66,10 +66,6 @@ namespace Ailu::Render
     }
     FramePacket::~FramePacket()
     {
-        for (auto &it: _cam_cb)
-        {
-            AL_DELETE(it.second);
-        }
     }
 #pragma endregion
 

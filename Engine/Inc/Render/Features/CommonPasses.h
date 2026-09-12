@@ -45,7 +45,7 @@ namespace Ailu
         private:
             Material *_p_blit_mat;
             Mesh *_p_quad_mesh;
-            ConstantBuffer *_p_obj_cb;
+            Ref<ConstantBuffer> _p_obj_cb;
             Rect _half_sceen_rect;
         };
 
@@ -61,7 +61,7 @@ namespace Ailu
 
         private:
             Material *_p_blit_mat;
-            ConstantBuffer *_p_obj_cb;
+            Ref<ConstantBuffer> _p_obj_cb;
             RTHandle _depth_tex_handle;
         };
 

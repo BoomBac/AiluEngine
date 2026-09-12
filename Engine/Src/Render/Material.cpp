@@ -374,8 +374,7 @@ namespace Ailu::Render
         }
 
         MaterialDrawState draw_state;
-        draw_state._shader = _p_active_shader;
-        draw_state._binding_layout = binding_layout;
+        draw_state._shader = _p_active_shader->TypedHandle<ShaderTag>();
         draw_state._pass_index = pass_index;
         draw_state._variant_hash = variant_hash;
         draw_state._is_ready = cur_state._is_ready;
@@ -455,7 +454,7 @@ namespace Ailu::Render
             auto &binding = entries[entry_index++];
             auto res_type = cur_state._bind_res_type[slot];
             AL_ASSERT_MSG(res_type != EBindResDescType::kUnknown, "Unknown resource type");
-            binding._resource = res;
+            binding._resource = res->Handle();
             binding._resource_type = res_type;
             binding._slot = slot;
             binding._priority = cur_state._bind_res_priority[slot];
@@ -479,7 +478,7 @@ namespace Ailu::Render
                     && binding->_resource_type != EBindResDescType::kConstBufferRaw)
                     continue;
                 auto &cbuf_binding = entries[entry_index++];
-                cbuf_binding._resource = command_binding._resource;
+                cbuf_binding._resource = command_binding._resource != nullptr ? command_binding._resource->Handle() : GpuResourceHandle{};
                 cbuf_binding._resource_type = command_binding._resource_type;
                 cbuf_binding._slot = static_cast<u16>(binding->_bind_slot);
                 cbuf_binding._priority = PipelineResource::kPriorityCmd;
@@ -491,7 +490,7 @@ namespace Ailu::Render
         if (has_material_block)
         {
             auto &mat_binding = entries[entry_index++];
-            mat_binding._resource = block._upload_buffer;
+            mat_binding._resource = block._upload_buffer != nullptr ? block._upload_buffer->Handle() : GpuResourceHandle{};
             mat_binding._resource_type = EBindResDescType::kConstBufferRaw;
             mat_binding._slot = static_cast<u16>(cur_state._cbuf_bind_slot);
             mat_binding._priority = PipelineResource::kPriorityCmd;

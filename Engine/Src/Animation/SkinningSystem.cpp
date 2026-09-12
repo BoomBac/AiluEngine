@@ -189,9 +189,9 @@ namespace Ailu::ECS
             (mesh->GetTangentStream() >= 0 && entry._tangent_buffer == nullptr))
             return nullptr;
 
-        entry._vertex_buffer.reset(Render::VertexBuffer::Create(source->GetLayout(),
+        entry._vertex_buffer = Render::VertexBuffer::Create(source->GetLayout(),
                                                                   std::format("{}_SkinOutput_{}", mesh->Name(),
-                                                                              entry._handle._id)));
+                                                                              entry._handle._id));
         if (entry._vertex_buffer == nullptr)
             return nullptr;
 

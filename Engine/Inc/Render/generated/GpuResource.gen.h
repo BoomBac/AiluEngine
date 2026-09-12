@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __GPURESOURCE_GEN_H__
 //Class GpuResource begin...........................
-#define GPURESOURCE_GEN_H_78_GENERATED_BODY \
+#define GPURESOURCE_GEN_H_162_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_GpuResource_Type();\
                                 static const Type* GetPrivateStaticClass();\

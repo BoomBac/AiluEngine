@@ -29,7 +29,6 @@ namespace Ailu::RHI::DX12
         if (rhi_cmd)
         {
             auto d3dcmd = static_cast<D3DCommandBuffer *>(rhi_cmd);
-            d3dcmd->MarkUsedResource(this);
         }
         u16 pass_index = 0u;
         ShaderVariantHash variant_hash = 0u;
@@ -293,7 +292,6 @@ namespace Ailu::RHI::DX12
     {
         if (res._p_resource == nullptr)
             return;
-        static_cast<D3DCommandBuffer *>(cmd)->MarkUsedResource(res._p_resource);
         switch (res._res_type)
         {
             case EBindResDescType::kConstBuffer:

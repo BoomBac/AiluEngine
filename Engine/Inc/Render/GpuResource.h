@@ -9,9 +9,93 @@
 #include "Objects/Object.h"
 #include "CoreType.h"
 #include "RendererAPI.h"
+#include <deque>
+#include <memory>
+#include <mutex>
+#include <type_traits>
 #include "generated/GpuResource.gen.h"
 namespace Ailu::Render
 {
+    inline constexpr u32 kInvalidGpuHandleIndex = UINT32_MAX;
+
+    struct GpuResourceTag {};
+    struct BufferTag {};
+    struct TextureTag {};
+    struct ShaderTag {};
+
+    template<typename tag_t>
+    struct GpuHandle
+    {
+        u32 _index = kInvalidGpuHandleIndex;
+        u32 _generation = 0u;
+
+        constexpr bool IsValid() const { return _index != kInvalidGpuHandleIndex; }
+        constexpr bool operator==(const GpuHandle &) const = default;
+    };
+
+    using GpuResourceHandle = GpuHandle<GpuResourceTag>;
+    using BufferHandle = GpuHandle<BufferTag>;
+    using GpuTextureHandle = GpuHandle<TextureTag>;
+    using ShaderHandle = GpuHandle<ShaderTag>;
+
+    static_assert(std::is_trivially_copyable_v<GpuResourceHandle>);
+
+    class GpuResource;
+    enum class EGpuResourceSlotState : u8
+    {
+        kFree,
+        kAlive,
+    };
+
+    struct GpuResourceSlot
+    {
+        u32 _generation = 1u;
+        EGpuResourceSlotState _state = EGpuResourceSlotState::kFree;
+        std::unique_ptr<GpuResource> _resource;
+    };
+
+    struct RetiredGpuResource
+    {
+        u64 _fence = 0u;
+        std::unique_ptr<GpuResource> _resource;
+    };
+
+    class AILU_API GpuResourceRegistry
+    {
+    public:
+        GpuResourceRegistry() = default;
+        GpuResourceRegistry(const GpuResourceRegistry &) = delete;
+        GpuResourceRegistry &operator=(const GpuResourceRegistry &) = delete;
+
+        static GpuResourceRegistry &Get();
+
+        GpuResourceHandle Add(std::unique_ptr<GpuResource> resource);
+        GpuResource *Resolve(GpuResourceHandle handle);
+        const GpuResource *Resolve(GpuResourceHandle handle) const;
+        template<typename tag_t>
+        GpuResource *Resolve(GpuHandle<tag_t> handle)
+        {
+            return Resolve(GpuResourceHandle{handle._index, handle._generation});
+        }
+        template<typename tag_t>
+        const GpuResource *Resolve(GpuHandle<tag_t> handle) const
+        {
+            return Resolve(GpuResourceHandle{handle._index, handle._generation});
+        }
+        void Retire(GpuResourceHandle handle, u64 fence);
+        void Release(GpuResourceHandle handle);
+        Vector<GpuResourceHandle> TakePendingReleases();
+        void Collect(u64 completed_fence);
+        void Clear();
+
+    private:
+        Vector<GpuResourceSlot> _slots;
+        Vector<u32> _free_indices;
+        std::deque<RetiredGpuResource> _retired_resources;
+        std::mutex _pending_release_mutex;
+        Vector<GpuResourceHandle> _pending_releases;
+    };
+
 
     struct NativeHandle
     {
@@ -95,15 +179,15 @@ namespace Ailu::Render
         void Upload(GraphicsContext* ctx,RHICommandBuffer* rhi_cmd,UploadParams* params);
         void Bind(RHICommandBuffer* rhi_cmd, const BindParams& params);
         u64 GetSize() const {return _mem_size;}
-        u64 GetFenceValue() const {return _fence_value;}
-        void Track(u64 fence = 0u);
+        GpuResourceHandle Handle() const { return _handle; }
+        template<typename tag_t>
+        GpuHandle<tag_t> TypedHandle() const { return {_handle._index, _handle._generation}; }
+        void SetHandle(GpuResourceHandle handle) { _handle = handle; }
         void SetCreatedFence(u64 fence)
         {
             _created_fence = fence;
             _is_ready_for_rendering = false;
         }
-        bool MarkUsedByCommand(u64 command_epoch);
-        bool IsReferenceByGpu() const;
         EGpuResType GetResourceType() const {return _res_type;}
         bool IsReady();
     public:
@@ -114,12 +198,25 @@ namespace Ailu::Render
     protected:
         inline static u64 s_total_mem_size = 0u;
         u64 _mem_size = 0u;
-        u64 _fence_value = 0u;
         u64 _created_fence = ~u64(0);
-        u64 _last_marked_command_epoch = 0u;
+        GpuResourceHandle _handle;
         EGpuResType _res_type;
         bool _is_ready_for_rendering = false;
     };
+
+    template<typename resource_t>
+    Ref<resource_t> AdoptGpuResource(resource_t *resource)
+    {
+        static_assert(std::is_base_of_v<GpuResource, resource_t>);
+        if (resource == nullptr)
+            return nullptr;
+
+        const GpuResourceHandle handle = GpuResourceRegistry::Get().Add(std::unique_ptr<GpuResource>(resource));
+        return Ref<resource_t>(resource, [handle](resource_t *)
+        {
+            GpuResourceRegistry::Get().Release(handle);
+        });
+    }
 }// namespace Ailu
 
 #endif// !FRAME_RESOURCE_H__

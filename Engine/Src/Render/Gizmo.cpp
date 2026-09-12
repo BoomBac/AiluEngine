@@ -23,8 +23,8 @@ namespace Ailu::Render
                 {EVertexSemantic::kPosition, EShaderDateType::kFloat3, 0},
                 {EVertexSemantic::kColor, EShaderDateType::kFloat4, 1},
         };
-        _world_vbuf.reset(VertexBuffer::Create(layout));
-        _screen_vbuf.reset(VertexBuffer::Create(layout));
+        _world_vbuf = VertexBuffer::Create(layout);
+        _screen_vbuf = VertexBuffer::Create(layout);
         _world_vbuf->SetStream(nullptr, kMaxVertexNum * sizeof(Vector3f), 0, true);
         _world_vbuf->SetStream(nullptr, kMaxVertexNum * sizeof(Vector4f), 1, true);
         _screen_vbuf->SetStream(nullptr, kMaxVertexNum * sizeof(Vector3f), 0, true);
@@ -40,9 +40,9 @@ namespace Ailu::Render
         GraphicsContext::Get().CreateResource(_screen_vbuf.get());
         for(u32 i = 0; i < kMaxDrawTextureNum;i++)
         {
-            _tex_screen_vbufs[i].reset(VertexBuffer::Create({
+            _tex_screen_vbufs[i] = VertexBuffer::Create({
                 {EVertexSemantic::kPosition, EShaderDateType::kFloat2, 0},
-            }));
+            });
             _tex_screen_vbufs[i]->SetStream(nullptr, 6 * sizeof(Vector2f), 0, true);
             _tex_screen_vbufs[i]->Name("GizmoTextureBuffer");
             GraphicsContext::Get().CreateResource(_tex_screen_vbufs[i].get());
@@ -376,6 +376,14 @@ namespace Ailu::Render
         s_pInstance->_mesh_renderers.emplace_back(mesh, mat,matrix);
     }
 
+    void Gizmo::DrawPreviewMesh(Mesh *mesh, const Matrix4x4f &matrix, Material *mat)
+    {
+        if (mesh == nullptr || mat == nullptr)
+            return;
+        s_pInstance->_preview_mesh_renderer = {mesh, mat, matrix};
+        s_pInstance->_has_preview_mesh_renderer = true;
+    }
+
     void Gizmo::DrawTexture(const Rect &rect, Texture *tex)
     {
         if (s_pInstance->_tex_screen_item_num >= kMaxDrawTextureNum)
@@ -424,7 +432,7 @@ namespace Ailu::Render
             cmd->DrawInstanced(s_pInstance->_world_vbuf.get(), nullptr, s_pInstance->_line_drawer, 0, 1);
             s_pInstance->_world_vertex_num = 0u;
         }
-        for (auto& r: s_pInstance->_mesh_renderers)
+        auto submit_mesh = [&](const MeshRendererNode &r)
         {
             CBufferPerSceneData preview_scene_data{};
             preview_scene_data._DirectionalLights[0]._LightDir = Normalize(Vector3f(-0.45f, -1.0f, -0.65f));
@@ -437,6 +445,24 @@ namespace Ailu::Render
             {
                 cmd->DrawMesh(r._mesh, r._material, r._matrix, i);
             }
+        };
+        for (auto &r: s_pInstance->_mesh_renderers)
+        {
+            submit_mesh(r);
+        }
+        if (s_pInstance->_has_preview_mesh_renderer)
+        {
+            const auto &r = s_pInstance->_preview_mesh_renderer;
+            auto *vertex_buffer = r._mesh->GetVertexBuffer().get();
+            auto *index_buffer = r._mesh->SubmeshCount() > 0u ? r._mesh->GetIndexBuffer().get() : nullptr;
+            LOG_INFO("[Gizmo] Submit preview mesh={} submeshes={} vb={} vb_ready={} vb_handle=({}, {}) ib={} ib_ready={} ib_handle=({}, {})",
+                     r._mesh, r._mesh->SubmeshCount(), vertex_buffer, vertex_buffer->IsReady(),
+                     vertex_buffer->Handle()._index, vertex_buffer->Handle()._generation, index_buffer,
+                     index_buffer != nullptr && index_buffer->IsReady(),
+                     index_buffer != nullptr ? index_buffer->Handle()._index : kInvalidGpuHandleIndex,
+                     index_buffer != nullptr ? index_buffer->Handle()._generation : 0u);
+            submit_mesh(r);
+            s_pInstance->_has_preview_mesh_renderer = false;
         }
         s_pInstance->_mesh_renderers.clear();
         if (s_pInstance->_screen_vertex_num > 0)
@@ -500,6 +526,7 @@ namespace Ailu::Render
     //当激活时，实际就不用调用
     void Gizmo::EndFrame()
     {
+        s_pInstance->_has_preview_mesh_renderer = false;
         for(u32 i = 0; i < s_pInstance->_tex_screen_item_num; ++i)
         {
             s_pInstance->_draw_tex_items[i]._tex = nullptr;

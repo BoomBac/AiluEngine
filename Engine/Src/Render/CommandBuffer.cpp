@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 
 #include "Framework/Common/ThreadPool.h"
 #include "Framework/Common/Allocator.hpp"
@@ -21,10 +21,22 @@
 #include "Render/RayTracing/RayTracingScene.h"
 #include "Render/RayTracing/RayTracingGeometry.h"
 #include "Render/RayTracing/RayTracingShader.h"
-#include <unordered_set>
 
 namespace Ailu::Render
 {
+    namespace
+    {
+        GpuResourceHandle GetResourceHandle(const GpuResource *resource)
+        {
+            return resource != nullptr ? resource->Handle() : GpuResourceHandle{};
+        }
+
+        BufferHandle GetBufferHandle(const GpuResource *resource)
+        {
+            return resource != nullptr ? resource->TypedHandle<BufferTag>() : BufferHandle{};
+        }
+    }
+
     static CommandBufferPool *s_pCommandBufferPool = nullptr;
     static RHICommandBufferPool *s_pRHICommandBufferPool = nullptr;
     //-----------------------------------------------------
@@ -103,19 +115,22 @@ namespace Ailu::Render
         ~Impl() = default;
 
     private:
-        void PushMaterialState(CommandDraw *cmd)
+        void PushMaterialState(CommandDraw *cmd, Material *mat)
         {
             ++_rendering_states_data.MaterialCaptureCount;
             // This is the frontend command-construction boundary. Resolve handles here so
             // deferred DX12 recording consumes only the captured MaterialDrawState snapshot.
-            cmd->_mat->RefreshAssetReferences();
+            if (mat == nullptr)
+                return;
+            mat->RefreshAssetReferences();
             const ShaderPropertyId per_obj_id = ShaderPropertyRegistry::Get().Intern(RenderConstants::kCBufNamePerObject);
-            if (cmd->_per_obj_cb != nullptr)
+            auto *per_obj_cb = static_cast<ConstantBuffer *>(GpuResourceRegistry::Get().Resolve(cmd->_per_obj_cb));
+            if (per_obj_cb != nullptr)
             {
                 // 将per-object cbuffer烘焙进command_resources，CaptureDrawState会写入binding snapshot，
                 // RHI draw路径只回放snapshot，无需在D3DContext再单独绑定
                 auto &binding = _command_resources[per_obj_id];
-                binding._resource = cmd->_per_obj_cb;
+                binding._resource = per_obj_cb;
                 binding._resource_type = EBindResDescType::kConstBuffer;
                 binding._addi_info = {};
             }
@@ -127,7 +142,8 @@ namespace Ailu::Render
                 if (it != _command_resources.end() && it->second._resource_type == EBindResDescType::kConstBuffer)
                     _command_resources.erase(it);
             }
-            cmd->_material_draw_state = cmd->_mat->CaptureDrawState(cmd->_pass_index,
+            cmd->_material_id = mat->ID();
+            cmd->_material_draw_state = mat->CaptureDrawState(cmd->_pass_index,
                                                                        FrameResourceManager::Get().GetActiveFrameSlot(),
                                                                        g_pGfxContext->GetFrameCount(),
                                                                        *FrameResourceManager::Get().GetActiveFrameAllocator(),
@@ -148,8 +164,6 @@ namespace Ailu::Render
                     CommandPool::Get().DeAlloc(cmd);
             }
             _commands.clear();
-            _keep_alive_objects.clear();
-            _keep_alive_set.clear();
             _command_resources.clear();
             _leased_temp_rts.clear();
             _released_temp_rts.clear();
@@ -212,8 +226,8 @@ namespace Ailu::Render
             }
             else
                 cmd->_color_target_num = 0u;
-            cmd->_color_target[0] = color;
-            cmd->_depth_target = depth;
+            cmd->_color_target[0] = GetResourceHandle(color);
+            cmd->_depth_target = GetResourceHandle(depth);
             cmd->_color_indices[0] = 0u;
             cmd->_depth_index = 0u;
             if (_viewports[0].width != 0u)
@@ -236,7 +250,7 @@ namespace Ailu::Render
         {
             auto cmd = CommandPool::Get().Alloc<CommandSetTarget>();
             cmd->_color_target_num = 1u;
-            cmd->_color_target[0] = color;
+            cmd->_color_target[0] = GetResourceHandle(color);
             cmd->_color_indices[0] = index;
             if (_viewports[0].width != 0u)
             {
@@ -253,8 +267,8 @@ namespace Ailu::Render
         {
             auto cmd = CommandPool::Get().Alloc<CommandSetTarget>();
             cmd->_color_target_num = color ? 1u : 0u;
-            cmd->_color_target[0] = color;
-            cmd->_depth_target = depth;
+            cmd->_color_target[0] = GetResourceHandle(color);
+            cmd->_depth_target = GetResourceHandle(depth);
             cmd->_color_indices[0] = color_index;
             cmd->_depth_index = depth_index;
             if (_viewports[0].width != 0u)
@@ -280,7 +294,8 @@ namespace Ailu::Render
             static Color s_clear_colors[RenderConstants::kMaxMRTNum] = {Colors::kBlack, Colors::kBlack, Colors::kBlack, Colors::kBlack, Colors::kBlack, Colors::kBlack, Colors::kBlack, Colors::kBlack};
             for (u16 i = 0; i < colors.size(); ++i)
             {
-                cmd->_color_target[i] = colors[i];
+                auto *color = colors[i];
+                cmd->_color_target[i] = GetResourceHandle(color);
                 cmd->_color_indices[i] = 0u;
                 if (_viewports[i].width != 0u)
                 {
@@ -288,14 +303,14 @@ namespace Ailu::Render
                     _viewports[i] = Rect();
                 }
                 else
-                    cmd->_viewports[i] = Rect(0, 0, cmd->_color_target[i]->Width(), cmd->_color_target[i]->Height());
+                    cmd->_viewports[i] = color != nullptr ? Rect(0, 0, color->Width(), color->Height()) : Rect();
             }
-            cmd->_depth_target = depth;
+            cmd->_depth_target = GetResourceHandle(depth);
             cmd->_depth_index = 0u;
             _commands.push_back(cmd);
-            if (cmd->_color_target[0]->_load_action == ELoadStoreAction::kClear)
+            if (!colors.empty() && colors[0] != nullptr && colors[0]->_load_action == ELoadStoreAction::kClear)
                 ClearRenderTarget(s_clear_colors, cmd->_color_target_num);
-            if (cmd->_depth_target->_load_action == ELoadStoreAction::kClear)
+            if (depth != nullptr && depth->_load_action == ELoadStoreAction::kClear)
                 ClearRenderTarget(kZFar, 0u);
         }
         void SetRenderTargets(const Vector<RTHandle> &colors, RTHandle depth)
@@ -344,13 +359,12 @@ namespace Ailu::Render
         void DrawIndexed(VertexBuffer *vb, IndexBuffer *ib, ConstantBuffer *per_obj_cb, Material *mat, u16 pass_index, u32 index_start, u32 index_num)
         {
             auto cmd = CommandPool::Get().Alloc<CommandDraw>();
-            cmd->_vb = vb;
-            cmd->_ib = ib;
-            cmd->_per_obj_cb = per_obj_cb;
-            cmd->_mat = mat;
+            cmd->_vb = GetBufferHandle(vb);
+            cmd->_ib = GetBufferHandle(ib);
+            cmd->_per_obj_cb = GetBufferHandle(per_obj_cb);
             cmd->_pass_index = pass_index;
             cmd->_instance_count = 1u;
-            PushMaterialState(cmd);
+            PushMaterialState(cmd, mat);
             cmd->_index_start = index_start;
             cmd->_index_num = index_num;
             _commands.push_back(cmd);
@@ -358,13 +372,12 @@ namespace Ailu::Render
         void DrawInstanced(VertexBuffer *vb, ConstantBuffer *per_obj_cb, Material *mat, u16 pass_index, u16 instance_count)
         {
             auto cmd = CommandPool::Get().Alloc<CommandDraw>();
-            cmd->_vb = vb;
-            cmd->_ib = nullptr;
-            cmd->_per_obj_cb = per_obj_cb;
-            cmd->_mat = mat;
+            cmd->_vb = GetBufferHandle(vb);
+            cmd->_ib = BufferHandle{};
+            cmd->_per_obj_cb = GetBufferHandle(per_obj_cb);
             cmd->_pass_index = pass_index;
             cmd->_instance_count = instance_count;
-            PushMaterialState(cmd);
+            PushMaterialState(cmd, mat);
             _commands.push_back(cmd);
         }
         void DrawIndexedInstanced(VertexBuffer *vb, IndexBuffer *ib, ConstantBuffer *per_obj_cb, Material *mat,
@@ -372,14 +385,13 @@ namespace Ailu::Render
                                   u32 index_num)
         {
             auto cmd = CommandPool::Get().Alloc<CommandDraw>();
-            cmd->_vb = vb;
-            cmd->_ib = ib;
-            cmd->_per_obj_cb = per_obj_cb;
-            cmd->_mat = mat;
+            cmd->_vb = GetBufferHandle(vb);
+            cmd->_ib = GetBufferHandle(ib);
+            cmd->_per_obj_cb = GetBufferHandle(per_obj_cb);
             cmd->_pass_index = pass_index;
             cmd->_instance_count = instance_count;
             cmd->_start_instance = start_instance;
-            PushMaterialState(cmd);
+            PushMaterialState(cmd, mat);
             cmd->_index_start = index_start;
             cmd->_index_num = index_num;
             _commands.push_back(cmd);
@@ -388,15 +400,14 @@ namespace Ailu::Render
                            const CBufferPrimitiveDrawData &draw_data, u32 instance_count)
         {
             auto cmd = CommandPool::Get().Alloc<CommandDraw>();
-            cmd->_vb = vb;
-            cmd->_ib = ib;
-            cmd->_mat = material;
+            cmd->_vb = GetBufferHandle(vb);
+            cmd->_ib = GetBufferHandle(ib);
             cmd->_sub_mesh = submesh_index;
             cmd->_pass_index = pass_index;
             cmd->_primitive_draw_data = draw_data;
             cmd->_is_scene_primitive_draw = true;
             cmd->_instance_count = instance_count;
-            PushMaterialState(cmd);
+            PushMaterialState(cmd, material);
             _commands.push_back(cmd);
         }
         void SetViewport(Rect viewport)
@@ -472,108 +483,6 @@ namespace Ailu::Render
             return std::move(_released_temp_rts);
         }
 
-        void KeepAlive(Object *object)
-        {
-            if (object == nullptr || !_keep_alive_set.insert(object).second)
-                return;
-            if (auto object_ref = object->SharedFromThis(); object_ref != nullptr)
-                _keep_alive_objects.emplace_back(std::move(object_ref));
-        }
-
-        void CollectKeepAliveObjects()
-        {
-            const auto collect_bindings = [this](const PipelineBindingSnapshot &bindings)
-            {
-                for (u16 i = 0u; i < bindings._entry_count; ++i)
-                    KeepAlive(bindings._entries[i]._resource);
-            };
-            const auto collect_compute_bindings = [this](const ComputeDispatchSnapshot &bindings)
-            {
-                for (u16 i = 0u; i < bindings._entry_count; ++i)
-                    KeepAlive(bindings._entries[i]._resource);
-            };
-            for (GfxCommand *command: _commands)
-            {
-                if (command == nullptr)
-                    continue;
-                switch (command->GetCmdType())
-                {
-                case EGpuCommandType::kSetTarget:
-                {
-                    auto *target = static_cast<CommandSetTarget *>(command);
-                    for (u16 i = 0u; i < target->_color_target_num; ++i)
-                        KeepAlive(target->_color_target[i]);
-                    KeepAlive(target->_depth_target);
-                    break;
-                }
-                case EGpuCommandType::kDraw:
-                {
-                    auto *draw = static_cast<CommandDraw *>(command);
-                    KeepAlive(draw->_vb);
-                    KeepAlive(draw->_ib);
-                    KeepAlive(draw->_per_obj_cb);
-                    KeepAlive(draw->_mat);
-                    KeepAlive(draw->_arg_buffer);
-                    KeepAlive(draw->_material_draw_state._shader);
-                    collect_bindings(draw->_material_draw_state._bindings);
-                    break;
-                }
-                case EGpuCommandType::kDispatch:
-                {
-                    auto *dispatch = static_cast<CommandDispatch *>(command);
-                    KeepAlive(dispatch->_cs);
-                    KeepAlive(dispatch->_arg_buffer);
-                    collect_compute_bindings(dispatch->_bindings);
-                    break;
-                }
-                case EGpuCommandType::kResourceUpload:
-                    KeepAlive(static_cast<CommandGpuResourceUpload *>(command)->_res);
-                    break;
-                case EGpuCommandType::kRequireResourceState:
-                    KeepAlive(static_cast<CommandRequireResourceState *>(command)->_res);
-                    break;
-                case EGpuCommandType::kUavBarrier:
-                    KeepAlive(static_cast<CommandUavBarrier *>(command)->_res);
-                    break;
-                case EGpuCommandType::kCopyCounter:
-                {
-                    auto *copy = static_cast<CommandCopyCounter *>(command);
-                    KeepAlive(copy->_src);
-                    KeepAlive(copy->_dst);
-                    break;
-                }
-                case EGpuCommandType::kReadBack:
-                    KeepAlive(static_cast<CommandReadBack *>(command)->_res);
-                    break;
-                case EGpuCommandType::kBuildAS:
-                {
-                    auto *build = static_cast<CommandBuildAS *>(command);
-                    KeepAlive(build->_dst);
-                    KeepAlive(build->_src);
-                    KeepAlive(build->_tlas._instance_buffer);
-                    break;
-                }
-                case EGpuCommandType::kDispatchRays:
-                {
-                    auto *dispatch = static_cast<CommandDispatchRays *>(command);
-                    KeepAlive(dispatch->_shader);
-                    KeepAlive(dispatch->_scene);
-                    break;
-                }
-                default:
-                    break;
-                }
-            }
-            for (const auto &[property_id, binding]: _command_resources)
-                KeepAlive(binding._resource);
-        }
-
-        Vector<Ref<Object>> TakeKeepAliveObjects()
-        {
-            CollectKeepAliveObjects();
-            _keep_alive_set.clear();
-            return std::move(_keep_alive_objects);
-        }
         void Blit(RTHandle src, RTHandle dst, Material *mat, u16 pass_index)
         {
             Blit(g_pRenderTexturePool->Get(src), g_pRenderTexturePool->Get(dst), mat, pass_index);
@@ -613,13 +522,12 @@ namespace Ailu::Render
         void DrawFullScreenQuad(Material *mat, u16 pass_index)
         {
             auto cmd = CommandPool::Get().Alloc<CommandDraw>();
-            cmd->_vb = Mesh::s_fullscreen_triangle.lock()->GetVertexBuffer().get();
-            cmd->_ib = Mesh::s_fullscreen_triangle.lock()->GetIndexBuffer().get();
-            cmd->_mat = mat;
+            cmd->_vb = GetBufferHandle(Mesh::s_fullscreen_triangle.lock()->GetVertexBuffer().get());
+            cmd->_ib = GetBufferHandle(Mesh::s_fullscreen_triangle.lock()->GetIndexBuffer().get());
             cmd->_instance_count = 1u;
             cmd->_sub_mesh = 0u;
             cmd->_pass_index = pass_index;
-            PushMaterialState(cmd);
+            PushMaterialState(cmd, mat);
             _commands.emplace_back(cmd);
         }
         void SetGlobalBuffer(const String &name, void *data, u64 data_size)
@@ -668,52 +576,48 @@ namespace Ailu::Render
             per_obj_data._MatrixWorld_Pre = per_obj_data._MatrixWorld;
             SetGlobalBuffer(RenderConstants::kCBufNamePerObject, (u8 *) (&per_obj_data), RenderConstants::kPerObjectDataSize);
             auto cmd = CommandPool::Get().Alloc<CommandDraw>();
-            cmd->_vb = mesh->GetVertexBuffer().get();
-            cmd->_ib = mesh->GetIndexBuffer(sub_mesh).get();
-            cmd->_mat = material;
+            cmd->_vb = GetBufferHandle(mesh->GetVertexBuffer().get());
+            cmd->_ib = GetBufferHandle(mesh->GetIndexBuffer(sub_mesh).get());
             cmd->_instance_count = instance_count;
             cmd->_sub_mesh = sub_mesh;
             cmd->_pass_index = 0u;
-            PushMaterialState(cmd);
+            PushMaterialState(cmd, material);
             _commands.emplace_back(cmd);
         }
         void DrawMesh(Mesh *mesh, Material *material, ConstantBuffer *per_obj_cb, u32 instance_count)
         {
             auto cmd = CommandPool::Get().Alloc<CommandDraw>();
-            cmd->_vb = ResolveSkinningVertexBuffer(mesh, per_obj_cb);
-            cmd->_ib = mesh->GetIndexBuffer().get();
-            cmd->_per_obj_cb = per_obj_cb;
-            cmd->_mat = material;
+            cmd->_vb = GetBufferHandle(ResolveSkinningVertexBuffer(mesh, per_obj_cb));
+            cmd->_ib = GetBufferHandle(mesh->GetIndexBuffer().get());
+            cmd->_per_obj_cb = GetBufferHandle(per_obj_cb);
             cmd->_instance_count = instance_count;
             cmd->_sub_mesh = 0u;
             cmd->_pass_index = 0u;
-            PushMaterialState(cmd);
+            PushMaterialState(cmd, material);
             _commands.emplace_back(cmd);
         }
         void DrawMesh(Mesh *mesh, Material *material, ConstantBuffer *per_obj_cb, u16 sub_mesh, u32 instance_count)
         {
             auto cmd = CommandPool::Get().Alloc<CommandDraw>();
-            cmd->_vb = ResolveSkinningVertexBuffer(mesh, per_obj_cb);
-            cmd->_ib = mesh->GetIndexBuffer(sub_mesh).get();
-            cmd->_per_obj_cb = per_obj_cb;
-            cmd->_mat = material;
+            cmd->_vb = GetBufferHandle(ResolveSkinningVertexBuffer(mesh, per_obj_cb));
+            cmd->_ib = GetBufferHandle(mesh->GetIndexBuffer(sub_mesh).get());
+            cmd->_per_obj_cb = GetBufferHandle(per_obj_cb);
             cmd->_instance_count = instance_count;
             cmd->_sub_mesh = sub_mesh;
             cmd->_pass_index = 0u;
-            PushMaterialState(cmd);
+            PushMaterialState(cmd, material);
             _commands.emplace_back(cmd);
         }
         void DrawMesh(Mesh *mesh, Material *material, ConstantBuffer *per_obj_cb, u16 sub_mesh, u16 pass_index, u32 instance_count)
         {
             auto cmd = CommandPool::Get().Alloc<CommandDraw>();
-            cmd->_vb = ResolveSkinningVertexBuffer(mesh, per_obj_cb);
-            cmd->_ib = mesh->GetIndexBuffer(sub_mesh).get();
-            cmd->_per_obj_cb = per_obj_cb;
-            cmd->_mat = material;
+            cmd->_vb = GetBufferHandle(ResolveSkinningVertexBuffer(mesh, per_obj_cb));
+            cmd->_ib = GetBufferHandle(mesh->GetIndexBuffer(sub_mesh).get());
+            cmd->_per_obj_cb = GetBufferHandle(per_obj_cb);
             cmd->_instance_count = instance_count;
             cmd->_sub_mesh = sub_mesh;
             cmd->_pass_index = pass_index;
-            PushMaterialState(cmd);
+            PushMaterialState(cmd, material);
             _commands.emplace_back(cmd);
         }
         void DrawMesh(Mesh *mesh, Material *material, const Matrix4x4f &world_mat, u16 sub_mesh, u16 pass_index, u32 instance_count)
@@ -724,67 +628,62 @@ namespace Ailu::Render
             per_obj_data._MatrixWorld_Pre = per_obj_data._MatrixWorld;
             SetGlobalBuffer(RenderConstants::kCBufNamePerObject, (u8 *) (&per_obj_data), RenderConstants::kPerObjectDataSize);
             auto cmd = CommandPool::Get().Alloc<CommandDraw>();
-            cmd->_vb = mesh->GetVertexBuffer().get();
-            cmd->_ib = mesh->GetIndexBuffer(sub_mesh).get();
-            cmd->_mat = material;
+            cmd->_vb = GetBufferHandle(mesh->GetVertexBuffer().get());
+            cmd->_ib = GetBufferHandle(mesh->GetIndexBuffer(sub_mesh).get());
             cmd->_instance_count = instance_count;
             cmd->_sub_mesh = sub_mesh;
             cmd->_pass_index = pass_index;
-            PushMaterialState(cmd);
+            PushMaterialState(cmd, material);
             _commands.emplace_back(cmd);
         }
         void DrawMesh(Mesh *mesh, Material *material, const CBufferPerObjectData &per_obj_data, u16 sub_mesh, u16 pass_index, u32 instance_count)
         {
             SetGlobalBuffer(RenderConstants::kCBufNamePerObject, (u8 *) (&per_obj_data), RenderConstants::kPerObjectDataSize);
             auto cmd = CommandPool::Get().Alloc<CommandDraw>();
-            cmd->_vb = mesh->GetVertexBuffer().get();
-            cmd->_ib = mesh->GetIndexBuffer(sub_mesh).get();
-            cmd->_mat = material;
+            cmd->_vb = GetBufferHandle(mesh->GetVertexBuffer().get());
+            cmd->_ib = GetBufferHandle(mesh->GetIndexBuffer(sub_mesh).get());
             cmd->_instance_count = instance_count;
             cmd->_sub_mesh = sub_mesh;
             cmd->_pass_index = pass_index;
-            PushMaterialState(cmd);
+            PushMaterialState(cmd, material);
             _commands.emplace_back(cmd);
         }
         void DrawMeshIndirect(Mesh *mesh, u16 sub_mesh, Material *material, u16 pass_index, GPUBuffer *arg_buffer, u32 arg_offset)
         {
             auto cmd = CommandPool::Get().Alloc<CommandDraw>();
-            cmd->_vb = mesh->GetVertexBuffer().get();
-            cmd->_ib = mesh->GetIndexBuffer(sub_mesh).get();
-            cmd->_mat = material;
+            cmd->_vb = GetBufferHandle(mesh->GetVertexBuffer().get());
+            cmd->_ib = GetBufferHandle(mesh->GetIndexBuffer(sub_mesh).get());
             cmd->_sub_mesh = sub_mesh;
             cmd->_pass_index = pass_index;
-            cmd->_arg_buffer = arg_buffer;
+            cmd->_arg_buffer = GetBufferHandle(arg_buffer);
             cmd->_arg_offset = arg_offset;
-            PushMaterialState(cmd);
+            PushMaterialState(cmd, material);
             _commands.emplace_back(cmd);
         }
 
         void DrawProcedural(Material *material, u16 pass_index, u32 vertex_count, u32 instance_count)
         {
             auto cmd = CommandPool::Get().Alloc<CommandDraw>();
-            cmd->_vb = nullptr;
-            cmd->_ib = nullptr;
-            cmd->_mat = material;
+            cmd->_vb = BufferHandle{};
+            cmd->_ib = BufferHandle{};
             cmd->_sub_mesh = 0;
             cmd->_pass_index = pass_index;
             cmd->_vertex_count = vertex_count;
             cmd->_instance_count = instance_count;
-            PushMaterialState(cmd);
+            PushMaterialState(cmd, material);
             _commands.emplace_back(cmd);
         }
 
         void DrawProceduralIndirect(Material *material, u16 pass_index, GPUBuffer *arg_buffer, u32 arg_offset)
         {
             auto cmd = CommandPool::Get().Alloc<CommandDraw>();
-            cmd->_vb = nullptr;
-            cmd->_ib = nullptr;
-            cmd->_mat = material;
+            cmd->_vb = BufferHandle{};
+            cmd->_ib = BufferHandle{};
             cmd->_sub_mesh = 0;
             cmd->_pass_index = pass_index;
-            cmd->_arg_buffer = arg_buffer;
+            cmd->_arg_buffer = GetBufferHandle(arg_buffer);
             cmd->_arg_offset = arg_offset;
-            PushMaterialState(cmd);
+            PushMaterialState(cmd, material);
             _commands.emplace_back(cmd);
         }
 
@@ -800,14 +699,14 @@ namespace Ailu::Render
                 return;
             }
             auto cmd = CommandPool::Get().Alloc<CommandDispatch>();
-            cmd->_cs = cs;
+            cmd->_cs = cs->TypedHandle<ShaderTag>();
             cmd->_group_num_x = std::max<u16>(1u, thread_group_x);
             cmd->_group_num_y = std::max<u16>(1u, thread_group_y);
             cmd->_group_num_z = std::max<u16>(1u, thread_group_z);
             cmd->_kernel = kernel;
-            cmd->_arg_buffer = nullptr;
+            cmd->_arg_buffer = BufferHandle{};
             cmd->_arg_offset = 0u;
-            cmd->_cs->CaptureDispatchState(cmd->_kernel, cmd->_bindings, &_command_resources);
+            cs->CaptureDispatchState(cmd->_kernel, cmd->_bindings, &_command_resources);
             _commands.emplace_back(cmd);
         }
         void Dispatch(ComputeShader *cs, ComputeShaderKernelId kernel, GPUBuffer *arg_buffer, u16 arg_offset)
@@ -818,25 +717,26 @@ namespace Ailu::Render
                 return;
             }
             auto cmd = CommandPool::Get().Alloc<CommandDispatch>();
-            cmd->_cs = cs;
+            cmd->_cs = cs->TypedHandle<ShaderTag>();
             cmd->_kernel = kernel;
             cmd->_group_num_x = 1u;
             cmd->_group_num_y = 1u;
             cmd->_group_num_z = 1u;
-            cmd->_cs->CaptureDispatchState(cmd->_kernel, cmd->_bindings, &_command_resources);
-            cmd->_arg_buffer = arg_buffer;
+            cs->CaptureDispatchState(cmd->_kernel, cmd->_bindings, &_command_resources);
+            cmd->_arg_buffer = GetBufferHandle(arg_buffer);
             cmd->_arg_offset = arg_offset;
             _commands.emplace_back(cmd);
         }
         void DispatchRays(RayTracingShader *shader, RayTracingScene *scene, u16 width, u16 height, u16 depth)
         {
             auto cmd = CommandPool::Get().Alloc<CommandDispatchRays>();
-            cmd->_shader = shader;
-            cmd->_scene = scene;
+            cmd->_shader = shader != nullptr ? shader->TypedHandle<ShaderTag>() : ShaderHandle{};
+            cmd->_scene = GetResourceHandle(scene);
             cmd->_w = std::max<u16>(1u, width);
             cmd->_h = std::max<u16>(1u, height);
             cmd->_depth = std::max<u16>(1u, depth);
-            cmd->_shader->PushState(scene);
+            if (shader != nullptr)
+                shader->PushState(scene);
             _commands.emplace_back(cmd);
         }
         void BeginProfiler(const String &name)
@@ -855,8 +755,8 @@ namespace Ailu::Render
         void CopyCounterValue(GPUBuffer *src, GPUBuffer *dst, u32 dst_offset)
         {
             auto cmd = CommandPool::Get().Alloc<CommandCopyCounter>();
-            cmd->_src = src;
-            cmd->_dst = dst;
+            cmd->_src = GetBufferHandle(src);
+            cmd->_dst = GetBufferHandle(dst);
             cmd->_dst_offset = dst_offset;
             _commands.emplace_back(cmd);
         }
@@ -875,7 +775,7 @@ namespace Ailu::Render
         void RequireState(GpuResource *res, EResourceState state, u32 sub_res)
         {
             auto cmd = CommandPool::Get().Alloc<CommandRequireResourceState>();
-            cmd->_res = res;
+            cmd->_res = GetResourceHandle(res);
             cmd->_state = state;
             cmd->_sub_res = sub_res;
             _commands.emplace_back(cmd);
@@ -884,7 +784,7 @@ namespace Ailu::Render
         void UavBarrier(GpuResource *res)
         {
             auto cmd = CommandPool::Get().Alloc<CommandUavBarrier>();
-            cmd->_res = res;
+            cmd->_res = GetResourceHandle(res);
             _commands.emplace_back(cmd);
         }
 
@@ -893,19 +793,28 @@ namespace Ailu::Render
             auto cmd = CommandPool::Get().Alloc<CommandReadBack>();
             cmd->_is_buffer = true;
             cmd->_is_counter_value = is_counter;
-            cmd->_res = buffer;
+            cmd->_res = GetResourceHandle(buffer);
             cmd->_size = size;
             cmd->_callback = callback;
+            _commands.emplace_back(cmd);
+        }
+
+        void DestroyGpuResource(GpuResource *resource)
+        {
+            if (resource == nullptr)
+                return;
+            auto cmd = CommandPool::Get().Alloc<CommandDestroyGpuResource>();
+            cmd->_handle = resource->Handle();
             _commands.emplace_back(cmd);
         }
 
         void BuildAS(RayTracingScene* scene,bool is_update = false)
         {
             auto cmd = CommandPool::Get().Alloc<CommandBuildAS>();
-            cmd->_dst = scene;
-            cmd->_src = is_update ? cmd->_dst : nullptr;
+            cmd->_dst = GetResourceHandle(scene);
+            cmd->_src = is_update ? cmd->_dst : GpuResourceHandle{};
             cmd->_scratch_size = 0u;
-            cmd->_tlas._instance_buffer = nullptr;
+            cmd->_tlas._instance_buffer = BufferHandle{};
             cmd->_tlas._instance_count = 0u;
             cmd->_is_blas = false;
             cmd->_is_update = is_update;
@@ -915,18 +824,14 @@ namespace Ailu::Render
         void BuildAS(RayTracingGeometry* geometry,bool is_update = false)
         {
             auto cmd = CommandPool::Get().Alloc<CommandBuildAS>();
-            cmd->_blas._geometries = &geometry->GetDesc();
-            cmd->_blas._geometry_count = 1u;
-            cmd->_dst = geometry;
-            cmd->_src = is_update ? cmd->_dst : nullptr;
+            cmd->_dst = GetResourceHandle(geometry);
+            cmd->_src = is_update ? cmd->_dst : GpuResourceHandle{};
             cmd->_scratch_size = geometry->GetScratchBufferSize();
             cmd->_is_blas = true;
             _commands.emplace_back(cmd);
         }
         String _name;
         Vector<GfxCommand *> _commands;
-        Vector<Ref<Object>> _keep_alive_objects;
-        std::unordered_set<Object *> _keep_alive_set;
         Array<Rect, RenderConstants::kMaxMRTNum> _viewports;
         RDG::RenderGraph *_render_graph = nullptr;
         // CommandBuffer局部资源，以kPriorityCmd烘焙进draw state snapshot
@@ -1217,14 +1122,14 @@ namespace Ailu::Render
         _impl->ReadbackBuffer(buffer, is_counter, size, callback);
     }
 
+    void CommandBuffer::DestroyGpuResource(GpuResource *resource)
+    {
+        _impl->DestroyGpuResource(resource);
+    }
+
     Vector<GfxCommand *> CommandBuffer::TakeCommands()
     {
         return std::move(_impl->_commands);
-    }
-
-    Vector<Ref<Object>> CommandBuffer::TakeKeepAliveObjects()
-    {
-        return _impl->TakeKeepAliveObjects();
     }
 
     Vector<RTHandle> CommandBuffer::TakeReleasedTempRTs()
@@ -1303,6 +1208,9 @@ namespace Ailu::Render
             auto &[available, cmd_buf] = it;
             if (cmd_buf == cmd)
             {
+                // 归还到池中的命令缓冲不再参与执行，必须立刻释放录制期间持有的资源强引用，
+                // 否则这些引用会一直存活到该缓冲下一次被取出，导致交换链后台缓冲无法 ResizeBuffers。
+                cmd_buf->ReleaseTrackedResources();
                 available = true;
                 return;
             }

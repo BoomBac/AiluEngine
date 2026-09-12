@@ -43,6 +43,12 @@ namespace Ailu::Editor
         }
     }
 
+    void AssetPreviewViewport3D::RequestRender()
+    {
+        _render_pending = true;
+        _settle_frame_count = kSettleFrameCount;
+    }
+
     bool AssetPreviewViewport3D::SetViewportSize(Vector2f size)
     {
         const u16 width = static_cast<u16>(std::clamp(size.x, 64.0f, 2048.0f));
@@ -53,7 +59,7 @@ namespace Ailu::Editor
         _render_width = width;
         _render_height = height;
         _render_texture.reset();
-        _render_pending = true;
+        RequestRender();
         return true;
     }
 
@@ -63,7 +69,7 @@ namespace Ailu::Editor
         _preview_material.reset();
         if (_material != nullptr)
             _preview_material = CreatePerObjectPreviewMaterial(_material);
-        _render_pending = true;
+        RequestRender();
     }
 
     void AssetPreviewViewport3D::SetMesh(Render::Mesh *mesh)
@@ -78,7 +84,7 @@ namespace Ailu::Editor
         if (_mesh == nullptr)
             _has_preview_bounds = false;
         _camera_initialized = false;
-        _render_pending = true;
+        RequestRender();
     }
 
     void AssetPreviewViewport3D::SetPreviewBounds(const AABB &bounds)
@@ -86,7 +92,7 @@ namespace Ailu::Editor
         _preview_bounds = bounds;
         _has_preview_bounds = true;
         _camera_initialized = false;
-        _render_pending = true;
+        RequestRender();
     }
 
     void AssetPreviewViewport3D::SetShowGrid(bool show_grid)
@@ -94,7 +100,7 @@ namespace Ailu::Editor
         if (_show_grid == show_grid)
             return;
         _show_grid = show_grid;
-        _render_pending = true;
+        RequestRender();
     }
 
     void AssetPreviewViewport3D::SetWireframe(bool wireframe)
@@ -102,7 +108,7 @@ namespace Ailu::Editor
         if (_wireframe == wireframe)
             return;
         _wireframe = wireframe;
-        _render_pending = true;
+        RequestRender();
     }
 
     void AssetPreviewViewport3D::BeginCameraDrag(Vector2f local_position)
@@ -120,7 +126,7 @@ namespace Ailu::Editor
         const Vector3f old_position = _orbit_controller.GetCameraPosition();
         _orbit_controller.Orbit(local_position);
         if (!(_orbit_controller.GetCameraPosition() == old_position))
-            _render_pending = true;
+            RequestRender();
     }
 
     void AssetPreviewViewport3D::BeginCameraPan(Vector2f local_position)
@@ -138,7 +144,7 @@ namespace Ailu::Editor
         const Vector3f old_target = _orbit_controller.GetTarget();
         _orbit_controller.Pan(local_position, _viewport_size, kPreviewFov * k2Radius);
         if (!(_orbit_controller.GetTarget() == old_target))
-            _render_pending = true;
+            RequestRender();
     }
 
     void AssetPreviewViewport3D::ZoomCamera(f32 scroll_delta)
@@ -146,13 +152,13 @@ namespace Ailu::Editor
         const Vector3f old_position = _orbit_controller.GetCameraPosition();
         _orbit_controller.Zoom(scroll_delta);
         if (!(_orbit_controller.GetCameraPosition() == old_position))
-            _render_pending = true;
+            RequestRender();
     }
 
     void AssetPreviewViewport3D::ResetCamera()
     {
         _camera_initialized = false;
-        _render_pending = true;
+        RequestRender();
     }
 
     bool AssetPreviewViewport3D::GetCameraRay(Vector2f local_position, Vector3f &origin, Vector3f &direction) const
@@ -228,6 +234,12 @@ namespace Ailu::Editor
         }
         if (material == nullptr)
             return;
+        // 材质变体还没编译完时先不画，保持重绘请求，等就绪后再重试
+        if (!material->IsReadyForDraw())
+        {
+            _render_pending = true;
+            return;
+        }
 
         auto cmd = Render::CommandBufferPool::Get("AssetPreviewViewport3D");
         auto depth = cmd->GetTempRT(_render_width, _render_height, "asset_preview_viewport_3d_depth",
@@ -309,6 +321,15 @@ namespace Ailu::Editor
         cmd->ReleaseTempRT(depth);
         Render::GraphicsContext::Get().ExecuteCommandBuffer(cmd);
         Render::CommandBufferPool::Release(cmd);
-        _render_pending = false;
+        // 变体就绪后的首帧可能因为 PSO 还在异步创建而画不出内容，多补几帧
+        if (_settle_frame_count > 0u)
+        {
+            --_settle_frame_count;
+            _render_pending = true;
+        }
+        else
+        {
+            _render_pending = false;
+        }
     }
 }

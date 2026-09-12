@@ -23,13 +23,12 @@ namespace Ailu::Render
     }
     VoxelizePass::~VoxelizePass()
     {
-        AL_DELETE(_cam_cbuf);
     }
     void VoxelizePass::Execute(GraphicsContext *context, RenderingData &rendering_data)
     {
         auto cmd = CommandBufferPool::Get("Voxelize");
         {
-            auto *cbuf_cam = ConstantBuffer::As<CBufferPerCameraData>(_cam_cbuf);
+            auto *cbuf_cam = ConstantBuffer::As<CBufferPerCameraData>(_cam_cbuf.get());
             Vector3f cam_pos = rendering_data._vxgi_data._center;
             cam_pos.z -= rendering_data._vxgi_data._size.z * 0.5f;
             BuildOrthographicMatrix(cbuf_cam->_MatrixP, -rendering_data._vxgi_data._size.x * 0.5f, rendering_data._vxgi_data._size.x * 0.5f,
@@ -48,7 +47,7 @@ namespace Ailu::Render
                     {
                         for (auto &obj: obj_list)
                         {
-                            cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, _cam_cbuf);
+                            cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, _cam_cbuf.get());
                             cmd->SetGlobalBuffer("g_voxel_data_block", _voxel_buf.get());
                             cmd->DrawSceneMesh(obj._vertex_buffer, obj._index_buffer, obj._material, obj._submesh_index,
                                                _voxel_pass_index, CBufferPrimitiveDrawData{obj._primitive_index}, 1u);

@@ -17,6 +17,17 @@ namespace Ailu::Render
     {
     }
 
+    bool SpriteBatcher::IsReadyForRender() const
+    {
+        if (_vertex_buffer == nullptr || !_vertex_buffer->IsReady())
+            return false;
+        if (_index_buffer == nullptr || !_index_buffer->IsReady())
+            return false;
+        if (_instance_buffer == nullptr || !_instance_buffer->IsReady())
+            return false;
+        return _default_material != nullptr && _default_material->IsReadyForDraw();
+    }
+
     SpriteBatcher::~SpriteBatcher()
     {
         Shutdown();
@@ -31,7 +42,7 @@ namespace Ailu::Render
             "DefaultSpriteMaterial");
         _default_material->SetTexture("_MainTex", Texture2D::s_p_default_white);
 
-        _per_obj_cb.reset(ConstantBuffer::Create(sizeof(CBufferPerObjectData)));
+        _per_obj_cb = ConstantBuffer::Create(sizeof(CBufferPerObjectData));
         memset(_per_obj_cb->GetData(), 0, sizeof(CBufferPerObjectData));
 
         _instance_capacity = 256u;
@@ -56,15 +67,14 @@ namespace Ailu::Render
             {EVertexSemantic::kTexcoord0, EShaderDateType::kFloat2, 1}
         };
 
-        auto *vb = VertexBuffer::Create(layout, "SpriteUnitQuadVB");
+        auto vb = VertexBuffer::Create(layout, "SpriteUnitQuadVB");
         vb->SetStream((u8 *)kSpritePositions, sizeof(kSpritePositions), 0, false);
         vb->SetStream((u8 *)kSpriteUVs, sizeof(kSpriteUVs), 1, false);
-        _vertex_buffer.reset(vb);
+        _vertex_buffer = std::move(vb);
         GraphicsContext::Get().CreateResource(_vertex_buffer.get());
 
         // Create index buffer
-        auto *ib = IndexBuffer::Create(kSpriteIndices, 6, "SpriteUnitQuadIB", false);
-        _index_buffer.reset(ib);
+        _index_buffer = IndexBuffer::Create(kSpriteIndices, 6, "SpriteUnitQuadIB", false);
         GraphicsContext::Get().CreateResource(_index_buffer.get());
     }
 

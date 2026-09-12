@@ -438,7 +438,20 @@ namespace Ailu
             const bool needs_post_arrange = _is_layout_dirty || is_layout_changed;
             _arrange_rect = new_arrange_rect;
             _content_rect = new_content_rect;
+            // 这里算出的 mat 同时用于 _abs_rect；必须一并写回 _matrix/_inv_matrix。
+            // 否则当父容器在本帧 Update 之后才重新 Arrange 时，子元素缓存的 _matrix
+            // 会停留在上一次布局，绘制仍然按旧位置烘焙（旧图标残留），而 _abs_rect
+            // 已是新值，且元素不再 dirty，问题会一直保持到整棵子树被重建。
+            if (_is_transf_dirty)
+            {
+                _transform._position = _transition;
+                _transform._scale = _scale;
+                _transform._rotation = _rotation * k2Radius;
+            }
             auto mat = CalculateWorldMatrix(true);
+            _matrix = mat;
+            _inv_matrix = MatrixInverse(_matrix);
+            _is_transf_dirty = false;
             Vector3f corners[4] = {
                     {_arrange_rect.x, _arrange_rect.y, 1.0f},
                     {_arrange_rect.x + _arrange_rect.z, _arrange_rect.y, 1.0f},

@@ -40,8 +40,6 @@ namespace Ailu
                 u32 _draw_call = 0u;
                 u32 _dispatch_call = 0u;
                 u64 _draw_command_count = 0u;
-                u64 _resource_mark_request_count = 0u;
-                u64 _unique_resource_mark_count = 0u;
                 u64 _vb_bind_cache_hit_count = 0u;
                 u64 _vb_bind_cache_miss_count = 0u;
 
@@ -52,8 +50,6 @@ namespace Ailu
                     _draw_call = 0u;
                     _dispatch_call = 0u;
                     _draw_command_count = 0u;
-                    _resource_mark_request_count = 0u;
-                    _unique_resource_mark_count = 0u;
                     _vb_bind_cache_hit_count = 0u;
                     _vb_bind_cache_miss_count = 0u;
                 }
@@ -65,8 +61,6 @@ namespace Ailu
                     data.DrawCall += _draw_call;
                     data.DispatchCall += _dispatch_call;
                     data.DrawCommandCount += _draw_command_count;
-                    data.ResourceMarkRequestCount += _resource_mark_request_count;
-                    data.UniqueResourceMarkCount += _unique_resource_mark_count;
                     data.VbBindCacheHitCount += _vb_bind_cache_hit_count;
                     data.VbBindCacheMissCount += _vb_bind_cache_miss_count;
                 }
@@ -158,6 +152,8 @@ namespace Ailu
             void RecordQueueTransition(const D3DResource &resource, Render::EResourceState before_state,
                                         Render::EResourceState after_state, u32 sub_res);
             const D3DResourceStateTracker &StateTracker() const { return _state_tracker; }
+            /// @brief 丢弃录制的资源引用，避免命令缓冲在池中长时间持有资源（如交换链后台缓冲）
+            void ReleaseTrackedResources() final { _state_tracker.ReleaseRecordedResources(); }
             /// @brief While a batch is open, barrier recording only appends to the internal cache.
             void BeginResourceBarrierBatch() { _is_batching_barriers = true; }
             void EndResourceBarrierBatch()
@@ -189,24 +185,9 @@ namespace Ailu
             void ResetRenderTarget();
             void SetActiveRenderTarget(GpuResource *resource) { if (resource != nullptr) _active_render_targets.insert(resource); }
             bool IsActiveRenderTarget(GpuResource *resource) const { return _active_render_targets.contains(resource); }
-            /// @brief 标记当前cmd使用的资源，将当前cmd直接完毕的围栏值写入
-            /// @param res
-            void MarkUsedResource(GpuResource *resource)
-            {
-                ++_statistics._resource_mark_request_count;
-
-                if (resource == nullptr)
-                    return;
-
-                if (_used_resource_set.insert(resource).second)
-                {
-                    _used_resources.emplace_back(resource);
-                    ++_statistics._unique_resource_mark_count;
-                }
-            }
             u16 GetDescriptorHeapId() const { return _cur_cbv_heap_id; }
             void SetDescriptorHeapId(u16 id) { _cur_cbv_heap_id = id; };
-            void PostExecute();
+            void Finalize();
             void AddPostSubmitCallback(std::function<void(u64)> callback) { _post_submit_callbacks.emplace_back(std::move(callback)); }
             void RunPostSubmitCallbacks(u64 fence_value);
             void UploadDataToBuffer(void *src, u64 src_size, const D3DResource &resource);
@@ -533,13 +514,11 @@ namespace Ailu
             D3D12_CPU_DESCRIPTOR_HANDLE *_depth;
             Array<D3D12_VIEWPORT, Render::RenderConstants::kMaxMRTNum> _viewports;
             Array<D3D12_RECT, Render::RenderConstants::kMaxMRTNum> _scissors;
-            Vector<GpuResource *> _used_resources;
             String _first_recording_group_name;
             String _recording_group_name;
             u32 _first_group_submission_index = 0u;
             u32 _last_group_submission_index = 0u;
             bool _has_recorded_group = false;
-            std::unordered_set<GpuResource *> _used_resource_set;
             bool _is_cmd_closed;
             bool _is_submitted;
             i16 _cur_cbv_heap_id;

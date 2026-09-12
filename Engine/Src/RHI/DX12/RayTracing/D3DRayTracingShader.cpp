@@ -431,7 +431,6 @@ namespace Ailu::RHI::DX12
             if (bind_res == nullptr)
                 continue;
 
-            d3d_cmd->MarkUsedResource(bind_res);
             const auto &view_info = state._bind_params[slot];
             BindParams params;
             params._is_compute_pipeline = true;

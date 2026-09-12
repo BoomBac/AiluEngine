@@ -15,11 +15,11 @@ namespace Ailu
             desc_list.emplace_back(EVertexSemantic::kTexcoord1, EShaderDateType::kFloat4, 3);
             desc_list.emplace_back(EVertexSemantic::kTexcoord2, EShaderDateType::kFloat4, 4);
             desc_list.emplace_back(EVertexSemantic::kTexcoord3, EShaderDateType::kFloat4, 5);
-            _vbuf = Ref<VertexBuffer>(VertexBuffer::Create(desc_list, std::format("block({})_vbuf", s_id_gen)));
+            _vbuf = VertexBuffer::Create(desc_list, std::format("block({})_vbuf", s_id_gen));
             _vbuf->EnableBindlessSRV(false);
-            _ibuf = Ref<IndexBuffer>(IndexBuffer::Create(nullptr, vert_num, std::format("block({})_ibuf", s_id_gen), true));
+            _ibuf = IndexBuffer::Create(nullptr, vert_num, std::format("block({})_ibuf", s_id_gen), true);
             _ibuf->EnableBindlessSRV(false);
-            _obj_cb = Ref<ConstantBuffer>(ConstantBuffer::Create(RenderConstants::kPerObjectDataSize));
+            _obj_cb = ConstantBuffer::Create(RenderConstants::kPerObjectDataSize);
             _vbuf->SetStream(nullptr, vert_num * sizeof(Vector3f), 0, true);
             _vbuf->SetStream(nullptr, vert_num * sizeof(Vector2f), 1, true);
             _vbuf->SetStream(nullptr, vert_num * sizeof(Vector4f), 2, true);

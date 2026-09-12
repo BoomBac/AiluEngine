@@ -50,6 +50,7 @@ namespace Ailu::Render
         kScissorRect,
         kBuildAS,
         kDispatchRays,
+        kDestroyGpuResource,
         kCustom
     };
 
@@ -84,8 +85,8 @@ namespace Ailu::Render
 
     struct CommandSetTarget : public TypedGfxCommand<EGpuCommandType::kSetTarget>
     {
-        Array<RenderTexture *, RenderConstants::kMaxMRTNum> _color_target;
-        RenderTexture *_depth_target;
+        Array<GpuResourceHandle, RenderConstants::kMaxMRTNum> _color_target;
+        GpuResourceHandle _depth_target;
         u16 _color_target_num;
         Array<u16, RenderConstants::kMaxMRTNum> _color_indices;
         Array<Rect, RenderConstants::kMaxMRTNum> _viewports;
@@ -117,11 +118,11 @@ namespace Ailu::Render
     struct CommandDraw : public TypedGfxCommand<EGpuCommandType::kDraw>
     {
         MaterialDrawState _material_draw_state;
-        VertexBuffer *_vb;
-        IndexBuffer *_ib;
-        Material *_mat;
+        BufferHandle _vb;
+        BufferHandle _ib;
+        u32 _material_id = 0u;
         u16 _pass_index;
-        ConstantBuffer *_per_obj_cb;
+        BufferHandle _per_obj_cb;
         CBufferPrimitiveDrawData _primitive_draw_data{};
         bool _is_scene_primitive_draw = false;
         u32 _instance_count;
@@ -130,7 +131,7 @@ namespace Ailu::Render
         u32 _vertex_count;
         u32 _index_start;
         u32 _index_num;
-        GPUBuffer* _arg_buffer;
+        BufferHandle _arg_buffer;
         u32 _arg_offset;
 
         void Reset()
@@ -140,13 +141,13 @@ namespace Ailu::Render
     };
     struct CommandDispatch : public TypedGfxCommand<EGpuCommandType::kDispatch>
     {
-        ComputeShader *_cs;
+        ShaderHandle _cs;
         ComputeShaderKernelId _kernel;
         ComputeDispatchSnapshot _bindings;
         u16 _group_num_x;
         u16 _group_num_y;
         u16 _group_num_z;
-        GPUBuffer* _arg_buffer;
+        BufferHandle _arg_buffer;
         u16 _arg_offset;
         void Reset()
         {
@@ -155,7 +156,7 @@ namespace Ailu::Render
     };
     struct CommandGpuResourceUpload : public TypedGfxCommand<EGpuCommandType::kResourceUpload>
     {
-        GpuResource *_res;
+        GpuResourceHandle _res;
         UploadParams *_params;
         ~CommandGpuResourceUpload()
         {
@@ -167,21 +168,21 @@ namespace Ailu::Render
     };
     struct CommandRequireResourceState : public TypedGfxCommand<EGpuCommandType::kRequireResourceState>
     {
-        GpuResource *_res;
+        GpuResourceHandle _res;
         EResourceState _state;
         u32 _sub_res;
-        CommandRequireResourceState() : _res(nullptr), _state(EResourceState::kCommon), _sub_res(kTotalSubRes) {}
+        CommandRequireResourceState() : _res{}, _state(EResourceState::kCommon), _sub_res(kTotalSubRes) {}
         CommandRequireResourceState(GpuResource *res, EResourceState state, u32 sub_res = kTotalSubRes)
-            : _res(res), _state(state), _sub_res(sub_res) {}
+            : _res(res != nullptr ? res->Handle() : GpuResourceHandle{}), _state(state), _sub_res(sub_res) {}
         void Reset() {
             SafeResetCommand(this);
         }
     };
     struct CommandUavBarrier : public TypedGfxCommand<EGpuCommandType::kUavBarrier>
     {
-        GpuResource *_res;
-        CommandUavBarrier() : _res(nullptr) {}
-        explicit CommandUavBarrier(GpuResource *res) : _res(res) {}
+        GpuResourceHandle _res;
+        CommandUavBarrier() : _res{} {}
+        explicit CommandUavBarrier(GpuResource *res) : _res(res != nullptr ? res->Handle() : GpuResourceHandle{}) {}
         void Reset() {
             SafeResetCommand(this);
         }
@@ -192,22 +193,16 @@ namespace Ailu::Render
         bool _is_update;
         bool _is_blas;
         // 通用
-        GpuResource* _dst;      // 目标AS
-        GpuResource* _src;      // update用（BLAS/TLAS都可能用到）
+        GpuResourceHandle _dst;      // 目标AS
+        GpuResourceHandle _src;      // update用（BLAS/TLAS都可能用到）
 
         u64 _scratch_size;
 
         // ===== BLAS =====
-        struct
-        {
-            const RayTracingGeometryDesc* _geometries;
-            u32 _geometry_count;
-        } _blas;
-
         // ===== TLAS =====
         struct
         {
-            GPUBuffer* _instance_buffer;
+            BufferHandle _instance_buffer;
             u32 _instance_count;
         } _tlas;
 
@@ -251,8 +246,8 @@ namespace Ailu::Render
 
     struct CommandCopyCounter : public TypedGfxCommand<EGpuCommandType::kCopyCounter>
     {
-        GPUBuffer* _src;
-        GPUBuffer* _dst;
+        BufferHandle _src;
+        BufferHandle _dst;
         u32 _dst_offset;
         void Reset() {
             SafeResetCommand(this);
@@ -276,7 +271,7 @@ namespace Ailu::Render
     using ReadbackCallback = std::function<void(const u8*,u32)>;
     struct CommandReadBack : public TypedGfxCommand<EGpuCommandType::kReadBack>
     {
-        GpuResource *_res;
+        GpuResourceHandle _res;
         bool _is_buffer;
         bool _is_counter_value;
         u32 _size;
@@ -289,11 +284,20 @@ namespace Ailu::Render
 
     struct CommandDispatchRays : public TypedGfxCommand<EGpuCommandType::kDispatchRays>
     {
-        RayTracingShader *_shader;
-        RayTracingScene *_scene;
+        ShaderHandle _shader;
+        GpuResourceHandle _scene;
         u16 _w;
         u16 _h;
         u16 _depth;
+        void Reset()
+        {
+            SafeResetCommand(this);
+        }
+    };
+
+    struct CommandDestroyGpuResource : public TypedGfxCommand<EGpuCommandType::kDestroyGpuResource>
+    {
+        GpuResourceHandle _handle;
         void Reset()
         {
             SafeResetCommand(this);
@@ -313,14 +317,14 @@ namespace Ailu::Render
         sizeof(CommandGpuResourceUpload), sizeof(CommandRequireResourceState), sizeof(CommandUavBarrier),
         sizeof(CommandCustom), sizeof(CommandAllocConstBuffer), sizeof(CommandProfiler),
         sizeof(CommandCopyCounter), sizeof(CommandPresent), sizeof(CommandScissor), sizeof(CommandDispatchRays),
-        sizeof(CommandReadBack), sizeof(CommandBuildAS));
+        sizeof(CommandReadBack), sizeof(CommandBuildAS), sizeof(CommandDestroyGpuResource));
 
     inline constexpr size_t kCommandPayloadAlign = MaxCommandValue(
         alignof(CommandSetTarget), alignof(CommandClearTarget), alignof(CommandDraw), alignof(CommandDispatch),
         alignof(CommandGpuResourceUpload), alignof(CommandRequireResourceState), alignof(CommandUavBarrier),
         alignof(CommandCustom), alignof(CommandAllocConstBuffer), alignof(CommandProfiler),
         alignof(CommandCopyCounter), alignof(CommandPresent), alignof(CommandScissor), alignof(CommandDispatchRays),
-        alignof(CommandReadBack), alignof(CommandBuildAS));
+        alignof(CommandReadBack), alignof(CommandBuildAS), alignof(CommandDestroyGpuResource));
 
     struct alignas(kCommandPayloadAlign) CommandPayload
     {

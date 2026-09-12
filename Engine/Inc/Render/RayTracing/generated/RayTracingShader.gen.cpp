@@ -8,7 +8,7 @@
 using namespace Ailu;
 const Ailu::Type* Ailu::Render::Z_Construct_RayTracingShader_Type()
 {
-Ailu::Object::StaticType();
+Ailu::Render::GpuResource::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
 {
@@ -19,7 +19,7 @@ initializer._full_name = "Ailu::Render::RayTracingShader";
 initializer._is_class = true;
 initializer._is_abstract = false;
 initializer._namespace = "Ailu::Render";
-initializer._base_name = "Ailu::Object";
+initializer._base_name = "Ailu::Render::GpuResource";
 initializer._constructor = []()->Ailu::Render::RayTracingShader* {return new Ailu::Render::RayTracingShader;};
 cur_type = std::make_unique<Ailu::Type>(initializer);
 Ailu::Type::RegisterType(cur_type.get());

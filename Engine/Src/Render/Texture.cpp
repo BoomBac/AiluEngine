@@ -355,7 +355,7 @@ namespace Ailu::Render
                 return nullptr;
             case RendererAPI::ERenderAPI::kDirectX12:
             {
-                return MakeRef<RHI::DX12::D3DTexture2D>(initializer);
+                return AdoptGpuResource(new RHI::DX12::D3DTexture2D(initializer));
             }
         }
         AL_ASSERT_MSG(false, "Unsupport render api!");
@@ -558,7 +558,7 @@ namespace Ailu::Render
                 return nullptr;
             case RendererAPI::ERenderAPI::kDirectX12:
             {
-                return MakeRef<RHI::DX12::D3DCubeMap>(width, mipmap_chain, format, linear, random_access);
+                return AdoptGpuResource(new RHI::DX12::D3DCubeMap(width, mipmap_chain, format, linear, random_access));
             }
         }
         AL_ASSERT_MSG(false, "Unsupport render api!");
@@ -653,7 +653,7 @@ namespace Ailu::Render
                 return nullptr;
             case RendererAPI::ERenderAPI::kDirectX12:
             {
-                return MakeRef<RHI::DX12::D3DTexture3D>(initializer);
+                return AdoptGpuResource(new RHI::DX12::D3DTexture3D(initializer));
             }
         }
         AL_ASSERT_MSG(false, "Unsupport render api!");
@@ -795,7 +795,7 @@ namespace Ailu::Render
                 desc._is_linear = linear;
                 desc._is_depth_target = format == ERenderTargetFormat::kDepth || format == ERenderTargetFormat::kShadowMap;
                 desc._is_color_target = !desc._is_depth_target;
-                auto rt = MakeRef<RHI::DX12::D3DRenderTexture>(desc);
+                auto rt = AdoptGpuResource(new RHI::DX12::D3DRenderTexture(desc));
                 rt->Name(name);
                 rt->Apply();
                 return rt;
@@ -825,7 +825,7 @@ namespace Ailu::Render
                 desc._is_linear = linear;
                 desc._is_depth_target = format == ERenderTargetFormat::kDepth || format == ERenderTargetFormat::kShadowMap;
                 desc._is_color_target = !desc._is_depth_target;
-                auto rt = MakeRef<RHI::DX12::D3DRenderTexture>(desc);
+                auto rt = AdoptGpuResource(new RHI::DX12::D3DRenderTexture(desc));
                 rt->Name(name);
                 rt->Apply();
                 return rt;
@@ -854,7 +854,7 @@ namespace Ailu::Render
                 desc._is_linear = linear;
                 desc._is_depth_target = format == ERenderTargetFormat::kDepth || format == ERenderTargetFormat::kShadowMap;
                 desc._is_color_target = !desc._is_depth_target;
-                auto rt = MakeRef<RHI::DX12::D3DRenderTexture>(desc);
+                auto rt = AdoptGpuResource(new RHI::DX12::D3DRenderTexture(desc));
                 rt->Name(name);
                 rt->Apply();
                 return rt;
@@ -873,7 +873,7 @@ namespace Ailu::Render
                 return nullptr;
             case RendererAPI::ERenderAPI::kDirectX12:
             {
-                auto rt = MakeRef<RHI::DX12::D3DRenderTexture>(desc);
+                auto rt = AdoptGpuResource(new RHI::DX12::D3DRenderTexture(desc));
                 rt->Name(name);
                 rt->Apply();
                 return rt;
@@ -903,7 +903,7 @@ namespace Ailu::Render
                 desc._is_linear = linear;
                 desc._is_depth_target = format == ERenderTargetFormat::kDepth || format == ERenderTargetFormat::kShadowMap;
                 desc._is_color_target = !desc._is_depth_target;
-                auto rt = MakeRef<RHI::DX12::D3DRenderTexture>(desc);
+                auto rt = AdoptGpuResource(new RHI::DX12::D3DRenderTexture(desc));
                 rt->Name(name);
                 rt->Apply();
                 return rt;
@@ -1089,7 +1089,7 @@ namespace Ailu::Render
             auto &info = it->second;
             if (info._is_available)
             {
-                if (!info._rt->IsReferenceByGpu())
+                if (info._rt != nullptr)
                 {
                     it->second._is_available = false;
                     it->second._last_access_frame_count = Application::Application::Get().GetFrameCount();
@@ -1119,7 +1119,7 @@ namespace Ailu::Render
         u32 released_rt_num = 0;
         for (auto it = _pool.begin(); it != _pool.end();)
         {
-            if (!it->second._is_available || it->second._rt == nullptr || it->second._rt->IsReferenceByGpu())
+            if (!it->second._is_available || it->second._rt == nullptr)
             {
                 ++it;
                 continue;

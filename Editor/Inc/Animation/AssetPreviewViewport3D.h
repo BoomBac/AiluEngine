@@ -48,6 +48,10 @@ namespace Ailu::Editor
         Render::RenderTexture *GetRenderTexture() const { return _render_texture.get(); }
 
     private:
+        //预览材质的变体与 PSO 都是异步准备，就绪后需要再连续重绘几帧才能画出来
+        static constexpr u8 kSettleFrameCount = 2u;
+        void RequestRender();
+
         Render::Mesh *_mesh = nullptr;
         Render::Material *_material = nullptr;
         Ref<Render::Material> _preview_material;
@@ -64,6 +68,7 @@ namespace Ailu::Editor
         bool _wireframe = false;
         bool _has_preview_bounds = false;
         bool _render_pending = false;
+        u8 _settle_frame_count = 0u;
         u16 _render_width = 0u;
         u16 _render_height = 0u;
     };

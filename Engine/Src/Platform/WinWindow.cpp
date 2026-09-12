@@ -492,7 +492,12 @@ namespace Ailu
 
     void WinWindow::ToggleMaximize()
     {
-        SendMessage(_hwnd, WM_SYSCOMMAND, IsZoomed(_hwnd) ? SC_RESTORE : SC_MAXIMIZE, 0);
+        // 用 Post 而不是 Send：该接口通常从 UI 点击回调里调用，Send 会让
+        // WM_SIZE -> ResizeSwapChain 在当前帧的 UI 事件派发中间重入执行。
+        // Post 后系统命令在消息泵里处理，resize 落在帧边界。
+        // 注意：实测 Post/Send 都还会出现"最大化后旧图标残留"，所以这不是该问题的
+        // 修复，只是让 resize 不再重入事件派发。
+        PostMessage(_hwnd, WM_SYSCOMMAND, IsZoomed(_hwnd) ? SC_RESTORE : SC_MAXIMIZE, 0);
     }
 
     void WinWindow::RequestClose()

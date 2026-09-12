@@ -226,7 +226,7 @@ namespace Ailu::Render
     };
 
     ACLASS()
-    class AILU_API Shader : public Object
+    class AILU_API Shader : public GpuResource
     {
         GENERATED_BODY()
         friend class Material;
@@ -373,7 +373,7 @@ namespace Ailu::Render
     };
 
     ACLASS()
-    class AILU_API ComputeShader : public Object
+    class AILU_API ComputeShader : public GpuResource
     {
         GENERATED_BODY()
         struct ComputeBindParams

@@ -89,7 +89,7 @@ namespace Ailu
 
         GIPass::GIPass(ComputeShader *cs, RayTracingShader *rt_shader) : _gi_compute_shader(cs), _gi_raytracing_shader(rt_shader), RenderPass("GIPass")
         {
-            g_perCamData.reset(ConstantBuffer::Create(sizeof(CBufferPerCameraData), "PerCamData"));
+            g_perCamData = ConstantBuffer::Create(sizeof(CBufferPerCameraData), "PerCamData");
 
 
             _debug_line_mat = MakeRef<Material>(ResourceMgr::Get().Load<Shader>(L"Shaders/hlsl/ray_trace/raytrace_debug_draw.alasset").get(), "RayDebugLineMat");
@@ -98,7 +98,7 @@ namespace Ailu
             _kernel_denoise = cs->FindKernel("Denoise");
             _event = static_cast<ERenderPassEvent>(static_cast<u16>(ERenderPassEvent::kAfterTransparent) - 5u);//before copy color
             _scene_rt_proxy = MakeScope<SceneRayTracingProxy>();
-            _raygen_data.reset(ConstantBuffer::Create(sizeof(RayGenConstantBuffer), "RayTraceGI_RayGenData"));
+            _raygen_data = ConstantBuffer::Create(sizeof(RayGenConstantBuffer), "RayTraceGI_RayGenData");
             BufferDesc desc;
             desc._is_random_write = true;
             desc._is_readable = false;

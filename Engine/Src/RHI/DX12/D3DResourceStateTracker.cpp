@@ -16,6 +16,16 @@ namespace Ailu::RHI::DX12
         _transitions.clear();
     }
 
+    void D3DResourceStateTracker::ReleaseRecordedResources()
+    {
+        // 只释放资源强引用，保留状态条目（状态ID仍在队列状态跟踪器里用于后续初始化），
+        // 命令缓冲回到池中后不能再持有 D3D12 资源，否则交换链 ResizeBuffers 会因
+        // 后台缓冲仍有未释放引用而返回 DXGI_ERROR_INVALID_CALL。
+        for (auto &[state_id, local_state]: _states)
+            local_state._resource._resource.Reset();
+        _transitions.clear();
+    }
+
     void D3DResourceStateTracker::InitializeWholeResource(LocalResourceState &local_state,
                                                            Render::EResourceState state)
     {

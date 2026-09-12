@@ -3,6 +3,7 @@
 #include "UI/Basic.h"
 #include "UI/Container.h"
 #include "Render/Camera.h"
+#include "Render/AssetPreviewMaterial.h"
 #include "Render/RenderPipeline.h"
 #include "Render/Texture.h"
 #include "EditorApp.h"
@@ -466,21 +467,49 @@ namespace Ailu
             _transform_gizmo->Draw();
             if (_drag_preview_mesh)
             {
-                Render::Gizmo::DrawMesh(_drag_preview_mesh.get(), MatrixTranslation(_drag_preview_pos), Render::Material::s_standard_forward_lit.lock().get());
+                if (_drag_preview_material == nullptr)
+                {
+                    auto standard_material = Render::Material::s_standard_forward_lit.lock();
+                    _drag_preview_material = CreatePerObjectPreviewMaterial(standard_material.get());
+                }
+                Render::Gizmo::DrawPreviewMesh(_drag_preview_mesh.get(), MatrixTranslation(_drag_preview_pos),
+                                               _drag_preview_material.get());
             }
             ProcessCameraInput(dt);
         }
         void SceneView::UpdateDragPreview()
         {
+            static Asset *s_last_drag_asset = nullptr;
+            static Render::Mesh *s_last_preview_mesh = nullptr;
+            static bool s_logged_preview_position = false;
             if (!DragDropManager::Get().IsDragging(EDragType::kMesh))
             {
                 _drag_preview_mesh = nullptr;
+                _drag_preview_material = nullptr;
+                s_last_drag_asset = nullptr;
+                s_last_preview_mesh = nullptr;
+                s_logged_preview_position = false;
                 return;
             }
 
             const auto &payload = DragDropManager::Get().GetPayload();
             auto *asset = payload && payload->_data != nullptr ? static_cast<Asset *>(payload->_data) : nullptr;
             _drag_preview_mesh = asset != nullptr ? asset->AsRef<Render::Mesh>() : nullptr;
+            if (asset != s_last_drag_asset || _drag_preview_mesh.get() != s_last_preview_mesh)
+            {
+                auto *vertex_buffer = _drag_preview_mesh != nullptr ? _drag_preview_mesh->GetVertexBuffer().get() : nullptr;
+                auto *index_buffer = _drag_preview_mesh != nullptr && _drag_preview_mesh->SubmeshCount() > 0u
+                                         ? _drag_preview_mesh->GetIndexBuffer().get()
+                                         : nullptr;
+                LOG_INFO("[SceneView] DragPreview type={} asset={} obj={} mesh={} submeshes={} vb={} vb_ready={} ib={} ib_ready={}",
+                         payload ? StaticEnum<EDragType>()->GetNameByEnum(payload->_type) : "<none>", asset,
+                         asset != nullptr ? asset->_p_obj.get() : nullptr, _drag_preview_mesh.get(),
+                         _drag_preview_mesh != nullptr ? _drag_preview_mesh->SubmeshCount() : 0u, vertex_buffer,
+                         vertex_buffer != nullptr && vertex_buffer->IsReady(), index_buffer,
+                         index_buffer != nullptr && index_buffer->IsReady());
+                s_last_drag_asset = asset;
+                s_last_preview_mesh = _drag_preview_mesh.get();
+            }
             if (_drag_preview_mesh == nullptr || Camera::sCurrent == nullptr)
                 return;
 
@@ -512,6 +541,12 @@ namespace Ailu
             }
             position.y += _drag_preview_mesh->BoundBox()[0].GetHalfAxisLength().y;
             _drag_preview_pos = position;
+            if (!s_logged_preview_position)
+            {
+                LOG_INFO("[SceneView] DragPreview placement world={} screen={} camera={}", _drag_preview_pos,
+                         Camera::sCurrent->WorldToScreen(_drag_preview_pos), Camera::sCurrent->Position());
+                s_logged_preview_position = true;
+            }
         }
         void SceneView::BuildSceneToolbar()
         {

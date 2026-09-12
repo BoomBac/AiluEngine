@@ -33,7 +33,7 @@ namespace Ailu::Render
                 return nullptr;
             case RendererAPI::ERenderAPI::kDirectX12:
             {
-                auto shader = MakeRef<RHI::DX12::D3DRayTracingShader>(sys_path);
+                auto shader = AdoptGpuResource(new RHI::DX12::D3DRayTracingShader(sys_path));
                 shader->Name(name);
                 return shader;
             }

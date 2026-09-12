@@ -27,7 +27,6 @@ namespace Ailu::RHI::DX12
         _upload_buf = MakeScope<UploadBuffer>(std::format("CmdUploadBuffer_{}", _id));
         _cur_cbv_heap_id = -1;
         _fence_value = 0u;
-        _used_resources.reserve(64u);
         _barrier_cache.reserve(64u);
         _is_executed = false;
         _p_cmd->SetName(std::format(L"CmdList_{}", _id).c_str());
@@ -45,8 +44,6 @@ namespace Ailu::RHI::DX12
         _allocations.clear();
         _temp_allocs.clear();
         _upload_buf->Reset();
-        _used_resource_set.clear();
-        _used_resources.clear();
         _state_tracker.Clear();
         _first_recording_group_name.clear();
         _recording_group_name.clear();
@@ -101,12 +98,8 @@ namespace Ailu::RHI::DX12
         return _temp_allocs.back();
     }
 
-    void D3DCommandBuffer::PostExecute()
+    void D3DCommandBuffer::Finalize()
     {
-        for(auto& it : _used_resources)
-        {
-            it->Track(_fence_value);
-        }
         _recording_context.RenderingStatesData().MergeTo(Render::RenderingStates::RenderData());
         _statistics.MergeTo(Render::RenderingStates::RenderData());
         _is_executed = true;

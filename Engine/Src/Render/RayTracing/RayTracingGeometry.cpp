@@ -28,7 +28,7 @@ namespace Ailu::Render
                 return nullptr;
             case RendererAPI::ERenderAPI::kDirectX12:
             {
-                auto geometry = MakeRef<RHI::DX12::D3DRayTracingGeometry>(desc);
+                auto geometry = AdoptGpuResource(new RHI::DX12::D3DRayTracingGeometry(desc));
                 geometry->Name(name);
                 geometry->Apply();
                 geometry->Build();

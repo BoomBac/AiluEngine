@@ -131,7 +131,7 @@ namespace Ailu::Render
             {
                 // An unavailable entry is still owned by an active graph/lease.  It must never be
                 // reused based on its age: the CPU frame count says nothing about GPU completion.
-                if (!it->second._is_available || it->second._res == nullptr || it->second._res->IsReferenceByGpu())
+                if (!it->second._is_available || it->second._res == nullptr)
                     continue;
                 it->second._is_available = false;
                 it->second._last_access_frame_count = cur_frame;
@@ -164,7 +164,7 @@ namespace Ailu::Render
             u32 released_rt_num = 0;
             for (auto it = _pool.begin(); it != _pool.end();)
             {
-                if (!it->second._is_available || it->second._res == nullptr || it->second._res->IsReferenceByGpu())
+                if (!it->second._is_available || it->second._res == nullptr)
                 {
                     ++it;
                     continue;

@@ -11,6 +11,7 @@ namespace Ailu
     {
         enum class ECameraType;
         class Mesh;
+        class Material;
         class Camera;
         class RenderTexture;
         class VolumeTexturePreviewPass;
@@ -103,6 +104,7 @@ namespace Ailu
             bool _has_camera_input_last_mouse_pos = false;
             Vector3f _drag_preview_pos = Vector3f::kZero;
             Ref<Render::Mesh> _drag_preview_mesh = nullptr;
+            Ref<Render::Material> _drag_preview_material = nullptr;
             Ref<Render::RenderTexture> _camera_preview_texture = nullptr;
         };
 

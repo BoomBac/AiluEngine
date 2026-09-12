@@ -37,11 +37,7 @@ namespace Ailu::RHI::DX12
     {
     }
 
-    D3DRayTracingGeometry::~D3DRayTracingGeometry()
-    {
-        if (::Ailu::Render::g_pGfxContext)
-            ::Ailu::Render::g_pGfxContext->WaitForFence(_fence_value);
-    }
+    D3DRayTracingGeometry::~D3DRayTracingGeometry() = default;
 
     void D3DRayTracingGeometry::UploadImpl(GraphicsContext *ctx, RHICommandBuffer *rhi_cmd, UploadParams *params)
     {

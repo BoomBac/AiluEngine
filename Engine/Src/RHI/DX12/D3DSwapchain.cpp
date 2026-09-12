@@ -4,6 +4,7 @@
 #include "RHI/DX12/D3DContext.h"
 #include "Render/CommandBuffer.h"
 #include "Framework/Common/Allocator.hpp"
+#include "Framework/Common/Log.h"
 #include "Framework/Common/Window.h"
 
 
@@ -81,12 +82,28 @@ namespace Ailu::RHI::DX12
     {
         if (w == _width && h == _height)
             return;
+        // ResizeBuffers 要求调用时没有任何未释放的后台缓冲引用，否则返回 DXGI_ERROR_INVALID_CALL。
+        // 因此 setExternalState/resize 必须发生在帧边界（见 D3DContext::ApplyPendingSwapChainResizes），
+        // 此时上一帧的命令缓冲已全部归还到池中、没有任何命令缓冲在录制。
+        for (u16 i = 0; i < _buffer_num; i++)
+        {
+            if (_back_buffers[i].Get() == nullptr)
+                continue;
+            // 此时引用计数应为 1（仅 _back_buffers 自身持有），大于 1 说明还有地方没释放后台缓冲。
+            const ULONG ref_count = _back_buffers[i].Get()->AddRef();
+            _back_buffers[i].Get()->Release();
+            if (ref_count > 1u)
+                LOG_WARNING("D3DSwapchainTexture::Resize: back buffer {} still has {} reference(s) before ResizeBuffers", i, ref_count);
+        }
         for (u16 i = 0; i < _buffer_num; i++)
             _back_buffers[i].Reset();
         SwapchainTexture::Resize(w, h);
         DXGI_SWAP_CHAIN_DESC desc = {};
         _swapchain->GetDesc(&desc);
-        ThrowIfFailed(_swapchain->ResizeBuffers(_buffer_num, w, h, desc.BufferDesc.Format, desc.Flags));
+        const HRESULT hr = _swapchain->ResizeBuffers(_buffer_num, w, h, desc.BufferDesc.Format, desc.Flags);
+        if (FAILED(hr))
+            LOG_ERROR("D3DSwapchainTexture::Resize: ResizeBuffers({}x{}) failed, hr = 0x{:08X}", w, h, static_cast<u32>(hr));
+        ThrowIfFailed(hr);
         _cur_backbuf_index = _swapchain->GetCurrentBackBufferIndex();//重新获取，不然resize时会黑屏
         for (u16 i = 0; i < _buffer_num; i++)
         {
@@ -98,5 +115,4 @@ namespace Ailu::RHI::DX12
         }
     }
 }
-
 

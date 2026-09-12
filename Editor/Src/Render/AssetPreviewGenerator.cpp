@@ -6,6 +6,7 @@
 #include "Render/2D/SpriteBatcher.h"
 #include "Render/CommandBuffer.h"
 #include "Render/GraphicsContext.h"
+#include "Render/GraphicsPipelineStateObject.h"
 #include "Render/Material.h"
 #include "Render/ResourcePool.h"
 #include "Render/Shader.h"
@@ -19,18 +20,51 @@ namespace Ailu
         {
             Scope<SpriteBatcher> s_sprite_batcher;
 
-            void GenerateMeshSnapshotImpl(u16 w, u16 h, Render::Mesh *mesh, Render::Material *material,
+            bool IsResourceReady(Render::GpuResource *resource)
+            {
+                return resource == nullptr || resource->IsReady();
+            }
+
+            bool IsMeshReadyForPreview(Render::Mesh *mesh)
+            {
+                if (mesh == nullptr)
+                    return false;
+                if (!IsResourceReady(mesh->GetVertexBuffer().get()))
+                    return false;
+                for (u16 i = 0u; i < mesh->SubmeshCount(); ++i)
+                {
+                    if (!IsResourceReady(mesh->GetIndexBuffer(i).get()))
+                        return false;
+                }
+                return true;
+            }
+
+            // 贴图和 shader 变体都是异步就绪的；没就绪时出图只会得到一张空贴图
+            bool IsMaterialReadyForPreview(Render::Material *material)
+            {
+                if (material == nullptr || !material->IsReadyForDraw())
+                    return false;
+                for (const auto &[property_id, texture]: material->BoundTextures())
+                {
+                    (void) property_id;
+                    if (texture != nullptr && !texture->IsReady())
+                        return false;
+                }
+                return true;
+            }
+
+            bool GenerateMeshSnapshotImpl(u16 w, u16 h, Render::Mesh *mesh, Render::Material *material,
                                           const String &preview_name, Ref<Render::RenderTexture> &target)
             {
                 if (mesh == nullptr || material == nullptr)
                 {
                     LOG_ERROR("Invalid mesh or material for snapshot generation.");
-                    return;
+                    return false;
                 }
                 if (mesh->BoundBox().empty())
                 {
                     LOG_ERROR("Mesh has no bounds for snapshot generation: {}", mesh->Name());
-                    return;
+                    return false;
                 }
 
                 if (target == nullptr)
@@ -38,9 +72,15 @@ namespace Ailu
                 if (target == nullptr || target->Width() == 0u || target->Height() == 0u)
                 {
                     LOG_ERROR("Failed to create mesh snapshot target: {}", preview_name);
-                    return;
+                    return false;
                 }
 
+                // 输入资源还没就绪就先不出图：调用方会保留这张 target 稍后重试，
+                // 直接画只会把空预览烘死成永久黑图标。
+                if (!IsMeshReadyForPreview(mesh) || !IsMaterialReadyForPreview(material))
+                    return false;
+
+                const u64 pso_miss_before = CommandRecordingContext::PSOMissCount();
                 auto cmd = CommandBufferPool::Get("GeneratorMeshSnapshot");
                 auto depth = cmd->GetTempRT(
                         target->Width(), target->Height(),
@@ -93,47 +133,50 @@ namespace Ailu
                 GraphicsContext::Get().ExecuteCommandBufferSync(cmd);
                 cmd->ReleaseTempRT(depth);
                 CommandBufferPool::Release(cmd);
+                // 录制期间缺 PSO 时这次绘制被丢掉了，让调用方下一帧用同一张 target 再画一遍
+                return CommandRecordingContext::PSOMissCount() == pso_miss_before;
             }
         }
 
-        void AssetPreviewGenerator::GeneratorMeshSnapshot(u16 w, u16 h, Render::Mesh *mesh,
-                                                          Ref<Render::RenderTexture> &target)
+        bool AssetPreviewGenerator::GeneratorMeshSnapshot(u16 w, u16 h, Render::Mesh *mesh,
+                                                         Ref<Render::RenderTexture> &target)
         {
             auto standard_material = Material::s_standard_forward_lit.lock();
             auto preview_material = CreatePerObjectPreviewMaterial(standard_material.get());
             String preview_name = "mesh";
             if (mesh != nullptr)
                 preview_name = mesh->Name();
-            GenerateMeshSnapshotImpl(w, h, mesh, preview_material.get(), preview_name, target);
+            return GenerateMeshSnapshotImpl(w, h, mesh, preview_material.get(), preview_name, target);
         }
 
-        void AssetPreviewGenerator::GeneratorMaterialSnapshot(u16 w, u16 h, Render::Material *material,
-                                                               Ref<Render::RenderTexture> &target)
+        bool AssetPreviewGenerator::GeneratorMaterialSnapshot(u16 w, u16 h, Render::Material *material,
+                                                             Ref<Render::RenderTexture> &target)
         {
             if (material == nullptr)
             {
                 LOG_ERROR("Invalid material for snapshot generation.");
-                return;
+                return false;
             }
             auto sphere = Mesh::s_sphere.lock();
             if (sphere == nullptr)
             {
                 LOG_ERROR("Sphere mesh is unavailable for material snapshot generation.");
-                return;
+                return false;
             }
 
             auto preview_material = CreatePerObjectPreviewMaterial(material);
-            GenerateMeshSnapshotImpl(w, h, sphere.get(), preview_material.get(), material->Name(), target);
+            return GenerateMeshSnapshotImpl(w, h, sphere.get(), preview_material.get(), material->Name(), target);
         }
-        void AssetPreviewGenerator::GeneratorSpriteSnapshot(u16 w, u16 h, Render::Sprite *sprite, Ref<Render::RenderTexture> &target)
+        bool AssetPreviewGenerator::GeneratorSpriteSnapshot(u16 w, u16 h, Render::Sprite *sprite, Ref<Render::RenderTexture> &target)
         {
             if (!sprite || !sprite->_texture)
             {
                 LOG_ERROR("Invalid sprite or sprite texture for snapshot generation.");
-                return;
+                return false;
             }
 
-            if (target == nullptr)
+            const bool is_target_created = target == nullptr;
+            if (is_target_created)
                 target = RenderTexture::Create(w, h, std::format("{}_preview", sprite->Name()));
 
             if (s_sprite_batcher == nullptr)
@@ -141,6 +184,10 @@ namespace Ailu
                 s_sprite_batcher = MakeScope<SpriteBatcher>();
                 s_sprite_batcher->Initialize();
             }
+
+            // 贴图/shader 变体还没就绪就先不出图，等调用方稍后重试（原因见 GeneratorMeshSnapshot）
+            if (!sprite->_texture->IsReady())
+                return false;
 
             // Build sprite render data matching the runtime rendering path
             SpriteRenderData render_data;
@@ -183,7 +230,11 @@ namespace Ailu
             data._CameraPos = Vector4f(camera_pos, 1.0f);
 
             s_sprite_batcher->Build({render_data});
+            // batcher 自己的顶点/索引/实例缓冲也是第一次用到时才异步创建的
+            if (!s_sprite_batcher->IsReadyForRender())
+                return false;
 
+            const u64 pso_miss_before = CommandRecordingContext::PSOMissCount();
             auto cmd = CommandBufferPool::Get("GeneratorSpriteSnapshot");
             auto depth = cmd->GetTempRT(
                     target->Width(), target->Height(),
@@ -201,6 +252,8 @@ namespace Ailu
             GraphicsContext::Get().ExecuteCommandBufferSync(cmd);
             cmd->ReleaseTempRT(depth);
             CommandBufferPool::Release(cmd);
+            // 同 GeneratorMeshSnapshot：缺 PSO 时这一张是空的，交给调用方重绘
+            return CommandRecordingContext::PSOMissCount() == pso_miss_before;
         }
 
         void AssetPreviewGenerator::Shutdown()

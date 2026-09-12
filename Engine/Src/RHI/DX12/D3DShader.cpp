@@ -658,7 +658,6 @@ namespace Ailu::RHI::DX12
                 GpuResource *bind_res = cur_state._bind_res[bind_info._bind_slot];
                 if (bind_res == nullptr)
                     continue;
-                static_cast<D3DCommandBuffer *>(cmd)->MarkUsedResource(bind_res);
                 if (bind_info._res_type == EBindResDescType::kTexture2D)
                 {
                     auto tex = static_cast<Texture2D *>(bind_res);
@@ -758,9 +757,9 @@ namespace Ailu::RHI::DX12
         for (u16 i = 0u; i < snapshot._entry_count; ++i)
         {
             const auto &entry = snapshot._entries[i];
-            if (entry._resource == nullptr)
+            auto *resource = GpuResourceRegistry::Get().Resolve(entry._resource);
+            if (resource == nullptr && entry._resource_type != EBindResDescType::kConstBufferRaw)
                 continue;
-            d3dcmd->MarkUsedResource(entry._resource);
             BindParams params;
             params._is_compute_pipeline = true;
             params._slot = entry._slot;
@@ -771,28 +770,28 @@ namespace Ailu::RHI::DX12
             }
             else if (entry._resource_type == EBindResDescType::kTexture2D)
             {
-                auto tex = static_cast<Texture *>(entry._resource);
+                auto tex = static_cast<Texture *>(resource);
                 params._params._texture_binder._sub_res = entry._sub_res;
                 params._params._texture_binder._view_idx = entry._view_index;
                 tex->Bind(cmd, params);
             }
             else if (entry._resource_type == EBindResDescType::kUAVTexture2D)
             {
-                auto tex = static_cast<Texture *>(entry._resource);
+                auto tex = static_cast<Texture *>(resource);
                 params._params._texture_binder._sub_res = entry._sub_res;
                 params._params._texture_binder._view_idx = entry._view_index;
                 tex->Bind(cmd, params);
             }
             else if (entry._resource_type == EBindResDescType::kTexture3D)
             {
-                auto tex = static_cast<Texture3D *>(entry._resource);
+                auto tex = static_cast<Texture3D *>(resource);
                 params._params._texture_binder._sub_res = entry._sub_res;
                 params._params._texture_binder._view_idx = entry._view_index;
                 tex->Bind(cmd, params);
             }
             else if (entry._resource_type == EBindResDescType::kRWTexture3D)
             {
-                auto tex = static_cast<Texture3D *>(entry._resource);
+                auto tex = static_cast<Texture3D *>(resource);
                 params._params._texture_binder._sub_res = entry._sub_res;
                 params._params._texture_binder._view_idx = entry._view_index;
                 tex->Bind(cmd, params);
@@ -800,7 +799,7 @@ namespace Ailu::RHI::DX12
             else if (entry._resource_type == EBindResDescType::kRWBuffer || entry._resource_type == EBindResDescType::kBuffer
                      || entry._resource_type == EBindResDescType::kConstBuffer)
             {
-                entry._resource->Bind(cmd, params);
+                resource->Bind(cmd, params);
             }
             else
             {

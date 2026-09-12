@@ -10,7 +10,7 @@ namespace Ailu::Render
     class RayTracingScene;
     class RHICommandBuffer;
     ACLASS()
-    class AILU_API RayTracingShader : public Object
+    class AILU_API RayTracingShader : public GpuResource
     {
         GENERATED_BODY()
     public:

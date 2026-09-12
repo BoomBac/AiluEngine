@@ -115,7 +115,7 @@ namespace Ailu::Render
     private:
         Array<ViewEntity,kMaxViewNum> _views;
         u32 _view_num;
-        HashMap<u64, ConstantBuffer *> _cam_cb;
+        HashMap<u64, Ref<ConstantBuffer>> _cam_cb;
     };
 
     class AILU_API RenderPipeline : public NonCopyable

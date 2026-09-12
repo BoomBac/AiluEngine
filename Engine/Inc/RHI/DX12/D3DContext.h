@@ -71,7 +71,6 @@ namespace Ailu::RHI::DX12
         GpuCommandWorker(Render::GraphicsContext* context);
         ~GpuCommandWorker();
         void Push(Vector<GfxCommand *>&& cmds, SubmitParams&& params);
-        void Push(Vector<GfxCommand *>&& cmds, Vector<Ref<Object>>&& keep_alive_objects, SubmitParams&& params);
         void RunSync();
         //async scope
         void Start();
@@ -85,14 +84,11 @@ namespace Ailu::RHI::DX12
         struct CommandGroup
         {
             Vector<GfxCommand *> _cmds;
-            Vector<Ref<Object>> _keep_alive_objects;
             SubmitParams _params;
             u32 _submission_index = 0u;
             CommandGroup() = default;
-            CommandGroup(Vector<GfxCommand *>&& cmds, Vector<Ref<Object>>&& keep_alive_objects,
-                         SubmitParams&& params, u32 submission_index)
-                : _cmds(std::move(cmds)), _keep_alive_objects(std::move(keep_alive_objects)), _params(std::move(params)),
-                  _submission_index(submission_index){}
+            CommandGroup(Vector<GfxCommand *>&& cmds, SubmitParams&& params, u32 submission_index)
+                : _cmds(std::move(cmds)), _params(std::move(params)), _submission_index(submission_index){}
             ~CommandGroup()
             {
                 for(auto& c : _cmds)
@@ -104,9 +100,7 @@ namespace Ailu::RHI::DX12
                 for(auto& c : _cmds)
                     Render::CommandPool::Get().DeAlloc(c);
                 _cmds.clear();
-                _keep_alive_objects.clear();
                 _params = std::move(other._params);
-                _keep_alive_objects = std::move(other._keep_alive_objects);
                 _submission_index = other._submission_index;
                 _cmds = std::move(other._cmds);
                 other._params = SubmitParams{};
@@ -119,7 +113,6 @@ namespace Ailu::RHI::DX12
                 for(auto& c : _cmds)
                     Render::CommandPool::Get().DeAlloc(c);
                 _cmds.clear();
-                _keep_alive_objects = std::move(other._keep_alive_objects);
                 _params = std::move(other._params);
                 _submission_index = other._submission_index;
                 _cmds = std::move(other._cmds);
@@ -163,6 +156,8 @@ namespace Ailu::RHI::DX12
         void TakePixCapture() final;
         void TakeRenderDocCapture() final;
         void ResizeSwapChain(void *window_handle, const u32 width, const u32 height) final;
+        /// @brief 在帧边界（无命令缓冲在录制）应用待处理的交换链 resize 请求
+        void ApplyPendingSwapChainResizes() final;
         virtual u64 GetFrameCount() const final { return _frame_count; };
         IGPUTimer* GetTimer() final { return _p_gpu_timer.get(); }
         void TryReleaseUnusedResources() final;

@@ -8,11 +8,17 @@
 //Blend: Src,OneMinusSrc
 //ZTest: LEqual
 //Fill: Wireframe
+//multi_compile _ PER_OBJECT_CB
 //pass end::
 //info end
+//PER_OBJECT_CB：资产预览等非场景绘制路径没有 scene primitive 缓冲，切回 per-object cbuffer
+#if defined(PER_OBJECT_CB)
+#include "common.hlsli"
+#else
 #define AL_SCENE_PRIMITIVE 1
 #include "common.hlsli"
 #include "primitive.hlsli"
+#endif
 
 struct VSInput
 {
@@ -28,7 +34,11 @@ struct PSInput
 PSInput VSMain(VSInput v)
 {
 	PSInput result;
+#if defined(PER_OBJECT_CB)
+	result.position = TransformToClipSpace(v.position);
+#else
 	result.position = TransformPrimitiveToClipSpace(LoadPrimitive(v.instance_id), v.position);
+#endif
 	return result;
 }
 

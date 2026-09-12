@@ -31,6 +31,11 @@ namespace Ailu::Render
         void RenderWithMaterial(CommandBuffer *cmd, Material *material);
 
         GPUBuffer *InstanceBuffer() const { return _instance_buffer.get(); }
+        // 离线/预览渲染需要确认默认材质是否已可绘制（shader variant 就绪）
+        Material *DefaultMaterial() const { return _default_material.get(); }
+        // 顶点/索引/实例缓冲和默认材质的 PSO 都是异步创建的，没就绪就画只会得到一张空图。
+        // 需要先 Build()（第一次会创建实例缓冲）再查询。
+        bool IsReadyForRender() const;
 
         void Clear();
         static Vector<SpriteBatch> BuildBatchesForTesting(const Vector<SpriteRenderData> &render_data);

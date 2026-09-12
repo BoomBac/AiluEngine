@@ -44,7 +44,7 @@ namespace Ailu::Render
     {
         if (!_camera_cb_lut.contains(hash))
         {
-            auto cb = Ref<ConstantBuffer>(ConstantBuffer::Create(RenderConstants::kPerCameraDataSize));
+            auto cb = ConstantBuffer::Create(RenderConstants::kPerCameraDataSize);
             _camera_cb_refs.emplace_back(cb);
             _camera_cbs.emplace_back(cb.get());
             _camera_cbs.back()->Name(std::format("CameraCB_{}", hash));
@@ -57,7 +57,7 @@ namespace Ailu::Render
     {
         if (!_scene_cb_lut.contains(hash))
         {
-            auto cb = Ref<ConstantBuffer>(ConstantBuffer::Create(RenderConstants::kPerSceneDataSize));
+            auto cb = ConstantBuffer::Create(RenderConstants::kPerSceneDataSize);
             _scene_cb_refs.emplace_back(cb);
             _scene_cbs.emplace_back(cb.get());
             _scene_cb_lut[hash] = _scene_cbs.size() - 1;
@@ -168,7 +168,8 @@ namespace Ailu::Render
     FrameUploadAllocation FrameResourceManager::AllocFrameUpload(u32 size, u32 alignment)
     {
         if (_frame_upload_buffers[_active_slot] == nullptr)
-            _frame_upload_buffers[_active_slot] = MakeScope<RHI::DX12::UploadBuffer>(std::format("FrameUploadBuffer_{}", _active_slot));
+            _frame_upload_buffers[_active_slot] = AdoptGpuResource(
+                    new RHI::DX12::UploadBuffer(std::format("FrameUploadBuffer_{}", _active_slot)));
         auto *upload_buf = static_cast<RHI::DX12::UploadBuffer *>(_frame_upload_buffers[_active_slot].get());
         auto alloc = upload_buf->Allocate(size, alignment);
         FrameUploadAllocation out;
@@ -197,7 +198,7 @@ namespace Ailu::Render
                 {
                     if (cur_frame - handle._last_access_frame_count > kMaxResourceStaleFrame)
                     {
-                        if (handle._res != nullptr && !handle._res->IsReferenceByGpu())
+                        if (handle._res != nullptr)
                         {
                             handle._is_available = true;
                             ++released_count;
@@ -212,7 +213,7 @@ namespace Ailu::Render
                 {
                     if (cur_frame - handle._last_access_frame_count > kMaxResourceStaleFrame)
                     {
-                        if (handle._res != nullptr && !handle._res->IsReferenceByGpu())
+                        if (handle._res != nullptr)
                         {
                             handle._is_available = true;
                             ++released_count;

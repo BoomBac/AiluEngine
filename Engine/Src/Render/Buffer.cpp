@@ -21,7 +21,7 @@ namespace Ailu::Render
 				return nullptr;
 			case RendererAPI::ERenderAPI::kDirectX12:
 			{
-				auto buf = MakeRef<RHI::DX12::D3DGPUBuffer>(desc);
+                                auto buf = AdoptGpuResource(new RHI::DX12::D3DGPUBuffer(desc));
 				buf->Name(name);
 				GraphicsContext::Get().CreateResource(buf.get());
 				return buf;
@@ -39,7 +39,7 @@ namespace Ailu::Render
 				return nullptr;
 			case RendererAPI::ERenderAPI::kDirectX12:
 			{
-				auto buf = MakeRef<RHI::DX12::D3DGPUBuffer>(desc);
+                                auto buf = AdoptGpuResource(new RHI::DX12::D3DGPUBuffer(desc));
 				buf->Name(name);
 				GraphicsContext::Get().CreateResourceSync(buf.get());
 				return buf;
@@ -61,7 +61,7 @@ namespace Ailu::Render
 	#pragma endregion
 
 	#pragma region VertexBuffer
-	VertexBuffer* VertexBuffer::Create(VertexBufferLayout layout, const String& name)
+	Ref<VertexBuffer> VertexBuffer::Create(VertexBufferLayout layout, const String& name)
 	{
 		switch (Renderer::GetAPI())
 		{
@@ -72,7 +72,7 @@ namespace Ailu::Render
 		{
 			auto buf = new RHI::DX12::D3DVertexBuffer(layout);
             buf->Name(name);
-			return buf;
+			return AdoptGpuResource(buf);
 		}
 		}
 		AL_ASSERT_MSG(false, "Unsupported render api!");
@@ -183,7 +183,7 @@ namespace Ailu::Render
 	#pragma endregion
 
 	#pragma region IndexBuffer
-	IndexBuffer* IndexBuffer::Create(u32* indices, u32 count, const String& name,bool is_dynamic )
+	Ref<IndexBuffer> IndexBuffer::Create(u32* indices, u32 count, const String& name,bool is_dynamic )
 	{
 		switch (Renderer::GetAPI())
 		{
@@ -191,10 +191,10 @@ namespace Ailu::Render
 			AL_ASSERT_MSG(false, "None render api used!");
 			return nullptr;
         case RendererAPI::ERenderAPI::kDirectX12:
-        {
+		{
 			auto buf = new RHI::DX12::D3DIndexBuffer(indices, count, is_dynamic);
 			buf->Name(name);
-            return buf;
+			return AdoptGpuResource(buf);
         }
 		}
 		AL_ASSERT_MSG(false, "Unsupported render api!");
@@ -225,27 +225,27 @@ namespace Ailu::Render
 	#pragma endregion
 
 	#pragma region ConstantBuffer
-	ConstantBuffer *ConstantBuffer::Create(u32 size,const String& name)
-	{
-		switch (Renderer::GetAPI())
-		{
-		case RendererAPI::ERenderAPI::kNone:
-			AL_ASSERT_MSG(false, "None render api used!");
-			return nullptr;
-		case RendererAPI::ERenderAPI::kDirectX12:
-		{
-			RHI::DX12::D3DConstantBuffer *buffer = new RHI::DX12::D3DConstantBuffer(size);
-			buffer->Name(name);
-			return buffer;
-		}
-			return new RHI::DX12::D3DConstantBuffer(size);
-		}
-		AL_ASSERT_MSG(false, "Unsupported render api!");
-		return nullptr;
-	}
+        Ref<ConstantBuffer> ConstantBuffer::Create(u32 size,const String& name)
+        {
+                switch (Renderer::GetAPI())
+                {
+                case RendererAPI::ERenderAPI::kNone:
+                        AL_ASSERT_MSG(false, "None render api used!");
+                        return nullptr;
+                case RendererAPI::ERenderAPI::kDirectX12:
+                {
+                        auto buffer = AdoptGpuResource(new RHI::DX12::D3DConstantBuffer(size));
+                        buffer->Name(name);
+                        return buffer;
+                }
+                }
+                AL_ASSERT_MSG(false, "Unsupported render api!");
+                return nullptr;
+        }
 	void ConstantBuffer::Release(ConstantBuffer* ptr)
 	{
-		delete ptr;
+		if (ptr != nullptr)
+			GpuResourceRegistry::Get().Release(ptr->Handle());
 	}
 	#pragma endregion
 
@@ -278,11 +278,11 @@ namespace Ailu::Render
 				return buffer.get();
 			}
 		}
-		ConstantBuffer *buffer = ConstantBuffer::Create(size);
-        s_ConstBufferPool->_buffer_pool.emplace(size, ConstbufferNode{Ref<ConstantBuffer>(buffer), cur_frame});
+		auto buffer = ConstantBuffer::Create(size);
+		s_ConstBufferPool->_buffer_pool.emplace(size, ConstbufferNode{buffer, cur_frame});
 		if (s_ConstBufferPool->_buffer_pool.size()> 100u)
 			LOG_INFO("[ConstBufferPool::Acquire]: Create a new constant buffer pool: {}", s_ConstBufferPool->_buffer_pool.size());
-		return buffer;
+		return buffer.get();
 	}
 	#pragma endregion
 }// namespace Ailu::Render

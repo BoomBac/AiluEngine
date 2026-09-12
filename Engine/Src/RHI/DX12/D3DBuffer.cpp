@@ -120,7 +120,6 @@ namespace Ailu::RHI::DX12
         D3DDescriptorMgr::Get().Free(std::move(_uav_alloc));
         ReleaseBindlessSrvIndex(_bindless_srv_index);
         ReleaseBindlessUavIndex(_bindless_uav_index);
-        g_pGfxContext->WaitForFence(_fence_value);
     }
     void D3DGPUBuffer::UploadImpl(GraphicsContext *ctx, RHICommandBuffer *rhi_cmd, UploadParams *params)
     {
@@ -422,8 +421,6 @@ namespace Ailu::RHI::DX12
     {
         for (auto& bindless_srv_index : _bindless_srv_indices)
             ReleaseBindlessSrvIndex(bindless_srv_index);
-        if (g_pGfxContext)
-            g_pGfxContext->WaitForFence(_fence_value);
     }
     void D3DVertexBuffer::RequireState(RHICommandBuffer *rhi_cmd, EResourceState state, u32 sub_res)
     {
@@ -567,7 +564,6 @@ namespace Ailu::RHI::DX12
     D3DIndexBuffer::~D3DIndexBuffer()
     {
         ReleaseBindlessSrvIndex(_bindless_srv_index);
-        g_pGfxContext->WaitForFence(_fence_value);
     }
 
     void D3DIndexBuffer::UploadImpl(GraphicsContext *ctx, RHICommandBuffer *rhi_cmd, UploadParams *params)
@@ -639,7 +635,6 @@ namespace Ailu::RHI::DX12
     {
         if (_capacity == new_size || !_is_dynamic)
             return;
-        g_pGfxContext->WaitForFence(_fence_value);
         _capacity = new_size;
         _count = std::min<u32>(new_size, _count);
         _mem_size = sizeof(u32) * new_size;
