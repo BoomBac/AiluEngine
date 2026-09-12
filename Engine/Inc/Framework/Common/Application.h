@@ -20,6 +20,7 @@
 
 namespace Ailu
 {
+    class EngineRuntime;
     using Render::RenderPipeline;
 
     AENUM()
@@ -28,7 +29,8 @@ namespace Ailu
         EApplicationState_None,
         EApplicationState_Running,
         EApplicationState_Pause,
-        EApplicationState_Exit
+        EApplicationState_Exit,
+        kShuttingDown
     };
     struct AILU_API ApplicationDesc
     {
@@ -120,6 +122,7 @@ namespace Ailu
         DECLARE_DELEGATE(after_update);
         DECLARE_DELEGATE(on_window_resize,Window*,Vector2f);
     public:
+        Application();
         static Window *FocusedWindow() { return s_focus_window; };
     public:
 #ifdef COMPANY_ENV
@@ -149,6 +152,7 @@ namespace Ailu
         static Application& Get();
         static Application *Instance() { return sp_instance; }
         static bool IsMainThread();
+        ~Application();
         void UpdatePlatformEventState(Event &e);
         int Initialize() override;
         int Initialize(ApplicationDesc desc) { return Initialize(desc, ApplicationInitContext{}); }
@@ -246,6 +250,7 @@ namespace Ailu
         bool _main_finished = false;
         u64 _frame_count = 0u;
         Scope<Core::RawEventQueue> _raw_event_queue;
+        Scope<EngineRuntime> _runtime;
         //maybe editor
         std::atomic<bool> _has_drop_files = false;
         std::mutex _drop_files_mtx;

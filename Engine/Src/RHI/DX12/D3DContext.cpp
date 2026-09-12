@@ -1082,6 +1082,7 @@ namespace Ailu::RHI::DX12
         u64 submitted_fence = 0u;
         auto submit_begin_time = std::chrono::high_resolution_clock::now();
         {
+            PROFILE_BLOCK_CPU("QueueResourceState")
             std::lock_guard submit_lock(_command_submit_mtx);
             D3DQueueResourceStateTracker planned_queue_states = _queue_state_tracker;
             for (D3DCommandBuffer *d3dcmd: d3d_cmds)

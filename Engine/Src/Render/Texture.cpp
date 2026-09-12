@@ -687,10 +687,6 @@ namespace Ailu::Render
 
     Texture3D::~Texture3D()
     {
-        for (auto p: _pixel_data)
-        {
-            AL_FREE(p);
-        }
     }
 
     void Texture3D::GenerateMipmap()

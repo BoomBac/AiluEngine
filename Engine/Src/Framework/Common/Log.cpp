@@ -39,14 +39,15 @@ namespace Ailu
     void LogMgr::Init()
     {
         AL_ASSERT(g_LogMgr == nullptr);
-        g_LogMgr = AL_NEW_TAG(EMemoryTag::kCore, LogMgr);
+        g_LogMgr = new LogMgr;
         g_LogMgr->Initialize();
     }
     void LogMgr::Shutdown()
     {
         AL_ASSERT(g_LogMgr != nullptr);
         g_LogMgr->Finalize();
-        AL_DELETE(g_LogMgr);
+        delete g_LogMgr;
+        g_LogMgr = nullptr;
     }
     LogMgr &LogMgr::Get()
     {
@@ -56,7 +57,7 @@ namespace Ailu
     int LogMgr::Initialize()
     {
         int ret = 0;
-        _appenders.push_back(AL_NEW_TAG(EMemoryTag::kCore, OutputAppender));
+        _appenders.push_back(new OutputAppender);
         // Open the file in truncate mode (clears the content).
         std::ofstream file(FileAppender::s_out_path, std::ofstream::out | std::ofstream::trunc);
 
@@ -76,8 +77,9 @@ namespace Ailu
     {
         for (auto &logger: _appenders)
         {
-            AL_DELETE(logger);
+            delete logger;
         }
+        _appenders.clear();
     }
 
     LogMgr::LogMgr()

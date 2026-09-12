@@ -198,10 +198,39 @@ namespace Ailu
             return loaded_asset == nullptr ? std::nullopt : ResolveScriptPath(loaded_asset->SourceFile());
         }
 
+    namespace
+    {
+        ScriptSystem *s_script_system = nullptr;
+    }
+
+    ScriptSystem::ScriptSystem()
+    {
+        AL_ASSERT_MSG(s_script_system == nullptr, "ScriptSystem already initialized");
+        s_script_system = this;
+    }
+
+    ScriptSystem::~ScriptSystem()
+    {
+        if (s_script_system == this)
+            s_script_system = nullptr;
+    }
+
     ScriptSystem &ScriptSystem::Get()
     {
-        static ScriptSystem s_script_system;
-        return s_script_system;
+        AL_ASSERT_MSG(s_script_system != nullptr, "ScriptSystem has not been initialized");
+        return *s_script_system;
+    }
+
+    void ScriptSystem::Init()
+    {
+        if (s_script_system == nullptr)
+            AL_NEW_TAG(EMemoryTag::kScript, ScriptSystem);
+    }
+
+    void ScriptSystem::Shutdown()
+    {
+        if (s_script_system != nullptr)
+            AL_DELETE(s_script_system);
     }
 
     int ScriptSystem::Initialize()

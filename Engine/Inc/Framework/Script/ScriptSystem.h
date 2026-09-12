@@ -44,6 +44,11 @@ namespace Ailu
 #endif
     public:
         static ScriptSystem &Get();
+        static void Init();
+        static void Shutdown();
+
+        ScriptSystem();
+        ~ScriptSystem();
 
         int Initialize() final;
         void Finalize() final;
@@ -117,8 +122,6 @@ namespace Ailu
 #endif
 
     private:
-        ScriptSystem() = default;
-
 #if AILU_ENABLE_LUA_SCRIPTING
         struct ScriptInstanceKey
         {

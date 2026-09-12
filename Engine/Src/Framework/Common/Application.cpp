@@ -2,6 +2,7 @@
 #include "Audio/Audio.h"
 #include "Framework/Common/Allocator.hpp"
 #include "Framework/Common/EngineConfig.h"
+#include "Framework/Common/EngineRuntime.h"
 #include "Framework/Common/JobSystem.h"
 #include "Framework/Common/Log.h"
 #include "Framework/Common/ResourceMgr.h"
@@ -42,6 +43,9 @@ using namespace Ailu::Render;
 
 namespace Ailu
 {
+    Application::Application() = default;
+    Application::~Application() = default;
+
     namespace
     {
         const char *ApplicationStateToString(EApplicationState state)
@@ -56,6 +60,8 @@ namespace Ailu
                     return "EApplicationState_Pause";
                 case EApplicationState::EApplicationState_Exit:
                     return "EApplicationState_Exit";
+                case EApplicationState::kShuttingDown:
+                    return "kShuttingDown";
                 default:
                     return "EApplicationState_None";
             }
@@ -186,7 +192,7 @@ namespace Ailu
         TimeMgr::Get().Mark();
         sp_instance = this;
         s_main_thread_id = std::this_thread::get_id();
-        LogMgr::Get().AddAppender(AL_NEW_TAG(EMemoryTag::kCore, FileAppender));
+        LogMgr::Get().AddAppender(new FileAppender);
         //Load ini
         {
             ProjectManager::Init();
@@ -219,25 +225,9 @@ namespace Ailu
         //初始化imgui gfx时要求imgui window已经初始化
         _p_imgui_layer = AL_NEW_TAG(EMemoryTag::kUi, ImGUILayer);
 #endif// DEAR_IMGUI
-    Core::ThreadPool::Init(6u, "GlobalThreadPool");
-    JobSystem::Init(6u);
-        GraphicsContext::InitGlobalContext();
-        GraphicsContext::Get().RegisterWindow(_p_window.get());
-        RenderTexture::s_backbuffer = RenderTexture::WindowBackBuffer(&Application::Get().GetWindow());
-        g_pGfxContext->ResizeSwapChain(_p_window->GetNativeWindowPtr(), desc._window_width, desc._window_height);
-        ResourceMgr::Init();
-        ResourceMgr::Get().Initialize();
-        ScriptSystem::Get().Initialize();
-        AudioDeviceConfig audio_config;
-        audio_config._enabled = init_ctx._enable_audio;
-        audio_config._device_name = init_ctx._audio_device_name;
-        audio_config._sample_rate = init_ctx._audio_sample_rate;
-        audio_config._max_voices = init_ctx._audio_max_voices;
-        audio_config._max_streaming_voices = init_ctx._audio_max_streaming_voices;
-        Audio::Initialize(audio_config);
-        Gizmo::Initialize();
-        UI::UIManager::Init();
-        SceneManagement::SceneMgr::Init();
+        _runtime = MakeScope<EngineRuntime>();
+        if (!_runtime->Initialize(init_ctx, *_p_window, desc))
+            return -1;
 #ifdef DEAR_IMGUI
         PushLayer(_p_imgui_layer);
 #endif// DEAR_IMGUI
@@ -265,31 +255,41 @@ namespace Ailu
 
     void Application::Finalize()
     {
-        JsonArchive ar;
-        const Type *type = EngineConfig::StaticType();
-        for (auto &it: type->GetProperties())
-            it.Serialize(&g_engine_config,ar);
-        ar.Save(s_engine_config_path);
+        {
+            JsonArchive ar;
+            const Type *type = EngineConfig::StaticType();
+            for (auto &it: type->GetProperties())
+                it.Serialize(&g_engine_config, ar);
+            ar.Save(s_engine_config_path);
+        }
+        _state.store(EApplicationState::kShuttingDown);
+        _is_handling_event.store(false);
+        if (_is_multi_thread_rendering.load() && g_pGfxContext != nullptr)
+        {
+            g_pGfxContext->SetMultiThreadRendering(false);
+            _is_multi_thread_rendering.store(false);
+        }
+        AL_DELETE(_layer_stack);
+        _p_imgui_layer = nullptr;
+        if (_runtime)
+        {
+            _runtime->BeginShutdown();
+            _runtime->Drain();
+            _runtime->Shutdown();
+            _runtime.reset();
+        }
         _win_input_backend.Shutdown(*_input_system);
         _input_system.reset();
-        AL_DELETE(_layer_stack);
-        UI::UIManager::Shutdown();
-        Gizmo::Shutdown();
-        SceneManagement::SceneMgr::Shutdown();
-        Audio::Shutdown();
-        ScriptSystem::Get().Finalize();
-        ResourceMgr::Get().Finalize();
-        ResourceMgr::Shutdown();
-        GraphicsContext::Get().UnRegisterWindow(_p_window.get());
-        GraphicsContext::FinalizeGlobalContext();
-        Core::ThreadPool::Shutdown();
+        _p_window.reset();
+        _raw_event_queue.reset();
         TimeMgr::Get().Finalize();
         TimeMgr::Shutdown();
-        JobSystem::Shutdown();
         ProjectManager::Shutdown();
         ObjectRegister::Shutdown();
         Allocator::Get().PrintLeaks();
         Allocator::Shutdown();
+        s_focus_window = nullptr;
+        sp_instance = nullptr;
     }
 
     void Application::Tick(f32 delta_time)

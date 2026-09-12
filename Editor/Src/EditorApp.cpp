@@ -158,9 +158,15 @@ namespace Ailu
                 _pipe_server->Finalize();
             if (_automation_service)
                 _automation_service->Finalize();
+            if (_is_multi_thread_rendering.load())
+                SetMultiThreadRendering(false);
+            Render::RenderPipeline::Register(nullptr);
+            Camera::sScene = nullptr;
+            Camera::sCurrent = nullptr;
             AL_DELETE(_p_scene_camera);
             AL_DELETE(g_pCommandMgr);
             AL_DELETE(_pipeline);
+            _pipeline = nullptr;
             Application::Finalize();
             fs::path p(s_editor_root_path);
             fs::directory_iterator dir_it(p);

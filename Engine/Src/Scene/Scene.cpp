@@ -118,10 +118,36 @@ namespace Ailu::SceneManagement
         }
     }
 
-    Scene::~Scene()
+    void Scene::Shutdown(SceneShutdownContext &context)
     {
-        Clear();
-        ScriptSystem::Get().OnSceneDestroyed(this);
+        _register.WaitForSystems();
+        if (context._scripts != nullptr)
+            context._scripts->OnSceneDestroyed(this);
+
+        Vector<ECS::Entity> entities;
+        u32 index = 0u;
+        for (const auto &id_comp : _register.View<ECS::PersistentIdComponent>())
+            entities.push_back(_register.GetEntity<ECS::PersistentIdComponent>(index++));
+        for (ECS::Entity entity : entities)
+        {
+            UnregisterEntityGuid(entity);
+            _register.Destory(entity);
+        }
+        _register.WaitForSystems();
+        _guid_to_entity.clear();
+        _pending_delete_entities.clear();
+        _pending_scene_commands.clear();
+        _scene_mesh_data.reset();
+        _blas_buffer.reset();
+        _tlas_buffer.reset();
+        _tlas_nodes.clear();
+        _bvh_nodes_range.clear();
+        _mesh_bvh_node_triangle_offset.clear();
+        _triangle_count = 0u;
+        _blas_node_count = 0u;
+        _prefab_instances.clear();
+        _total_renderable_count = 0u;
+        _dirty = false;
     }
 
     // =========================================================================
@@ -1120,16 +1146,56 @@ namespace Ailu::SceneManagement
 
     SceneMgr::SceneMgr()
     {
+        AL_ASSERT_MSG(s_scene_mgr == nullptr, "SceneMgr already init!");
+        s_scene_mgr = this;
         TIMER_BLOCK("-----------------------------------------------------------SceneMgr::Initialize")
     }
     SceneMgr::~SceneMgr()
     {
-        //std::ostringstream oss;
-        //TextOArchive ar(&oss);
-        //_p_current->Serialize(ar);
-        //FileManager::CreateFile(ResourceMgr::GetResSysPath(L"Test/a.txt"));
-        //FileManager::WriteFile(ResourceMgr::GetResSysPath(L"Test/a.txt"), false, oss.str());
+        if (s_scene_mgr == this)
+            s_scene_mgr = nullptr;
     }
+
+    void SceneMgr::ShutdownScenes(SceneShutdownContext &context)
+    {
+        std::unordered_set<Scene *> shutdown_scenes;
+        auto shutdown_scene = [&](Scene *scene)
+        {
+            if (scene != nullptr && shutdown_scenes.insert(scene).second)
+                scene->Shutdown(context);
+        };
+
+        for (const auto &[path, scene] : _all_scene)
+            shutdown_scene(scene.get());
+        shutdown_scene(_temporary_scene.get());
+        shutdown_scene(_runtime_scene);
+        shutdown_scene(_retired_runtime_scene);
+        shutdown_scene(_retired_temporary_scene.get());
+
+        std::unordered_set<Scene *> raw_scenes;
+        if (_runtime_scene != nullptr)
+            raw_scenes.insert(_runtime_scene);
+        if (_retired_runtime_scene != nullptr)
+            raw_scenes.insert(_retired_runtime_scene);
+        for (Scene *scene : raw_scenes)
+            AL_DELETE(scene);
+
+        _runtime_scene = nullptr;
+        _retired_runtime_scene = nullptr;
+        _runtime_scene_src = nullptr;
+        _p_current = nullptr;
+        _scene_before_temporary = nullptr;
+        _temporary_scene.reset();
+        _retired_temporary_scene.reset();
+        _all_scene.clear();
+        _transform_cache.clear();
+        _temporary_prefab_asset_guid = Guid::EmptyGuid();
+        _temporary_prefab_root_entity = ECS::kInvalidEntity;
+        _temporary_scene_initial_edit_revision = 0u;
+        Camera::sMain = nullptr;
+        Camera::sCurrent = nullptr;
+    }
+
     Ref<Scene> SceneMgr::Create(String name)
     {
         return MakeRef<Scene>(name);
@@ -1208,6 +1274,7 @@ namespace Ailu::SceneManagement
     {
         if (_temporary_scene == nullptr)
             return;
+        ScriptSystem::Get().OnSceneDestroyed(_temporary_scene.get());
         _p_current = _scene_before_temporary;
         _scene_before_temporary = nullptr;
         _retired_temporary_scene = std::move(_temporary_scene);

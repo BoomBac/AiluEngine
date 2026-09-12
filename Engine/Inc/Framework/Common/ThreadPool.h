@@ -54,6 +54,7 @@ namespace Ailu
 			};
 			explicit ThreadPool(u8 thread_num, std::string name = "ALThreadPool") : _initial_thread_count(thread_num), _pool_name(std::move(name))
 			{
+				s_instance = this;
 				s_total_thread_num += thread_num;
 				if (s_total_thread_num > 1.5 * std::thread::hardware_concurrency())
 				{
@@ -66,6 +67,8 @@ namespace Ailu
 			~ThreadPool()
 			{
 				Release();
+				if (s_instance == this)
+					s_instance = nullptr;
 			}
 			u16 ThreadNum() const { return _initial_thread_count; }
 			void ClearRecords() 
@@ -172,6 +175,7 @@ namespace Ailu
 			LockFreeQueue<Task,256> _tasks;
 			Vector<EThreadStatus> _thread_status;
 			std::string _pool_name;
+			inline static ThreadPool *s_instance = nullptr;
 			Vector<TimeMgr> _timers;
 			Vector<List<std::tuple<String,f32,f32>>> _task_time_records;
 		};

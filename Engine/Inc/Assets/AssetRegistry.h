@@ -126,6 +126,7 @@ namespace Ailu
         u64 AddPublishedListener(PublishedListener listener);
         void RemovePublishedListener(u64 listener_id);
         void Unregister(const Guid &guid);
+        void Clear();
 
     private:
         AssetHandleBase GetOrCreateHandleBase(const Guid &guid);

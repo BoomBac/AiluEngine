@@ -21,6 +21,7 @@ initializer._str_to_enum_lut["EApplicationState_None"] = 0;
 initializer._str_to_enum_lut["EApplicationState_Running"] = 1;
 initializer._str_to_enum_lut["EApplicationState_Pause"] = 2;
 initializer._str_to_enum_lut["EApplicationState_Exit"] = 3;
+initializer._str_to_enum_lut["kShuttingDown"] = 4;
 s_enum_type_EApplicationState = std::make_unique<Ailu::Enum>(initializer);
 Ailu::Enum::RegisterEnum(s_enum_type_EApplicationState.get());
 }

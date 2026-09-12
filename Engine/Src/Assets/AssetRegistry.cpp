@@ -268,6 +268,27 @@ namespace Ailu
         _guid_to_slot.erase(iter);
     }
 
+    void AssetRegistry::Clear()
+    {
+        std::lock_guard<std::mutex> registry_lock(_mutex);
+        for (Scope<AssetSlot> &slot : _slots)
+        {
+            std::lock_guard<std::mutex> slot_lock(slot->_mutex);
+            slot->_current.reset();
+            slot->_dependencies.clear();
+            slot->_dependents.clear();
+            slot->_guid = Guid::EmptyGuid();
+            slot->_state = EAssetLoadState::kUnloaded;
+            ++slot->_slot_generation;
+        }
+        _guid_to_slot.clear();
+        _free_slots.clear();
+        {
+            std::lock_guard<std::mutex> listener_lock(_listener_mutex);
+            _published_listeners.clear();
+        }
+    }
+
     AssetSlot *AssetRegistry::TryGetSlot(const AssetHandleBase &handle)
     {
         return const_cast<AssetSlot *>(std::as_const(*this).TryGetSlot(handle));

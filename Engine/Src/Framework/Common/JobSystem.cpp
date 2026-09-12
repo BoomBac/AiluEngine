@@ -47,18 +47,19 @@ namespace Ailu
     JobSystem* g_pJobSystem = nullptr;
     void JobSystem::Init(u32 thread_count)
     {
-        if (g_pJobSystem == nullptr)
-            g_pJobSystem = AL_NEW_TAG(EMemoryTag::kJobSystem, JobSystem, thread_count);
+        if (s_instance == nullptr)
+            AL_NEW_TAG(EMemoryTag::kJobSystem, JobSystem, thread_count);
     }
     void JobSystem::Shutdown()
     {
-        AL_DELETE(g_pJobSystem);
+        if (s_instance != nullptr)
+            AL_DELETE(s_instance);
     }
     JobSystem& JobSystem::Get()
     {
-        if (g_pJobSystem == nullptr)
+        if (s_instance == nullptr)
             Init(6);
-        return *g_pJobSystem;
+        return *s_instance;
     }
 
     Job *JobSystem::JobPool::Fetch()
@@ -99,6 +100,8 @@ namespace Ailu
 
     JobSystem::JobSystem(u32 thread_count): _stop(false)
     {
+        s_instance = this;
+        g_pJobSystem = this;
         if (thread_count == 0u)
             thread_count = 1u;
         for (u32 i = 0; i < thread_count; ++i)
@@ -123,6 +126,10 @@ namespace Ailu
                 thread.join();
         }
         AL_DELETE(_pool);
+        if (s_instance == this)
+            s_instance = nullptr;
+        if (g_pJobSystem == this)
+            g_pJobSystem = nullptr;
     }
 
     WaitHandle JobSystem::Dispatch(Job *job)

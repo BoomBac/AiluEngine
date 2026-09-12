@@ -103,11 +103,21 @@ namespace Ailu::Render
 
     void GpuResourceRegistry::Clear()
     {
-        std::lock_guard lock(_pending_release_mutex);
-        _pending_releases.clear();
+        {
+            std::lock_guard lock(_pending_release_mutex);
+            _pending_releases.clear();
+        }
+
+        // Resource destructors may release nested Ref objects, which re-enter Release().
+        // Do not hold _pending_release_mutex while unique_ptr destructors are running.
         _retired_resources.clear();
         _slots.clear();
         _free_indices.clear();
+
+        {
+            std::lock_guard lock(_pending_release_mutex);
+            _pending_releases.clear();
+        }
     }
 
     #pragma region GpuResource

@@ -97,7 +97,7 @@
             "_window_state": ""
         }, {
             "_type_id": "Ailu::Editor::SceneView",
-            "_id": 119,
+            "_id": 133,
             "_parent_id": 5,
             "_type": 2,
             "_is_vertical_split": true,
@@ -113,7 +113,7 @@
             "_window_state": ""
         }, {
             "_type_id": "Ailu::Editor::GameView",
-            "_id": 120,
+            "_id": 134,
             "_parent_id": 5,
             "_type": 2,
             "_is_vertical_split": true,

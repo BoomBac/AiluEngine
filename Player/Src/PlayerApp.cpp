@@ -40,9 +40,13 @@ namespace Ailu
 
     void PlayerApp::Finalize()
     {
+        if (_is_multi_thread_rendering.load())
+            SetMultiThreadRendering(false);
+        Render::RenderPipeline::Register(nullptr);
         AL_DELETE(_pipeline);
-        LogMgr::Shutdown();
+        _pipeline = nullptr;
         Application::Finalize();
+        LogMgr::Shutdown();
     }
 
     bool PlayerApp::OnWindowResize(WindowResizeEvent &e)

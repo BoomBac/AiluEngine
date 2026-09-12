@@ -132,6 +132,7 @@ namespace Ailu
     class AILU_API IAppender
     {
     public:
+        virtual ~IAppender() = default;
         virtual void Print(const LogMessage &log_msg) = 0;
     };
 

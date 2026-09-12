@@ -29,20 +29,20 @@ namespace Ailu::Render
         FrameResourceManager::Init();
         ImGuiRenderer::Init();
 	}
-	void GraphicsContext::FinalizeGlobalContext()
-	{
+        void GraphicsContext::FinalizeGlobalContext()
+        {
         ImGuiRenderer::Shutdown();
         ConstBufferPool::ShutDown();
 		GraphicsPipelineStateMgr::Shutdown();
         RHICommandBufferPool::Shutdown();
         CommandBufferPool::Shutdown();
         FrameResourceManager::Shutdown();
-        RHI::DX12::GpuResourceManager::Shutdown();
                 CommandPool::Shutdown();
                 AL_DELETE(g_pRenderTexturePool);
                 AL_DELETE(g_pGfxContext);
                 g_pGfxContext = nullptr;
-	}
+        RHI::DX12::GpuResourceManager::Shutdown();
+        }
     GraphicsContext &GraphicsContext::Get()
     {
         return *g_pGfxContext;

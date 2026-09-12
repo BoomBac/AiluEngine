@@ -1,28 +1,25 @@
 #include "Framework/Common/ThreadPool.h"
 
 #include "pch.h"
+#include "Framework/Common/Allocator.hpp"
 
 namespace Ailu::Core
 {
-    namespace
-    {
-        Scope<ThreadPool> s_thread_pool;
-    }
-
     void ThreadPool::Init(u8 thread_num, std::string name)
     {
-        AL_ASSERT_MSG(s_thread_pool == nullptr, "ThreadPool already init!");
-        s_thread_pool = MakeScope<ThreadPool>(thread_num, std::move(name));
+        AL_ASSERT_MSG(s_instance == nullptr, "ThreadPool already init!");
+        AL_NEW_TAG(EMemoryTag::kCore, ThreadPool, thread_num, std::move(name));
     }
 
     void ThreadPool::Shutdown()
     {
-        s_thread_pool.reset();
+        if (s_instance != nullptr)
+            AL_DELETE(s_instance);
     }
 
     ThreadPool &ThreadPool::Get()
     {
-        AL_ASSERT_MSG(s_thread_pool != nullptr, "ThreadPool has not been initialized!");
-        return *s_thread_pool;
+        AL_ASSERT_MSG(s_instance != nullptr, "ThreadPool has not been initialized!");
+        return *s_instance;
     }
 }

@@ -339,6 +339,18 @@ namespace Ailu
 		}
 	}// namespace
 
+        ResourceMgr::ResourceMgr()
+        {
+                AL_ASSERT_MSG(g_pResourceMgr == nullptr, "ResourceMgr already init!");
+                g_pResourceMgr = this;
+        }
+
+        ResourceMgr::~ResourceMgr()
+        {
+                if (g_pResourceMgr == this)
+                        g_pResourceMgr = nullptr;
+        }
+
         void ResourceMgr::Init()
         {
                 AL_ASSERT_MSG(g_pResourceMgr == nullptr, "ResourceMgr already init!");
@@ -806,16 +818,65 @@ namespace Ailu
 		return 0;
 	}
 
-	void ResourceMgr::Finalize()
-	{
+        void ResourceMgr::Finalize()
+        {
 		_is_watching_directory = false;
 		for (auto &[guid, asset]: _asset_db)
 		{
 			if (asset->_asset_type == Scene::StaticType() || asset->_asset_type == Material::StaticType())
 				SaveAsset(asset.get());
 		}
-		SaveAssetDB(EAssetDomain::kProject);
-	}
+                SaveAssetDB(EAssetDomain::kProject);
+        }
+
+        void ResourceMgr::BeginShutdown()
+        {
+                if (_is_shutting_down)
+                        return;
+
+                _is_shutting_down = true;
+                _is_watching_directory = false;
+                _pending_reload_requests.clear();
+                while (!_async_tasks.empty())
+                        _async_tasks.pop();
+                while (!_sync_tasks.empty())
+                        _sync_tasks.pop();
+                _task_group.Close();
+        }
+
+        void ResourceMgr::Drain()
+        {
+                _task_group.Wait();
+        }
+
+        void ResourceMgr::ReleaseRuntimeResources()
+        {
+                _is_watching_directory = false;
+                s_p_file_watch_service = nullptr;
+                _asset_reload_listeners.clear();
+                _asset_changed_callbacks.clear();
+                while (!s_pending_save_assets.empty())
+                        s_pending_save_assets.pop();
+                while (!_pending_delete_assets.empty())
+                        _pending_delete_assets.pop();
+                while (!_pending_artifact_cleanup_guids.empty())
+                        _pending_artifact_cleanup_guids.pop();
+
+                _default_font.reset();
+                _global_resources.clear();
+                _lut_global_resources.clear();
+                _lut_global_resources_by_type.clear();
+                _sub_assets.clear();
+                _sub_asset_guids.clear();
+                _sub_asset_locations.clear();
+                _asset_registry.Clear();
+                _object_to_asset.clear();
+                _asset_looktable.clear();
+                _asset_db.clear();
+                _importers.clear();
+                _asset_domains.clear();
+                _derived_data_cache.reset();
+        }
 
 	void ResourceMgr::Tick(f32 delta_time)
 	{
@@ -867,11 +928,11 @@ namespace Ailu
 			_sync_tasks.front()();
 			_sync_tasks.pop();
 		}
-		while (!_async_tasks.empty())
-		{
-			Core::ThreadPool::Get().Enqueue(std::move(_async_tasks.front()));
-			_async_tasks.pop();
-		}
+                while (!_async_tasks.empty())
+                {
+                        _task_group.Dispatch(std::move(_async_tasks.front()));
+                        _async_tasks.pop();
+                }
 	}
 
 	bool ResourceMgr::SaveAsset(Asset *asset)
@@ -2151,22 +2212,28 @@ namespace Ailu
 	{
 		return ImportResourceImpl(sys_path, target_dir, &setting);
 	}
-	void ResourceMgr::SubmitTaskSync(ResourceTask task)
-	{
-		_sync_tasks.push([=]()
-						 { task(); });
-	}
+        void ResourceMgr::SubmitTaskSync(ResourceTask task)
+        {
+                if (_is_shutting_down)
+                        return;
+                _sync_tasks.push([=]()
+                                                 { task(); });
+        }
 
-	void ResourceMgr::SubmitTaskSync(ResourceTask task, std::function<void(bool)> callback)
-	{
-		_sync_tasks.push([=]()
-						 { callback(task()); });
-	}
+        void ResourceMgr::SubmitTaskSync(ResourceTask task, std::function<void(bool)> callback)
+        {
+                if (_is_shutting_down)
+                        return;
+                _sync_tasks.push([=]()
+                                                 { callback(task()); });
+        }
 
-	Ref<void> ResourceMgr::ImportResourceAsync(const WString &sys_path, const WString &target_dir, const ImportSetting &setting, OnResourceTaskCompleted callback)
-	{
-		_async_tasks.push([=]()
-						  {
+        Ref<void> ResourceMgr::ImportResourceAsync(const WString &sys_path, const WString &target_dir, const ImportSetting &setting, OnResourceTaskCompleted callback)
+        {
+                if (_is_shutting_down)
+                        return nullptr;
+                _async_tasks.push([=]()
+                                                  {
 			callback(ImportResourceImpl(sys_path,target_dir,&setting));
 			return nullptr; });
 		return nullptr;

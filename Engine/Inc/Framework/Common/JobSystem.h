@@ -273,6 +273,7 @@ namespace Ailu
         std::mutex _all_job_mutex;
         std::condition_variable _all_job_cv;
         std::set<u32> _temp_jobs;
+        inline static JobSystem *s_instance = nullptr;
     };
 };// namespace Ailu
 #endif//AILU_JOBSYSTEM_H

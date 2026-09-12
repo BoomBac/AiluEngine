@@ -10,6 +10,7 @@
 #include "Assets/AssetRegistry.h"
 #include "Assets/DerivedDataCache.h"
 #include "Framework/Common/Utils.h"
+#include "Framework/Common/TaskGroup.h"
 #include "Framework/Parser/AssetParser.h"
 #include "Animation/SkeletonAsset.h"
 #include "Objects/Type.h"
@@ -187,9 +188,13 @@ namespace Ailu
         static WString NormalizeAssetPath(const WString &asset_path, EAssetDomain default_domain = EAssetDomain::kEngine);
         static EAssetDomain GetAssetPathDomain(const WString &asset_path, EAssetDomain default_domain = EAssetDomain::kEngine);
 
-        ResourceMgr() = default;
+        ResourceMgr();
+        ~ResourceMgr();
         int Initialize();
         void Finalize();
+        void BeginShutdown();
+        void Drain();
+        void ReleaseRuntimeResources();
         void Tick(f32 delta_time);
         auto Begin() { return _asset_db.begin(); };
         auto End() { return _asset_db.end(); };
@@ -477,7 +482,11 @@ namespace Ailu
         Scope<DerivedDataCache> _derived_data_cache;
         Vector<AssetReloadListener> _asset_reload_listeners;
         u64 _next_asset_reload_listener_id = 1u;
+        TaskGroup _task_group;
+        bool _is_shutting_down = false;
     };
+
+    using ResourceSystem = ResourceMgr;
 
     template<typename T>
     inline Ref<T> ResourceMgr::Load(const WString &asset_path, const ImportSetting *setting)
@@ -502,11 +511,11 @@ namespace Ailu
         };
 
         auto async_setting = CopyAsyncImportSetting(setting, static_cast<const T *>(nullptr));
-        Core::ThreadPool::Get().Enqueue([this, asset_path, async_setting, callback = std::move(execute_callback)]() mutable
-                               {
-                                   auto asset = this->Load<T>(asset_path, &async_setting);
-                                   callback(std::move(asset));
-                               });
+        _task_group.Dispatch([this, asset_path, async_setting, callback = std::move(execute_callback)]() mutable
+                              {
+                                  auto asset = this->Load<T>(asset_path, &async_setting);
+                                  callback(std::move(asset));
+                              });
     }
     template<typename T>
     inline void ResourceMgr::LoadAsync(const Guid &guid, const ImportSetting *setting, OnLoadTaskCompleted<T> callback)
@@ -518,11 +527,11 @@ namespace Ailu
         };
 
         auto async_setting = CopyAsyncImportSetting(setting, static_cast<const T *>(nullptr));
-        Core::ThreadPool::Get().Enqueue([this, guid, async_setting, callback = std::move(execute_callback)]() mutable
-                               {
-                                   auto asset = this->Load<T>(guid, &async_setting);
-                                   callback(std::move(asset));
-                               });
+        _task_group.Dispatch([this, guid, async_setting, callback = std::move(execute_callback)]() mutable
+                              {
+                                  auto asset = this->Load<T>(guid, &async_setting);
+                                  callback(std::move(asset));
+                              });
     }
     template<typename T>
     inline T *ResourceMgr::Get(const WString &res_id)

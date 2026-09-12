@@ -16,6 +16,7 @@
 
 namespace Ailu
 {
+    class ScriptSystem;
     namespace SceneManagement
     {
         struct LightingData
@@ -23,6 +24,10 @@ namespace Ailu
             f32 _indirect_lighting_intensity = 0.25f;
         };
         class ISceneCommand;
+        struct SceneShutdownContext
+        {
+            ::Ailu::ScriptSystem *_scripts = nullptr;
+        };
         ACLASS()
         class AILU_API Scene final : public Object
         {
@@ -31,7 +36,8 @@ namespace Ailu
         public:
             Scene() = default;
             explicit Scene(const String &name, bool create_render_resources = true);
-            ~Scene();
+            ~Scene() = default;
+            void Shutdown(SceneShutdownContext &context);
             ECS::Entity AddObject(String name = "");
             ECS::Entity AddObject(Ref<Mesh> mesh, Ref<Material> mat);
             ECS::Entity AddObject(Ref<Mesh> mesh, const Vector<Ref<Material>>& mats);
@@ -199,6 +205,7 @@ namespace Ailu
             void OpenTemporaryScene(Ref<Scene> scene, const Guid &prefab_asset_guid = Guid::EmptyGuid(),
                                     ECS::Entity prefab_root_entity = ECS::kInvalidEntity);
             void CloseTemporaryScene();
+            void ShutdownScenes(SceneShutdownContext &context);
             bool IsTemporaryScene() const { return _temporary_scene != nullptr; }
             bool IsTemporaryPrefabScene() const { return IsTemporaryScene() && !_temporary_prefab_asset_guid.IsEmpty(); }
             bool HasTemporarySceneEdits() const
