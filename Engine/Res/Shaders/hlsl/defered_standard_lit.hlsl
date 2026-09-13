@@ -1,4 +1,4 @@
-//info bein
+//info begin
 //pass begin::
 //name: defered_standard_lit
 //vert: GBufferVSMain
@@ -126,7 +126,7 @@ GBuffer GBufferPSMain(StandardPSInput input) : SV_TARGET
 	else if (_MaterialID == 2) // scheckboard
 	{
 		InitSurfaceDataCheckboard(input, surface_data);
-		surface_data.albedo.rgb = Checkerboard(input.uv0, 20);
+		//surface_data.albedo.rgb = Checkerboard(input.uv0, 20);
 	}
 	else {};
 #ifdef ALPHA_TEST

@@ -56,6 +56,29 @@ namespace Ailu
             return a;
         }
 
+        struct FrameUploadAllocation
+        {
+            GpuResource *_owner = nullptr;
+            void *_cpu_ptr = nullptr;
+            u64 _gpu_handle = 0u;
+            NativeHandle _native_page{};
+            u32 _offset = 0u;
+            u32 _size = 0u;
+            u32 _frame_slot = 0u;
+        };
+
+        struct BufferDataVersion
+        {
+            FrameUploadAllocation _upload;
+            u64 _generation = 0u;
+            u32 _size = 0u;
+
+            [[nodiscard]] bool IsValid() const
+            {
+                return _upload._owner != nullptr && _upload._native_page._res != nullptr && _size != 0u;
+            }
+        };
+
         struct DispatchArguments
         {
             u32 _thread_group_num_x;
@@ -127,7 +150,7 @@ namespace Ailu
                 _res_type = EGpuResType::kBuffer;
                 _desc._size = desc._size == 0 ? desc._element_num * desc._element_size : desc._size;
             }
-            virtual ~GPUBuffer() = default;
+            virtual ~GPUBuffer();
             virtual void ReadBack(u8 *dst, u32 size) {};
             virtual void ReadBackAsync(u8 *dst, u32 size, std::function<void()> on_complete) {};
             [[nodiscard]] bool IsRandomAccess() const { return _desc._is_random_write; };
@@ -143,42 +166,22 @@ namespace Ailu
                 u64 data_size = sizeof(T) * data.size();
                 AL_ASSERT(data_size <= _mem_size);
                 AL_ASSERT(sizeof(T) == _desc._element_size);
-                if (_data)
-                {
-                    AL_FREE(_data);
-                    _data = nullptr;
-                }
-                _fill_data_size = data_size;
-                _data = reinterpret_cast<u8 *>(AL_ALLOC(T, data.size()));
-                memcpy(_data, data.data(), data_size);
-                _counter = (u32) data.size();
-                OnDataChanged();
+                SetData(reinterpret_cast<const u8 *>(data.data()), static_cast<u32>(data_size));
             }
-            void SetData(const u8 *data, u32 size)
-            {
-                AL_ASSERT(size <= _mem_size);
-                if (_data)
-                {
-                    AL_FREE(_data);
-                    _data = nullptr;
-                }
-                _fill_data_size = size;
-                _data = reinterpret_cast<u8 *>(AL_ALLOC(u8, size));
-                memcpy(_data, data, size);
-                _counter = size / _desc._element_size;
-                OnDataChanged();
-            }
+            void SetData(const u8 *data, u32 size);
+            [[nodiscard]] const BufferDataVersion &CurrentDataVersion() const { return _current_data_version; }
 
         protected:
-            virtual void OnDataChanged() {};
+            virtual bool IsPhysicalResourceCreated() const { return false; }
 
         protected:
             BufferDesc _desc;
             //for append/consume buffer
             u32 _counter = 0u;
-            u8 *_data = nullptr;
-            //每次设置data时的实际大小，使用容量拷贝时可能会有越界错误
-            u64 _fill_data_size = 0u;
+            u8 *_initial_data = nullptr;
+            u32 _initial_data_size = 0u;
+            BufferDataVersion _current_data_version;
+            u64 _data_generation = 0u;
             i32 _bindless_srv_index = -1;
             i32 _bindless_uav_index = -1;
         };

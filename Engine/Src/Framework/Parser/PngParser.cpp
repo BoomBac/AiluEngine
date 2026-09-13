@@ -69,7 +69,8 @@ namespace Ailu
                 auto mip_level = desc._mip_num - 1;
                 for (int i = 0; i < mip_level; i++)
                 {
-                    load_data._data.emplace_back(TextureUtils::DownSample(load_data._data.back(), desc._width >> i, desc._height >> i, 4));
+                    load_data._data.emplace_back(TextureUtils::DownSample(load_data._data.back(), desc._width >> i, desc._height >> i, 4,
+                                                                           import_settings._is_srgb));
                     if (desc._width >> i == 1)
                         break;
                 }

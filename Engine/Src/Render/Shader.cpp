@@ -653,7 +653,7 @@ namespace Ailu::Render
         String line{};
         u32 line_count = 0;
         auto sys_path = ToChar(_src_file_path);
-        lines = ReadFileToLines(sys_path, line_count, "//info bein", "//info end");
+        lines = ReadFileToLines(sys_path, line_count, "//info begin", "//info end");
         if (line_count > 0)
         {
             auto pass_blocks = ExtractPassBlocks(lines);
@@ -1655,6 +1655,9 @@ namespace Ailu::Render
             if (entry->_resource.IsValid() && entry->_priority > priority)
                 return;
             entry->_resource = resource->Handle();
+            entry->_data_version = {};
+            if (auto *buffer = dynamic_cast<GPUBuffer *>(resource))
+                entry->_data_version = buffer->CurrentDataVersion();
             entry->_resource_type = resource_type;
             entry->_priority = priority;
             entry->_face = static_cast<u16>(params._face);
@@ -1727,6 +1730,9 @@ namespace Ailu::Render
                     entry->_slot = bind_info._bind_slot;
                 }
                 entry->_resource = command_binding._resource != nullptr ? command_binding._resource->Handle() : GpuResourceHandle{};
+                entry->_data_version = {};
+                if (auto *buffer = dynamic_cast<GPUBuffer *>(command_binding._resource))
+                    entry->_data_version = buffer->CurrentDataVersion();
                 entry->_resource_type = command_binding._resource_type == EBindResDescType::kConstBufferRaw
                     ? EBindResDescType::kConstBufferRaw : bind_info._res_type;
                 entry->_priority = PipelineResource::kPriorityCmd;

@@ -13,6 +13,8 @@
 #include "Framework/Core/Containers/Map.h"
 #include "Framework/Core/Containers/Array.h"
 #include <future>
+#include <condition_variable>
+#include <mutex>
 #include <optional>
 #include <set>
 #include <stdexcept>
@@ -21,6 +23,32 @@ namespace Ailu
     using JobFunction = std::function<void()>;
 
     class JobSystem;
+    class AILU_API JobGroup
+    {
+    public:
+        JobGroup() = default;
+        ~JobGroup();
+
+        JobGroup(const JobGroup&) = delete;
+        JobGroup& operator=(const JobGroup&) = delete;
+
+        JobGroup(JobGroup&&) = delete;
+        JobGroup& operator=(JobGroup&&) = delete;
+
+        bool IsDone() const;
+
+    private:
+        friend class JobSystem;
+
+        void Add(u32 count = 1u);
+        void Done();
+
+    private:
+        std::atomic<u32> _remaining{0u};
+        std::mutex _wait_mutex;
+        std::condition_variable _wait_cv;
+    };
+
     class AILU_API Job
     {
     public:
@@ -37,6 +65,7 @@ namespace Ailu
             _name = name;
             _function = std::move(func);
             _promise = MakeRef<std::promise<void>>();
+            _group = nullptr;
         }
         const String &Name() const { return _name; }
 
@@ -63,6 +92,7 @@ namespace Ailu
             _name.clear();
             _function = nullptr;
             _promise.reset();
+            _group = nullptr;
         }
         const u32 Index() const { return _index; }
         Ref<std::future<void>> GetFuture()
@@ -73,6 +103,8 @@ namespace Ailu
         bool IsValid() const { return _function != nullptr; }
 
     private:
+        friend class JobSystem;
+
         void AddDependency() { _remaining_dependencies.fetch_add(1, std::memory_order_relaxed); }
         void EnsurePromise()
         {
@@ -89,6 +121,7 @@ namespace Ailu
         JobSystem *_system = nullptr;
         String _name;
         Ref<std::promise<void>> _promise;
+        JobGroup *_group = nullptr;
     };
 
     struct AILU_API JobHandle
@@ -232,6 +265,23 @@ namespace Ailu
         }
         WaitHandle Dispatch(Job *job);
         WaitHandle Dispatch(const String &name, JobFunction func);
+        template<typename Callable>
+        WaitHandle Dispatch(JobGroup &group, Callable &&task)
+        {
+            Job *job = CreateJob("noname", std::forward<Callable>(task));
+            AL_ASSERT(job);
+            if (job == nullptr)
+            {
+                auto promise = MakeRef<std::promise<void>>();
+                auto future = MakeRef<std::future<void>>(promise->get_future());
+                promise->set_exception(std::make_exception_ptr(std::runtime_error("JobSystem job pool is full")));
+                return WaitHandle(future);
+            }
+
+            group.Add();
+            job->_group = &group;
+            return Dispatch(job);
+        }
         template<typename Callable, typename... Args>
         WaitHandle Dispatch(Callable &&task, Args &&...args)
         {
@@ -250,6 +300,33 @@ namespace Ailu
         }
         void Wait();
         void Wait(const WaitHandle &handle);
+        void Wait(JobGroup &group);
+
+        u32 GetWorkerCount() const { return static_cast<u32>(_queues.size()); }
+
+        template<typename Callable>
+        void ParallelFor(JobGroup &group, u32 count, u32 grain_size, Callable &&func)
+        {
+            if (count == 0u)
+                return;
+
+            grain_size = grain_size == 0u ? 1u : grain_size;
+            for (u32 begin = 0u; begin < count;)
+            {
+                const u32 remaining = count - begin;
+                const u32 end = remaining > grain_size ? begin + grain_size : count;
+                Dispatch(group, [begin, end, func]() mutable { func(begin, end); });
+                begin = end;
+            }
+        }
+
+        template<typename Callable>
+        void ParallelFor(u32 count, u32 grain_size, Callable &&func)
+        {
+            JobGroup group;
+            ParallelFor(group, count, grain_size, std::forward<Callable>(func));
+            Wait(group);
+        }
 
     private:
         bool WorkOnce();

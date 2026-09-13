@@ -62,6 +62,7 @@ namespace Ailu::RHI::DX12
         _recording_context.Clear();
         _statistics.Reset();
         _profiler_stack.clear();
+        _uploaded_buffer_versions.clear();
         _post_submit_callbacks.clear();
     }
 
@@ -226,6 +227,31 @@ namespace Ailu::RHI::DX12
         alloc.SetData(src,src_size);
         RequireState(resource, Render::EResourceState::kCopyDest);
         _p_cmd->CopyBufferRegion(resource.Get(), 0u, alloc._page_res, alloc._offset, src_size);
+    }
+
+    bool D3DCommandBuffer::EnsureBufferVersion(D3DGPUBuffer *buffer, const BufferDataVersion &version)
+    {
+        if (buffer == nullptr || !version.IsValid())
+            return true;
+        for (const auto &[handle, generation] : _uploaded_buffer_versions)
+        {
+            if (handle == buffer->Handle() && generation == version._generation)
+                return true;
+        }
+        ApplyBufferVersion(buffer, version);
+        _uploaded_buffer_versions.emplace_back(buffer->Handle(), version._generation);
+        return true;
+    }
+
+    void D3DCommandBuffer::ApplyBufferVersion(D3DGPUBuffer *buffer, const BufferDataVersion &version)
+    {
+        if (buffer == nullptr || !version.IsValid())
+            return;
+        auto *upload_page = version._upload._native_page.As<ID3D12Resource>();
+        if (upload_page == nullptr || !buffer->Resource())
+            return;
+        RequireState(buffer->Resource(), Render::EResourceState::kCopyDest);
+        _p_cmd->CopyBufferRegion(buffer->Resource().Get(), 0u, upload_page, version._upload._offset, version._size);
     }
 
     void D3DCommandBuffer::ResetRenderTarget()

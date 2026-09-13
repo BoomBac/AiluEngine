@@ -10,9 +10,9 @@
             "_window_id": 0,
             "_tab_id": "0",
             "_window_position": [-858993472.0, -858993472.0],
-            "_window_size": [1594.0, 903.0],
+            "_window_size": [2560.0, 1392.0],
             "_position": [0.0, 34.0],
-            "_size": [1594.0, 845.0],
+            "_size": [2560.0, 1334.0],
             "_flags": 48,
             "_window_state": ""
         }, {
@@ -26,9 +26,9 @@
             "_window_id": 0,
             "_tab_id": "",
             "_window_position": [-858993472.0, -858993472.0],
-            "_window_size": [1594.0, 903.0],
+            "_window_size": [2560.0, 1392.0],
             "_position": [2.0, 55.0],
-            "_size": [1590.0, 822.0],
+            "_size": [2556.0, 1311.0],
             "_flags": 0,
             "_window_state": ""
         }, {
@@ -42,9 +42,9 @@
             "_window_id": 0,
             "_tab_id": "",
             "_window_position": [-858993472.0, -858993472.0],
-            "_window_size": [1594.0, 903.0],
+            "_window_size": [2560.0, 1392.0],
             "_position": [2.0, 55.0],
-            "_size": [1207.9229, 822.0],
+            "_size": [1941.7932, 1311.0],
             "_flags": 0,
             "_window_state": ""
         }, {
@@ -58,15 +58,31 @@
             "_window_id": 0,
             "_tab_id": "",
             "_window_position": [-858993472.0, -858993472.0],
-            "_window_size": [1594.0, 903.0],
+            "_window_size": [2560.0, 1392.0],
             "_position": [2.0, 55.0],
-            "_size": [1207.9229, 523.2852],
+            "_size": [1941.7932, 834.5826],
+            "_flags": 0,
+            "_window_state": ""
+        }, {
+            "_type_id": "null",
+            "_id": 101,
+            "_parent_id": 102,
+            "_type": 1,
+            "_is_vertical_split": true,
+            "_split_ratio": 0.5,
+            "_title": "null",
+            "_window_id": 0,
+            "_tab_id": "0",
+            "_window_position": [-858993472.0, -858993472.0],
+            "_window_size": [2560.0, 1392.0],
+            "_position": [2.0, 55.0],
+            "_size": [426.4178, 834.5826],
             "_flags": 0,
             "_window_state": ""
         }, {
             "_type_id": "Ailu::Editor::WorldOutline",
-            "_id": 101,
-            "_parent_id": 102,
+            "_id": 174,
+            "_parent_id": 101,
             "_type": 2,
             "_is_vertical_split": true,
             "_split_ratio": 0.5,
@@ -74,9 +90,25 @@
             "_window_id": 0,
             "_tab_id": "",
             "_window_position": [-858993472.0, -858993472.0],
-            "_window_size": [1594.0, 903.0],
+            "_window_size": [2560.0, 1392.0],
             "_position": [2.0, 55.0],
-            "_size": [265.2598, 523.2852],
+            "_size": [426.4178, 834.5826],
+            "_flags": 0,
+            "_window_state": ""
+        }, {
+            "_type_id": "Ailu::Editor::PlaceActor",
+            "_id": 175,
+            "_parent_id": 101,
+            "_type": 2,
+            "_is_vertical_split": true,
+            "_split_ratio": 0.5,
+            "_title": "Place Actor",
+            "_window_id": 0,
+            "_tab_id": "",
+            "_window_position": [-858993472.0, -858993472.0],
+            "_window_size": [2560.0, 1392.0],
+            "_position": [2.0, 55.0],
+            "_size": [426.4178, 834.5826],
             "_flags": 0,
             "_window_state": ""
         }, {
@@ -90,14 +122,14 @@
             "_window_id": 0,
             "_tab_id": "0",
             "_window_position": [-858993472.0, -858993472.0],
-            "_window_size": [1594.0, 903.0],
-            "_position": [267.2598, 55.0],
-            "_size": [942.663, 523.2852],
+            "_window_size": [2560.0, 1392.0],
+            "_position": [428.4178, 55.0],
+            "_size": [1515.3753, 834.5826],
             "_flags": 0,
             "_window_state": ""
         }, {
             "_type_id": "Ailu::Editor::SceneView",
-            "_id": 133,
+            "_id": 176,
             "_parent_id": 5,
             "_type": 2,
             "_is_vertical_split": true,
@@ -106,14 +138,14 @@
             "_window_id": 0,
             "_tab_id": "",
             "_window_position": [-858993472.0, -858993472.0],
-            "_window_size": [1594.0, 903.0],
-            "_position": [267.2598, 55.0],
-            "_size": [942.663, 523.2852],
+            "_window_size": [2560.0, 1392.0],
+            "_position": [428.4178, 55.0],
+            "_size": [1515.3753, 834.5826],
             "_flags": 0,
             "_window_state": ""
         }, {
             "_type_id": "Ailu::Editor::GameView",
-            "_id": 134,
+            "_id": 177,
             "_parent_id": 5,
             "_type": 2,
             "_is_vertical_split": true,
@@ -122,9 +154,9 @@
             "_window_id": 0,
             "_tab_id": "",
             "_window_position": [-858993472.0, -858993472.0],
-            "_window_size": [1594.0, 903.0],
-            "_position": [267.2598, 55.0],
-            "_size": [942.663, 523.2852],
+            "_window_size": [2560.0, 1392.0],
+            "_position": [428.4178, 55.0],
+            "_size": [1515.3753, 834.5826],
             "_flags": 0,
             "_window_state": ""
         }, {
@@ -138,9 +170,9 @@
             "_window_id": 0,
             "_tab_id": "",
             "_window_position": [-858993472.0, -858993472.0],
-            "_window_size": [1594.0, 903.0],
-            "_position": [2.0, 578.2852],
-            "_size": [1207.9229, 298.7147],
+            "_window_size": [2560.0, 1392.0],
+            "_position": [2.0, 889.5826],
+            "_size": [1941.7932, 476.4173],
             "_flags": 0,
             "_window_state": "{\n    \"_split_ratio\": 0.2125\n}"
         }, {
@@ -154,46 +186,53 @@
             "_window_id": 0,
             "_tab_id": "",
             "_window_position": [-858993472.0, -858993472.0],
-            "_window_size": [1594.0, 903.0],
-            "_position": [1209.9229, 55.0],
-            "_size": [382.077, 822.0],
+            "_window_size": [2560.0, 1392.0],
+            "_position": [1943.7932, 55.0],
+            "_size": [614.2067, 1311.0],
             "_flags": 0,
             "_window_state": ""
         }],
     "_window_placements": [{
             "_dock_id": "Ailu::Editor::WorldOutline",
             "_position": [2.0, 55.0],
-            "_size": [265.2598, 523.2852],
+            "_size": [426.4178, 834.5826],
             "_native_window_position": [-858993472.0, -858993472.0],
-            "_native_window_size": [1594.0, 903.0],
+            "_native_window_size": [2560.0, 1392.0],
             "_is_external_window": false
         }, {
             "_dock_id": "Ailu::Editor::SceneView",
-            "_position": [267.2598, 55.0],
-            "_size": [942.663, 523.2852],
+            "_position": [428.4178, 55.0],
+            "_size": [1515.3753, 834.5826],
             "_native_window_position": [-858993472.0, -858993472.0],
-            "_native_window_size": [1594.0, 903.0],
+            "_native_window_size": [2560.0, 1392.0],
             "_is_external_window": false
         }, {
             "_dock_id": "Ailu::Editor::GameView",
-            "_position": [267.2598, 55.0],
-            "_size": [942.663, 523.2852],
+            "_position": [428.4178, 55.0],
+            "_size": [1515.3753, 834.5826],
             "_native_window_position": [-858993472.0, -858993472.0],
-            "_native_window_size": [1594.0, 903.0],
+            "_native_window_size": [2560.0, 1392.0],
             "_is_external_window": false
         }, {
             "_dock_id": "Ailu::Editor::AssetBrowser",
-            "_position": [2.0, 578.2852],
-            "_size": [1207.9229, 298.7147],
+            "_position": [2.0, 889.5826],
+            "_size": [1941.7932, 476.4173],
             "_native_window_position": [-858993472.0, -858993472.0],
-            "_native_window_size": [1594.0, 903.0],
+            "_native_window_size": [2560.0, 1392.0],
             "_is_external_window": false
         }, {
             "_dock_id": "Ailu::Editor::ObjectDetail",
-            "_position": [1209.9229, 55.0],
-            "_size": [382.077, 822.0],
+            "_position": [1943.7932, 55.0],
+            "_size": [614.2067, 1311.0],
             "_native_window_position": [-858993472.0, -858993472.0],
-            "_native_window_size": [1594.0, 903.0],
+            "_native_window_size": [2560.0, 1392.0],
+            "_is_external_window": false
+        }, {
+            "_dock_id": "Ailu::Editor::PlaceActor",
+            "_position": [2.0, 55.0],
+            "_size": [426.4178, 834.5826],
+            "_native_window_position": [-858993472.0, -858993472.0],
+            "_native_window_size": [2560.0, 1392.0],
             "_is_external_window": false
         }]
 }

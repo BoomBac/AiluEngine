@@ -536,7 +536,7 @@ namespace Ailu::Render
             if (alloc._cpu_ptr != nullptr && data_size > 0u)
                 memcpy(alloc._cpu_ptr, data, data_size);
             auto &binding = _command_resources[ShaderPropertyRegistry::Get().Intern(name)];
-            binding._resource = alloc._buffer;
+            binding._resource = alloc._owner;
             binding._resource_type = EBindResDescType::kConstBufferRaw;
             binding._addi_info = {};
             binding._addi_info._gpu_handle = alloc._gpu_handle;

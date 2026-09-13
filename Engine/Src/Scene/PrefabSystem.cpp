@@ -19,6 +19,7 @@ namespace Ailu::SceneManagement
             if (component_name == ECS::LightComponent::StaticTypeName()) return entity_doc._has_light_component;
             if (component_name == ECS::CCamera::StaticTypeName()) return entity_doc._has_camera_component;
             if (component_name == ECS::CLightProbe::StaticTypeName()) return entity_doc._has_lightprobe_component;
+            if (component_name == ECS::EnvironmentComponent::StaticTypeName()) return entity_doc._has_environment_component;
             if (component_name == ECS::CRigidBody::StaticTypeName()) return entity_doc._has_rigidbody_component;
             if (component_name == ECS::CCollider::StaticTypeName()) return entity_doc._has_collider_component;
             if (component_name == ECS::RigidBody2DComponent::StaticTypeName()) return entity_doc._has_rigidbody_2d_component;
@@ -269,6 +270,21 @@ namespace Ailu::SceneManagement
                 component._is_update_every_tick = entity_doc._lightprobe_component._is_update_every_tick;
                 component._is_dirty = true;
                 registry.SetComponentEnabled<ECS::CLightProbe>(entity, !is_component_disabled(entity_doc, "CLightProbe"));
+            }
+            if (entity_doc._has_environment_component)
+            {
+                auto &component = registry.AddComponent<ECS::EnvironmentComponent>(entity);
+                const auto &document = entity_doc._environment_component;
+                component._source = document._source;
+                component._texture = document._texture_guid.empty() ? Guid::EmptyGuid() : Guid(document._texture_guid);
+                component._procedural_sky._sky_color = document._sky_color;
+                component._procedural_sky._ground_color = document._ground_color;
+                component._intensity = document._intensity;
+                component._rotation = document._rotation;
+                component._render_sky = document._render_sky;
+                component._enable_ibl = document._enable_ibl;
+                registry.SetComponentEnabled<ECS::EnvironmentComponent>(entity,
+                                                                         !is_component_disabled(entity_doc, "EnvironmentComponent"));
             }
             if (entity_doc._has_rigidbody_component)
             {
@@ -711,6 +727,27 @@ namespace Ailu::SceneManagement
                 component._is_update_every_tick = entity_doc._lightprobe_component._is_update_every_tick;
                 component._is_dirty = true;
                 registry.SetComponentEnabled<ECS::CLightProbe>(entity, !IsComponentDisabled(entity_doc, "CLightProbe"));
+                refreshed = true;
+            }
+            if (entity_doc._has_environment_component)
+            {
+                auto *component = registry.GetComponent<ECS::EnvironmentComponent>(entity);
+                if (component == nullptr)
+                {
+                    component = &registry.AddComponent<ECS::EnvironmentComponent>(entity);
+                    refreshed = true;
+                }
+                const auto &document = entity_doc._environment_component;
+                component->_source = document._source;
+                component->_texture = document._texture_guid.empty() ? Guid::EmptyGuid() : Guid(document._texture_guid);
+                component->_procedural_sky._sky_color = document._sky_color;
+                component->_procedural_sky._ground_color = document._ground_color;
+                component->_intensity = document._intensity;
+                component->_rotation = document._rotation;
+                component->_render_sky = document._render_sky;
+                component->_enable_ibl = document._enable_ibl;
+                registry.SetComponentEnabled<ECS::EnvironmentComponent>(entity,
+                                                                         !IsComponentDisabled(entity_doc, "EnvironmentComponent"));
                 refreshed = true;
             }
             if (entity_doc._has_vxgi_component && registry.GetComponent<ECS::CVXGI>(entity) == nullptr)

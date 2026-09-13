@@ -45,7 +45,7 @@ namespace Ailu::RHI::DX12
 		void UavBarrier(RHICommandBuffer *rhi_cmd) final;
 		Render::NativeHandle NativeResource() final { return {Render::RendererAPI::ERenderAPI::kDirectX12, _p_d3d_res.Get()}; }
 	protected:
-		void OnDataChanged() final;
+                bool IsPhysicalResourceCreated() const final { return static_cast<bool>(_p_d3d_res); }
 	public:
 		D3DResource _p_d3d_res;
 		D3DResource _counter_buffer;

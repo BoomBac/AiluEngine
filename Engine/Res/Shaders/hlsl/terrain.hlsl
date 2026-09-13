@@ -1,4 +1,4 @@
-//info bein
+//info begin
 //pass begin::
 //name: terrain
 //vert: VSMain

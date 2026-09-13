@@ -1,4 +1,4 @@
-//info bein
+//info begin
 //pass begin::
 //name: voxel_drawer
 //vert: ForwardVSMain

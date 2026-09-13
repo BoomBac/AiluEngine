@@ -68,6 +68,7 @@ namespace Ailu
             else if (type_name == ECS::StaticMeshComponent::StaticTypeName()) reg.AddComponent<ECS::StaticMeshComponent>(entity);
             else if (type_name == ECS::LightComponent::StaticTypeName()) reg.AddComponent<ECS::LightComponent>(entity);
             else if (type_name == ECS::CCamera::StaticTypeName()) reg.AddComponent<ECS::CCamera>(entity);
+            else if (type_name == ECS::EnvironmentComponent::StaticTypeName()) reg.AddComponent<ECS::EnvironmentComponent>(entity);
             else if (type_name == ECS::CHierarchy::StaticTypeName()) reg.AddComponent<ECS::CHierarchy>(entity);
             else if (type_name == ECS::CLightProbe::StaticTypeName()) reg.AddComponent<ECS::CLightProbe>(entity);
             else if (type_name == ECS::CRigidBody::StaticTypeName()) reg.AddComponent<ECS::CRigidBody>(entity);

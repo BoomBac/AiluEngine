@@ -189,12 +189,37 @@ namespace Ailu::SceneManagement
             entity_doc._camera_component._size = camera->_camera.Size();
             mark_disabled.template operator()<ECS::CCamera>("CCamera");
         }
+        if (const auto *postprocess = registry.GetComponent<ECS::PostprocessVolumeComponent>(entity); postprocess != nullptr)
+        {
+            entity_doc._has_postprocess_volume_component = true;
+            auto &document = entity_doc._postprocess_volume_component;
+            document._is_global = postprocess->_is_global;
+            document._priority = postprocess->_priority;
+            document._blend_weight = postprocess->_blend_weight;
+            document._blend_distance = postprocess->_blend_distance;
+            document._settings = postprocess->_settings;
+            mark_disabled.template operator()<ECS::PostprocessVolumeComponent>("PostprocessVolumeComponent");
+        }
         if (const auto *light_probe = registry.GetComponent<ECS::CLightProbe>(entity); light_probe != nullptr)
         {
             entity_doc._has_lightprobe_component = true;
             entity_doc._lightprobe_component._size = light_probe->_size;
             entity_doc._lightprobe_component._is_update_every_tick = light_probe->_is_update_every_tick;
             mark_disabled.template operator()<ECS::CLightProbe>("CLightProbe");
+        }
+        if (const auto *environment = registry.GetComponent<ECS::EnvironmentComponent>(entity); environment != nullptr)
+        {
+            entity_doc._has_environment_component = true;
+            auto &document = entity_doc._environment_component;
+            document._source = environment->_source;
+            document._texture_guid = environment->_texture.IsEmpty() ? String{} : environment->_texture.ToString();
+            document._sky_color = environment->_procedural_sky._sky_color;
+            document._ground_color = environment->_procedural_sky._ground_color;
+            document._intensity = environment->_intensity;
+            document._rotation = environment->_rotation;
+            document._render_sky = environment->_render_sky;
+            document._enable_ibl = environment->_enable_ibl;
+            mark_disabled.template operator()<ECS::EnvironmentComponent>("EnvironmentComponent");
         }
         if (const auto *rigidbody = registry.GetComponent<ECS::CRigidBody>(entity); rigidbody != nullptr)
         {
@@ -286,7 +311,9 @@ namespace Ailu::SceneManagement
             ECS::StaticMeshComponent::StaticComponentTypeId(),
             ECS::LightComponent::StaticComponentTypeId(),
             ECS::CCamera::StaticComponentTypeId(),
+            ECS::PostprocessVolumeComponent::StaticComponentTypeId(),
             ECS::CLightProbe::StaticComponentTypeId(),
+            ECS::EnvironmentComponent::StaticComponentTypeId(),
             ECS::CRigidBody::StaticComponentTypeId(),
             ECS::CCollider::StaticComponentTypeId(),
             ECS::RigidBody2DComponent::StaticComponentTypeId(),

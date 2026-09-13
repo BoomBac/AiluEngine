@@ -1020,7 +1020,14 @@ Scope<Asset> MaterialAssetHandler::Load(const AssetLoadContext &context)
         for (auto &prop : doc._float_properties)
             mat->SetFloat(prop._name, prop._value);
         for (auto &prop : doc._vector_properties)
+        {
+            if (std::find(doc._color_properties.begin(), doc._color_properties.end(), prop._name) != doc._color_properties.end())
+            {
+                const Color linear = Color::FromSrgb(Color(prop._value));
+                prop._value = Vector4f(linear.r, linear.g, linear.b, linear.a);
+            }
             mat->SetVector(prop._name, prop._value);
+        }
         for (auto &prop : doc._uint_properties)
             mat->SetInt(prop._name, prop._value);
         for (auto &prop : doc._int_vector_properties)
@@ -1107,7 +1114,18 @@ bool MaterialAssetHandler::Save(const AssetSaveContext &context)
     {
         AssetNamedVectorProperty entry;
         entry._name = name;
-        entry._value = value;
+        const auto prop_it = props.find(name);
+        const bool is_color = prop_it != props.end() && prop_it->second->_type == EShaderPropertyType::kColor;
+        if (is_color)
+        {
+            const Color srgb = Color(value).ToSrgb();
+            entry._value = Vector4f(srgb.r, srgb.g, srgb.b, srgb.a);
+            doc._color_properties.emplace_back(name);
+        }
+        else
+        {
+            entry._value = value;
+        }
         doc._vector_properties.push_back(entry);
     }
     for (auto &[name, value] : int_vector_props)
@@ -1703,6 +1721,18 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
             component._camera.MarkDirty();
             component._camera.RecalculateMatrix(true);
         }
+        if (entity_doc._has_postprocess_volume_component)
+        {
+            auto &component = reg.AddComponent<ECS::PostprocessVolumeComponent>(entity);
+            reg.SetComponentEnabled<ECS::PostprocessVolumeComponent>(
+                entity, !is_component_disabled(entity_doc, "PostprocessVolumeComponent"));
+            const auto &document = entity_doc._postprocess_volume_component;
+            component._is_global = document._is_global;
+            component._priority = document._priority;
+            component._blend_weight = document._blend_weight;
+            component._blend_distance = document._blend_distance;
+            component._settings = document._settings;
+        }
         if (entity_doc._has_lightprobe_component)
         {
             auto &component = reg.AddComponent<ECS::CLightProbe>(entity);
@@ -1710,6 +1740,21 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
             component._size = entity_doc._lightprobe_component._size;
             component._is_update_every_tick = entity_doc._lightprobe_component._is_update_every_tick;
             component._is_dirty = true;
+        }
+        if (entity_doc._has_environment_component)
+        {
+            auto &component = reg.AddComponent<ECS::EnvironmentComponent>(entity);
+            reg.SetComponentEnabled<ECS::EnvironmentComponent>(entity,
+                                                                !is_component_disabled(entity_doc, "EnvironmentComponent"));
+            const auto &document = entity_doc._environment_component;
+            component._source = document._source;
+            component._texture = document._texture_guid.empty() ? Guid::EmptyGuid() : Guid(document._texture_guid);
+            component._procedural_sky._sky_color = document._sky_color;
+            component._procedural_sky._ground_color = document._ground_color;
+            component._intensity = document._intensity;
+            component._rotation = document._rotation;
+            component._render_sky = document._render_sky;
+            component._enable_ibl = document._enable_ibl;
         }
         if (entity_doc._has_rigidbody_component)
         {
@@ -2012,6 +2057,18 @@ bool SceneAssetHandler::Save(const AssetSaveContext &context)
         const u32 sibling_index = sibling_it != entity_sibling_index.end() ? sibling_it->second : 0u;
         SceneEntityDocument entity_doc = EntitySerializer::BuildEntityDocument(*scene, entity, sibling_index);
         doc._entities.emplace_back(std::move(entity_doc));
+    }
+
+    for (const auto &entity_doc : doc._entities)
+    {
+        if (!entity_doc._has_environment_component || entity_doc._environment_component._texture_guid.empty())
+            continue;
+        const Guid texture_guid(entity_doc._environment_component._texture_guid);
+        if (texture_guid.IsEmpty() || std::any_of(doc._header._dependencies.begin(), doc._header._dependencies.end(),
+                                                   [&texture_guid](const AssetDependency &dependency)
+                                                   { return dependency._guid == texture_guid; }))
+            continue;
+        doc._header._dependencies.emplace_back(texture_guid, EAssetDependencyType::kRuntime);
     }
 
     // 按 GUID 字符串排序，减少 ECS dense storage 调整导致的无意义文件 diff。

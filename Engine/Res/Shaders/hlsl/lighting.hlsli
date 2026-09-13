@@ -158,6 +158,13 @@ void InitShadingData(LightData light,SurfaceData surface,inout ShadingData data)
 }
 
 
+float3 RotateEnvironmentDirection(float3 direction)
+{
+        float s = sin(g_EnvironmentRotation);
+        float c = cos(g_EnvironmentRotation);
+        return float3(c * direction.x - s * direction.z, direction.y, s * direction.x + c * direction.z);
+}
+
 float3 CalculateLightPBR(SurfaceData surface,float3 world_pos,float2 screen_uv)
 {
 #if defined(DEBUG_GI)
@@ -178,7 +185,8 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos,float2 screen_uv)
 		InitShadingData(light_data,surface,shading_data);
 		if(_DirectionalLights[i]._shadowmap_index != -1)
 		{
-			shadow_factor = ApplyCascadeShadow(nl, _CameraPos.xyz, world_pos, _DirectionalLights[i]._ShadowDistance);
+			shadow_factor = ApplyCascadeShadow(shading_data.nl, _CameraPos.xyz, world_pos, _DirectionalLights[i]._ShadowDistance,
+			                                   _DirectionalLights[i]._constant_bias, _DirectionalLights[i]._slope_bias);
 		}
 		light_data.shadow_atten = shadow_factor;
 		float3 f = CookTorranceBRDF(surface, shading_data);
@@ -242,12 +250,15 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos,float2 screen_uv)
 	//indirect light
 
 	float lod = surface.roughness * PREFILTER_CUBEMAP_NUM;
-	float3 irradiance = SAMPLE_TEXTURECUBE_LOD(RadianceTex,g_LinearWrapSampler,surface.wnormal,0.0).rgb;
-	float3 radiance = SAMPLE_TEXTURECUBE_LOD(PrefilterEnvTex,g_AnisotropicClampSampler, reflect(shading_data.view_dir,surface.wnormal),lod).rgb;
+        float3 environment_normal = RotateEnvironmentDirection(surface.wnormal);
+        float3 environment_reflection = RotateEnvironmentDirection(reflect(-shading_data.view_dir, surface.wnormal));
+        float3 irradiance = SAMPLE_TEXTURECUBE_LOD(RadianceTex,g_LinearWrapSampler,environment_normal,0.0).rgb;
+        float3 radiance = SAMPLE_TEXTURECUBE_LOD(PrefilterEnvTex,g_AnisotropicClampSampler,environment_reflection,lod).rgb;
 	float2 lut = SAMPLE_TEXTURE2D_LOD(IBLLut,g_LinearClampSampler,float2(shading_data.nv,surface.roughness),0.0).xy;
 	float ao = SAMPLE_TEXTURE2D(_OcclusionTex,g_LinearClampSampler,screen_uv).r;// * g_IndirectLightingIntensity;
 	float voxel_shadow = 1.0;//ConeTraceShadow(world_pos + surface.wnormal * 0.05,-_DirectionalLights[0]._LightPosOrDir);
-	light += voxel_shadow * AmbientLighting(surface,shading_data,irradiance,radiance,lut,ao);
+        light += voxel_shadow * AmbientLighting(surface,shading_data,irradiance,radiance,lut,ao) *
+                 g_EnvironmentIntensity * g_EnvironmentEnabled;
 #ifdef _VOXEL_GI_ON
 	light *= voxel_shadow;
 	light += VoxelGI(world_pos,surface.wnormal) * surface.albedo.rgb;

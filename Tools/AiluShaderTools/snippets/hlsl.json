@@ -1,0 +1,38 @@
+{
+    "Ailu pass": {
+        "prefix": "ailupass",
+        "description": "Insert an AiluEngine shader pass metadata block.",
+        "body": [
+            "//pass begin::",
+            "//name: ${1:pass_name}",
+            "//vert: ${2:VSMain}",
+            "//pixel: ${3:PSMain}",
+            "//Cull: Back",
+            "//Queue: Opaque",
+            "//Fill: Solid",
+            "//ZTest: LEqual",
+            "//ZWrite: On",
+            "//pass end::",
+            "$0"
+        ]
+    },
+    "Ailu shader info": {
+        "prefix": "ailuinfo",
+        "description": "Insert an AiluEngine shader info and pass block.",
+        "body": [
+            "//info begin",
+            "//pass begin::",
+            "//name: ${1:pass_name}",
+            "//vert: ${2:VSMain}",
+            "//pixel: ${3:PSMain}",
+            "//Cull: Back",
+            "//Queue: Opaque",
+            "//Fill: Solid",
+            "//ZTest: LEqual",
+            "//ZWrite: On",
+            "//pass end::",
+            "//info end",
+            "$0"
+        ]
+    }
+}

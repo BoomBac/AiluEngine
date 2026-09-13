@@ -45,7 +45,7 @@ namespace Ailu
                 return new_data;
             }
 
-            static u8 *DownSample(u8 *image, int width, int height, int channels)
+            static u8 *DownSample(u8 *image, int width, int height, int channels, bool is_srgb = false)
             {
                 constexpr static int sub_task_block_size = 128;
                 constexpr static bool use_multithread = false;
@@ -61,15 +61,35 @@ namespace Ailu
                     {
                         for (int j = xbegin; j < xend; ++j)
                         {
-                            // 计算混合颜色的坐标
                             int a_i = i * 2;
                             int a_j = j * 2;
-                            // 获取当前像素及其右侧像素
                             u8 *a = &image[a_i * row_size + a_j * channels];
                             u8 *b = &image[a_i * row_size + (a_j + 1) * channels];
-                            // 计算齐次加权平均值
+                            u8 *c = &image[(a_i + 1) * row_size + a_j * channels];
+                            u8 *d = &image[(a_i + 1) * row_size + (a_j + 1) * channels];
                             for (int k = 0; k < channels; ++k)
-                                blend_color[k] = static_cast<u8>((a[k] + b[k]) / 2);
+                            {
+                                if (is_srgb && k < 3)
+                                {
+                                    const auto to_linear = [](f32 value)
+                                    {
+                                        return value <= 0.04045f ? value / 12.92f
+                                            : std::pow((value + 0.055f) / 1.055f, 2.4f);
+                                    };
+                                    const auto to_srgb = [](f32 value)
+                                    {
+                                        return value <= 0.0031308f ? value * 12.92f
+                                            : 1.055f * std::pow(std::max(value, 0.0f), 1.0f / 2.4f) - 0.055f;
+                                    };
+                                    const f32 average = (to_linear(a[k] / 255.0f) + to_linear(b[k] / 255.0f) +
+                                                         to_linear(c[k] / 255.0f) + to_linear(d[k] / 255.0f)) * 0.25f;
+                                    blend_color[k] = static_cast<u8>(std::clamp(to_srgb(average) * 255.0f + 0.5f, 0.0f, 255.0f));
+                                }
+                                else
+                                {
+                                    blend_color[k] = static_cast<u8>((static_cast<u32>(a[k]) + b[k] + c[k] + d[k]) / 4u);
+                                }
+                            }
                             int new_index = i * new_width * channels + j * channels;
                             memcpy(new_image + new_index, blend_color, sizeof(blend_color));
                         }

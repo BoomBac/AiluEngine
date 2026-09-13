@@ -26,6 +26,8 @@ namespace Ailu
     using Render::RHICommandBuffer;
     using Render::ECommandBufferType;
     using Render::GpuResource;
+    using Render::GpuResourceHandle;
+    using Render::BufferDataVersion;
 
     namespace RHI::DX12
     {
@@ -191,6 +193,8 @@ namespace Ailu
             void AddPostSubmitCallback(std::function<void(u64)> callback) { _post_submit_callbacks.emplace_back(std::move(callback)); }
             void RunPostSubmitCallbacks(u64 fence_value);
             void UploadDataToBuffer(void *src, u64 src_size, const D3DResource &resource);
+            bool EnsureBufferVersion(class D3DGPUBuffer *buffer, const BufferDataVersion &version);
+            void ApplyBufferVersion(class D3DGPUBuffer *buffer, const BufferDataVersion &version);
             bool IsGraphicsPSOActive(const void *pso) const { return _graphics_state_cache._pso == pso; }
             void SetGraphicsPSOActive(const void *pso)
             {
@@ -531,6 +535,7 @@ namespace Ailu
             u64 _active_ib_view_version = 0u;
             CommandBufferStatistics _statistics;
             Vector<Render::CommandProfiler *> _profiler_stack;
+            Vector<std::pair<GpuResourceHandle, u64>> _uploaded_buffer_versions;
             std::unordered_set<GpuResource *> _active_render_targets;
             D3DResourceStateTracker _state_tracker;
             Vector<std::function<void(u64)>> _post_submit_callbacks;

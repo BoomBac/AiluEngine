@@ -76,7 +76,8 @@ void LightInjection(CSInput input)
     float phase = PhaseHG(cosTheta, _g);
     float3 world_pos_no_jitter = worldPos;
     worldPos += view_dir * jitter * SliceThickness(idx.z, _cam_near, _cam_far);
-    float shadow = ApplyCascadeShadowHard(1.0,_cam_pos,worldPos, _DirectionalLights[0]._ShadowDistance);
+    float shadow = ApplyCascadeShadowHard(1.0, _cam_pos, worldPos, _DirectionalLights[0]._ShadowDistance,
+                                           _DirectionalLights[0]._constant_bias, _DirectionalLights[0]._slope_bias);
     float slice_far = SliceDistance(idx.z + 1, _cam_near, _cam_far);
     float3 injected = lightColor * shadow * phase * _intensity;
     if (_temporal_reprojection)

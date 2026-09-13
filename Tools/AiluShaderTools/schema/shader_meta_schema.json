@@ -1,0 +1,148 @@
+{
+    "version": 1,
+    "markers": {
+        "info_begin": "//info begin",
+        "info_begin_aliases": ["//info bein"],
+        "info_end": "//info end",
+        "pass_begin": "//pass begin::",
+        "pass_end": "//pass end::"
+    },
+    "fields": {
+        "name": {
+            "type": "string",
+            "required": true,
+            "description": "The name of this shader pass."
+        },
+        "vert": {
+            "type": "shader_entry",
+            "stage": "vertex",
+            "required": true,
+            "description": "Vertex shader entry function."
+        },
+        "pixel": {
+            "type": "shader_entry",
+            "stage": "pixel",
+            "description": "Pixel shader entry function."
+        },
+        "geometry": {
+            "type": "shader_entry",
+            "stage": "geometry",
+            "description": "Geometry shader entry function."
+        },
+        "Cull": {
+            "type": "enum",
+            "values": ["Off", "Front", "Back"],
+            "aliases": {"None": "Off", "none": "Off"},
+            "description": "Rasterizer culling mode."
+        },
+        "Queue": {
+            "type": "enum",
+            "values": ["Opaque", "Transparent"],
+            "description": "Render queue classification."
+        },
+        "Topology": {
+            "type": "enum",
+            "values": ["Triangle", "TriangleStrip", "Line"],
+            "description": "Primitive topology used by this pass."
+        },
+        "Blend": {
+            "type": "blend",
+            "values": ["Src", "OneMinusSrc", "One", "Zero"],
+            "description": "Source and destination blend factors."
+        },
+        "Fill": {
+            "type": "enum",
+            "values": ["Solid", "Wireframe"],
+            "description": "Rasterizer fill mode."
+        },
+        "ZTest": {
+            "type": "enum",
+            "values": ["Off", "Never", "Less", "LEqual", "Equal", "Greater", "GEqual", "NotEqual", "Always"],
+            "aliases": {"Nevel": "Never"},
+            "description": "Depth comparison function."
+        },
+        "ZWrite": {
+            "type": "enum",
+            "values": ["On", "Off"],
+            "description": "Whether this pass writes depth."
+        },
+        "Stencil": {
+            "type": "stencil",
+            "children": {
+                "Ref": {
+                    "type": "integer",
+                    "values": ["0", "1", "255"],
+                    "description": "Stencil reference value."
+                },
+                "Comp": {
+                    "type": "enum",
+                    "values": ["Never", "Less", "LEqual", "Equal", "Greater", "GEqual", "NotEqual", "Always"],
+                    "description": "Stencil comparison function."
+                },
+                "Pass": {
+                    "type": "enum",
+                    "values": ["Replace", "Keep", "Zero", "Incr", "Decr"],
+                    "description": "Stencil operation when the test passes."
+                }
+            },
+            "description": "Stencil state: {Ref:int,Comp:comparison,Pass:operation}."
+        },
+        "ColorMask": {
+            "type": "color_mask",
+            "values": ["RGBA", "RGB", "RGA", "RBA", "GBA", "RG", "RB", "RA", "GB", "GA", "BA", "R", "G", "B", "A", "0"],
+            "aliases": {"None": "0"},
+            "description": "Color channels written by this pass."
+        },
+        "Conservative": {
+            "type": "enum",
+            "values": ["On", "Off"],
+            "description": "Whether conservative rasterization is enabled."
+        },
+        "multi_compile": {
+            "type": "keywords",
+            "description": "A keyword group used to generate shader variants."
+        }
+    },
+    "properties": {
+        "types": {
+            "Texture2D": {
+                "description": "A 2D texture property.",
+                "insert_text": "Texture2D"
+            },
+            "Texture3D": {
+                "description": "A 3D texture property.",
+                "insert_text": "Texture3D"
+            },
+            "Color": {
+                "description": "A four-component color property.",
+                "insert_text": "Color"
+            },
+            "Range": {
+                "description": "A scalar property constrained by a minimum and maximum.",
+                "insert_text": "Range(${1:0}, ${2:1})"
+            },
+            "Float": {
+                "description": "A scalar floating-point property.",
+                "insert_text": "Float"
+            },
+            "Vector": {
+                "description": "A four-component vector property.",
+                "insert_text": "Vector"
+            }
+        },
+        "annotations": {
+            "Toggle": {
+                "description": "Creates a boolean property and its shader keyword.",
+                "insert_text": "Toggle]"
+            },
+            "Enum": {
+                "description": "Creates an enum property from name/value pairs.",
+                "insert_text": "Enum(${1:Option}, ${2:0})]"
+            },
+            "HDR": {
+                "description": "Marks a Color property as HDR.",
+                "insert_text": "HDR]"
+            }
+        }
+    }
+}

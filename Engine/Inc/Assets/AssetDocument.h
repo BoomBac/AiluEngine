@@ -14,6 +14,7 @@
 #include "Objects/SerializeSpecializations.h"
 #include "AssetCommon.h"
 #include "Physics/2D/Physics2DComponents.h"
+#include "Render/PostprocessSettings.h"
 #include "Scene/Component.h"
 #include "Scene/PrefabTypes.h"
 #include "generated/AssetDocument.gen.h"
@@ -227,6 +228,8 @@ namespace Ailu
         Vector<AssetNamedIntVectorProperty> _int_vector_properties;
         APROPERTY()
         Vector<AssetTextureBinding> _texture_properties;
+        APROPERTY()
+        Vector<String> _color_properties;
     };
 
     ASTRUCT()
@@ -723,6 +726,29 @@ namespace Ailu
     };
 
     ASTRUCT()
+    struct AILU_API SceneEnvironmentComponentDocument
+    {
+        GENERATED_BODY()
+
+        APROPERTY()
+        ECS::EEnvironmentSource _source = ECS::EEnvironmentSource::kProceduralSky;
+        APROPERTY()
+        String _texture_guid;
+        APROPERTY()
+        Color _sky_color = Color(0.18f, 0.32f, 0.58f, 1.0f);
+        APROPERTY()
+        Color _ground_color = Color(0.08f, 0.06f, 0.04f, 1.0f);
+        APROPERTY()
+        f32 _intensity = 1.0f;
+        APROPERTY()
+        f32 _rotation = 0.0f;
+        APROPERTY()
+        bool _render_sky = true;
+        APROPERTY()
+        bool _enable_ibl = true;
+    };
+
+    ASTRUCT()
     struct AILU_API SceneRigidBodyComponentDocument
     {
         GENERATED_BODY()
@@ -845,6 +871,23 @@ namespace Ailu
     };
 
     ASTRUCT()
+    struct AILU_API ScenePostprocessVolumeComponentDocument
+    {
+        GENERATED_BODY()
+
+        APROPERTY()
+        bool _is_global = true;
+        APROPERTY()
+        i32 _priority = 0;
+        APROPERTY()
+        f32 _blend_weight = 1.0f;
+        APROPERTY()
+        f32 _blend_distance = 0.0f;
+        APROPERTY()
+        Render::PostprocessSettings _settings;
+    };
+
+    ASTRUCT()
     struct AILU_API SceneSpriteRendererComponentDocument
     {
         GENERATED_BODY()
@@ -891,6 +934,8 @@ namespace Ailu
         inline static const String kCameraComponent = "_camera_component";
         inline static const String kHasLightprobeComponent = "_has_lightprobe_component";
         inline static const String kLightprobeComponent = "_lightprobe_component";
+        inline static const String kHasEnvironmentComponent = "_has_environment_component";
+        inline static const String kEnvironmentComponent = "_environment_component";
         inline static const String kHasRigidbodyComponent = "_has_rigidbody_component";
         inline static const String kRigidbodyComponent = "_rigidbody_component";
         inline static const String kHasColliderComponent = "_has_collider_component";
@@ -907,6 +952,8 @@ namespace Ailu
         inline static const String kSpriteRendererComponent = "_sprite_renderer_component";
         inline static const String kHasVxgiComponent = "_has_vxgi_component";
         inline static const String kVxgiComponent = "_vxgi_component";
+        inline static const String kHasPostprocessVolumeComponent = "_has_postprocess_volume_component";
+        inline static const String kPostprocessVolumeComponent = "_postprocess_volume_component";
         inline static const String kDisabledComponents = "_disabled_components";
 
         void Serialize(FArchive &ar)
@@ -929,6 +976,8 @@ namespace Ailu
                 SerializerWrapper<SceneCameraComponentDocument>::Serialize(&_camera_component, ar, &kCameraComponent);
             if (_has_lightprobe_component)
                 SerializerWrapper<SceneLightProbeComponentDocument>::Serialize(&_lightprobe_component, ar, &kLightprobeComponent);
+            if (_has_environment_component)
+                SerializerWrapper<SceneEnvironmentComponentDocument>::Serialize(&_environment_component, ar, &kEnvironmentComponent);
             if (_has_rigidbody_component)
                 SerializerWrapper<SceneRigidBodyComponentDocument>::Serialize(&_rigidbody_component, ar, &kRigidbodyComponent);
             if (_has_collider_component)
@@ -945,6 +994,9 @@ namespace Ailu
                 SerializerWrapper<SceneAnimatorComponentDocument>::Serialize(&_animator_component, ar, &kAnimatorComponent);
             if (_has_vxgi_component)
                 SerializerWrapper<SceneVXGIComponentDocument>::Serialize(&_vxgi_component, ar, &kVxgiComponent);
+            if (_has_postprocess_volume_component)
+                SerializerWrapper<ScenePostprocessVolumeComponentDocument>::Serialize(&_postprocess_volume_component, ar,
+                                                                                        &kPostprocessVolumeComponent);
             if (_has_sprite_renderer_component)
                 SerializerWrapper<SceneSpriteRendererComponentDocument>::Serialize(&_sprite_renderer_component, ar, &kSpriteRendererComponent);
         }
@@ -993,6 +1045,7 @@ namespace Ailu
             deserialize_component(_has_hierarchy_component, _hierarchy_component, kHasHierarchyComponent, kHierarchyComponent);
             deserialize_component(_has_camera_component, _camera_component, kHasCameraComponent, kCameraComponent);
             deserialize_component(_has_lightprobe_component, _lightprobe_component, kHasLightprobeComponent, kLightprobeComponent);
+            deserialize_component(_has_environment_component, _environment_component, kHasEnvironmentComponent, kEnvironmentComponent);
             deserialize_component(_has_rigidbody_component, _rigidbody_component, kHasRigidbodyComponent, kRigidbodyComponent);
             deserialize_component(_has_collider_component, _collider_component, kHasColliderComponent, kColliderComponent);
             deserialize_component(_has_rigidbody_2d_component, _rigidbody_2d_component, kHasRigidBody2DComponent,
@@ -1003,6 +1056,8 @@ namespace Ailu
             deserialize_component(_has_animator_component, _animator_component, kHasAnimatorComponent, kAnimatorComponent);
             deserialize_component(_has_sprite_renderer_component, _sprite_renderer_component, kHasSpriteRendererComponent, kSpriteRendererComponent);
             deserialize_component(_has_vxgi_component, _vxgi_component, kHasVxgiComponent, kVxgiComponent);
+            deserialize_component(_has_postprocess_volume_component, _postprocess_volume_component,
+                                  kHasPostprocessVolumeComponent, kPostprocessVolumeComponent);
         }
 
         APROPERTY()
@@ -1041,6 +1096,10 @@ namespace Ailu
         APROPERTY()
         SceneLightProbeComponentDocument _lightprobe_component;
         APROPERTY()
+        bool _has_environment_component = false;
+        APROPERTY()
+        SceneEnvironmentComponentDocument _environment_component;
+        APROPERTY()
         bool _has_rigidbody_component = false;
         APROPERTY()
         SceneRigidBodyComponentDocument _rigidbody_component;
@@ -1068,6 +1127,10 @@ namespace Ailu
         bool _has_vxgi_component = false;
         APROPERTY()
         SceneVXGIComponentDocument _vxgi_component;
+        APROPERTY()
+        bool _has_postprocess_volume_component = false;
+        APROPERTY()
+        ScenePostprocessVolumeComponentDocument _postprocess_volume_component;
         APROPERTY()
         bool _has_sprite_renderer_component = false;
         APROPERTY()

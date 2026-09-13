@@ -19,7 +19,7 @@
             "_value": 0
         }, {
             "_name": "_cull",
-            "_value": 0
+            "_value": 2
         }, {
             "_name": "_surface",
             "_value": 0
@@ -41,7 +41,7 @@
             "_value": 0.0
         }, {
             "_name": "_RoughnessValue",
-            "_value": 1.0
+            "_value": 0.0176
         }, {
             "_name": "_SamplerMask",
             "_value": 0.0
@@ -51,7 +51,7 @@
         }],
     "_vector_properties": [{
             "_name": "_AlbedoValue",
-            "_value": [1.0, 1.0, 1.0, 1.0]
+            "_value": [0.9998, 0.9998, 0.9998, 1.0]
         }, {
             "_name": "_EmissionValue",
             "_value": [0.0, 0.0, 0.0, -1.0]
@@ -75,5 +75,6 @@
         }, {
             "_name": "_SpecularTex",
             "_texture_guid": ""
-        }]
+        }],
+    "_color_properties": ["_AlbedoValue", "_EmissionValue", "_SpecularValue"]
 }

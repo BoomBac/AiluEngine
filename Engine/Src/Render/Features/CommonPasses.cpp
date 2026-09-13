@@ -206,6 +206,8 @@ namespace Ailu::Render
                           }
                           if (rendering_data._rg_handles._ao_tex.IsValid())
                               builder.Read(rendering_data._rg_handles._ao_tex);
+                          builder.Read(rendering_data._rg_handles._environment_diffuse);
+                          builder.Read(rendering_data._rg_handles._environment_specular);
                           rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target);
                           rendering_data._rg_handles._depth_target = builder.Write(rendering_data._rg_handles._depth_target,EResourceUsage::kDSV);
                       }, 
@@ -233,6 +235,11 @@ namespace Ailu::Render
         auto *occlusion_tex = rendering_data._rg_handles._ao_tex.IsValid()
             ? graph.Resolve<Texture>(rendering_data._rg_handles._ao_tex) : Texture::s_p_default_white;
         cmd->SetGlobalTexture("IBLLut", _brdf_lut.get());
+        if (rendering_data._environment != nullptr)
+        {
+            cmd->SetGlobalTexture("RadianceTex", graph.Resolve<Texture>(rendering_data._rg_handles._environment_diffuse));
+            cmd->SetGlobalTexture("PrefilterEnvTex", graph.Resolve<Texture>(rendering_data._rg_handles._environment_specular));
+        }
         cmd->SetGlobalTexture("_OcclusionTex", occlusion_tex ? occlusion_tex : Texture::s_p_default_white);
         cmd->SetGlobalTexture(RenderResourceName::kMainLightShadowMap, main_light_shadow_map);
         cmd->SetGlobalTexture(RenderResourceName::kAddLightShadowMap, add_light_shadow_maps);
@@ -287,6 +294,11 @@ namespace Ailu::Render
         {
             PROFILE_BLOCK_GPU(cmd.get(), _name)
             cmd->SetGlobalTexture("IBLLut", _brdf_lut.get());
+            if (rendering_data._environment != nullptr)
+            {
+                cmd->SetGlobalTexture("RadianceTex", rendering_data._environment->_diffuse_irradiance.get());
+                cmd->SetGlobalTexture("PrefilterEnvTex", rendering_data._environment->_specular_prefilter.get());
+            }
             cmd->SetRenderTarget(rendering_data._camera_color_target_handle, rendering_data._camera_depth_target_handle);
             for (auto &it: all_renderable)
             {
@@ -641,26 +653,42 @@ namespace Ailu::Render
 #pragma region CubeMapGenPass
     //-------------------------------------------------------------CubeMapGenPass-------------------------------------------------------------
 
-    CubeMapGenPass::CubeMapGenPass(Texture *src_tex, u16 size) : RenderPass("CubeMapGenPass"),
-                                                                 _cubemap_rect(Rect{0, 0, size, size}), _ibl_rect(Rect{0, 0, (u16) (size / 4), (u16) (size / 4)})
+    CubeMapGenPass::CubeMapGenPass(Texture *src_tex, u16 size) : RenderPass("CubeMapGenPass")
     {
-        _is_src_cubemap = src_tex->Dimension() == ETextureDimension::kCube;
+        Initialize(src_tex, nullptr, size);
+    }
+
+    CubeMapGenPass::CubeMapGenPass(Material *source_material, u16 size) : RenderPass("CubeMapGenPass")
+    {
+        Initialize(nullptr, source_material, size);
+    }
+
+    void CubeMapGenPass::Initialize(Texture *src_tex, Material *source_material, u16 size)
+    {
+        _is_procedural_source = source_material != nullptr;
+        _is_src_cubemap = !_is_procedural_source && src_tex->Dimension() == ETextureDimension::kCube;
+        _cubemap_rect = Rect{0, 0, size, size};
+        _ibl_rect = Rect{0, 0, (u16) (size / 4), (u16) (size / 4)};
+        const String source_name = _is_procedural_source ? "ProceduralSky" : src_tex->Name();
         float x = 0.f, y = 0.f, z = 0.f;
         Vector3f center = {x, y, z};
         Vector3f world_up = Vector3f::kUp;
         if (!_is_src_cubemap)
         {
-            _src_cubemap = RenderTexture::Create(size, src_tex->Name() + "_src_cubemap", ERenderTargetFormat::kDefaultHDR, true, true, true);
+            _src_cubemap = RenderTexture::Create(size, source_name + "_src_cubemap", ERenderTargetFormat::kDefaultHDR,
+                                                 true, true, true);
         }
         else
             _input_src = src_tex;
 
-        _prefilter_cubemap = RenderTexture::Create(size, src_tex->Name() + "_prefilter_cubemap", ERenderTargetFormat::kDefaultHDR, true, true, true);
+        _prefilter_cubemap = RenderTexture::Create(size, source_name + "_prefilter_cubemap", ERenderTargetFormat::kDefaultHDR,
+                                                   true, true, true);
         _prefilter_cubemap->_load_action = ELoadStoreAction::kNotCare;
-        _radiance_map = RenderTexture::Create(size / 4, src_tex->Name() + "_radiance", ERenderTargetFormat::kDefaultHDR, false);
+        _radiance_map = RenderTexture::Create(size / 4, source_name + "_radiance", ERenderTargetFormat::kDefaultHDR, false);
         _radiance_map->_load_action = ELoadStoreAction::kNotCare;
-        _p_gen_material = ResourceMgr::Get().Get<Material>(L"Runtime/Material/CubemapGen");
-        _p_gen_material->SetTexture("env", src_tex);
+        _p_gen_material = source_material != nullptr ? source_material : ResourceMgr::Get().Get<Material>(L"Runtime/Material/CubemapGen");
+        if (!_is_procedural_source)
+            _p_gen_material->SetTexture("env", src_tex);
         _p_filter_material = ResourceMgr::Get().Get<Material>(L"Runtime/Material/EnvmapFilter");
         Matrix4x4f view, proj;
         BuildPerspectiveFovLHMatrix(proj, 90 * k2Radius, 1.0f, 0.01f, 100.f);
@@ -710,18 +738,32 @@ namespace Ailu::Render
     void Ailu::Render::CubeMapGenPass::OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data)
     {
         Texture *src_tex = _input_src ? _input_src : _src_cubemap.get();
-        const bool source_uses_graph_handle = !_is_src_cubemap ||
-                                              (_input_src != nullptr && _input_src->MipmapLevel() > 1u);
+        const bool source_uses_graph_handle = !_is_src_cubemap;
         if(!_is_src_cubemap)
         {
             graph.AddPass("GenCubeMap",RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder) { 
                 _src_map_handle = builder.Import(_src_cubemap.get());
                 _src_map_handle = builder.WriteRange(_src_map_handle, EResourceUsage::kWriteRTV, 0, 1, 0, 6);
+                if (_is_procedural_source)
+                {
+                    builder.Read(rendering_data._rg_handles._sky_view_lut);
+                    builder.Read(rendering_data._rg_handles._environment_transmittance_lut);
+                }
             }, [this, src_tex](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data) {
                         //image tp cubemap
                 auto *dst_cubemap = graph.Resolve<RenderTexture>(_src_map_handle);
                 if (src_tex == nullptr || dst_cubemap == nullptr)
                     return;
+                if (_is_procedural_source && data._environment != nullptr)
+                {
+                    _p_gen_material->SetTexture("_TexSkyViewLUT", graph.Resolve<Texture>(data._rg_handles._sky_view_lut));
+                    _p_gen_material->SetTexture("_TexTransmittanceLUT",
+                                                 graph.Resolve<Texture>(data._rg_handles._environment_transmittance_lut));
+                    _p_gen_material->SetFloat("_EnvironmentIntensity", data._environment->_intensity);
+                    _p_gen_material->SetFloat("_EnvironmentRotation", data._environment->_rotation);
+                    _p_gen_material->SetVector("_SkyColor", data._environment->_sky_color);
+                    _p_gen_material->SetVector("_GroundColor", data._environment->_ground_color);
+                }
                 for (u16 i = 0; i < 6; i++)
                 {
                     u16 rt_index = dst_cubemap->CalculateViewIndex(Texture::ETextureViewType::kRTV, (ECubemapFace)(i + 1), 0, 0);
@@ -731,58 +773,6 @@ namespace Ailu::Render
                     cmd->DrawMesh(Mesh::s_cube.lock().get(), _p_gen_material, _per_obj_cb.get(), 0, 0, 1);
                 }
             });
-        }
-        if (!_is_src_cubemap && _src_cubemap->MipmapLevel() > 1u)
-        {
-            const u16 mipmap_count = _src_cubemap->MipmapLevel();
-            graph.AddPass("GenCubeMapMipmap0", RDG::PassDesc(RDG::EPassType::kCompute), [&, this, mipmap_count](RDG::RenderGraphBuilder &builder)
-            {
-                builder.ReadRange(_src_map_handle, EResourceUsage::kReadSRV, 0, 1, 0, 6);
-                _src_map_handle = builder.WriteRange(_src_map_handle, EResourceUsage::kWriteUAV, 1, std::min<u16>(4u, mipmap_count - 1u), 0, 6);
-            }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
-            {
-                if (auto *src_map = graph.Resolve<RenderTexture>(_src_map_handle); src_map != nullptr)
-                    src_map->GenerateMipmap(cmd, 0u, 4u);
-            });
-            if (mipmap_count > 5u)
-            {
-                graph.AddPass("GenCubeMapMipmap1", RDG::PassDesc(RDG::EPassType::kCompute), [&, this, mipmap_count](RDG::RenderGraphBuilder &builder)
-                {
-                    builder.ReadRange(_src_map_handle, EResourceUsage::kReadSRV, 4, 1, 0, 6);
-                    _src_map_handle = builder.WriteRange(_src_map_handle, EResourceUsage::kWriteUAV, 5,
-                                                         std::min<u16>(4u, mipmap_count - 5u), 0, 6);
-                }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
-                {
-                    if (auto *src_map = graph.Resolve<RenderTexture>(_src_map_handle); src_map != nullptr)
-                        src_map->GenerateMipmap(cmd, 4u, 4u);
-                });
-            }
-        }
-        else if (_is_src_cubemap && _input_src->MipmapLevel() > 1u)
-        {
-            const u16 mipmap_count = _input_src->MipmapLevel();
-            graph.AddPass("GenMipmap0", RDG::PassDesc(RDG::EPassType::kCompute), [&](RDG::RenderGraphBuilder &builder)
-                          { 
-                _src_map_handle = builder.Import(_input_src);
-                builder.ReadRange(_src_map_handle, EResourceUsage::kReadSRV, 0, 1, 0, 6);
-                _src_map_handle = builder.WriteRange(_src_map_handle, EResourceUsage::kWriteUAV, 1, std::min<u16>(4u, mipmap_count - 1u), 0, 6);
-                          }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
-                          { 
-                              if (auto *src_map = graph.Resolve<RenderTexture>(_src_map_handle); src_map != nullptr)
-                                  src_map->GenerateMipmap(cmd, 0u, 4u); });
-            if (mipmap_count > 5u)
-            {
-                graph.AddPass("GenMipmap1", RDG::PassDesc(RDG::EPassType::kCompute), [&, this, mipmap_count](RDG::RenderGraphBuilder &builder)
-                              {
-                    builder.ReadRange(_src_map_handle, EResourceUsage::kReadSRV, 4, 1, 0, 6);
-                    _src_map_handle = builder.WriteRange(_src_map_handle, EResourceUsage::kWriteUAV, 5,
-                                                         std::min<u16>(4u, mipmap_count - 5u), 0, 6);
-                              }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
-                              {
-                                  if (auto *src_map = graph.Resolve<RenderTexture>(_src_map_handle); src_map != nullptr)
-                                      src_map->GenerateMipmap(cmd, 4u, 4u);
-                              });
-            }
         }
         //gen radiance map
         graph.AddPass("RadianceGen", RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
@@ -837,6 +827,8 @@ namespace Ailu::Render
                 //cmd->SetViewport(r);
                 //cmd->SetScissorRect(r);
                 cmd->SetRenderTarget(prefilter_map, rt_index);
+                cmd->SetViewport(Rect{0, 0, static_cast<u16>(std::max<u32>(1u, _prefilter_cubemap->Width() >> j)),
+                                      static_cast<u16>(std::max<u32>(1u, _prefilter_cubemap->Height() >> j))});
                 cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, _per_camera_cb[i].get());
                 cmd->DrawMesh(Mesh::s_cube.lock().get(), _reflection_prefilter_mateirals[j].get(), _per_obj_cb.get(), 0, 1, 1);
             }
@@ -851,10 +843,19 @@ namespace Ailu::Render
         u16 mipmap_level = src_tex->MipmapLevel();
         if (!_is_src_cubemap)
         {
+            if (_is_procedural_source && rendering_data._environment != nullptr)
+            {
+                _p_gen_material->SetTexture("_TexSkyViewLUT", rendering_data._environment->_sky_view_lut.get());
+                _p_gen_material->SetTexture("_TexTransmittanceLUT", rendering_data._environment->_transmittance_lut.get());
+                _p_gen_material->SetFloat("_EnvironmentIntensity", rendering_data._environment->_intensity);
+                _p_gen_material->SetFloat("_EnvironmentRotation", rendering_data._environment->_rotation);
+                _p_gen_material->SetVector("_SkyColor", rendering_data._environment->_sky_color);
+                _p_gen_material->SetVector("_GroundColor", rendering_data._environment->_ground_color);
+            }
             //image tp cubemap
             for (u16 i = 0; i < 6; i++)
             {
-                u16 rt_index = src_tex->CalculateViewIndex(Texture::ETextureViewType::kRTV, (ECubemapFace)(i + 1), 0, 0);
+                u16 rt_index = _src_cubemap->CalculateViewIndex(Texture::ETextureViewType::kRTV, (ECubemapFace)(i + 1), 0, 0);
                 cmd->SetRenderTarget(_src_cubemap.get(), rt_index);
                 cmd->ClearRenderTarget(Colors::kBlack);
                 cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, _per_camera_cb[i].get());
@@ -862,12 +863,6 @@ namespace Ailu::Render
             }
             context->ExecuteCommandBuffer(cmd);
             cmd->Clear();
-            //实际上mipmap生成不使用传入的cmd，但是需要等待原始cubemap生成完毕
-            _src_cubemap->GenerateMipmap();
-        }
-        else
-        {
-            dynamic_cast<RenderTexture *>(_input_src)->GenerateMipmap();
         }
 
         //gen radiance map
@@ -1037,6 +1032,8 @@ namespace Ailu::Render
                               builder.Read(rendering_data._rg_handles._ao_tex);
                           if (rendering_data._rg_handles._volumetric_fog_accum.IsValid())
                               builder.Read(rendering_data._rg_handles._volumetric_fog_accum);
+                          builder.Read(rendering_data._rg_handles._environment_diffuse);
+                          builder.Read(rendering_data._rg_handles._environment_specular);
                           rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target);
                       },
                           [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
@@ -1065,6 +1062,10 @@ namespace Ailu::Render
                                                                   _dummy_point_light_shadow_map.get());
                             }
                             _p_lighting_material->SetTexture("IBLLut", _brdf_lut.get());
+                            _p_lighting_material->SetTexture("RadianceTex",
+                                                              graph.Resolve<Texture>(data._rg_handles._environment_diffuse));
+                            _p_lighting_material->SetTexture("PrefilterEnvTex",
+                                                              graph.Resolve<Texture>(data._rg_handles._environment_specular));
                             auto *occlusion_tex = data._rg_handles._ao_tex.IsValid()
                                 ? graph.Resolve<Texture>(data._rg_handles._ao_tex) : nullptr;
                             _p_lighting_material->SetTexture("_OcclusionTex", occlusion_tex ? occlusion_tex : Texture::s_p_default_white);
@@ -1087,6 +1088,11 @@ namespace Ailu::Render
         _p_lighting_material->SetTexture("_GBuffer3", rendering_data._gbuffers[3]);
         _p_lighting_material->SetTexture("_CameraDepthTexture", rendering_data._camera_depth_tex_handle);
         _p_lighting_material->SetTexture("IBLLut", _brdf_lut.get());
+        if (rendering_data._environment != nullptr)
+        {
+            _p_lighting_material->SetTexture("RadianceTex", rendering_data._environment->_diffuse_irradiance.get());
+            _p_lighting_material->SetTexture("PrefilterEnvTex", rendering_data._environment->_specular_prefilter.get());
+        }
         auto cmd = CommandBufferPool::Get("DeferredLightingPass");
         {
             PROFILE_BLOCK_GPU(cmd.get(), _name)
@@ -1108,63 +1114,57 @@ namespace Ailu::Render
 #pragma endregion
     //-------------------------------------------------------------DeferedLightingPass-------------------------------------------------------------
 
-#pragma region SkyboxPass
+#pragma region SkyPass
     //-------------------------------------------------------------SkyboxPass-------------------------------------------------------------
-    SkyboxPass::SkyboxPass() : RenderPass("SkyboxPass")
+    SkyPass::SkyPass() : RenderPass("SkyPass")
     {
-        _p_lut_gen = ComputeShader::Create(ResourceMgr::GetResSysPath(L"Shaders/hlsl/Compute/atmosphere_lut_gen.hlsl"));
-        _transmittance_lut_gen_kernel = _p_lut_gen->FindKernel("TransmittanceGen");
-        _mult_scatter_lut_gen_kernel = _p_lut_gen->FindKernel("MultiScattGen");
-        _sky_lut_gen_kernel = _p_lut_gen->FindKernel("SkyLightGen");
         _p_skybox_material = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/skybox.alasset"), "Skybox");
+        _p_procedural_material = _p_skybox_material;
+        auto texture_sky_shader = ResourceMgr::Get().GetRef<Shader>(L"Shaders/hlsl/texture_sky.alasset");
+        if (texture_sky_shader == nullptr)
+            texture_sky_shader = ResourceMgr::Get().Load<Shader>(L"Shaders/hlsl/texture_sky.alasset");
+        _p_texture_material = MakeRef<Material>(texture_sky_shader.get(), "TextureSky");
         _p_skybox_material->SetCullMode(ECullMode::kFront);
+        _p_texture_material->SetCullMode(ECullMode::kFront);
         Matrix4x4f world_mat;
         MatrixScale(world_mat, 1000000.f, 1000000.f, 1000000.f);
         _p_cbuffer = ConstantBuffer::Create(RenderConstants::kPerObjectDataSize);
         _p_cbuffer->SetData(reinterpret_cast<u8 *>(&world_mat), sizeof(Matrix4x4f));
-        _tlut = RenderTexture::Create(_transmittance_lut_size.x, _transmittance_lut_size.y, "_TransmittanceLUT", ERenderTargetFormat::kRGBAHalf, false, false, true);
-        _ms_lut = RenderTexture::Create(_mult_scatter_lut_size.x, _mult_scatter_lut_size.y, "_MultScatterLUT", ERenderTargetFormat::kRGBAHalf, false, false, true);
-
-        auto cmd = CommandBufferPool::Get("SkyLutGen");
-        _p_lut_gen->SetTexture(_transmittance_lut_gen_kernel, "_TransmittanceLUT", _tlut.get());
-        cmd->Dispatch(_p_lut_gen.get(), _transmittance_lut_gen_kernel, _transmittance_lut_size.x / 16, _transmittance_lut_size.y / 16, 1);
-
-        _p_lut_gen->SetTexture(_mult_scatter_lut_gen_kernel, "_TexTransmittanceLUT", _tlut.get());
-        _p_lut_gen->SetTexture(_mult_scatter_lut_gen_kernel, "_MultScatterLUT", _ms_lut.get());
-        cmd->Dispatch(_p_lut_gen.get(), _mult_scatter_lut_gen_kernel, _mult_scatter_lut_size.x / 16, _mult_scatter_lut_size.y / 16, 1);
-        // LUT generation is outside the render graph; publish both persistent resources at COMMON.
-        cmd->RequireState(_tlut.get(), EResourceState::kCommon);
-        cmd->RequireState(_ms_lut.get(), EResourceState::kCommon);
-        g_pGfxContext->ExecuteCommandBufferSync(cmd);
-        CommandBufferPool::Release(cmd);
         _event = static_cast<ERenderPassEvent>(static_cast<u16>(ERenderPassEvent::kBeforeSkybox) + 25u);
     }
 
-    void Ailu::Render::SkyboxPass::OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data)
+    void Ailu::Render::SkyPass::OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data)
     {
-        graph.AddPass("GenSkyLUT", RDG::PassDesc{RDG::EPassType::kCompute}, [&](RDG::RenderGraphBuilder &builder)
-                      { 
-                          TextureDesc sky_lut_desc = TextureDesc(_sky_lut_size.x, _sky_lut_size.y, ERenderTargetFormat::kRGBAHalf);
-                          sky_lut_desc._is_random_access = true;
-                          rendering_data._rg_handles._sky_view_lut = builder.AllocTexture(sky_lut_desc, "_SkyLightLUT");
-                          rendering_data._rg_handles._sky_view_lut = builder.Write(rendering_data._rg_handles._sky_view_lut,
-                                                                                    EResourceUsage::kWriteUAV);
-                          builder.SetGlobalTextureAfterPass(Shader::PropertyID("_TexSkyViewLUT"),
-                                                            rendering_data._rg_handles._sky_view_lut);
-                      }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data)
-                      {
-                            _p_lut_gen->SetTexture(_sky_lut_gen_kernel, "_TexTransmittanceLUT", _tlut.get());
-                            _p_lut_gen->SetTexture(_sky_lut_gen_kernel, "_TexMultScatterLUT", _ms_lut.get());
-                            auto *sky_lut = graph.Resolve<RenderTexture>(
-                                rendering_data._rg_handles._sky_view_lut);
-                            _p_lut_gen->SetTexture(_sky_lut_gen_kernel, "_SkyLightLUT", sky_lut);
-                            _p_lut_gen->SetVector("_MainLightPosition", rendering_data._mainlight_world_position);
-                            cmd->Dispatch(_p_lut_gen.get(), _sky_lut_gen_kernel, _sky_lut_size.x / 16, _sky_lut_size.y / 16, 1);
-        });
+        if (rendering_data._environment == nullptr || !rendering_data._environment->_render_sky)
+            return;
+        if (rendering_data._environment != nullptr && rendering_data._environment->_is_texture_source)
+        {
+            graph.AddPass("DrawTextureSky", RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
+            {
+                builder.Read(rendering_data._rg_handles._environment_sky);
+                builder.Read(rendering_data._rg_handles._color_target, EResourceUsage::kWriteRTV);
+                builder.Read(rendering_data._rg_handles._depth_target, EResourceUsage::kDSV);
+                rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target);
+                rendering_data._rg_handles._depth_target = builder.Write(rendering_data._rg_handles._depth_target, EResourceUsage::kDSV);
+            }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
+            {
+                _p_texture_material->SetTexture("_EnvironmentSky", graph.Resolve<Texture>(data._rg_handles._environment_sky));
+                _p_texture_material->SetFloat("_EnvironmentIntensity", data._environment->_intensity);
+                _p_texture_material->SetFloat("_EnvironmentRotation", data._environment->_rotation);
+                cmd->SetRenderTarget(data._rg_handles._color_target, data._rg_handles._depth_target);
+                if (_is_clear)
+                {
+                    cmd->ClearRenderTarget(Colors::kBlack);
+                    cmd->ClearRenderTarget(kZFar, 0u);
+                }
+                cmd->DrawMesh(Mesh::s_sphere.lock().get(), _p_texture_material.get(), _p_cbuffer.get(), 0, 1);
+            });
+            return;
+        }
         graph.AddPass("DrawSkyBox", RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
                       { 
-                          rendering_data._rg_handles._sky_view_lut =
-                              builder.ReadGlobalTexture(Shader::PropertyID("_TexSkyViewLUT"));
+                          builder.Read(rendering_data._rg_handles._sky_view_lut);
+                          builder.Read(rendering_data._rg_handles._environment_transmittance_lut);
                           builder.Read(rendering_data._rg_handles._color_target, EResourceUsage::kWriteRTV);
                           builder.Read(rendering_data._rg_handles._depth_target, EResourceUsage::kDSV);
                           rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target);
@@ -1173,7 +1173,12 @@ namespace Ailu::Render
                       {
                         _p_skybox_material->SetTexture(
                             "_TexSkyViewLUT", graph.Resolve<RenderTexture>(rendering_data._rg_handles._sky_view_lut));
-                        _p_skybox_material->SetTexture("_TexTransmittanceLUT", _tlut.get());
+                        _p_skybox_material->SetTexture("_TexTransmittanceLUT",
+                                                       graph.Resolve<Texture>(rendering_data._rg_handles._environment_transmittance_lut));
+                        _p_skybox_material->SetFloat("_EnvironmentIntensity", rendering_data._environment->_intensity);
+                        _p_skybox_material->SetFloat("_EnvironmentRotation", rendering_data._environment->_rotation);
+                        _p_skybox_material->SetVector("_SkyColor", rendering_data._environment->_sky_color);
+                        _p_skybox_material->SetVector("_GroundColor", rendering_data._environment->_ground_color);
                         cmd->SetRenderTargetLoadAction(rendering_data._rg_handles._color_target, ELoadStoreAction::kNotCare);
                         cmd->SetRenderTargetLoadAction(rendering_data._rg_handles._depth_target, ELoadStoreAction::kNotCare);
                         cmd->SetRenderTarget(rendering_data._rg_handles._color_target, rendering_data._rg_handles._depth_target);
@@ -1185,24 +1190,36 @@ namespace Ailu::Render
                         cmd->DrawMesh(Mesh::s_sphere.lock().get(), _p_skybox_material.get(), _p_cbuffer.get(), 0, 1);
         });
     }
-    void SkyboxPass::Execute(GraphicsContext *context, RenderingData &rendering_data)
+    void SkyPass::Execute(GraphicsContext *context, RenderingData &rendering_data)
     {
+        if (rendering_data._environment == nullptr || !rendering_data._environment->_render_sky)
+            return;
         auto cmd = CommandBufferPool::Get("SkyboxPass");
         cmd->Clear();
         {
             PROFILE_BLOCK_GPU(cmd.get(), _name)
-            auto sv_lut = cmd->GetTempRT(_sky_lut_size.x, _sky_lut_size.y, "_SkyLightLUT", ERenderTargetFormat::kRGBAHalf, false, false, true);
-
-
-            _p_lut_gen->SetTexture(_sky_lut_gen_kernel, "_TexTransmittanceLUT", _tlut.get());
-            _p_lut_gen->SetTexture(_sky_lut_gen_kernel, "_TexMultScatterLUT", _ms_lut.get());
-            _p_lut_gen->SetTexture(_sky_lut_gen_kernel, "_SkyLightLUT", sv_lut);
-            _p_lut_gen->SetVector("_MainLightPosition", rendering_data._mainlight_world_position);
-            cmd->Dispatch(_p_lut_gen.get(), _sky_lut_gen_kernel, _sky_lut_size.x / 16, _sky_lut_size.y / 16, 1);
-
-
-            _p_skybox_material->SetTexture("_TexSkyViewLUT", sv_lut);
-            _p_skybox_material->SetTexture("_TexTransmittanceLUT", _tlut.get());
+            if (rendering_data._environment != nullptr && rendering_data._environment->_is_texture_source)
+            {
+                _p_texture_material->SetTexture("_EnvironmentSky", rendering_data._environment->_sky_cubemap.get());
+                _p_texture_material->SetFloat("_EnvironmentIntensity", rendering_data._environment->_intensity);
+                _p_texture_material->SetFloat("_EnvironmentRotation", rendering_data._environment->_rotation);
+                cmd->SetRenderTarget(rendering_data._camera_color_target_handle, rendering_data._camera_depth_target_handle);
+                if (_is_clear)
+                {
+                    cmd->ClearRenderTarget(Colors::kBlack);
+                    cmd->ClearRenderTarget(kZFar, 0u);
+                }
+            cmd->DrawMesh(Mesh::s_sphere.lock().get(), _p_texture_material.get(), _p_cbuffer.get(), 0, 1);
+                context->ExecuteCommandBuffer(cmd);
+                CommandBufferPool::Release(cmd);
+                return;
+            }
+            _p_skybox_material->SetTexture("_TexSkyViewLUT", rendering_data._environment->_sky_view_lut.get());
+            _p_skybox_material->SetTexture("_TexTransmittanceLUT", rendering_data._environment->_transmittance_lut.get());
+            _p_skybox_material->SetFloat("_EnvironmentIntensity", rendering_data._environment->_intensity);
+            _p_skybox_material->SetFloat("_EnvironmentRotation", rendering_data._environment->_rotation);
+            _p_skybox_material->SetVector("_SkyColor", rendering_data._environment->_sky_color);
+            _p_skybox_material->SetVector("_GroundColor", rendering_data._environment->_ground_color);
             cmd->SetRenderTargetLoadAction(rendering_data._camera_color_target_handle, ELoadStoreAction::kNotCare);
             cmd->SetRenderTargetLoadAction(rendering_data._camera_depth_target_handle, ELoadStoreAction::kNotCare);
             cmd->SetRenderTarget(rendering_data._camera_color_target_handle, rendering_data._camera_depth_target_handle);
@@ -1212,21 +1229,19 @@ namespace Ailu::Render
                 cmd->ClearRenderTarget(kZFar, 0u);
             }
             cmd->DrawMesh(Mesh::s_sphere.lock().get(), _p_skybox_material.get(), _p_cbuffer.get(), 0, 1);
-            ComputeShader::SetGlobalTexture("_TexSkyViewLUT", sv_lut);
-            cmd->ReleaseTempRT(sv_lut);
         }
         context->ExecuteCommandBuffer(cmd);
         CommandBufferPool::Release(cmd);
     }
-    void SkyboxPass::BeginPass(GraphicsContext *context)
+    void SkyPass::BeginPass(GraphicsContext *context)
     {
     }
-    void SkyboxPass::EndPass(GraphicsContext *context)
+    void SkyPass::EndPass(GraphicsContext *context)
     {
         RenderPass::EndPass(context);
     }
 #pragma endregion
-    //-------------------------------------------------------------SkyboxPass-------------------------------------------------------------
+    //-------------------------------------------------------------SkyPass-------------------------------------------------------------
 
 #pragma region GizmoPass
     //-------------------------------------------------------------GizmoPass-------------------------------------------------------------

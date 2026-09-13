@@ -261,6 +261,7 @@ namespace Ailu::Render
         float _cbs_padding1;
         float4 _CascadeShadowSplit[kMaxCascadeShadowMapSplit];//sphere center,radius * radius
         float4 _CascadeShadowParams;                          //cascade count,1/shadow_fade_out_factor,1/max_shadow_distance
+        float4 _MainShadowMapParams;                          //1/width, 1/height, PCF radius in texels, reserved
         ShaderDirectionalAndPointLightData _DirectionalLights[kMaxDirectionalLight];
         ShaderDirectionalAndPointLightData _PointLights[kMaxPointLight];
         ShaderSpotlLightData _SpotLights[kMaxSpotLight];
@@ -279,7 +280,10 @@ namespace Ailu::Render
         float4 g_VXGI_GridSize;
         float4 g_VXGI_Size;
         float g_IndirectLightingIntensity;
-        float _cbs_paddings[23];
+        float g_EnvironmentIntensity;
+        float g_EnvironmentRotation;
+        float g_EnvironmentEnabled;
+        float _cbs_paddings[16];
         //float4x4 _JointMatrix[80];
     } AL_SHADER_INTEROP_CBUFFER_END
 

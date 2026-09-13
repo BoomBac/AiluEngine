@@ -1,0 +1,72 @@
+{
+    "name": "ailu-shader-tools",
+    "displayName": "Ailu Shader Tools",
+    "description": "Completion, diagnostics, hover and navigation for AiluEngine shader metadata in HLSL files.",
+    "version": "0.1.0",
+    "publisher": "ailu",
+    "license": "MIT",
+    "engines": {
+        "vscode": "^1.74.0"
+    },
+    "categories": ["Programming Languages", "Linters"],
+    "activationEvents": ["onLanguage:hlsl"],
+    "main": "./out/src/extension.js",
+    "contributes": {
+        "commands": [
+            {
+                "command": "ailuShader.validateCurrentFile",
+                "title": "Ailu Shader: Validate Current File"
+            },
+            {
+                "command": "ailuShader.normalizeMetadata",
+                "title": "Ailu Shader: Normalize Metadata"
+            },
+            {
+                "command": "ailuShader.insertPass",
+                "title": "Ailu Shader: Insert Pass"
+            }
+        ],
+        "snippets": [
+            {
+                "language": "hlsl",
+                "path": "./snippets/hlsl.json"
+            }
+        ],
+        "semanticTokenScopes": [
+            {
+                "language": "hlsl",
+                "scopes": {
+                    "ailuShaderName": ["entity.name.function"],
+                    "ailuShaderVert": ["support.function"],
+                    "ailuShaderPixel": ["support.constant"],
+                    "ailuShaderGeometry": ["support.type"],
+                    "ailuShaderCull": ["keyword.control"],
+                    "ailuShaderQueue": ["storage.type"],
+                    "ailuShaderTopology": ["constant.language"],
+                    "ailuShaderBlend": ["keyword.operator"],
+                    "ailuShaderFill": ["entity.name.class"],
+                    "ailuShaderZTest": ["variable.language"],
+                    "ailuShaderZWrite": ["storage.modifier"],
+                    "ailuShaderStencil": ["entity.other.attribute-name"],
+                    "ailuShaderColorMask": ["constant.numeric"],
+                    "ailuShaderConservative": ["punctuation.definition"],
+                    "ailuShaderMultiCompile": ["entity.name.tag"],
+                    "ailuShaderPropertyType": ["support.type"],
+                    "ailuShaderPropertyAnnotation": ["storage.modifier"],
+                    "ailuShaderUnknown": ["invalid.illegal"]
+                }
+            }
+        ]
+    },
+    "scripts": {
+        "compile": "tsc -p ./",
+        "test": "npm run compile && node ./test/run-tests.js",
+        "package": "npm run compile && vsce package --no-dependencies"
+    },
+    "devDependencies": {
+        "@types/node": "^20.14.10",
+        "@types/vscode": "^1.74.0",
+        "typescript": "^5.5.4",
+        "@vscode/vsce": "^2.31.1"
+    }
+}

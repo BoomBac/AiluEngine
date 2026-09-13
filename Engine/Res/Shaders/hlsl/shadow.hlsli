@@ -14,6 +14,10 @@ float Random(float4 seed4)
 	return frac(sin(dp) * 43758.5453);
 }
 
+cbuffer AAA : register(b5)
+{
+	float4 _aaaa;
+};
 float ShadowDistaanceAtten(float dis, float max_dis) 
 {
 	if(dis < 0.8 * max_dis)
@@ -40,6 +44,28 @@ float GetShadowDepthBias(float nl,float constant_bias,float slope_bias)
 	*/
 	return bias;
 }
+
+// Directional CSM uses this complete, symmetric 16-tap set directly. Do not use a prefix of poissonDisk below:
+// its 64 points are not ordered as progressively uniform subsets.
+static const float2 cascadePoissonDisk[16] =
+{
+    float2(-0.94201624f, -0.39906216f),
+    float2(0.94558609f, -0.76890725f),
+    float2(-0.09418410f, -0.92938870f),
+    float2(0.34495938f, 0.29387760f),
+    float2(-0.91588581f, 0.45771432f),
+    float2(-0.81544232f, -0.87912464f),
+    float2(-0.38277543f, 0.27676845f),
+    float2(0.97484398f, 0.75648379f),
+    float2(0.44323325f, -0.97511554f),
+    float2(0.53742981f, -0.47373420f),
+    float2(-0.26496911f, -0.41893023f),
+    float2(0.79197514f, 0.19090188f),
+    float2(-0.24188840f, 0.99706507f),
+    float2(-0.81409955f, 0.91437590f),
+    float2(0.19984126f, 0.78641367f),
+    float2(0.14383161f, -0.14100790f),
+};
 
 static const float2 poissonDisk[64] =
 {
@@ -132,20 +158,13 @@ static const float2 poissonDisk[64] =
 // 	return 1.0 - shadow_factor;// *= lerp(1,0.0,saturate(dis/_MainLightShadowDistance));
 // }
 
-#define _ShadowMapTexelSize 0.0009765625// 1/1024
 #define _SOFT_SAMPLE_COUNT 16
 
 
-float ApplyCascadeShadow(float nl,float3 cam_pos, float3 world_pos,float shadow_distance)
+float ApplyCascadeShadow(float nl, float3 cam_pos, float3 world_pos, float shadow_distance, float constant_bias, float slope_bias)
 {
 	float dis = distance(cam_pos.xyz,world_pos);
-	// if(dis > shadow_distance)
-	// 	return 1.0;	
-	// float z_bias = 0.025 * tan(acos(nl));
-	// z_bias = clamp(z_bias, 0, 0.001);
-	//if dis~[0~max_dis*fade_out] out 1
-	//else [max_dis*fade_out~max_dis] out 1->0
-	float z_bias = GetShadowDepthBias(nl,_DirectionalLights[0]._constant_bias,_DirectionalLights[0]._slope_bias);
+	float z_bias = GetShadowDepthBias(nl, constant_bias, slope_bias);
 	float atten = saturate((_CascadeShadowParams.y * (1.0 - dis * _CascadeShadowParams.z)));
 	int cascade_count = (int)_CascadeShadowParams.x;
 	for(int cascade_index = 0;cascade_index < cascade_count;cascade_index++)
@@ -168,11 +187,9 @@ float ApplyCascadeShadow(float nl,float3 cam_pos, float3 world_pos,float shadow_
 			float shadow_factor = 0.0;
 			for (int i = 0; i < _SOFT_SAMPLE_COUNT; i++)
 			{
-				//uint random_index = uint(8.0 * Random(float4(world_pos.xyy, i))) % 8;
-				// shadow_factor += lerp(0.0, 0.125, _MainLightShadowMap.SampleCmpLevelZero(g_ShadowSampler, 
-				// 	float3(shadow_uv.xy + poissonDisk[i] * _ShadowMapTexelSize,cascade_index), depth - z_bias).r);
 				shadow_factor += 1 - _MainLightShadowMap.SampleCmpLevelZero(g_ShadowSampler, 
-					float3(shadow_uv.xy + poissonDisk[i] * _ShadowMapTexelSize,cascade_index), depth).r;
+					float3(shadow_uv.xy + cascadePoissonDisk[i] * _MainShadowMapParams.xy * _MainShadowMapParams.z,
+					       cascade_index), depth).r;
 			}
 			shadow_factor /= _SOFT_SAMPLE_COUNT;
 			shadow_factor =  (1.0 - shadow_factor);
@@ -182,10 +199,10 @@ float ApplyCascadeShadow(float nl,float3 cam_pos, float3 world_pos,float shadow_
 	return 1.0;
 }
 
-float ApplyCascadeShadowHard(float nl,float3 cam_pos, float3 world_pos,float shadow_distance)
+float ApplyCascadeShadowHard(float nl, float3 cam_pos, float3 world_pos, float shadow_distance, float constant_bias, float slope_bias)
 {
 	float dis = distance(cam_pos.xyz,world_pos);
-	float z_bias = GetShadowDepthBias(nl,_DirectionalLights[0]._constant_bias,_DirectionalLights[0]._slope_bias);
+	float z_bias = GetShadowDepthBias(nl, constant_bias, slope_bias);
 	float atten = saturate((_CascadeShadowParams.y * (1.0 - dis * _CascadeShadowParams.z)));
 	int cascade_count = (int)_CascadeShadowParams.x;
 	for(int cascade_index = 0;cascade_index < cascade_count;cascade_index++)

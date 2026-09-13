@@ -1,10 +1,12 @@
-//info bein
+//info begin
 //pass begin::
 //name: cubemap_debug
 //vert: VSMain
 //pixel: PSMain
 //Cull: Back
 //Queue: Opaque
+//ZTest: Always
+//ZWrite: Off
 //multi_compile _ DEBUG_REFLECT
 //pass end::
 //Properties
@@ -63,7 +65,8 @@ float4 PSMain(PSInput input) : SV_TARGET
 	input.wnormal = normalize(input.wnormal);
 	float3 uvw = input.wnormal;
 #ifdef DEBUG_REFLECT
-	uvw = -uvw;//(input.wnormal,input.world_pos - GetCameraPositionWS());
+	float3 view_direction = normalize(GetCameraPositionWS() - input.world_pos);
+	uvw = reflect(-view_direction, input.wnormal);
 #endif
 	return float4( SAMPLE_TEXTURECUBE_LOD(_SrcCubeMap,g_LinearWrapSampler,uvw,_mipmap).rgb, 1.0);
 	//float2 uv = SampleSphericalMap(normalize(-input.wnormal)); 

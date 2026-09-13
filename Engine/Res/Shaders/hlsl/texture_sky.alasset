@@ -1,0 +1,12 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "5dd9f2c1-f2b9-4d22-a746-5aa3cb79d720",
+        "_asset_type": "Ailu::Render::Shader",
+        "_asset_name": "texture_sky",
+        "_dependencies": []
+    },
+    "_file": "texture_sky.hlsl",
+    "_vs_entry": "VSMain",
+    "_ps_entry": "PSMain"
+}

@@ -321,6 +321,11 @@
       "type": "Ailu::Render::Shader"
     },
     {
+      "guid": "5dd9f2c1-f2b9-4d22-a746-5aa3cb79d720",
+      "path": "engine://Shaders/hlsl/texture_sky.alasset",
+      "type": "Ailu::Render::Shader"
+    },
+    {
       "guid": "b3df3b8f-0bd8-4cbf-9510-e063fc6eb49f",
       "path": "engine://Shaders/hlsl/blit.alasset",
       "type": "Ailu::Render::Shader"

@@ -1,4 +1,4 @@
-//info bein
+//info begin
 //pass begin::
 //name: deferred_lighting
 //vert: FullscreenVSMain

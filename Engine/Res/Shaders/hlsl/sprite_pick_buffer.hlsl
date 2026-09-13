@@ -1,4 +1,4 @@
-//info bein
+//info begin
 //pass begin::
 //name: sprite_pick_buffer
 //vert: VSMain

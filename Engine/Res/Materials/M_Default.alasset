@@ -60,7 +60,7 @@
         }],
     "_vector_properties": [{
             "_name": "_AlbedoValue",
-            "_value": [1.0, 1.0, 1.0, 0.0]
+            "_value": [0.9998, 0.9998, 0.9998, 0.0]
         }, {
             "_name": "_EmissionValue",
             "_value": [0.0, 0.0, 0.0, -1.0]
@@ -84,5 +84,6 @@
         }, {
             "_name": "_SpecularTex",
             "_texture_guid": ""
-        }]
+        }],
+    "_color_properties": ["_AlbedoValue", "_EmissionValue", "_SpecularValue"]
 }

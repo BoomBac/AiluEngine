@@ -8,12 +8,14 @@
 #include "Render/Texture.h"
 #include "EditorApp.h"
 #include "Widgets/EditorLayer.h"
+#include "Widgets/PlaceActor.h"
 #include "Common/Selection.h"
 #include "Framework/Common/Input.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Common/Undo.h"
 #include "Common/TransformGizmo.h"
 #include "Assets/PrefabAsset.h"
+#include "Scene/Scene.h"
 #include "Scene/PrefabSystem.h"
 #include "UI/DragDrop.h"
 #include "UI/Composite.h"
@@ -387,17 +389,71 @@ namespace Ailu
             DropHandler handler;
             handler._can_drop = [](const DragPayload &payload) -> bool
             {
-                return payload._type == EDragType::kMesh || payload._type == EDragType::kPrefab;
+                return payload._type == EDragType::kMesh || payload._type == EDragType::kPrefab ||
+                       payload._type == EDragType::kCustomUserData;
             };
             handler._on_drop = [this](const DragPayload &payload, f32 x, f32 y)
             {
                 LOG_INFO("SceneView {} drop", StaticEnum<EDragType>()->GetNameByEnum(payload._type));
                 if (payload._data == nullptr)
                     return;
-                auto *asset = static_cast<Asset *>(payload._data);
                 auto *scene = SceneMgr::Get().ActiveScene();
                 if (scene == nullptr)
                     return;
+                if (payload._type == EDragType::kCustomUserData)
+                {
+                    const auto *preset = static_cast<const PlaceActorDragPayload *>(payload._data);
+                    const ECS::Entity new_entity = scene->AddObject(
+                            preset->_display_name != nullptr ? preset->_display_name : "Place Actor");
+                    auto &reg = scene->GetRegister();
+                    if (preset->_type == EPlaceActorPresetType::kLightProbe)
+                    {
+                        auto &probe = reg.AddComponent<ECS::CLightProbe>(new_entity);
+                        probe._size = 10.0f;
+                        probe._is_update_every_tick = false;
+                        probe._is_dirty = true;
+                    }
+                    else
+                    {
+                        auto &light = reg.AddComponent<ECS::LightComponent>(new_entity);
+                        light._type = ECS::ELightType::kDirectional;
+                        light._light._light_color = Color(1.0f, 1.0f, 1.0f, 1.0f);
+                        light._light._light_pos = {
+                                _drag_preview_pos.x, _drag_preview_pos.y, _drag_preview_pos.z, 1.0f};
+                        light._light._light_dir = Vector4f(0.0f, -1.0f, 0.0f, 0.0f);
+                        light._light._light_param = Vector4f::kZero;
+                        light._light._is_two_side = false;
+                        light._shadow._is_cast_shadow = true;
+                        light._shadow._constant_bias = 0.01f;
+                        light._shadow._slope_bias = 0.01f;
+                        light._shadow._padding = 0.0f;
+                        light._shadow._shaodwcam_num = 0u;
+                        switch (preset->_type)
+                        {
+                            case EPlaceActorPresetType::kPointLight:
+                                light._type = ECS::ELightType::kPoint;
+                                light._light._light_param = {10.0f, 0.1f, 0.0f, 0.0f};
+                                break;
+                            case EPlaceActorPresetType::kSpotLight:
+                                light._type = ECS::ELightType::kSpot;
+                                light._light._light_param = {10.0f, 20.0f, 30.0f, 0.0f};
+                                break;
+                            case EPlaceActorPresetType::kAreaLight:
+                                light._type = ECS::ELightType::kArea;
+                                light._light._light_param = {10.0f, 4.0f, 5.0f, 0.0f};
+                                break;
+                            case EPlaceActorPresetType::kDirectionalLight:
+                            default:
+                                light._light._light_param.w = 0.265f;
+                                break;
+                        }
+                    }
+                    if (auto *transform = reg.GetComponent<ECS::TransformComponent>(new_entity))
+                        transform->SetLocalPosition(_drag_preview_pos);
+                    Selection::SetSelection(new_entity);
+                    return;
+                }
+                auto *asset = static_cast<Asset *>(payload._data);
                 if (payload._type == EDragType::kPrefab)
                 {
                     Ref<PrefabAssetDocument> prefab = asset->AsRef<PrefabAssetDocument>();
@@ -482,7 +538,10 @@ namespace Ailu
             static Asset *s_last_drag_asset = nullptr;
             static Render::Mesh *s_last_preview_mesh = nullptr;
             static bool s_logged_preview_position = false;
-            if (!DragDropManager::Get().IsDragging(EDragType::kMesh))
+            const auto &payload = DragDropManager::Get().GetPayload();
+            const bool is_mesh_drag = DragDropManager::Get().IsDragging(EDragType::kMesh);
+            const bool is_place_actor_drag = DragDropManager::Get().IsDragging(EDragType::kCustomUserData);
+            if (!is_mesh_drag && !is_place_actor_drag)
             {
                 _drag_preview_mesh = nullptr;
                 _drag_preview_material = nullptr;
@@ -492,10 +551,9 @@ namespace Ailu
                 return;
             }
 
-            const auto &payload = DragDropManager::Get().GetPayload();
-            auto *asset = payload && payload->_data != nullptr ? static_cast<Asset *>(payload->_data) : nullptr;
+            auto *asset = is_mesh_drag && payload && payload->_data != nullptr ? static_cast<Asset *>(payload->_data) : nullptr;
             _drag_preview_mesh = asset != nullptr ? asset->AsRef<Render::Mesh>() : nullptr;
-            if (asset != s_last_drag_asset || _drag_preview_mesh.get() != s_last_preview_mesh)
+            if (is_mesh_drag && (asset != s_last_drag_asset || _drag_preview_mesh.get() != s_last_preview_mesh))
             {
                 auto *vertex_buffer = _drag_preview_mesh != nullptr ? _drag_preview_mesh->GetVertexBuffer().get() : nullptr;
                 auto *index_buffer = _drag_preview_mesh != nullptr && _drag_preview_mesh->SubmeshCount() > 0u
@@ -510,7 +568,7 @@ namespace Ailu
                 s_last_drag_asset = asset;
                 s_last_preview_mesh = _drag_preview_mesh.get();
             }
-            if (_drag_preview_mesh == nullptr || Camera::sCurrent == nullptr)
+            if ((is_mesh_drag && _drag_preview_mesh == nullptr) || Camera::sCurrent == nullptr)
                 return;
 
             const Vector4f rect = _source->GetArrangeRect();
@@ -539,7 +597,8 @@ namespace Ailu
                 if (!has_position)
                     position = ray._start + ray._dir * 10.0f;
             }
-            position.y += _drag_preview_mesh->BoundBox()[0].GetHalfAxisLength().y;
+            if (_drag_preview_mesh != nullptr)
+                position.y += _drag_preview_mesh->BoundBox()[0].GetHalfAxisLength().y;
             _drag_preview_pos = position;
             if (!s_logged_preview_position)
             {

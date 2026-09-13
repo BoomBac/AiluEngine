@@ -7,6 +7,7 @@
 #include <deque>
 #include <memory>
 #include <mutex>
+#include <atomic>
 #include <wrl.h>
 
 #include "Ext/d3dx12.h"
@@ -37,7 +38,11 @@ namespace Ailu::RHI::DX12
         u64 GetPageSize() const { return m_PageSize; }
         Allocation Allocate(size_t sizeInBytes, size_t alignment);
         void Reset();
-        Render::NativeHandle NativeResource() final { return {Render::RendererAPI::ERenderAPI::kDirectX12, m_CurrentPage ? m_CurrentPage->NativeResource() : nullptr}; }
+        Render::NativeHandle NativeResource() final
+        {
+            auto current_page = m_CurrentPage.load(std::memory_order_acquire);
+            return {Render::RendererAPI::ERenderAPI::kDirectX12, current_page ? current_page->NativeResource() : nullptr};
+        }
         void BindImpl(Render::RHICommandBuffer *rhi_cmd, const Render::BindParams& params) final;
 
     private:
@@ -47,7 +52,7 @@ namespace Ailu::RHI::DX12
             Page(const String &name, u64 byte_size);
             ~Page();
             bool HasSpace(u64 byte_size, u64 alignment) const;
-            Allocation Allocate(size_t sizeInBytes, size_t alignment);
+            bool Allocate(size_t size_in_bytes, size_t alignment, Allocation &allocation);
             void Reset();
             ID3D12Resource *NativeResource() const { return m_d3d12Resource.Get(); }
 
@@ -56,7 +61,7 @@ namespace Ailu::RHI::DX12
             void *m_CPUPtr;
             D3D12_GPU_VIRTUAL_ADDRESS m_GPUPtr;
             size_t m_PageSize;
-            size_t m_Offset;
+            std::atomic<size_t> m_Offset;
         };
         using PagePool = std::deque<std::shared_ptr<Page>>;
         // Request a page from the pool of available pages
@@ -66,7 +71,8 @@ namespace Ailu::RHI::DX12
         PagePool m_PagePool;
         PagePool m_AvailablePages;
         PagePool m_LargePagePool;
-        std::shared_ptr<Page> m_CurrentPage;
+        std::atomic<std::shared_ptr<Page>> m_CurrentPage;
+        mutable std::mutex m_PagePoolMutex;
         // The size of each page of memory.
         size_t m_PageSize;
     };

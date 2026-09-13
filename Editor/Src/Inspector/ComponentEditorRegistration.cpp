@@ -6,6 +6,7 @@
 #include "Inspector/ComponentEditors/CameraComponentEditor.h"
 #include "Inspector/ComponentEditors/SpriteRendererComponentEditor.h"
 #include "Inspector/ComponentEditors/LightProbeComponentEditor.h"
+#include "Inspector/ComponentEditors/EnvironmentComponentEditor.h"
 #include "Inspector/ComponentEditors/RigidBodyComponentEditor.h"
 #include "Inspector/ComponentEditors/ColliderComponentEditor.h"
 #include "Inspector/ComponentEditors/PersistentIdComponentEditor.h"
@@ -13,6 +14,7 @@
 #include "Inspector/ComponentEditors/Collider2DComponentEditor.h"
 #include "Inspector/ComponentEditors/AnimatorComponentEditor.h"
 #include "Inspector/ComponentEditors/TagComponentEditor.h"
+#include "Inspector/ComponentEditors/PostprocessVolumeComponentEditor.h"
 #include "Physics/2D/Physics2DComponents.h"
 #include "Scene/Component.h"
 
@@ -34,7 +36,12 @@ namespace Ailu
 
             registry.RegisterCustom<ECS::CLightProbe, LightProbeComponentEditor>("Light Probe", "Rendering", 220);
 
+            registry.RegisterCustom<ECS::EnvironmentComponent, EnvironmentComponentEditor>("Environment", "Rendering", 225);
+
             registry.RegisterCustom<ECS::CCamera, CameraComponentEditor>("Camera", "Rendering", 230);
+
+            registry.RegisterCustom<ECS::PostprocessVolumeComponent, PostprocessVolumeComponentEditor>(
+                "Postprocess Volume", "Rendering", 235);
 
             registry.RegisterCustom<ECS::SpriteRendererComponent, SpriteRendererComponentEditor>("Sprite Renderer", "Rendering", 240);
 

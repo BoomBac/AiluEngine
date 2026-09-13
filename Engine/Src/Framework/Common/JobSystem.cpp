@@ -13,6 +13,34 @@
 
 namespace Ailu
 {
+    JobGroup::~JobGroup()
+    {
+        AL_ASSERT(IsDone());
+    }
+
+    void JobGroup::Add(u32 count)
+    {
+        AL_ASSERT(count > 0u);
+        _remaining.fetch_add(count, std::memory_order_relaxed);
+    }
+
+    void JobGroup::Done()
+    {
+        const u32 previous = _remaining.fetch_sub(1u, std::memory_order_acq_rel);
+        AL_ASSERT(previous > 0u);
+
+        if (previous == 1u)
+        {
+            std::lock_guard lock(_wait_mutex);
+            _wait_cv.notify_all();
+        }
+    }
+
+    bool JobGroup::IsDone() const
+    {
+        return _remaining.load(std::memory_order_acquire) == 0u;
+    }
+
     void Job::OnComplete(std::exception_ptr exception)
     {
         if (exception)
@@ -134,6 +162,7 @@ namespace Ailu
 
     WaitHandle JobSystem::Dispatch(Job *job)
     {
+        PROFILE_BLOCK_CPU("JobSystem::Dispatch");
         job->SetJobSystem(this);
         size_t index = _thread_index++ % _queues.size();
         AL_ASSERT(job->IsValid());
@@ -191,6 +220,7 @@ namespace Ailu
 
     bool JobSystem::WorkOnce()
     {
+        PROFILE_BLOCK_CPU("JobSystem::WorkOnce");
         Job *job = nullptr;
         size_t index = _thread_index % _queues.size();
 
@@ -271,6 +301,9 @@ namespace Ailu
     }
     void JobSystem::CompleteJob(Job *job, std::exception_ptr exception)
     {
+        PROFILE_BLOCK_CPU("JobSystem::CompleteJob");
+        if (job->_group != nullptr)
+            job->_group->Done();
         job->OnComplete(exception);
         if (job->Index() < kMaxJobPoolSize)
             ++_job_fence[job->Index()];
@@ -321,6 +354,22 @@ namespace Ailu
             std::unique_lock<std::mutex> lock(_all_job_mutex);
             if (_all_job_cv.wait_for(lock, std::chrono::milliseconds(1), [&]() -> bool { return _temp_jobs.empty(); }))
                 return;
+        }
+    }
+
+    void JobSystem::Wait(JobGroup& group)
+    {
+        PROFILE_BLOCK_CPU("JobSystem::Wait(JobGroup)");
+        while (!group.IsDone())
+        {
+            if (WorkOnce())
+                continue;
+
+            std::unique_lock lock(group._wait_mutex);
+            if (group.IsDone())
+                break;
+
+            group._wait_cv.wait_for(lock, std::chrono::microseconds(100), [&group]() { return group.IsDone(); });
         }
     }
 }// namespace Ailu

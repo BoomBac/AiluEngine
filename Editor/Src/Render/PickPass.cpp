@@ -12,6 +12,8 @@
 #include "Render/2D/Sprite.h"
 #include "Scene/Scene.h"
 
+#include <algorithm>
+
 namespace Ailu
 {
     using namespace Editor;
@@ -44,6 +46,39 @@ namespace Ailu
                                    draw_data, 1u);
                 cmd->DrawSceneMesh(primitive->_vertex_buffer, primitive->_index_buffer, material, submesh_index, 1u,
                                    draw_data, 1u);
+            }
+
+            Texture *GetEnvironmentPreviewTexture(const ECS::EnvironmentComponent &component,
+                                                   const EnvironmentRuntimeData &environment)
+            {
+                switch (component._src_type)
+                {
+                case 0:
+                    return environment._sky_cubemap.get();
+                case 1:
+                    return environment._diffuse_irradiance.get();
+                case 2:
+                    return environment._specular_prefilter.get();
+                default:
+                    return nullptr;
+                }
+            }
+
+            void SetupEnvironmentPreviewMaterial(Material *material, const ECS::EnvironmentComponent &component,
+                                                 const EnvironmentRuntimeData &environment)
+            {
+                if (material == nullptr)
+                    return;
+                Texture *source = GetEnvironmentPreviewTexture(component, environment);
+                if (source == nullptr)
+                    return;
+                if (component._src_type == 2)
+                    material->EnableKeyword("DEBUG_REFLECT");
+                else
+                    material->DisableKeyword("DEBUG_REFLECT");
+                const f32 max_mipmap = source->MipmapLevel() > 0u ? static_cast<f32>(source->MipmapLevel() - 1u) : 0.0f;
+                material->SetTexture("_SrcCubeMap", source);
+                material->SetFloat("_mipmap", std::clamp(component._mipmap, 0.0f, max_mipmap));
             }
         }
 
@@ -171,6 +206,14 @@ namespace Ailu
                         builder.Read(builder.Import(source));
                 }
             };
+            const auto read_environment_resources = [&rendering_data](RDG::RenderGraphBuilder &builder)
+            {
+                if (rendering_data._environment == nullptr)
+                    return;
+                builder.Read(rendering_data._rg_handles._environment_sky);
+                builder.Read(rendering_data._rg_handles._environment_diffuse);
+                builder.Read(rendering_data._rg_handles._environment_specular);
+            };
             if (rendering_data._scene != nullptr && rendering_data._camera != nullptr)
                 CollectSprites(*rendering_data._scene, *rendering_data._camera, false);
             graph.AddPass("PickBuffer", RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
@@ -186,6 +229,7 @@ namespace Ailu
                                                                                              EResourceUsage::kDSV);
                                      read_sprite_resources(builder);
                                      read_light_probe_resources(builder);
+                                     read_environment_resources(builder);
                 }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data)
                 {
                 ECS::Register &r = SceneMgr::Get().ActiveScene()->GetRegister();
@@ -207,6 +251,16 @@ namespace Ailu
                             Vector3f ext = Vector3f(comp->_size) * 0.5f;
                             Gizmo::DrawAABB(t->_position - ext, t->_position + ext);
                             cmd->DrawMesh(Mesh::s_sphere.lock().get(), comp->_debug_material, t->GetWorldMatrix(), 0, 0, 1);
+                        }
+                        else if (auto comp = r.GetComponent<ECS::EnvironmentComponent>(entity); comp != nullptr &&
+                                 rendering_data._environment != nullptr)
+                        {
+                            SetupEnvironmentPreviewMaterial(rendering_data._environment->_debug_material, *comp,
+                                                             *rendering_data._environment);
+                            if (rendering_data._environment->_debug_material != nullptr &&
+                                GetEnvironmentPreviewTexture(*comp, *rendering_data._environment) != nullptr)
+                                cmd->DrawMesh(Mesh::s_sphere.lock().get(), rendering_data._environment->_debug_material,
+                                              t->GetWorldMatrix(), 0, 0, 1);
                         }
                         else if (auto comp = r.GetComponent<ECS::CCamera>(entity); comp != nullptr)
                         {
@@ -392,6 +446,16 @@ namespace Ailu
                             Vector3f ext = Vector3f(comp->_size) * 0.5f;
                             Gizmo::DrawAABB(t.GetPosition() - ext, t.GetPosition() + ext);
                             cmd->DrawMesh(Mesh::s_sphere.lock().get(), comp->_debug_material, t.GetWorldMatrix(), 0, 0, 1);
+                        }
+                        else if (auto comp = r.GetComponent<ECS::EnvironmentComponent>(entity); comp != nullptr &&
+                                 rendering_data._environment != nullptr)
+                        {
+                            SetupEnvironmentPreviewMaterial(rendering_data._environment->_debug_material, *comp,
+                                                             *rendering_data._environment);
+                            if (rendering_data._environment->_debug_material != nullptr &&
+                                GetEnvironmentPreviewTexture(*comp, *rendering_data._environment) != nullptr)
+                                cmd->DrawMesh(Mesh::s_sphere.lock().get(), rendering_data._environment->_debug_material,
+                                              t.GetWorldMatrix(), 0, 0, 1);
                         }
                         else if (auto comp = r.GetComponent<ECS::CCamera>(entity); comp != nullptr)
                         {

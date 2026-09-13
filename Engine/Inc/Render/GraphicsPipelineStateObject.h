@@ -145,8 +145,6 @@ namespace Ailu::Render
         GraphicsPipelineStateMgr();
         ~GraphicsPipelineStateMgr();
         GraphicsPipelineStateObject *FindReadyPSO(const PSOHash &hash);
-        void RequestPSOCreation(const PSOCreateRequest &request);
-        void ProcessPendingPSOCreationRequests();
         void ProcessPendingShaderCompiles();
         void OnShaderCompiled(Shader *shader, u16 pass_id, ShaderVariantHash variant_hash)
         {
@@ -173,7 +171,6 @@ namespace Ailu::Render
         HashMap<PSOHash, Ref<GraphicsPipelineStateObject>, PSOHash::HashFunc> _pso_library{};
         u32 s_reserved_pso_id = 32u;
         Core::LockFreeQueue<ShaderCompiledInfo, 256> _shader_compiled_queue;
-        Core::LockFreeQueue<PSOCreateRequest, 1024> _pso_create_queue;
     };
 
     class AILU_API CommandRecordingContext
@@ -207,7 +204,7 @@ namespace Ailu::Render
         void MarkPSODirty()
         {
             _is_pso_dirty = true;
-            _pso_request_submitted = false;
+            _pso_creation_attempted = false;
         }
 #if AILU_ENABLE_FRAME_DEBUGGER
         FrameDebugger::EPsoDirtyReason _capture_pso_dirty_reasons = FrameDebugger::EPsoDirtyReason::kNone;
@@ -220,7 +217,7 @@ namespace Ailu::Render
         void MarkPSODirty(FrameDebugger::EPsoDirtyReason reason)
         {
             _is_pso_dirty = true;
-            _pso_request_submitted = false;
+            _pso_creation_attempted = false;
 #if AILU_ENABLE_FRAME_DEBUGGER
             _capture_pso_dirty_reasons = _capture_pso_dirty_reasons | reason;
 #endif
@@ -249,7 +246,7 @@ namespace Ailu::Render
         ETopology _current_topology = ETopology::kTriangle;
         u8 _stencil_ref = 0u;
         bool _is_pso_dirty = true;
-        bool _pso_request_submitted = false;
+        bool _pso_creation_attempted = false;
         Shader* _current_shader = nullptr;
         u16 _current_pass_index = 0u;
         ShaderVariantHash _current_variant_hash = 0u;

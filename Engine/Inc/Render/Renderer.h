@@ -18,6 +18,7 @@
 #include "Texture.h"
 #include <functional>
 #include "RenderingData.h"
+#include "Render/Environment.h"
 #include "Scene/Scene.h"
 #include "generated/Renderer.gen.h"
 
@@ -34,7 +35,7 @@ namespace Ailu
             kWireframe = 2,
             kLitWireframe = 3
         };
-        class PostProcessPass;
+        class PostprocessStack;
         class SSAOPass;
         class Camera;
         class FrameResource;
@@ -125,15 +126,16 @@ namespace Ailu
 
             RDG::RenderGraph* _rd_graph;
 
+            EnvironmentSystem _environment_system;
             Scope<ShadowCastPass> _shadowcast_pass;
             Scope<DeferredGeometryPass> _gbuffer_pass;
             Scope<CopyDepthPass> _coptdepth_pass;
             Scope<DeferredLightingPass> _lighting_pass;
-            Scope<SkyboxPass> _skybox_pass;
+            Scope<SkyPass> _sky_pass;
             Scope<MotionVectorPass> _motion_vector_pass;
             Scope<ForwardPass> _forward_pass;
             Scope<CopyColorPass> _copycolor_pass;
-            Scope<PostProcessPass> _postprocess_pass;
+            Scope<PostprocessStack> _postprocess_stack;
             Scope<GizmoPass> _gizmo_pass;
             Scope<GUIPass> _gui_pass;
             Scope<WireFramePass> _wireframe_pass;

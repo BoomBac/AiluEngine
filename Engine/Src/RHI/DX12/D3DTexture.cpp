@@ -341,7 +341,7 @@ namespace Ailu::RHI::DX12
         static const ComputeShaderKernelId s_mipmap_gen_2d_kernel = s_mipmap_gen->FindKernel("MipmapGen2D");
         s_mipmap_gen->SetInt("SrcMipLevel", 0);
         s_mipmap_gen->SetInt("NumMipLevels", 4);
-        s_mipmap_gen->SetBool("IsSRGB", false);
+        s_mipmap_gen->SetBool("IsSRGB", sRGB());
         auto [mip1w, mip1h] = CalculateMipSize(_width, _height, 1);
         s_mipmap_gen->SetInt("SrcDimension", GetTextureSizePower2Info(CalculateMipSize(_width, _height, 0)));
         s_mipmap_gen->SetVector("TexelSize", Vector4f(1.0f / (float) mip1w, 1.0f / (float) mip1h, 0.0f, 0.0f));
@@ -359,7 +359,7 @@ namespace Ailu::RHI::DX12
             s_mipmap_gen->SetInt("SrcMipLevel", 4);
             s_mipmap_gen->SetInt("NumMipLevels", std::min<u16>(_mipmap_count - 5, 4));
             s_mipmap_gen->SetInt("SrcDimension", GetTextureSizePower2Info(CalculateMipSize(_width, _height, 4)));
-            s_mipmap_gen->SetBool("IsSRGB", false);
+            s_mipmap_gen->SetBool("IsSRGB", sRGB());
             s_mipmap_gen->SetVector("TexelSize", Vector4f(1.0f / (float) mip5w, 1.0f / (float) mip5h, 0.0f, 0.0f));
             s_mipmap_gen->SetTexture(s_mipmap_gen_2d_kernel, "SrcMip", this, ECubemapFace::kUnknown, 4);
             s_mipmap_gen->SetTexture(s_mipmap_gen_2d_kernel, "OutMip1", this, ECubemapFace::kUnknown, 5);
@@ -374,7 +374,7 @@ namespace Ailu::RHI::DX12
             s_mipmap_gen->SetInt("SrcMipLevel", 8);
             s_mipmap_gen->SetInt("NumMipLevels", std::min<u16>(_mipmap_count - 9, 4));
             s_mipmap_gen->SetInt("SrcDimension", GetTextureSizePower2Info(CalculateMipSize(_width, _height, 8)));
-            s_mipmap_gen->SetBool("IsSRGB", false);
+            s_mipmap_gen->SetBool("IsSRGB", sRGB());
             s_mipmap_gen->SetVector("TexelSize", Vector4f(1.0f / (float) mip9w, 1.0f / (float) mip9h, 0.0f, 0.0f));
             s_mipmap_gen->SetTexture(s_mipmap_gen_2d_kernel, "SrcMip", this, ECubemapFace::kUnknown, 8);
             s_mipmap_gen->SetTexture(s_mipmap_gen_2d_kernel, "OutMip1", this, ECubemapFace::kUnknown, 9);

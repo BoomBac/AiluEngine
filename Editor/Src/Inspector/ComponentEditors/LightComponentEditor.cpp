@@ -30,7 +30,7 @@ namespace Ailu
                 comp->_type = static_cast<ECS::ELightType>(idx);
             };
 
-            Editor::AddFloatSliderRow(context._content, "Intensity", 0.0f, 100.0f, comp->_light._light_color.a, [comp](f32 value)
+            Editor::AddFloatSliderRow(context._content, "Intensity", 0.0f, 50.0f, comp->_light._light_color.a, [comp](f32 value)
             {
                 comp->_light._light_color.a = value;
             });
@@ -57,6 +57,30 @@ namespace Ailu
                     UIManager::Get()->ShowPopupAt(show_pos.x, show_pos.y, color_picker);
                 };
             }
+
+            auto *shadow_panel = context._content->AddChild<CollapsibleView>("Shadow");
+            shadow_panel->GetSlotAs<LinearSlot>().SizePolicy(ESizePolicy::kFill, ESizePolicy::kAuto);
+            shadow_panel->SetCollapsed(true);
+            auto *shadow_content = static_cast<VerticalBox *>(shadow_panel->GetContent()->AddChild<VerticalBox>());
+            shadow_content->SlotPadding() = Padding(2.0f, 2.0f, 2.0f, 2.0f);
+
+            auto *cast_shadow = Editor::AddCheckBoxRow(shadow_content, "Cast Shadow", comp->_shadow._is_cast_shadow);
+            cast_shadow->_on_click += [comp](bool checked)
+            {
+                comp->_shadow._is_cast_shadow = checked;
+            };
+
+            auto &shadow_data = comp->_shadow;
+            Editor::AddFloatSliderRow(shadow_content, "Constant Bias", 0.0f, 1.0f, shadow_data._constant_bias,
+                                      [&shadow_data](f32 value)
+            {
+                shadow_data._constant_bias = value;
+            });
+            Editor::AddFloatSliderRow(shadow_content, "Slope Bias", 0.0f, 1.0f, shadow_data._slope_bias,
+                                      [&shadow_data](f32 value)
+            {
+                shadow_data._slope_bias = value;
+            });
 
             if (comp->_type == ECS::ELightType::kDirectional)
             {

@@ -2,6 +2,7 @@
 #include "Framework/Common/Path.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Framework/Script/ScriptSystem.h"
+#include "Render/GraphicsContext.h"
 #include "Render/RayTracing/RayTracingShader.h"
 #include "Render/Shader.h"
 #include <algorithm>
@@ -200,7 +201,10 @@ namespace Ailu
                     if (source_file == sys_path)
                     {
                         match_file = true;
-                        ResourceMgr::Get().MarkAssetForReload(ResourceMgr::Get().GetLinkedAsset(shader.get()));
+                        if (Asset *linked_asset = ResourceMgr::Get().GetLinkedAsset(shader.get()); linked_asset != nullptr)
+                            ResourceMgr::Get().MarkAssetForReload(linked_asset);
+                        else if (Render::g_pGfxContext != nullptr)
+                            Render::g_pGfxContext->CompileShaderAsync(shader.get());
                         ++count;
                         break;
                     }

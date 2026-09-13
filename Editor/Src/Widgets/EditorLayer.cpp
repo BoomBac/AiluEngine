@@ -16,7 +16,6 @@
 #include "Framework/Common/Log.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Framework/Common/TimeMgr.h"
-#include "Render/Features/PostprocessPass.h"
 #include "Render/Features/VolumetricClouds.h"
 #include "Render/Features/VolumetricFog.h"
 #include "Render/Gizmo.h"
@@ -44,6 +43,7 @@
 #include "UI/Menu.h"
 #include "UI/Widget.h"
 #include "Widgets/FrameDebuggerWindow.h"
+#include "Widgets/PlaceActor.h"
 
 #include "Objects/JsonArchive.h"
 
@@ -1298,6 +1298,13 @@ namespace Ailu
 
             BuildEditorChrome();
 
+            if (!DockManager::Get().HasDock("Ailu::Editor::PlaceActor"))
+            {
+                auto place_actor = MakeRef<PlaceActor>();
+                place_actor->SetPosition({8.0f, g_editor_style._toolbar_height + 8.0f});
+                DockManager::Get().AddDock(std::move(place_actor));
+            }
+
             //DockManager::Get().AddDock(MakeRef<AIAssistantWindow>());
         }
 
@@ -2037,7 +2044,7 @@ namespace Ailu
             ImGui::SameLine();
             ImGui::TextUnformatted(s_package_player_status.c_str());
 
-            ImGui::Checkbox("Postprocess", &Camera::sCurrent->_is_enable_postprocess);
+            ImGui::Checkbox("Postprocess", &Camera::sCurrent->_postprocess_enabled);
             //ImGui::Checkbox("UseRenderGraph", &RenderPipeline::Get().GetRenderer()->_is_use_render_graph);
 
             // for (auto &info: ResourceMgr::Get().GetImportInfos())

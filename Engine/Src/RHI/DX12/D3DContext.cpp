@@ -384,10 +384,6 @@ namespace Ailu::RHI::DX12
             Render::FrameDebugger::FrameCaptureService::BeginFrame(_ctx->GetFrameCount());
 #endif
             {
-                PROFILE_BLOCK_CPU("GpuCommandWorker_ProcessPSO");
-                GraphicsPipelineStateMgr::Get().ProcessPendingPSOCreationRequests();
-            }
-            {
                 PROFILE_BLOCK_CPU("GpuCommandWorker_RunAsync")
                 Vector<Ref<RHICommandBuffer>> recorded_cmds;
                 Vector<WaitHandle> record_jobs;
@@ -506,7 +502,6 @@ namespace Ailu::RHI::DX12
     void GpuCommandWorker::EndFrame()
     {
         // All recording and submission jobs for this frame have completed here.
-        GraphicsPipelineStateMgr::Get().ProcessPendingPSOCreationRequests();
         u16 compiled_shader_num = 0u, compiled_compute_shader_num = 0u, compiled_raytracing_shader_num = 0u;
         while (!_pending_update_shaders.Empty())
         {
@@ -2173,6 +2168,12 @@ namespace Ailu::RHI::DX12
                 auto *binding_resource = GpuResourceRegistry::Get().Resolve(binding._resource);
                 if (binding_resource == nullptr && binding._resource_type != EBindResDescType::kConstBufferRaw)
                     continue;
+                if (binding._data_version.IsValid())
+                {
+                    auto *buffer = dynamic_cast<D3DGPUBuffer *>(binding_resource);
+                    if (buffer != nullptr)
+                        d3dcmd->EnsureBufferVersion(buffer, binding._data_version);
+                }
                 auto resource = PipelineResource(binding_resource, binding._resource_type, binding._slot, binding._priority);
                 resource._addi_info = binding._addi_info;
                 cmd_buffer->RecordingContext().SubmitBindResource(resource);
@@ -2467,6 +2468,15 @@ namespace Ailu::RHI::DX12
                     record_dispatch(Render::FrameDebugger::EFrameEventExecutionResult::kSkippedInvalidResource);
 #endif
                 return;
+            }
+            for (u16 i = 0u; i < cmd_disp->_bindings._entry_count; ++i)
+            {
+                const auto &binding = cmd_disp->_bindings._entries[i];
+                if (!binding._data_version.IsValid())
+                    continue;
+                auto *buffer = dynamic_cast<D3DGPUBuffer *>(GpuResourceRegistry::Get().Resolve(binding._resource));
+                if (buffer != nullptr)
+                    d3dcmd->EnsureBufferVersion(buffer, binding._data_version);
             }
             compute_shader->Bind(d3dcmd, cmd_disp->_kernel, cmd_disp->_bindings);
             if (is_indirect)

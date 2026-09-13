@@ -1,9 +1,11 @@
-//info bein
+//info begin
 //pass begin::
 //name: skybox
 //vert: VSMain
 //pixel: PSMain
 //Cull: Front
+//ZTest: Equal
+//ZWrite: Off
 //Queue: Opaque
 //pass end::
 //Properties

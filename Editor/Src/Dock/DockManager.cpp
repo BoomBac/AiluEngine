@@ -2969,6 +2969,37 @@ namespace Ailu
             return item != nullptr && _focused_window != nullptr && item->ContainsWindow(_focused_window);
         }
 
+        bool DockManager::HasDock(StringView persistence_id) const
+        {
+            std::function<bool(const DockNode *)> has_dock = [&](const DockNode *node) -> bool
+            {
+                if (node == nullptr || !node->_is_valid)
+                    return false;
+                if (node->_type == DockNode::EType::kLeaf)
+                    return node->_window != nullptr && node->_window->GetDockPersistenceId() == persistence_id;
+                if (node->_type == DockNode::EType::kSplit)
+                    return has_dock(node->_left.get()) || has_dock(node->_right.get());
+                if (node->_tab == nullptr)
+                    return false;
+                for (const auto &item : *node->_tab)
+                {
+                    if (auto *window = item->PrimaryWindow(); window != nullptr &&
+                        window->GetDockPersistenceId() == persistence_id)
+                        return true;
+                    if (auto split_item = std::dynamic_pointer_cast<DockNodeTabItem>(item);
+                        split_item != nullptr && has_dock(split_item->Node().get()))
+                        return true;
+                }
+                return false;
+            };
+
+            for (const auto &[window, nodes] : _float_nodes)
+                for (const auto &node : nodes)
+                    if (has_dock(node.get()))
+                        return true;
+            return false;
+        }
+
         DockNode *DockManager::FindNodeByWindow(DockWindow *w)
         {
             std::function<DockNode *(DockNode *)> find_node = [&](DockNode *node) -> DockNode *

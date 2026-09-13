@@ -11,6 +11,8 @@
 #include "DirectXMath.h"
 #include "Render/Features/RenderFeature.h"
 #include "DirectXPackedVector.h"
+#include <array>
+#include <cfloat>
 
 using namespace DirectX;
 using namespace DirectX::PackedVector;
@@ -21,11 +23,87 @@ namespace Ailu
     {
         using namespace Ailu::Render;
         #pragma region LightingSystem
-        static Vector3f XMVecToVec3(const XMVECTOR &vec)
+        struct CascadeShadowInfo
         {
-            Vector3f ret;
-            memcpy(ret.Data(), vec.m128_f32, sizeof(Vector3f));
-            return ret;
+            Matrix4x4f _view;
+            Matrix4x4f _projection;
+            Vector3f _center;
+            f32 _radius = 0.0f;
+        };
+
+        static void BuildCascadeFrustumCorners(const Camera &camera, f32 cascade_near, f32 cascade_far,
+                                                std::array<Vector3f, 8> &corners)
+        {
+            const f32 tan_half_fov = tanf(camera.FovH() * k2Radius * 0.5f);
+            const f32 near_half_height = tan_half_fov * cascade_near;
+            const f32 near_half_width = near_half_height * camera.Aspect();
+            const f32 far_half_height = tan_half_fov * cascade_far;
+            const f32 far_half_width = far_half_height * camera.Aspect();
+            const Vector3f near_center = camera.Position() + camera.Forward() * cascade_near;
+            const Vector3f far_center = camera.Position() + camera.Forward() * cascade_far;
+
+            corners[0] = near_center + camera.Up() * near_half_height - camera.Right() * near_half_width;
+            corners[1] = near_center + camera.Up() * near_half_height + camera.Right() * near_half_width;
+            corners[2] = near_center - camera.Up() * near_half_height - camera.Right() * near_half_width;
+            corners[3] = near_center - camera.Up() * near_half_height + camera.Right() * near_half_width;
+            corners[4] = far_center + camera.Up() * far_half_height - camera.Right() * far_half_width;
+            corners[5] = far_center + camera.Up() * far_half_height + camera.Right() * far_half_width;
+            corners[6] = far_center - camera.Up() * far_half_height - camera.Right() * far_half_width;
+            corners[7] = far_center - camera.Up() * far_half_height + camera.Right() * far_half_width;
+        }
+
+        static CascadeShadowInfo BuildCascadeShadow(const Camera &camera, const Vector3f &light_direction, f32 cascade_near,
+                                                     f32 cascade_far, u32 shadow_resolution)
+        {
+            std::array<Vector3f, 8> corners;
+            BuildCascadeFrustumCorners(camera, cascade_near, cascade_far, corners);
+
+            Vector3f center = Vector3f::kZero;
+            for (const Vector3f &corner : corners)
+                center += corner;
+            center /= static_cast<f32>(corners.size());
+
+            f32 radius = 0.0f;
+            for (const Vector3f &corner : corners)
+                radius = std::max(radius, Distance(center, corner));
+            constexpr f32 kRadiusQuantization = 1.0f / 16.0f;
+            radius = ceilf(radius / kRadiusQuantization) * kRadiusQuantization;
+
+            Vector3f light_up = Vector3f::kUp;
+            if (std::abs(DotProduct(light_direction, light_up)) > 0.99f)
+                light_up = Vector3f::kForward;
+            const Vector3f light_forward = Normalize(light_direction);
+            const Vector3f light_right = Normalize(CrossProduct(light_up, light_forward));
+            const Vector3f light_corrected_up = CrossProduct(light_forward, light_right);
+            Matrix4x4f light_view;
+            BuildViewMatrixLookToLH(light_view, Vector3f::kZero, light_forward, light_corrected_up);
+
+            Vector3f center_ls = TransformCoord(light_view, center);
+            const f32 world_units_per_texel = radius * 2.0f / static_cast<f32>(shadow_resolution);
+            center_ls.x = std::round(center_ls.x / world_units_per_texel) * world_units_per_texel;
+            center_ls.y = std::round(center_ls.y / world_units_per_texel) * world_units_per_texel;
+
+            f32 min_z = FLT_MAX;
+            f32 max_z = -FLT_MAX;
+            for (const Vector3f &corner : corners)
+            {
+                const Vector3f corner_ls = TransformCoord(light_view, corner);
+                min_z = std::min(min_z, corner_ls.z);
+                max_z = std::max(max_z, corner_ls.z);
+            }
+            constexpr f32 kCasterDepthMargin = 20.0f;
+            min_z -= kCasterDepthMargin;
+            max_z += kCasterDepthMargin;
+
+            Matrix4x4f projection;
+            BuildOrthographicMatrix(projection, center_ls.x - radius, center_ls.x + radius, center_ls.y + radius,
+                                    center_ls.y - radius, min_z, max_z);
+            CascadeShadowInfo result;
+            result._view = light_view;
+            result._projection = projection;
+            result._center = light_right * center_ls.x + light_corrected_up * center_ls.y + light_forward * center_ls.z;
+            result._radius = radius;
+            return result;
         }
 
         Ailu::ECS::LightingSystem::LightingSystem()
@@ -154,9 +232,6 @@ namespace Ailu
                     //}
                     else {}
                     _light_probe_debug_mat->SetFloat("_mipmap", comp._mipmap);
-                    Shader::SetGlobalTexture("SkyBox", comp._cubemap.get());
-                    Shader::SetGlobalTexture("RadianceTex", comp._pass->_radiance_map.get());
-                    Shader::SetGlobalTexture("PrefilterEnvTex", comp._pass->_prefilter_cubemap.get());
                     comp._debug_material = _light_probe_debug_mat.get();
                 }
             }
@@ -192,136 +267,13 @@ namespace Ailu
                         {
                             cur_level_start = QuailtySetting::s_main_light_shaodw_distance * QuailtySetting::s_cascade_shadow_map_split[i - 1];
                         }
-                        Sphere cascade_sphere = Camera::GetShadowCascadeSphere(selected_cam, 0, 10);
-                        //cascade_sphere._center.y = 10.0f;
-                        f32 world_unit_per_pixel = (f32) QuailtySetting::s_cascade_shaodw_map_resolution / cascade_sphere._radius * 2;
-                        float height = cascade_sphere._radius * 2.5f;
-                        Vector3f shadow_cam_pos = cascade_sphere._center + -comp->_light._light_dir.xyz * height;
-                        Vector3f light_dir = comp->_light._light_dir.xyz;
-                        light_dir = Normalize(light_dir);
-                        f32 radius_align_down = acosf(DotProduct(light_dir, -Vector3f::kUp));
-                        bool m1 = true;
-                        if (m1)
-                        {
-                            XMFLOAT4 rot;
-                            memcpy(&rot, &transf._rotation, sizeof(XMFLOAT4));
-                            const XMMATRIX lightRotation = XMMatrixRotationQuaternion(XMLoadFloat4(&rot));
-                            const XMVECTOR to = XMVector3TransformNormal(XMVectorSet(0.0f, -1.0f, 0.0f, 0.0f), lightRotation);
-                            const XMVECTOR up = XMVector3TransformNormal(XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f), lightRotation);
-                            const XMMATRIX lightView = XMMatrixLookToLH(XMVectorZero(), to, up);// important to not move (zero out eye vector) the light view matrix itself because texel snapping must be done on projection matrix!
-                            const XMMATRIX lightViewInv = XMMatrixInverse(nullptr, lightView);
-                            const float farPlane = selected_cam.Far();
-                            f32 origin_near = selected_cam.Near();
-                            //selected_cam.Near(1.0f);
-                            selected_cam.RecalculateMatrix(true);
-                            // Unproject main frustum corners into world space (notice the reversed Z projection!):
-                            auto unproj_mat = MatrixInverse(selected_cam.GetView() * MatrixReverseZ(selected_cam.GetProj()));//这里如果near-clip过小的话，也会造成抖动的情况
-                            //selected_cam.Near(origin_near);
-                            selected_cam.RecalculateMatrix(true);
-                            XMMATRIX unproj;
-                            memcpy(unproj.r, unproj_mat, sizeof(XMMATRIX));
-                            XMVECTOR frustum_corners[] =
-                                    {
-                                            XMVector3TransformCoord(XMVectorSet(-1, -1, 0, 1), unproj),// near
-                                            XMVector3TransformCoord(XMVectorSet(-1, -1, 1, 1), unproj),// far
-                                            XMVector3TransformCoord(XMVectorSet(-1, 1, 0, 1), unproj), // near
-                                            XMVector3TransformCoord(XMVectorSet(-1, 1, 1, 1), unproj), // far
-                                            XMVector3TransformCoord(XMVectorSet(1, -1, 0, 1), unproj), // near
-                                            XMVector3TransformCoord(XMVectorSet(1, -1, 1, 1), unproj), // far
-                                            XMVector3TransformCoord(XMVectorSet(1, 1, 0, 1), unproj),  // near
-                                            XMVector3TransformCoord(XMVectorSet(1, 1, 1, 1), unproj),  // far
-                                    };
-                            // Compute cascade bounds in light-view-space from the main frustum corners:
-                            float scalar_factor = QuailtySetting::s_main_light_shaodw_distance / farPlane;
-                            frustum_corners[1] = XMVectorLerp(frustum_corners[0], frustum_corners[1], scalar_factor);
-                            frustum_corners[3] = XMVectorLerp(frustum_corners[2], frustum_corners[3], scalar_factor);
-                            frustum_corners[5] = XMVectorLerp(frustum_corners[4], frustum_corners[5], scalar_factor);
-                            frustum_corners[7] = XMVectorLerp(frustum_corners[6], frustum_corners[7], scalar_factor);
-                            const float split_near = i == 0 ? 0.0f : QuailtySetting::s_cascade_shadow_map_split[i - 1];
-                            const float split_far = QuailtySetting::s_cascade_shadow_map_split[i];
-                            const XMVECTOR corners[] =
-                                    {
-                                            XMVector3Transform(XMVectorLerp(frustum_corners[0], frustum_corners[1], split_near), lightView),
-                                            XMVector3Transform(XMVectorLerp(frustum_corners[0], frustum_corners[1], split_far), lightView),
-                                            XMVector3Transform(XMVectorLerp(frustum_corners[2], frustum_corners[3], split_near), lightView),
-                                            XMVector3Transform(XMVectorLerp(frustum_corners[2], frustum_corners[3], split_far), lightView),
-                                            XMVector3Transform(XMVectorLerp(frustum_corners[4], frustum_corners[5], split_near), lightView),
-                                            XMVector3Transform(XMVectorLerp(frustum_corners[4], frustum_corners[5], split_far), lightView),
-                                            XMVector3Transform(XMVectorLerp(frustum_corners[6], frustum_corners[7], split_near), lightView),
-                                            XMVector3Transform(XMVectorLerp(frustum_corners[6], frustum_corners[7], split_far), lightView),
-                                    };
-
-                            // Compute cascade bounding sphere center:
-                            XMVECTOR center = XMVectorZero();
-                            for (int j = 0; j < 8; ++j)
-                            {
-                                center = XMVectorAdd(center, corners[j]);
-                            }
-                            center = XMVectorScale(center, 1.0f / 8.0f);
-                            //Gizmo::DrawLine(Vector3f::kZero, XMVecToVec3(center));
-
-                            // Compute cascade bounding sphere radius:
-                            float radius = 0;
-                            for (int j = 0; j < 8; ++j)
-                            {
-                                radius = std::max(radius, XMVectorGetX(XMVector3Length(XMVectorSubtract(corners[j], center))));
-                            }
-                            //Sphere s;
-
-
-                            // Fit AABB onto bounding sphere:
-                            XMVECTOR vRadius = XMVectorReplicate(radius);
-                            XMVECTOR vMin = XMVectorSubtract(center, vRadius);
-                            XMVECTOR vMax = XMVectorAdd(center, vRadius);
-                            // Snap cascade to texel grid:
-                            const XMVECTOR extent = XMVectorSubtract(vMax, vMin);
-                            const XMVECTOR texelSize = XMVectorScale(extent, 1.0f / static_cast<f32>(QuailtySetting::s_cascade_shaodw_map_resolution));
-                            vMin = XMVectorMultiply(XMVectorFloor(XMVectorDivide(vMin, texelSize)), texelSize);
-                            vMax = XMVectorMultiply(XMVectorFloor(XMVectorDivide(vMax, texelSize)), texelSize);
-                            center = XMVectorScale(XMVectorAdd(vMin, vMax), 0.5f);
-
-
-                            XMFLOAT3 _center;
-                            XMFLOAT3 _min;
-                            XMFLOAT3 _max;
-                            XMStoreFloat3(&_center, center);
-                            XMStoreFloat3(&_min, vMin);
-                            XMStoreFloat3(&_max, vMax);
-                            center = XMVector3TransformCoord(center, lightViewInv);
-                            cascade_sphere._center.x = center.m128_f32[0];
-                            cascade_sphere._center.y = center.m128_f32[1];
-                            cascade_sphere._center.z = center.m128_f32[2];
-                            cascade_sphere._radius = radius;
-                            //if (i == 1)
-                            //{
-                            //    Gizmo::DrawLine(XMVecToVec3(frustum_corners[0]), XMVecToVec3(frustum_corners[1]), Colors::kRed);
-                            //    Gizmo::DrawLine(XMVecToVec3(frustum_corners[2]), XMVecToVec3(frustum_corners[3]), Colors::kRed);
-                            //    Gizmo::DrawLine(XMVecToVec3(frustum_corners[4]), XMVecToVec3(frustum_corners[5]), Colors::kRed);
-                            //    Gizmo::DrawLine(XMVecToVec3(frustum_corners[6]), XMVecToVec3(frustum_corners[7]), Colors::kRed);
-                            //    Gizmo::DrawSphere(cascade_sphere, Random::RandomColor32(i));
-                            //}
-                            // Extrude bounds to avoid early shadow clipping:
-                            float ext = abs(_center.z - _min.z);
-                            //ext = std::max(ext, std::min(1500.0f, farPlane) * 0.5f);
-                            ext = std::max(ext, 75.f);
-                            _min.z = _center.z - ext;
-                            _max.z = _center.z + ext;
-                        #if defined(_REVERSED_Z)
-                            std::swap(_min.z,_max.z);
-                        #endif
-                            const XMMATRIX lightProjection = XMMatrixOrthographicOffCenterLH(_min.x, _max.x, _min.y, _max.y,_min.z,_max.z);// notice reversed Z!
-                            Matrix4x4f view, proj;
-                            memcpy(view, lightView.r, sizeof(XMMATRIX));
-                            memcpy(proj, lightProjection.r, sizeof(XMMATRIX));
-                            comp->_shadow_cameras[i].SetViewAndProj(view, proj);
-                            comp->_shadow_cameras[i]._layer_mask &= shadow_cast_layer._value;
-                        }
-                        else
-                        {
-                        }
-                        //https://alextardif.com/shadowmapping.html
-                        comp->_cascade_shadow_data[i].xyz = cascade_sphere._center;
-                        comp->_cascade_shadow_data[i].w = cascade_sphere._radius * cascade_sphere._radius;
+                        const CascadeShadowInfo shadow = BuildCascadeShadow(selected_cam, comp->_light._light_dir.xyz,
+                                                                             cur_level_start, cur_level_end,
+                                                                             QuailtySetting::s_cascade_shaodw_map_resolution);
+                        comp->_shadow_cameras[i].SetViewAndProj(shadow._view, shadow._projection);
+                        comp->_shadow_cameras[i]._layer_mask &= shadow_cast_layer._value;
+                        comp->_cascade_shadow_data[i].xyz = shadow._center;
+                        comp->_cascade_shadow_data[i].w = shadow._radius * shadow._radius;
                     }
                 }
                 else if (comp->_type == ELightType::kSpot)

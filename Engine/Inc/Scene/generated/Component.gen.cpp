@@ -230,6 +230,405 @@ return Ailu::ECS::ScriptPropertyData::StaticType();
 return Ailu::ECS::ScriptPropertyData::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_ScriptPropertyData(&Ailu::ECS::ScriptPropertyData::StaticType, "Ailu::ECS::ScriptPropertyData");
+const Ailu::Type* Ailu::ECS::Z_Construct_ProceduralSkySettings_Type()
+{
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "ProceduralSkySettings";
+initializer._size = sizeof(Ailu::ECS::ProceduralSkySettings);
+initializer._full_name = "Ailu::ECS::ProceduralSkySettings";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu::ECS";
+initializer._base_name = "";
+initializer._constructor = []()->Ailu::ECS::ProceduralSkySettings* {return new Ailu::ECS::ProceduralSkySettings;};
+Meta meta_sky_color;
+meta_sky_color.Set("Category","");
+meta_sky_color.Set("IsColor",true);
+meta_sky_color.Set("IsRange",false);
+meta_sky_color.Set("IsFloatRange",true);
+meta_sky_color.Set("RangeMin",(f32)0);
+meta_sky_color.Set("RangeMax",(f32)1);
+MemberBuilder builder_sky_color;
+builder_sky_color._name = "_sky_color";
+builder_sky_color._type_name = "Ailu::Math::Color";
+builder_sky_color._offset = offsetof(ProceduralSkySettings,_sky_color);
+builder_sky_color._is_const = false;
+builder_sky_color._is_static = false;
+builder_sky_color._is_public = false;
+builder_sky_color._is_pointer = false;
+builder_sky_color._is_ref = false;
+builder_sky_color._is_template = false;
+builder_sky_color._meta = meta_sky_color;
+builder_sky_color._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Color>);
+builder_sky_color._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Color>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_sky_color));
+Meta meta_ground_color;
+meta_ground_color.Set("Category","");
+meta_ground_color.Set("IsColor",true);
+meta_ground_color.Set("IsRange",false);
+meta_ground_color.Set("IsFloatRange",true);
+meta_ground_color.Set("RangeMin",(f32)0);
+meta_ground_color.Set("RangeMax",(f32)1);
+MemberBuilder builder_ground_color;
+builder_ground_color._name = "_ground_color";
+builder_ground_color._type_name = "Ailu::Math::Color";
+builder_ground_color._offset = offsetof(ProceduralSkySettings,_ground_color);
+builder_ground_color._is_const = false;
+builder_ground_color._is_static = false;
+builder_ground_color._is_public = false;
+builder_ground_color._is_pointer = false;
+builder_ground_color._is_ref = false;
+builder_ground_color._is_template = false;
+builder_ground_color._meta = meta_ground_color;
+builder_ground_color._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Color>);
+builder_ground_color._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Color>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_ground_color));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+const Ailu::Type* Ailu::ECS::ProceduralSkySettings::GetPrivateStaticClass()
+{
+	static const Ailu::Type* type = Z_Construct_ProceduralSkySettings_Type();
+	return type;
+}
+
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::ECS::ProceduralSkySettings>()
+{
+return Ailu::ECS::ProceduralSkySettings::StaticType();
+}
+    const Type *Ailu::ECS::ProceduralSkySettings::GetType()
+{
+return Ailu::ECS::ProceduralSkySettings::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_ProceduralSkySettings(&Ailu::ECS::ProceduralSkySettings::StaticType, "Ailu::ECS::ProceduralSkySettings");
+const Ailu::Type* Ailu::ECS::Z_Construct_EnvironmentComponent_Type()
+{
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "EnvironmentComponent";
+initializer._size = sizeof(Ailu::ECS::EnvironmentComponent);
+initializer._full_name = "Ailu::ECS::EnvironmentComponent";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu::ECS";
+initializer._base_name = "";
+initializer._constructor = []()->Ailu::ECS::EnvironmentComponent* {return new Ailu::ECS::EnvironmentComponent;};
+Meta meta_source;
+meta_source.Set("Category","");
+meta_source.Set("IsColor",false);
+meta_source.Set("IsRange",false);
+meta_source.Set("IsFloatRange",true);
+meta_source.Set("RangeMin",(f32)0);
+meta_source.Set("RangeMax",(f32)1);
+MemberBuilder builder_source;
+builder_source._name = "_source";
+builder_source._type_name = "Ailu::ECS::EEnvironmentSource";
+builder_source._offset = offsetof(EnvironmentComponent,_source);
+builder_source._is_const = false;
+builder_source._is_static = false;
+builder_source._is_public = false;
+builder_source._is_pointer = false;
+builder_source._is_ref = false;
+builder_source._is_template = false;
+builder_source._meta = meta_source;
+builder_source._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<EEnvironmentSource>);
+builder_source._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<EEnvironmentSource>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_source));
+Meta meta_texture;
+meta_texture.Set("Category","");
+meta_texture.Set("IsColor",false);
+meta_texture.Set("IsRange",false);
+meta_texture.Set("IsFloatRange",true);
+meta_texture.Set("RangeMin",(f32)0);
+meta_texture.Set("RangeMax",(f32)1);
+MemberBuilder builder_texture;
+builder_texture._name = "_texture";
+builder_texture._type_name = "Ailu::Guid";
+builder_texture._offset = offsetof(EnvironmentComponent,_texture);
+builder_texture._is_const = false;
+builder_texture._is_static = false;
+builder_texture._is_public = false;
+builder_texture._is_pointer = false;
+builder_texture._is_ref = false;
+builder_texture._is_template = false;
+builder_texture._meta = meta_texture;
+builder_texture._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Guid>);
+builder_texture._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Guid>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_texture));
+Meta meta_procedural_sky;
+meta_procedural_sky.Set("Category","");
+meta_procedural_sky.Set("IsColor",false);
+meta_procedural_sky.Set("IsRange",false);
+meta_procedural_sky.Set("IsFloatRange",true);
+meta_procedural_sky.Set("RangeMin",(f32)0);
+meta_procedural_sky.Set("RangeMax",(f32)1);
+MemberBuilder builder_procedural_sky;
+builder_procedural_sky._name = "_procedural_sky";
+builder_procedural_sky._type_name = "Ailu::ECS::ProceduralSkySettings";
+builder_procedural_sky._offset = offsetof(EnvironmentComponent,_procedural_sky);
+builder_procedural_sky._is_const = false;
+builder_procedural_sky._is_static = false;
+builder_procedural_sky._is_public = false;
+builder_procedural_sky._is_pointer = false;
+builder_procedural_sky._is_ref = false;
+builder_procedural_sky._is_template = false;
+builder_procedural_sky._meta = meta_procedural_sky;
+builder_procedural_sky._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<ProceduralSkySettings>);
+builder_procedural_sky._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<ProceduralSkySettings>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_procedural_sky));
+Meta meta_intensity;
+meta_intensity.Set("Category","");
+meta_intensity.Set("IsColor",false);
+meta_intensity.Set("IsRange",false);
+meta_intensity.Set("IsFloatRange",true);
+meta_intensity.Set("RangeMin",(f32)0);
+meta_intensity.Set("RangeMax",(f32)1);
+MemberBuilder builder_intensity;
+builder_intensity._name = "_intensity";
+builder_intensity._type_name = "f32";
+builder_intensity._offset = offsetof(EnvironmentComponent,_intensity);
+builder_intensity._is_const = false;
+builder_intensity._is_static = false;
+builder_intensity._is_public = false;
+builder_intensity._is_pointer = false;
+builder_intensity._is_ref = false;
+builder_intensity._is_template = false;
+builder_intensity._meta = meta_intensity;
+builder_intensity._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_intensity._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_intensity));
+Meta meta_rotation;
+meta_rotation.Set("Category","");
+meta_rotation.Set("IsColor",false);
+meta_rotation.Set("IsRange",false);
+meta_rotation.Set("IsFloatRange",true);
+meta_rotation.Set("RangeMin",(f32)0);
+meta_rotation.Set("RangeMax",(f32)1);
+MemberBuilder builder_rotation;
+builder_rotation._name = "_rotation";
+builder_rotation._type_name = "f32";
+builder_rotation._offset = offsetof(EnvironmentComponent,_rotation);
+builder_rotation._is_const = false;
+builder_rotation._is_static = false;
+builder_rotation._is_public = false;
+builder_rotation._is_pointer = false;
+builder_rotation._is_ref = false;
+builder_rotation._is_template = false;
+builder_rotation._meta = meta_rotation;
+builder_rotation._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_rotation._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_rotation));
+Meta meta_render_sky;
+meta_render_sky.Set("Category","");
+meta_render_sky.Set("IsColor",false);
+meta_render_sky.Set("IsRange",false);
+meta_render_sky.Set("IsFloatRange",true);
+meta_render_sky.Set("RangeMin",(f32)0);
+meta_render_sky.Set("RangeMax",(f32)1);
+MemberBuilder builder_render_sky;
+builder_render_sky._name = "_render_sky";
+builder_render_sky._type_name = "bool";
+builder_render_sky._offset = offsetof(EnvironmentComponent,_render_sky);
+builder_render_sky._is_const = false;
+builder_render_sky._is_static = false;
+builder_render_sky._is_public = false;
+builder_render_sky._is_pointer = false;
+builder_render_sky._is_ref = false;
+builder_render_sky._is_template = false;
+builder_render_sky._meta = meta_render_sky;
+builder_render_sky._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_render_sky._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_render_sky));
+Meta meta_enable_ibl;
+meta_enable_ibl.Set("Category","");
+meta_enable_ibl.Set("IsColor",false);
+meta_enable_ibl.Set("IsRange",false);
+meta_enable_ibl.Set("IsFloatRange",true);
+meta_enable_ibl.Set("RangeMin",(f32)0);
+meta_enable_ibl.Set("RangeMax",(f32)1);
+MemberBuilder builder_enable_ibl;
+builder_enable_ibl._name = "_enable_ibl";
+builder_enable_ibl._type_name = "bool";
+builder_enable_ibl._offset = offsetof(EnvironmentComponent,_enable_ibl);
+builder_enable_ibl._is_const = false;
+builder_enable_ibl._is_static = false;
+builder_enable_ibl._is_public = false;
+builder_enable_ibl._is_pointer = false;
+builder_enable_ibl._is_ref = false;
+builder_enable_ibl._is_template = false;
+builder_enable_ibl._meta = meta_enable_ibl;
+builder_enable_ibl._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_enable_ibl._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_enable_ibl));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+const Ailu::Type* Ailu::ECS::EnvironmentComponent::GetPrivateStaticClass()
+{
+	static const Ailu::Type* type = Z_Construct_EnvironmentComponent_Type();
+	return type;
+}
+
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::ECS::EnvironmentComponent>()
+{
+return Ailu::ECS::EnvironmentComponent::StaticType();
+}
+    const Type *Ailu::ECS::EnvironmentComponent::GetType()
+{
+return Ailu::ECS::EnvironmentComponent::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_EnvironmentComponent(&Ailu::ECS::EnvironmentComponent::StaticType, "Ailu::ECS::EnvironmentComponent");
+const Ailu::Type* Ailu::ECS::Z_Construct_PostprocessVolumeComponent_Type()
+{
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "PostprocessVolumeComponent";
+initializer._size = sizeof(Ailu::ECS::PostprocessVolumeComponent);
+initializer._full_name = "Ailu::ECS::PostprocessVolumeComponent";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu::ECS";
+initializer._base_name = "";
+initializer._constructor = []()->Ailu::ECS::PostprocessVolumeComponent* {return new Ailu::ECS::PostprocessVolumeComponent;};
+Meta meta_is_global;
+meta_is_global.Set("Category","");
+meta_is_global.Set("IsColor",false);
+meta_is_global.Set("IsRange",false);
+meta_is_global.Set("IsFloatRange",true);
+meta_is_global.Set("RangeMin",(f32)0);
+meta_is_global.Set("RangeMax",(f32)1);
+MemberBuilder builder_is_global;
+builder_is_global._name = "_is_global";
+builder_is_global._type_name = "bool";
+builder_is_global._offset = offsetof(PostprocessVolumeComponent,_is_global);
+builder_is_global._is_const = false;
+builder_is_global._is_static = false;
+builder_is_global._is_public = false;
+builder_is_global._is_pointer = false;
+builder_is_global._is_ref = false;
+builder_is_global._is_template = false;
+builder_is_global._meta = meta_is_global;
+builder_is_global._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_is_global._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_is_global));
+Meta meta_priority;
+meta_priority.Set("Category","");
+meta_priority.Set("IsColor",false);
+meta_priority.Set("IsRange",false);
+meta_priority.Set("IsFloatRange",true);
+meta_priority.Set("RangeMin",(f32)0);
+meta_priority.Set("RangeMax",(f32)1);
+MemberBuilder builder_priority;
+builder_priority._name = "_priority";
+builder_priority._type_name = "i32";
+builder_priority._offset = offsetof(PostprocessVolumeComponent,_priority);
+builder_priority._is_const = false;
+builder_priority._is_static = false;
+builder_priority._is_public = false;
+builder_priority._is_pointer = false;
+builder_priority._is_ref = false;
+builder_priority._is_template = false;
+builder_priority._meta = meta_priority;
+builder_priority._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<i32>);
+builder_priority._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<i32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_priority));
+Meta meta_blend_weight;
+meta_blend_weight.Set("Category","");
+meta_blend_weight.Set("IsColor",false);
+meta_blend_weight.Set("IsRange",false);
+meta_blend_weight.Set("IsFloatRange",true);
+meta_blend_weight.Set("RangeMin",(f32)0);
+meta_blend_weight.Set("RangeMax",(f32)1);
+MemberBuilder builder_blend_weight;
+builder_blend_weight._name = "_blend_weight";
+builder_blend_weight._type_name = "f32";
+builder_blend_weight._offset = offsetof(PostprocessVolumeComponent,_blend_weight);
+builder_blend_weight._is_const = false;
+builder_blend_weight._is_static = false;
+builder_blend_weight._is_public = false;
+builder_blend_weight._is_pointer = false;
+builder_blend_weight._is_ref = false;
+builder_blend_weight._is_template = false;
+builder_blend_weight._meta = meta_blend_weight;
+builder_blend_weight._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_blend_weight._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_blend_weight));
+Meta meta_blend_distance;
+meta_blend_distance.Set("Category","");
+meta_blend_distance.Set("IsColor",false);
+meta_blend_distance.Set("IsRange",false);
+meta_blend_distance.Set("IsFloatRange",true);
+meta_blend_distance.Set("RangeMin",(f32)0);
+meta_blend_distance.Set("RangeMax",(f32)1);
+MemberBuilder builder_blend_distance;
+builder_blend_distance._name = "_blend_distance";
+builder_blend_distance._type_name = "f32";
+builder_blend_distance._offset = offsetof(PostprocessVolumeComponent,_blend_distance);
+builder_blend_distance._is_const = false;
+builder_blend_distance._is_static = false;
+builder_blend_distance._is_public = false;
+builder_blend_distance._is_pointer = false;
+builder_blend_distance._is_ref = false;
+builder_blend_distance._is_template = false;
+builder_blend_distance._meta = meta_blend_distance;
+builder_blend_distance._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_blend_distance._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_blend_distance));
+Meta meta_settings;
+meta_settings.Set("Category","");
+meta_settings.Set("IsColor",false);
+meta_settings.Set("IsRange",false);
+meta_settings.Set("IsFloatRange",true);
+meta_settings.Set("RangeMin",(f32)0);
+meta_settings.Set("RangeMax",(f32)1);
+MemberBuilder builder_settings;
+builder_settings._name = "_settings";
+builder_settings._type_name = "Render::PostprocessSettings";
+builder_settings._offset = offsetof(PostprocessVolumeComponent,_settings);
+builder_settings._is_const = false;
+builder_settings._is_static = false;
+builder_settings._is_public = false;
+builder_settings._is_pointer = false;
+builder_settings._is_ref = false;
+builder_settings._is_template = false;
+builder_settings._meta = meta_settings;
+builder_settings._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Render::PostprocessSettings>);
+builder_settings._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Render::PostprocessSettings>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_settings));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+const Ailu::Type* Ailu::ECS::PostprocessVolumeComponent::GetPrivateStaticClass()
+{
+	static const Ailu::Type* type = Z_Construct_PostprocessVolumeComponent_Type();
+	return type;
+}
+
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::ECS::PostprocessVolumeComponent>()
+{
+return Ailu::ECS::PostprocessVolumeComponent::StaticType();
+}
+    const Type *Ailu::ECS::PostprocessVolumeComponent::GetType()
+{
+return Ailu::ECS::PostprocessVolumeComponent::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_PostprocessVolumeComponent(&Ailu::ECS::PostprocessVolumeComponent::StaticType, "Ailu::ECS::PostprocessVolumeComponent");
 static std::unique_ptr<Ailu::Enum> s_enum_type_EMotionVectorType = nullptr;
 //Enum EMotionVectorType begin...........................
 const Ailu::Enum* Z_Construct_Enum_Ailu_ECS_EMotionVectorType_Type()
@@ -315,6 +714,31 @@ template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::ECS::ELightType>()
 return s_enum_type_ELightType.get();
 }
 //Enum ELightType end...........................
+
+static std::unique_ptr<Ailu::Enum> s_enum_type_EEnvironmentSource = nullptr;
+//Enum EEnvironmentSource begin...........................
+const Ailu::Enum* Z_Construct_Enum_Ailu_ECS_EEnvironmentSource_Type()
+{
+if(s_enum_type_EEnvironmentSource == nullptr)
+{
+EnumInitializer initializer;
+initializer._name = "EEnvironmentSource";
+initializer._namespace = "Ailu::ECS";
+initializer._full_name = "Ailu::ECS::EEnvironmentSource";
+initializer._size = sizeof(Ailu::ECS::EEnvironmentSource);
+initializer._str_to_enum_lut["kProceduralSky"] = 0;
+initializer._str_to_enum_lut["kTexture"] = 1;
+s_enum_type_EEnvironmentSource = std::make_unique<Ailu::Enum>(initializer);
+Ailu::Enum::RegisterEnum(s_enum_type_EEnvironmentSource.get());
+}
+return s_enum_type_EEnvironmentSource.get();
+}
+static Ailu::EnumTypeRegister g_register_EEnvironmentSource(Z_Construct_Enum_Ailu_ECS_EEnvironmentSource_Type);
+template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::ECS::EEnvironmentSource>()
+{
+return s_enum_type_EEnvironmentSource.get();
+}
+//Enum EEnvironmentSource end...........................
 
 static std::unique_ptr<Ailu::Enum> s_enum_type_EColliderType = nullptr;
 //Enum EColliderType begin...........................

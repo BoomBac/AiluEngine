@@ -85,6 +85,7 @@ namespace Ailu
         {
         public:
             CubeMapGenPass(Texture *src_tex, u16 size = 512u);
+            CubeMapGenPass(Material *source_material, u16 size = 512u);
             void OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data);
             void Execute(GraphicsContext *context, RenderingData &rendering_data) final;
             void BeginPass(GraphicsContext *context) final;
@@ -92,9 +93,12 @@ namespace Ailu
             Ref<RenderTexture> _src_cubemap;
             Ref<RenderTexture> _prefilter_cubemap;
             Ref<RenderTexture> _radiance_map;
+            bool IsSourceCubemap() const { return _is_src_cubemap; }
 
         private:
+            void Initialize(Texture *src_tex, Material *source_material, u16 size);
             bool _is_src_cubemap = false;
+            bool _is_procedural_source = false;
             Texture *_input_src = nullptr;
             RDG::RGHandle _src_map_handle;
             RDG::RGHandle _radiance_handle;
@@ -147,10 +151,10 @@ namespace Ailu
             Ref<Texture3D> _dummy_volumetric_light;
         };
 
-        class SkyboxPass : public RenderPass
+        class SkyPass : public RenderPass
         {
         public:
-            SkyboxPass();
+            SkyPass();
             void OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data) final;
             void Setup(bool clear_first) { _is_clear = clear_first; }
             void Execute(GraphicsContext *context, RenderingData &rendering_data) final;
@@ -159,17 +163,10 @@ namespace Ailu
 
         private:
             Ref<Material> _p_skybox_material;
+            Ref<Material> _p_procedural_material;
+            Ref<Material> _p_texture_material;
             Ref<ConstantBuffer> _p_cbuffer;
-            Ref<ComputeShader> _p_lut_gen;
-            ComputeShaderKernelId _transmittance_lut_gen_kernel = kInvalidComputeShaderKernelId;
-            ComputeShaderKernelId _mult_scatter_lut_gen_kernel = kInvalidComputeShaderKernelId;
-            ComputeShaderKernelId _sky_lut_gen_kernel = kInvalidComputeShaderKernelId;
             bool _is_clear = false;
-            Vector2Int _transmittance_lut_size = Vector2Int(256, 64);
-            Vector2Int _mult_scatter_lut_size = Vector2Int(32, 32);
-            Vector2Int _sky_lut_size = Vector2Int(192, 192);
-            Ref<RenderTexture> _tlut;
-            Ref<RenderTexture> _ms_lut;
         };
 
         class AILU_API GizmoPass : public RenderPass

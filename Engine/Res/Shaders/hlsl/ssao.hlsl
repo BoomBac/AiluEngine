@@ -1,6 +1,6 @@
 #ifndef __SSAO_H__
 #define __SSAO_H__
-//info bein
+//info begin
 //pass begin::
 //name: SSAO Gen
 //vert: FullscreenVSMain

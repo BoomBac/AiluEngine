@@ -1,4 +1,4 @@
-//info bein
+//info begin
 //pass begin::
 //name: ThresholdExtract
 //vert: FullscreenVSMain
@@ -254,9 +254,6 @@ float4 Composite(FullScreenPSInput input) : SV_TARGET
     //     color += lens_flare;
     // }
 	//return float4(ACESFilm(lerp(color,bloom_color,_SampleParams.w)),1.0f);
-    float3 c = lerp(color,bloom_color,_SampleParams.w);
-    c = ACESFilm(c);
-    // float3 a = float3(0.5, 0.5, 0.5);          // linear
-    // float3 b = pow(a, 1.0/2.2);                // gamma
-	return float4(c,0.0f); 
+    float3 c = color + bloom_color * _SampleParams.w;
+        return float4(c,1.0f);
 }

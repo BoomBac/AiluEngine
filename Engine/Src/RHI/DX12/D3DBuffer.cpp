@@ -148,8 +148,8 @@ namespace Ailu::RHI::DX12
             _p_d3d_res.ResetStateId();
             _p_d3d_res->Map(0, nullptr, reinterpret_cast<void **>(&_mapped_data));
             _gpu_ptr = _p_d3d_res->GetGPUVirtualAddress();
-            if (_data)
-                memcpy(_mapped_data, _data, unaligned_size);
+            if (_initial_data)
+                memcpy(_mapped_data, _initial_data, _initial_data_size);
         }
         else
         {
@@ -161,9 +161,9 @@ namespace Ailu::RHI::DX12
             NameAndLogResource(_p_d3d_res.Get(), DebugResourceName("buffer", _name));
             _p_d3d_res._subresource_count = 1u;
             _p_d3d_res.ResetStateId();
-            if (_data)
+            if (_initial_data)
             {
-                d3dcmd->UploadDataToBuffer(_data, _fill_data_size, _p_d3d_res);
+                d3dcmd->UploadDataToBuffer(_initial_data, _initial_data_size, _p_d3d_res);
             }
             if (_desc._is_random_write)
             {
@@ -259,6 +259,12 @@ namespace Ailu::RHI::DX12
                 CreateBindlessBufferSrv(p_device, _p_d3d_res.Get(), _mem_size, _bindless_srv_index);
             }
         }
+        if (_initial_data != nullptr)
+        {
+            AL_FREE(_initial_data);
+            _initial_data = nullptr;
+            _initial_data_size = 0u;
+        }
     }
     void D3DGPUBuffer::BindImpl(RHICommandBuffer *rhi_cmd, const BindParams& params)
     {
@@ -291,33 +297,6 @@ namespace Ailu::RHI::DX12
         d3dcmd->UavBarrier(_p_d3d_res);
         if (_counter_buffer)
             d3dcmd->UavBarrier(_counter_buffer);
-    }
-
-    void D3DGPUBuffer::OnDataChanged()
-    {
-        if (_mapped_data)
-        {
-            memcpy(_mapped_data, _data, _fill_data_size);
-            return;
-        }
-
-        // The initial SetData can happen before the asynchronous resource-create command is recorded.
-        // UploadImpl will consume the CPU copy once the physical resource exists.
-        if (!_p_d3d_res)
-            return;
-        if (!IsReady())
-        {
-            LOG_WARNING("D3DGPUBuffer::OnDataChanged: buffer({}) not ready for rendering!",_name);
-            return;
-        }
-
-        auto cmd = RHICommandBufferPool::Get("ChangeData");
-        auto d3dcmd = dynamic_cast<D3DCommandBuffer *>(cmd.get());
-        d3dcmd->UploadDataToBuffer(_data, _fill_data_size, _p_d3d_res);
-        if (_counter_buffer)
-            d3dcmd->UploadDataToBuffer(&_counter, sizeof(u32), _counter_buffer);
-        GraphicsContext::Get().ExecuteRHICommandBuffer(cmd.get());
-        RHICommandBufferPool::Release(cmd);
     }
 
     void D3DGPUBuffer::ReadBack(u8 *dst, u32 size)

@@ -17,6 +17,7 @@
 #include "Objects/Type.h"
 #include "Render/Camera.h"
 #include "Render/Features/CommonPasses.h"
+#include "Render/PostprocessSettings.h"
 #include "Render/Mesh.h"
 #include "Render/2D/SpriteRenderData.h"
 
@@ -355,6 +356,81 @@ public:                                                                 \
         {
             DECLARE_COMPONENT(CCamera, "Ailu.ECS.CCamera")
             Camera _camera;
+        };
+
+        AENUM()
+        enum class EEnvironmentSource
+        {
+            kProceduralSky,
+            kTexture
+        };
+
+        ASTRUCT()
+        struct AILU_API ProceduralSkySettings
+        {
+            GENERATED_BODY()
+
+            APROPERTY()
+            Color _sky_color = Color(0.18f, 0.32f, 0.58f, 1.0f);
+
+            APROPERTY()
+            Color _ground_color = Color(0.08f, 0.06f, 0.04f, 1.0f);
+        };
+
+        ASTRUCT()
+        struct AILU_API EnvironmentComponent
+        {
+            GENERATED_BODY()
+
+            DECLARE_COMPONENT(EnvironmentComponent, "Ailu.ECS.EnvironmentComponent")
+
+            APROPERTY()
+            EEnvironmentSource _source = EEnvironmentSource::kProceduralSky;
+
+            APROPERTY()
+            Guid _texture = Guid::EmptyGuid();
+
+            APROPERTY()
+            ProceduralSkySettings _procedural_sky;
+
+            APROPERTY()
+            f32 _intensity = 1.0f;
+
+            APROPERTY()
+            f32 _rotation = 0.0f;
+
+            APROPERTY()
+            bool _render_sky = true;
+
+            APROPERTY()
+            bool _enable_ibl = true;
+
+            //编辑器选中环境实体时的预览设置，不参与运行时环境配置。
+            i32 _src_type = 0;
+            f32 _mipmap = 0.0f;
+        };
+
+        ASTRUCT()
+        struct AILU_API PostprocessVolumeComponent
+        {
+            GENERATED_BODY()
+
+            DECLARE_COMPONENT(PostprocessVolumeComponent, "Ailu.ECS.PostprocessVolumeComponent")
+
+            APROPERTY()
+            bool _is_global = true;
+
+            APROPERTY()
+            i32 _priority = 0;
+
+            APROPERTY()
+            f32 _blend_weight = 1.0f;
+
+            APROPERTY()
+            f32 _blend_distance = 0.0f;
+
+            APROPERTY()
+            Render::PostprocessSettings _settings;
         };
 
         struct AILU_API StaticMeshComponent

@@ -455,6 +455,9 @@ namespace Ailu::Render
             auto res_type = cur_state._bind_res_type[slot];
             AL_ASSERT_MSG(res_type != EBindResDescType::kUnknown, "Unknown resource type");
             binding._resource = res->Handle();
+            binding._data_version = {};
+            if (auto *buffer = dynamic_cast<GPUBuffer *>(res))
+                binding._data_version = buffer->CurrentDataVersion();
             binding._resource_type = res_type;
             binding._slot = slot;
             binding._priority = cur_state._bind_res_priority[slot];
@@ -563,8 +566,12 @@ namespace Ailu::Render
 
     void Material::SetFloat(ShaderPropertyId property_id, const float &f)
     {
+        if (_p_active_shader == nullptr)
+            return;
+        const size_t pass_count = std::min({_p_active_shader->_passes.size(), _pass_variants.size(),
+                                            _property_blocks.size()});
         bool is_changed = false;
-        for (u16 pass_index = 0u; pass_index < _p_active_shader->_passes.size(); ++pass_index)
+        for (u16 pass_index = 0u; pass_index < pass_count; ++pass_index)
         {
             const auto *layout = _p_active_shader->GetBindingLayout(pass_index, _pass_variants[pass_index]._variant_hash);
             const auto *binding = layout == nullptr ? nullptr : layout->Find(property_id);
@@ -636,8 +643,12 @@ namespace Ailu::Render
 
     void Material::SetVector(ShaderPropertyId property_id, const Vector4f &vector)
     {
+        if (_p_active_shader == nullptr)
+            return;
+        const size_t pass_count = std::min({_p_active_shader->_passes.size(), _pass_variants.size(),
+                                            _property_blocks.size()});
         bool is_changed = false;
-        for (u16 pass_index = 0u; pass_index < _p_active_shader->_passes.size(); ++pass_index)
+        for (u16 pass_index = 0u; pass_index < pass_count; ++pass_index)
         {
             const auto *layout = _p_active_shader->GetBindingLayout(pass_index, _pass_variants[pass_index]._variant_hash);
             const auto *binding = layout == nullptr ? nullptr : layout->Find(property_id);
@@ -1342,7 +1353,7 @@ namespace Ailu::Render
             auto upload = FrameResourceManager::Get().AllocFrameUpload(block._size, 256u);
             if (upload._cpu_ptr != nullptr)
                 memcpy(upload._cpu_ptr, block._data, block._size);
-            cache._block._upload_buffer = upload._buffer;
+            cache._block._upload_buffer = upload._owner;
             cache._block._gpu_handle = upload._gpu_handle;
             if (statistics != nullptr)
             {

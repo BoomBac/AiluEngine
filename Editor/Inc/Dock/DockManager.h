@@ -118,6 +118,7 @@ namespace Ailu
             void MarkDeleteNode(DockNode* node);
             bool IsFocused(DockWindow *w) const;
             bool IsTabItemFocused(const IDockTabItem *item) const;
+            bool HasDock(StringView persistence_id) const;
         private:
             enum class EDockMouseInteraction : u8
             {

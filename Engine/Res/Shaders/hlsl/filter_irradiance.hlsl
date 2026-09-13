@@ -1,4 +1,4 @@
-//info bein
+//info begin
 //pass begin::
 //name: filter_irradiance
 //vert: VSMain
@@ -137,18 +137,7 @@ float3 FilterCubeMapWithRoughness(float3 normal,float roughness,float image_size
 		nh = saturate(nh);
 		if(nl > 0.0)
 		{
-			// Based off https://developer.nvidia.com/gpugems/GPUGems3/gpugems3_ch20.html
-            // Typically you'd have the following:
-            // float pdf = D_GGX(NoH, roughness) * NoH / (4.0 * VoH);
-            // but since V = N => VoH == NoH
-            float pdf = D_GGX(nh, roughness) / 4.0 + 0.001;
-            // Solid angle of current sample -- bigger for less likely samples
-            float omegaS = 1.0 / (float(SAMPLE_COUNT) * pdf);
-            // Solid angle of texel
-            float omegaP = 4.0 * PI / (6.0 * image_size * image_size);
-            // Mip level is determined by the ratio of our sample's solid angle to a texel's solid angle
-            float mipLevel = max(0.5 * log2(omegaS / omegaP), 0.0);
-            prefilteredColor += EnvMap.SampleLevel(g_AnisotropicClampSampler, L,mipLevel).rgb * nl;
+			prefilteredColor += EnvMap.SampleLevel(g_AnisotropicClampSampler, L, 0.0).rgb * nl;
             totalWeight += nl;
 		}
         // float NdotL = max(dot(N, L), 0.0);
@@ -165,7 +154,7 @@ float3 FilterCubeMapWithRoughness(float3 normal,float roughness,float image_size
 
 float4 PSMainReflection(CubeFilterPSInput input) : SV_TARGET
 {
-	if(_roughness == 0)
-		return EnvMap.SampleLevel(g_AnisotropicClampSampler,normalize(-input.wnormal),0);
-	return float4(FilterCubeMapWithRoughness(normalize(-input.wnormal),_roughness,_width), 1.0);
+        if(_roughness == 0)
+                return EnvMap.SampleLevel(g_AnisotropicClampSampler,normalize(input.wnormal),0);
+        return float4(FilterCubeMapWithRoughness(normalize(input.wnormal),_roughness,_width), 1.0);
 }

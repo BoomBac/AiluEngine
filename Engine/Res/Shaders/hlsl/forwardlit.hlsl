@@ -1,4 +1,4 @@
-//info bein
+//info begin
 //pass begin::
 //name: forward_standard_lit
 //vert: ForwardVSMain

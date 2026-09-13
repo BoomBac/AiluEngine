@@ -7,7 +7,7 @@
 #include "Framework/Common/Application.h"
 #include "Render/Gizmo.h"
 #include "Render/GraphicsPipelineStateObject.h"
-#include "Render/Features/PostprocessPass.h"
+#include "Render/Features/PostprocessStack.h"
 #include "Render/Features/SSAO.h"
 #include "Render/Features/TemporalAA.h"
 #include "Render/Features/VolumetricClouds.h"
@@ -47,11 +47,11 @@ namespace Ailu::Render
         _gbuffer_pass = MakeScope<DeferredGeometryPass>();
         _coptdepth_pass = MakeScope<CopyDepthPass>();
         _lighting_pass = MakeScope<DeferredLightingPass>();
-        _skybox_pass = MakeScope<SkyboxPass>();
+        _sky_pass = MakeScope<SkyPass>();
         _motion_vector_pass = MakeScope<MotionVectorPass>();
         _forward_pass = MakeScope<ForwardPass>();
         _copycolor_pass = MakeScope<CopyColorPass>();
-        _postprocess_pass = MakeScope<PostProcessPass>();
+        _postprocess_stack = MakeScope<PostprocessStack>();
         _gizmo_pass = MakeScope<GizmoPass>();
         _wireframe_pass = MakeScope<WireFramePass>();
         _gui_pass = MakeScope<GUIPass>();
@@ -331,6 +331,9 @@ namespace Ailu::Render
         Cull(*SceneMgr::Get().ActiveScene(), cam);
         PrepareCamera(cam);
         _rendering_data._scene = &s;
+        _environment_system.Update(s);
+        _rendering_data._environment = &_environment_system.Runtime();
+        _rendering_data._postprocess_settings = ResolvePostprocessSettings(s);
         PrepareScene(*SceneMgr::Get().ActiveScene());
         PrepareLight(*SceneMgr::Get().ActiveScene());
         if (_rendering_data._pre_width != pixel_width || _rendering_data._pre_height != pixel_height)
@@ -360,13 +363,13 @@ namespace Ailu::Render
             _rtxdi->SetActive(false);
             if (static_cast<u32>(_mode) & static_cast<u32>(EShadingMode::kLit))
             {
-                _skybox_pass->Setup(false);
+                _sky_pass->Setup(false);
                 _render_passes.emplace_back(_gbuffer_pass.get());
                 _render_passes.emplace_back(_lighting_pass.get());
                 _render_passes.emplace_back(_forward_pass.get());
             }
             if (cam._is_render_sky_box)
-                _render_passes.emplace_back(_skybox_pass.get());
+                _render_passes.emplace_back(_sky_pass.get());
         }
         else if (_is_use_raytracing)
         {
@@ -387,7 +390,7 @@ namespace Ailu::Render
             _rtxdi->SetActive(false);
             if (static_cast<u32>(_mode) & static_cast<u32>(EShadingMode::kLit))
             {
-                _skybox_pass->Setup(false);
+                _sky_pass->Setup(false);
                 if (cam._is_render_shadow)
                     _render_passes.emplace_back(_shadowcast_pass.get());
                 if (!_rendering_data._is_debug_voxel)
@@ -399,25 +402,25 @@ namespace Ailu::Render
                     _render_passes.emplace_back(_coptdepth_pass.get());
                 }
                 else
-                    _skybox_pass->Setup(true);
+                    _sky_pass->Setup(true);
             }
             if (_is_hiz_active)
                 _render_passes.emplace_back(_hzb_pass.get());
             //_render_passes.emplace_back(_gui_pass.get());
             if (static_cast<u32>(_mode) & static_cast<u32>(EShadingMode::kWireframe))
             {
-                _skybox_pass->Setup(!(static_cast<u32>(_mode) & static_cast<u32>(EShadingMode::kLit)));
+                _sky_pass->Setup(!(static_cast<u32>(_mode) & static_cast<u32>(EShadingMode::kLit)));
                 _render_passes.emplace_back(_wireframe_pass.get());
             }
             if (cam._is_render_sky_box)
-                _render_passes.emplace_back(_skybox_pass.get());
+                _render_passes.emplace_back(_sky_pass.get());
         }
         if (cam._is_scene_camera)
             _render_passes.emplace_back(_gizmo_pass.get());
-        if (cam._is_enable_postprocess)
+        if (cam._postprocess_enabled)
         {
             _render_passes.emplace_back(_copycolor_pass.get());
-            _render_passes.emplace_back(_postprocess_pass.get());
+            _render_passes.emplace_back(_postprocess_stack.get());
         }
         for (auto &feature: _features)
         {
@@ -450,6 +453,7 @@ namespace Ailu::Render
         if (_is_use_render_graph)
         {
             _rendering_data._postprocess_input = nullptr;//taa关闭时，这个不赋值会导致bloom输入为空
+            _environment_system.RecordRenderGraph(*_rd_graph, _rendering_data);
             if (auto *animation_system = SceneMgr::Get().ActiveScene()->GetRegister().GetSystem<ECS::AnimationSystem>();
                 animation_system != nullptr)
                 animation_system->RecordSkinningRenderGraph(*_rd_graph, _rendering_data);
@@ -629,8 +633,13 @@ namespace Ailu::Render
         auto scene_data = ConstantBuffer::As<CBufferPerSceneData>(_rendering_data._p_per_scene_cbuf);
         f32 cascade_shaodw_max_dis = (f32) QuailtySetting::s_main_light_shaodw_distance * QuailtySetting::s_cascade_shadow_map_split[QuailtySetting::s_cascade_shadow_map_count - 1];
         scene_data->_CascadeShadowParams = Vector4f((f32) QuailtySetting::s_cascade_shadow_map_count,
-                                                    1.0f / QuailtySetting::s_shadow_fade_out_factor, 1.0f / cascade_shaodw_max_dis, 0.f);
+                                                    1.0f / QuailtySetting::s_shadow_fade_out_factor, 1.0f / cascade_shaodw_max_dis, 0.0f);
+        const f32 shadow_texel_size = 1.0f / static_cast<f32>(QuailtySetting::s_cascade_shaodw_map_resolution);
+        scene_data->_MainShadowMapParams = Vector4f(shadow_texel_size, shadow_texel_size, 1.25f, 0.0f);
         scene_data->g_IndirectLightingIntensity = s._light_data._indirect_lighting_intensity;
+        scene_data->g_EnvironmentIntensity = _rendering_data._environment != nullptr ? _rendering_data._environment->_intensity : 1.0f;
+        scene_data->g_EnvironmentRotation = _rendering_data._environment != nullptr ? _rendering_data._environment->_rotation : 0.0f;
+        scene_data->g_EnvironmentEnabled = _rendering_data._environment != nullptr && _rendering_data._environment->_enable_ibl ? 1.0f : 0.0f;
         PrepareLight(s);
         f32 t = TimeMgr::Get().TickTimeSinceLoad, dt = TimeMgr::Get().s_delta_time, sdt = TimeMgr::Get().s_smooth_delta_time;
         scene_data->_Time = Vector4f(t / 20, t, t * 2, (f32) g_pGfxContext->GetFrameCount());
@@ -685,11 +694,11 @@ namespace Ailu::Render
                     }
                     is_exist_directional_shaodw = true;
                 }
-                per_scene_cbuf_data->_DirectionalLights[direction_light_index]._LightColor = color.xyz;
+                per_scene_cbuf_data->_DirectionalLights[direction_light_index]._LightColor = color.xyz * kPi;
                 per_scene_cbuf_data->_DirectionalLights[direction_light_index]._LightDir = light_data._light_dir.xyz;
                 per_scene_cbuf_data->_DirectionalLights[direction_light_index]._LightParam0 = light_data._light_param.w;
                 per_scene_cbuf_data->_MainlightWorldPosition = light_data._light_dir.xyz;
-                per_scene_cbuf_data->_MainlightColor = color.xyz;
+                per_scene_cbuf_data->_MainlightColor = color.xyz * kPi;
                 _rendering_data._mainlight_world_position = per_scene_cbuf_data->_MainlightWorldPosition;
                 ++direction_light_index;
             }
@@ -721,7 +730,7 @@ namespace Ailu::Render
                     _rendering_data._point_shadow_data[point_light_index]._camera_far = light_data._light_param.x * 1.5f;
                     ++_rendering_data._addi_point_shadow_num;
                 }
-                per_scene_cbuf_data->_PointLights[point_light_index]._LightColor = color.xyz;
+                per_scene_cbuf_data->_PointLights[point_light_index]._LightColor = color.xyz * kPi;
                 per_scene_cbuf_data->_PointLights[point_light_index]._LightPos = light_data._light_pos.xyz;
                 per_scene_cbuf_data->_PointLights[point_light_index]._LightParam0 = light_data._light_param.x;
                 per_scene_cbuf_data->_PointLights[point_light_index++]._LightParam1 = light_data._light_param.y;
@@ -749,7 +758,7 @@ namespace Ailu::Render
                     _rendering_data._spot_shadow_data[spot_light_index]._cull_results = &_cull_results[shadow_cam.HashCode()];
                     ++_rendering_data._addi_shadow_num;
                 }
-                per_scene_cbuf_data->_SpotLights[spot_light_index]._LightColor = color.xyz;
+                per_scene_cbuf_data->_SpotLights[spot_light_index]._LightColor = color.xyz * kPi;
                 per_scene_cbuf_data->_SpotLights[spot_light_index]._LightPos = light_data._light_pos.xyz;
                 per_scene_cbuf_data->_SpotLights[spot_light_index]._LightDir = light_data._light_dir.xyz;
                 per_scene_cbuf_data->_SpotLights[spot_light_index]._Rdius = light_data._light_param.x;
@@ -782,7 +791,7 @@ namespace Ailu::Render
                     _rendering_data._area_shadow_data[area_light_index]._cull_results = &_cull_results[shadow_cam.HashCode()];
                     ++_rendering_data._addi_shadow_num;
                 }
-                per_scene_cbuf_data->_AreaLights[area_light_index]._LightColor = color.xyz;
+                per_scene_cbuf_data->_AreaLights[area_light_index]._LightColor = color.xyz * kPi;
                 memset(per_scene_cbuf_data->_AreaLights[area_light_index]._points, 0, sizeof(per_scene_cbuf_data->_AreaLights[area_light_index]._points));
                 per_scene_cbuf_data->_AreaLights[area_light_index]._points[0].xyz = light_data._area_points[0];
                 per_scene_cbuf_data->_AreaLights[area_light_index]._points[1].xyz = light_data._area_points[1];
@@ -980,6 +989,7 @@ namespace Ailu::Render
         }
         else
         {
+            _environment_system.Execute(_p_context, _rendering_data);
             if (cam._layer_mask & static_cast<u32>(ERenderLayer::kDefault))
             {
                 for (auto &pass: _render_passes)
@@ -995,10 +1005,10 @@ namespace Ailu::Render
             }
             else if (cam._layer_mask & static_cast<u32>(ERenderLayer::kSkyBox))
             {
-                PROFILE_BLOCK_CPU(_skybox_pass->GetName())
-                _skybox_pass->BeginPass(_p_context);
-                _skybox_pass->Execute(_p_context, _rendering_data);
-                _skybox_pass->EndPass(_p_context);
+                PROFILE_BLOCK_CPU(_sky_pass->GetName())
+                _sky_pass->BeginPass(_p_context);
+                _sky_pass->Execute(_p_context, _rendering_data);
+                _sky_pass->EndPass(_p_context);
             }
         }
         EndScene(s);

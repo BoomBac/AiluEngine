@@ -166,34 +166,6 @@ namespace Ailu::Render
         return AABB(vmin, vmax);
     }
 
-    Sphere Camera::GetShadowCascadeSphere(const Camera &eye_cam, f32 start, f32 end)
-    {
-        if (end < 0.0f)
-            end = QuailtySetting::s_main_light_shaodw_distance;
-        f32 end_len = end / eye_cam.Far(), start_len = start / eye_cam.Far();
-        end_len = std::min<f32>(end_len, 1.0);
-        start_len = std::clamp(start_len, 0.0f, end_len);
-        Vector3f vf_dir[4];
-        vf_dir[0] = eye_cam._far_bottom_left - eye_cam._position;
-        vf_dir[1] = eye_cam._far_bottom_right - eye_cam._position;
-        vf_dir[2] = eye_cam._far_top_left - eye_cam._position;
-        vf_dir[3] = eye_cam._far_top_right - eye_cam._position;
-        for (u16 i = 0; i < 4; i++)
-            Normalize(vf_dir[i]);
-        Vector<Vector3f> p(8);
-        p[0] = eye_cam._position + (vf_dir[0]) * end_len;
-        p[1] = eye_cam._position + (vf_dir[1]) * end_len;
-        p[2] = eye_cam._position + (vf_dir[2]) * end_len;
-        p[3] = eye_cam._position + (vf_dir[3]) * end_len;
-        p[4] = eye_cam._position + (vf_dir[0]) * start_len;
-        p[5] = eye_cam._position + (vf_dir[1]) * start_len;
-        p[6] = eye_cam._position + (vf_dir[2]) * start_len;
-        p[7] = eye_cam._position + (vf_dir[3]) * start_len;
-        Vector3f center = (p[0] + p[1] + p[2] + p[3] + p[4] + p[5] + p[6] + p[7]) * 0.125f;
-        f32 r = Distance(center, p[0]);
-        return Sphere(center, r);
-    }
-
     Camera::Camera() : Camera(16.0F / 9.0F)
     {
     }

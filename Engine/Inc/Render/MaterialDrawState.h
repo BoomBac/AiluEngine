@@ -4,6 +4,7 @@
 
 #include "CoreType.h"
 #include "GpuResource.h"
+#include "Buffer.h"
 #include "PipelineState.h"
 #include <type_traits>
 
@@ -14,6 +15,7 @@ namespace Ailu::Render
     struct PipelineBindingSnapshotEntry
     {
         GpuResourceHandle _resource;
+        BufferDataVersion _data_version;
         EBindResDescType _resource_type = EBindResDescType::kUnknown;
         u16 _slot = 0u;
         u16 _priority = 0u;
@@ -38,6 +40,7 @@ namespace Ailu::Render
     struct ComputeBindingSnapshotEntry
     {
         GpuResourceHandle _resource;
+        BufferDataVersion _data_version;
         EBindResDescType _resource_type = EBindResDescType::kUnknown;
         u16 _slot = 0u;
         u16 _priority = 0u;

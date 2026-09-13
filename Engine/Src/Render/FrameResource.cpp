@@ -173,9 +173,13 @@ namespace Ailu::Render
         auto *upload_buf = static_cast<RHI::DX12::UploadBuffer *>(_frame_upload_buffers[_active_slot].get());
         auto alloc = upload_buf->Allocate(size, alignment);
         FrameUploadAllocation out;
-        out._buffer = upload_buf;
+        out._owner = upload_buf;
         out._cpu_ptr = alloc.CPU;
         out._gpu_handle = alloc.GPU;
+        out._native_page = {RendererAPI::ERenderAPI::kDirectX12, alloc._page_res};
+        out._offset = alloc._offset;
+        out._size = static_cast<u32>(alloc._size);
+        out._frame_slot = _active_slot;
         return out;
     }
 

@@ -1,4 +1,4 @@
-//info bein
+//info begin
 //pass begin::
 //name: editor_outline_gen
 //vert: FullscreenVSMain

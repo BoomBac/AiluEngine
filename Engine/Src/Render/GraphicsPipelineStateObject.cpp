@@ -141,22 +141,6 @@ namespace Ailu::Render
         return it != _pso_library.end() && it->second->IsReady() ? it->second.get() : nullptr;
     }
 
-    void GraphicsPipelineStateMgr::RequestPSOCreation(const PSOCreateRequest &request)
-    {
-        while (_pso_create_queue.Full())
-            std::this_thread::yield();
-        _pso_create_queue.Push(request);
-    }
-
-    void GraphicsPipelineStateMgr::ProcessPendingPSOCreationRequests()
-    {
-        while (!_pso_create_queue.Empty())
-        {
-            if (auto request = _pso_create_queue.Pop(); request.has_value())
-                CreatePSO(request.value());
-        }
-    }
-
     void GraphicsPipelineStateMgr::BuildPSOCache()
     {
         LOG_WARNING("Begin initialize PSO cache...");
@@ -399,8 +383,8 @@ namespace Ailu::Render
             new_desc._p_vertex_shader = new_shader;
             new_desc._rt_state = RenderTargetState::_s_hash_obj.Get(rt_state);
             auto pso = std::move(GraphicsPipelineStateObject::Create(new_desc));
-            g_pGfxContext->CreateResource(pso.get(),
-                                          AL_NEW_TAG(EMemoryTag::kRenderer, UploadParamsGPSO, pass_index, variant_hash));
+            g_pGfxContext->CreateResourceSync(pso.get(),
+                                              AL_NEW_TAG(EMemoryTag::kRenderer, UploadParamsGPSO, pass_index, variant_hash));
             matched_pso = pso.get();
             GraphicsPipelineStateMgr::AddPSO(std::move(pso));
         }
@@ -441,13 +425,14 @@ namespace Ailu::Render
             if (_current_pso == nullptr)
             {
                 ++s_pso_miss_count;
-                if (!_pso_request_submitted)
+                if (!_pso_creation_attempted)
                 {
-                    GraphicsPipelineStateMgr::Get().RequestPSOCreation(
+                    _current_pso = GraphicsPipelineStateMgr::Get().CreatePSO(
                         PSOCreateRequest{_cur_pos_hash, _current_shader, _current_pass_index, _current_variant_hash});
-                    LOG_WARNING("PSO miss during command recording: shader={}, pass={}, variant={}", _current_shader->Name(),
-                                _current_pass_index, _current_variant_hash);
-                    _pso_request_submitted = true;
+                    if (_current_pso == nullptr)
+                        LOG_WARNING("PSO creation failed during command recording: shader={}, pass={}, variant={}",
+                                    _current_shader->Name(), _current_pass_index, _current_variant_hash);
+                    _pso_creation_attempted = true;
                 }
             }
             _is_pso_dirty = _current_pso == nullptr;

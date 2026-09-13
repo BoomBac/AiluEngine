@@ -1,4 +1,4 @@
-//info bein
+//info begin
 //pass begin::
 //name: SkyAtmosphere
 //vert: VSMain
@@ -10,6 +10,10 @@
 //Properties
 //{
 //	color("Color",Color) = (1,1,1,1)
+//  _EnvironmentIntensity("Intensity",Range(0,8)) = 1
+//  _EnvironmentRotation("Rotation",Range(-6.283,6.283)) = 0
+//  _SkyColor("Sky Color",Color) = (0.18,0.32,0.58,1)
+//  _GroundColor("Ground Color",Color) = (0.08,0.06,0.04,1)
 //}
 //info end
 
@@ -107,6 +111,10 @@ PSInput VSMain(VSInput v)
 }
 PerMaterialCBufferBegin
 	float4 _CameraDir;
+	float _EnvironmentIntensity;
+	float _EnvironmentRotation;
+	float4 _SkyColor;
+	float4 _GroundColor;
 PerMaterialCBufferEnd
 
 
@@ -119,6 +127,10 @@ float4 PSMain(PSInput input) : SV_TARGET
     float3 sunDir = -_MainlightWorldPosition;
     
     float3 rayDir =  normalize(input.wnormal);//normalize(camDir + camRight*xy.x*camWidthScale + camUp*xy.y*camHeightScale);
+    float rotation_sin = sin(_EnvironmentRotation);
+    float rotation_cos = cos(_EnvironmentRotation);
+    rayDir = float3(rotation_cos * rayDir.x - rotation_sin * rayDir.z, rayDir.y,
+                    rotation_sin * rayDir.x + rotation_cos * rayDir.z);
     
     float3 lum = getValFromSkyLUT(rayDir, sunDir);
     //return lum.rgbb;
@@ -138,8 +150,10 @@ float4 PSMain(PSInput input) : SV_TARGET
     lum += sunLum;
     
     // Tonemapping and gamma. Super ad-hoc, probably a better way to do this.
-    lum *= 8.0;
-    lum *= _MainlightColor;
+    //lum *= 8.0;
+    lum *= _MainlightColor * _EnvironmentIntensity;
+    float3 sky_tint = lerp(saturate(_GroundColor.rgb), saturate(_SkyColor.rgb), saturate(rayDir.y * 0.5 + 0.5));
+    lum *= lerp(1.0.xxx, sky_tint, 0.15);
     //lum = pow(lum, 1.3.xxx);
     //lum /= (smoothstep(0.0, 0.2, clamp(sunDir.y, 0.0, 1.0))*2.0 + 0.15);
     //lum = jodieReinhardTonemap(lum);

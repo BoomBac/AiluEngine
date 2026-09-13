@@ -3,8 +3,6 @@
 #include "RHI/DX12/D3DContext.h"
 #include "RHI/DX12/dxhelper.h"
 #include "pch.h"
-#include <new>// for std::bad_alloc
-
 using namespace Ailu::Render;
 
 namespace Ailu::RHI::DX12
@@ -32,20 +30,32 @@ namespace Ailu::RHI::DX12
         if (sizeInBytes > m_PageSize)
         {
             auto large_page = CreateLargePage(sizeInBytes, alignment);
-            return large_page->Allocate(sizeInBytes, alignment);
+            Allocation allocation{};
+            AL_ASSERT(large_page->Allocate(sizeInBytes, alignment, allocation));
+            return allocation;
         }
 
-        // If there is no current page, or the requested allocation exceeds the
-        // remaining space in the current page, request a new page.
-        if (!m_CurrentPage || !m_CurrentPage->HasSpace(sizeInBytes, alignment))
+        for (;;)
         {
-            m_CurrentPage = RequestPage();
-        }
+            auto current_page = m_CurrentPage.load(std::memory_order_acquire);
+            if (!current_page || !current_page->HasSpace(sizeInBytes, alignment))
+            {
+                current_page = RequestPage();
+                m_CurrentPage.store(current_page, std::memory_order_release);
+            }
 
-        return m_CurrentPage->Allocate(sizeInBytes, alignment);
+            Allocation allocation{};
+            if (current_page->Allocate(sizeInBytes, alignment, allocation))
+                return allocation;
+
+            std::shared_ptr<Page> expected_page = current_page;
+            m_CurrentPage.compare_exchange_strong(expected_page, std::shared_ptr<Page>{},
+                                                  std::memory_order_acq_rel, std::memory_order_acquire);
+        }
     }
     std::shared_ptr<UploadBuffer::Page> UploadBuffer::RequestPage()
     {
+        std::lock_guard lock(m_PagePoolMutex);
         std::shared_ptr<Page> page;
 
         if (!m_AvailablePages.empty())
@@ -63,6 +73,7 @@ namespace Ailu::RHI::DX12
     }
     std::shared_ptr<UploadBuffer::Page> UploadBuffer::CreateLargePage(size_t sizeInBytes, size_t alignment)
     {
+        std::lock_guard lock(m_PagePoolMutex);
         const size_t page_size = AlignTo(sizeInBytes, alignment);
         auto page = std::make_shared<Page>(std::format("{}_Large_{}", _name, m_LargePagePool.size()), page_size);
         m_LargePagePool.push_back(page);
@@ -70,7 +81,8 @@ namespace Ailu::RHI::DX12
     }
     void UploadBuffer::Reset()
     {
-        m_CurrentPage = nullptr;
+        std::lock_guard lock(m_PagePoolMutex);
+        m_CurrentPage.store(std::shared_ptr<Page>{}, std::memory_order_release);
         // Reset all available pages.
         m_AvailablePages = m_PagePool;
         m_LargePagePool.clear();
@@ -121,34 +133,47 @@ namespace Ailu::RHI::DX12
     bool UploadBuffer::Page::HasSpace(size_t sizeInBytes, size_t alignment) const
     {
         size_t alignedSize = AlignTo(sizeInBytes, alignment);
-        size_t alignedOffset = AlignTo(m_Offset, alignment);
+        size_t alignedOffset = AlignTo(m_Offset.load(std::memory_order_acquire), alignment);
 
         return alignedOffset + alignedSize <= m_PageSize;
     }
-    UploadBuffer::Allocation UploadBuffer::Page::Allocate(size_t sizeInBytes, size_t alignment)
+    bool UploadBuffer::Page::Allocate(size_t size_in_bytes, size_t alignment, Allocation &allocation)
     {
-        //lock_guard for thread safe!
-        if (!HasSpace(sizeInBytes, alignment))
+        if (!HasSpace(size_in_bytes, alignment))
         {
-            // Can't allocate space from page.
-            throw std::bad_alloc();
+            return false;
         }
 
-        size_t alignedSize = AlignTo(sizeInBytes, alignment);
-        m_Offset = AlignTo(m_Offset, alignment);
+        size_t alignedSize = AlignTo(size_in_bytes, alignment);
+        size_t alignedOffset = m_Offset.load(std::memory_order_relaxed);
+        constexpr u32 kMaxCompareExchangeRetries = 64u;
+        bool allocated = false;
+        for (u32 retry = 0u; retry < kMaxCompareExchangeRetries; ++retry)
+        {
+            alignedOffset = AlignTo(alignedOffset, alignment);
+            if (alignedOffset + alignedSize > m_PageSize)
+                return false;
+            if (m_Offset.compare_exchange_strong(alignedOffset, alignedOffset + alignedSize,
+                                                 std::memory_order_acq_rel, std::memory_order_relaxed))
+            {
+                allocated = true;
+                break;
+            }
+        }
 
-        Allocation allocation;
-        allocation.CPU = static_cast<u8 *>(m_CPUPtr) + m_Offset;
-        allocation.GPU = m_GPUPtr + m_Offset;
+        if (!allocated)
+            return false;
+
+        allocation.CPU = static_cast<u8 *>(m_CPUPtr) + alignedOffset;
+        allocation.GPU = m_GPUPtr + alignedOffset;
         allocation._size = alignedSize;
-        allocation._offset = (u32)m_Offset;
+        allocation._offset = (u32)alignedOffset;
         allocation._page_res = m_d3d12Resource.Get();
-        m_Offset += alignedSize;
-        return allocation;
+        return true;
     }
     void UploadBuffer::Page::Reset()
     {
-        m_Offset = 0;
+        m_Offset.store(0u, std::memory_order_release);
     }
 #pragma endregion
 

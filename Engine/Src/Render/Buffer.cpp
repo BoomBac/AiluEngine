@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "Render/Buffer.h"
+#include "Render/FrameResource.h"
 #include "Render/GraphicsContext.h"
 #include "Render/Renderer.h"
 #include "RHI/DX12/D3DBuffer.h"
@@ -11,7 +12,42 @@
 
 namespace Ailu::Render
 {
-	#pragma region GPUBuffer
+        GPUBuffer::~GPUBuffer()
+        {
+                if (_initial_data != nullptr)
+                        AL_FREE(_initial_data);
+        }
+
+        void GPUBuffer::SetData(const u8 *data, u32 size)
+        {
+                AL_ASSERT(data != nullptr || size == 0u);
+                AL_ASSERT(size <= _mem_size);
+                _counter = _desc._element_size == 0u ? 0u : size / _desc._element_size;
+
+                if (!IsPhysicalResourceCreated())
+                {
+                        if (_initial_data != nullptr)
+                                AL_FREE(_initial_data);
+                        _initial_data = nullptr;
+                        _initial_data_size = size;
+                        if (size != 0u)
+                        {
+                                _initial_data = reinterpret_cast<u8 *>(AL_ALLOC(u8, size));
+                                memcpy(_initial_data, data, size);
+                        }
+                        _current_data_version = {};
+                        return;
+                }
+
+                auto upload = FrameResourceManager::Get().AllocFrameUpload(size, 16u);
+                if (size != 0u)
+                        memcpy(upload._cpu_ptr, data, size);
+                _current_data_version._upload = upload;
+                _current_data_version._generation = ++_data_generation;
+                _current_data_version._size = size;
+        }
+
+        #pragma region GPUBuffer
 	Ref<GPUBuffer> GPUBuffer::Create(BufferDesc desc, const String &name)
 	{
 		switch (Renderer::GetAPI())

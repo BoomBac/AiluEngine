@@ -17,12 +17,6 @@
 namespace Ailu::Render
 {
     /// @brief 录制线程可用的帧作用域上传内存。数据在录制阶段写入GPU upload heap，GPU地址可在录制阶段获取。
-    struct FrameUploadAllocation
-    {
-        GpuResource *_buffer = nullptr;// 所属的上传缓冲区(GpuResource)，用于烘焙进binding snapshot
-        void *_cpu_ptr = nullptr;      // CPU可写指针
-        u64 _gpu_handle = 0u;          // GPU虚拟地址
-    };
     struct PrimitiveIndexAllocation
     {
         u32 *_cpu_ptr = nullptr;

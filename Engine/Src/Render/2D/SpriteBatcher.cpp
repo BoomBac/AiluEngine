@@ -175,7 +175,6 @@ namespace Ailu::Render
         desc._size = new_capacity * sizeof(SpriteInstanceData);
         desc._target = EGPUBufferTarget::kStructured;
         _instance_buffer = GPUBuffer::Create(desc, "SpriteInstanceBuffer");
-        GraphicsContext::Get().CreateResource(_instance_buffer.get());
     }
 
     void SpriteBatcher::BuildInstanceData(const Vector<SpriteRenderData> &render_data)
