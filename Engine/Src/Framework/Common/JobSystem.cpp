@@ -30,10 +30,7 @@ namespace Ailu
         AL_ASSERT(previous > 0u);
 
         if (previous == 1u)
-        {
-            std::lock_guard lock(_wait_mutex);
             _wait_cv.notify_all();
-        }
     }
 
     bool JobGroup::IsDone() const
@@ -220,7 +217,7 @@ namespace Ailu
 
     bool JobSystem::WorkOnce()
     {
-        PROFILE_BLOCK_CPU("JobSystem::WorkOnce");
+        //PROFILE_BLOCK_CPU("JobSystem::WorkOnce");
         Job *job = nullptr;
         size_t index = _thread_index % _queues.size();
 

@@ -745,6 +745,10 @@ namespace Ailu::RHI::DX12
         s_rdc_api->MaskOverlayBits(RENDERDOC_OverlayBits::eRENDERDOC_Overlay_None,
                                     RENDERDOC_OverlayBits::eRENDERDOC_Overlay_None);
         LOG_INFO("RenderDoc API loaded.");
+        if (s_rdc_api->SetCaptureOptionU32(eRENDERDOC_Option_DebugOutputMute, 0u) != 1)
+        {
+            LOG_WARNING("Failed to disable RenderDoc debug output mute.");
+        }
         return true;
     };
 

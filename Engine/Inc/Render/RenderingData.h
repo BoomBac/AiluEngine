@@ -105,6 +105,55 @@ namespace Ailu::Render
 
     using CullResult = Map<u32, Vector<RenderableObjectData>>;
 
+    class Camera;
+
+    enum class ERenderViewType : u8
+    {
+        kCamera,
+        kPreview,
+        kCubemap,
+        kDirectionalShadow,
+        kPointShadow,
+        kSpotShadow,
+        kAreaShadow
+    };
+
+    struct ViewCullInput
+    {
+        ViewFrustum _frustum;
+        Vector3f _camera_position = Vector3f::kZero;
+        u32 _layer_mask = 0u;
+        bool _is_custom_vp = false;
+    };
+
+    struct ShadowViewRequest
+    {
+        const Camera *_camera = nullptr;
+        ERenderViewType _view_type = ERenderViewType::kDirectionalShadow;
+        u16 _light_index = 0u;
+        u16 _cascade_or_face = 0u;
+        u32 _view_index = 0u;
+    };
+
+    struct SceneRenderData
+    {
+        const SceneManagement::Scene *_scene = nullptr;
+        const Vector<ScenePrimitive> *_primitives = nullptr;
+        const Vector<PrimitiveData> *_primitive_data = nullptr;
+        const Vector<MaterialData> *_material_data = nullptr;
+        Vector<ShadowViewRequest> _shadow_views;
+    };
+
+    struct ViewRenderData
+    {
+        const Camera *_camera = nullptr;
+        ERenderViewType _view_type = ERenderViewType::kCamera;
+        u64 _frame_index = 0u;
+        ViewCullInput _input;
+        CullResult _cull_result;
+        Vector<u32> _visible_skinned_primitives;
+    };
+
     struct RenderingShadowData
     {
         i16 _shadowmap_index = -1;

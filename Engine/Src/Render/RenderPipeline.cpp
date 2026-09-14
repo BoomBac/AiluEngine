@@ -1,4 +1,5 @@
 #include "Render/RenderPipeline.h"
+#include "Framework/Common/JobSystem.h"
 #include "Render/GraphicsContext.h"
 #include "Render/Material.h"
 #include "Framework/Common/Allocator.hpp"
@@ -135,10 +136,40 @@ namespace Ailu::Render
         }
         _frame_res_manager->NewFrame();
         Setup();
-        Camera *previous_selected_camera = Camera::sSelected;
+        const Scene &scene = *SceneManagement::SceneMgr::Get().ActiveScene();
+        bool has_cubemap_camera = false;
+        for (auto *camera : _cameras)
+        {
+            if (camera != nullptr && camera->TargetTexture() != nullptr &&
+                camera->TargetTexture()->Dimension() == ETextureDimension::kCube)
+            {
+                has_cubemap_camera = true;
+                break;
+            }
+        }
+        if (!has_cubemap_camera)
+            _renderers[0]->PrepareFrameViews(scene, _cameras);
+
+        auto ui_cmd = CommandBufferPool::Get("UI");
+        UI::UIRenderer::Get()->Prepare();
+        auto record_ui = [ui_cmd]() mutable
+        {
+            PROFILE_BLOCK_CPU("UIRender")
+            // 强制 clear 一下，backbuffer load action 默认为 dont care。
+            for (auto *backbuffer: RenderTexture::WindowBackBuffersSnapshot())
+            {
+                ui_cmd->SetRenderTarget(backbuffer);
+                ui_cmd->ClearRenderTarget(Colors::kBlack);
+            }
+            UI::UIRenderer::Get()->Record(ui_cmd.get());
+        };
+        JobGroup ui_group;
+        const bool is_parallel_ui_record = _renderers[0]->_is_use_render_graph;
+        if (is_parallel_ui_record)
+            JobSystem::Get().Dispatch(ui_group, [record_ui]() mutable { record_ui(); });
+
         for (auto cam: _cameras)
         {
-            Camera::sSelected = cam;
             cam->SetRenderer(_renderers[0].get());
 //#ifdef _PIX_DEBUG
 //            PIXBeginEvent(cam->HashCode(), L"DeferedRenderer");
@@ -147,30 +178,15 @@ namespace Ailu::Render
 //#else
 //            RenderSingleCamera(*cam, *_renderers[0].get());
 //#endif
-            RenderSingleCamera(*cam, *_renderers[0].get());
+            RenderSingleCamera(*cam, *_renderers[0].get(), scene);
             _targets.push_back(_renderers[0]->TargetTexture());
         }
-        Camera::sSelected = previous_selected_camera;
-        
-        {
-            //if (Application::Get()._is_multi_thread_rendering)
-            //{
-            //    Application::Get().NotifyRender();
-            //    Application::Get().WaitForRender();
-            //}
-            PROFILE_BLOCK_CPU("UIRender")
-            auto cmd = CommandBufferPool::Get("UI");
-            //强制clear一下，backbuffer load action默认为是dont care
-            //RenderTexture *backbuffer = RenderTexture::WindowBackBuffer(Application::s_focus_window? Application::s_focus_window : &Application::Get().GetWindow());
-            for (auto *backbuffer: RenderTexture::WindowBackBuffersSnapshot())
-            {
-                cmd->SetRenderTarget(backbuffer);
-                cmd->ClearRenderTarget(Colors::kBlack);
-            }
-            UI::UIRenderer::Get()->Render(cmd.get());
-            GraphicsContext::Get().ExecuteCommandBuffer(cmd);
-            CommandBufferPool::Release(cmd);
-        }
+        if (is_parallel_ui_record)
+            JobSystem::Get().Wait(ui_group);
+        else
+            record_ui();
+        GraphicsContext::Get().ExecuteCommandBuffer(ui_cmd);
+        CommandBufferPool::Release(ui_cmd);
     }
     RenderTexture *RenderPipeline::GetTarget(u16 index)
     {
@@ -178,9 +194,9 @@ namespace Ailu::Render
             return _targets[index];
         return nullptr;
     }
-    void RenderPipeline::RenderSingleCamera(const Camera &cam, Renderer &renderer)
+    void RenderPipeline::RenderSingleCamera(const Camera &cam, Renderer &renderer, const Scene &scene)
     {
-        renderer.Render(cam, *SceneMgr::Get().ActiveScene());
+        renderer.Render(cam, scene);
     }
     void RenderPipeline::FrameCleanup()
     {

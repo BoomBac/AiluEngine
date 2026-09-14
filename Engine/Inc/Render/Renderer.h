@@ -101,10 +101,17 @@ namespace Ailu
             void RefreshScenePrimitiveVertexBuffers();
             void PrepareScene(const Scene &s);
             void PrepareLight(const Scene &s);
+            void PrepareSceneRenderData(const Scene &s, const Camera &cam);
+            void PrepareViews(const Scene &s, const Camera &cam);
+            void PrepareFrameViews(const Scene &s, const Vector<Camera *> &cameras);
+            void DispatchViewCulls(const Scene &s, u32 first_view_index);
+            void ResetSceneShadowData(const Scene &s);
+            void FinalizeShadowViewData();
+            void RestorePreparedShadowData();
             void PrepareCamera(const Camera &cam);
             void PrepareMaterial(const Scene& s);
             void DoRender(const Camera &cam, const Scene &s, RenderTexture *output_target = nullptr, i32 output_view_index = -1);
-            void Cull(const Scene &s, const Camera &cam);
+            void Cull(const SceneRenderData &scene_data, const ViewCullInput &input, CullResult &output);
             static void StableSort(Vector<RenderPass *> list);
 
         private:
@@ -118,9 +125,18 @@ namespace Ailu
             RTHandle _gameview_rt_handle;
             RTHandle _camera_depth_handle;
             RTHandle _camera_depth_tex_handle;
-            Map<u64, CullResult> _cull_results;
             Vector<ScenePrimitive> _scene_primitives;
             Vector<PrimitiveData> _primitive_data;
+            SceneRenderData _scene_render_data;
+            Vector<ViewRenderData> _view_data;
+            ViewRenderData *_active_view_data = nullptr;
+            bool _scene_render_data_valid = false;
+            RenderingShadowData _prepared_cascade_shadow_data[RenderConstants::kMaxCascadeShadowMapSplitNum];
+            RenderingShadowData _prepared_spot_shadow_data[RenderConstants::kMaxSpotLightNum];
+            RenderingShadowData _prepared_area_shadow_data[RenderConstants::kMaxAreaLightNum];
+            RenderingPointShadowData _prepared_point_shadow_data[RenderConstants::kMaxPointLightNum];
+            u8 _prepared_addi_shadow_num = 0u;
+            u8 _prepared_addi_point_shadow_num = 0u;
             //CBufferPerSceneData _per_scene_cbuf_data;
             //CBufferPerCameraData _per_cam_cbuf_data;
 

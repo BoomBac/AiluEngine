@@ -105,6 +105,13 @@ namespace Ailu::Render
 
         void EmitQueuedDraws(CommandBuffer *cmd, Vector<QueuedDrawItem> &items)
         {
+            struct QueuedDrawBatch
+            {
+                u32 _item_index = 0u;
+                u32 _instance_count = 0u;
+                CBufferPrimitiveDrawData _primitive_draw_data{};
+            };
+
             EngineConfig &config = Ailu::g_engine_config;
             const bool can_sort = std::all_of(items.begin(), items.end(), [](const QueuedDrawItem &item)
             {
@@ -113,6 +120,8 @@ namespace Ailu::Render
             if (config.EnableCpuStateBatchedSubmission && can_sort && items.size() > 1u)
                 std::stable_sort(items.begin(), items.end(), CompareQueuedDrawItem);
 
+            Vector<QueuedDrawBatch> batches;
+            batches.reserve(items.size());
             for (u32 item_index = 0u; item_index < items.size();)
             {
                 auto &item = items[item_index];
@@ -120,15 +129,6 @@ namespace Ailu::Render
                 while (batch_end < items.size() && CompareQueuedDrawItem(item, items[batch_end]) == false
                        && CompareQueuedDrawItem(items[batch_end], item) == false)
                     ++batch_end;
-                bool was_alpha_test = false;
-                float alpha_cutoff = 0.0f;
-                if (item._force_alpha_test)
-                {
-                    was_alpha_test = item._material->ActiveKeywords(item._pass_index).contains("ALPHA_TEST");
-                    alpha_cutoff = item._material->GetFloat("_AlphaCulloff");
-                    item._material->EnableKeyword("ALPHA_TEST");
-                    item._material->SetFloat("_AlphaCulloff", 0.5f);
-                }
                 const u32 instance_count = batch_end - item_index;
                 CBufferPrimitiveDrawData draw_data = item._primitive_draw_data;
                 bool is_contiguous = true;
@@ -148,18 +148,35 @@ namespace Ailu::Render
                     draw_data._instance_index_offset = allocation._offset;
                     draw_data._flags |= kPrimitiveDrawUseInstanceIndex;
                 }
+                batches.emplace_back(QueuedDrawBatch{item_index, instance_count, draw_data});
+                item_index = batch_end;
+            }
+
+            // Draw snapshots capture a buffer data version.  Upload the complete indirection table before
+            // constructing any draw command so every batch binds this frame's version rather than the prior slot's.
+            FrameResource::Active()->UploadPrimitiveIndices();
+            for (const QueuedDrawBatch &batch: batches)
+            {
+                auto &item = items[batch._item_index];
+                bool was_alpha_test = false;
+                float alpha_cutoff = 0.0f;
+                if (item._force_alpha_test)
+                {
+                    was_alpha_test = item._material->ActiveKeywords(item._pass_index).contains("ALPHA_TEST");
+                    alpha_cutoff = item._material->GetFloat("_AlphaCulloff");
+                    item._material->EnableKeyword("ALPHA_TEST");
+                    item._material->SetFloat("_AlphaCulloff", 0.5f);
+                }
                 item._material->GetShader()->_stencil_ref = item._stencil_ref;
                 cmd->DrawSceneMesh(item._vertex_buffer, item._index_buffer, item._material, item._submesh_index, item._pass_index,
-                                   draw_data, instance_count);
+                                   batch._primitive_draw_data, batch._instance_count);
                 if (item._force_alpha_test)
                 {
                     item._material->SetFloat("_AlphaCulloff", alpha_cutoff);
                     if (!was_alpha_test)
                         item._material->DisableKeyword("ALPHA_TEST");
                 }
-                item_index = batch_end;
             }
-            FrameResource::Active()->UploadPrimitiveIndices();
         }
 
         void EmitQueuedDraws(const Ref<CommandBuffer> &cmd, Vector<QueuedDrawItem> &items)

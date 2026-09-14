@@ -1599,6 +1599,7 @@ namespace Ailu::Render
     void ComputeShader::CaptureDispatchState(ComputeShaderKernelId kernel, ComputeDispatchSnapshot &snapshot,
                                               const HashMap<ShaderPropertyId, CommandResourceBinding> *command_resources)
     {
+        std::shared_lock global_resource_lock(s_global_resource_mutex);
         snapshot = ComputeDispatchSnapshot{};
         if (!IsKernelValid(kernel))
             return;

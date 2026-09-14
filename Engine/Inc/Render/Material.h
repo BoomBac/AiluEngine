@@ -193,8 +193,9 @@ namespace Ailu::Render
         void EnableKeyword(const String &keyword);
         void DisableKeyword(const String &keyword);
         MaterialDrawState CaptureDrawState(u16 pass_index, u32 frame_slot, u64 frame_count, FrameAllocator &allocator,
+                                           const ShaderGlobalResourceSnapshot &global_resources,
                                            const HashMap<ShaderPropertyId, CommandResourceBinding> *command_resources = nullptr,
-                                           CommandRenderingStatesData *statistics = nullptr);
+                                           CommandRenderingStatesData *statistics = nullptr) const;
         [[nodiscard]] Shader *GetShader() const { return _p_shader; };
         [[nodiscard]] Shader *GetActiveShader() const { return _p_active_shader; };
         static ShaderPropertyId SurfacePropertyId() { return ShaderPropertyRegistry::Get().Intern("_surface"); }

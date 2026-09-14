@@ -215,20 +215,21 @@ namespace Ailu::Render
     }
 
     MaterialDrawState Material::CaptureDrawState(u16 pass_index, u32 frame_slot, u64 frame_count, FrameAllocator &allocator,
+                                                 const ShaderGlobalResourceSnapshot &global_resources,
                                                  const HashMap<ShaderPropertyId, CommandResourceBinding> *command_resources,
-                                                 CommandRenderingStatesData *statistics)
+                                                 CommandRenderingStatesData *statistics) const
     {
         if (_p_active_shader == nullptr || pass_index >= _pass_variants.size())
             return {};
         AL_ASSERT(pass_index < _pass_variants.size());
         const auto variant_hash = _pass_variants[pass_index]._variant_hash;
         const ShaderBindingLayout *binding_layout = _p_active_shader->GetBindingLayout(pass_index, variant_hash);
-        if (_binding_cache.size() != _pass_variants.size())
-            _binding_cache.resize(_pass_variants.size());
-        auto &cache = _binding_cache[pass_index];
+        // Capture may run on UI and RenderGraph recording threads at once.  Keep its
+        // resolution cache local until a frame-local cache is justified by profiling.
+        BindingCacheEntry cache;
         const u32 layout_version = binding_layout == nullptr ? 0u : binding_layout->Version();
         BindState cur_state;
-        const auto &global_res_registry = Shader::GlobalResourceRegistry();
+        const auto &global_res_registry = global_resources;
         u32 material_binding_invalid_reasons = 0u;
         if (cache._resource_binding_version != _resource_binding_version)
             material_binding_invalid_reasons |= 1u << 0u;
@@ -236,14 +237,14 @@ namespace Ailu::Render
             material_binding_invalid_reasons |= 1u << 1u;
         if (cache._variant_hash != variant_hash)
             material_binding_invalid_reasons |= 1u << 2u;
-        if (cache._global_res_layout_version != global_res_registry.LayoutVersion())
+        if (cache._global_res_layout_version != global_res_registry._layout_version)
             material_binding_invalid_reasons |= 1u << 3u;
-        if (cache._global_res_binding_version != global_res_registry.BindingVersion())
+        if (cache._global_res_binding_version != global_res_registry._binding_version)
             material_binding_invalid_reasons |= 1u << 4u;
         const bool is_material_cache_hit = material_binding_invalid_reasons == 0u;
         if (cache._resource_binding_version == _resource_binding_version && cache._layout_version == layout_version && cache._variant_hash == variant_hash
-            && cache._global_res_layout_version == global_res_registry.LayoutVersion()
-            && cache._global_res_binding_version == global_res_registry.BindingVersion())
+            && cache._global_res_layout_version == global_res_registry._layout_version
+            && cache._global_res_binding_version == global_res_registry._binding_version)
         {
             if (statistics != nullptr) ++statistics->MaterialBindingCacheHitCount;
             cur_state = cache._state;
@@ -293,14 +294,14 @@ namespace Ailu::Render
                 for (const auto &resolved_binding : cache._global_res_bindings)
                 {
                     clear_resolved_global_resource(resolved_binding);
-                    const auto it = global_res_registry.Resources().find(resolved_binding._property_id);
-                    if (it != global_res_registry.Resources().end())
+                    const auto it = global_res_registry._resources.find(resolved_binding._property_id);
+                    if (it != global_res_registry._resources.end())
                         apply_resolved_resource(resolved_binding, it->second._resource, PipelineResource::kPriorityGlobal);
                 }
             };
 
             const bool needs_full_rebuild = cache._resource_binding_version != _resource_binding_version || cache._layout_version != layout_version
-                || cache._variant_hash != variant_hash || cache._global_res_layout_version != global_res_registry.LayoutVersion();
+                || cache._variant_hash != variant_hash || cache._global_res_layout_version != global_res_registry._layout_version;
             if (needs_full_rebuild)
             {
                 if (statistics != nullptr) ++statistics->MaterialBindingResolveCount;
@@ -315,10 +316,10 @@ namespace Ailu::Render
                 for (const auto &[property_id, buffer] : _bind_buffers_by_id)
                     apply_resource(property_id, buffer, PipelineResource::kPriorityLocal);
                 if (cache._layout_version != layout_version || cache._variant_hash != variant_hash
-                    || cache._global_res_layout_version != global_res_registry.LayoutVersion())
+                    || cache._global_res_layout_version != global_res_registry._layout_version)
                 {
                     cache._global_res_bindings.clear();
-                    for (const auto &it : global_res_registry.Resources())
+                for (const auto &it : global_res_registry._resources)
                     {
                         ResolvedResourceBinding resolved_binding;
                         if (resolve_resource(it.first, resolved_binding))
@@ -336,8 +337,8 @@ namespace Ailu::Render
             cache._resource_binding_version = _resource_binding_version;
             cache._layout_version = layout_version;
             cache._variant_hash = variant_hash;
-            cache._global_res_layout_version = global_res_registry.LayoutVersion();
-            cache._global_res_binding_version = global_res_registry.BindingVersion();
+            cache._global_res_layout_version = global_res_registry._layout_version;
+            cache._global_res_binding_version = global_res_registry._binding_version;
             cache._state = cur_state;
         }
 
@@ -369,7 +370,6 @@ namespace Ailu::Render
             if (_p_active_shader->GetVariantState(pass_index, variant_hash) == EShaderVariantState::kReady)
             {
                 cur_state._is_ready = true;
-                _binding_cache[pass_index]._state._is_ready = true;
             }
         }
 
@@ -388,8 +388,8 @@ namespace Ailu::Render
         draw_state._material_binding_result = is_material_cache_hit ? 0u :
             ((material_binding_invalid_reasons & ((1u << 0u) | (1u << 1u) | (1u << 2u) | (1u << 3u))) != 0u ? 2u : 1u);
         draw_state._binding_layout_version = layout_version;
-        draw_state._global_layout_version = global_res_registry.LayoutVersion();
-        draw_state._global_binding_version = global_res_registry.BindingVersion();
+        draw_state._global_layout_version = global_res_registry._layout_version;
+        draw_state._global_binding_version = global_res_registry._binding_version;
         draw_state._cull_mode = _cull_mode;
         auto is_command_cbuffer_slot = [&](u16 slot)
         {
@@ -440,7 +440,25 @@ namespace Ailu::Render
         // 将材质属性块(raw cbuffer)烘焙进snapshot，RHI draw路径只回放snapshot即可，
         // 无需在D3DContext再单独上传/绑定per-material cbuffer
         const bool has_mat_slot = cur_state._cbuf_bind_slot >= 0;
-        const auto block = GetPropertyBlockForFrame(pass_index, frame_slot, frame_count, allocator, has_mat_slot, statistics);
+        PropertyBlockView block;
+        const auto &material_block = _property_blocks[pass_index];
+        block._data = allocator.Allocate<u8>(material_block._size);
+        block._size = material_block._size;
+        if (block._data != nullptr && block._size > 0u)
+            memcpy(block._data, material_block._data, block._size);
+        if (has_mat_slot && block._size > 0u)
+        {
+            const auto upload = FrameResourceManager::Get().AllocFrameUpload(block._size, 256u);
+            if (upload._cpu_ptr != nullptr)
+                memcpy(upload._cpu_ptr, block._data, block._size);
+            block._upload_buffer = upload._owner;
+            block._gpu_handle = upload._gpu_handle;
+            if (statistics != nullptr)
+            {
+                ++statistics->MaterialCBufferUploadCount;
+                statistics->MaterialCBufferUploadBytes += block._size;
+            }
+        }
         const bool has_material_block = has_mat_slot && block._size > 0u && block._gpu_handle != 0u;
         auto *entries = allocator.Allocate<PipelineBindingSnapshotEntry>(entry_count + cbuf_entry_count + (has_material_block ? 1u : 0u));
         draw_state._bindings._entries = entries;

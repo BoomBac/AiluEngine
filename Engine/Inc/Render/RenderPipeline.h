@@ -143,7 +143,7 @@ namespace Ailu::Render
     public:
         std::atomic<bool> _is_need_wait_for_render_thread = true;
     private:
-        void RenderSingleCamera(const Camera &cam, Renderer &renderer);
+        void RenderSingleCamera(const Camera &cam, Renderer &renderer, const Scene &scene);
         void UpdateRenderObject(u32 start,u32 end);
         void UpdateVisibilityObject(u32 start,u32 end);
         void OnRenderObjectSubmeshCountChanged(u32 render_obj_id,u16 old_mesh_count,u32 new_mesh_count);

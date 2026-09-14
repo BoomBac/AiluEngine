@@ -101,6 +101,12 @@ namespace Ailu
 
         void UIRenderer::Render(CommandBuffer *cmd)
         {
+            Prepare();
+            Record(cmd);
+        }
+
+        void UIRenderer::Prepare()
+        {
             _frame_index = Render::g_pGfxContext != nullptr ? static_cast<u16>(Render::g_pGfxContext->GetFrameCount() % RenderConstants::kFrameCount) : 0u;
             ResetFrameStats();
             if (!_drawer_blocks[_frame_index].empty() && _drawer_blocks[_frame_index][0u] != nullptr)
@@ -196,31 +202,8 @@ namespace Ailu
                 updated_widgets.push_back(canvas);
             }
             DragDropManager::Get().Update();
-            struct WidgetSubmitEntry
-            {
-                Widget *_widget = nullptr;
-                RenderTexture *_color = nullptr;
-                RenderTexture *_depth = nullptr;
-            };
-            Vector<WidgetSubmitEntry> submit_entries;
-            submit_entries.reserve(visible_widgets.size());
-            HashMap<RenderTexture *, RTHandle> composite_target_handles;
-            auto get_submit_color = [&](RenderTexture *color) -> RenderTexture *
-            {
-                if (color == nullptr || !color->IsSwapChain())
-                    return color;
-                if (auto it = composite_target_handles.find(color); it != composite_target_handles.end())
-                    return g_pRenderTexturePool->Get(it->second);
-                RTHandle handle = cmd->GetTempRT(color->Width(), color->Height(), std::format("UI_Composite_{}", composite_target_handles.size()),
-                                                 ERenderTargetFormat::kDefault, false, true, false);
-                _pending_backdrop_blur_release_handles.push_back(handle);
-                composite_target_handles[color] = handle;
-                auto *composite = g_pRenderTexturePool->Get(handle);
-                cmd->SetRenderTarget(composite);
-                cmd->ClearRenderTarget(Colors::kBlack);
-                cmd->SetRenderTargetLoadAction(composite, ELoadStoreAction::kLoad);
-                return composite;
-            };
+            _submit_entries.clear();
+            _submit_entries.reserve(visible_widgets.size());
             _cur_widget_index = 1u;
             for (auto *canvas: visible_widgets)
             {
@@ -280,7 +263,7 @@ namespace Ailu
                 }
 
                 auto [color, depth] = canvas->GetOutput();
-                submit_entries.push_back({canvas, color, depth});
+                _submit_entries.push_back({canvas, color, depth});
                 ++_cur_widget_index;
             }
             _cur_widget_block = nullptr;
@@ -289,7 +272,29 @@ namespace Ailu
             _cur_widget_index = 0u;
             if (_overlay_draw_callback)
                 _overlay_draw_callback();
-            for (const auto &entry: submit_entries)
+        }
+
+        void UIRenderer::Record(CommandBuffer *cmd)
+        {
+            HashMap<RenderTexture *, RTHandle> composite_target_handles;
+            auto get_submit_color = [&](RenderTexture *color) -> RenderTexture *
+            {
+                if (color == nullptr || !color->IsSwapChain())
+                    return color;
+                if (auto it = composite_target_handles.find(color); it != composite_target_handles.end())
+                    return g_pRenderTexturePool->Get(it->second);
+                const RTHandle handle = cmd->GetTempRT(color->Width(), color->Height(),
+                                                       std::format("UI_Composite_{}", composite_target_handles.size()),
+                                                       ERenderTargetFormat::kDefault, false, true, false);
+                _pending_backdrop_blur_release_handles.push_back(handle);
+                composite_target_handles[color] = handle;
+                auto *composite = g_pRenderTexturePool->Get(handle);
+                cmd->SetRenderTarget(composite);
+                cmd->ClearRenderTarget(Colors::kBlack);
+                cmd->SetRenderTargetLoadAction(composite, ELoadStoreAction::kLoad);
+                return composite;
+            };
+            for (const auto &entry: _submit_entries)
             {
                 if (entry._widget == nullptr || entry._widget->IsPopup())
                     continue;
@@ -315,7 +320,7 @@ namespace Ailu
                 }
             }
             _popup_backdrop_block_index = 0u;
-            for (const auto &entry: submit_entries)
+            for (const auto &entry: _submit_entries)
             {
                 if (entry._widget == nullptr || !entry._widget->IsPopup())
                     continue;

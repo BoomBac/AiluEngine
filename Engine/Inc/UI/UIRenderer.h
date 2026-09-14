@@ -81,6 +81,8 @@ namespace Ailu
         public:
             UIRenderer();
             ~UIRenderer();
+            void Prepare();
+            void Record(CommandBuffer *cmd);
             void Render(CommandBuffer* cmd);
             using OverlayDrawCallback = std::function<void()>;
             void SetOverlayDrawCallback(OverlayDrawCallback callback) { _overlay_draw_callback = std::move(callback); }
@@ -122,6 +124,12 @@ namespace Ailu
             void DrawDebugPannel();
             Vector<struct DrawerBlock *> &FrameBlocks() {return _drawer_blocks[_frame_index];};
             struct WidgetDrawerBlocks;
+            struct WidgetSubmitEntry
+            {
+                Widget *_widget = nullptr;
+                RenderTexture *_color = nullptr;
+                RenderTexture *_depth = nullptr;
+            };
             WidgetDrawerBlocks *GetWidgetBlockEntry(Widget *widget);
             Vector<DrawerBlock *> &GetWidgetCpuBlocks(Widget *widget);
             Vector<DrawerBlock *> &GetWidgetFrameBlocks(Widget *widget);
@@ -152,6 +160,7 @@ namespace Ailu
                 u64 _build_revision = 0u;
             };
             Vector<WidgetDrawerBlocks> _widget_drawer_blocks;
+            Vector<WidgetSubmitEntry> _submit_entries;
             DrawerBlock *_text_block;
             Vector<DrawerBlock *> _popup_backdrop_blocks;
             u32 _popup_backdrop_block_index = 0u;

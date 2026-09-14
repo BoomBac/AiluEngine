@@ -925,12 +925,17 @@ namespace Ailu
             void UnRegister(u32 rt_id);
             RenderTexture *Get(RTHandle handle)
             {
+                std::lock_guard lock(_mutex);
                 if (_lut_pool.contains(handle._id))
                     return _lut_pool[handle._id]->second._rt.get();
                 else
                     return nullptr;
             }
-            u32 Size() const { return static_cast<u32>(_pool.size()); }
+            u32 Size() const
+            {
+                std::lock_guard lock(_mutex);
+                return static_cast<u32>(_pool.size());
+            }
             RTPool::iterator begin() { return _pool.begin(); }
             RTPool::iterator end() { return _pool.end(); }
             auto PersistentRTBegin() { return _persistent_rts.begin(); }
@@ -941,6 +946,7 @@ namespace Ailu
             RTPool _pool;
             Map<u32, RTPool::iterator> _lut_pool;
             Map<u32, RenderTexture *> _persistent_rts;
+            mutable std::recursive_mutex _mutex;
         };
         extern AILU_API RenderTexturePool *g_pRenderTexturePool;
     }// namespace Render

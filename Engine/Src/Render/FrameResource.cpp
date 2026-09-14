@@ -24,10 +24,10 @@ namespace Ailu::Render
         desc._element_size = sizeof(u32);
         desc._is_random_write = false;
         desc._size = desc._element_num * desc._element_size;
-        // This is a frame-slot scoped upload buffer.  Keeping it on an upload
-        // heap makes every allocation visible to draws recorded in this slot
-        // without issuing a GPU copy for each non-contiguous batch.
-        desc._target = EGPUBufferTarget::kConstant | EGPUBufferTarget::kStructured;
+        // The CPU data is uploaded through the frame-slot upload allocator.  Keep the
+        // actual shader resource on the default heap so the version upload can transition
+        // it to COPY_DEST before CopyBufferRegion.
+        desc._target = EGPUBufferTarget::kStructured;
         _primitive_index_buffer = GPUBuffer::Create(desc);
         _primitive_index_buffer->Name("FramePrimitiveIndexBuffer");
         _primitive_indices.reserve(RenderConstants::kMaxRenderObjectCount);
@@ -167,6 +167,7 @@ namespace Ailu::Render
     }
     FrameUploadAllocation FrameResourceManager::AllocFrameUpload(u32 size, u32 alignment)
     {
+        std::lock_guard lock(_frame_upload_mutex);
         if (_frame_upload_buffers[_active_slot] == nullptr)
             _frame_upload_buffers[_active_slot] = AdoptGpuResource(
                     new RHI::DX12::UploadBuffer(std::format("FrameUploadBuffer_{}", _active_slot)));
@@ -185,6 +186,7 @@ namespace Ailu::Render
 
     void FrameResourceManager::ResetFrameUpload(u32 frame_slot)
     {
+        std::lock_guard lock(_frame_upload_mutex);
         if (_frame_upload_buffers[frame_slot])
             static_cast<RHI::DX12::UploadBuffer *>(_frame_upload_buffers[frame_slot].get())->Reset();
     }

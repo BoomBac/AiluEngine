@@ -57,6 +57,7 @@ namespace Ailu::Render
 
     Ref<CommandBuffer> CommandBufferPool::Get(const String &name)
     {
+        std::lock_guard lock(s_pCommandBufferPool->_mutex);
         for (auto &cmd: s_pCommandBufferPool->_cmd_buffers)
         {
             auto &[available, cmd_buf] = cmd;
@@ -69,7 +70,6 @@ namespace Ailu::Render
                 return cmd_buf;
             }
         }
-        std::unique_lock<std::mutex> lock(s_pCommandBufferPool->_mutex);
         //u32 newId = (u32) s_pCommandBufferPool->_cmd_buffers.size();
         auto cmd = std::make_shared<CommandBuffer>(name);
         s_pCommandBufferPool->_cmd_buffers.emplace_back(false, cmd);
@@ -147,6 +147,7 @@ namespace Ailu::Render
                                                                        FrameResourceManager::Get().GetActiveFrameSlot(),
                                                                        g_pGfxContext->GetFrameCount(),
                                                                        *FrameResourceManager::Get().GetActiveFrameAllocator(),
+                                                                       _global_resource_snapshot,
                                                                        &_command_resources, &_rendering_states_data);
         }
 
@@ -165,10 +166,12 @@ namespace Ailu::Render
             }
             _commands.clear();
             _command_resources.clear();
+            _render_target_load_actions.clear();
             _leased_temp_rts.clear();
             _released_temp_rts.clear();
             _render_graph = nullptr;
             _rendering_states_data.Reset();
+            _global_resource_snapshot = Shader::CaptureGlobalResourceSnapshot();
         }
         void ClearRenderTarget(Color color, f32 depth, u8 stencil)
         {
@@ -241,9 +244,9 @@ namespace Ailu::Render
                 cmd->_viewports[0] = Rect(0, 0, rt->Width(), rt->Height());
             }
             _commands.push_back(cmd);
-            if (color && color->_load_action == ELoadStoreAction::kClear)
+            if (color && GetLoadAction(color) == ELoadStoreAction::kClear)
                 ClearRenderTarget(Colors::kBlack);
-            if (depth && depth->_load_action == ELoadStoreAction::kClear)
+            if (depth && GetLoadAction(depth) == ELoadStoreAction::kClear)
                 ClearRenderTarget(kZFar, 0u);
         }
         void SetRenderTarget(RenderTexture *color, u16 index = 0u)
@@ -260,7 +263,7 @@ namespace Ailu::Render
             else
                 cmd->_viewports[0] = Rect(0, 0, color->Width(), color->Height());
             _commands.push_back(cmd);
-            if (color->_load_action == ELoadStoreAction::kClear)
+            if (GetLoadAction(color) == ELoadStoreAction::kClear)
                 ClearRenderTarget(Colors::kBlack);
         }
         void SetRenderTarget(RenderTexture *color, RenderTexture *depth, u16 color_index, u16 depth_index)
@@ -282,9 +285,9 @@ namespace Ailu::Render
                 cmd->_viewports[0] = Rect(0, 0, rt->Width(), rt->Height());
             }
             _commands.push_back(cmd);
-            if (color && color->_load_action == ELoadStoreAction::kClear)
+            if (color && GetLoadAction(color) == ELoadStoreAction::kClear)
                 ClearRenderTarget(Colors::kBlack);
-            if (depth->_load_action == ELoadStoreAction::kClear)
+            if (GetLoadAction(depth) == ELoadStoreAction::kClear)
                 ClearRenderTarget(kZFar, 0u);
         }
         void SetRenderTargets(const Vector<RenderTexture *> &colors, RenderTexture *depth)
@@ -308,9 +311,9 @@ namespace Ailu::Render
             cmd->_depth_target = GetResourceHandle(depth);
             cmd->_depth_index = 0u;
             _commands.push_back(cmd);
-            if (!colors.empty() && colors[0] != nullptr && colors[0]->_load_action == ELoadStoreAction::kClear)
+            if (!colors.empty() && colors[0] != nullptr && GetLoadAction(colors[0]) == ELoadStoreAction::kClear)
                 ClearRenderTarget(s_clear_colors, cmd->_color_target_num);
-            if (depth != nullptr && depth->_load_action == ELoadStoreAction::kClear)
+            if (depth != nullptr && GetLoadAction(depth) == ELoadStoreAction::kClear)
                 ClearRenderTarget(kZFar, 0u);
         }
         void SetRenderTargets(const Vector<RTHandle> &colors, RTHandle depth)
@@ -487,24 +490,24 @@ namespace Ailu::Render
         {
             Blit(g_pRenderTexturePool->Get(src), g_pRenderTexturePool->Get(dst), mat, pass_index);
         }
+
+        std::mutex _mutex;
         void Blit(Texture *src, RenderTexture *dst, Material *mat, u16 pass_index)
         {
+            std::lock_guard lock(_mutex);
             static const auto blit_mat = ResourceMgr::Get().Get<Material>(L"Runtime/Material/Blit");
             mat = mat ? mat : blit_mat;
             SetRenderTarget(dst);
-            if (dst->_load_action == ELoadStoreAction::kClear)
-                ClearRenderTarget(Colors::kBlack);
-            mat->SetTexture("_SourceTex", src);
+            SetGlobalTexture("_SourceTex", src);
             DrawFullScreenQuad(mat, pass_index);
         }
         void Blit(Texture *src, RenderTexture *dst, u16 src_view_index, u16 dst_view_index, Material *mat, u16 pass_index)
         {
+            std::lock_guard lock(_mutex);
             static const auto blit_mat = ResourceMgr::Get().Get<Material>(L"Runtime/Material/Blit");
             mat = mat ? mat : blit_mat;
             SetRenderTarget(dst, dst_view_index);
-            if (dst->_load_action == ELoadStoreAction::kClear)
-                ClearRenderTarget(Colors::kBlack);
-            mat->SetTexture("_SourceTex", src);
+            SetGlobalTexture("_SourceTex", src);
             DrawFullScreenQuad(mat, pass_index);
         }
         void Blit(RTHandle src, RenderTexture *dst, Material *mat, u16 pass_index)
@@ -762,7 +765,8 @@ namespace Ailu::Render
         }
         void SetRenderTargetLoadAction(RenderTexture *tex, ELoadStoreAction action)
         {
-            tex->_load_action = action;
+            if (tex != nullptr)
+                _render_target_load_actions[tex] = action;
         }
         void SetRenderTargetLoadAction(RTHandle handle, ELoadStoreAction action)
         {
@@ -771,6 +775,12 @@ namespace Ailu::Render
         void SetRenderTargetLoadAction(RDG::RGHandle handle, ELoadStoreAction action)
         {
             SetRenderTargetLoadAction(_render_graph->Resolve<RenderTexture>(handle), action);
+        }
+        ELoadStoreAction GetLoadAction(RenderTexture *tex) const
+        {
+            if (const auto it = _render_target_load_actions.find(tex); it != _render_target_load_actions.end())
+                return it->second;
+            return tex != nullptr ? tex->_load_action : ELoadStoreAction::kNotCare;
         }
         void RequireState(GpuResource *res, EResourceState state, u32 sub_res)
         {
@@ -831,11 +841,13 @@ namespace Ailu::Render
             _commands.emplace_back(cmd);
         }
         String _name;
+        ShaderGlobalResourceSnapshot _global_resource_snapshot;
         Vector<GfxCommand *> _commands;
         Array<Rect, RenderConstants::kMaxMRTNum> _viewports;
         RDG::RenderGraph *_render_graph = nullptr;
         // CommandBuffer局部资源，以kPriorityCmd烘焙进draw state snapshot
         HashMap<ShaderPropertyId, CommandResourceBinding> _command_resources;
+        HashMap<RenderTexture *, ELoadStoreAction> _render_target_load_actions;
         Vector<RTHandle> _leased_temp_rts;
         Vector<RTHandle> _released_temp_rts;
         CommandRenderingStatesData _rendering_states_data;

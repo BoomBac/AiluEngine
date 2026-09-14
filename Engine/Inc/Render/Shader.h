@@ -3,6 +3,7 @@
 #define __SHADER_H__
 #include "Buffer.h"
 #include "Framework/Math/ALMath.hpp"
+#include <shared_mutex>
 #include "Objects/Object.h"
 #include "PipelineState.h"
 #include "Texture.h"
@@ -107,6 +108,13 @@ namespace Ailu::Render
         GpuResource *_resource = nullptr;
     };
 
+    struct ShaderGlobalResourceSnapshot
+    {
+        HashMap<ShaderPropertyId, GlobalResourceBinding> _resources;
+        u64 _layout_version = 0u;
+        u64 _binding_version = 0u;
+    };
+
     class ShaderGlobalResourceRegistry
     {
     public:
@@ -120,14 +128,16 @@ namespace Ailu::Render
             SetResource(property_id, buffer);
         }
 
-        u64 Version() const { return _binding_version; }
-        u64 LayoutVersion() const { return _layout_version; }
-        u64 BindingVersion() const { return _binding_version; }
-        const HashMap<ShaderPropertyId, GlobalResourceBinding> &Resources() const { return _resources; }
+        ShaderGlobalResourceSnapshot CaptureSnapshot() const
+        {
+            std::shared_lock lock(_mutex);
+            return {_resources, _layout_version, _binding_version};
+        }
 
     private:
         void SetResource(ShaderPropertyId property_id, GpuResource *resource)
         {
+            std::unique_lock lock(_mutex);
             const bool is_new_resource_id = !_resources.contains(property_id);
             auto &binding = _resources[property_id];
             if (!is_new_resource_id && binding._resource == resource)
@@ -140,6 +150,7 @@ namespace Ailu::Render
         }
 
         HashMap<ShaderPropertyId, GlobalResourceBinding> _resources;
+        mutable std::shared_mutex _mutex;
         u64 _layout_version = 1u;
         u64 _binding_version = 1u;
     };
@@ -271,7 +282,7 @@ namespace Ailu::Render
 
         //0 is normal, 4001 is compiling, 4000 is error,same with render queue id
         static u32 GetShaderState(Shader *shader, u16 pass_index, ShaderVariantHash variant_hash);
-        static const ShaderGlobalResourceRegistry &GlobalResourceRegistry() { return s_global_res_registry; }
+        static ShaderGlobalResourceSnapshot CaptureGlobalResourceSnapshot() { return s_global_res_registry.CaptureSnapshot(); }
         static ShaderPropertyId PropertyID(const String &name) { return ShaderPropertyRegistry::Get().Intern(name); }
         Shader() = default;
         Shader(const WString &sys_path);
@@ -440,25 +451,30 @@ namespace Ailu::Render
         };
         AL_FORCE_INLINE static void SetGlobalBuffer(const String &name, ConstantBuffer *buf)
         {
+            std::unique_lock lock(s_global_resource_mutex);
             s_global_cbuffer_bind_info[name] = buf;
         };
         AL_FORCE_INLINE static void SetGlobalBuffer(const String &name, GPUBuffer *buf)
         {
+            std::unique_lock lock(s_global_resource_mutex);
             s_global_buffer_bind_info[name] = buf;
         };
         AL_FORCE_INLINE static void SetGlobalTexture(const String &name, Texture *texture)
         {
             if (!ValidatePersistentGlobalTexture(texture))
                 return;
+            std::unique_lock lock(s_global_resource_mutex);
             s_global_textures_bind_info[name] = texture;
         };
         static void SetGlobalTexture(const String &name, RTHandle texture);
         AL_FORCE_INLINE static void SetGlobalFloat(const String &name, f32 value)
         {
+            std::unique_lock lock(s_global_resource_mutex);
             s_global_floats[name] = value;
         };
         AL_FORCE_INLINE static void SetGlobalInt(const String &name, i32 value)
         {
+            std::unique_lock lock(s_global_resource_mutex);
             s_global_ints[name] = value;
         };
         static bool ValidatePersistentGlobalTexture(Texture *texture);
@@ -566,6 +582,7 @@ namespace Ailu::Render
         inline static Map<String, Texture *> s_global_textures_bind_info{};
         inline static Map<String, f32> s_global_floats{};
         inline static Map<String, i32> s_global_ints{};
+        inline static std::shared_mutex s_global_resource_mutex;
         Vector<KernelElement> _kernels;
         HashMap<ComputeShaderKernelId, u16> _kernel_id_to_index;
         HashMap<ComputeShaderKernelId, HashMap<ShaderPropertyId, ComputeResourceBinding>> _resource_bindings;

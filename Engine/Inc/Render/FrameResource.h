@@ -94,6 +94,7 @@ namespace Ailu::Render
         Vector<BufferHandle> _pending_buffer_frees;
         // 帧作用域的GPU上传缓冲区，按帧槽位双/三缓冲，随槽位fence复用
         Array<Ref<GpuResource>, kFrameResourceSlotCount> _frame_upload_buffers{};
+        mutable std::mutex _frame_upload_mutex;
         FrameAllocator* _active_allocator = nullptr;
         u32 _active_slot = 0u;
         u32 _prev_slot = 0u;

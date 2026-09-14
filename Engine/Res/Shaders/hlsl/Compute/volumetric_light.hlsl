@@ -31,7 +31,7 @@ RWTEXTURE3D(_VolumetricLight,float4)
 TEXTURE3D(_History_VolumetricLight)
 RWTEXTURE3D(_FogAccum,float4)
 TEXTURE2D(_BlueNoise)
-TEXTURE2D(_MaxZ_Texture)
+//TEXTURE2D(_MaxZ_Texture)
 
 // float SampleBlueNoise(uint2 pixel,uint frame)
 // {
@@ -143,8 +143,8 @@ void LightIntegration(uint3 id : SV_DispatchThreadID)
     float2 uv = (float2(id.x, id.y) + 0.5) / float2(w, h);
     uv.y = 1.0 - uv.y;
     uv *= _zmax_uv_scale;
-    float max_z = SAMPLE_TEXTURE2D_LOD(_MaxZ_Texture, g_LinearClampSampler, uv, 0).r;
-    float view_z = LinearEyeDepth(max_z, _cam_near, _cam_far);
+    //float max_z = SAMPLE_TEXTURE2D_LOD(_MaxZ_Texture, g_LinearClampSampler, uv, 0).r;
+    //float view_z = LinearEyeDepth(max_z, _cam_near, _cam_far);
     float4 accum_scattering_transmittance = float4(0.0f, 0.0f, 0.0f, 1.0f);
     for (uint z = 0; z < VOXEL_SLICE_COUNT; ++z)
     {
@@ -159,10 +159,9 @@ void LightIntegration(uint3 id : SV_DispatchThreadID)
         float3 slice_scattering = voxel.xyz;
         float slice_density = _FogDensity;
         float slice_z_far = SliceDistance(z + 1, _cam_near, _cam_far);
-        slice_z_far = min(slice_z_far, view_z);
+        //slice_z_far = min(slice_z_far, view_z);
         accum_scattering_transmittance = accumulate(slice_z_far - slice_z_near, accum_scattering_transmittance.rgb, 
             accum_scattering_transmittance.a, slice_scattering, slice_density);
-        //_FogAccum[cur_id] = float4(slice_z_near.xxx,1.0);
         _FogAccum[cur_id] = float4(accum_scattering_transmittance.rgb, z);
     }
 }

@@ -1063,6 +1063,7 @@ namespace Ailu::Render
     //----------------------------------------------------------RenderTexturePool---------------------------------------------------------------------
     u32 RenderTexturePool::Add(RTHash hash, Ref<RenderTexture> rt)
     {
+        std::lock_guard lock(_mutex);
         auto id = rt->ID();
         RTInfo info;
         info._is_available = false;
@@ -1079,6 +1080,7 @@ namespace Ailu::Render
     }
     std::optional<u32> RenderTexturePool::GetByIDHash(RTHash hash)
     {
+        std::lock_guard lock(_mutex);
         auto range = _pool.equal_range(hash);
         for (auto it = range.first; it != range.second; ++it)
         {
@@ -1097,6 +1099,7 @@ namespace Ailu::Render
     }
     void RenderTexturePool::ReleaseRT(RTHandle handle)
     {
+        std::lock_guard lock(_mutex);
         auto it = _lut_pool.find(handle._id);
         if (it == _lut_pool.end())
             return;
@@ -1104,6 +1107,7 @@ namespace Ailu::Render
     }
     void RenderTexturePool::RelesaeUnusedRT()
     {
+        std::lock_guard lock(_mutex);
         for (auto it = _pool.begin(); it != _pool.end(); it++)
         {
             it->second._is_available = true;
@@ -1111,6 +1115,7 @@ namespace Ailu::Render
     }
     void RenderTexturePool::TryCleanUp()
     {
+        std::lock_guard lock(_mutex);
         constexpr u64 MaxInactiveFrames = 500;// 假设超过100帧未使用的 RenderTexture 将被释放
         u32 released_rt_num = 0;
         for (auto it = _pool.begin(); it != _pool.end();)
@@ -1143,10 +1148,12 @@ namespace Ailu::Render
     }
     void RenderTexturePool::Register(RenderTexture *rt)
     {
+        std::lock_guard lock(_mutex);
         _persistent_rts[rt->ID()] = rt;
     }
     void RenderTexturePool::UnRegister(u32 rt_id)
     {
+        std::lock_guard lock(_mutex);
         _persistent_rts.erase(rt_id);
     }
 #pragma endregion

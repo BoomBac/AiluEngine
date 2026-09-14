@@ -8,6 +8,21 @@
 
 namespace Ailu
 {
+    std::wstring ANSIColorful(const LogMessage &log_msg)
+    {
+        //https://talyian.github.io/ansicolors/
+        // ANSI 控制码颜色：Info, Warning, Error, Fatal
+        static const std::wstring kFormatControlBlock[] = {
+            L"\u001b[1;37m",     // kInfo: 高亮白
+            L"\x1b[38;5;220m",   // kWarning: 黄色
+            L"\u001b[1;31m",     // kError: 高亮红
+            L"\u001b[1;41m"      // kFatal: 红底白字
+        };
+        std::wstring msg = kFormatControlBlock[log_msg._level];
+        msg.append(log_msg.ToString());
+        return msg;
+    }
+
 #pragma region LogMessage
     LogMessage::LogMessage(ELogLevel level, const std::wstring &message, const std::string &file, int line, const std::string &function)
         : _level(level), _message(message), _file(file), _line(line), _function(function)
