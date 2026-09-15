@@ -22,9 +22,8 @@ namespace Ailu::ECS
             PROFILE_BLOCK_CPU("SkinTask")
             const auto bone_weights = mesh->GetBoneWeights();
             const auto bone_indices = mesh->GetBoneIndices();
-            // The CPU output stream can alias _vertices before the asynchronous GPU upload completes.
-            // Keep the bind-pose source isolated from the stream we overwrite.
-            const auto source_vertices = mesh->GetPreviousVertices();
+            // Previous vertices are motion-vector history. Skinning always starts from the immutable bind pose.
+            const auto source_vertices = mesh->GetVertices();
             const auto source_normals = mesh->GetNormals();
             const auto source_tangents = mesh->GetTangents();
             for (u32 index = begin; index < end; ++index)
@@ -94,8 +93,8 @@ namespace Ailu::ECS
         {
             if (_frame_index > it->second._last_used_frame + kCacheKeepFrames)
             {
-                LOG_INFO("Compute skin cache evict: frame={}, mesh_id={}, pose_id={}, skin_id={}, last_used_frame={}",
-                         _frame_index, it->first._mesh_id, it->first._pose_id, it->second._handle._id,
+                LOG_INFO("Compute skin cache evict: frame={}, mesh_id={}, entity={}, skin_id={}, last_used_frame={}",
+                         _frame_index, it->first._mesh_id, it->first._entity_id, it->second._handle._id,
                          it->second._last_used_frame);
                 _handles.erase(it->second._handle._id);
                 it = _cache.erase(it);
@@ -120,6 +119,15 @@ namespace Ailu::ECS
             LOG_WARNING("Compute skinning palette is too large: {} bones", pose_palette.size());
             return;
         }
+        auto &pose_snapshot = _pose_snapshots[handle._id];
+        bool pose_changed = pose_snapshot.size() != pose_palette.size();
+        if (!pose_changed)
+            pose_changed = !std::equal(pose_snapshot.begin(), pose_snapshot.end(), pose_palette.begin());
+        if (pose_changed)
+        {
+            pose_snapshot.assign(pose_palette.begin(), pose_palette.end());
+            ++_pose_versions[handle._id];
+        }
         const u32 offset = static_cast<u32>(_palette_data.size());
         _pose_offsets[handle._id] = offset;
         _palette_data.insert(_palette_data.end(), pose_palette.begin(), pose_palette.end());
@@ -138,7 +146,7 @@ namespace Ailu::ECS
         desc._element_size = element_size;
         desc._size = vertex_count * element_size;
         desc._target = static_cast<Render::EGPUBufferTarget>(Render::kVertex | Render::kStructured);
-        desc._is_create_srv = false;
+        desc._is_create_srv = true;
         desc._is_create_uav = true;
         desc._is_random_write = true;
         return Render::GPUBuffer::Create(desc, name);
@@ -241,18 +249,21 @@ namespace Ailu::ECS
             bone_weight_srv == kInvalidBindlessIndex)
             return {};
 
-        const auto key = SkinCacheKey{mesh->ID(), pose_handle._id};
+        const auto key = SkinCacheKey{mesh->ID(), entity};
         auto cache_it = _cache.find(key);
         if (cache_it == _cache.end())
         {
-            LOG_INFO("Compute skin cache miss: frame={}, entity={}, mesh_id={}, pose_id={}, cache_size={}",
-                     _frame_index, entity, key._mesh_id, key._pose_id, _cache.size());
+            LOG_INFO("Compute skin cache miss: frame={}, entity={}, mesh_id={}, cache_size={}",
+                     _frame_index, entity, key._mesh_id, _cache.size());
         }
         SkinCacheEntry *entry = cache_it == _cache.end() ? CreateEntry(mesh, pose_handle, key) : &cache_it->second;
         if (entry == nullptr)
             return {};
         entry->_last_used_frame = _frame_index;
         _entity_handles[entity] = entry->_handle;
+        const u64 pose_version = _pose_versions[pose_handle._id];
+        if (entry->_output_valid && entry->_skin_version == pose_version)
+            return entry->_handle;
         if (std::find(_job_handles.begin(), _job_handles.end(), entry->_handle) != _job_handles.end())
             return entry->_handle;
 
@@ -272,6 +283,8 @@ namespace Ailu::ECS
         job._vertex_offset = 0u;
         if (job._position_uav == Render::RenderConstants::kInvalidBindlessHandle)
             return {};
+        entry->_skin_version = pose_version;
+        entry->_output_valid = true;
         _jobs.emplace_back(job);
         _job_handles.emplace_back(entry->_handle);
         return entry->_handle;
@@ -307,7 +320,7 @@ namespace Ailu::ECS
     bool SkinningSystem::EnsureComputeShader()
     {
         if (_compute_shader == nullptr)
-            _compute_shader = ResourceMgr::Get().Load<Render::ComputeShader>(
+            _compute_shader = ResourceMgr::Get().LoadAssetRef<Render::ComputeShader>(
                 L"Shaders/hlsl/Compute/compute_skinning.alasset");
         if (_compute_shader == nullptr)
             return false;
@@ -319,7 +332,25 @@ namespace Ailu::ECS
     void SkinningSystem::RecordRenderGraph(Render::RDG::RenderGraph &graph, Render::RenderingData &data)
     {
         (void)data;
-        if (!_gpu_enabled || _recorded || _jobs.empty())
+        _output_handles.clear();
+        if (!_gpu_enabled)
+        {
+            for (const auto &[entity, handle] : _entity_handles)
+            {
+                (void)entity;
+                const auto *entry = FindEntry(handle);
+                if (entry == nullptr || !entry->_output_valid)
+                    continue;
+                if (entry->_position_buffer != nullptr)
+                    _output_handles.emplace_back(graph.Import(entry->_position_buffer.get()));
+                if (entry->_normal_buffer != nullptr)
+                    _output_handles.emplace_back(graph.Import(entry->_normal_buffer.get()));
+                if (entry->_tangent_buffer != nullptr)
+                    _output_handles.emplace_back(graph.Import(entry->_tangent_buffer.get()));
+            }
+            return;
+        }
+        if (_recorded || _jobs.empty())
             return;
         EnsureStructuredBuffers();
         if (_palette_buffer == nullptr || _job_buffer == nullptr || _palette_data.empty())
@@ -328,7 +359,6 @@ namespace Ailu::ECS
         _job_buffer->SetData(_jobs);
         const auto palette_handle = graph.Import(_palette_buffer.get());
         const auto job_handle = graph.Import(_job_buffer.get());
-        _output_handles.clear();
         graph.AddPass("ComputeSkinning", Render::RDG::PassDesc(Render::RDG::EPassType::kCompute),
                       [this, palette_handle, job_handle](Render::RDG::RenderGraphBuilder &builder)
                       {
@@ -397,11 +427,22 @@ namespace Ailu::ECS
         if (handle_it == s_active_system->_entity_handles.end())
             return nullptr;
         const auto *entry = s_active_system->FindEntry(handle_it->second);
-        return entry != nullptr && entry->_mesh == mesh ? entry->_vertex_buffer.get() : nullptr;
+        return entry != nullptr && entry->_mesh == mesh && entry->_output_valid ? entry->_vertex_buffer.get() : nullptr;
+    }
+
+    u64 SkinningSystem::ResolveSkinVersion(Render::Mesh *mesh, u32 entity)
+    {
+        if (s_active_system == nullptr || mesh == nullptr)
+            return 0u;
+        const auto handle_it = s_active_system->_entity_handles.find(entity);
+        if (handle_it == s_active_system->_entity_handles.end())
+            return 0u;
+        const auto *entry = s_active_system->FindEntry(handle_it->second);
+        return entry != nullptr && entry->_mesh == mesh && entry->_output_valid ? entry->_skin_version : 0u;
     }
 
     void SkinningSystem::Submit(Render::SkeletonMesh *mesh, const Vector<Matrix4x4f> &pose_palette,
-                                u32 vertices_per_task)
+                                u32 vertices_per_task, u32 entity)
     {
         if (mesh == nullptr || pose_palette.empty() || vertices_per_task == 0u)
             return;
@@ -409,17 +450,31 @@ namespace Ailu::ECS
         if (mesh->GetVertexBuffer() == nullptr)
             return;
 
-        Vector3f *vertices = reinterpret_cast<Vector3f *>(mesh->GetVertexBuffer()->GetStream(0));
-        Vector3f *normals = nullptr;
-        Vector4f *tangents = nullptr;
-        const i32 normal_stream = mesh->GetNormalStream();
-        const i32 tangent_stream = mesh->GetTangentStream();
-        if (normal_stream >= 0)
-            normals = reinterpret_cast<Vector3f *>(
-                mesh->GetVertexBuffer()->GetStream(static_cast<u8>(normal_stream)));
-        if (tangent_stream >= 0)
-            tangents = reinterpret_cast<Vector4f *>(
-                mesh->GetVertexBuffer()->GetStream(static_cast<u8>(tangent_stream)));
+        const auto key = SkinCacheKey{mesh->ID(), entity};
+        auto cache_it = _cache.find(key);
+        SkinCacheEntry *entry = cache_it == _cache.end() ? CreateEntry(mesh, {}, key) : &cache_it->second;
+        if (entry == nullptr)
+            return;
+        entry->_last_used_frame = _frame_index;
+        _entity_handles[entity] = entry->_handle;
+
+        bool pose_changed = entry->_pose_snapshot.size() != pose_palette.size();
+        if (!pose_changed)
+            pose_changed = !std::equal(entry->_pose_snapshot.begin(), entry->_pose_snapshot.end(), pose_palette.begin());
+        if (!pose_changed && entry->_output_valid)
+            return;
+
+        entry->_pose_snapshot.assign(pose_palette.begin(), pose_palette.end());
+        ++entry->_skin_version;
+        entry->_cpu_positions.resize(mesh->GetVertexCount());
+        if (mesh->GetNormalStream() >= 0)
+            entry->_cpu_normals.resize(mesh->GetVertexCount());
+        if (mesh->GetTangentStream() >= 0)
+            entry->_cpu_tangents.resize(mesh->GetVertexCount());
+
+        Vector3f *vertices = entry->_cpu_positions.data();
+        Vector3f *normals = entry->_cpu_normals.empty() ? nullptr : entry->_cpu_normals.data();
+        Vector4f *tangents = entry->_cpu_tangents.empty() ? nullptr : entry->_cpu_tangents.data();
         const u32 vertex_count = mesh->GetVertexCount();
         const u32 task_count = (vertex_count + vertices_per_task - 1u) / vertices_per_task;
         _tasks.reserve(_tasks.size() + task_count);
@@ -432,12 +487,28 @@ namespace Ailu::ECS
                 { SkinTask(mesh, pose_palette, vertices, normals, tangents, begin, end); });
             _tasks.emplace_back(MakeRef<WaitHandle>(std::move(wait_handle)));
         }
+        entry->_cpu_upload_pending = true;
     }
 
-    void SkinningSystem::WaitFor() const
+    void SkinningSystem::WaitFor()
     {
         for (const auto &task : _tasks)
             JobSystem::Get().Wait(*task);
+
+        for (auto &[key, entry] : _cache)
+        {
+            (void)key;
+            if (!entry._cpu_upload_pending)
+                continue;
+            if (entry._position_buffer != nullptr)
+                entry._position_buffer->SetData(entry._cpu_positions);
+            if (entry._normal_buffer != nullptr && !entry._cpu_normals.empty())
+                entry._normal_buffer->SetData(entry._cpu_normals);
+            if (entry._tangent_buffer != nullptr && !entry._cpu_tangents.empty())
+                entry._tangent_buffer->SetData(entry._cpu_tangents);
+            entry._output_valid = true;
+            entry._cpu_upload_pending = false;
+        }
     }
 
     void SkinningSystem::Clear()

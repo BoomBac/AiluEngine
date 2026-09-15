@@ -38,6 +38,8 @@ namespace Ailu
         for (const auto &tag : _scene->GetRegister().View<ECS::TagComponent>())
         {
             const ECS::Entity entity = _scene->GetRegister().GetEntity<ECS::TagComponent>(index++);
+            if (_scene->IsSceneRoot(entity))
+                continue;
             if (tag._name == name) return MakeScriptEntity(_scene, entity);
         }
         return MakeScriptEntity(_scene, ECS::kInvalidEntity);

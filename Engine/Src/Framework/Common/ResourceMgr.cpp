@@ -22,6 +22,7 @@
 #include "Graph/GraphAsset.h"
 #include "Render/GraphicsContext.h"
 #include "Render/Material.h"
+#include "Render/StaticDiffuseProbeData.h"
 #include "pch.h"
 
 #include "Objects/JsonArchive.h"
@@ -531,7 +532,8 @@ namespace Ailu
 		_lut_global_resources_by_type[SpriteAtlas::StaticType()] = {};
 		_lut_global_resources_by_type[InputActionAsset::StaticType()] = {};
 		_lut_global_resources_by_type[AudioClip::StaticType()] = {};
-		_lut_global_resources_by_type[GraphAsset::StaticType()] = {};
+                _lut_global_resources_by_type[GraphAsset::StaticType()] = {};
+                _lut_global_resources_by_type[StaticDiffuseProbeData::StaticType()] = {};
 		_lut_global_resources_by_type[ScriptAsset::StaticType()] = {};
 		_asset_domains.emplace_back(AssetMountDesc{
 			EAssetDomain::kEngine,
@@ -567,6 +569,7 @@ namespace Ailu
 		_asset_handler_registry.Register(MakeScope<ScriptAssetHandler>());
 		_asset_handler_registry.Register(MakeScope<ShaderAssetHandler>());
 		_asset_handler_registry.Register(MakeScope<ComputeShaderAssetHandler>());
+		_asset_handler_registry.Register(MakeScope<RayTracingShaderAssetHandler>());
 		_asset_handler_registry.Register(MakeScope<TextureAssetHandler>());
 		_asset_handler_registry.Register(MakeScope<MaterialAssetHandler>());
 		_asset_handler_registry.Register(MakeScope<MeshAssetHandler>());
@@ -580,7 +583,8 @@ namespace Ailu
 		_asset_handler_registry.Register(MakeScope<InputActionAssetHandler>());
 		_asset_handler_registry.Register(MakeScope<AudioClipAssetHandler>());
 		_asset_handler_registry.Register(MakeScope<GraphAssetHandler>());
-		_asset_handler_registry.Register(MakeScope<WidgetAssetHandler>());
+                _asset_handler_registry.Register(MakeScope<WidgetAssetHandler>());
+                _asset_handler_registry.Register(MakeScope<StaticDiffuseProbeDataAssetHandler>());
 		
 		Vector<WString> shader_asset_pathes = {
 				L"Shaders/hlsl/deferred_lighting.alasset",
@@ -605,17 +609,18 @@ namespace Ailu
 				L"Shaders/hlsl/default_sprite.alasset",
 				L"Shaders/hlsl/water.alasset"};
 		Vector<WString> shader_pathes = {
-				L"Shaders/hlsl/debug.hlsl",
-				L"Shaders/hlsl/billboard.hlsl",
-				L"Shaders/hlsl/ssao.hlsl",
-				L"Shaders/hlsl/plane_grid.hlsl",
-				L"Shaders/hlsl/cubemap_debug.hlsl",
-				L"Shaders/hlsl/taa.hlsl",
-				L"Shaders/hlsl/pick_buffer.hlsl",
-				L"Shaders/hlsl/select_buffer.hlsl",
-				L"Shaders/hlsl/editor_outline.hlsl",
-				L"Shaders/hlsl/sprite_pick_buffer.hlsl",
-				L"Shaders/hlsl/sprite_select_buffer.hlsl",
+				L"Shaders/hlsl/debug.alasset",
+				L"Shaders/hlsl/billboard.alasset",
+				L"Shaders/hlsl/ssao.alasset",
+				L"Shaders/hlsl/plane_grid.alasset",
+				L"Shaders/hlsl/cubemap_debug.alasset",
+				L"Shaders/hlsl/light_probe_preview.alasset",
+				L"Shaders/hlsl/taa.alasset",
+				L"Shaders/hlsl/pick_buffer.alasset",
+				L"Shaders/hlsl/select_buffer.alasset",
+				L"Shaders/hlsl/editor_outline.alasset",
+				L"Shaders/hlsl/sprite_pick_buffer.alasset",
+				L"Shaders/hlsl/sprite_select_buffer.alasset",
 		};
 
 		//        std::atomic<int> shader_load_count = shader_asset_pathes.size() + shader_pathes.size();
@@ -628,7 +633,7 @@ namespace Ailu
 		//            for (auto &p: shader_pathes)
 		//                Core::ThreadPool::Get().Enqueue([&](WString p)
 		//                                       { RegisterResource(p, LoadExternalShader(p)); --shader_load_count ; }, p);
-		//			//RegisterResource(L"Shaders/hlsl/forwardlit.hlsl",LoadExternalShader(L"Shaders/hlsl/forwardlit.hlsl"));
+		//			//Load<Shader>(L"Shaders/hlsl/forwardlit.alasset");
 		//
 		//			Load<ComputeShader>(L"Shaders/hlsl/Compute/cs_mipmap_gen.alasset");
 		//		}
@@ -640,16 +645,17 @@ namespace Ailu
 				L"Shaders/hlsl/Compute/compute_skinning.alasset",
 				L"Shaders/hlsl/Compute/voxelize.alasset",
 				L"Shaders/hlsl/Compute/ssao_cs.alasset",
-				L"Shaders/hlsl/Compute/taa.alasset",
-				L"Shaders/hlsl/Compute/hzb.alasset",
-		};
+                                L"Shaders/hlsl/Compute/taa.alasset",
+                                L"Shaders/hlsl/Compute/hzb.alasset",
+                                L"Shaders/hlsl/Compute/environment_sh_project.alasset",
+                };
 		for (auto &p: shader_asset_pathes)
 			JobSystem::Get().Dispatch([&](WString p)
 									  { Load<Shader>(p); },
 									  p);
 		for (auto &p: shader_pathes)
 			JobSystem::Get().Dispatch([&](WString p)
-									  { RegisterResource(p, LoadExternalShader(p)); },
+									  { Load<Shader>(p); },
 									  p);
 		for (auto &p: compute_shader_pathes)
 			JobSystem::Get().Dispatch([&](WString p)
@@ -874,7 +880,10 @@ namespace Ailu
                 _object_to_asset.clear();
                 _asset_looktable.clear();
                 _asset_db.clear();
-                _importers.clear();
+                {
+                        std::lock_guard<std::mutex> lock(_importers_mutex);
+                        _importers.clear();
+                }
                 _asset_domains.clear();
                 _derived_data_cache.reset();
         }
@@ -1995,6 +2004,11 @@ namespace Ailu
 
 	void ResourceMgr::CreateAndRegisterEmbeddedMaterial(Mesh *mesh)
 	{
+		CreateAndRegisterEmbeddedMaterial(mesh, {});
+	}
+
+	void ResourceMgr::CreateAndRegisterEmbeddedMaterial(Mesh *mesh, std::span<const Guid> slot_material_assets)
+	{
 		if (mesh->GetCacheMaterials().empty())
 			return;
 
@@ -2002,6 +2016,21 @@ namespace Ailu
 		u16 index = 0u;
 		for (const auto &material_info : mesh->GetCacheMaterials())
 		{
+			// 优先使用导入时按槽位生成的材质资产，缺失时才用导入信息现造一个
+			if (index < slot_material_assets.size() && !slot_material_assets[index].IsEmpty())
+			{
+				Ref<Material> slot_material = GetRef<Material>(slot_material_assets[index]);
+				if (slot_material == nullptr)
+					slot_material = Load<Material>(slot_material_assets[index]);
+				if (slot_material != nullptr)
+				{
+					RegisterResource(ToWChar(std::format("EmbeddedMaterial/{}/{}", mesh->Name(), index)), slot_material,
+									 true);
+					++index;
+					continue;
+				}
+			}
+
 			const String material_key = GetEmbeddedMaterialKey(material_info);
 			Ref<Material> material;
 			if (auto existing = materials_by_key.find(material_key); existing != materials_by_key.end())
@@ -2273,6 +2302,11 @@ namespace Ailu
 		Queue<std::tuple<WString, Ref<Object>>> loaded_objects;
 		Vector<Ref<AnimationClip>> imported_clips;
 		std::unordered_set<WString> queued_asset_paths;
+		// 网格导入时建立的材质对象 -> 资产 guid，以及每个网格按 submesh 顺序的材质槽
+		Map<const Material *, Guid> material_asset_guids;
+		Map<Mesh *, Vector<Ref<Material>>> mesh_slot_materials;
+		std::unordered_map<u64, Ref<Material>> imported_materials_by_source_id;
+		std::unordered_set<String> material_asset_names;
 		auto queue_asset = [&](const WString &asset_path, Ref<Object> object)
 		{
 			if (object == nullptr || !queued_asset_paths.emplace(asset_path).second)
@@ -2294,8 +2328,6 @@ namespace Ailu
             const WString mesh_source_path = *mesh_loader == EMeshLoader::kGltf ? sys_path : external_asset_path;
 			Ref<SkeletonAsset> skeleton_asset;
 			auto mesh_list = std::move(LoadExternalMesh(mesh_source_path, *mesh_import_setting, clips, &skeleton_asset));
-			std::unordered_set<u64> imported_material_ids;
-			std::unordered_set<String> material_asset_names;
             if (skeleton_asset != nullptr && (mesh_import_setting->ShouldImportSkeleton() || !clips.empty()) &&
                 mesh_import_setting->_skeleton.IsEmpty())
             {
@@ -2311,10 +2343,19 @@ namespace Ailu
 				queue_asset(imported_asset_path, mesh);
 				if (mesh_import_setting->ShouldImportMaterial())
 				{
+					Vector<Ref<Material>> slot_materials;
+					slot_materials.reserve(mesh->GetCacheMaterials().size());
 					for (auto it = mesh->GetCacheMaterials().begin(); it != mesh->GetCacheMaterials().end(); it++)
 					{
-						if (it->_source_id != 0u && !imported_material_ids.emplace(it->_source_id).second)
-							continue;
+						if (it->_source_id != 0u)
+						{
+							if (auto existing = imported_materials_by_source_id.find(it->_source_id);
+								existing != imported_materials_by_source_id.end())
+							{
+								slot_materials.emplace_back(existing->second);
+								continue;
+							}
+						}
 						String material_asset_name = "MAT_" + it->_name;
 						if (!material_asset_names.emplace(material_asset_name).second)
 						{
@@ -2351,8 +2392,12 @@ namespace Ailu
 						imported_asset_path = created_asset_dir;
 						imported_asset_path.append(std::format(L"{}.alasset",
 							SanitizeAssetFileName(ToWChar(mat->_name.c_str()))));
+						if (it->_source_id != 0u)
+							imported_materials_by_source_id.emplace(it->_source_id, mat);
+						slot_materials.emplace_back(mat);
 						queue_asset(imported_asset_path, mat);
 					}
+					mesh_slot_materials.emplace(mesh.get(), std::move(slot_materials));
 				}
 				else
 					CreateAndRegisterEmbeddedMaterial(mesh.get());
@@ -2409,6 +2454,8 @@ namespace Ailu
 				continue;
 			}
 			new_asset->_external_asset_path = MakeStoredExternalAssetPath(external_asset_path);
+			if (auto *material = dynamic_cast<Material *>(obj.get()); material != nullptr)
+				material_asset_guids.emplace(material, new_asset->GetGuid());
 			if (dynamic_cast<SkeletonAsset *>(obj.get()) != nullptr)
 			{
 				imported_skeleton_guid = new_asset->GetGuid();
@@ -2440,6 +2487,22 @@ namespace Ailu
 				skeleton_mesh->SetSkeletonAsset(imported_skeleton_guid, imported_skeleton_asset);
 			for (const Ref<AnimationClip> &clip : imported_clips)
 				clip->SkeletonGuid(imported_skeleton_guid);
+		}
+		// 把生成的材质资产按 submesh 槽位记到网格上：文档保存后会带上这些引用
+		for (auto &[mesh, slot_materials] : mesh_slot_materials)
+		{
+			Vector<Guid> slot_guids(slot_materials.size());
+			for (u16 slot = 0u; slot < slot_materials.size(); ++slot)
+			{
+				if (slot_materials[slot] == nullptr)
+					continue;
+				auto guid_iter = material_asset_guids.find(slot_materials[slot].get());
+				if (guid_iter == material_asset_guids.end())
+					continue;
+				slot_guids[slot] = guid_iter->second;
+				mesh->SetCacheMaterialAssetGuid(slot, guid_iter->second);
+			}
+			CreateAndRegisterEmbeddedMaterial(mesh, slot_guids);
 		}
 		OnAssetDataBaseChanged();
 		SaveAllUnsavedAssets();
@@ -2474,18 +2537,40 @@ namespace Ailu
 
 	const ImportSetting *ResourceMgr::GetImportSetting(const WString &asset_path) const
 	{
+		thread_local std::optional<ImportSettingValue> import_setting_snapshot;
+		std::lock_guard<std::mutex> lock(_importers_mutex);
 		auto it = _importers.find(asset_path);
-		return it != _importers.end() ? it->second.get() : nullptr;
-	}
+		if (it == _importers.end())
+		{
+			import_setting_snapshot.reset();
+			return nullptr;
+		}
 
-	void ResourceMgr::SetImportSetting(const WString &asset_path, Scope<ImportSetting> setting)
-	{
-		_importers[asset_path] = std::move(setting);
+		import_setting_snapshot = it->second;
+		return std::visit(
+			[](const auto &setting) -> const ImportSetting * { return &setting; },
+			*import_setting_snapshot);
 	}
 
 	void ResourceMgr::SetImportSetting(const WString &asset_path, const ImportSetting &setting)
 	{
-		SetImportSetting(asset_path, setting.Clone());
+		std::lock_guard<std::mutex> lock(_importers_mutex);
+		if (const auto *texture_setting = dynamic_cast<const TextureImportSetting *>(&setting))
+		{
+			_importers.insert_or_assign(asset_path, *texture_setting);
+			return;
+		}
+		if (const auto *mesh_setting = dynamic_cast<const MeshImportSetting *>(&setting))
+		{
+			_importers.insert_or_assign(asset_path, *mesh_setting);
+			return;
+		}
+		if (const auto *shader_setting = dynamic_cast<const ShaderImportSetting *>(&setting))
+		{
+			_importers.insert_or_assign(asset_path, *shader_setting);
+			return;
+		}
+		_importers.insert_or_assign(asset_path, setting);
 	}
 
 	void ResourceMgr::OnAssetDataBaseChanged()

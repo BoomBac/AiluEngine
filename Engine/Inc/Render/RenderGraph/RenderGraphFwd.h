@@ -31,5 +31,6 @@ namespace Ailu::Render::RDG
     };
 
     class RenderGraph;
+    class RenderGraphBuilder;
 }
 #endif

@@ -27,7 +27,11 @@ namespace Ailu
             DrawerBlock &operator=(DrawerBlock &&other) noexcept;
             DrawerBlock(Ref<Render::Material> mat,u32 vert_num = kMaxVertNum);
             ~DrawerBlock();
-            bool CanAppend(u32 vert_num, u32 index_num) const {return _cur_vert_num + vert_num < _max_vert_num && _cur_index_num + index_num < _max_vert_num;};
+            bool CanAppend(u32 vert_num, u32 index_num) const
+            {
+                return _cur_vert_num <= _pos_buf.size() && vert_num <= _pos_buf.size() - _cur_vert_num &&
+                       _cur_index_num <= _index_buf.size() && index_num <= _index_buf.size() - _cur_index_num;
+            }
             void ResetBuildData()
             {
                 _cur_vert_num = 0u;

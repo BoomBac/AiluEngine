@@ -60,12 +60,12 @@ namespace Ailu::Render
         bool IsDependencyFile(const WString &sys_path) const;
         void PushState(RayTracingScene *scene = nullptr);
         virtual void DispatchRays(RHICommandBuffer* cmd,uint w, uint h, uint depth) {};
-        bool Compile(bool is_load_cache = true);
+        bool Compile(EShaderCompilePolicy policy = EShaderCompilePolicy::kUseArtifact);
         const std::unordered_map<String, ShaderBindResourceInfo> &GetBindResInfo() const { return _bind_res_infos; }
     public:
         std::atomic<bool> _is_compiling = false;
     protected:
-        virtual bool RHICompileImpl(ShaderVariantHash variant_hash, bool is_load_cache);
+        virtual bool RHICompileImpl(ShaderVariantHash variant_hash, EShaderCompilePolicy policy);
     protected:
         struct RayTracingBindParams
         {

@@ -376,6 +376,13 @@ namespace Ailu::Render
         s_pInstance->_mesh_renderers.emplace_back(mesh, mat,matrix);
     }
 
+    void Gizmo::DrawMeshInstanced(Mesh *mesh, const Vector<Matrix4x4f> &matrices, Material *mat)
+    {
+        if (mesh == nullptr || mat == nullptr || matrices.empty())
+            return;
+        s_pInstance->_instanced_mesh_renderers.push_back({mesh, mat, matrices});
+    }
+
     void Gizmo::DrawPreviewMesh(Mesh *mesh, const Matrix4x4f &matrix, Material *mat)
     {
         if (mesh == nullptr || mat == nullptr)
@@ -446,9 +453,53 @@ namespace Ailu::Render
                 cmd->DrawMesh(r._mesh, r._material, r._matrix, i);
             }
         };
+        auto submit_instanced_mesh = [&](const InstancedMeshRendererNode &r, u32 buffer_index)
+        {
+            if (r._matrices.empty())
+                return;
+            if (buffer_index >= s_pInstance->_instanced_mesh_buffers.size() ||
+                s_pInstance->_instanced_mesh_buffers[buffer_index] == nullptr ||
+                s_pInstance->_instanced_mesh_buffers[buffer_index]->GetSize() <
+                    r._matrices.size() * sizeof(Matrix4x4f))
+            {
+                BufferDesc desc;
+                desc._target = EGPUBufferTarget::kStructured;
+                desc._element_num = static_cast<u32>(r._matrices.size());
+                desc._element_size = sizeof(Matrix4x4f);
+                desc._size = desc._element_num * desc._element_size;
+                desc._is_random_write = false;
+                desc._is_create_uav = false;
+                if (buffer_index >= s_pInstance->_instanced_mesh_buffers.size())
+                    s_pInstance->_instanced_mesh_buffers.resize(buffer_index + 1u);
+                s_pInstance->_instanced_mesh_buffers[buffer_index] = GPUBuffer::Create(
+                    desc, std::format("GizmoInstanceBuffer{}", buffer_index));
+            }
+
+            GPUBuffer *instance_buffer = s_pInstance->_instanced_mesh_buffers[buffer_index].get();
+            instance_buffer->SetData(r._matrices);
+
+            CBufferPerSceneData preview_scene_data{};
+            preview_scene_data._DirectionalLights[0]._LightDir = Normalize(Vector3f(-0.45f, -1.0f, -0.65f));
+            preview_scene_data._DirectionalLights[0]._LightColor = Vector3f(1.0f, 1.0f, 1.0f);
+            preview_scene_data._DirectionalLights[0]._shadowmap_index = -1;
+            preview_scene_data._ActiveLightCount.x = 1.0f;
+            cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerScene, &preview_scene_data, sizeof(preview_scene_data));
+            cmd->SetGlobalTexture("_OcclusionTex", Texture::s_p_default_white);
+            cmd->SetGlobalBuffer("_ProbeInstanceData", instance_buffer);
+            for (u16 i = 0; i < r._mesh->SubmeshCount(); ++i)
+            {
+                cmd->DrawMesh(r._mesh, r._material, static_cast<ConstantBuffer *>(nullptr), i, 0u,
+                              static_cast<u32>(r._matrices.size()));
+            }
+        };
         for (auto &r: s_pInstance->_mesh_renderers)
         {
             submit_mesh(r);
+        }
+        u32 instanced_mesh_index = 0u;
+        for (const auto &r : s_pInstance->_instanced_mesh_renderers)
+        {
+            submit_instanced_mesh(r, instanced_mesh_index++);
         }
         if (s_pInstance->_has_preview_mesh_renderer)
         {
@@ -465,6 +516,7 @@ namespace Ailu::Render
             s_pInstance->_has_preview_mesh_renderer = false;
         }
         s_pInstance->_mesh_renderers.clear();
+        s_pInstance->_instanced_mesh_renderers.clear();
         if (s_pInstance->_screen_vertex_num > 0)
         {
             cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &s_screen_camera_cb, RenderConstants::kPerCameraDataSize);

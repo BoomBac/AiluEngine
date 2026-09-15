@@ -164,6 +164,44 @@ namespace Ailu
             AppendValue(data, node._count_or_flag);
         }
 
+        void AppendMaterial(Vector<u8> &data, const Mesh::ImportedMaterialInfo &material)
+        {
+            AppendString(data, material._name);
+            AppendValue(data, material._source_id);
+            AppendValue(data, material._slot);
+            for (const String &texture : material._textures)
+                AppendString(data, texture);
+            AppendVector(data, material._diffuse);
+            AppendVector(data, material._specular);
+            AppendVector(data, material._emissive);
+            AppendValue(data, material._roughness);
+            AppendString(data, material._asset_guid.ToString());
+        }
+
+        bool ReadMaterial(std::span<const u8> data, size_t &offset, Mesh::ImportedMaterialInfo &material)
+        {
+            if (!ReadString(data, offset, material._name) || !ReadValue(data, offset, material._source_id) ||
+                !ReadValue(data, offset, material._slot))
+                return false;
+            for (String &texture : material._textures)
+            {
+                if (!ReadString(data, offset, texture))
+                    return false;
+            }
+            Vector4f diffuse, specular, emissive;
+            if (!ReadVector(data, offset, diffuse) || !ReadVector(data, offset, specular) ||
+                !ReadVector(data, offset, emissive))
+                return false;
+            material._diffuse = diffuse;
+            material._specular = specular;
+            material._emissive = emissive;
+            String material_asset;
+            if (!ReadValue(data, offset, material._roughness) || !ReadString(data, offset, material_asset))
+                return false;
+            material._asset_guid = Guid(std::move(material_asset));
+            return true;
+        }
+
         bool ReadBvhNode(std::span<const u8> data, size_t &offset, BVHNode &node)
         {
             return ReadAabb(data, offset, node._aabb) && ReadValue(data, offset, node._child_index_or_first) &&
@@ -205,6 +243,7 @@ namespace Ailu
             out_artifact._submesh_bvh_ranges[index] = Vector2UInt{mesh.GetBVHNodeStart(index), mesh.GetBVHNodeCount(index)};
         out_artifact._vertex_count = mesh.GetVertexCount();
         out_artifact._triangle_count = mesh.GetTriangleCount();
+        out_artifact._materials.assign(mesh.GetCacheMaterials().begin(), mesh.GetCacheMaterials().end());
 
         if (const auto *skeleton_mesh = dynamic_cast<const SkeletonMesh *>(&mesh))
         {
@@ -260,6 +299,11 @@ namespace Ailu
             AppendAabb(submesh_data, submesh._bounds);
         }
         AddSection(writer, kMeshArtifactSubmeshesSection, submesh_data, static_cast<u32>(artifact._submeshes.size()), 0u);
+        Vector<u8> material_data;
+        AppendArray(material_data, artifact._materials,
+                    [](Vector<u8> &data, const Mesh::ImportedMaterialInfo &value) { AppendMaterial(data, value); });
+        AddSection(writer, kMeshArtifactMaterialsSection, material_data,
+                   static_cast<u32>(artifact._materials.size()), 0u);
         AddSection(writer, kMeshArtifactBoundsSection, bounds, static_cast<u32>(artifact._bounds.size()), sizeof(AABB));
         AddSection(writer, kMeshArtifactTriangleBoundsSection, triangle_bounds,
                    static_cast<u32>(artifact._triangle_bounds.size()), sizeof(AABB));
@@ -353,6 +397,9 @@ namespace Ailu
         }
         if (offset != submesh_data.size())
             return false;
+        if (!ReadArray(reader.GetSectionData(kMeshArtifactMaterialsSection), out_artifact._materials,
+                       [](auto data, auto &offset, auto &value) { return ReadMaterial(data, offset, value); }))
+            return false;
 
         if (out_artifact._is_skeleton)
         {
@@ -386,6 +433,8 @@ namespace Ailu
             mesh->SetUVs(Vector<Vector2f>(artifact._uvs[channel].begin(), artifact._uvs[channel].end()), channel);
         for (const auto &submesh : artifact._submeshes)
             mesh->AddSubmesh(submesh._indices);
+        for (const auto &material : artifact._materials)
+            mesh->AddCacheMaterial(material);
         mesh->SetBounds(artifact._bounds);
         mesh->SetVerticesCount(artifact._vertex_count);
         mesh->SetDerivedData(Vector<AABB>(artifact._triangle_bounds.begin(), artifact._triangle_bounds.end()),

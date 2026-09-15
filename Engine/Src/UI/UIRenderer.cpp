@@ -53,7 +53,7 @@ namespace Ailu
             _default_material->SetTexture("_MainTex", Render::Texture::s_p_default_white);
             _shadow_material = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/ui_shadow.alasset"), "UIShadowMaterial");
             _shadow_material->SetFloat("_ShadowSpread", 16.0f);
-            _backdrop_blur_cs = ComputeShader::Create(ResourceMgr::GetResSysPath(L"Shaders/hlsl/Compute/blur.hlsl"));
+            _backdrop_blur_cs = ResourceMgr::Get().LoadAssetRef<ComputeShader>(L"Shaders/hlsl/Compute/blur.alasset");
             _backdrop_blur_x_kernel = _backdrop_blur_cs->FindKernel("blur_x");
             _backdrop_blur_y_kernel = _backdrop_blur_cs->FindKernel("blur_y");
             for (auto &frame_blocks: _drawer_blocks)
@@ -109,8 +109,12 @@ namespace Ailu
         {
             _frame_index = Render::g_pGfxContext != nullptr ? static_cast<u16>(Render::g_pGfxContext->GetFrameCount() % RenderConstants::kFrameCount) : 0u;
             ResetFrameStats();
-            if (!_drawer_blocks[_frame_index].empty() && _drawer_blocks[_frame_index][0u] != nullptr)
-                _drawer_blocks[_frame_index][0u]->ResetBuildData();
+            _cur_global_block_index = 0u;
+            for (auto *block: _drawer_blocks[_frame_index])
+            {
+                if (block != nullptr)
+                    block->ResetBuildData();
+            }
             for (auto &it: _window_drawer_blocks[_frame_index])
             {
                 for (auto *block: it.second)
@@ -303,7 +307,8 @@ namespace Ailu
                     SubmitBlock(block, cmd, submit_color, entry._depth);
             }
             //绘制全局gui
-            SubmitBlock(_drawer_blocks[_frame_index][0u], cmd, get_submit_color(RenderTexture::s_backbuffer));
+            for (auto *block: _drawer_blocks[_frame_index])
+                SubmitBlock(block, cmd, get_submit_color(RenderTexture::s_backbuffer));
             auto &window_blocks = _window_drawer_blocks[_frame_index];
             for (auto &it: window_blocks)
             {
@@ -409,6 +414,11 @@ namespace Ailu
                                            Vector4f corner_radius, f32 depth, Render::Material *material,
                                            Vector4f border_thickness)
         {
+            if (cb == nullptr || !cb->CanAppend(4u, 6u))
+            {
+                AL_ASSERT_MSG(false, "UI DrawerBlock capacity overflow!");
+                return;
+            }
             auto color = brush._tint;
             u32 cur_vert_num = cb->CurrentVertNum(), cur_index_num = cb->CurrentIndexNum();
             cb->_pos_buf[cur_vert_num] = {rect.xy, depth};
@@ -510,6 +520,8 @@ namespace Ailu
             if (!texture)
                 return;
             DrawerBlock *cb = GetAvailableBlock(4u, 6u);
+            if (cb == nullptr)
+                return;
             u32 cur_vert_num = cb->CurrentVertNum(), cur_index_num = cb->CurrentIndexNum();
             cb->_pos_buf[cur_vert_num] = {rect.xy, opts._depth};
             cb->_pos_buf[cur_vert_num + 1] = {rect.x + rect.z, rect.y, opts._depth};
@@ -576,6 +588,8 @@ namespace Ailu
             Vector2f p3 = b + offset;
 
             DrawerBlock *cb = GetAvailableBlock(4u, 6u);
+            if (cb == nullptr)
+                return;
             auto v = cb->CurrentVertNum();
             auto i = cb->CurrentIndexNum();
 
@@ -801,6 +815,8 @@ namespace Ailu
                     _cur_widget_block_index = 0u;
                     if (_cur_widget_blocks->empty())
                         _cur_widget_blocks->push_back(AL_NEW(DrawerBlock, _default_material, 8092u * 4));
+                    if ((*_cur_widget_blocks)[_cur_widget_block_index] == nullptr)
+                        (*_cur_widget_blocks)[_cur_widget_block_index] = AL_NEW(DrawerBlock, _default_material, 8092u * 4);
                     _cur_widget_block = (*_cur_widget_blocks)[_cur_widget_block_index];
                 }
                 else if (!_cur_widget_block->CanAppend(vert_num, index_num))
@@ -813,33 +829,29 @@ namespace Ailu
                     _cur_widget_block = (*_cur_widget_blocks)[_cur_widget_block_index];
                 }
                 AL_ASSERT_MSG(_cur_widget_block->CanAppend(vert_num, index_num), "UI DrawerBlock index overflow!");
-                return _cur_widget_block;
+                return _cur_widget_block->CanAppend(vert_num, index_num) ? _cur_widget_block : nullptr;
             }
             auto &frame_block = _drawer_blocks[_frame_index];
-            if (frame_block.size() < _cur_widget_index + 1u)
+            while (frame_block.size() <= _cur_global_block_index)
             {
                 frame_block.push_back(AL_NEW(DrawerBlock, _default_material,8092u * 4));
-                available_block = frame_block.back();
             }
-            else
+            available_block = frame_block[_cur_global_block_index];
+            if (available_block == nullptr)
             {
-                //for (auto b: frame_block)
-                //{
-                //    if (b->_cur_vert_num + vert_num <= b->_max_vert_num)
-                //    {
-                //        available_block = b;
-                //        break;
-                //    }
-                //}
-                //if (available_block == nullptr)
-                //{
-                //    frame_block.push_back(AL_NEW(DrawerBlock));
-                //    available_block = frame_block.back();
-                //}
-                available_block = frame_block[_cur_widget_index];
-                AL_ASSERT_MSG(available_block->CanAppend(vert_num,index_num), "UI DrawerBlock index overflow!");
+                available_block = AL_NEW(DrawerBlock, _default_material, 8092u * 4);
+                frame_block[_cur_global_block_index] = available_block;
             }
-            return available_block;
+            if (!available_block->CanAppend(vert_num, index_num))
+            {
+                ++_cur_global_block_index;
+                while (frame_block.size() <= _cur_global_block_index)
+                    frame_block.push_back(AL_NEW(DrawerBlock, _default_material, 8092u * 4));
+                available_block = frame_block[_cur_global_block_index];
+            }
+            AL_ASSERT_MSG(available_block != nullptr && available_block->CanAppend(vert_num, index_num),
+                          "UI DrawerBlock index overflow!");
+            return available_block != nullptr && available_block->CanAppend(vert_num, index_num) ? available_block : nullptr;
         }
         DrawerBlock *UIRenderer::GetAvailableWindowBlock(Window *window, u32 vert_num, u32 index_num, Render::Material *material)
         {
@@ -883,16 +895,16 @@ namespace Ailu
             cmd->Blit(source, downsample);
             cmd->RequireState(downsample_rt, EResourceState::kNonPixelShaderResource);
             cmd->RequireState(blur_x_rt, EResourceState::kUnorderedAccess);
-            _backdrop_blur_cs->SetTexture(_backdrop_blur_x_kernel, "_SourceTex", downsample);
-            _backdrop_blur_cs->SetTexture(_backdrop_blur_x_kernel, "_OutTex", blur_x);
+            _backdrop_blur_cs->SetTexture(_backdrop_blur_x_kernel, "_BlurSource", downsample);
+            _backdrop_blur_cs->SetTexture(_backdrop_blur_x_kernel, "_BlurResult", blur_x);
             auto [group_num_x, group_num_y, group_num_z] = _backdrop_blur_cs->CalculateDispatchNum(_backdrop_blur_x_kernel, blur_width, blur_height, 1u);
             cmd->Dispatch(_backdrop_blur_cs.get(), _backdrop_blur_x_kernel, group_num_x, group_num_y, 1u);
             // The following transition out of kUnorderedAccess already orders the dispatch writes; an explicit
             // UAV barrier before it is redundant.
             cmd->RequireState(blur_x_rt, EResourceState::kNonPixelShaderResource);
             cmd->RequireState(blur_y_rt, EResourceState::kUnorderedAccess);
-            _backdrop_blur_cs->SetTexture(_backdrop_blur_y_kernel, "_SourceTex", blur_x);
-            _backdrop_blur_cs->SetTexture(_backdrop_blur_y_kernel, "_OutTex", blur_y);
+            _backdrop_blur_cs->SetTexture(_backdrop_blur_y_kernel, "_BlurSource", blur_x);
+            _backdrop_blur_cs->SetTexture(_backdrop_blur_y_kernel, "_BlurResult", blur_y);
             cmd->Dispatch(_backdrop_blur_cs.get(), _backdrop_blur_y_kernel, group_num_x, group_num_y, 1u);
             cmd->RequireState(blur_y_rt, EResourceState::kPixelShaderResource);
 

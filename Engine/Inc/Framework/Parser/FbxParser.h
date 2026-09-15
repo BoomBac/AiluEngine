@@ -11,7 +11,7 @@ namespace Ailu
 {
     using Render::Mesh;
     using Render::SkeletonMesh;
-    class FbxParser : public IMeshParser
+    class AILU_API FbxParser : public IMeshParser
     {
     public:
         inline static constexpr u16 kMaxInfluenceBoneNum = 4;

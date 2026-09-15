@@ -165,13 +165,13 @@ float ApplyCascadeShadow(float nl, float3 cam_pos, float3 world_pos, float shado
 {
 	float dis = distance(cam_pos.xyz,world_pos);
 	float z_bias = GetShadowDepthBias(nl, constant_bias, slope_bias);
-	float atten = saturate((_CascadeShadowParams.y * (1.0 - dis * _CascadeShadowParams.z)));
-	int cascade_count = (int)_CascadeShadowParams.x;
+	float atten = saturate((_DirectionalShadowParams.y * (1.0 - dis * _DirectionalShadowParams.z)));
+	int cascade_count = (int)_DirectionalShadowParams.x;
 	for(int cascade_index = 0;cascade_index < cascade_count;cascade_index++)
 	{
-		if(SqrDistance(world_pos,_CascadeShadowSplit[cascade_index].xyz) <= _CascadeShadowSplit[cascade_index].w)
+		if(SqrDistance(world_pos,_DirectionalShadowSplit[cascade_index].xyz) <= _DirectionalShadowSplit[cascade_index].w)
 		{
-			float4 shadow_coord = mul(_CascadeShadowMatrix[cascade_index],float4(world_pos,1.0));
+			float4 shadow_coord = mul(_DirectionalShadowMatrix[cascade_index],float4(world_pos,1.0));
 			if (shadow_coord.x < -1 || shadow_coord.x > 1 || shadow_coord.y < -1 || shadow_coord.y > 1)
 				return 1.0f;
 			shadow_coord.xyz /= shadow_coord.w;
@@ -188,7 +188,7 @@ float ApplyCascadeShadow(float nl, float3 cam_pos, float3 world_pos, float shado
 			for (int i = 0; i < _SOFT_SAMPLE_COUNT; i++)
 			{
 				shadow_factor += 1 - _MainLightShadowMap.SampleCmpLevelZero(g_ShadowSampler, 
-					float3(shadow_uv.xy + cascadePoissonDisk[i] * _MainShadowMapParams.xy * _MainShadowMapParams.z,
+					float3(shadow_uv.xy + cascadePoissonDisk[i] * _DirectionalShadowMapParams.xy * _DirectionalShadowMapParams.z,
 					       cascade_index), depth).r;
 			}
 			shadow_factor /= _SOFT_SAMPLE_COUNT;
@@ -203,13 +203,13 @@ float ApplyCascadeShadowHard(float nl, float3 cam_pos, float3 world_pos, float s
 {
 	float dis = distance(cam_pos.xyz,world_pos);
 	float z_bias = GetShadowDepthBias(nl, constant_bias, slope_bias);
-	float atten = saturate((_CascadeShadowParams.y * (1.0 - dis * _CascadeShadowParams.z)));
-	int cascade_count = (int)_CascadeShadowParams.x;
+	float atten = saturate((_DirectionalShadowParams.y * (1.0 - dis * _DirectionalShadowParams.z)));
+	int cascade_count = (int)_DirectionalShadowParams.x;
 	for(int cascade_index = 0;cascade_index < cascade_count;cascade_index++)
 	{
-		if(SqrDistance(world_pos,_CascadeShadowSplit[cascade_index].xyz) <= _CascadeShadowSplit[cascade_index].w)
+		if(SqrDistance(world_pos,_DirectionalShadowSplit[cascade_index].xyz) <= _DirectionalShadowSplit[cascade_index].w)
 		{
-			float4 shadow_coord = mul(_CascadeShadowMatrix[cascade_index],float4(world_pos,1.0));
+			float4 shadow_coord = mul(_DirectionalShadowMatrix[cascade_index],float4(world_pos,1.0));
 			if (shadow_coord.x < -1 || shadow_coord.x > 1 || shadow_coord.y < -1 || shadow_coord.y > 1)
 				return 1.0f;
 			shadow_coord.xyz /= shadow_coord.w;

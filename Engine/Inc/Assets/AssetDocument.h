@@ -15,6 +15,7 @@
 #include "AssetCommon.h"
 #include "Physics/2D/Physics2DComponents.h"
 #include "Render/PostprocessSettings.h"
+#include "Render/StaticDiffuseProbeData.h"
 #include "Scene/Component.h"
 #include "Scene/PrefabTypes.h"
 #include "generated/AssetDocument.gen.h"
@@ -204,6 +205,9 @@ namespace Ailu
         MeshImportSetting _import_setting;
         APROPERTY()
         Guid _skeleton = Guid::EmptyGuid();
+        //按 submesh 顺序记录导入时生成的材质资产，空字符串表示该槽位没有对应资产
+        APROPERTY()
+        Vector<String> _materials;
     };
 
     ACLASS()
@@ -726,6 +730,34 @@ namespace Ailu
     };
 
     ASTRUCT()
+    struct AILU_API SceneLightProbeGroupComponentDocument
+    {
+        GENERATED_BODY()
+
+        APROPERTY()
+        Vector3Int _probe_count = Vector3Int(8, 4, 8);
+        APROPERTY()
+        Vector3f _size = Vector3f(10.0f, 5.0f, 10.0f);
+        APROPERTY()
+        String _baked_data_guid;
+        APROPERTY()
+        bool _draw_probes = true;
+    };
+
+    ASTRUCT()
+    struct AILU_API SceneDDGIVolumeComponentDocument
+    {
+        GENERATED_BODY()
+
+        APROPERTY()
+        Vector3UInt _probe_count = Vector3UInt(8u, 4u, 8u);
+        APROPERTY()
+        Vector3f _probe_spacing = Vector3f(2.0f, 2.0f, 2.0f);
+        APROPERTY()
+        bool _draw_probes = true;
+    };
+
+    ASTRUCT()
     struct AILU_API SceneEnvironmentComponentDocument
     {
         GENERATED_BODY()
@@ -934,6 +966,10 @@ namespace Ailu
         inline static const String kCameraComponent = "_camera_component";
         inline static const String kHasLightprobeComponent = "_has_lightprobe_component";
         inline static const String kLightprobeComponent = "_lightprobe_component";
+        inline static const String kHasLightProbeGroupComponent = "_has_light_probe_group_component";
+        inline static const String kLightProbeGroupComponent = "_light_probe_group_component";
+        inline static const String kHasDDGIVolumeComponent = "_has_ddgi_volume_component";
+        inline static const String kDDGIVolumeComponent = "_ddgi_volume_component";
         inline static const String kHasEnvironmentComponent = "_has_environment_component";
         inline static const String kEnvironmentComponent = "_environment_component";
         inline static const String kHasRigidbodyComponent = "_has_rigidbody_component";
@@ -976,6 +1012,12 @@ namespace Ailu
                 SerializerWrapper<SceneCameraComponentDocument>::Serialize(&_camera_component, ar, &kCameraComponent);
             if (_has_lightprobe_component)
                 SerializerWrapper<SceneLightProbeComponentDocument>::Serialize(&_lightprobe_component, ar, &kLightprobeComponent);
+            if (_has_light_probe_group_component)
+                SerializerWrapper<SceneLightProbeGroupComponentDocument>::Serialize(
+                    &_light_probe_group_component, ar, &kLightProbeGroupComponent);
+            if (_has_ddgi_volume_component)
+                SerializerWrapper<SceneDDGIVolumeComponentDocument>::Serialize(
+                    &_ddgi_volume_component, ar, &kDDGIVolumeComponent);
             if (_has_environment_component)
                 SerializerWrapper<SceneEnvironmentComponentDocument>::Serialize(&_environment_component, ar, &kEnvironmentComponent);
             if (_has_rigidbody_component)
@@ -1045,6 +1087,10 @@ namespace Ailu
             deserialize_component(_has_hierarchy_component, _hierarchy_component, kHasHierarchyComponent, kHierarchyComponent);
             deserialize_component(_has_camera_component, _camera_component, kHasCameraComponent, kCameraComponent);
             deserialize_component(_has_lightprobe_component, _lightprobe_component, kHasLightprobeComponent, kLightprobeComponent);
+            deserialize_component(_has_light_probe_group_component, _light_probe_group_component,
+                                  kHasLightProbeGroupComponent, kLightProbeGroupComponent);
+            deserialize_component(_has_ddgi_volume_component, _ddgi_volume_component,
+                                  kHasDDGIVolumeComponent, kDDGIVolumeComponent);
             deserialize_component(_has_environment_component, _environment_component, kHasEnvironmentComponent, kEnvironmentComponent);
             deserialize_component(_has_rigidbody_component, _rigidbody_component, kHasRigidbodyComponent, kRigidbodyComponent);
             deserialize_component(_has_collider_component, _collider_component, kHasColliderComponent, kColliderComponent);
@@ -1096,6 +1142,14 @@ namespace Ailu
         APROPERTY()
         SceneLightProbeComponentDocument _lightprobe_component;
         APROPERTY()
+        bool _has_light_probe_group_component = false;
+        APROPERTY()
+        SceneLightProbeGroupComponentDocument _light_probe_group_component;
+        APROPERTY()
+        bool _has_ddgi_volume_component = false;
+        APROPERTY()
+        SceneDDGIVolumeComponentDocument _ddgi_volume_component;
+        APROPERTY()
         bool _has_environment_component = false;
         APROPERTY()
         SceneEnvironmentComponentDocument _environment_component;
@@ -1138,6 +1192,23 @@ namespace Ailu
     };
 
     ACLASS()
+    class AILU_API StaticDiffuseProbeDataAssetDocument : public Object
+    {
+        GENERATED_BODY()
+
+    public:
+        APROPERTY()
+        AssetDocumentHeader _header;
+        APROPERTY()
+        Render::ProbeGridDesc _grid;
+        // Flattened as 9 * probe_count Vector4f values to keep the asset format compact and generic.
+        APROPERTY()
+        Vector<Vector4f> _coefficients;
+        APROPERTY()
+        u64 _revision = 0u;
+    };
+
+    ACLASS()
     class AILU_API GraphAssetDocument : public Object
     {
         GENERATED_BODY()
@@ -1163,7 +1234,9 @@ namespace Ailu
         GENERATED_BODY()
 
     public:
-        inline static constexpr u32 kCurrentSceneFormatVersion = 3u;
+        inline static constexpr u32 kEntityGuidSceneFormatVersion = 2u;
+        inline static constexpr u32 kSceneRootFormatVersion = 4u;
+        inline static constexpr u32 kCurrentSceneFormatVersion = kSceneRootFormatVersion;
         inline static const String kHeader = "_header";
         inline static const String kSceneFormatVersion = "_scene_format_version";
         inline static const String kEntities = "_entities";

@@ -6,6 +6,7 @@
 #include <wrl/client.h>
 
 #include "Render/RenderConstants.h"
+#include "Render/ShaderArtifact.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -19,6 +20,7 @@ namespace Ailu::RHI::DX12
         Vector<D3D_SHADER_MACRO> _keywords;
         bool _is_load_cache = true;
         bool _skip_entry_point = false;
+        Render::EShaderCompileMode _compile_mode = Render::kRuntimeShaderCompileMode;
     };
 
     struct D3DShaderCompileOutput
@@ -27,6 +29,7 @@ namespace Ailu::RHI::DX12
         ComPtr<ID3DBlob> _reflection_blob;
         ComPtr<ID3D12ShaderReflection> _shader_reflection;
         ComPtr<ID3D12LibraryReflection> _library_reflection;
+        ComPtr<IDxcBlob> _pdb;
         std::set<WString> _include_files;
     };
 
@@ -35,6 +38,8 @@ namespace Ailu::RHI::DX12
                                   const Vector<WString> &search_paths = {});
 
     bool CreateFromFileDXC(const D3DShaderCompileDesc &desc, D3DShaderCompileOutput &output);
+
+    bool CompileDxcStage(const D3DShaderCompileDesc &desc, D3DShaderCompileOutput &output);
 
     bool CreateFromFileFXC(const D3DShaderCompileDesc &desc, D3DShaderCompileOutput &output);
 

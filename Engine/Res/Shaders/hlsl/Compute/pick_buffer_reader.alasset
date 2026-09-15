@@ -1,0 +1,11 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "3f1c6d53-2af2-4af5-9fe5-3dd9a85a7f02",
+        "_asset_type": "Ailu::Render::ComputeShader",
+        "_asset_name": "pick_buffer_reader",
+        "_dependencies": []
+    },
+    "_file": "pick_buffer_reader.hlsl",
+    "_kernel": "cs_main"
+}

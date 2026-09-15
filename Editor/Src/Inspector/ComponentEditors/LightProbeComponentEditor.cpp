@@ -23,9 +23,10 @@ namespace Ailu
                 comp->_is_dirty = true;
             };
 
-            Editor::AddCheckBoxRow(context._content, "UpdateTick", comp->_is_update_every_tick)->_on_click += [comp](bool is_on)
+            Editor::AddCheckBoxRow(context._content, "UpdateTick", comp->_is_update_every_tick)->_on_click += [comp, context](bool is_on)
             {
                 comp->_is_update_every_tick = is_on;
+                context.MarkSceneDirty();
             };
         }
     }// namespace Editor

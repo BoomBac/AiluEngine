@@ -8,6 +8,7 @@
 //Stencil: {Ref:0,Comp:NotEqual,Pass:Keep}
 //Queue: Opaque
 //multi_compile _ DEBUG_NORMAL DEBUG_ALBEDO DEBUG_WORLDPOS DEBUG_GI
+//multi_compile _ STATIC_DIFFUSE_PROBE_GPU
 //pass end::
 //Properties
 //{
@@ -21,6 +22,7 @@
 #include "shadow.hlsli"
 #include "fullscreen_quad.hlsli"
 #include "froxel_common.hlsli"
+#include "static_diffuse_probe.hlsli"
 
 
 TEXTURE2D(_GBuffer0)
@@ -66,7 +68,7 @@ float4 DeferredLightingPSMain(FullScreenPSInput input) : SV_TARGET
 	float2 gbuf0 = SAMPLE_TEXTURE2D_LOD(_GBuffer0, g_LinearClampSampler, input.uv,0).xy;
 	float4 gbuf1 = _GBuffer1.Sample(g_LinearWrapSampler,input.uv);
 	float4 gbuf2 = _GBuffer2.Sample(g_LinearWrapSampler,input.uv);
-	half4 emssion = SAMPLE_TEXTURE2D_LOD(_GBuffer3, g_LinearClampSampler, input.uv,0);
+	float3 diffuse_irradiance = SAMPLE_TEXTURE2D_LOD(_GBuffer3, g_LinearClampSampler, input.uv, 0).rgb;
 	float depth = SAMPLE_TEXTURE2D_LOD(_CameraDepthTexture,g_LinearWrapSampler,input.uv,0).r;
 	float3 world_pos = ComputeWorldSpacePosition(input.uv,depth,_MatrixIVP);
 	//float3 world_pos = _CameraPos.xyz + UnprojectByCameraRay(input.uv,depth);
@@ -76,9 +78,14 @@ float4 DeferredLightingPSMain(FullScreenPSInput input) : SV_TARGET
 	surface_data.roughness = gbuf1.w;
 	surface_data.metallic = gbuf2.w;
 	surface_data.specular = 1.0.xxx;
-	surface_data.anisotropy = gbuf2.z;
-	surface_data.emssive = emssion.rgb;
+        surface_data.anisotropy = 0.0f;
+        surface_data.emssive = gbuf2.rgb;
 	OrthonormalBasis(surface_data.wnormal,surface_data.tangent,surface_data.bitangent);
+	#if defined(STATIC_DIFFUSE_PROBE_GPU)
+	    float3 static_probe_irradiance;
+	    if (SampleStaticDiffuseProbeIrradiance(world_pos, surface_data.wnormal, static_probe_irradiance))
+	        diffuse_irradiance = static_probe_irradiance;
+	#endif
 	uint material_id = (uint)gbuf2.r;
 	//return float4(surface_data.wnormal,1);
 #ifdef DEBUG_NORMAL
@@ -88,7 +95,7 @@ float4 DeferredLightingPSMain(FullScreenPSInput input) : SV_TARGET
 #elif DEBUG_WORLDPOS
 	return float4(world_pos.xyz,1);
 #else
-	float3 light = max(0.0, CalculateLightPBR(surface_data, world_pos.xyz,input.uv));
+        float3 light = max(0.0, CalculateLightPBR(surface_data, world_pos.xyz,input.uv, diffuse_irradiance));
 	light += surface_data.emssive;
     float3 vol_light_uvw = WorldToVolumetricVoxelUVW(world_pos.xyz,_MatrixV,_MatrixP,_ProjectionParams.y,_ProjectionParams.z);
 	float4 vol_light = RaymarchVolumetric(vol_light_uvw,depth);

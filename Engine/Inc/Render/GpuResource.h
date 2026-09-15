@@ -12,6 +12,7 @@
 #include <deque>
 #include <memory>
 #include <mutex>
+#include <shared_mutex>
 #include <type_traits>
 #include "generated/GpuResource.gen.h"
 namespace Ailu::Render
@@ -89,6 +90,7 @@ namespace Ailu::Render
         void Clear();
 
     private:
+        mutable std::shared_mutex _resource_mutex;
         Vector<GpuResourceSlot> _slots;
         Vector<u32> _free_indices;
         std::deque<RetiredGpuResource> _retired_resources;

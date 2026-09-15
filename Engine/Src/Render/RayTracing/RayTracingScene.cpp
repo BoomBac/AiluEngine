@@ -124,7 +124,7 @@ namespace Ailu::Render
         PrepareBuild(_is_need_rebuild);
 
         auto cmd = CommandBufferPool::Get();
-        cmd->BuildAS(this, !_is_need_rebuild);
+        RecordBuild(cmd.get());
         if (need_recreate_resource)
             GraphicsContext::Get().ExecuteCommandBufferSync(cmd);
         else
@@ -145,5 +145,22 @@ namespace Ailu::Render
             return;
 
         Build();
+    }
+
+    void RayTracingScene::RecordBuild(CommandBuffer *cmd)
+    {
+        if (cmd == nullptr || _instances.empty() || !NeedsUpdate())
+            return;
+
+        const bool is_rebuild = _is_need_rebuild;
+        if (is_rebuild && NeedRecreateBuildResource())
+        {
+            _is_ready_for_rendering = false;
+            ApplySync();
+        }
+        PrepareBuild(is_rebuild);
+        cmd->BuildAS(this, !is_rebuild);
+        _is_need_rebuild = false;
+        _is_need_refit = false;
     }
 }

@@ -1,3 +1,4 @@
+#include "Assets/AssetRef.h"
 #include "./RenderFeature.h"
 #include "Framework/Core/Containers/Array.h"
 #include "Render/CoreType.h"
@@ -27,7 +28,7 @@ namespace Ailu::Render
         TerrainPass* _terrain_pass;
         Ref<Mesh> _plane;
         Ref<Material> _terrain_mat;
-        Ref<ComputeShader> _terrain_gen;
+        AssetRef<ComputeShader> _terrain_gen;
     };
 
     class TerrainPass : public RenderPass
@@ -38,13 +39,13 @@ namespace Ailu::Render
         void Execute(GraphicsContext *context, RenderingData &rendering_data) final;
         void BeginPass(GraphicsContext *context) final;
         void EndPass(GraphicsContext *context) final;
-        void Setup(ComputeShader* terrain_gen,Mesh* plane,Material* terrain_mat,f32* max_height);
+        void Setup(const AssetRef<ComputeShader> &terrain_gen, Mesh* plane, Material* terrain_mat, f32* max_height);
     public:
         Camera* _cam;
         bool _is_debug = false;
     private:
         static const u16 kMaxLOD =5;
-        ComputeShader* _terrain_gen;
+        AssetRef<ComputeShader> _terrain_gen;
         ComputeShaderKernelId _min_max_height_gen_kernel = kInvalidComputeShaderKernelId;
         ComputeShaderKernelId _quad_tree_processor_kernel = kInvalidComputeShaderKernelId;
         ComputeShaderKernelId _gen_lod_map_kernel = kInvalidComputeShaderKernelId;

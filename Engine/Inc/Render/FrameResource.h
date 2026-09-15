@@ -32,6 +32,9 @@ namespace Ailu::Render
         ConstantBuffer * GetCameraCB(u64 hash);
         ConstantBuffer * GetSceneCB(u64 hash);
         GPUBuffer *GetScenePrimitiveBuffer(u64 hash);
+        GPUBuffer *GetScenePrimitiveGIDataBuffer(u64 hash);
+        GPUBuffer *GetStaticDiffuseProbeGroupBuffer(u64 hash);
+        GPUBuffer *GetStaticDiffuseProbeDataBuffer(u64 hash);
         PrimitiveIndexAllocation AllocatePrimitiveIndices(u32 count);
         void ResetPrimitiveIndices();
         void UploadPrimitiveIndices();
@@ -47,12 +50,18 @@ namespace Ailu::Render
         Vector<Ref<ConstantBuffer>> _camera_cb_refs;
         Vector<Ref<ConstantBuffer>> _scene_cb_refs;
         Vector<Ref<GPUBuffer>> _scene_primitive_buffers;
+        Vector<Ref<GPUBuffer>> _scene_primitive_gi_buffers;
+        Vector<Ref<GPUBuffer>> _static_diffuse_probe_group_buffers;
+        Vector<Ref<GPUBuffer>> _static_diffuse_probe_data_buffers;
         Vector<u32> _primitive_indices;
         Ref<GPUBuffer> _primitive_index_buffer;
         Ref<GPUBuffer> _material_buffer;//for ray tracing material data
         Map<u64,u64> _camera_cb_lut;
         Map<u64,u64> _scene_cb_lut;
         Map<u64, u64> _scene_primitive_buffer_lut;
+        Map<u64, u64> _scene_primitive_gi_buffer_lut;
+        Map<u64, u64> _static_diffuse_probe_group_buffer_lut;
+        Map<u64, u64> _static_diffuse_probe_data_buffer_lut;
         inline static FrameResource *s_active = nullptr;
     };
     class FrameAllocator;

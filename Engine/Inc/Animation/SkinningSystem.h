@@ -2,6 +2,7 @@
 #ifndef __SKINNING_SYSTEM_H__
 #define __SKINNING_SYSTEM_H__
 
+#include "Assets/AssetRef.h"
 #include "Framework/Common/JobSystem.h"
 #include "Framework/Core/Containers/Vector.h"
 #include "Framework/Core/SmartPtr.h"
@@ -64,22 +65,23 @@ namespace Ailu::ECS
         [[nodiscard]] bool IsGpuSkinningEnabled() const noexcept { return _gpu_enabled; }
         [[nodiscard]] Render::VertexBuffer *GetVertexBuffer(SkinHandle handle) const;
         static Render::VertexBuffer *ResolveVertexBuffer(Render::Mesh *mesh, u32 entity);
+        static u64 ResolveSkinVersion(Render::Mesh *mesh, u32 entity);
 
         // CPU fallback and animation preview path.
         void Submit(Render::SkeletonMesh *mesh, const Vector<Matrix4x4f> &pose_palette,
-                    u32 vertices_per_task = kDefaultVerticesPerTask);
-        void WaitFor() const;
+                    u32 vertices_per_task = kDefaultVerticesPerTask, u32 entity = 0u);
+        void WaitFor();
         void Clear();
 
     private:
         struct SkinCacheKey
         {
             u32 _mesh_id = 0u;
-            u32 _pose_id = 0u;
+            u32 _entity_id = 0u;
 
             friend bool operator==(const SkinCacheKey &lhs, const SkinCacheKey &rhs) noexcept
             {
-                return lhs._mesh_id == rhs._mesh_id && lhs._pose_id == rhs._pose_id;
+                return lhs._mesh_id == rhs._mesh_id && lhs._entity_id == rhs._entity_id;
             }
         };
 
@@ -87,7 +89,7 @@ namespace Ailu::ECS
         {
             size_t operator()(const SkinCacheKey &key) const noexcept
             {
-                return (static_cast<size_t>(key._mesh_id) << 32u) ^ key._pose_id;
+                return (static_cast<size_t>(key._mesh_id) << 32u) ^ key._entity_id;
             }
         };
 
@@ -116,6 +118,13 @@ namespace Ailu::ECS
             SkinHandle _handle;
             u64 _last_used_frame = 0u;
             u32 _vertex_count = 0u;
+            u64 _skin_version = 0u;
+            bool _output_valid = false;
+            bool _cpu_upload_pending = false;
+            Vector<Vector3f> _cpu_positions;
+            Vector<Vector3f> _cpu_normals;
+            Vector<Vector4f> _cpu_tangents;
+            Vector<Matrix4x4f> _pose_snapshot;
         };
 
         bool EnsureComputeShader();
@@ -129,6 +138,8 @@ namespace Ailu::ECS
         std::unordered_map<SkinCacheKey, SkinCacheEntry, SkinCacheKeyHash> _cache;
         std::unordered_map<u32, SkinCacheKey> _handles;
         std::unordered_map<u32, u32> _pose_offsets;
+        std::unordered_map<u32, u64> _pose_versions;
+        std::unordered_map<u32, Vector<Matrix4x4f>> _pose_snapshots;
         std::unordered_map<u32, PoseHandle> _entity_poses;
         std::unordered_map<u32, SkinHandle> _entity_handles;
         Vector<SkinningJobData> _jobs;
@@ -137,7 +148,7 @@ namespace Ailu::ECS
         Vector<Render::RDG::RGHandle> _output_handles;
         Ref<Render::GPUBuffer> _palette_buffer;
         Ref<Render::GPUBuffer> _job_buffer;
-        Ref<Render::ComputeShader> _compute_shader;
+        AssetRef<Render::ComputeShader> _compute_shader;
         u16 _kernel = Render::kInvalidComputeShaderKernelId;
         u64 _frame_index = 0u;
         u32 _next_pose_id = 1u;

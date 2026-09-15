@@ -17,6 +17,7 @@ namespace Ailu::Render
         if (resource == nullptr)
             return {};
 
+        std::unique_lock lock(_resource_mutex);
         u32 index = kInvalidGpuHandleIndex;
         if (!_free_indices.empty())
         {
@@ -39,6 +40,7 @@ namespace Ailu::Render
 
     GpuResource *GpuResourceRegistry::Resolve(GpuResourceHandle handle)
     {
+        std::shared_lock lock(_resource_mutex);
         if (!handle.IsValid() || handle._index >= _slots.size())
             return nullptr;
         auto &slot = _slots[handle._index];
@@ -49,6 +51,7 @@ namespace Ailu::Render
 
     const GpuResource *GpuResourceRegistry::Resolve(GpuResourceHandle handle) const
     {
+        std::shared_lock lock(_resource_mutex);
         if (!handle.IsValid() || handle._index >= _slots.size())
             return nullptr;
         const auto &slot = _slots[handle._index];
@@ -59,6 +62,7 @@ namespace Ailu::Render
 
     void GpuResourceRegistry::Retire(GpuResourceHandle handle, u64 fence)
     {
+        std::unique_lock lock(_resource_mutex);
         if (!handle.IsValid() || handle._index >= _slots.size())
             return;
         auto &slot = _slots[handle._index];
@@ -97,6 +101,7 @@ namespace Ailu::Render
 
     void GpuResourceRegistry::Collect(u64 completed_fence)
     {
+        std::unique_lock lock(_resource_mutex);
         while (!_retired_resources.empty() && _retired_resources.front()._fence <= completed_fence)
             _retired_resources.pop_front();
     }
@@ -110,9 +115,12 @@ namespace Ailu::Render
 
         // Resource destructors may release nested Ref objects, which re-enter Release().
         // Do not hold _pending_release_mutex while unique_ptr destructors are running.
-        _retired_resources.clear();
-        _slots.clear();
-        _free_indices.clear();
+        {
+            std::unique_lock lock(_resource_mutex);
+            _retired_resources.clear();
+            _slots.clear();
+            _free_indices.clear();
+        }
 
         {
             std::lock_guard lock(_pending_release_mutex);

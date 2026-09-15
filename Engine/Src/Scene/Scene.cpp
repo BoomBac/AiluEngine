@@ -69,6 +69,8 @@ namespace Ailu::SceneManagement
         _register.RegisterComponent<ECS::PostprocessVolumeComponent>();
         _register.RegisterComponent<ECS::CHierarchy>();
         _register.RegisterComponent<ECS::CLightProbe>();
+        _register.RegisterComponent<ECS::CLightProbeGroup>();
+        _register.RegisterComponent<ECS::DDGIVolumeComponent>();
         _register.RegisterComponent<ECS::CRigidBody>();
         _register.RegisterComponent<ECS::CCollider>();
         _register.RegisterComponent<ECS::RigidBody2DComponent>();
@@ -79,6 +81,11 @@ namespace Ailu::SceneManagement
         _register.RegisterComponent<ECS::SpriteRendererComponent>();
         _register.RegisterComponent<ECS::AudioSourceComponent>();
         _register.RegisterComponent<ECS::AudioListenerComponent>();
+        _scene_root = _register.Create();
+        auto &scene_root_tag = _register.AddComponent<ECS::TagComponent>(_scene_root);
+        scene_root_tag._name = "SceneRoot";
+        _register.AddComponent<ECS::TransformComponent>(_scene_root);
+        _register.AddComponent<ECS::CHierarchy>(_scene_root);
         if (!create_render_resources)
             return;
 
@@ -110,7 +117,7 @@ namespace Ailu::SceneManagement
         {
             BufferDesc buf_desc;
             buf_desc._is_random_write = false;
-            buf_desc._target = EGPUBufferTarget::kStructured | EGPUBufferTarget::kConstant;
+            buf_desc._target = EGPUBufferTarget::kStructured;
             buf_desc._size = buf_desc._element_size * buf_desc._element_num;
             buf_desc._element_num = 2000;
             buf_desc._element_size = sizeof(LBVHNode);
@@ -135,6 +142,9 @@ namespace Ailu::SceneManagement
             UnregisterEntityGuid(entity);
             _register.Destory(entity);
         }
+        if (_scene_root != ECS::kInvalidEntity && _register.IsAlive(_scene_root))
+            _register.Destory(_scene_root);
+        _scene_root = ECS::kInvalidEntity;
         _register.WaitForSystems();
         _guid_to_entity.clear();
         _pending_delete_entities.clear();
@@ -318,6 +328,8 @@ namespace Ailu::SceneManagement
         }
         for (ECS::Entity entity : entities)
         {
+            if (IsSceneRoot(entity))
+                continue;
             auto *id_comp = _register.GetComponent<ECS::PersistentIdComponent>(entity);
             if (id_comp == nullptr || id_comp->_guid.IsEmpty())
             {
@@ -514,10 +526,15 @@ namespace Ailu::SceneManagement
     // =========================================================================
     bool Scene::Reparent(ECS::Entity child, ECS::Entity new_parent, bool keep_world_transform)
     {
+        if (new_parent == ECS::kInvalidEntity && _scene_root != ECS::kInvalidEntity)
+            new_parent = _scene_root;
+
         // --- Validation ---
         if (child == ECS::kInvalidEntity)
             return false;
         if (!_register.IsAlive(child))
+            return false;
+        if (child == _scene_root)
             return false;
         if (!_register.HasComponent<ECS::CHierarchy>(child))
             return false;
@@ -632,7 +649,7 @@ namespace Ailu::SceneManagement
         return _register.EntityView<ECS::CHierarchy>();
     }
 
-    ECS::Entity Scene::CreateEntityInternal(String name, const Guid &requested_guid)
+    ECS::Entity Scene::CreateEntityInternal(String name, const Guid &requested_guid, bool attach_to_scene_root)
     {
         ECS::Entity entity = _register.Create();
         const Guid guid = requested_guid.IsValid() ? requested_guid : GenerateUniqueEntityGuid();
@@ -646,12 +663,14 @@ namespace Ailu::SceneManagement
         _register.AddComponent<ECS::TagComponent>(entity, name);
         _register.AddComponent<ECS::TransformComponent>(entity);
         _register.AddComponent<ECS::CHierarchy>(entity);
+        if (attach_to_scene_root && _scene_root != ECS::kInvalidEntity)
+            LinkAsLastChild(entity, _scene_root);
         return entity;
     }
 
     ECS::Entity Scene::AddObject(Ref<Mesh> mesh, Ref<Material> mat)
     {
-        ECS::Entity obj = CreateEntityInternal("", Guid::EmptyGuid());
+        ECS::Entity obj = CreateEntityInternal("", Guid::EmptyGuid(), true);
         auto &comp = _register.AddComponent<ECS::StaticMeshComponent>(obj);
         comp._p_mesh = mesh ? mesh : Mesh::s_plane.lock();
         comp._transformed_aabbs.resize(comp._p_mesh->SubmeshCount() + 1);
@@ -661,7 +680,7 @@ namespace Ailu::SceneManagement
     }
     ECS::Entity Scene::AddObject(Ref<Mesh> mesh, const Vector<Ref<Material>> &mats)
     {
-        ECS::Entity obj = CreateEntityInternal("", Guid::EmptyGuid());
+        ECS::Entity obj = CreateEntityInternal("", Guid::EmptyGuid(), true);
         auto &comp = _register.AddComponent<ECS::StaticMeshComponent>(obj);
         comp._p_mesh = mesh ? mesh : Mesh::s_plane.lock();
         comp._transformed_aabbs.resize(comp._p_mesh->SubmeshCount() + 1);
@@ -671,13 +690,13 @@ namespace Ailu::SceneManagement
     }
     ECS::Entity Scene::AddObject(String name)
     {
-        const ECS::Entity entity = CreateEntityInternal(std::move(name), Guid::EmptyGuid());
+        const ECS::Entity entity = CreateEntityInternal(std::move(name), Guid::EmptyGuid(), true);
         TouchStructure();
         return entity;
     }
-    ECS::Entity Scene::AddObject(String name, const Guid &requested_guid)
+    ECS::Entity Scene::AddObject(String name, const Guid &requested_guid, bool attach_to_scene_root)
     {
-        const ECS::Entity entity = CreateEntityInternal(std::move(name), requested_guid);
+        const ECS::Entity entity = CreateEntityInternal(std::move(name), requested_guid, attach_to_scene_root);
         TouchStructure();
         return entity;
     }
@@ -716,6 +735,8 @@ namespace Ailu::SceneManagement
     }
     void Scene::RemoveObject(ECS::Entity entity)
     {
+        if (entity == _scene_root)
+            return;
         _pending_delete_entities.emplace(entity);
     }
     void Scene::DeletePendingEntities()
@@ -729,6 +750,8 @@ namespace Ailu::SceneManagement
 
         for (ECS::Entity root : _pending_delete_entities)
         {
+            if (root == _scene_root)
+                continue;
             if (all_to_delete.contains(root))
                 continue;
             Vector<ECS::Entity> subtree;
@@ -743,6 +766,8 @@ namespace Ailu::SceneManagement
         // Step 2: Unlink roots whose parent is NOT being deleted
         for (ECS::Entity root : _pending_delete_entities)
         {
+            if (root == _scene_root)
+                continue;
             auto *hier = _register.GetComponent<ECS::CHierarchy>(root);
             if (hier && hier->_parent != ECS::kInvalidEntity && !all_to_delete.contains(hier->_parent))
                 UnlinkFromParent(root);
@@ -778,6 +803,7 @@ namespace Ailu::SceneManagement
         {
             if (auto *script_comp = _register.GetComponent<ECS::ScriptComponent>(entity))
                 ScriptSystem::Get().DestroyComponent(this, entity, *script_comp);
+            UnlinkFromParent(entity);
             UnregisterEntityGuid(entity);
             _register.Destory(entity);
         }
@@ -1103,7 +1129,7 @@ namespace Ailu::SceneManagement
             buf_desc._element_num = _triangle_count;
             buf_desc._element_size = sizeof(TriangleData);
             buf_desc._is_random_write = false;
-            buf_desc._target = EGPUBufferTarget::kStructured | EGPUBufferTarget::kConstant;
+            buf_desc._target = EGPUBufferTarget::kStructured;
             buf_desc._size = buf_desc._element_size * buf_desc._element_num;
             _scene_mesh_data = GPUBuffer::Create(buf_desc);
             _scene_mesh_data->Name(std::format("{}_mesh_data_buffer", Name()));

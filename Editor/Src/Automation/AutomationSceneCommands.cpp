@@ -211,7 +211,7 @@ namespace Ailu
 
             const ECS::CHierarchy *hierarchy = scene->GetRegister().GetComponent<ECS::CHierarchy>(entity);
             const ECS::Entity old_parent = hierarchy != nullptr ? hierarchy->_parent : ECS::kInvalidEntity;
-            _has_old_parent = old_parent != ECS::kInvalidEntity;
+            _has_old_parent = old_parent != ECS::kInvalidEntity && !scene->IsSceneRoot(old_parent);
             if (_has_old_parent)
                 _old_parent_guid = scene->GetEntityGuid(old_parent);
 

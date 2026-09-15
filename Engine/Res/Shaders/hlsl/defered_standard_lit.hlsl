@@ -72,6 +72,7 @@
 #define AL_SCENE_PRIMITIVE 1
 #include "standard_lit_common.hlsli"
 #include "primitive.hlsli"
+#include "lighting.hlsli"
 #include "shadow_caster.hlsli"
 #include "pixel_packing.hlsli"
 #include "voxel_gi.hlsli"
@@ -81,7 +82,7 @@ struct GBuffer
 	float2 packed_normal : SV_Target0;
 	float4 color_roughness : SV_Target1;
 	float4 specular_metallic : SV_Target2;
-	half4  emission : SV_Target3;
+        half4  irradiance : SV_Target3;
 };
 
 StandardPSInput GBufferVSMain(StandardVSInput v)
@@ -97,7 +98,8 @@ StandardPSInput GBufferVSMain(StandardVSInput v)
 	float3 N = TransformPrimitiveNormal(primitive, v.normal);
 	result.btn = float3x3(T, B, N);
 	result.normal = N;
-	result.world_pos = TransformPrimitiveToWorld(primitive, v.position);
+        result.world_pos = TransformPrimitiveToWorld(primitive, v.position);
+        result.primitive_index = GetPrimitiveIndex(v.instance_id);
 	return result;
 }
 
@@ -136,8 +138,12 @@ GBuffer GBufferPSMain(StandardPSInput input) : SV_TARGET
 	output.packed_normal = PackNormal(surface_data.wnormal);
 	output.color_roughness = float4(surface_data.albedo.rgb, surface_data.roughness);
 	//output.specular_metallic = float4(surface_data.specular, surface_data.metallic);
-	output.specular_metallic = float4(0.0,0.0,surface_data.anisotropy,surface_data.metallic);
-	output.emission = half4(surface_data.emssive.rgb,1.0);
+        output.specular_metallic = float4(surface_data.emssive.rgb, surface_data.metallic);
+        const PrimitiveData primitive = g_primitive_data[input.primitive_index];
+        float3 irradiance = EvaluateEnvironmentIrradiance(surface_data.wnormal);
+        if (HasPrimitiveStaticGI(primitive))
+            irradiance = EvaluatePrimitiveStaticIrradiance(primitive, surface_data.wnormal);
+        output.irradiance = half4(irradiance, 1.0);
 	return output;
 }
 
@@ -193,7 +199,8 @@ void VoxelGSMain(triangle VoxelGSInput g[3],inout TriangleStream<StandardPSInput
 		result.normal = g[i].normal;
 		result.uv0 = g[i].uv0;
 		result.btn = float3x3(float3(1,0,0),float3(0,1,0),float3(0,0,3));
-		result.world_pos = g[i].world_pos;
+                result.world_pos = g[i].world_pos;
+                result.primitive_index = UINT32_MAX;
 		results.Append(result);
 	}
 }

@@ -649,7 +649,8 @@ namespace Ailu::ECS
                         else
                         {
                             PROFILE_BLOCK_CPU("AnimationSystem::SubmitCpuSkinning")
-                            _skinning_system->Submit(component->_p_mesh.get(), palette, s_vertex_num_per_skin_task);
+                            _skinning_system->Submit(component->_p_mesh.get(), palette, s_vertex_num_per_skin_task,
+                                                      static_cast<u32>(mesh_entity));
                         }
                     }
                 }

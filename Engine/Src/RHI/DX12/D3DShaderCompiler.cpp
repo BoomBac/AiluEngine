@@ -3,30 +3,21 @@
 #include <d3d12.h>
 #include <d3dcompiler.h>
 #include <dxcapi.h>
-#include <mutex>
 
-#include "Framework/Common/Application.h"
 #include "Framework/Common/Allocator.hpp"
+#include "Framework/Common/Application.h"
 #include "Framework/Common/FileManager.h"
 #include "Framework/Common/Log.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Framework/Common/Utils.h"
 #include "Framework/Core/CoreMinimal.h"
 #include "Framework/Core/Containers/Vector.h"
-#include "Framework/Common/Assert.h"
 #include "RHI/DX12/D3DShaderCompiler.h"
+#include "RHI/DX12/DxcCompilerContext.h"
 #include "RHI/DX12/dxhelper.h"
-
-
-#define SHADER_DEBUG_SYMBOLS 1
 
 namespace Ailu
 {
-    bool LoadBlobFromFile(const WString &path, ComPtr<ID3DBlob> &blob)
-    {
-        return SUCCEEDED(D3DReadFileToBlob(path.c_str(), blob.ReleaseAndGetAddressOf()));
-    }
-
     bool CopyDxcBlob(IDxcBlob *source_blob, ComPtr<ID3DBlob> &dest_blob)
     {
         if (!source_blob)
@@ -58,8 +49,6 @@ namespace Ailu
                 L"Shaders/hlsl/",
                 L"Shaders/hlsl/Compute/",
                 L"Shaders/hlsl/PostProcess/"};
-        u8 *_data = nullptr;
-        inline static std::mutex s_compile_lock;
     };
 
     namespace
@@ -222,6 +211,30 @@ namespace Ailu
             }
             return parse_succeed;
         }
+
+        //调试信息通过 -Qembed_debug 已嵌入 byte code，pdb 单独落盘供调试器查找
+        void WriteShaderDebugPdb(IDxcResult *result, IDxcBlob *pdb)
+        {
+            if (result == nullptr || pdb == nullptr || pdb->GetBufferSize() == 0u)
+                return;
+
+            ComPtr<IDxcBlob> hash_blob;
+            if (FAILED(result->GetOutput(DXC_OUT_SHADER_HASH, IID_PPV_ARGS(hash_blob.GetAddressOf()), nullptr)) || hash_blob == nullptr)
+                return;
+
+            const auto *shader_hash = reinterpret_cast<const DxcShaderHash *>(hash_blob->GetBufferPointer());
+            WString hash_str;
+            hash_str.reserve(32u);
+            for (u32 index = 0u; index < 16u; ++index)
+            {
+                hash_str += std::format(L"{:02x}", shader_hash->HashDigest[index]);
+            }
+
+            const WString pdb_dir = Application::GetWorkingPath() + L"cache/shader_artifacts/pdb/";
+            FileManager::CreateDirectory(pdb_dir);
+            FileManager::WriteFile(pdb_dir + hash_str + L".pdb", false,
+                                   static_cast<const u8 *>(pdb->GetBufferPointer()), pdb->GetBufferSize());
+        }
     }
 
     HRESULT D3DShaderInclude ::Close(LPCVOID pData)
@@ -242,12 +255,10 @@ namespace Ailu
         }
 
         {
-            std::lock_guard<std::mutex> l(s_compile_lock);
             auto [file_data, byte_size] = FileManager::ReadFile(resolved_path);
-            _data = file_data;
-            *ppData = _data;
+            *ppData = file_data;
             *pBytes = (u32) byte_size;
-            _include_files.insert(resolved_path);
+            _include_files.insert(PathUtils::FormatFilePath(resolved_path));
             return S_OK;
         }
     }
@@ -266,7 +277,6 @@ namespace Ailu
                 L"Shaders/hlsl/",
                 L"Shaders/hlsl/Compute/",
                 L"Shaders/hlsl/PostProcess/"};
-        inline static std::mutex s_compile_lock;
 
     public:
         explicit DxcIncludeHandlerEx(IDxcUtils *utils)
@@ -312,8 +322,6 @@ namespace Ailu
 
         HRESULT STDMETHODCALLTYPE LoadSource(LPCWSTR pFilename, IDxcBlob **ppIncludeSource) override
         {
-            std::lock_guard<std::mutex> l(s_compile_lock);
-
             *ppIncludeSource = nullptr;
 
             auto try_load_file = [&](const WString &full_path) -> HRESULT
@@ -354,15 +362,6 @@ namespace Ailu
         return !desc._skip_entry_point && !desc._entry_point.empty() && !IsDxrLibraryTarget(desc._target);
     }
 
-    void BuildKeywordStrings(const Vector<D3D_SHADER_MACRO> &keywords, Vector<String> &keyword_str)
-    {
-        for (auto &kw: keywords)
-        {
-            if (kw.Name)
-                keyword_str.emplace_back(kw.Name);
-        }
-    }
-
     bool TryCreateShaderReflection(IDxcUtils *utils, ID3DBlob *reflection_blob, ComPtr<ID3D12ShaderReflection> &shader_reflection)
     {
         if (!reflection_blob)
@@ -398,77 +397,29 @@ namespace Ailu
 
     namespace RHI::DX12
     {
-        static bool IsShaderCacheCurrent(const WString &cache_path, const WString &source_path,
-                                         std::set<WString> &include_files)
+        bool CompileDxcStage(const D3DShaderCompileDesc &desc, D3DShaderCompileOutput &output)
         {
-            if (!FileManager::Exist(cache_path) || !FileManager::IsFileNewer(cache_path, source_path))
-                return false;
-
-            if (!ParseIncludeDependencies(source_path, include_files))
-                return false;
-
-            for (const WString &include_file: include_files)
-            {
-                if (!FileManager::Exist(include_file) || !FileManager::IsFileNewer(cache_path, include_file))
-                    return false;
-            }
-            return true;
-        }
-
-        bool CreateFromFileDXC(const D3DShaderCompileDesc &desc, D3DShaderCompileOutput &output)
-        {
-            Vector<String> keyword_str;
-            BuildKeywordStrings(desc._keywords, keyword_str);
-
             const bool needs_entry_point = NeedsEntryPoint(desc);
-            String unique = std::format("{}_{}_{}_{}_{}",
-                                        ToChar(desc._filename),
-                                        desc._entry_point,
-                                        desc._target,
-                                        needs_entry_point ? "entry" : "library",
-                                        su::Join(keyword_str, "_"));
-
-            u64 hash = std::hash<String>{}(unique);
-
-            auto working = Application::GetWorkingPath();
-            WString cached_shader_blob_path = working + std::format(L"cache/shader_cache/dxc/{}.dxil", hash);
-            WString cached_reflection_blob_path = working + std::format(L"cache/shader_cache/dxc/{}.rft", hash);
-            std::set<WString> cached_include_files;
-
-            if (desc._is_load_cache && IsShaderCacheCurrent(cached_shader_blob_path, desc._filename, cached_include_files))
+            auto &context = GetThreadDxcCompilerContext();
+            if (!context.IsValid())
             {
-                const bool load_shader_succeed = LoadBlobFromFile(cached_shader_blob_path, output._byte_code);
-                AL_ASSERT(load_shader_succeed);
-                output._include_files = std::move(cached_include_files);
-
-                if (FileManager::Exist(cached_reflection_blob_path))
-                {
-                    LoadBlobFromFile(cached_reflection_blob_path, output._reflection_blob);
-                    if (output._reflection_blob)
-                    {
-                        ComPtr<IDxcUtils> utils;
-                        DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&utils));
-                        if (!IsDxrLibraryTarget(desc._target))
-                            TryCreateShaderReflection(utils.Get(), output._reflection_blob.Get(), output._shader_reflection);
-                        else
-                            TryCreateShaderReflection(utils.Get(), output._reflection_blob.Get(), output._library_reflection);
-                    }
-                    //LOG_INFO(L"Loaded cached shader and reflection for {} from {}", desc._filename, cached_shader_blob_path);
-                }
-                return true;
+                LOG_ERROR(L"DXC context creation failed for shader {}", desc._filename);
+                return false;
             }
-
-            ComPtr<IDxcUtils> utils;
-            ComPtr<IDxcCompiler3> compiler;
-            DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&utils));
-            DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&compiler));
+            auto *utils = context.Utils();
+            auto *compiler = context.Compiler();
 
             auto base_path = std::filesystem::path(desc._filename).parent_path().wstring();
-            auto *include = AL_NEW_TAG(EMemoryTag::kRenderer, DxcIncludeHandlerEx, utils.Get());
+            auto *include = AL_NEW_TAG(EMemoryTag::kRenderer, DxcIncludeHandlerEx, utils);
             include->_cur_source_file_path = desc._filename;
 
             ComPtr<IDxcBlobEncoding> source;
-            utils->LoadFile(desc._filename.c_str(), nullptr, &source);
+            if (FAILED(utils->LoadFile(desc._filename.c_str(), nullptr, &source)) || source == nullptr)
+            {
+                include->Release();
+                LOG_ERROR(L"DXC source load failed for shader {}", desc._filename);
+                return false;
+            }
 
             DxcBuffer src = {};
             src.Ptr = source->GetBufferPointer();
@@ -489,14 +440,17 @@ namespace Ailu
             }
             args.push_back(L"-T");
             args.push_back(target_w.c_str());
-            args.push_back(L"-Zi");
-            args.push_back(L"-Zss");
-#if SHADER_DEBUG_SYMBOLS
-            args.push_back(L"-Od");
-            args.push_back(L"-Qembed_debug");
-#else
-            args.push_back(L"-O3");
-#endif
+            if (desc._compile_mode == Render::EShaderCompileMode::kDebug)
+            {
+                args.push_back(L"-Zi");
+                args.push_back(L"-Zss");
+                args.push_back(L"-Od");
+                args.push_back(L"-Qembed_debug");
+            }
+            else
+            {
+                args.push_back(L"-O3");
+            }
             std::vector<std::wstring> define_strings;
             for (auto &kw: desc._keywords)
             {
@@ -522,8 +476,13 @@ namespace Ailu
             }
 
             ComPtr<IDxcResult> result;
-            compiler->Compile(&src, args.data(), (UINT) args.size(), include, IID_PPV_ARGS(&result));
+            const HRESULT compile_hr = compiler->Compile(&src, args.data(), (UINT) args.size(), include,
+                                                         IID_PPV_ARGS(&result));
+            const auto include_files = include->_include_files;
             include->Release();
+
+            if (FAILED(compile_hr) || result == nullptr)
+                return false;
 
             HRESULT hr;
             result->GetStatus(&hr);
@@ -542,50 +501,36 @@ namespace Ailu
                 LOG_ERROR(L"DXC object extraction failed for shader {}", desc._filename);
                 return false;
             }
-            FileManager::WriteFile(cached_shader_blob_path, false, reinterpret_cast<u8 *>(output._byte_code->GetBufferPointer()), output._byte_code->GetBufferSize());
-
             ComPtr<IDxcBlob> reflection_blob;
             hr = result->GetOutput(DXC_OUT_REFLECTION, IID_PPV_ARGS(reflection_blob.GetAddressOf()), nullptr);
             if (SUCCEEDED(hr) && reflection_blob && CopyDxcBlob(reflection_blob.Get(), output._reflection_blob))
             {
                 if (!IsDxrLibraryTarget(desc._target))
                 {
-                    TryCreateShaderReflection(utils.Get(), output._reflection_blob.Get(), output._shader_reflection);
+                    TryCreateShaderReflection(utils, output._reflection_blob.Get(), output._shader_reflection);
                 }
                 else
                 {
-                    TryCreateShaderReflection(utils.Get(), output._reflection_blob.Get(), output._library_reflection);
+                    TryCreateShaderReflection(utils, output._reflection_blob.Get(), output._library_reflection);
                 }
-                FileManager::WriteFile(cached_reflection_blob_path, false, reinterpret_cast<u8 *>(output._reflection_blob->GetBufferPointer()), output._reflection_blob->GetBufferSize());
             }
             else
             {
                 LOG_WARNING(L"DXC generate reflection failed for shader {}", desc._filename);
             }
 
-            ComPtr<IDxcBlob> pdb;
-            hr = result->GetOutput(DXC_OUT_PDB, IID_PPV_ARGS(&pdb), nullptr);
-            if (SUCCEEDED(hr) && pdb)
+            if (desc._compile_mode == Render::EShaderCompileMode::kDebug)
             {
-                ComPtr<IDxcBlob> hash_blob;
-                result->GetOutput(DXC_OUT_SHADER_HASH, IID_PPV_ARGS(&hash_blob), nullptr);
-                const DxcShaderHash *shader_hash = reinterpret_cast<const DxcShaderHash *>(hash_blob->GetBufferPointer());
-                std::wstring hash_str;
-                for (int i = 0; i < 16; ++i)
-                {
-                    wchar_t buf[3];
-                    swprintf(buf, 3, L"%02x", shader_hash->HashDigest[i]);
-                    hash_str += buf;
-                }
-                WString pdb_cache_path = working + std::format(L"cache/shader_cache/dxc/{}.pdb", hash_str);
-                FileManager::WriteFile(pdb_cache_path, false, (u8 *) pdb->GetBufferPointer(), pdb->GetBufferSize());
+                result->GetOutput(DXC_OUT_PDB, IID_PPV_ARGS(output._pdb.GetAddressOf()), nullptr);
+                WriteShaderDebugPdb(result.Get(), output._pdb.Get());
             }
-            else
-            {
-                LOG_WARNING(L"DXC generate pdb failed for shader {}", desc._filename);
-            }
-            ParseIncludeDependencies(desc._filename, output._include_files);
+            output._include_files = include_files;
             return true;
+        }
+
+        bool CreateFromFileDXC(const D3DShaderCompileDesc &desc, D3DShaderCompileOutput &output)
+        {
+            return CompileDxcStage(desc, output);
         }
 
         bool CreateFromFileFXC(const D3DShaderCompileDesc &desc, D3DShaderCompileOutput &output)
@@ -598,54 +543,22 @@ namespace Ailu
 
             D3DShaderInclude include;
             include._cur_source_file_path = desc._filename;
-            Vector<String> keyword_str;
-            BuildKeywordStrings(desc._keywords, keyword_str);
-
-            String unique_str = std::format("{}_{}_{}_{}", ToChar(desc._filename), desc._entry_point, desc._target, su::Join(keyword_str, "_"));
-            u64 shader_hash = std::hash<String>{}(unique_str);
-            auto working_path = Application::GetWorkingPath();
-            WString cached_blob_path = working_path + std::format(L"cache/shader_cache/fxc/{}.cso", shader_hash);
-            std::set<WString> cached_include_files;
-            if (desc._is_load_cache && IsShaderCacheCurrent(cached_blob_path, desc._filename, cached_include_files))
+            ID3DBlob *pErrorBlob = nullptr;
+            UINT compileFlags = desc._compile_mode == Render::EShaderCompileMode::kDebug
+                ? D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION | D3DCOMPILE_DEBUG_NAME_FOR_SOURCE : 0u;
+            D3DCompileFromFile(desc._filename.c_str(), desc._keywords.data(), &include, desc._entry_point.c_str(),
+                               desc._target.c_str(), compileFlags, 0, &output._byte_code, &pErrorBlob);
+            if (pErrorBlob)
             {
-                LOG_INFO(L"[D3DShader compiler]: load cache: {},entry : {}", desc._filename, ToWChar(desc._entry_point));
-                AL_ASSERT(LoadBlobFromFile(cached_blob_path, output._byte_code));
-                output._include_files = std::move(cached_include_files);
-            }
-            else
-            {
-                LOG_INFO(L"[D3DShader compiler]: compile : {},entry : {},defines: {}", desc._filename, ToWChar(desc._entry_point), ToWChar(su::Join(keyword_str, ",")));
-                ID3DBlob *pErrorBlob = nullptr;
-                UINT compileFlags = 0;
-#if SHADER_DEBUG_SYMBOLS
-                if (desc._target == Render::RenderConstants::kCSModel_5_0)
+                String text(reinterpret_cast<const char *>(pErrorBlob->GetBufferPointer()));
+                std::istringstream iss(text);
+                std::string line;
+                while (std::getline(iss, line))
                 {
-                    compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_DEBUG_NAME_FOR_SOURCE | D3DCOMPILE_SKIP_OPTIMIZATION;
+                    if (line.find("ERROR") != line.npos || line.find("error") != line.npos)
+                        LOG_ERROR("{} when compile shader {}", line, ToChar(desc._filename));
                 }
-                else
-                {
-                    compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION | D3DCOMPILE_DEBUG_NAME_FOR_SOURCE;
-                }
-#endif
-                D3DCompileFromFile(desc._filename.c_str(), desc._keywords.data(), &include, desc._entry_point.c_str(), desc._target.c_str(), compileFlags, 0, &output._byte_code, &pErrorBlob);
-                if (pErrorBlob)
-                {
-                    String text(reinterpret_cast<const char *>(pErrorBlob->GetBufferPointer()));
-                    std::istringstream iss(text);
-                    std::string line;
-                    while (std::getline(iss, line))
-                    {
-                        if (line.find("ERROR") != line.npos || line.find("error") != line.npos)
-                        {
-                            LOG_ERROR("{} when compile shader {}", line, ToChar(desc._filename));
-                        }
-                    }
-                    pErrorBlob->Release();
-                }
-                if (output._byte_code != nullptr)
-                {
-                    FileManager::WriteFile(cached_blob_path, false, (u8 *) output._byte_code->GetBufferPointer(), output._byte_code->GetBufferSize());
-                }
+                pErrorBlob->Release();
             }
 
             if (output._byte_code != nullptr)

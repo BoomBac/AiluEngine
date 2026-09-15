@@ -4,8 +4,11 @@
 #include "Animation/SkinningSystem.h"
 #include "Render/Mesh.h"
 #include "Render/Material.h"
+#include "Render/RenderGraph/RenderGraph.h"
 #include "Render/Texture.h"
 #include "pch.h"
+
+#include <unordered_set>
 
 namespace Ailu::Render
 {
@@ -29,7 +32,7 @@ namespace Ailu::Render
         Ref<GPUBuffer> CreateDynamicStructuredBuffer(const Vector<T> &data, const String &name)
         {
             BufferDesc desc = {};
-            desc._target = EGPUBufferTarget::kStructured | EGPUBufferTarget::kConstant;
+            desc._target = EGPUBufferTarget::kStructured;
             desc._element_size = sizeof(T);
             desc._element_num = std::max(1u, static_cast<u32>(data.capacity()));
             desc._is_random_write = true;
@@ -304,7 +307,6 @@ namespace Ailu::Render
     SceneRayTracingProxy::SceneRayTracingProxy()
     {
         _material_data_cache.reserve(200u);
-        _material_buffer = CreateDynamicStructuredBuffer(_material_data_cache, "SceneRayTracingProxy_MaterialBuffer");
         _unified_light_data_cache.reserve(32u);
         _unified_light_buffer = CreateDynamicStructuredBuffer(_unified_light_data_cache, "SceneRayTracingProxy_UnifiedLightBuffer");
         _unified_light_config = ConstantBuffer::Create(sizeof(UnifiedLightBufferConfig), "SceneRayTracingProxy_UnifiedLightConfig");
@@ -320,6 +322,7 @@ namespace Ailu::Render
         miss_mat._roughness = 1.0f;
         miss_mat._metallic_roughness_tex = RenderConstants::kInvalidBindlessHandle;
         _material_data_cache.push_back(miss_mat);
+        _material_buffer = CreateDynamicStructuredBuffer(_material_data_cache, "SceneRayTracingProxy_MaterialBuffer");
     }
 
 
@@ -425,6 +428,7 @@ namespace Ailu::Render
                 instance_key._entity = entity;
                 instance_key._mesh = mesh;
                 instance_key._vertex_buffer = vertex_buffer;
+                instance_key._dynamic = is_skinned && vertex_buffer != mesh->GetVertexBuffer().get();
                 auto mat = renderable._p_mats.empty() ? nullptr : renderable._p_mats[0].get();
                 if (mat != nullptr && mat->IsStandardLit() && mat->MaterialID() == EMaterialID::kChecker)
                     instance_key._material_class = 1u;
@@ -452,7 +456,8 @@ namespace Ailu::Render
         {
             if (slot._instance_keys[index]._entity != instance_keys[index]._entity ||
                 slot._instance_keys[index]._mesh != instance_keys[index]._mesh ||
-                slot._instance_keys[index]._vertex_buffer != instance_keys[index]._vertex_buffer)
+                slot._instance_keys[index]._vertex_buffer != instance_keys[index]._vertex_buffer ||
+                slot._instance_keys[index]._dynamic != instance_keys[index]._dynamic)
             {
                 return true;
             }
@@ -460,16 +465,18 @@ namespace Ailu::Render
         return false;
     }
 
-    Vector<Ref<RayTracingGeometry>> SceneRayTracingProxy::AcquireGeometry(Mesh *mesh, VertexBuffer *vertex_buffer)
+    Vector<Ref<RayTracingGeometry>> SceneRayTracingProxy::AcquireGeometry(Mesh *mesh, VertexBuffer *vertex_buffer,
+                                                                            bool dynamic)
     {
-        if (mesh == nullptr || vertex_buffer == nullptr)
+        if (mesh == nullptr || vertex_buffer == nullptr || !vertex_buffer->IsReady())
             return {};
 
-        if (auto it = _mesh_geometry_cache.find(mesh); it != _mesh_geometry_cache.end() &&
-            it->second._vertex_buffer == vertex_buffer)
+        const GeometryCacheKey cache_key{mesh, vertex_buffer};
+        if (auto it = _geometry_cache.find(cache_key); it != _geometry_cache.end())
             return it->second._geometries;
         CachedGeometry cached_geometry;
         cached_geometry._vertex_buffer = vertex_buffer;
+        cached_geometry._dynamic = dynamic;
         cached_geometry._geometries.reserve(mesh->SubmeshCount());
         for (u32 submesh_index = 0u; submesh_index < mesh->SubmeshCount(); ++submesh_index)
         {
@@ -486,10 +493,29 @@ namespace Ailu::Render
             desc._vertex_stride = desc._vertex_buffer->GetLayout().GetStride(0);
             desc._vertex_count = desc._vertex_buffer->GetVertexCount();
             desc._opaque = true;
-            cached_geometry._geometries.push_back(RayTracingGeometry::Create(desc, std::format("{}_rt_blas_{}", mesh->Name(), submesh_index)));
+            desc._build_mode = dynamic ? ERayTracingGeometryBuildMode::kDynamic :
+                                         ERayTracingGeometryBuildMode::kStatic;
+            const String vertex_buffer_suffix = dynamic ?
+                std::format("_vb_{}_{}", vertex_buffer->Handle()._index, vertex_buffer->Handle()._generation) : "";
+            cached_geometry._geometries.push_back(RayTracingGeometry::Create(
+                desc, std::format("{}_rt_blas{}_{}", mesh->Name(), vertex_buffer_suffix, submesh_index)));
         }
-        auto [it, inserted] = _mesh_geometry_cache.insert_or_assign(mesh, std::move(cached_geometry));
+        auto [it, inserted] = _geometry_cache.insert_or_assign(cache_key, std::move(cached_geometry));
         return it->second._geometries;
+    }
+
+    SceneRayTracingProxy::CachedGeometry *SceneRayTracingProxy::FindCachedGeometry(Mesh *mesh,
+                                                                                     VertexBuffer *vertex_buffer)
+    {
+        const auto it = _geometry_cache.find({mesh, vertex_buffer});
+        return it == _geometry_cache.end() ? nullptr : &it->second;
+    }
+
+    const SceneRayTracingProxy::CachedGeometry *SceneRayTracingProxy::FindCachedGeometry(
+        Mesh *mesh, VertexBuffer *vertex_buffer) const
+    {
+        const auto it = _geometry_cache.find({mesh, vertex_buffer});
+        return it == _geometry_cache.end() ? nullptr : &it->second;
     }
 
     void SceneRayTracingProxy::StartRebuild(const Vector<SceneInstanceKey> &instance_keys, const Vector<Matrix4x4f> &transforms)
@@ -521,7 +547,8 @@ namespace Ailu::Render
                 return false;
             }
 
-            auto geometries = AcquireGeometry(instance_keys[index]._mesh, instance_keys[index]._vertex_buffer);
+            auto geometries = AcquireGeometry(instance_keys[index]._mesh, instance_keys[index]._vertex_buffer,
+                                               instance_keys[index]._dynamic);
             if (geometries.empty())
             {
                 LOG_WARNING(std::format("SceneRayTracingProxy: geometry acquisition failed for mesh {}, postponing swap.", mesh->Name()));
@@ -596,7 +623,6 @@ namespace Ailu::Render
         }
 
         slot._scene->ApplySync();
-        slot._scene->Build();
         return true;
     }
 
@@ -631,7 +657,161 @@ namespace Ailu::Render
         if (any_transform_changed)
         {
             _scene_primitive_buffer->SetData(*_scene_primitive_data);
-            slot._scene->Update();
+        }
+    }
+
+    void SceneRayTracingProxy::AddBLASUpdatePass(RDG::RenderGraph &graph)
+    {
+        struct PendingUpdate
+        {
+            Ref<RayTracingGeometry> _geometry;
+            GPUBuffer *_position_buffer = nullptr;
+            IndexBuffer *_index_buffer = nullptr;
+            bool _is_build = false;
+        };
+
+        Vector<PendingUpdate> pending_updates;
+        std::unordered_set<RayTracingGeometry *> scheduled_geometries;
+        for (const auto &instance_key : FrontSlot()._instance_keys)
+        {
+            if (!instance_key._dynamic)
+                continue;
+
+            auto *cached_geometry = FindCachedGeometry(instance_key._mesh, instance_key._vertex_buffer);
+            if (cached_geometry == nullptr || !cached_geometry->_dynamic)
+                continue;
+
+            const u64 skin_version = ECS::SkinningSystem::ResolveSkinVersion(
+                instance_key._mesh, static_cast<u32>(instance_key._entity));
+            const bool needs_update = skin_version != cached_geometry->_last_blas_version;
+            if (!needs_update && std::none_of(cached_geometry->_geometries.begin(), cached_geometry->_geometries.end(),
+                                              [](const auto &geometry) { return geometry != nullptr && geometry->NeedsBuild(); }))
+                continue;
+
+            bool all_geometries_scheduled = true;
+            for (const auto &geometry : cached_geometry->_geometries)
+            {
+                if (geometry == nullptr || !scheduled_geometries.emplace(geometry.get()).second)
+                {
+                    all_geometries_scheduled = false;
+                    continue;
+                }
+
+                auto *mesh = instance_key._mesh;
+                auto *vertex_buffer = geometry->GetDesc()._vertex_buffer;
+                GPUBuffer *position_buffer = nullptr;
+                if (mesh != nullptr && mesh->GetVertexBuffer() != nullptr && vertex_buffer != nullptr)
+                {
+                    for (const auto &element : mesh->GetVertexBuffer()->GetLayout().GetBufferDesc())
+                    {
+                        if (element._semantic == EVertexSemantic::kPosition)
+                        {
+                            position_buffer = vertex_buffer->GetGpuStream(element.Stream);
+                            break;
+                        }
+                    }
+                }
+                if (position_buffer == nullptr)
+                {
+                    all_geometries_scheduled = false;
+                    continue;
+                }
+
+                pending_updates.push_back({geometry, position_buffer, geometry->GetIndexBuffer(),
+                                           geometry->NeedsBuild()});
+            }
+            if (all_geometries_scheduled)
+                cached_geometry->_last_blas_version = skin_version;
+        }
+
+        if (pending_updates.empty())
+            return;
+
+        graph.AddPass("SkinnedBLASUpdate", RDG::PassDesc(RDG::EPassType::kRayTracing),
+                      [pending_updates](RDG::RenderGraphBuilder &builder)
+                      {
+                          for (const auto &pending : pending_updates)
+                          {
+                              (void)builder.Read(builder.Import(pending._position_buffer), EResourceUsage::kReadSRV);
+                              if (pending._index_buffer != nullptr)
+                                  (void)builder.Read(builder.Import(pending._index_buffer), EResourceUsage::kReadSRV);
+                              (void)builder.Write(builder.Import(pending._geometry.get()), EResourceUsage::kAccelStructWrite);
+                          }
+                      },
+                      [pending_updates](RDG::RenderGraph &, CommandBuffer *cmd, const RenderingData &)
+                      {
+                          for (const auto &pending : pending_updates)
+                          {
+                              if (pending._is_build)
+                                  pending._geometry->Build(cmd);
+                              else
+                                  pending._geometry->Update(cmd);
+                          }
+                      });
+    }
+
+    void SceneRayTracingProxy::AddTLASUpdatePass(RDG::RenderGraph &graph)
+    {
+        auto &slot = FrontSlot();
+        if (slot._scene == nullptr || !slot._scene->NeedsUpdate())
+            return;
+
+        const auto scene = slot._scene;
+        graph.AddPass("TLASUpdate", RDG::PassDesc(RDG::EPassType::kRayTracing),
+                      [scene](RDG::RenderGraphBuilder &builder)
+                      {
+                          for (u64 index = 0u; index < scene->InstanceCount(); ++index)
+                          {
+                              const auto *instance = scene->GetInstance(index);
+                              if (instance != nullptr && instance->_geometry != nullptr)
+                                  (void)builder.Read(builder.Import(instance->_geometry), EResourceUsage::kAccelStructRead);
+                          }
+                          (void)builder.Write(builder.Import(scene.get()), EResourceUsage::kAccelStructWrite);
+                      },
+                      [scene](RDG::RenderGraph &, CommandBuffer *cmd, const RenderingData &)
+                      {
+                          scene->RecordBuild(cmd);
+                      });
+    }
+
+    void SceneRayTracingProxy::AddRayTracingResourceReads(RDG::RenderGraphBuilder &builder) const
+    {
+        std::unordered_set<GPUBuffer *> read_buffers;
+        std::unordered_set<IndexBuffer *> read_indices;
+        std::unordered_set<RayTracingGeometry *> read_geometries;
+        for (const auto &instance_key : FrontSlot()._instance_keys)
+        {
+            if (!instance_key._dynamic || instance_key._mesh == nullptr || instance_key._vertex_buffer == nullptr)
+                continue;
+
+            if (const auto *cached_geometry = FindCachedGeometry(instance_key._mesh, instance_key._vertex_buffer);
+                cached_geometry != nullptr)
+            {
+                for (const auto &geometry : cached_geometry->_geometries)
+                {
+                    if (geometry != nullptr && read_geometries.emplace(geometry.get()).second)
+                        builder.Read(builder.Import(geometry.get()), EResourceUsage::kAccelStructRead);
+                }
+            }
+
+            const auto &layout = instance_key._mesh->GetVertexBuffer()->GetLayout();
+            for (const auto &element : layout.GetBufferDesc())
+            {
+                if (element._semantic != EVertexSemantic::kPosition &&
+                    element._semantic != EVertexSemantic::kNormal &&
+                    element._semantic != EVertexSemantic::kTangent)
+                    continue;
+                auto *stream = instance_key._vertex_buffer->GetGpuStream(element.Stream);
+                if (stream != nullptr && read_buffers.emplace(stream).second)
+                    builder.Read(builder.Import(stream), EResourceUsage::kReadSRV);
+            }
+
+            for (u32 submesh_index = 0u; submesh_index < instance_key._mesh->SubmeshCount(); ++submesh_index)
+            {
+                auto *index_buffer = instance_key._mesh->GetIndexBuffer(static_cast<u16>(submesh_index)).get();
+                if (index_buffer != nullptr && read_indices.emplace(index_buffer).second)
+                    builder.Read(builder.Import(index_buffer), EResourceUsage::kReadSRV);
+            }
         }
     }
 
@@ -886,9 +1066,15 @@ namespace Ailu::Render
         };
         collect_materials(s.GetRegister().View<ECS::StaticMeshComponent>());
         collect_materials(s.GetRegister().View<ECS::CSkeletonMesh>());
-        _material_buffer->SetData(
-            (u8*)_material_data_cache.data(),
-            (u32)(_material_data_cache.size() * sizeof(MaterialData)));
+        // 着色器按 material_id 直接索引 g_material_data，buffer 必须能容纳全部材质，
+        // 否则结构化缓冲越界读会触发 device removal。
+        const u64 required_size = std::max<u64>(1u, _material_data_cache.capacity()) * sizeof(MaterialData);
+        if (_material_buffer == nullptr || _material_buffer->GetSize() < required_size)
+            _material_buffer = CreateDynamicStructuredBuffer(_material_data_cache, "SceneRayTracingProxy_MaterialBuffer");
+        else
+            _material_buffer->SetData(
+                (u8*)_material_data_cache.data(),
+                (u32)(_material_data_cache.size() * sizeof(MaterialData)));
     }
 
     void SceneRayTracingProxy::UpdateUnifiedLights(const SceneManagement::Scene &scene)

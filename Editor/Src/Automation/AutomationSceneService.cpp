@@ -30,7 +30,7 @@ namespace Ailu
                 Vector<String> parts;
                 ECS::Entity current = entity;
                 u32 guard = 0u;
-                while (current != ECS::kInvalidEntity && guard++ < 1024u)
+                while (current != ECS::kInvalidEntity && !scene->IsSceneRoot(current) && guard++ < 1024u)
                 {
                     const ECS::TagComponent *tag = reg.GetComponent<ECS::TagComponent>(current);
                     parts.emplace_back(tag ? tag->_name : String{});
@@ -169,7 +169,9 @@ namespace Ailu
             for (const auto &tag : reg.View<ECS::TagComponent>())
             {
                 (void) tag;
-                entities.push_back(reg.GetEntity<ECS::TagComponent>(index++));
+                const ECS::Entity entity = reg.GetEntity<ECS::TagComponent>(index++);
+                if (!scene->IsSceneRoot(entity))
+                    entities.push_back(entity);
             }
 
             AutomationArray items;
@@ -299,7 +301,7 @@ namespace Ailu
             result.emplace("hierarchy_path", AutomationValue(BuildHierarchyPath(scene, entity)));
 
             const ECS::CHierarchy *hierarchy = reg.GetComponent<ECS::CHierarchy>(entity);
-            if (hierarchy != nullptr && hierarchy->_parent != ECS::kInvalidEntity)
+            if (hierarchy != nullptr && hierarchy->_parent != ECS::kInvalidEntity && !scene->IsSceneRoot(hierarchy->_parent))
                 result.emplace("parent_guid", AutomationValue(EntityGuidString(scene, hierarchy->_parent)));
 
             AutomationArray children;

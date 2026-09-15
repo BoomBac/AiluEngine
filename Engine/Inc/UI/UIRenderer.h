@@ -4,6 +4,7 @@
 
 #ifndef AILU_UIRENDERER_H
 #define AILU_UIRENDERER_H
+#include "Assets/AssetRef.h"
 #include "Framework/Math/Transform2D.h"
 #include "Framework/Core/CoreMinimal.h"
 #include "Framework/Core/String.h"
@@ -166,12 +167,13 @@ namespace Ailu
             u32 _popup_backdrop_block_index = 0u;
             //暂时每个widget独立一个block,0保留为全局绘制
             u16 _cur_widget_index = 0u;
+            u32 _cur_global_block_index = 0u;
             DrawerBlock *_cur_widget_block = nullptr;
             Vector<DrawerBlock *> *_cur_widget_blocks = nullptr;
             u32 _cur_widget_block_index = 0u;
             Ref<Material> _default_material;
             Ref<Material> _shadow_material;
-            Ref<Render::ComputeShader> _backdrop_blur_cs;
+            AssetRef<Render::ComputeShader> _backdrop_blur_cs;
             Render::ComputeShaderKernelId _backdrop_blur_x_kernel = Render::kInvalidComputeShaderKernelId;
             Render::ComputeShaderKernelId _backdrop_blur_y_kernel = Render::kInvalidComputeShaderKernelId;
             OverlayDrawCallback _overlay_draw_callback;

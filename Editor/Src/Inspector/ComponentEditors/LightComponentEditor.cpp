@@ -25,31 +25,35 @@ namespace Ailu
             auto items = Vector<String>{"Directional", "Point", "Spot", "Area"};
             auto light_type_dropdown = Editor::AddDropdownRow(context._content, "Type", items);
             light_type_dropdown->SetSelectedIndex(static_cast<i32>(comp->_type));
-            light_type_dropdown->_on_selected_changed += [comp](i32 idx)
+            light_type_dropdown->_on_selected_changed += [comp, context](i32 idx)
             {
                 comp->_type = static_cast<ECS::ELightType>(idx);
+                context.MarkSceneDirty();
             };
 
-            Editor::AddFloatSliderRow(context._content, "Intensity", 0.0f, 50.0f, comp->_light._light_color.a, [comp](f32 value)
+            Editor::AddFloatSliderRow(context._content, "Intensity", 0.0f, 50.0f, comp->_light._light_color.a,
+                                      [comp, context](f32 value)
             {
                 comp->_light._light_color.a = value;
+                context.MarkSceneDirty();
             });
 
             {
                 auto btn = Editor::AddButtonRow(context._content, "Color",
                     FormatColorButtonText(Vector4f(comp->_light._light_color.r, comp->_light._light_color.g, comp->_light._light_color.b, comp->_light._light_color.a)));
-                btn->OnMouseClick() += [comp, btn](UIEvent &e)
+                btn->OnMouseClick() += [comp, btn, context](UIEvent &e)
                 {
                     auto color_picker = MakeRef<ColorPicker>(
                         Vector4f(comp->_light._light_color.r, comp->_light._light_color.g, comp->_light._light_color.b, 1.0f));
                     color_picker->Name("LightColor");
                     color_picker->GetSlot()->Size({320.0f, 240.0f});
-                    color_picker->OnValueChanged() += [comp, btn](Vector4f color)
+                    color_picker->OnValueChanged() += [comp, btn, context](Vector4f color)
                     {
                         comp->_light._light_color.r = color.r;
                         comp->_light._light_color.g = color.g;
                         comp->_light._light_color.b = color.b;
                         btn->SetText(FormatColorButtonText(Vector4f(color.r, color.g, color.b, comp->_light._light_color.a)));
+                        context.MarkSceneDirty();
                     };
                     auto abs_rect = e._current_target->GetArrangeRect();
                     Vector2f show_pos = abs_rect.xy;
@@ -65,21 +69,24 @@ namespace Ailu
             shadow_content->SlotPadding() = Padding(2.0f, 2.0f, 2.0f, 2.0f);
 
             auto *cast_shadow = Editor::AddCheckBoxRow(shadow_content, "Cast Shadow", comp->_shadow._is_cast_shadow);
-            cast_shadow->_on_click += [comp](bool checked)
+            cast_shadow->_on_click += [comp, context](bool checked)
             {
                 comp->_shadow._is_cast_shadow = checked;
+                context.MarkSceneDirty();
             };
 
             auto &shadow_data = comp->_shadow;
             Editor::AddFloatSliderRow(shadow_content, "Constant Bias", 0.0f, 1.0f, shadow_data._constant_bias,
-                                      [&shadow_data](f32 value)
+                                      [&shadow_data, context](f32 value)
             {
                 shadow_data._constant_bias = value;
+                context.MarkSceneDirty();
             });
             Editor::AddFloatSliderRow(shadow_content, "Slope Bias", 0.0f, 1.0f, shadow_data._slope_bias,
-                                      [&shadow_data](f32 value)
+                                      [&shadow_data, context](f32 value)
             {
                 shadow_data._slope_bias = value;
+                context.MarkSceneDirty();
             });
 
             if (comp->_type == ECS::ELightType::kDirectional)
@@ -87,9 +94,11 @@ namespace Ailu
                 auto &light_data = comp->_light;
                 if (light_data._light_param.w <= 0.0f)
                     light_data._light_param.w = 0.265f;
-                Editor::AddFloatSliderRow(context._content, "AngularRadius", 0.01f, 5.0f, light_data._light_param.w, [&light_data](f32 value)
+                Editor::AddFloatSliderRow(context._content, "AngularRadius", 0.01f, 5.0f, light_data._light_param.w,
+                                          [&light_data, context](f32 value)
                 {
                     light_data._light_param.w = value;
+                    context.MarkSceneDirty();
                 });
             }
             else if (comp->_type == ECS::ELightType::kArea)
@@ -98,63 +107,84 @@ namespace Ailu
                 auto &light_data = comp->_light;
                 auto dropdown = Editor::AddDropdownRow(context._content, "Shape", kShapes);
                 dropdown->SetSelectedIndex(static_cast<i32>(light_data._light_param.w));
-                dropdown->_on_selected_changed += [&light_data](i32 idx)
+                dropdown->_on_selected_changed += [&light_data, context](i32 idx)
                 {
                     light_data._light_param.w = static_cast<f32>(idx);
+                    context.MarkSceneDirty();
                 };
-                Editor::AddFloatSliderRow(context._content, "Range", 0.0f, 500.0f, light_data._light_param.x, [&light_data](f32 value)
+                Editor::AddFloatSliderRow(context._content, "Range", 0.0f, 500.0f, light_data._light_param.x,
+                                          [&light_data, context](f32 value)
                 {
                     light_data._light_param.x = value;
+                    context.MarkSceneDirty();
                 });
-                Editor::AddCheckBoxRow(context._content, "TwoSide", light_data._is_two_side)->_on_click += [&light_data](bool checked)
+                Editor::AddCheckBoxRow(context._content, "TwoSide", light_data._is_two_side)->_on_click +=
+                    [&light_data, context](bool checked)
                 {
                     light_data._is_two_side = checked;
+                    context.MarkSceneDirty();
                 };
                 if (light_data._light_param.w == 0)
                 {
-                    Editor::AddFloatInputRow(context._content, "Width", std::to_string(light_data._light_param.y), [&light_data](f32 value)
+                    Editor::AddFloatInputRow(context._content, "Width", std::to_string(light_data._light_param.y),
+                                             [&light_data, context](f32 value)
                     {
                         light_data._light_param.y = value;
+                        context.MarkSceneDirty();
                     });
-                    Editor::AddFloatInputRow(context._content, "Height", std::to_string(light_data._light_param.z), [&light_data](f32 value)
+                    Editor::AddFloatInputRow(context._content, "Height", std::to_string(light_data._light_param.z),
+                                             [&light_data, context](f32 value)
                     {
                         light_data._light_param.z = value;
+                        context.MarkSceneDirty();
                     });
                 }
                 else
                 {
-                    Editor::AddFloatSliderRow(context._content, "Radius", 0.0f, 10.0f, light_data._light_param.x, [&light_data](f32 value)
+                    Editor::AddFloatSliderRow(context._content, "Radius", 0.0f, 10.0f, light_data._light_param.x,
+                                              [&light_data, context](f32 value)
                     {
                         light_data._light_param.x = value;
+                        context.MarkSceneDirty();
                     });
                 }
             }
             else if (comp->_type == ECS::ELightType::kSpot)
             {
                 auto &light_data = comp->_light;
-                Editor::AddFloatSliderRow(context._content, "Range", 0.0f, 500.0f, light_data._light_param.x, [&light_data](f32 value)
+                Editor::AddFloatSliderRow(context._content, "Range", 0.0f, 500.0f, light_data._light_param.x,
+                                          [&light_data, context](f32 value)
                 {
                     light_data._light_param.x = value;
+                    context.MarkSceneDirty();
                 });
-                Editor::AddFloatSliderRow(context._content, "InnerAngle", 0.0f, 180.0f, light_data._light_param.y, [&light_data](f32 value)
+                Editor::AddFloatSliderRow(context._content, "InnerAngle", 0.0f, 180.0f, light_data._light_param.y,
+                                          [&light_data, context](f32 value)
                 {
                     light_data._light_param.y = value;
+                    context.MarkSceneDirty();
                 });
-                Editor::AddFloatSliderRow(context._content, "OuterAngle", 0.0f, 180.0f, light_data._light_param.z, [&light_data](f32 value)
+                Editor::AddFloatSliderRow(context._content, "OuterAngle", 0.0f, 180.0f, light_data._light_param.z,
+                                          [&light_data, context](f32 value)
                 {
                     light_data._light_param.z = value;
+                    context.MarkSceneDirty();
                 });
             }
             else if (comp->_type == ECS::ELightType::kPoint)
             {
                 auto &light_data = comp->_light;
-                Editor::AddFloatSliderRow(context._content, "Range", 0.0f, 80.0f, light_data._light_param.x, [&light_data](f32 value)
+                Editor::AddFloatSliderRow(context._content, "Range", 0.0f, 80.0f, light_data._light_param.x,
+                                          [&light_data, context](f32 value)
                 {
                     light_data._light_param.x = value;
+                    context.MarkSceneDirty();
                 });
-                Editor::AddFloatSliderRow(context._content, "Radius", 0.0f, 1.0f, light_data._light_param.y, [&light_data](f32 value)
+                Editor::AddFloatSliderRow(context._content, "Radius", 0.0f, 1.0f, light_data._light_param.y,
+                                          [&light_data, context](f32 value)
                 {
                     light_data._light_param.y = value;
+                    context.MarkSceneDirty();
                 });
             }
         }

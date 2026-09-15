@@ -159,6 +159,12 @@ namespace Ailu::Render
     using ShaderHash = u64;
     using ShaderVariantHash = u32;
 
+    enum class EShaderCompilePolicy : u8
+    {
+        kUseArtifact,
+        kForceCompile
+    };
+
     class ShaderVariantMgr
     {
     public:
@@ -290,9 +296,10 @@ namespace Ailu::Render
         virtual void Bind(RHICommandBuffer *cmd, u16 pass_index, ShaderVariantHash variant_hash);
         //call this before compile
         virtual bool PreProcessShader();
-        virtual bool Compile(u16 pass_id, ShaderVariantHash variant_hash, bool is_load_cache = true);
+        virtual bool Compile(u16 pass_id, ShaderVariantHash variant_hash,
+                             EShaderCompilePolicy policy = EShaderCompilePolicy::kUseArtifact);
         //compile all pass's variants
-        virtual bool Compile(bool is_load_cache = true);
+        virtual bool Compile(EShaderCompilePolicy policy = EShaderCompilePolicy::kUseArtifact);
         virtual void *GetByteCode(EShaderType type, u16 pass_index, ShaderVariantHash variant_hash);
         const WString &GetMainSourceFile() { return _src_file_path; }
         void SetVertexShader(u16 pass_index, const WString &sys_path, const String &entry);
@@ -358,7 +365,7 @@ namespace Ailu::Render
         u8 _stencil_ref = 0u;
 
     protected:
-        virtual bool RHICompileImpl(u16 pass_index, ShaderVariantHash variant_hash, bool is_load_cache);
+        virtual bool RHICompileImpl(u16 pass_index, ShaderVariantHash variant_hash, EShaderCompilePolicy policy);
         void BuildBindingLayout(u16 pass_index, ShaderVariantHash variant_hash);
 
     protected:
@@ -546,7 +553,7 @@ namespace Ailu::Render
         bool IsDependencyFile(const WString &sys_path) const;
         /// @brief 预处理shader，必须在compile之前调用！
         bool Preprocess();
-        bool Compile(bool is_load_cache = true);
+        bool Compile(EShaderCompilePolicy policy = EShaderCompilePolicy::kUseArtifact);
         ShaderVariantHash ActiveVariant(ComputeShaderKernelId kernel) const { return ResolveActiveVariant(kernel); }
         bool IsKernelValid(ComputeShaderKernelId kernel) const;
         void PushState(ComputeShaderKernelId kernel = kInvalidComputeShaderKernelId);
@@ -555,8 +562,9 @@ namespace Ailu::Render
     public:
         std::atomic<bool> _is_compiling = false;
     protected:
-        bool Compile(u16 kernel_index, ShaderVariantHash variant_hash, bool is_load_cache = true);
-        virtual bool RHICompileImpl(u16 kernel_index,ShaderVariantHash variant_hash, bool is_load_cache);
+        bool Compile(u16 kernel_index, ShaderVariantHash variant_hash,
+                     EShaderCompilePolicy policy = EShaderCompilePolicy::kUseArtifact);
+        virtual bool RHICompileImpl(u16 kernel_index, ShaderVariantHash variant_hash, EShaderCompilePolicy policy);
         u16 ResolveKernelIndex(ComputeShaderKernelId kernel) const;
         ShaderVariantHash ResolveActiveVariant(ComputeShaderKernelId kernel) const;
         void SetResourceBinding(ComputeShaderKernelId kernel, ShaderPropertyId property_id, GpuResource *resource,
@@ -593,7 +601,7 @@ namespace Ailu::Render
         ShaderVariantHash _active_variant = 0u;
         //bind_slot:cubemapface,mipmap
         std::unordered_map<u16, ComputeBindParams> _bind_params{};
-        bool _is_valid;
+        bool _is_valid = false;
         u8 _cbuf_data[kCBufferSize];
         u8 _cache_cbuf_data[kCBufferSize];//重编译之前复制一份缓存，用于恢复已有的数据
         String _internal_cbuf_name="";

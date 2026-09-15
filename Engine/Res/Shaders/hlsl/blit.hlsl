@@ -13,11 +13,11 @@
 #include "common.hlsli"
 #include "fullscreen_quad.hlsli"
 
-TEXTURE2D(_SourceTex)
+TEXTURE2D(_BlitSourceTex)
 
 FullScreenPSInput FullscreenVSMain(FullScreenVSInput v);
 
 float4 PSMainCopy(FullScreenPSInput input) : SV_TARGET
 {
-	return SAMPLE_TEXTURE2D_LOD(_SourceTex, g_LinearClampSampler, input.uv, 0);
+	return SAMPLE_TEXTURE2D_LOD(_BlitSourceTex, g_LinearClampSampler, input.uv, 0);
 }

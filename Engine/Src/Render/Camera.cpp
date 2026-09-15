@@ -200,11 +200,11 @@ namespace Ailu::Render
             float bottom = -(_size * 0.5f) / _aspect;
             BuildOrthographicMatrix(_proj_matrix, left, right, top, bottom,_near_clip, _far_clip);
         }
-        _no_jitter_view_proj_matrix = _view_matrix * _proj_matrix;
         _forward = _rotation * Vector3f::kForward;
         _up = _rotation * Vector3f::kUp;
         _right = CrossProduct(_up, _forward);
         BuildViewMatrixLookToLH(_view_matrix, _position, _forward, _up);
+        _no_jitter_view_proj_matrix = _view_matrix * _proj_matrix;
         if (_anti_aliasing == EAntiAliasing::kTAA)
             ProcessJitter();
         CalculateFrustum();
@@ -375,8 +375,8 @@ namespace Ailu::Render
             float bottom = -(_size * 0.5f) / _aspect;
             BuildOrthographicMatrix(_proj_matrix, left, right, top, bottom,_near_clip,_far_clip);
         }
-        _no_jitter_view_proj_matrix = _view_matrix * _proj_matrix;
         BuildViewMatrixLookToLH(_view_matrix, _position, _forward, _up);
+        _no_jitter_view_proj_matrix = _view_matrix * _proj_matrix;
         if (_anti_aliasing == EAntiAliasing::kTAA)
             ProcessJitter();
         CalculateFrustum();
@@ -469,11 +469,6 @@ namespace Ailu::Render
         const u16 face_index = static_cast<u16>(face) - 1u;
         Camera &out = cameras[face_index];
         out._layer_mask = base_cam._layer_mask;
-        float x = base_cam._position.x, y = base_cam._position.y, z = base_cam._position.z;
-        Vector3f center = {x, y, z};
-        Vector3f world_up = Vector3f::kUp;
-        Matrix4x4f  proj{};
-        BuildPerspectiveFovLHMatrix(proj, 90 * k2Radius, 1.0, base_cam._near_clip, base_cam._far_clip);
         const static Vector3f targets[] =
                 {
                         {+1.f, 0.f, 0.0f},//+x

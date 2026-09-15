@@ -6,7 +6,7 @@
         "_asset_name": "empty_scene",
         "_dependencies": []
     },
-    "_scene_format_version": 3,
+    "_scene_format_version": 4,
     "_entities": [{
             "_entity_guid": "09740016-4a70-441e-b6d6-3a476a65f6a9",
             "_tag_component": {
@@ -78,7 +78,7 @@
             },
             "_hierarchy_component": {
                 "_parent_guid": "",
-                "_sibling_index": 0,
+                "_sibling_index": 1,
                 "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
                 "_enabled": true
             },
@@ -104,7 +104,7 @@
             },
             "_hierarchy_component": {
                 "_parent_guid": "",
-                "_sibling_index": 0,
+                "_sibling_index": 2,
                 "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
                 "_enabled": true
             },
@@ -191,7 +191,7 @@
             },
             "_hierarchy_component": {
                 "_parent_guid": "",
-                "_sibling_index": 0,
+                "_sibling_index": 3,
                 "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
                 "_enabled": true
             }
@@ -234,7 +234,7 @@
             },
             "_hierarchy_component": {
                 "_parent_guid": "",
-                "_sibling_index": 0,
+                "_sibling_index": 4,
                 "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
                 "_enabled": true
             },
@@ -304,7 +304,7 @@
             },
             "_hierarchy_component": {
                 "_parent_guid": "",
-                "_sibling_index": 0,
+                "_sibling_index": 5,
                 "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
                 "_enabled": true
             },
@@ -394,7 +394,7 @@
             },
             "_hierarchy_component": {
                 "_parent_guid": "",
-                "_sibling_index": 0,
+                "_sibling_index": 6,
                 "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
                 "_enabled": true
             },
@@ -421,7 +421,7 @@
             },
             "_hierarchy_component": {
                 "_parent_guid": "",
-                "_sibling_index": 0,
+                "_sibling_index": 7,
                 "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
                 "_enabled": true
             },
@@ -552,7 +552,7 @@
             },
             "_hierarchy_component": {
                 "_parent_guid": "",
-                "_sibling_index": 0,
+                "_sibling_index": 8,
                 "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
                 "_enabled": true
             },
@@ -603,7 +603,7 @@
             },
             "_hierarchy_component": {
                 "_parent_guid": "",
-                "_sibling_index": 0,
+                "_sibling_index": 9,
                 "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
                 "_enabled": true
             },
@@ -629,7 +629,7 @@
             },
             "_hierarchy_component": {
                 "_parent_guid": "",
-                "_sibling_index": 0,
+                "_sibling_index": 10,
                 "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
                 "_enabled": true
             },

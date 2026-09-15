@@ -8,6 +8,7 @@
 
 #include "Render/RenderConstants.h"
 #include "Render/Shader.h"
+#include "Render/ShaderArtifact.h"
 
 
 using Microsoft::WRL::ComPtr;
@@ -363,11 +364,17 @@ namespace Ailu::RHI::DX12
         std::pair<D3D12_INPUT_ELEMENT_DESC *, u8> GetVertexInputLayout(u16 pass_index, ShaderVariantHash variant_hash);
 
     private:
-        bool RHICompileImpl(u16 pass_index, ShaderVariantHash variant_hash, bool is_load_cache) final;
+        bool RHICompileImpl(u16 pass_index, ShaderVariantHash variant_hash, Render::EShaderCompilePolicy policy) final;
+        bool HydrateGraphicsVariant(u16 pass_index, ShaderVariantHash variant_hash,
+                                    const Render::GraphicsShaderVariantArtifact &artifact);
+        void BuildGraphicsArtifact(u16 pass_index, ShaderVariantHash variant_hash,
+                                   const Vector<D3D_SHADER_MACRO> &keyword_defines,
+                                   const Render::ShaderArtifactKey &key,
+                                   Render::GraphicsShaderVariantArtifact &artifact) const;
         void Reset();
         void LoadShaderReflection(u16 pass_index, ShaderVariantHash variant_hash, ID3D12ShaderReflection *ref_vs, ID3D12ShaderReflection *ref_ps);
         void LoadAdditionalShaderReflection(const WString &sys_path, u16 pass_index, ShaderVariantHash variant_hash);
-        void GenerateInternalPSO(u16 pass_index, ShaderVariantHash variant_hash);
+        void GenerateInternalPSO(u16 pass_index, ShaderVariantHash variant_hash, Vector<u8> *serialized_signature = nullptr);
     private:
         Vector<D3DShaderElement> _pass_elements;
     };
@@ -406,8 +413,13 @@ namespace Ailu::RHI::DX12
         void Bind(RHICommandBuffer *cmd, Render::ComputeShaderKernelId kernel,
                   const Render::ComputeDispatchSnapshot &snapshot) final;
     private:
-        bool RHICompileImpl(u16 kernel_index,ShaderVariantHash variant_hash, bool is_load_cache) final;
-        void GenerateInternalPSO(u16 kernel_index,ShaderVariantHash variant_hash);
+        bool RHICompileImpl(u16 kernel_index, ShaderVariantHash variant_hash, Render::EShaderCompilePolicy policy) final;
+        bool HydrateComputeVariant(u16 kernel_index, ShaderVariantHash variant_hash,
+                                   const Render::ComputeShaderVariantArtifact &artifact);
+        void BuildComputeArtifact(u16 kernel_index, ShaderVariantHash variant_hash,
+                                  const Render::ShaderArtifactKey &key,
+                                  Render::ComputeShaderVariantArtifact &artifact) const;
+        void GenerateInternalPSO(u16 kernel_index,ShaderVariantHash variant_hash, Vector<u8> *serialized_signature = nullptr);
         void LoadReflectionInfo(ID3D12ShaderReflection *p_reflect, u16 kernel_index,ShaderVariantHash variant_hash);
         void LoadAdditionalShaderReflection(const WString &sys_path, u16 kernel_index, ShaderVariantHash variant_hash);
 

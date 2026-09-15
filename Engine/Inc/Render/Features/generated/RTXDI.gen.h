@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __RTXDI_GEN_H__
 //Class RTXDI begin...........................
-#define RTXDI_GEN_H_15_GENERATED_BODY \
+#define RTXDI_GEN_H_16_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_RTXDI_Type();\
                                 static const Type* GetPrivateStaticClass();\

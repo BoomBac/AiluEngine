@@ -516,13 +516,14 @@ namespace Ailu::RHI::DX12
         return _dispatch_desc;
     }
 
-    bool D3DRayTracingShader::RHICompileImpl(Render::ShaderVariantHash variant_hash, bool is_load_cache)
+    bool D3DRayTracingShader::RHICompileImpl(Render::ShaderVariantHash variant_hash,
+                                             Render::EShaderCompilePolicy policy)
     {
         D3DShaderCompileDesc desc{};
         D3DShaderCompileOutput output;
         desc._filename = _src_file_path;
         desc._target = Render::RenderConstants::kLibModel_6_3;
-        desc._is_load_cache = is_load_cache;
+        desc._is_load_cache = policy == Render::EShaderCompilePolicy::kUseArtifact;
         if (!CreateFromFileDXC(desc, output) || output._byte_code == nullptr || output._library_reflection == nullptr)
         {
             LOG_ERROR("RayTracingShader: failed to compile raytracing shader library: {}", ToChar(desc._filename));

@@ -84,11 +84,11 @@ namespace Ailu
 
         PickPass::PickPass() : RenderPass("PickPass")
         {
-            _pick_gen = MakeScope<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/pick_buffer.hlsl"), "Runtime/PickGen");
-            _select_gen = MakeScope<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/select_buffer.hlsl"), "Runtime/SelectGen");
-            _sprite_pick_gen = MakeScope<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/sprite_pick_buffer.hlsl"), "Runtime/SpritePickGen");
-            _sprite_select_gen = MakeScope<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/sprite_select_buffer.hlsl"), "Runtime/SpriteSelectGen");
-            _editor_outline = MakeScope<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/editor_outline.hlsl"), "Runtime/EditorOutline");
+            _pick_gen = MakeScope<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/pick_buffer.alasset"), "Runtime/PickGen");
+            _select_gen = MakeScope<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/select_buffer.alasset"), "Runtime/SelectGen");
+            _sprite_pick_gen = MakeScope<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/sprite_pick_buffer.alasset"), "Runtime/SpritePickGen");
+            _sprite_select_gen = MakeScope<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/sprite_select_buffer.alasset"), "Runtime/SpriteSelectGen");
+            _editor_outline = MakeScope<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/editor_outline.alasset"), "Runtime/EditorOutline");
             _sprite_batcher = MakeScope<SpriteBatcher>();
             _sprite_batcher->Initialize();
             _event = static_cast<ERenderPassEvent>(static_cast<u16>(ERenderPassEvent::kAfterPostprocess) - 1u);//before gizmo pass
@@ -711,7 +711,7 @@ namespace Ailu
         //-----------------------------------------------------------------------PickFeature----------------------------------------------------------------------------
         PickFeature::PickFeature() : RenderFeature("Pick")
         {
-            _read_pickbuf = ComputeShader::Create(ResourceMgr::GetResSysPath(L"Shaders/hlsl/Compute/pick_buffer_reader.hlsl"));
+            _read_pickbuf = ResourceMgr::Get().LoadAssetRef<ComputeShader>(L"Shaders/hlsl/Compute/pick_buffer_reader.alasset");
             _read_pickbuf_kernel = _read_pickbuf->FindKernel("cs_main");
             BufferDesc desc{};
             desc._size = 256;

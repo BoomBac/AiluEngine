@@ -3,6 +3,7 @@
 #define __EDITOR_LAYER_H__
 #include "Framework/Events/Layer.h"
 #include "Framework/Events/Event.h"
+#include "Render/EditorDebugFeature.h"
 #include "Render/PickPass.h"
 #include "Scene/Entity.h"
 #include "Dock/DockManager.h"
@@ -37,6 +38,7 @@ namespace Ailu
 			void End();
 			Vector2f     _viewport_size;
 			Render::PickFeature _pick;
+			Render::EditorDebugFeature _editor_debug;
             Vector4f _scene_vp_rect;
 
 		private:

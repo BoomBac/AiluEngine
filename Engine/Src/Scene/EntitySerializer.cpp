@@ -15,7 +15,7 @@ namespace Ailu::SceneManagement
 {
     ECS::Entity EntitySerializer::CloneEntity(Scene &scene, ECS::Entity source)
     {
-        if (!scene.IsValidEntity(source))
+        if (!scene.IsValidEntity(source) || scene.IsSceneRoot(source))
             return ECS::kInvalidEntity;
 
         const auto *source_tag = scene.GetRegister().GetComponent<ECS::TagComponent>(source);
@@ -47,7 +47,7 @@ namespace Ailu::SceneManagement
 
     ECS::Entity EntitySerializer::CloneSubtree(Scene &scene, ECS::Entity source_root)
     {
-        if (!scene.IsValidEntity(source_root))
+        if (!scene.IsValidEntity(source_root) || scene.IsSceneRoot(source_root))
             return ECS::kInvalidEntity;
 
         Vector<ECS::Entity> source_entities;
@@ -96,7 +96,7 @@ namespace Ailu::SceneManagement
     SceneEntityDocument EntitySerializer::BuildEntityDocument(const Scene &scene, ECS::Entity entity, u32 sibling_index)
     {
         SceneEntityDocument entity_doc;
-        if (!scene.IsValidEntity(entity))
+        if (!scene.IsValidEntity(entity) || scene.IsSceneRoot(entity))
             return entity_doc;
 
         const auto &registry = scene.GetRegister();
@@ -174,7 +174,8 @@ namespace Ailu::SceneManagement
         {
             entity_doc._has_hierarchy_component = true;
             entity_doc._hierarchy_component._enabled = hierarchy->_enabled;
-            entity_doc._hierarchy_component._parent_guid = scene.GetEntityGuid(hierarchy->_parent);
+            entity_doc._hierarchy_component._parent_guid = scene.IsSceneRoot(hierarchy->_parent)
+                ? Guid::EmptyGuid() : scene.GetEntityGuid(hierarchy->_parent);
             entity_doc._hierarchy_component._sibling_index = sibling_index;
             entity_doc._hierarchy_component._inv_matrix_attach = hierarchy->_inv_matrix_attach.ToString();
         }
@@ -206,6 +207,26 @@ namespace Ailu::SceneManagement
             entity_doc._lightprobe_component._size = light_probe->_size;
             entity_doc._lightprobe_component._is_update_every_tick = light_probe->_is_update_every_tick;
             mark_disabled.template operator()<ECS::CLightProbe>("CLightProbe");
+        }
+        if (const auto *probe_group = registry.GetComponent<ECS::CLightProbeGroup>(entity);
+            probe_group != nullptr)
+        {
+            entity_doc._has_light_probe_group_component = true;
+            entity_doc._light_probe_group_component._probe_count = probe_group->_probe_count;
+            entity_doc._light_probe_group_component._size = probe_group->_size;
+            entity_doc._light_probe_group_component._baked_data_guid =
+                probe_group->_baked_data.IsEmpty() ? String{} : probe_group->_baked_data.ToString();
+            entity_doc._light_probe_group_component._draw_probes = probe_group->_draw_probes;
+            mark_disabled.template operator()<ECS::CLightProbeGroup>("CLightProbeGroup");
+        }
+        if (const auto *ddgi_volume = registry.GetComponent<ECS::DDGIVolumeComponent>(entity);
+            ddgi_volume != nullptr)
+        {
+            entity_doc._has_ddgi_volume_component = true;
+            entity_doc._ddgi_volume_component._probe_count = ddgi_volume->_probe_count;
+            entity_doc._ddgi_volume_component._probe_spacing = ddgi_volume->_probe_spacing;
+            entity_doc._ddgi_volume_component._draw_probes = ddgi_volume->_draw_probes;
+            mark_disabled.template operator()<ECS::DDGIVolumeComponent>("DDGIVolumeComponent");
         }
         if (const auto *environment = registry.GetComponent<ECS::EnvironmentComponent>(entity); environment != nullptr)
         {
@@ -313,6 +334,8 @@ namespace Ailu::SceneManagement
             ECS::CCamera::StaticComponentTypeId(),
             ECS::PostprocessVolumeComponent::StaticComponentTypeId(),
             ECS::CLightProbe::StaticComponentTypeId(),
+            ECS::CLightProbeGroup::StaticComponentTypeId(),
+            ECS::DDGIVolumeComponent::StaticComponentTypeId(),
             ECS::EnvironmentComponent::StaticComponentTypeId(),
             ECS::CRigidBody::StaticComponentTypeId(),
             ECS::CCollider::StaticComponentTypeId(),
@@ -339,7 +362,7 @@ namespace Ailu::SceneManagement
 
     bool EntitySerializer::SerializeSubtree(const Scene &scene, ECS::Entity source_root, PrefabAssetDocument &prefab)
     {
-        if (!scene.IsValidEntity(source_root))
+        if (!scene.IsValidEntity(source_root) || scene.IsSceneRoot(source_root))
             return false;
 
         Vector<ECS::Entity> source_entities;

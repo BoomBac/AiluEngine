@@ -7,6 +7,8 @@
 
 namespace Ailu::Render
 {
+    class CommandBuffer;
+
     struct RayTracingInstance
     {
         RayTracingGeometry* _geometry;
@@ -33,6 +35,8 @@ namespace Ailu::Render
         void ClearInstances();
         void Build();
         void Update();
+        void RecordBuild(CommandBuffer *cmd);
+        bool NeedsUpdate() const { return _is_need_rebuild || _is_need_refit; }
     private:
         virtual void OnInstanceTransformChanged(u32 index) {};
         virtual void OnInstanceChanged(u32 index) {};

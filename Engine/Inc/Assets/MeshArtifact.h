@@ -23,6 +23,7 @@ namespace Ailu
     inline constexpr u32 kMeshArtifactBoneIndicesSection = 16u;
     inline constexpr u32 kMeshArtifactBoneWeightsSection = 17u;
     inline constexpr u32 kMeshArtifactMeshBindGlobalSection = 18u;
+    inline constexpr u32 kMeshArtifactMaterialsSection = 19u;
 
     struct AILU_API MeshArtifact
     {
@@ -44,6 +45,8 @@ namespace Ailu
         Vector<Vector4D<u32>> _bone_indices;
         Vector<Vector4f> _bone_weights;
         Matrix4x4f _mesh_bind_global = Matrix4x4f::Identity();
+        //按 submesh 顺序保存的导入材质信息，缺了它 artifact 命中后网格会丢掉全部材质
+        Vector<Render::Mesh::ImportedMaterialInfo> _materials;
     };
 
     AILU_API bool BuildMeshArtifact(const Render::Mesh &mesh, MeshArtifact &out_artifact);

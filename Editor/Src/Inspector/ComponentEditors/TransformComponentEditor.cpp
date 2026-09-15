@@ -31,16 +31,19 @@ namespace Ailu
 
             for (auto i = 0; i < 3; i++)
             {
-                pos_block[i]->_on_content_changed += [entity, i](String content)
+                pos_block[i]->_on_content_changed += [entity, i, context](String content)
                 {
                     auto &reg = SceneMgr::Get().ActiveScene()->GetRegister();
                     if (auto tcomp = reg.GetComponent<ECS::TransformComponent>(entity); tcomp != nullptr)
                     {
                         if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
+                        {
                             tcomp->_local_transform._position[i] = opt.value();
+                            context.MarkSceneDirty();
+                        }
                     }
                 };
-                rot_block[i]->_on_content_changed += [entity, i](String content)
+                rot_block[i]->_on_content_changed += [entity, i, context](String content)
                 {
                     auto &reg = SceneMgr::Get().ActiveScene()->GetRegister();
                     if (auto tcomp = reg.GetComponent<ECS::TransformComponent>(entity); tcomp != nullptr)
@@ -50,16 +53,20 @@ namespace Ailu
                             Vector3f euler = Quaternion::EulerAngles(tcomp->_local_transform._rotation);
                             euler[i] = opt.value();
                             tcomp->_local_transform._rotation = Quaternion::EulerAngles(euler);
+                            context.MarkSceneDirty();
                         }
                     }
                 };
-                scale_block[i]->_on_content_changed += [entity, i](String content)
+                scale_block[i]->_on_content_changed += [entity, i, context](String content)
                 {
                     auto &reg = SceneMgr::Get().ActiveScene()->GetRegister();
                     if (auto tcomp = reg.GetComponent<ECS::TransformComponent>(entity); tcomp != nullptr)
                     {
                         if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
+                        {
                             tcomp->_local_transform._scale[i] = opt.value();
+                            context.MarkSceneDirty();
+                        }
                     }
                 };
             }

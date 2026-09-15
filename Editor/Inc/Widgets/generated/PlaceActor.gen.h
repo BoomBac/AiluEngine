@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __PLACEACTOR_GEN_H__
 //Class PlaceActor begin...........................
-#define PLACEACTOR_GEN_H_42_GENERATED_BODY \
+#define PLACEACTOR_GEN_H_46_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_PlaceActor_Type();\
                                 static const Type* GetPrivateStaticClass();\

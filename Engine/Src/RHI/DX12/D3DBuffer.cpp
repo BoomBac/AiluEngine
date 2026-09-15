@@ -284,6 +284,7 @@ namespace Ailu::RHI::DX12
         auto d3dcmd = dynamic_cast<D3DCommandBuffer *>(rhi_cmd);
         if (d3dcmd == nullptr)
             return;
+        d3dcmd->EnsureBufferVersion(this, _current_data_version);
         if (_p_d3d_res && !IsUploadHeapResource(_p_d3d_res.Get()))
             d3dcmd->RequireState(_p_d3d_res, state, sub_res);
         if (_counter_buffer && (state == EResourceState::kUnorderedAccess ||

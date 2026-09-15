@@ -45,7 +45,7 @@ namespace Ailu::RHI::DX12
                 {
                         -1 + border, -1 + border * m_aspectRatio,
                         1.0f - border, 1 - border * m_aspectRatio};
-        m_raytracing_shader = RayTracingShader::Create(ResourceMgr::GetResSysPath(L"Shaders/hlsl/DXR/Raytracing.hlsl"), "DXR_Sample_RayTracingShader");
+        m_raytracing_shader = ResourceMgr::Get().LoadAssetRef<RayTracingShader>(L"Shaders/hlsl/DXR/raytracing.alasset");
         if (m_raytracing_shader == nullptr)
         {
             LOG_ERROR("DXRSample: failed to create raytracing shader.");

@@ -1235,7 +1235,7 @@ void RayGen(CSInput input)
     float2 gbuf0 = SAMPLE_TEXTURE2D_LOD(_GBuffer0, g_LinearClampSampler, uv,0).xy;
 	float4 gbuf1 = SAMPLE_TEXTURE2D_LOD(_GBuffer1, g_LinearClampSampler, uv,0);
 	float4 gbuf2 = SAMPLE_TEXTURE2D_LOD(_GBuffer2, g_LinearClampSampler, uv,0);
-	half4 emssion = SAMPLE_TEXTURE2D_LOD(_GBuffer3, g_LinearClampSampler, uv,0);
+	half4 emssion = SAMPLE_TEXTURE2D_LOD(_GBuffer3, g_LinearClampSampler, uv,0)*0.0001;
 	float depth = SAMPLE_TEXTURE2D_LOD(_CameraDepthTexture,g_LinearClampSampler,uv,0).r;
 	float3 world_pos = ComputeWorldSpacePosition(uv,depth,_MatrixIVP);
 	//float3 world_pos = _CameraPos.xyz + UnprojectByCameraRay(input.uv,depth);

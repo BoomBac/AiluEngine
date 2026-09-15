@@ -19,6 +19,7 @@ namespace Ailu::SceneManagement
             if (component_name == ECS::LightComponent::StaticTypeName()) return entity_doc._has_light_component;
             if (component_name == ECS::CCamera::StaticTypeName()) return entity_doc._has_camera_component;
             if (component_name == ECS::CLightProbe::StaticTypeName()) return entity_doc._has_lightprobe_component;
+            if (component_name == ECS::DDGIVolumeComponent::StaticTypeName()) return entity_doc._has_ddgi_volume_component;
             if (component_name == ECS::EnvironmentComponent::StaticTypeName()) return entity_doc._has_environment_component;
             if (component_name == ECS::CRigidBody::StaticTypeName()) return entity_doc._has_rigidbody_component;
             if (component_name == ECS::CCollider::StaticTypeName()) return entity_doc._has_collider_component;
@@ -270,6 +271,28 @@ namespace Ailu::SceneManagement
                 component._is_update_every_tick = entity_doc._lightprobe_component._is_update_every_tick;
                 component._is_dirty = true;
                 registry.SetComponentEnabled<ECS::CLightProbe>(entity, !is_component_disabled(entity_doc, "CLightProbe"));
+            }
+            if (entity_doc._has_light_probe_group_component)
+            {
+                auto &component = registry.AddComponent<ECS::CLightProbeGroup>(entity);
+                const auto &document = entity_doc._light_probe_group_component;
+                component._probe_count = document._probe_count;
+                component._size = document._size;
+                component._baked_data = document._baked_data_guid.empty()
+                    ? Guid::EmptyGuid() : Guid(document._baked_data_guid);
+                component._draw_probes = document._draw_probes;
+                registry.SetComponentEnabled<ECS::CLightProbeGroup>(
+                    entity, !is_component_disabled(entity_doc, "CLightProbeGroup"));
+            }
+            if (entity_doc._has_ddgi_volume_component)
+            {
+                auto &component = registry.AddComponent<ECS::DDGIVolumeComponent>(entity);
+                const auto &document = entity_doc._ddgi_volume_component;
+                component._probe_count = document._probe_count;
+                component._probe_spacing = document._probe_spacing;
+                component._draw_probes = document._draw_probes;
+                registry.SetComponentEnabled<ECS::DDGIVolumeComponent>(
+                    entity, !is_component_disabled(entity_doc, "DDGIVolumeComponent"));
             }
             if (entity_doc._has_environment_component)
             {
@@ -610,8 +633,9 @@ namespace Ailu::SceneManagement
             const auto *tag = scene.GetRegister().GetComponent<ECS::TagComponent>(entity);
             if (tag == nullptr || tag->_prefab_entity.IsEmpty() || prefab_entities.contains(tag->_prefab_entity)) continue;
             const auto *hierarchy = scene.GetRegister().GetComponent<ECS::CHierarchy>(entity);
+            const bool parent_is_scene_root = hierarchy != nullptr && scene.IsSceneRoot(hierarchy->_parent);
             const auto *parent_tag = hierarchy != nullptr ? scene.GetRegister().GetComponent<ECS::TagComponent>(hierarchy->_parent) : nullptr;
-            if (parent_tag == nullptr || prefab_entities.contains(parent_tag->_prefab_entity))
+            if (parent_tag == nullptr || parent_is_scene_root || prefab_entities.contains(parent_tag->_prefab_entity))
             {
                 scene.RemoveObject(entity);
                 refreshed = true;
@@ -727,6 +751,32 @@ namespace Ailu::SceneManagement
                 component._is_update_every_tick = entity_doc._lightprobe_component._is_update_every_tick;
                 component._is_dirty = true;
                 registry.SetComponentEnabled<ECS::CLightProbe>(entity, !IsComponentDisabled(entity_doc, "CLightProbe"));
+                refreshed = true;
+            }
+            if (entity_doc._has_light_probe_group_component &&
+                registry.GetComponent<ECS::CLightProbeGroup>(entity) == nullptr)
+            {
+                auto &component = registry.AddComponent<ECS::CLightProbeGroup>(entity);
+                const auto &document = entity_doc._light_probe_group_component;
+                component._probe_count = document._probe_count;
+                component._size = document._size;
+                component._baked_data = document._baked_data_guid.empty()
+                    ? Guid::EmptyGuid() : Guid(document._baked_data_guid);
+                component._draw_probes = document._draw_probes;
+                registry.SetComponentEnabled<ECS::CLightProbeGroup>(
+                    entity, !IsComponentDisabled(entity_doc, "CLightProbeGroup"));
+                refreshed = true;
+            }
+            if (entity_doc._has_ddgi_volume_component &&
+                registry.GetComponent<ECS::DDGIVolumeComponent>(entity) == nullptr)
+            {
+                auto &component = registry.AddComponent<ECS::DDGIVolumeComponent>(entity);
+                const auto &document = entity_doc._ddgi_volume_component;
+                component._probe_count = document._probe_count;
+                component._probe_spacing = document._probe_spacing;
+                component._draw_probes = document._draw_probes;
+                registry.SetComponentEnabled<ECS::DDGIVolumeComponent>(
+                    entity, !IsComponentDisabled(entity_doc, "DDGIVolumeComponent"));
                 refreshed = true;
             }
             if (entity_doc._has_environment_component)

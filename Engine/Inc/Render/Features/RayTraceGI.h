@@ -1,5 +1,6 @@
 #ifndef __RAYTRACE_GI_H__
 #define __RAYTRACE_GI_H__
+#include "Assets/AssetRef.h"
 #include "RenderFeature.h"
 #include "Render/RayTracing/SceneRayTracingProxy.h"
 #include "Render/RayTracing/RayTracingShader.h"
@@ -35,8 +36,8 @@ namespace Ailu
             bool _enable_resampling = true;
         private:
             Scope<GIPass> _gi_pass;
-            Ref<ComputeShader> _gi_compute_shader;
-            Ref<RayTracingShader> _gi_raytracing_shader;
+            AssetRef<ComputeShader> _gi_compute_shader;
+            AssetRef<RayTracingShader> _gi_raytracing_shader;
         };
 
         class GIPass : public RenderPass
@@ -57,7 +58,7 @@ namespace Ailu
                 Viewport stencil;
             };
 
-            GIPass(ComputeShader* cs, RayTracingShader *rt_shader);
+            GIPass(const AssetRef<ComputeShader> &cs, const AssetRef<RayTracingShader> &rt_shader);
             ~GIPass() = default;
             void OnRecordRenderGraph(RDG::RenderGraph& graph, RenderingData& rendering_data) final;
         public:
@@ -70,8 +71,8 @@ namespace Ailu
             void PrepareHardwareRayTracingScene(const RenderingData &rendering_data);
             void UpdateRayGenData(const RenderingData &rendering_data);
         private:
-            ComputeShader *_gi_compute_shader;
-            RayTracingShader *_gi_raytracing_shader;
+            AssetRef<ComputeShader> _gi_compute_shader;
+            AssetRef<RayTracingShader> _gi_raytracing_shader;
             ComputeShaderKernelId _kernel_ray_gen = kInvalidComputeShaderKernelId;
             ComputeShaderKernelId _kernel_denoise = kInvalidComputeShaderKernelId;
             Ref<GPUBuffer> _debug_buffer = nullptr;

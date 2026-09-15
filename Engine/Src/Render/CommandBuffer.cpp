@@ -498,7 +498,7 @@ namespace Ailu::Render
             static const auto blit_mat = ResourceMgr::Get().Get<Material>(L"Runtime/Material/Blit");
             mat = mat ? mat : blit_mat;
             SetRenderTarget(dst);
-            SetGlobalTexture("_SourceTex", src);
+            SetGlobalTexture("_BlitSourceTex", src);
             DrawFullScreenQuad(mat, pass_index);
         }
         void Blit(Texture *src, RenderTexture *dst, u16 src_view_index, u16 dst_view_index, Material *mat, u16 pass_index)
@@ -507,7 +507,7 @@ namespace Ailu::Render
             static const auto blit_mat = ResourceMgr::Get().Get<Material>(L"Runtime/Material/Blit");
             mat = mat ? mat : blit_mat;
             SetRenderTarget(dst, dst_view_index);
-            SetGlobalTexture("_SourceTex", src);
+            SetGlobalTexture("_BlitSourceTex", src);
             DrawFullScreenQuad(mat, pass_index);
         }
         void Blit(RTHandle src, RenderTexture *dst, Material *mat, u16 pass_index)
@@ -838,6 +838,7 @@ namespace Ailu::Render
             cmd->_src = is_update ? cmd->_dst : GpuResourceHandle{};
             cmd->_scratch_size = geometry->GetScratchBufferSize();
             cmd->_is_blas = true;
+            cmd->_is_update = is_update;
             _commands.emplace_back(cmd);
         }
         String _name;

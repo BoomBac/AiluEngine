@@ -2,6 +2,7 @@
 #ifndef __TONE_MAPPING_PASS_H__
 #define __TONE_MAPPING_PASS_H__
 
+#include "Assets/AssetRef.h"
 #include "Render/PostprocessSettings.h"
 #include "Render/RenderGraph/RenderGraphFwd.h"
 
@@ -20,7 +21,7 @@ namespace Ailu::Render
                              const ToneMappingSettings &settings);
 
     private:
-        Ref<Shader> _shader;
+        AssetRef<Shader> _shader;
         Ref<Material> _material;
     };
 }

@@ -2,15 +2,18 @@
 //#include <atlcomcli.h>
 
 #include "Framework/Common/Log.h"
+#include "Framework/Common/FileManager.h"
 #include "Framework/Common/Utils.h"
 #include "RHI/DX12/D3DCommandBuffer.h"
 #include "RHI/DX12/D3DContext.h"
 #include "RHI/DX12/D3DShader.h"
 #include "RHI/DX12/D3DShaderCompiler.h"
 #include "RHI/DX12/D3DShaderReflectionUtils.h"
+#include "RHI/DX12/D3DRootSignaturePool.h"
 #include "RHI/DX12/D3DTexture.h"
 #include "RHI/DX12/dxhelper.h"
 #include "Render/GraphicsPipelineStateObject.h"
+#include "Render/ShaderArtifactCache.h"
 
 #define SHADER_DXC 1
 
@@ -59,6 +62,153 @@ namespace Ailu::RHI::DX12
                 CD3DX12_STATIC_SAMPLER_DESC(7, D3D12_FILTER_ANISOTROPIC, D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP)};
         samplers[2].BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
         return samplers;
+    }
+
+    static ComPtr<ID3DBlob> CreateBlobFromBytes(const Vector<u8> &bytes)
+    {
+        if (bytes.empty())
+            return nullptr;
+        ComPtr<ID3DBlob> blob;
+        if (FAILED(D3DCreateBlob(bytes.size(), blob.GetAddressOf())))
+            return nullptr;
+        std::memcpy(blob->GetBufferPointer(), bytes.data(), bytes.size());
+        return blob;
+    }
+
+    static Vector<Render::ShaderMacro> ConvertShaderMacros(const Vector<D3D_SHADER_MACRO> &macros)
+    {
+        Vector<Render::ShaderMacro> result;
+        for (const auto &macro : macros)
+        {
+            if (macro.Name == nullptr)
+                continue;
+            result.emplace_back(Render::ShaderMacro{macro.Name, macro.Definition == nullptr ? "1" : macro.Definition});
+        }
+        return result;
+    }
+
+    static Render::ShaderArtifactKey BuildShaderArtifactKey(Render::EShaderArtifactType type, const WString &source_path,
+                                                             const String &pass_or_kernel_name, u16 index,
+                                                             ShaderVariantHash variant_hash, const String &shader_model,
+                                                             const Vector<D3D_SHADER_MACRO> &macros)
+    {
+        auto shader_macros = ConvertShaderMacros(macros);
+        shader_macros.emplace_back(Render::ShaderMacro{"SHADER_DXC", "1"});
+        const WString packaged_shader_interop = PathUtils::ResolveRelPath(L"../ShaderInterop.h", PathUtils::Parent(source_path)).wstring();
+        if (FileManager::Exist(packaged_shader_interop))
+            shader_macros.emplace_back(Render::ShaderMacro{"AL_PACKAGE_SHADER_INTEROP", "1"});
+        Render::ShaderArtifactKey key;
+        key._type = type;
+        key._source_path = ToChar(PathUtils::FormatFilePath(source_path));
+        key._pass_or_kernel_name = pass_or_kernel_name;
+        key._pass_or_kernel_index = index;
+        key._variant_hash = variant_hash;
+        key._backend = "dx12";
+        key._shader_artifact_version = Render::kShaderArtifactVersion;
+        key._shader_abi_version = Render::kShaderAbiVersion;
+        key._compiler_version = Render::kDxcCompilerVersion;
+        key._compile_config_hash = Render::HashCompileConfig(key._backend, shader_model,
+                                                              Render::kRuntimeShaderCompileMode,
+                                                              shader_macros);
+        return key;
+    }
+
+    static Render::ShaderResourceBindingArtifact MakeBindingArtifact(const String &name,
+                                                                       const ShaderBindResourceInfo &info)
+    {
+        Render::ShaderResourceBindingArtifact binding;
+        binding._name = name;
+        binding._property_id = info._property_id;
+        binding._resource_type = static_cast<u32>(info._res_type);
+        binding._bind_slot = info._bind_slot;
+        binding._register_space = info._register_space;
+        binding._bind_flag = info._bind_flag;
+        binding._array_size = info._array_size;
+        binding._constant_buffer_size = info._cbuf_size;
+        if (info._res_type & EBindResDescType::kCBufferAttribute)
+        {
+            binding._buffer_offset = ShaderBindResourceInfo::GetVariableOffset(info);
+            binding._buffer_size = ShaderBindResourceInfo::GetVariableSize(info);
+            binding._root_constant_buffer_name = info._p_root_cbuf == nullptr ? String{} : info._p_root_cbuf->_name;
+        }
+        else
+        {
+            binding._resource_slot = info._res_slot;
+        }
+        return binding;
+    }
+
+    static void AppendArtifactDependencies(const std::set<WString> &paths,
+                                           Vector<Render::ShaderArtifactDependency> &dependencies)
+    {
+        std::set<WString> unique_paths;
+        for (const auto &path : paths)
+        {
+            const WString normalized_path = PathUtils::FormatFilePath(path);
+            if (normalized_path.empty() || !unique_paths.insert(normalized_path).second)
+                continue;
+            const auto &fingerprint = Render::ShaderFileFingerprintCache::Get().GetFingerprint(normalized_path);
+            if (!fingerprint._exists)
+                continue;
+            const u64 content_hash = Render::ShaderFileFingerprintCache::Get().GetContentHash(normalized_path);
+            dependencies.emplace_back(Render::ShaderArtifactDependency{normalized_path, fingerprint._file_size,
+                                                                       fingerprint._last_write_time, content_hash});
+        }
+    }
+
+    static void MoveSourceDependencyFirst(const WString &source_path,
+                                          Vector<Render::ShaderArtifactDependency> &dependencies)
+    {
+        const WString normalized_source_path = PathUtils::FormatFilePath(source_path);
+        const auto source_it = std::find_if(dependencies.begin(), dependencies.end(), [&](const auto &dependency)
+        {
+            return dependency._path == normalized_source_path;
+        });
+        if (source_it != dependencies.end() && source_it != dependencies.begin())
+            std::iter_swap(dependencies.begin(), source_it);
+    }
+
+    static bool FillBindingInfo(const Render::ShaderResourceBindingArtifact &artifact,
+                                ShaderBindResourceInfo &info)
+    {
+        info._res_type = static_cast<EBindResDescType>(artifact._resource_type);
+        info._bind_slot = static_cast<u8>(artifact._bind_slot);
+        info._name = artifact._name;
+        info._property_id = ShaderPropertyRegistry::Get().Intern(info._name);
+        info._register_space = artifact._register_space;
+        info._bind_flag = artifact._bind_flag;
+        info._array_size = static_cast<u8>(artifact._array_size);
+        info._cbuf_size = artifact._constant_buffer_size;
+        if (info._res_type & EBindResDescType::kCBufferAttribute)
+        {
+            info._cbuf_member_offset = (artifact._buffer_offset << 16u) | (artifact._buffer_size & 0xffffu);
+        }
+        else
+        {
+            info._res_slot = artifact._resource_slot;
+        }
+        return true;
+    }
+
+    static void HydrateBindingMap(const Vector<Render::ShaderResourceBindingArtifact> &bindings,
+                                  ShaderReflectionResourceMap &bind_res_infos)
+    {
+        bind_res_infos.clear();
+        for (const auto &binding : bindings)
+        {
+            ShaderBindResourceInfo info;
+            FillBindingInfo(binding, info);
+            bind_res_infos.emplace(binding._name, std::move(info));
+        }
+        for (const auto &binding : bindings)
+        {
+            if (binding._root_constant_buffer_name.empty())
+                continue;
+            auto binding_it = bind_res_infos.find(binding._name);
+            auto root_it = bind_res_infos.find(binding._root_constant_buffer_name);
+            if (binding_it != bind_res_infos.end() && root_it != bind_res_infos.end())
+                binding_it->second._p_root_cbuf = &root_it->second;
+        }
     }
 
     static void ParserBindResourceAddiInfo(HashMap<String, ShaderBindResourceInfo> &bind_res_infos, String line, bool is_in_cbuf_scope)
@@ -319,7 +469,8 @@ namespace Ailu::RHI::DX12
     {
     }
 
-    void D3DShader::GenerateInternalPSO(u16 pass_index, ShaderVariantHash variant_hash)
+    void D3DShader::GenerateInternalPSO(u16 pass_index, ShaderVariantHash variant_hash,
+                                        Vector<u8> *serialized_signature)
     {
         AL_ASSERT(pass_index < _passes.size());
         AL_ASSERT(_passes[pass_index]._variants.contains(variant_hash));
@@ -425,57 +576,191 @@ namespace Ailu::RHI::DX12
         ComPtr<ID3DBlob> error;
         auto hr = D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, featureData.HighestVersion, &signature, &error);
         if (error) { LOG_ERROR("Root signature error: {}", (const char *) error->GetBufferPointer()); }
-        ThrowIfFailed(hr);//如果参数一致，实际上会从池中返回已有的根签名，这就意味着在使用一个重复的根签名之前，需要清空其绑定的资源 
-        ThrowIfFailed(device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&_pass_elements[pass_index]._variants[variant_hash]._p_sig)));
+        ThrowIfFailed(hr);
+        Vector<u8> signature_bytes(signature->GetBufferSize());
+        std::memcpy(signature_bytes.data(), signature->GetBufferPointer(), signature_bytes.size());
+        if (serialized_signature != nullptr)
+            *serialized_signature = signature_bytes;
+        const u64 signature_hash = Render::HashArtifactBytes(signature_bytes);
+        _pass_elements[pass_index]._variants[variant_hash]._p_sig =
+            D3DRootSignaturePool::Get().GetOrCreate(signature_hash, signature_bytes);
+        ThrowIfFailed(_pass_elements[pass_index]._variants[variant_hash]._p_sig != nullptr ? S_OK : E_FAIL);
     }
 
-    bool D3DShader::RHICompileImpl(u16 pass_index, ShaderVariantHash variant_hash, bool is_load_cache)
+    bool D3DShader::RHICompileImpl(u16 pass_index, ShaderVariantHash variant_hash, Render::EShaderCompilePolicy policy)
     {
-        bool succeed = true;
-        ComPtr<ID3DBlob> tmp_p_vblob;
-        ComPtr<ID3DBlob> tmp_p_pblob;
-        ComPtr<ID3DBlob> tmp_p_gblob;
-        ComPtr<ID3D12ShaderReflection> tmp_p_vreflect, tmp_p_preflect, tmp_p_greflect;
-        Vector<D3D_SHADER_MACRO> keyword_defines;
+        const bool is_load_cache = policy == Render::EShaderCompilePolicy::kUseArtifact;
+        if (pass_index >= _passes.size() || !_passes[pass_index]._variants.contains(variant_hash))
+            return false;
+        if (!_is_pass_elements_init.load())
+        {
+            Reset();
+            _is_pass_elements_init.store(true);
+        }
+
+        auto &pass = _passes[pass_index];
+        const auto keyword_defines = ConstructVariantMarcos(pass._variants[variant_hash]._active_keywords);
+        const auto key = BuildShaderArtifactKey(Render::EShaderArtifactType::kGraphics, _src_file_path, pass._name,
+                                                pass_index, variant_hash, "vs6.1|ps6.1|gs6.1", keyword_defines);
+        auto &artifact_cache = Render::ShaderArtifactCache::Get();
+        Render::GraphicsShaderVariantArtifact artifact;
+        Render::EShaderArtifactInvalidReason reason = Render::EShaderArtifactInvalidReason::kNone;
+        if (is_load_cache && artifact_cache.Load(key, artifact, &reason) && HydrateGraphicsVariant(pass_index, variant_hash, artifact))
+        {
+            LOG_INFO("ShaderVariant READY shader={} pass={} variant={} source=artifact reason={}", _name, pass_index,
+                     variant_hash, Render::ShaderArtifactInvalidReasonToString(reason));
+            return true;
+        }
+        if (is_load_cache && artifact_cache.WaitForCompile(key) &&
+            artifact_cache.Load(key, artifact, &reason) && HydrateGraphicsVariant(pass_index, variant_hash, artifact))
+        {
+            LOG_INFO("ShaderVariant READY shader={} pass={} variant={} source=artifact reason={}", _name, pass_index,
+                     variant_hash, Render::ShaderArtifactInvalidReasonToString(reason));
+            return true;
+        }
+
+        artifact_cache.BeginCompile(key);
+        bool succeed = false;
+        bool used_artifact = false;
         try
         {
-            //应该可以把全部元素都清空，pso在运行时似乎没有再引用这里的东西
-            if (!_is_pass_elements_init.load())
+            if (is_load_cache && artifact_cache.Load(key, artifact, &reason) && HydrateGraphicsVariant(pass_index, variant_hash, artifact))
             {
-                Reset();
-                _is_pass_elements_init.store(true);
+                succeed = true;
+                used_artifact = true;
             }
-            auto &pass = _passes[pass_index];
-            keyword_defines = ConstructVariantMarcos(pass._variants[variant_hash]._active_keywords);
+            else
+            {
+                ComPtr<ID3DBlob> tmp_p_vblob;
+                ComPtr<ID3DBlob> tmp_p_pblob;
+                ComPtr<ID3DBlob> tmp_p_gblob;
+                ComPtr<ID3D12ShaderReflection> tmp_p_vreflect, tmp_p_preflect, tmp_p_greflect;
+                std::set<WString> dependency_files = pass._source_files;
+                bool compile_succeed = true;
 #ifdef SHADER_DXC
-            succeed &= CreateFromFileDXC(pass._vert_src_file, pass._vert_entry, RenderConstants::kVSModel_6_1, keyword_defines, tmp_p_vblob, tmp_p_vreflect, pass._source_files, is_load_cache);
-            succeed &= CreateFromFileDXC(pass._pixel_src_file, pass._pixel_entry, RenderConstants::kPSModel_6_1, keyword_defines, tmp_p_pblob, tmp_p_preflect, pass._source_files, is_load_cache);
-            if (!pass._geometry_entry.empty())
-                succeed &= CreateFromFileDXC(pass._geom_src_file, pass._geometry_entry, RenderConstants::kGSModel_6_1, keyword_defines, tmp_p_gblob, tmp_p_greflect, pass._source_files, is_load_cache);
+                compile_succeed &= CreateFromFileDXC(pass._vert_src_file, pass._vert_entry, RenderConstants::kVSModel_6_1,
+                                                      keyword_defines, tmp_p_vblob, tmp_p_vreflect, dependency_files, false);
+                compile_succeed &= CreateFromFileDXC(pass._pixel_src_file, pass._pixel_entry, RenderConstants::kPSModel_6_1,
+                                                      keyword_defines, tmp_p_pblob, tmp_p_preflect, dependency_files, false);
+                if (!pass._geometry_entry.empty())
+                    compile_succeed &= CreateFromFileDXC(pass._geom_src_file, pass._geometry_entry, RenderConstants::kGSModel_6_1,
+                                                          keyword_defines, tmp_p_gblob, tmp_p_greflect, dependency_files, false);
 #else
-            succeed &= CreateFromFileFXC(pass._vert_src_file, pass._vert_entry, RenderConstants::kVSModel_5_0, keyword_defines, tmp_p_vblob, tmp_p_vreflect, pass._source_files, is_load_cache);
-            succeed &= CreateFromFileFXC(pass._pixel_src_file, pass._pixel_entry, RenderConstants::kPSModel_5_0, keyword_defines, tmp_p_pblob, tmp_p_preflect, pass._source_files, is_load_cache);
-            if (!pass._geometry_entry.empty())
-                succeed &= CreateFromFileFXC(pass._geom_src_file, pass._geometry_entry, RenderConstants::kGSModel_5_0, keyword_defines, tmp_p_gblob, tmp_p_greflect, pass._source_files, is_load_cache);
-#endif// SHADER_DXC
+                compile_succeed &= CreateFromFileFXC(pass._vert_src_file, pass._vert_entry, RenderConstants::kVSModel_5_0,
+                                                      keyword_defines, tmp_p_vblob, tmp_p_vreflect, dependency_files, false);
+                compile_succeed &= CreateFromFileFXC(pass._pixel_src_file, pass._pixel_entry, RenderConstants::kPSModel_5_0,
+                                                      keyword_defines, tmp_p_pblob, tmp_p_preflect, dependency_files, false);
+                if (!pass._geometry_entry.empty())
+                    compile_succeed &= CreateFromFileFXC(pass._geom_src_file, pass._geometry_entry, RenderConstants::kGSModel_5_0,
+                                                          keyword_defines, tmp_p_gblob, tmp_p_greflect, dependency_files, false);
+#endif
+                if (compile_succeed && tmp_p_vreflect != nullptr && tmp_p_preflect != nullptr)
+                {
+                    auto &element = _pass_elements[pass_index]._variants[variant_hash];
+                    element = D3DShaderElement::D3DVariantElement();
+                    element._p_vblob = tmp_p_vblob;
+                    element._p_pblob = tmp_p_pblob;
+                    element._p_gblob = tmp_p_gblob;
+                    element._keyword_defines = keyword_defines;
+                    pass._source_files = std::move(dependency_files);
+                    LoadShaderReflection(pass_index, variant_hash, tmp_p_vreflect.Get(), tmp_p_preflect.Get());
+                    Render::GraphicsShaderVariantArtifact new_artifact;
+                    GenerateInternalPSO(pass_index, variant_hash, &new_artifact._root_signature_blob);
+                    BuildBindingLayout(pass_index, variant_hash);
+                    BuildGraphicsArtifact(pass_index, variant_hash, keyword_defines, key, new_artifact);
+                    new_artifact._header._type = Render::EShaderArtifactType::kGraphics;
+                    new_artifact._header._artifact_key = key.Hash();
+                    new_artifact._root_signature_hash = Render::HashArtifactBytes(new_artifact._root_signature_blob);
+                    artifact_cache.Store(key, new_artifact);
+                    ++artifact_cache.Stats()._compiled_variant_count;
+                    succeed = true;
+                }
+            }
         }
-        catch (const std::exception &)
+        catch (const std::exception &error)
         {
+            LOG_ERROR("Compile shader {} failed: {}", _name, error.what());
             succeed = false;
-            LOG_ERROR(L"Compile shader with src {0} failed!", _src_file_path);
         }
-        if (succeed)
-        {
-            _pass_elements[pass_index]._variants.insert(std::make_pair(variant_hash, D3DShaderElement::D3DVariantElement()));
-            LoadShaderReflection(pass_index, variant_hash, tmp_p_vreflect.Get(), tmp_p_preflect.Get());
-            _pass_elements[pass_index]._variants[variant_hash]._p_vblob = tmp_p_vblob;
-            _pass_elements[pass_index]._variants[variant_hash]._p_pblob = tmp_p_pblob;
-            _pass_elements[pass_index]._variants[variant_hash]._p_gblob = tmp_p_gblob;
-            _pass_elements[pass_index]._variants[variant_hash]._keyword_defines = keyword_defines;
-            GenerateInternalPSO(pass_index, variant_hash);
-            BuildBindingLayout(pass_index, variant_hash);
-        }
+        artifact_cache.EndCompile(key);
+        LOG_INFO("ShaderVariant READY shader={} pass={} variant={} source={} reason={}", _name, pass_index, variant_hash,
+                 used_artifact ? "artifact" : "compile", Render::ShaderArtifactInvalidReasonToString(reason));
         return succeed;
+    }
+
+    bool D3DShader::HydrateGraphicsVariant(u16 pass_index, ShaderVariantHash variant_hash,
+                                           const Render::GraphicsShaderVariantArtifact &artifact)
+    {
+        if (artifact._root_signature_blob.empty() || artifact._vertex_shader._byte_code.empty() ||
+            artifact._pixel_shader._byte_code.empty())
+            return false;
+        auto &pass = _passes[pass_index];
+        auto &pass_variant = _passes[pass_index]._variants[variant_hash];
+        auto &element = _pass_elements[pass_index]._variants[variant_hash];
+        element = D3DShaderElement::D3DVariantElement();
+        element._p_vblob = CreateBlobFromBytes(artifact._vertex_shader._byte_code);
+        element._p_pblob = CreateBlobFromBytes(artifact._pixel_shader._byte_code);
+        element._p_gblob = CreateBlobFromBytes(artifact._geometry_shader._byte_code);
+        element._p_sig = D3DRootSignaturePool::Get().GetOrCreate(artifact._root_signature_hash,
+                                                                  artifact._root_signature_blob);
+        if (element._p_vblob == nullptr || element._p_pblob == nullptr || element._p_sig == nullptr)
+            return false;
+        pass._source_files.clear();
+        for (const auto &dependency : artifact._dependencies)
+            pass._source_files.insert(dependency._path);
+        pass_variant._vertex_input_num = static_cast<u8>(artifact._vertex_input_layout.size());
+        pass_variant._pipeline_input_layout = VertexBufferLayout(artifact._vertex_input_layout);
+        for (u32 index = 0u; index < artifact._vertex_input_layout.size() && index < RenderConstants::kMaxVertexAttrNum; ++index)
+        {
+            const auto &layout = artifact._vertex_input_layout[index];
+            element._vertex_input_layout[index] = D3D12_INPUT_ELEMENT_DESC{
+                RenderConstants::GetVertexSemanticName(layout._semantic),
+                RenderConstants::GetVertexSemanticIndex(layout._semantic),
+                D3DConvertUtils::GetGXGIFormatByShaderDataType(layout.Type), index, layout.Offset,
+                D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0};
+        }
+        HydrateBindingMap(artifact._bindings, pass_variant._bind_res_infos);
+        pass_variant._per_mat_buf_bind_slot = artifact._per_material_slot;
+        pass_variant._per_pass_buf_bind_slot = artifact._per_camera_slot;
+        pass_variant._per_frame_buf_bind_slot = artifact._per_scene_slot;
+        element._root_parameters.clear();
+        BuildBindingLayout(pass_index, variant_hash);
+        return true;
+    }
+
+    void D3DShader::BuildGraphicsArtifact(u16 pass_index, ShaderVariantHash variant_hash,
+                                          const Vector<D3D_SHADER_MACRO> &keyword_defines,
+                                          const Render::ShaderArtifactKey &key,
+                                          Render::GraphicsShaderVariantArtifact &artifact) const
+    {
+        (void) keyword_defines;
+        const auto &pass = _passes[pass_index];
+        const auto &pass_variant = pass._variants.at(variant_hash);
+        const auto &element = _pass_elements[pass_index]._variants.at(variant_hash);
+        artifact._header._type = Render::EShaderArtifactType::kGraphics;
+        artifact._header._artifact_key = key.Hash();
+        artifact._vertex_shader._byte_code.assign(static_cast<const u8 *>(element._p_vblob->GetBufferPointer()),
+                                                  static_cast<const u8 *>(element._p_vblob->GetBufferPointer()) + element._p_vblob->GetBufferSize());
+        artifact._pixel_shader._byte_code.assign(static_cast<const u8 *>(element._p_pblob->GetBufferPointer()),
+                                                 static_cast<const u8 *>(element._p_pblob->GetBufferPointer()) + element._p_pblob->GetBufferSize());
+        if (element._p_gblob != nullptr)
+            artifact._geometry_shader._byte_code.assign(static_cast<const u8 *>(element._p_gblob->GetBufferPointer()),
+                                                        static_cast<const u8 *>(element._p_gblob->GetBufferPointer()) + element._p_gblob->GetBufferSize());
+        artifact._vertex_input_layout.assign(pass_variant._pipeline_input_layout.GetBufferDesc().begin(),
+                                             pass_variant._pipeline_input_layout.GetBufferDesc().end());
+        for (const auto &[name, info] : pass_variant._bind_res_infos)
+            artifact._bindings.emplace_back(MakeBindingArtifact(name, info));
+        artifact._per_material_slot = pass_variant._per_mat_buf_bind_slot;
+        artifact._per_camera_slot = pass_variant._per_pass_buf_bind_slot;
+        artifact._per_scene_slot = pass_variant._per_frame_buf_bind_slot;
+        std::set<WString> dependency_files = pass._source_files;
+        dependency_files.insert(_src_file_path);
+        dependency_files.insert(pass._vert_src_file);
+        dependency_files.insert(pass._pixel_src_file);
+        if (!pass._geom_src_file.empty())
+            dependency_files.insert(pass._geom_src_file);
+        AppendArtifactDependencies(dependency_files, artifact._dependencies);
+        MoveSourceDependencyFirst(_src_file_path, artifact._dependencies);
     }
 
     void D3DShader::LoadAdditionalShaderReflection(const WString &sys_path, u16 pass_index, ShaderVariantHash variant_hash)
@@ -866,8 +1151,10 @@ namespace Ailu::RHI::DX12
         }
     }
 
-    bool D3DComputeShader::RHICompileImpl(u16 kernel_index, ShaderVariantHash variant_hash, bool is_load_cache)
+    bool D3DComputeShader::RHICompileImpl(u16 kernel_index, ShaderVariantHash variant_hash,
+                                           Render::EShaderCompilePolicy policy)
     {
+        const bool is_load_cache = policy == Render::EShaderCompilePolicy::kUseArtifact;
         if (kernel_index >= _kernels.size())
             return false;
         {
@@ -875,42 +1162,155 @@ namespace Ailu::RHI::DX12
             if (kernel_index >= _elements.size())
                 _elements.resize(kernel_index + 1);
         }
-        bool succeed = true;
-        ComPtr<ID3DBlob> tmp_blob = nullptr;
-        ComPtr<ID3D12ShaderReflection> tmp_reflection{nullptr};
-        std::set<WString> tmp_all_dep_file_pathes;
-        //Vector<D3D_SHADER_MACRO> v = {{"COMPUTE", "1"}, {NULL, NULL}};
         auto &cur_variant = _kernels[kernel_index]._variants[variant_hash];
-        Vector<D3D_SHADER_MACRO> marcos = ConstructVariantMarcos(cur_variant._active_keywords);
+        const auto macros = ConstructVariantMarcos(cur_variant._active_keywords);
+        const auto key = BuildShaderArtifactKey(Render::EShaderArtifactType::kCompute, _src_file_path,
+                                                _kernels[kernel_index]._name, kernel_index, variant_hash, "cs6.1", macros);
+        auto &artifact_cache = Render::ShaderArtifactCache::Get();
+        Render::ComputeShaderVariantArtifact artifact;
+        Render::EShaderArtifactInvalidReason reason = Render::EShaderArtifactInvalidReason::kNone;
+        if (is_load_cache && artifact_cache.Load(key, artifact, &reason) && HydrateComputeVariant(kernel_index, variant_hash, artifact))
+        {
+            LOG_INFO("ComputeShaderVariant READY shader={} kernel={} variant={} source=artifact reason={}",
+                     ToChar(_src_file_path), kernel_index, variant_hash,
+                     Render::ShaderArtifactInvalidReasonToString(reason));
+            return true;
+        }
+        if (is_load_cache && artifact_cache.WaitForCompile(key) &&
+            artifact_cache.Load(key, artifact, &reason) && HydrateComputeVariant(kernel_index, variant_hash, artifact))
+        {
+            LOG_INFO("ComputeShaderVariant READY shader={} kernel={} variant={} source=artifact reason={}",
+                     ToChar(_src_file_path), kernel_index, variant_hash,
+                     Render::ShaderArtifactInvalidReasonToString(reason));
+            return true;
+        }
+
+        artifact_cache.BeginCompile(key);
+        bool succeed = false;
+        bool used_artifact = false;
         try
         {
+            if (is_load_cache && artifact_cache.Load(key, artifact, &reason) && HydrateComputeVariant(kernel_index, variant_hash, artifact))
+            {
+                succeed = true;
+                used_artifact = true;
+            }
+            else
+            {
+                ComPtr<ID3DBlob> tmp_blob;
+                ComPtr<ID3D12ShaderReflection> tmp_reflection;
+                std::set<WString> dependency_files = cur_variant._all_dep_file_pathes;
+                bool compile_succeed = false;
 #ifdef SHADER_DXC
-            succeed &= CreateFromFileDXC(_src_file_path, _kernels[kernel_index]._name, RenderConstants::kCSModel_6_1, marcos, tmp_blob, tmp_reflection, tmp_all_dep_file_pathes, is_load_cache);
+                compile_succeed = CreateFromFileDXC(_src_file_path, _kernels[kernel_index]._name,
+                                                    RenderConstants::kCSModel_6_1, macros, tmp_blob, tmp_reflection,
+                                                    dependency_files, false);
 #else
-            succeed &= CreateFromFileFXC(_src_file_path, _kernels[kernel_index]._name, RenderConstants::kCSModel_5_0, marcos, tmp_blob, tmp_reflection, tmp_all_dep_file_pathes, is_load_cache);
-#endif// SHADER_DXC
+                compile_succeed = CreateFromFileFXC(_src_file_path, _kernels[kernel_index]._name,
+                                                    RenderConstants::kCSModel_5_0, macros, tmp_blob, tmp_reflection,
+                                                    dependency_files, false);
+#endif
+                if (compile_succeed && tmp_reflection != nullptr)
+                {
+                    cur_variant._all_dep_file_pathes = std::move(dependency_files);
+                    _elements[kernel_index]._variants[variant_hash] = D3DVariantElement();
+                    _elements[kernel_index]._variants[variant_hash]._p_blob = tmp_blob;
+                    LoadReflectionInfo(tmp_reflection.Get(), kernel_index, variant_hash);
+                    LoadAdditionalShaderReflection(_src_file_path, kernel_index, variant_hash);
+                    Render::ComputeShaderVariantArtifact new_artifact;
+                    GenerateInternalPSO(kernel_index, variant_hash, &new_artifact._root_signature_blob);
+                    BuildComputeArtifact(kernel_index, variant_hash, key, new_artifact);
+                    artifact_cache.Store(key, new_artifact);
+                    ++artifact_cache.Stats()._compiled_variant_count;
+                    succeed = _is_valid;
+                }
+            }
         }
-        catch (const std::exception &)
+        catch (const std::exception &error)
         {
-            succeed = false;
-            LOG_ERROR(L"Compile shader with src {0} failed!", _src_file_path);
-            _is_valid = false;
+            LOG_ERROR("Compile compute shader {} failed: {}", ToChar(_src_file_path), error.what());
         }
-        if (succeed)
-        {
-            for (auto &p: tmp_all_dep_file_pathes)
-                cur_variant._all_dep_file_pathes.insert(p);
-            _elements[kernel_index]._variants[variant_hash]._p_blob = tmp_blob;
-            LoadReflectionInfo(tmp_reflection.Get(), kernel_index, variant_hash);
-            LoadAdditionalShaderReflection(_src_file_path, kernel_index, variant_hash);
-            GenerateInternalPSO(kernel_index, variant_hash);
-            succeed = _is_valid;
-            LOG_INFO(L"Compile shader with src {0} succeed!", _src_file_path);
-        }
+        artifact_cache.EndCompile(key);
+        LOG_INFO("ComputeShaderVariant READY shader={} kernel={} variant={} source={} reason={}",
+                 ToChar(_src_file_path), kernel_index, variant_hash, used_artifact ? "artifact" : "compile",
+                 Render::ShaderArtifactInvalidReasonToString(reason));
         return succeed;
     }
 
-    void D3DComputeShader::GenerateInternalPSO(u16 kernel_index, ShaderVariantHash variant_hash)
+    bool D3DComputeShader::HydrateComputeVariant(u16 kernel_index, ShaderVariantHash variant_hash,
+                                                const Render::ComputeShaderVariantArtifact &artifact)
+    {
+        if (artifact._compute_shader._byte_code.empty() || artifact._root_signature_blob.empty())
+            return false;
+        auto &kernel_variant = _kernels[kernel_index]._variants[variant_hash];
+        auto &d3d_variant = _elements[kernel_index]._variants[variant_hash];
+        d3d_variant = D3DVariantElement();
+        d3d_variant._p_blob = CreateBlobFromBytes(artifact._compute_shader._byte_code);
+        d3d_variant._p_sig = D3DRootSignaturePool::Get().GetOrCreate(artifact._root_signature_hash,
+                                                                      artifact._root_signature_blob);
+        if (d3d_variant._p_blob == nullptr || d3d_variant._p_sig == nullptr)
+            return false;
+        _kernels[kernel_index]._thread_num = artifact._thread_group_size;
+        HydrateBindingMap(artifact._bindings, kernel_variant._bind_res_infos);
+        kernel_variant._temp_bind_res_infos.clear();
+        kernel_variant._all_dep_file_pathes.clear();
+        for (const auto &dependency : artifact._dependencies)
+            kernel_variant._all_dep_file_pathes.insert(dependency._path);
+        for (const auto &binding : artifact._bindings)
+        {
+            if (binding._name == "g_bindless_texture2d")
+            {
+                d3d_variant._has_bindless_texture2d = true;
+                d3d_variant._bindless_texture_slot = binding._bind_slot;
+            }
+            else if (binding._name == "g_bindless_buffer")
+            {
+                d3d_variant._has_bindless_buffer = true;
+                d3d_variant._bindless_buffer_slot = binding._bind_slot;
+            }
+            else if (binding._name == "g_bindless_rw_texture2d")
+            {
+                d3d_variant._has_bindless_rw_texture2d = true;
+                d3d_variant._bindless_rw_texture_slot = binding._bind_slot;
+            }
+            else if (binding._name == "g_bindless_rw_buffer")
+            {
+                d3d_variant._has_bindless_rw_buffer = true;
+                d3d_variant._bindless_rw_buffer_slot = binding._bind_slot;
+            }
+        }
+        D3D12_COMPUTE_PIPELINE_STATE_DESC pso_desc{};
+        pso_desc.pRootSignature = d3d_variant._p_sig.Get();
+        pso_desc.CS = {d3d_variant._p_blob->GetBufferPointer(), d3d_variant._p_blob->GetBufferSize()};
+        const auto device = static_cast<D3DContext &>(GraphicsContext::Get()).GetDevice();
+        if (device == nullptr || FAILED(device->CreateComputePipelineState(&pso_desc, IID_PPV_ARGS(&d3d_variant._pso))))
+            return false;
+        _is_valid = true;
+        return true;
+    }
+
+    void D3DComputeShader::BuildComputeArtifact(u16 kernel_index, ShaderVariantHash variant_hash,
+                                                const Render::ShaderArtifactKey &key,
+                                                Render::ComputeShaderVariantArtifact &artifact) const
+    {
+        const auto &kernel_variant = _kernels[kernel_index]._variants.at(variant_hash);
+        const auto &element = _elements[kernel_index]._variants.at(variant_hash);
+        artifact._header._type = Render::EShaderArtifactType::kCompute;
+        artifact._header._artifact_key = key.Hash();
+        artifact._compute_shader._byte_code.assign(static_cast<const u8 *>(element._p_blob->GetBufferPointer()),
+                                                   static_cast<const u8 *>(element._p_blob->GetBufferPointer()) + element._p_blob->GetBufferSize());
+        artifact._thread_group_size = _kernels[kernel_index]._thread_num;
+        for (const auto &[name, info] : kernel_variant._bind_res_infos)
+            artifact._bindings.emplace_back(MakeBindingArtifact(name, info));
+        std::set<WString> dependency_files = kernel_variant._all_dep_file_pathes;
+        dependency_files.insert(_src_file_path);
+        AppendArtifactDependencies(dependency_files, artifact._dependencies);
+        MoveSourceDependencyFirst(_src_file_path, artifact._dependencies);
+        artifact._root_signature_hash = Render::HashArtifactBytes(artifact._root_signature_blob);
+    }
+
+    void D3DComputeShader::GenerateInternalPSO(u16 kernel_index, ShaderVariantHash variant_hash,
+                                                Vector<u8> *serialized_signature)
     {
         D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
         featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
@@ -1009,9 +1409,19 @@ namespace Ailu::RHI::DX12
         ComPtr<ID3DBlob> signature;
         ComPtr<ID3DBlob> error;
 
-        if (SUCCEEDED(D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, featureData.HighestVersion, &signature, &error)) &&
-            SUCCEEDED(device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&sig))))
+        if (SUCCEEDED(D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, featureData.HighestVersion, &signature, &error)))
         {
+            Vector<u8> signature_bytes(signature->GetBufferSize());
+            std::memcpy(signature_bytes.data(), signature->GetBufferPointer(), signature_bytes.size());
+            if (serialized_signature != nullptr)
+                *serialized_signature = signature_bytes;
+            const u64 signature_hash = Render::HashArtifactBytes(signature_bytes);
+            sig = D3DRootSignaturePool::Get().GetOrCreate(signature_hash, signature_bytes);
+            if (sig == nullptr)
+            {
+                _is_valid = false;
+                return;
+            }
             D3D12_COMPUTE_PIPELINE_STATE_DESC pso_desc{};
             pso_desc.pRootSignature = sig.Get();
             pso_desc.CS = {d3d_ele._p_blob->GetBufferPointer(), d3d_ele._p_blob->GetBufferSize()};

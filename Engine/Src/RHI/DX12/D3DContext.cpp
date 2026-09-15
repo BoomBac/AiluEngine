@@ -20,6 +20,7 @@
 #include "Render/Material.h"
 #include "Render/RenderingData.h"
 #include "Render/RenderingStates.h"
+#include "Render/ShaderArtifactCache.h"
 #if AILU_ENABLE_FRAME_DEBUGGER
 #include "Render/FrameDebugger/FrameCaptureService.h"
 #include "Render/FrameDebugger/FrameCaptureSession.h"
@@ -512,7 +513,7 @@ namespace Ailu::RHI::DX12
                     if (shader->PreProcessShader())
                     {
                         bool is_all_succeed = true;
-                        is_all_succeed = shader->Compile(false);//暂时重编所有变体，避免材质切换变体后使用的是旧的shader
+                        is_all_succeed = shader->Compile(Render::EShaderCompilePolicy::kForceCompile);
                         for (auto &mat: shader->GetAllReferencedMaterials())
                         {
                             mat->ConstructKeywords(shader);
@@ -530,14 +531,14 @@ namespace Ailu::RHI::DX12
                     if (shader->Preprocess())
                     {
                         shader->_is_compiling.store(true);// shader Compile()也会设置这个值，这里设置一下防止读取该值时还没执行compile
-                        shader->Compile(false);
+                        shader->Compile(Render::EShaderCompilePolicy::kForceCompile);
                         compiled_compute_shader_num++;
                     }
                 }
                 else if (RayTracingShader *shader = dynamic_cast<RayTracingShader *>(obj.value()); shader != nullptr)
                 {
                     shader->_is_compiling.store(true);
-                    shader->Compile(false);
+                    shader->Compile(Render::EShaderCompilePolicy::kForceCompile);
                     compiled_raytracing_shader_num++;
                 }
             }
@@ -546,6 +547,7 @@ namespace Ailu::RHI::DX12
         {
             LOG_INFO("Compiled {} shaders, {} compute shaders and {} ray tracing shaders!", compiled_shader_num,
                      compiled_compute_shader_num, compiled_raytracing_shader_num);
+            Render::ShaderArtifactCache::Get().LogStats();
         }
         GraphicsPipelineStateMgr::Get().ProcessPendingShaderCompiles();
         Render::RenderPipeline::Get().FrameCleanup();
@@ -2632,25 +2634,44 @@ namespace Ailu::RHI::DX12
             auto cmd_bas = static_cast<CommandBuildAS *>(cmd);
             if (cmd_bas->_is_blas)
             {
-                if (cmd_bas->_is_update) { AL_ASSERT_MSG(false, "BLAS update is not supported yet!"); }
-                else
+                auto blas = static_cast<D3DRayTracingGeometry *>(GpuResourceRegistry::Get().Resolve(cmd_bas->_dst));
+                if (blas == nullptr)
+                    return;
+                AL_ASSERT_MSG(!cmd_bas->_is_update || blas->IsDynamic(), "Only dynamic BLAS can be updated");
+                if (cmd_bas->_is_update)
                 {
-                    auto blas = static_cast<D3DRayTracingGeometry *>(GpuResourceRegistry::Get().Resolve(cmd_bas->_dst));
-                    if (blas == nullptr)
-                        return;
-                    auto scratch_res = blas->_scratch_resource.Get();
-                    auto blas_res = blas->_blas_resource.Get();
-                    AL_ASSERT(scratch_res != nullptr && blas_res != nullptr);
-                    d3dcmd->RequireState(blas->_scratch_resource, EResourceState::kUnorderedAccess);
-                    d3dcmd->RequireState(blas->_blas_resource, EResourceState::kRaytracingAccelerationStructure);
-                    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDesc = {};
-                    bottomLevelBuildDesc.Inputs = blas->_inputs;
-                    bottomLevelBuildDesc.ScratchAccelerationStructureData = scratch_res->GetGPUVirtualAddress();
-                    bottomLevelBuildDesc.DestAccelerationStructureData = blas_res->GetGPUVirtualAddress();
-                    auto dxcmd = d3dcmd->NativeCmdList();
-                    dxcmd->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
-                    d3dcmd->UavBarrier(blas->_blas_resource);
+                    AL_ASSERT_MSG(blas->_inputs.Flags &
+                                      D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE,
+                                  "Dynamic BLAS was not created with ALLOW_UPDATE");
                 }
+
+                auto scratch_res = blas->_scratch_resource.Get();
+                auto blas_res = blas->_blas_resource.Get();
+                AL_ASSERT(scratch_res != nullptr && blas_res != nullptr);
+                if (blas->_desc._vertex_buffer != nullptr)
+                {
+                    if (auto *position_buffer = blas->_desc._vertex_buffer->GetGpuStream(0u);
+                        auto *d3d_position_buffer = dynamic_cast<D3DGPUBuffer *>(position_buffer))
+                    {
+                        d3dcmd->EnsureBufferVersion(d3d_position_buffer, d3d_position_buffer->CurrentDataVersion());
+                        d3dcmd->RequireState(d3d_position_buffer->Resource(), EResourceState::kAllShaderResource);
+                    }
+                }
+                d3dcmd->RequireState(blas->_scratch_resource, EResourceState::kUnorderedAccess);
+                d3dcmd->RequireState(blas->_blas_resource, EResourceState::kRaytracingAccelerationStructure);
+                D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDesc = {};
+                bottomLevelBuildDesc.Inputs = blas->_inputs;
+                bottomLevelBuildDesc.ScratchAccelerationStructureData = scratch_res->GetGPUVirtualAddress();
+                bottomLevelBuildDesc.DestAccelerationStructureData = blas_res->GetGPUVirtualAddress();
+                if (cmd_bas->_is_update)
+                {
+                    bottomLevelBuildDesc.Inputs.Flags |=
+                        D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PERFORM_UPDATE;
+                    bottomLevelBuildDesc.SourceAccelerationStructureData = blas_res->GetGPUVirtualAddress();
+                }
+                auto dxcmd = d3dcmd->NativeCmdList();
+                dxcmd->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
+                d3dcmd->UavBarrier(blas->_blas_resource);
             }
             else
             {
@@ -2662,6 +2683,8 @@ namespace Ailu::RHI::DX12
                 if (tlas->_tlas_resource)
                     d3dcmd->RequireState(tlas->_tlas_resource, EResourceState::kRaytracingAccelerationStructure);
                 d3dcmd->NativeCmdList()->BuildRaytracingAccelerationStructure(&tlas->GetBuildDesc(cmd_bas->_is_update), 0, nullptr);
+                if (tlas->_tlas_resource)
+                    d3dcmd->UavBarrier(tlas->_tlas_resource);
             }
         }
         else if (cmd->GetCmdType() == EGpuCommandType::kDispatchRays)

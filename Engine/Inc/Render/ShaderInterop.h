@@ -171,7 +171,29 @@ namespace Ailu::Render
         uint _index_bindless_idx;
         uint _submesh_triangle_offset;
         uint _submesh_triangle_count;
-        uint _reserved0;
+        uint _gi_data_index;
+    };
+
+    struct PrimitiveGIData
+    {
+        float4 _sh[9];
+    };
+
+    struct StaticDiffuseProbeGroupData
+    {
+        float3 _position;
+        uint _probe_offset;
+        float3 _size;
+        uint _probe_count_x;
+        float3 _origin;
+        uint _probe_count_y;
+        float3 _spacing;
+        uint _probe_count_z;
+    };
+
+    struct StaticDiffuseProbeSHData
+    {
+        float4 _sh[9];
     };
 
 #if defined(__cplusplus) || defined(AL_SCENE_PRIMITIVE)
@@ -259,14 +281,10 @@ namespace Ailu::Render
         uint   _FrameIndex;
         float3 _MainlightColor;
         float _cbs_padding1;
-        float4 _CascadeShadowSplit[kMaxCascadeShadowMapSplit];//sphere center,radius * radius
-        float4 _CascadeShadowParams;                          //cascade count,1/shadow_fade_out_factor,1/max_shadow_distance
-        float4 _MainShadowMapParams;                          //1/width, 1/height, PCF radius in texels, reserved
         ShaderDirectionalAndPointLightData _DirectionalLights[kMaxDirectionalLight];
         ShaderDirectionalAndPointLightData _PointLights[kMaxPointLight];
         ShaderSpotlLightData _SpotLights[kMaxSpotLight];
         ShaderArealLightData _AreaLights[kMaxAreaLight];
-        float4x4 _CascadeShadowMatrix[kMaxCascadeShadowMapSplit];
         float4 _ActiveLightCount;
         float4 _Time;     // (t/20,t,t*2,t*3)
         float4 _SinTime;  // sin(t/8),sin(t/4),sin(t/2),sin(t)
@@ -283,7 +301,7 @@ namespace Ailu::Render
         float g_EnvironmentIntensity;
         float g_EnvironmentRotation;
         float g_EnvironmentEnabled;
-        float _cbs_paddings[16];
+        float _cbs_paddings[40];
         //float4x4 _JointMatrix[80];
     } AL_SHADER_INTEROP_CBUFFER_END
 
@@ -321,10 +339,21 @@ namespace Ailu::Render
         float _uv_jitter_x;
         float3 _RB;
         float _uv_jitter_y;
+        float4x4 _DirectionalShadowMatrix[kMaxCascadeShadowMapSplit];
+        float4 _DirectionalShadowSplit[kMaxCascadeShadowMapSplit];
+        float4 _DirectionalShadowParams;
+        float4 _DirectionalShadowMapParams;
+        uint _RenderFeatureFlags;
+        float3 _render_view_padding0;
+        float4 _render_view_padding[9];
     } AL_SHADER_INTEROP_CBUFFER_END
 
 #ifdef __cplusplus
     static_assert((sizeof(PrimitiveData) % 16) == 0, "PrimitiveData must preserve StructuredBuffer element alignment");
+    static_assert((sizeof(StaticDiffuseProbeGroupData) % 16) == 0,
+                  "Static diffuse probe group data must preserve StructuredBuffer element alignment");
+    static_assert((sizeof(StaticDiffuseProbeSHData) % 16) == 0,
+                  "Static diffuse probe SH data must preserve StructuredBuffer element alignment");
     //	struct ScenePerMaterialData
     //	{
     //		float4 _BaseColor;

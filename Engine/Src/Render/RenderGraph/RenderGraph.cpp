@@ -36,13 +36,14 @@ namespace Ailu
                 constexpr u32 k_write_mask = static_cast<u32>(EResourceUsage::kWriteUAV) |
                                               static_cast<u32>(EResourceUsage::kWriteRTV) |
                                               static_cast<u32>(EResourceUsage::kDSV) |
-                                              static_cast<u32>(EResourceUsage::kCopyDst);
+                                              static_cast<u32>(EResourceUsage::kCopyDst) |
+                                              static_cast<u32>(EResourceUsage::kAccelStructWrite);
                 constexpr u32 k_read_mask = static_cast<u32>(EResourceUsage::kReadSRV) |
                                              static_cast<u32>(EResourceUsage::kCopySrc) |
                                              static_cast<u32>(EResourceUsage::kIndirectArgument) |
                                              static_cast<u32>(EResourceUsage::kVertexBuffer);
                 constexpr u32 k_known_mask = k_write_mask | k_read_mask |
-                                              static_cast<u32>(EResourceUsage::kRaytracingAccel);
+                                              static_cast<u32>(EResourceUsage::kAccelStructRead);
 
                 const u32 usage_bits = static_cast<u32>(usage);
                 const u32 write_bits = usage_bits & k_write_mask;
@@ -66,10 +67,10 @@ namespace Ailu
                     out_error = "a write usage cannot be combined with another usage";
                     return false;
                 }
-                if (HasUsage(usage, EResourceUsage::kRaytracingAccel) && usage_bits !=
-                    static_cast<u32>(EResourceUsage::kRaytracingAccel))
+                if (HasUsage(usage, EResourceUsage::kAccelStructRead) && usage_bits !=
+                    static_cast<u32>(EResourceUsage::kAccelStructRead))
                 {
-                    out_error = "RaytracingAccel cannot be combined with another usage";
+                    out_error = "AccelStructRead cannot be combined with another usage";
                     return false;
                 }
 
@@ -81,7 +82,8 @@ namespace Ailu
                     out_state = EResourceState::kDepthWrite;
                 else if (HasUsage(usage, EResourceUsage::kCopyDst))
                     out_state = EResourceState::kCopyDest;
-                else if (HasUsage(usage, EResourceUsage::kRaytracingAccel))
+                else if (HasUsage(usage, EResourceUsage::kAccelStructWrite) ||
+                         HasUsage(usage, EResourceUsage::kAccelStructRead))
                     out_state = EResourceState::kRaytracingAccelerationStructure;
                 else
                 {
@@ -393,7 +395,7 @@ namespace Ailu
             if (external == nullptr)
                 return RGHandle(0u);
             auto res_type = external->GetResourceType();
-            if (res_type == EGpuResType::kIndexBuffer || res_type == EGpuResType::kConstBuffer || res_type == EGpuResType::kGraphicsPSO)
+            if (res_type == EGpuResType::kConstBuffer || res_type == EGpuResType::kGraphicsPSO)
             {
                 AL_ASSERT_MSG(false, "RenderGraph::Import: Unsupported resource type!");
             }
@@ -1075,8 +1077,10 @@ namespace Ailu
                     tokens.emplace_back("CopyDst");
                 if (HasUsage(usage, EResourceUsage::kIndirectArgument))
                     tokens.emplace_back("IndirectArg");
-                if (HasUsage(usage, EResourceUsage::kRaytracingAccel))
-                    tokens.emplace_back("RTAS");
+                if (HasUsage(usage, EResourceUsage::kAccelStructRead))
+                    tokens.emplace_back("RTASRead");
+                if (HasUsage(usage, EResourceUsage::kAccelStructWrite))
+                    tokens.emplace_back("RTASWrite");
                 if (HasUsage(usage, EResourceUsage::kVertexBuffer))
                     tokens.emplace_back("VertexBuffer");
                 return join_strings(tokens, "|");

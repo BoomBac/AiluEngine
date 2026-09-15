@@ -30,11 +30,11 @@ namespace Ailu::Render
     #pragma region SSAOPass
     SSAOPass::SSAOPass() : RenderPass("SSAOPass")
     {
-        _ssao_computer = ResourceMgr::Get().GetRef<ComputeShader>(L"Shaders/hlsl/Compute/ssao_cs.alasset");
+        _ssao_computer = ResourceMgr::Get().LoadAssetRef<ComputeShader>(L"Shaders/hlsl/Compute/ssao_cs.alasset");
         _ssao_gen_kernel = _ssao_computer->FindKernel("SSAOGen");
         _ssao_blur_x_kernel = _ssao_computer->FindKernel("SSAOBlurX");
         _ssao_blur_y_kernel = _ssao_computer->FindKernel("SSAOBlurY");
-        _ssao_gen = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/ssao.hlsl"), "Runtime/SSAOGen");
+        _ssao_gen = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/ssao.alasset"), "Runtime/SSAOGen");
         _event = ERenderPassEvent::kBeforeDeferedLighting;
     }
     SSAOPass::~SSAOPass()

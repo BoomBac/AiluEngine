@@ -44,7 +44,8 @@ namespace Ailu
 
             auto &reg = _target_scene->GetRegister();
             auto *hier = reg.GetComponent<ECS::CHierarchy>(_target_entity);
-            if (hier == nullptr || hier->_parent == ECS::kInvalidEntity || !reg.IsAlive(hier->_parent))
+            if (hier == nullptr || hier->_parent == ECS::kInvalidEntity || _target_scene->IsSceneRoot(hier->_parent) ||
+                !reg.IsAlive(hier->_parent))
                 return nullptr;
 
             return reg.GetComponent<ECS::TransformComponent>(hier->_parent);

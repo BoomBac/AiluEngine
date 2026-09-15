@@ -657,6 +657,27 @@ builder_skeleton._meta = meta_skeleton;
 builder_skeleton._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Guid>);
 builder_skeleton._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Guid>);
 initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_skeleton));
+Meta meta_materials;
+meta_materials.Set("Category","");
+meta_materials.Set("IsColor",false);
+meta_materials.Set("IsRange",false);
+meta_materials.Set("IsFloatRange",true);
+meta_materials.Set("RangeMin",(f32)0);
+meta_materials.Set("RangeMax",(f32)1);
+MemberBuilder builder_materials;
+builder_materials._name = "_materials";
+builder_materials._type_name = "Vector<String>";
+builder_materials._offset = offsetof(MeshAssetDocument,_materials);
+builder_materials._is_const = false;
+builder_materials._is_static = false;
+builder_materials._is_public = true;
+builder_materials._is_pointer = false;
+builder_materials._is_ref = false;
+builder_materials._is_template = true;
+builder_materials._meta = meta_materials;
+builder_materials._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<String>>);
+builder_materials._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<String>>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_materials));
 cur_type = std::make_unique<Ailu::Type>(initializer);
 Ailu::Type::RegisterType(cur_type.get());
 }
@@ -1875,6 +1896,126 @@ return Ailu::InputActionAssetDocument::StaticType();
 return Ailu::InputActionAssetDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_InputActionAssetDocument(&Ailu::InputActionAssetDocument::StaticType, "Ailu::InputActionAssetDocument");
+const Ailu::Type* Ailu::Z_Construct_StaticDiffuseProbeDataAssetDocument_Type()
+{
+Ailu::Object::StaticType();
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "StaticDiffuseProbeDataAssetDocument";
+initializer._size = sizeof(Ailu::StaticDiffuseProbeDataAssetDocument);
+initializer._full_name = "Ailu::StaticDiffuseProbeDataAssetDocument";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu";
+initializer._base_name = "Ailu::Object";
+initializer._constructor = []()->Ailu::StaticDiffuseProbeDataAssetDocument* {return new Ailu::StaticDiffuseProbeDataAssetDocument;};
+Meta meta_header;
+meta_header.Set("Category","");
+meta_header.Set("IsColor",false);
+meta_header.Set("IsRange",false);
+meta_header.Set("IsFloatRange",true);
+meta_header.Set("RangeMin",(f32)0);
+meta_header.Set("RangeMax",(f32)1);
+MemberBuilder builder_header;
+builder_header._name = "_header";
+builder_header._type_name = "Ailu::AssetDocumentHeader";
+builder_header._offset = offsetof(StaticDiffuseProbeDataAssetDocument,_header);
+builder_header._is_const = false;
+builder_header._is_static = false;
+builder_header._is_public = true;
+builder_header._is_pointer = false;
+builder_header._is_ref = false;
+builder_header._is_template = false;
+builder_header._meta = meta_header;
+builder_header._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<AssetDocumentHeader>);
+builder_header._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<AssetDocumentHeader>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_header));
+Meta meta_grid;
+meta_grid.Set("Category","");
+meta_grid.Set("IsColor",false);
+meta_grid.Set("IsRange",false);
+meta_grid.Set("IsFloatRange",true);
+meta_grid.Set("RangeMin",(f32)0);
+meta_grid.Set("RangeMax",(f32)1);
+MemberBuilder builder_grid;
+builder_grid._name = "_grid";
+builder_grid._type_name = "Render::ProbeGridDesc";
+builder_grid._offset = offsetof(StaticDiffuseProbeDataAssetDocument,_grid);
+builder_grid._is_const = false;
+builder_grid._is_static = false;
+builder_grid._is_public = true;
+builder_grid._is_pointer = false;
+builder_grid._is_ref = false;
+builder_grid._is_template = false;
+builder_grid._meta = meta_grid;
+builder_grid._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Render::ProbeGridDesc>);
+builder_grid._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Render::ProbeGridDesc>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_grid));
+Meta meta_coefficients;
+meta_coefficients.Set("Category","");
+meta_coefficients.Set("IsColor",false);
+meta_coefficients.Set("IsRange",false);
+meta_coefficients.Set("IsFloatRange",true);
+meta_coefficients.Set("RangeMin",(f32)0);
+meta_coefficients.Set("RangeMax",(f32)1);
+MemberBuilder builder_coefficients;
+builder_coefficients._name = "_coefficients";
+builder_coefficients._type_name = "Vector<Vector4f>";
+builder_coefficients._offset = offsetof(StaticDiffuseProbeDataAssetDocument,_coefficients);
+builder_coefficients._is_const = false;
+builder_coefficients._is_static = false;
+builder_coefficients._is_public = true;
+builder_coefficients._is_pointer = false;
+builder_coefficients._is_ref = false;
+builder_coefficients._is_template = true;
+builder_coefficients._meta = meta_coefficients;
+builder_coefficients._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<Vector4f>>);
+builder_coefficients._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<Vector4f>>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_coefficients));
+Meta meta_revision;
+meta_revision.Set("Category","");
+meta_revision.Set("IsColor",false);
+meta_revision.Set("IsRange",false);
+meta_revision.Set("IsFloatRange",true);
+meta_revision.Set("RangeMin",(f32)0);
+meta_revision.Set("RangeMax",(f32)1);
+MemberBuilder builder_revision;
+builder_revision._name = "_revision";
+builder_revision._type_name = "u64";
+builder_revision._offset = offsetof(StaticDiffuseProbeDataAssetDocument,_revision);
+builder_revision._is_const = false;
+builder_revision._is_static = false;
+builder_revision._is_public = true;
+builder_revision._is_pointer = false;
+builder_revision._is_ref = false;
+builder_revision._is_template = false;
+builder_revision._meta = meta_revision;
+builder_revision._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<u64>);
+builder_revision._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<u64>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_revision));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+const Ailu::Type* Ailu::StaticDiffuseProbeDataAssetDocument::GetPrivateStaticClass()
+{
+	static const Ailu::Type* type = Z_Construct_StaticDiffuseProbeDataAssetDocument_Type();
+	return type;
+}
+
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::StaticDiffuseProbeDataAssetDocument>()
+{
+return Ailu::StaticDiffuseProbeDataAssetDocument::StaticType();
+}
+    const Type *Ailu::StaticDiffuseProbeDataAssetDocument::GetType()
+{
+return Ailu::StaticDiffuseProbeDataAssetDocument::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_StaticDiffuseProbeDataAssetDocument(&Ailu::StaticDiffuseProbeDataAssetDocument::StaticType, "Ailu::StaticDiffuseProbeDataAssetDocument");
 const Ailu::Type* Ailu::Z_Construct_GraphAssetDocument_Type()
 {
 Ailu::Object::StaticType();
@@ -5335,6 +5476,223 @@ return Ailu::SceneLightProbeComponentDocument::StaticType();
 return Ailu::SceneLightProbeComponentDocument::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_SceneLightProbeComponentDocument(&Ailu::SceneLightProbeComponentDocument::StaticType, "Ailu::SceneLightProbeComponentDocument");
+const Ailu::Type* Ailu::Z_Construct_SceneLightProbeGroupComponentDocument_Type()
+{
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "SceneLightProbeGroupComponentDocument";
+initializer._size = sizeof(Ailu::SceneLightProbeGroupComponentDocument);
+initializer._full_name = "Ailu::SceneLightProbeGroupComponentDocument";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu";
+initializer._base_name = "";
+initializer._constructor = []()->Ailu::SceneLightProbeGroupComponentDocument* {return new Ailu::SceneLightProbeGroupComponentDocument;};
+Meta meta_probe_count;
+meta_probe_count.Set("Category","");
+meta_probe_count.Set("IsColor",false);
+meta_probe_count.Set("IsRange",false);
+meta_probe_count.Set("IsFloatRange",true);
+meta_probe_count.Set("RangeMin",(f32)0);
+meta_probe_count.Set("RangeMax",(f32)1);
+MemberBuilder builder_probe_count;
+builder_probe_count._name = "_probe_count";
+builder_probe_count._type_name = "Vector3Int";
+builder_probe_count._offset = offsetof(SceneLightProbeGroupComponentDocument,_probe_count);
+builder_probe_count._is_const = false;
+builder_probe_count._is_static = false;
+builder_probe_count._is_public = true;
+builder_probe_count._is_pointer = false;
+builder_probe_count._is_ref = false;
+builder_probe_count._is_template = false;
+builder_probe_count._meta = meta_probe_count;
+builder_probe_count._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector3Int>);
+builder_probe_count._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector3Int>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_probe_count));
+Meta meta_size;
+meta_size.Set("Category","");
+meta_size.Set("IsColor",false);
+meta_size.Set("IsRange",false);
+meta_size.Set("IsFloatRange",true);
+meta_size.Set("RangeMin",(f32)0);
+meta_size.Set("RangeMax",(f32)1);
+MemberBuilder builder_size;
+builder_size._name = "_size";
+builder_size._type_name = "Vector3f";
+builder_size._offset = offsetof(SceneLightProbeGroupComponentDocument,_size);
+builder_size._is_const = false;
+builder_size._is_static = false;
+builder_size._is_public = true;
+builder_size._is_pointer = false;
+builder_size._is_ref = false;
+builder_size._is_template = false;
+builder_size._meta = meta_size;
+builder_size._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector3f>);
+builder_size._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector3f>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_size));
+Meta meta_baked_data_guid;
+meta_baked_data_guid.Set("Category","");
+meta_baked_data_guid.Set("IsColor",false);
+meta_baked_data_guid.Set("IsRange",false);
+meta_baked_data_guid.Set("IsFloatRange",true);
+meta_baked_data_guid.Set("RangeMin",(f32)0);
+meta_baked_data_guid.Set("RangeMax",(f32)1);
+MemberBuilder builder_baked_data_guid;
+builder_baked_data_guid._name = "_baked_data_guid";
+builder_baked_data_guid._type_name = "String";
+builder_baked_data_guid._offset = offsetof(SceneLightProbeGroupComponentDocument,_baked_data_guid);
+builder_baked_data_guid._is_const = false;
+builder_baked_data_guid._is_static = false;
+builder_baked_data_guid._is_public = true;
+builder_baked_data_guid._is_pointer = false;
+builder_baked_data_guid._is_ref = false;
+builder_baked_data_guid._is_template = false;
+builder_baked_data_guid._meta = meta_baked_data_guid;
+builder_baked_data_guid._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<String>);
+builder_baked_data_guid._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<String>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_baked_data_guid));
+Meta meta_draw_probes;
+meta_draw_probes.Set("Category","");
+meta_draw_probes.Set("IsColor",false);
+meta_draw_probes.Set("IsRange",false);
+meta_draw_probes.Set("IsFloatRange",true);
+meta_draw_probes.Set("RangeMin",(f32)0);
+meta_draw_probes.Set("RangeMax",(f32)1);
+MemberBuilder builder_draw_probes;
+builder_draw_probes._name = "_draw_probes";
+builder_draw_probes._type_name = "bool";
+builder_draw_probes._offset = offsetof(SceneLightProbeGroupComponentDocument,_draw_probes);
+builder_draw_probes._is_const = false;
+builder_draw_probes._is_static = false;
+builder_draw_probes._is_public = true;
+builder_draw_probes._is_pointer = false;
+builder_draw_probes._is_ref = false;
+builder_draw_probes._is_template = false;
+builder_draw_probes._meta = meta_draw_probes;
+builder_draw_probes._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_draw_probes._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_draw_probes));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+const Ailu::Type* Ailu::SceneLightProbeGroupComponentDocument::GetPrivateStaticClass()
+{
+	static const Ailu::Type* type = Z_Construct_SceneLightProbeGroupComponentDocument_Type();
+	return type;
+}
+
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::SceneLightProbeGroupComponentDocument>()
+{
+return Ailu::SceneLightProbeGroupComponentDocument::StaticType();
+}
+    const Type *Ailu::SceneLightProbeGroupComponentDocument::GetType()
+{
+return Ailu::SceneLightProbeGroupComponentDocument::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_SceneLightProbeGroupComponentDocument(&Ailu::SceneLightProbeGroupComponentDocument::StaticType, "Ailu::SceneLightProbeGroupComponentDocument");
+const Ailu::Type* Ailu::Z_Construct_SceneDDGIVolumeComponentDocument_Type()
+{
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "SceneDDGIVolumeComponentDocument";
+initializer._size = sizeof(Ailu::SceneDDGIVolumeComponentDocument);
+initializer._full_name = "Ailu::SceneDDGIVolumeComponentDocument";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu";
+initializer._base_name = "";
+initializer._constructor = []()->Ailu::SceneDDGIVolumeComponentDocument* {return new Ailu::SceneDDGIVolumeComponentDocument;};
+Meta meta_probe_count;
+meta_probe_count.Set("Category","");
+meta_probe_count.Set("IsColor",false);
+meta_probe_count.Set("IsRange",false);
+meta_probe_count.Set("IsFloatRange",true);
+meta_probe_count.Set("RangeMin",(f32)0);
+meta_probe_count.Set("RangeMax",(f32)1);
+MemberBuilder builder_probe_count;
+builder_probe_count._name = "_probe_count";
+builder_probe_count._type_name = "Vector3UInt";
+builder_probe_count._offset = offsetof(SceneDDGIVolumeComponentDocument,_probe_count);
+builder_probe_count._is_const = false;
+builder_probe_count._is_static = false;
+builder_probe_count._is_public = true;
+builder_probe_count._is_pointer = false;
+builder_probe_count._is_ref = false;
+builder_probe_count._is_template = false;
+builder_probe_count._meta = meta_probe_count;
+builder_probe_count._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector3UInt>);
+builder_probe_count._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector3UInt>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_probe_count));
+Meta meta_probe_spacing;
+meta_probe_spacing.Set("Category","");
+meta_probe_spacing.Set("IsColor",false);
+meta_probe_spacing.Set("IsRange",false);
+meta_probe_spacing.Set("IsFloatRange",true);
+meta_probe_spacing.Set("RangeMin",(f32)0);
+meta_probe_spacing.Set("RangeMax",(f32)1);
+MemberBuilder builder_probe_spacing;
+builder_probe_spacing._name = "_probe_spacing";
+builder_probe_spacing._type_name = "Vector3f";
+builder_probe_spacing._offset = offsetof(SceneDDGIVolumeComponentDocument,_probe_spacing);
+builder_probe_spacing._is_const = false;
+builder_probe_spacing._is_static = false;
+builder_probe_spacing._is_public = true;
+builder_probe_spacing._is_pointer = false;
+builder_probe_spacing._is_ref = false;
+builder_probe_spacing._is_template = false;
+builder_probe_spacing._meta = meta_probe_spacing;
+builder_probe_spacing._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector3f>);
+builder_probe_spacing._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector3f>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_probe_spacing));
+Meta meta_draw_probes;
+meta_draw_probes.Set("Category","");
+meta_draw_probes.Set("IsColor",false);
+meta_draw_probes.Set("IsRange",false);
+meta_draw_probes.Set("IsFloatRange",true);
+meta_draw_probes.Set("RangeMin",(f32)0);
+meta_draw_probes.Set("RangeMax",(f32)1);
+MemberBuilder builder_draw_probes;
+builder_draw_probes._name = "_draw_probes";
+builder_draw_probes._type_name = "bool";
+builder_draw_probes._offset = offsetof(SceneDDGIVolumeComponentDocument,_draw_probes);
+builder_draw_probes._is_const = false;
+builder_draw_probes._is_static = false;
+builder_draw_probes._is_public = true;
+builder_draw_probes._is_pointer = false;
+builder_draw_probes._is_ref = false;
+builder_draw_probes._is_template = false;
+builder_draw_probes._meta = meta_draw_probes;
+builder_draw_probes._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_draw_probes._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_draw_probes));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+const Ailu::Type* Ailu::SceneDDGIVolumeComponentDocument::GetPrivateStaticClass()
+{
+	static const Ailu::Type* type = Z_Construct_SceneDDGIVolumeComponentDocument_Type();
+	return type;
+}
+
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::SceneDDGIVolumeComponentDocument>()
+{
+return Ailu::SceneDDGIVolumeComponentDocument::StaticType();
+}
+    const Type *Ailu::SceneDDGIVolumeComponentDocument::GetType()
+{
+return Ailu::SceneDDGIVolumeComponentDocument::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_SceneDDGIVolumeComponentDocument(&Ailu::SceneDDGIVolumeComponentDocument::StaticType, "Ailu::SceneDDGIVolumeComponentDocument");
 const Ailu::Type* Ailu::Z_Construct_SceneEnvironmentComponentDocument_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -7043,6 +7401,90 @@ builder_lightprobe_component._meta = meta_lightprobe_component;
 builder_lightprobe_component._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<SceneLightProbeComponentDocument>);
 builder_lightprobe_component._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<SceneLightProbeComponentDocument>);
 initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_lightprobe_component));
+Meta meta_has_light_probe_group_component;
+meta_has_light_probe_group_component.Set("Category","");
+meta_has_light_probe_group_component.Set("IsColor",false);
+meta_has_light_probe_group_component.Set("IsRange",false);
+meta_has_light_probe_group_component.Set("IsFloatRange",true);
+meta_has_light_probe_group_component.Set("RangeMin",(f32)0);
+meta_has_light_probe_group_component.Set("RangeMax",(f32)1);
+MemberBuilder builder_has_light_probe_group_component;
+builder_has_light_probe_group_component._name = "_has_light_probe_group_component";
+builder_has_light_probe_group_component._type_name = "bool";
+builder_has_light_probe_group_component._offset = offsetof(SceneEntityDocument,_has_light_probe_group_component);
+builder_has_light_probe_group_component._is_const = false;
+builder_has_light_probe_group_component._is_static = false;
+builder_has_light_probe_group_component._is_public = true;
+builder_has_light_probe_group_component._is_pointer = false;
+builder_has_light_probe_group_component._is_ref = false;
+builder_has_light_probe_group_component._is_template = false;
+builder_has_light_probe_group_component._meta = meta_has_light_probe_group_component;
+builder_has_light_probe_group_component._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_has_light_probe_group_component._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_has_light_probe_group_component));
+Meta meta_light_probe_group_component;
+meta_light_probe_group_component.Set("Category","");
+meta_light_probe_group_component.Set("IsColor",false);
+meta_light_probe_group_component.Set("IsRange",false);
+meta_light_probe_group_component.Set("IsFloatRange",true);
+meta_light_probe_group_component.Set("RangeMin",(f32)0);
+meta_light_probe_group_component.Set("RangeMax",(f32)1);
+MemberBuilder builder_light_probe_group_component;
+builder_light_probe_group_component._name = "_light_probe_group_component";
+builder_light_probe_group_component._type_name = "Ailu::SceneLightProbeGroupComponentDocument";
+builder_light_probe_group_component._offset = offsetof(SceneEntityDocument,_light_probe_group_component);
+builder_light_probe_group_component._is_const = false;
+builder_light_probe_group_component._is_static = false;
+builder_light_probe_group_component._is_public = true;
+builder_light_probe_group_component._is_pointer = false;
+builder_light_probe_group_component._is_ref = false;
+builder_light_probe_group_component._is_template = false;
+builder_light_probe_group_component._meta = meta_light_probe_group_component;
+builder_light_probe_group_component._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<SceneLightProbeGroupComponentDocument>);
+builder_light_probe_group_component._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<SceneLightProbeGroupComponentDocument>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_light_probe_group_component));
+Meta meta_has_ddgi_volume_component;
+meta_has_ddgi_volume_component.Set("Category","");
+meta_has_ddgi_volume_component.Set("IsColor",false);
+meta_has_ddgi_volume_component.Set("IsRange",false);
+meta_has_ddgi_volume_component.Set("IsFloatRange",true);
+meta_has_ddgi_volume_component.Set("RangeMin",(f32)0);
+meta_has_ddgi_volume_component.Set("RangeMax",(f32)1);
+MemberBuilder builder_has_ddgi_volume_component;
+builder_has_ddgi_volume_component._name = "_has_ddgi_volume_component";
+builder_has_ddgi_volume_component._type_name = "bool";
+builder_has_ddgi_volume_component._offset = offsetof(SceneEntityDocument,_has_ddgi_volume_component);
+builder_has_ddgi_volume_component._is_const = false;
+builder_has_ddgi_volume_component._is_static = false;
+builder_has_ddgi_volume_component._is_public = true;
+builder_has_ddgi_volume_component._is_pointer = false;
+builder_has_ddgi_volume_component._is_ref = false;
+builder_has_ddgi_volume_component._is_template = false;
+builder_has_ddgi_volume_component._meta = meta_has_ddgi_volume_component;
+builder_has_ddgi_volume_component._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_has_ddgi_volume_component._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_has_ddgi_volume_component));
+Meta meta_ddgi_volume_component;
+meta_ddgi_volume_component.Set("Category","");
+meta_ddgi_volume_component.Set("IsColor",false);
+meta_ddgi_volume_component.Set("IsRange",false);
+meta_ddgi_volume_component.Set("IsFloatRange",true);
+meta_ddgi_volume_component.Set("RangeMin",(f32)0);
+meta_ddgi_volume_component.Set("RangeMax",(f32)1);
+MemberBuilder builder_ddgi_volume_component;
+builder_ddgi_volume_component._name = "_ddgi_volume_component";
+builder_ddgi_volume_component._type_name = "Ailu::SceneDDGIVolumeComponentDocument";
+builder_ddgi_volume_component._offset = offsetof(SceneEntityDocument,_ddgi_volume_component);
+builder_ddgi_volume_component._is_const = false;
+builder_ddgi_volume_component._is_static = false;
+builder_ddgi_volume_component._is_public = true;
+builder_ddgi_volume_component._is_pointer = false;
+builder_ddgi_volume_component._is_ref = false;
+builder_ddgi_volume_component._is_template = false;
+builder_ddgi_volume_component._meta = meta_ddgi_volume_component;
+builder_ddgi_volume_component._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<SceneDDGIVolumeComponentDocument>);
+builder_ddgi_volume_component._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<SceneDDGIVolumeComponentDocument>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_ddgi_volume_component));
 Meta meta_has_environment_component;
 meta_has_environment_component.Set("Category","");
 meta_has_environment_component.Set("IsColor",false);

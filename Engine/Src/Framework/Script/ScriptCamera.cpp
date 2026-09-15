@@ -28,7 +28,8 @@ namespace Ailu
         if (transform == nullptr) return;
         Matrix4x4f local_matrix = Transform::ToMatrix(Transform(position, rotation, transform->_scale));
         const auto *hierarchy = _scene->GetRegister().GetComponent<ECS::CHierarchy>(_entity);
-        if (hierarchy != nullptr && hierarchy->_parent != ECS::kInvalidEntity)
+        if (hierarchy != nullptr && hierarchy->_parent != ECS::kInvalidEntity &&
+            !_scene->IsSceneRoot(hierarchy->_parent))
         {
             if (const auto *parent = _scene->GetRegister().GetComponent<ECS::TransformComponent>(hierarchy->_parent))
                 local_matrix = local_matrix * Math::MatrixInverse(parent->_world_matrix);

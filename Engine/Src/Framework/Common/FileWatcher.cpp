@@ -5,6 +5,8 @@
 #include "Render/GraphicsContext.h"
 #include "Render/RayTracing/RayTracingShader.h"
 #include "Render/Shader.h"
+#include "Render/ShaderArtifactCache.h"
+#include "Render/ShaderDependencyRegistry.h"
 #include <algorithm>
 #include <cwctype>
 
@@ -153,6 +155,9 @@ namespace Ailu
             return;
 
         const WString sys_path = PathUtils::FormatFilePath(event._path);
+        Render::ShaderFileFingerprintCache::Get().Invalidate(sys_path);
+        for (const u64 artifact_key : Render::ShaderDependencyRegistry::Get().FindAffectedArtifacts(sys_path))
+            Render::ShaderArtifactCache::Get().InvalidateArtifact(artifact_key);
         u16 reload_shader_count = 0;
         u16 reload_compute_count = 0;
         u16 reload_rt_shader_count = 0;
@@ -222,7 +227,10 @@ namespace Ailu
             auto cs = ResourceMgr::IterToRefPtr<Render::ComputeShader>(it);
             if (cs && cs->IsDependencyFile(sys_path))
             {
-                ResourceMgr::Get().MarkAssetForReload(ResourceMgr::Get().GetLinkedAsset(cs.get()));
+                if (Asset *linked_asset = ResourceMgr::Get().GetLinkedAsset(cs.get()); linked_asset != nullptr)
+                    ResourceMgr::Get().MarkAssetForReload(linked_asset);
+                else if (Render::g_pGfxContext != nullptr)
+                    Render::g_pGfxContext->CompileShaderAsync(cs.get());
                 ++count;
             }
         }
@@ -236,9 +244,11 @@ namespace Ailu
         {
             if (shader != nullptr && shader->IsDependencyFile(sys_path))
             {
-                // Ray tracing shaders are currently runtime-only objects, not registered assets.
-                // Do not compile from the watcher callback; their asset-backed migration owns reload.
-                LOG_WARNING(L"Ray tracing shader dependency changed: {}. It is not yet asset-backed.", sys_path);
+                if (Asset *linked_asset = ResourceMgr::Get().GetLinkedAsset(shader); linked_asset != nullptr)
+                    ResourceMgr::Get().MarkAssetForReload(linked_asset);
+                else if (Render::g_pGfxContext != nullptr)
+                    Render::g_pGfxContext->CompileShaderAsync(shader);
+                ++count;
             }
         }
         return count;

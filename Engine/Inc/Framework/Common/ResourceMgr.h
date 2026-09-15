@@ -7,6 +7,7 @@
 #include "Framework/Common/NonCopyable.h"
 #include "FileManager.h"
 #include "Assets/Asset.h"
+#include "Assets/AssetRef.h"
 #include "Assets/AssetRegistry.h"
 #include "Assets/DerivedDataCache.h"
 #include "Framework/Common/Utils.h"
@@ -23,7 +24,9 @@
 #include "Scene/Scene.h"
 #include <chrono>
 #include <optional>
+#include <span>
 #include <unordered_map>
+#include <variant>
 
 namespace Ailu
 {
@@ -269,6 +272,8 @@ namespace Ailu
         template<typename T>
         Ref<T> Load(const Guid &guid, const ImportSetting *setting = nullptr);
         template<typename T>
+        AssetRef<T> LoadAssetRef(const WString &asset_path, const ImportSetting *setting = nullptr);
+        template<typename T>
         void LoadAsync(const WString &asset_path, const ImportSetting *setting = nullptr, OnLoadTaskCompleted<T> callback = {});
         template<typename T>
         void LoadAsync(const Guid &guid, const ImportSetting *setting = nullptr, OnLoadTaskCompleted<T> callback = {});
@@ -319,10 +324,11 @@ namespace Ailu
         Ref<Shader> LoadExternalShader(const WString &asset_path);
         Ref<ComputeShader> LoadExternalComputeShader(const WString &asset_path);
         void CreateAndRegisterEmbeddedMaterial(Mesh* mesh);
+        // slot_material_assets 按 submesh 顺序给出导入时生成的材质资产，命中槽位时优先使用它们
+        void CreateAndRegisterEmbeddedMaterial(Mesh *mesh, std::span<const Guid> slot_material_assets);
 
         // Import settings management
         const ImportSetting *GetImportSetting(const WString &asset_path) const;
-        void SetImportSetting(const WString &asset_path, Scope<ImportSetting> setting);
         void SetImportSetting(const WString &asset_path, const ImportSetting &setting);
 
         // Handler lookup (used by GetAssetLoader lambda which needs public access)
@@ -444,6 +450,9 @@ namespace Ailu
             Map<const Type *, Scope<IAssetHandler>> _handlers;
         };
 
+        using ImportSettingValue = std::variant<ImportSetting, TextureImportSetting, MeshImportSetting,
+                                                ShaderImportSetting>;
+
         inline static WString s_engine_res_root_path;
         inline static WString s_editor_res_root_path;
         inline static WString s_project_root_path;
@@ -475,7 +484,8 @@ namespace Ailu
         Queue<Asset *> _pending_delete_assets;
         HashMap<Guid, PendingAssetReload, GuidHasher> _pending_reload_requests;
         Queue<Guid> _pending_artifact_cleanup_guids;
-        HashMap<WString, Scope<ImportSetting>> _importers;
+        mutable std::mutex _importers_mutex;
+        HashMap<WString, ImportSettingValue> _importers;
         Vector<AssetMountDomain> _asset_domains;
         AssetHandlerRegistry _asset_handler_registry;
         AssetRegistry _asset_registry;
@@ -493,6 +503,23 @@ namespace Ailu
     {
         return std::static_pointer_cast<T>(Load(asset_path,setting,T::StaticType()));
     }
+
+    template<typename T>
+    inline AssetRef<T> ResourceMgr::LoadAssetRef(const WString &asset_path, const ImportSetting *setting)
+    {
+        Ref<T> asset = Load<T>(asset_path, setting);
+        AssetRef<T> asset_ref;
+        if (asset == nullptr)
+            return asset_ref;
+
+        const Guid &guid = GetAssetGuid(asset.get());
+        if (!guid.IsEmpty())
+            asset_ref.Set(guid, std::move(asset));
+        else
+            asset_ref = std::move(asset);
+        return asset_ref;
+    }
+
     template<typename T>
     inline Ref<T> ResourceMgr::Load(const Guid &guid, const ImportSetting *setting)
     {

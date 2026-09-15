@@ -4,6 +4,7 @@
 #pragma once
 #ifndef __CLOUD_RENDERER_H__
 #define __CLOUD_RENDERER_H__
+#include "Assets/AssetRef.h"
 #include "../Texture.h"
 #include "RenderFeature.h"
 #include "generated/VolumetricClouds.gen.h"
@@ -48,8 +49,8 @@ namespace Ailu::Render
         Ref<Texture2D> _blue_noise;
         Ref<Texture2D> _curl_noise;
         Ref<Texture2D> _weather_map;
-        Ref<ComputeShader> _noise_gen;
-        Ref<ComputeShader> _cloud_gen;
+        AssetRef<ComputeShader> _noise_gen;
+        AssetRef<ComputeShader> _cloud_gen;
         ComputeShaderKernelId _cloud_main_kernel = kInvalidComputeShaderKernelId;
         ComputeShaderKernelId _cloud_reprojection_kernel = kInvalidComputeShaderKernelId;
         Ref<RenderTexture> _cloud_rt_a;

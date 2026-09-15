@@ -1,4 +1,5 @@
 #pragma once
+#include "Assets/AssetRef.h"
 #ifndef __D3D_TEXTURE2D_H__
 #define __D3D_TEXTURE2D_H__
 
@@ -126,9 +127,9 @@ namespace Ailu::RHI::DX12
         D3DResource _p_d3dres;
         Map<u16, D3DTextureViewInfo> _views;
         //gen mipmap for 1~4
-        Ref<ComputeShader> _p_mipmapgen_cs0 = nullptr;
+        AssetRef<ComputeShader> _p_mipmapgen_cs0;
         //gen mipmap for 5~max
-        Ref<ComputeShader> _p_mipmapgen_cs1 = nullptr;
+        AssetRef<ComputeShader> _p_mipmapgen_cs1;
         ComputeShaderKernelId _mipmap_gen_3d_kernel = kInvalidComputeShaderKernelId;
     };
 

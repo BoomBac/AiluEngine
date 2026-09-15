@@ -71,6 +71,7 @@ namespace Ailu
             else if (type_name == ECS::EnvironmentComponent::StaticTypeName()) reg.AddComponent<ECS::EnvironmentComponent>(entity);
             else if (type_name == ECS::CHierarchy::StaticTypeName()) reg.AddComponent<ECS::CHierarchy>(entity);
             else if (type_name == ECS::CLightProbe::StaticTypeName()) reg.AddComponent<ECS::CLightProbe>(entity);
+            else if (type_name == ECS::DDGIVolumeComponent::StaticTypeName()) reg.AddComponent<ECS::DDGIVolumeComponent>(entity);
             else if (type_name == ECS::CRigidBody::StaticTypeName()) reg.AddComponent<ECS::CRigidBody>(entity);
             else if (type_name == ECS::CCollider::StaticTypeName()) reg.AddComponent<ECS::CCollider>(entity);
             else if (type_name == ECS::RigidBody2DComponent::StaticTypeName()) reg.AddComponent<ECS::RigidBody2DComponent>(entity);
@@ -94,6 +95,7 @@ namespace Ailu
             else if (type_name == ECS::ScriptComponent::StaticTypeName()) reg.RemoveComponent<ECS::ScriptComponent>(entity);
             else if (type_name == ECS::RigidBody2DComponent::StaticTypeName()) reg.RemoveComponent<ECS::RigidBody2DComponent>(entity);
             else if (type_name == ECS::Collider2DComponent::StaticTypeName()) reg.RemoveComponent<ECS::Collider2DComponent>(entity);
+            else if (type_name == ECS::DDGIVolumeComponent::StaticTypeName()) reg.RemoveComponent<ECS::DDGIVolumeComponent>(entity);
             else if (type_name == ECS::SpriteRendererComponent::StaticTypeName()) reg.RemoveComponent<ECS::SpriteRendererComponent>(entity);
             else return false;
             scene.MarkStructureChanged();
@@ -122,7 +124,8 @@ namespace Ailu
 
             Matrix4x4f local_matrix = Transform::ToMatrix(world_transform);
             const auto *hierarchy = script_transform._scene->GetRegister().GetComponent<ECS::CHierarchy>(script_transform._entity);
-            if (hierarchy != nullptr && hierarchy->_parent != ECS::kInvalidEntity)
+            if (hierarchy != nullptr && hierarchy->_parent != ECS::kInvalidEntity &&
+                !script_transform._scene->IsSceneRoot(hierarchy->_parent))
             {
                 const auto *parent = script_transform._scene->GetRegister().GetComponent<ECS::TransformComponent>(hierarchy->_parent);
                 if (parent != nullptr)

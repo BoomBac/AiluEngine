@@ -42,6 +42,13 @@ namespace Ailu
         bool Save(const AssetSaveContext &context) final;
     };
 
+    class AILU_API RayTracingShaderAssetHandler : public IAssetHandler
+    {
+        const Type *AssetType() const final;
+        Scope<Asset> Load(const AssetLoadContext &context) final;
+        bool Save(const AssetSaveContext &context) final;
+    };
+
     class AILU_API TextureAssetHandler : public IAssetHandler
     {
         const Type *AssetType() const final;
@@ -134,6 +141,13 @@ namespace Ailu
     };
 
     class AILU_API WidgetAssetHandler : public IAssetHandler
+    {
+        const Type *AssetType() const final;
+        Scope<Asset> Load(const AssetLoadContext &context) final;
+        bool Save(const AssetSaveContext &context) final;
+    };
+
+    class AILU_API StaticDiffuseProbeDataAssetHandler : public IAssetHandler
     {
         const Type *AssetType() const final;
         Scope<Asset> Load(const AssetLoadContext &context) final;

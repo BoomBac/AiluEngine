@@ -17,7 +17,7 @@ namespace Ailu::Render
         desc._element_size = sizeof(MaterialData);
         desc._is_random_write = false;
         desc._size = desc._element_size * desc._element_num;
-        desc._target = EGPUBufferTarget::kConstant | EGPUBufferTarget::kStructured;
+        desc._target = EGPUBufferTarget::kStructured;
         _material_buffer = GPUBuffer::Create(desc);
         _material_buffer->Name(std::format("GlobalMaterialBuffer"));
         desc._element_num = RenderConstants::kMaxRenderObjectCount;
@@ -84,6 +84,60 @@ namespace Ailu::Render
         }
         return &*_scene_primitive_buffers[_scene_primitive_buffer_lut[hash]];
     }
+    GPUBuffer *FrameResource::GetScenePrimitiveGIDataBuffer(u64 hash)
+    {
+        if (!_scene_primitive_gi_buffer_lut.contains(hash))
+        {
+            BufferDesc desc;
+            desc._element_num = RenderConstants::kMaxRenderObjectCount;
+            desc._element_size = sizeof(PrimitiveGIData);
+            desc._is_random_write = false;
+            desc._size = desc._element_size * desc._element_num;
+            desc._target = EGPUBufferTarget::kStructured;
+            auto buf = GPUBuffer::Create(desc);
+            buf->Name(std::format("ScenePrimitiveGIDataBuffer_{}", hash));
+            _scene_primitive_gi_buffers.push_back(buf);
+            _scene_primitive_gi_buffer_lut[hash] = _scene_primitive_gi_buffers.size() - 1u;
+            return _scene_primitive_gi_buffers.back().get();
+        }
+        return _scene_primitive_gi_buffers[_scene_primitive_gi_buffer_lut[hash]].get();
+    }
+    GPUBuffer *FrameResource::GetStaticDiffuseProbeGroupBuffer(u64 hash)
+    {
+        if (!_static_diffuse_probe_group_buffer_lut.contains(hash))
+        {
+            BufferDesc desc;
+            desc._element_num = RenderConstants::kMaxStaticDiffuseProbeGroupCount;
+            desc._element_size = sizeof(StaticDiffuseProbeGroupData);
+            desc._is_random_write = false;
+            desc._size = desc._element_size * desc._element_num;
+            desc._target = EGPUBufferTarget::kStructured;
+            auto buffer = GPUBuffer::Create(desc);
+            buffer->Name(std::format("StaticDiffuseProbeGroupBuffer_{}", hash));
+            _static_diffuse_probe_group_buffers.emplace_back(buffer);
+            _static_diffuse_probe_group_buffer_lut[hash] = _static_diffuse_probe_group_buffers.size() - 1u;
+            return buffer.get();
+        }
+        return _static_diffuse_probe_group_buffers[_static_diffuse_probe_group_buffer_lut[hash]].get();
+    }
+    GPUBuffer *FrameResource::GetStaticDiffuseProbeDataBuffer(u64 hash)
+    {
+        if (!_static_diffuse_probe_data_buffer_lut.contains(hash))
+        {
+            BufferDesc desc;
+            desc._element_num = RenderConstants::kMaxStaticDiffuseProbeCount;
+            desc._element_size = sizeof(StaticDiffuseProbeSHData);
+            desc._is_random_write = false;
+            desc._size = desc._element_size * desc._element_num;
+            desc._target = EGPUBufferTarget::kStructured;
+            auto buffer = GPUBuffer::Create(desc);
+            buffer->Name(std::format("StaticDiffuseProbeDataBuffer_{}", hash));
+            _static_diffuse_probe_data_buffers.emplace_back(buffer);
+            _static_diffuse_probe_data_buffer_lut[hash] = _static_diffuse_probe_data_buffers.size() - 1u;
+            return buffer.get();
+        }
+        return _static_diffuse_probe_data_buffers[_static_diffuse_probe_data_buffer_lut[hash]].get();
+    }
     PrimitiveIndexAllocation FrameResource::AllocatePrimitiveIndices(u32 count)
     {
         AL_ASSERT(_primitive_indices.size() + count <= RenderConstants::kMaxRenderObjectCount);
@@ -135,6 +189,10 @@ namespace Ailu::Render
         auto &gfx = GraphicsContext::Get();
         if (_has_active_slot)
         {
+            // 槽位fence必须记录该槽位“最后一次使用”之后提交的fence：上一帧的所有命令在上一帧
+            // 结束时已提交完毕，此刻取到的值才能覆盖该槽位上传缓冲区里被引用的内容。
+            // 若在这里提前记录帧起始值，等待会落在已经穿越的fence上，槽位复用可能发生在
+            // 上一轮GPU工作仍在执行时（表现为大页被使用中释放）。
             _frame_slot_fence_values[_active_slot] = gfx.GetFenceValueCPU();
             _prev_slot = _active_slot;
             _active_slot = (_active_slot + 1u) % kFrameResourceSlotCount;
@@ -146,6 +204,7 @@ namespace Ailu::Render
             _has_active_slot = true;
         }
 
+        // 该槽位上一轮的工作尚未执行完时，必须先等待，之后才能重置它的上传缓冲区
         const u64 slot_fence = _frame_slot_fence_values[_active_slot];
         if (slot_fence != 0u && gfx.GetFenceValueGPU() < slot_fence)
         {

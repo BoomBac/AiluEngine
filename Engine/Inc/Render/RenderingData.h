@@ -9,6 +9,7 @@
 #include "Framework/Math/Geometry.h"
 #include "Texture.h"
 #include "PostprocessSettings.h"
+#include "SphericalHarmonics.h"
 #include "RenderGraph/RenderGraphFwd.h"
 #include "generated/RenderingData.gen.h"
 
@@ -33,6 +34,7 @@ namespace Ailu::Render
         Texture *_source = nullptr;
         Ref<Texture> _sky_cubemap;
         Ref<Texture> _diffuse_irradiance;
+        Ref<GPUBuffer> _diffuse_sh;
         Ref<Texture> _specular_prefilter;
         Ref<Texture> _transmittance_lut;
         Ref<Texture> _mult_scatter_lut;
@@ -70,6 +72,12 @@ namespace Ailu::Render
         inline static f32 s_cascade_shadow_map_split[4] = {0.10f, 0.25f, 0.50f, 1.0f};
         inline static f32 s_shadow_fade_out_factor = 0.1f;
         inline static u32 s_cascade_shaodw_map_resolution = 2048u;
+        inline static f32 s_probe_shadow_distance = 40.0f;
+        inline static u32 s_probe_directional_shadow_map_resolution = 1024u;
+        // 静态漫反射探针烘焙遍数。第 2 遍起会把上一遍烘出的 GI 作为间接光参与 capture，
+        // 每多一遍多一次光能弹射（单遍烘焙等于零弹射，室内间接光会明显偏弱）。
+        // 每遍耗时约等于探针数量帧，探针多时不要把遍数设大。
+        inline static u32 s_static_probe_bake_pass_count = 3u;
     };
 
     class Mesh;
@@ -105,17 +113,72 @@ namespace Ailu::Render
 
     using CullResult = Map<u32, Vector<RenderableObjectData>>;
 
+    enum class ERenderPurpose : u8
+    {
+        kCamera,
+        kReflectionProbe,
+        kStaticDiffuseProbe
+    };
+
+    enum ERenderFeature : u32
+    {
+        kRenderFeatureStaticDiffuseGi = 1u << 0u,
+        kRenderFeatureReflectionProbe = 1u << 1u,
+        kRenderFeatureEnvironmentIbl = 1u << 2u
+    };
+
+    inline constexpr u32 kDefaultRenderFeatures = kRenderFeatureStaticDiffuseGi |
+                                                   kRenderFeatureReflectionProbe |
+                                                   kRenderFeatureEnvironmentIbl;
+
+    struct RenderRequest
+    {
+        ERenderPurpose _purpose = ERenderPurpose::kCamera;
+        u32 _feature_flags = kDefaultRenderFeatures;
+        bool _enable_shadows = true;
+        f32 _probe_shadow_distance = 40.0f;
+    };
+
+    inline RenderRequest MakeCameraRenderRequest()
+    {
+        return RenderRequest{};
+    }
+
+    inline RenderRequest MakeReflectionProbeRenderRequest(f32 shadow_distance)
+    {
+        RenderRequest request;
+        request._purpose = ERenderPurpose::kReflectionProbe;
+        request._feature_flags = kRenderFeatureEnvironmentIbl;
+        request._enable_shadows = true;
+        request._probe_shadow_distance = shadow_distance;
+        return request;
+    }
+
+    inline RenderRequest MakeStaticDiffuseProbeRenderRequest(f32 shadow_distance)
+    {
+        RenderRequest request;
+        request._purpose = ERenderPurpose::kStaticDiffuseProbe;
+        request._feature_flags = kRenderFeatureEnvironmentIbl;
+        request._enable_shadows = true;
+        request._probe_shadow_distance = shadow_distance;
+        return request;
+    }
+
+    enum class EDirectionalShadowMode : u8
+    {
+        kNone,
+        kCsm,
+        kSingleOrthographic
+    };
+
+    struct ShadowSet;
+
     class Camera;
 
     enum class ERenderViewType : u8
     {
         kCamera,
-        kPreview,
-        kCubemap,
-        kDirectionalShadow,
-        kPointShadow,
-        kSpotShadow,
-        kAreaShadow
+        kPreview
     };
 
     struct ViewCullInput
@@ -126,22 +189,12 @@ namespace Ailu::Render
         bool _is_custom_vp = false;
     };
 
-    struct ShadowViewRequest
-    {
-        const Camera *_camera = nullptr;
-        ERenderViewType _view_type = ERenderViewType::kDirectionalShadow;
-        u16 _light_index = 0u;
-        u16 _cascade_or_face = 0u;
-        u32 _view_index = 0u;
-    };
-
     struct SceneRenderData
     {
         const SceneManagement::Scene *_scene = nullptr;
         const Vector<ScenePrimitive> *_primitives = nullptr;
         const Vector<PrimitiveData> *_primitive_data = nullptr;
         const Vector<MaterialData> *_material_data = nullptr;
-        Vector<ShadowViewRequest> _shadow_views;
     };
 
     struct ViewRenderData
@@ -153,24 +206,6 @@ namespace Ailu::Render
         CullResult _cull_result;
         Vector<u32> _visible_skinned_primitives;
     };
-
-    struct RenderingShadowData
-    {
-        i16 _shadowmap_index = -1;
-        Matrix4x4f _shadow_matrix;
-        float _shadow_bias = 0.001f;
-        const CullResult *_cull_results;
-    };
-    struct RenderingPointShadowData
-    {
-        i16 _shadowmap_index = -1;
-        Matrix4x4f _shadow_matrices[6];
-        float _shadow_bias = 0.001f;
-        Vector3f _light_world_pos;
-        float _camera_near, _camera_far;
-        Array<const CullResult *, 6> _cull_results;
-    };
-
 
     struct CameraData
     {
@@ -192,12 +227,6 @@ namespace Ailu::Render
     {
     public:
         RenderingData() {};
-        //index 0 for directional shadow
-        RenderingShadowData _cascade_shadow_data[RenderConstants::kMaxCascadeShadowMapSplitNum];
-        RenderingShadowData _spot_shadow_data[RenderConstants::kMaxSpotLightNum];
-        RenderingShadowData _area_shadow_data[RenderConstants::kMaxAreaLightNum];
-        RenderingPointShadowData _point_shadow_data[RenderConstants::kMaxPointLightNum];
-        u8 _addi_shadow_num = 0, _addi_point_shadow_num = 0;
         ConstantBuffer *_p_per_scene_cbuf;
         ConstantBuffer *_p_per_camera_cbuf;
         GPUBuffer *_scene_primitive_buffer = nullptr;
@@ -216,8 +245,8 @@ namespace Ailu::Render
         /*
           GBuffer0 (RG, 2通道) - 存储法线 (Packed)
           GBuffer1 (RGBA, 4通道) - 存储颜色 (RGB) 和 粗糙度 (A)
-          GBuffer2 (RGBA, 4通道) - 存储高光颜色 (RGB) 和 金属度 (A)
-          GBuffer3 (RGBA, 4通道) - 存储自发光颜色 (RGB) 和 可能的附加信息 (A)*/
+          GBuffer2 (RGBA, 4通道) - 存储自发光颜色 (RGB) 和 金属度 (A)
+          GBuffer3 (RGBA, 4通道) - 存储选中的 diffuse irradiance (RGB)，A 保留*/
         Vector<RTHandle> _gbuffers;
         struct
         {
@@ -236,6 +265,7 @@ namespace Ailu::Render
             RDG::RGHandle         _volumetric_fog_accum;
             RDG::RGHandle         _sky_view_lut;
             RDG::RGHandle         _environment_sky;
+            RDG::RGHandle         _environment_sh;
             RDG::RGHandle         _environment_diffuse;
             RDG::RGHandle         _environment_specular;
             RDG::RGHandle         _environment_transmittance_lut;
@@ -243,6 +273,8 @@ namespace Ailu::Render
         } _rg_handles;
         CommandBuffer *cmd;
         const CullResult *_cull_results;
+        const ShadowSet *_shadow_set = nullptr;
+        bool _render_shadow_maps = false;
         const SceneManagement::Scene *_scene = nullptr;
         const Camera *_camera;
         CameraData _camera_data;
@@ -256,8 +288,6 @@ namespace Ailu::Render
         Vector4f _mainlight_world_position;
         void Reset()
         {
-            _addi_shadow_num = 0;
-            _addi_point_shadow_num = 0;
             _postprocess_input = nullptr;
         }
     };

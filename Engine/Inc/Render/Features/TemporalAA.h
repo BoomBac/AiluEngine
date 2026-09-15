@@ -1,6 +1,7 @@
 #pragma once
 #ifndef __TAA_H__
 #define __TAA_H__
+#include "Assets/AssetRef.h"
 #include "RenderFeature.h"
 #include "Framework/Core/CoreMinimal.h"
 #include "Framework/Core/Containers/Map.h"
@@ -99,7 +100,7 @@ namespace Ailu::Render
         Material *_taa_material;
         Matrix4x4f _cur_vp_matrix;
         Ref<ConstantBuffer> _origin_camera_cbuf;
-        Ref<ComputeShader> _taa_gen;
+        AssetRef<ComputeShader> _taa_gen;
         ComputeShaderKernelId _taa_kernel = kInvalidComputeShaderKernelId;
     };
 

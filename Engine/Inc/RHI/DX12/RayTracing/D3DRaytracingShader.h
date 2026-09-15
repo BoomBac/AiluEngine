@@ -18,7 +18,7 @@ namespace Ailu::RHI::DX12
         const D3D12_DISPATCH_RAYS_DESC& GetDispatchDesc(u32 w,u32 h, u32 depth);
     private:
         void DispatchRays(RHICommandBuffer* cmd,uint w, uint h, uint depth) final;
-        bool RHICompileImpl(Render::ShaderVariantHash variant_hash, bool is_load_cache) final;
+        bool RHICompileImpl(Render::ShaderVariantHash variant_hash, Render::EShaderCompilePolicy policy) final;
         void BuildShaderTables();
         void LoadReflectionInfo(ID3D12LibraryReflection *reflection);
         void GenerateRootSignature();

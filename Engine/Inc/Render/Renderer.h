@@ -19,6 +19,8 @@
 #include <functional>
 #include "RenderingData.h"
 #include "Render/Environment.h"
+#include "Render/StaticDiffuseProbeSystem.h"
+#include "Render/ShadowSystem.h"
 #include "Scene/Scene.h"
 #include "generated/Renderer.gen.h"
 
@@ -71,6 +73,13 @@ namespace Ailu
             Renderer();
             ~Renderer();
             void Render(const Camera &cam, const Scene &s);
+            void Render(const Camera &cam, const Scene &s, const RenderRequest &request);
+            const RenderRequest &GetRenderRequest() const { return _render_request; }
+            bool IsRenderingProbe() const
+            {
+                return _render_request._purpose == ERenderPurpose::kReflectionProbe ||
+                       _render_request._purpose == ERenderPurpose::kStaticDiffuseProbe;
+            }
             void BeginScene(const Camera &cam, const Scene &s);
             void EndScene(const Scene &s);
             void FrameCleanup();
@@ -92,7 +101,6 @@ namespace Ailu
             void SetupFrameResource(FrameResource *prev_fr, FrameResource *cur_fr);
             RDG::RenderGraph& GetRenderGraph() { return *_rd_graph; }
         public:
-            bool _is_render_light_probe = false;
             bool _is_hiz_active = true;
             bool _is_use_render_graph = true;
             bool _is_use_raytracing = false;
@@ -101,16 +109,17 @@ namespace Ailu
             void RefreshScenePrimitiveVertexBuffers();
             void PrepareScene(const Scene &s);
             void PrepareLight(const Scene &s);
-            void PrepareSceneRenderData(const Scene &s, const Camera &cam);
+            void PrepareSceneRenderData(const Scene &s);
             void PrepareViews(const Scene &s, const Camera &cam);
             void PrepareFrameViews(const Scene &s, const Vector<Camera *> &cameras);
             void DispatchViewCulls(const Scene &s, u32 first_view_index);
-            void ResetSceneShadowData(const Scene &s);
-            void FinalizeShadowViewData();
-            void RestorePreparedShadowData();
+            void CullShadowSet(const Scene &s, ShadowSet &shadow_set);
+            void ApplyShadowSetToLightData(const Scene &s, const ShadowSet *shadow_set);
             void PrepareCamera(const Camera &cam);
+            void ApplyShadowSetToCameraData(CBufferPerCameraData &camera_data, const ShadowSet *shadow_set);
             void PrepareMaterial(const Scene& s);
-            void DoRender(const Camera &cam, const Scene &s, RenderTexture *output_target = nullptr, i32 output_view_index = -1);
+            void DoRender(const Camera &cam, const Scene &s, const RenderRequest &request, const ShadowSet *shadow_set,
+                          bool render_shadow_maps, RenderTexture *output_target = nullptr, i32 output_view_index = -1);
             void Cull(const SceneRenderData &scene_data, const ViewCullInput &input, CullResult &output);
             static void StableSort(Vector<RenderPass *> list);
 
@@ -127,22 +136,29 @@ namespace Ailu
             RTHandle _camera_depth_tex_handle;
             Vector<ScenePrimitive> _scene_primitives;
             Vector<PrimitiveData> _primitive_data;
+            Vector<PrimitiveGIData> _primitive_gi_data;
+            Vector<StaticDiffuseProbeGroupData> _static_diffuse_probe_groups;
+            Vector<StaticDiffuseProbeSHData> _static_diffuse_probe_data;
+            struct RendererGIState
+            {
+                SphericalHarmonicsL2 _sh;
+                Vector3f _anchor = Vector3f::kZero;
+                u64 _revision = 0u;
+                bool _valid = false;
+            };
+            HashMap<ECS::Entity, RendererGIState> _gi_cache;
             SceneRenderData _scene_render_data;
             Vector<ViewRenderData> _view_data;
             ViewRenderData *_active_view_data = nullptr;
             bool _scene_render_data_valid = false;
-            RenderingShadowData _prepared_cascade_shadow_data[RenderConstants::kMaxCascadeShadowMapSplitNum];
-            RenderingShadowData _prepared_spot_shadow_data[RenderConstants::kMaxSpotLightNum];
-            RenderingShadowData _prepared_area_shadow_data[RenderConstants::kMaxAreaLightNum];
-            RenderingPointShadowData _prepared_point_shadow_data[RenderConstants::kMaxPointLightNum];
-            u8 _prepared_addi_shadow_num = 0u;
-            u8 _prepared_addi_point_shadow_num = 0u;
             //CBufferPerSceneData _per_scene_cbuf_data;
             //CBufferPerCameraData _per_cam_cbuf_data;
 
             RDG::RenderGraph* _rd_graph;
 
             EnvironmentSystem _environment_system;
+            StaticDiffuseProbeSystem _static_probe_system;
+            ShadowSystem _shadow_system;
             Scope<ShadowCastPass> _shadowcast_pass;
             Scope<DeferredGeometryPass> _gbuffer_pass;
             Scope<CopyDepthPass> _coptdepth_pass;
@@ -166,10 +182,12 @@ namespace Ailu
             RenderFeature *_raytrace_gi;
             RenderFeature *_rtxdi;
             RenderFeature *_fog;
-        RenderFeature *_sprite;
+            RenderFeature *_ddgi;
+            RenderFeature *_sprite;
             u64 _active_camera_hash;
 
             RenderingData _rendering_data;
+            RenderRequest _render_request;
 
             Vector<RenderFeature *> _owned_features;
             //存储一份当前renderer使用的所有feature，不对元素的生命周期负责

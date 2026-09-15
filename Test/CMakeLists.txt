@@ -52,6 +52,7 @@ function(ailu_configure_test_target target_name)
 
     target_compile_definitions(${target_name} PUBLIC
         Editor_EXPORTS
+        FBXSDK_SHARED
         _WINDOWS
         UNICODE
         _UNICODE

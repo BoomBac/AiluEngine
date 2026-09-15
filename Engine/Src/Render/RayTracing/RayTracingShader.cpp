@@ -306,13 +306,13 @@ namespace Ailu::Render
         _bind_state.push(cur_state);
     }
 
-    bool RayTracingShader::Compile(bool is_load_cache)
+    bool RayTracingShader::Compile(EShaderCompilePolicy policy)
     {
         _is_compiling.store(true);
         const auto old_bind_infos = _bind_res_infos;
         memcpy(_cache_cbuf_data, _cbuf_data, sizeof(_cbuf_data));
         ShaderVariantHash variant_hash = 0u;
-        const bool is_succeed = RHICompileImpl(variant_hash, is_load_cache);
+        const bool is_succeed = RHICompileImpl(variant_hash, policy);
         if (is_succeed)
         {
             for (auto &[name, info] : _bind_res_infos)
@@ -325,7 +325,7 @@ namespace Ailu::Render
         return is_succeed;
     }
 
-    bool RayTracingShader::RHICompileImpl(ShaderVariantHash variant_hash, bool is_load_cache)
+    bool RayTracingShader::RHICompileImpl(ShaderVariantHash variant_hash, EShaderCompilePolicy policy)
     {
         return true;
     }

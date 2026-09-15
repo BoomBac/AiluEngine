@@ -40,8 +40,8 @@ namespace Ailu::Render
         auto cloud_shader = ResourceMgr::Get().Load<Shader>(L"Shaders/hlsl/global_volumetric_cloud.alasset");
         _global_cloud = MakeRef<Material>(cloud_shader.get(), "Runtime/VolumetricClouds");
         _event = ERenderPassEvent::kAfterSkybox;
-        _noise_gen = ResourceMgr::Get().Load<ComputeShader>(L"Shaders/hlsl/Compute/volumetric_noise_generator.alasset");
-        _cloud_gen = ResourceMgr::Get().Load<ComputeShader>(L"Shaders/hlsl/Compute/volumetric_cloud.alasset");
+        _noise_gen = ResourceMgr::Get().LoadAssetRef<ComputeShader>(L"Shaders/hlsl/Compute/volumetric_noise_generator.alasset");
+        _cloud_gen = ResourceMgr::Get().LoadAssetRef<ComputeShader>(L"Shaders/hlsl/Compute/volumetric_cloud.alasset");
         _cloud_main_kernel = _cloud_gen->FindKernel("CloudMain");
         _cloud_reprojection_kernel = _cloud_gen->FindKernel("CloudReprojection");
         _cloud_gen->EnableKeyword("_QUALITY_HIGH");
@@ -325,7 +325,7 @@ namespace Ailu::Render
 
     void Ailu::Render::VolumetricClouds::AddRenderPasses(Renderer &renderer, const RenderingData & rendering_data)
     {
-        if (renderer._is_render_light_probe)
+        if (renderer.IsRenderingProbe())
             return;
         static const int kGridSize = 1000;
         //snap to grid

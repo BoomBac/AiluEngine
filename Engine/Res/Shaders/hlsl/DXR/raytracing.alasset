@@ -1,0 +1,12 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "6af1af95-87d8-4cb4-8612-1a7a8d45d865",
+        "_asset_type": "Ailu::Render::RayTracingShader",
+        "_asset_name": "RayTracingShader",
+        "_dependencies": []
+    },
+    "_file": "raytracing.hlsl",
+    "_vs_entry": "",
+    "_ps_entry": ""
+}

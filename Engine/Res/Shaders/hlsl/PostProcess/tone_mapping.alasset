@@ -1,0 +1,12 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "8e7e84fd-5a47-49f9-98e9-9726f168a5a7",
+        "_asset_type": "Ailu::Render::Shader",
+        "_asset_name": "tone_mapping",
+        "_dependencies": []
+    },
+    "_file": "tone_mapping.hlsl",
+    "_vs_entry": "FullscreenVSMain",
+    "_ps_entry": "ToneMappingPS"
+}

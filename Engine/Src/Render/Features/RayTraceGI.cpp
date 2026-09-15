@@ -21,9 +21,10 @@ namespace Ailu
         {
             _use_hardware_ray_tracing = GraphicsContext::Get().IsHardwareRayTracingSupported();
             if (_use_hardware_ray_tracing)
-                _gi_raytracing_shader = RayTracingShader::Create(ResourceMgr::GetResSysPath(L"Shaders/hlsl/DXR/Raytracing.hlsl"), "RayTraceGI_RayTracingShader");
-            _gi_compute_shader = ResourceMgr::Get().Load<ComputeShader>(L"Shaders/hlsl/ray_trace/raytrace_gi.alasset");
-            _gi_pass = MakeScope<GIPass>(_gi_compute_shader.get(), _gi_raytracing_shader.get());
+                _gi_raytracing_shader = ResourceMgr::Get().LoadAssetRef<RayTracingShader>(
+                    L"Shaders/hlsl/DXR/raytracing.alasset");
+            _gi_compute_shader = ResourceMgr::Get().LoadAssetRef<ComputeShader>(L"Shaders/hlsl/ray_trace/raytrace_gi.alasset");
+            _gi_pass = MakeScope<GIPass>(_gi_compute_shader, _gi_raytracing_shader);
             _gi_compute_shader->SetInts("_PickPixel",{200,200});
             _gi_compute_shader->SetBool("_enable_ris", _enable_ris);
             _gi_compute_shader->SetBool("_enable_resampling", _enable_resampling);
@@ -87,7 +88,8 @@ namespace Ailu
         Ref<ConstantBuffer> g_perCamData;
         CBufferPerCameraData g_camData;
 
-        GIPass::GIPass(ComputeShader *cs, RayTracingShader *rt_shader) : _gi_compute_shader(cs), _gi_raytracing_shader(rt_shader), RenderPass("GIPass")
+        GIPass::GIPass(const AssetRef<ComputeShader> &cs, const AssetRef<RayTracingShader> &rt_shader) :
+            _gi_compute_shader(cs), _gi_raytracing_shader(rt_shader), RenderPass("GIPass")
         {
             g_perCamData = ConstantBuffer::Create(sizeof(CBufferPerCameraData), "PerCamData");
 
@@ -189,6 +191,11 @@ namespace Ailu
             GPUBuffer *curr_surface_buffer = _is_cur_a ? _surface_buffer_a.get() : _surface_buffer_b.get();
             GPUBuffer *unified_light_data = _scene_rt_proxy != nullptr ? _scene_rt_proxy->GetUnifiedLightData() : nullptr;
             RayTracingScene *rt_scene = use_hardware_ray_tracing && _scene_rt_proxy != nullptr ? _scene_rt_proxy->GetScene() : nullptr;
+            if (use_hardware_ray_tracing && _scene_rt_proxy != nullptr && rt_scene != nullptr)
+            {
+                _scene_rt_proxy->AddBLASUpdatePass(graph);
+                _scene_rt_proxy->AddTLASUpdatePass(graph);
+            }
             if (!use_hardware_ray_tracing && _scene_rt_proxy != nullptr)
             {
                 _scene_rt_proxy->SyncLightCache(SceneManagement::SceneMgr::Get().ActiveScene());
@@ -217,13 +224,14 @@ namespace Ailu
                         if (unified_light_data != nullptr)
                             builder.Read(builder.Import(unified_light_data));
                         if (rt_scene != nullptr)
-                            builder.Read(builder.Import(rt_scene), EResourceUsage::kRaytracingAccel);
+                            builder.Read(builder.Import(rt_scene), EResourceUsage::kAccelStructRead);
                         if (use_hardware_ray_tracing && _scene_rt_proxy != nullptr)
                         {
                             if (auto *instance_data = _scene_rt_proxy->GetPrimitiveData(); instance_data != nullptr)
                                 builder.Read(builder.Import(instance_data));
                             if (auto *material_data = _scene_rt_proxy->GetMaterialData(); material_data != nullptr)
                                 builder.Read(builder.Import(material_data));
+                            _scene_rt_proxy->AddRayTracingResourceReads(builder);
                         }
                         if (_debug_buffer != nullptr)
                             (void) builder.Write(builder.Import(_debug_buffer.get()), EResourceUsage::kWriteUAV);
@@ -263,7 +271,7 @@ namespace Ailu
                         _gi_raytracing_shader->SetBuffer("_UnifiedLightConfig", _scene_rt_proxy->GetUnifiedLightConfig());
                         //_gi_raytracing_shader->SetBuffer("g_perCamData", data._p_per_camera_cbuf);
                         _gi_raytracing_shader->SetTexture("RenderTarget", output);
-                        cmd->DispatchRays(_gi_raytracing_shader, rt_scene, static_cast<u16>(data._width), static_cast<u16>(data._height), 1u);
+                        cmd->DispatchRays(_gi_raytracing_shader.get(), rt_scene, static_cast<u16>(data._width), static_cast<u16>(data._height), 1u);
                         return;
                     }
 
@@ -310,7 +318,7 @@ namespace Ailu
                                                       _is_cur_a ? _reservoir_b.get() : _reservoir_a.get());
                         _gi_compute_shader->SetBuffer(_kernel_ray_gen, "g_curr_reservoir",
                                                       _is_cur_a ? _reservoir_a.get() : _reservoir_b.get());
-                        cmd->Dispatch(_gi_compute_shader, _kernel_ray_gen, x, y, 1);
+                        cmd->Dispatch(_gi_compute_shader.get(), _kernel_ray_gen, x, y, 1);
                     } });
             }
             ++_tile_frame_counter;
@@ -335,7 +343,7 @@ namespace Ailu
                                                    graph.Resolve<Texture>(_cur_target_handle));
                     _gi_compute_shader->SetTexture(_kernel_denoise, "_HistoryTarget",
                                                    graph.Resolve<Texture>(_history_target_handle));
-                    cmd->Dispatch(_gi_compute_shader, _kernel_denoise, x, y, 1);
+                    cmd->Dispatch(_gi_compute_shader.get(), _kernel_denoise, x, y, 1);
                 } });
             }
             _is_cur_a = !_is_cur_a;

@@ -5,6 +5,7 @@
 #include "Render/Buffer.h"
 #include "Render/RayTracing/RayTracingGeometry.h"
 #include "Render/RayTracing/RayTracingScene.h"
+#include "Render/RenderGraph/RenderGraphFwd.h"
 #include "Render/ShaderInterop.h"
 #include "Scene/Scene.h"
 
@@ -18,6 +19,9 @@ namespace Ailu::Render
         SceneRayTracingProxy();
         void Sync(const SceneManagement::Scene *scene, Vector<PrimitiveData> *primitive_data = nullptr,
                   GPUBuffer *primitive_buffer = nullptr, const Vector<ScenePrimitive> *scene_primitives = nullptr);
+        void AddBLASUpdatePass(RDG::RenderGraph &graph);
+        void AddTLASUpdatePass(RDG::RenderGraph &graph);
+        void AddRayTracingResourceReads(RDG::RenderGraphBuilder &builder) const;
         void SyncLightCache(const SceneManagement::Scene *scene);
 
         RayTracingScene *GetScene() const { return FrontSlot()._scene.get(); }
@@ -44,6 +48,30 @@ namespace Ailu::Render
         {
             Vector<Ref<RayTracingGeometry>> _geometries;
             VertexBuffer *_vertex_buffer = nullptr;
+            bool _dynamic = false;
+            u64 _last_blas_version = 0u;
+        };
+
+        struct GeometryCacheKey
+        {
+            Mesh *_mesh = nullptr;
+            VertexBuffer *_vertex_buffer = nullptr;
+
+            friend bool operator==(const GeometryCacheKey &lhs, const GeometryCacheKey &rhs) noexcept
+            {
+                return lhs._mesh == rhs._mesh && lhs._vertex_buffer == rhs._vertex_buffer;
+            }
+        };
+
+        struct GeometryCacheKeyHash
+        {
+            size_t operator()(const GeometryCacheKey &key) const noexcept
+            {
+                size_t hash = std::hash<Mesh *>{}(key._mesh);
+                hash ^= std::hash<VertexBuffer *>{}(key._vertex_buffer) + 0x9e3779b9u +
+                        (hash << 6u) + (hash >> 2u);
+                return hash;
+            }
         };
 
         struct SceneInstanceKey
@@ -52,6 +80,7 @@ namespace Ailu::Render
             Mesh *_mesh = nullptr;
             VertexBuffer *_vertex_buffer = nullptr;
             u16 _material_class = 0u;
+            bool _dynamic = false;
         };
 
         struct GeometryRange
@@ -81,7 +110,9 @@ namespace Ailu::Render
 
         Vector<SceneInstanceKey> CollectInstanceKeys(const SceneManagement::Scene &scene, Vector<Matrix4x4f> &transforms, Vector<Material*> &materials) const;
         bool NeedsStructureRebuild(const ProxyBufferSlot &slot, const Vector<SceneInstanceKey> &instance_keys) const;
-        Vector<Ref<RayTracingGeometry>> AcquireGeometry(Mesh *mesh, VertexBuffer *vertex_buffer);
+        Vector<Ref<RayTracingGeometry>> AcquireGeometry(Mesh *mesh, VertexBuffer *vertex_buffer, bool dynamic);
+        CachedGeometry *FindCachedGeometry(Mesh *mesh, VertexBuffer *vertex_buffer);
+        const CachedGeometry *FindCachedGeometry(Mesh *mesh, VertexBuffer *vertex_buffer) const;
         void StartRebuild(const Vector<SceneInstanceKey> &instance_keys, const Vector<Matrix4x4f> &transforms);
         bool Rebuild(ProxyBufferSlot &slot, const Vector<SceneInstanceKey> &instance_keys, const Vector<Matrix4x4f> &transforms);
         void UpdateTransforms(ProxyBufferSlot &slot, const Vector<Matrix4x4f> &transforms);
@@ -98,7 +129,7 @@ namespace Ailu::Render
         const ProxyBufferSlot &BackSlot() const { return _slots[1u - _front_slot]; }
 
     private:
-        HashMap<Mesh *, CachedGeometry> _mesh_geometry_cache;
+        HashMap<GeometryCacheKey, CachedGeometry, GeometryCacheKeyHash> _geometry_cache;
         ProxyBufferSlot _slots[2];
         u32 _front_slot = 0u;
         bool _has_pending_swap = false;

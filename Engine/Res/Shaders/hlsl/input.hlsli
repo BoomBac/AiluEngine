@@ -15,8 +15,9 @@ struct StandardPSInput
 	float4 position : SV_POSITION;
 	float3 world_pos : POSITION;
 	float3 normal : NORMAL;
-	float2 uv0 : TEXCOORD0;
-	float3x3 btn : BTN;
+        float2 uv0 : TEXCOORD0;
+        float3x3 btn : BTN;
+        nointerpolation uint primitive_index : TEXCOORD7;
 };
 
 

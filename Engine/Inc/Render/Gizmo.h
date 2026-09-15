@@ -26,6 +26,7 @@ namespace Ailu
         class Texture;
         class CommandBuffer;
         class Buffer;
+        class GPUBuffer;
         class VertexBuffer;
         struct RenderingData;
 
@@ -58,6 +59,7 @@ namespace Ailu
             static void DrawLine(const Vector2f &from, const Vector2f &to, Color color = Gizmo::s_color);
             static void DrawRect(const Vector2f &top_left, const Vector2f &bottom_right, Color color = Gizmo::s_color);
             static void DrawMesh(Mesh *mesh, const Matrix4x4f &matrix, Material *mat);
+            static void DrawMeshInstanced(Mesh *mesh, const Vector<Matrix4x4f> &matrices, Material *mat);
             static void DrawPreviewMesh(Mesh *mesh, const Matrix4x4f &matrix, Material *mat);
             static void DrawTexture(const Rect &rect, Texture *tex);
             static void DrawText(const String &text, Vector2f pos, f32 font_size = 10.0f, Color color = Gizmo::s_color);
@@ -105,6 +107,14 @@ namespace Ailu
                 Matrix4x4f _matrix;
             };
             Vector<MeshRendererNode> _mesh_renderers;
+            struct InstancedMeshRendererNode
+            {
+                Mesh *_mesh;
+                Material *_material;
+                Vector<Matrix4x4f> _matrices;
+            };
+            Vector<InstancedMeshRendererNode> _instanced_mesh_renderers;
+            Vector<Ref<GPUBuffer>> _instanced_mesh_buffers;
             MeshRendererNode _preview_mesh_renderer{};
             bool _has_preview_mesh_renderer = false;
         };

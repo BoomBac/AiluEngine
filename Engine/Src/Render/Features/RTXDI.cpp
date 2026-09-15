@@ -11,8 +11,8 @@ namespace Ailu::Render
     #define GET_MEMBER_NAME(member_name) (std::string_view(#member_name))
     RTXDI::RTXDI() : RenderFeature("RTXDI")
     {
-        _rtxdi_compute_shader = ResourceMgr::Get().Load<ComputeShader>(L"Shaders/hlsl/ray_trace/RTXDI/rtxdi.alasset");
-        _rtxdi_pass = MakeScope<RTXDIPass>(_rtxdi_compute_shader.get());
+        _rtxdi_compute_shader = ResourceMgr::Get().LoadAssetRef<ComputeShader>(L"Shaders/hlsl/ray_trace/RTXDI/rtxdi.alasset");
+        _rtxdi_pass = MakeScope<RTXDIPass>(_rtxdi_compute_shader);
         _rtxdi_compute_shader->SetInt("_light_sample_count", static_cast<i32>(_light_sample_count));
         _rtxdi_compute_shader->SetInt("_brdf_sample_count", static_cast<i32>(_brdf_sample_count));
         _rtxdi_compute_shader->SetBool("_enable_resampling", _enable_resampling);
@@ -44,7 +44,7 @@ namespace Ailu::Render
     }
 
 
-    RTXDIPass::RTXDIPass(ComputeShader *shader) : _compute_shader(shader), RenderPass("RTXDIPass")
+    RTXDIPass::RTXDIPass(const AssetRef<ComputeShader> &shader) : _compute_shader(shader), RenderPass("RTXDIPass")
     {
         _kernel_ray_gen = _compute_shader ? _compute_shader->FindKernel("RayGen") : kInvalidComputeShaderKernelId;
         _event = static_cast<ERenderPassEvent>(static_cast<u16>(ERenderPassEvent::kAfterTransparent) - 5u);
@@ -124,13 +124,12 @@ namespace Ailu::Render
             _compute_shader->SetInt("_light_count", static_cast<i32>(_scene_rt_proxy->GetUnifiedLightCount()));
             _compute_shader->SetInts("_GI_TileOffset", {0, 0});
             _compute_shader->SetInts("_GI_TileSize", {static_cast<i32>(data._width), static_cast<i32>(data._height)});
-            cmd->Dispatch(_compute_shader, _kernel_ray_gen, dispatch_x, dispatch_y, dispatch_z);
+            cmd->Dispatch(_compute_shader.get(), _kernel_ray_gen, dispatch_x, dispatch_y, dispatch_z);
         });
 
         graph.AddPass("RTXDI Composite", RDG::PassDesc(), [&, this](RDG::RenderGraphBuilder &builder)
         {
             builder.Read(_output_handle);
-            builder.Read(rendering_data._rg_handles._color_target, EResourceUsage::kWriteRTV);
             rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target);
         },
         [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)

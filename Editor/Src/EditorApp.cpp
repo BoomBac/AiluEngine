@@ -16,6 +16,7 @@
 #include "Widgets/RenderView.h"
 #include "Inspector/ComponentEditorRegistry.h"
 #include "Inspector/ComponentEditorRegistration.h"
+#include "PlaceActor/PlaceActorRegistration.h"
 #include "Assets/AssetTypeRegistry.h"
 
 #include "Framework/Common/FileManager.h"
@@ -69,6 +70,8 @@ namespace Ailu
 
         int EditorApp::Initialize(ApplicationInitContext init_ctx)
         {
+            TimeMgr timer;
+            timer.Mark();
             LogMgr::Init();
             g_pCommandMgr = AL_NEW_TAG(EMemoryTag::kEditor, CommandManager);
             Enum::InitTypeInfo();
@@ -115,6 +118,7 @@ namespace Ailu
                 UI::UIManager::Get()->SetTheme(&g_editor_ui_theme);
             }
             RegisterComponentEditors();
+            RegisterPlaceActors();
             _automation_service = MakeScope<EditorAutomationService>();
             _automation_service->Initialize();
             {
@@ -148,6 +152,7 @@ namespace Ailu
             _is_playing_mode = false;
             _is_simulate_mode = false;
             ConfigureResourceReloading();
+            LOG_INFO("EditorApp::Initialize {} cost {}ms", ret,timer.GetElapsedSinceLastMark());
             return ret;
         }
         void EditorApp::Finalize()
@@ -305,19 +310,19 @@ namespace Ailu
                 ResourceMgr::Get().RegisterResource(mat_path, mat);
                 return mat.get();
             };
-            mat_creator(L"Shaders/hlsl/billboard.hlsl", L"Runtime/Material/PointLightBillboard", "PointLightBillboard");
-            mat_creator(L"Shaders/hlsl/billboard.hlsl", L"Runtime/Material/DirectionalLightBillboard", "DirectionalLightBillboard");
-            mat_creator(L"Shaders/hlsl/billboard.hlsl", L"Runtime/Material/SpotLightBillboard", "SpotLightBillboard");
-            mat_creator(L"Shaders/hlsl/billboard.hlsl", L"Runtime/Material/AreaLightBillboard", "AreaLightBillboard");
-            mat_creator(L"Shaders/hlsl/billboard.hlsl", L"Runtime/Material/CameraBillboard", "CameraBillboard");
-            mat_creator(L"Shaders/hlsl/billboard.hlsl", L"Runtime/Material/LightProbeBillboard", "LightProbeBillboard");
+            mat_creator(L"Shaders/hlsl/billboard.alasset", L"Runtime/Material/PointLightBillboard", "PointLightBillboard");
+            mat_creator(L"Shaders/hlsl/billboard.alasset", L"Runtime/Material/DirectionalLightBillboard", "DirectionalLightBillboard");
+            mat_creator(L"Shaders/hlsl/billboard.alasset", L"Runtime/Material/SpotLightBillboard", "SpotLightBillboard");
+            mat_creator(L"Shaders/hlsl/billboard.alasset", L"Runtime/Material/AreaLightBillboard", "AreaLightBillboard");
+            mat_creator(L"Shaders/hlsl/billboard.alasset", L"Runtime/Material/CameraBillboard", "CameraBillboard");
+            mat_creator(L"Shaders/hlsl/billboard.alasset", L"Runtime/Material/LightProbeBillboard", "LightProbeBillboard");
             ResourceMgr::Get().Get<Material>(L"Runtime/Material/PointLightBillboard")->SetTexture("_MainTex", EnginePath::kEngineIconPathW + L"point_light.alasset");
             ResourceMgr::Get().Get<Material>(L"Runtime/Material/DirectionalLightBillboard")->SetTexture("_MainTex", EnginePath::kEngineIconPathW + L"directional_light.alasset");
             ResourceMgr::Get().Get<Material>(L"Runtime/Material/SpotLightBillboard")->SetTexture("_MainTex", EnginePath::kEngineIconPathW + L"spot_light.alasset");
             ResourceMgr::Get().Get<Material>(L"Runtime/Material/AreaLightBillboard")->SetTexture("_MainTex", EnginePath::kEngineIconPathW + L"area_light.alasset");
             ResourceMgr::Get().Get<Material>(L"Runtime/Material/CameraBillboard")->SetTexture("_MainTex", EnginePath::kEngineIconPathW + L"camera.alasset");
             ResourceMgr::Get().Get<Material>(L"Runtime/Material/LightProbeBillboard")->SetTexture("_MainTex", EnginePath::kEngineIconPathW + L"light_probe.alasset");
-            mat_creator(L"Shaders/hlsl/plane_grid.hlsl", L"Runtime/Material/GridPlane", "GridPlane")->SetFloat("_grid_alpha", 1.0f);
+            mat_creator(L"Shaders/hlsl/plane_grid.alasset", L"Runtime/Material/GridPlane", "GridPlane")->SetFloat("_grid_alpha", 1.0f);
             Material::s_checker = ResourceMgr::Get().Load<Material>(EnginePath::kEngineMaterialPathW + L"M_Default.alasset");
         }
 

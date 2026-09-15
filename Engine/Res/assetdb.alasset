@@ -425,10 +425,110 @@
       "path": "engine://Shaders/hlsl/Compute/volumetric_cloud.alasset",
       "type": "Ailu::Render::ComputeShader"
     },
-      {
+    {
       "guid": "8029eac3-978a-458c-8a7b-e165f2a2710f",
       "path": "engine://Shaders/hlsl/default_sprite.alasset",
       "type": "Ailu::Render::Shader"
+    },
+    {
+      "guid": "1c77df1f-1e2f-4aef-82ee-11a4d7bb2f01",
+      "path": "engine://Shaders/hlsl/debug.alasset",
+      "type": "Ailu::Render::Shader"
+    },
+    {
+      "guid": "1c77df1f-1e2f-4aef-82ee-11a4d7bb2f02",
+      "path": "engine://Shaders/hlsl/billboard.alasset",
+      "type": "Ailu::Render::Shader"
+    },
+    {
+      "guid": "1c77df1f-1e2f-4aef-82ee-11a4d7bb2f03",
+      "path": "engine://Shaders/hlsl/ssao.alasset",
+      "type": "Ailu::Render::Shader"
+    },
+    {
+      "guid": "1c77df1f-1e2f-4aef-82ee-11a4d7bb2f04",
+      "path": "engine://Shaders/hlsl/plane_grid.alasset",
+      "type": "Ailu::Render::Shader"
+    },
+    {
+      "guid": "1c77df1f-1e2f-4aef-82ee-11a4d7bb2f05",
+      "path": "engine://Shaders/hlsl/cubemap_debug.alasset",
+      "type": "Ailu::Render::Shader"
+    },
+    {
+      "guid": "1c77df1f-1e2f-4aef-82ee-11a4d7bb2f06",
+      "path": "engine://Shaders/hlsl/light_probe_preview.alasset",
+      "type": "Ailu::Render::Shader"
+    },
+    {
+      "guid": "1c77df1f-1e2f-4aef-82ee-11a4d7bb2f08",
+      "path": "engine://Shaders/hlsl/taa.alasset",
+      "type": "Ailu::Render::Shader"
+    },
+    {
+      "guid": "1c77df1f-1e2f-4aef-82ee-11a4d7bb2f09",
+      "path": "engine://Shaders/hlsl/pick_buffer.alasset",
+      "type": "Ailu::Render::Shader"
+    },
+    {
+      "guid": "1c77df1f-1e2f-4aef-82ee-11a4d7bb2f10",
+      "path": "engine://Shaders/hlsl/select_buffer.alasset",
+      "type": "Ailu::Render::Shader"
+    },
+    {
+      "guid": "1c77df1f-1e2f-4aef-82ee-11a4d7bb2f11",
+      "path": "engine://Shaders/hlsl/editor_outline.alasset",
+      "type": "Ailu::Render::Shader"
+    },
+    {
+      "guid": "1c77df1f-1e2f-4aef-82ee-11a4d7bb2f12",
+      "path": "engine://Shaders/hlsl/sprite_pick_buffer.alasset",
+      "type": "Ailu::Render::Shader"
+    },
+    {
+      "guid": "1c77df1f-1e2f-4aef-82ee-11a4d7bb2f13",
+      "path": "engine://Shaders/hlsl/sprite_select_buffer.alasset",
+      "type": "Ailu::Render::Shader"
+    },
+    {
+      "guid": "c3c5d3d8-2d0d-4e8e-9de8-c0b75d3d5e5a",
+      "path": "engine://Shaders/hlsl/color_picker_sv.alasset",
+      "type": "Ailu::Render::Shader"
+    },
+    {
+      "guid": "8e2f6b6c-0f47-4c1f-a21d-68c8a22f3b4e",
+      "path": "engine://Shaders/hlsl/Compute/compute_skinning.alasset",
+      "type": "Ailu::Render::ComputeShader"
+    },
+    {
+      "guid": "33aa66a8-3a67-4d2a-8f2e-0cc1e4a90dc0",
+      "path": "engine://Shaders/hlsl/Compute/environment_sh_project.alasset",
+      "type": "Ailu::Render::ComputeShader"
+    },
+    {
+      "guid": "0c5b1e3a-6a10-4f4e-a2e6-91d16b6a18c1",
+      "path": "engine://Shaders/hlsl/Compute/blur.alasset",
+      "type": "Ailu::Render::ComputeShader"
+    },
+    {
+      "guid": "3f1c6d53-2af2-4af5-9fe5-3dd9a85a7f02",
+      "path": "engine://Shaders/hlsl/Compute/pick_buffer_reader.alasset",
+      "type": "Ailu::Render::ComputeShader"
+    },
+    {
+      "guid": "b1e1d0b8-6aaf-47d2-b8f8-f0d0cc0d9f45",
+      "path": "engine://Shaders/hlsl/Compute/atmosphere_lut_gen.alasset",
+      "type": "Ailu::Render::ComputeShader"
+    },
+    {
+      "guid": "8e7e84fd-5a47-49f9-98e9-9726f168a5a7",
+      "path": "engine://Shaders/hlsl/PostProcess/tone_mapping.alasset",
+      "type": "Ailu::Render::Shader"
+    },
+    {
+      "guid": "6af1af95-87d8-4cb4-8612-1a7a8d45d865",
+      "path": "engine://Shaders/hlsl/DXR/raytracing.alasset",
+      "type": "Ailu::Render::RayTracingShader"
     }
   ]
 }

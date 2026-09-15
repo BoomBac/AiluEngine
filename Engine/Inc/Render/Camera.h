@@ -172,7 +172,6 @@ namespace Ailu
         public:
             u32 _layer_mask = (u32) -1;
             bool _is_scene_camera = false;
-            bool _is_render_shadow = true;
             bool _is_render_sky_box = true;
             bool _postprocess_enabled = true;
             bool _is_gen_voxel = false;

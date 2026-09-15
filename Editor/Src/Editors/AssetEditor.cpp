@@ -9,6 +9,8 @@
 #include "UI/Container.h"
 #include "UI/Menu.h"
 
+#include <type_traits>
+
 namespace Ailu
 {
     namespace Editor
@@ -52,7 +54,7 @@ namespace Ailu
                 _asset_reload_listener_id = 0u;
             }
             OnClose();
-            _editor_import_setting.reset();
+            _editor_import_setting.emplace<std::monostate>();
             _asset = nullptr;
             RefreshTitle();
         }
@@ -118,8 +120,8 @@ namespace Ailu
                 return false;
 
             OnBeforeSave();
-            if (_editor_import_setting != nullptr)
-                ResourceMgr::Get().SetImportSetting(_asset->_asset_path, *_editor_import_setting);
+            if (const ImportSetting *setting = GetEditorImportSetting())
+                ResourceMgr::Get().SetImportSetting(_asset->_asset_path, *setting);
             if (!ResourceMgr::Get().SaveAsset(_asset))
                 return false;
 
@@ -144,7 +146,50 @@ namespace Ailu
 
         void AssetEditor::SetEditorImportSetting(const ImportSetting &setting)
         {
-            _editor_import_setting = setting.Clone();
+            if (const auto *texture_setting = dynamic_cast<const TextureImportSetting *>(&setting))
+            {
+                _editor_import_setting = *texture_setting;
+                return;
+            }
+            if (const auto *mesh_setting = dynamic_cast<const MeshImportSetting *>(&setting))
+            {
+                _editor_import_setting = *mesh_setting;
+                return;
+            }
+            if (const auto *shader_setting = dynamic_cast<const ShaderImportSetting *>(&setting))
+            {
+                _editor_import_setting = *shader_setting;
+                return;
+            }
+            _editor_import_setting = setting;
+        }
+
+        ImportSetting *AssetEditor::GetEditorImportSetting()
+        {
+            return std::visit(
+                [](auto &value) -> ImportSetting *
+                {
+                    using value_t = std::decay_t<decltype(value)>;
+                    if constexpr (std::is_same_v<value_t, std::monostate>)
+                        return nullptr;
+                    else
+                        return &value;
+                },
+                _editor_import_setting);
+        }
+
+        const ImportSetting *AssetEditor::GetEditorImportSetting() const
+        {
+            return std::visit(
+                [](const auto &value) -> const ImportSetting *
+                {
+                    using value_t = std::decay_t<decltype(value)>;
+                    if constexpr (std::is_same_v<value_t, std::monostate>)
+                        return nullptr;
+                    else
+                        return &value;
+                },
+                _editor_import_setting);
         }
 
         void AssetEditor::HandleAssetReloaded(Asset *asset)

@@ -18,6 +18,7 @@
 #include "Render/Camera.h"
 #include "Render/Features/CommonPasses.h"
 #include "Render/PostprocessSettings.h"
+#include "Render/StaticDiffuseProbeData.h"
 #include "Render/Mesh.h"
 #include "Render/2D/SpriteRenderData.h"
 
@@ -329,7 +330,6 @@ public:                                                                 \
             float _constant_bias;
             float _slope_bias;
             float _padding;
-            u16 _shaodwcam_num;
         };
 
         AENUM()
@@ -348,8 +348,6 @@ public:                                                                 \
             LightData _light;
             ShadowData _shadow;
             ELightType _type;
-            Array<Camera, 6> _shadow_cameras;
-            Array<Vector4f, 4> _cascade_shadow_data;
         };
 
         struct AILU_API CCamera
@@ -493,6 +491,42 @@ public:                                                                 \
             Ref<Render::CubeMapGenPass> _pass;
             Material *_debug_material;
             CLightProbe();
+        };
+
+        ASTRUCT()
+        struct AILU_API CLightProbeGroup
+        {
+            GENERATED_BODY()
+
+            DECLARE_COMPONENT(CLightProbeGroup, "Ailu.ECS.CLightProbeGroup")
+
+            APROPERTY()
+            Vector3Int _probe_count = Vector3Int(8, 4, 8);
+            APROPERTY()
+            Vector3f _size = Vector3f(10.0f, 5.0f, 10.0f);
+            APROPERTY()
+            Guid _baked_data = Guid::EmptyGuid();
+            APROPERTY()
+            bool _draw_probes = true;
+
+            bool _bake_requested = false;
+            bool _capture_bake_requested = false;
+            bool _preview_cubemap = false;
+        };
+
+        ASTRUCT()
+        struct AILU_API DDGIVolumeComponent
+        {
+            GENERATED_BODY()
+
+            DECLARE_COMPONENT(DDGIVolumeComponent, "Ailu.ECS.DDGIVolumeComponent")
+
+            APROPERTY()
+            Vector3UInt _probe_count = Vector3UInt(8u, 4u, 8u);
+            APROPERTY()
+            Vector3f _probe_spacing = Vector3f(2.0f, 2.0f, 2.0f);
+            APROPERTY()
+            bool _draw_probes = true;
         };
 
         struct CRigidBody

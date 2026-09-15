@@ -26,12 +26,17 @@ namespace Ailu::Render
             case RendererAPI::ERenderAPI::kNone:
                 AL_ASSERT_MSG(false, "None render api used!");
                 return nullptr;
-            case RendererAPI::ERenderAPI::kDirectX12:
+        case RendererAPI::ERenderAPI::kDirectX12:
             {
                 auto geometry = AdoptGpuResource(new RHI::DX12::D3DRayTracingGeometry(desc));
                 geometry->Name(name);
-                geometry->Apply();
-                geometry->Build();
+                if (geometry->IsDynamic())
+                    geometry->ApplySync();
+                else
+                {
+                    geometry->Apply();
+                    geometry->Build();
+                }
                 return geometry;
             }
         }
@@ -60,16 +65,25 @@ namespace Ailu::Render
     void RayTracingGeometry::Build()
     {
         auto cmd = CommandBufferPool::Get();
-        cmd->BuildAS(this);
+        Build(cmd.get());
         GraphicsContext::Get().ExecuteCommandBuffer(cmd);
         CommandBufferPool::Release(cmd);
     }
 
-    void RayTracingGeometry::Update()
+    void RayTracingGeometry::Build(CommandBuffer *cmd)
     {
-        auto cmd = CommandBufferPool::Get();
-        cmd->BuildAS(this,false);
-        GraphicsContext::Get().ExecuteCommandBuffer(cmd);
-        CommandBufferPool::Release(cmd);
+        if (cmd == nullptr)
+            return;
+        cmd->BuildAS(this, false);
+        _has_been_built = true;
+    }
+
+    void RayTracingGeometry::Update(CommandBuffer *cmd)
+    {
+        AL_ASSERT_MSG(IsDynamic(), "Only dynamic BLAS can be updated");
+        AL_ASSERT_MSG(_has_been_built, "A dynamic BLAS must be built before it is updated");
+        if (cmd == nullptr)
+            return;
+        cmd->BuildAS(this, true);
     }
 }// namespace Ailu::Render

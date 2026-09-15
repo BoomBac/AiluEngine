@@ -2,6 +2,7 @@
 #define __PRIMITIVE_HLSLI__
 
 #include "cbuffer.hlsli"
+#include "spherical_harmonics.hlsli"
 
 // Fixed register contract, space0:
 //   b0: per-draw root constants (or the legacy per-object CBV for non-scene shaders)
@@ -10,6 +11,18 @@
 //   t16-t23: GPU scene resources. Reserve this range so per-object scene data never collides with a material texture.
 StructuredBuffer<PrimitiveData> g_primitive_data : register(t16);
 StructuredBuffer<uint> g_instance_primitive_indices : register(t17);
+StructuredBuffer<PrimitiveGIData> g_primitive_gi_data : register(t19);
+
+bool HasPrimitiveStaticGI(PrimitiveData primitive)
+{
+    return (_RenderFeatureFlags & kRenderFeatureStaticDiffuseGi) != 0u &&
+           primitive._gi_data_index != UINT32_MAX;
+}
+
+float3 EvaluatePrimitiveStaticIrradiance(PrimitiveData primitive, float3 normal_ws)
+{
+    return EvaluateSH9(g_primitive_gi_data[primitive._gi_data_index]._sh, normal_ws);
+}
 
 uint GetPrimitiveIndex(uint instance_id)
 {

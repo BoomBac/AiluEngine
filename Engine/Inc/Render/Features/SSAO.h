@@ -1,6 +1,7 @@
 #pragma once
 #ifndef __SSAO_PASS_H__
 #define __SSAO_PASS_H__
+#include "Assets/AssetRef.h"
 #include "RenderFeature.h"
 #include "../Texture.h"
 #include "generated/SSAO.gen.h"
@@ -20,7 +21,7 @@ namespace Ailu::Render
 		bool _is_half_res = true;
 		bool _is_cbr = false;
 	private:
-		Ref<ComputeShader> _ssao_computer;
+        AssetRef<ComputeShader> _ssao_computer;
 		Ref<Material> _ssao_gen;
         ComputeShaderKernelId _ssao_gen_kernel = kInvalidComputeShaderKernelId;
         ComputeShaderKernelId _ssao_blur_x_kernel = kInvalidComputeShaderKernelId;

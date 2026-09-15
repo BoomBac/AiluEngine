@@ -76,7 +76,7 @@ namespace Ailu
                                              main_light_shadow_map);
                 auto [x,y,z] = _volumetric_fog->CalculateDispatchNum(_light_injection_kernel, cur_light->Width(),
                                                                       cur_light->Height(), cur_light->Depth());
-                cmd->Dispatch(_volumetric_fog, _light_injection_kernel, x, y, z);
+                cmd->Dispatch(_volumetric_fog.get(), _light_injection_kernel, x, y, z);
                 _matrix_prev_p = cam->GetProjNoJitter();
                 _matrix_prev_v = cam->GetView();
             });
@@ -102,7 +102,7 @@ namespace Ailu
                 _volumetric_fog->SetTexture(_light_integration_kernel, "_FogAccum", accum_tex);
                 //_volumetric_fog->SetTexture("_MaxZ_Texture", graph.Resolve<Texture>(s_max_z_handle));
                 auto [x,y,z] = _volumetric_fog->CalculateDispatchNum(_light_integration_kernel, cur_light->Width(), cur_light->Height(), cur_light->Depth());
-                cmd->Dispatch(_volumetric_fog, _light_integration_kernel, x, y, 1);
+                cmd->Dispatch(_volumetric_fog.get(), _light_integration_kernel, x, y, 1);
             });
             if (_debug_voxel_pos)
             {
@@ -155,8 +155,8 @@ namespace Ailu
             _volumetric_light_b = Texture3D::Create(desc);
             _volumetric_light_b->Name("VolumetricLightTextureB");
             _volumetric_light_b->Apply();
-            _volumetric_fog_cs = ResourceMgr::Get().Load<ComputeShader>(L"Shaders/hlsl/Compute/volumetric_light.alasset");
-            _max_z_cs = ResourceMgr::Get().Load<ComputeShader>(L"Shaders/hlsl/Compute/max_z.alasset");
+            _volumetric_fog_cs = ResourceMgr::Get().LoadAssetRef<ComputeShader>(L"Shaders/hlsl/Compute/volumetric_light.alasset");
+            _max_z_cs = ResourceMgr::Get().LoadAssetRef<ComputeShader>(L"Shaders/hlsl/Compute/max_z.alasset");
             _accum_texture = Texture3D::Create(desc);
             _accum_texture->Name("VolumetricFogAccumTexture");
             _accum_texture->Apply();
@@ -165,8 +165,8 @@ namespace Ailu
             _volumetric_fog_cs->SetBool("_temporal_reprojection", _temporal_reprojection);
             _volumetric_fog_cs->SetFloat("_intensity", _intensity);
             _volumetric_fog_cs->SetFloat("_g", _g);
-            _volumetric_fog_pass->_volumetric_fog = _volumetric_fog_cs.get();
-            _volumetric_fog_pass->_max_z_cs = _max_z_cs.get();
+            _volumetric_fog_pass->_volumetric_fog = _volumetric_fog_cs;
+            _volumetric_fog_pass->_max_z_cs = _max_z_cs;
             _volumetric_fog_pass->_light_injection_kernel = _volumetric_fog_cs->FindKernel("LightInjection");
             _volumetric_fog_pass->_light_integration_kernel = _volumetric_fog_cs->FindKernel("LightIntegration");
             const auto blue_noise_path = EnginePath::kEngineTexturePathW + L"blue_noise.alasset";

@@ -68,14 +68,16 @@ namespace Ailu::Render::RDG
         {
             return static_cast<uint32_t>(_usage & (EResourceUsage::kWriteUAV |
                                                    EResourceUsage::kWriteRTV | EResourceUsage::kDSV |
-                                                   EResourceUsage::kCopyDst)) != 0;
+                                                   EResourceUsage::kCopyDst |
+                                                   EResourceUsage::kAccelStructWrite)) != 0;
         }
 
         bool isRead() const
         {
             return static_cast<uint32_t>(_usage & (EResourceUsage::kReadSRV |
                                                    EResourceUsage::kCopySrc | EResourceUsage::kIndirectArgument |
-                                                   EResourceUsage::kRaytracingAccel | EResourceUsage::kVertexBuffer)) != 0;
+                                                   EResourceUsage::kAccelStructRead |
+                                                   EResourceUsage::kVertexBuffer)) != 0;
         }
     };
 

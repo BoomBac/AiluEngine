@@ -59,7 +59,7 @@ namespace Ailu::RHI::DX12
             geometry_desc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
             geometry_desc.Triangles.VertexCount = _desc._vertex_count;
             geometry_desc.Triangles.VertexBuffer.StartAddress = vb->NativeResource(0u).As<ID3D12Resource>()->GetGPUVirtualAddress();
-            geometry_desc.Triangles.VertexBuffer.StrideInBytes = vb->GetLayout().GetStride(0);
+            geometry_desc.Triangles.VertexBuffer.StrideInBytes = _desc._vertex_stride;
             geometry_desc.Flags = _desc._opaque ? D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE : D3D12_RAYTRACING_GEOMETRY_FLAG_NONE;
             _geometry_descs.push_back(geometry_desc);
         }
@@ -67,7 +67,15 @@ namespace Ailu::RHI::DX12
         AL_ASSERT_MSG(!_geometry_descs.empty(), "RayTracingGeometry({}) has no valid submesh index buffer for BLAS build", Name());
 
         _inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
-        _inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
+        if (IsDynamic())
+        {
+            _inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE |
+                            D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_BUILD;
+        }
+        else
+        {
+            _inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
+        }
         _inputs.NumDescs = static_cast<UINT>(_geometry_descs.size());
         _inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
         _inputs.pGeometryDescs = _geometry_descs.data();
@@ -77,13 +85,15 @@ namespace Ailu::RHI::DX12
         D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO bottomLevelPrebuildInfo = {};
         dev->GetRaytracingAccelerationStructurePrebuildInfo(&_inputs, &bottomLevelPrebuildInfo);
         AL_ASSERT(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes > 0);
-        _scratch_buffer_size = static_cast<u32>(bottomLevelPrebuildInfo.ScratchDataSizeInBytes);
+        const u64 scratch_size = std::max(bottomLevelPrebuildInfo.ScratchDataSizeInBytes,
+                                          bottomLevelPrebuildInfo.UpdateScratchDataSizeInBytes);
+        _scratch_buffer_size = static_cast<u32>(scratch_size);
         CreateBufferResource(dynamic_cast<D3DContext *>(ctx),
-                             bottomLevelPrebuildInfo.ScratchDataSizeInBytes,
+                             scratch_size,
                              true,
                              std::format("blas_{}_scratch", _desc._vertex_buffer->Name()),
                              _scratch_resource);
-        _mem_size += static_cast<u32>(bottomLevelPrebuildInfo.ScratchDataSizeInBytes);
+        _mem_size += static_cast<u32>(scratch_size);
 
         CreateBufferResource(dynamic_cast<D3DContext *>(ctx),
                              bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes,

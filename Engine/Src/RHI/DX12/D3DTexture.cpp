@@ -337,7 +337,9 @@ namespace Ailu::RHI::DX12
     void D3DTexture2D::GenerateMipmap()
     {
         auto cmd = CommandBufferPool::Get("MipmapGen2D");
-        static ComputeShader *s_mipmap_gen = ResourceMgr::Get().Get<ComputeShader>(L"Shaders/hlsl/Compute/cs_mipmap_gen.alasset");
+        auto s_mipmap_gen = ResourceMgr::Get().GetRef<ComputeShader>(L"Shaders/hlsl/Compute/cs_mipmap_gen.alasset");
+        if (s_mipmap_gen == nullptr)
+            return;
         static const ComputeShaderKernelId s_mipmap_gen_2d_kernel = s_mipmap_gen->FindKernel("MipmapGen2D");
         s_mipmap_gen->SetInt("SrcMipLevel", 0);
         s_mipmap_gen->SetInt("NumMipLevels", 4);
@@ -352,7 +354,7 @@ namespace Ailu::RHI::DX12
         s_mipmap_gen->SetTexture(s_mipmap_gen_2d_kernel, "OutMip4", this, ECubemapFace::kUnknown, 4);
         //static_cast<D3DComputeShader*>(_p_mipmapgen_cs0.get())->BindImpl(cmd, 32, 32, 1);
         //保证线程数和第一级输出的mipmap像素数一一对应
-        cmd->Dispatch(s_mipmap_gen, s_mipmap_gen_2d_kernel, mip1w / 8, mip1h / 8, 1);
+        cmd->Dispatch(s_mipmap_gen.get(), s_mipmap_gen_2d_kernel, mip1w / 8, mip1h / 8, 1);
         if (_mipmap_count > 5)
         {
             auto [mip5w, mip5h] = CalculateMipSize(_width, _height, 5);
@@ -366,7 +368,7 @@ namespace Ailu::RHI::DX12
             s_mipmap_gen->SetTexture(s_mipmap_gen_2d_kernel, "OutMip2", this, ECubemapFace::kUnknown, 6);
             s_mipmap_gen->SetTexture(s_mipmap_gen_2d_kernel, "OutMip3", this, ECubemapFace::kUnknown, 7);
             s_mipmap_gen->SetTexture(s_mipmap_gen_2d_kernel, "OutMip4", this, ECubemapFace::kUnknown, 8);
-            cmd->Dispatch(s_mipmap_gen, s_mipmap_gen_2d_kernel, std::max(mip5w / 8, 1), std::max(mip5h / 8, 1), 1);
+            cmd->Dispatch(s_mipmap_gen.get(), s_mipmap_gen_2d_kernel, std::max(mip5w / 8, 1), std::max(mip5h / 8, 1), 1);
         }
         if (_mipmap_count > 9)
         {
@@ -381,7 +383,7 @@ namespace Ailu::RHI::DX12
             s_mipmap_gen->SetTexture(s_mipmap_gen_2d_kernel, "OutMip2", this, ECubemapFace::kUnknown, 10);
             s_mipmap_gen->SetTexture(s_mipmap_gen_2d_kernel, "OutMip3", this, ECubemapFace::kUnknown, 11);
             s_mipmap_gen->SetTexture(s_mipmap_gen_2d_kernel, "OutMip4", this, ECubemapFace::kUnknown, 12);
-            cmd->Dispatch(s_mipmap_gen, s_mipmap_gen_2d_kernel, std::max(mip9w / 8, 1), std::max(mip9h / 8, 1), 1);
+            cmd->Dispatch(s_mipmap_gen.get(), s_mipmap_gen_2d_kernel, std::max(mip9w / 8, 1), std::max(mip9h / 8, 1), 1);
         }
         // Leave the generated chain in a shader-resource state for the next caller.
         cmd->RequireState(this, D3DConvertUtils::ToALResState(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
@@ -585,8 +587,8 @@ namespace Ailu::RHI::DX12
     {
         if (_p_mipmapgen_cs0 == nullptr)
         {
-            _p_mipmapgen_cs0 = ResourceMgr::Get().GetRef<ComputeShader>(L"Shaders/hlsl/Compute/cs_mipmap_gen.alasset");
-            _p_mipmapgen_cs1 = ResourceMgr::Get().GetRef<ComputeShader>(L"Shaders/hlsl/Compute/cs_mipmap_gen.alasset");
+            _p_mipmapgen_cs0 = ResourceMgr::Get().LoadAssetRef<ComputeShader>(L"Shaders/hlsl/Compute/cs_mipmap_gen.alasset");
+            _p_mipmapgen_cs1 = ResourceMgr::Get().LoadAssetRef<ComputeShader>(L"Shaders/hlsl/Compute/cs_mipmap_gen.alasset");
         }
         _mipmap_gen_3d_kernel = _p_mipmapgen_cs0->FindKernel("MipmapGen3D");
     }
@@ -1275,7 +1277,9 @@ namespace Ailu::RHI::DX12
         if (cmd == nullptr)
             return;
         cmd->RequireState(this, D3DConvertUtils::ToALResState(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
-        static ComputeShader *s_mipmap_gen = ResourceMgr::Get().Get<ComputeShader>(L"Shaders/hlsl/Compute/cs_mipmap_gen.alasset");
+        auto s_mipmap_gen = ResourceMgr::Get().GetRef<ComputeShader>(L"Shaders/hlsl/Compute/cs_mipmap_gen.alasset");
+        if (s_mipmap_gen == nullptr)
+            return;
         static const ComputeShaderKernelId s_mipmap_gen_2d_kernel = s_mipmap_gen->FindKernel("MipmapGen2D");
         GenerateMipmap(cmd, 0u, std::min<u16>(_mipmap_count > 1u ? _mipmap_count - 1u : 0u, 4u));
         if (_mipmap_count > 5u)
@@ -1293,7 +1297,9 @@ namespace Ailu::RHI::DX12
 
         output_mip_count = std::min<u16>(output_mip_count, 4u);
         output_mip_count = std::min<u16>(output_mip_count, _mipmap_count - source_mip - 1u);
-        static ComputeShader *s_mipmap_gen = ResourceMgr::Get().Get<ComputeShader>(L"Shaders/hlsl/Compute/cs_mipmap_gen.alasset");
+        auto s_mipmap_gen = ResourceMgr::Get().GetRef<ComputeShader>(L"Shaders/hlsl/Compute/cs_mipmap_gen.alasset");
+        if (s_mipmap_gen == nullptr)
+            return;
         static const ComputeShaderKernelId s_mipmap_gen_2d_kernel = s_mipmap_gen->FindKernel("MipmapGen2D");
         for (int i = 1; i < 7; i++)
         {
@@ -1311,7 +1317,7 @@ namespace Ailu::RHI::DX12
             }
             //static_cast<D3DComputeShader*>(_p_mipmapgen_cs0.get())->BindImpl(cmd, 32, 32, 1);
             //保证线程数和第一级输出的mipmap像素数一一对应
-            cmd->Dispatch(s_mipmap_gen, s_mipmap_gen_2d_kernel, mip1w / 8, mip1h / 8, 1);
+            cmd->Dispatch(s_mipmap_gen.get(), s_mipmap_gen_2d_kernel, mip1w / 8, mip1h / 8, 1);
         }
     }
 

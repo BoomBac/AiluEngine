@@ -2,6 +2,9 @@
 #ifndef __PLACE_ACTOR_H__
 #define __PLACE_ACTOR_H__
 #include "Dock/DockWindow.h"
+#include "Framework/Core/Containers/Vector.h"
+#include "Framework/Core/SmartPtr.h"
+#include "Framework/Core/String.h"
 #include "generated/PlaceActor.gen.h"
 
 namespace Ailu
@@ -20,20 +23,21 @@ namespace Ailu
     }
     namespace Editor
     {
-        enum class EPlaceActorPresetType : u32
-        {
-            kMesh,
-            kDirectionalLight,
-            kPointLight,
-            kSpotLight,
-            kAreaLight,
-            kLightProbe
-        };
-
         struct PlaceActorDragPayload
         {
-            EPlaceActorPresetType _type = EPlaceActorPresetType::kMesh;
-            const char *_display_name = nullptr;
+            String _id;
+        };
+
+        struct PlaceActorUIEntry
+        {
+            String _id;
+            String _display_name;
+            String _category;
+            i32 _order = 0;
+            WString _asset_path;
+            Asset *_asset = nullptr;
+            Ref<Render::Mesh> _mesh = nullptr;
+            bool _is_mesh = false;
         };
 
         ACLASS()
@@ -48,6 +52,8 @@ namespace Ailu
 
         private:
             void BuildUI();
+            void BuildEntries();
+            void BuildCategories();
             void RefreshEntries();
             void ResolveEntries();
             void BeginActorDrag(i32 entry_index);
@@ -57,13 +63,8 @@ namespace Ailu
             UI::ScrollView *_entry_scroll = nullptr;
             UI::VerticalBox *_entry_content = nullptr;
             Vector<UI::Button *> _category_buttons;
-            Vector<String> _entry_names;
-            Vector<WString> _entry_paths;
-            Vector<u32> _entry_categories;
-            Vector<EPlaceActorPresetType> _entry_types;
-            Vector<Asset *> _entry_assets;
-            Vector<Ref<Render::Mesh>> _entry_meshes;
-            Vector<UI::Button *> _entry_buttons;
+            Vector<String> _categories;
+            Vector<PlaceActorUIEntry> _entries;
             u32 _selected_category = 0u;
             PlaceActorDragPayload _drag_payload;
             i32 _drag_source_index = -1;

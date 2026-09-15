@@ -56,13 +56,15 @@ StandardPSInput ForwardVSMain(StandardVSInput v)
 	StandardPSInput result;
 	v.tangent.xyz *= v.tangent.w;
 #if defined(PER_OBJECT_CB)
-	result.position = TransformToClipSpace(v.position);
-	result.world_pos = TransformObjectToWorld(v.position);
+        result.position = TransformToClipSpace(v.position);
+        result.world_pos = TransformObjectToWorld(v.position);
+        result.primitive_index = UINT32_MAX;
 	float3 T = TransformNormal(v.tangent.xyz);
 	float3 B = TransformNormal(cross(v.tangent.xyz, v.normal));
 	float3 N = TransformNormal(v.normal);
 #else
-	const PrimitiveData primitive = LoadPrimitive(v.instance_id);
+        const PrimitiveData primitive = LoadPrimitive(v.instance_id);
+        result.primitive_index = GetPrimitiveIndex(v.instance_id);
 	result.position = TransformPrimitiveToClipSpace(primitive, v.position);
 	result.world_pos = TransformPrimitiveToWorld(primitive, v.position);
 	float3 T = TransformPrimitiveNormal(primitive, v.tangent.xyz);
@@ -84,7 +86,13 @@ float4 ForwardPSMain(StandardPSInput input) : SV_TARGET
 #ifdef ALPHA_TEST
 	clip(alpha - _AlphaCulloff);
 #endif
-    float3 light = max(0.0, CalculateLightPBR(surface_data, input.world_pos,input.uv0));
+    float3 irradiance = EvaluateEnvironmentIrradiance(surface_data.wnormal);
+#if !defined(PER_OBJECT_CB)
+    const PrimitiveData primitive = g_primitive_data[input.primitive_index];
+    if (HasPrimitiveStaticGI(primitive))
+        irradiance = EvaluatePrimitiveStaticIrradiance(primitive, surface_data.wnormal);
+#endif
+    float3 light = max(0.0, CalculateLightPBR(surface_data, input.world_pos,input.uv0, irradiance));
     light += surface_data.emssive;
     return float4(light, alpha);
 }

@@ -1,0 +1,11 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "b1e1d0b8-6aaf-47d2-b8f8-f0d0cc0d9f45",
+        "_asset_type": "Ailu::Render::ComputeShader",
+        "_asset_name": "atmosphere_lut_gen",
+        "_dependencies": []
+    },
+    "_file": "atmosphere_lut_gen.hlsl",
+    "_kernel": "TransmittanceGen"
+}

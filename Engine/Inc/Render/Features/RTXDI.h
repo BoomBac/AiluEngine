@@ -2,6 +2,7 @@
 #ifndef __RTXDI_FEATURE_H__
 #define __RTXDI_FEATURE_H__
 
+#include "Assets/AssetRef.h"
 #include "RenderFeature.h"
 #include "Render/RayTracing/SceneRayTracingProxy.h"
 #include "generated/RTXDI.gen.h"
@@ -27,13 +28,13 @@ namespace Ailu::Render
         void OnPropertyChanged(const PropertyInfo& prop) final;
     private:
         Scope<RTXDIPass> _rtxdi_pass;
-        Ref<ComputeShader> _rtxdi_compute_shader;
+        AssetRef<ComputeShader> _rtxdi_compute_shader;
     };
 
     class RTXDIPass : public RenderPass
     {
     public:
-        explicit RTXDIPass(ComputeShader *shader);
+        explicit RTXDIPass(const AssetRef<ComputeShader> &shader);
         ~RTXDIPass() override = default;
         void OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data) final;
 
@@ -41,7 +42,7 @@ namespace Ailu::Render
         bool EnsureTarget(const RenderingData &rendering_data);
 
     private:
-        ComputeShader *_compute_shader = nullptr;
+        AssetRef<ComputeShader> _compute_shader;
         Scope<SceneRayTracingProxy> _scene_rt_proxy;
         Ref<Texture2D> _output_texture = nullptr;
         RDG::RGHandle _output_handle;

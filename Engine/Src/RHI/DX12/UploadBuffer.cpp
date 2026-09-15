@@ -85,7 +85,11 @@ namespace Ailu::RHI::DX12
         m_CurrentPage.store(std::shared_ptr<Page>{}, std::memory_order_release);
         // Reset all available pages.
         m_AvailablePages = m_PagePool;
-        m_LargePagePool.clear();
+        // 大页的GPU资源只能延迟一个周期释放：Reset() 虽然在该槽位fence等待之后调用，
+        // 但调用后当前帧立刻会重新提交引用新大页的命令，直接析构会让仍在执行中的
+        // ID3D12Resource 被 final-release（D3D12 OBJECT_DELETED_WHILE_STILL_IN_USE）。
+        m_RetirePages.clear();
+        m_RetirePages.swap(m_LargePagePool);
 
         for (auto page: m_AvailablePages)
         {

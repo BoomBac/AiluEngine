@@ -303,15 +303,6 @@ namespace Ailu::Render
             ViewEntity::FormCamera(cam._camera, view_entry);
             _cur_frame_packet->CopyCameraConstBuffer(view_entry);
         }
-        for (auto &light: r.View<ECS::LightComponent>())
-        {
-            for (u16 i = 0; i < light._shadow._shaodwcam_num; ++i)
-            {
-                auto &view_entry = _cur_frame_packet->FetchViewEntity();
-                ViewEntity::FormCamera(light._shadow_cameras[i], view_entry);
-                _cur_frame_packet->CopyCameraConstBuffer(view_entry);
-            }
-        }
     }
     void RenderPipeline::ProcessPendingRenderObjects()
     {

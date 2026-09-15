@@ -2,6 +2,7 @@
 #ifndef __COMMON_PASSES_H__
 #define __COMMON_PASSES_H__
 
+#include "Assets/AssetRef.h"
 #include "RenderFeature.h"
 #include "Render/RenderingData.h"
 #include <set>
@@ -11,6 +12,8 @@ namespace Ailu
 {
     namespace Render
     {
+        class ShadowSystem;
+
         class ForwardPass : public RenderPass
         {
         public:
@@ -68,17 +71,14 @@ namespace Ailu
         class ShadowCastPass : public RenderPass
         {
         public:
-            ShadowCastPass();
+            explicit ShadowCastPass(ShadowSystem *shadow_system);
             void OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data) final;
             void Execute(GraphicsContext *context, RenderingData &rendering_data) final;
             void BeginPass(GraphicsContext *context) final;
             void EndPass(GraphicsContext *context) final;
 
         private:
-            Ref<RenderTexture> _p_mainlight_shadow_map;
-            Ref<RenderTexture> _p_addlight_shadow_maps;
-            Ref<RenderTexture> _p_point_light_shadow_maps;
-            RDG::RGHandle _mainlight_shadow_map,_addlight_shadow_maps,_point_light_shadow_maps;
+            ShadowSystem *_shadow_system = nullptr;
         };
 
         class AILU_API CubeMapGenPass : public RenderPass
@@ -144,7 +144,7 @@ namespace Ailu
 
         private:
             Ref<Texture2D> _brdf_lut;
-            Ref<ComputeShader> _brdflut_gen;
+            AssetRef<ComputeShader> _brdflut_gen;
             Ref<RenderTexture> _dummy_main_light_shadow_map;
             Ref<RenderTexture> _dummy_add_light_shadow_maps;
             Ref<RenderTexture> _dummy_point_light_shadow_map;
@@ -207,7 +207,7 @@ namespace Ailu
             void EndPass(GraphicsContext *context) final;
 
         private:
-            Ref<Shader> _ui_default_shader;
+            AssetRef<Shader> _ui_default_shader;
             Ref<VertexBuffer> _vbuf;
             Ref<IndexBuffer> _ibuf;
             Ref<Material> _ui_default_mat;
@@ -237,7 +237,7 @@ namespace Ailu
             void BeginPass(GraphicsContext *context) final;
             void EndPass(GraphicsContext *context) final;
         private:
-            Ref<ComputeShader> _hzb_gen;
+            AssetRef<ComputeShader> _hzb_gen;
             ComputeShaderKernelId _hzb_kernel = kInvalidComputeShaderKernelId;
         };
 

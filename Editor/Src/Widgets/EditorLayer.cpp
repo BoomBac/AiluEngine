@@ -1266,6 +1266,7 @@ namespace Ailu
         {
             auto r = Render::RenderPipeline::Get().GetRenderer();
             r->AddFeature(&_pick);
+            r->AddFeature(&_editor_debug);
             r->SetShadingMode(EShadingMode::kLit);
 
 

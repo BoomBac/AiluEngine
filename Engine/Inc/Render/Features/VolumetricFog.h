@@ -1,6 +1,7 @@
 #ifndef VOLUMETRIC_FOG_H
 #define VOLUMETRIC_FOG_H
 #pragma once
+#include "Assets/AssetRef.h"
 #include "RenderFeature.h"
 #include "Framework/Math/ALMath.hpp"
 #include "Render/CoreType.h"
@@ -39,8 +40,8 @@ namespace Ailu
             Ref<Texture3D> _volumetric_light_a, _volumetric_light_b;
             Ref<Texture3D> _accum_texture;
             bool _is_cur_a = true;
-            Ref<ComputeShader> _volumetric_fog_cs;
-            Ref<ComputeShader> _max_z_cs;
+            AssetRef<ComputeShader> _volumetric_fog_cs;
+            AssetRef<ComputeShader> _max_z_cs;
             Vector3UInt _voxel_num = Vector3UInt(170, 90, 96);
         };
 
@@ -57,8 +58,8 @@ namespace Ailu
             bool _debug_voxel_pos = false;
             Vector3UInt _voxel_num;
         private:
-            ComputeShader* _volumetric_fog;
-            ComputeShader* _max_z_cs;
+            AssetRef<ComputeShader> _volumetric_fog;
+            AssetRef<ComputeShader> _max_z_cs;
             ComputeShaderKernelId _light_injection_kernel = kInvalidComputeShaderKernelId;
             ComputeShaderKernelId _light_integration_kernel = kInvalidComputeShaderKernelId;
             Texture3D* _cur_light_texture;

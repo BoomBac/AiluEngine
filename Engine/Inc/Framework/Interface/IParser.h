@@ -58,7 +58,6 @@ namespace Ailu
             _name_id = name_id;
             _is_copy = is_copy;
         }
-        virtual Scope<ImportSetting> Clone() const { return MakeScope<ImportSetting>(*this); }
         virtual ~ImportSetting() = default;
         //virtual void* operator new(size_t size) = 0;
         //virtual void* operator new[](size_t size) = 0;
@@ -118,7 +117,6 @@ namespace Ailu
         GENERATED_BODY()
 
     public:
-        Scope<ImportSetting> Clone() const override { return MakeScope<TextureImportSetting>(*this); }
         static TextureImportSetting &Default()
         {
             static TextureImportSetting s_default;
@@ -145,7 +143,6 @@ namespace Ailu
         GENERATED_BODY()
 
     public:
-        Scope<ImportSetting> Clone() const override { return MakeScope<MeshImportSetting>(*this); }
         inline static u8 kImportFlagMesh = 1;
         inline static u8 kImportFlagAnimation = 2;
         inline static u8 kImportFlagMaterial = 4;
@@ -202,7 +199,6 @@ namespace Ailu
     struct AILU_API ShaderImportSetting : public ImportSetting
     {
     public:
-        Scope<ImportSetting> Clone() const override { return MakeScope<ShaderImportSetting>(*this); }
         static ShaderImportSetting &Default()
         {
             static ShaderImportSetting s_default;

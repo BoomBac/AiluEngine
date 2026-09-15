@@ -71,6 +71,9 @@ namespace Ailu::RHI::DX12
         PagePool m_PagePool;
         PagePool m_AvailablePages;
         PagePool m_LargePagePool;
+        // 大页在上一个使用周期提交的GPU工作可能仍在执行：Reset() 时先移入待回收队列，
+        // 下一次 Reset()（此时该槽位fence已等待完成）再析构，保证不会在GPU使用中释放资源
+        PagePool m_RetirePages;
         std::atomic<std::shared_ptr<Page>> m_CurrentPage;
         mutable std::mutex m_PagePoolMutex;
         // The size of each page of memory.

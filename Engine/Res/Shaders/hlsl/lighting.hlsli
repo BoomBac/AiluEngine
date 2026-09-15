@@ -9,7 +9,7 @@
 #include "shadow.hlsli"
 #include "ltc.hlsli"
 #include "voxel_gi.hlsli"
-
+#include "spherical_harmonics.hlsli"
 
 // TEXTURE2D(Albedo)
 // TEXTURE2D(Normal)
@@ -32,6 +32,7 @@ TextureCube RadianceTex : register(t6);
 TextureCube PrefilterEnvTex : register(t7);
 Texture2D IBLLut : register(t8);
 Texture2D _OcclusionTex : register(t9);
+StructuredBuffer<float4> g_environment_sh : register(t18);
 //TEXTURE2D(_OcclusionTex)
 
 
@@ -80,7 +81,7 @@ float3 GetSpotLightIrridance(uint index,float3 world_pos)
 	return _SpotLights[index]._LightColor * atten;
 }
 
-float3 AmbientLighting(SurfaceData surface,ShadingData data,float3 irradiance, float3 prefiltered_color, float2 lut,float ao)
+float3 AmbientLighting(SurfaceData surface,ShadingData data,float3 irradiance, float3 prefiltered_color, float2 lut)
 {
 #ifdef _MULTI_SCATTER
 	//https://bruop.github.io/ibl/
@@ -94,12 +95,12 @@ float3 AmbientLighting(SurfaceData surface,ShadingData data,float3 irradiance, f
     float3 F_avg = f0 + (1.0 - f0) / 21.0;
     float3 FmsEms = Ems * FssEss * F_avg / (1.0 - F_avg * Ems);
     float3 k_D = surface.albedo.rgb * (1.0 - FssEss - FmsEms);
-	return (FssEss * prefiltered_color + (FmsEms + k_D) * irradiance) * ao;
+        return FssEss * prefiltered_color + (FmsEms + k_D) * irradiance;
 #else
-	float3 diffuse = (1.0 - surface.metallic) * surface.albedo.rgb;
-	diffuse *= irradiance;
-	float3 specular = prefiltered_color * EnvBRDF(surface.metallic,surface.albedo.rgb,lut);
-	return (diffuse + specular) * ao;
+        float3 diffuse = (1.0 - surface.metallic) * surface.albedo.rgb;
+        diffuse *= irradiance * INV_PI;
+        float3 specular = prefiltered_color * EnvBRDF(surface.metallic,surface.albedo.rgb,lut);
+        return diffuse + specular;
 #endif//_MULTI_SCATTER
 }
 uint GetGlobalDirectionalLightCount()
@@ -165,7 +166,12 @@ float3 RotateEnvironmentDirection(float3 direction)
         return float3(c * direction.x - s * direction.z, direction.y, s * direction.x + c * direction.z);
 }
 
-float3 CalculateLightPBR(SurfaceData surface,float3 world_pos,float2 screen_uv)
+float3 EvaluateEnvironmentIrradiance(float3 normal_ws)
+{
+        return EvaluateSH9(g_environment_sh, RotateEnvironmentDirection(normal_ws));
+}
+
+float3 CalculateLightPBR(SurfaceData surface,float3 world_pos,float2 screen_uv,float3 diffuse_irradiance)
 {
 #if defined(DEBUG_GI)
 	return VoxelGI(world_pos,surface.wnormal);
@@ -252,18 +258,17 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos,float2 screen_uv)
 	float lod = surface.roughness * PREFILTER_CUBEMAP_NUM;
         float3 environment_normal = RotateEnvironmentDirection(surface.wnormal);
         float3 environment_reflection = RotateEnvironmentDirection(reflect(-shading_data.view_dir, surface.wnormal));
-        float3 irradiance = SAMPLE_TEXTURECUBE_LOD(RadianceTex,g_LinearWrapSampler,environment_normal,0.0).rgb;
         float3 radiance = SAMPLE_TEXTURECUBE_LOD(PrefilterEnvTex,g_AnisotropicClampSampler,environment_reflection,lod).rgb;
 	float2 lut = SAMPLE_TEXTURE2D_LOD(IBLLut,g_LinearClampSampler,float2(shading_data.nv,surface.roughness),0.0).xy;
 	float ao = SAMPLE_TEXTURE2D(_OcclusionTex,g_LinearClampSampler,screen_uv).r;// * g_IndirectLightingIntensity;
 	float voxel_shadow = 1.0;//ConeTraceShadow(world_pos + surface.wnormal * 0.05,-_DirectionalLights[0]._LightPosOrDir);
-        light += voxel_shadow * AmbientLighting(surface,shading_data,irradiance,radiance,lut,ao) *
+        light += voxel_shadow * AmbientLighting(surface,shading_data,diffuse_irradiance,radiance,lut) * ao *
                  g_EnvironmentIntensity * g_EnvironmentEnabled;
 #ifdef _VOXEL_GI_ON
 	light *= voxel_shadow;
 	light += VoxelGI(world_pos,surface.wnormal) * surface.albedo.rgb;
 #endif
-	return light * ao;
+        return light;
 }
 float3 CalculateLightSimple(SurfaceData surface,float3 world_pos,float2 screen_uv)
 {

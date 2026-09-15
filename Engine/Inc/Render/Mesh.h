@@ -48,6 +48,8 @@ namespace Ailu
                 Color _specular = Color(1.0f);
                 Color _emissive = Color(0.0f);
                 f32 _roughness = 1.0f;
+                //导入时由生成的 MAT_ 资产回填，供 mesh 资产记录 per-submesh 材质引用
+                Guid _asset_guid = Guid::EmptyGuid();
 
                 ImportedMaterialInfo(u16 s = 0, std::string n = "")
                     : _name(std::move(n)), _slot(s) {}
@@ -150,6 +152,11 @@ namespace Ailu
             //-----------------------------------------
             void AddCacheMaterial(ImportedMaterialInfo material) { _imported_taterials.emplace_back(std::move(material)); }
             [[nodiscard]] const Vector<ImportedMaterialInfo> &GetCacheMaterials() const noexcept { return _imported_taterials; }
+            void SetCacheMaterialAssetGuid(u16 slot, const Guid &material_asset)
+            {
+                if (slot < _imported_taterials.size())
+                    _imported_taterials[slot]._asset_guid = material_asset;
+            }
 
         protected:
             ////-----------------------------------------

@@ -16,7 +16,7 @@ namespace Ailu::Render
     {
         _prepare_pass._event = ERenderPassEvent::kBeforeGbuffer;
         _execute_pass._event = ERenderPassEvent::kBeforePostprocess;
-        _taa = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/taa.hlsl"), "Runtime/TAA");
+        _taa = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/taa.alasset"), "Runtime/TAA");
     };
 
     TemporalAA::~TemporalAA()
@@ -104,7 +104,7 @@ namespace Ailu::Render
     TAAExecutePass::TAAExecutePass() : RenderPass("TAAExecutePass")
     {
         _origin_camera_cbuf = ConstantBuffer::Create(RenderConstants::kPerCameraDataSize);
-        _taa_gen = ResourceMgr::Get().GetRef<ComputeShader>(L"Shaders/hlsl/Compute/taa.alasset");
+        _taa_gen = ResourceMgr::Get().LoadAssetRef<ComputeShader>(L"Shaders/hlsl/Compute/taa.alasset");
         _taa_kernel = _taa_gen->FindKernel("CSMain");
     }
     void TAAExecutePass::Setup(Matrix4x4f pre_matrix, Matrix4x4f cur_matrix, Material *taa_mat, int camera_hash, Vector2f jitter,Vector4f params,Vector4f quality)

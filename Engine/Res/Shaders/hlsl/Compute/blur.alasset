@@ -1,0 +1,11 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "0c5b1e3a-6a10-4f4e-a2e6-91d16b6a18c1",
+        "_asset_type": "Ailu::Render::ComputeShader",
+        "_asset_name": "blur",
+        "_dependencies": []
+    },
+    "_file": "blur.hlsl",
+    "_kernel": "blur_x"
+}

@@ -46,13 +46,20 @@ namespace Ailu
             {
                 Vector<TreeItemId> roots;
                 if (!_scene) return roots;
-                auto& reg = _scene->GetRegister();
-                for (auto e : _scene->EntityView())
+                const ECS::Entity scene_root = _scene->SceneRoot();
+                const auto *root_hierarchy = _scene->GetRegister().GetComponent<ECS::CHierarchy>(scene_root);
+                if (root_hierarchy == nullptr)
+                    return roots;
+                auto &reg = _scene->GetRegister();
+                ECS::Entity child = root_hierarchy->_first_child;
+                u32 count = 0u;
+                while (child != ECS::kInvalidEntity && count < 1000u)
                 {
-                    if (!reg.IsAlive(e)) continue;
-                    auto* hier = reg.GetComponent<ECS::CHierarchy>(e);
-                    if (hier && hier->_parent == ECS::kInvalidEntity)
-                        roots.push_back(ToTreeItem(e));
+                    if (reg.IsAlive(child) && !_scene->IsSceneRoot(child) && reg.HasComponent<ECS::CHierarchy>(child))
+                        roots.push_back(ToTreeItem(child));
+                    const auto *child_hierarchy = reg.GetComponent<ECS::CHierarchy>(child);
+                    child = child_hierarchy != nullptr ? child_hierarchy->_next_sibling : ECS::kInvalidEntity;
+                    ++count;
                 }
                 return roots;
             }
@@ -94,6 +101,7 @@ namespace Ailu
 
                 auto* hier = _scene->GetRegister().GetComponent<ECS::CHierarchy>(entity);
                 if (!hier || hier->_parent == ECS::kInvalidEntity) return kInvalidTreeItemId;
+                if (_scene->IsSceneRoot(hier->_parent)) return kInvalidTreeItemId;
                 if (!_scene->IsValidEntity(hier->_parent))
                 {
                     LOG_WARNING("SceneTreeDataSource: parent {} of {} is not alive", hier->_parent, entity);
@@ -130,7 +138,7 @@ namespace Ailu
             bool IsValid(TreeItemId item) const override
             {
                 auto entity = ToEntity(item);
-                return _scene && _scene->IsValidEntity(entity);
+                return _scene && _scene->IsValidEntity(entity) && !_scene->IsSceneRoot(entity);
             }
 
         private:
@@ -378,7 +386,7 @@ namespace Ailu
             String entity_name = tag ? tag->_name : "Entity";
             bool has_parent = false;
             if (auto* hier = reg.GetComponent<ECS::CHierarchy>(entity))
-                has_parent = (hier->_parent != ECS::kInvalidEntity);
+                has_parent = (hier->_parent != ECS::kInvalidEntity && !scene->IsSceneRoot(hier->_parent));
 
             Vector<ECS::Entity> selected_entities;
             for (TreeItemId selected_item : _tree_view->GetSelectedItems())

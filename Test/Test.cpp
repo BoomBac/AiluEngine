@@ -7,9 +7,13 @@
 #include <Framework/Common/TimeMgr.h>
 #include <Framework/Math/Guid.h>
 #include <Framework/Common/ResourceMgr.h>
+#include <Framework/Parser/FbxParser.h>
+#include <Render/Mesh.h>
+#include <fbxsdk.h>
 #include <Assets/AssetDocument.h>
 #include <Assets/AssetRef.h>
 #include <Assets/AssetArtifact.h>
+#include <Assets/MeshArtifact.h>
 #include <Assets/AssetRegistry.h>
 #include <Assets/DerivedDataCache.h>
 #include <Graph/GraphDocument.h>
@@ -2160,6 +2164,429 @@ namespace
             std::exit(EXIT_FAILURE);
     }
 
+    // ============================================================
+    // FBX import diagnostics (mesh import debugging)
+    // ============================================================
+    static void PrintFbxVec(const FbxVector4 &v)
+    {
+        std::cout << '(' << v[0] << ", " << v[1] << ", " << v[2] << ')';
+    }
+
+    template<typename TLayerElement>
+    static void DumpFbxLayerElement(const char *label, TLayerElement *element)
+    {
+        if (element == nullptr)
+        {
+            std::cout << "      " << label << "=none\n";
+            return;
+        }
+        std::cout << "      " << label << " mapping=" << static_cast<int>(element->GetMappingMode())
+                  << " reference=" << static_cast<int>(element->GetReferenceMode())
+                  << " direct_count=" << element->GetDirectArray().GetCount()
+                  << " index_count=" << element->GetIndexArray().GetCount() << '\n';
+    }
+
+    static void DumpFbxMeshInfo(FbxNode *node)
+    {
+        FbxMesh *mesh = node->GetMesh();
+        if (mesh == nullptr)
+            return;
+        const int cp_count = mesh->GetControlPointsCount();
+        FbxVector4 mn(0, 0, 0), mx(0, 0, 0);
+        if (cp_count > 0)
+        {
+            const FbxVector4 *points = mesh->GetControlPoints();
+            for (int axis = 0; axis < 3; ++axis)
+            {
+                mn[axis] = points[0][axis];
+                mx[axis] = points[0][axis];
+            }
+            for (int i = 1; i < cp_count; ++i)
+            {
+                for (int axis = 0; axis < 3; ++axis)
+                {
+                    mn[axis] = std::min(mn[axis], points[i][axis]);
+                    mx[axis] = std::max(mx[axis], points[i][axis]);
+                }
+            }
+        }
+        std::cout << "      mesh=" << mesh->GetName() << " cp=" << cp_count
+                  << " polys=" << mesh->GetPolygonCount()
+                  << " node_mats=" << node->GetMaterialCount() << '\n';
+        std::cout << "      geo_space_aabb=";
+        PrintFbxVec(mn);
+        std::cout << " .. ";
+        PrintFbxVec(mx);
+        std::cout << '\n';
+        DumpFbxLayerElement("normal", mesh->GetElementNormalCount() > 0 ? mesh->GetElementNormal(0) : nullptr);
+        DumpFbxLayerElement("uv0", mesh->GetElementUVCount() > 0 ? mesh->GetElementUV(0) : nullptr);
+        DumpFbxLayerElement("tangent", mesh->GetElementTangentCount() > 0 ? mesh->GetElementTangent(0) : nullptr);
+        const int mat_element_count = mesh->GetElementMaterialCount();
+        std::cout << "      material_element_count=" << mat_element_count;
+        if (mat_element_count > 0)
+        {
+            auto *mat_element = mesh->GetElementMaterial(0);
+            std::cout << " mapping=" << static_cast<int>(mat_element->GetMappingMode())
+                      << " reference=" << static_cast<int>(mat_element->GetReferenceMode())
+                      << " index_count=" << mat_element->GetIndexArray().GetCount() << " indices=[";
+            for (int i = 0; i < std::min<int>(mat_element->GetIndexArray().GetCount(), 24); ++i)
+                std::cout << mat_element->GetIndexArray().GetAt(i) << ' ';
+            std::cout << ']';
+        }
+        std::cout << '\n';
+        for (int i = 0; i < node->GetMaterialCount(); ++i)
+        {
+            FbxSurfaceMaterial *material = node->GetMaterial(i);
+            std::cout << "      node_mat[" << i << "]=" << (material != nullptr ? material->GetName() : "<null>")
+                      << '\n';
+        }
+    }
+
+    static void DumpFbxNodeRecursive(FbxNode *node, int depth)
+    {
+        const std::string indent(static_cast<size_t>(depth) * 2, ' ');
+        FbxNodeAttribute *attribute = node->GetNodeAttribute();
+        const char *type_name = attribute != nullptr ? attribute->GetTypeName() : "none";
+        const FbxVector4 geo_t = node->GetGeometricTranslation(FbxNode::eSourcePivot);
+        const FbxVector4 geo_r = node->GetGeometricRotation(FbxNode::eSourcePivot);
+        const FbxVector4 geo_s = node->GetGeometricScaling(FbxNode::eSourcePivot);
+        std::cout << indent << node->GetName() << " type=" << type_name
+                  << " children=" << node->GetChildCount() << '\n';
+        std::cout << indent << "  local_t=";
+        PrintFbxVec(node->EvaluateLocalTransform().GetT());
+        std::cout << " local_s=";
+        PrintFbxVec(node->EvaluateLocalTransform().GetS());
+        std::cout << " global_t=";
+        PrintFbxVec(node->EvaluateGlobalTransform().GetT());
+        std::cout << " global_s=";
+        PrintFbxVec(node->EvaluateGlobalTransform().GetS());
+        std::cout << '\n';
+        std::cout << indent << "  geo_t=";
+        PrintFbxVec(geo_t);
+        std::cout << " geo_r=";
+        PrintFbxVec(geo_r);
+        std::cout << " geo_s=";
+        PrintFbxVec(geo_s);
+        std::cout << '\n';
+        DumpFbxMeshInfo(node);
+        for (int i = 0; i < node->GetChildCount(); ++i)
+            DumpFbxNodeRecursive(node->GetChild(i), depth + 1);
+    }
+
+    static void DumpFbxSceneSettings(FbxScene *scene, const char *label)
+    {
+        const FbxAxisSystem axis = scene->GetGlobalSettings().GetAxisSystem();
+        i32 up_sign = 0, front_sign = 0;
+        const FbxAxisSystem::EUpVector up_axis = axis.GetUpVector(up_sign);
+        const FbxAxisSystem::EFrontVector front_axis = axis.GetFrontVector(front_sign);
+        const FbxAxisSystem::ECoordSystem coord_system = axis.GetCoorSystem();
+        const FbxSystemUnit unit = scene->GetGlobalSettings().GetSystemUnit();
+        std::cout << "scene_settings[" << label << "]: up_axis=" << static_cast<int>(up_axis)
+                  << " up_sign=" << up_sign
+                  << " front_axis=" << static_cast<int>(front_axis) << " front_sign=" << front_sign
+                  << " coord_system=" << static_cast<int>(coord_system)
+                  << " unit_to_cm=" << unit.GetConversionFactorTo(FbxSystemUnit::cm) << '\n';
+    }
+
+    static void PrintAabb(const AABB &box)
+    {
+        std::cout << "min(" << box._min.x << ", " << box._min.y << ", " << box._min.z << ") max(" << box._max.x
+                  << ", " << box._max.y << ", " << box._max.z << ")";
+    }
+
+    static void DumpParsedMeshes(const wchar_t *path, bool combine, bool import_material)
+    {
+        FbxParser parser;
+        MeshImportSetting setting;
+        setting._import_flag = MeshImportSetting::kImportFlagMesh;
+        if (import_material)
+            setting._import_flag |= MeshImportSetting::kImportFlagMaterial;
+        setting._is_combine_mesh = combine;
+        parser.Parser(WString(path), setting);
+        List<Ref<Mesh>> meshes;
+        parser.GetMeshes(meshes);
+        std::cout << "=== parser combine=" << combine << " import_material=" << import_material
+                  << " mesh_count=" << meshes.size() << " ===\n";
+        size_t mesh_index = 0u;
+        for (auto mesh_iter = meshes.begin(); mesh_iter != meshes.end(); ++mesh_iter, ++mesh_index)
+        {
+            Mesh *mesh = mesh_iter->get();
+            if (mesh == nullptr)
+                continue;
+            const auto vertices = mesh->GetVertices();
+            const auto normals = mesh->GetNormals();
+            const auto uvs = mesh->GetUVs(0);
+            const auto tangents = mesh->GetTangents();
+            Vector3f vertex_min(std::numeric_limits<f32>::max());
+            Vector3f vertex_max(std::numeric_limits<f32>::lowest());
+            f32 normal_len_min = std::numeric_limits<f32>::max();
+            f32 normal_len_max = 0.0f;
+            Vector2f uv_min(std::numeric_limits<f32>::max());
+            Vector2f uv_max(std::numeric_limits<f32>::lowest());
+            for (const auto &v: vertices)
+            {
+                vertex_min.x = std::min(vertex_min.x, v.x);
+                vertex_min.y = std::min(vertex_min.y, v.y);
+                vertex_min.z = std::min(vertex_min.z, v.z);
+                vertex_max.x = std::max(vertex_max.x, v.x);
+                vertex_max.y = std::max(vertex_max.y, v.y);
+                vertex_max.z = std::max(vertex_max.z, v.z);
+            }
+            for (const auto &n: normals)
+            {
+                const f32 length = std::sqrt(n.x * n.x + n.y * n.y + n.z * n.z);
+                normal_len_min = std::min(normal_len_min, length);
+                normal_len_max = std::max(normal_len_max, length);
+            }
+            for (const auto &uv: uvs)
+            {
+                uv_min.x = std::min(uv_min.x, uv.x);
+                uv_min.y = std::min(uv_min.y, uv.y);
+                uv_max.x = std::max(uv_max.x, uv.x);
+                uv_max.y = std::max(uv_max.y, uv.y);
+            }
+            std::cout << "mesh[" << mesh_index << "] name=" << mesh->Name()
+                      << " type=" << (dynamic_cast<SkeletonMesh *>(mesh) != nullptr ? "SkeletonMesh" : "Mesh")
+                      << " verts=" << vertices.size() << " normals=" << normals.size()
+                      << " uvs=" << uvs.size() << " tangents=" << tangents.size()
+                      << " submeshes=" << mesh->SubmeshCount()
+                      << " cache_mats=" << mesh->GetCacheMaterials().size()
+                      << " vertex_count=" << mesh->GetVertexCount() << '\n';
+            std::cout << "  vertex_aabb: ";
+            PrintAabb(AABB(vertex_min, vertex_max));
+            std::cout << " normal_len=[" << normal_len_min << ", " << normal_len_max << "] uv_range=(" << uv_min.x
+                      << ", " << uv_min.y << ")..(" << uv_max.x << ", " << uv_max.y << ")\n";
+            // 面朝向统计：以网格自身顶点重心为参考，判断三角形正面朝向内侧还是外侧
+            {
+                Vector3f centroid(0.0f, 0.0f, 0.0f);
+                for (const auto &v: vertices)
+                    centroid = centroid + v;
+                if (!vertices.empty())
+                    centroid = centroid / static_cast<f32>(vertices.size());
+                u32 outward_tris = 0u;
+                u32 inward_tris = 0u;
+                for (u16 submesh_index = 0u; submesh_index < mesh->SubmeshCount(); ++submesh_index)
+                {
+                    const auto indices = mesh->GetIndices(submesh_index);
+                    for (size_t tri_index = 0u; tri_index + 2u < indices.size(); tri_index += 3u)
+                    {
+                        const Vector3f &v0 = vertices[indices[tri_index]];
+                        const Vector3f &v1 = vertices[indices[tri_index + 1u]];
+                        const Vector3f &v2 = vertices[indices[tri_index + 2u]];
+                        const Vector3f geometric_normal = CrossProduct(v1 - v0, v2 - v0);
+                        if (DotProduct(geometric_normal, centroid - v0) > 0.0f)
+                            ++inward_tris;
+                        else
+                            ++outward_tris;
+                    }
+                }
+                std::cout << "  facing: inward(toward mesh centroid)=" << inward_tris
+                          << " outward=" << outward_tris << '\n';
+            }
+            if (vertices.size() > 0)
+            {
+                const auto &v = vertices[0];
+                std::cout << "  v0=(" << v.x << ", " << v.y << ", " << v.z << ')';
+                if (!normals.empty())
+                    std::cout << " n0=(" << normals[0].x << ", " << normals[0].y << ", " << normals[0].z << ')';
+                if (!uvs.empty())
+                    std::cout << " uv0=(" << uvs[0].x << ", " << uvs[0].y << ')';
+                if (!tangents.empty())
+                    std::cout << " t0=(" << tangents[0].x << ", " << tangents[0].y << ", " << tangents[0].z
+                              << ", " << tangents[0].w << ')';
+                std::cout << '\n';
+            }
+            const auto &bounds = mesh->BoundBox();
+            std::cout << "  bounds_count=" << bounds.size() << '\n';
+            for (size_t bound_index = 0; bound_index < bounds.size(); ++bound_index)
+            {
+                std::cout << "  bounds[" << bound_index << "]: ";
+                PrintAabb(bounds[bound_index]);
+                std::cout << '\n';
+            }
+            for (u16 submesh_index = 0; submesh_index < mesh->SubmeshCount(); ++submesh_index)
+            {
+                const auto indices = mesh->GetIndices(submesh_index);
+                u32 index_min = std::numeric_limits<u32>::max();
+                u32 index_max = 0u;
+                for (auto index: indices)
+                {
+                    index_min = std::min(index_min, index);
+                    index_max = std::max(index_max, index);
+                }
+                std::cout << "  submesh[" << submesh_index << "] indices=" << indices.size()
+                          << " tris=" << indices.size() / 3u << " index_range=[" << index_min << ", " << index_max
+                          << ']';
+                const auto &cache_materials = mesh->GetCacheMaterials();
+                if (submesh_index < cache_materials.size())
+                    std::cout << " material=" << cache_materials[submesh_index]._name
+                              << " slot=" << cache_materials[submesh_index]._slot
+                              << " diffuse=(" << cache_materials[submesh_index]._diffuse.r << ", "
+                              << cache_materials[submesh_index]._diffuse.g << ", "
+                              << cache_materials[submesh_index]._diffuse.b << ')';
+                std::cout << '\n';
+                u32 front_face_tris = 0u;
+                u32 back_face_tris = 0u;
+                for (size_t tri_index = 0u; tri_index + 2u < indices.size(); tri_index += 3u)
+                {
+                    const Vector3f &v0 = vertices[indices[tri_index]];
+                    const Vector3f &v1 = vertices[indices[tri_index + 1u]];
+                    const Vector3f &v2 = vertices[indices[tri_index + 2u]];
+                    const Vector3f geometric_normal = CrossProduct(v1 - v0, v2 - v0);
+                    const Vector3f &shading_normal = normals[indices[tri_index]];
+                    if (DotProduct(geometric_normal, shading_normal) >= 0.0f)
+                        ++front_face_tris;
+                    else
+                        ++back_face_tris;
+                }
+                std::cout << "    winding: geometric_normal_along_shading_normal=" << front_face_tris
+                          << " opposite=" << back_face_tris << '\n';
+            }
+        }
+        std::cout << std::flush;
+    }
+
+    struct TriangleKey
+    {
+        u32 _index[3]{};
+        bool operator<(const TriangleKey &other) const
+        {
+            return std::tie(_index[0], _index[1], _index[2]) <
+                   std::tie(other._index[0], other._index[1], other._index[2]);
+        }
+        bool operator==(const TriangleKey &other) const
+        {
+            return std::tie(_index[0], _index[1], _index[2]) ==
+                   std::tie(other._index[0], other._index[1], other._index[2]);
+        }
+    };
+
+    static Vector<TriangleKey> CollectTriangleKeys(const Mesh *mesh)
+    {
+        Vector<TriangleKey> keys;
+        for (u16 submesh_index = 0u; submesh_index < mesh->SubmeshCount(); ++submesh_index)
+        {
+            const auto indices = mesh->GetIndices(submesh_index);
+            for (size_t tri_index = 0u; tri_index + 2u < indices.size(); tri_index += 3u)
+            {
+                TriangleKey key{};
+                key._index[0] = indices[tri_index];
+                key._index[1] = indices[tri_index + 1u];
+                key._index[2] = indices[tri_index + 2u];
+                std::sort(std::begin(key._index), std::end(key._index));
+                keys.emplace_back(key);
+            }
+        }
+        std::sort(keys.begin(), keys.end());
+        return keys;
+    }
+
+    // Verifies the runtime mesh pipeline: BVH index reorder (BuildDerivedData) and the
+    // mesh artifact roundtrip used by the asset cache.
+    static void DumpRuntimeMeshPipeline(const wchar_t *path)
+    {
+        FbxParser parser;
+        MeshImportSetting setting;
+        setting._import_flag = MeshImportSetting::kImportFlagMesh | MeshImportSetting::kImportFlagMaterial;
+        setting._is_combine_mesh = true;
+        parser.Parser(WString(path), setting);
+        List<Ref<Mesh>> meshes;
+        parser.GetMeshes(meshes);
+        if (meshes.empty())
+        {
+            std::cout << "runtime pipeline: parser returned no mesh\n";
+            return;
+        }
+        Mesh *mesh = meshes.front().get();
+        Vector<TriangleKey> triangles_before = CollectTriangleKeys(mesh);
+        mesh->BuildDerivedData();
+        Vector<TriangleKey> triangles_after = CollectTriangleKeys(mesh);
+        std::cout << "=== runtime mesh pipeline ===\n";
+        std::cout << "BuildDerivedData: triangles_before=" << triangles_before.size()
+                  << " triangles_after=" << triangles_after.size()
+                  << " identical=" << (triangles_before == triangles_after)
+                  << " triangle_count=" << mesh->GetTriangleCount()
+                  << " derived_ready=" << mesh->HasDerivedData() << '\n';
+        for (u16 submesh_index = 0u; submesh_index < mesh->SubmeshCount(); ++submesh_index)
+            std::cout << "  submesh[" << submesh_index << "] tris=" << mesh->GetTriangleCount(submesh_index)
+                      << " bvh_nodes=" << mesh->GetBVHNodeCount(submesh_index) << '\n';
+
+        MeshArtifact artifact;
+        // 模拟导入阶段回填的材质资产 guid，验证它能跟着 artifact 一起往返
+        Vector<Guid> expected_material_assets;
+        for (u16 slot = 0u; slot < mesh->GetCacheMaterials().size(); ++slot)
+        {
+            const Guid material_asset = Guid::Generate();
+            mesh->SetCacheMaterialAssetGuid(slot, material_asset);
+            expected_material_assets.emplace_back(material_asset);
+        }
+        if (!BuildMeshArtifact(*mesh, artifact))
+        {
+            std::cout << "BuildMeshArtifact FAILED\n";
+            return;
+        }
+        AssetArtifactKey key;
+        key._source_hash = 0x1111u;
+        key._import_setting_hash = 0x2222u;
+        key._dependency_hash = 0x3333u;
+        key._importer_version = 3u;
+        key._artifact_version = kMeshArtifactVersion;
+        Vector<u8> data;
+        const bool serialized = SerializeMeshArtifact(artifact, key, data);
+        std::cout << "SerializeMeshArtifact=" << serialized << " bytes=" << data.size()
+                  << " cache_materials=" << mesh->GetCacheMaterials().size() << '\n';
+        if (!serialized)
+            return;
+        MeshArtifact restored;
+        const bool deserialized = DeserializeMeshArtifact(data, key, restored);
+        std::cout << "DeserializeMeshArtifact=" << deserialized << '\n';
+        if (!deserialized)
+            return;
+        Ref<Mesh> rebuilt = CreateMeshFromArtifact(restored);
+        std::cout << "rebuilt mesh: name=" << rebuilt->Name() << " verts=" << rebuilt->GetVertices().size()
+                  << " normals=" << rebuilt->GetNormals().size() << " uvs=" << rebuilt->GetUVs(0).size()
+                  << " tangents=" << rebuilt->GetTangents().size() << " submeshes=" << rebuilt->SubmeshCount()
+                  << " cache_materials=" << rebuilt->GetCacheMaterials().size()
+                  << " vertex_count=" << rebuilt->GetVertexCount()
+                  << " triangle_count=" << rebuilt->GetTriangleCount()
+                  << " derived_ready=" << rebuilt->HasDerivedData() << '\n';
+        const auto rebuilt_vertices = rebuilt->GetVertices();
+        Vector3f rebuilt_min(std::numeric_limits<f32>::max());
+        Vector3f rebuilt_max(std::numeric_limits<f32>::lowest());
+        for (const auto &v: rebuilt_vertices)
+        {
+            rebuilt_min.x = std::min(rebuilt_min.x, v.x);
+            rebuilt_min.y = std::min(rebuilt_min.y, v.y);
+            rebuilt_min.z = std::min(rebuilt_min.z, v.z);
+            rebuilt_max.x = std::max(rebuilt_max.x, v.x);
+            rebuilt_max.y = std::max(rebuilt_max.y, v.y);
+            rebuilt_max.z = std::max(rebuilt_max.z, v.z);
+        }
+        std::cout << "rebuilt vertex_aabb: ";
+        PrintAabb(AABB(rebuilt_min, rebuilt_max));
+        std::cout << " bounds_count=" << rebuilt->BoundBox().size() << '\n';
+        std::cout << "rebuilt triangles identical to source: "
+                  << (CollectTriangleKeys(rebuilt.get()) == triangles_before) << '\n';
+        const auto &source_materials = mesh->GetCacheMaterials();
+        const auto &rebuilt_materials = rebuilt->GetCacheMaterials();
+        std::cout << "material roundtrip: source=" << source_materials.size()
+                  << " rebuilt=" << rebuilt_materials.size() << '\n';
+        for (size_t material_index = 0u; material_index < rebuilt_materials.size(); ++material_index)
+        {
+            const auto &material = rebuilt_materials[material_index];
+            std::cout << "  material[" << material_index << "] name=" << material._name
+                      << " slot=" << material._slot << " source_id=" << material._source_id
+                      << " diffuse=(" << material._diffuse.x << ", " << material._diffuse.y << ", "
+                      << material._diffuse.z << ") roughness=" << material._roughness
+                      << " albedo_tex=" << (material._textures[0].empty() ? "<none>" : material._textures[0])
+                      << " guid_match="
+                      << (material_index < expected_material_assets.size() &&
+                          material._asset_guid == expected_material_assets[material_index])
+                      << '\n';
+        }
+        std::cout << std::flush;
+    }
+
 }
 
 int main(int argc, char **argv)
@@ -2169,6 +2596,67 @@ int main(int argc, char **argv)
     Allocator::Init();
     // DEBUG 构建下部分引擎系统（如 SceneMgr 构造的 TIMER_BLOCK）依赖 TimeMgr。
     TimeMgr::Init();
+
+    if (argc == 2 && std::strcmp(argv[1], "--fbx-hierarchy-dump") == 0)
+    {
+        FbxManager *manager = FbxManager::Create();
+        FbxIOSettings *settings = FbxIOSettings::Create(manager, IOSROOT);
+        manager->SetIOSettings(settings);
+        FbxImporter *importer = FbxImporter::Create(manager, "");
+        FbxScene *scene = FbxScene::Create(manager, "hierarchy_dump");
+        if (!importer->Initialize("I:\\Downloads\\Cornell_box_fbx\\Cornell_Box_-_from_real_data.fbx", -1,
+                                  manager->GetIOSettings()) || !importer->Import(scene))
+            return EXIT_FAILURE;
+
+        const auto dump_node = [](FbxNode *node, const char *label)
+        {
+            const FbxVector4 local_translation = node->EvaluateLocalTransform().GetT();
+            const FbxVector4 global_translation = node->EvaluateGlobalTransform().GetT();
+            const FbxVector4 local_scale = node->EvaluateLocalTransform().GetS();
+            std::cout << label << ' ' << node->GetName() << " local_t=(" << local_translation[0] << ", "
+                      << local_translation[1] << ", " << local_translation[2] << ") local_s=("
+                      << local_scale[0] << ", " << local_scale[1] << ", " << local_scale[2] << ") global_t=("
+                      << global_translation[0] << ", " << global_translation[1] << ", " << global_translation[2]
+                      << ")\n";
+        };
+        const auto dump_geo_mesh = [&dump_node, scene](const char *label)
+        {
+            FbxNode *root = scene->GetRootNode();
+            for (int child_index = 0; child_index < root->GetChildCount(); ++child_index)
+            {
+                FbxNode *node = root->GetChild(child_index);
+                if (std::strcmp(node->GetName(), "geo") != 0)
+                    continue;
+                dump_node(node, label);
+                for (int mesh_index = 0; mesh_index < node->GetChildCount(); ++mesh_index)
+                {
+                    FbxNode *mesh_node = node->GetChild(mesh_index);
+                    if (std::strcmp(mesh_node->GetName(), "Mesh") == 0)
+                        dump_node(mesh_node, label);
+                }
+            }
+        };
+
+        dump_geo_mesh("raw");
+        DumpFbxSceneSettings(scene, "raw");
+        FbxAxisSystem::DirectX.DeepConvertScene(scene);
+        dump_geo_mesh("axis");
+        DumpFbxSceneSettings(scene, "axis");
+        FbxSystemUnit::m.ConvertScene(scene);
+        dump_geo_mesh("unit");
+        DumpFbxSceneSettings(scene, "unit");
+        std::cout << "\n=== full scene dump (after axis+unit convert) ===\n";
+        DumpFbxNodeRecursive(scene->GetRootNode(), 0);
+        importer->Destroy();
+        manager->Destroy();
+        const wchar_t *fbx_path = L"I:\\Downloads\\Cornell_box_fbx\\Cornell_Box_-_from_real_data.fbx";
+        std::cout << "\n=== engine parser dump ===\n";
+        DumpParsedMeshes(fbx_path, false, false);
+        DumpParsedMeshes(fbx_path, true, false);
+        DumpParsedMeshes(fbx_path, true, true);
+        DumpRuntimeMeshPipeline(fbx_path);
+        std::_Exit(EXIT_SUCCESS);
+    }
 
     if (argc == 2 && std::strcmp(argv[1], "--animation-tests") == 0)
     {

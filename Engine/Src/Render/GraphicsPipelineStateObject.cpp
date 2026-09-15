@@ -233,7 +233,7 @@ namespace Ailu::Render
         }
 
         memset(&pso_desc, 0, sizeof(GraphicsPipelineStateInitializer));
-        shader = ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/debug.hlsl");
+        shader = ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/debug.alasset");
         for (i16 i = 0; i < shader->PassCount(); i++)
         {
             auto &pass = shader->GetPassInfo(i);

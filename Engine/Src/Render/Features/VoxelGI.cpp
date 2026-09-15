@@ -18,7 +18,7 @@ namespace Ailu::Render
         _standard_lit_forward = Shader::s_p_defered_standart_lit.lock();
         _voxel_pass_index = _standard_lit_forward->FindPass("VoxelLit");
         _cam_cbuf = ConstantBuffer::Create(sizeof(CBufferPerCameraData), "VoxelCbuf");
-        _voxelize_cs = ResourceMgr::Get().GetRef<ComputeShader>(L"Shaders/hlsl/Compute/voxelize.alasset");
+        _voxelize_cs = ResourceMgr::Get().LoadAssetRef<ComputeShader>(L"Shaders/hlsl/Compute/voxelize.alasset");
         _fill_texture3d_kernel = _voxelize_cs->FindKernel("FillTexture3D");
     }
     VoxelizePass::~VoxelizePass()

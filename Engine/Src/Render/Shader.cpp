@@ -297,16 +297,16 @@ namespace Ailu::Render
         variant._binding_layout = layout;
     }
 
-    bool Shader::Compile(u16 pass_id, ShaderVariantHash variant_hash, bool is_load_cache)
+    bool Shader::Compile(u16 pass_id, ShaderVariantHash variant_hash, EShaderCompilePolicy policy)
     {
         //LOG_INFO(L"Begin compile shader: {},pass: {},variant: {} with keywords {}...", _src_file_path, pass_id, variant_hash, ToWChar(su::Join(ActiveKeywords(pass_id, variant_hash), ",")));
         TimeMgr::Get().Mark();
         AL_ASSERT(pass_id < _passes.size());
         auto &pass = _passes[pass_id];
         AL_ASSERT(pass._variants.contains(variant_hash));
+        const auto previous_state = _variant_state[pass_id][variant_hash];
         _variant_state[pass_id][variant_hash] = EShaderVariantState::kCompiling;
-        String variant_str = std::format("{}_{}_{},keywords: {}", _name, pass_id, variant_hash, su::Join(ActiveKeywords(pass_id, variant_hash), ","));
-        if (RHICompileImpl(pass_id, variant_hash, is_load_cache))
+        if (RHICompileImpl(pass_id, variant_hash, policy))
         {
             pass._variants[variant_hash]._pipeline_input_layout.Hash(PipelineStateHash<VertexInputLayout>::GenHash(pass._variants[variant_hash]._pipeline_input_layout));
             pass._pipeline_raster_state.Hash(PipelineStateHash<RasterizerState>::GenHash(pass._pipeline_raster_state));
@@ -315,17 +315,21 @@ namespace Ailu::Render
             pass._variants[variant_hash]._shader_hash = ConstructHash(_id, pass_id, variant_hash);
             GraphicsPipelineStateMgr::Get().OnShaderCompiled(this, pass_id, variant_hash);
             _variant_state[pass_id][variant_hash] = EShaderVariantState::kReady;
-            LOG_INFO("Shader({}) compile success with {}ms", variant_str, TimeMgr::Get().GetElapsedSinceLastMark());
+            LOG_INFO("ShaderVariant READY shader={} pass={} variant={} total={}ms", _name, pass_id, variant_hash,
+                     TimeMgr::Get().GetElapsedSinceLastMark());
         }
         else
         {
-            _variant_state[pass_id][variant_hash] = EShaderVariantState::kError;
-            LOG_ERROR("Shader({}) compile failed with {}ms", variant_str, TimeMgr::Get().GetElapsedSinceLastMark());
+            _variant_state[pass_id][variant_hash] = previous_state == EShaderVariantState::kReady
+                                                        ? EShaderVariantState::kReady
+                                                        : EShaderVariantState::kError;
+            LOG_ERROR("ShaderVariant FAILED shader={} pass={} variant={} total={}ms", _name, pass_id, variant_hash,
+                      TimeMgr::Get().GetElapsedSinceLastMark());
         }
         return _variant_state[pass_id][variant_hash] == EShaderVariantState::kReady;
     }
 
-    bool Shader::Compile(bool is_load_cache)
+    bool Shader::Compile(EShaderCompilePolicy policy)
     {
         u16 pass_index = 0;
         u32 variant_index = 0;
@@ -335,7 +339,7 @@ namespace Ailu::Render
             for (auto &variant_it: pass._variants)
             {
                 auto &[vhash, kw_seq] = variant_it;
-                if (!Compile(pass_index, vhash, is_load_cache))
+                if (!Compile(pass_index, vhash, policy))
                     ++error_variant_count;
                 ++variant_index;
             }
@@ -529,7 +533,7 @@ namespace Ailu::Render
     {
         _reference_mats.erase(mat);
     }
-    bool Shader::RHICompileImpl(u16 pass_index, ShaderVariantHash variant_hash, bool is_load_cache)
+    bool Shader::RHICompileImpl(u16 pass_index, ShaderVariantHash variant_hash, EShaderCompilePolicy policy)
     {
         return true;
     }
@@ -649,6 +653,8 @@ namespace Ailu::Render
     bool Shader::PreProcessShader()
     {
         bool is_process_succeed = true;
+        auto previous_variant_state = std::move(_variant_state);
+        _variant_state.clear();
         List<String> lines{};
         String line{};
         u32 line_count = 0;
@@ -926,6 +932,9 @@ namespace Ailu::Render
 
                 auto pass_it = std::find_if(_passes.begin(), _passes.end(), [&](const ShaderPass &p)
                                             { return p._name == cur_pass._name; });
+                const size_t previous_pass_index = pass_it == _passes.end()
+                                                        ? _passes.size()
+                                                        : static_cast<size_t>(std::distance(_passes.begin(), pass_it));
                 //预处理时，从原始pass info中，对于完全一致的变体，复制编译后才能获取的信息并填充,否则这些变体未编译的话，导致引用他们的材质出现问题
                 if (pass_it != _passes.end())
                 {
@@ -938,6 +947,12 @@ namespace Ailu::Render
                             if (variant._active_keywords == old_variant._active_keywords)
                             {
                                 variant = old_variant;
+                                if (previous_pass_index < previous_variant_state.size())
+                                {
+                                    if (auto state_it = previous_variant_state[previous_pass_index].find(old_vhash);
+                                        state_it != previous_variant_state[previous_pass_index].end())
+                                        cur_pass_variant_state[vhash] = state_it->second;
+                                }
                             }
                         }
                     }
@@ -960,6 +975,7 @@ namespace Ailu::Render
         else
         {
             AL_ASSERT_MSG(_passes.size() > 0, "parser failed, no pass found!");
+            _variant_state = std::move(previous_variant_state);
         }
         _is_pass_elements_init.store(!is_process_succeed);
         return is_process_succeed;
@@ -1462,7 +1478,7 @@ namespace Ailu::Render
         }
         return false;
     }
-    bool ComputeShader::Compile(bool is_load_cache)
+    bool ComputeShader::Compile(EShaderCompilePolicy policy)
     {
         _is_compiling.store(true);
         if (!FileManager::Exist(_src_file_path))
@@ -1478,7 +1494,7 @@ namespace Ailu::Render
             for (auto &v: k._variants)
             {
                 const auto kernel_index = ResolveKernelIndex(k._id);
-                is_succeed &= Compile(kernel_index, v.first, is_load_cache);
+                is_succeed &= Compile(kernel_index, v.first, policy);
             }
         }
         _is_compiling.store(false);
@@ -1754,15 +1770,19 @@ namespace Ailu::Render
     }
 
 
-    bool ComputeShader::Compile(u16 kernel_index, ShaderVariantHash variant_hash, bool is_load_cache)
+    bool ComputeShader::Compile(u16 kernel_index, ShaderVariantHash variant_hash, EShaderCompilePolicy policy)
     {
         _is_compiling.store(true);
-        bool is_succeed = RHICompileImpl(kernel_index, variant_hash, is_load_cache);
-        _variant_state[kernel_index][variant_hash] = is_succeed ? EShaderVariantState::kReady : EShaderVariantState::kError;
+        const auto previous_state = _variant_state[kernel_index][variant_hash];
+        bool is_succeed = RHICompileImpl(kernel_index, variant_hash, policy);
+        if (is_succeed || previous_state == EShaderVariantState::kReady)
+            _variant_state[kernel_index][variant_hash] = EShaderVariantState::kReady;
+        else
+            _variant_state[kernel_index][variant_hash] = EShaderVariantState::kError;
         _is_compiling.store(false);
         return is_succeed;
     }
-    bool ComputeShader::RHICompileImpl(u16 kernel_index, ShaderVariantHash variant_hash, bool is_load_cache)
+    bool ComputeShader::RHICompileImpl(u16 kernel_index, ShaderVariantHash variant_hash, EShaderCompilePolicy policy)
     {
         return false;
     }
@@ -1847,6 +1867,8 @@ namespace Ailu::Render
 
     bool ComputeShader::Preprocess()
     {
+        auto previous_kernels = std::move(_kernels);
+        auto previous_variant_state = std::move(_variant_state);
         String data;
         FileManager::ReadFile(_src_file_path, data);
         auto lines = su::Split(data, "\n");
@@ -1920,17 +1942,68 @@ namespace Ailu::Render
                 cur_kernel._variants.insert(std::make_pair(0, v));
             }
             Map<ShaderVariantHash, EShaderVariantState> cur_kernel_variant_state;
+            const auto previous_kernel_it = std::find_if(previous_kernels.begin(), previous_kernels.end(),
+                                                         [&](const KernelElement &kernel)
+                                                         { return kernel._name == cur_kernel._name; });
+            const size_t previous_kernel_index = previous_kernel_it == previous_kernels.end()
+                                                     ? previous_kernels.size()
+                                                     : static_cast<size_t>(std::distance(previous_kernels.begin(), previous_kernel_it));
+            if (previous_kernel_it != previous_kernels.end())
+            {
+                cur_kernel._thread_num = previous_kernel_it->_thread_num;
+                for (auto &[variant_hash, variant] : cur_kernel._variants)
+                {
+                    for (const auto &[old_variant_hash, old_variant] : previous_kernel_it->_variants)
+                    {
+                        if (variant._active_keywords != old_variant._active_keywords)
+                            continue;
+                        HashMap<String, String> root_cbuffer_names;
+                        for (const auto &[name, info] : old_variant._bind_res_infos)
+                        {
+                            if (info._p_root_cbuf != nullptr)
+                                root_cbuffer_names[name] = info._p_root_cbuf->_name;
+                        }
+                        variant = old_variant;
+                        for (auto &[name, info] : variant._bind_res_infos)
+                        {
+                            if (auto root_name_it = root_cbuffer_names.find(name);
+                                root_name_it != root_cbuffer_names.end())
+                            {
+                                if (auto root_it = variant._bind_res_infos.find(root_name_it->second);
+                                    root_it != variant._bind_res_infos.end())
+                                    info._p_root_cbuf = &root_it->second;
+                            }
+                        }
+                        if (previous_kernel_index < previous_variant_state.size())
+                        {
+                            if (auto state_it = previous_variant_state[previous_kernel_index].find(old_variant_hash);
+                                state_it != previous_variant_state[previous_kernel_index].end())
+                                cur_kernel_variant_state[variant_hash] = state_it->second;
+                        }
+                        break;
+                    }
+                }
+            }
             for (auto &it: cur_kernel._variants)
             {
                 auto &[vhash, variant] = it;
-                cur_kernel_variant_state[vhash] = EShaderVariantState::kNotReady;
+                if (!cur_kernel_variant_state.contains(vhash))
+                    cur_kernel_variant_state[vhash] = EShaderVariantState::kNotReady;
             }
             _variant_state.emplace_back(std::move(cur_kernel_variant_state));
             _kernel_id_to_index[cur_kernel._id] = kernel_index;
             _kernels.emplace_back(std::move(cur_kernel));
         }
-        AL_ASSERT(!_kernels.empty());
-        return !_kernels.empty();
+        if (_kernels.empty())
+        {
+            _kernels = std::move(previous_kernels);
+            _variant_state = std::move(previous_variant_state);
+            _kernel_id_to_index.clear();
+            for (u16 index = 0u; index < _kernels.size(); ++index)
+                _kernel_id_to_index[_kernels[index]._id] = index;
+            return false;
+        }
+        return true;
     }
 
     void ComputeShader::EnableKeyword(const String &kw)

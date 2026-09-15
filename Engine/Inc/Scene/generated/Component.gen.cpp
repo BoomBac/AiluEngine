@@ -629,6 +629,223 @@ return Ailu::ECS::PostprocessVolumeComponent::StaticType();
 return Ailu::ECS::PostprocessVolumeComponent::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_PostprocessVolumeComponent(&Ailu::ECS::PostprocessVolumeComponent::StaticType, "Ailu::ECS::PostprocessVolumeComponent");
+const Ailu::Type* Ailu::ECS::Z_Construct_CLightProbeGroup_Type()
+{
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "CLightProbeGroup";
+initializer._size = sizeof(Ailu::ECS::CLightProbeGroup);
+initializer._full_name = "Ailu::ECS::CLightProbeGroup";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu::ECS";
+initializer._base_name = "";
+initializer._constructor = []()->Ailu::ECS::CLightProbeGroup* {return new Ailu::ECS::CLightProbeGroup;};
+Meta meta_probe_count;
+meta_probe_count.Set("Category","");
+meta_probe_count.Set("IsColor",false);
+meta_probe_count.Set("IsRange",false);
+meta_probe_count.Set("IsFloatRange",true);
+meta_probe_count.Set("RangeMin",(f32)0);
+meta_probe_count.Set("RangeMax",(f32)1);
+MemberBuilder builder_probe_count;
+builder_probe_count._name = "_probe_count";
+builder_probe_count._type_name = "Vector3Int";
+builder_probe_count._offset = offsetof(CLightProbeGroup,_probe_count);
+builder_probe_count._is_const = false;
+builder_probe_count._is_static = false;
+builder_probe_count._is_public = false;
+builder_probe_count._is_pointer = false;
+builder_probe_count._is_ref = false;
+builder_probe_count._is_template = false;
+builder_probe_count._meta = meta_probe_count;
+builder_probe_count._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector3Int>);
+builder_probe_count._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector3Int>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_probe_count));
+Meta meta_size;
+meta_size.Set("Category","");
+meta_size.Set("IsColor",false);
+meta_size.Set("IsRange",false);
+meta_size.Set("IsFloatRange",true);
+meta_size.Set("RangeMin",(f32)0);
+meta_size.Set("RangeMax",(f32)1);
+MemberBuilder builder_size;
+builder_size._name = "_size";
+builder_size._type_name = "Vector3f";
+builder_size._offset = offsetof(CLightProbeGroup,_size);
+builder_size._is_const = false;
+builder_size._is_static = false;
+builder_size._is_public = false;
+builder_size._is_pointer = false;
+builder_size._is_ref = false;
+builder_size._is_template = false;
+builder_size._meta = meta_size;
+builder_size._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector3f>);
+builder_size._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector3f>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_size));
+Meta meta_baked_data;
+meta_baked_data.Set("Category","");
+meta_baked_data.Set("IsColor",false);
+meta_baked_data.Set("IsRange",false);
+meta_baked_data.Set("IsFloatRange",true);
+meta_baked_data.Set("RangeMin",(f32)0);
+meta_baked_data.Set("RangeMax",(f32)1);
+MemberBuilder builder_baked_data;
+builder_baked_data._name = "_baked_data";
+builder_baked_data._type_name = "Ailu::Guid";
+builder_baked_data._offset = offsetof(CLightProbeGroup,_baked_data);
+builder_baked_data._is_const = false;
+builder_baked_data._is_static = false;
+builder_baked_data._is_public = false;
+builder_baked_data._is_pointer = false;
+builder_baked_data._is_ref = false;
+builder_baked_data._is_template = false;
+builder_baked_data._meta = meta_baked_data;
+builder_baked_data._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Guid>);
+builder_baked_data._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Guid>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_baked_data));
+Meta meta_draw_probes;
+meta_draw_probes.Set("Category","");
+meta_draw_probes.Set("IsColor",false);
+meta_draw_probes.Set("IsRange",false);
+meta_draw_probes.Set("IsFloatRange",true);
+meta_draw_probes.Set("RangeMin",(f32)0);
+meta_draw_probes.Set("RangeMax",(f32)1);
+MemberBuilder builder_draw_probes;
+builder_draw_probes._name = "_draw_probes";
+builder_draw_probes._type_name = "bool";
+builder_draw_probes._offset = offsetof(CLightProbeGroup,_draw_probes);
+builder_draw_probes._is_const = false;
+builder_draw_probes._is_static = false;
+builder_draw_probes._is_public = false;
+builder_draw_probes._is_pointer = false;
+builder_draw_probes._is_ref = false;
+builder_draw_probes._is_template = false;
+builder_draw_probes._meta = meta_draw_probes;
+builder_draw_probes._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_draw_probes._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_draw_probes));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+const Ailu::Type* Ailu::ECS::CLightProbeGroup::GetPrivateStaticClass()
+{
+	static const Ailu::Type* type = Z_Construct_CLightProbeGroup_Type();
+	return type;
+}
+
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::ECS::CLightProbeGroup>()
+{
+return Ailu::ECS::CLightProbeGroup::StaticType();
+}
+    const Type *Ailu::ECS::CLightProbeGroup::GetType()
+{
+return Ailu::ECS::CLightProbeGroup::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_CLightProbeGroup(&Ailu::ECS::CLightProbeGroup::StaticType, "Ailu::ECS::CLightProbeGroup");
+const Ailu::Type* Ailu::ECS::Z_Construct_DDGIVolumeComponent_Type()
+{
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "DDGIVolumeComponent";
+initializer._size = sizeof(Ailu::ECS::DDGIVolumeComponent);
+initializer._full_name = "Ailu::ECS::DDGIVolumeComponent";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu::ECS";
+initializer._base_name = "";
+initializer._constructor = []()->Ailu::ECS::DDGIVolumeComponent* {return new Ailu::ECS::DDGIVolumeComponent;};
+Meta meta_probe_count;
+meta_probe_count.Set("Category","");
+meta_probe_count.Set("IsColor",false);
+meta_probe_count.Set("IsRange",false);
+meta_probe_count.Set("IsFloatRange",true);
+meta_probe_count.Set("RangeMin",(f32)0);
+meta_probe_count.Set("RangeMax",(f32)1);
+MemberBuilder builder_probe_count;
+builder_probe_count._name = "_probe_count";
+builder_probe_count._type_name = "Vector3UInt";
+builder_probe_count._offset = offsetof(DDGIVolumeComponent,_probe_count);
+builder_probe_count._is_const = false;
+builder_probe_count._is_static = false;
+builder_probe_count._is_public = false;
+builder_probe_count._is_pointer = false;
+builder_probe_count._is_ref = false;
+builder_probe_count._is_template = false;
+builder_probe_count._meta = meta_probe_count;
+builder_probe_count._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector3UInt>);
+builder_probe_count._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector3UInt>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_probe_count));
+Meta meta_probe_spacing;
+meta_probe_spacing.Set("Category","");
+meta_probe_spacing.Set("IsColor",false);
+meta_probe_spacing.Set("IsRange",false);
+meta_probe_spacing.Set("IsFloatRange",true);
+meta_probe_spacing.Set("RangeMin",(f32)0);
+meta_probe_spacing.Set("RangeMax",(f32)1);
+MemberBuilder builder_probe_spacing;
+builder_probe_spacing._name = "_probe_spacing";
+builder_probe_spacing._type_name = "Vector3f";
+builder_probe_spacing._offset = offsetof(DDGIVolumeComponent,_probe_spacing);
+builder_probe_spacing._is_const = false;
+builder_probe_spacing._is_static = false;
+builder_probe_spacing._is_public = false;
+builder_probe_spacing._is_pointer = false;
+builder_probe_spacing._is_ref = false;
+builder_probe_spacing._is_template = false;
+builder_probe_spacing._meta = meta_probe_spacing;
+builder_probe_spacing._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector3f>);
+builder_probe_spacing._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector3f>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_probe_spacing));
+Meta meta_draw_probes;
+meta_draw_probes.Set("Category","");
+meta_draw_probes.Set("IsColor",false);
+meta_draw_probes.Set("IsRange",false);
+meta_draw_probes.Set("IsFloatRange",true);
+meta_draw_probes.Set("RangeMin",(f32)0);
+meta_draw_probes.Set("RangeMax",(f32)1);
+MemberBuilder builder_draw_probes;
+builder_draw_probes._name = "_draw_probes";
+builder_draw_probes._type_name = "bool";
+builder_draw_probes._offset = offsetof(DDGIVolumeComponent,_draw_probes);
+builder_draw_probes._is_const = false;
+builder_draw_probes._is_static = false;
+builder_draw_probes._is_public = false;
+builder_draw_probes._is_pointer = false;
+builder_draw_probes._is_ref = false;
+builder_draw_probes._is_template = false;
+builder_draw_probes._meta = meta_draw_probes;
+builder_draw_probes._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_draw_probes._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_draw_probes));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+const Ailu::Type* Ailu::ECS::DDGIVolumeComponent::GetPrivateStaticClass()
+{
+	static const Ailu::Type* type = Z_Construct_DDGIVolumeComponent_Type();
+	return type;
+}
+
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::ECS::DDGIVolumeComponent>()
+{
+return Ailu::ECS::DDGIVolumeComponent::StaticType();
+}
+    const Type *Ailu::ECS::DDGIVolumeComponent::GetType()
+{
+return Ailu::ECS::DDGIVolumeComponent::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_DDGIVolumeComponent(&Ailu::ECS::DDGIVolumeComponent::StaticType, "Ailu::ECS::DDGIVolumeComponent");
 static std::unique_ptr<Ailu::Enum> s_enum_type_EMotionVectorType = nullptr;
 //Enum EMotionVectorType begin...........................
 const Ailu::Enum* Z_Construct_Enum_Ailu_ECS_EMotionVectorType_Type()

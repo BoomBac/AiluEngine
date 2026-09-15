@@ -25,8 +25,9 @@ initializer._str_to_enum_lut["kDSV"] = 8;
 initializer._str_to_enum_lut["kCopySrc"] = 16;
 initializer._str_to_enum_lut["kCopyDst"] = 32;
 initializer._str_to_enum_lut["kIndirectArgument"] = 64;
-initializer._str_to_enum_lut["kRaytracingAccel"] = 128;
+initializer._str_to_enum_lut["kAccelStructRead"] = 128;
 initializer._str_to_enum_lut["kVertexBuffer"] = 256;
+initializer._str_to_enum_lut["kAccelStructWrite"] = 512;
 s_enum_type_EResourceUsage = std::make_unique<Ailu::Enum>(initializer);
 Ailu::Enum::RegisterEnum(s_enum_type_EResourceUsage.get());
 }

@@ -40,6 +40,8 @@
 #include "Render/Font.h"
 #include "Render/GraphicsContext.h"
 #include "Render/Material.h"
+#include "Render/RayTracing/RayTracingShader.h"
+#include "Render/StaticDiffuseProbeData.h"
 // Material asset references are initialized through its Guid-to-handle setters.
 #include "Render/Mesh.h"
 #include "Render/Texture.h"
@@ -808,6 +810,44 @@ bool ComputeShaderAssetHandler::Save(const AssetSaveContext &context)
 }
 
 // ============================================================
+// RayTracingShaderAssetHandler
+// ============================================================
+
+const Type *RayTracingShaderAssetHandler::AssetType() const
+{
+    return RayTracingShader::StaticType();
+}
+
+Scope<Asset> RayTracingShaderAssetHandler::Load(const AssetLoadContext &context)
+{
+    auto sys_path = context._system_path;
+    ShaderAssetDocument doc;
+    if (!LoadAssetDocument(sys_path, doc))
+        return nullptr;
+
+    auto file = ToWChar(doc._file);
+    auto resolved_file = ResolveExternalAssetPath(context._asset_path, file);
+    auto asset = MakeScope<Asset>(Guid(doc._header._guid), RayTracingShader::StaticType(), context._asset_path);
+    asset->_external_asset_path = file;
+    asset->_p_obj = RayTracingShader::Create(context._resource_mgr->GetResSysPath(resolved_file), doc._header._asset_name);
+    asset->_domain = context._resource_mgr->GetAssetPathDomain(asset->_asset_path);
+    return asset;
+}
+
+bool RayTracingShaderAssetHandler::Save(const AssetSaveContext &context)
+{
+    ShaderAssetDocument doc;
+    doc._header = MakeAssetDocumentHeader(context._asset);
+    doc._file = ToChar(MakeStoredExternalAssetPath(context._asset->_external_asset_path));
+    if (!SaveAssetDocument(context._system_path, doc))
+    {
+        LOG_ERROR(L"Save ray tracing shader to {} failed!", context._system_path);
+        return false;
+    }
+    return true;
+}
+
+// ============================================================
 // TextureAssetHandler
 // ============================================================
 
@@ -1265,6 +1305,11 @@ static Scope<Asset> LoadMeshImpl(const AssetLoadContext &context)
     setting._mesh_name = doc._inner_file_name;
     if (!doc._skeleton.IsEmpty())
         setting._skeleton = doc._skeleton;
+    // 文档里按 submesh 记录了导入时生成的材质资产，重新走原生导入时要把这些槽位接回去
+    Vector<Guid> slot_material_guids;
+    slot_material_guids.reserve(doc._materials.size());
+    for (const String &material_guid : doc._materials)
+        slot_material_guids.emplace_back(material_guid.empty() ? Guid::EmptyGuid() : Guid(material_guid));
 
     const WString source_system_path = context._resource_mgr->GetResSysPath(resolved_file);
     AssetArtifactKey artifact_key;
@@ -1313,12 +1358,25 @@ static Scope<Asset> LoadMeshImpl(const AssetLoadContext &context)
         }
     }
 
+    // 文档是材质引用的权威来源：写回 cache materials，避免重新导入或重建 artifact 时丢掉引用
+    const auto apply_doc_material_refs = [&slot_material_guids, &mesh_list]()
+    {
+        for (const Ref<Mesh> &mesh : mesh_list)
+        {
+            if (mesh == nullptr)
+                continue;
+            for (u16 slot = 0u; slot < slot_material_guids.size() && slot < mesh->GetCacheMaterials().size(); ++slot)
+                mesh->SetCacheMaterialAssetGuid(slot, slot_material_guids[slot]);
+        }
+    };
+
     if (!loaded_from_artifact)
     {
         LOG_INFO(L"Mesh artifact cache miss: {}", source_system_path);
         const auto native_import_start = std::chrono::steady_clock::now();
         mesh_list = std::move(context._resource_mgr->LoadExternalMesh(resolved_file, setting, clips));
         native_import_us = ElapsedMicroseconds(native_import_start);
+        apply_doc_material_refs();
         if (!mesh_list.empty() && artifact_key._source_hash != 0u && context._derived_data_cache != nullptr)
         {
             const auto artifact_write_start = std::chrono::steady_clock::now();
@@ -1335,6 +1393,7 @@ static Scope<Asset> LoadMeshImpl(const AssetLoadContext &context)
     }
     if (mesh_list.empty())
         return nullptr;
+    apply_doc_material_refs();
     if (!doc._skeleton.IsEmpty())
     {
         Ref<SkeletonAsset> skeleton_asset = context._resource_mgr->GetRef<SkeletonAsset>(doc._skeleton);
@@ -1375,7 +1434,7 @@ static Scope<Asset> LoadMeshImpl(const AssetLoadContext &context)
     asset->_p_obj = mesh_list.front();
     asset->_domain = context._resource_mgr->GetAssetPathDomain(asset->_asset_path);
 
-    context._resource_mgr->CreateAndRegisterEmbeddedMaterial(mesh_list.front().get());
+    context._resource_mgr->CreateAndRegisterEmbeddedMaterial(mesh_list.front().get(), slot_material_guids);
     context._resource_mgr->SetImportSetting(context._asset_path, setting);
     return asset;
 }
@@ -1383,6 +1442,30 @@ static Scope<Asset> LoadMeshImpl(const AssetLoadContext &context)
 Scope<Asset> MeshAssetHandler::Load(const AssetLoadContext &context)
 {
     return LoadMeshImpl(context);
+}
+
+// 把网格按 submesh 记录的材质资产写进文档，并登记为运行时依赖
+static void CollectMeshMaterialRefs(const Render::Mesh *mesh, MeshAssetDocument &doc)
+{
+    doc._materials.clear();
+    if (mesh == nullptr)
+        return;
+
+    for (const auto &material_info : mesh->GetCacheMaterials())
+    {
+        doc._materials.emplace_back(material_info._asset_guid.IsEmpty()
+                                        ? String{}
+                                        : material_info._asset_guid.ToString());
+        if (material_info._asset_guid.IsEmpty())
+            continue;
+        const bool already_added = std::any_of(doc._header._dependencies.begin(), doc._header._dependencies.end(),
+                                               [&material_info](const AssetDependency &dependency)
+                                               {
+                                                   return dependency._guid == material_info._asset_guid;
+                                               });
+        if (!already_added)
+            doc._header._dependencies.emplace_back(material_info._asset_guid, EAssetDependencyType::kRuntime);
+    }
 }
 
 bool MeshAssetHandler::Save(const AssetSaveContext &context)
@@ -1406,6 +1489,7 @@ bool MeshAssetHandler::Save(const AssetSaveContext &context)
         if (!skeleton_guid.IsEmpty())
             doc._header._dependencies.emplace_back(skeleton_guid, EAssetDependencyType::kRuntime);
     }
+    CollectMeshMaterialRefs(dynamic_cast<const Render::Mesh *>(context._asset->_p_obj.get()), doc);
 
     if (!SaveAssetDocument(context._system_path, doc))
     {
@@ -1451,6 +1535,7 @@ bool SkeletonMeshAssetHandler::Save(const AssetSaveContext &context)
         if (!skeleton_guid.IsEmpty())
             doc._header._dependencies.emplace_back(skeleton_guid, EAssetDependencyType::kRuntime);
     }
+    CollectMeshMaterialRefs(dynamic_cast<const Render::Mesh *>(context._asset->_p_obj.get()), doc);
 
     if (!SaveAssetDocument(context._system_path, doc))
     {
@@ -1560,7 +1645,8 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
     loaded_scene->SetAssetGuid(Guid(doc._header._guid));
     auto &reg = loaded_scene->GetRegister();
 
-    const bool is_v2 = doc._scene_format_version >= SceneAssetDocument::kCurrentSceneFormatVersion;
+    const bool has_entity_guids = doc._scene_format_version >= SceneAssetDocument::kEntityGuidSceneFormatVersion;
+    const bool has_scene_root_order = doc._scene_format_version >= SceneAssetDocument::kSceneRootFormatVersion;
 
     // First pass: create entities and build identity index.
     // 与 doc._entities 保持索引对齐，避免重复计算修复后的 GUID。
@@ -1589,7 +1675,8 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
             generated = true;
         }
 
-        ECS::Entity new_entity = loaded_scene->AddObject(entity_doc._tag_component._name, generated ? Guid::EmptyGuid() : guid);
+        ECS::Entity new_entity = loaded_scene->AddObject(entity_doc._tag_component._name,
+                                                          generated ? Guid::EmptyGuid() : guid, false);
         if (generated)
         {
             guid = loaded_scene->GetEntityGuid(new_entity);
@@ -1603,7 +1690,7 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
         created_entities.emplace_back(new_entity);
         guid_to_entity.emplace(guid, new_entity);
 
-        if (!is_v2)
+        if (!has_entity_guids)
         {
             old_to_new_entities.emplace(static_cast<ECS::Entity>(entity_doc._entity_id), new_entity);
         }
@@ -1740,6 +1827,27 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
             component._size = entity_doc._lightprobe_component._size;
             component._is_update_every_tick = entity_doc._lightprobe_component._is_update_every_tick;
             component._is_dirty = true;
+        }
+        if (entity_doc._has_light_probe_group_component)
+        {
+            auto &component = reg.AddComponent<ECS::CLightProbeGroup>(entity);
+            reg.SetComponentEnabled<ECS::CLightProbeGroup>(
+                entity, !is_component_disabled(entity_doc, "CLightProbeGroup"));
+            const auto &document = entity_doc._light_probe_group_component;
+            component._probe_count = document._probe_count;
+            component._size = document._size;
+            component._baked_data = document._baked_data_guid.empty() ? Guid::EmptyGuid() : Guid(document._baked_data_guid);
+            component._draw_probes = document._draw_probes;
+        }
+        if (entity_doc._has_ddgi_volume_component)
+        {
+            auto &component = reg.AddComponent<ECS::DDGIVolumeComponent>(entity);
+            reg.SetComponentEnabled<ECS::DDGIVolumeComponent>(
+                entity, !is_component_disabled(entity_doc, "DDGIVolumeComponent"));
+            const auto &document = entity_doc._ddgi_volume_component;
+            component._probe_count = document._probe_count;
+            component._probe_spacing = document._probe_spacing;
+            component._draw_probes = document._draw_probes;
         }
         if (entity_doc._has_environment_component)
         {
@@ -1882,15 +1990,19 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
     };
 
     Vector<HierarchyIntent> hierarchy_intents;
-    if (is_v2)
+    if (has_entity_guids)
     {
+        u32 legacy_root_sibling_index = 0u;
         for (u32 doc_index = 0u; doc_index < doc._entities.size(); ++doc_index)
         {
             const auto &entity_doc = doc._entities[doc_index];
             if (!entity_doc._has_hierarchy_component)
                 continue;
-            hierarchy_intents.push_back({created_entities[doc_index], entity_doc._hierarchy_component._parent_guid,
-                                        entity_doc._hierarchy_component._sibling_index, &entity_doc._hierarchy_component});
+            const Guid parent_guid = entity_doc._hierarchy_component._parent_guid;
+            const u32 sibling_index = parent_guid.IsEmpty() && !has_scene_root_order
+                ? legacy_root_sibling_index++ : entity_doc._hierarchy_component._sibling_index;
+            hierarchy_intents.push_back({created_entities[doc_index], parent_guid, sibling_index,
+                                        &entity_doc._hierarchy_component});
         }
     }
     else
@@ -1901,6 +2013,7 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
             legacy_id_to_doc_index.emplace(doc._entities[i]._entity_id, i);
 
         HashMap<u64, u32> sibling_index_by_legacy_id;
+        u32 legacy_root_sibling_index = 0u;
         for (u32 doc_index = 0u; doc_index < doc._entities.size(); ++doc_index)
         {
             const auto &entity_doc = doc._entities[doc_index];
@@ -1939,6 +2052,8 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
             const auto sidx_it = sibling_index_by_legacy_id.find(entity_doc._entity_id);
             if (sidx_it != sibling_index_by_legacy_id.end())
                 sibling_index = sidx_it->second;
+            else if (parent_guid.IsEmpty())
+                sibling_index = legacy_root_sibling_index++;
             hierarchy_intents.push_back({created_entities[doc_index], parent_guid, sibling_index, &entity_doc._hierarchy_component});
         }
     }
@@ -1953,12 +2068,13 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
         if (child == parent)
         {
             LOG_ERROR("Scene load: entity {} referenced as its own parent, keep as root", child);
-            return;
+            parent = loaded_scene->SceneRoot();
         }
         if (!loaded_scene->Reparent(child, parent, false))
         {
             LOG_ERROR("Scene load: Reparent entity {} under {} failed (cycle or invalid), degraded to root", child, parent);
-            return;
+            if (!loaded_scene->Reparent(child, loaded_scene->SceneRoot(), false))
+                return;
         }
         if (!hier_doc._inv_matrix_attach.empty())
         {
@@ -1969,19 +2085,29 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
 
     for (auto &[parent_guid, children] : children_by_parent)
     {
-        if (parent_guid.IsEmpty())
-            continue;// 根节点保持根
-        const auto parent_it = guid_to_entity.find(parent_guid);
-        if (parent_it == guid_to_entity.end())
+        ECS::Entity parent = loaded_scene->SceneRoot();
+        if (!parent_guid.IsEmpty())
         {
-            LOG_ERROR("Scene load: parent guid {} not found, degrading its children to root", parent_guid.ToString());
-            continue;
+            const auto parent_it = guid_to_entity.find(parent_guid);
+            if (parent_it == guid_to_entity.end())
+            {
+                LOG_ERROR("Scene load: parent guid {} not found, degrading its children to root", parent_guid.ToString());
+            }
+            else
+            {
+                parent = parent_it->second;
+            }
         }
-        const ECS::Entity parent = parent_it->second;
         std::stable_sort(children.begin(), children.end(),
                          [](const HierarchyIntent *a, const HierarchyIntent *b) { return a->_sibling_index < b->_sibling_index; });
         for (const HierarchyIntent *intent : children)
             reparent_intent(intent->entity, parent, *intent->_doc);
+    }
+
+    for (u32 doc_index = 0u; doc_index < doc._entities.size(); ++doc_index)
+    {
+        if (!doc._entities[doc_index]._has_hierarchy_component)
+            loaded_scene->Reparent(created_entities[doc_index], loaded_scene->SceneRoot(), false);
     }
 
     for (u32 doc_index = 0u; doc_index < doc._entities.size(); ++doc_index)
@@ -1993,8 +2119,8 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
 
     loaded_scene->MutablePrefabInstances() = doc._prefab_instances;
 
-    // V1 迁移只在内存中升级，标记 Dirty 使下一次保存自动转为 V2。
-    if (!is_v2)
+    // 旧场景在内存中迁移，标记 Dirty 使下一次保存升级到 SceneRoot 格式。
+    if (!has_entity_guids || !has_scene_root_order)
         loaded_scene->MarkDirty();
 
     auto asset = MakeScope<Asset>(Guid(doc._header._guid),Scene::StaticType(),context._asset_path);
@@ -2025,7 +2151,7 @@ bool SceneAssetHandler::Save(const AssetSaveContext &context)
 
     const ECS::Register &reg = scene->GetRegister();
     const auto &tag_view = reg.View<ECS::TagComponent>();
-    doc._entities.reserve(tag_view.size());
+    doc._entities.reserve(tag_view.size() > 0u ? tag_view.size() - 1u : 0u);
 
     // 预先按当前兄弟链顺序计算每个实体的 sibling index。
     HashMap<ECS::Entity, u32> entity_sibling_index;
@@ -2052,6 +2178,8 @@ bool SceneAssetHandler::Save(const AssetSaveContext &context)
     for (u64 index = 0u; index < tag_view.size(); ++index)
     {
         ECS::Entity entity = reg.GetEntity<ECS::TagComponent>(index);
+        if (scene->IsSceneRoot(entity))
+            continue;
 
         const auto sibling_it = entity_sibling_index.find(entity);
         const u32 sibling_index = sibling_it != entity_sibling_index.end() ? sibling_it->second : 0u;
@@ -2526,6 +2654,61 @@ bool GraphAssetHandler::Save(const AssetSaveContext &context)
     }
     LOG_INFO(L"Save graph asset to {}", context._system_path);
     return true;
+}
+
+// ============================================================
+// WidgetAssetHandler
+// ============================================================
+
+const Type *StaticDiffuseProbeDataAssetHandler::AssetType() const
+{
+    return Render::StaticDiffuseProbeData::StaticType();
+}
+
+Scope<Asset> StaticDiffuseProbeDataAssetHandler::Load(const AssetLoadContext &context)
+{
+    StaticDiffuseProbeDataAssetDocument document;
+    if (!LoadAssetDocument(context._system_path, document))
+        return nullptr;
+
+    auto data = MakeRef<Render::StaticDiffuseProbeData>(document._header._asset_name);
+    data->_grid = document._grid;
+    data->_revision = document._revision;
+    const u32 probe_count = data->_grid.ProbeCount();
+    if (document._coefficients.size() != static_cast<size_t>(probe_count) * Render::SphericalHarmonicsL2::kCoefficientCount)
+        LOG_WARNING(L"Static diffuse probe asset '{}' has {} coefficients, expected {}", context._system_path,
+                    document._coefficients.size(), probe_count * Render::SphericalHarmonicsL2::kCoefficientCount);
+    data->_probes.resize(probe_count);
+    for (u32 probe_index = 0u; probe_index < probe_count; ++probe_index)
+    {
+        for (u32 coefficient = 0u; coefficient < Render::SphericalHarmonicsL2::kCoefficientCount; ++coefficient)
+        {
+            const u32 flat_index = probe_index * Render::SphericalHarmonicsL2::kCoefficientCount + coefficient;
+            if (flat_index < document._coefficients.size())
+                data->_probes[probe_index]._coefficients[coefficient] = document._coefficients[flat_index];
+        }
+    }
+    auto asset = MakeScope<Asset>(Guid(document._header._guid), Render::StaticDiffuseProbeData::StaticType(),
+                                  context._asset_path);
+    asset->_p_obj = std::move(data);
+    asset->_domain = context._resource_mgr->GetAssetPathDomain(asset->_asset_path);
+    return asset;
+}
+
+bool StaticDiffuseProbeDataAssetHandler::Save(const AssetSaveContext &context)
+{
+    const auto *data = context._asset->As<Render::StaticDiffuseProbeData>();
+    if (data == nullptr)
+        return false;
+    StaticDiffuseProbeDataAssetDocument document;
+    document._header = MakeAssetDocumentHeader(context._asset);
+    document._grid = data->_grid;
+    document._revision = data->_revision;
+    document._coefficients.reserve(data->_probes.size() * Render::SphericalHarmonicsL2::kCoefficientCount);
+    for (const auto &probe : data->_probes)
+        for (const auto &coefficient : probe._coefficients)
+            document._coefficients.emplace_back(coefficient);
+    return SaveAssetDocument(context._system_path, document);
 }
 
 // ============================================================

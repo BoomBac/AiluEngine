@@ -15,6 +15,20 @@ namespace Ailu::Render
         {
             return lhs.r == rhs.r && lhs.g == rhs.g && lhs.b == rhs.b && lhs.a == rhs.a;
         }
+
+        // 主光转过约 5 度以内不重烘环境 cubemap。绕场景旋转主光时若每帧重烘，
+        // 会逐帧重建 512 的 cubemap + radiance + prefilter + SH 投影，形成 GPU 尖峰。
+        constexpr f32 kMainlightRebakeCosThreshold = 0.996f;
+
+        bool IsMainlightRebakeRequired(const Vector3f &current, const Vector3f &baked)
+        {
+            const f32 current_length_sq = SqrMagnitude(current);
+            const f32 baked_length_sq = SqrMagnitude(baked);
+            if (current_length_sq < kFloatEpsilon || baked_length_sq < kFloatEpsilon)
+                return true;
+            const f32 cos_angle = DotProduct(current, baked) / sqrt(current_length_sq * baked_length_sq);
+            return cos_angle < kMainlightRebakeCosThreshold;
+        }
     }
 
     EnvironmentSystem::EnvironmentSystem()
@@ -22,10 +36,10 @@ namespace Ailu::Render
         _fallback_cubemap = RenderTexture::Create(1u, "EnvironmentFallback", ERenderTargetFormat::kDefaultHDR, true, true, true);
         _procedural_material = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/skybox.alasset"),
                                                   "ProceduralSkyIBL");
-        _debug_material = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/cubemap_debug.hlsl"),
+        _debug_material = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/cubemap_debug.alasset"),
                                             "EnvironmentDebug");
         _runtime._debug_material = _debug_material.get();
-        _lut_generator = ComputeShader::Create(ResourceMgr::GetResSysPath(L"Shaders/hlsl/Compute/atmosphere_lut_gen.hlsl"));
+        _lut_generator = ResourceMgr::Get().LoadAssetRef<ComputeShader>(L"Shaders/hlsl/Compute/atmosphere_lut_gen.alasset");
         _transmittance_lut_kernel = _lut_generator->FindKernel("TransmittanceGen");
         _mult_scatter_lut_kernel = _lut_generator->FindKernel("MultiScattGen");
         _sky_lut_kernel = _lut_generator->FindKernel("SkyLightGen");
@@ -79,10 +93,17 @@ namespace Ailu::Render
         _runtime._sky_cubemap = _fallback_cubemap;
         _runtime._diffuse_irradiance = _fallback_cubemap;
         _runtime._specular_prefilter = _fallback_cubemap;
+        _runtime._diffuse_sh = _diffuse_projector.Output();
         _runtime._transmittance_lut = _transmittance_lut;
         _runtime._mult_scatter_lut = _mult_scatter_lut;
         _runtime._sky_view_lut = _sky_view_lut;
         _runtime._source_revision = 0u;
+    }
+
+    void EnvironmentSystem::BindDiffuseSH()
+    {
+        Shader::SetGlobalBuffer("g_environment_sh", _diffuse_projector.Output().get());
+        ComputeShader::SetGlobalBuffer("g_environment_sh", _diffuse_projector.Output().get());
     }
 
     bool EnvironmentSystem::HasProceduralSettingsChanged(const ECS::ProceduralSkySettings &settings) const
@@ -137,8 +158,15 @@ namespace Ailu::Render
                                        !SameVector(mainlight_direction, _mainlight_direction);
         if (source_changed)
             _resources_dirty = true;
-        if (mainlight_changed && _source == ECS::EEnvironmentSource::kProceduralSky)
+        // cubemap 里烘了太阳，主光大幅转向后必须重建；但每帧重建代价过高，
+        // 这里用角度阈值做迟滞，避免旋转主光时逐帧重烘整个环境。
+        const bool rebake_env = _source == ECS::EEnvironmentSource::kProceduralSky &&
+                                (source_changed || (!_resources_dirty && IsMainlightRebakeRequired(mainlight_direction, _baked_mainlight_direction)));
+        if (rebake_env)
+        {
             _resources_dirty = true;
+            _baked_mainlight_direction = mainlight_direction;
+        }
         if (source_changed || mainlight_changed)
             _sky_lut_dirty = true;
         if (source_changed)
@@ -196,6 +224,7 @@ namespace Ailu::Render
     void EnvironmentSystem::RecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data)
     {
         rendering_data._rg_handles._environment_sky = graph.Import(_runtime._sky_cubemap.get());
+        rendering_data._rg_handles._environment_sh = graph.Import(_diffuse_projector.Output().get());
         rendering_data._rg_handles._environment_diffuse = graph.Import(_runtime._diffuse_irradiance.get());
         rendering_data._rg_handles._environment_specular = graph.Import(_runtime._specular_prefilter.get());
         rendering_data._rg_handles._environment_transmittance_lut = graph.Import(_transmittance_lut.get());
@@ -228,7 +257,12 @@ namespace Ailu::Render
             _runtime._sky_cubemap = _cube_map_pass->IsSourceCubemap() ? _source_ref : _cube_map_pass->_src_cubemap;
             _runtime._diffuse_irradiance = _cube_map_pass->_radiance_map;
             _runtime._specular_prefilter = _cube_map_pass->_prefilter_cubemap;
+            _runtime._diffuse_sh = _diffuse_projector.Output();
+            rendering_data._rg_handles._environment_sh =
+                _diffuse_projector.RecordRenderGraph(graph, rendering_data._rg_handles._environment_sky);
         }
+        // 环境 SH 每帧重新绑定，不能被其它系统（探针烘焙）长期占用该全局槽位
+        BindDiffuseSH();
         _resources_dirty = false;
         if (_runtime._is_texture_source || _lut_generator == nullptr)
             _sky_lut_dirty = false;
@@ -246,6 +280,12 @@ namespace Ailu::Render
                 _runtime._sky_cubemap = _cube_map_pass->IsSourceCubemap() ? _source_ref : _cube_map_pass->_src_cubemap;
                 _runtime._diffuse_irradiance = _cube_map_pass->_radiance_map;
                 _runtime._specular_prefilter = _cube_map_pass->_prefilter_cubemap;
+                _runtime._diffuse_sh = _diffuse_projector.Output();
+                auto cmd = CommandBufferPool::Get("EnvironmentSHProject");
+                _diffuse_projector.Execute(cmd.get(), _runtime._sky_cubemap.get(), _diffuse_projector.Output().get());
+                context->ExecuteCommandBuffer(cmd);
+                CommandBufferPool::Release(cmd);
+                BindDiffuseSH();
             }
             _resources_dirty = false;
             _sky_lut_dirty = false;
@@ -272,6 +312,12 @@ namespace Ailu::Render
             _runtime._sky_cubemap = _cube_map_pass->IsSourceCubemap() ? _source_ref : _cube_map_pass->_src_cubemap;
             _runtime._diffuse_irradiance = _cube_map_pass->_radiance_map;
             _runtime._specular_prefilter = _cube_map_pass->_prefilter_cubemap;
+            _runtime._diffuse_sh = _diffuse_projector.Output();
+            auto cmd = CommandBufferPool::Get("EnvironmentSHProject");
+            _diffuse_projector.Execute(cmd.get(), _runtime._sky_cubemap.get(), _diffuse_projector.Output().get());
+            context->ExecuteCommandBuffer(cmd);
+            CommandBufferPool::Release(cmd);
+            BindDiffuseSH();
         }
         _resources_dirty = false;
     }

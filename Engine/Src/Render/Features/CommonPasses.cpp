@@ -183,13 +183,61 @@ namespace Ailu::Render
         {
             EmitQueuedDraws(cmd.get(), items);
         }
+
+        void DrawShadowView(CommandBuffer *cmd, RenderTexture *shadow_map, const ShadowView &view)
+        {
+            if (cmd == nullptr || shadow_map == nullptr)
+                return;
+            const bool is_point_shadow = view._type == EShadowViewType::kPoint;
+            const u16 dsv_view_index = is_point_shadow
+                ? shadow_map->CalculateViewIndex(Texture::ETextureViewType::kDSV,
+                                                 static_cast<ECubemapFace>(view._target_slice + 1u), 0u,
+                                                 view._shadow_map_index)
+                : shadow_map->CalculateViewIndex(Texture::ETextureViewType::kDSV, 0u, view._target_slice);
+            cmd->SetRenderTarget(nullptr, shadow_map, 0u, dsv_view_index);
+            cmd->ClearRenderTarget(kZFar, 0u);
+
+            CBufferPerCameraData camera_data{};
+            camera_data._MatrixVP = view._shadow_matrix;
+            camera_data._CameraPos = Vector4f(view._light_world_position, 0.0f);
+            if (is_point_shadow)
+                camera_data._ZBufferParams = Vector4f(view._camera_near, view._camera_far, 0.0f, 0.0f);
+            cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &camera_data, RenderConstants::kPerCameraDataSize);
+
+            Vector<QueuedDrawItem> draw_items;
+            for (const auto &[queue, objects] : view._cull_result)
+            {
+                for (const auto &object : objects)
+                {
+                    Material *shadow_material = object._material;
+                    if (shadow_material == nullptr || shadow_material->GetActiveShader() == nullptr)
+                        continue;
+                    const i16 shadow_pass = shadow_material->GetActiveShader()->FindPass("ShadowCaster");
+                    if (shadow_pass == -1)
+                        continue;
+                    if (is_point_shadow)
+                        shadow_material->EnableKeyword("CAST_POINT_SHADOW");
+                    else
+                        shadow_material->DisableKeyword("CAST_POINT_SHADOW");
+                    draw_items.emplace_back(MakeQueuedDrawItem(queue, object, shadow_material,
+                                                               static_cast<u16>(shadow_pass),
+                                                               shadow_material->SurfaceType() == ESurfaceType::kTransparent));
+                }
+            }
+            EmitQueuedDraws(cmd, draw_items);
+            if (is_point_shadow)
+            {
+                for (const auto &item : draw_items)
+                    item._material->DisableKeyword("CAST_POINT_SHADOW");
+            }
+        }
     }
 
 #pragma region ForwardPass
     //-------------------------------------------------------------OpaqueRenderPass-------------------------------------------------------------
     ForwardPass::ForwardPass() : RenderPass("TransparentPass")
     {
-        shader_state_mat = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/debug.hlsl"), "ShaderStateDebug");
+        shader_state_mat = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/debug.alasset"), "ShaderStateDebug");
         _error_shader_pass_id = 0;
         _compiling_shader_pass_id = 1;
         _forward_lit_shader = ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/forwardlit.alasset");
@@ -210,7 +258,7 @@ namespace Ailu::Render
 
     void Ailu::Render::ForwardPass::OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData & rendering_data)
     {
-        const bool use_shadow_maps = rendering_data._camera != nullptr && rendering_data._camera->_is_render_shadow;
+        const bool use_shadow_maps = rendering_data._shadow_set != nullptr && rendering_data._shadow_set->_valid;
         graph.AddPass(_name, RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
                       { 
                           builder.Read(rendering_data._rg_handles._color_target, EResourceUsage::kWriteRTV);
@@ -223,6 +271,8 @@ namespace Ailu::Render
                           }
                           if (rendering_data._rg_handles._ao_tex.IsValid())
                               builder.Read(rendering_data._rg_handles._ao_tex);
+                          if (rendering_data._rg_handles._environment_sh.IsValid())
+                              builder.Read(rendering_data._rg_handles._environment_sh);
                           builder.Read(rendering_data._rg_handles._environment_diffuse);
                           builder.Read(rendering_data._rg_handles._environment_specular);
                           rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target);
@@ -261,6 +311,8 @@ namespace Ailu::Render
         cmd->SetGlobalTexture(RenderResourceName::kMainLightShadowMap, main_light_shadow_map);
         cmd->SetGlobalTexture(RenderResourceName::kAddLightShadowMap, add_light_shadow_maps);
         cmd->SetGlobalTexture(RenderResourceName::kPointLightShadowMap, point_light_shadow_maps);
+        cmd->SetRenderTargetLoadAction(rendering_data._rg_handles._color_target, ELoadStoreAction::kLoad);
+        cmd->SetRenderTargetLoadAction(rendering_data._rg_handles._depth_target, ELoadStoreAction::kLoad);
         cmd->SetRenderTarget(rendering_data._rg_handles._color_target, rendering_data._rg_handles._depth_target);
             for (auto &it: all_renderable)
             {
@@ -347,163 +399,43 @@ namespace Ailu::Render
     //-------------------------------------------------------------OpaqueRenderPass-------------------------------------------------------------
 
     //-------------------------------------------------------------ShadowCastPass-------------------------------------------------------------
-    ShadowCastPass::ShadowCastPass() : RenderPass("ShadowCastPass")
+    ShadowCastPass::ShadowCastPass(ShadowSystem *shadow_system) : RenderPass("ShadowCastPass"), _shadow_system(shadow_system)
     {
-        auto shadow_map_size = QuailtySetting::s_cascade_shaodw_map_resolution;
-        _p_mainlight_shadow_map = RenderTexture::Create(shadow_map_size, shadow_map_size, RenderConstants::kMaxCascadeShadowMapSplitNum, RenderResourceName::kMainLightShadowMap, ERenderTargetFormat::kShadowMap);
-        _p_addlight_shadow_maps = RenderTexture::Create(shadow_map_size >> 1, shadow_map_size >> 1, RenderConstants::kMaxSpotLightNum + RenderConstants::kMaxAreaLightNum, RenderResourceName::kAddLightShadowMap, ERenderTargetFormat::kShadowMap);
-        _p_point_light_shadow_maps = RenderTexture::Create(shadow_map_size >> 1,RenderResourceName::kPointLightShadowMap, ERenderTargetFormat::kShadowMap, RenderConstants::kMaxPointLightNum);
         _event = static_cast<ERenderPassEvent>(static_cast<u16>(ERenderPassEvent::kBeforeShaodwMap) + 25u);
-        _p_mainlight_shadow_map->_store_action = ELoadStoreAction::kClear;
-        _p_addlight_shadow_maps->_store_action = ELoadStoreAction::kClear;
-        _p_point_light_shadow_maps->_store_action = ELoadStoreAction::kClear;
     }
 
     void Ailu::Render::ShadowCastPass::OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData & rendering_data)
     {
-        graph.AddPass(_name,RDG::PassDesc(),[&,this](RDG::RenderGraphBuilder &builder)
-                      {
-                          rendering_data._rg_handles._main_light_shadow_map = builder.Write(rendering_data._rg_handles._main_light_shadow_map,EResourceUsage::kDSV);
-                          rendering_data._rg_handles._addi_shadow_maps = builder.Write(rendering_data._rg_handles._addi_shadow_maps,EResourceUsage::kDSV);
-                          rendering_data._rg_handles._point_light_shadow_maps = builder.Write(rendering_data._rg_handles._point_light_shadow_maps,EResourceUsage::kDSV);
-                      },
-        [this](RDG::RenderGraph& graph, CommandBuffer *cmd, const RenderingData &rendering_data){
-            auto *main_light_shadow_map = graph.Resolve<RenderTexture>(rendering_data._rg_handles._main_light_shadow_map);
-            auto *add_light_shadow_maps = graph.Resolve<RenderTexture>(rendering_data._rg_handles._addi_shadow_maps);
-            auto *point_light_shadow_maps = graph.Resolve<RenderTexture>(rendering_data._rg_handles._point_light_shadow_maps);
-            u32 obj_index = 0u;
-            CBufferPerCameraData camera_data;
-            //方向光阴影，只有一个
-            if (rendering_data._cascade_shadow_data[0]._shadowmap_index >= 0)
+        graph.AddPass(_name, RDG::PassDesc(), [&, this](RDG::RenderGraphBuilder &builder)
+        {
+            if (rendering_data._render_shadow_maps && rendering_data._shadow_set != nullptr &&
+                rendering_data._shadow_set->_valid)
             {
-                for (int i = 0; i < QuailtySetting::s_cascade_shadow_map_count; i++)
-                {
-                    u16 dsv_rt_index = main_light_shadow_map->CalculateViewIndex(Texture::ETextureViewType::kDSV, 0, i);
-                    cmd->SetRenderTarget(nullptr, main_light_shadow_map, 0, dsv_rt_index);
-                    cmd->ClearRenderTarget(kZFar, 0u);
-                    camera_data._MatrixVP = rendering_data._cascade_shadow_data[i]._shadow_matrix;
-                    cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &camera_data, RenderConstants::kPerCameraDataSize);
-                    Vector<QueuedDrawItem> draw_items;
-                    for (auto &it: *rendering_data._cascade_shadow_data[i]._cull_results)
-                    {
-                        auto &[queue, objs] = it;
-                        for (auto &obj: objs)
-                        {
-                            Material *shadow_material = obj._material;
-                            if (i16 shadow_pass = shadow_material->GetActiveShader()->FindPass("ShadowCaster"); shadow_pass != -1)
-                            {
-                                shadow_material->DisableKeyword("CAST_POINT_SHADOW");
-                                draw_items.emplace_back(MakeQueuedDrawItem(queue, obj, shadow_material, (u16) shadow_pass,
-                                                                           obj._material->SurfaceType() == ESurfaceType::kTransparent));
-                            }
-                        }
-                    }
-                    EmitQueuedDraws(cmd, draw_items);
-                }
+                rendering_data._rg_handles._main_light_shadow_map =
+                    builder.Write(rendering_data._rg_handles._main_light_shadow_map, EResourceUsage::kDSV);
+                rendering_data._rg_handles._addi_shadow_maps =
+                    builder.Write(rendering_data._rg_handles._addi_shadow_maps, EResourceUsage::kDSV);
+                rendering_data._rg_handles._point_light_shadow_maps =
+                    builder.Write(rendering_data._rg_handles._point_light_shadow_maps, EResourceUsage::kDSV);
             }
-            //投灯阴影
-            if (rendering_data._addi_shadow_num > 0)
+            else
             {
-                for (int i = 0; i < RenderConstants::kMaxSpotLightNum; i++)
-                {
-                    auto &shadow_data = rendering_data._spot_shadow_data[i];
-                    if (shadow_data._shadowmap_index < 0)
-                        continue;
-                    u16 dsv_rt_index = add_light_shadow_maps->CalculateViewIndex(Texture::ETextureViewType::kDSV, 0, shadow_data._shadowmap_index);
-                    cmd->SetRenderTarget(nullptr, add_light_shadow_maps, 0, dsv_rt_index);
-                    cmd->ClearRenderTarget(kZFar, 0u);
-                    camera_data._MatrixVP = rendering_data._spot_shadow_data[i]._shadow_matrix;
-                    cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &camera_data, RenderConstants::kPerCameraDataSize);
-                    Vector<QueuedDrawItem> draw_items;
-                    for (auto &it: *rendering_data._spot_shadow_data[i]._cull_results)
-                    {
-                        auto &[queue, objs] = it;
-                        for (auto &obj: objs)
-                        {
-                            Material *shadow_material = obj._material;
-                            if (i16 shadow_pass = shadow_material->GetActiveShader()->FindPass("ShadowCaster"); shadow_pass != -1)
-                            {
-                                shadow_material->DisableKeyword("CAST_POINT_SHADOW");
-                                draw_items.emplace_back(MakeQueuedDrawItem(queue, obj, shadow_material, (u16) shadow_pass,
-                                                                           obj._material->SurfaceType() == ESurfaceType::kTransparent));
-                            }
-                        }
-                    }
-                    EmitQueuedDraws(cmd, draw_items);
-                    obj_index = 0;
-                }
-                for (int i = 0; i < RenderConstants::kMaxAreaLightNum; i++)
-                {
-                    auto &shadow_data = rendering_data._area_shadow_data[i];
-                    if (shadow_data._shadowmap_index < 0)
-                        continue;
-                    u16 dsv_rt_index = add_light_shadow_maps->CalculateViewIndex(Texture::ETextureViewType::kDSV, 0, shadow_data._shadowmap_index);
-                    cmd->SetRenderTarget(nullptr, add_light_shadow_maps, 0, dsv_rt_index);
-                    cmd->ClearRenderTarget(kZFar, 0u);
-                    camera_data._MatrixVP = rendering_data._area_shadow_data[i]._shadow_matrix;
-                    cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &camera_data, RenderConstants::kPerCameraDataSize);
-                    Vector<QueuedDrawItem> draw_items;
-                    for (auto &it: *rendering_data._area_shadow_data[i]._cull_results)
-                    {
-                        auto &[queue, objs] = it;
-                        for (auto &obj: objs)
-                        {
-                            Material *shadow_material = obj._material;
-                            if (i16 shadow_pass = shadow_material->GetActiveShader()->FindPass("ShadowCaster"); shadow_pass != -1)
-                            {
-                                shadow_material->DisableKeyword("CAST_POINT_SHADOW");
-                                draw_items.emplace_back(MakeQueuedDrawItem(queue, obj, shadow_material, (u16) shadow_pass,
-                                                                           obj._material->SurfaceType() == ESurfaceType::kTransparent));
-                            }
-                        }
-                    }
-                    EmitQueuedDraws(cmd, draw_items);
-                    obj_index = 0;
-                }
+                builder.Read(rendering_data._rg_handles._main_light_shadow_map);
+                builder.Read(rendering_data._rg_handles._addi_shadow_maps);
+                builder.Read(rendering_data._rg_handles._point_light_shadow_maps);
             }
-            //点光阴影
-            if (rendering_data._addi_point_shadow_num > 0)
+        }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
+        {
+            if (!data._render_shadow_maps || data._shadow_set == nullptr || !data._shadow_set->_valid)
+                return;
+            auto *directional_map = graph.Resolve<RenderTexture>(data._rg_handles._main_light_shadow_map);
+            auto *additional_map = graph.Resolve<RenderTexture>(data._rg_handles._addi_shadow_maps);
+            auto *point_map = graph.Resolve<RenderTexture>(data._rg_handles._point_light_shadow_maps);
+            for (const ShadowView &view : data._shadow_set->_views)
             {
-                static const u32 pointshadow_mat_start = RenderConstants::kMaxCascadeShadowMapSplitNum + RenderConstants::kMaxSpotLightNum;
-                for (int i = 0; i < RenderConstants::kMaxPointLightNum; i++)
-                {
-                    auto &shadow_data = rendering_data._point_shadow_data[i];
-                    if (shadow_data._shadowmap_index < 0)
-                        continue;
-                    for (int j = 0; j < 6; j++)
-                    {
-                        //j + i * 6 定位到cubearray
-                        u16 per_cube_slice_index = j + shadow_data._shadowmap_index * 6;
-                    u16 dsv_rt_index = point_light_shadow_maps->CalculateViewIndex(
-                        Texture::ETextureViewType::kDSV, static_cast<ECubemapFace>(j + 1), 0, shadow_data._shadowmap_index);
-                    cmd->SetRenderTarget(nullptr, point_light_shadow_maps, 0, dsv_rt_index);
-                        cmd->ClearRenderTarget(kZFar, 0u);
-                        Vector4f light_pos = rendering_data._point_shadow_data[shadow_data._shadowmap_index]._light_world_pos;
-                        camera_data._CameraPos.xyz = light_pos.xyz;
-                        light_pos.x = rendering_data._point_shadow_data[shadow_data._shadowmap_index]._camera_near;
-                        light_pos.y = rendering_data._point_shadow_data[shadow_data._shadowmap_index]._camera_far;
-                        camera_data._MatrixVP = rendering_data._point_shadow_data[shadow_data._shadowmap_index]._shadow_matrices[j];
-                        camera_data._ZBufferParams = light_pos;
-                        cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &camera_data, RenderConstants::kPerCameraDataSize);
-                        Vector<QueuedDrawItem> draw_items;
-                        for (auto &it: *rendering_data._point_shadow_data[shadow_data._shadowmap_index]._cull_results[j])
-                        {
-                            auto &[queue, objs] = it;
-                            for (auto &obj: objs)
-                            {
-                                Material *shadow_material = obj._material;
-                                if (i16 shadow_pass = shadow_material->GetActiveShader()->FindPass("ShadowCaster"); shadow_pass != -1)
-                                {
-                                    shadow_material->EnableKeyword("CAST_POINT_SHADOW");
-                                    draw_items.emplace_back(MakeQueuedDrawItem(queue, obj, shadow_material, (u16) shadow_pass,
-                                                                               obj._material->SurfaceType() == ESurfaceType::kTransparent));
-                                }
-                            }
-                        }
-                        EmitQueuedDraws(cmd, draw_items);
-                        obj_index = 0;
-                    }
-                }
+                RenderTexture *target = view._type == EShadowViewType::kDirectional ? directional_map
+                    : view._type == EShadowViewType::kPoint ? point_map : additional_map;
+                DrawShadowView(cmd, target, view);
             }
         });
     }
@@ -513,149 +445,29 @@ namespace Ailu::Render
     }
     void ShadowCastPass::Execute(GraphicsContext *context, RenderingData &rendering_data)
     {
-        auto cmd = CommandBufferPool::Get("MainLightShadowCastPass");
+        if (_shadow_system == nullptr || !rendering_data._render_shadow_maps || rendering_data._shadow_set == nullptr ||
+            !rendering_data._shadow_set->_valid)
+            return;
+        auto cmd = CommandBufferPool::Get(_name);
         cmd->Clear();
         {
             PROFILE_BLOCK_GPU(cmd.get(), _name)
-            u32 obj_index = 0u;
-            CBufferPerCameraData camera_data;
-            //方向光阴影，只有一个
-            if (rendering_data._cascade_shadow_data[0]._shadowmap_index >= 0)
+            for (const ShadowView &view : rendering_data._shadow_set->_views)
             {
-                for (int i = 0; i < QuailtySetting::s_cascade_shadow_map_count; i++)
-                {
-                    u16 dsv_rt_index = _p_mainlight_shadow_map->CalculateViewIndex(Texture::ETextureViewType::kDSV, 0, i);
-                    cmd->SetRenderTarget(nullptr, _p_mainlight_shadow_map.get(), 0, dsv_rt_index);
-                    cmd->ClearRenderTarget(kZFar, 0u);
-                    camera_data._MatrixVP = rendering_data._cascade_shadow_data[i]._shadow_matrix;
-                    cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &camera_data, RenderConstants::kPerCameraDataSize);
-                    Vector<QueuedDrawItem> draw_items;
-                    for (auto &it: *rendering_data._cascade_shadow_data[i]._cull_results)
-                    {
-                        auto &[queue, objs] = it;
-                        for (auto &obj: objs)
-                        {
-                            Material *shadow_material = obj._material;
-                            if (i16 shadow_pass = shadow_material->GetActiveShader()->FindPass("ShadowCaster"); shadow_pass != -1)
-                            {
-                                shadow_material->DisableKeyword("CAST_POINT_SHADOW");
-                                draw_items.emplace_back(MakeQueuedDrawItem(queue, obj, shadow_material, (u16) shadow_pass,
-                                                                           obj._material->SurfaceType() == ESurfaceType::kTransparent));
-                            }
-                        }
-                    }
-                    EmitQueuedDraws(cmd, draw_items);
-                }
-            }
-            //投灯阴影
-            if (rendering_data._addi_shadow_num > 0)
-            {
-                for (int i = 0; i < RenderConstants::kMaxSpotLightNum; i++)
-                {
-                    auto &shadow_data = rendering_data._spot_shadow_data[i];
-                    if (shadow_data._shadowmap_index < 0)
-                        continue;
-                    u16 dsv_rt_index = _p_addlight_shadow_maps->CalculateViewIndex(Texture::ETextureViewType::kDSV, 0, shadow_data._shadowmap_index);
-                    cmd->SetRenderTarget(nullptr, _p_addlight_shadow_maps.get(), 0, dsv_rt_index);
-                    cmd->ClearRenderTarget(kZFar, 0u);
-                    camera_data._MatrixVP = rendering_data._spot_shadow_data[i]._shadow_matrix;
-                    cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &camera_data, RenderConstants::kPerCameraDataSize);
-                    Vector<QueuedDrawItem> draw_items;
-                    for (auto &it: *rendering_data._spot_shadow_data[i]._cull_results)
-                    {
-                        auto &[queue, objs] = it;
-                        for (auto &obj: objs)
-                        {
-                            Material *shadow_material = obj._material;
-                            if (i16 shadow_pass = shadow_material->GetActiveShader()->FindPass("ShadowCaster"); shadow_pass != -1)
-                            {
-                                shadow_material->DisableKeyword("CAST_POINT_SHADOW");
-                                draw_items.emplace_back(MakeQueuedDrawItem(queue, obj, shadow_material, (u16) shadow_pass,
-                                                                           obj._material->SurfaceType() == ESurfaceType::kTransparent));
-                            }
-                        }
-                    }
-                    EmitQueuedDraws(cmd, draw_items);
-                    obj_index = 0;
-                }
-                for (int i = 0; i < RenderConstants::kMaxAreaLightNum; i++)
-                {
-                    auto &shadow_data = rendering_data._area_shadow_data[i];
-                    if (shadow_data._shadowmap_index < 0)
-                        continue;
-                    u16 dsv_rt_index = _p_addlight_shadow_maps->CalculateViewIndex(Texture::ETextureViewType::kDSV, 0, shadow_data._shadowmap_index);
-                    cmd->SetRenderTarget(nullptr, _p_addlight_shadow_maps.get(), 0, dsv_rt_index);
-                    cmd->ClearRenderTarget(kZFar, 0u);
-                    camera_data._MatrixVP = rendering_data._area_shadow_data[i]._shadow_matrix;
-                    cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &camera_data, RenderConstants::kPerCameraDataSize);
-                    Vector<QueuedDrawItem> draw_items;
-                    for (auto &it: *rendering_data._area_shadow_data[i]._cull_results)
-                    {
-                        auto &[queue, objs] = it;
-                        for (auto &obj: objs)
-                        {
-                            Material *shadow_material = obj._material;
-                            if (i16 shadow_pass = shadow_material->GetActiveShader()->FindPass("ShadowCaster"); shadow_pass != -1)
-                            {
-                                shadow_material->DisableKeyword("CAST_POINT_SHADOW");
-                                draw_items.emplace_back(MakeQueuedDrawItem(queue, obj, shadow_material, (u16) shadow_pass,
-                                                                           obj._material->SurfaceType() == ESurfaceType::kTransparent));
-                            }
-                        }
-                    }
-                    EmitQueuedDraws(cmd, draw_items);
-                    obj_index = 0;
-                }
-            }
-            //点光阴影
-            if (rendering_data._addi_point_shadow_num > 0)
-            {
-                static const u32 pointshadow_mat_start = RenderConstants::kMaxCascadeShadowMapSplitNum + RenderConstants::kMaxSpotLightNum;
-                for (int i = 0; i < RenderConstants::kMaxPointLightNum; i++)
-                {
-                    auto &shadow_data = rendering_data._point_shadow_data[i];
-                    if (shadow_data._shadowmap_index < 0)
-                        continue;
-                    for (int j = 0; j < 6; j++)
-                    {
-                        //j + i * 6 定位到cubearray
-                        u16 per_cube_slice_index = j + shadow_data._shadowmap_index * 6;
-                        u16 dsv_rt_index = _p_point_light_shadow_maps->CalculateViewIndex(Texture::ETextureViewType::kDSV, (ECubemapFace)(j + 1), 0, shadow_data._shadowmap_index);
-                        cmd->SetRenderTarget(nullptr, _p_point_light_shadow_maps.get(), 0, dsv_rt_index);
-                        cmd->ClearRenderTarget(kZFar, 0u);
-                        Vector4f light_pos = rendering_data._point_shadow_data[shadow_data._shadowmap_index]._light_world_pos;
-                        camera_data._CameraPos.xyz = light_pos.xyz;
-                        light_pos.x = rendering_data._point_shadow_data[shadow_data._shadowmap_index]._camera_near;
-                        light_pos.y = rendering_data._point_shadow_data[shadow_data._shadowmap_index]._camera_far;
-                        camera_data._MatrixVP = rendering_data._point_shadow_data[shadow_data._shadowmap_index]._shadow_matrices[j];
-                        camera_data._ZBufferParams = light_pos;
-                        cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &camera_data, RenderConstants::kPerCameraDataSize);
-                        Vector<QueuedDrawItem> draw_items;
-                        for (auto &it: *rendering_data._point_shadow_data[shadow_data._shadowmap_index]._cull_results[j])
-                        {
-                        auto &[queue, objs] = it;
-                        for (auto &obj: objs)
-                        {
-                            Material *shadow_material = obj._material;
-                            if (i16 shadow_pass = shadow_material->GetActiveShader()->FindPass("ShadowCaster"); shadow_pass != -1)
-                            {
-                                shadow_material->EnableKeyword("CAST_POINT_SHADOW");
-                                draw_items.emplace_back(MakeQueuedDrawItem(queue, obj, shadow_material, (u16) shadow_pass,
-                                                                           obj._material->SurfaceType() == ESurfaceType::kTransparent));
-                            }
-                            }
-                        }
-                        EmitQueuedDraws(cmd, draw_items);
-                        obj_index = 0;
-                    }
-                }
+                RenderTexture *target = view._type == EShadowViewType::kDirectional
+                    ? _shadow_system->GetDirectionalShadowMap(rendering_data._shadow_set->_directional._mode)
+                    : view._type == EShadowViewType::kPoint ? _shadow_system->GetPointShadowMap()
+                    : _shadow_system->GetAdditionalShadowMap();
+                DrawShadowView(cmd.get(), target, view);
             }
         }
-        Shader::SetGlobalTexture(RenderResourceName::kMainLightShadowMap, _p_mainlight_shadow_map.get());
-        Shader::SetGlobalTexture(RenderResourceName::kAddLightShadowMap, _p_addlight_shadow_maps.get());
-        Shader::SetGlobalTexture(RenderResourceName::kPointLightShadowMap, _p_point_light_shadow_maps.get());
+        Shader::SetGlobalTexture(RenderResourceName::kMainLightShadowMap,
+                                 _shadow_system->GetDirectionalShadowMap(rendering_data._shadow_set->_directional._mode));
+        Shader::SetGlobalTexture(RenderResourceName::kAddLightShadowMap, _shadow_system->GetAdditionalShadowMap());
+        Shader::SetGlobalTexture(RenderResourceName::kPointLightShadowMap, _shadow_system->GetPointShadowMap());
         context->ExecuteCommandBuffer(cmd);
         CommandBufferPool::Release(cmd);
+        return;
     }
 
     void ShadowCastPass::EndPass(GraphicsContext *context)
@@ -851,6 +663,8 @@ namespace Ailu::Render
             }
         }
         });
+        if (source_uses_graph_handle)
+            rendering_data._rg_handles._environment_sky = _src_map_handle;
     }
     void CubeMapGenPass::Execute(GraphicsContext *context, RenderingData &rendering_data)
     {
@@ -944,6 +758,8 @@ namespace Ailu::Render
                           rendering_data._rg_handles._gbuffers[2] = builder.Write(rendering_data._rg_handles._gbuffers[2]);
                           rendering_data._rg_handles._gbuffers[3] = builder.Write(rendering_data._rg_handles._gbuffers[3]);
                           rendering_data._rg_handles._depth_target = builder.Write(rendering_data._rg_handles._depth_target,EResourceUsage::kDSV);
+                          if (rendering_data._rg_handles._environment_sh.IsValid())
+                              builder.Read(rendering_data._rg_handles._environment_sh);
                       },
                       [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data)
                       {
@@ -1007,6 +823,7 @@ namespace Ailu::Render
     DeferredLightingPass::DeferredLightingPass() : RenderPass("DeferredLightingPass")
     {
         _p_lighting_material = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/deferred_lighting.alasset"), "DeferedGbufferLighting");
+        _p_lighting_material->EnableKeyword("STATIC_DIFFUSE_PROBE_GPU");
         _brdf_lut = ResourceMgr::Get().Load<Texture2D>(L"Textures/ibl_brdf_lut.alasset");
         TextureDesc shadow_desc(1u, 1u, ERenderTargetFormat::kShadowMap);
         shadow_desc._array_size = 1u;
@@ -1031,7 +848,7 @@ namespace Ailu::Render
 
     void Ailu::Render::DeferredLightingPass::OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data)
     {
-        const bool use_shadow_maps = rendering_data._camera != nullptr && rendering_data._camera->_is_render_shadow;
+        const bool use_shadow_maps = rendering_data._shadow_set != nullptr && rendering_data._shadow_set->_valid;
         graph.AddPass(_name, RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
                       { 
                           builder.Read(rendering_data._rg_handles._gbuffers[0]);
@@ -1060,7 +877,7 @@ namespace Ailu::Render
                             _p_lighting_material->SetTexture("_GBuffer2", graph.Resolve<Texture>(data._rg_handles._gbuffers[2]));
                             _p_lighting_material->SetTexture("_GBuffer3", graph.Resolve<Texture>(data._rg_handles._gbuffers[3]));
                             _p_lighting_material->SetTexture("_CameraDepthTexture", graph.Resolve<Texture>(data._rg_handles._depth_target));
-                            if (data._camera != nullptr && data._camera->_is_render_shadow)
+                            if (data._shadow_set != nullptr && data._shadow_set->_valid)
                             {
                                 _p_lighting_material->SetTexture("_MainLightShadowMap",
                                                                   graph.Resolve<Texture>(data._rg_handles._main_light_shadow_map));
@@ -1557,7 +1374,7 @@ namespace Ailu::Render
     void CopyColorPass::EndPass(GraphicsContext *context)
     {
         RenderPass::EndPass(context);
-        _p_blit_mat->SetTexture("_SourceTex", nullptr);
+        _p_blit_mat->SetTexture("_BlitSourceTex", nullptr);
     }
 #pragma endregion
 
@@ -1602,7 +1419,7 @@ namespace Ailu::Render
     void CopyDepthPass::EndPass(GraphicsContext *context)
     {
         RenderPass::EndPass(context);
-        _p_blit_mat->SetTexture("_SourceTex", nullptr);
+        _p_blit_mat->SetTexture("_BlitSourceTex", nullptr);
         Shader::SetGlobalTexture("_CameraDepthTexture", _depth_tex_handle);
         ComputeShader::SetGlobalTexture("_CameraDepthTexture", _depth_tex_handle);
     }
@@ -1712,7 +1529,7 @@ namespace Ailu::Render
     {
         _event = ERenderPassEvent::kAfterPostprocess;
         const u16 vertex_count = 1000u;
-        _ui_default_shader = ResourceMgr::Get().GetRef<Shader>(L"Shaders/hlsl/default_ui.alasset");
+        _ui_default_shader = ResourceMgr::Get().LoadAssetRef<Shader>(L"Shaders/hlsl/default_ui.alasset");
         _ui_default_mat = MakeRef<Material>(_ui_default_shader.get(), "DefaultUIMaterial");
         _ui_default_mat->SetTexture("_MainTex", Texture::s_p_default_white);
         _ui_default_mat->SetVector("_Color", Colors::kWhite);
@@ -1884,7 +1701,7 @@ namespace Ailu::Render
 #pragma region HZB
     HZBPass::HZBPass() : RenderPass("HZB")
     {
-        _hzb_gen = ResourceMgr::Get().GetRef<ComputeShader>(L"Shaders/hlsl/Compute/hzb.alasset");
+        _hzb_gen = ResourceMgr::Get().LoadAssetRef<ComputeShader>(L"Shaders/hlsl/Compute/hzb.alasset");
         _hzb_kernel = _hzb_gen->FindKernel("CSMain");
         _event = ERenderPassEvent::kAfterGbuffer;
     }

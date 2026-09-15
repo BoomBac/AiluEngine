@@ -16,12 +16,12 @@ namespace Ailu::Render
     GpuTerrain::GpuTerrain() : RenderFeature("GpuTerrain")
     {
         _terrain_pass = AL_NEW(TerrainPass);
-        _terrain_gen = ResourceMgr::Get().Load<ComputeShader>(L"Shaders/hlsl/Compute/gpu_terrain.alasset");
+        _terrain_gen = ResourceMgr::Get().LoadAssetRef<ComputeShader>(L"Shaders/hlsl/Compute/gpu_terrain.alasset");
         _plane = ResourceMgr::Get().Load<Mesh>(L"Meshs/src_res/terrain_plane.alasset");
         _terrain_mat = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/terrain.alasset"),"DefaultTerrain");
         _terrain_mat->SetTexture("_BaseColor", ResourceMgr::Get().Get<Texture2D>(L"Textures/TerrainDiffuse"));
         _terrain_mat->SetTexture("_HeightMap", ResourceMgr::Get().Get<Texture2D>(L"Textures/TerrainHeight"));
-        _terrain_pass->Setup(_terrain_gen.get(),_plane.get(),_terrain_mat.get(),&_max_height);
+        _terrain_pass->Setup(_terrain_gen, _plane.get(), _terrain_mat.get(), &_max_height);
         _terrain_mat->EnableKeyword("DEBUG_LOD");
     }
     GpuTerrain::~GpuTerrain()
@@ -91,7 +91,7 @@ namespace Ailu::Render
 
     }
 
-    void TerrainPass::Setup(ComputeShader *terrain_gen, Mesh *plane, Material *terrain_mat, f32* max_height)
+    void TerrainPass::Setup(const AssetRef<ComputeShader> &terrain_gen, Mesh *plane, Material *terrain_mat, f32 *max_height)
     {
         _max_height = max_height;
         _terrain_gen =  terrain_gen;
@@ -120,7 +120,7 @@ namespace Ailu::Render
                 _terrain_gen->SetTexture(_min_max_height_gen_kernel, "MinMaxMap", _minmax_height.get(), i);
             }
             auto [x, y, z] = _terrain_gen->CalculateDispatchNum(_min_max_height_gen_kernel, 1280u >> i, 1280u >> i, 1u);
-            cmd->Dispatch(_terrain_gen, _min_max_height_gen_kernel, x, y);
+            cmd->Dispatch(_terrain_gen.get(), _min_max_height_gen_kernel, x, y);
         }
         GraphicsContext::Get().ExecuteCommandBuffer(cmd);
         CommandBufferPool::Release(cmd);
@@ -147,14 +147,14 @@ namespace Ailu::Render
                 _terrain_gen->SetBuffer(_quad_tree_processor_kernel,"temp_nodes",dst_buf);
                 _terrain_gen->SetInt("cur_lod",i);
                 cmd->CopyCounterValue(src_buf, _disp_args_buf.get(), 0u);
-                cmd->Dispatch(_terrain_gen, _quad_tree_processor_kernel, _disp_args_buf.get(), 0u);
+                cmd->Dispatch(_terrain_gen.get(), _quad_tree_processor_kernel, _disp_args_buf.get(), 0u);
                 std::swap(src_buf,dst_buf);
             }
             //lod map
             cmd->CopyCounterValue(_final_node_buf.get(), _disp_args_buf.get(), 0u);
             _terrain_gen->SetBuffer(_gen_lod_map_kernel, "_input_final_nodes", _final_node_buf.get());
             _terrain_gen->SetTexture(_gen_lod_map_kernel, "_LODMap",_lod_map.get());
-            cmd->Dispatch(_terrain_gen, _gen_lod_map_kernel, _disp_args_buf.get(), 0u);
+            cmd->Dispatch(_terrain_gen.get(), _gen_lod_map_kernel, _disp_args_buf.get(), 0u);
             //patch gen
             const auto& vf = _cam->GetViewFrustum()._planes;
             for(u16 i = 0; i < 6; i++)
@@ -163,7 +163,7 @@ namespace Ailu::Render
             _terrain_gen->SetBuffer(_gen_patches_kernel, "_input_final_nodes", _final_node_buf.get());
             _terrain_gen->SetBuffer(_gen_patches_kernel, "_patch_list", _patches_buf.get());
             _terrain_gen->SetTexture(_gen_patches_kernel, "_InputLODMap",_lod_map.get());
-            cmd->Dispatch(_terrain_gen, _gen_patches_kernel, _disp_args_buf.get(), 0u);
+            cmd->Dispatch(_terrain_gen.get(), _gen_patches_kernel, _disp_args_buf.get(), 0u);
             //draw
             cmd->SetRenderTarget(rendering_data._camera_color_target_handle, rendering_data._camera_depth_target_handle);
             _terrain_mat->SetBuffer("PatchList", _patches_buf.get());

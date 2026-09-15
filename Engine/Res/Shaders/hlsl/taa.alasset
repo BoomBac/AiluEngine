@@ -1,0 +1,4 @@
+{
+    "_header": { "_format_version": 1, "_guid": "1c77df1f-1e2f-4aef-82ee-11a4d7bb2f08", "_asset_type": "Ailu::Render::Shader", "_asset_name": "taa", "_dependencies": [] },
+    "_file": "taa.hlsl", "_vs_entry": "FullscreenVSMain", "_ps_entry": "PSMain"
+}

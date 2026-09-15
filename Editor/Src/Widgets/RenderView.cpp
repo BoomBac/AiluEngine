@@ -12,6 +12,7 @@
 #include "Common/Selection.h"
 #include "Framework/Common/Input.h"
 #include "Framework/Common/ResourceMgr.h"
+#include "PlaceActor/PlaceActorRegistry.h"
 #include "Common/Undo.h"
 #include "Common/TransformGizmo.h"
 #include "Assets/PrefabAsset.h"
@@ -402,55 +403,16 @@ namespace Ailu
                     return;
                 if (payload._type == EDragType::kCustomUserData)
                 {
-                    const auto *preset = static_cast<const PlaceActorDragPayload *>(payload._data);
-                    const ECS::Entity new_entity = scene->AddObject(
-                            preset->_display_name != nullptr ? preset->_display_name : "Place Actor");
-                    auto &reg = scene->GetRegister();
-                    if (preset->_type == EPlaceActorPresetType::kLightProbe)
-                    {
-                        auto &probe = reg.AddComponent<ECS::CLightProbe>(new_entity);
-                        probe._size = 10.0f;
-                        probe._is_update_every_tick = false;
-                        probe._is_dirty = true;
-                    }
-                    else
-                    {
-                        auto &light = reg.AddComponent<ECS::LightComponent>(new_entity);
-                        light._type = ECS::ELightType::kDirectional;
-                        light._light._light_color = Color(1.0f, 1.0f, 1.0f, 1.0f);
-                        light._light._light_pos = {
-                                _drag_preview_pos.x, _drag_preview_pos.y, _drag_preview_pos.z, 1.0f};
-                        light._light._light_dir = Vector4f(0.0f, -1.0f, 0.0f, 0.0f);
-                        light._light._light_param = Vector4f::kZero;
-                        light._light._is_two_side = false;
-                        light._shadow._is_cast_shadow = true;
-                        light._shadow._constant_bias = 0.01f;
-                        light._shadow._slope_bias = 0.01f;
-                        light._shadow._padding = 0.0f;
-                        light._shadow._shaodwcam_num = 0u;
-                        switch (preset->_type)
-                        {
-                            case EPlaceActorPresetType::kPointLight:
-                                light._type = ECS::ELightType::kPoint;
-                                light._light._light_param = {10.0f, 0.1f, 0.0f, 0.0f};
-                                break;
-                            case EPlaceActorPresetType::kSpotLight:
-                                light._type = ECS::ELightType::kSpot;
-                                light._light._light_param = {10.0f, 20.0f, 30.0f, 0.0f};
-                                break;
-                            case EPlaceActorPresetType::kAreaLight:
-                                light._type = ECS::ELightType::kArea;
-                                light._light._light_param = {10.0f, 4.0f, 5.0f, 0.0f};
-                                break;
-                            case EPlaceActorPresetType::kDirectionalLight:
-                            default:
-                                light._light._light_param.w = 0.265f;
-                                break;
-                        }
-                    }
-                    if (auto *transform = reg.GetComponent<ECS::TransformComponent>(new_entity))
-                        transform->SetLocalPosition(_drag_preview_pos);
-                    Selection::SetSelection(new_entity);
+                    const auto *place_payload = static_cast<const PlaceActorDragPayload *>(payload._data);
+                    if (place_payload == nullptr)
+                        return;
+
+                    PlaceActorSpawnContext context;
+                    context._scene = scene;
+                    context._position = _drag_preview_pos;
+                    const ECS::Entity new_entity = PlaceActorRegistry::Get().Spawn(place_payload->_id, context);
+                    if (new_entity != ECS::kInvalidEntity)
+                        Selection::SetSelection(new_entity);
                     return;
                 }
                 auto *asset = static_cast<Asset *>(payload._data);

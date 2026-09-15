@@ -10,7 +10,7 @@ namespace Ailu::Render
 {
     ToneMappingPass::ToneMappingPass()
     {
-        _shader = Shader::Create(ResourceMgr::GetResSysPath(L"Shaders/hlsl/PostProcess/tone_mapping.hlsl"));
+        _shader = ResourceMgr::Get().LoadAssetRef<Shader>(L"Shaders/hlsl/PostProcess/tone_mapping.alasset");
         if (_shader != nullptr)
             _shader->Compile();
         _material = MakeRef<Material>(_shader.get(), "ToneMapping");

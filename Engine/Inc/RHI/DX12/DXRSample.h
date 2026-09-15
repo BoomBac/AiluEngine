@@ -5,6 +5,7 @@
 #include <dxgi1_6.h>
 #include <d3d12shader.h>
 
+#include "Assets/AssetRef.h"
 #include "Render/Shader.h"
 #include "Render/Buffer.h"
 #include "Render/RayTracing/SceneRayTracingProxy.h"
@@ -55,7 +56,7 @@ namespace Ailu
             ID3D12Device5 *m_dxrDevice;
             ID3D12CommandQueue *m_commandQueue;
 
-            Ref<Render::RayTracingShader> m_raytracing_shader;
+            AssetRef<Render::RayTracingShader> m_raytracing_shader;
             Scope<Render::SceneRayTracingProxy> m_sceneProxy;
 
             // Raytracing scene

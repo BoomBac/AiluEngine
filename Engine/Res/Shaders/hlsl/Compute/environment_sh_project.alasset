@@ -1,0 +1,11 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "33aa66a8-3a67-4d2a-8f2e-0cc1e4a90dc0",
+        "_asset_type": "Ailu::Render::ComputeShader",
+        "_asset_name": "environment_sh_project",
+        "_dependencies": []
+    },
+    "_file": "environment_sh_project.hlsl",
+    "_kernel": "SHProject"
+}

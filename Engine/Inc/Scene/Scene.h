@@ -41,12 +41,14 @@ namespace Ailu
             ECS::Entity AddObject(String name = "");
             ECS::Entity AddObject(Ref<Mesh> mesh, Ref<Material> mat);
             ECS::Entity AddObject(Ref<Mesh> mesh, const Vector<Ref<Material>>& mats);
-            ECS::Entity AddObject(String name, const Guid &requested_guid);
+            ECS::Entity AddObject(String name, const Guid &requested_guid, bool attach_to_scene_root = true);
             ECS::Entity DuplicateEntity(ECS::Entity e);
             void RemoveObject(ECS::Entity entity);
 
             // --- Hierarchy API (new) ---
             bool IsValidEntity(ECS::Entity entity) const;
+            bool IsSceneRoot(ECS::Entity entity) const { return entity == _scene_root; }
+            ECS::Entity SceneRoot() const { return _scene_root; }
             bool IsEntityEnabled(ECS::Entity entity) const;
             bool SetEntityEnabled(ECS::Entity entity, bool enabled);
             bool IsDescendantOf(ECS::Entity entity, ECS::Entity potential_ancestor) const;
@@ -94,9 +96,9 @@ namespace Ailu
             ECS::Register &GetRegister() { return _register; }
             const Vector<PrefabInstance> &PrefabInstances() const { return _prefab_instances; }
             Vector<PrefabInstance> &MutablePrefabInstances() { return _prefab_instances; }
-            u32 EntityNum() const { return _register.EntityNum(); }
+            u32 EntityNum() const { return _register.EntityNum() - (_scene_root != ECS::kInvalidEntity ? 1u : 0u); }
 
-            String AcquireName() const { return std::format("new_object_{}", _register.EntityNum()); };
+            String AcquireName() const { return std::format("new_object_{}", EntityNum()); };
             Render::GPUBuffer *GetSceneMeshDataBuffer() const{ return &*_scene_mesh_data; };
             u32 TriangleCount() const { return _triangle_count; };
             //指示实际三角形数据在buffer中的偏移，计算时读取到node.start + offset来索引三角形
@@ -156,7 +158,7 @@ namespace Ailu
             bool RegisterEntityGuid(ECS::Entity entity, const Guid &guid);
             void UnregisterEntityGuid(ECS::Entity entity);
             void RebuildEntityGuidIndex();
-            ECS::Entity CreateEntityInternal(String name, const Guid &requested_guid);
+            ECS::Entity CreateEntityInternal(String name, const Guid &requested_guid, bool attach_to_scene_root);
 
         private:
             struct QueuedSceneCommand
@@ -171,6 +173,7 @@ namespace Ailu
             u64 _edit_revision = 1u;
             u16 _total_renderable_count = 0u;
             ECS::Register _register;
+            ECS::Entity _scene_root = ECS::kInvalidEntity;
             std::unordered_set<ECS::Entity> _pending_delete_entities;
             Vector<QueuedSceneCommand> _pending_scene_commands;
             Ref<Render::GPUBuffer> _scene_mesh_data;

@@ -6,6 +6,8 @@
 #include "Inspector/ComponentEditors/CameraComponentEditor.h"
 #include "Inspector/ComponentEditors/SpriteRendererComponentEditor.h"
 #include "Inspector/ComponentEditors/LightProbeComponentEditor.h"
+#include "Inspector/ComponentEditors/LightProbeGroupComponentEditor.h"
+#include "Inspector/ComponentEditors/DDGIVolumeComponentEditor.h"
 #include "Inspector/ComponentEditors/EnvironmentComponentEditor.h"
 #include "Inspector/ComponentEditors/RigidBodyComponentEditor.h"
 #include "Inspector/ComponentEditors/ColliderComponentEditor.h"
@@ -35,6 +37,12 @@ namespace Ailu
             registry.RegisterCustom<ECS::StaticMeshComponent, StaticMeshComponentEditor>("Static Mesh", "Rendering", 210);
 
             registry.RegisterCustom<ECS::CLightProbe, LightProbeComponentEditor>("Light Probe", "Rendering", 220);
+
+            registry.RegisterCustom<ECS::CLightProbeGroup, LightProbeGroupComponentEditor>(
+                "Light Probe Group", "Rendering", 221);
+
+            registry.RegisterCustom<ECS::DDGIVolumeComponent, DDGIVolumeComponentEditor>(
+                "DDGI Volume", "Rendering", 222);
 
             registry.RegisterCustom<ECS::EnvironmentComponent, EnvironmentComponentEditor>("Environment", "Rendering", 225);
 

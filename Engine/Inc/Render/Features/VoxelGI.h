@@ -5,6 +5,7 @@
 #ifndef AILU_VOXELGI_H
 #define AILU_VOXELGI_H
 
+#include "Assets/AssetRef.h"
 #include "../Buffer.h"
 #include "../RenderingData.h"
 #include "RenderFeature.h"
@@ -30,7 +31,7 @@ namespace Ailu::Render
         VoxelGIData _data;
         Vector3Int _pre_grid_num;
         Ref<ConstantBuffer> _cam_cbuf;
-        Ref<ComputeShader> _voxelize_cs;
+        AssetRef<ComputeShader> _voxelize_cs;
         ComputeShaderKernelId _fill_texture3d_kernel = kInvalidComputeShaderKernelId;
         Ref<GPUBuffer> _voxel_buf = nullptr;
     };

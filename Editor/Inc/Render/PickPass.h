@@ -1,6 +1,7 @@
 #pragma once
 #ifndef __PICK_PASS__
 #define __PICK_PASS__
+#include "Assets/AssetRef.h"
 #include <Render/Features/RenderFeature.h>
 #include <Render/2D/SpriteBatcher.h>
 #include <Render/2D/SpriteRenderData.h>
@@ -55,7 +56,7 @@ namespace Ailu
             u32 _pick_id = 0u;
             Ref<RenderTexture> _pick_buf = nullptr;
             Ref<RenderTexture> _pick_buf_depth = nullptr;
-            Ref<ComputeShader> _read_pickbuf;
+            AssetRef<ComputeShader> _read_pickbuf;
             ComputeShaderKernelId _read_pickbuf_kernel = kInvalidComputeShaderKernelId;
             Ref<GPUBuffer> _readback_buf;
             Vector4f _params;
