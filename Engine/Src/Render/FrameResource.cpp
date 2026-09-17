@@ -76,7 +76,7 @@ namespace Ailu::Render
             desc._size = desc._element_size * desc._element_num;
             desc._target = EGPUBufferTarget::kStructured;
             auto buf = GPUBuffer::Create(desc);
-            buf->Name(std::format("ScenePrimitiveBuffer_{}", hash));
+            buf->Name(std::format("ScenePrimitiveBuffer_{}_Frame{}", hash, _frame_slot));
             _scene_primitive_buffers.push_back(buf);
             _scene_primitive_buffer_lut[hash] = _scene_primitive_buffers.size() - 1;
 

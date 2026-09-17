@@ -21,7 +21,11 @@ namespace Ailu::Render
                   GPUBuffer *primitive_buffer = nullptr, const Vector<ScenePrimitive> *scene_primitives = nullptr);
         void AddBLASUpdatePass(RDG::RenderGraph &graph);
         void AddTLASUpdatePass(RDG::RenderGraph &graph);
-        void AddRayTracingResourceReads(RDG::RenderGraphBuilder &builder) const;
+        void AddTraceResourceReads(RDG::RenderGraphBuilder &builder) const;
+        void AddRayTracingResourceReads(RDG::RenderGraphBuilder &builder) const
+        {
+            AddTraceResourceReads(builder);
+        }
         void SyncLightCache(const SceneManagement::Scene *scene);
 
         RayTracingScene *GetScene() const { return FrontSlot()._scene.get(); }

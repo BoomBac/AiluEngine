@@ -14,6 +14,7 @@
 #include "Render/Renderer.h"
 #include "Render/Shader.h"
 #include "Render/RenderGraph/RenderGraph.h"
+#include "Render/RayTracing/RayTracingScene.h"
 
 namespace Ailu::Render
 {
@@ -1432,6 +1433,42 @@ namespace Ailu::Render
         }
     }
 
+    void ComputeShader::SetAccelerationStructure(ComputeShaderKernelId kernel, const String &name,
+                                                 RayTracingScene *scene)
+    {
+        if (scene == nullptr || !IsKernelValid(kernel))
+            return;
+        const auto &kernel_element = _kernels[ResolveKernelIndex(kernel)];
+        for (const auto &[variant_hash, variant] : kernel_element._variants)
+        {
+            (void) variant_hash;
+            if (variant._bind_res_infos.contains(name))
+            {
+                SetResourceBinding(kernel, ShaderPropertyRegistry::Get().Intern(name), scene, ComputeBindParams{});
+                return;
+            }
+        }
+    }
+
+    void ComputeShader::SetAccelerationStructure(const String &name, RayTracingScene *scene)
+    {
+        if (scene == nullptr)
+            return;
+        for (auto &kernel_element : _kernels)
+        {
+            for (const auto &[variant_hash, variant] : kernel_element._variants)
+            {
+                (void) variant_hash;
+                if (variant._bind_res_infos.contains(name))
+                {
+                    SetResourceBinding(kernel_element._id, ShaderPropertyRegistry::Get().Intern(name), scene,
+                                       ComputeBindParams{});
+                    break;
+                }
+            }
+        }
+    }
+
     void ComputeShader::SetMatrix(const String& name,Matrix4x4f mat)
     {
         for (auto &cs_ele: _kernels)
@@ -1836,6 +1873,12 @@ namespace Ailu::Render
                 continue;
             const bool is_uav = bind_it->second._res_type == EBindResDescType::kUAVTexture2D
                 || bind_it->second._res_type == EBindResDescType::kRWTexture3D;
+            const bool is_texture = bind_it->second._res_type == EBindResDescType::kTexture2D
+                || bind_it->second._res_type == EBindResDescType::kTexture3D
+                || bind_it->second._res_type == EBindResDescType::kUAVTexture2D
+                || bind_it->second._res_type == EBindResDescType::kRWTexture3D;
+            if (!is_texture)
+                break;
             if (!is_uav && binding._params._view_index != (u16)-1)
                 break;
             const auto view_type = is_uav ? Texture::ETextureViewType::kUAV : Texture::ETextureViewType::kSRV;

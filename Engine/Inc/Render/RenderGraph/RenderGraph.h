@@ -197,6 +197,8 @@ namespace Ailu::Render::RDG
 
         RGHandle GetTexture(const String &name);
         RGHandle GetBuffer(const String &name);
+        String GetResourceName(RGHandle handle) const;
+        u32 GetPassNameOrdinal(const CompiledRenderPass &compiled_pass) const;
 
         // 添加一个渲染Pass
         void AddPass(const String &name, PassDesc desc, SetupFunction setup_func, ExecuteFunction executor);
@@ -364,9 +366,8 @@ namespace Ailu::Render::RDG
         HashMap<String, RGHandle> _transient_tex_handles;
         HashMap<String, RGHandle> _transient_buffer_handles;
         HashMap<u32, ResourceNode> _transient_resources;
-        //外部资源句柄，通常是从外部传入的资源，RenderGraph不会管理其生命周期，新资源会覆盖旧资源
-        HashMap<String, RGHandle> _external_tex_handles;
-        HashMap<String, RGHandle> _external_buffer_handles;
+        // External resources are identified by their physical resource pointer for this graph recording.
+        HashMap<GpuResource *, RGHandle> _imported_resource_handles;
         HashMap<u32, ResourceNode> _external_resources;
         // Current-graph globals keep handles only.  Persistent Shader/ComputeShader globals must never retain RG resources.
         HashMap<ShaderPropertyId, RGGlobalTextureBinding> _global_textures;

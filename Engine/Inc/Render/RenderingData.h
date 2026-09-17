@@ -220,6 +220,36 @@ namespace Ailu::Render
         Vector3f _grid_size;
     };
 
+    struct DDGILightingData
+    {
+        RDG::RGHandle _irradiance_atlas_handle{};
+        Ref<Texture2D> _irradiance_atlas_texture;
+        RDG::RGHandle _distance_atlas_handle{};
+        Ref<Texture2D> _distance_atlas_texture;
+        RDG::RGHandle _probe_data_handle{};
+        Ref<GPUBuffer> _probe_data;
+        Matrix4x4f _local_to_world = Matrix4x4f::Identity();
+        Matrix4x4f _world_to_local = Matrix4x4f::Identity();
+        Vector3f _probe_spacing = Vector3f::kOne;
+        u32 _probe_count_x = 0u;
+        u32 _probe_count_y = 0u;
+        u32 _probe_count_z = 0u;
+        u32 _atlas_tiles_x = 0u;
+        u32 _atlas_tiles_y = 0u;
+        u32 _atlas_width = 0u;
+        u32 _atlas_height = 0u;
+        u32 _distance_atlas_tiles_x = 0u;
+        u32 _distance_atlas_tiles_y = 0u;
+        u32 _distance_atlas_width = 0u;
+        u32 _distance_atlas_height = 0u;
+        bool _use_visibility = true;
+        f32 _probe_normal_bias = 0.1f;
+        f32 _probe_view_bias = 0.1f;
+        bool _use_probe_relocation = false;
+        u32 _debug_mode = 4u;
+        bool _enabled = false;
+    };
+
     class CommandBuffer;
     class Camera;
 
@@ -230,6 +260,7 @@ namespace Ailu::Render
         ConstantBuffer *_p_per_scene_cbuf;
         ConstantBuffer *_p_per_camera_cbuf;
         GPUBuffer *_scene_primitive_buffer = nullptr;
+        GPUBuffer *_material_buffer = nullptr;
         Vector<PrimitiveData> *_primitive_data = nullptr;
         const Vector<ScenePrimitive> *_scene_primitives = nullptr;
         RTHandle _camera_color_target_handle;
@@ -251,8 +282,12 @@ namespace Ailu::Render
         struct
         {
             Vector<RDG::RGHandle> _gbuffers;
+            // _color_target 始终是 _CameraColorAttachmentA：场景 Pass 在注册阶段对它 Write，在录制阶段直接绑定它。
+            // 后处理链（Bloom/ToneMapping）的输出写入 _final_color，FinalBlit 使用 _final_color，
+            // 这样 PostprocessStack 不会把 _color_target 改写成另一个资源，导致注册在它之前的 Pass 绑错目标。
             RDG::RGHandle         _color_target;
             RDG::RGHandle         _color_tex;
+            RDG::RGHandle         _final_color;
             RDG::RGHandle         _depth_target;
             RDG::RGHandle         _depth_tex;
             RDG::RGHandle         _motion_vector_tex;
@@ -284,11 +319,24 @@ namespace Ailu::Render
         EDisplayOutput _display_output = EDisplayOutput::kHdrScRgb;
         bool _is_debug_voxel = false;
         u16 _vxgi_debug_mipmap = 0u;
+        DDGILightingData _ddgi_lighting;
         //temp
         Vector4f _mainlight_world_position;
+        // 后处理之后的最终颜色：PostprocessStack 写入 _final_color，未启用后处理时回退到场景颜色 _color_target。
+        // 注册顺序在后处理之后的叠加类 Pass（Gizmo / 编辑器 Debug / DDGI Debug 等）必须使用它；
+        // 若写入 _color_target(_CameraColorAttachmentA)，该写入发生在 CopyColor 之后，不会进入最终画面。
+        RDG::RGHandle &FinalColorHandle()
+        {
+            return _rg_handles._final_color.IsValid() ? _rg_handles._final_color : _rg_handles._color_target;
+        }
+        const RDG::RGHandle &FinalColorHandle() const
+        {
+            return _rg_handles._final_color.IsValid() ? _rg_handles._final_color : _rg_handles._color_target;
+        }
         void Reset()
         {
             _postprocess_input = nullptr;
+            _ddgi_lighting = {};
         }
     };
 }// namespace Ailu

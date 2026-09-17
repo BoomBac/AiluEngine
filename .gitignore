@@ -381,3 +381,6 @@ FodyWeavers.xsd
 .vscode/
 Engine/Engine.zip
 Editor/Editor.zip
+AiluEngine_Source.zip
+PackAiluEngineSource.cmd
+PackAiluEngineSource.ps1

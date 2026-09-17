@@ -24,8 +24,12 @@ namespace Ailu::Render
         {
             const f32 current_length_sq = SqrMagnitude(current);
             const f32 baked_length_sq = SqrMagnitude(baked);
-            if (current_length_sq < kFloatEpsilon || baked_length_sq < kFloatEpsilon)
+            // 只有"当前有主光但从未按该方向烘过"才强制重烘。当前没有主光（零向量）由调用方
+            // 处理：无方向光的场景不应每帧重烘环境。
+            if (baked_length_sq < kFloatEpsilon)
                 return true;
+            if (current_length_sq < kFloatEpsilon)
+                return false;
             const f32 cos_angle = DotProduct(current, baked) / sqrt(current_length_sq * baked_length_sq);
             return cos_angle < kMainlightRebakeCosThreshold;
         }
@@ -160,8 +164,15 @@ namespace Ailu::Render
             _resources_dirty = true;
         // cubemap 里烘了太阳，主光大幅转向后必须重建；但每帧重建代价过高，
         // 这里用角度阈值做迟滞，避免旋转主光时逐帧重烘整个环境。
+        // 没有主光的场景（纯 GI / 纯自发光测试场景）cubemap 里不含太阳，
+        // 不能走 IsMainlightRebakeRequired 的退化分支，否则会逐帧重建 512 cubemap
+        // + radiance + prefilter + SH 投影；只有"原本有主光、现在没了"时才需要重烘一次
+        // 把烘进去的太阳去掉。
+        const bool mainlight_rebake_required = has_mainlight
+            ? IsMainlightRebakeRequired(mainlight_direction, _baked_mainlight_direction)
+            : _has_mainlight;
         const bool rebake_env = _source == ECS::EEnvironmentSource::kProceduralSky &&
-                                (source_changed || (!_resources_dirty && IsMainlightRebakeRequired(mainlight_direction, _baked_mainlight_direction)));
+                                (source_changed || (!_resources_dirty && mainlight_rebake_required));
         if (rebake_env)
         {
             _resources_dirty = true;

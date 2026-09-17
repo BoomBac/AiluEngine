@@ -1,0 +1,11 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "c5a1a51e-4bea-4f38-88d1-67f03a635cd5",
+        "_asset_type": "Ailu::Render::ComputeShader",
+        "_asset_name": "ddgi_radiance",
+        "_dependencies": []
+    },
+    "_file": "ddgi_radiance.hlsl",
+    "_kernel": "ProbeRadiance"
+}

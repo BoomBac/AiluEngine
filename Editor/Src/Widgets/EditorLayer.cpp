@@ -54,6 +54,8 @@
 #include "Framework/Events/KeyEvent.h"
 #include "Render/CommonRenderPipeline.h"
 #include "Render/RenderGraph/RenderGraph.h"
+#include "Render/ImageCapture/Adapters/RenderGraphImageCaptureBridge.h"
+#include "Render/ImageCapture/ImageCaptureService.h"
 
 #include "Widgets/CommonView.h"
 #include "Widgets/AllocatorDebugPanel.h"
@@ -1216,6 +1218,11 @@ namespace Ailu
 
         EditorLayer::~EditorLayer()
         {
+            if (_deferred_lighting_capture_session_id != 0u)
+            {
+                ImageCaptureService::Cancel(_deferred_lighting_capture_session_id);
+                RenderGraphImageCaptureBridge::RemoveSelector(_deferred_lighting_capture_session_id);
+            }
             AL_DELETE(s_prifile_wd);
         }
         UI::Text *g_text = nullptr;
@@ -1330,6 +1337,124 @@ namespace Ailu
             LOG_INFO(L"Save widget to ", p);
             ar.Save(p);
         }
+
+        void EditorLayer::StartDeferredLightingCapture()
+        {
+            if (_deferred_lighting_capture_session_id != 0u)
+            {
+                ImageCaptureService::Cancel(_deferred_lighting_capture_session_id);
+                RenderGraphImageCaptureBridge::RemoveSelector(_deferred_lighting_capture_session_id);
+                _deferred_lighting_capture_session_id = 0u;
+            }
+
+            if (_deferred_lighting_capture_frame_count <= 0)
+            {
+                _deferred_lighting_capture_status = "Image Capture: frame count must be greater than 0";
+                return;
+            }
+
+            ImageCaptureSequenceDesc desc;
+            desc._frame_count = static_cast<u32>(_deferred_lighting_capture_frame_count);
+            desc._frame_interval = 1u;
+            desc._file_prefix = "deferred_lighting";
+            desc._output_directory = L"Saved/RenderCapture/DeferredLighting";
+            _deferred_lighting_capture_session_id = ImageCaptureService::BeginSequence(desc);
+            if (_deferred_lighting_capture_session_id == 0u)
+            {
+                _deferred_lighting_capture_status = "Image Capture: failed to start";
+                return;
+            }
+
+            RenderGraphCaptureSelector selector;
+            selector._pass_name = "DeferredLightingPass";
+            selector._pass_name_ordinal = 0u;
+            selector._resource_name = RenderResourceName::kCameraColorA;
+            selector._input_access_index = 0u;
+            selector._capture_output = true;
+            selector._camera_ordinal = RenderPipeline::Get().HasPreviewCamera() ? 1u : 0u;
+            RenderGraphImageCaptureBridge::SetSelector(_deferred_lighting_capture_session_id, std::move(selector));
+            _deferred_lighting_capture_status = std::format(
+                "Image Capture: armed session {} (DeferredLightingPass -> {})",
+                _deferred_lighting_capture_session_id, RenderResourceName::kCameraColorA);
+        }
+
+        void EditorLayer::UpdateAutoCapture()
+        {
+            if (_auto_capture_done)
+                return;
+            if (_auto_capture_frame < 0)
+            {
+                char buffer[32] = {};
+                const DWORD length = GetEnvironmentVariableA("AILU_AUTOCAP_FRAME", buffer,
+                                                             static_cast<DWORD>(sizeof(buffer)));
+                _auto_capture_frame = (length > 0u && length < sizeof(buffer))
+                    ? std::atoll(buffer) : -1;
+                if (_auto_capture_frame < 0)
+                {
+                    _auto_capture_done = true;
+                    return;
+                }
+                LOG_INFO("[AutoCapture] armed at tick {}", _auto_capture_frame);
+                if (auto *editor = EditorApp::GetEditor())
+                {
+                    if (Camera *camera = editor->GetSceneCamera())
+                    {
+                        const Vector3f p = camera->Position();
+                        const Quaternion &q = camera->Rotation();
+                        LOG_INFO("[AutoCapture] camera pos=({},{},{}) rot=({},{},{},{})",
+                                 p.x, p.y, p.z, q.x, q.y, q.z, q.w);
+                    }
+                }
+            }
+
+            ++_auto_capture_tick;
+            // The capture is armed one frame ahead so that the deferred-lighting pass of the
+            // requested tick is the one written out.
+            if (_auto_capture_tick == _auto_capture_frame)
+            {
+                _deferred_lighting_capture_frame_count = 1;
+                StartDeferredLightingCapture();
+                LOG_INFO("[AutoCapture] capture requested at tick {}", _auto_capture_tick);
+            }
+            else if (_auto_capture_tick > _auto_capture_frame && _deferred_lighting_capture_session_id == 0u)
+            {
+                _auto_capture_done = true;
+                LOG_INFO("[AutoCapture] done, closing editor");
+                Application::Get().GetWindow().RequestClose();
+            }
+        }
+
+        void EditorLayer::UpdateDeferredLightingCaptureStatus()
+        {
+            if (_deferred_lighting_capture_session_id == 0u)
+                return;
+
+            const ImageCaptureStatus status = ImageCaptureService::GetStatus(_deferred_lighting_capture_session_id);
+            const char *state_name = "Unknown";
+            switch (status._state)
+            {
+            case EImageCaptureState::kPending: state_name = "Pending"; break;
+            case EImageCaptureState::kCapturing: state_name = "Capturing"; break;
+            case EImageCaptureState::kFinalizing: state_name = "Finalizing"; break;
+            case EImageCaptureState::kCompleted: state_name = "Completed"; break;
+            case EImageCaptureState::kCancelled: state_name = "Cancelled"; break;
+            case EImageCaptureState::kFailed: state_name = "Failed"; break;
+            }
+
+            _deferred_lighting_capture_status = std::format(
+                "Image Capture: {} {}/{} submitted {}", state_name, status._completed_frame_count,
+                status._requested_frame_count, status._submitted_frame_count);
+            if (!status._error.empty())
+                _deferred_lighting_capture_status += std::format(" | {}", status._error);
+
+            if (status._state == EImageCaptureState::kCompleted || status._state == EImageCaptureState::kFailed ||
+                status._state == EImageCaptureState::kCancelled)
+            {
+                RenderGraphImageCaptureBridge::RemoveSelector(_deferred_lighting_capture_session_id);
+                _deferred_lighting_capture_session_id = 0u;
+            }
+        }
+
         static CCDSolver ccd_solver;
         //static CCDSolver ccd_solver1;
         static CCDSolver fabrik_solver;
@@ -1443,6 +1568,8 @@ namespace Ailu
             if (auto *automation = EditorApp::GetEditor()->GetAutomationService())
                 automation->Tick();
             UpdateEditorChrome(dt);
+            UpdateDeferredLightingCaptureStatus();
+            UpdateAutoCapture();
             // static bool s_opened_graph_editor = false;
             // if (!s_opened_graph_editor)
             // {
@@ -1925,6 +2052,14 @@ namespace Ailu
                         }
                     }
                 }
+            }
+            if (ImGui::CollapsingHeader("Image Capture"))
+            {
+                ImGui::SliderInt("Deferred Lighting Frames", &_deferred_lighting_capture_frame_count, 0, 10);
+                ImGui::TextWrapped("Capture the Deferred Lighting color output for the next N frames.");
+                if (ImGui::Button("Capture Deferred Lighting Color"))
+                    StartDeferredLightingCapture();
+                ImGui::TextWrapped("%s", _deferred_lighting_capture_status.c_str());
             }
 
             static bool s_show_shadding_mode = false;

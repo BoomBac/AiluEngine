@@ -116,13 +116,19 @@ namespace Ailu::RHI::DX12
         auto device = static_cast<D3DContext *>(g_pGfxContext)->GetDevice();
         auto heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
         auto buffer = CD3DX12_RESOURCE_DESC::Buffer(m_PageSize);
-        ThrowIfFailed(device->CreateCommittedResource(
-                &heap_prop,
-                D3D12_HEAP_FLAG_NONE,
-                &buffer,
-                D3D12_RESOURCE_STATE_GENERIC_READ,
-                nullptr,
-                IID_PPV_ARGS(&m_d3d12Resource)));
+        const HRESULT create_resource_hr = device->CreateCommittedResource(
+            &heap_prop,
+            D3D12_HEAP_FLAG_NONE,
+            &buffer,
+            D3D12_RESOURCE_STATE_GENERIC_READ,
+            nullptr,
+            IID_PPV_ARGS(&m_d3d12Resource));
+        if (FAILED(create_resource_hr))
+        {
+            static_cast<D3DContext *>(g_pGfxContext)->ReportDeviceRemoved(
+                create_resource_hr, "ID3D12Device::CreateCommittedResource(UploadBuffer::Page)");
+        }
+        ThrowIfFailed(create_resource_hr);
 
         m_GPUPtr = m_d3d12Resource->GetGPUVirtualAddress();
         m_d3d12Resource->Map(0, nullptr, &m_CPUPtr);

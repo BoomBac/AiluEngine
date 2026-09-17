@@ -226,6 +226,20 @@ namespace Ailu::SceneManagement
             entity_doc._ddgi_volume_component._probe_count = ddgi_volume->_probe_count;
             entity_doc._ddgi_volume_component._probe_spacing = ddgi_volume->_probe_spacing;
             entity_doc._ddgi_volume_component._draw_probes = ddgi_volume->_draw_probes;
+            entity_doc._ddgi_volume_component._max_ray_distance = ddgi_volume->_max_ray_distance;
+            entity_doc._ddgi_volume_component._draw_probe_rays = ddgi_volume->_draw_probe_rays;
+            entity_doc._ddgi_volume_component._use_probe_relocation = ddgi_volume->_use_probe_relocation;
+            entity_doc._ddgi_volume_component._relocation_backface_threshold =
+                ddgi_volume->_relocation_backface_threshold;
+            entity_doc._ddgi_volume_component._random_ray_backface_threshold =
+                ddgi_volume->_random_ray_backface_threshold;
+            entity_doc._ddgi_volume_component._relocation_min_frontface_distance_ratio =
+                ddgi_volume->_relocation_min_frontface_distance_ratio;
+            entity_doc._ddgi_volume_component._draw_relocation_debug = ddgi_volume->_draw_relocation_debug;
+            entity_doc._ddgi_volume_component._freeze_ray_rotation = ddgi_volume->_freeze_ray_rotation;
+            entity_doc._ddgi_volume_component._debug_probe_radius = ddgi_volume->_debug_probe_radius;
+            entity_doc._ddgi_volume_component._debug_ray_length = ddgi_volume->_debug_ray_length;
+            entity_doc._ddgi_volume_component._debug_mode = ddgi_volume->_debug_mode;
             mark_disabled.template operator()<ECS::DDGIVolumeComponent>("DDGIVolumeComponent");
         }
         if (const auto *environment = registry.GetComponent<ECS::EnvironmentComponent>(entity); environment != nullptr)

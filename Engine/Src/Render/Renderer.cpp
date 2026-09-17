@@ -303,6 +303,8 @@ namespace Ailu::Render
             hzb_desc._mip_num = Texture::MaxMipmapCount(hzb_desc._width, hzb_desc._height);
             _rendering_data._rg_handles._hzb = _rd_graph->CreateResource(hzb_desc, RenderResourceName::kHZB);
             _rendering_data._rg_handles._ao_tex = RDG::RGHandle{0u, 0u};
+            // 由 PostprocessStack 在注册阶段填充；未启用后处理时 FinalBlit 回退到 _color_target。
+            _rendering_data._rg_handles._final_color = RDG::RGHandle{};
         }
         else
         {
@@ -375,8 +377,8 @@ namespace Ailu::Render
         }
         else if (_is_use_raytracing)
         {
-            //_raytrace_gi->SetActive(true);
-            _rtxdi->SetActive(true);
+            _raytrace_gi->SetActive(true);
+            //_rtxdi->SetActive(true);
             _fog->SetActive(false);
             _ssao->SetActive(false);
             _render_passes.emplace_back(_gbuffer_pass.get());
@@ -388,7 +390,7 @@ namespace Ailu::Render
         {
             _ssao->SetActive(true);
             _fog->SetActive(true);
-            //_raytrace_gi->SetActive(false);
+            _raytrace_gi->SetActive(false);
             _rtxdi->SetActive(false);
             if (static_cast<u32>(_mode) & static_cast<u32>(EShadingMode::kLit))
             {
@@ -428,6 +430,11 @@ namespace Ailu::Render
         {
             if (feature->IsActive())
                 feature->AddRenderPasses(*this, _rendering_data);
+        }
+        if (_is_use_render_graph)
+        {
+            if (auto *ddgi = dynamic_cast<DDGIFeature *>(_ddgi); ddgi != nullptr)
+                ddgi->PrepareDeferredLighting(*_rd_graph, _rendering_data);
         }
         _rendering_data._rg_handles._volumetric_fog_accum = {};
         auto *volumetric_fog = dynamic_cast<VolumetricFog *>(_fog);
@@ -696,6 +703,7 @@ namespace Ailu::Render
         if (!_static_diffuse_probe_data.empty())
             static_probe_data_buffer->SetData(_static_diffuse_probe_data);
         _rendering_data._scene_primitive_buffer = primitive_buffer;
+        _rendering_data._material_buffer = _cur_fs->GetMaterialBuffer();
         _rendering_data._primitive_data = &_primitive_data;
         _rendering_data._scene_primitives = &_scene_primitives;
         Shader::SetGlobalBuffer("g_primitive_data", primitive_buffer);
@@ -856,6 +864,15 @@ namespace Ailu::Render
         {
             per_scene_cbuf_data->_DirectionalLights[0]._LightColor = Colors::kBlack.xyz;
             per_scene_cbuf_data->_DirectionalLights[0]._LightDir = {0.0f, 0.0f, 0.0f};
+        }
+        // 没有方向光的场景（纯自发光 / 纯 GI 测试）也必须给 _MainlightWorldPosition 一个合法朝向：
+        // 体积光对它做了 normalize，零向量会产出 NaN，写进整张体积光 3D 贴图后整屏发黑；大气/天空也读同一个量。
+        // 这里退化成一盏正上方的虚拟太阳：朝向合法、颜色为黑，不会照亮任何东西。
+        if (direction_light_index == 0u)
+        {
+            per_scene_cbuf_data->_MainlightWorldPosition = Vector3f(0.0f, 1.0f, 0.0f);
+            per_scene_cbuf_data->_MainlightColor = Colors::kBlack.xyz;
+            _rendering_data._mainlight_world_position = per_scene_cbuf_data->_MainlightWorldPosition;
         }
         for (const auto &vxgi: s.GetRegister().View<ECS::CVXGI>())
         {
@@ -1047,8 +1064,11 @@ namespace Ailu::Render
         dst._normal_tex             = RenderConstants::kInvalidBindlessHandle;
         dst._metallic_roughness_tex = RenderConstants::kInvalidBindlessHandle;
         dst._emission_tex           = RenderConstants::kInvalidBindlessHandle;
+        dst._emission_strength      = 0.0f;
         if (src != nullptr && src->IsStandardLit())
         {
+            // Mirror the raster standard lit path: only the checker id is forwarded, everything else is standard.
+            dst._material_id = src->MaterialID() == EMaterialID::kChecker ? AL_MATERIAL_ID_CHECKER : AL_MATERIAL_ID_STANDARD;
             const auto *albedo_prop = src->MainProperty(ETextureUsage::kAlbedo);
             if (albedo_prop != nullptr)
                 dst._base_color = albedo_prop->GetValue<Vector4f>().xyz;
@@ -1072,7 +1092,15 @@ namespace Ailu::Render
             }
             const auto *emission_prop = src->MainProperty(ETextureUsage::kEmission);
             if (emission_prop != nullptr)
+            {
                 dst._emission = emission_prop->GetValue<Color>().xyz;
+                dst._emission_strength = 1.0f;
+            }
+            if (auto emission_tex = src->MainTex(ETextureUsage::kEmission); emission_tex)
+            {
+                dst._emission_tex = emission_tex->GetBindlessSRVIndex();
+                dst._emission_strength = 1.0f;
+            }
             dst._ior = src->GetFloat("_IOR");
             dst._transmission = src->GetFloat("_Transmission");
         }
@@ -1147,7 +1175,7 @@ namespace Ailu::Render
             RenderTexture *final_target = output_target != nullptr ? output_target : _presentation_texture.get();
             if (final_target != nullptr)
             {
-                const RDG::RGHandle source_handle = _rendering_data._rg_handles._color_target;
+                const RDG::RGHandle source_handle = _rendering_data.FinalColorHandle();
                 const RDG::RGHandle target_handle = _rd_graph->Import(final_target);
                 RDG::RGHandle output_handle;
                 const String final_blit_name = output_view_index >= 0

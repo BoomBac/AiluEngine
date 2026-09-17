@@ -1,5 +1,6 @@
 #include "Ailu.h"
 #include "EditorApp.h"
+#include "Framework/Common/Log.h"
 
 #include <shellapi.h>
 
@@ -14,6 +15,17 @@
 #endif
 
 using namespace Ailu;
+
+namespace
+{
+    void LogEditorStartupError(const std::wstring &message,
+                               const std::source_location &location = std::source_location::current())
+    {
+        FileAppender file_appender;
+        file_appender.Print(LogMessage(ELogLevel::kError, message, location.file_name(), location.line(),
+                                       location.function_name()));
+    }
+}
 
 int WINAPI WinMain(
     _In_ HINSTANCE instance,
@@ -30,6 +42,7 @@ int WINAPI WinMain(
     LPWSTR *arguments = CommandLineToArgvW(GetCommandLineW(), &argument_count);
     if (arguments == nullptr)
     {
+        LogEditorStartupError(L"Failed to parse command line.");
         MessageBoxW(nullptr, L"Failed to parse command line.", L"Ailu Editor", MB_OK | MB_ICONERROR);
         return 1;
     }
@@ -43,6 +56,7 @@ int WINAPI WinMain(
 
     if (context._arguments.size() <= 1)
     {
+        LogEditorStartupError(L"No project file specified.");
         MessageBoxW(nullptr, L"No project file specified.", L"Ailu Editor", MB_OK | MB_ICONERROR);
         return 1;
     }

@@ -5,6 +5,7 @@
 #include "Framework/Math/Vector.hpp"
 #include <cmath>
 #include <cstdint>
+#include <limits>
 
 namespace Ailu::Render::DDGI
 {
@@ -13,7 +14,16 @@ namespace Ailu::Render::DDGI
 
     inline u64 ProbeCount(const Vector3UInt &count)
     {
-        return static_cast<u64>(count.x) * static_cast<u64>(count.y) * static_cast<u64>(count.z);
+        u64 result = static_cast<u64>(count.x);
+        for (const u32 dimension : {count.y, count.z})
+        {
+            if (result == 0u || dimension == 0u)
+                return 0u;
+            if (result > std::numeric_limits<u64>::max() / static_cast<u64>(dimension))
+                return std::numeric_limits<u64>::max();
+            result *= static_cast<u64>(dimension);
+        }
+        return result;
     }
 
     inline u32 ProbeIndex(const Vector3UInt &coord, const Vector3UInt &count)

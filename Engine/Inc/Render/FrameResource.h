@@ -28,6 +28,7 @@ namespace Ailu::Render
     public:
         FrameResource();
         ~FrameResource() override;
+        void SetFrameSlot(u32 frame_slot) { _frame_slot = frame_slot; }
         ConstantBuffer * GetMatCB(u32 index);
         ConstantBuffer * GetCameraCB(u64 hash);
         ConstantBuffer * GetSceneCB(u64 hash);
@@ -62,6 +63,7 @@ namespace Ailu::Render
         Map<u64, u64> _scene_primitive_gi_buffer_lut;
         Map<u64, u64> _static_diffuse_probe_group_buffer_lut;
         Map<u64, u64> _static_diffuse_probe_data_buffer_lut;
+        u32 _frame_slot = 0u;
         inline static FrameResource *s_active = nullptr;
     };
     class FrameAllocator;

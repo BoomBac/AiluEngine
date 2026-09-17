@@ -1,0 +1,12 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "9a9a0eb8-0b58-46d7-9d23-31d1fcf2d3d5",
+        "_asset_type": "Ailu::Render::Shader",
+        "_asset_name": "ddgi_probe_debug",
+        "_dependencies": []
+    },
+    "_file": "ddgi_probe_debug.hlsl",
+    "_vs_entry": "DDGIProbeSphereVS",
+    "_ps_entry": "DDGIProbeSpherePS"
+}

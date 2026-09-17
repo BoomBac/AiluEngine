@@ -236,11 +236,68 @@ namespace Ailu
             _camera_controller->_base_camera_move_speed = _editor_config._move_speed;
             _p_scene_camera->RecalculateMatrix(true);
             _opened_scene_path = ToWChar(_editor_config._scene_path);
+            // Unattended diagnostics: AILU_SCENE / AILU_CAM_POS / AILU_CAM_LOOK override the
+            // saved editor state so a capture run is reproducible without touching the config.
+            ApplyDiagnosticOverrides();
             desc._window_width = _editor_config._window_size.x;
-            desc._window_height = _editor_config._window_size.y;
-            desc._gameview_width = _editor_config._viewport_size.x;
+            desc._window_height = _editor_config._window_size.y;            desc._gameview_width = _editor_config._viewport_size.x;
             desc._gameview_height = _editor_config._viewport_size.y;
         }
+
+        void EditorApp::ApplyDiagnosticOverrides()
+        {
+            auto read_env = [](const char *name, char *buffer, DWORD size) -> bool
+            {
+                const DWORD length = GetEnvironmentVariableA(name, buffer, size);
+                return length > 0u && length < size;
+            };
+
+            char buffer[256] = {};
+            if (read_env("AILU_SCENE", buffer, sizeof(buffer)))
+            {
+                _opened_scene_path = ToWChar(String(buffer));
+                LOG_INFO("[Diag] scene override: {}", buffer);
+            }
+            if (read_env("AILU_CAM_POS", buffer, sizeof(buffer)))
+            {
+                f32 x = 0.0f, y = 0.0f, z = 0.0f;
+                if (std::sscanf(buffer, "%f,%f,%f", &x, &y, &z) == 3)
+                {
+                    _p_scene_camera->Position(Vector3f(x, y, z));
+                    LOG_INFO("[Diag] camera position override: {} {} {}", x, y, z);
+                }
+            }
+            // AILU_CAM_YAW drives the camera deterministically: it seeds the controller state
+            // (which is what Interpolate() eases from) and also overwrites the persisted
+            // controller rotation, so a capture run does not depend on EditorConfig.json.
+            if (read_env("AILU_CAM_YAW", buffer, sizeof(buffer)))
+            {
+                const f32 yaw_deg = static_cast<f32>(std::atof(buffer));
+                f32 pitch_deg = 0.0f;
+                if (read_env("AILU_CAM_PITCH", buffer, sizeof(buffer)))
+                    pitch_deg = static_cast<f32>(std::atof(buffer));
+                // The controller stores yaw/pitch in radians; AILU_* takes degrees.
+                const Vector3f position = _p_scene_camera->Position();
+                _camera_controller->SnapTo(position, yaw_deg * 0.017453292f,
+                                           pitch_deg * 0.017453292f);
+                _editor_config._controller_rot = Vector2f(yaw_deg, pitch_deg);
+                LOG_INFO("[Diag] camera yaw/pitch override: {} {}", yaw_deg, pitch_deg);
+            }
+            else
+            {
+                _camera_controller->SnapTo(_p_scene_camera->Position(),
+                                           _editor_config._controller_rot.x * 0.017453292f,
+                                           _editor_config._controller_rot.y * 0.017453292f);
+            }
+            if (read_env("AILU_FOV", buffer, sizeof(buffer)))
+            {
+                const f32 fov = static_cast<f32>(std::atof(buffer));
+                if (fov > 1.0f)
+                    _p_scene_camera->FovH(fov);
+            }
+            _p_scene_camera->RecalculateMatrix(true);
+        }
+
         void EditorApp::SaveEditorConfig()
         {
             Camera::sCurrent = _p_scene_camera;

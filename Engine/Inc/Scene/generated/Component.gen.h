@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __COMPONENT_GEN_H__
 //Struct ScriptPropertyData begin...........................
-#define COMPONENT_GEN_H_284_GENERATED_BODY \
+#define COMPONENT_GEN_H_290_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_ScriptPropertyData_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -21,7 +21,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::ECS::ScriptPrope
 //Struct ScriptPropertyData end...........................
 
 //Struct ProceduralSkySettings begin...........................
-#define COMPONENT_GEN_H_369_GENERATED_BODY \
+#define COMPONENT_GEN_H_375_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_ProceduralSkySettings_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -37,7 +37,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::ECS::ProceduralS
 //Struct ProceduralSkySettings end...........................
 
 //Struct EnvironmentComponent begin...........................
-#define COMPONENT_GEN_H_381_GENERATED_BODY \
+#define COMPONENT_GEN_H_387_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_EnvironmentComponent_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -53,7 +53,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::ECS::Environment
 //Struct EnvironmentComponent end...........................
 
 //Struct PostprocessVolumeComponent begin...........................
-#define COMPONENT_GEN_H_414_GENERATED_BODY \
+#define COMPONENT_GEN_H_420_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_PostprocessVolumeComponent_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -69,7 +69,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::ECS::Postprocess
 //Struct PostprocessVolumeComponent end...........................
 
 //Struct CLightProbeGroup begin...........................
-#define COMPONENT_GEN_H_499_GENERATED_BODY \
+#define COMPONENT_GEN_H_505_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_CLightProbeGroup_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -85,7 +85,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::ECS::CLightProbe
 //Struct CLightProbeGroup end...........................
 
 //Struct DDGIVolumeComponent begin...........................
-#define COMPONENT_GEN_H_520_GENERATED_BODY \
+#define COMPONENT_GEN_H_539_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_DDGIVolumeComponent_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -135,6 +135,15 @@ enum class EEnvironmentSource : i32;
 template<>
 AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::ECS::EEnvironmentSource>();
 //Enum EEnvironmentSource end...........................
+
+//Enum EDDGIProbeDebugMode begin...........................
+const Ailu::Enum* Z_Construct_Enum_Ailu_ECS_EDDGIProbeDebugMode_Type();
+namespace Ailu::ECS {
+enum class EDDGIProbeDebugMode : i32;
+}
+template<>
+AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::ECS::EDDGIProbeDebugMode>();
+//Enum EDDGIProbeDebugMode end...........................
 
 //Enum EColliderType begin...........................
 const Ailu::Enum* Z_Construct_Enum_Ailu_ECS_EColliderType_Type();

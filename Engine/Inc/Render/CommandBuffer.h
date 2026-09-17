@@ -6,6 +6,7 @@
 #include "GraphicsPipelineStateObject.h"
 #include "RendererAPI.h"
 #include "Texture.h"
+#include "ImageCapture/ImageCaptureTypes.h"
 #include <mutex>
 #include <tuple>
 #include "Render/RenderGraph/RenderGraphFwd.h"
@@ -55,7 +56,7 @@ namespace Ailu
         };
         virtual ~RHICommandBuffer() {};
         virtual void Clear() {};
-        /// @brief 释放录制期间登记的 GPU 资源强引用（命令缓冲归还到池中时调用）
+        /// @brief 释放录制期间登记的 GPU 资源强引用（仅在 GPU 完成该命令缓冲后调用）
         virtual void ReleaseTrackedResources() {};
         virtual bool IsReady() const { return true; }
         virtual void UavBarrier() {}
@@ -86,6 +87,7 @@ namespace Ailu
         static void Shutdown();
         static Ref<RHICommandBuffer> Get(const String &name = "", ECommandBufferType type = ECommandBufferType::kCommandBufTypeDirect);
         static void Release(Ref<RHICommandBuffer> &cmd);
+        static void ReleaseCompletedTrackedResources();
 
     private:
         inline static const u16 kInitialPoolSize = 10u;
@@ -105,6 +107,7 @@ namespace Ailu
 
     class AILU_API CommandBuffer : public Object
     {
+        friend class ImageCaptureService;
         friend class RHI::DX12::D3DContext;
 
     public:
@@ -220,6 +223,10 @@ namespace Ailu
         const Vector<GfxCommand *> &GetCommands() const;
 
     private:
+        bool ReadbackTextureInternal(Texture *texture, const ImageCaptureTextureDesc &texture_desc,
+                                     ImageCaptureSessionId session_id, ImageCaptureReadbackId readback_id,
+                                     u32 capture_index, u64 engine_frame_index, ImageCaptureReadbackCallback callback);
+
         struct Impl;
         Impl *_impl;
 #if AILU_ENABLE_FRAME_DEBUGGER

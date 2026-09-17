@@ -439,8 +439,9 @@ namespace Ailu::RHI::DX12
             switch (bind_info._res_type)
             {
             case EBindResDescType::kTexture2D:
+            case EBindResDescType::kCubeMap:
             {
-                auto *tex = static_cast<Texture2D *>(bind_res);
+                auto *tex = static_cast<Texture *>(bind_res);
                 params._params._texture_binder._sub_res = view_info._sub_res;
                 params._params._texture_binder._view_idx = view_info._view_index == static_cast<u16>(-1)
                                                            ? tex->CalculateViewIndex(Texture::ETextureViewType::kSRV, view_info._face, view_info._mipmap, 0)

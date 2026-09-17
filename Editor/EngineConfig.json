@@ -10,6 +10,8 @@
     "EnableIncrementalGraphicsBinding": true,
     "_enable_compute_skinning": true,
     "_enable_d3d12_debug_layer": true,
+    "_enable_dred_breadcrumbs": true,
+    "_enable_dred_page_fault": true,
     "_enable_rdc": false,
     "_enable_pix": true
 }

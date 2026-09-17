@@ -91,6 +91,38 @@ namespace Ailu::Render
             return item;
         }
 
+        void BindDDGILighting(Material *material, const RenderingData &data, Texture *irradiance_atlas,
+                              Texture *distance_atlas)
+        {
+            const auto &ddgi = data._ddgi_lighting;
+            material->SetTexture("_DDGI_IrradianceAtlas",
+                                 irradiance_atlas != nullptr ? irradiance_atlas : Texture::s_p_default_black);
+            material->SetTexture("_DDGI_DistanceAtlas",
+                                 distance_atlas != nullptr ? distance_atlas : Texture::s_p_default_black);
+            material->SetMatrix("_DDGI_LocalToWorld", ddgi._local_to_world);
+            material->SetMatrix("_DDGI_WorldToLocal", ddgi._world_to_local);
+            material->SetVector("_DDGI_ProbeSpacing",
+                                Vector4f(ddgi._probe_spacing.x, ddgi._probe_spacing.y, ddgi._probe_spacing.z, 0.0f));
+            material->SetVector("_DDGI_ProbeCount",
+                                Vector4f(static_cast<f32>(ddgi._probe_count_x), static_cast<f32>(ddgi._probe_count_y),
+                                         static_cast<f32>(ddgi._probe_count_z), 0.0f));
+            material->SetVector("_DDGI_AtlasInfo",
+                                Vector4f(static_cast<f32>(ddgi._atlas_width), static_cast<f32>(ddgi._atlas_height),
+                                         static_cast<f32>(ddgi._atlas_tiles_x), static_cast<f32>(ddgi._atlas_tiles_y)));
+            material->SetVector("_DDGI_DistanceAtlasInfo",
+                                Vector4f(static_cast<f32>(ddgi._distance_atlas_width),
+                                         static_cast<f32>(ddgi._distance_atlas_height),
+                                         static_cast<f32>(ddgi._distance_atlas_tiles_x),
+                                         static_cast<f32>(ddgi._distance_atlas_tiles_y)));
+            material->SetFloat("_DDGI_UseVisibility", ddgi._use_visibility ? 1.0f : 0.0f);
+            material->SetFloat("_DDGI_ProbeNormalBias", ddgi._probe_normal_bias);
+            material->SetFloat("_DDGI_ProbeViewBias", ddgi._probe_view_bias);
+            material->SetBuffer("_DDGI_ProbeData", ddgi._probe_data.get());
+            material->SetFloat("_DDGI_UseProbeRelocation", ddgi._use_probe_relocation ? 1.0f : 0.0f);
+            material->SetFloat("_DDGI_DebugMode", static_cast<f32>(ddgi._debug_mode));
+            material->SetFloat("_DDGI_Enabled", ddgi._enabled ? 1.0f : 0.0f);
+        }
+
         bool CompareQueuedDrawItem(const QueuedDrawItem &lhs, const QueuedDrawItem &rhs)
         {
             return std::tie(lhs._render_queue, lhs._shader_ptr, lhs._pass_index, lhs._variant_hash, lhs._material_ptr, lhs._mesh_ptr,
@@ -272,7 +304,7 @@ namespace Ailu::Render
                           if (rendering_data._rg_handles._ao_tex.IsValid())
                               builder.Read(rendering_data._rg_handles._ao_tex);
                           if (rendering_data._rg_handles._environment_sh.IsValid())
-                              builder.Read(rendering_data._rg_handles._environment_sh);
+                          builder.Read(rendering_data._rg_handles._environment_sh);
                           builder.Read(rendering_data._rg_handles._environment_diffuse);
                           builder.Read(rendering_data._rg_handles._environment_specular);
                           rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target);
@@ -588,8 +620,10 @@ namespace Ailu::Render
                     _p_gen_material->SetTexture("_TexSkyViewLUT", graph.Resolve<Texture>(data._rg_handles._sky_view_lut));
                     _p_gen_material->SetTexture("_TexTransmittanceLUT",
                                                  graph.Resolve<Texture>(data._rg_handles._environment_transmittance_lut));
-                    _p_gen_material->SetFloat("_EnvironmentIntensity", data._environment->_intensity);
-                    _p_gen_material->SetFloat("_EnvironmentRotation", data._environment->_rotation);
+                    // The generated cubemap is the canonical environment. Runtime intensity and
+                    // rotation are applied by each consumer when sampling it.
+                    _p_gen_material->SetFloat("_EnvironmentIntensity", 1.0f);
+                    _p_gen_material->SetFloat("_EnvironmentRotation", 0.0f);
                     _p_gen_material->SetVector("_SkyColor", data._environment->_sky_color);
                     _p_gen_material->SetVector("_GroundColor", data._environment->_ground_color);
                 }
@@ -678,8 +712,9 @@ namespace Ailu::Render
             {
                 _p_gen_material->SetTexture("_TexSkyViewLUT", rendering_data._environment->_sky_view_lut.get());
                 _p_gen_material->SetTexture("_TexTransmittanceLUT", rendering_data._environment->_transmittance_lut.get());
-                _p_gen_material->SetFloat("_EnvironmentIntensity", rendering_data._environment->_intensity);
-                _p_gen_material->SetFloat("_EnvironmentRotation", rendering_data._environment->_rotation);
+                // Keep the baked cubemap canonical; runtime consumers own these transforms.
+                _p_gen_material->SetFloat("_EnvironmentIntensity", 1.0f);
+                _p_gen_material->SetFloat("_EnvironmentRotation", 0.0f);
                 _p_gen_material->SetVector("_SkyColor", rendering_data._environment->_sky_color);
                 _p_gen_material->SetVector("_GroundColor", rendering_data._environment->_ground_color);
             }
@@ -868,6 +903,12 @@ namespace Ailu::Render
                               builder.Read(rendering_data._rg_handles._volumetric_fog_accum);
                           builder.Read(rendering_data._rg_handles._environment_diffuse);
                           builder.Read(rendering_data._rg_handles._environment_specular);
+                          if (rendering_data._ddgi_lighting._irradiance_atlas_handle.IsValid())
+                              builder.Read(rendering_data._ddgi_lighting._irradiance_atlas_handle);
+                          if (rendering_data._ddgi_lighting._distance_atlas_handle.IsValid())
+                              builder.Read(rendering_data._ddgi_lighting._distance_atlas_handle);
+                          if (rendering_data._ddgi_lighting._probe_data_handle.IsValid())
+                              builder.Read(rendering_data._ddgi_lighting._probe_data_handle);
                           rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target);
                       },
                           [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
@@ -908,6 +949,14 @@ namespace Ailu::Render
                             _p_lighting_material->SetTexture("_VolumetricLightTexture",
                                                               volumetric_light ? volumetric_light
                                                                                : _dummy_volumetric_light.get());
+                            Texture *ddgi_atlas = data._ddgi_lighting._irradiance_atlas_handle.IsValid()
+                                ? graph.Resolve<Texture>(data._ddgi_lighting._irradiance_atlas_handle) : nullptr;
+                            Texture *ddgi_distance_atlas = data._ddgi_lighting._distance_atlas_handle.IsValid()
+                                ? graph.Resolve<Texture>(data._ddgi_lighting._distance_atlas_handle) : nullptr;
+                            BindDDGILighting(_p_lighting_material.get(), data, ddgi_atlas, ddgi_distance_atlas);
+                            GPUBuffer *ddgi_probe_data = data._ddgi_lighting._probe_data_handle.IsValid()
+                                ? graph.Resolve<GPUBuffer>(data._ddgi_lighting._probe_data_handle) : nullptr;
+                            _p_lighting_material->SetBuffer("_DDGI_ProbeData", ddgi_probe_data);
                             cmd->SetRenderTargetLoadAction(data._rg_handles._color_target, ELoadStoreAction::kNotCare);
                             cmd->SetRenderTarget(data._rg_handles._color_target);
                             cmd->DrawFullScreenQuad(_p_lighting_material.get());
@@ -927,6 +976,9 @@ namespace Ailu::Render
             _p_lighting_material->SetTexture("RadianceTex", rendering_data._environment->_diffuse_irradiance.get());
             _p_lighting_material->SetTexture("PrefilterEnvTex", rendering_data._environment->_specular_prefilter.get());
         }
+        BindDDGILighting(_p_lighting_material.get(), rendering_data,
+                         rendering_data._ddgi_lighting._irradiance_atlas_texture.get(),
+                         rendering_data._ddgi_lighting._distance_atlas_texture.get());
         auto cmd = CommandBufferPool::Get("DeferredLightingPass");
         {
             PROFILE_BLOCK_GPU(cmd.get(), _name)
@@ -1155,9 +1207,11 @@ namespace Ailu::Render
         static auto mat_lightprobe = ResourceMgr::Get().Get<Material>(L"Runtime/Material/LightProbeBillboard");
         graph.AddPass(_name, RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
                 { 
-                    builder.Read(rendering_data._rg_handles._color_target, EResourceUsage::kWriteRTV);
+                    // Gizmo 叠加在后处理结果之上，不再读写场景颜色。
+                    RDG::RGHandle &color_target = rendering_data.FinalColorHandle();
+                    builder.Read(color_target, EResourceUsage::kWriteRTV);
                     builder.Read(rendering_data._rg_handles._depth_target, EResourceUsage::kDSV);
-                    rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target);
+                    color_target = builder.Write(color_target);
                     rendering_data._rg_handles._depth_target = builder.Write(rendering_data._rg_handles._depth_target,EResourceUsage::kDSV);
                 },[this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data)
                 {
@@ -1168,15 +1222,15 @@ namespace Ailu::Render
                     Gizmo::DrawLine(axis[2].xy, axis[2].zw, Colors::kBlue);
                     bool is_2d_grid = Is2DGridCamera(rendering_data);
                     if (is_2d_grid)
-                        cmd->SetRenderTarget(rendering_data._rg_handles._color_target);
+                        cmd->SetRenderTarget(rendering_data.FinalColorHandle());
                     else
-                        cmd->SetRenderTarget(rendering_data._rg_handles._color_target, rendering_data._rg_handles._depth_target);
+                        cmd->SetRenderTarget(rendering_data.FinalColorHandle(), rendering_data._rg_handles._depth_target);
 
                     Matrix4x4f grid_plane_pos = GetGridPlaneMatrix(rendering_data);
                     SetGridPlaneAxisMode(mat_gird_plane, rendering_data);
                     cmd->DrawMesh(Mesh::s_plane.lock().get(), mat_gird_plane, grid_plane_pos);
                     if (is_2d_grid)
-                        cmd->SetRenderTarget(rendering_data._rg_handles._color_target, rendering_data._rg_handles._depth_target);
+                        cmd->SetRenderTarget(rendering_data.FinalColorHandle(), rendering_data._rg_handles._depth_target);
                     u16 entity_index = 0;
                     for (auto &light_comp: SceneMgr::Get().ActiveScene()->GetRegister().View<ECS::LightComponent>())
                     {

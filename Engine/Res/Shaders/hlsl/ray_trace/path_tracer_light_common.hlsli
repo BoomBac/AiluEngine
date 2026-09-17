@@ -66,6 +66,11 @@ UnifiedLightData LoadUnifiedLight(uint index)
     return _UnifiedLights[index];
 }
 
+bool UnifiedLightCastsShadow(uint light_index)
+{
+    return LoadUnifiedLight(light_index)._shadow_index >= 0;
+}
+
 float GetUnifiedLightSelectionPMF(uint light_count)
 {
     return light_count > 0u ? rcp((float)light_count) : 0.0;
@@ -514,23 +519,6 @@ bool FindClosestUnifiedLightHit(uint light_num,float3 ray_origin, float3 ray_dir
     }
 
     return hit_anything;
-}
-
-float3 ProceduralSky(float3 d)
-{
-    float h = saturate(d.y);
-
-    float3 zenith = float3(0.22, 0.35, 0.95);
-    float3 horizon = float3(0.8, 0.85, 0.9);
-    float3 ground = float3(0.1, 0.1, 0.1);
-
-    float3 sky = lerp(horizon, zenith, pow(h, 0.2));
-    float horizon_boost = exp(-abs(d.y) * 20.0);
-    sky += horizon * horizon_boost * 0.2;
-
-    float horizon_width = 0.05;
-    float t = smoothstep(-horizon_width, horizon_width, d.y);
-    return lerp(ground, sky, t);
 }
 
 float DirectLightCosTheta(Material mat, float3 n, float3 wi)

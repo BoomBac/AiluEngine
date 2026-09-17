@@ -40,6 +40,11 @@
 #define AL_UNIFIED_LIGHT_TYPE_TRIANGLE_AREA 4u
 
 #define AL_UNIFIED_LIGHT_FLAG_TWO_SIDED 0x1u
+
+// Must stay in sync with Ailu::Render::EMaterialID.
+#define AL_MATERIAL_ID_STANDARD 0u
+#define AL_MATERIAL_ID_SUBSURFACE 1u
+#define AL_MATERIAL_ID_CHECKER 2u
 // C++
 #ifdef __cplusplus
 namespace Ailu::Render
@@ -247,8 +252,8 @@ namespace Ailu::Render
         uint _emission_tex;
 
         uint _opacity_tex;
+        uint _material_id;           // EMaterialID (AL_MATERIAL_ID_*), decides how the maps above are interpreted
         uint _reserved0;
-        uint _reserved1;
         uint _flags;                 // MaterialFlags
     };
 

@@ -73,7 +73,7 @@ namespace Ailu
         private:
             AssetRef<ComputeShader> _gi_compute_shader;
             AssetRef<RayTracingShader> _gi_raytracing_shader;
-            ComputeShaderKernelId _kernel_ray_gen = kInvalidComputeShaderKernelId;
+            ComputeShaderKernelId _kernel_primary_ray = kInvalidComputeShaderKernelId;
             ComputeShaderKernelId _kernel_denoise = kInvalidComputeShaderKernelId;
             Ref<GPUBuffer> _debug_buffer = nullptr;
             Ref<GPUBuffer> _debug_index_buffer = nullptr;

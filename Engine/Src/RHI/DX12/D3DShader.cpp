@@ -943,9 +943,10 @@ namespace Ailu::RHI::DX12
                 GpuResource *bind_res = cur_state._bind_res[bind_info._bind_slot];
                 if (bind_res == nullptr)
                     continue;
-                if (bind_info._res_type == EBindResDescType::kTexture2D)
+                if (bind_info._res_type == EBindResDescType::kTexture2D ||
+                    bind_info._res_type == EBindResDescType::kCubeMap)
                 {
-                    auto tex = static_cast<Texture2D *>(bind_res);
+                    auto tex = static_cast<Texture *>(bind_res);
                     u16 view_index = view_info._view_index == (u16) -1 ? tex->CalculateViewIndex(Texture::ETextureViewType::kSRV, view_info._face, view_info._mipmap, 0) : view_info._view_index;
                     BindParams params;
                     params._is_compute_pipeline = true;
@@ -1001,6 +1002,13 @@ namespace Ailu::RHI::DX12
                     bind_res->Bind(cmd, params);
                 }
                 else if (bind_info._res_type == EBindResDescType::kConstBuffer)
+                {
+                    BindParams params;
+                    params._is_compute_pipeline = true;
+                    params._slot = bind_info._bind_slot;
+                    bind_res->Bind(cmd, params);
+                }
+                else if (bind_info._res_type == EBindResDescType::kAccelerationStructure)
                 {
                     BindParams params;
                     params._is_compute_pipeline = true;
@@ -1082,7 +1090,8 @@ namespace Ailu::RHI::DX12
                 tex->Bind(cmd, params);
             }
             else if (entry._resource_type == EBindResDescType::kRWBuffer || entry._resource_type == EBindResDescType::kBuffer
-                     || entry._resource_type == EBindResDescType::kConstBuffer)
+                     || entry._resource_type == EBindResDescType::kConstBuffer ||
+                     entry._resource_type == EBindResDescType::kAccelerationStructure)
             {
                 resource->Bind(cmd, params);
             }
@@ -1163,9 +1172,20 @@ namespace Ailu::RHI::DX12
                 _elements.resize(kernel_index + 1);
         }
         auto &cur_variant = _kernels[kernel_index]._variants[variant_hash];
+        const bool is_inline_ray_tracing = cur_variant._active_keywords.contains("AL_RAY_QUERY_DXR_INLINE");
+        if (is_inline_ray_tracing && !GraphicsContext::Get().IsInlineRayTracingSupported())
+        {
+            LOG_INFO("Skip unsupported inline DXR compute variant shader={} kernel={} variant={}",
+                     ToChar(_src_file_path), kernel_index, variant_hash);
+            return true;
+        }
         const auto macros = ConstructVariantMarcos(cur_variant._active_keywords);
+        const String shader_model = is_inline_ray_tracing ? RenderConstants::kCSModel_6_5
+                                                          : RenderConstants::kCSModel_6_1;
+        const String artifact_shader_model = is_inline_ray_tracing ? "cs6.5" : "cs6.1";
         const auto key = BuildShaderArtifactKey(Render::EShaderArtifactType::kCompute, _src_file_path,
-                                                _kernels[kernel_index]._name, kernel_index, variant_hash, "cs6.1", macros);
+                                                _kernels[kernel_index]._name, kernel_index, variant_hash,
+                                                artifact_shader_model, macros);
         auto &artifact_cache = Render::ShaderArtifactCache::Get();
         Render::ComputeShaderVariantArtifact artifact;
         Render::EShaderArtifactInvalidReason reason = Render::EShaderArtifactInvalidReason::kNone;
@@ -1203,12 +1223,13 @@ namespace Ailu::RHI::DX12
                 bool compile_succeed = false;
 #ifdef SHADER_DXC
                 compile_succeed = CreateFromFileDXC(_src_file_path, _kernels[kernel_index]._name,
-                                                    RenderConstants::kCSModel_6_1, macros, tmp_blob, tmp_reflection,
+                                                    shader_model, macros, tmp_blob, tmp_reflection,
                                                     dependency_files, false);
 #else
-                compile_succeed = CreateFromFileFXC(_src_file_path, _kernels[kernel_index]._name,
-                                                    RenderConstants::kCSModel_5_0, macros, tmp_blob, tmp_reflection,
-                                                    dependency_files, false);
+                if (!is_inline_ray_tracing)
+                    compile_succeed = CreateFromFileFXC(_src_file_path, _kernels[kernel_index]._name,
+                                                        RenderConstants::kCSModel_5_0, macros, tmp_blob, tmp_reflection,
+                                                        dependency_files, false);
 #endif
                 if (compile_succeed && tmp_reflection != nullptr)
                 {
@@ -1362,7 +1383,9 @@ namespace Ailu::RHI::DX12
             auto &desc = it->second;
             if (desc._name == "g_bindless_texture2d" || desc._name == "g_bindless_buffer" || desc._name == "g_bindless_rw_texture2d" || desc._name == "g_bindless_rw_buffer")
                 continue;
-            if (desc._res_type == EBindResDescType::kTexture2D || desc._res_type == EBindResDescType::kTexture3D)
+            if (desc._res_type == EBindResDescType::kTexture2D ||
+                desc._res_type == EBindResDescType::kCubeMap ||
+                desc._res_type == EBindResDescType::kTexture3D)
             {
                 ++texture_count;
                 ranges[root_param_index].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, desc._res_slot, desc._register_space, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
@@ -1370,7 +1393,8 @@ namespace Ailu::RHI::DX12
                 desc._bind_slot = root_param_index;
                 ++root_param_index;
             }
-            else if (desc._res_type == EBindResDescType::kBuffer)
+            else if (desc._res_type == EBindResDescType::kBuffer ||
+                     desc._res_type == EBindResDescType::kAccelerationStructure)
             {
                 ranges[root_param_index].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, desc._res_slot, desc._register_space, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
                 rootParameters[root_param_index].InitAsDescriptorTable(1, &ranges[root_param_index]);

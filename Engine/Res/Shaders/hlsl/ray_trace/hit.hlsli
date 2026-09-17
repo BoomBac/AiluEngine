@@ -391,7 +391,8 @@ bool TraverseBLASAny(PrimitiveData inst, TraversalRayCtx world_ray, float ray_tm
     return false;
 }
 
-bool TraverseSceneClosest(float3 ray_origin, float3 ray_dir, inout HitRecord rec, out TriangleHitCandidate best_hit, out PrimitiveData best_inst)
+bool TraverseSceneClosest(float3 ray_origin, float3 ray_dir, inout HitRecord rec, out TriangleHitCandidate best_hit,
+                          out uint primitive_index, out PrimitiveData best_inst)
 {
     TraversalRayCtx world_ray;
     InitTraversalRayCtx(ray_origin, ray_dir, world_ray);
@@ -404,6 +405,7 @@ bool TraverseSceneClosest(float3 ray_origin, float3 ray_dir, inout HitRecord rec
     best_hit.bary = 0.0.xx;
     best_hit.world_t = rec.t;
     best_hit.world_pos = 0.0.xxx;
+    primitive_index = UINT32_MAX;
     best_inst = (PrimitiveData)0;
 
     while (tlas_sp > 0)
@@ -426,6 +428,7 @@ bool TraverseSceneClosest(float3 ray_origin, float3 ray_dir, inout HitRecord rec
             if (TraverseBLASClosest(inst, world_ray, rec, inst_hit))
             {
                 best_hit = inst_hit;
+                primitive_index = (uint)inst_id;
                 best_inst = inst;
             }
         }
@@ -436,6 +439,13 @@ bool TraverseSceneClosest(float3 ray_origin, float3 ray_dir, inout HitRecord rec
     }
 
     return best_hit.tri_idx != -1;
+}
+
+bool TraverseSceneClosest(float3 ray_origin, float3 ray_dir, inout HitRecord rec, out TriangleHitCandidate best_hit,
+                          out PrimitiveData best_inst)
+{
+    uint primitive_index;
+    return TraverseSceneClosest(ray_origin, ray_dir, rec, best_hit, primitive_index, best_inst);
 }
 
 bool TraverseSceneAny(float3 ray_origin, float3 ray_dir, float ray_tmax_world)

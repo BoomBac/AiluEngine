@@ -54,7 +54,10 @@ namespace Ailu::RHI::DX12
 
     void D3DSwapchainTexture::Present()
     {
-        ThrowIfFailed(_swapchain->Present(1, 0));
+        const HRESULT present_hr = _swapchain->Present(1, 0);
+        if (FAILED(present_hr))
+            static_cast<D3DContext &>(Render::GraphicsContext::Get()).ReportDeviceRemoved(present_hr, "IDXGISwapChain::Present");
+        ThrowIfFailed(present_hr);
         _cur_backbuf_index = _swapchain->GetCurrentBackBufferIndex();
     }
 
@@ -102,7 +105,10 @@ namespace Ailu::RHI::DX12
         _swapchain->GetDesc(&desc);
         const HRESULT hr = _swapchain->ResizeBuffers(_buffer_num, w, h, desc.BufferDesc.Format, desc.Flags);
         if (FAILED(hr))
+        {
             LOG_ERROR("D3DSwapchainTexture::Resize: ResizeBuffers({}x{}) failed, hr = 0x{:08X}", w, h, static_cast<u32>(hr));
+            static_cast<D3DContext &>(Render::GraphicsContext::Get()).ReportDeviceRemoved(hr, "IDXGISwapChain::ResizeBuffers");
+        }
         ThrowIfFailed(hr);
         _cur_backbuf_index = _swapchain->GetCurrentBackBufferIndex();//重新获取，不然resize时会黑屏
         for (u16 i = 0; i < _buffer_num; i++)
@@ -115,4 +121,3 @@ namespace Ailu::RHI::DX12
         }
     }
 }
-

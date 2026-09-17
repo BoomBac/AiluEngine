@@ -81,6 +81,7 @@ namespace Ailu
             virtual u64 ExecuteRHICommandBuffers(const Vector<RHICommandBuffer *> &cmds) = 0;
 
             virtual bool IsHardwareRayTracingSupported() const = 0;
+            virtual bool IsInlineRayTracingSupported() const = 0;
 
         protected:
         };

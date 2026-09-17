@@ -154,6 +154,7 @@ namespace Ailu::Render
         inline const static String kVSModel_6_1 = "vs_6_1";
         inline const static String kPSModel_6_1 = "ps_6_1";
         inline const static String kCSModel_6_1 = "cs_6_1";
+        inline const static String kCSModel_6_5 = "cs_6_5";
         inline const static String kGSModel_6_1 = "gs_6_1";
         inline const static String kLibModel_6_3 = "lib_6_3";
         inline const static String kLibModel_6_6 = "lib_6_6";

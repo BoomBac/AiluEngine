@@ -93,13 +93,25 @@ namespace Ailu
         void TransformSystem::Update(Register &r, f32 delta_time)
         {
             PROFILE_BLOCK_CPU("TransformSystem::Update")
-            if (_order_dirty || _observed_hierarchy_revision != r.HierarchyRevision() || _ordered_entities.size() != _entities.size())
+            const bool hierarchy_changed = _order_dirty || _observed_hierarchy_revision != r.HierarchyRevision() ||
+                                           _ordered_entities.size() != _entities.size();
+            if (hierarchy_changed)
                 RebuildOrder(r);
 
             for (Entity entity: _ordered_entities)
             {
                 auto *transform = r.GetComponent<TransformComponent>(entity);
                 if (transform == nullptr)
+                    continue;
+
+                const auto *hier = r.GetComponent<CHierarchy>(entity);
+                TransformComponent *parent_transform = nullptr;
+                if (hier != nullptr && hier->_parent != kInvalidEntity && r.IsAlive(hier->_parent))
+                    parent_transform = r.GetComponent<TransformComponent>(hier->_parent);
+
+                const bool parent_world_changed = parent_transform != nullptr &&
+                                                  transform->_cached_parent_world_version != parent_transform->_world_version;
+                if (!hierarchy_changed && !transform->_world_dirty && !parent_world_changed)
                     continue;
 
                 const bool has_previous_world = transform->_world_version > 0u;
@@ -111,11 +123,6 @@ namespace Ailu
                     transform->_prev_scale = transform->_scale;
                 }
                 Transform::ToMatrix(transform->_local_transform, transform->_local_matrix);
-
-                const auto *hier = r.GetComponent<CHierarchy>(entity);
-                TransformComponent *parent_transform = nullptr;
-                if (hier != nullptr && hier->_parent != kInvalidEntity && r.IsAlive(hier->_parent))
-                    parent_transform = r.GetComponent<TransformComponent>(hier->_parent);
 
                 if (parent_transform != nullptr)
                 {
@@ -150,7 +157,6 @@ namespace Ailu
                     transform->_render_scale = transform->_scale;
                 }
 
-                ++transform->_local_version;
                 ++transform->_world_version;
                 transform->_local_dirty = false;
                 transform->_world_dirty = false;

@@ -229,7 +229,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::InputActionAssetD
 //Class InputActionAssetDocument end...........................
 
 //Class StaticDiffuseProbeDataAssetDocument begin...........................
-#define ASSETDOCUMENT_GEN_H_1197_GENERATED_BODY \
+#define ASSETDOCUMENT_GEN_H_1219_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_StaticDiffuseProbeDataAssetDocument_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -245,7 +245,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::StaticDiffuseProb
 //Class StaticDiffuseProbeDataAssetDocument end...........................
 
 //Class GraphAssetDocument begin...........................
-#define ASSETDOCUMENT_GEN_H_1214_GENERATED_BODY \
+#define ASSETDOCUMENT_GEN_H_1236_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_GraphAssetDocument_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -261,7 +261,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::GraphAssetDocumen
 //Class GraphAssetDocument end...........................
 
 //Class SceneAssetDocument begin...........................
-#define ASSETDOCUMENT_GEN_H_1234_GENERATED_BODY \
+#define ASSETDOCUMENT_GEN_H_1256_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_SceneAssetDocument_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -773,7 +773,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::SceneDDGIVolumeC
 //Struct SceneDDGIVolumeComponentDocument end...........................
 
 //Struct SceneEnvironmentComponentDocument begin...........................
-#define ASSETDOCUMENT_GEN_H_763_GENERATED_BODY \
+#define ASSETDOCUMENT_GEN_H_785_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_SceneEnvironmentComponentDocument_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -789,7 +789,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::SceneEnvironment
 //Struct SceneEnvironmentComponentDocument end...........................
 
 //Struct SceneRigidBodyComponentDocument begin...........................
-#define ASSETDOCUMENT_GEN_H_786_GENERATED_BODY \
+#define ASSETDOCUMENT_GEN_H_808_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_SceneRigidBodyComponentDocument_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -805,7 +805,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::SceneRigidBodyCo
 //Struct SceneRigidBodyComponentDocument end...........................
 
 //Struct SceneRigidBody2DComponentDocument begin...........................
-#define ASSETDOCUMENT_GEN_H_795_GENERATED_BODY \
+#define ASSETDOCUMENT_GEN_H_817_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_SceneRigidBody2DComponentDocument_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -821,7 +821,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::SceneRigidBody2D
 //Struct SceneRigidBody2DComponentDocument end...........................
 
 //Struct SceneColliderComponentDocument begin...........................
-#define ASSETDOCUMENT_GEN_H_816_GENERATED_BODY \
+#define ASSETDOCUMENT_GEN_H_838_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_SceneColliderComponentDocument_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -837,7 +837,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::SceneColliderCom
 //Struct SceneColliderComponentDocument end...........................
 
 //Struct SceneCollider2DComponentDocument begin...........................
-#define ASSETDOCUMENT_GEN_H_831_GENERATED_BODY \
+#define ASSETDOCUMENT_GEN_H_853_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_SceneCollider2DComponentDocument_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -853,7 +853,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::SceneCollider2DC
 //Struct SceneCollider2DComponentDocument end...........................
 
 //Struct SceneSkeletonMeshComponentDocument begin...........................
-#define ASSETDOCUMENT_GEN_H_844_GENERATED_BODY \
+#define ASSETDOCUMENT_GEN_H_866_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_SceneSkeletonMeshComponentDocument_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -869,7 +869,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::SceneSkeletonMes
 //Struct SceneSkeletonMeshComponentDocument end...........................
 
 //Struct SceneAnimatorComponentDocument begin...........................
-#define ASSETDOCUMENT_GEN_H_857_GENERATED_BODY \
+#define ASSETDOCUMENT_GEN_H_879_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_SceneAnimatorComponentDocument_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -885,7 +885,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::SceneAnimatorCom
 //Struct SceneAnimatorComponentDocument end...........................
 
 //Struct SceneVXGIComponentDocument begin...........................
-#define ASSETDOCUMENT_GEN_H_897_GENERATED_BODY \
+#define ASSETDOCUMENT_GEN_H_919_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_SceneVXGIComponentDocument_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -901,7 +901,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::SceneVXGICompone
 //Struct SceneVXGIComponentDocument end...........................
 
 //Struct ScenePostprocessVolumeComponentDocument begin...........................
-#define ASSETDOCUMENT_GEN_H_908_GENERATED_BODY \
+#define ASSETDOCUMENT_GEN_H_930_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_ScenePostprocessVolumeComponentDocument_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -917,7 +917,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::ScenePostprocess
 //Struct ScenePostprocessVolumeComponentDocument end...........................
 
 //Struct SceneSpriteRendererComponentDocument begin...........................
-#define ASSETDOCUMENT_GEN_H_925_GENERATED_BODY \
+#define ASSETDOCUMENT_GEN_H_947_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_SceneSpriteRendererComponentDocument_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -933,7 +933,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::SceneSpriteRende
 //Struct SceneSpriteRendererComponentDocument end...........................
 
 //Struct SceneEntityDocument begin...........................
-#define ASSETDOCUMENT_GEN_H_950_GENERATED_BODY \
+#define ASSETDOCUMENT_GEN_H_972_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_SceneEntityDocument_Type();\
                                 static const Type* GetPrivateStaticClass();\

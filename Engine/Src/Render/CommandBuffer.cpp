@@ -841,6 +841,33 @@ namespace Ailu::Render
             cmd->_is_update = is_update;
             _commands.emplace_back(cmd);
         }
+
+        bool ReadbackTextureInternal(Texture *texture, const ImageCaptureTextureDesc &texture_desc,
+                                     ImageCaptureSessionId session_id, ImageCaptureReadbackId readback_id,
+                                     u32 capture_index, u64 engine_frame_index,
+                                     ImageCaptureReadbackCallback callback)
+        {
+            if (texture == nullptr)
+                return false;
+            auto cmd = CommandPool::Get().Alloc<CommandReadBackTexture>();
+            if (cmd == nullptr)
+                return false;
+            cmd->_res = texture->Handle();
+            cmd->_all_sub_resources = texture_desc._all_sub_resources;
+            cmd->_mip_level = texture_desc._mip_level;
+            cmd->_mip_count = texture_desc._mip_count;
+            cmd->_array_slice = texture_desc._array_slice;
+            cmd->_array_slice_count = texture_desc._array_slice_count;
+            cmd->_restore_state = texture_desc._restore_state;
+            cmd->_has_explicit_restore_state = texture_desc._has_explicit_restore_state;
+            cmd->_session_id = session_id;
+            cmd->_readback_id = readback_id;
+            cmd->_capture_index = capture_index;
+            cmd->_engine_frame_index = engine_frame_index;
+            cmd->_callback = std::move(callback);
+            _commands.emplace_back(cmd);
+            return true;
+        }
         String _name;
         ShaderGlobalResourceSnapshot _global_resource_snapshot;
         Vector<GfxCommand *> _commands;
@@ -1135,6 +1162,15 @@ namespace Ailu::Render
         _impl->ReadbackBuffer(buffer, is_counter, size, callback);
     }
 
+    bool CommandBuffer::ReadbackTextureInternal(Texture *texture, const ImageCaptureTextureDesc &texture_desc,
+                                                 ImageCaptureSessionId session_id, ImageCaptureReadbackId readback_id,
+                                                 u32 capture_index, u64 engine_frame_index,
+                                                 ImageCaptureReadbackCallback callback)
+    {
+        return _impl->ReadbackTextureInternal(texture, texture_desc, session_id, readback_id, capture_index,
+                                              engine_frame_index, std::move(callback));
+    }
+
     void CommandBuffer::DestroyGpuResource(GpuResource *resource)
     {
         _impl->DestroyGpuResource(resource);
@@ -1221,12 +1257,19 @@ namespace Ailu::Render
             auto &[available, cmd_buf] = it;
             if (cmd_buf == cmd)
             {
-                // 归还到池中的命令缓冲不再参与执行，必须立刻释放录制期间持有的资源强引用，
-                // 否则这些引用会一直存活到该缓冲下一次被取出，导致交换链后台缓冲无法 ResizeBuffers。
-                cmd_buf->ReleaseTrackedResources();
                 available = true;
                 return;
             }
+        }
+    }
+
+    void RHICommandBufferPool::ReleaseCompletedTrackedResources()
+    {
+        std::unique_lock<std::mutex> lock(s_pRHICommandBufferPool->_mutex);
+        for (auto &[available, cmd_buf]: s_pRHICommandBufferPool->_cmd_buffers)
+        {
+            if (available && cmd_buf->IsReady())
+                cmd_buf->ReleaseTrackedResources();
         }
     }
 }// namespace Ailu

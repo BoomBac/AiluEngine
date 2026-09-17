@@ -151,7 +151,10 @@ float4 PSMain(PSInput input) : SV_TARGET
     
     // Tonemapping and gamma. Super ad-hoc, probably a better way to do this.
     //lum *= 8.0;
-    lum *= _MainlightColor * _EnvironmentIntensity;
+    // 固定用 PI（引擎里方向光的 `_LightColor` 就是 `color * PI` 这一套单位）而不是 `_MainlightColor`：
+    // 乘主光颜色会让"没有方向光"的场景天空全黑（连带 IBL/SH 环境项为 0），而且主光带色时整个天空都会被染色。
+    // 太阳本身的贡献在 `sunWithBloom()` 里已经单独乘过光色，这里只管大气散射本体。
+    lum *= PI * _EnvironmentIntensity;
     float3 sky_tint = lerp(saturate(_GroundColor.rgb), saturate(_SkyColor.rgb), saturate(rayDir.y * 0.5 + 0.5));
     lum *= lerp(1.0.xxx, sky_tint, 0.15);
     //lum = pow(lum, 1.3.xxx);

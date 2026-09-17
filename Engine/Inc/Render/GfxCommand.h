@@ -10,6 +10,7 @@
 #include "Framework/Core/Containers/Array.h"
 #include "CoreType.h"
 #include "GpuResource.h"
+#include "ImageCapture/ImageCaptureTypes.h"
 #include "MaterialDrawState.h"
 #include "RenderConstants.h"
 #include <cstddef>
@@ -46,6 +47,7 @@ namespace Ailu::Render
         kCommandProfiler,
         kCopyCounter,
         kReadBack,
+        kReadBackTexture,
         kPresent,
         kScissorRect,
         kBuildAS,
@@ -304,6 +306,36 @@ namespace Ailu::Render
         }
     };
 
+    struct TextureReadbackSubresource
+    {
+        u32 _mip_level = 0u;
+        u32 _array_slice = 0u;
+        u32 _subresource = 0u;
+    };
+
+    struct CommandReadBackTexture : public TypedGfxCommand<EGpuCommandType::kReadBackTexture>
+    {
+        GpuResourceHandle _res;
+        Vector<TextureReadbackSubresource> _sub_resources;
+        EResourceState _restore_state = EResourceState::kCommon;
+        bool _has_explicit_restore_state = false;
+        bool _all_sub_resources = true;
+        u32 _mip_level = 0u;
+        u32 _mip_count = 1u;
+        u32 _array_slice = 0u;
+        u32 _array_slice_count = 1u;
+        ImageCaptureSessionId _session_id = 0u;
+        ImageCaptureReadbackId _readback_id = 0u;
+        u32 _capture_index = 0u;
+        u64 _engine_frame_index = 0u;
+        ImageCaptureReadbackCallback _callback;
+
+        void Reset()
+        {
+            SafeResetCommand(this);
+        }
+    };
+
     template<typename... Values>
     constexpr size_t MaxCommandValue(size_t first, Values... rest)
     {
@@ -317,14 +349,16 @@ namespace Ailu::Render
         sizeof(CommandGpuResourceUpload), sizeof(CommandRequireResourceState), sizeof(CommandUavBarrier),
         sizeof(CommandCustom), sizeof(CommandAllocConstBuffer), sizeof(CommandProfiler),
         sizeof(CommandCopyCounter), sizeof(CommandPresent), sizeof(CommandScissor), sizeof(CommandDispatchRays),
-        sizeof(CommandReadBack), sizeof(CommandBuildAS), sizeof(CommandDestroyGpuResource));
+        sizeof(CommandReadBack), sizeof(CommandReadBackTexture), sizeof(CommandBuildAS),
+        sizeof(CommandDestroyGpuResource));
 
     inline constexpr size_t kCommandPayloadAlign = MaxCommandValue(
         alignof(CommandSetTarget), alignof(CommandClearTarget), alignof(CommandDraw), alignof(CommandDispatch),
         alignof(CommandGpuResourceUpload), alignof(CommandRequireResourceState), alignof(CommandUavBarrier),
         alignof(CommandCustom), alignof(CommandAllocConstBuffer), alignof(CommandProfiler),
         alignof(CommandCopyCounter), alignof(CommandPresent), alignof(CommandScissor), alignof(CommandDispatchRays),
-        alignof(CommandReadBack), alignof(CommandBuildAS), alignof(CommandDestroyGpuResource));
+        alignof(CommandReadBack), alignof(CommandReadBackTexture), alignof(CommandBuildAS),
+        alignof(CommandDestroyGpuResource));
 
     struct alignas(kCommandPayloadAlign) CommandPayload
     {

@@ -28,6 +28,7 @@
 #include "Physics/Collision.h"
 
 #include "Render/Features/RayTraceGI.h"
+#include "Render/Features/DDGI.h"
 
 using namespace Ailu::UI;
 
@@ -298,13 +299,13 @@ namespace Ailu
                 }
             };
             static Render::RayTraceGI *ray_trace = nullptr;
+            static Render::DDGIFeature *ddgi = nullptr;
             for (auto f : Render::RenderPipeline::Get().GetRenderer()->GetFeatures())
             {
-                if (f->GetType() == Render::RayTraceGI::StaticType())
-                {
+                if (ray_trace == nullptr && f->GetType() == Render::RayTraceGI::StaticType())
                     ray_trace = dynamic_cast<Render::RayTraceGI *>(f);
-                    break;
-                }
+                if (ddgi == nullptr)
+                    ddgi = dynamic_cast<Render::DDGIFeature *>(f);
             }
             // 新增：抬起结束拖拽
             _source->OnMouseUp() += [this](UI::UIEvent &e)
@@ -320,11 +321,21 @@ namespace Ailu
                         Vector4f rect = e._current_target->GetArrangeRect();
                         Vector2f local_pos = e._mouse_position - rect.xy;
                         Vector2f render_pos = ViewToRenderPosition(local_pos);
+                        const bool probe_picked = ddgi != nullptr && Camera::sCurrent != nullptr &&
+                                                  ddgi->PickProbe(*Camera::sCurrent, render_pos);
+                        if (ray_trace != nullptr)
+                            ray_trace->_debug_pos = local_pos;
+                        if (probe_picked)
+                        {
+                            Selection::AddAndRemovePreSelection(ddgi->GetSelectedProbeEntity(), 0u);
+                            LOG_INFO("Pick DDGI probe: volume={}, index={}", ddgi->GetSelectedProbeEntity(),
+                                     ddgi->GetSelectedProbeIndex());
+                            return;
+                        }
                         s_editor_layer->_pick.GetPickID((u16) render_pos.x, (u16) render_pos.y, [this, local_pos](ECS::Entity closest_entity,u32 submesh_index)
                         {
                             LOG_INFO("Pick entity: {},subidex: {} on pos {}", closest_entity, submesh_index, local_pos.ToString());
                             Selection::AddAndRemovePreSelection(closest_entity,submesh_index);
-                            ray_trace->_debug_pos = local_pos;
                         });
                     }
                 }

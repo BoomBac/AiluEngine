@@ -237,6 +237,7 @@ namespace Ailu::Render
 
     void EditorDebugPass::DrawDDGIVolumes(const RenderingData &rendering_data)
     {
+        return;
         if (rendering_data._scene == nullptr)
             return;
 
@@ -307,14 +308,16 @@ namespace Ailu::Render
     {
         graph.AddPass(_name, RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
         {
-            builder.Read(rendering_data._rg_handles._color_target, EResourceUsage::kWriteRTV);
+            // 编辑器叠加画在后处理结果之上，不再写场景颜色。
+            RDG::RGHandle &color_target = rendering_data.FinalColorHandle();
+            builder.Read(color_target, EResourceUsage::kWriteRTV);
             builder.Read(rendering_data._rg_handles._depth_target, EResourceUsage::kDSV);
-            rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target);
+            color_target = builder.Write(color_target);
             rendering_data._rg_handles._depth_target = builder.Write(rendering_data._rg_handles._depth_target,
                                                                        EResourceUsage::kDSV);
         }, [this](RDG::RenderGraph &, CommandBuffer *cmd, const RenderingData &pass_rendering_data)
         {
-            cmd->SetRenderTarget(pass_rendering_data._rg_handles._color_target,
+            cmd->SetRenderTarget(pass_rendering_data.FinalColorHandle(),
                                  pass_rendering_data._rg_handles._depth_target);
             cmd->SetViewport(pass_rendering_data._viewport);
             cmd->SetScissorRect(pass_rendering_data._scissor_rect);

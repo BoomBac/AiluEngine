@@ -32,6 +32,10 @@ namespace Ailu
         APROPERTY(Category = "Debug")
         bool _enable_d3d12_debug_layer;
         APROPERTY(Category = "Debug")
+        bool _enable_dred_breadcrumbs = false;
+        APROPERTY(Category = "Debug")
+        bool _enable_dred_page_fault = false;
+        APROPERTY(Category = "Debug")
         bool _enable_rdc;
         APROPERTY(Category = "Debug")
         bool _enable_pix;

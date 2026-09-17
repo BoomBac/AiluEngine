@@ -17,6 +17,8 @@
 #include "Render/Gizmo.h"
 #include "Render/GpuResource.h"
 #include "Render/GraphicsPipelineStateObject.h"
+#include "Render/ImageCapture/ImageCaptureService.h"
+#include "Render/Texture.h"
 #include "Render/Material.h"
 #include "Render/RenderingData.h"
 #include "Render/RenderingStates.h"
@@ -87,6 +89,28 @@ namespace Ailu::RHI::DX12
         u32 s_debug_message_kind_count = 0u;
         u32 s_debug_message_frames_since_log = 0u;
         u64 s_debug_message_unlisted_count = 0u;
+
+        const char *AutoBreadcrumbOpName(D3D12_AUTO_BREADCRUMB_OP operation)
+        {
+            switch (operation)
+            {
+            case D3D12_AUTO_BREADCRUMB_OP_BEGINEVENT: return "BeginEvent";
+            case D3D12_AUTO_BREADCRUMB_OP_ENDEVENT: return "EndEvent";
+            case D3D12_AUTO_BREADCRUMB_OP_DRAWINSTANCED: return "DrawInstanced";
+            case D3D12_AUTO_BREADCRUMB_OP_DRAWINDEXEDINSTANCED: return "DrawIndexedInstanced";
+            case D3D12_AUTO_BREADCRUMB_OP_EXECUTEINDIRECT: return "ExecuteIndirect";
+            case D3D12_AUTO_BREADCRUMB_OP_DISPATCH: return "Dispatch";
+            case D3D12_AUTO_BREADCRUMB_OP_COPYBUFFERREGION: return "CopyBufferRegion";
+            case D3D12_AUTO_BREADCRUMB_OP_COPYTEXTUREREGION: return "CopyTextureRegion";
+            case D3D12_AUTO_BREADCRUMB_OP_CLEARRENDERTARGETVIEW: return "ClearRenderTargetView";
+            case D3D12_AUTO_BREADCRUMB_OP_CLEARDEPTHSTENCILVIEW: return "ClearDepthStencilView";
+            case D3D12_AUTO_BREADCRUMB_OP_RESOURCEBARRIER: return "ResourceBarrier";
+            case D3D12_AUTO_BREADCRUMB_OP_PRESENT: return "Present";
+            case D3D12_AUTO_BREADCRUMB_OP_BUILDRAYTRACINGACCELERATIONSTRUCTURE: return "BuildRayTracingAS";
+            case D3D12_AUTO_BREADCRUMB_OP_DISPATCHRAYS: return "DispatchRays";
+            default: return "Unknown";
+            }
+        }
 
         void DrainD3DDebugLayerMessages()
         {
@@ -332,6 +356,7 @@ namespace Ailu::RHI::DX12
             case EGpuCommandType::kBuildAS: cost += 20u; break;
             case EGpuCommandType::kResourceUpload: cost += 12u; break;
             case EGpuCommandType::kReadBack: cost += 12u; break;
+            case EGpuCommandType::kReadBackTexture: cost += 16u; break;
             case EGpuCommandType::kRequireResourceState: cost += 4u; break;
             case EGpuCommandType::kUavBarrier: cost += 2u; break;
             default: cost += 1u; break;
@@ -381,6 +406,7 @@ namespace Ailu::RHI::DX12
                 PROFILE_BLOCK_CPU("GpuCommandWorker_WaitForMain");
                 Application::Get().WaitForMain();
             }
+            ImageCaptureService::Tick();
 #if AILU_ENABLE_FRAME_DEBUGGER
             Render::FrameDebugger::FrameCaptureService::BeginFrame(_ctx->GetFrameCount());
 #endif
@@ -696,14 +722,17 @@ namespace Ailu::RHI::DX12
     static RENDERDOC_API_1_1_2 *s_rdc_api = nullptr;
     static HMODULE s_rdc_module = nullptr;
 
-    static inline bool IsDirectXRaytracingSupported(IDXGIAdapter4 *adapter)
+    static inline D3D12_RAYTRACING_TIER GetDirectXRaytracingTier(IDXGIAdapter4 *adapter)
     {
         ComPtr<ID3D12Device> testDevice;
         D3D12_FEATURE_DATA_D3D12_OPTIONS5 featureSupportData = {};
 
-        return SUCCEEDED(D3D12CreateDevice(adapter, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&testDevice))) &&
-               SUCCEEDED(testDevice->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &featureSupportData, sizeof(featureSupportData))) &&
-               featureSupportData.RaytracingTier != D3D12_RAYTRACING_TIER_NOT_SUPPORTED;
+        if (FAILED(D3D12CreateDevice(adapter, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&testDevice))) ||
+            FAILED(testDevice->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &featureSupportData, sizeof(featureSupportData))))
+        {
+            return D3D12_RAYTRACING_TIER_NOT_SUPPORTED;
+        }
+        return featureSupportData.RaytracingTier;
     }
 
     static bool RdcLoadLatestRdcGpuCapturerLibrary()
@@ -975,7 +1004,6 @@ namespace Ailu::RHI::DX12
         _readback_pool = MakeScope<ReadbackBufferPool>(m_device.Get());
         _p_gpu_timer = MakeScope<D3DGPUTimer>(m_device.Get(), m_commandQueue.Get(), RenderConstants::kFrameCount);
         if (Application::Get()._is_multi_thread_rendering.load()) { _cmd_worker->Start(); }
-        _is_hardware_ray_tracing_supported = IsDirectXRaytracingSupported(_p_adapter.Get());
     }
 
     void D3DContext::TryReleaseUnusedResources()
@@ -1116,7 +1144,10 @@ namespace Ailu::RHI::DX12
                 {
                     std::lock_guard lock(_cmd_fence_mtx);
                     submitted_fence = ++_fence_value;
-                    ThrowIfFailed(m_commandQueue->Signal(_p_cmd_buffer_fence.Get(), submitted_fence));
+                    const HRESULT signal_hr = m_commandQueue->Signal(_p_cmd_buffer_fence.Get(), submitted_fence);
+                    if (FAILED(signal_hr))
+                        ReportDeviceRemoved(signal_hr, "ID3D12CommandQueue::Signal");
+                    ThrowIfFailed(signal_hr);
                 }
             }
             for (D3DCommandBuffer *d3dcmd: d3d_cmds)
@@ -1147,6 +1178,7 @@ namespace Ailu::RHI::DX12
             queue_state_d3dcmd->Finalize();
             RHICommandBufferPool::Release(queue_state_cmd);
         }
+        RHICommandBufferPool::ReleaseCompletedTrackedResources();
         return submitted_fence;
     }
 
@@ -1185,10 +1217,138 @@ namespace Ailu::RHI::DX12
     }
 
     bool D3DContext::IsHardwareRayTracingSupported() const { return _is_hardware_ray_tracing_supported; }
+    bool D3DContext::IsInlineRayTracingSupported() const { return _is_inline_ray_tracing_supported; }
+
+    void D3DContext::ReportDeviceRemoved(HRESULT operation_hr, const char *operation)
+    {
+        if (m_device == nullptr)
+            return;
+        const HRESULT removed_reason = m_device->GetDeviceRemovedReason();
+        if (SUCCEEDED(operation_hr) && SUCCEEDED(removed_reason))
+            return;
+
+        bool expected = false;
+        if (!_has_reported_device_removed.compare_exchange_strong(expected, true))
+            return;
+
+        const String operation_hr_text = std::format("0x{:08X}", static_cast<u32>(operation_hr));
+        const String removed_reason_text = std::format("0x{:08X}", static_cast<u32>(removed_reason));
+        LOG_ERROR("D3D12 device removal detected after {}: operation_hr={}, reason={}", operation, operation_hr_text,
+                  removed_reason_text);
+        ComPtr<ID3D12DeviceRemovedExtendedData> dred;
+        if (FAILED(m_device.As(&dred)))
+        {
+            LOG_ERROR("D3D12 DRED interface is unavailable.");
+            return;
+        }
+
+        if (g_engine_config._enable_dred_breadcrumbs)
+        {
+            ComPtr<ID3D12DeviceRemovedExtendedData1> dred1;
+            if (SUCCEEDED(m_device.As(&dred1)))
+            {
+                D3D12_DRED_AUTO_BREADCRUMBS_OUTPUT1 breadcrumbs{};
+                if (FAILED(dred1->GetAutoBreadcrumbsOutput1(&breadcrumbs)))
+                {
+                    LOG_ERROR("D3D12 DRED auto-breadcrumb context data is unavailable.");
+                }
+                else
+                {
+                    u32 node_index = 0u;
+                    for (const auto *node = breadcrumbs.pHeadAutoBreadcrumbNode; node != nullptr; node = node->pNext)
+                    {
+                        const String command_list_name = node->pCommandListDebugNameA != nullptr
+                                                             ? node->pCommandListDebugNameA : ToChar(node->pCommandListDebugNameW);
+                        const String command_queue_name = node->pCommandQueueDebugNameA != nullptr
+                                                              ? node->pCommandQueueDebugNameA : ToChar(node->pCommandQueueDebugNameW);
+                        const u32 completed_count = node->pLastBreadcrumbValue != nullptr ? *node->pLastBreadcrumbValue : 0u;
+                        const u32 operation_index = node->BreadcrumbCount == 0u
+                                                        ? 0u : std::min(completed_count, node->BreadcrumbCount - 1u);
+                        const auto breadcrumb_op = node->pCommandHistory != nullptr && node->BreadcrumbCount != 0u
+                                                       ? node->pCommandHistory[operation_index] : D3D12_AUTO_BREADCRUMB_OP_SETMARKER;
+                        LOG_ERROR("DRED breadcrumb[{}]: command_list={}, queue={}, completed={}/{}, operation[{}]={}({})",
+                                  node_index, command_list_name.empty() ? "<unnamed>" : command_list_name,
+                                  command_queue_name.empty() ? "<unnamed>" : command_queue_name, completed_count,
+                                  node->BreadcrumbCount, operation_index, AutoBreadcrumbOpName(breadcrumb_op),
+                                  static_cast<u32>(breadcrumb_op));
+                        for (u32 context_index = 0u; context_index < node->BreadcrumbContextsCount; ++context_index)
+                        {
+                            const auto &context = node->pBreadcrumbContexts[context_index];
+                            LOG_ERROR("DRED breadcrumb[{}] context: index={}, name={}", node_index, context.BreadcrumbIndex,
+                                      ToChar(context.pContextString));
+                        }
+                        ++node_index;
+                    }
+                }
+            }
+            else
+            {
+                D3D12_DRED_AUTO_BREADCRUMBS_OUTPUT breadcrumbs{};
+                if (SUCCEEDED(dred->GetAutoBreadcrumbsOutput(&breadcrumbs)))
+                {
+                    u32 node_index = 0u;
+                    for (const auto *node = breadcrumbs.pHeadAutoBreadcrumbNode; node != nullptr; node = node->pNext)
+                    {
+                        const String command_list_name = node->pCommandListDebugNameA != nullptr
+                                                             ? node->pCommandListDebugNameA : ToChar(node->pCommandListDebugNameW);
+                        const u32 completed_count = node->pLastBreadcrumbValue != nullptr ? *node->pLastBreadcrumbValue : 0u;
+                        LOG_ERROR("DRED breadcrumb[{}]: command_list={}, completed={}/{}", node_index++,
+                                  command_list_name.empty() ? "<unnamed>" : command_list_name, completed_count,
+                                  node->BreadcrumbCount);
+                    }
+                }
+                else
+                {
+                    LOG_ERROR("D3D12 DRED auto-breadcrumb data is unavailable.");
+                }
+            }
+        }
+
+        if (g_engine_config._enable_dred_page_fault)
+        {
+            D3D12_DRED_PAGE_FAULT_OUTPUT page_fault{};
+            if (SUCCEEDED(dred->GetPageFaultAllocationOutput(&page_fault)))
+            {
+                LOG_ERROR("DRED page fault virtual address: 0x{:X}", page_fault.PageFaultVA);
+                const auto log_allocations = [](const char *list_name, const D3D12_DRED_ALLOCATION_NODE *node)
+                {
+                    for (u32 index = 0u; node != nullptr; node = node->pNext, ++index)
+                    {
+                        const String object_name = node->ObjectNameA != nullptr ? node->ObjectNameA
+                                                                                  : ToChar(node->ObjectNameW);
+                        LOG_ERROR("DRED {} allocation[{}]: type={}, name={}", list_name, index,
+                                  static_cast<u32>(node->AllocationType), object_name.empty() ? "<unnamed>" : object_name);
+                    }
+                };
+                log_allocations("existing", page_fault.pHeadExistingAllocationNode);
+                log_allocations("recently_freed", page_fault.pHeadRecentFreedAllocationNode);
+            }
+            else
+            {
+                LOG_ERROR("D3D12 DRED page-fault data is unavailable.");
+            }
+        }
+    }
 
     void D3DContext::LoadPipeline()
     {
         UINT dxgiFactoryFlags = 0;
+        ComPtr<ID3D12DeviceRemovedExtendedDataSettings> dred_settings;
+        if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&dred_settings))))
+        {
+            const auto breadcrumbs_enablement = g_engine_config._enable_dred_breadcrumbs
+                                                     ? D3D12_DRED_ENABLEMENT_FORCED_ON
+                                                     : D3D12_DRED_ENABLEMENT_FORCED_OFF;
+            const auto page_fault_enablement = g_engine_config._enable_dred_page_fault
+                                                   ? D3D12_DRED_ENABLEMENT_FORCED_ON
+                                                   : D3D12_DRED_ENABLEMENT_FORCED_OFF;
+            dred_settings->SetAutoBreadcrumbsEnablement(breadcrumbs_enablement);
+            dred_settings->SetPageFaultEnablement(page_fault_enablement);
+        }
+        else if (g_engine_config._enable_dred_breadcrumbs || g_engine_config._enable_dred_page_fault)
+        {
+            LOG_WARNING("DRED settings are unavailable on this system.");
+        }
         if (g_engine_config._enable_d3d12_debug_layer)
         {
             // Enable the debug layer (requires the Graphics Tools "optional feature").
@@ -1218,8 +1378,14 @@ namespace Ailu::RHI::DX12
         ThrowIfFailed(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory)));
         GetHardwareAdapter(factory.Get(), _p_adapter.GetAddressOf(), &_local_video_memory_info, &_non_local_video_memory_info);
         ThrowIfFailed(D3D12CreateDevice(_p_adapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&m_device)));
-        _is_hardware_ray_tracing_supported = IsDirectXRaytracingSupported(_p_adapter.Get());
-        LOG_INFO(" DirectX Raytracing Supported: {}", _is_hardware_ray_tracing_supported ? "Yes" : "No");
+        LOG_INFO("DRED diagnostics: breadcrumbs={}, page_fault={}",
+                 g_engine_config._enable_dred_breadcrumbs, g_engine_config._enable_dred_page_fault);
+        const auto raytracing_tier = GetDirectXRaytracingTier(_p_adapter.Get());
+        _is_hardware_ray_tracing_supported = raytracing_tier != D3D12_RAYTRACING_TIER_NOT_SUPPORTED;
+        _is_inline_ray_tracing_supported = raytracing_tier >= D3D12_RAYTRACING_TIER_1_1;
+        LOG_INFO(" DirectX Raytracing Supported: {}, Inline Ray Query Supported: {}",
+                 _is_hardware_ray_tracing_supported ? "Yes" : "No",
+                 _is_inline_ray_tracing_supported ? "Yes" : "No");
 
         ComPtr<ID3D12InfoQueue> infoQueue;
         if (SUCCEEDED(m_device->QueryInterface(IID_PPV_ARGS(&infoQueue))))
@@ -1495,11 +1661,18 @@ namespace Ailu::RHI::DX12
         std::lock_guard submit_lock(_command_submit_mtx);
         std::lock_guard lock(_cmd_fence_mtx);
         ++_fence_value;
-        ThrowIfFailed(m_commandQueue->Signal(_p_cmd_buffer_fence.Get(), _fence_value));
+        const HRESULT signal_hr = m_commandQueue->Signal(_p_cmd_buffer_fence.Get(), _fence_value);
+        if (FAILED(signal_hr))
+            ReportDeviceRemoved(signal_hr, "ID3D12CommandQueue::Signal");
+        ThrowIfFailed(signal_hr);
         if (_p_cmd_buffer_fence->GetCompletedValue() < _fence_value)
         {
-            ThrowIfFailed(_p_cmd_buffer_fence->SetEventOnCompletion(_fence_value, _p_cmd_buffer_fence_event));
+            const HRESULT event_hr = _p_cmd_buffer_fence->SetEventOnCompletion(_fence_value, _p_cmd_buffer_fence_event);
+            if (FAILED(event_hr))
+                ReportDeviceRemoved(event_hr, "ID3D12Fence::SetEventOnCompletion");
+            ThrowIfFailed(event_hr);
             WaitForSingleObjectEx(_p_cmd_buffer_fence_event, INFINITE, FALSE);
+            ReportDeviceRemoved(S_OK, "D3DContext::WaitForGpu");
         }
     }
 
@@ -1508,17 +1681,20 @@ namespace Ailu::RHI::DX12
         std::lock_guard lock(_cmd_fence_mtx);
         if (_p_cmd_buffer_fence->GetCompletedValue() < fence_value)
         {
-            ThrowIfFailed(_p_cmd_buffer_fence->SetEventOnCompletion(fence_value, _p_cmd_buffer_fence_event));
+            const HRESULT event_hr = _p_cmd_buffer_fence->SetEventOnCompletion(fence_value, _p_cmd_buffer_fence_event);
+            if (FAILED(event_hr))
+                ReportDeviceRemoved(event_hr, "ID3D12Fence::SetEventOnCompletion");
+            ThrowIfFailed(event_hr);
             WaitForSingleObjectEx(_p_cmd_buffer_fence_event, INFINITE, FALSE);
+            ReportDeviceRemoved(S_OK, "D3DContext::WaitForFence");
         }
     }
 
     void D3DContext::ApplyPendingSwapChainResizes()
     {
         // 必须在帧边界（上一帧命令缓冲全部归还到池中、且当前没有任何命令缓冲在录制）执行：
-        // ResizeBuffers 要求后台缓冲不再被任何对象引用，而命令缓冲的状态跟踪器会持有
-        // 后台缓冲的强引用直到该缓冲归还到池中。若在 PresentImpl 里 resize，正在录制的那条
-        // 命令缓冲（PresentImpl 的 cmd）仍然持有引用，ResizeBuffers 会返回 DXGI_ERROR_INVALID_CALL。
+        // ResizeBuffers 要求后台缓冲不再被任何对象引用。命令缓冲的状态跟踪器会持有
+        // 后台缓冲的强引用直至 GPU 完成；等待队列并回收完成命令后才能 ResizeBuffers。
         std::lock_guard<std::mutex> lock(_render_windows_mtx);
         for (auto &ctx: _render_windows)
         {
@@ -1530,6 +1706,7 @@ namespace Ailu::RHI::DX12
             const u32 new_width = (new_pack_size >> 16) & 0xFFFF;
             const u32 new_height = new_pack_size & 0xFFFF;
             ctx->WaitForGpu(m_commandQueue.Get());
+            RHICommandBufferPool::ReleaseCompletedTrackedResources();
             ctx->_swapchain->Resize((u16) new_width, (u16) new_height);
             ctx->WaitForGpu(m_commandQueue.Get());
         }
@@ -2033,6 +2210,11 @@ namespace Ailu::RHI::DX12
                     d3dcmd->SetRenderTargets(0u, nullptr, d3dcmd->_depth);
                     d3dcmd->SetScissors(1u, d3dcmd->_scissors.data());
                     d3dcmd->SetViewports(1u, d3dcmd->_viewports.data());
+                }
+                else
+                {
+                    // A zero-target SetRenderTarget is used to detach an RTV before a texture readback.
+                    d3dcmd->SetRenderTargets(0u, nullptr, nullptr);
                 }
             }
             else
@@ -2606,6 +2788,253 @@ namespace Ailu::RHI::DX12
                                     copy_dst_capture->Unmap(0, nullptr);
                                 });
                     });
+        }
+        else if (cmd->GetCmdType() == EGpuCommandType::kReadBackTexture)
+        {
+            auto texture_cmd = static_cast<CommandReadBackTexture *>(cmd);
+            auto *readback_resource = GpuResourceRegistry::Get().Resolve(texture_cmd->_res);
+            auto *texture = dynamic_cast<Texture *>(readback_resource);
+            ID3D12Resource *source_resource = readback_resource != nullptr ?
+                readback_resource->NativeResource().As<ID3D12Resource>() : nullptr;
+            if (texture == nullptr || source_resource == nullptr)
+            {
+                ImageCaptureService::FailReadback(texture_cmd->_session_id, texture_cmd->_readback_id,
+                                                  "invalid texture readback resource");
+                return;
+            }
+
+            const D3D12_RESOURCE_DESC source_desc = source_resource->GetDesc();
+            if (source_desc.SampleDesc.Count > 1u)
+            {
+                ImageCaptureService::FailReadback(texture_cmd->_session_id, texture_cmd->_readback_id,
+                                                  "unsupported MSAA texture capture");
+                return;
+            }
+            if (source_desc.Format == DXGI_FORMAT_D24_UNORM_S8_UINT ||
+                source_desc.Format == DXGI_FORMAT_D32_FLOAT_S8X24_UINT)
+            {
+                ImageCaptureService::FailReadback(texture_cmd->_session_id, texture_cmd->_readback_id,
+                                                  "unsupported depth-stencil texture capture");
+                return;
+            }
+            if (source_desc.MipLevels == 0u || source_desc.Width == 0u || source_desc.Height == 0u)
+            {
+                ImageCaptureService::FailReadback(texture_cmd->_session_id, texture_cmd->_readback_id,
+                                                  "invalid texture descriptor");
+                return;
+            }
+
+            const bool is_3d = source_desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D;
+            const u32 mip_levels = source_desc.MipLevels;
+            const u32 physical_slice_count = is_3d ? 1u : source_desc.DepthOrArraySize;
+            Vector<TextureReadbackSubresource> subresources;
+            if (texture_cmd->_all_sub_resources)
+            {
+                subresources.reserve(static_cast<size_t>(mip_levels) * physical_slice_count);
+                for (u32 array_slice = 0u; array_slice < physical_slice_count; ++array_slice)
+                {
+                    for (u32 mip_level = 0u; mip_level < mip_levels; ++mip_level)
+                    {
+                        subresources.push_back({mip_level, array_slice,
+                                                is_3d ? mip_level : array_slice * mip_levels + mip_level});
+                    }
+                }
+            }
+            else
+            {
+                const u32 mip_count = std::max<u32>(1u, texture_cmd->_mip_count);
+                const u32 array_slice_count = is_3d ? 1u : std::max<u32>(1u, texture_cmd->_array_slice_count);
+                if (texture_cmd->_mip_level >= mip_levels || texture_cmd->_mip_level + mip_count > mip_levels ||
+                    texture_cmd->_array_slice >= physical_slice_count ||
+                    texture_cmd->_array_slice + array_slice_count > physical_slice_count)
+                {
+                    ImageCaptureService::FailReadback(texture_cmd->_session_id, texture_cmd->_readback_id,
+                                                      "invalid subresource range");
+                    return;
+                }
+                subresources.reserve(static_cast<size_t>(mip_count) * array_slice_count);
+                for (u32 array_slice = 0u; array_slice < array_slice_count; ++array_slice)
+                {
+                    for (u32 mip_offset = 0u; mip_offset < mip_count; ++mip_offset)
+                    {
+                        const u32 mip_level = texture_cmd->_mip_level + mip_offset;
+                        const u32 physical_slice = texture_cmd->_array_slice + array_slice;
+                        subresources.push_back({mip_level, physical_slice,
+                                                is_3d ? mip_level : physical_slice * mip_levels + mip_level});
+                    }
+                }
+            }
+            if (subresources.empty())
+            {
+                ImageCaptureService::FailReadback(texture_cmd->_session_id, texture_cmd->_readback_id,
+                                                  "empty texture subresource range");
+                return;
+            }
+
+            struct TextureReadbackLayout
+            {
+                TextureReadbackSubresource _subresource;
+                D3D12_PLACED_SUBRESOURCE_FOOTPRINT _footprint{};
+                u64 _row_size = 0u;
+                u32 _row_count = 0u;
+            };
+            Vector<TextureReadbackLayout> layouts;
+            layouts.reserve(subresources.size());
+            u64 total_bytes = 0u;
+            for (const auto &subresource: subresources)
+            {
+                TextureReadbackLayout &layout = layouts.emplace_back();
+                layout._subresource = subresource;
+                UINT64 required_size = 0u;
+                m_device->GetCopyableFootprints(&source_desc, subresource._subresource, 1u, total_bytes,
+                                                &layout._footprint, &layout._row_count, &layout._row_size,
+                                                &required_size);
+                if (required_size <= total_bytes || layout._row_size == 0u ||
+                    layout._row_size > std::numeric_limits<u32>::max() ||
+                    layout._footprint.Footprint.RowPitch > std::numeric_limits<u32>::max())
+                {
+                    ImageCaptureService::FailReadback(texture_cmd->_session_id, texture_cmd->_readback_id,
+                                                      "GetCopyableFootprints failed");
+                    return;
+                }
+                total_bytes = required_size;
+            }
+            if (!ImageCaptureService::PrepareReadback(texture_cmd->_session_id, texture_cmd->_readback_id, total_bytes))
+                return;
+
+            const auto source_handle = readback_resource->Handle();
+            LOG_INFO("[ImageCapture] Readback source session={} id={} texture={} name={} native={} handle=({}, {}) "
+                     "size={}x{} format={} subresources={} bytes={} restore_state={}",
+                     texture_cmd->_session_id, texture_cmd->_readback_id, static_cast<void *>(readback_resource),
+                     texture->Name(), static_cast<void *>(source_resource), source_handle._index,
+                     source_handle._generation, source_desc.Width, source_desc.Height,
+                     static_cast<u32>(source_desc.Format), layouts.size(), total_bytes,
+                     static_cast<u32>(texture_cmd->_has_explicit_restore_state ? texture_cmd->_restore_state
+                                                                               : EResourceState::kCommon));
+
+            CD3DX12_HEAP_PROPERTIES heap_properties(D3D12_HEAP_TYPE_READBACK);
+            const auto readback_desc = CD3DX12_RESOURCE_DESC::Buffer(total_bytes);
+            ComPtr<ID3D12Resource> readback_buffer;
+            const HRESULT allocation_result = m_device->CreateCommittedResource(
+                &heap_properties, D3D12_HEAP_FLAG_NONE, &readback_desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
+                IID_PPV_ARGS(readback_buffer.GetAddressOf()));
+            if (FAILED(allocation_result))
+            {
+                ImageCaptureService::FailReadback(texture_cmd->_session_id, texture_cmd->_readback_id,
+                                                  "readback allocation failed");
+                return;
+            }
+
+            for (const auto &layout: layouts)
+            {
+                readback_resource->RequireState(d3dcmd, EResourceState::kCopySource, layout._subresource._subresource);
+                const CD3DX12_TEXTURE_COPY_LOCATION copy_destination(readback_buffer.Get(), layout._footprint);
+                const CD3DX12_TEXTURE_COPY_LOCATION copy_source(source_resource, layout._subresource._subresource);
+                dxcmd->CopyTextureRegion(&copy_destination, 0u, 0u, 0u, &copy_source, nullptr);
+            }
+            const EResourceState restore_state = texture_cmd->_has_explicit_restore_state ?
+                texture_cmd->_restore_state : EResourceState::kCommon;
+            for (const auto &layout: layouts)
+                readback_resource->RequireState(d3dcmd, restore_state, layout._subresource._subresource);
+
+            const auto fence = _p_cmd_buffer_fence;
+            const auto source_signature = ImageCaptureSourceSignature{
+                texture->PixelFormat(),
+                texture->Dimension(),
+                static_cast<u32>(source_desc.Width),
+                static_cast<u32>(source_desc.Height),
+                is_3d ? static_cast<u32>(source_desc.DepthOrArraySize) : 1u,
+                mip_levels,
+                texture->Dimension() == ETextureDimension::kCube ||
+                        texture->Dimension() == ETextureDimension::kCubeArray ?
+                    std::max<u32>(1u, physical_slice_count / 6u) : physical_slice_count};
+            const u32 captured_mip_count = texture_cmd->_all_sub_resources ?
+                mip_levels : std::max<u32>(1u, texture_cmd->_mip_count);
+            const u32 captured_array_size = is_3d ? 1u :
+                (texture->Dimension() == ETextureDimension::kCube ||
+                 texture->Dimension() == ETextureDimension::kCubeArray ?
+                     std::max<u32>(1u, static_cast<u32>(layouts.size()) / captured_mip_count / 6u) :
+                     (texture_cmd->_all_sub_resources ? physical_slice_count :
+                      std::max<u32>(1u, texture_cmd->_array_slice_count)));
+            const auto callback = std::move(texture_cmd->_callback);
+            d3dcmd->AddPostSubmitCallback(
+                [fence, readback_buffer, layouts = std::move(layouts), total_bytes, source_signature,
+                 captured_mip_count, captured_array_size, callback = std::move(callback),
+                 session_id = texture_cmd->_session_id, readback_id = texture_cmd->_readback_id,
+                 capture_index = texture_cmd->_capture_index,
+                 engine_frame_index = texture_cmd->_engine_frame_index](u64 fence_value) mutable
+                {
+                    JobSystem::Get().Dispatch(
+                        [fence, readback_buffer, layouts = std::move(layouts), total_bytes, source_signature,
+                         captured_mip_count, captured_array_size, callback = std::move(callback), session_id,
+                         readback_id, capture_index, engine_frame_index, fence_value]() mutable
+                        {
+                            while (fence->GetCompletedValue() < fence_value)
+                                std::this_thread::yield();
+                            ImageCaptureReadbackData data;
+                            data._session_id = session_id;
+                            data._readback_id = readback_id;
+                            data._capture_index = capture_index;
+                            data._engine_frame_index = engine_frame_index;
+                            data._source = source_signature;
+                            data._captured_mip_count = captured_mip_count;
+                            data._captured_array_size = captured_array_size;
+                            data._data.resize(static_cast<size_t>(total_bytes));
+                            D3D12_RANGE range{0u, total_bytes};
+                            u8 *mapped_data = nullptr;
+                            const HRESULT map_result = readback_buffer->Map(0u, &range,
+                                                                              reinterpret_cast<void **>(&mapped_data));
+                            if (FAILED(map_result) || mapped_data == nullptr)
+                            {
+                                data._success = false;
+                                data._error = "readback map failed";
+                            }
+                            else
+                            {
+                                memcpy(data._data.data(), mapped_data, static_cast<size_t>(total_bytes));
+                                u64 nonzero_byte_count = 0u;
+                                u8 max_byte_value = 0u;
+                                for (const u8 value: data._data)
+                                {
+                                    if (value != 0u)
+                                        ++nonzero_byte_count;
+                                    if (value > max_byte_value)
+                                        max_byte_value = value;
+                                }
+                                LOG_INFO("[ImageCapture] Readback mapped session={} id={} frame={} bytes={} "
+                                         "nonzero={} max_byte={}", session_id, readback_id, engine_frame_index,
+                                         data._data.size(), nonzero_byte_count, max_byte_value);
+                                D3D12_RANGE empty_range{0u, 0u};
+                                readback_buffer->Unmap(0u, &empty_range);
+                                data._sub_resources.reserve(layouts.size());
+                                for (const auto &layout: layouts)
+                                {
+                                    const auto &footprint = layout._footprint.Footprint;
+                                    if (footprint.RowPitch > std::numeric_limits<u32>::max() ||
+                                        static_cast<u64>(footprint.RowPitch) * layout._row_count >
+                                            std::numeric_limits<u32>::max())
+                                    {
+                                        data._success = false;
+                                        data._error = "readback footprint is too large";
+                                        break;
+                                    }
+                                    data._sub_resources.push_back({
+                                        layout._footprint.Offset,
+                                        layout._row_size,
+                                        footprint.RowPitch,
+                                        layout._row_count,
+                                        footprint.RowPitch * layout._row_count,
+                                        footprint.Width,
+                                        footprint.Height,
+                                        footprint.Depth,
+                                        layout._subresource._mip_level,
+                                        layout._subresource._array_slice});
+                                }
+                            }
+                            if (callback)
+                                callback(std::move(data));
+                        });
+                });
         }
         else if (cmd->GetCmdType() == EGpuCommandType::kPresent)
         {

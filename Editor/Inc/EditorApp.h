@@ -103,6 +103,9 @@ namespace Ailu
             bool OnGetFocus(WindowFocusEvent &e) final;
             bool OnLostFocus(WindowLostFocusEvent &e) final;
             void LoadEditorConfig(ApplicationDesc &desc);
+            // Reads AILU_SCENE / AILU_CAM_POS / AILU_CAM_LOOK (all optional) and overrides the
+            // saved editor state.  Used by unattended capture runs; a no-op when unset.
+            void ApplyDiagnosticOverrides();
             void SaveEditorConfig();
             void LoadEditorResource();
             void ConfigureResourceReloading();

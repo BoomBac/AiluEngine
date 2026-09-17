@@ -291,6 +291,17 @@ namespace Ailu::SceneManagement
                 component._probe_count = document._probe_count;
                 component._probe_spacing = document._probe_spacing;
                 component._draw_probes = document._draw_probes;
+                component._max_ray_distance = document._max_ray_distance;
+                component._draw_probe_rays = document._draw_probe_rays;
+                component._use_probe_relocation = document._use_probe_relocation;
+                component._relocation_backface_threshold = document._relocation_backface_threshold;
+                component._random_ray_backface_threshold = document._random_ray_backface_threshold;
+                component._relocation_min_frontface_distance_ratio = document._relocation_min_frontface_distance_ratio;
+                component._draw_relocation_debug = document._draw_relocation_debug;
+                component._freeze_ray_rotation = document._freeze_ray_rotation;
+                component._debug_probe_radius = document._debug_probe_radius;
+                component._debug_ray_length = document._debug_ray_length;
+                component._debug_mode = document._debug_mode;
                 registry.SetComponentEnabled<ECS::DDGIVolumeComponent>(
                     entity, !is_component_disabled(entity_doc, "DDGIVolumeComponent"));
             }
@@ -775,6 +786,17 @@ namespace Ailu::SceneManagement
                 component._probe_count = document._probe_count;
                 component._probe_spacing = document._probe_spacing;
                 component._draw_probes = document._draw_probes;
+                component._max_ray_distance = document._max_ray_distance;
+                component._draw_probe_rays = document._draw_probe_rays;
+                component._use_probe_relocation = document._use_probe_relocation;
+                component._relocation_backface_threshold = document._relocation_backface_threshold;
+                component._random_ray_backface_threshold = document._random_ray_backface_threshold;
+                component._relocation_min_frontface_distance_ratio = document._relocation_min_frontface_distance_ratio;
+                component._draw_relocation_debug = document._draw_relocation_debug;
+                component._freeze_ray_rotation = document._freeze_ray_rotation;
+                component._debug_probe_radius = document._debug_probe_radius;
+                component._debug_ray_length = document._debug_ray_length;
+                component._debug_mode = document._debug_mode;
                 registry.SetComponentEnabled<ECS::DDGIVolumeComponent>(
                     entity, !IsComponentDisabled(entity_doc, "DDGIVolumeComponent"));
                 refreshed = true;

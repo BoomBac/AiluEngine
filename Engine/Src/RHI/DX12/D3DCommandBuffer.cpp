@@ -36,6 +36,7 @@ namespace Ailu::RHI::DX12
     void D3DCommandBuffer::Clear()
     {
         AL_ASSERT(IsReady());
+        ReleaseTrackedResources();
         RHICommandBuffer::Clear();
         ThrowIfFailed(_p_alloc->Reset());
         ThrowIfFailed(_p_cmd->Reset(_p_alloc.Get(), nullptr));
@@ -64,6 +65,11 @@ namespace Ailu::RHI::DX12
         _profiler_stack.clear();
         _uploaded_buffer_versions.clear();
         _post_submit_callbacks.clear();
+    }
+
+    void D3DCommandBuffer::ReleaseTrackedResources()
+    {
+        _state_tracker.ReleaseRecordedResources();
     }
 
     void D3DCommandBuffer::Close()

@@ -1,0 +1,11 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "f3e35a62-3c6e-4b65-9e4b-a2b6a0b2a6e7",
+        "_asset_type": "Ailu::Render::ComputeShader",
+        "_asset_name": "ddgi_relocation",
+        "_dependencies": []
+    },
+    "_file": "ddgi_relocation.hlsl",
+    "_kernel": "ProbeRelocation"
+}

@@ -2,6 +2,7 @@
 
 #include "Dock/DockWindow.h"
 #include "Render/FrameDebugger/FrameCapture.h"
+#include "Render/ImageCapture/ImageCaptureTypes.h"
 
 namespace Ailu
 {
@@ -39,6 +40,8 @@ namespace Ailu
             void AddDiagnosticText(const String &text, Color color);
             void SetActiveTab(u32 tab_index);
             void SetEventFilter(u32 filter);
+            void StartImageCapture(const String &pass_name, u32 pass_ordinal, const String &resource_name,
+                                   u32 input_index);
 
             u32 EventIndexFromTreeItem(u64 item) const { return item == 0u ? 0u : (u32)(item - 1u); }
             u64 TreeItemFromEventIndex(u32 idx) const { return (u64)idx + 1u; }
@@ -56,6 +59,7 @@ namespace Ailu
 
             UI::Button *_capture_button = nullptr;
             UI::Text *_status_text = nullptr;
+            UI::Text *_image_capture_status_text = nullptr;
             UI::Text *_summary_text = nullptr;
             UI::TreeView *_event_tree = nullptr;
             UI::ScrollView *_detail_scroll = nullptr;
@@ -73,6 +77,7 @@ namespace Ailu
 
             u32 _selected_event_id = ~0u;
             u64 _observed_capture_revision = 0u;
+            Render::ImageCaptureSessionId _image_capture_session_id = 0u;
         };
     } // namespace Editor
 } // namespace Ailu

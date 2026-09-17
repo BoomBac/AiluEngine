@@ -9,6 +9,7 @@
 #include "Platform/WinWindow.h"
 #include "Render/GraphicsContext.h"
 #include "Render/Gizmo.h"
+#include "Render/ImageCapture/ImageCaptureService.h"
 #include "Render/RenderPipeline.h"
 #include "Render/Texture.h"
 #include "Scene/Scene.h"
@@ -100,6 +101,7 @@ namespace Ailu
 
         BeginShutdown();
         Drain();
+        Render::ImageCaptureService::Shutdown();
 
         if (_scenes)
         {

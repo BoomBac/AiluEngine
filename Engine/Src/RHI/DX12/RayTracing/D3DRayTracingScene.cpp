@@ -32,6 +32,7 @@ namespace Ailu::RHI::DX12
                                          u64 size,
                                          bool allow_uav,
                                          const String& name,
+                                         D3D12_RESOURCE_STATES initial_state,
                                          D3DResource &resource)
         {
             auto desc = CD3DX12_RESOURCE_DESC::Buffer(size);
@@ -43,12 +44,16 @@ namespace Ailu::RHI::DX12
                 &heap_prop,
                 D3D12_HEAP_FLAG_NONE,
                 &desc,
-                D3D12_RESOURCE_STATE_COMMON,
+                initial_state,
                 nullptr,
                 IID_PPV_ARGS(resource.GetAddressOf())));
             resource->SetName(ToWChar(name).c_str());
             resource._subresource_count = 1u;
             resource.ResetStateId();
+            if (initial_state == D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE)
+            {
+                ctx->SetExternalState(resource, Render::EResourceState::kRaytracingAccelerationStructure);
+            }
         }
 
         void CreateUploadBufferResource(D3DContext* ctx,
@@ -191,17 +196,19 @@ namespace Ailu::RHI::DX12
         AL_ASSERT(topLevelPrebuildInfo.ResultDataMaxSizeInBytes > 0);
 
         CreateDefaultBufferResource(dynamic_cast<D3DContext *>(ctx),
-                        topLevelPrebuildInfo.ScratchDataSizeInBytes,
-                        true,
-                        "scene_scratch_buffer",
-                        _scratch_resource);
+                         topLevelPrebuildInfo.ScratchDataSizeInBytes,
+                         true,
+                         "scene_scratch_buffer",
+                         D3D12_RESOURCE_STATE_COMMON,
+                         _scratch_resource);
         _mem_size += static_cast<u32>(topLevelPrebuildInfo.ScratchDataSizeInBytes);
 
         CreateDefaultBufferResource(dynamic_cast<D3DContext *>(ctx),
-                        topLevelPrebuildInfo.ResultDataMaxSizeInBytes,
-                        true,
-                        "scene_tlas_buffer",
-                        _tlas_resource);
+                         topLevelPrebuildInfo.ResultDataMaxSizeInBytes,
+                         true,
+                         "scene_tlas_buffer",
+                         D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
+                         _tlas_resource);
         _tlas_gpu_address = _tlas_resource->GetGPUVirtualAddress();
         _native_resource = {Render::RendererAPI::ERenderAPI::kDirectX12, _tlas_resource.Get()};
         _mem_size += static_cast<u32>(topLevelPrebuildInfo.ResultDataMaxSizeInBytes);

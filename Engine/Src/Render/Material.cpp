@@ -515,6 +515,7 @@ namespace Ailu::Render
             mat_binding._resource_type = EBindResDescType::kConstBufferRaw;
             mat_binding._slot = static_cast<u16>(cur_state._cbuf_bind_slot);
             mat_binding._priority = PipelineResource::kPriorityCmd;
+            mat_binding._addi_info = {};
             mat_binding._addi_info._gpu_handle = block._gpu_handle;
             draw_state._bindings._max_slot = std::max(draw_state._bindings._max_slot, mat_binding._slot);
             draw_state._bindings._binding_mask |= 1u << mat_binding._slot;

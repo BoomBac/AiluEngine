@@ -755,6 +755,28 @@ namespace Ailu
         Vector3f _probe_spacing = Vector3f(2.0f, 2.0f, 2.0f);
         APROPERTY()
         bool _draw_probes = true;
+        APROPERTY()
+        f32 _max_ray_distance = 50.0f;
+        APROPERTY()
+        bool _draw_probe_rays = false;
+        APROPERTY()
+        bool _use_probe_relocation = false;
+        APROPERTY(Range(0.0f, 1.0f))
+        f32 _relocation_backface_threshold = 0.25f;
+        APROPERTY(Range(0.0f, 1.0f))
+        f32 _random_ray_backface_threshold = 0.10f;
+        APROPERTY(Range(0.0f, 0.5f))
+        f32 _relocation_min_frontface_distance_ratio = 0.1f;
+        APROPERTY()
+        bool _draw_relocation_debug = false;
+        APROPERTY()
+        bool _freeze_ray_rotation = false;
+        APROPERTY()
+        f32 _debug_probe_radius = 0.12f;
+        APROPERTY()
+        f32 _debug_ray_length = 4.0f;
+        APROPERTY()
+        ECS::EDDGIProbeDebugMode _debug_mode = ECS::EDDGIProbeDebugMode::kHitType;
     };
 
     ASTRUCT()

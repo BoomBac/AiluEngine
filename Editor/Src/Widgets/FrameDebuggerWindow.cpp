@@ -1,5 +1,7 @@
 #include "Widgets/FrameDebuggerWindow.h"
 #include "Render/FrameDebugger/FrameCaptureService.h"
+#include "Render/ImageCapture/Adapters/RenderGraphImageCaptureBridge.h"
+#include "Render/ImageCapture/ImageCaptureService.h"
 #include "UI/Element/UITableElement.h"
 #include "UI/TreeView.h"
 #include "UI/Basic.h"
@@ -10,6 +12,7 @@
 #include <format>
 
 using namespace Ailu::Render::FrameDebugger;
+using namespace Ailu::Render;
 using namespace Ailu::UI;
 
 namespace Ailu::Editor
@@ -443,6 +446,15 @@ namespace
 
     FrameDebuggerWindow::~FrameDebuggerWindow()
     {
+        if (_image_capture_session_id != 0u)
+        {
+            const auto status = ImageCaptureService::GetStatus(_image_capture_session_id);
+            if (status._state == EImageCaptureState::kPending ||
+                status._state == EImageCaptureState::kCapturing ||
+                status._state == EImageCaptureState::kFinalizing)
+                ImageCaptureService::Cancel(_image_capture_session_id);
+            RenderGraphImageCaptureBridge::RemoveSelector(_image_capture_session_id);
+        }
         if (_event_tree) _event_tree->SetDataSource(nullptr);
     }
 
@@ -461,6 +473,10 @@ namespace
 
             _status_text = toolbar->AddChild<UI::Text>("Idle");
             _status_text->GetSlotAs<UI::LinearSlot>().SizePolicy(ESizePolicy::kFill, ESizePolicy::kAuto);
+
+            _image_capture_status_text = toolbar->AddChild<UI::Text>("Image Capture: Idle");
+            _image_capture_status_text->GetSlotAs<UI::LinearSlot>().SizePolicy(ESizePolicy::kFixed, ESizePolicy::kAuto)
+                .Size(Vector2f(260.0f, 24.0f));
         }
 
         {
@@ -660,6 +676,30 @@ namespace
                 RefreshCapture();
                 break;
             }
+        }
+        if (_image_capture_session_id != 0u)
+        {
+            const auto image_status = ImageCaptureService::GetStatus(_image_capture_session_id);
+            const char *state_name = "Unknown";
+            switch (image_status._state)
+            {
+            case EImageCaptureState::kPending: state_name = "Pending"; break;
+            case EImageCaptureState::kCapturing: state_name = "Capturing"; break;
+            case EImageCaptureState::kFinalizing: state_name = "Finalizing"; break;
+            case EImageCaptureState::kCompleted: state_name = "Completed"; break;
+            case EImageCaptureState::kCancelled: state_name = "Cancelled"; break;
+            case EImageCaptureState::kFailed: state_name = "Failed"; break;
+            }
+            String image_text = std::format("Image Capture: {} {}/{}", state_name,
+                                            image_status._completed_frame_count,
+                                            image_status._requested_frame_count);
+            if (!image_status._error.empty())
+                image_text += std::format(" | {}", image_status._error);
+            _image_capture_status_text->SetText(image_text);
+            if (image_status._state == EImageCaptureState::kCompleted ||
+                image_status._state == EImageCaptureState::kFailed ||
+                image_status._state == EImageCaptureState::kCancelled)
+                RenderGraphImageCaptureBridge::RemoveSelector(_image_capture_session_id);
         }
     }
 
@@ -987,11 +1027,27 @@ namespace
                 add_line("Outputs", std::to_string(pass._output_count));
                 add_line("Pre Barriers", std::to_string(pass._pre_barrier_count));
                 add_line("Post Barriers", std::to_string(pass._post_barrier_count));
+                u32 pass_ordinal = 0u;
+                for (u32 i = 0u; i < payload_idx && i < _capture->RGPasses().size(); ++i)
+                {
+                    if (_capture->Strings().Get(_capture->RGPasses()[i]._name) ==
+                        _capture->Strings().Get(pass._name))
+                        ++pass_ordinal;
+                }
                 for (u16 i = 0u; i < pass._input_count && (pass._input_range_begin + i) < _capture->RGResourceAccesses().size(); ++i)
                 {
                     const auto &access = _capture->RGResourceAccesses()[pass._input_range_begin + i];
                     String res_name(_capture->Strings().Get(access._resource_name));
                     add_line("  In " + std::to_string(i), std::format("{} usage=0x{:X} ver={}.{}", res_name, access._usage, access._handle_id, access._handle_version));
+                    auto *capture_button = _detail_content->AddChild<UI::Button>(
+                        std::format("Capture input {} (8 frames)", i));
+                    capture_button->GetSlotAs<UI::LinearSlot>().SizePolicy(ESizePolicy::kFill, ESizePolicy::kFixed)
+                        .Size(Vector2f(0.0f, 24.0f)).Margin(Padding(4.0f, 0.0f, 4.0f, 0.0f));
+                    const String pass_name(_capture->Strings().Get(pass._name));
+                    capture_button->OnMouseClick() += [this, pass_name, pass_ordinal, res_name, i](UI::UIEvent &)
+                    {
+                        StartImageCapture(pass_name, pass_ordinal, res_name, i);
+                    };
                 }
                 for (u16 i = 0u; i < pass._output_count && (pass._output_range_begin + i) < _capture->RGResourceAccesses().size(); ++i)
                 {
@@ -1004,6 +1060,31 @@ namespace
 
         auto *bottom_padding = _detail_content->AddChild<UI::Text>("");
         bottom_padding->GetSlotAs<UI::LinearSlot>().SizePolicy(ESizePolicy::kFill, ESizePolicy::kFixed).Size(Vector2f(0.0f, 12.0f));
+    }
+
+    void FrameDebuggerWindow::StartImageCapture(const String &pass_name, u32 pass_ordinal,
+                                                const String &resource_name, u32 input_index)
+    {
+        if (_image_capture_session_id != 0u)
+        {
+            ImageCaptureService::Cancel(_image_capture_session_id);
+            RenderGraphImageCaptureBridge::RemoveSelector(_image_capture_session_id);
+        }
+
+        ImageCaptureSequenceDesc desc;
+        desc._frame_count = 8u;
+        desc._frame_interval = 1u;
+        desc._file_prefix = "frame";
+        _image_capture_session_id = ImageCaptureService::BeginSequence(desc);
+        if (_image_capture_session_id == 0u)
+        {
+            _image_capture_status_text->SetText("Image Capture: failed to start");
+            return;
+        }
+        RenderGraphImageCaptureBridge::SetSelector(
+            _image_capture_session_id, {pass_name, pass_ordinal, resource_name, input_index});
+        _image_capture_status_text->SetText(
+            std::format("Image Capture: armed session {} ({})", _image_capture_session_id, resource_name));
     }
 
     void FrameDebuggerWindow::ClearBindingCacheDetails()

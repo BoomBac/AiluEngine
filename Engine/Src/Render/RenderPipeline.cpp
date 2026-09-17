@@ -81,6 +81,8 @@ namespace Ailu::Render
         _renderers.push_back(MakeScope<Renderer>());
         _renderers.back()->_p_cur_pipeline = this;
         _cameras.emplace_back(Camera::sCurrent);
+        for (u32 frame_slot = 0u; frame_slot < _frame_res.size(); ++frame_slot)
+            _frame_res[frame_slot].SetFrameSlot(frame_slot);
         _frame_res_manager = &FrameResourceManager::Get();
         _cur_frame_packet = nullptr;
         _cur_frame_res = nullptr;

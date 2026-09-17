@@ -1,0 +1,11 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "2f1efb43-c6d0-4c9d-9d16-27c315a7a5de",
+        "_asset_type": "Ailu::Render::ComputeShader",
+        "_asset_name": "ddgi_border",
+        "_dependencies": []
+    },
+    "_file": "ddgi_border.hlsl",
+    "_kernel": "ProbeBorder"
+}

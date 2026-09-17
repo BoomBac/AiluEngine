@@ -32,6 +32,8 @@ namespace Ailu::Render
             return "kCopyCounter";
         case EGpuCommandType::kReadBack:
             return "kReadBack";
+        case EGpuCommandType::kReadBackTexture:
+            return "kReadBackTexture";
         case EGpuCommandType::kPresent:
             return "kPresent";
         case EGpuCommandType::kScissorRect:
@@ -81,6 +83,9 @@ namespace Ailu::Render
             break;
         case EGpuCommandType::kReadBack:
             static_cast<CommandReadBack *>(cmd)->~CommandReadBack();
+            break;
+        case EGpuCommandType::kReadBackTexture:
+            static_cast<CommandReadBackTexture *>(cmd)->~CommandReadBackTexture();
             break;
         case EGpuCommandType::kPresent:
             static_cast<CommandPresent *>(cmd)->~CommandPresent();

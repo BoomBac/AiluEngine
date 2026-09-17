@@ -19,6 +19,7 @@
 namespace Ailu::Render
 {
     class RHICommandBuffer;
+    class RayTracingScene;
 
     struct ShaderCommand
     {
@@ -534,6 +535,8 @@ namespace Ailu::Render
         /// @param name 
         /// @param buf 
         void SetBuffer(ComputeShaderKernelId kernel,const String &name, GPUBuffer *buf);
+        void SetAccelerationStructure(ComputeShaderKernelId kernel, const String &name, RayTracingScene *scene);
+        void SetAccelerationStructure(const String &name, RayTracingScene *scene);
         void SetMatrix(const String& name,Matrix4x4f mat);
         void SetMatrixArray(const String& name,Vector<Matrix4x4f> matrix_arr);
         void GetThreadNum(ComputeShaderKernelId kernel, u16 &x, u16 &y, u16 &z) const;

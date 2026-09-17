@@ -13,6 +13,7 @@ namespace Ailu::RHI::DX12
                                   u64 size,
                                   bool allow_uav,
                                   const String& name,
+                                  D3D12_RESOURCE_STATES initial_state,
                                   D3DResource &resource)
         {
             auto desc = CD3DX12_RESOURCE_DESC::Buffer(size);
@@ -24,12 +25,16 @@ namespace Ailu::RHI::DX12
                 &heap_prop,
                 D3D12_HEAP_FLAG_NONE,
                 &desc,
-                D3D12_RESOURCE_STATE_COMMON,
+                initial_state,
                 nullptr,
                 IID_PPV_ARGS(resource.GetAddressOf())));
             resource->SetName(ToWChar(name).c_str());
             resource._subresource_count = 1u;
             resource.ResetStateId();
+            if (initial_state == D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE)
+            {
+                ctx->SetExternalState(resource, Render::EResourceState::kRaytracingAccelerationStructure);
+            }
         }
     }
 
@@ -92,6 +97,7 @@ namespace Ailu::RHI::DX12
                              scratch_size,
                              true,
                              std::format("blas_{}_scratch", _desc._vertex_buffer->Name()),
+                             D3D12_RESOURCE_STATE_COMMON,
                              _scratch_resource);
         _mem_size += static_cast<u32>(scratch_size);
 
@@ -99,6 +105,7 @@ namespace Ailu::RHI::DX12
                              bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes,
                              true,
                              std::format("blas_{}", _desc._vertex_buffer->Name()),
+                             D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
                              _blas_resource);
         _blas_gpu_address = _blas_resource->GetGPUVirtualAddress();
         _native_resource = {Render::RendererAPI::ERenderAPI::kDirectX12, _blas_resource.Get()};

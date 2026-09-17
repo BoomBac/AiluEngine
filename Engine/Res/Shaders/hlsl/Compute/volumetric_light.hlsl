@@ -68,18 +68,28 @@ void LightInjection(CSInput input)
     blue = blue - 0.5;
     float jitter = blue.r * 4;
     // ---- 4. Lighting ----
-    float3 lightDir = normalize(_MainlightWorldPosition.xyz);
+    // _MainlightWorldPosition 在没有方向光（或方向光被禁用）时是零向量：normalize(0) = NaN，
+    // 再经 phase 与 `lightColor(0) * NaN` 传播写进 _VolumetricLight，采样它的像素全部变黑。
+    // 这里退化成“正上方的虚拟太阳”，方向合法但颜色为 0，不会真的照亮任何东西。
+    const float3 mainlight_dir = _MainlightWorldPosition.xyz;
+    const float mainlight_dir_len_sq = dot(mainlight_dir, mainlight_dir);
+    float3 lightDir = mainlight_dir_len_sq > 1e-8f
+                          ? mainlight_dir * rsqrt(mainlight_dir_len_sq)
+                          : float3(0.0f, 1.0f, 0.0f);
     float3 lightColor = _DirectionalLights[0]._LightColor;
     float3 worldPos = VolumetricVoxelUVWToWorld(uvw, _matrix_iv, _matrix_ip, _cam_near, _cam_far);
     float3 view_dir = normalize(worldPos - _cam_pos);
     float cosTheta = dot(view_dir, lightDir);
-    float phase = PhaseHG(cosTheta, _g);
+    float phase = PhaseHG(cosTheta, clamp(_g, -0.999f, 0.999f));
     float3 world_pos_no_jitter = worldPos;
     worldPos += view_dir * jitter * SliceThickness(idx.z, _cam_near, _cam_far);
     float shadow = ApplyCascadeShadowHard(1.0, _cam_pos, worldPos, _DirectionalLights[0]._ShadowDistance,
                                            _DirectionalLights[0]._constant_bias, _DirectionalLights[0]._slope_bias);
     float slice_far = SliceDistance(idx.z + 1, _cam_near, _cam_far);
     float3 injected = lightColor * shadow * phase * _intensity;
+    // NaN/Inf 绝不能进入 3D 贴图：一旦进去，采样它的每个像素都会变黑（history 打开时还会一直留着重投影下去）。
+    if (any(!isfinite(injected)))
+        injected = 0.0f.xxx;
     if (_temporal_reprojection)
     {
         float3 prev_uvw = WorldToVolumetricVoxelUVW(world_pos_no_jitter, _matrix_pre_v, _matrix_pre_p, _cam_near, _cam_far);
@@ -89,6 +99,8 @@ void LightInjection(CSInput input)
             return;
         }
         float3 prev = _History_VolumetricLight.SampleLevel(g_LinearClampSampler, prev_uvw, 0).rgb;
+        if (any(!isfinite(prev)))
+            prev = 0.0f.xxx;
         injected = lerp(prev, injected.rgb, _temporal_blend_factor);
     }
     _VolumetricLight[idx] = float4(injected, slice_far);
@@ -99,7 +111,7 @@ float4 accumulate(float thickness, float3 accum_scattering, float accum_transmit
 {
     const float slice_transmittance = exp(-slice_density * thickness * 0.01f);
 
-    float3 slice_scattering_integral = slice_scattering * (1.0 - slice_transmittance) / slice_density;
+    float3 slice_scattering_integral = slice_scattering * (1.0 - slice_transmittance) / max(slice_density, 1e-6f);
 
     accum_scattering += slice_scattering_integral * accum_transmittance;
     accum_transmittance *= slice_transmittance;

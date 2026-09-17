@@ -1,4 +1,4 @@
-﻿#include "Render/Features/RayTraceGI.h"
+#include "Render/Features/RayTraceGI.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Render/GraphicsContext.h"
 #include "Render/Material.h"
@@ -95,8 +95,7 @@ namespace Ailu
 
 
             _debug_line_mat = MakeRef<Material>(ResourceMgr::Get().Load<Shader>(L"Shaders/hlsl/ray_trace/raytrace_debug_draw.alasset").get(), "RayDebugLineMat");
-            // _kernel_ray_gen = cs->FindKernel("PrimaryRay");
-            _kernel_ray_gen = cs->FindKernel("RayGen");
+            _kernel_primary_ray = cs->FindKernel("PrimaryRay");
             _kernel_denoise = cs->FindKernel("Denoise");
             _event = static_cast<ERenderPassEvent>(static_cast<u16>(ERenderPassEvent::kAfterTransparent) - 5u);//before copy color
             _scene_rt_proxy = MakeScope<SceneRayTracingProxy>();
@@ -213,6 +212,7 @@ namespace Ailu
                         builder.Read(rendering_data._rg_handles._gbuffers[3]);
                         builder.Read(rendering_data._rg_handles._depth_tex);
                         builder.Read(rendering_data._rg_handles._motion_vector_tex);
+                        builder.Read(rendering_data._rg_handles._environment_sky);
                         if (prev_reservoir != nullptr)
                             builder.Read(builder.Import(prev_reservoir));
                         if (curr_reservoir != nullptr)
@@ -269,6 +269,8 @@ namespace Ailu
                         _gi_raytracing_shader->SetBuffer("g_material_data", _scene_rt_proxy->GetMaterialData());
                         _gi_raytracing_shader->SetBuffer("_UnifiedLights", _scene_rt_proxy->GetUnifiedLightData());
                         _gi_raytracing_shader->SetBuffer("_UnifiedLightConfig", _scene_rt_proxy->GetUnifiedLightConfig());
+                        _gi_raytracing_shader->SetTexture("_EnvironmentSky",
+                                                          graph.Resolve<Texture>(data._rg_handles._environment_sky));
                         //_gi_raytracing_shader->SetBuffer("g_perCamData", data._p_per_camera_cbuf);
                         _gi_raytracing_shader->SetTexture("RenderTarget", output);
                         cmd->DispatchRays(_gi_raytracing_shader.get(), rt_scene, static_cast<u16>(data._width), static_cast<u16>(data._height), 1u);
@@ -293,32 +295,34 @@ namespace Ailu
                         const u16 tile_size_y = (u16) ((tile_offset_y + tile_h > h) ? (h - tile_offset_y) : tile_h);
                         if (s_is_debug_collecting && s_debug_collect_begin_frame == s_global_frame_counter - 1)
                             _debug_buffer->SetCounter(0u);
-                        auto [x, y, z] = _gi_compute_shader->CalculateDispatchNum(_kernel_ray_gen, tile_size_x, tile_size_y, 1);
-                        _gi_compute_shader->SetTexture(_kernel_ray_gen, "_GBuffer0",
+                        auto [x, y, z] = _gi_compute_shader->CalculateDispatchNum(_kernel_primary_ray, tile_size_x, tile_size_y, 1);
+                        _gi_compute_shader->SetTexture(_kernel_primary_ray, "_GBuffer0",
                                                        graph.Resolve<Texture>(data._rg_handles._gbuffers[0]));
-                        _gi_compute_shader->SetTexture(_kernel_ray_gen, "_GBuffer1",
+                        _gi_compute_shader->SetTexture(_kernel_primary_ray, "_GBuffer1",
                                                        graph.Resolve<Texture>(data._rg_handles._gbuffers[1]));
-                        _gi_compute_shader->SetTexture(_kernel_ray_gen, "_GBuffer2",
+                        _gi_compute_shader->SetTexture(_kernel_primary_ray, "_GBuffer2",
                                                        graph.Resolve<Texture>(data._rg_handles._gbuffers[2]));
-                        _gi_compute_shader->SetTexture(_kernel_ray_gen, "_GBuffer3",
+                        _gi_compute_shader->SetTexture(_kernel_primary_ray, "_GBuffer3",
                                                        graph.Resolve<Texture>(data._rg_handles._gbuffers[3]));
-                        _gi_compute_shader->SetTexture(_kernel_ray_gen, "_CameraDepthTexture",
+                        _gi_compute_shader->SetTexture(_kernel_primary_ray, "_CameraDepthTexture",
                                                        graph.Resolve<Texture>(data._rg_handles._depth_tex));
-                        _gi_compute_shader->SetTexture(_kernel_ray_gen, "_MotionVectorTexture",
+                        _gi_compute_shader->SetTexture(_kernel_primary_ray, "_MotionVectorTexture",
                                                        graph.Resolve<Texture>(data._rg_handles._motion_vector_tex));
+                        Texture *environment_sky = graph.Resolve<Texture>(data._rg_handles._environment_sky);
+                        _gi_compute_shader->SetTexture(_kernel_primary_ray, "_EnvironmentSky", environment_sky);
                         //_gi_compute_shader->SetBuffer("_debug_rays", _debug_buffer.get());
                         //_gi_compute_shader->SetBuffer("_debug_ray_indices", &*_debug_index_buffer);
                         auto light_count = _scene_rt_proxy->GetUnifiedLightCount();
                         _gi_compute_shader->SetInt("_light_count", light_count);
                         _gi_compute_shader->SetInts("_GI_TileOffset", {(i32) tile_offset_x, (i32) tile_offset_y});
                         _gi_compute_shader->SetInts("_GI_TileSize", {(i32) tile_size_x, (i32) tile_size_y});
-                        _gi_compute_shader->SetTexture(_kernel_ray_gen, "_GI_Texture",
+                        _gi_compute_shader->SetTexture(_kernel_primary_ray, "_GI_Texture",
                                                        graph.Resolve<Texture>(_cur_target_handle));
-                        _gi_compute_shader->SetBuffer(_kernel_ray_gen, "g_prev_reservoir",
+                        _gi_compute_shader->SetBuffer(_kernel_primary_ray, "g_prev_reservoir",
                                                       _is_cur_a ? _reservoir_b.get() : _reservoir_a.get());
-                        _gi_compute_shader->SetBuffer(_kernel_ray_gen, "g_curr_reservoir",
+                        _gi_compute_shader->SetBuffer(_kernel_primary_ray, "g_curr_reservoir",
                                                       _is_cur_a ? _reservoir_a.get() : _reservoir_b.get());
-                        cmd->Dispatch(_gi_compute_shader.get(), _kernel_ray_gen, x, y, 1);
+                        cmd->Dispatch(_gi_compute_shader.get(), _kernel_primary_ray, x, y, 1);
                     } });
             }
             ++_tile_frame_counter;
@@ -350,7 +354,6 @@ namespace Ailu
             graph.AddPass("Debug GI", RDG::PassDesc(), [&, this](RDG::RenderGraphBuilder &builder)
                           {
                     builder.Read(_cur_target_handle);
-                    builder.Read(rendering_data._rg_handles._color_target, EResourceUsage::kWriteRTV);
                     rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target); 
                     }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
                 { 
@@ -372,7 +375,6 @@ namespace Ailu
                               {
                         builder.Read(builder.Import(_debug_buffer.get()));
                         builder.Read(debug_arg_handle, EResourceUsage::kIndirectArgument);
-                        builder.Read(rendering_data._rg_handles._color_target, EResourceUsage::kWriteRTV);
                         builder.Read(rendering_data._rg_handles._depth_target, EResourceUsage::kDSV);
                         rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target);
                         rendering_data._rg_handles._depth_target = builder.Write(rendering_data._rg_handles._depth_target,EResourceUsage::kDSV);
@@ -380,6 +382,8 @@ namespace Ailu
                     [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
                               { 
                         _debug_line_mat->SetBuffer("_ray_list", _debug_buffer.get());
+                        cmd->SetRenderTargetLoadAction(data._rg_handles._color_target, ELoadStoreAction::kLoad);
+                        cmd->SetRenderTargetLoadAction(data._rg_handles._depth_target, ELoadStoreAction::kLoad);
                         cmd->SetRenderTarget(data._rg_handles._color_target,data._rg_handles._depth_target);
                         cmd->DrawProceduralIndirect(&*_debug_line_mat,0,&*_arg_buffer);
                     });

@@ -287,9 +287,15 @@ namespace Ailu
                     return color;
                 if (auto it = composite_target_handles.find(color); it != composite_target_handles.end())
                     return g_pRenderTexturePool->Get(it->second);
+                // The composite target stores LDR color, so it must be an sRGB format: the hardware
+                // then encodes on write and decodes on sample, which keeps the values (and therefore
+                // the final image) identical to a linear target while quantizing perceptually
+                // uniformly.  An 8bit linear target quantizes at 1/255 of the linear range, which
+                // turns dark gradients - and the whole editor UI composited here - into visible
+                // banding.
                 const RTHandle handle = cmd->GetTempRT(color->Width(), color->Height(),
                                                        std::format("UI_Composite_{}", composite_target_handles.size()),
-                                                       ERenderTargetFormat::kDefault, false, true, false);
+                                                       ERenderTargetFormat::kDefault, false, false, false);
                 _pending_backdrop_blur_release_handles.push_back(handle);
                 composite_target_handles[color] = handle;
                 auto *composite = g_pRenderTexturePool->Get(handle);

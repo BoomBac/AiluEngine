@@ -29,8 +29,10 @@ namespace Ailu::Render
         FrameResourceManager::Init();
         ImGuiRenderer::Init();
 	}
-        void GraphicsContext::FinalizeGlobalContext()
-        {
+    void GraphicsContext::FinalizeGlobalContext()
+    {
+        if (g_pGfxContext != nullptr)
+            g_pGfxContext->WaitForGpu();
         ImGuiRenderer::Shutdown();
         ConstBufferPool::ShutDown();
 		GraphicsPipelineStateMgr::Shutdown();

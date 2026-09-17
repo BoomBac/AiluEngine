@@ -222,9 +222,9 @@ namespace Ailu
                                      _depth_handle = builder.Import(_depth);
                                      _color_handle = builder.Write(_color_handle);
                                      _depth_handle = builder.Write(_depth_handle,EResourceUsage::kDSV);
-                                     builder.Read(rendering_data._rg_handles._color_target, EResourceUsage::kWriteRTV);
+                                     builder.Read(rendering_data.FinalColorHandle(), EResourceUsage::kWriteRTV);
                                      builder.Read(rendering_data._rg_handles._depth_target, EResourceUsage::kDSV);
-                                     rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target);
+                                     rendering_data.FinalColorHandle() = builder.Write(rendering_data.FinalColorHandle());
                                      rendering_data._rg_handles._depth_target = builder.Write(rendering_data._rg_handles._depth_target,
                                                                                              EResourceUsage::kDSV);
                                      read_sprite_resources(builder);
@@ -233,7 +233,7 @@ namespace Ailu
                 }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data)
                 {
                 ECS::Register &r = SceneMgr::Get().ActiveScene()->GetRegister();
-                cmd->SetRenderTarget(rendering_data._rg_handles._color_target,
+                cmd->SetRenderTarget(rendering_data.FinalColorHandle(),
                                      rendering_data._rg_handles._depth_target);
                 if (auto &selected = Editor::Selection::SelectedEntities(); selected.size() > 0)
                 {
@@ -406,12 +406,12 @@ namespace Ailu
             graph.AddPass("ApplyOutline", RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
                           {
                     builder.Read(select_buf);
-                    builder.Read(rendering_data._rg_handles._color_target);
-                    rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target);
+                    builder.Read(rendering_data.FinalColorHandle());
+                    rendering_data.FinalColorHandle() = builder.Write(rendering_data.FinalColorHandle());
                 }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data)
                           { 
                     _editor_outline->SetTexture("_SelectBuffer", graph.Resolve<Texture>(select_buf));
-                    cmd->SetRenderTarget(rendering_data._rg_handles._color_target);
+                    cmd->SetRenderTarget(rendering_data.FinalColorHandle());
                     cmd->DrawFullScreenQuad(_editor_outline.get(),2); });
         }
         void PickPass::Execute(GraphicsContext *context, RenderingData &rendering_data)

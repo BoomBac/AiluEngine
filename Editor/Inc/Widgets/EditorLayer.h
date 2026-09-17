@@ -46,6 +46,12 @@ namespace Ailu
             void BuildEditorChrome();
             void UpdateEditorChrome(f32 dt);
             void SaveAllAssets();
+            void StartDeferredLightingCapture();
+            void UpdateDeferredLightingCaptureStatus();
+            // Unattended screenshot: arms the deferred-lighting capture at a fixed frame and
+            // closes the editor once the readback is written.  Inactive unless the
+            // AILU_AUTOCAP_FRAME environment variable is set, so normal editing is unaffected.
+            void UpdateAutoCapture();
 		private:
 			Ref<UI::Widget> _main_widget = nullptr;
             Ref<UI::Widget> _toolbar_widget = nullptr;
@@ -57,6 +63,12 @@ namespace Ailu
             UI::Text *_status_left_text = nullptr;
             UI::Text *_status_right_text = nullptr;
             String _editor_status_message = "Ready";
+            i32 _deferred_lighting_capture_frame_count = 1;
+            u64 _deferred_lighting_capture_session_id = 0u;
+            String _deferred_lighting_capture_status = "Image Capture: Idle";
+            i64 _auto_capture_frame = -1;
+            i64 _auto_capture_tick = 0;
+            bool _auto_capture_done = false;
 			//transform gizmo
             i16 _transform_gizmo_type = -1;
             bool _is_transform_gizmo_snap = false;

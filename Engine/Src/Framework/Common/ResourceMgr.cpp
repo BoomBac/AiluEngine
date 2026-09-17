@@ -349,17 +349,16 @@ namespace Ailu
         ResourceMgr::~ResourceMgr()
         {
                 if (g_pResourceMgr == this)
+                {
+                        AssetReferenceRuntime::SetHandleResolver({});
                         g_pResourceMgr = nullptr;
+                }
         }
 
         void ResourceMgr::Init()
         {
                 AL_ASSERT_MSG(g_pResourceMgr == nullptr, "ResourceMgr already init!");
                 g_pResourceMgr = AL_NEW_TAG(EMemoryTag::kResource, ResourceMgr);
-                AssetReferenceRuntime::SetHandleResolver([](const Guid &guid)
-                {
-                    return ResourceMgr::Get().GetOrCreateAssetHandle<Object>(guid);
-                });
         }
 
         void ResourceMgr::Shutdown()
@@ -514,6 +513,10 @@ namespace Ailu
 	int ResourceMgr::Initialize()
 	{
 		TimerBlock b("-----------------------------------------------------------ResourceMgr::Initialize");
+		AssetReferenceRuntime::SetHandleResolver([](const Guid &guid)
+		{
+			return ResourceMgr::Get().GetOrCreateAssetHandle<Object>(guid);
+		});
 		AL_ASSERT(!s_engine_res_root_path.empty());
 		_derived_data_cache = MakeScope<DerivedDataCache>(s_project_library_root_path);
 		FileManager::SetCurPath(s_engine_res_root_path);

@@ -132,6 +132,7 @@ namespace Ailu::Render
         void Render();
         virtual void Setup();
         void SetPreviewCamera(Camera *camera, RenderTexture *target);
+        bool HasPreviewCamera() const { return _preview_camera != nullptr && _preview_target != nullptr; }
         Renderer *GetRenderer(u16 index = 0) { return index < _renderers.size() ? _renderers[index].get() : nullptr; };
         RenderTexture *GetTarget(u16 index = 0);
         void FrameCleanup();

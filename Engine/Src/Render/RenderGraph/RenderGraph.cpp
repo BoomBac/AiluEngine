@@ -1,4 +1,5 @@
 #include "Render/RenderGraph/RenderGraph.h"
+#include "Render/ImageCapture/Adapters/RenderGraphImageCaptureBridge.h"
 #include "Framework/Common/Hash.hpp"
 #include "Render/GraphicsContext.h"
 #include "Render/CommandBuffer.h"
@@ -183,19 +184,19 @@ namespace Ailu
         void RenderGraph::EndFrame()
         {
             _global_textures.clear();
-            _transient_tex_handles.clear();
-            _transient_buffer_handles.clear();
             for (auto *pass: _passes)
                 _pass_pool.Release(pass);
             _passes.clear();
+            _external_resources.clear();
+            _imported_resource_handles.clear();
+            _transient_tex_handles.clear();
+            _transient_buffer_handles.clear();
             for (auto& it: _transient_resources)
             {
                 auto& [id, node] = it;
                 ReleaseTransientResource(node);
             }
             _transient_resources.clear();
-            for (auto &[id, node]: _external_resources)
-                ResetResourceNodeVersions(node);
             _sorted_passes.clear();
             _compiled_passes.clear();
             _is_compiled = false;
@@ -394,14 +395,22 @@ namespace Ailu
         {
             if (external == nullptr)
                 return RGHandle(0u);
-            auto res_type = external->GetResourceType();
+            const auto res_type = external->GetResourceType();
             if (res_type == EGpuResType::kConstBuffer || res_type == EGpuResType::kGraphicsPSO)
             {
                 AL_ASSERT_MSG(false, "RenderGraph::Import: Unsupported resource type!");
+                return RGHandle(0u);
             }
-            bool is_tex = res_type == EGpuResType::kTexture || res_type == EGpuResType::kRenderTexture;
-            auto& external_pool = is_tex ? _external_tex_handles : _external_buffer_handles;
+            const bool is_tex = res_type == EGpuResType::kTexture || res_type == EGpuResType::kRenderTexture;
             std::lock_guard lock(_mutex);
+            if (auto it = _imported_resource_handles.find(external); it != _imported_resource_handles.end())
+                return it->second;
+
+            const RGHandle handle(s_next_handle_id++);
+            auto [imported_it, inserted] = _imported_resource_handles.emplace(external, handle);
+            if (!inserted)
+                return imported_it->second;
+
             const auto update_external_metadata = [&](ResourceNode &node)
             {
                 node._extern_raw_res = external;
@@ -446,25 +455,12 @@ namespace Ailu
                     }
                 }
             };
-            if (auto it = external_pool.find(external->Name()); it != external_pool.end())
-            {
-                auto &existing = _external_resources[it->second._id];
-                if (existing._extern_raw_res != external)
-                {
-                    LOG_WARNING("RenderGraph::Import: External resource name conflict, re-binding [{}]", external->Name());
-                }
-                update_external_metadata(existing);
-                return it->second;
-            }
-
-            RGHandle handle(s_next_handle_id++);
             ResourceNode node(external->Name());
             update_external_metadata(node);
-            external_pool[node._name] = handle;
-            node._handle_ptr = &external_pool[node._name];
+            node._handle_ptr = &imported_it->second;
             ResetResourceNodeVersions(node);
             _external_resources[handle._id] = node;
-            return handle;
+            return imported_it->second;
         }
 
         GpuResource* RenderGraph::Export(RGHandle handle)
@@ -478,16 +474,6 @@ namespace Ailu
                 it->second._is_transient = false;
                 it->second._is_external = true;
                 auto &&old_handle = std::move(_transient_resources[handle._id]);
-                if (it->second._is_tex)
-                {
-                    _external_tex_handles[it->second._name] = handle;
-                    old_handle._handle_ptr = &_external_tex_handles[it->second._name];
-                }
-                else
-                {
-                    _external_buffer_handles[it->second._name] = handle;
-                    old_handle._handle_ptr = &_external_buffer_handles[it->second._name];
-                }
                 _external_resources[handle._id] = old_handle;
                 _transient_resources.erase(it);
                 return out_res;
@@ -497,8 +483,6 @@ namespace Ailu
 
         RGHandle RenderGraph::GetTexture(const String &name)
         {
-            if (auto iter = _external_tex_handles.find(name); iter != _external_tex_handles.end())
-                return iter->second;
             if (auto iter = _transient_tex_handles.find(name); iter != _transient_tex_handles.end())
                 return iter->second;
             return RGHandle(0u);
@@ -506,8 +490,6 @@ namespace Ailu
 
         RGHandle RenderGraph::GetBuffer(const String &name)
         {
-            if (auto iter = _external_buffer_handles.find(name); iter != _external_buffer_handles.end())
-                return iter->second;
             if (auto iter = _transient_buffer_handles.find(name); iter != _transient_buffer_handles.end())
                 return iter->second;
             return RGHandle(0u);
@@ -957,6 +939,7 @@ namespace Ailu
                     {
                         cmd->RequireState(Resolve<GpuResource>(usage._handle), usage._required_state, usage._sub_resource);
                     }
+                    RenderGraphImageCaptureBridge::TryCaptureActivePassInputs(*this, compiled_pass, *cmd);
                     {
                         PROFILE_BLOCK_GPU(cmd.get(), pass->_name)
                         s_executing_graph = this;
@@ -965,12 +948,34 @@ namespace Ailu
                         s_executing_pass = nullptr;
                         s_executing_graph = nullptr;
                     }
+                    RenderGraphImageCaptureBridge::TryCaptureActivePassOutputs(*this, compiled_pass, *cmd);
                     for (const auto &usage: compiled_pass._final_resource_usages)
                         cmd->RequireState(Resolve<GpuResource>(usage._handle), usage._required_state, usage._sub_resource);
                     context.ExecuteCommandBuffer(cmd);
                     CommandBufferPool::Release(cmd);
                 }
             }
+        }
+
+        String RenderGraph::GetResourceName(RGHandle handle) const
+        {
+            if (auto *node = const_cast<RenderGraph *>(this)->GetResourceNode(handle); node != nullptr)
+                return node->_name;
+            return {};
+        }
+
+        u32 RenderGraph::GetPassNameOrdinal(const CompiledRenderPass &compiled_pass) const
+        {
+            u32 ordinal = 0u;
+            for (const auto &candidate: _compiled_passes)
+            {
+                if (&candidate == &compiled_pass)
+                    break;
+                if (candidate._pass != nullptr && compiled_pass._pass != nullptr &&
+                    candidate._pass->_name == compiled_pass._pass->_name)
+                    ++ordinal;
+            }
+            return ordinal;
         }
         void RenderGraph::ExportToFile(const WString &filename)
         {

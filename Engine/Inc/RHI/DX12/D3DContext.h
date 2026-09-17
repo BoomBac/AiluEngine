@@ -195,6 +195,8 @@ namespace Ailu::RHI::DX12
         void WaitForFence(u64 fence_value) final;
 
         bool IsHardwareRayTracingSupported() const final;
+        bool IsInlineRayTracingSupported() const final;
+        void ReportDeviceRemoved(HRESULT operation_hr, const char *operation);
     private:
         void Destroy();
         void LoadPipeline();
@@ -273,6 +275,8 @@ namespace Ailu::RHI::DX12
         ComPtr<ID3D12CommandSignature> _draw_indexed_cmd_sig;
         Scope<ReadbackBufferPool> _readback_pool;
         bool _is_hardware_ray_tracing_supported = false;
+        bool _is_inline_ray_tracing_supported = false;
+        std::atomic<bool> _has_reported_device_removed = false;
     };
 
 

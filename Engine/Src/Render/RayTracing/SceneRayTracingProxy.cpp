@@ -774,23 +774,26 @@ namespace Ailu::Render
                       });
     }
 
-    void SceneRayTracingProxy::AddRayTracingResourceReads(RDG::RenderGraphBuilder &builder) const
+    void SceneRayTracingProxy::AddTraceResourceReads(RDG::RenderGraphBuilder &builder) const
     {
         std::unordered_set<GPUBuffer *> read_buffers;
         std::unordered_set<IndexBuffer *> read_indices;
         std::unordered_set<RayTracingGeometry *> read_geometries;
         for (const auto &instance_key : FrontSlot()._instance_keys)
         {
-            if (!instance_key._dynamic || instance_key._mesh == nullptr || instance_key._vertex_buffer == nullptr)
+            if (instance_key._mesh == nullptr || instance_key._vertex_buffer == nullptr)
                 continue;
 
-            if (const auto *cached_geometry = FindCachedGeometry(instance_key._mesh, instance_key._vertex_buffer);
-                cached_geometry != nullptr)
+            if (instance_key._dynamic)
             {
-                for (const auto &geometry : cached_geometry->_geometries)
+                if (const auto *cached_geometry = FindCachedGeometry(instance_key._mesh, instance_key._vertex_buffer);
+                    cached_geometry != nullptr)
                 {
-                    if (geometry != nullptr && read_geometries.emplace(geometry.get()).second)
-                        builder.Read(builder.Import(geometry.get()), EResourceUsage::kAccelStructRead);
+                    for (const auto &geometry : cached_geometry->_geometries)
+                    {
+                        if (geometry != nullptr && read_geometries.emplace(geometry.get()).second)
+                            builder.Read(builder.Import(geometry.get()), EResourceUsage::kAccelStructRead);
+                    }
                 }
             }
 
@@ -799,7 +802,8 @@ namespace Ailu::Render
             {
                 if (element._semantic != EVertexSemantic::kPosition &&
                     element._semantic != EVertexSemantic::kNormal &&
-                    element._semantic != EVertexSemantic::kTangent)
+                    element._semantic != EVertexSemantic::kTangent &&
+                    element._semantic != EVertexSemantic::kTexcoord0)
                     continue;
                 auto *stream = instance_key._vertex_buffer->GetGpuStream(element.Stream);
                 if (stream != nullptr && read_buffers.emplace(stream).second)
@@ -992,8 +996,11 @@ namespace Ailu::Render
         dst._normal_tex             = RenderConstants::kInvalidBindlessHandle;
         dst._metallic_roughness_tex = RenderConstants::kInvalidBindlessHandle;
         dst._emission_tex           = RenderConstants::kInvalidBindlessHandle;
+        dst._emission_strength      = 0.0f;
         if (src != nullptr && src->IsStandardLit())
         {
+            // Mirror the raster standard lit path: only the checker id is forwarded, everything else is standard.
+            dst._material_id = src->MaterialID() == EMaterialID::kChecker ? AL_MATERIAL_ID_CHECKER : AL_MATERIAL_ID_STANDARD;
             const auto *albedo_prop = src->MainProperty(ETextureUsage::kAlbedo);
             if (albedo_prop != nullptr)
                 dst._base_color = albedo_prop->GetValue<Vector4f>().xyz;
@@ -1017,7 +1024,15 @@ namespace Ailu::Render
             }
             const auto *emission_prop = src->MainProperty(ETextureUsage::kEmission);
             if (emission_prop != nullptr)
+            {
                 dst._emission = emission_prop->GetValue<Color>().xyz;
+                dst._emission_strength = 1.0f;
+            }
+            if (auto emission_tex = src->MainTex(ETextureUsage::kEmission); emission_tex)
+            {
+                dst._emission_tex = emission_tex->GetBindlessSRVIndex();
+                dst._emission_strength = 1.0f;
+            }
             dst._ior = src->GetFloat("_IOR");
             dst._transmission = src->GetFloat("_Transmission");
         }

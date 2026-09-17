@@ -81,7 +81,11 @@ namespace Ailu::RHI::DX12::ShaderReflectionUtils
         }
         else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_TEXTURE)
         {
-            auto info = Render::ShaderBindResourceInfo{Render::EBindResDescType::kTexture2D, static_cast<uint16_t>(bind_desc.BindPoint), 255u, bind_desc.Name};
+            const auto texture_type = bind_desc.Dimension == D3D_SRV_DIMENSION_TEXTURECUBE
+                ? Render::EBindResDescType::kCubeMap
+                : Render::EBindResDescType::kTexture2D;
+            auto info = Render::ShaderBindResourceInfo{
+                texture_type, static_cast<uint16_t>(bind_desc.BindPoint), 255u, bind_desc.Name};
             info._register_space = static_cast<u16>(bind_desc.Space);
             ret = std::make_pair(bind_desc.Name, info);
         }
@@ -268,6 +272,7 @@ namespace Ailu::RHI::DX12::ShaderReflectionUtils
             switch (desc._res_type)
             {
                 case Render::EBindResDescType::kTexture2D:
+                case Render::EBindResDescType::kCubeMap:
                 case Render::EBindResDescType::kTexture3D:
                 case Render::EBindResDescType::kBuffer:
                 case Render::EBindResDescType::kAccelerationStructure:

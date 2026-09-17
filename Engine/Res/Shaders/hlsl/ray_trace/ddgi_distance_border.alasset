@@ -1,0 +1,11 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "7b8d3f7a-1d0b-4a20-a8b2-5c7e6f3d9b11",
+        "_asset_type": "Ailu::Render::ComputeShader",
+        "_asset_name": "ddgi_distance_border",
+        "_dependencies": []
+    },
+    "_file": "ddgi_distance_border.hlsl",
+    "_kernel": "ProbeDistanceBorder"
+}

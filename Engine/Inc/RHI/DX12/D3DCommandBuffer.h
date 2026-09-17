@@ -154,8 +154,8 @@ namespace Ailu
             void RecordQueueTransition(const D3DResource &resource, Render::EResourceState before_state,
                                         Render::EResourceState after_state, u32 sub_res);
             const D3DResourceStateTracker &StateTracker() const { return _state_tracker; }
-            /// @brief 丢弃录制的资源引用，避免命令缓冲在池中长时间持有资源（如交换链后台缓冲）
-            void ReleaseTrackedResources() final { _state_tracker.ReleaseRecordedResources(); }
+            /// @brief 仅在命令缓冲完成后丢弃录制期间的资源引用。
+            void ReleaseTrackedResources() final;
             /// @brief While a batch is open, barrier recording only appends to the internal cache.
             void BeginResourceBarrierBatch() { _is_batching_barriers = true; }
             void EndResourceBarrierBatch()

@@ -132,9 +132,6 @@ half ComputeAO(float2 uv,float4 texel_size)
     //vnormal.z *= -1;
     float2x2 rot = BuildRotationMatrix(uv);
     float2 noise = float2(Random(uv.xy),Random(uv.yx));
-    //float stride = min(RADIUS / -vpos.z, MAXRADIUSPIXEL) / (STEP_COUNT + 1.0);
-    float stride = (0.1f * RADIUS / -vpos.z) / (STEP_COUNT + 1.0);
-   // if (stride < 1) return 1.0;
     half ao = 0.0;
     float3 pr = GetPosViewSpace(uv + float2(texel_size.x,0.0));
     float3 pl = GetPosViewSpace(uv + float2(-texel_size.x,0.0));
@@ -142,6 +139,12 @@ half ComputeAO(float2 uv,float4 texel_size)
     float3 pb = GetPosViewSpace(uv + float2(0.0,-texel_size.y));
     float3 dPdu = MinDiff(vpos, pr, pl);
     float3 dPdv = MinDiff(vpos, pt, pb) * (texel_size.w * texel_size.x);
+    // stride 的单位是 texel：原来的 (0.1 * RADIUS / -vpos.z) / (STEP_COUNT+1) 缺了「世界单位 → texel」
+    // 的换算，3m 处只有约 0.6 texel/步，6 步跨不到 4 个 texel —— 每个采样点几乎和自身共面，
+    // tanH 还会因为 T≈0 退化，于是 tanS > tanH 几乎不成立、AO 恒等于 1（等于全屏没有遮蔽、没有接触阴影）。
+    // 一个 texel 在世界空间的大小就是 |dPdu| / |dPdv|，所以半径(米) → texel 只差这一次除法。
+    const float texel_world_size = max(min(length(dPdu), length(dPdv)), 1e-5f);
+    const float stride = max(RADIUS / (texel_world_size * (STEP_COUNT + 1.0f)), 1.0f);
     for (int d = 0; d < DIRECTION_COUNT; d++) 
     {
         float2 ray_dir = mul(rot,kDirections[d]);

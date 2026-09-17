@@ -16,7 +16,8 @@ namespace Ailu::Render
 		void Execute(GraphicsContext* context, RenderingData& rendering_data) final;
 		void BeginPass(GraphicsContext* context) final;
 		void EndPass(GraphicsContext* context) final;
-		Vector4f _ao_params = {1.25f,125.f,0.f,0.f};
+		// x = 强度，y = 遮蔽半径（米，1.0 左右适合大范围 AO，0.2~0.5 适合接触阴影），z/w 未使用。
+		Vector4f _ao_params = {1.25f,0.5f,0.f,0.f};
 		bool _is_debug_mode = false;
 		bool _is_half_res = true;
 		bool _is_cbr = false;
