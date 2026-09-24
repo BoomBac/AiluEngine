@@ -16,6 +16,7 @@
 #endif
 
 #ifdef __cplusplus
+    #include <cstddef>
     #include "Framework/Math/ALMath.hpp"
     #define float2 Vector2f
     #define float3 Vector3f
@@ -240,7 +241,7 @@ namespace Ailu::Render
         float  _specular;            // specular weight (dielectric F0 control)
         float _anisotropy;          // anisotropy [0,1], 0 is isotropic, 1 is fully anisotropic
         float  _ior;                 // index of refraction (1.0 ~ 2.5)
-        float  _transmission;             // 1 = opaque, <1 transmission
+        float  _transmission;        // [0,1] 1 = 全部按玻璃折射, <1 的剩余部分按不透明表面着色
 
         // -------------------------------------------------
         // Texture indices (bindless / array)
@@ -253,9 +254,16 @@ namespace Ailu::Render
 
         uint _opacity_tex;
         uint _material_id;           // EMaterialID (AL_MATERIAL_ID_*), decides how the maps above are interpreted
-        uint _reserved0;
+        // RGB 体积吸收系数 (1/世界单位)，Beer-Lambert: T = exp(-sigma_a * 介质内行程)。
+        float3 _sigma_a;
         uint _flags;                 // MaterialFlags
     };
+
+#ifdef __cplusplus
+    static_assert(offsetof(MaterialData, _sigma_a) == 76u, "MaterialData::_sigma_a layout changed");
+    static_assert(offsetof(MaterialData, _flags) == 88u, "MaterialData::_flags layout changed");
+    static_assert(sizeof(MaterialData) == 92u, "MaterialData stride changed");
+#endif
 
     
     struct LBVHNode

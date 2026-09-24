@@ -194,7 +194,7 @@ namespace Ailu::Render
             color.r *= color.a;
             color.g *= color.a;
             color.b *= color.a;
-            return color.xyz;
+            return color.xyz * kPi;
         }
 
         float GetSpotAngleScale(const Vector4f &light_param)
@@ -523,6 +523,8 @@ namespace Ailu::Render
         auto &back_slot = BackSlot();
         ClearSlot(back_slot);
         _has_pending_swap = Rebuild(back_slot, instance_keys, transforms);
+        if (!_has_pending_swap)
+            ClearSlot(FrontSlot());
     }
 
     bool SceneRayTracingProxy::Rebuild(ProxyBufferSlot &slot, const Vector<SceneInstanceKey> &instance_keys, const Vector<Matrix4x4f> &transforms)
@@ -997,6 +999,7 @@ namespace Ailu::Render
         dst._metallic_roughness_tex = RenderConstants::kInvalidBindlessHandle;
         dst._emission_tex           = RenderConstants::kInvalidBindlessHandle;
         dst._emission_strength      = 0.0f;
+        dst._sigma_a                = Vector3f::kZero;
         if (src != nullptr && src->IsStandardLit())
         {
             // Mirror the raster standard lit path: only the checker id is forwarded, everything else is standard.
@@ -1013,7 +1016,7 @@ namespace Ailu::Render
                 dst._metallic = metallic_prop->GetValue<f32>();
             const auto *roughness_prop = src->MainProperty(ETextureUsage::kRoughness);
             if (roughness_prop != nullptr)
-                dst._roughness = std::max(0.03f, roughness_prop->GetValue<f32>());
+                dst._roughness = std::max(0.0f, roughness_prop->GetValue<f32>());
             if (auto normal_tex = src->MainTex(ETextureUsage::kNormal); normal_tex)
             {
                 dst._normal_tex = normal_tex->GetBindlessSRVIndex();
@@ -1035,6 +1038,7 @@ namespace Ailu::Render
             }
             dst._ior = src->GetFloat("_IOR");
             dst._transmission = src->GetFloat("_Transmission");
+            dst._sigma_a = src->GetPathTracerSigmaA();
         }
         //dst._base_color        = Vector3f::kOne;
         //dst._metallic          = src.metallic;

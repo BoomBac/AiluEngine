@@ -346,7 +346,7 @@ namespace Ailu::RHI::DX12
                 }
             }
         }
-        else if (su::BeginWith(line, "float"))//默认所有4字节大小的均为float，所以这里不需要调整其类型
+        else if (su::BeginWith(line, "float") && !su::BeginWith(line, "float4x4"))
         {
             std::regex pattern(R"(^(\w+)\s+(\w+)\s*(\[\d*\])?\s*;)");
             std::smatch matches;
@@ -359,6 +359,17 @@ namespace Ailu::RHI::DX12
                 if (it != bind_res_infos.end())
                 {
                     auto &c = it->second;
+                    if (type_name == "float")
+                    {
+                        c._res_type = (EBindResDescType) (EBindResDescType::kCBufferAttribute |
+                                                          (array_size > 1u ? EBindResDescType::kCBufferFloats :
+                                                                             EBindResDescType::kCBufferFloat));
+                    }
+                    else
+                    {
+                        c._res_type = (EBindResDescType) (EBindResDescType::kCBufferAttribute |
+                                                          EBindResDescType::kCBufferFloats);
+                    }
                     c._array_size = array_size;
                 }
             }
@@ -947,7 +958,16 @@ namespace Ailu::RHI::DX12
                     bind_info._res_type == EBindResDescType::kCubeMap)
                 {
                     auto tex = static_cast<Texture *>(bind_res);
-                    u16 view_index = view_info._view_index == (u16) -1 ? tex->CalculateViewIndex(Texture::ETextureViewType::kSRV, view_info._face, view_info._mipmap, 0) : view_info._view_index;
+                    u16 view_index = view_info._view_index;
+                    if (view_index == static_cast<u16>(-1))
+                    {
+                        view_index = bind_info._res_type == EBindResDescType::kCubeMap &&
+                                     view_info._face == static_cast<u16>(ECubemapFace::kUnknown)
+                                         ? Texture::kMainSRVIndex
+                                         : tex->CalculateViewIndex(Texture::ETextureViewType::kSRV,
+                                                                    static_cast<ECubemapFace>(view_info._face),
+                                                                    view_info._mipmap, 0u);
+                    }
                     BindParams params;
                     params._is_compute_pipeline = true;
                     params._params._texture_binder._sub_res = view_info._sub_res;
@@ -961,14 +981,14 @@ namespace Ailu::RHI::DX12
                     BindParams params;
                     params._is_compute_pipeline = true;
                     params._params._texture_binder._sub_res = view_info._sub_res;
-                    params._params._texture_binder._view_idx = tex->CalculateViewIndex(Texture::ETextureViewType::kUAV, view_info._face, view_info._mipmap, 0);
+                    params._params._texture_binder._view_idx = tex->CalculateViewIndex(Texture::ETextureViewType::kUAV, static_cast<ECubemapFace>(view_info._face), view_info._mipmap, 0);
                     params._slot = bind_info._bind_slot;
                     tex->Bind(cmd, params);
                 }
                 else if (bind_info._res_type == EBindResDescType::kTexture3D)
                 {
                     auto tex = static_cast<Texture3D *>(bind_res);
-                    u16 view_index = view_info._view_index == (u16) -1 ? tex->CalculateViewIndex(Texture::ETextureViewType::kSRV, view_info._face, view_info._mipmap, view_info._slice) : view_info._view_index;
+                    u16 view_index = view_info._view_index == (u16) -1 ? tex->CalculateViewIndex(Texture::ETextureViewType::kSRV, static_cast<ECubemapFace>(view_info._face), view_info._mipmap, view_info._slice) : view_info._view_index;
                     BindParams params;
                     params._is_compute_pipeline = true;
                     params._params._texture_binder._sub_res = view_info._sub_res;
@@ -982,7 +1002,7 @@ namespace Ailu::RHI::DX12
                     BindParams params;
                     params._is_compute_pipeline = true;
                     params._params._texture_binder._sub_res = view_info._sub_res;
-                    params._params._texture_binder._view_idx = tex->CalculateViewIndex(Texture::ETextureViewType::kUAV, view_info._face, view_info._mipmap, view_info._slice);
+                    params._params._texture_binder._view_idx = tex->CalculateViewIndex(Texture::ETextureViewType::kUAV, static_cast<ECubemapFace>(view_info._face), view_info._mipmap, view_info._slice);
                     params._slot = bind_info._bind_slot;
                     tex->Bind(cmd, params);
                 }
@@ -1061,7 +1081,8 @@ namespace Ailu::RHI::DX12
             {
                 native_cmd->SetComputeRootConstantBufferView(entry._slot, entry._addi_info._gpu_handle);
             }
-            else if (entry._resource_type == EBindResDescType::kTexture2D)
+            else if (entry._resource_type == EBindResDescType::kTexture2D ||
+                     entry._resource_type == EBindResDescType::kCubeMap)
             {
                 auto tex = static_cast<Texture *>(resource);
                 params._params._texture_binder._sub_res = entry._sub_res;
@@ -1240,6 +1261,8 @@ namespace Ailu::RHI::DX12
                     LoadAdditionalShaderReflection(_src_file_path, kernel_index, variant_hash);
                     Render::ComputeShaderVariantArtifact new_artifact;
                     GenerateInternalPSO(kernel_index, variant_hash, &new_artifact._root_signature_blob);
+                    cur_variant._binding_layout = Render::BuildShaderBindingLayout(
+                        cur_variant._bind_res_infos, static_cast<u32>(variant_hash));
                     BuildComputeArtifact(kernel_index, variant_hash, key, new_artifact);
                     artifact_cache.Store(key, new_artifact);
                     ++artifact_cache.Stats()._compiled_variant_count;
@@ -1273,6 +1296,8 @@ namespace Ailu::RHI::DX12
             return false;
         _kernels[kernel_index]._thread_num = artifact._thread_group_size;
         HydrateBindingMap(artifact._bindings, kernel_variant._bind_res_infos);
+        kernel_variant._binding_layout = Render::BuildShaderBindingLayout(
+            kernel_variant._bind_res_infos, static_cast<u32>(variant_hash));
         kernel_variant._temp_bind_res_infos.clear();
         kernel_variant._all_dep_file_pathes.clear();
         for (const auto &dependency : artifact._dependencies)

@@ -17,12 +17,13 @@ namespace Ailu::RHI::DX12
         ~D3DRayTracingShader();
         const D3D12_DISPATCH_RAYS_DESC& GetDispatchDesc(u32 w,u32 h, u32 depth);
     private:
-        void DispatchRays(RHICommandBuffer* cmd,uint w, uint h, uint depth) final;
+        void DispatchRays(RHICommandBuffer *cmd, uint w, uint h, uint depth,
+                          const Render::DispatchBindingSnapshot &snapshot) final;
         bool RHICompileImpl(Render::ShaderVariantHash variant_hash, Render::EShaderCompilePolicy policy) final;
         void BuildShaderTables();
         void LoadReflectionInfo(ID3D12LibraryReflection *reflection);
         void GenerateRootSignature();
-        void BindResources(RHICommandBuffer *cmd, const BindState &state);
+        bool BindResources(RHICommandBuffer *cmd, const Render::DispatchBindingSnapshot &snapshot);
     private:
         ComPtr<ID3DBlob> _byte_code;
         ComPtr<ID3D12StateObject> _state_object;

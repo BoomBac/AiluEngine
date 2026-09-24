@@ -24,15 +24,19 @@ namespace Ailu
             return std::format("R:{:.2f} G:{:.2f} B:{:.2f}", color.x, color.y, color.z);
         }
 
-        inline UI::HorizontalBox *AddPropertyRow(UI::UIElement *parent, const String &label, UI::HorizontalBox **out_value_box = nullptr)
+        inline UI::HorizontalBox *AddPropertyRow(UI::UIElement *parent, const String &label,
+                                                 UI::HorizontalBox **out_value_box = nullptr,
+                                                 f32 fill_rate = kPropValueFill)
         {
             auto row = parent->AddChild<UI::HorizontalBox>();
             row->AddChild<UI::Text>(label)->GetSlotAs<UI::LinearSlot>().Margin(kPropLabelMargin)
-                    .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto).FillRate(kPropLabelFill);
+                    .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto)
+                    .FillRate(kPropLabelFill);
 
             auto value_box = row->AddChild<UI::HorizontalBox>();
             value_box->GetSlotAs<UI::LinearSlot>().Margin(kPropValueMargin).CrossAlignment(UI::EAlignment::kRight)
-                    .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto).FillRate(kPropValueFill);
+                    .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto)
+                    .FillRate(fill_rate);
 
             if (out_value_box != nullptr)
                 *out_value_box = value_box;
@@ -164,7 +168,7 @@ namespace Ailu
         inline UI::CheckBox *AddCheckBoxRow(UI::UIElement *parent, const String &label, bool initial_state)
         {
             UI::HorizontalBox *value_box = nullptr;
-            AddPropertyRow(parent, label, &value_box);
+            AddPropertyRow(parent, label, &value_box, kPropLabelFill / kPropValueFill);
             auto checkbox = value_box->AddChild<UI::CheckBox>();
             checkbox->GetSlotAs<UI::LinearSlot>().Margin(kPropInnerMargin).CrossAlignment(UI::EAlignment::kRight)
                     .SizePolicy(UI::ESizePolicy::kAuto, UI::ESizePolicy::kAuto);

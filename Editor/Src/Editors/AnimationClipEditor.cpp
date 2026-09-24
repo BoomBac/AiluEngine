@@ -955,6 +955,7 @@ namespace Ailu
                         MarkDirty();
                     }
                 });
+                id_input->SetIntegerMode();
                 (void)id_input;
                 auto *kind_row = AddPropertyRow(_events_root, "Kind");
                 auto *kind = kind_row->AddChild<UI::Dropdown>(Vector<String>{"Gameplay", "Cosmetic"});

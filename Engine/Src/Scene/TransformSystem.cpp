@@ -144,6 +144,14 @@ namespace Ailu
                     transform->_scale = transform->_local_transform._scale;
                 }
 
+                if (transform->_reset_render_interpolation)
+                {
+                    transform->_prev_world_matrix = transform->_world_matrix;
+                    transform->_prev_position = transform->_position;
+                    transform->_prev_rotation = transform->_rotation;
+                    transform->_prev_scale = transform->_scale;
+                }
+
                 if (!has_previous_world)
                 {
                     transform->_prev_world_matrix = transform->_world_matrix;

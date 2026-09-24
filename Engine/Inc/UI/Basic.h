@@ -226,6 +226,13 @@ namespace Ailu
             void Update(f32 dt) final;
             void SetContent(const String& content, bool trigger_event = true);
             void SetCursorToEnd();
+            void SetIntegerMode(bool enabled = true)
+            {
+                _is_integer_mode = enabled;
+                if (enabled)
+                    _drag_step = 1.0f;
+            }
+            void SetDragStep(f32 step) { _drag_step = std::max(step, 0.000001f); }
             Vector2f MeasureDesiredSize() override;
             bool IsEditing() const { return _is_editing; }
             bool IsDragAdjusting() const { return _is_drag_adjusting; }
@@ -257,8 +264,11 @@ namespace Ailu
             u32 _select_end = 0u;  // 选区结束
             bool _cursor_visible = true;// 当前是否绘制光标
             bool _is_drag_adjusting = false;// 是否正在拖动调整纯数值文本
-            f32 _drag_start_value = 0.0f;  // 纯数值文本开始拖动时的数值
+            bool _is_drag_candidate = false;// 数值框按下后，等待判断是否开始拖动调整
+            f64 _drag_start_value = 0.0;   // 纯数值文本开始拖动时的数值
             f32 _drag_start_x = 0.0f;
+            f32 _drag_step = 0.01f;
+            bool _is_integer_mode = false;
             bool _is_numeric = false;        // 当前文本是否为纯数值
             f32 _cursor_timer = 0.0f;   // 闪烁计时
             f32 _cursor_hold_timer = 0.0f;

@@ -1,0 +1,11 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "a4a6c25d-6d23-4d61-9271-4ddf5c190b2c",
+        "_asset_type": "Ailu::Render::ComputeShader",
+        "_asset_name": "surfel_placement",
+        "_dependencies": []
+    },
+    "_file": "surfel_placement.hlsl",
+    "_kernel": "SurfelGridClearCS"
+}

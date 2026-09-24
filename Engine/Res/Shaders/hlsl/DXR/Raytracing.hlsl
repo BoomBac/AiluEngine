@@ -26,8 +26,7 @@
 #define RAY_FLAG_NONE 0x0
 #endif
 
-static const uint kMaxPathDepth = 3u;
-
+// 路径最大顶点数（界面穿越次数）。
 RaytracingAccelerationStructure Scene : register(t0, space0);
 StructuredBuffer<MaterialData> g_material_data : register(t7);
 

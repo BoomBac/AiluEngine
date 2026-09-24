@@ -71,6 +71,7 @@ namespace Ailu::SceneManagement
         _register.RegisterComponent<ECS::CLightProbe>();
         _register.RegisterComponent<ECS::CLightProbeGroup>();
         _register.RegisterComponent<ECS::DDGIVolumeComponent>();
+        _register.RegisterComponent<ECS::SurfelGIComponent>();
         _register.RegisterComponent<ECS::CRigidBody>();
         _register.RegisterComponent<ECS::CCollider>();
         _register.RegisterComponent<ECS::RigidBody2DComponent>();
@@ -898,6 +899,9 @@ namespace Ailu::SceneManagement
 
             if (!has_history)
                 transform._prev_render_world_matrix = transform._render_world_matrix;
+            else if (transform._reset_render_interpolation)
+                transform._prev_render_world_matrix = transform._render_world_matrix;
+            transform._reset_render_interpolation = false;
         }
     }
 

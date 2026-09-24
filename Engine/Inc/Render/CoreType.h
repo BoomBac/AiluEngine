@@ -324,6 +324,7 @@ namespace Ailu
             u32 _buffer_size = 0u;
             u16 _register_space = 0u;
             u8 _bind_flag = 0u;
+            u16 _array_size = 1u;
         };
 
         class AILU_API ShaderBindingLayout
@@ -344,6 +345,8 @@ namespace Ailu
                 const auto it = _bindings.find(property_id);
                 return it == _bindings.end() ? nullptr : &it->second;
             }
+
+            const std::unordered_map<ShaderPropertyId, ShaderPropertyBinding> &Bindings() const { return _bindings; }
 
         private:
             u32 _version = 0u;
@@ -413,7 +416,6 @@ namespace Ailu
             u8 _bind_slot;
             String _name;
             ShaderPropertyId _property_id = kInvalidShaderPropertyId;
-            GpuResource *_p_res = nullptr;
             ShaderBindResourceInfo *_p_root_cbuf;
             //1 for per obj,2for per mat,4 for per pass,8 for per frame
             u8 _bind_flag = 0u;
@@ -441,6 +443,25 @@ namespace Ailu
         };
 
         using ShaderReflectionResourceMap = std::unordered_map<String, ShaderBindResourceInfo>;
+
+        AILU_API Ref<const ShaderBindingLayout> BuildShaderBindingLayout(const ShaderReflectionResourceMap &bind_res_infos,
+                                                                          u32 version = 0u);
+
+        struct ShaderResourceBindParams
+        {
+            u16 _face = 0u;
+            u16 _mipmap = 0u;
+            u16 _slice = 0u;
+            u32 _sub_res = UINT32_MAX;
+            u16 _view_index = static_cast<u16>(-1);
+            bool _is_internal_cbuf = false;
+        };
+
+        struct ShaderResourceBinding
+        {
+            GpuResource *_resource = nullptr;
+            ShaderResourceBindParams _params{};
+        };
 
         enum class EShaderPropertyType
         {

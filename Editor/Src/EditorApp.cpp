@@ -2,6 +2,7 @@
 #include "Automation/AIAssistant.h"
 #include "Automation/AutomationAdapter.h"
 #include "Automation/AutomationAssetService.h"
+#include "Automation/AutomationCaptureService.h"
 #include "Automation/AutomationDestructiveService.h"
 #include "Automation/AutomationPipeServer.h"
 #include "Automation/AutomationReadModel.h"
@@ -129,6 +130,7 @@ namespace Ailu
                 AutomationReflectionService::Register(_automation_service->Registry());
                 AutomationWriteService::Register(_automation_service->Registry());
                 AutomationDestructiveService::Register(_automation_service->Registry());
+                AutomationCaptureService::Register(_automation_service->Registry());
             }
             {
                 // Built-in AI assistant: talks to the automation services in-process.
@@ -295,6 +297,7 @@ namespace Ailu
                 if (fov > 1.0f)
                     _p_scene_camera->FovH(fov);
             }
+            // 抓帧不在这里改 feature 开关：RayTraceGI 是否激活由渲染器的 shading mode 决定。
             _p_scene_camera->RecalculateMatrix(true);
         }
 

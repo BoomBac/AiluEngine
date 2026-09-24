@@ -950,13 +950,9 @@ namespace Ailu
                 {
                     if (StringUtils::IsNumeric(_content))
                     {
-                        LOG_INFO("begin drag adjust...");
-                        _is_drag_adjusting = true;
-                        _is_selecting = false;
-                        _drag_start_value = std::stof(_content);
+                        _is_drag_candidate = true;
+                        _drag_start_value = std::stod(_content);
                         _drag_start_x = e._mouse_position.x;
-                        Application::Get().SetCursor(ECursorType::kSizeEW);
-                        return;
                     }
                     _is_selecting = true;
                     _select_start = IndexFromMouseX(e._mouse_position.x);
@@ -980,17 +976,28 @@ namespace Ailu
                 {
                     _is_selecting = false;
                     _is_drag_adjusting = false;
+                    _is_drag_candidate = false;
                     Application::Get().SetCursor(ECursorType::kArrow);
                     KeepCursorVisible();
                 }
             };
             OnMouseMove() += [this](UIEvent &e)
             {
+                constexpr f32 kDragStartThreshold = 3.0f;
+                if (_is_drag_candidate && std::abs(e._mouse_position.x - _drag_start_x) >= kDragStartThreshold)
+                {
+                    _is_drag_candidate = false;
+                    _is_drag_adjusting = true;
+                    _is_selecting = false;
+                    _is_editing = false;
+                }
                 if (_is_drag_adjusting)
                 {
-                    const f32 delta = e._mouse_position.x - _drag_start_x;
-                    const f32 new_value = _drag_start_value + delta * std::max(_drag_start_value * 0.02f,0.01f);
-                    const String new_content = std::format("{:.3}", new_value);
+                    const f32 delta = std::trunc(e._mouse_position.x - _drag_start_x);
+                    const f64 new_value = _drag_start_value + delta * _drag_step;
+                    const String new_content = _is_integer_mode
+                                                   ? std::format("{}", static_cast<i64>(std::llround(new_value)))
+                                                   : std::format("{}", static_cast<f32>(new_value));
                     if (_content != new_content)
                     {
                         SetContent(new_content);
@@ -1035,6 +1042,7 @@ namespace Ailu
                 CommitEdit();
                 _is_selecting = false;
                 _is_drag_adjusting = false;
+                _is_drag_candidate = false;
                 _cursor_visible = false;
                 _cursor_timer = 0.0f;
                 _cursor_hold_timer = 0.0f;

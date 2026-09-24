@@ -29,8 +29,6 @@ namespace Ailu::RHI::DX12
         _fence_value = 0u;
         _barrier_cache.reserve(64u);
         _is_executed = false;
-        _p_cmd->SetName(std::format(L"CmdList_{}", _id).c_str());
-        _p_alloc->SetName(std::format(L"CmdAllocator_{}", _id).c_str());
     }
 
     void D3DCommandBuffer::Clear()

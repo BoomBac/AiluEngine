@@ -38,8 +38,13 @@ namespace Ailu
                     {
                         if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
                         {
-                            tcomp->_local_transform._position[i] = opt.value();
-                            context.MarkSceneDirty();
+                            Vector3f position = tcomp->GetLocalPosition();
+                            position[i] = opt.value();
+                            if (tcomp->SetLocalPosition(position))
+                            {
+                                tcomp->ResetRenderInterpolation();
+                                context.MarkSceneDirty();
+                            }
                         }
                     }
                 };
@@ -52,8 +57,11 @@ namespace Ailu
                         {
                             Vector3f euler = Quaternion::EulerAngles(tcomp->_local_transform._rotation);
                             euler[i] = opt.value();
-                            tcomp->_local_transform._rotation = Quaternion::EulerAngles(euler);
-                            context.MarkSceneDirty();
+                            if (tcomp->SetLocalRotation(Quaternion::EulerAngles(euler)))
+                            {
+                                tcomp->ResetRenderInterpolation();
+                                context.MarkSceneDirty();
+                            }
                         }
                     }
                 };
@@ -64,8 +72,13 @@ namespace Ailu
                     {
                         if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
                         {
-                            tcomp->_local_transform._scale[i] = opt.value();
-                            context.MarkSceneDirty();
+                            Vector3f scale = tcomp->GetLocalScale();
+                            scale[i] = opt.value();
+                            if (tcomp->SetLocalScale(scale))
+                            {
+                                tcomp->ResetRenderInterpolation();
+                                context.MarkSceneDirty();
+                            }
                         }
                     }
                 };

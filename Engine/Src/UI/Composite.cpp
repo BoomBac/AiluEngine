@@ -376,6 +376,8 @@ namespace Ailu
                 auto input = hb->AddChild<UI::InputBlock>(std::format("{}", value));
                 input->GetSlotAs<UI::LinearSlot>().Margin({2, 2, 2, 4}).SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto)
                         .FillRate(GetInputFillRate(N));
+                if constexpr (std::is_integral_v<Scalar>)
+                    input->SetIntegerMode();
 
                 input->_on_content_changed +=
                         [property, instance, i, params](String content)
@@ -442,6 +444,10 @@ namespace Ailu
             auto input_block = hb->AddChild<UI::InputBlock>(text);
             input_block->GetSlotAs<UI::LinearSlot>().Margin({2.0f, 0.0f, 2.0f, 2.0f}).SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto)
                     .FillRate(GetInputFillRate(3));
+            if constexpr (std::is_integral_v<T>)
+                input_block->SetIntegerMode();
+            else if (auto *float_params = dynamic_cast<FloatFieldParams *>(params); float_params != nullptr)
+                input_block->SetDragStep(float_params->_step);
             if constexpr (std::is_floating_point_v<T>)
             {
                 input_block->_on_content_changed += [property, instance, params](String content)
@@ -491,6 +497,10 @@ namespace Ailu
             auto input_block = hb->AddChild<UI::InputBlock>(FormatNumericFieldValue(data));
             input_block->GetSlotAs<UI::LinearSlot>().Margin({2.0f, 0.0f, 2.0f, 2.0f}).CrossAlignment(UI::EAlignment::kRight)
                     .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto).FillRate(1.2f);
+            if constexpr (std::is_integral_v<T>)
+                input_block->SetIntegerMode();
+            else if (auto *float_params = dynamic_cast<FloatFieldParams *>(params); float_params != nullptr)
+                input_block->SetDragStep(float_params->_step);
             slider->_on_value_change += [property, instance, params](f32 v)
             {
                 CompositeBuilder::SetPropertyValue(property, instance, static_cast<T>(v), params);

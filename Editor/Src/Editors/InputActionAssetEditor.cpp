@@ -962,6 +962,7 @@ namespace Ailu
             auto *input = AddTextInput(parent, label, std::to_string(value),
                                        [value, on_changed](String content) { on_changed(ParseU32(content, value)); },
                                        label_width);
+            input->SetIntegerMode();
             return input;
         }
 
@@ -971,6 +972,7 @@ namespace Ailu
             auto *input = AddTextInput(parent, label, std::to_string(value),
                                        [value, on_changed](String content) { on_changed(ParseI32(content, value)); },
                                        label_width);
+            input->SetIntegerMode();
             return input;
         }
 

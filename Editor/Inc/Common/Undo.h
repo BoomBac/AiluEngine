@@ -167,9 +167,7 @@ private:                                                                  \
             {
                 for (size_t i = 0; i < _comps.size(); ++i)
                 {
-                    _comps[i]->_local_transform._position = _new_transforms[i]._position;
-                    _comps[i]->_local_transform._rotation = _new_transforms[i]._rotation;
-                    _comps[i]->_local_transform._scale = _new_transforms[i]._scale;
+                    _comps[i]->SetLocalTransform(_new_transforms[i]);
                     LOG_INFO("Exe or redo {} on obj {}", s_name, _obj_names[i]);
                 }
             }
@@ -178,9 +176,7 @@ private:                                                                  \
             {
                 for (size_t i = 0; i < _comps.size(); ++i)
                 {
-                    _comps[i]->_local_transform._position = _old_transforms[i]._position;
-                    _comps[i]->_local_transform._rotation = _old_transforms[i]._rotation;
-                    _comps[i]->_local_transform._scale = _old_transforms[i]._scale;
+                    _comps[i]->SetLocalTransform(_old_transforms[i]);
                     LOG_INFO("Undo {} on obj {}", s_name, _obj_names[i]);
                 }
             }

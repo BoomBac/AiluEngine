@@ -7,6 +7,7 @@
 #include "RHI/DX12/D3DShaderCompiler.h"
 #include "RHI/DX12/D3DShaderReflectionUtils.h"
 #include "Render/Buffer.h"
+#include "Render/RayTracing/RayTracingScene.h"
 #include "Render/Texture.h"
 #include "pch.h"
 
@@ -398,64 +399,58 @@ namespace Ailu::RHI::DX12
     {
     }
 
-    void D3DRayTracingShader::DispatchRays(RHICommandBuffer* cmd,uint w, uint h, uint depth)
+    void D3DRayTracingShader::DispatchRays(RHICommandBuffer *cmd, uint w, uint h, uint depth,
+                                           const Render::DispatchBindingSnapshot &snapshot)
     {
-        std::unique_lock lock(_state_mutex);
-        AL_ASSERT(!_bind_state.empty());
-        if (_bind_state.empty() || _state_object == nullptr)
+        if (_state_object == nullptr || !snapshot._is_ready)
             return;
-
-        auto cur_state = _bind_state.front();
-        _bind_state.pop();
-        lock.unlock();
-
         auto d3dcmd = static_cast<D3DCommandBuffer*>(cmd)->NativeCmdList();
         d3dcmd->SetPipelineState1(_state_object.Get());
         d3dcmd->SetComputeRootSignature(_global_root_signature.Get());
-        BindResources(cmd, cur_state);
+        if (!BindResources(cmd, snapshot))
+            throw HrException(E_INVALIDARG);
         d3dcmd->DispatchRays(&GetDispatchDesc(w, h, depth));
     }
 
-    void D3DRayTracingShader::BindResources(RHICommandBuffer *cmd, const BindState &state)
+    bool D3DRayTracingShader::BindResources(RHICommandBuffer *cmd, const Render::DispatchBindingSnapshot &snapshot)
     {
         auto *d3d_cmd = static_cast<D3DCommandBuffer *>(cmd);
-        for (u16 slot = 0; slot <= state._max_bind_slot; ++slot)
+        bool scene_bound = false;
+        for (u16 index = 0u; index < snapshot._entry_count; ++index)
         {
-            auto it = std::find_if(_bind_res_infos.begin(), _bind_res_infos.end(), [slot](const auto &entry)
-                                   { return entry.second._bind_slot == slot; });
-            if (it == _bind_res_infos.end())
-                continue;
-
-            auto &bind_info = it->second;
-            auto *bind_res = state._bind_res[slot];
+            const auto &entry = snapshot._entries[index];
+            const u16 slot = entry._slot;
+            auto *bind_res = Render::GpuResourceRegistry::Get().Resolve(entry._resource);
             if (bind_res == nullptr)
                 continue;
-
-            const auto &view_info = state._bind_params[slot];
+            if (entry._resource_type == EBindResDescType::kAccelerationStructure &&
+                bind_res == static_cast<Render::GpuResource *>(_scene))
+                scene_bound = true;
             BindParams params;
             params._is_compute_pipeline = true;
             params._slot = slot;
 
-            switch (bind_info._res_type)
+            if (entry._resource_type == EBindResDescType::kConstBufferRaw)
+            {
+                d3d_cmd->NativeCmdList()->SetComputeRootConstantBufferView(slot, entry._addi_info._gpu_handle);
+                continue;
+            }
+            switch (entry._resource_type)
             {
             case EBindResDescType::kTexture2D:
             case EBindResDescType::kCubeMap:
             {
                 auto *tex = static_cast<Texture *>(bind_res);
-                params._params._texture_binder._sub_res = view_info._sub_res;
-                params._params._texture_binder._view_idx = view_info._view_index == static_cast<u16>(-1)
-                                                           ? tex->CalculateViewIndex(Texture::ETextureViewType::kSRV, view_info._face, view_info._mipmap, 0)
-                                                           : view_info._view_index;
+                params._params._texture_binder._sub_res = entry._sub_res;
+                params._params._texture_binder._view_idx = entry._view_index;
                 tex->Bind(cmd, params);
                 break;
             }
             case EBindResDescType::kTexture3D:
             {
                 auto *tex = static_cast<Texture3D *>(bind_res);
-                params._params._texture_binder._sub_res = view_info._sub_res;
-                params._params._texture_binder._view_idx = view_info._view_index == static_cast<u16>(-1)
-                                                           ? tex->CalculateViewIndex(Texture::ETextureViewType::kSRV, view_info._face, view_info._mipmap, view_info._slice)
-                                                           : view_info._view_index;
+                params._params._texture_binder._sub_res = entry._sub_res;
+                params._params._texture_binder._view_idx = entry._view_index;
                 tex->Bind(cmd, params);
                 break;
             }
@@ -463,8 +458,8 @@ namespace Ailu::RHI::DX12
             {
                 auto *tex = static_cast<Texture2D *>(bind_res);
                 params._is_random_access = true;
-                params._params._texture_binder._sub_res = view_info._sub_res;
-                params._params._texture_binder._view_idx = tex->CalculateViewIndex(Texture::ETextureViewType::kUAV, view_info._face, view_info._mipmap, 0);
+                params._params._texture_binder._sub_res = entry._sub_res;
+                params._params._texture_binder._view_idx = entry._view_index;
                 tex->Bind(cmd, params);
                 break;
             }
@@ -472,8 +467,8 @@ namespace Ailu::RHI::DX12
             {
                 auto *tex = static_cast<Texture3D *>(bind_res);
                 params._is_random_access = true;
-                params._params._texture_binder._sub_res = view_info._sub_res;
-                params._params._texture_binder._view_idx = tex->CalculateViewIndex(Texture::ETextureViewType::kUAV, view_info._face, view_info._mipmap, view_info._slice);
+                params._params._texture_binder._sub_res = entry._sub_res;
+                params._params._texture_binder._view_idx = entry._view_index;
                 tex->Bind(cmd, params);
                 break;
             }
@@ -491,8 +486,25 @@ namespace Ailu::RHI::DX12
             }
         }
 
+        if (!scene_bound)
+        {
+            i32 scene_root_slot = -1;
+            if (_binding_layout != nullptr)
+            {
+                const auto *scene_binding = _binding_layout->Find(Render::ShaderPropertyRegistry::Get().Intern("Scene"));
+                if (scene_binding != nullptr)
+                    scene_root_slot = scene_binding->_bind_slot;
+            }
+            LOG_ERROR("DXR DispatchRays aborted: Scene TLAS is missing from dispatch snapshot; "
+                      "scene={}, expected_root_slot={}, snapshot_entries={}",
+                      static_cast<const void *>(_scene), scene_root_slot, snapshot._entry_count);
+            return false;
+        }
+
         const auto bindless_srv_base = D3DDescriptorMgr::Get().GetBindlessSRVBaseGpuHandle();
         const auto bindless_uav_base = D3DDescriptorMgr::Get().GetBindlessUAVBaseGpuHandle();
+        if (_has_bindless_texture2d || _has_bindless_buffer || _has_bindless_rw_texture2d || _has_bindless_rw_buffer)
+            d3d_cmd->SetDescriptorHeap(D3DDescriptorMgr::Get().GetBindHeap(), 1024u);
         if (_has_bindless_texture2d)
             d3d_cmd->NativeCmdList()->SetComputeRootDescriptorTable(_bindless_texture_slot, bindless_srv_base);
         if (_has_bindless_buffer)
@@ -501,6 +513,7 @@ namespace Ailu::RHI::DX12
             d3d_cmd->NativeCmdList()->SetComputeRootDescriptorTable(_bindless_rw_texture_slot, bindless_uav_base);
         if (_has_bindless_rw_buffer)
             d3d_cmd->NativeCmdList()->SetComputeRootDescriptorTable(_bindless_rw_buffer_slot, bindless_uav_base);
+        return true;
     }
 
     const D3D12_DISPATCH_RAYS_DESC& D3DRayTracingShader::GetDispatchDesc(u32 w,u32 h, u32 depth)
@@ -539,6 +552,7 @@ namespace Ailu::RHI::DX12
         LoadReflectionInfo(output._library_reflection.Get());
         _dev = dynamic_cast<D3DContext&>(Render::GraphicsContext::Get()).GetDevice();
         GenerateRootSignature();
+        _binding_layout = Render::BuildShaderBindingLayout(_bind_res_infos, _binding_layout_version++);
         RTPSOBuilder builder;
 
         auto& lib = builder.SetDXILibrary(_byte_code->GetBufferPointer(), _byte_code->GetBufferSize());

@@ -297,6 +297,7 @@ namespace Ailu::Render
             RDG::RGHandle         _addi_shadow_maps;
             RDG::RGHandle         _point_light_shadow_maps;
             RDG::RGHandle         _ao_tex;
+            RDG::RGHandle         _surfel_coverage;
             RDG::RGHandle         _volumetric_fog_accum;
             RDG::RGHandle         _sky_view_lut;
             RDG::RGHandle         _environment_sky;
@@ -337,6 +338,7 @@ namespace Ailu::Render
         {
             _postprocess_input = nullptr;
             _ddgi_lighting = {};
+            _rg_handles._surfel_coverage = {};
         }
     };
 }// namespace Ailu

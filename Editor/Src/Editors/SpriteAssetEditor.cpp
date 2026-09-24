@@ -829,6 +829,7 @@ namespace Ailu
                     .Size(Vector2f(90.0f, 0.0f));
                 auto *input = row->AddChild<UI::InputBlock>(std::to_string(value));
                 input->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
+                input->SetIntegerMode();
                 input->_on_content_changed += std::function<void(String)>(on_changed);
             };
             add_input("Cell Width", *cell_width, [cell_width](String value)

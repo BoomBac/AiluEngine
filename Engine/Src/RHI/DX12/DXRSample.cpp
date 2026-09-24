@@ -119,7 +119,8 @@ namespace Ailu::RHI::DX12
         m_raytracing_shader->SetBuffer("g_perSceneData", g_perSceneData.get());
         m_raytracing_shader->SetBuffer("g_perCamData", g_perCamData.get());
         m_raytracing_shader->SetTexture("RenderTarget", m_uav_output.get());
-        m_raytracing_shader->PushState(raytracing_scene);
-        m_raytracing_shader->DispatchRays(cmd, w, h, 1u);
+        Render::DispatchBindingSnapshot bindings;
+        m_raytracing_shader->CaptureDispatchState(raytracing_scene, bindings);
+        m_raytracing_shader->DispatchRays(cmd, w, h, 1u, bindings);
     }
 }// namespace Ailu::RHI::DX12

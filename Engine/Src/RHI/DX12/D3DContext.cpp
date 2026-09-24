@@ -390,138 +390,139 @@ namespace Ailu::RHI::DX12
     {
         SetThreadName("RenderThread");
         while (!_is_stop.load())
-        {
-            if (Application::Get().State() == EApplicationState::EApplicationState_Exit)
             {
-                _is_stop.store(true);
-                break;
-            }
-            PROFILE_BLOCK_CPU("GpuCommandWorker_FrameLoop")
-            {
-                // 帧边界：上一帧的命令缓冲已全部归还到池中，此时才允许 resize 交换链
-                PROFILE_BLOCK_CPU("GpuCommandWorker_ApplySwapChainResize")
-                _ctx->ApplyPendingSwapChainResizes();
-            }
-            {
-                PROFILE_BLOCK_CPU("GpuCommandWorker_WaitForMain");
-                Application::Get().WaitForMain();
-            }
-            ImageCaptureService::Tick();
+                if (Application::Get().State() == EApplicationState::EApplicationState_Exit)
+                {
+                    _is_stop.store(true);
+                    break;
+                }
+                PROFILE_BLOCK_CPU("GpuCommandWorker_FrameLoop")
+                {
+                    // 帧边界：上一帧的命令缓冲已全部归还到池中，此时才允许 resize 交换链
+                    PROFILE_BLOCK_CPU("GpuCommandWorker_ApplySwapChainResize")
+                    _ctx->ApplyPendingSwapChainResizes();
+                }
+                {
+                    PROFILE_BLOCK_CPU("GpuCommandWorker_WaitForMain");
+                    Application::Get().WaitForMain();
+                }
+                ImageCaptureService::Tick();
 #if AILU_ENABLE_FRAME_DEBUGGER
-            Render::FrameDebugger::FrameCaptureService::BeginFrame(_ctx->GetFrameCount());
+                Render::FrameDebugger::FrameCaptureService::BeginFrame(_ctx->GetFrameCount());
 #endif
-            {
-                PROFILE_BLOCK_CPU("GpuCommandWorker_RunAsync")
-                Vector<Ref<RHICommandBuffer>> recorded_cmds;
-                Vector<WaitHandle> record_jobs;
-                struct PendingGroup
                 {
-                    Ref<CommandGroup> _group;
-                    u32 _cost = 0u;
-                };
-                Vector<PendingGroup> pending_groups;
-                constexpr u32 kMaxRecordBatchCount = 6u;
-                const auto wait_record_jobs = [&record_jobs]()
-                {
-                    PROFILE_BLOCK_CPU("GpuCommandWorker_WaitRecordJobs");
-                for (const auto& job: record_jobs)
-                    JobSystem::Get().Wait(job);
-                record_jobs.clear();
-                };
-                const auto dispatch_pending_records = [&]()
-                {
-                    PROFILE_BLOCK_CPU("GpuCommandWorker_DispatchPendingRecords");
-                    if (pending_groups.empty())
-                        return;
-
-                    const u32 batch_count = std::min<u32>(kMaxRecordBatchCount, static_cast<u32>(pending_groups.size()));
-                    u32 remaining_cost = 0u;
-                    for (const auto& pending: pending_groups)
-                        remaining_cost += pending._cost;
-                    u32 group_index = 0u;
-                    for (u32 batch_index = 0u; batch_index < batch_count; ++batch_index)
+                    PROFILE_BLOCK_CPU("GpuCommandWorker_RunAsync")
+                    Vector<Ref<RHICommandBuffer>> recorded_cmds;
+                    Vector<WaitHandle> record_jobs;
+                    struct PendingGroup
                     {
-                        const u32 groups_left = static_cast<u32>(pending_groups.size()) - group_index;
-                        const u32 batches_left = batch_count - batch_index;
-                        Vector<Ref<CommandGroup>> batch_groups;
-                        const u32 target_cost = (remaining_cost + batches_left - 1u) / batches_left;
-                        u32 batch_cost = 0u;
-                        while (group_index < pending_groups.size())
-                        {
-                            const u32 groups_in_batch = static_cast<u32>(batch_groups.size());
-                            const bool must_leave_group = groups_left - groups_in_batch <= batches_left - 1u;
-                            if (!batch_groups.empty() && (batch_cost >= target_cost || must_leave_group))
-                                break;
-                            batch_cost += pending_groups[group_index]._cost;
-                            batch_groups.emplace_back(std::move(pending_groups[group_index]._group));
-                            ++group_index;
-                        }
-                        if (batch_groups.empty())
-                            break;
-                        remaining_cost -= batch_cost;
+                        Ref<CommandGroup> _group;
+                        u32 _cost = 0u;
+                    };
+                    Vector<PendingGroup> pending_groups;
+                    constexpr u32 kMaxRecordBatchCount = 6u;
+                    const auto wait_record_jobs = [&record_jobs]()
+                    {
+                        PROFILE_BLOCK_CPU("GpuCommandWorker_WaitRecordJobs");
+                        for (const auto& job: record_jobs)
+                            JobSystem::Get().Wait(job);
+                        record_jobs.clear();
+                    };
+                    const auto dispatch_pending_records = [&]()
+                    {
+                        PROFILE_BLOCK_CPU("GpuCommandWorker_DispatchPendingRecords");
+                        if (pending_groups.empty())
+                            return;
 
-                        auto cmd = RHICommandBufferPool::Get(batch_groups.front()->_params._name);
-                        recorded_cmds.emplace_back(cmd);
-                        auto record_job = JobSystem::Get().CreateJob(
-                            "RecordCommandBatch",
-                            [this, groups = std::move(batch_groups), cmd]() mutable
+                        const u32 batch_count = std::min<u32>(kMaxRecordBatchCount,
+                                                              static_cast<u32>(pending_groups.size()));
+                        u32 remaining_cost = 0u;
+                        for (const auto& pending: pending_groups)
+                            remaining_cost += pending._cost;
+                        u32 group_index = 0u;
+                        for (u32 batch_index = 0u; batch_index < batch_count; ++batch_index)
+                        {
+                            const u32 groups_left = static_cast<u32>(pending_groups.size()) - group_index;
+                            const u32 batches_left = batch_count - batch_index;
+                            Vector<Ref<CommandGroup>> batch_groups;
+                            const u32 target_cost = (remaining_cost + batches_left - 1u) / batches_left;
+                            u32 batch_cost = 0u;
+                            while (group_index < pending_groups.size())
                             {
-                                PROFILE_BLOCK_CPU("RecordCommandBatch");
-                                for (auto& group: groups)
-                                    RecordCommandGroup(*group, cmd);
-                            });
-                        record_jobs.emplace_back(JobSystem::Get().Dispatch(record_job));
-                    }
-                    pending_groups.clear();
-                };
-                while (true)
-                {
-                    auto group_opt = _cmd_queue.Pop();
-                    if (group_opt.has_value())
-                    {
-                        auto& group = group_opt.value();
-                        const bool is_end_frame = group._params._is_end_frame;
-                        const bool has_resource_upload = HasResourceUpload(group);
-                        if (g_engine_config.enable_graphics_job && (is_end_frame || has_resource_upload))
-                        {
-                            dispatch_pending_records();
-                            wait_record_jobs();
-                            SubmitRecordedCommandBuffers(recorded_cmds);
+                                const u32 groups_in_batch = static_cast<u32>(batch_groups.size());
+                                const bool must_leave_group = groups_left - groups_in_batch <= batches_left - 1u;
+                                if (!batch_groups.empty() && (batch_cost >= target_cost || must_leave_group))
+                                    break;
+                                batch_cost += pending_groups[group_index]._cost;
+                                batch_groups.emplace_back(std::move(pending_groups[group_index]._group));
+                                ++group_index;
+                            }
+                            if (batch_groups.empty())
+                                break;
+                            remaining_cost -= batch_cost;
+
+                            auto cmd = RHICommandBufferPool::Get(batch_groups.front()->_params._name);
+                            recorded_cmds.emplace_back(cmd);
+                            auto record_job = JobSystem::Get().CreateJob(
+                                "RecordCommandBatch",
+                                [this, groups = std::move(batch_groups), cmd]() mutable
+                                {
+                                    PROFILE_BLOCK_CPU("RecordCommandBatch");
+                                    for (auto& group: groups)
+                                        RecordCommandGroup(*group, cmd);
+                                });
+                            record_jobs.emplace_back(JobSystem::Get().Dispatch(record_job));
                         }
-                        if (g_engine_config.enable_graphics_job && !is_end_frame && !has_resource_upload)
+                        pending_groups.clear();
+                    };
+                    while (true)
+                    {
+                        auto group_opt = _cmd_queue.Pop();
+                        if (group_opt.has_value())
                         {
-                            PROFILE_BLOCK_CPU("GpuCommandWorker_QueuePendingGroup");
-                            const u32 record_cost = EstimateRecordCost(group);
-                            auto group_holder = MakeRef<CommandGroup>(std::move(group_opt.value()));
-                            pending_groups.emplace_back(std::move(group_holder), record_cost);
+                            auto& group = group_opt.value();
+                            const bool is_end_frame = group._params._is_end_frame;
+                            const bool has_resource_upload = HasResourceUpload(group);
+                            if (g_engine_config.enable_graphics_job && (is_end_frame || has_resource_upload))
+                            {
+                                dispatch_pending_records();
+                                wait_record_jobs();
+                                SubmitRecordedCommandBuffers(recorded_cmds);
+                            }
+                            if (g_engine_config.enable_graphics_job && !is_end_frame && !has_resource_upload)
+                            {
+                                PROFILE_BLOCK_CPU("GpuCommandWorker_QueuePendingGroup");
+                                const u32 record_cost = EstimateRecordCost(group);
+                                auto group_holder = MakeRef<CommandGroup>(std::move(group_opt.value()));
+                                pending_groups.emplace_back(std::move(group_holder), record_cost);
+                            }
+                            else
+                            {
+                                PROFILE_BLOCK_CPU("GpuCommandWorker_PrepareGroup");
+                                auto cmd = RHICommandBufferPool::Get(group._params._name);
+                                RecordCommandGroup(group, cmd);
+                                PROFILE_BLOCK_CPU(group._params._name + "_Execute")
+                                _ctx->ExecuteRHICommandBuffer(cmd.get());
+                                RHICommandBufferPool::Release(cmd);
+                            }
+                            if (is_end_frame)
+                            {
+                                PROFILE_BLOCK_CPU("EndFrame")
+                                SubmitRecordedCommandBuffers(recorded_cmds);
+                                EndFrame();
+                                break;
+                            }
                         }
                         else
                         {
-                            PROFILE_BLOCK_CPU("GpuCommandWorker_PrepareGroup");
-                            auto cmd = RHICommandBufferPool::Get(group._params._name);
-                            RecordCommandGroup(group, cmd);
-                            PROFILE_BLOCK_CPU(group._params._name + "_Execute")
-                            _ctx->ExecuteRHICommandBuffer(cmd.get());
-                            RHICommandBufferPool::Release(cmd);
+                            PROFILE_BLOCK_CPU("GpuCommandWorker_WaitForCommand")
+                            if (_is_stop.load())
+                                break;
+                            std::unique_lock<std::mutex> lock(_cmd_wait_mutex);
+                            _cmd_wait_cv.wait(lock, [this] { return _is_stop.load() || !_cmd_queue.Empty(); });
                         }
-                        if (is_end_frame)
-                        {
-                            PROFILE_BLOCK_CPU("EndFrame")
-                            SubmitRecordedCommandBuffers(recorded_cmds);
-                            EndFrame();
-                            break;
-                        }
-                    }
-                    else
-                    {
-                        PROFILE_BLOCK_CPU("GpuCommandWorker_WaitForCommand")
-                        if (_is_stop.load())
-                            break;
-                        std::unique_lock<std::mutex> lock(_cmd_wait_mutex);
-                        _cmd_wait_cv.wait(lock, [this] { return _is_stop.load() || !_cmd_queue.Empty(); });
                     }
                 }
-            }
         }
         LOG_INFO("GpuCommandWorker::RunAsync: Release {} un-executed cmd", _cmd_queue.Size());
         while (!_cmd_queue.Empty()) _cmd_queue.Pop();
@@ -1145,8 +1146,6 @@ namespace Ailu::RHI::DX12
                     std::lock_guard lock(_cmd_fence_mtx);
                     submitted_fence = ++_fence_value;
                     const HRESULT signal_hr = m_commandQueue->Signal(_p_cmd_buffer_fence.Get(), submitted_fence);
-                    if (FAILED(signal_hr))
-                        ReportDeviceRemoved(signal_hr, "ID3D12CommandQueue::Signal");
                     ThrowIfFailed(signal_hr);
                 }
             }
@@ -1663,16 +1662,12 @@ namespace Ailu::RHI::DX12
         ++_fence_value;
         const HRESULT signal_hr = m_commandQueue->Signal(_p_cmd_buffer_fence.Get(), _fence_value);
         if (FAILED(signal_hr))
-            ReportDeviceRemoved(signal_hr, "ID3D12CommandQueue::Signal");
         ThrowIfFailed(signal_hr);
         if (_p_cmd_buffer_fence->GetCompletedValue() < _fence_value)
         {
             const HRESULT event_hr = _p_cmd_buffer_fence->SetEventOnCompletion(_fence_value, _p_cmd_buffer_fence_event);
-            if (FAILED(event_hr))
-                ReportDeviceRemoved(event_hr, "ID3D12Fence::SetEventOnCompletion");
             ThrowIfFailed(event_hr);
             WaitForSingleObjectEx(_p_cmd_buffer_fence_event, INFINITE, FALSE);
-            ReportDeviceRemoved(S_OK, "D3DContext::WaitForGpu");
         }
     }
 
@@ -1682,11 +1677,8 @@ namespace Ailu::RHI::DX12
         if (_p_cmd_buffer_fence->GetCompletedValue() < fence_value)
         {
             const HRESULT event_hr = _p_cmd_buffer_fence->SetEventOnCompletion(fence_value, _p_cmd_buffer_fence_event);
-            if (FAILED(event_hr))
-                ReportDeviceRemoved(event_hr, "ID3D12Fence::SetEventOnCompletion");
             ThrowIfFailed(event_hr);
             WaitForSingleObjectEx(_p_cmd_buffer_fence_event, INFINITE, FALSE);
-            ReportDeviceRemoved(S_OK, "D3DContext::WaitForFence");
         }
     }
 
@@ -3123,8 +3115,7 @@ namespace Ailu::RHI::DX12
             auto *scene = static_cast<RayTracingScene *>(GpuResourceRegistry::Get().Resolve(cmd_dr->_scene));
             if (shader == nullptr)
                 return;
-            shader->SetScene(scene);
-            shader->DispatchRays(d3dcmd, cmd_dr->_w, cmd_dr->_h, cmd_dr->_depth);
+            shader->DispatchRays(d3dcmd, cmd_dr->_w, cmd_dr->_h, cmd_dr->_depth, cmd_dr->_bindings);
         }
         else
         {

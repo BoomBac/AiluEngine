@@ -4,6 +4,7 @@
 #include "Render/CommandBuffer.h"
 #include "Render/GraphicsContext.h"
 #include "Render/ImageCapture/DdsCaptureEncoder.h"
+#include "Render/ImageCapture/PngCaptureEncoder.h"
 
 #include <algorithm>
 #include <cstring>
@@ -320,7 +321,8 @@ ImageCaptureSessionId ImageCaptureService::BeginSequence(const ImageCaptureSeque
         session->_output_directory = std::filesystem::path(root) / std::format(L"session_{}", session_id);
         session->_manifest_path = std::filesystem::path(session->_output_directory) / L"capture.json";
         output_directory = session->_output_directory;
-        unsupported_output_format = session->_desc._output_format != EImageCaptureOutputFormat::kDdsNative;
+        unsupported_output_format = session->_desc._output_format != EImageCaptureOutputFormat::kDdsNative &&
+                                    session->_desc._output_format != EImageCaptureOutputFormat::kPng;
         s_sessions.emplace(session_id, std::move(session));
     }
 
@@ -333,7 +335,7 @@ ImageCaptureSessionId ImageCaptureService::BeginSequence(const ImageCaptureSeque
         ReportError(session_id, std::format("filesystem create failed: {}", exception.what()));
     }
     if (unsupported_output_format)
-        ReportError(session_id, "Only DDS native output is implemented");
+        ReportError(session_id, "Unsupported capture output format (only DDS and PNG are implemented)");
 
     const auto status = GetStatus(session_id);
     LOG_INFO("[ImageCapture] Session {} started: {} frames, interval {}", session_id,
@@ -602,13 +604,17 @@ void ImageCaptureService::CompleteReadback(ImageCaptureReadbackData &&data)
         return;
     }
 
-    const String extension = ".dds";
+    const bool want_png = desc._output_format == EImageCaptureOutputFormat::kPng;
+    const String extension = want_png ? ".png" : ".dds";
     const String file_name = std::format("{}_{:04}{}", desc._file_prefix, data._capture_index, extension);
     const WString file_path = std::filesystem::path(output_directory) / file_name;
-    DdsCaptureEncoder encoder;
+    DdsCaptureEncoder dds_encoder;
+    PngCaptureEncoder png_encoder;
+    ImageCaptureEncoder &encoder = want_png ? static_cast<ImageCaptureEncoder &>(png_encoder)
+                                             : static_cast<ImageCaptureEncoder &>(dds_encoder);
     if (!encoder.Encode(image, file_path, error))
     {
-        ReportError(data._session_id, std::format("DDS encode failed: {}", error));
+        ReportError(data._session_id, std::format("{} encode failed: {}", want_png ? "PNG" : "DDS", error));
         ReleaseReadback(data._session_id, data._readback_id);
         return;
     }

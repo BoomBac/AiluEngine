@@ -780,6 +780,33 @@ namespace Ailu
     };
 
     ASTRUCT()
+    struct AILU_API SceneSurfelGIComponentDocument
+    {
+        GENERATED_BODY()
+
+        APROPERTY()
+        bool _enabled = true;
+        APROPERTY()
+        bool _debug_draw_surfels = true;
+        APROPERTY()
+        bool _debug_coverage = false;
+        APROPERTY()
+        f32 _base_cell_size = 0.125f;
+        APROPERTY()
+        u32 _cascade_count = 5u;
+        APROPERTY()
+        u32 _grid_resolution = 64u;
+        APROPERTY()
+        f32 _target_pixel_radius = 8.0f;
+        APROPERTY(Range(0.0f, 1.0f))
+        f32 _spawn_coverage_threshold = 0.5f;
+        APROPERTY()
+        u32 _max_surfel_count = 262144u;
+        APROPERTY()
+        i32 _debug_cascade = -1;
+    };
+
+    ASTRUCT()
     struct AILU_API SceneEnvironmentComponentDocument
     {
         GENERATED_BODY()
@@ -992,6 +1019,8 @@ namespace Ailu
         inline static const String kLightProbeGroupComponent = "_light_probe_group_component";
         inline static const String kHasDDGIVolumeComponent = "_has_ddgi_volume_component";
         inline static const String kDDGIVolumeComponent = "_ddgi_volume_component";
+        inline static const String kHasSurfelGIComponent = "_has_surfel_gi_component";
+        inline static const String kSurfelGIComponent = "_surfel_gi_component";
         inline static const String kHasEnvironmentComponent = "_has_environment_component";
         inline static const String kEnvironmentComponent = "_environment_component";
         inline static const String kHasRigidbodyComponent = "_has_rigidbody_component";
@@ -1040,6 +1069,9 @@ namespace Ailu
             if (_has_ddgi_volume_component)
                 SerializerWrapper<SceneDDGIVolumeComponentDocument>::Serialize(
                     &_ddgi_volume_component, ar, &kDDGIVolumeComponent);
+            if (_has_surfel_gi_component)
+                SerializerWrapper<SceneSurfelGIComponentDocument>::Serialize(
+                    &_surfel_gi_component, ar, &kSurfelGIComponent);
             if (_has_environment_component)
                 SerializerWrapper<SceneEnvironmentComponentDocument>::Serialize(&_environment_component, ar, &kEnvironmentComponent);
             if (_has_rigidbody_component)
@@ -1113,6 +1145,8 @@ namespace Ailu
                                   kHasLightProbeGroupComponent, kLightProbeGroupComponent);
             deserialize_component(_has_ddgi_volume_component, _ddgi_volume_component,
                                   kHasDDGIVolumeComponent, kDDGIVolumeComponent);
+            deserialize_component(_has_surfel_gi_component, _surfel_gi_component,
+                                  kHasSurfelGIComponent, kSurfelGIComponent);
             deserialize_component(_has_environment_component, _environment_component, kHasEnvironmentComponent, kEnvironmentComponent);
             deserialize_component(_has_rigidbody_component, _rigidbody_component, kHasRigidbodyComponent, kRigidbodyComponent);
             deserialize_component(_has_collider_component, _collider_component, kHasColliderComponent, kColliderComponent);
@@ -1171,6 +1205,10 @@ namespace Ailu
         bool _has_ddgi_volume_component = false;
         APROPERTY()
         SceneDDGIVolumeComponentDocument _ddgi_volume_component;
+        APROPERTY()
+        bool _has_surfel_gi_component = false;
+        APROPERTY()
+        SceneSurfelGIComponentDocument _surfel_gi_component;
         APROPERTY()
         bool _has_environment_component = false;
         APROPERTY()

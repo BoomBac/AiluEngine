@@ -353,9 +353,8 @@ bool EvaluateRISDirectCandidate(
     if (cos_theta <= 1e-6)
         return false;
 
-    float3 h = normalize(light_sample._wi + wo);
     float pdf_brdf = 0.0;
-    float3 f = EvalBRDF(trace_ctx, n, h, wo, light_sample._wi, pdf_brdf);
+    float3 f = EvalBRDF(trace_ctx, n, wo, light_sample._wi, pdf_brdf);
     numerator = light_sample._radiance * f * cos_theta;
     target = max(Luminance(numerator), 0);
     return target > 0.0;
@@ -447,6 +446,8 @@ TraceContext BuildSurfaceTraceContext(Material mat)
     trace_ctx._ior_i = 1.0;
     trace_ctx._ior_t = mat._ior;
     trace_ctx._eta = trace_ctx._ior_i / trace_ctx._ior_t;
+    // 这个上下文只用于对任意方向求值（NEE / MIS），没有采样端的瓣信息，走解析反推
+    trace_ctx._lobe = kBSDFLobeAnalytic;
     return trace_ctx;
 }
 
@@ -469,13 +470,10 @@ bool EvaluateReservoirTargetAtSurface(TinyLightSample sample, Surface surface, o
         return false;
 
     float3 wo = normalize(_CameraPos.xyz - surface._position);
-    float3 h = normalize(wi + wo);
-    if (all(h == 0.0.xxx))
-        return false;
 
     float pdf_brdf = 0.0;
     TraceContext trace_ctx = BuildSurfaceTraceContext(mat);
-    float3 f = EvalBRDF(trace_ctx, surface._normal, h, wo, wi, pdf_brdf);
+    float3 f = EvalBRDF(trace_ctx, surface._normal, wo, wi, pdf_brdf);
     if (all(f == 0.0.xxx))
         return false;
 
@@ -623,8 +621,7 @@ float4 EvaluateSurfaceReSTIRDI(uint2 pixel,float3 world_pos,SurfaceData surface_
             float pdf_brdf = 0.0;
             if (valid)
             {
-                float3 h = normalize(light_sample._wi + wo);
-                EvalBRDF(trace_ctx, n, h, wo, light_sample._wi, pdf_brdf);
+                EvalBRDF(trace_ctx, n, wo, light_sample._wi, pdf_brdf);
             }
             TinyLightSample ts = (TinyLightSample)0;
             ts._light_idx = sampled_light_idx;
@@ -641,7 +638,7 @@ float4 EvaluateSurfaceReSTIRDI(uint2 pixel,float3 world_pos,SurfaceData surface_
         for (uint brdf_candidate_index = 0u; brdf_candidate_index < brdf_candidate_count; ++brdf_candidate_index)
         {
             float3 r3 = float3(rand(ctx), rand(ctx), rand(ctx));
-            SampleBRDFResult result = SampleBRDF(trace_ctx,n,wo,r3.x,r3.y,r3.z);
+            SampleBRDFResult result = SampleBRDF(trace_ctx,n,wo,r3.x,r3.y,r3.z,rand(ctx));
             if (all(result.wi == 0.0.xxx))
                 continue;
 
@@ -650,7 +647,11 @@ float4 EvaluateSurfaceReSTIRDI(uint2 pixel,float3 world_pos,SurfaceData surface_
                 continue;
 
             float pdf_brdf = 0.0;
-            float3 f = EvalBRDF(trace_ctx, n, result.h, wo, result.wi, pdf_brdf);
+            // 回填采样到的瓣与半程向量，否则玻璃的求值会走解析反推、方向与 pdf 都不对
+            TraceContext brdf_ctx = trace_ctx;
+            brdf_ctx._lobe = result._lobe;
+            brdf_ctx._sampled_h = result._h;
+            float3 f = EvalBRDF(brdf_ctx, n, wo, result.wi, pdf_brdf);
             if (pdf_brdf <= 1e-6 || all(f == 0.0.xxx))
                 continue;
 
@@ -701,9 +702,8 @@ float4 EvaluateSurfaceReSTIRDI(uint2 pixel,float3 world_pos,SurfaceData surface_
 
             if (!is_occluded)
             {
-                float3 h = normalize(wi + wo);
                 float pdf_brdf = 0.0;
-                float3 f = EvalBRDF(trace_ctx, n, h, wo, wi, pdf_brdf);
+                float3 f = EvalBRDF(trace_ctx, n, wo, wi, pdf_brdf);
                 radiance.rgb += selected_sample._le * f * cos_theta * r.w_sum;
                 radiance.a = r.w_sum;
             }
@@ -726,11 +726,10 @@ float4 EvaluateSurfaceReSTIRDI(uint2 pixel,float3 world_pos,SurfaceData surface_
             AppendDebugLine(shadow_origin, shadow_origin + light_sample._wi * shadow_ray_tmax, float4(1, 0, 0, 1));
         if (!is_occluded && light_sample._pdf > 1e-6 && cos_theta > 1e-6 && any(light_sample._radiance > 0.0.xxx))
         {
-            float3 h = normalize(light_sample._wi + wo);
             float pdf_brdf_for_light = 0.0;
-            float3 f = EvalBRDF(trace_ctx, n, h, wo, light_sample._wi, pdf_brdf_for_light);
+            float3 f = EvalBRDF(trace_ctx, n, wo, light_sample._wi, pdf_brdf_for_light);
             float weight = PowerHeuristic(light_sample._pdf, pdf_brdf_for_light);
-            radiance.rgb += light_sample._radiance * f * cos_theta / light_sample._pdf;
+            radiance.rgb += light_sample._radiance * f * cos_theta * weight / light_sample._pdf;
         }
     }
 
@@ -893,9 +892,12 @@ void PrimaryRay(CSInput input)
     jitter = (jitter * 2.0 - 1.0) * 0.5;
     uv += jitter * _ScreenParams.xy;
     float3 ray_origin = _CameraPos.xyz;
-    uint depth = 3u;
     float3 ray_dir = normalize(Unproject(uv,1.0f) - ray_origin);
-    float3 color = TracePath(pixel, ray_origin, ray_dir, depth, ctx);
+    // 主光线同样要走满 kMaxPathDepth。
+    // 这里曾经硬编码成 3：闭合玻璃体内的全反射光管路径会被硬截断，
+    // 既不返回几何体也不返回环境，贡献恰好为 0，球体内部因此大面积纯黑。
+    // DXR 后端用的是 kMaxPathDepth，两边必须一致。
+    float3 color = TracePath(pixel, ray_origin, ray_dir, kMaxPathDepth, ctx);
     _GI_Texture[pixel] = float4(color, 1.0);
 }
 

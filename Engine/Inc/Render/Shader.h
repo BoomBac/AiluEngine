@@ -395,21 +395,8 @@ namespace Ailu::Render
     class AILU_API ComputeShader : public GpuResource
     {
         GENERATED_BODY()
-        struct ComputeBindParams
-        {
-            ECubemapFace _face;
-            u16 _mipmap;
-            // depth or array
-            u16 _slice;
-            u32 _sub_res;
-            u16 _view_index = (u16)-1;
-            bool _is_internal_cbuf = false;
-        };
-        struct ComputeResourceBinding
-        {
-            GpuResource *_resource = nullptr;
-            ComputeBindParams _params{};
-        };
+        using ComputeBindParams = ShaderResourceBindParams;
+        using ComputeResourceBinding = ShaderResourceBinding;
         struct KernelElement
         {
             static bool IsKernelKeyword(const KernelElement &ker, const String &kw)
@@ -430,6 +417,7 @@ namespace Ailu::Render
                 std::set<WString> _all_dep_file_pathes;
                 HashMap<String, ShaderBindResourceInfo> _bind_res_infos{};
                 HashMap<String, ShaderBindResourceInfo> _temp_bind_res_infos{};
+                Ref<const ShaderBindingLayout> _binding_layout;
                 std::set<String> _active_keywords;
             };
             ComputeShaderKernelId _id;
@@ -460,30 +448,30 @@ namespace Ailu::Render
         AL_FORCE_INLINE static void SetGlobalBuffer(const String &name, ConstantBuffer *buf)
         {
             std::unique_lock lock(s_global_resource_mutex);
-            s_global_cbuffer_bind_info[name] = buf;
+            s_global_res_registry.SetBuffer(ShaderPropertyRegistry::Get().Intern(name), buf);
         };
         AL_FORCE_INLINE static void SetGlobalBuffer(const String &name, GPUBuffer *buf)
         {
             std::unique_lock lock(s_global_resource_mutex);
-            s_global_buffer_bind_info[name] = buf;
+            s_global_res_registry.SetBuffer(ShaderPropertyRegistry::Get().Intern(name), buf);
         };
         AL_FORCE_INLINE static void SetGlobalTexture(const String &name, Texture *texture)
         {
             if (!ValidatePersistentGlobalTexture(texture))
                 return;
             std::unique_lock lock(s_global_resource_mutex);
-            s_global_textures_bind_info[name] = texture;
+            s_global_res_registry.SetTexture(ShaderPropertyRegistry::Get().Intern(name), texture);
         };
         static void SetGlobalTexture(const String &name, RTHandle texture);
         AL_FORCE_INLINE static void SetGlobalFloat(const String &name, f32 value)
         {
             std::unique_lock lock(s_global_resource_mutex);
-            s_global_floats[name] = value;
+            s_global_floats[ShaderPropertyRegistry::Get().Intern(name)] = value;
         };
         AL_FORCE_INLINE static void SetGlobalInt(const String &name, i32 value)
         {
             std::unique_lock lock(s_global_resource_mutex);
-            s_global_ints[name] = value;
+            s_global_ints[ShaderPropertyRegistry::Get().Intern(name)] = value;
         };
         static bool ValidatePersistentGlobalTexture(Texture *texture);
     public:
@@ -495,7 +483,12 @@ namespace Ailu::Render
         virtual void Bind(RHICommandBuffer *cmd, ComputeShaderKernelId kernel, const ComputeDispatchSnapshot &snapshot)
         { Bind(cmd, kernel); }
         void SetTexture(const String &name, Texture *texture);
+        void SetTexture(ShaderPropertyId property_id, Texture *texture);
+        void SetTexture(ShaderPropertyId property_id, Texture *texture, ECubemapFace face, u16 mipmap);
         void SetTexture(ComputeShaderKernelId kernel, const String &name, Texture *texture);
+        void SetTexture(ComputeShaderKernelId kernel, ShaderPropertyId property_id, Texture *texture);
+        void SetTexture(ComputeShaderKernelId kernel, ShaderPropertyId property_id, Texture *texture,
+                        ECubemapFace face, u16 mipmap);
         void SetTexture(ComputeShaderKernelId kernel, const String &name, RTHandle handle);
         void SetTexture(ComputeShaderKernelId kernel, const String &name, RTHandle handle, ECubemapFace face,
                         u16 mipmap);
@@ -510,35 +503,49 @@ namespace Ailu::Render
         //void SetTexture(const String &name, RDG::RGHandle handle);
         //void SetTexture(const String &name, RDG::RGHandle handle, ECubemapFace face, u16 mipmap);
         void SetFloat(const String &name, f32 value);
+        void SetFloat(ShaderPropertyId property_id, f32 value);
         void SetFloats(const String& name,Vector<f32> values);
+        void SetFloats(ShaderPropertyId property_id, const Vector<f32> &values);
         void SetBool(const String &name, bool value);
+        void SetBool(ShaderPropertyId property_id, bool value);
         void SetInt(const String &name, i32 value);
+        void SetInt(ShaderPropertyId property_id, i32 value);
         void SetInts(const String &name, Vector<i32> values);
+        void SetInts(ShaderPropertyId property_id, const Vector<i32> &values);
         void SetVector(const String &name, Vector4f vector);
+        void SetVector(ShaderPropertyId property_id, Vector4f vector);
         void SetVectorArray(const String& name,const Vector<Vector4f>& vectors);
+        void SetVectorArray(ShaderPropertyId property_id, const Vector<Vector4f> &vectors);
         void SetVectorArray(const String& name,Vector4f* vectors,u16 num);
         /// @brief 为所有kernel的对应名称设置buffer
         /// @param name 
         /// @param buf 
         void SetBuffer(const String &name, ConstantBuffer *buf);
+        void SetBuffer(ShaderPropertyId property_id, ConstantBuffer *buf);
         /// @brief 为所有kernel的对应名称设置buffer
         /// @param name 
         /// @param buf 
         void SetBuffer(const String &name, GPUBuffer *buf);
+        void SetBuffer(ShaderPropertyId property_id, GPUBuffer *buf);
         /// @brief 为指定kernel的对应名称设置buffer
         /// @param kernel 
         /// @param name 
         /// @param buf 
         void SetBuffer(ComputeShaderKernelId kernel,const String &name, ConstantBuffer *buf);
+        void SetBuffer(ComputeShaderKernelId kernel, ShaderPropertyId property_id, ConstantBuffer *buf);
         /// @brief 为指定kernel的对应名称设置buffer
         /// @param kernel 
         /// @param name 
         /// @param buf 
         void SetBuffer(ComputeShaderKernelId kernel,const String &name, GPUBuffer *buf);
+        void SetBuffer(ComputeShaderKernelId kernel, ShaderPropertyId property_id, GPUBuffer *buf);
         void SetAccelerationStructure(ComputeShaderKernelId kernel, const String &name, RayTracingScene *scene);
+        void SetAccelerationStructure(ComputeShaderKernelId kernel, ShaderPropertyId property_id, RayTracingScene *scene);
         void SetAccelerationStructure(const String &name, RayTracingScene *scene);
         void SetMatrix(const String& name,Matrix4x4f mat);
+        void SetMatrix(ShaderPropertyId property_id, Matrix4x4f mat);
         void SetMatrixArray(const String& name,Vector<Matrix4x4f> matrix_arr);
+        void SetMatrixArray(ShaderPropertyId property_id, const Vector<Matrix4x4f> &matrix_arr);
         void GetThreadNum(ComputeShaderKernelId kernel, u16 &x, u16 &y, u16 &z) const;
         i16 NameToSlot(const String &name, ComputeShaderKernelId kernel,ShaderVariantHash variant_hash) const;
         String SlotToName(ComputeShaderKernelId kernel, u16 slot) const;
@@ -588,11 +595,9 @@ namespace Ailu::Render
         };
         inline static std::set<String> s_global_active_keywords;
         inline static HashMap<u32,bool> s_global_variant_update_map{};
-        inline static Map<String, ConstantBuffer *> s_global_cbuffer_bind_info{};
-        inline static Map<String, GPUBuffer *> s_global_buffer_bind_info{};
-        inline static Map<String, Texture *> s_global_textures_bind_info{};
-        inline static Map<String, f32> s_global_floats{};
-        inline static Map<String, i32> s_global_ints{};
+        inline static HashMap<ShaderPropertyId, f32> s_global_floats{};
+        inline static HashMap<ShaderPropertyId, i32> s_global_ints{};
+        inline static ShaderGlobalResourceRegistry s_global_res_registry;
         inline static std::shared_mutex s_global_resource_mutex;
         Vector<KernelElement> _kernels;
         HashMap<ComputeShaderKernelId, u16> _kernel_id_to_index;

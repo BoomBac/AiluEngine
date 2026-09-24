@@ -1338,7 +1338,9 @@ namespace Ailu
             ar.Save(p);
         }
 
-        void EditorLayer::StartDeferredLightingCapture()
+        void EditorLayer::StartRenderGraphCapture(const String &pass_name, const String &resource_name,
+                                                  u32 access_index, bool capture_output, u32 camera_ordinal,
+                                                  const String &file_prefix, u32 frame_count)
         {
             if (_deferred_lighting_capture_session_id != 0u)
             {
@@ -1347,35 +1349,51 @@ namespace Ailu
                 _deferred_lighting_capture_session_id = 0u;
             }
 
-            if (_deferred_lighting_capture_frame_count <= 0)
+            if (frame_count == 0u)
             {
                 _deferred_lighting_capture_status = "Image Capture: frame count must be greater than 0";
                 return;
             }
 
             ImageCaptureSequenceDesc desc;
-            desc._frame_count = static_cast<u32>(_deferred_lighting_capture_frame_count);
+            desc._frame_count = frame_count;
             desc._frame_interval = 1u;
-            desc._file_prefix = "deferred_lighting";
-            desc._output_directory = L"Saved/RenderCapture/DeferredLighting";
+            desc._file_prefix = file_prefix.empty() ? String("capture") : file_prefix;
+            desc._output_format = EImageCaptureOutputFormat::kPng;
+            desc._output_directory = L"Saved/RenderCapture/AutoCapture";
             _deferred_lighting_capture_session_id = ImageCaptureService::BeginSequence(desc);
             if (_deferred_lighting_capture_session_id == 0u)
             {
                 _deferred_lighting_capture_status = "Image Capture: failed to start";
+                LOG_ERROR("[AutoCapture] BeginSequence failed for pass '{}'", pass_name);
                 return;
             }
 
             RenderGraphCaptureSelector selector;
-            selector._pass_name = "DeferredLightingPass";
+            selector._pass_name = pass_name;
             selector._pass_name_ordinal = 0u;
-            selector._resource_name = RenderResourceName::kCameraColorA;
-            selector._input_access_index = 0u;
-            selector._capture_output = true;
-            selector._camera_ordinal = RenderPipeline::Get().HasPreviewCamera() ? 1u : 0u;
+            selector._resource_name = resource_name;
+            selector._input_access_index = access_index;
+            selector._capture_output = capture_output;
+            selector._camera_ordinal = camera_ordinal;
             RenderGraphImageCaptureBridge::SetSelector(_deferred_lighting_capture_session_id, std::move(selector));
             _deferred_lighting_capture_status = std::format(
-                "Image Capture: armed session {} (DeferredLightingPass -> {})",
-                _deferred_lighting_capture_session_id, RenderResourceName::kCameraColorA);
+                "Image Capture: armed session {} ({} -> {})",
+                _deferred_lighting_capture_session_id, pass_name,
+                resource_name.empty() ? String("<any>") : resource_name);
+            LOG_INFO("[AutoCapture] armed session {} pass='{}' resource='{}' output={} frames={}",
+                     _deferred_lighting_capture_session_id, pass_name,
+                     resource_name.empty() ? String("<any>") : resource_name, capture_output, frame_count);
+        }
+
+        void EditorLayer::StartDeferredLightingCapture()
+        {
+            StartRenderGraphCapture("DeferredLightingPass", RenderResourceName::kCameraColorA, 0u, true,
+                                    RenderPipeline::Get().HasPreviewCamera() ? 1u : 0u,
+                                    "deferred_lighting",
+                                    _deferred_lighting_capture_frame_count > 0
+                                        ? static_cast<u32>(_deferred_lighting_capture_frame_count)
+                                        : 0u);
         }
 
         void EditorLayer::UpdateAutoCapture()
@@ -1412,9 +1430,32 @@ namespace Ailu
             // requested tick is the one written out.
             if (_auto_capture_tick == _auto_capture_frame)
             {
+                // 抓哪个 pass / 资源由环境变量决定，默认沿用延迟光照 pass。
+                const auto read_env_string = [](const char *name, const String &fallback) -> String
+                {
+                    char buffer[256] = {};
+                    const DWORD length = GetEnvironmentVariableA(name, buffer, static_cast<DWORD>(sizeof(buffer)));
+                    return (length > 0u && length < sizeof(buffer)) ? String(buffer) : fallback;
+                };
+                const String pass_name = read_env_string("AILU_AUTOCAP_PASS", "DeferredLightingPass");
+                const String resource_name = read_env_string("AILU_AUTOCAP_RESOURCE", String{});
+                // 文件名里不能带空格，pass 名含空格时退回通用前缀。
+                const String prefix = read_env_string("AILU_AUTOCAP_PREFIX",
+                                                      pass_name.find(' ') == String::npos
+                                                          ? pass_name
+                                                          : String("capture"));
+                // 一个 pass 可能有多个输出（RayTrace GI 就是 5 个），默认取第 0 个。
+                char index_buffer[16] = {};
+                const DWORD index_length = GetEnvironmentVariableA("AILU_AUTOCAP_ACCESS_INDEX", index_buffer,
+                                                                   static_cast<DWORD>(sizeof(index_buffer)));
+                const u32 access_index = (index_length > 0u && index_length < sizeof(index_buffer))
+                                             ? static_cast<u32>(std::max(0, std::atoi(index_buffer)))
+                                             : 0u;
                 _deferred_lighting_capture_frame_count = 1;
-                StartDeferredLightingCapture();
-                LOG_INFO("[AutoCapture] capture requested at tick {}", _auto_capture_tick);
+                StartRenderGraphCapture(pass_name, resource_name, access_index, true,
+                                        RenderPipeline::Get().HasPreviewCamera() ? 1u : 0u, prefix, 1u);
+                LOG_INFO("[AutoCapture] capture requested at tick {} for pass '{}' output {}",
+                         _auto_capture_tick, pass_name, access_index);
             }
             else if (_auto_capture_tick > _auto_capture_frame && _deferred_lighting_capture_session_id == 0u)
             {
@@ -2131,7 +2172,9 @@ namespace Ailu
 
             //g_pRenderer->_shadow_distance = shadow_dis_m * 100.0f;
             static bool s_show_anim_clip = false;
-            static bool s_raytracing_pipeline = false;
+            // 光追管线开关只存在于这个调试菜单里、且不持久化，无人值守运行永远拿不到它。
+            // AILU_RAYTRACING_PIPELINE=1 让抓帧运行也能确定性地切到光追管线。
+            static bool s_raytracing_pipeline = true;
             ImGui::Checkbox("Expand", &show);
             ImGui::Checkbox("ShowPlotDemo", &s_show_plot_demo);
             ImGui::Checkbox("ShowAssetTable", &s_show_asset_table);

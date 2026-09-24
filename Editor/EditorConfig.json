@@ -1,13 +1,13 @@
 {
-    "_window_size": [1431, 874],
+    "_window_size": [2560, 1392],
     "_viewport_size": [0, 0],
-    "_position": [4.7919, 3.9798, 7.9822],
-    "_rotation": [0.0255, -0.9737, 0.1403, 0.1772],
+    "_position": [1.7076, 2.7328, 6.1001],
+    "_rotation": [0.0172, -0.9826, 0.1232, 0.1378],
     "_fov": 60.0,
-    "_aspect": 1.75,
-    "_near": 0.1,
-    "_far": 300.0,
-    "_move_speed": 0.2524,
-    "_controller_rot": [16.4083, -159.3709],
+    "_aspect": 1.8461,
+    "_near": 0.0098,
+    "_far": 1000.0,
+    "_move_speed": 0.2339,
+    "_controller_rot": [14.2942, -164.0308],
     "_scene_path": "project://scene/NewScene.almap"
 }

@@ -35,7 +35,10 @@
 //	_MetallicValue("Metallic",Range(0,1)) = 0
 //	_Anisotropy("Anisotropy",Range(0,1)) = 0
 //	_IOR("IOR",Range(0,3)) = 1
-//	_Transmission("_Transmission",Range(0,1)) = 0
+//	_Transmission("Transmission",Range(0,1)) = 0
+	//	_Absorption("Legacy Volume Absorption (per world unit)",Range(0,100)) = 0
+	//	_AttenuationColor("Attenuation Color",Color) = (1,1,1,1)
+	//	_AttenuationDistance("Attenuation Distance",Range(0,1000)) = 1
 //}
 //info end
 

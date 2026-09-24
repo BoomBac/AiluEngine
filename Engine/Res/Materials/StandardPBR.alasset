@@ -25,14 +25,20 @@
             "_value": 0
         }],
     "_float_properties": [{
+            "_name": "_Absorption",
+            "_value": 0.0
+        }, {
             "_name": "_AlphaCulloff",
             "_value": 0.0
         }, {
             "_name": "_Anisotropy",
             "_value": 0.344
         }, {
+            "_name": "_AttenuationDistance",
+            "_value": 0.0
+        }, {
             "_name": "_IOR",
-            "_value": 1.45
+            "_value": 1.5075
         }, {
             "_name": "_MaterialID",
             "_value": 0.0
@@ -41,16 +47,19 @@
             "_value": 0.0
         }, {
             "_name": "_RoughnessValue",
-            "_value": 1.0
+            "_value": 0.0
         }, {
             "_name": "_SamplerMask",
             "_value": 0.0
         }, {
             "_name": "_Transmission",
-            "_value": 0.0
+            "_value": 1.0
         }],
     "_vector_properties": [{
             "_name": "_AlbedoValue",
+            "_value": [0.9998, 0.9998, 0.9998, 1.0]
+        }, {
+            "_name": "_AttenuationColor",
             "_value": [0.9998, 0.9998, 0.9998, 1.0]
         }, {
             "_name": "_EmissionValue",
@@ -76,5 +85,5 @@
             "_name": "_SpecularTex",
             "_texture_guid": ""
         }],
-    "_color_properties": ["_AlbedoValue", "_EmissionValue", "_SpecularValue"]
+    "_color_properties": ["_AlbedoValue", "_AttenuationColor", "_EmissionValue", "_SpecularValue"]
 }

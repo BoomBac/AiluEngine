@@ -12,6 +12,19 @@ namespace
 {
 std::mutex s_selector_mutex;
 std::unordered_map<ImageCaptureSessionId, RenderGraphCaptureSelector> s_selectors;
+// 把每个经过的 pass 及其输出资源名打进日志，便于确定抓帧选择器参数。
+// 默认关闭；排查抓帧配置时设 AILU_CAPTURE_DUMP_PASSES=1 临时打开。
+bool DumpActivePassesEnabled()
+{
+    static const bool s_enabled = []
+    {
+        char buffer[16] = {};
+        const DWORD length = GetEnvironmentVariableA("AILU_CAPTURE_DUMP_PASSES", buffer,
+                                                     static_cast<DWORD>(sizeof(buffer)));
+        return length > 0u && length < sizeof(buffer) && std::atoi(buffer) != 0;
+    }();
+    return s_enabled;
+}
 
 struct SelectorMatchState
 {
@@ -173,6 +186,22 @@ void RenderGraphImageCaptureBridge::TryCaptureActivePassOutputs(RDG::RenderGraph
     }
 
     const u32 pass_ordinal = graph.GetPassNameOrdinal(compiled_pass);
+
+    // 诊断：打印每个经过的 pass 及其输出资源名，便于确认选择器该填什么。
+    // 只在有活跃选择器时打印，正常编辑不产生噪音。
+    if (DumpActivePassesEnabled() && !selectors.empty())
+    {
+        String outputs_text;
+        u32 output_index = 0u;
+        for (const auto &output: compiled_pass._pass->_output_access_records)
+        {
+            outputs_text += std::format("{}[{}]=\"{}\"", output_index == 0u ? "" : " ", output_index,
+                                        graph.GetResourceName(output._handle));
+            ++output_index;
+        }
+        LOG_INFO("[ImageCapture] pass '{}' ordinal {} outputs {}", compiled_pass._pass->_name, pass_ordinal,
+                 outputs_text);
+    }
 
     for (const auto &[session_id, selector]: selectors)
     {

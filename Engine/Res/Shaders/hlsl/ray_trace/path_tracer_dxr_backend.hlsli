@@ -4,6 +4,7 @@
 #include "path_tracer_common.hlsli"
 #include "path_tracer_material.hlsli"
 #include "path_tracer_light_common.hlsli"
+#include "path_tracer_manifold.hlsli"
 
 typedef BuiltInTriangleIntersectionAttributes MyAttributes;
 
@@ -72,10 +73,12 @@ PathHit MakeDxrPathMiss()
     return hit;
 }
 
-PathHit MakeDxrPathLightHit(float3 ray_origin, float3 ray_direction, float light_t, LightSample light_sample)
+PathHit MakeDxrPathLightHit(float3 ray_origin, float3 ray_direction, float light_t, uint light_index,
+                            LightSample light_sample)
 {
     PathHit hit = (PathHit)0;
     hit._type = kPathHitLight;
+    hit._light_index = light_index;
     hit._hit_t = light_t;
     hit._light_pdf = light_sample._pdf;
     hit._world_position = ray_origin + light_t * ray_direction;
@@ -117,6 +120,10 @@ PathHit MakeDxrPathSurfaceHit(RayPayload payload, float3 ray_direction)
 
     hit._type = kPathHitSurface;
     hit._front_face = front_face ? 1u : 0u;
+    hit._primitive_index = payload._primitive_index;
+    hit._triangle_index = payload._triangle_index;
+    hit._material_index = primitive._material_id;
+    hit._barycentrics = payload._barycentrics;
     hit._hit_t = payload._hit_t;
     hit._world_position = mul(primitive._local_to_world, float4(local_position, 1.0f)).xyz;
     hit._geometric_normal = geometric_normal;
@@ -124,6 +131,43 @@ PathHit MakeDxrPathSurfaceHit(RayPayload payload, float3 ray_direction)
     float2 uv = triangle_data.uv0 * barycentrics.x + triangle_data.uv1 * barycentrics.y +
                 triangle_data.uv2 * barycentrics.z;
     hit._material = CreatePathMaterial(g_material_data[primitive._material_id], uv);
+    return hit;
+}
+
+bool LoadPathTriangle(uint primitive_index, uint triangle_index, out ManifoldTriangle triangle_data)
+{
+    triangle_data = (ManifoldTriangle)0;
+    TriangleData source_triangle;
+    if (!LoadDxrPathTriangle(g_primitive_data[primitive_index], triangle_index, source_triangle))
+        return false;
+    const PrimitiveData primitive = g_primitive_data[primitive_index];
+    triangle_data._v0 = mul(primitive._local_to_world, float4(source_triangle.v0, 1.0f)).xyz;
+    triangle_data._v1 = mul(primitive._local_to_world, float4(source_triangle.v1, 1.0f)).xyz;
+    triangle_data._v2 = mul(primitive._local_to_world, float4(source_triangle.v2, 1.0f)).xyz;
+    return true;
+}
+
+PathHit TracePathSegment(float3 ray_origin, float3 ray_direction, float max_t)
+{
+    RayDesc ray;
+    ray.Origin = ray_origin;
+    ray.Direction = ray_direction;
+    ray.TMin = 0.001f;
+    ray.TMax = max_t;
+    RayPayload payload = (RayPayload)0;
+    TraceRay(Scene, RAY_FLAG_NONE, ~0u, 0, 1, 0, ray, payload);
+    if (payload._hit == 0u)
+        return MakeDxrPathMiss();
+    const PrimitiveData primitive = g_primitive_data[payload._primitive_index];
+    if (!IsPathMaterialTransmissive(g_material_data[primitive._material_id]))
+    {
+        PathHit blocker = (PathHit)0;
+        blocker._type = kPathHitSurface;
+        return blocker;
+    }
+    PathHit hit = MakeDxrPathSurfaceHit(payload, ray_direction);
+    if (payload._hit != 0u && hit._type == kPathHitMiss)
+        hit._type = kPathHitSurface;
     return hit;
 }
 
@@ -145,7 +189,7 @@ PathHit TracePathRay(float3 ray_origin, float3 ray_direction)
     bool hit_light = FindClosestUnifiedLightHit(GetUnifiedLightCount(), ray_origin, ray_direction, max_light_t,
                                                 light_index, light_t, light_sample);
     if (hit_light && (payload._hit == 0u || light_t < payload._hit_t))
-        return MakeDxrPathLightHit(ray_origin, ray_direction, light_t, light_sample);
+        return MakeDxrPathLightHit(ray_origin, ray_direction, light_t, light_index, light_sample);
     if (payload._hit == 0u)
         return MakeDxrPathMiss();
     return MakeDxrPathSurfaceHit(payload, ray_direction);
@@ -153,35 +197,17 @@ PathHit TracePathRay(float3 ray_origin, float3 ray_direction)
 
 bool IsPathOccluded(float3 ray_origin, float3 ray_direction, float max_t)
 {
-    float remaining_t = max_t;
-    float3 current_origin = ray_origin;
-
-    [loop]
-    for (uint step = 0u; step < 8u; ++step)
-    {
-        RayDesc ray;
-        ray.Origin = current_origin;
-        ray.Direction = ray_direction;
-        ray.TMin = 0.001f;
-        ray.TMax = remaining_t;
-
-        RayPayload payload = (RayPayload)0;
-        TraceRay(Scene, RAY_FLAG_NONE, ~0u, 0, 1, 0, ray, payload);
-        if (payload._hit == 0u)
-            return false;
-
-        PathHit hit = MakeDxrPathSurfaceHit(payload, ray_direction);
-        if (hit._type != kPathHitSurface || !hit._material._is_glass)
-            return true;
-
-        float adaptive_offset = max(0.001f, payload._hit_t * 1e-4f);
-        current_origin = OffsetPathRayOrigin(hit._world_position, hit._geometric_normal, ray_direction, payload._hit_t);
-        remaining_t -= payload._hit_t + adaptive_offset;
-        if (remaining_t <= 0.0f)
-            return false;
-    }
-    return false;
+    RayDesc ray;
+    ray.Origin = ray_origin;
+    ray.Direction = ray_direction;
+    ray.TMin = 0.001f;
+    ray.TMax = max_t;
+    RayPayload payload = (RayPayload)0;
+    TraceRay(Scene, RAY_FLAG_NONE, ~0u, 0, 1, 0, ray, payload);
+    return payload._hit != 0u;
 }
+
+#include "path_tracer_core.hlsli"
 
 void WriteDxrPathHitPayload(inout RayPayload payload, in MyAttributes attributes)
 {

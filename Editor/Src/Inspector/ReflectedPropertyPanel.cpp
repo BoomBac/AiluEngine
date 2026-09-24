@@ -72,12 +72,17 @@ namespace Ailu
                 return params;
             }
             const bool is_range = ReadMetaBool(property, "IsRange", false);
-            if (!is_range)
+            const Type *property_type = property.GetType();
+            const bool is_numeric = property_type == StaticClass<f32>() || property_type == StaticClass<i32>();
+            if (!is_range && !is_numeric)
                 return nullptr;
 
             auto params = MakeScope<UI::FloatFieldParams>();
-            params->_range.x = ReadMetaFloat(property, "RangeMin", 0.0f);
-            params->_range.y = ReadMetaFloat(property, "RangeMax", 1.0f);
+            if (is_range)
+            {
+                params->_range.x = ReadMetaFloat(property, "RangeMin", 0.0f);
+                params->_range.y = ReadMetaFloat(property, "RangeMax", 1.0f);
+            }
             params->_step = ReadMetaFloat(property, "Step", 0.01f);
             return params;
         }

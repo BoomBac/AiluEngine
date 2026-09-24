@@ -44,7 +44,8 @@ namespace Ailu::Render
         u32 GetUnifiedLightCount() const { return _unified_light_config_cpu._light_count; }
         bool HasRenderableScene() const
         {
-            return _scene_primitive_buffer != nullptr && FrontSlot()._scene != nullptr && FrontSlot()._scene->InstanceCount() > 0u;
+            return !_has_pending_swap && _scene_primitive_buffer != nullptr && FrontSlot()._scene != nullptr &&
+                   FrontSlot()._scene->InstanceCount() > 0u;
         }
 
     private:

@@ -739,7 +739,7 @@ namespace Ailu::Render
             cmd->_h = std::max<u16>(1u, height);
             cmd->_depth = std::max<u16>(1u, depth);
             if (shader != nullptr)
-                shader->PushState(scene);
+                shader->CaptureDispatchState(scene, cmd->_bindings, &_command_resources);
             _commands.emplace_back(cmd);
         }
         void BeginProfiler(const String &name)

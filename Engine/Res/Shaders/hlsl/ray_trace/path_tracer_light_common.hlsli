@@ -169,14 +169,15 @@ LightSample SampleTriangleAreaLight(SampleLightData light, float3 x, inout Rando
     float cos_theta_l = dot(light_normal, -wi);
     if (light._is_double_sided)
         cos_theta_l = abs(cos_theta_l);
-    if (cos_theta_l <= FLOAT_EPSILON)
-        return result;
 
     float area = 0.5 * length(cross(tri.v1 - tri.v0, tri.v2 - tri.v0));
-    result._pdf = PdfSolidAngleFromArea(rcp(max(area, 1e-6)), r2, cos_theta_l);
+    result._pdf_area = rcp(max(area, 1e-6));
+    result._pdf = cos_theta_l > FLOAT_EPSILON ? PdfSolidAngleFromArea(result._pdf_area, r2, cos_theta_l) : 0.0f;
     result._wi = wi;
     result._t = r;
     result._normal = light_normal;
+    result._position = y;
+    result._uv = tri.uv0 * bary0 + tri.uv1 * bary1 + tri.uv2 * bary2;
     result._radiance = EvaluateTriangleLightRadiance(light, tri.uv0 * bary0 + tri.uv1 * bary1 + tri.uv2 * bary2);
     return result;
 }
@@ -203,14 +204,15 @@ LightSample SampleTriangleAreaLight(SampleLightData light, float3 x, float2 rand
     float cos_theta_l = dot(light_normal, -wi);
     if (light._is_double_sided)
         cos_theta_l = abs(cos_theta_l);
-    if (cos_theta_l <= FLOAT_EPSILON)
-        return result;
 
     float area = 0.5 * length(cross(tri.v1 - tri.v0, tri.v2 - tri.v0));
-    result._pdf = PdfSolidAngleFromArea(rcp(max(area, 1e-6)), r2, cos_theta_l);
+    result._pdf_area = rcp(max(area, 1e-6));
+    result._pdf = cos_theta_l > FLOAT_EPSILON ? PdfSolidAngleFromArea(result._pdf_area, r2, cos_theta_l) : 0.0f;
     result._wi = wi;
     result._t = r;
     result._normal = light_normal;
+    result._position = y;
+    result._uv = tri.uv0 * bary0 + tri.uv1 * bary1 + tri.uv2 * bary2;
     result._radiance = EvaluateTriangleLightRadiance(light, tri.uv0 * bary0 + tri.uv1 * bary1 + tri.uv2 * bary2);
     return result;
 }
@@ -465,13 +467,14 @@ bool EvaluateUnifiedLightHit(uint light_num,uint light_index, float3 ray_origin,
     light_sample._wi = ray_dir;
     light_sample._pdf = PdfUnifiedLight(light_index, ray_origin, ray_dir) * GetUnifiedLightSelectionPMF(light_num);
     light_sample._t = light_t;
+    light_sample._position = hit_pos;
     if (light._type == LIGHT_TYPE_TRIANGLE_AREA)
     {
         TriangleData tri = LoadTriangleAreaLightData(light);
         //hit_uv = GetTriangleLightUV(tri, uv);
         light_sample._normal = GetTriangleAreaLightNormal(tri);
     }
-    light_sample._radiance = EvaluateFiniteLightRadiance(light, hit_pos, light_sample._uv);
+    light_sample._radiance = EvaluateFiniteLightRadiance(light, ray_origin, light_sample._uv);
     if (light._type == LIGHT_TYPE_RECT_AREA)
         light_sample._normal = -normalize(cross(light._light_u, light._light_v));
     else if (light._type == LIGHT_TYPE_TRIANGLE_AREA)

@@ -80,6 +80,7 @@ namespace Ailu::Render
         _material_id_offset = other._material_id_offset;
         _sampler_mask = other._sampler_mask;
         _is_standard_lit = other._is_standard_lit;
+        _use_legacy_path_tracer_absorption = other._use_legacy_path_tracer_absorption;
         _property_data_version = other._property_data_version;
         _resource_binding_version = other._resource_binding_version;
         other._p_shader = nullptr;
@@ -116,6 +117,7 @@ namespace Ailu::Render
         _material_id_offset = other._material_id_offset;
         _sampler_mask = other._sampler_mask;
         _is_standard_lit = other._is_standard_lit;
+        _use_legacy_path_tracer_absorption = other._use_legacy_path_tracer_absorption;
         _bind_textures_by_id = other._bind_textures_by_id;
         _bind_buffers_by_id = other._bind_buffers_by_id;
 
@@ -157,6 +159,7 @@ namespace Ailu::Render
         _material_id_offset = other._material_id_offset;
         _sampler_mask = other._sampler_mask;
         _is_standard_lit = other._is_standard_lit;
+        _use_legacy_path_tracer_absorption = other._use_legacy_path_tracer_absorption;
         _property_data_version = other._property_data_version;
         _resource_binding_version = other._resource_binding_version;
         other._p_shader = nullptr;
@@ -585,6 +588,10 @@ namespace Ailu::Render
 
     void Material::SetFloat(ShaderPropertyId property_id, const float &f)
     {
+        if (property_id == ShaderPropertyRegistry::Get().Intern("_Absorption"))
+            _use_legacy_path_tracer_absorption = true;
+        else if (property_id == ShaderPropertyRegistry::Get().Intern("_AttenuationDistance"))
+            _use_legacy_path_tracer_absorption = false;
         if (_p_active_shader == nullptr)
             return;
         const size_t pass_count = std::min({_p_active_shader->_passes.size(), _pass_variants.size(),
@@ -662,6 +669,8 @@ namespace Ailu::Render
 
     void Material::SetVector(ShaderPropertyId property_id, const Vector4f &vector)
     {
+        if (property_id == ShaderPropertyRegistry::Get().Intern("_AttenuationColor"))
+            _use_legacy_path_tracer_absorption = false;
         if (_p_active_shader == nullptr)
             return;
         const size_t pass_count = std::min({_p_active_shader->_passes.size(), _pass_variants.size(),
@@ -740,6 +749,25 @@ namespace Ailu::Render
                 return *reinterpret_cast<float *>(_property_blocks[pass_index]._data + binding->_buffer_offset);
         }
         return 0.0f;
+    }
+
+    Vector3f Material::GetPathTracerSigmaA()
+    {
+        if (_use_legacy_path_tracer_absorption)
+        {
+            const float legacy_absorption = std::max(0.0f, GetFloat("_Absorption"));
+            return Vector3f(legacy_absorption);
+        }
+
+        const Vector3f attenuation_color = GetVector("_AttenuationColor").xyz;
+        const float attenuation_distance = GetFloat("_AttenuationDistance");
+        if (attenuation_distance <= 0.0f)
+            return Vector3f::kZero;
+
+        const Vector3f color(std::clamp(attenuation_color.x, 1e-6f, 1.0f),
+                             std::clamp(attenuation_color.y, 1e-6f, 1.0f),
+                             std::clamp(attenuation_color.z, 1e-6f, 1.0f));
+        return Vector3f(-std::log(color.x), -std::log(color.y), -std::log(color.z)) / attenuation_distance;
     }
     void Material::SetCullMode(ECullMode mode)
     {

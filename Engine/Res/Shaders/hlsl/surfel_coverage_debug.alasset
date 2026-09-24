@@ -1,0 +1,12 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "fb53a7e4-1cb0-4c82-b3e0-66d4fe2a2615",
+        "_asset_type": "Ailu::Render::Shader",
+        "_asset_name": "surfel_coverage_debug",
+        "_dependencies": []
+    },
+    "_file": "surfel_coverage_debug.hlsl",
+    "_vs_entry": "FullscreenVSMain",
+    "_ps_entry": "PSMain"
+}

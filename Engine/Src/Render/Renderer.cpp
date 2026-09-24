@@ -17,6 +17,7 @@
 #include "Render/Features/RTXDI.h"
 #include "Render/Features/VolumetricFog.h"
 #include "Render/Features/DDGI.h"
+#include "Render/Features/SurfelGI.h"
 #include "Render/2D/SpriteRenderFeature.h"
 #include "Render/RenderPipeline.h"
 #include "Render/RenderingData.h"
@@ -77,6 +78,8 @@ namespace Ailu::Render
         _fog = _owned_features.back();
         _owned_features.push_back(AL_NEW_TAG(EMemoryTag::kRenderer, DDGIFeature));
         _ddgi = _owned_features.back();
+        _owned_features.push_back(AL_NEW_TAG(EMemoryTag::kRenderer, SurfelGIFeature));
+        _surfel_gi = _owned_features.back();
         _owned_features.push_back(AL_NEW_TAG(EMemoryTag::kRenderer, SpriteRenderFeature));
         _sprite = _owned_features.back();
         //_features.push_back(_vxgi);
@@ -90,6 +93,7 @@ namespace Ailu::Render
         _features.push_back(_fog);
         _fog->SetActive(true);
         _features.push_back(_ddgi);
+        _features.push_back(_surfel_gi);
         _features.push_back(_sprite);
         _material_data_lut[0] = 0; //default material
         MaterialData miss_mat{};
@@ -104,7 +108,7 @@ namespace Ailu::Render
         _material_data_cache.push_back(miss_mat);
         //_features.push_back(_gpu_terrain);
         //_features.push_back(_taa);
-
+        _is_use_raytracing = true;
     }
 
     Renderer::~Renderer()
@@ -303,6 +307,7 @@ namespace Ailu::Render
             hzb_desc._mip_num = Texture::MaxMipmapCount(hzb_desc._width, hzb_desc._height);
             _rendering_data._rg_handles._hzb = _rd_graph->CreateResource(hzb_desc, RenderResourceName::kHZB);
             _rendering_data._rg_handles._ao_tex = RDG::RGHandle{0u, 0u};
+            _rendering_data._rg_handles._surfel_coverage = RDG::RGHandle{0u, 0u};
             // 由 PostprocessStack 在注册阶段填充；未启用后处理时 FinalBlit 回退到 _color_target。
             _rendering_data._rg_handles._final_color = RDG::RGHandle{};
         }
@@ -1065,6 +1070,7 @@ namespace Ailu::Render
         dst._metallic_roughness_tex = RenderConstants::kInvalidBindlessHandle;
         dst._emission_tex           = RenderConstants::kInvalidBindlessHandle;
         dst._emission_strength      = 0.0f;
+        dst._sigma_a                = Vector3f::kZero;
         if (src != nullptr && src->IsStandardLit())
         {
             // Mirror the raster standard lit path: only the checker id is forwarded, everything else is standard.
@@ -1081,7 +1087,7 @@ namespace Ailu::Render
                 dst._metallic = metallic_prop->GetValue<f32>();
             const auto *roughness_prop = src->MainProperty(ETextureUsage::kRoughness);
             if (roughness_prop != nullptr)
-                dst._roughness = std::max(0.03f, roughness_prop->GetValue<f32>());
+                dst._roughness = std::max(0.0f, roughness_prop->GetValue<f32>());
             if (auto normal_tex = src->MainTex(ETextureUsage::kNormal); normal_tex)
             {
                 dst._normal_tex = normal_tex->GetBindlessSRVIndex();
@@ -1103,6 +1109,7 @@ namespace Ailu::Render
             }
             dst._ior = src->GetFloat("_IOR");
             dst._transmission = src->GetFloat("_Transmission");
+            dst._sigma_a = src->GetPathTracerSigmaA();
         }
         //dst._base_color        = Vector3f::kOne;
         //dst._metallic          = src.metallic;

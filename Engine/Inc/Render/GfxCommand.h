@@ -288,6 +288,7 @@ namespace Ailu::Render
     {
         ShaderHandle _shader;
         GpuResourceHandle _scene;
+        DispatchBindingSnapshot _bindings;
         u16 _w;
         u16 _h;
         u16 _depth;

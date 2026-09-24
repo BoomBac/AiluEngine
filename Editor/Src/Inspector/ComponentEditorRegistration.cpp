@@ -8,6 +8,7 @@
 #include "Inspector/ComponentEditors/LightProbeComponentEditor.h"
 #include "Inspector/ComponentEditors/LightProbeGroupComponentEditor.h"
 #include "Inspector/ComponentEditors/DDGIVolumeComponentEditor.h"
+#include "Inspector/ComponentEditors/SurfelGIComponentEditor.h"
 #include "Inspector/ComponentEditors/EnvironmentComponentEditor.h"
 #include "Inspector/ComponentEditors/RigidBodyComponentEditor.h"
 #include "Inspector/ComponentEditors/ColliderComponentEditor.h"
@@ -43,6 +44,9 @@ namespace Ailu
 
             registry.RegisterCustom<ECS::DDGIVolumeComponent, DDGIVolumeComponentEditor>(
                 "DDGI Volume", "Rendering", 222);
+
+            registry.RegisterCustom<ECS::SurfelGIComponent, SurfelGIComponentEditor>(
+                "Surfel GI", "Rendering", 223);
 
             registry.RegisterCustom<ECS::EnvironmentComponent, EnvironmentComponentEditor>("Environment", "Rendering", 225);
 

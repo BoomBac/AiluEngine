@@ -1,0 +1,12 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "c24fd23c-799d-482e-987c-5a46009df053",
+        "_asset_type": "Ailu::Render::Shader",
+        "_asset_name": "surfel_tile_grid",
+        "_dependencies": []
+    },
+    "_file": "surfel_tile_grid.hlsl",
+    "_vs_entry": "FullscreenVSMain",
+    "_ps_entry": "PSMain"
+}

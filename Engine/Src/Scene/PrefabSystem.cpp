@@ -20,6 +20,7 @@ namespace Ailu::SceneManagement
             if (component_name == ECS::CCamera::StaticTypeName()) return entity_doc._has_camera_component;
             if (component_name == ECS::CLightProbe::StaticTypeName()) return entity_doc._has_lightprobe_component;
             if (component_name == ECS::DDGIVolumeComponent::StaticTypeName()) return entity_doc._has_ddgi_volume_component;
+            if (component_name == ECS::SurfelGIComponent::StaticTypeName()) return entity_doc._has_surfel_gi_component;
             if (component_name == ECS::EnvironmentComponent::StaticTypeName()) return entity_doc._has_environment_component;
             if (component_name == ECS::CRigidBody::StaticTypeName()) return entity_doc._has_rigidbody_component;
             if (component_name == ECS::CCollider::StaticTypeName()) return entity_doc._has_collider_component;
@@ -304,6 +305,23 @@ namespace Ailu::SceneManagement
                 component._debug_mode = document._debug_mode;
                 registry.SetComponentEnabled<ECS::DDGIVolumeComponent>(
                     entity, !is_component_disabled(entity_doc, "DDGIVolumeComponent"));
+            }
+            if (entity_doc._has_surfel_gi_component)
+            {
+                auto &component = registry.AddComponent<ECS::SurfelGIComponent>(entity);
+                const auto &document = entity_doc._surfel_gi_component;
+                component._enabled = document._enabled;
+                component._debug_draw_surfels = document._debug_draw_surfels;
+                component._debug_coverage = document._debug_coverage;
+                component._base_cell_size = document._base_cell_size;
+                component._cascade_count = document._cascade_count;
+                component._grid_resolution = document._grid_resolution;
+                component._target_pixel_radius = document._target_pixel_radius;
+                component._spawn_coverage_threshold = document._spawn_coverage_threshold;
+                component._max_surfel_count = document._max_surfel_count;
+                component._debug_cascade = document._debug_cascade;
+                registry.SetComponentEnabled<ECS::SurfelGIComponent>(
+                    entity, !is_component_disabled(entity_doc, "SurfelGIComponent"));
             }
             if (entity_doc._has_environment_component)
             {
@@ -799,6 +817,25 @@ namespace Ailu::SceneManagement
                 component._debug_mode = document._debug_mode;
                 registry.SetComponentEnabled<ECS::DDGIVolumeComponent>(
                     entity, !IsComponentDisabled(entity_doc, "DDGIVolumeComponent"));
+                refreshed = true;
+            }
+            if (entity_doc._has_surfel_gi_component &&
+                registry.GetComponent<ECS::SurfelGIComponent>(entity) == nullptr)
+            {
+                auto &component = registry.AddComponent<ECS::SurfelGIComponent>(entity);
+                const auto &document = entity_doc._surfel_gi_component;
+                component._enabled = document._enabled;
+                component._debug_draw_surfels = document._debug_draw_surfels;
+                component._debug_coverage = document._debug_coverage;
+                component._base_cell_size = document._base_cell_size;
+                component._cascade_count = document._cascade_count;
+                component._grid_resolution = document._grid_resolution;
+                component._target_pixel_radius = document._target_pixel_radius;
+                component._spawn_coverage_threshold = document._spawn_coverage_threshold;
+                component._max_surfel_count = document._max_surfel_count;
+                component._debug_cascade = document._debug_cascade;
+                registry.SetComponentEnabled<ECS::SurfelGIComponent>(
+                    entity, !IsComponentDisabled(entity_doc, "SurfelGIComponent"));
                 refreshed = true;
             }
             if (entity_doc._has_environment_component)

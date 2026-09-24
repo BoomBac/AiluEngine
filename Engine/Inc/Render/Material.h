@@ -172,6 +172,8 @@ namespace Ailu::Render
         const Map<ShaderPropertyId, GPUBuffer *> &BoundBuffers() const { return _bind_buffers_by_id; }
         float GetFloat(const String &name);
         float GetFloat(ShaderPropertyId property_id);
+        Vector3f GetPathTracerSigmaA();
+        void UsePathTracerAttenuationProperties() { _use_legacy_path_tracer_absorption = false; }
         void SetCullMode(ECullMode mode);
         [[nodiscard]] ECullMode GetCullMode() const;
         [[nodiscard]] ShaderVariantHash ActiveVariantHash(u16 pass_index) const;
@@ -346,6 +348,7 @@ namespace Ailu::Render
         u16 _material_id_offset = 0u;
         u32 _sampler_mask = 0u;
         bool _is_standard_lit = false;
+        bool _use_legacy_path_tracer_absorption = false;
     };
 }// namespace Ailu
 

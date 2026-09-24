@@ -1,0 +1,12 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "6b4cfdb7-67f0-4d49-9324-8c1fbb54f3c1",
+        "_asset_type": "Ailu::Render::Shader",
+        "_asset_name": "surfel_disk",
+        "_dependencies": []
+    },
+    "_file": "surfel_disk.hlsl",
+    "_vs_entry": "VSMain",
+    "_ps_entry": "PSMain"
+}

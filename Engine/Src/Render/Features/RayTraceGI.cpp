@@ -245,7 +245,8 @@ namespace Ailu
                     {
                         auto *rt_scene = _scene_rt_proxy->GetScene();
                         auto *output = graph.Resolve<Texture>(_cur_target_handle);
-                        if (rt_scene == nullptr || !_scene_rt_proxy->HasRenderableScene() || output == nullptr || !rt_scene->IsReady())
+                        if (rt_scene == nullptr || rt_scene->NeedsUpdate() || !_scene_rt_proxy->HasRenderableScene() ||
+                            output == nullptr || !rt_scene->IsReady())
                             return;
 
                         auto cam = *Camera::sCurrent;
@@ -259,7 +260,7 @@ namespace Ailu
                         g_camData._MatrixVP = cam.GetViewProj();
                         g_camData._MatrixVP_NoJitter = cam.GetViewProj();
                         g_camData._MatrixIVP = MatrixInverse(g_camData._MatrixVP);
-                        g_perCamData->SetData((const u8 *) data._p_per_camera_cbuf->GetData(), sizeof(CBufferPerCameraData));
+                        g_perCamData->SetData(reinterpret_cast<const u8 *>(&g_camData), sizeof(CBufferPerCameraData));
             
                         _gi_raytracing_shader->SetScene(rt_scene);
                         _gi_raytracing_shader->SetBuffer("g_primitive_data", _scene_rt_proxy->GetPrimitiveData());
@@ -269,9 +270,8 @@ namespace Ailu
                         _gi_raytracing_shader->SetBuffer("g_material_data", _scene_rt_proxy->GetMaterialData());
                         _gi_raytracing_shader->SetBuffer("_UnifiedLights", _scene_rt_proxy->GetUnifiedLightData());
                         _gi_raytracing_shader->SetBuffer("_UnifiedLightConfig", _scene_rt_proxy->GetUnifiedLightConfig());
-                        _gi_raytracing_shader->SetTexture("_EnvironmentSky",
+                         _gi_raytracing_shader->SetTexture("_EnvironmentSky",
                                                           graph.Resolve<Texture>(data._rg_handles._environment_sky));
-                        //_gi_raytracing_shader->SetBuffer("g_perCamData", data._p_per_camera_cbuf);
                         _gi_raytracing_shader->SetTexture("RenderTarget", output);
                         cmd->DispatchRays(_gi_raytracing_shader.get(), rt_scene, static_cast<u16>(data._width), static_cast<u16>(data._height), 1u);
                         return;

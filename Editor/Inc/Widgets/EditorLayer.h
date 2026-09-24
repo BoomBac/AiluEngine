@@ -47,10 +47,20 @@ namespace Ailu
             void UpdateEditorChrome(f32 dt);
             void SaveAllAssets();
             void StartDeferredLightingCapture();
+            // 抓取任意 render graph pass 的输入/输出。空白 pass 名回退到 DeferredLightingPass，
+            // 保证原有调用点行为不变。
+            void StartRenderGraphCapture(const String &pass_name, const String &resource_name,
+                                         u32 access_index, bool capture_output, u32 camera_ordinal,
+                                         const String &file_prefix, u32 frame_count);
             void UpdateDeferredLightingCaptureStatus();
-            // Unattended screenshot: arms the deferred-lighting capture at a fixed frame and
-            // closes the editor once the readback is written.  Inactive unless the
-            // AILU_AUTOCAP_FRAME environment variable is set, so normal editing is unaffected.
+            // Unattended screenshot: arms a capture at a fixed frame and closes the editor once
+            // the readback is written.  Inactive unless AILU_AUTOCAP_FRAME is set, so normal
+            // editing is unaffected.
+            //   AILU_AUTOCAP_FRAME     tick index to capture at
+            //   AILU_AUTOCAP_PASS      render graph pass name (default DeferredLightingPass)
+            //   AILU_AUTOCAP_RESOURCE  expected resource name (empty accepts any)
+            //   AILU_AUTOCAP_PREFIX    output file prefix (default: pass name)
+            //   AILU_AUTOCAP_FORMAT    "png" (default) or "dds"
             void UpdateAutoCapture();
 		private:
 			Ref<UI::Widget> _main_widget = nullptr;

@@ -242,6 +242,22 @@ namespace Ailu::SceneManagement
             entity_doc._ddgi_volume_component._debug_mode = ddgi_volume->_debug_mode;
             mark_disabled.template operator()<ECS::DDGIVolumeComponent>("DDGIVolumeComponent");
         }
+        if (const auto *surfel_gi = registry.GetComponent<ECS::SurfelGIComponent>(entity); surfel_gi != nullptr)
+        {
+            entity_doc._has_surfel_gi_component = true;
+            auto &document = entity_doc._surfel_gi_component;
+            document._enabled = surfel_gi->_enabled;
+            document._debug_draw_surfels = surfel_gi->_debug_draw_surfels;
+            document._debug_coverage = surfel_gi->_debug_coverage;
+            document._base_cell_size = surfel_gi->_base_cell_size;
+            document._cascade_count = surfel_gi->_cascade_count;
+            document._grid_resolution = surfel_gi->_grid_resolution;
+            document._target_pixel_radius = surfel_gi->_target_pixel_radius;
+            document._spawn_coverage_threshold = surfel_gi->_spawn_coverage_threshold;
+            document._max_surfel_count = surfel_gi->_max_surfel_count;
+            document._debug_cascade = surfel_gi->_debug_cascade;
+            mark_disabled.template operator()<ECS::SurfelGIComponent>("SurfelGIComponent");
+        }
         if (const auto *environment = registry.GetComponent<ECS::EnvironmentComponent>(entity); environment != nullptr)
         {
             entity_doc._has_environment_component = true;
@@ -350,6 +366,7 @@ namespace Ailu::SceneManagement
             ECS::CLightProbe::StaticComponentTypeId(),
             ECS::CLightProbeGroup::StaticComponentTypeId(),
             ECS::DDGIVolumeComponent::StaticComponentTypeId(),
+            ECS::SurfelGIComponent::StaticComponentTypeId(),
             ECS::EnvironmentComponent::StaticComponentTypeId(),
             ECS::CRigidBody::StaticComponentTypeId(),
             ECS::CCollider::StaticComponentTypeId(),

@@ -37,7 +37,7 @@ namespace Ailu::Render
         u32 _binding_mask = 0u;
     };
 
-    struct ComputeBindingSnapshotEntry
+    struct DispatchBindingSnapshotEntry
     {
         GpuResourceHandle _resource;
         BufferDataVersion _data_version;
@@ -53,14 +53,18 @@ namespace Ailu::Render
         PipelineResource::AddiInfo _addi_info;
     };
 
-    struct ComputeDispatchSnapshot
+    using ComputeBindingSnapshotEntry = DispatchBindingSnapshotEntry;
+
+    struct DispatchBindingSnapshot
     {
-        Array<ComputeBindingSnapshotEntry, 32> _entries{};
+        Array<DispatchBindingSnapshotEntry, 32> _entries{};
         Array<u8, 1024> _cbuf_data{};
         u16 _entry_count = 0u;
         u32 _variant_hash = 0u;
         bool _is_ready = false;
     };
+
+    using ComputeDispatchSnapshot = DispatchBindingSnapshot;
 
     struct MaterialDrawState
     {

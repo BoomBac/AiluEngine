@@ -160,6 +160,12 @@ public:                                                                 \
             bool _local_dirty = true;
             bool _world_dirty = true;
             bool _world_to_local_dirty = true;
+            bool _reset_render_interpolation = false;
+
+            void ResetRenderInterpolation()
+            {
+                _reset_render_interpolation = true;
+            }
 
             bool SetLocalPosition(const Vector3f &position)
             {
@@ -197,6 +203,17 @@ public:                                                                 \
                     return false;
 
                 _local_transform._scale = scale;
+                MarkLocalDirty();
+                return true;
+            }
+
+            bool SetLocalTransform(const Transform &transform)
+            {
+                if (_local_transform._position == transform._position && _local_transform._rotation == transform._rotation &&
+                    _local_transform._scale == transform._scale)
+                    return false;
+
+                _local_transform = transform;
                 MarkLocalDirty();
                 return true;
             }
@@ -568,6 +585,39 @@ public:                                                                 \
             f32 _debug_ray_length = 4.0f;
             APROPERTY()
             EDDGIProbeDebugMode _debug_mode = EDDGIProbeDebugMode::kHitType;
+        };
+
+        ASTRUCT()
+        struct AILU_API SurfelGIComponent
+        {
+            GENERATED_BODY()
+
+            DECLARE_COMPONENT(SurfelGIComponent, "Ailu.ECS.SurfelGIComponent")
+
+            APROPERTY()
+            bool _enabled = true;
+            APROPERTY()
+            bool _debug_draw_surfels = true;
+            APROPERTY()
+            bool _debug_coverage = false;
+            APROPERTY()
+            f32 _base_cell_size = 0.125f;
+            APROPERTY()
+            u32 _cascade_count = 5u;
+            APROPERTY()
+            u32 _grid_resolution = 64u;
+            APROPERTY()
+            f32 _target_pixel_radius = 8.0f;
+            APROPERTY(Range(0.0f, 1.0f))
+            f32 _spawn_coverage_threshold = 0.5f;
+            APROPERTY()
+            u32 _max_surfel_count = 262144u;
+            APROPERTY()
+            i32 _debug_cascade = -1;
+
+            bool _debug_draw_tile_grid = false;
+            bool _manual_spawn = true;
+            mutable bool _spawn_once_requested = false;
         };
 
         struct CRigidBody

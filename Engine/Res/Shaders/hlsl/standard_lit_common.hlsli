@@ -22,6 +22,11 @@ PerMaterialCBufferBegin
 	float  _AlphaCulloff;
 	float _IOR;
 	float _Transmission;
+	// 体积吸收系数 (1/世界单位)，Beer-Lambert: T = exp(-_Absorption * 介质内行程)。
+	// Legacy PathTracer property; new materials use attenuation color and distance below.
+	float _Absorption;
+	float4 _AttenuationColor;
+	float _AttenuationDistance;
 PerMaterialCBufferEnd
 
 

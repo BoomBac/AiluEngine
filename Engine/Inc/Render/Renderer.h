@@ -183,6 +183,7 @@ namespace Ailu
             RenderFeature *_rtxdi;
             RenderFeature *_fog;
             RenderFeature *_ddgi;
+            RenderFeature *_surfel_gi;
             RenderFeature *_sprite;
             u64 _active_camera_hash;
 

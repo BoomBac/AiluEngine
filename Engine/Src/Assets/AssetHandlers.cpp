@@ -1068,6 +1068,10 @@ Scope<Asset> MaterialAssetHandler::Load(const AssetLoadContext &context)
             }
             mat->SetVector(prop._name, prop._value);
         }
+        if (std::any_of(doc._vector_properties.begin(), doc._vector_properties.end(), [](const auto &prop) {
+                return prop._name == "_AttenuationColor";
+            }))
+            mat->UsePathTracerAttenuationProperties();
         for (auto &prop : doc._uint_properties)
             mat->SetInt(prop._name, prop._value);
         for (auto &prop : doc._int_vector_properties)
@@ -1859,6 +1863,23 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
             component._debug_probe_radius = document._debug_probe_radius;
             component._debug_ray_length = document._debug_ray_length;
             component._debug_mode = document._debug_mode;
+        }
+        if (entity_doc._has_surfel_gi_component)
+        {
+            auto &component = reg.AddComponent<ECS::SurfelGIComponent>(entity);
+            reg.SetComponentEnabled<ECS::SurfelGIComponent>(
+                entity, !is_component_disabled(entity_doc, "SurfelGIComponent"));
+            const auto &document = entity_doc._surfel_gi_component;
+            component._enabled = document._enabled;
+            component._debug_draw_surfels = document._debug_draw_surfels;
+            component._debug_coverage = document._debug_coverage;
+            component._base_cell_size = document._base_cell_size;
+            component._cascade_count = document._cascade_count;
+            component._grid_resolution = document._grid_resolution;
+            component._target_pixel_radius = document._target_pixel_radius;
+            component._spawn_coverage_threshold = document._spawn_coverage_threshold;
+            component._max_surfel_count = document._max_surfel_count;
+            component._debug_cascade = document._debug_cascade;
         }
         if (entity_doc._has_environment_component)
         {

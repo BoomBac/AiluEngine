@@ -3,7 +3,7 @@
 
 #include "rt_common.hlsli"
 
-TextureCube _EnvironmentSky;
+TextureCube _EnvironmentSky : register(t3, space0);
 
 float3 RotatePathEnvironmentDirection(float3 direction)
 {
