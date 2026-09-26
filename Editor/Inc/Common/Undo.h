@@ -167,7 +167,8 @@ private:                                                                  \
             {
                 for (size_t i = 0; i < _comps.size(); ++i)
                 {
-                    _comps[i]->SetLocalTransform(_new_transforms[i]);
+                    if (_comps[i]->SetLocalTransform(_new_transforms[i]))
+                        _comps[i]->ResetRenderInterpolation();
                     LOG_INFO("Exe or redo {} on obj {}", s_name, _obj_names[i]);
                 }
             }
@@ -176,7 +177,8 @@ private:                                                                  \
             {
                 for (size_t i = 0; i < _comps.size(); ++i)
                 {
-                    _comps[i]->SetLocalTransform(_old_transforms[i]);
+                    if (_comps[i]->SetLocalTransform(_old_transforms[i]))
+                        _comps[i]->ResetRenderInterpolation();
                     LOG_INFO("Undo {} on obj {}", s_name, _obj_names[i]);
                 }
             }

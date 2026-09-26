@@ -14,6 +14,7 @@
 #include "RHI/DX12/dxhelper.h"
 #include "Render/GraphicsPipelineStateObject.h"
 #include "Render/ShaderArtifactCache.h"
+#include "Render/ShaderDependencyPath.h"
 
 #define SHADER_DXC 1
 
@@ -144,7 +145,7 @@ namespace Ailu::RHI::DX12
         std::set<WString> unique_paths;
         for (const auto &path : paths)
         {
-            const WString normalized_path = PathUtils::FormatFilePath(path);
+            const WString normalized_path = Render::NormalizeShaderDependencyPath(path);
             if (normalized_path.empty() || !unique_paths.insert(normalized_path).second)
                 continue;
             const auto &fingerprint = Render::ShaderFileFingerprintCache::Get().GetFingerprint(normalized_path);
@@ -159,7 +160,7 @@ namespace Ailu::RHI::DX12
     static void MoveSourceDependencyFirst(const WString &source_path,
                                           Vector<Render::ShaderArtifactDependency> &dependencies)
     {
-        const WString normalized_source_path = PathUtils::FormatFilePath(source_path);
+        const WString normalized_source_path = Render::NormalizeShaderDependencyPath(source_path);
         const auto source_it = std::find_if(dependencies.begin(), dependencies.end(), [&](const auto &dependency)
         {
             return dependency._path == normalized_source_path;
@@ -673,7 +674,7 @@ namespace Ailu::RHI::DX12
                     element._p_pblob = tmp_p_pblob;
                     element._p_gblob = tmp_p_gblob;
                     element._keyword_defines = keyword_defines;
-                    pass._source_files = std::move(dependency_files);
+                    pass._source_files = Render::NormalizeShaderDependencyPaths(dependency_files);
                     LoadShaderReflection(pass_index, variant_hash, tmp_p_vreflect.Get(), tmp_p_preflect.Get());
                     Render::GraphicsShaderVariantArtifact new_artifact;
                     GenerateInternalPSO(pass_index, variant_hash, &new_artifact._root_signature_blob);
@@ -718,7 +719,7 @@ namespace Ailu::RHI::DX12
             return false;
         pass._source_files.clear();
         for (const auto &dependency : artifact._dependencies)
-            pass._source_files.insert(dependency._path);
+            pass._source_files.insert(Render::NormalizeShaderDependencyPath(dependency._path));
         pass_variant._vertex_input_num = static_cast<u8>(artifact._vertex_input_layout.size());
         pass_variant._pipeline_input_layout = VertexBufferLayout(artifact._vertex_input_layout);
         for (u32 index = 0u; index < artifact._vertex_input_layout.size() && index < RenderConstants::kMaxVertexAttrNum; ++index)
@@ -938,10 +939,11 @@ namespace Ailu::RHI::DX12
         auto &cur_state = _bind_state.front();
         if (_variant_state[kernel_index][cur_state._variant_hash] != EShaderVariantState::kReady)
             return;
-        auto d3dcmd = static_cast<D3DCommandBuffer *>(cmd)->NativeCmdList();
+        auto command_buffer = static_cast<D3DCommandBuffer *>(cmd);
+        auto d3dcmd = command_buffer->NativeCmdList();
         auto &d3d_ele = _elements[kernel_index]._variants[cur_state._variant_hash];
         auto &cs_ele = _kernels[kernel_index]._variants[cur_state._variant_hash];
-        d3dcmd->SetPipelineState(d3d_ele._pso.Get());
+        command_buffer->SetComputePipelineState(d3d_ele._pso.Get());
         d3dcmd->SetComputeRootSignature(d3d_ele._p_sig.Get());
         for (u16 i = 0; i <= cur_state._max_bind_slot; i++)
         {
@@ -1065,7 +1067,7 @@ namespace Ailu::RHI::DX12
         auto native_cmd = d3dcmd->NativeCmdList();
         auto &d3d_ele = _elements[kernel_index]._variants[snapshot._variant_hash];
         auto &cs_ele = _kernels[kernel_index]._variants[snapshot._variant_hash];
-        native_cmd->SetPipelineState(d3d_ele._pso.Get());
+        d3dcmd->SetComputePipelineState(d3d_ele._pso.Get());
         native_cmd->SetComputeRootSignature(d3d_ele._p_sig.Get());
         for (u16 i = 0u; i < snapshot._entry_count; ++i)
         {
@@ -1254,7 +1256,7 @@ namespace Ailu::RHI::DX12
 #endif
                 if (compile_succeed && tmp_reflection != nullptr)
                 {
-                    cur_variant._all_dep_file_pathes = std::move(dependency_files);
+                    cur_variant._all_dep_file_pathes = Render::NormalizeShaderDependencyPaths(dependency_files);
                     _elements[kernel_index]._variants[variant_hash] = D3DVariantElement();
                     _elements[kernel_index]._variants[variant_hash]._p_blob = tmp_blob;
                     LoadReflectionInfo(tmp_reflection.Get(), kernel_index, variant_hash);
@@ -1301,7 +1303,7 @@ namespace Ailu::RHI::DX12
         kernel_variant._temp_bind_res_infos.clear();
         kernel_variant._all_dep_file_pathes.clear();
         for (const auto &dependency : artifact._dependencies)
-            kernel_variant._all_dep_file_pathes.insert(dependency._path);
+            kernel_variant._all_dep_file_pathes.insert(Render::NormalizeShaderDependencyPath(dependency._path));
         for (const auto &binding : artifact._bindings)
         {
             if (binding._name == "g_bindless_texture2d")

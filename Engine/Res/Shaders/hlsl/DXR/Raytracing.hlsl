@@ -11,6 +11,8 @@
 #define AL_SHADER_INTEROP_CBUFFER_AS_STRUCT 1
 #define DXR
 
+#pragma multi_compile _ PATH_TRACER_MNEE
+
 #if defined(AL_PACKAGE_SHADER_INTEROP)
 #include "../../ShaderInterop.h"
 #else

@@ -13,6 +13,7 @@
 #include "Render/RenderQueue.h"
 #include "Render/Renderer.h"
 #include "Render/Shader.h"
+#include "Render/ShaderDependencyPath.h"
 #include "Render/RenderGraph/RenderGraph.h"
 #include "Render/RayTracing/RayTracingScene.h"
 
@@ -965,7 +966,7 @@ namespace Ailu::Render
                     }
                 }
                 cur_pass._index = i;
-                cur_pass._source_files.insert(_src_file_path);
+                cur_pass._source_files.insert(NormalizeShaderDependencyPath(_src_file_path));
                 cur_pass._pipeline_raster_state = pass_pipeline_raster_state;
                 cur_pass._pipeline_ds_state = pass_pipeline_ds_state;
                 cur_pass._pipeline_topology = pass_pipeline_topology;
@@ -1457,12 +1458,13 @@ namespace Ailu::Render
 
     bool Ailu::ComputeShader::IsDependencyFile(const WString &sys_path) const
     {
+        const WString normalized_path = NormalizeShaderDependencyPath(sys_path);
         for (const auto &k: _kernels)
         {
             for (const auto &it: k._variants)
             {
                 auto &variant = it.second;
-                if (variant._all_dep_file_pathes.contains(sys_path))
+                if (variant._all_dep_file_pathes.contains(normalized_path))
                     return true;
             }
         }
@@ -1881,14 +1883,14 @@ namespace Ailu::Render
                     ShaderVariantHash kw_hash = cur_kernel._variant_mgr.GetVariantHash(kw_set);
                     KernelElement::KernelVariant v;
                     v._active_keywords = kw_set;
-                    v._all_dep_file_pathes.insert(_src_file_path);
+                    v._all_dep_file_pathes.insert(NormalizeShaderDependencyPath(_src_file_path));
                     cur_kernel._variants.insert(std::make_pair(kw_hash, v));
                 }
             }
             if (!cur_kernel._variants.contains(0))
             {
                 KernelElement::KernelVariant v;
-                v._all_dep_file_pathes.insert(_src_file_path);
+                v._all_dep_file_pathes.insert(NormalizeShaderDependencyPath(_src_file_path));
                 cur_kernel._variants.insert(std::make_pair(0, v));
             }
             Map<ShaderVariantHash, EShaderVariantState> cur_kernel_variant_state;

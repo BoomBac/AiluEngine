@@ -123,9 +123,13 @@ namespace Ailu
         };
         void StartRecord() { _is_start_record = true; };
         void StopRecord() { _is_start_record = false; };
-        const HashMap<String, f32> &GetPassGPUTime() { return _gpu_time;}
+        HashMap<String, f32> GetPassGPUTime() const
+        {
+            std::lock_guard<std::mutex> lock(_gpu_mutex);
+            return _gpu_time;
+        }
         /// <summary>
-        /// 渲染线程调用，避免对gpu marker加锁
+        /// Drains GPU markers after synchronizing with command recording workers.
         /// </summary>
         void CollectGPUTimeData();
     private:
@@ -136,6 +140,7 @@ namespace Ailu
         TimeMgr _cpu_timer;
         IGPUTimer *_p_gpu_timer = nullptr;
         std::mutex _lock;
+        mutable std::mutex _gpu_mutex;
         List<ProfileFrameData> _cache_data;
         bool _is_clear_cache = true;
         bool _is_record_mode = false;

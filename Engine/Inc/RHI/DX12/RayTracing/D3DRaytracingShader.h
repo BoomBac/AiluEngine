@@ -23,8 +23,28 @@ namespace Ailu::RHI::DX12
         void BuildShaderTables();
         void LoadReflectionInfo(ID3D12LibraryReflection *reflection);
         void GenerateRootSignature();
-        bool BindResources(RHICommandBuffer *cmd, const Render::DispatchBindingSnapshot &snapshot);
+        struct DxrVariant
+        {
+            ComPtr<ID3DBlob> _byte_code;
+            ComPtr<ID3D12StateObject> _state_object;
+            ComPtr<ID3D12RootSignature> _global_root_signature;
+            ComPtr<ID3D12Resource> _ray_gen_stb;
+            ComPtr<ID3D12Resource> _miss_stb;
+            ComPtr<ID3D12Resource> _hit_group_stb;
+            D3D12_DISPATCH_RAYS_DESC _dispatch_desc{};
+            bool _has_bindless_texture2d = false;
+            bool _has_bindless_buffer = false;
+            bool _has_bindless_rw_texture2d = false;
+            bool _has_bindless_rw_buffer = false;
+            u16 _bindless_texture_slot = static_cast<u16>(-1);
+            u16 _bindless_buffer_slot = static_cast<u16>(-1);
+            u16 _bindless_rw_texture_slot = static_cast<u16>(-1);
+            u16 _bindless_rw_buffer_slot = static_cast<u16>(-1);
+        };
+        bool BindResources(RHICommandBuffer *cmd, const Render::DispatchBindingSnapshot &snapshot,
+                           const DxrVariant &variant);
     private:
+        HashMap<Render::ShaderVariantHash, DxrVariant> _dxr_variants;
         ComPtr<ID3DBlob> _byte_code;
         ComPtr<ID3D12StateObject> _state_object;
         // Root signatures

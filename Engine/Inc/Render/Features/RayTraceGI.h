@@ -31,6 +31,8 @@ namespace Ailu
             APROPERTY()
             bool _use_hardware_ray_tracing = false;
             APROPERTY()
+            bool _enable_mnee = false;
+            APROPERTY()
             bool _enable_ris = true;
             APROPERTY()
             bool _enable_resampling = true;

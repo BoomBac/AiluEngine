@@ -75,8 +75,22 @@ namespace Ailu
     }
     u32 Profiler::StartGpuProfile(RHICommandBuffer *cmdList, const String &name)
     {
-        //std::lock_guard<std::mutex> lock(_lock);
-        u32 profileIdx = FindProfileSlot(_gpu_profiles, numProfiles, name, _cur_frame);
+        std::lock_guard<std::mutex> lock(_gpu_mutex);
+        u32 profileIdx = kInvalidProfileIndex;
+        u32 reusable_idx = kInvalidProfileIndex;
+        for (u32 i = 0; i < numProfiles; ++i)
+        {
+            auto &candidate = _gpu_profiles[i];
+            if (candidate.Name == name && !candidate._is_start && candidate._is_finished)
+            {
+                profileIdx = i;
+                break;
+            }
+            if (reusable_idx == kInvalidProfileIndex && CanRecycleProfileSlot(candidate, _cur_frame))
+                reusable_idx = i;
+        }
+        if (profileIdx == kInvalidProfileIndex)
+            profileIdx = reusable_idx != kInvalidProfileIndex ? reusable_idx : numProfiles;
         if (profileIdx == numProfiles)
         {
             AL_ASSERT(numProfiles < kMaxProfileNum);
@@ -100,7 +114,7 @@ namespace Ailu
     }
     void Profiler::EndGpuProfile(RHICommandBuffer *cmdList, u32 idx)
     {
-        //std::lock_guard<std::mutex> lock(_lock);
+        std::lock_guard<std::mutex> lock(_gpu_mutex);
         AL_ASSERT(idx < numProfiles);
         ProfileData &profile_data = _gpu_profiles[idx];
         AL_ASSERT(profile_data._is_start != false);
@@ -116,7 +130,21 @@ namespace Ailu
     u32 Profiler::StartCPUProfile(const String &name)
     {
         std::lock_guard<std::mutex> lock(_lock);
-        u32 profileIdx = FindProfileSlot(_cpu_profiles, numCPUProfiles, name, _cur_frame);
+        u32 profileIdx = kInvalidProfileIndex;
+        u32 reusable_idx = kInvalidProfileIndex;
+        for (u32 i = 0; i < numCPUProfiles; ++i)
+        {
+            auto &candidate = _cpu_profiles[i];
+            if (candidate.Name == name && !candidate._is_start && candidate._is_finished)
+            {
+                profileIdx = i;
+                break;
+            }
+            if (reusable_idx == kInvalidProfileIndex && CanRecycleProfileSlot(candidate, _cur_frame))
+                reusable_idx = i;
+        }
+        if (profileIdx == kInvalidProfileIndex)
+            profileIdx = reusable_idx != kInvalidProfileIndex ? reusable_idx : numCPUProfiles;
         if (profileIdx == numCPUProfiles)
         {
             AL_ASSERT(numCPUProfiles < kMaxProfileNum);
@@ -163,14 +191,13 @@ namespace Ailu
     }
     void Profiler::AddGPUProfilerHierarchy(bool begin_profiler, u32 index)
     {
-        // if (!_is_record_mode)
-        // 	return;
-        // std::lock_guard<std::mutex> lock(_lock);
+        std::lock_guard<std::mutex> lock(_gpu_mutex);
         _gpu_profiler_queue.emplace(begin_profiler, index, std::this_thread::get_id(), _gpu_profiles[index].Name,_cur_frame);
     }
 
     void Profiler::CollectGPUTimeData()
     {
+        std::lock_guard<std::mutex> lock(_gpu_mutex);
         while (!Profiler::Get()._gpu_profiler_queue.empty())
         {
             const auto &marker = _gpu_profiler_queue.front();
@@ -203,6 +230,7 @@ namespace Ailu
     }
     void Profiler::BeginFrame()
     {
+        std::scoped_lock lock(_lock, _gpu_mutex);
         _is_record_mode = _is_start_record;
         _cur_frame = Application::Get().GetFrameCount();
     }
@@ -235,13 +263,15 @@ namespace Ailu
             profile._max_time = maxTime;
             profile._is_active = false;
         };
-        for (u32 i = 0; i < numCPUProfiles; i++)
         {
-            update_profile(_cpu_profiles[i]);
+            std::lock_guard<std::mutex> lock(_lock);
+            for (u32 i = 0; i < numCPUProfiles; i++)
+                update_profile(_cpu_profiles[i]);
         }
-        for (u32 i = 0; i < numProfiles; i++)
         {
-            update_profile(_gpu_profiles[i]);
+            std::lock_guard<std::mutex> lock(_gpu_mutex);
+            for (u32 i = 0; i < numProfiles; i++)
+                update_profile(_gpu_profiles[i]);
         }
         if (_is_record_mode)
         {
@@ -308,15 +338,11 @@ namespace Ailu
 //         TracyCZone(_tracy_ctx, true);
 //         TracyCZoneName(_tracy_ctx, _name.c_str(), _name.size());
 // #endif
-        //cmdList->BeginProfiler(name);
-        //		idx = Profiler::Get().StartGpuProfile(cmdList, name);
-        //		Profiler::Get().AddGPUProfilerHierarchy(true, idx);
+        _cmdList->BeginProfiler(_name);
     }
     GpuProfileBlock::~GpuProfileBlock()
     {
-        //_cmdList->EndProfiler();
-        //		Profiler::Get().EndGpuProfile(cmdList, idx);
-        //		Profiler::Get().AddGPUProfilerHierarchy(false, idx);
+        _cmdList->EndProfiler();
 
 // #if defined(TRACY_ENABLE)
 //         TracyCZoneEnd(_tracy_ctx);

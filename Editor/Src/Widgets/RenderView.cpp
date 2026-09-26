@@ -11,6 +11,7 @@
 #include "Widgets/PlaceActor.h"
 #include "Common/Selection.h"
 #include "Framework/Common/Input.h"
+#include "Framework/Common/Window.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "PlaceActor/PlaceActorRegistry.h"
 #include "Common/Undo.h"
@@ -492,6 +493,15 @@ namespace Ailu
                 s_editor_layer->_scene_vp_rect = rect;
             }
             UpdateSceneToolbarState();
+            if (_transform_gizmo->IsDragging())
+            {
+                if (const auto *window = _content_widget->Parent())
+                {
+                    const auto [client_x, client_y] = window->GetClientPosition();
+                    const Vector2f client_origin(static_cast<f32>(client_x), static_cast<f32>(client_y));
+                    _mouse_pos = Input::GetGlobalMousePosAccurate() - client_origin - _source->GetArrangeRect().xy;
+                }
+            }
             _transform_gizmo->Update(dt, ViewToRenderPosition(_mouse_pos),Camera::sCurrent);
             _transform_gizmo->Draw();
             if (_drag_preview_mesh)

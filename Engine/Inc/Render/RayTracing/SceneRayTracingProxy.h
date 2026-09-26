@@ -42,6 +42,7 @@ namespace Ailu::Render
         GPUBuffer *GetUnifiedLightData() const { return _unified_light_buffer.get(); }
         ConstantBuffer *GetUnifiedLightConfig() const { return _unified_light_config.get(); }
         u32 GetUnifiedLightCount() const { return _unified_light_config_cpu._light_count; }
+        const Vector<UnifiedLightData> &GetUnifiedLights() const { return _unified_light_data_cache; }
         bool HasRenderableScene() const
         {
             return !_has_pending_swap && _scene_primitive_buffer != nullptr && FrontSlot()._scene != nullptr &&

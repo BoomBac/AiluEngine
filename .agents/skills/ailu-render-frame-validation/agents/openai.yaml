@@ -1,0 +1,3 @@
+interface:
+  display_name: "Ailu Frame Validation"
+  short_description: "Automate Editor render captures"

@@ -196,9 +196,11 @@ namespace Ailu
             bool EnsureBufferVersion(class D3DGPUBuffer *buffer, const BufferDataVersion &version);
             void ApplyBufferVersion(class D3DGPUBuffer *buffer, const BufferDataVersion &version);
             bool IsGraphicsPSOActive(const void *pso) const { return _graphics_state_cache._pso == pso; }
-            void SetGraphicsPSOActive(const void *pso)
+            void SetComputePipelineState(ID3D12PipelineState *native_pso)
             {
-                _graphics_state_cache._pso = pso;
+                // Graphics and compute share the native PSO slot on a command list.
+                _graphics_state_cache._pso = nullptr;
+                _p_cmd->SetPipelineState(native_pso);
             }
             bool SetGraphicsPipelineState(const void *pso, ID3D12PipelineState *native_pso)
             {

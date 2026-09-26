@@ -12,7 +12,8 @@ namespace Ailu::Render
     enum class EShaderArtifactType : u8
     {
         kGraphics,
-        kCompute
+        kCompute,
+        kRayTracing
     };
 
     enum class EShaderCompileMode : u8
@@ -145,9 +146,20 @@ namespace Ailu::Render
         Vector<ShaderArtifactDependency> _dependencies;
     };
 
+    struct RayTracingShaderVariantArtifact
+    {
+        ShaderArtifactHeader _header;
+        ShaderStageArtifact _library;
+        Vector<u8> _reflection_blob;
+        Vector<ShaderArtifactDependency> _dependencies;
+    };
+
     namespace ShaderArtifactSerializer
     {
         bool Serialize(const GraphicsShaderVariantArtifact &artifact, Vector<u8> &data);
+        bool Serialize(const RayTracingShaderVariantArtifact &artifact, Vector<u8> &data);
+        bool Deserialize(const Vector<u8> &data, RayTracingShaderVariantArtifact &artifact,
+                         EShaderArtifactInvalidReason *reason = nullptr);
         bool Serialize(const ComputeShaderVariantArtifact &artifact, Vector<u8> &data);
         bool Deserialize(const Vector<u8> &data, GraphicsShaderVariantArtifact &artifact,
                          EShaderArtifactInvalidReason *reason = nullptr);

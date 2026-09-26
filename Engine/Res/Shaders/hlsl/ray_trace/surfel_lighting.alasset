@@ -1,0 +1,11 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "a6451d5c-7c2e-4c83-9af4-1f6a7e36d9bd",
+        "_asset_type": "Ailu::Render::ComputeShader",
+        "_asset_name": "surfel_lighting",
+        "_dependencies": []
+    },
+    "_file": "surfel_lighting.hlsl",
+    "_kernel": "SurfelLightingUpdateCS"
+}

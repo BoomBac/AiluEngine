@@ -31,6 +31,17 @@ namespace Ailu
         }
         void RayTraceGI::AddRenderPasses(Renderer &renderer, const RenderingData &rendering_data)
         {
+            if (_gi_raytracing_shader != nullptr)
+            {
+                if (_enable_mnee)
+                    _gi_raytracing_shader->EnableKeyword("PATH_TRACER_MNEE");
+                else
+                    _gi_raytracing_shader->DisableKeyword("PATH_TRACER_MNEE");
+            }
+            if (_enable_mnee)
+                _gi_compute_shader->EnableKeyword("PATH_TRACER_MNEE");
+            else
+                _gi_compute_shader->DisableKeyword("PATH_TRACER_MNEE");
             if (s_is_debug_collecting && s_global_frame_counter - s_debug_collect_begin_frame >= kCollectDebugFrameNum)
             {
                 s_is_debug_collecting = false;

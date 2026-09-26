@@ -1589,7 +1589,7 @@ namespace Ailu::RHI::DX12
         TakePixCapture();
     }
 
-    void D3DContext::TakePixCapture()
+    void D3DContext::TakePixCapture(bool open_ui)
     {
         if (!g_engine_config._enable_pix)
         {
@@ -1606,6 +1606,7 @@ namespace Ailu::RHI::DX12
             LOG_WARNING("PIX capture is already active or pending.");
             return;
         }
+        _pix_capture_open_ui = open_ui;
         _is_pix_capture_pending = true;
     }
 
@@ -1849,6 +1850,7 @@ namespace Ailu::RHI::DX12
     {
         if (g_engine_config._enable_pix)
         {
+            const bool open_ui = _pix_capture_open_ui.load();
             HRESULT result = PIXEndCapture(false);
             _is_pix_frame_capturing = false;
             if (FAILED(result) && result != E_PENDING)
@@ -1856,7 +1858,9 @@ namespace Ailu::RHI::DX12
                 LOG_ERROR("PIXEndCapture failed: {}", result);
                 return;
             }
-            PIXOpenCaptureInUI(_pix_capture_name.data());
+            LOG_INFO("PIX capture ended: {} (result={})", ToChar(_pix_capture_name), result);
+            if (open_ui)
+                PIXOpenCaptureInUI(_pix_capture_name.data());
         }
     }
 

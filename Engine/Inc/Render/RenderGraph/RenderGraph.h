@@ -419,6 +419,24 @@ namespace Ailu::Render::RDG
             return RGHandle(0u);
         }
 
+        // Adds a write-after-write dependency without declaring a GPU read access.
+        [[nodiscard]] RGHandle WriteAfter(RGHandle handle, ResourceAccess accessor)
+        {
+            if (auto node = _graph->GetResourceNode(handle); node != nullptr)
+            {
+                if (handle._version >= node->_versions.size())
+                {
+                    LOG_ERROR("RenderGraphBuilder::WriteAfter: invalid version!");
+                    return RGHandle(0u);
+                }
+
+                node->_versions[handle._version]._consumers.push_back(_pass);
+                return Write(handle, accessor);
+            }
+            LOG_ERROR("RenderGraphBuilder::WriteAfter: Attempted to write to a resource that does not exist in the graph.");
+            return RGHandle(0u);
+        }
+
         void Read(RGHandle handle,EResourceUsage usage = EResourceUsage::kReadSRV)
         {
             ResourceAccess accessor;
@@ -436,6 +454,13 @@ namespace Ailu::Render::RDG
             ResourceAccess accessor;
             accessor._usage = usage;
             return Write(handle, accessor);
+        }
+
+        [[nodiscard]] RGHandle WriteAfter(RGHandle handle, EResourceUsage usage = EResourceUsage::kWriteRTV)
+        {
+            ResourceAccess accessor;
+            accessor._usage = usage;
+            return WriteAfter(handle, accessor);
         }
 
         [[nodiscard]] RGHandle WriteRange(RGHandle handle, EResourceUsage usage, u32 mip_level, u32 mip_count,

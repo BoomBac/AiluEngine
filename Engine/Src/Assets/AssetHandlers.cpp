@@ -1872,12 +1872,24 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
             const auto &document = entity_doc._surfel_gi_component;
             component._enabled = document._enabled;
             component._debug_draw_surfels = document._debug_draw_surfels;
+            component._debug_show_irradiance = document._debug_show_irradiance;
+            component._debug_opaque_disks = document._debug_opaque_disks;
+            component._debug_irradiance_exposure = document._debug_irradiance_exposure;
+            component._lighting_enabled = document._lighting_enabled;
+            component._rays_per_surfel = document._rays_per_surfel;
+            component._max_lighting_updates_per_frame = document._max_lighting_updates_per_frame;
+            component._lighting_hysteresis = document._lighting_hysteresis;
+            component._lighting_max_ray_distance = document._lighting_max_ray_distance;
             component._debug_coverage = document._debug_coverage;
             component._base_cell_size = document._base_cell_size;
             component._cascade_count = document._cascade_count;
             component._grid_resolution = document._grid_resolution;
             component._target_pixel_radius = document._target_pixel_radius;
             component._spawn_coverage_threshold = document._spawn_coverage_threshold;
+            component._spawn_spacing_scale = document._spawn_spacing_scale;
+            component._max_spawn_per_frame = document._max_spawn_per_frame;
+            component._spawn_normal_threshold = document._spawn_normal_threshold;
+            component._blue_noise_strength = document._blue_noise_strength;
             component._max_surfel_count = document._max_surfel_count;
             component._debug_cascade = document._debug_cascade;
         }

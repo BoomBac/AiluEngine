@@ -44,9 +44,9 @@ namespace Ailu::Editor
     // Teleport the camera and its interpolation state in one step.  Interpolate() eases the
     // camera from _rot_world_y/_rot_object_x toward _rotation every frame, so setting the
     // target alone still leaves the camera on its old attitude for dozens of frames.
-    void FirstPersonCameraController::SnapTo(const Vector3f &position, f32 yaw, f32 pitch)
+    void FirstPersonCameraController::SnapTo(const Vector3f &position, f32 pitch, f32 yaw)
     {
-        _rotation = Vector2f(yaw, pitch);
+        _rotation = Vector2f(pitch, yaw);
         _rot_world_y = Quaternion::AngleAxis(yaw, Vector3f::kUp);
         const Vector3f right = _rot_world_y * Vector3f::kRight;
         _rot_object_x = Quaternion::AngleAxis(pitch, right);

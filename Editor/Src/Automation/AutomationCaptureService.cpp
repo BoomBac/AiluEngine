@@ -1,11 +1,15 @@
 #include "Automation/AutomationCaptureService.h"
 
 #include "Framework/Common/Log.h"
+#include "Framework/Common/Profiler.h"
 #include "Project/ProjectManager.h"
+#include "Render/GraphicsContext.h"
 #include "Render/ImageCapture/Adapters/RenderGraphImageCaptureBridge.h"
 #include "Render/ImageCapture/ImageCaptureService.h"
 #include "Render/RenderPipeline.h"
 #include "Render/Renderer.h"
+#include "Scene/Component.h"
+#include "Scene/Scene.h"
 
 #include <filesystem>
 #include <format>
@@ -104,6 +108,54 @@ namespace Ailu
 
         void AutomationCaptureService::Register(EditorAutomationRegistry &registry)
         {
+            {
+                AutomationMethodDesc desc;
+                desc._name = "render.gpu_timings";
+                desc._description = "Read GPU panel rolling-average pass times in milliseconds; values may lag rendering.";
+                desc._permission = EAutomationPermission::kReadOnly;
+                registry.Register("render.gpu_timings", std::move(desc),
+                    [](EditorAutomationContext &, const AutomationObject &) -> AutomationResult
+                    {
+                        AutomationObject timings;
+                        for (const auto &[name, time] : Profiler::Get().GetPassGPUTime())
+                            timings.emplace(name, AutomationValue(static_cast<double>(time)));
+                        return AutomationResult::Ok(AutomationValue(std::move(timings)));
+                    });
+            }
+            {
+                AutomationMethodDesc desc;
+                desc._name = "render.surfel_spawn_once";
+                desc._description = "Request one manual placement batch on the active Surfel GI component.";
+                desc._permission = EAutomationPermission::kExternalEffect;
+                desc._input_schema.AddParam("capture_pix", "Request a silent PIX capture with this placement batch.",
+                                            EAutomationValueType::kBool);
+                registry.Register("render.surfel_spawn_once", std::move(desc),
+                                  [](EditorAutomationContext &, const AutomationObject &arguments) -> AutomationResult
+                {
+                    auto *scene = SceneManagement::SceneMgr::Get().ActiveScene();
+                    if (!scene)
+                        return AutomationResult::Fail(AutomationError::Make(
+                            AutomationErrors::kSceneNotOpen, "no scene is open"));
+                    auto &reg = scene->GetRegister();
+                    u32 component_index = 0u;
+                    for (auto &component : reg.View<ECS::SurfelGIComponent>())
+                    {
+                        const auto entity = reg.GetEntity<ECS::SurfelGIComponent>(component_index++);
+                        if (!scene->IsEntityEnabled(entity) ||
+                            !reg.IsComponentEnabled<ECS::SurfelGIComponent>(entity) || !component._enabled)
+                            continue;
+                        component._manual_spawn = true;
+                        component._spawn_once_requested = true;
+                        const auto capture_it = arguments.find("capture_pix");
+                        if (capture_it != arguments.end() && capture_it->second.AsBool())
+                            GraphicsContext::Get().TakePixCapture(false);
+                        return AutomationResult::Ok(AutomationValue(AutomationObject{
+                            {"spawn_requested", AutomationValue(true)}}));
+                    }
+                    return AutomationResult::Fail(AutomationError::Make(
+                        AutomationErrors::kTargetNotFound, "no enabled Surfel GI component"));
+                });
+            }
             {
                 AutomationMethodDesc desc;
                 desc._name = "render.capture_pass";

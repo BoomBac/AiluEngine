@@ -2,6 +2,8 @@
 #include "Render/Buffer.h"
 #include "Render/CoreType.h"
 #include "Render/RayTracing/RayTracingScene.h"
+#include "Render/ShaderDependencyPath.h"
+#include "Framework/Common/FileManager.h"
 #include "RHI/DX12/RayTracing/D3DRayTracingShader.h"
 #include "pch.h"
 
@@ -284,7 +286,87 @@ namespace Ailu::Render
 
     bool RayTracingShader::IsDependencyFile(const WString &sys_path) const
     {
-        return _all_dep_file_pathes.contains(sys_path);
+        return _all_dep_file_pathes.contains(NormalizeShaderDependencyPath(sys_path));
+    }
+
+    void RayTracingShader::RegisterDependencyFile(const WString &path)
+    {
+        _all_dep_file_pathes.insert(NormalizeShaderDependencyPath(path));
+    }
+
+    void RayTracingShader::EnableKeyword(const String &keyword)
+    {
+        if (_active_keywords.contains(keyword))
+            return;
+        const auto group = _variant_mgr.KeywordsSameGroup(keyword);
+        if (group.empty())
+            return;
+        for (const auto &group_keyword : group)
+            _active_keywords.erase(group_keyword);
+        _active_keywords.insert(keyword);
+        _active_variant.store(_variant_mgr.GetVariantHash(_active_keywords));
+        if (const auto it = _variants.find(_active_variant.load()); it != _variants.end())
+            _binding_layout = it->second._binding_layout;
+    }
+
+    void RayTracingShader::DisableKeyword(const String &keyword)
+    {
+        if (_active_keywords.erase(keyword) != 0u)
+        {
+            _active_variant.store(_variant_mgr.GetVariantHash(_active_keywords));
+            if (const auto it = _variants.find(_active_variant.load()); it != _variants.end())
+                _binding_layout = it->second._binding_layout;
+        }
+    }
+
+    bool RayTracingShader::PreprocessVariants()
+    {
+        String source;
+        if (!FileManager::ReadFile(_src_file_path, source))
+            return false;
+        Vector<std::set<String>> keyword_groups;
+        for (const auto &line : su::Split(source, "\n"))
+        {
+            if (!su::BeginWith(line, "#pragma multi_compile "))
+                continue;
+            std::istringstream stream(line);
+            String pragma, directive, keyword;
+            stream >> pragma >> directive;
+            auto &group = keyword_groups.emplace_back();
+            while (stream >> keyword)
+                group.insert(keyword);
+        }
+        _variant_mgr.BuildIndex(keyword_groups);
+        Vector<std::set<String>> permutations(1);
+        for (const auto &group : keyword_groups)
+        {
+            Vector<std::set<String>> next;
+            for (const auto &keywords : permutations)
+            {
+                for (const auto &keyword : group)
+                {
+                    auto selected = keywords;
+                    if (keyword != "_")
+                        selected.insert(keyword);
+                    next.emplace_back(std::move(selected));
+                }
+            }
+            permutations = std::move(next);
+        }
+        auto previous_variants = std::move(_variants);
+        HashMap<ShaderVariantHash, Variant> variants;
+        for (const auto &keywords : permutations)
+        {
+            const auto hash = _variant_mgr.GetVariantHash(keywords);
+            auto &variant = variants[hash];
+            if (const auto old = previous_variants.find(hash); old != previous_variants.end() &&
+                old->second._active_keywords == keywords)
+                variant = std::move(old->second);
+            variant._active_keywords = keywords;
+        }
+        _variants = std::move(variants);
+        _active_variant.store(_variant_mgr.GetVariantHash(_active_keywords));
+        return !_variants.empty();
     }
 
     void RayTracingShader::CaptureDispatchState(
@@ -428,13 +510,34 @@ namespace Ailu::Render
         }
 
         snapshot._entry_count = captured_count;
-        snapshot._is_ready = _is_valid;
+        snapshot._variant_hash = _active_variant.load();
+        if (const auto it = _variants.find(snapshot._variant_hash); it != _variants.end())
+            snapshot._is_ready = it->second._is_ready;
     }
 
     bool RayTracingShader::Compile(EShaderCompilePolicy policy)
     {
         _is_compiling.store(true);
-        const bool is_succeed = RHICompileImpl(0u, policy);
+        bool is_succeed = PreprocessVariants();
+        if (is_succeed)
+        {
+            _all_dep_file_pathes.clear();
+            RegisterDependencyFile(_src_file_path);
+            for (auto &[variant_hash, variant] : _variants)
+            {
+                const bool compiled = RHICompileImpl(variant_hash, policy);
+                variant._is_ready = compiled || variant._is_ready;
+                if (compiled)
+                {
+                    variant._bind_res_infos = std::move(_bind_res_infos);
+                    variant._binding_layout = _binding_layout;
+                    LOG_INFO("RayTracingShaderVariant READY shader={} variant={}", _name, variant_hash);
+                }
+                is_succeed &= compiled;
+            }
+            if (const auto it = _variants.find(_active_variant.load()); it != _variants.end())
+                _binding_layout = it->second._binding_layout;
+        }
         _is_compiling.store(false);
         return is_succeed;
     }

@@ -9,6 +9,13 @@ namespace Ailu::ECS
         if (device == nullptr)
             return;
 
+        const auto get_velocity = [delta_time](const TransformComponent &transform)
+        {
+            const auto &previous = transform._prev_render_world_matrix;
+            const Vector3f previous_position(previous[3][0], previous[3][1], previous[3][2]);
+            return delta_time > 0.0f ? (transform.GetRenderPosition() - previous_position) / delta_time : Vector3f::kZero;
+        };
+
         AudioListenerState listener;
         bool has_listener = false;
         u32 listener_index = 0u;
@@ -21,10 +28,11 @@ namespace Ailu::ECS
             if (transform == nullptr)
                 continue;
 
-            listener._position = transform->_position;
-            listener._forward = Vector3f(transform->_world_matrix[2][0], transform->_world_matrix[2][1], transform->_world_matrix[2][2]);
-            listener._up = Vector3f(transform->_world_matrix[1][0], transform->_world_matrix[1][1], transform->_world_matrix[1][2]);
-            listener._velocity = delta_time > 0.0f ? (transform->_position - transform->_prev_position) / delta_time : Vector3f::kZero;
+            const auto &world_matrix = transform->GetRenderWorldMatrix();
+            listener._position = transform->GetRenderPosition();
+            listener._forward = Vector3f(world_matrix[2][0], world_matrix[2][1], world_matrix[2][2]);
+            listener._up = Vector3f(world_matrix[1][0], world_matrix[1][1], world_matrix[1][2]);
+            listener._velocity = get_velocity(*transform);
             has_listener = true;
             break;
         }
@@ -41,9 +49,10 @@ namespace Ailu::ECS
                 const auto *transform = r.GetComponent<TransformComponent>(entity);
                 if (transform == nullptr)
                     continue;
-                listener._position = transform->_position;
-                listener._forward = Vector3f(transform->_world_matrix[2][0], transform->_world_matrix[2][1], transform->_world_matrix[2][2]);
-                listener._up = Vector3f(transform->_world_matrix[1][0], transform->_world_matrix[1][1], transform->_world_matrix[1][2]);
+                const auto &world_matrix = transform->GetRenderWorldMatrix();
+                listener._position = transform->GetRenderPosition();
+                listener._forward = Vector3f(world_matrix[2][0], world_matrix[2][1], world_matrix[2][2]);
+                listener._up = Vector3f(world_matrix[1][0], world_matrix[1][1], world_matrix[1][2]);
                 has_listener = true;
                 break;
             }
@@ -59,7 +68,7 @@ namespace Ailu::ECS
             if (!r.IsEntityEnabled(entity) || !r.IsComponentEnabled<AudioSourceComponent>(entity))
                 continue;
             const auto *transform = r.GetComponent<TransformComponent>(entity);
-            const Vector3f position = transform != nullptr ? transform->_position : Vector3f::kZero;
+            const Vector3f position = transform != nullptr ? transform->GetRenderPosition() : Vector3f::kZero;
 
             if (source._play_on_awake && !source._runtime_handle.IsValid() && source._audio_event != Guid::EmptyGuid())
             {
@@ -79,8 +88,8 @@ namespace Ailu::ECS
             if (source._runtime_handle.IsValid() && device->IsValid(source._runtime_handle))
             {
                 device->SetPosition(source._runtime_handle, position);
-                if (transform != nullptr && delta_time > 0.0f)
-                    device->SetVelocity(source._runtime_handle, (transform->_position - transform->_prev_position) / delta_time);
+                if (transform != nullptr)
+                    device->SetVelocity(source._runtime_handle, get_velocity(*transform));
             }
             else
             {

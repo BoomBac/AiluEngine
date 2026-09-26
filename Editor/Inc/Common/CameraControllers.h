@@ -34,8 +34,8 @@ namespace Ailu
             void Attach(Render::Camera *camera);
             void SetTargetPosition(const Vector3f &position, bool is_force = false);
             void SetTargetRotation(f32 x, f32 y, bool is_force = false);
-            // Teleport the camera and its interpolation state at once (yaw/pitch in radians).
-            void SnapTo(const Vector3f &position, f32 yaw, f32 pitch);
+            // Teleport the camera and its interpolation state at once (pitch/yaw in degrees).
+            void SnapTo(const Vector3f &position, f32 pitch, f32 yaw);
             void Move(const Vector3f &d);
             void Interpolate(float speed);
             void Accelerate(bool faster) { _cur_move_speed = faster ? _fast_camera_move_speed : _base_camera_move_speed; };

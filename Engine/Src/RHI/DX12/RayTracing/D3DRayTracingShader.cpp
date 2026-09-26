@@ -9,12 +9,122 @@
 #include "Render/Buffer.h"
 #include "Render/RayTracing/RayTracingScene.h"
 #include "Render/Texture.h"
+#include "Render/ShaderArtifactCache.h"
+#include "Render/ShaderDependencyPath.h"
+#include "Framework/Common/Path.h"
+#include "Framework/Common/FileManager.h"
 #include "pch.h"
 
 namespace Ailu::RHI::DX12
 {
     namespace
     {
+        bool LoadRayTracingLibrary(const D3DShaderCompileDesc &desc, Render::ShaderVariantHash variant_hash,
+                                   D3DShaderCompileOutput &output)
+        {
+            Render::ShaderArtifactKey key;
+            key._type = Render::EShaderArtifactType::kRayTracing;
+            key._source_path = ToChar(Render::NormalizeShaderDependencyPath(desc._filename));
+            key._variant_hash = variant_hash;
+            key._backend = "dx12";
+            Vector<Render::ShaderMacro> macros;
+            for (const auto &macro : desc._keywords)
+                macros.push_back({macro.Name, macro.Definition == nullptr ? "1" : macro.Definition});
+            macros.push_back({"SHADER_DXC", "1"});
+            macros.push_back({"AL_SHADER_INTEROP_CBUFFER_AS_STRUCT", "1"});
+            const auto packaged_interop = PathUtils::ResolveRelPath(
+                L"../ShaderInterop.h", PathUtils::Parent(desc._filename)).wstring();
+            if (FileManager::Exist(packaged_interop))
+                macros.push_back({"AL_PACKAGE_SHADER_INTEROP", "1"});
+            key._compile_config_hash = Render::HashCompileConfig(key._backend, desc._target, desc._compile_mode, macros);
+            auto &cache = Render::ShaderArtifactCache::Get();
+            Render::RayTracingShaderVariantArtifact artifact;
+            auto reason = Render::EShaderArtifactInvalidReason::kNone;
+            auto load_artifact = [&]()
+            {
+                if (!desc._is_load_cache || !cache.Load(key, artifact, &reason))
+                    return false;
+                if (artifact._library._byte_code.empty() || artifact._reflection_blob.empty() ||
+                    artifact._dependencies.empty())
+                {
+                    reason = Render::EShaderArtifactInvalidReason::kCorrupted;
+                    return false;
+                }
+                ComPtr<IDxcUtils> utils;
+                ComPtr<ID3DBlob> byte_code;
+                ComPtr<ID3D12LibraryReflection> reflection;
+                DxcBuffer buffer{};
+                buffer.Ptr = artifact._reflection_blob.data();
+                buffer.Size = artifact._reflection_blob.size();
+                if (FAILED(DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&utils))) ||
+                    FAILED(utils->CreateReflection(&buffer, IID_PPV_ARGS(&reflection))) ||
+                    FAILED(D3DCreateBlob(artifact._library._byte_code.size(), &byte_code)))
+                {
+                    reason = Render::EShaderArtifactInvalidReason::kCorrupted;
+                    return false;
+                }
+                memcpy(byte_code->GetBufferPointer(), artifact._library._byte_code.data(),
+                       artifact._library._byte_code.size());
+                reason = Render::EShaderArtifactInvalidReason::kNone;
+                output._byte_code = byte_code;
+                output._library_reflection = reflection;
+                output._include_files.clear();
+                for (const auto &dependency : artifact._dependencies)
+                    output._include_files.insert(Render::NormalizeShaderDependencyPath(dependency._path));
+                return true;
+            };
+            bool used_artifact = load_artifact();
+            bool succeeded = used_artifact;
+            if (!used_artifact)
+            {
+                cache.BeginCompile(key);
+                try
+                {
+                    used_artifact = load_artifact();
+                    succeeded = used_artifact;
+                    if (!used_artifact && CompileDxcStage(desc, output) && output._byte_code != nullptr &&
+                        output._library_reflection != nullptr && output._reflection_blob != nullptr)
+                    {
+                        artifact = {};
+                        const auto *byte_code = static_cast<const u8 *>(output._byte_code->GetBufferPointer());
+                        artifact._library._byte_code.assign(byte_code, byte_code + output._byte_code->GetBufferSize());
+                        const auto *reflection = static_cast<const u8 *>(output._reflection_blob->GetBufferPointer());
+                        artifact._reflection_blob.assign(
+                            reflection, reflection + output._reflection_blob->GetBufferSize());
+                        auto dependencies = Render::NormalizeShaderDependencyPaths(output._include_files);
+                        const auto source_path = Render::NormalizeShaderDependencyPath(desc._filename);
+                        dependencies.erase(source_path);
+                        auto append_dependency = [&](const WString &path)
+                        {
+                            const auto fingerprint = Render::ShaderFileFingerprintCache::Get().GetFingerprint(path);
+                            const auto content_hash = Render::ShaderFileFingerprintCache::Get().GetContentHash(path);
+                            artifact._dependencies.push_back(
+                                {path, fingerprint._file_size, fingerprint._last_write_time, content_hash});
+                        };
+                        append_dependency(source_path);
+                        for (const auto &path : dependencies)
+                            append_dependency(path);
+                        if (!cache.Store(key, artifact))
+                            LOG_WARNING("RayTracing shader artifact store failed shader={} variant={}",
+                                        key._source_path, variant_hash);
+                        ++cache.Stats()._compiled_variant_count;
+                        succeeded = true;
+                    }
+                }
+                catch (...)
+                {
+                    cache.EndCompile(key);
+                    throw;
+                }
+                cache.EndCompile(key);
+            }
+            if (succeeded)
+                LOG_INFO("RayTracingShaderLibrary shader={} variant={} source={} reason={}", key._source_path,
+                         variant_hash, used_artifact ? "artifact" : "compile",
+                         Render::ShaderArtifactInvalidReasonToString(reason));
+            return succeeded;
+        }
+
         constexpr u32 kDxrHitAttributeSize = 2u * sizeof(float);
         constexpr u32 kDxrRayPayloadSize = 96u;
         constexpr u32 kDxrMaxRecursionDepth = 1u;
@@ -402,17 +512,24 @@ namespace Ailu::RHI::DX12
     void D3DRayTracingShader::DispatchRays(RHICommandBuffer *cmd, uint w, uint h, uint depth,
                                            const Render::DispatchBindingSnapshot &snapshot)
     {
-        if (_state_object == nullptr || !snapshot._is_ready)
+        const auto it = _dxr_variants.find(snapshot._variant_hash);
+        if (it == _dxr_variants.end() || it->second._state_object == nullptr || !snapshot._is_ready)
             return;
+        const auto &variant = it->second;
         auto d3dcmd = static_cast<D3DCommandBuffer*>(cmd)->NativeCmdList();
-        d3dcmd->SetPipelineState1(_state_object.Get());
-        d3dcmd->SetComputeRootSignature(_global_root_signature.Get());
-        if (!BindResources(cmd, snapshot))
+        d3dcmd->SetPipelineState1(variant._state_object.Get());
+        d3dcmd->SetComputeRootSignature(variant._global_root_signature.Get());
+        if (!BindResources(cmd, snapshot, variant))
             throw HrException(E_INVALIDARG);
-        d3dcmd->DispatchRays(&GetDispatchDesc(w, h, depth));
+        auto dispatch_desc = variant._dispatch_desc;
+        dispatch_desc.Width = w;
+        dispatch_desc.Height = h;
+        dispatch_desc.Depth = depth;
+        d3dcmd->DispatchRays(&dispatch_desc);
     }
 
-    bool D3DRayTracingShader::BindResources(RHICommandBuffer *cmd, const Render::DispatchBindingSnapshot &snapshot)
+    bool D3DRayTracingShader::BindResources(RHICommandBuffer *cmd, const Render::DispatchBindingSnapshot &snapshot,
+                                            const DxrVariant &variant)
     {
         auto *d3d_cmd = static_cast<D3DCommandBuffer *>(cmd);
         bool scene_bound = false;
@@ -489,9 +606,11 @@ namespace Ailu::RHI::DX12
         if (!scene_bound)
         {
             i32 scene_root_slot = -1;
-            if (_binding_layout != nullptr)
+            if (const auto layout_it = _variants.find(snapshot._variant_hash);
+                layout_it != _variants.end() && layout_it->second._binding_layout != nullptr)
             {
-                const auto *scene_binding = _binding_layout->Find(Render::ShaderPropertyRegistry::Get().Intern("Scene"));
+                const auto *scene_binding = layout_it->second._binding_layout->Find(
+                    Render::ShaderPropertyRegistry::Get().Intern("Scene"));
                 if (scene_binding != nullptr)
                     scene_root_slot = scene_binding->_bind_slot;
             }
@@ -503,16 +622,19 @@ namespace Ailu::RHI::DX12
 
         const auto bindless_srv_base = D3DDescriptorMgr::Get().GetBindlessSRVBaseGpuHandle();
         const auto bindless_uav_base = D3DDescriptorMgr::Get().GetBindlessUAVBaseGpuHandle();
-        if (_has_bindless_texture2d || _has_bindless_buffer || _has_bindless_rw_texture2d || _has_bindless_rw_buffer)
+        if (variant._has_bindless_texture2d || variant._has_bindless_buffer ||
+            variant._has_bindless_rw_texture2d || variant._has_bindless_rw_buffer)
             d3d_cmd->SetDescriptorHeap(D3DDescriptorMgr::Get().GetBindHeap(), 1024u);
-        if (_has_bindless_texture2d)
-            d3d_cmd->NativeCmdList()->SetComputeRootDescriptorTable(_bindless_texture_slot, bindless_srv_base);
-        if (_has_bindless_buffer)
-            d3d_cmd->NativeCmdList()->SetComputeRootDescriptorTable(_bindless_buffer_slot, bindless_srv_base);
-        if (_has_bindless_rw_texture2d)
-            d3d_cmd->NativeCmdList()->SetComputeRootDescriptorTable(_bindless_rw_texture_slot, bindless_uav_base);
-        if (_has_bindless_rw_buffer)
-            d3d_cmd->NativeCmdList()->SetComputeRootDescriptorTable(_bindless_rw_buffer_slot, bindless_uav_base);
+        if (variant._has_bindless_texture2d)
+            d3d_cmd->NativeCmdList()->SetComputeRootDescriptorTable(variant._bindless_texture_slot, bindless_srv_base);
+        if (variant._has_bindless_buffer)
+            d3d_cmd->NativeCmdList()->SetComputeRootDescriptorTable(variant._bindless_buffer_slot, bindless_srv_base);
+        if (variant._has_bindless_rw_texture2d)
+            d3d_cmd->NativeCmdList()->SetComputeRootDescriptorTable(variant._bindless_rw_texture_slot,
+                                                                   bindless_uav_base);
+        if (variant._has_bindless_rw_buffer)
+            d3d_cmd->NativeCmdList()->SetComputeRootDescriptorTable(variant._bindless_rw_buffer_slot,
+                                                                   bindless_uav_base);
         return true;
     }
 
@@ -538,17 +660,21 @@ namespace Ailu::RHI::DX12
         desc._filename = _src_file_path;
         desc._target = Render::RenderConstants::kLibModel_6_3;
         desc._is_load_cache = policy == Render::EShaderCompilePolicy::kUseArtifact;
-        if (!CreateFromFileDXC(desc, output) || output._byte_code == nullptr || output._library_reflection == nullptr)
+        const auto variant_it = _variants.find(variant_hash);
+        if (variant_it == _variants.end())
+            return false;
+        for (const auto &keyword : variant_it->second._active_keywords)
+            desc._keywords.emplace_back(D3D_SHADER_MACRO{keyword.c_str(), "1"});
+        if (!LoadRayTracingLibrary(desc, variant_hash, output))
         {
-            LOG_ERROR("RayTracingShader: failed to compile raytracing shader library: {}", ToChar(desc._filename));
-            _is_valid = false;
+            LOG_ERROR("RayTracingShader: failed to compile raytracing shader library: {} variant={}",
+                      ToChar(desc._filename), variant_hash);
             return false;
         }
 
         _byte_code = output._byte_code;
-        _all_dep_file_pathes.clear();
-        _all_dep_file_pathes.insert(_src_file_path);
-        _all_dep_file_pathes.insert(output._include_files.begin(), output._include_files.end());
+        for (const auto &include_file : output._include_files)
+            RegisterDependencyFile(include_file);
         LoadReflectionInfo(output._library_reflection.Get());
         _dev = dynamic_cast<D3DContext&>(Render::GraphicsContext::Get()).GetDevice();
         GenerateRootSignature();
@@ -580,6 +706,22 @@ namespace Ailu::RHI::DX12
         _dispatch_desc.MissShaderTable.StrideInBytes = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
         _dispatch_desc.RayGenerationShaderRecord.StartAddress = _ray_gen_stb->GetGPUVirtualAddress();
         _dispatch_desc.RayGenerationShaderRecord.SizeInBytes = _ray_gen_stb->GetDesc().Width;
+        auto &variant = _dxr_variants[variant_hash];
+        variant._byte_code = _byte_code;
+        variant._state_object = _state_object;
+        variant._global_root_signature = _global_root_signature;
+        variant._ray_gen_stb = _ray_gen_stb;
+        variant._miss_stb = _miss_stb;
+        variant._hit_group_stb = _hit_group_stb;
+        variant._dispatch_desc = _dispatch_desc;
+        variant._has_bindless_texture2d = _has_bindless_texture2d;
+        variant._has_bindless_buffer = _has_bindless_buffer;
+        variant._has_bindless_rw_texture2d = _has_bindless_rw_texture2d;
+        variant._has_bindless_rw_buffer = _has_bindless_rw_buffer;
+        variant._bindless_texture_slot = _bindless_texture_slot;
+        variant._bindless_buffer_slot = _bindless_buffer_slot;
+        variant._bindless_rw_texture_slot = _bindless_rw_texture_slot;
+        variant._bindless_rw_buffer_slot = _bindless_rw_buffer_slot;
         _is_valid = true;
         return true;
     }

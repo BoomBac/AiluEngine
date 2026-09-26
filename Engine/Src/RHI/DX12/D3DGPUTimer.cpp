@@ -126,7 +126,7 @@ namespace Ailu::RHI::DX12
         //开始查询和结束查询分别进行 query_index 和 query_index + 1两个查询
         u64 dst_offset = (GraphicsContext::Get().CurBackbufIndex() * c_timerSlots + start_query_index) * sizeof(u64);
         //这里第四个参数应该是实际使用的timer数量 * 2，对没查询索引的解析结果会报错
-        //commandList->ResolveQueryData(m_heap.Get(), D3D12_QUERY_TYPE_TIMESTAMP, start_query_index, 2, m_buffer.Get(), dst_offset);
+        commandList->ResolveQueryData(m_heap.Get(), D3D12_QUERY_TYPE_TIMESTAMP, start_query_index, 2, m_buffer.Get(), dst_offset);
     }
 
     void D3DGPUTimer::Reset()

@@ -1,7 +1,7 @@
 #include "pch.h"
 
-#include "Framework/Common/Path.h"
 #include "Render/ShaderDependencyRegistry.h"
+#include "Render/ShaderDependencyPath.h"
 
 namespace Ailu::Render
 {
@@ -31,7 +31,7 @@ namespace Ailu::Render
         auto &paths = _artifact_to_dependencies[artifact_key];
         for (const auto &dependency : dependencies)
         {
-            const WString path = PathUtils::FormatFilePath(dependency._path);
+            const WString path = NormalizeShaderDependencyPath(dependency._path);
             paths.emplace_back(path);
             _dependency_to_artifacts[path].insert(artifact_key);
         }
@@ -58,7 +58,7 @@ namespace Ailu::Render
     {
         std::lock_guard lock(_mutex);
         Vector<u64> result;
-        const auto it = _dependency_to_artifacts.find(PathUtils::FormatFilePath(changed_file));
+        const auto it = _dependency_to_artifacts.find(NormalizeShaderDependencyPath(changed_file));
         if (it == _dependency_to_artifacts.end())
             return result;
         result.assign(it->second.begin(), it->second.end());

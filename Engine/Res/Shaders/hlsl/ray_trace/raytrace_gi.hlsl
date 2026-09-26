@@ -34,6 +34,7 @@
 
 #pragma kernel RayGen
 #pragma kernel PrimaryRay
+#pragma multi_compile PrimaryRay _ PATH_TRACER_MNEE
 #pragma kernel Denoise
 
 #define MAX_ACCUMULATED_FRAMES 4096

@@ -7,6 +7,7 @@
 #include "Render/Shader.h"
 #include "Render/ShaderArtifactCache.h"
 #include "Render/ShaderDependencyRegistry.h"
+#include "Render/ShaderDependencyPath.h"
 #include <algorithm>
 #include <cwctype>
 
@@ -189,6 +190,7 @@ namespace Ailu
     u16 ResourceReloadService::ReloadShaderDependencies(const WString &sys_path) const
     {
         u16 count = 0;
+        const WString normalized_path = Render::NormalizeShaderDependencyPath(sys_path);
         for (auto it = ResourceMgr::Get().ResourceBegin<Render::Shader>(); it != ResourceMgr::Get().ResourceEnd<Render::Shader>(); it++)
         {
             auto shader = ResourceMgr::IterToRefPtr<Render::Shader>(it);
@@ -203,7 +205,7 @@ namespace Ailu
                 const auto &pass = shader->GetPassInfo(i);
                 for (const auto &source_file: pass._source_files)
                 {
-                    if (source_file == sys_path)
+                    if (source_file == normalized_path)
                     {
                         match_file = true;
                         if (Asset *linked_asset = ResourceMgr::Get().GetLinkedAsset(shader.get()); linked_asset != nullptr)

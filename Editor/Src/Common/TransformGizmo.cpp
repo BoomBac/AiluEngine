@@ -75,7 +75,8 @@ namespace Ailu
             if (target == nullptr)
                 return;
 
-            target->SetLocalPosition(WorldPositionToTargetLocal(world_position));
+            if (target->SetLocalPosition(WorldPositionToTargetLocal(world_position)))
+                target->ResetRenderInterpolation();
         }
 
         void TransformGizmo::SetTargetWorldRotation(ECS::TransformComponent *target, const Quaternion &world_rotation) const
@@ -83,7 +84,8 @@ namespace Ailu
             if (target == nullptr)
                 return;
 
-            target->SetLocalRotation(WorldRotationToTargetLocal(world_rotation));
+            if (target->SetLocalRotation(WorldRotationToTargetLocal(world_rotation)))
+                target->ResetRenderInterpolation();
         }
         void TransformGizmo::ToggleSpace()
         {
@@ -698,7 +700,10 @@ namespace Ailu
                         else {}
                         if (IsSnapActive())
                             world_delta = SnapVector(world_delta, _translate_snap_step);
-                        SetTargetWorldPosition(target, _drag_start_pos + world_delta);
+                        const Vector3f world_position = _drag_start_pos + world_delta;
+                        SetTargetWorldPosition(target, world_position);
+                        // Draw at this frame's drag position before TransformSystem updates the world matrix.
+                        _cur_target_pos = world_position;
                     }
                     else if (_mode == EGizmoMode::kScale)
                     {
@@ -718,7 +723,8 @@ namespace Ailu
                             Vector3f target_scale = _drag_start_scale * world_scale;
                             if (IsSnapActive())
                                 target_scale = _drag_start_scale + SnapVector(target_scale - _drag_start_scale, _scale_snap_step);
-                            target->SetLocalScale(target_scale);
+                            if (target->SetLocalScale(target_scale))
+                                target->ResetRenderInterpolation();
                             _drag_scale_factor[_drag_axis >> 1] = _drag_start_scale[_drag_axis >> 1] != 0.0f
                                                                           ? target_scale[_drag_axis >> 1] /
                                                                                     _drag_start_scale[_drag_axis >> 1]
@@ -744,7 +750,8 @@ namespace Ailu
                                 target_scale = _drag_start_scale +
                                                SnapVector(target_scale - _drag_start_scale, _scale_snap_step);
                             }
-                            target->SetLocalScale(target_scale);
+                            if (target->SetLocalScale(target_scale))
+                                target->ResetRenderInterpolation();
                             _drag_scale_factor = Vector3f(
                                     _drag_start_scale.x != 0.0f ? target_scale.x / _drag_start_scale.x : scale_factor,
                                     _drag_start_scale.y != 0.0f ? target_scale.y / _drag_start_scale.y : scale_factor,

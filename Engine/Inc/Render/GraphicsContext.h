@@ -66,7 +66,7 @@ namespace Ailu
             virtual void CompileShaderAsync(RayTracingShader *shader) = 0;
 
             virtual void TakeCapture() = 0;
-            virtual void TakePixCapture() = 0;
+            virtual void TakePixCapture(bool open_ui = true) = 0;
             virtual void TakeRenderDocCapture() = 0;
             virtual void ResizeSwapChain(void* window_handle,const u32 width, const u32 height) = 0;
             /// @brief 在帧边界应用待处理的交换链 resize（此时没有命令缓冲在录制）

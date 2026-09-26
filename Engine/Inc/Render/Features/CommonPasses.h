@@ -136,6 +136,7 @@ namespace Ailu
         {
         public:
             DeferredLightingPass();
+            void SetSurfelGI(class SurfelGIFeature *feature) { _surfel_gi = feature; }
             void OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data) final;
             void Execute(GraphicsContext *context, RenderingData &rendering_data) final;
             void BeginPass(GraphicsContext *context) final;
@@ -143,6 +144,7 @@ namespace Ailu
             Ref<Material> _p_lighting_material;
 
         private:
+            class SurfelGIFeature *_surfel_gi = nullptr;
             Ref<Texture2D> _brdf_lut;
             AssetRef<ComputeShader> _brdflut_gen;
             Ref<RenderTexture> _dummy_main_light_shadow_map;

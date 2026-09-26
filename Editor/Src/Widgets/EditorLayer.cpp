@@ -2174,7 +2174,7 @@ namespace Ailu
             static bool s_show_anim_clip = false;
             // 光追管线开关只存在于这个调试菜单里、且不持久化，无人值守运行永远拿不到它。
             // AILU_RAYTRACING_PIPELINE=1 让抓帧运行也能确定性地切到光追管线。
-            static bool s_raytracing_pipeline = true;
+            static bool s_raytracing_pipeline = false;
             ImGui::Checkbox("Expand", &show);
             ImGui::Checkbox("ShowPlotDemo", &s_show_plot_demo);
             ImGui::Checkbox("ShowAssetTable", &s_show_asset_table);

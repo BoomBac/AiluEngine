@@ -92,6 +92,16 @@ namespace Ailu
 
         void TransformSystem::Update(Register &r, f32 delta_time)
         {
+            UpdateTransforms(r, false);
+        }
+
+        void TransformSystem::UpdateFixed(Register &r)
+        {
+            UpdateTransforms(r, true);
+        }
+
+        void TransformSystem::UpdateTransforms(Register &r, bool fixed_update)
+        {
             PROFILE_BLOCK_CPU("TransformSystem::Update")
             const bool hierarchy_changed = _order_dirty || _observed_hierarchy_revision != r.HierarchyRevision() ||
                                            _ordered_entities.size() != _entities.size();
@@ -111,17 +121,13 @@ namespace Ailu
 
                 const bool parent_world_changed = parent_transform != nullptr &&
                                                   transform->_cached_parent_world_version != parent_transform->_world_version;
-                if (!hierarchy_changed && !transform->_world_dirty && !parent_world_changed)
+                if (parent_transform != nullptr && parent_transform->_reset_render_interpolation)
+                    transform->ResetRenderInterpolation();
+                if (!hierarchy_changed && !transform->_world_dirty && !parent_world_changed &&
+                    !transform->_reset_render_interpolation)
                     continue;
 
                 const bool has_previous_world = transform->_world_version > 0u;
-                if (has_previous_world)
-                {
-                    transform->_prev_world_matrix = transform->_world_matrix;
-                    transform->_prev_position = transform->_position;
-                    transform->_prev_rotation = transform->_rotation;
-                    transform->_prev_scale = transform->_scale;
-                }
                 Transform::ToMatrix(transform->_local_transform, transform->_local_matrix);
 
                 if (parent_transform != nullptr)
@@ -144,7 +150,8 @@ namespace Ailu
                     transform->_scale = transform->_local_transform._scale;
                 }
 
-                if (transform->_reset_render_interpolation)
+                // Frame-driven edits must not interpolate against a fixed-step snapshot.
+                if (!fixed_update || transform->_reset_render_interpolation)
                 {
                     transform->_prev_world_matrix = transform->_world_matrix;
                     transform->_prev_position = transform->_position;

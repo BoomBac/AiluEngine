@@ -63,6 +63,8 @@ namespace Ailu
                 ImGui::UpdatePlatformWindows();
                 ImGui::RenderPlatformWindowsDefault(nullptr, (void *) dxcmd);
             }
+            // The ImGui backend binds native pipeline, root, and IA state outside D3DCommandBuffer's cache.
+            d3dcmd->ResetGraphicsStateCache();
         }
         void ImGuiRenderer::RecordImguiUsedTexture(RenderTexture *tex)
         {

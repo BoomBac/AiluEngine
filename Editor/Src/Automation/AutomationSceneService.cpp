@@ -2,13 +2,17 @@
 
 #include "Automation/AutomationAdapter.h"
 #include "Automation/AutomationReadModel.h"
+#include "Common/CameraControllers.h"
 #include "Common/Selection.h"
+#include "EditorApp.h"
 #include "Framework/Common/Application.h"
 #include "Framework/Common/Utils.h"
 #include "Project/ProjectManager.h"
+#include "Render/Camera.h"
 #include "Scene/Component.h"
 #include "Scene/Scene.h"
 
+#include <cmath>
 #include <format>
 
 namespace Ailu
@@ -60,6 +64,39 @@ namespace Ailu
                 const Guid *guid = scene->FindEntityGuid(entity);
                 return guid ? guid->ToString() : String{};
             }
+
+            AutomationValue ToAutomationVector3(const Vector3f &value)
+            {
+                return AutomationValue(AutomationArray{
+                    AutomationValue(value.x), AutomationValue(value.y), AutomationValue(value.z)});
+            }
+
+            bool TryReadVector3(const AutomationValue &value, Vector3f &result)
+            {
+                if (!value.IsArray() || value.AsArray().size() != 3u)
+                    return false;
+
+                const AutomationArray &array = value.AsArray();
+                if (!array[0].IsNumber() || !array[1].IsNumber() || !array[2].IsNumber())
+                    return false;
+
+                result = Vector3f(static_cast<f32>(array[0].AsFloat()),
+                                  static_cast<f32>(array[1].AsFloat()),
+                                  static_cast<f32>(array[2].AsFloat()));
+                return std::isfinite(result.x) && std::isfinite(result.y) && std::isfinite(result.z);
+            }
+
+            bool TryReadFloat(const AutomationObject &arguments, StringView name, f32 &result)
+            {
+                const auto it = arguments.find(String(name));
+                if (it == arguments.end())
+                    return false;
+                if (!it->second.IsNumber())
+                    return false;
+
+                result = static_cast<f32>(it->second.AsFloat());
+                return std::isfinite(result);
+            }
         }// namespace
 
         void AutomationSceneService::Register(EditorAutomationRegistry &registry)
@@ -70,6 +107,29 @@ namespace Ailu
                 desc._description = "Return editor state: mode, active scene, revisions and selection.";
                 desc._permission = EAutomationPermission::kReadOnly;
                 registry.Register("editor.get_state", std::move(desc), HandleGetState);
+            }
+            {
+                AutomationMethodDesc desc;
+                desc._name = "editor.get_scene_camera";
+                desc._description = "Read the current SceneView camera pose and its controller target.";
+                desc._permission = EAutomationPermission::kReadOnly;
+                registry.Register("editor.get_scene_camera", std::move(desc), HandleGetSceneCamera);
+            }
+            {
+                AutomationMethodDesc desc;
+                desc._name = "editor.set_scene_camera";
+                desc._description =
+                    "Set SceneView camera position, pitch/yaw in degrees and horizontal FOV. Set snap=false "
+                    "to move toward the target using the SceneView camera controller interpolation.";
+                desc._permission = EAutomationPermission::kSafeWrite;
+                desc._input_schema.AddParam("position", "World-space target position [x,y,z].", EAutomationValueType::kVector);
+                desc._input_schema.AddParam("pitch_degrees", "Target pitch in degrees.", EAutomationValueType::kFloat);
+                desc._input_schema.AddParam("yaw_degrees", "Target yaw in degrees.", EAutomationValueType::kFloat);
+                desc._input_schema.AddParam("fov_degrees", "Horizontal field of view in degrees (1 to 179).",
+                                            EAutomationValueType::kFloat);
+                desc._input_schema.AddParam("snap", "Apply position and orientation immediately; defaults to true.",
+                                            EAutomationValueType::kBool);
+                registry.Register("editor.set_scene_camera", std::move(desc), HandleSetSceneCamera);
             }
             {
                 AutomationMethodDesc desc;
@@ -140,6 +200,97 @@ namespace Ailu
             }
             result.emplace("selection", AutomationValue(std::move(selection)));
             return AutomationResult::Ok(AutomationValue(std::move(result)));
+        }
+
+        AutomationResult AutomationSceneService::HandleGetSceneCamera(EditorAutomationContext &,
+                                                                        const AutomationObject &)
+        {
+            EditorApp *editor = EditorApp::GetEditor();
+            if (editor == nullptr || editor->GetSceneCamera() == nullptr)
+                return AutomationResult::Fail(AutomationErrors::kEditorNotReady, "SceneView camera is unavailable");
+
+            const Render::Camera &camera = *editor->GetSceneCamera();
+            const FirstPersonCameraController &controller = editor->GetSceneCameraController();
+            const Quaternion &rotation = camera.Rotation();
+            AutomationObject result;
+            result.emplace("position", ToAutomationVector3(camera.Position()));
+            result.emplace("target_position", ToAutomationVector3(controller._target_pos));
+            result.emplace("forward", ToAutomationVector3(camera.Forward()));
+            result.emplace("rotation", AutomationValue(AutomationArray{
+                AutomationValue(rotation.x), AutomationValue(rotation.y),
+                AutomationValue(rotation.z), AutomationValue(rotation.w)}));
+            result.emplace("pitch_degrees", AutomationValue(controller._rotation.x));
+            result.emplace("yaw_degrees", AutomationValue(controller._rotation.y));
+            result.emplace("fov_degrees", AutomationValue(camera.FovH()));
+            return AutomationResult::Ok(AutomationValue(std::move(result)));
+        }
+
+        AutomationResult AutomationSceneService::HandleSetSceneCamera(EditorAutomationContext &context,
+                                                                        const AutomationObject &arguments)
+        {
+            EditorApp *editor = EditorApp::GetEditor();
+            if (editor == nullptr || editor->GetSceneCamera() == nullptr)
+                return AutomationResult::Fail(AutomationErrors::kEditorNotReady, "SceneView camera is unavailable");
+
+            Render::Camera *camera = editor->GetSceneCamera();
+            FirstPersonCameraController &controller = editor->GetSceneCameraController();
+            Vector3f position = controller._target_pos;
+            f32 pitch = controller._rotation.x;
+            f32 yaw = controller._rotation.y;
+            f32 fov = camera->FovH();
+            bool has_update = false;
+
+            if (const auto it = arguments.find("position"); it != arguments.end())
+            {
+                if (!TryReadVector3(it->second, position))
+                    return AutomationResult::Fail(AutomationErrors::kInvalidArgument,
+                                                  "position must be a finite [x,y,z] vector");
+                has_update = true;
+            }
+            if (arguments.contains("pitch_degrees"))
+            {
+                if (!TryReadFloat(arguments, "pitch_degrees", pitch))
+                    return AutomationResult::Fail(AutomationErrors::kInvalidArgument,
+                                                  "pitch_degrees must be finite");
+                has_update = true;
+            }
+            if (arguments.contains("yaw_degrees"))
+            {
+                if (!TryReadFloat(arguments, "yaw_degrees", yaw))
+                    return AutomationResult::Fail(AutomationErrors::kInvalidArgument,
+                                                  "yaw_degrees must be finite");
+                has_update = true;
+            }
+            if (arguments.contains("fov_degrees"))
+            {
+                if (!TryReadFloat(arguments, "fov_degrees", fov) || fov <= 1.0f || fov >= 179.0f)
+                    return AutomationResult::Fail(AutomationErrors::kInvalidArgument,
+                                                  "fov_degrees must be greater than 1 and less than 179");
+                has_update = true;
+            }
+            if (!has_update)
+                return AutomationResult::Fail(AutomationErrors::kInvalidArgument,
+                                              "provide position, pitch_degrees, yaw_degrees or fov_degrees");
+
+            bool snap = true;
+            if (const auto it = arguments.find("snap"); it != arguments.end())
+            {
+                if (!it->second.IsBool())
+                    return AutomationResult::Fail(AutomationErrors::kInvalidArgument, "snap must be a boolean");
+                snap = it->second.AsBool();
+            }
+
+            if (snap)
+                controller.SnapTo(position, pitch, yaw);
+            else
+            {
+                controller.SetTargetPosition(position, true);
+                controller.SetTargetRotation(pitch, yaw, true);
+            }
+            controller._camera_fov_h = fov;
+            camera->FovH(fov);
+
+            return HandleGetSceneCamera(context, AutomationObject{});
         }
 
         AutomationResult AutomationSceneService::HandleQueryEntities(EditorAutomationContext &, const AutomationObject &arguments)

@@ -36,6 +36,8 @@ namespace Ailu::Render
     {
         std::atomic<u64> _graphics_hit_count = 0u;
         std::atomic<u64> _graphics_miss_count = 0u;
+        std::atomic<u64> _ray_tracing_hit_count = 0u;
+        std::atomic<u64> _ray_tracing_miss_count = 0u;
         std::atomic<u64> _compute_hit_count = 0u;
         std::atomic<u64> _compute_miss_count = 0u;
         std::atomic<u64> _invalid_dependency_count = 0u;
@@ -55,6 +57,12 @@ namespace Ailu::Render
                   EShaderArtifactInvalidReason *reason = nullptr);
         bool Store(const ShaderArtifactKey &key, const GraphicsShaderVariantArtifact &artifact);
         bool Store(const ShaderArtifactKey &key, const ComputeShaderVariantArtifact &artifact);
+
+        bool Load(const ShaderArtifactKey &key, RayTracingShaderVariantArtifact &artifact,
+                  EShaderArtifactInvalidReason *reason = nullptr);
+        bool Store(const ShaderArtifactKey &key, const RayTracingShaderVariantArtifact &artifact);
+        bool ValidateDependencies(RayTracingShaderVariantArtifact &artifact,
+                                  EShaderArtifactInvalidReason *reason = nullptr);
 
         void Invalidate(const ShaderArtifactKey &key);
         void InvalidateArtifact(u64 artifact_key);
@@ -91,6 +99,7 @@ namespace Ailu::Render
         HashMap<u64, bool> _compiling_artifacts;
         HashMap<u64, GraphicsShaderVariantArtifact> _graphics_artifacts;
         HashMap<u64, ComputeShaderVariantArtifact> _compute_artifacts;
+        HashMap<u64, RayTracingShaderVariantArtifact> _ray_tracing_artifacts;
         ShaderArtifactStats _stats;
     };
 }

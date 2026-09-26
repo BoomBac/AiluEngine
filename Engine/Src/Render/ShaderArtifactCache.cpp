@@ -11,6 +11,7 @@
 #include "Framework/Common/Path.h"
 #include "Render/ShaderArtifactCache.h"
 #include "Render/ShaderDependencyRegistry.h"
+#include "Render/ShaderDependencyPath.h"
 
 namespace Ailu::Render
 {
@@ -78,7 +79,7 @@ namespace Ailu::Render
 
     const ShaderFileFingerprint &ShaderFileFingerprintCache::GetFingerprint(const WString &path)
     {
-        const WString normalized_path = PathUtils::FormatFilePath(path);
+        const WString normalized_path = NormalizeShaderDependencyPath(path);
         std::lock_guard lock(_mutex);
         auto it = _fingerprints.find(normalized_path);
         if (it == _fingerprints.end())
@@ -91,7 +92,7 @@ namespace Ailu::Render
 
     u64 ShaderFileFingerprintCache::GetContentHash(const WString &path)
     {
-        const WString normalized_path = PathUtils::FormatFilePath(path);
+        const WString normalized_path = NormalizeShaderDependencyPath(path);
         std::lock_guard lock(_mutex);
         auto it = _fingerprints.find(normalized_path);
         if (it == _fingerprints.end())
@@ -109,7 +110,7 @@ namespace Ailu::Render
     void ShaderFileFingerprintCache::Invalidate(const WString &path)
     {
         std::lock_guard lock(_mutex);
-        _fingerprints.erase(PathUtils::FormatFilePath(path));
+        _fingerprints.erase(NormalizeShaderDependencyPath(path));
     }
 
     void ShaderFileFingerprintCache::Clear()
@@ -189,7 +190,7 @@ namespace Ailu::Render
                         _graphics_artifacts.erase(it);
                 }
             }
-            else
+            else if constexpr (std::is_same_v<Artifact, ComputeShaderVariantArtifact>)
             {
                 auto it = _compute_artifacts.find(artifact_key);
                 if (it != _compute_artifacts.end())
@@ -202,13 +203,28 @@ namespace Ailu::Render
                         _compute_artifacts.erase(it);
                 }
             }
+            else
+            {
+                auto it = _ray_tracing_artifacts.find(artifact_key);
+                if (it != _ray_tracing_artifacts.end())
+                {
+                    artifact = it->second;
+                    memory_hit = artifact._header._artifact_key == artifact_key && ValidateDependencies(artifact, reason);
+                    if (memory_hit)
+                        it->second = artifact;
+                    else
+                        _ray_tracing_artifacts.erase(it);
+                }
+            }
         }
         if (memory_hit)
         {
             if constexpr (std::is_same_v<Artifact, GraphicsShaderVariantArtifact>)
                 ++_stats._graphics_hit_count;
-            else
+            else if constexpr (std::is_same_v<Artifact, ComputeShaderVariantArtifact>)
                 ++_stats._compute_hit_count;
+            else
+                ++_stats._ray_tracing_hit_count;
             ShaderDependencyRegistry::Get().Register(artifact_key, artifact._dependencies);
             return true;
         }
@@ -219,8 +235,10 @@ namespace Ailu::Render
         {
             if constexpr (std::is_same_v<Artifact, GraphicsShaderVariantArtifact>)
                 ++_stats._graphics_miss_count;
-            else
+            else if constexpr (std::is_same_v<Artifact, ComputeShaderVariantArtifact>)
                 ++_stats._compute_miss_count;
+            else
+                ++_stats._ray_tracing_miss_count;
             return false;
         }
 
@@ -245,8 +263,10 @@ namespace Ailu::Render
             SetReason(reason, EShaderArtifactInvalidReason::kCorrupted);
             if constexpr (std::is_same_v<Artifact, GraphicsShaderVariantArtifact>)
                 ++_stats._graphics_miss_count;
-            else
+            else if constexpr (std::is_same_v<Artifact, ComputeShaderVariantArtifact>)
                 ++_stats._compute_miss_count;
+            else
+                ++_stats._ray_tracing_miss_count;
             return false;
         }
         if (!ValidateDependencies(artifact, reason))
@@ -254,22 +274,28 @@ namespace Ailu::Render
             ++_stats._invalid_dependency_count;
             if constexpr (std::is_same_v<Artifact, GraphicsShaderVariantArtifact>)
                 ++_stats._graphics_miss_count;
-            else
+            else if constexpr (std::is_same_v<Artifact, ComputeShaderVariantArtifact>)
                 ++_stats._compute_miss_count;
+            else
+                ++_stats._ray_tracing_miss_count;
             return false;
         }
         {
             std::lock_guard lock(_mutex);
             if constexpr (std::is_same_v<Artifact, GraphicsShaderVariantArtifact>)
                 _graphics_artifacts[artifact_key] = artifact;
-            else
+            else if constexpr (std::is_same_v<Artifact, ComputeShaderVariantArtifact>)
                 _compute_artifacts[artifact_key] = artifact;
+            else
+                _ray_tracing_artifacts[artifact_key] = artifact;
         }
         ShaderDependencyRegistry::Get().Register(artifact_key, artifact._dependencies);
         if constexpr (std::is_same_v<Artifact, GraphicsShaderVariantArtifact>)
             ++_stats._graphics_hit_count;
-        else
+        else if constexpr (std::is_same_v<Artifact, ComputeShaderVariantArtifact>)
             ++_stats._compute_hit_count;
+        else
+            ++_stats._ray_tracing_hit_count;
         return true;
     }
 
@@ -327,8 +353,10 @@ namespace Ailu::Render
             std::lock_guard lock(_mutex);
             if constexpr (std::is_same_v<Artifact, GraphicsShaderVariantArtifact>)
                 _graphics_artifacts[key.Hash()] = stored;
-            else
+            else if constexpr (std::is_same_v<Artifact, ComputeShaderVariantArtifact>)
                 _compute_artifacts[key.Hash()] = stored;
+            else
+                _ray_tracing_artifacts[key.Hash()] = stored;
         }
         ShaderDependencyRegistry::Get().Register(key.Hash(), stored._dependencies);
         _stats._artifact_bytes_written.fetch_add(data.size());
@@ -357,6 +385,23 @@ namespace Ailu::Render
         return StoreImpl(key, artifact);
     }
 
+    bool ShaderArtifactCache::Load(const ShaderArtifactKey &key, RayTracingShaderVariantArtifact &artifact,
+                                  EShaderArtifactInvalidReason *reason)
+    {
+        return LoadImpl(key, artifact, reason);
+    }
+
+    bool ShaderArtifactCache::Store(const ShaderArtifactKey &key, const RayTracingShaderVariantArtifact &artifact)
+    {
+        return StoreImpl(key, artifact);
+    }
+
+    bool ShaderArtifactCache::ValidateDependencies(RayTracingShaderVariantArtifact &artifact,
+                                                  EShaderArtifactInvalidReason *reason)
+    {
+        return ValidateDependencies<RayTracingShaderVariantArtifact>(artifact, reason);
+    }
+
     void ShaderArtifactCache::Invalidate(const ShaderArtifactKey &key)
     {
         InvalidateArtifact(key.Hash());
@@ -368,6 +413,7 @@ namespace Ailu::Render
             std::lock_guard lock(_mutex);
             _graphics_artifacts.erase(artifact_key);
             _compute_artifacts.erase(artifact_key);
+            _ray_tracing_artifacts.erase(artifact_key);
         }
         ShaderDependencyRegistry::Get().Unregister(artifact_key);
         std::error_code error;
@@ -382,6 +428,7 @@ namespace Ailu::Render
             std::lock_guard lock(_mutex);
             _graphics_artifacts.clear();
             _compute_artifacts.clear();
+            _ray_tracing_artifacts.clear();
         }
         ShaderFileFingerprintCache::Get().Clear();
     }
@@ -423,11 +470,15 @@ namespace Ailu::Render
         const u64 graphics_miss = _stats._graphics_miss_count.load();
         const u64 compute_hit = _stats._compute_hit_count.load();
         const u64 compute_miss = _stats._compute_miss_count.load();
-        const u64 total = graphics_hit + graphics_miss + compute_hit + compute_miss;
-        const f64 hit_rate = total == 0u ? 100.0 : static_cast<f64>(graphics_hit + compute_hit) * 100.0 / total;
-        LOG_INFO("Shader Artifact Cache: Graphics: {} hit / {} miss, Compute: {} hit / {} miss, Hit rate: {:.1}%, "
+        const u64 ray_tracing_hit = _stats._ray_tracing_hit_count.load();
+        const u64 ray_tracing_miss = _stats._ray_tracing_miss_count.load();
+        const u64 total = graphics_hit + graphics_miss + compute_hit + compute_miss + ray_tracing_hit + ray_tracing_miss;
+        const f64 hit_rate = total == 0u ? 100.0
+            : static_cast<f64>(graphics_hit + compute_hit + ray_tracing_hit) * 100.0 / total;
+        LOG_INFO("Shader Artifact Cache: Graphics: {} hit / {} miss, Compute: {} hit / {} miss, "
+                 "RayTracing: {} hit / {} miss, Hit rate: {:.1}%, "
                  "Compiled variants: {}, Artifact read: {} bytes, Artifact written: {} bytes",
-                 graphics_hit, graphics_miss, compute_hit, compute_miss, hit_rate,
+                 graphics_hit, graphics_miss, compute_hit, compute_miss, ray_tracing_hit, ray_tracing_miss, hit_rate,
                  _stats._compiled_variant_count.load(), _stats._artifact_bytes_read.load(),
                  _stats._artifact_bytes_written.load());
     }

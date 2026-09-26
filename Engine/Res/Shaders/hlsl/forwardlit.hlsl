@@ -95,7 +95,7 @@ float4 ForwardPSMain(StandardPSInput input) : SV_TARGET
     if (HasPrimitiveStaticGI(primitive))
         irradiance = EvaluatePrimitiveStaticIrradiance(primitive, surface_data.wnormal);
 #endif
-    float3 light = max(0.0, CalculateLightPBR(surface_data, input.world_pos,input.uv0, irradiance));
+    float3 light = max(0.0, CalculateLightPBR(surface_data, input.world_pos, input.uv0, irradiance, irradiance, false));
     light += surface_data.emssive;
     return float4(light, alpha);
 }

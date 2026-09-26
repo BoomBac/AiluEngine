@@ -599,6 +599,14 @@ public:                                                                 \
             APROPERTY()
             bool _debug_draw_surfels = true;
             APROPERTY()
+            bool _debug_show_irradiance = false;
+            APROPERTY()
+            bool _debug_opaque_disks = false;
+            APROPERTY()
+            f32 _debug_irradiance_exposure = 1.0f;
+            APROPERTY()
+            u32 _debug_lighting_mode = 0u;
+            APROPERTY()
             bool _debug_coverage = false;
             APROPERTY()
             f32 _base_cell_size = 0.125f;
@@ -609,14 +617,32 @@ public:                                                                 \
             APROPERTY()
             f32 _target_pixel_radius = 8.0f;
             APROPERTY(Range(0.0f, 1.0f))
-            f32 _spawn_coverage_threshold = 0.5f;
+            f32 _spawn_coverage_threshold = 0.2f;
+            APROPERTY(Range(0.5f, 3.0f))
+            f32 _spawn_spacing_scale = 1.25f;
+            APROPERTY(Range(1, 4096))
+            u32 _max_spawn_per_frame = 512u;
+            APROPERTY()
+            bool _lighting_enabled = true;
+            APROPERTY(Range(1, 8))
+            u32 _rays_per_surfel = 4u;
+            APROPERTY(Range(1, 4096))
+            u32 _max_lighting_updates_per_frame = 256u;
+            APROPERTY(Range(0.0f, 0.99f))
+            f32 _lighting_hysteresis = 0.9f; // Legacy scene field; unused by progressive accumulation.
+            APROPERTY()
+            f32 _lighting_max_ray_distance = 50.0f;
+            APROPERTY(Range(0.0f, 1.0f))
+            f32 _spawn_normal_threshold = 0.75f;
+            APROPERTY(Range(0.0f, 1.0f))
+            f32 _blue_noise_strength = 0.15f;
             APROPERTY()
             u32 _max_surfel_count = 262144u;
             APROPERTY()
             i32 _debug_cascade = -1;
 
             bool _debug_draw_tile_grid = false;
-            bool _manual_spawn = true;
+            bool _manual_spawn = false;
             mutable bool _spawn_once_requested = false;
         };
 

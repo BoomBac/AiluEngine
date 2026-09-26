@@ -26,6 +26,7 @@ float3 EvaluatePathDirectLighting(PathHit hit, TraceContext trace_context, float
     const float shadow_t_max = GetLightShadowRayTMax(light_sample) * 0.98f;
     const float3 shadow_origin = OffsetPathRayOrigin(hit._world_position, hit._geometric_normal,
                                                     light_sample._wi, hit._hit_t);
+#if defined(PATH_TRACER_MNEE)
     const PathHit blocker = TracePathSegment(shadow_origin, light_sample._wi, shadow_t_max);
     if (blocker._type != kPathHitMiss)
     {
@@ -35,6 +36,10 @@ float3 EvaluatePathDirectLighting(PathHit hit, TraceContext trace_context, float
         return EvaluateManifoldDirectLighting(hit, trace_context, wo, light_index, light_selection_pmf,
                                               light_sample, blocker);
     }
+#else
+    if (IsPathOccluded(shadow_origin, light_sample._wi, shadow_t_max))
+        return 0.0.xxx;
+#endif
 
     if (cos_theta <= 1e-6f)
         return 0.0.xxx;
@@ -163,10 +168,12 @@ float3 TracePath(uint2 pixel, float3 ray_origin, float3 ray_direction, uint max_
     float3 throughput = 1.0.xxx;
     float previous_bsdf_pdf = 0.0f;
     bool has_previous_bsdf_sample = false;
+#if defined(PATH_TRACER_MNEE)
     bool has_manifold_receiver = false;
     float manifold_receiver_bsdf_pdf = 0.0f;
     float3 manifold_receiver_position = 0.0.xxx;
     ManifoldPath manifold_path = (ManifoldPath)0;
+#endif
     // 当前所在介质每单位长度的吸收系数。0 = 在空气里（或无损介质）。
     float3 medium_sigma_a = 0.0.xxx;
 
@@ -187,6 +194,7 @@ float3 TracePath(uint2 pixel, float3 ray_origin, float3 ray_direction, uint max_
         {
             throughput *= ApplyMediumAbsorption(medium_sigma_a, hit._hit_t);
             float mis_weight = 1.0f;
+#if defined(PATH_TRACER_MNEE)
             if (has_manifold_receiver && manifold_path._vertex_count > 0u)
             {
                 const uint light_count = GetUnifiedLightCount();
@@ -195,6 +203,9 @@ float3 TracePath(uint2 pixel, float3 ray_origin, float3 ray_direction, uint max_
                                                     GetUnifiedLightSelectionPMF(light_count));
             }
             else if (has_previous_bsdf_sample)
+#else
+            if (has_previous_bsdf_sample)
+#endif
             {
                 mis_weight = PowerHeuristic(previous_bsdf_pdf, hit._light_pdf);
             }
@@ -222,6 +233,7 @@ float3 TracePath(uint2 pixel, float3 ray_origin, float3 ray_direction, uint max_
         if (!bounce._valid)
             break;
 
+#if defined(PATH_TRACER_MNEE)
         if (bounce._is_delta)
         {
             if (has_manifold_receiver && bounce._is_transmission &&
@@ -242,6 +254,7 @@ float3 TracePath(uint2 pixel, float3 ray_origin, float3 ray_direction, uint max_
             manifold_path = (ManifoldPath)0;
             manifold_path._event_pdf = 1.0f;
         }
+#endif
 
         // 法线已朝向入射侧，折射方向在进出两种情况下都与它反向；用几何面的正背面区分进出。
         if (bounce._is_transmission)

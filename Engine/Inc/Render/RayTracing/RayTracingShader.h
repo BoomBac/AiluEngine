@@ -74,10 +74,26 @@ namespace Ailu::Render
         virtual void DispatchRays(RHICommandBuffer *cmd, u32 width, u32 height, u32 depth,
                                   const DispatchBindingSnapshot &snapshot) {};
         bool Compile(EShaderCompilePolicy policy = EShaderCompilePolicy::kUseArtifact);
-        const std::unordered_map<String, ShaderBindResourceInfo> &GetBindResInfo() const { return _bind_res_infos; }
+        void EnableKeyword(const String &keyword);
+        void DisableKeyword(const String &keyword);
+        ShaderVariantHash ActiveVariant() const { return _active_variant.load(); }
+        const std::unordered_map<String, ShaderBindResourceInfo> &GetBindResInfo() const
+        {
+            const auto it = _variants.find(_active_variant.load());
+            return it != _variants.end() && it->second._is_ready ? it->second._bind_res_infos : _bind_res_infos;
+        }
     public:
         std::atomic<bool> _is_compiling = false;
     protected:
+        struct Variant
+        {
+            std::set<String> _active_keywords;
+            ShaderReflectionResourceMap _bind_res_infos;
+            Ref<const ShaderBindingLayout> _binding_layout;
+            bool _is_ready = false;
+        };
+        bool PreprocessVariants();
+        void RegisterDependencyFile(const WString &path);
         virtual bool RHICompileImpl(ShaderVariantHash variant_hash, EShaderCompilePolicy policy);
     protected:
         inline static ShaderGlobalResourceRegistry s_global_res_registry;
@@ -88,6 +104,10 @@ namespace Ailu::Render
         RayTracingScene* _scene = nullptr;
         WString _src_file_path;
         std::set<WString> _all_dep_file_pathes;
+        ShaderVariantMgr _variant_mgr;
+        HashMap<ShaderVariantHash, Variant> _variants;
+        std::set<String> _active_keywords;
+        std::atomic<ShaderVariantHash> _active_variant{0u};
         std::unordered_map<String, ShaderBindResourceInfo> _bind_res_infos;
         Ref<const ShaderBindingLayout> _binding_layout;
         u32 _binding_layout_version = 1u;

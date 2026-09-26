@@ -826,6 +826,18 @@ namespace Ailu::SceneManagement
     {
         BeginUpdate();
 
+        // Resolve pending frame/editor edits before capturing the fixed-step starting state.
+        auto *transform_system = _register.GetSystem<ECS::TransformSystem>();
+        if (transform_system != nullptr)
+            transform_system->Update(_register, fixed_delta_time);
+        for (auto &transform: _register.View<ECS::TransformComponent>())
+        {
+            transform._prev_world_matrix = transform._world_matrix;
+            transform._prev_position = transform._position;
+            transform._prev_rotation = transform._rotation;
+            transform._prev_scale = transform._scale;
+        }
+
         if (auto *physics_2d_system = _register.GetSystem<ECS::Physics2DSystem>())
             physics_2d_system->Synchronize(_register);
 
@@ -833,6 +845,8 @@ namespace Ailu::SceneManagement
         _register.ExecutePhase(ECS::ESystemPhase::kPrePhysics, fixed_delta_time);
         _register.ExecutePhase(ECS::ESystemPhase::kPhysics, fixed_delta_time);
         _register.ExecutePhase(ECS::ESystemPhase::kPostPhysics, fixed_delta_time);
+        if (transform_system != nullptr)
+            transform_system->UpdateFixed(_register);
     }
 
     void Scene::UpdateFixedScripts(f32 fixed_delta_time)
@@ -884,7 +898,7 @@ namespace Ailu::SceneManagement
         {
             //这里是一个小热点
             const bool has_history = transform._world_version > 1u;
-            const Transform render_transform = has_history
+            const Transform render_transform = has_history && !transform._reset_render_interpolation
                                                    ? Transform::Mix(
                                                            Transform(transform._prev_position, transform._prev_rotation, transform._prev_scale),
                                                            Transform(transform._position, transform._rotation, transform._scale),

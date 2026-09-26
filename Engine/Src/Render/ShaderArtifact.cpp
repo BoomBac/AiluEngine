@@ -211,7 +211,7 @@ namespace Ailu::Render
                         *reason = EShaderArtifactInvalidReason::kArtifactVersionChanged;
                     return false;
                 }
-                if (type > static_cast<u8>(EShaderArtifactType::kCompute))
+                if (type > static_cast<u8>(EShaderArtifactType::kRayTracing))
                 {
                     if (reason)
                         *reason = EShaderArtifactInvalidReason::kCorrupted;
@@ -405,6 +405,27 @@ namespace Ailu::Render
                 writer.Value(artifact._root_signature_hash);
                 WriteDependencies(writer, artifact._dependencies);
             });
+        }
+
+        bool Serialize(const RayTracingShaderVariantArtifact &artifact, Vector<u8> &data)
+        {
+            return SerializeImpl(artifact, data, [&](Writer &writer)
+            {
+                writer.Bytes(artifact._library._byte_code);
+                writer.Bytes(artifact._reflection_blob);
+                WriteDependencies(writer, artifact._dependencies);
+            });
+        }
+
+        bool Deserialize(const Vector<u8> &data, RayTracingShaderVariantArtifact &artifact,
+                         EShaderArtifactInvalidReason *reason)
+        {
+            return DeserializeImpl(data, artifact, [&](Reader &reader)
+            {
+                return artifact._header._type == EShaderArtifactType::kRayTracing &&
+                       reader.Bytes(artifact._library._byte_code) && reader.Bytes(artifact._reflection_blob) &&
+                       ReadDependencies(reader, artifact._dependencies);
+            }, reason);
         }
 
         bool Serialize(const ComputeShaderVariantArtifact &artifact, Vector<u8> &data)

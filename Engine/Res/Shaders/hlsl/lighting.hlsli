@@ -171,7 +171,8 @@ float3 EvaluateEnvironmentIrradiance(float3 normal_ws)
         return EvaluateSH9(g_environment_sh, RotateEnvironmentDirection(normal_ws));
 }
 
-float3 CalculateLightPBR(SurfaceData surface,float3 world_pos,float2 screen_uv,float3 diffuse_irradiance)
+float3 CalculateLightPBR(SurfaceData surface, float3 world_pos, float2 screen_uv, float3 diffuse_irradiance,
+                        float3 environment_irradiance, bool has_diffuse_gi)
 {
 #if defined(DEBUG_GI)
 	return VoxelGI(world_pos,surface.wnormal);
@@ -262,8 +263,14 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos,float2 screen_uv,f
 	float2 lut = SAMPLE_TEXTURE2D_LOD(IBLLut,g_LinearClampSampler,float2(shading_data.nv,surface.roughness),0.0).xy;
 	float ao = SAMPLE_TEXTURE2D(_OcclusionTex,g_LinearClampSampler,screen_uv).r;// * g_IndirectLightingIntensity;
 	float voxel_shadow = 1.0;//ConeTraceShadow(world_pos + surface.wnormal * 0.05,-_DirectionalLights[0]._LightPosOrDir);
-        light += voxel_shadow * AmbientLighting(surface,shading_data,diffuse_irradiance,radiance,lut) * ao *
-                 g_EnvironmentIntensity * g_EnvironmentEnabled;
+	float environment_scale = g_EnvironmentIntensity * g_EnvironmentEnabled;
+	float3 environment_light = AmbientLighting(surface, shading_data, environment_irradiance, radiance, lut) *
+	                           environment_scale;
+	float3 diffuse_gi_light = has_diffuse_gi
+	    ? AmbientLighting(surface, shading_data, diffuse_irradiance, 0.0.xxx, lut)
+	    : 0.0.xxx;
+	// Surfel supplies surface-reflected light only; direct diffuse and specular environment light stay in IBL.
+	light += voxel_shadow * (environment_light + diffuse_gi_light) * ao;
 #ifdef _VOXEL_GI_ON
 	light *= voxel_shadow;
 	light += VoxelGI(world_pos,surface.wnormal) * surface.albedo.rgb;

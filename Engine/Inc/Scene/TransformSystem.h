@@ -14,6 +14,7 @@ namespace Ailu
         public:
             TransformSystem();
             void Update(Register &r, f32 delta_time) final;
+            void UpdateFixed(Register &r);
             ESystemPhase GetPhase() const final { return ESystemPhase::kTransform; }
             virtual Ref<System> Clone() final
             {
@@ -26,6 +27,7 @@ namespace Ailu
             };
             void OnPushEntity(Entity entity) final;
         private:
+            void UpdateTransforms(Register &r, bool fixed_update);
             void RebuildOrder(Register &r);
             void AppendSubtree(Register &r, Entity entity, std::unordered_set<Entity> &visited, std::unordered_set<Entity> &visiting);
 

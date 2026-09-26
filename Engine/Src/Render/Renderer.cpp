@@ -80,6 +80,7 @@ namespace Ailu::Render
         _ddgi = _owned_features.back();
         _owned_features.push_back(AL_NEW_TAG(EMemoryTag::kRenderer, SurfelGIFeature));
         _surfel_gi = _owned_features.back();
+        _lighting_pass->SetSurfelGI(static_cast<SurfelGIFeature *>(_surfel_gi));
         _owned_features.push_back(AL_NEW_TAG(EMemoryTag::kRenderer, SpriteRenderFeature));
         _sprite = _owned_features.back();
         //_features.push_back(_vxgi);

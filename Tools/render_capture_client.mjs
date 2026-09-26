@@ -4,6 +4,9 @@
 //   node Tools/render_capture_client.mjs status
 //   node Tools/render_capture_client.mjs capture --pass "RayTrace GI DXR" --frames 8
 //   node Tools/render_capture_client.mjs capture --pass "RayTrace GI DXR" --resource RayTraceGI_A --frames 8 --wait
+//   node Tools/render_capture_client.mjs camera
+//   node Tools/render_capture_client.mjs camera --position 0,1,2 --yaw 90 --smooth
+//   node Tools/render_capture_client.mjs camera-dolly --distance 0.5
 //
 // 会话来自 <project>/.ailu/editor_session.json（Editor 打开工程时写入）。
 import { readFileSync, existsSync } from "node:fs";
@@ -114,7 +117,64 @@ if (command === "status") {
   }
   console.log("等待超时");
   process.exit(4);
+} else if (command === "camera") {
+  const args = {};
+  if (arg("position")) {
+    const values = arg("position").split(",").map(Number);
+    if (values.length !== 3 || values.some(value => !Number.isFinite(value))) {
+      throw new Error("--position 需要以逗号分隔的三个有限数字，例如 0,1,2");
+    }
+    args.position = values;
+  }
+  for (const [option, parameter] of [["pitch", "pitch_degrees"], ["yaw", "yaw_degrees"], ["fov", "fov_degrees"]]) {
+    if (arg(option) !== undefined) {
+      const value = Number(arg(option));
+      if (!Number.isFinite(value)) throw new Error(`--${option} 必须为有限数字`);
+      args[parameter] = value;
+    }
+  }
+  if (Object.keys(args).length === 0) {
+    printResult("editor.get_scene_camera", await invoke("editor.get_scene_camera", {}));
+  } else {
+    args.snap = !hasFlag("smooth");
+    printResult("editor.set_scene_camera", await invoke("editor.set_scene_camera", args));
+  }
+} else if (command === "camera-dolly") {
+  const distance = Number(arg("distance"));
+  if (!Number.isFinite(distance)) throw new Error("camera-dolly 需要 --distance <world_units>");
+  const current = await invoke("editor.get_scene_camera", {});
+  if (!current?.success) {
+    printResult("editor.get_scene_camera", current);
+    process.exit(2);
+  }
+  const camera = current.data;
+  const position = camera.position.map((value, index) => value + camera.forward[index] * distance);
+  const moved = await invoke("editor.set_scene_camera", { position, snap: hasFlag("snap") });
+  printResult("editor.set_scene_camera", moved);
+  if (!moved?.success) process.exit(2);
+
+  if (!hasFlag("no-wait")) {
+    const target = moved.data.target_position;
+    const deadline = Date.now() + Number(arg("timeout_ms", "15000"));
+    while (Date.now() < deadline) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      const status = await invoke("editor.get_scene_camera", {});
+      if (!status?.success) {
+        printResult("editor.get_scene_camera", status);
+        process.exit(2);
+      }
+      const actual = status.data.position;
+      const remaining = Math.hypot(...actual.map((value, index) => value - target[index]));
+      if (remaining <= 0.005) {
+        console.log(`相机已到达目标位置，剩余距离 ${remaining.toFixed(4)} m`);
+        process.exit(0);
+      }
+    }
+    throw new Error("等待 SceneView 相机移动到目标位置超时");
+  }
 } else {
-  console.log("用法: node Tools/render_capture_client.mjs [status|capture] [--pass NAME] [--resource NAME] [--frames N] [--wait]");
+  console.log("用法: node Tools/render_capture_client.mjs [status|capture|camera|camera-dolly] [参数]");
+  console.log("  camera [--position x,y,z] [--pitch DEG] [--yaw DEG] [--fov DEG] [--smooth]");
+  console.log("  camera-dolly --distance WORLD_UNITS [--snap] [--no-wait]");
   process.exit(1);
 }

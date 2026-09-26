@@ -1171,7 +1171,7 @@ namespace Ailu::Render
         ConstructKeywords(_p_active_shader);
         u16 pass_count = _p_active_shader->PassCount();
         //u16 cur_shader_cbuf_size = 0; //每个passcbuffer大小一致。
-        Vector<u16> cbuf_size_per_passes(pass_count);
+        Vector<u64> cbuf_size_per_passes(pass_count);
         _prop_views.clear();
         _properties.clear();
         _mat_cbuf_per_pass_size.clear();
@@ -1197,9 +1197,13 @@ namespace Ailu::Render
             //处理cbuffer
             if (cbuf_size_per_passes[i] == 0)
                 cbuf_size_per_passes[i] = 256;
-            cbuf_size_per_passes[i] = AlignTo(cbuf_size_per_passes[i],256);
-            AL_ASSERT(cbuf_size_per_passes[i] <= 256);
-            _mat_cbuf_per_pass_size[i] = cbuf_size_per_passes[i];
+            cbuf_size_per_passes[i] = AlignTo(cbuf_size_per_passes[i], 256u);
+            if (cbuf_size_per_passes[i] > std::numeric_limits<u16>::max())
+            {
+                AL_ASSERT(cbuf_size_per_passes[i] <= std::numeric_limits<u16>::max());
+                return;
+            }
+            _mat_cbuf_per_pass_size[i] = static_cast<u16>(cbuf_size_per_passes[i]);
             _property_blocks[i]._size = cbuf_size_per_passes[i];
             _property_blocks[i]._data = AL_ALLOC_TAG(EMemoryTag::kRenderer, u8, cbuf_size_per_passes[i]);
             memset(_property_blocks[i]._data, 0, cbuf_size_per_passes[i]);

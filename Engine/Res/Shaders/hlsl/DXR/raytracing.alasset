@@ -6,7 +6,7 @@
         "_asset_name": "RayTracingShader",
         "_dependencies": []
     },
-    "_file": "raytracing.hlsl",
+    "_file": "Raytracing.hlsl",
     "_vs_entry": "",
     "_ps_entry": ""
 }

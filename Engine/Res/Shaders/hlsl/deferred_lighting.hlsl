@@ -24,6 +24,7 @@
 #include "froxel_common.hlsli"
 #include "static_diffuse_probe.hlsli"
 #include "ray_trace/ddgi_common.hlsli"
+#include "surfel_common.hlsli"
 
 
 TEXTURE2D(_GBuffer0)
@@ -36,6 +37,11 @@ TEXTURE3D(_VolumetricLightTexture)
 Texture2D _DDGI_IrradianceAtlas : register(t22);
 Texture2D<float2> _DDGI_DistanceAtlas : register(t23);
 StructuredBuffer<DDGIProbeData> _DDGI_ProbeData : register(t24);
+StructuredBuffer<SurfelData> _SurfelPool;
+StructuredBuffer<SurfelLightingData> _SurfelLighting;
+StructuredBuffer<uint> _SurfelState;
+StructuredBuffer<uint2> _SurfelGridCells;
+StructuredBuffer<uint> _SurfelGridIndices;
 
 static const float kDDGIWeightCrushThreshold = 0.2f;
 
@@ -52,7 +58,192 @@ PerMaterialCBufferBegin
     float _DDGI_UseProbeRelocation;
     float _DDGI_DebugMode;
     float _DDGI_Enabled;
+    uint _SurfelQueryEnabled;
+    uint _SurfelGridResolution;
+    uint _SurfelCascadeCount;
+    uint _SurfelMaxCount;
+    float _SurfelBaseCellSize;
 PerMaterialCBufferEnd
+
+float4 SurfelGetGridInfo(uint level)
+{
+    const float cell_size = _SurfelBaseCellSize * exp2((float)level);
+    const float3 center = floor(_CameraPos.xyz / cell_size) * cell_size;
+    const float world_size = cell_size * (float)_SurfelGridResolution;
+    return float4(center - world_size * 0.5f, cell_size);
+}
+
+uint SurfelGetCellIndex(uint level, int3 cell)
+{
+    const uint resolution = _SurfelGridResolution;
+    return ((level * resolution + (uint)cell.z) * resolution + (uint)cell.y) * resolution + (uint)cell.x;
+}
+
+void SampleSurfelCascade(float3 world_position, float3 surface_normal, uint cascade, float4 grid_info,
+                         float support_scale, uint high_watermark, out float3 irradiance_sum, out float weight_sum,
+                         out float confidence)
+{
+    irradiance_sum = 0.0f.xxx;
+    weight_sum = 0.0f;
+    confidence = 0.0f;
+    // Placement caps the indexed radius at 0.7 cell; retain the original world-space support.
+    const float max_support_radius = max(support_scale * 0.7f * grid_info.w, 2.0f * _SurfelBaseCellSize);
+    const int3 cell_min = max((int3)floor((world_position - max_support_radius - grid_info.xyz) / grid_info.w), 0);
+    const int3 cell_max = min((int3)floor((world_position + max_support_radius - grid_info.xyz) / grid_info.w),
+                             (int)_SurfelGridResolution - 1);
+    if (any(cell_min > cell_max))
+        return;
+
+    [loop]
+    for (int z = cell_min.z; z <= cell_max.z; ++z)
+    {
+        const uint2 slab_first = _SurfelGridCells[SurfelGetCellIndex(cascade, int3(cell_min.xy, z))];
+        const uint2 slab_last = _SurfelGridCells[SurfelGetCellIndex(cascade, int3(cell_max.xy, z))];
+        if (slab_first.x == slab_last.x + slab_last.y)
+            continue;
+
+        [loop]
+        for (int y = cell_min.y; y <= cell_max.y; ++y)
+        {
+            // Bound this row by the support sphere, using the closest point in its YZ slab.
+            // Keep a small conservative margin at cell boundaries to avoid rounding out a sample.
+            const float2 row_min = grid_info.yz + float2(y, z) * grid_info.w;
+            const float2 row_delta = max(max(row_min - world_position.yz,
+                                            world_position.yz - row_min - grid_info.w), 0.0f);
+            const float row_radius_sq = max_support_radius * max_support_radius - dot(row_delta, row_delta);
+            if (row_radius_sq < 0.0f)
+                continue;
+            const float row_radius = sqrt(row_radius_sq) + grid_info.w * 1e-4f;
+            const int row_min_x = max(cell_min.x,
+                (int)floor((world_position.x - row_radius - grid_info.x) / grid_info.w));
+            const int row_max_x = min(cell_max.x,
+                (int)floor((world_position.x + row_radius - grid_info.x) / grid_info.w));
+            // X cells are contiguous in the prefix index. Two reads cover the entire row,
+            // including empty cells; no per-pixel walk through each empty X cell is needed.
+            if (row_min_x > row_max_x)
+                continue;
+            const uint2 row_first = _SurfelGridCells[SurfelGetCellIndex(cascade, int3(row_min_x, y, z))];
+            const uint2 row_last = _SurfelGridCells[SurfelGetCellIndex(cascade, int3(row_max_x, y, z))];
+            const uint row_end = row_last.x + row_last.y;
+            [loop]
+            for (uint i = row_first.x; i < row_end; ++i)
+            {
+                const uint surfel_index = _SurfelGridIndices[i];
+                if (surfel_index >= high_watermark)
+                    continue;
+                const SurfelData surfel = _SurfelPool[surfel_index];
+                if ((surfel._flags & kSurfelValid) == 0u || surfel._cascade_level != cascade || surfel._radius <= 0.0f)
+                    continue;
+                const int3 surfel_cell = (int3)floor((surfel._position - grid_info.xyz) / grid_info.w);
+                if (surfel_cell.y != y || surfel_cell.z != z ||
+                    surfel_cell.x < cell_min.x || surfel_cell.x > cell_max.x)
+                    continue;
+
+                const float3 delta = world_position - surfel._position;
+                const float support_radius = max(support_scale * surfel._radius, 2.0f * _SurfelBaseCellSize);
+                const float distance_sq = dot(delta, delta);
+                if (distance_sq >= support_radius * support_radius)
+                    continue;
+                // The placement grid replicates a surfel into overlapping cells. Accept only
+                // the entry stored in its owner cell, exactly as the original per-cell query did.
+                const uint2 owner_cell = _SurfelGridCells[SurfelGetCellIndex(cascade, surfel_cell)];
+                if (i < owner_cell.x || i >= owner_cell.x + owner_cell.y)
+                    continue;
+                const float contribution = SurfelContributionWeight(surfel, _FrameIndex);
+                if (contribution <= 0.0f)
+                    continue;
+                const float3 surfel_normal = normalize(surfel._normal);
+                const float normal_weight = saturate((dot(surface_normal, surfel_normal) - 0.25f) / 0.75f);
+                if (normal_weight <= 0.0f)
+                    continue;
+                const SurfelLightingData lighting = _SurfelLighting[surfel_index];
+                if ((lighting._flags & kSurfelLightingValid) == 0u)
+                    continue;
+
+                const float relative_distance = sqrt(distance_sq) / support_radius;
+                const float falloff = saturate(1.0f - relative_distance);
+                const float radial_weight = falloff * falloff * falloff * falloff *
+                                            (1.0f + 4.0f * relative_distance);
+                const float plane_distance = abs(dot(delta, surfel_normal));
+                const float plane_scale = max(surfel._radius * 0.35f, 0.001f);
+                const float plane_weight = exp(-0.5f * plane_distance * plane_distance / (plane_scale * plane_scale));
+                const float maturity = (lighting._flags & kSurfelLightingInherited) != 0u
+                    ? 1.0f : SurfelLightingMaturity(lighting._sample_count);
+                const float weight = radial_weight * plane_weight * normal_weight * maturity * contribution;
+                irradiance_sum += lighting._irradiance * weight;
+                weight_sum += weight;
+                const float support_coverage = smoothstep(0.0f, 0.25f, falloff);
+                confidence = max(confidence, support_coverage * plane_weight * normal_weight * maturity * contribution);
+            }
+        }
+    }
+}
+
+void SampleSurfelField(float3 world_position, float3 surface_normal, float support_scale, uint high_watermark,
+                       out float3 irradiance_sum, out float weight_sum, out float confidence)
+{
+    irradiance_sum = 0.0f.xxx;
+    weight_sum = 0.0f;
+    confidence = 0.0f;
+    [loop]
+    for (uint level = 0u; level < min(_SurfelCascadeCount, 5u); ++level)
+    {
+        const uint cells_per_level = _SurfelGridResolution * _SurfelGridResolution * _SurfelGridResolution;
+        const uint2 first_cell = _SurfelGridCells[level * cells_per_level];
+        const uint2 last_cell = _SurfelGridCells[(level + 1u) * cells_per_level - 1u];
+        if (last_cell.x + last_cell.y == first_cell.x)
+            continue;
+        const float4 grid_info = SurfelGetGridInfo(level);
+        const float3 grid_max = grid_info.xyz + grid_info.www * (float)_SurfelGridResolution;
+        const float max_support_radius = max(support_scale * 0.7f * grid_info.w, 2.0f * _SurfelBaseCellSize);
+        // Include support crossing a grid edge; reindexing a point must not clip its contribution.
+        if (any(world_position < grid_info.xyz - max_support_radius) ||
+            any(world_position >= grid_max + max_support_radius))
+            continue;
+
+        float3 level_sum;
+        float level_weight;
+        float level_confidence;
+        SampleSurfelCascade(world_position, surface_normal, level, grid_info, support_scale, high_watermark,
+                            level_sum, level_weight, level_confidence);
+        irradiance_sum += level_sum;
+        weight_sum += level_weight;
+        confidence = max(confidence, level_confidence);
+    }
+}
+
+bool SampleSurfelIrradiance(float3 world_position, float3 surface_normal, out float3 irradiance)
+{
+    irradiance = 0.0f.xxx;
+    if (_SurfelQueryEnabled == 0u || _SurfelCascadeCount == 0u || _SurfelGridResolution == 0u ||
+        _SurfelMaxCount == 0u)
+        return false;
+
+    const uint high_watermark = min(_SurfelState[0], _SurfelMaxCount);
+    if (high_watermark == 0u)
+        return false;
+
+    // Normalize one world-space field across all indexing cascades. Fine-first selection changes
+    // the reconstructed light whenever a sample migrates, even when its position and history do not.
+    float3 irradiance_sum;
+    float weight_sum;
+    float confidence;
+    SampleSurfelField(world_position, surface_normal, 4.0f, high_watermark,
+                      irradiance_sum, weight_sum, confidence);
+    irradiance = irradiance_sum / max(weight_sum, 1e-12f) * confidence;
+    if (confidence < 1.0f)
+    {
+        float3 fallback_sum;
+        float fallback_weight;
+        float fallback_confidence;
+        SampleSurfelField(world_position, surface_normal, 6.0f, high_watermark,
+                          fallback_sum, fallback_weight, fallback_confidence);
+        const float fill_weight = (1.0f - confidence) * fallback_confidence;
+        irradiance += fallback_sum / max(fallback_weight, 1e-12f) * fill_weight;
+        confidence += fill_weight;
+    }
+    return confidence > 1e-5f;
+}
 
 float3 SampleDDGIProbeIrradiance(uint probe_index, float3 direction)
 {
@@ -231,7 +422,8 @@ float4 DeferredLightingPSMain(FullScreenPSInput input) : SV_TARGET
 	float2 gbuf0 = SAMPLE_TEXTURE2D_LOD(_GBuffer0, g_LinearClampSampler, input.uv,0).xy;
 	float4 gbuf1 = _GBuffer1.Sample(g_LinearWrapSampler,input.uv);
 	float4 gbuf2 = _GBuffer2.Sample(g_LinearWrapSampler,input.uv);
-	float3 diffuse_irradiance = SAMPLE_TEXTURE2D_LOD(_GBuffer3, g_LinearClampSampler, input.uv, 0).rgb;
+	float3 environment_irradiance = SAMPLE_TEXTURE2D_LOD(_GBuffer3, g_LinearClampSampler, input.uv, 0).rgb;
+	float3 diffuse_irradiance = environment_irradiance;
 	float depth = SAMPLE_TEXTURE2D_LOD(_CameraDepthTexture,g_LinearWrapSampler,input.uv,0).r;
 	float3 world_pos = ComputeWorldSpacePosition(input.uv,depth,_MatrixIVP);
 	//float3 world_pos = _CameraPos.xyz + UnprojectByCameraRay(input.uv,depth);
@@ -246,12 +438,25 @@ float4 DeferredLightingPSMain(FullScreenPSInput input) : SV_TARGET
 	OrthonormalBasis(surface_data.wnormal,surface_data.tangent,surface_data.bitangent);
 	float3 ddgi_irradiance;
 	const bool has_ddgi_irradiance = SampleDDGIIrradiance(world_pos, surface_data.wnormal, ddgi_irradiance);
+	bool has_surfel_irradiance = false;
 	if (has_ddgi_irradiance)
 	    diffuse_irradiance = ddgi_irradiance;
+	else
+	{
+	    float3 surfel_irradiance;
+	    has_surfel_irradiance = SampleSurfelIrradiance(world_pos, surface_data.wnormal, surfel_irradiance);
+	    if (has_surfel_irradiance)
+	        diffuse_irradiance = surfel_irradiance;
+	}
+	bool has_static_probe_irradiance = false;
 	#if defined(STATIC_DIFFUSE_PROBE_GPU)
 	    float3 static_probe_irradiance;
-	    if (!has_ddgi_irradiance && SampleStaticDiffuseProbeIrradiance(world_pos, surface_data.wnormal, static_probe_irradiance))
+	    if (!has_ddgi_irradiance && !has_surfel_irradiance &&
+	        SampleStaticDiffuseProbeIrradiance(world_pos, surface_data.wnormal, static_probe_irradiance))
+	    {
 	        diffuse_irradiance = static_probe_irradiance;
+	        has_static_probe_irradiance = true;
+	    }
 	#endif
 	uint material_id = (uint)gbuf2.r;
 	//return float4(surface_data.wnormal,1);
@@ -262,7 +467,9 @@ float4 DeferredLightingPSMain(FullScreenPSInput input) : SV_TARGET
 #elif DEBUG_WORLDPOS
 	return float4(world_pos.xyz,1);
 #else
-        float3 light = max(0.0, CalculateLightPBR(surface_data, world_pos.xyz,input.uv, diffuse_irradiance));
+        const bool has_diffuse_gi = has_ddgi_irradiance || has_surfel_irradiance || has_static_probe_irradiance;
+        float3 light = max(0.0, CalculateLightPBR(surface_data, world_pos.xyz, input.uv, diffuse_irradiance,
+                                                 environment_irradiance, has_diffuse_gi));
 	light += surface_data.emssive;
     float3 vol_light_uvw = WorldToVolumetricVoxelUVW(world_pos.xyz,_MatrixV,_MatrixP,_ProjectionParams.y,_ProjectionParams.z);
 	float4 vol_light = RaymarchVolumetric(vol_light_uvw,depth);

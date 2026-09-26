@@ -153,7 +153,7 @@ namespace Ailu::RHI::DX12
         void RegisterWindow(Window *window);
         void UnRegisterWindow(Window *window);
         void TakeCapture() final;
-        void TakePixCapture() final;
+        void TakePixCapture(bool open_ui = true) final;
         void TakeRenderDocCapture() final;
         void ResizeSwapChain(void *window_handle, const u32 width, const u32 height) final;
         /// @brief 在帧边界（无命令缓冲在录制）应用待处理的交换链 resize 请求
@@ -263,6 +263,7 @@ namespace Ailu::RHI::DX12
         std::mutex _resource_task_lock;
         float m_aspectRatio;
         std::atomic<bool> _is_pix_capture_pending = false;
+        std::atomic<bool> _pix_capture_open_ui = true;
         std::atomic<bool> _is_pix_frame_capturing = false;
         std::atomic<bool> _is_renderdoc_capture_pending = false;
         std::atomic<u32> _renderdoc_capture_count_before = 0u;
