@@ -371,8 +371,7 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
-/Engine/Ext/dxc
-/Engine/Ext/fbxsdk/include
+/Engine/Ext/Packages/
 /cmake-build-ailu
 .idea/
 /Engine/Res/NewScene/Palace
@@ -382,5 +381,3 @@ FodyWeavers.xsd
 Engine/Engine.zip
 Editor/Editor.zip
 AiluEngine_Source.zip
-PackAiluEngineSource.cmd
-PackAiluEngineSource.ps1

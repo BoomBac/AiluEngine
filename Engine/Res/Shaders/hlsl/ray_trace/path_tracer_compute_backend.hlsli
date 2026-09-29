@@ -124,8 +124,7 @@ bool IsPathOccluded(float3 ray_origin, float3 ray_direction, float max_t)
     trace_ray._t_min = 0.001f;
     trace_ray._t_max = max_t;
     trace_ray._mask = 0xffu;
-    TraceHit trace_hit;
-    return TraceClosest(trace_ray, trace_hit);
+    return TraceAny(trace_ray);
 }
 
 #endif // PATH_TRACER_COMPUTE_BACKEND_HLSLI

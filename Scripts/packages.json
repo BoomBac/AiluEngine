@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "packages": [
+    {
+      "name": "dxc",
+      "version": "1.7.2308",
+      "sourceUrl": "https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.7.2308/dxc_2023_08_14.zip",
+      "installPath": "Engine/Ext/Packages/dxc",
+      "fileCount": 20,
+      "sizeBytes": 58961188,
+      "treeSha256": "754366e1dbabedcd8f1bfb844b50aa221a112e59d4604ac65f2564b9b58e1a77"
+    },
+    {
+      "name": "fbxsdk",
+      "version": "2020.2.1",
+      "sourceUrl": "https://aps.autodesk.com/developer/overview/fbx-sdk",
+      "installPath": "Engine/Ext/Packages/fbxsdk",
+      "fileCount": 299,
+      "sizeBytes": 839406743,
+      "treeSha256": "502486231c97a13d39429c7dddde5f3e5361cf657dda1e1affa8c703abc27ef1",
+      "distribution": "Install from Autodesk under its license; do not redistribute the SDK package."
+    }
+  ]
+}

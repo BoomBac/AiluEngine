@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __RAYTRACEGI_GEN_H__
 //Class RayTraceGI begin...........................
-#define RAYTRACEGI_GEN_H_17_GENERATED_BODY \
+#define RAYTRACEGI_GEN_H_25_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_RayTraceGI_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -19,6 +19,15 @@ class RayTraceGI ;
 template<>
 AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::RayTraceGI>();
 //Class RayTraceGI end...........................
+
+//Enum EPathTracerAccumulationMode begin...........................
+const Ailu::Enum* Z_Construct_Enum_Ailu_Render_EPathTracerAccumulationMode_Type();
+namespace Ailu::Render {
+enum class EPathTracerAccumulationMode : u8;
+}
+template<>
+AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::EPathTracerAccumulationMode>();
+//Enum EPathTracerAccumulationMode end...........................
 
 #undef CURRENT_FILE_ID
 #define CURRENT_FILE_ID RAYTRACEGI_GEN_H

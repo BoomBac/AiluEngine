@@ -42,27 +42,27 @@ builder_debug_hit_box._meta = meta_debug_hit_box;
 builder_debug_hit_box._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<u32>);
 builder_debug_hit_box._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<u32>);
 initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_debug_hit_box));
-Meta meta_is_temporal_denoise;
-meta_is_temporal_denoise.Set("Category","");
-meta_is_temporal_denoise.Set("IsColor",false);
-meta_is_temporal_denoise.Set("IsRange",false);
-meta_is_temporal_denoise.Set("IsFloatRange",true);
-meta_is_temporal_denoise.Set("RangeMin",(f32)0);
-meta_is_temporal_denoise.Set("RangeMax",(f32)1);
-MemberBuilder builder_is_temporal_denoise;
-builder_is_temporal_denoise._name = "_is_temporal_denoise";
-builder_is_temporal_denoise._type_name = "bool";
-builder_is_temporal_denoise._offset = offsetof(RayTraceGI,_is_temporal_denoise);
-builder_is_temporal_denoise._is_const = false;
-builder_is_temporal_denoise._is_static = false;
-builder_is_temporal_denoise._is_public = true;
-builder_is_temporal_denoise._is_pointer = false;
-builder_is_temporal_denoise._is_ref = false;
-builder_is_temporal_denoise._is_template = false;
-builder_is_temporal_denoise._meta = meta_is_temporal_denoise;
-builder_is_temporal_denoise._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
-builder_is_temporal_denoise._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
-initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_is_temporal_denoise));
+Meta meta_accumulation_mode;
+meta_accumulation_mode.Set("Category","");
+meta_accumulation_mode.Set("IsColor",false);
+meta_accumulation_mode.Set("IsRange",false);
+meta_accumulation_mode.Set("IsFloatRange",true);
+meta_accumulation_mode.Set("RangeMin",(f32)0);
+meta_accumulation_mode.Set("RangeMax",(f32)1);
+MemberBuilder builder_accumulation_mode;
+builder_accumulation_mode._name = "_accumulation_mode";
+builder_accumulation_mode._type_name = "Ailu::Render::EPathTracerAccumulationMode";
+builder_accumulation_mode._offset = offsetof(RayTraceGI,_accumulation_mode);
+builder_accumulation_mode._is_const = false;
+builder_accumulation_mode._is_static = false;
+builder_accumulation_mode._is_public = true;
+builder_accumulation_mode._is_pointer = false;
+builder_accumulation_mode._is_ref = false;
+builder_accumulation_mode._is_template = false;
+builder_accumulation_mode._meta = meta_accumulation_mode;
+builder_accumulation_mode._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<EPathTracerAccumulationMode>);
+builder_accumulation_mode._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<EPathTracerAccumulationMode>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_accumulation_mode));
 Meta meta_is_show_debug;
 meta_is_show_debug.Set("Category","");
 meta_is_show_debug.Set("IsColor",false);
@@ -126,6 +126,27 @@ builder_enable_mnee._meta = meta_enable_mnee;
 builder_enable_mnee._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
 builder_enable_mnee._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
 initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_enable_mnee));
+Meta meta_use_power_weighted_light_sampling;
+meta_use_power_weighted_light_sampling.Set("Category","");
+meta_use_power_weighted_light_sampling.Set("IsColor",false);
+meta_use_power_weighted_light_sampling.Set("IsRange",false);
+meta_use_power_weighted_light_sampling.Set("IsFloatRange",true);
+meta_use_power_weighted_light_sampling.Set("RangeMin",(f32)0);
+meta_use_power_weighted_light_sampling.Set("RangeMax",(f32)1);
+MemberBuilder builder_use_power_weighted_light_sampling;
+builder_use_power_weighted_light_sampling._name = "_use_power_weighted_light_sampling";
+builder_use_power_weighted_light_sampling._type_name = "bool";
+builder_use_power_weighted_light_sampling._offset = offsetof(RayTraceGI,_use_power_weighted_light_sampling);
+builder_use_power_weighted_light_sampling._is_const = false;
+builder_use_power_weighted_light_sampling._is_static = false;
+builder_use_power_weighted_light_sampling._is_public = true;
+builder_use_power_weighted_light_sampling._is_pointer = false;
+builder_use_power_weighted_light_sampling._is_ref = false;
+builder_use_power_weighted_light_sampling._is_template = false;
+builder_use_power_weighted_light_sampling._meta = meta_use_power_weighted_light_sampling;
+builder_use_power_weighted_light_sampling._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_use_power_weighted_light_sampling._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_use_power_weighted_light_sampling));
 Meta meta_enable_ris;
 meta_enable_ris.Set("Category","");
 meta_enable_ris.Set("IsColor",false);
@@ -168,6 +189,27 @@ builder_enable_resampling._meta = meta_enable_resampling;
 builder_enable_resampling._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
 builder_enable_resampling._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
 initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_enable_resampling));
+Meta meta_debug_temporal_target;
+meta_debug_temporal_target.Set("Category","");
+meta_debug_temporal_target.Set("IsColor",false);
+meta_debug_temporal_target.Set("IsRange",true);
+meta_debug_temporal_target.Set("IsFloatRange",false);
+meta_debug_temporal_target.Set("RangeMin",(i32)0);
+meta_debug_temporal_target.Set("RangeMax",(i32)5);
+MemberBuilder builder_debug_temporal_target;
+builder_debug_temporal_target._name = "_debug_temporal_target";
+builder_debug_temporal_target._type_name = "u32";
+builder_debug_temporal_target._offset = offsetof(RayTraceGI,_debug_temporal_target);
+builder_debug_temporal_target._is_const = false;
+builder_debug_temporal_target._is_static = false;
+builder_debug_temporal_target._is_public = true;
+builder_debug_temporal_target._is_pointer = false;
+builder_debug_temporal_target._is_ref = false;
+builder_debug_temporal_target._is_template = false;
+builder_debug_temporal_target._meta = meta_debug_temporal_target;
+builder_debug_temporal_target._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<u32>);
+builder_debug_temporal_target._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<u32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_debug_temporal_target));
 cur_type = std::make_unique<Ailu::Type>(initializer);
 Ailu::Type::RegisterType(cur_type.get());
 }
@@ -189,3 +231,29 @@ return Ailu::Render::RayTraceGI::StaticType();
 return Ailu::Render::RayTraceGI::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_RayTraceGI(&Ailu::Render::RayTraceGI::StaticType, "Ailu::Render::RayTraceGI");
+static std::unique_ptr<Ailu::Enum> s_enum_type_EPathTracerAccumulationMode = nullptr;
+//Enum EPathTracerAccumulationMode begin...........................
+const Ailu::Enum* Z_Construct_Enum_Ailu_Render_EPathTracerAccumulationMode_Type()
+{
+if(s_enum_type_EPathTracerAccumulationMode == nullptr)
+{
+EnumInitializer initializer;
+initializer._name = "EPathTracerAccumulationMode";
+initializer._namespace = "Ailu::Render";
+initializer._full_name = "Ailu::Render::EPathTracerAccumulationMode";
+initializer._size = sizeof(Ailu::Render::EPathTracerAccumulationMode);
+initializer._str_to_enum_lut["kDisabled"] = 0;
+initializer._str_to_enum_lut["kReference"] = 1;
+initializer._str_to_enum_lut["kRealtime"] = 2;
+s_enum_type_EPathTracerAccumulationMode = std::make_unique<Ailu::Enum>(initializer);
+Ailu::Enum::RegisterEnum(s_enum_type_EPathTracerAccumulationMode.get());
+}
+return s_enum_type_EPathTracerAccumulationMode.get();
+}
+static Ailu::EnumTypeRegister g_register_EPathTracerAccumulationMode(Z_Construct_Enum_Ailu_Render_EPathTracerAccumulationMode_Type);
+template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::EPathTracerAccumulationMode>()
+{
+return s_enum_type_EPathTracerAccumulationMode.get();
+}
+//Enum EPathTracerAccumulationMode end...........................
+

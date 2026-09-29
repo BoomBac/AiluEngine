@@ -10,6 +10,12 @@
 #pragma kernel SurfelGridPrefixBlocksCS
 #pragma kernel SurfelGridPrefixFinalizeCS
 #pragma kernel SurfelGridFillCS
+#pragma kernel SurfelQueryGridClearCS
+#pragma kernel SurfelQueryGridCountCS
+#pragma kernel SurfelQueryGridPrefixLocalCS
+#pragma kernel SurfelQueryGridPrefixBlocksCS
+#pragma kernel SurfelQueryGridPrefixFinalizeCS
+#pragma kernel SurfelQueryGridFillCS
 #pragma kernel SurfelMigrationResolveCS
 #pragma kernel SurfelMigrationRecycleCS
 #pragma kernel SurfelCoverageCS
@@ -88,6 +94,11 @@ RWStructuredBuffer<uint> _GridWriteCounters;
 RWStructuredBuffer<uint> _GridIndices;
 StructuredBuffer<uint> _GridIndicesRead;
 RWStructuredBuffer<uint> _GridBlockPrefix;
+RWStructuredBuffer<SurfelGridCell> _QueryGridCells;
+RWStructuredBuffer<uint> _QueryGridWriteCounters;
+RWStructuredBuffer<uint> _QueryGridIndices;
+RWStructuredBuffer<uint> _QueryGridBlockPrefix;
+RWStructuredBuffer<uint> _SurfelQueryDebugCounters;
 RWStructuredBuffer<SurfelCandidate> _SurfelCandidates;
 RWStructuredBuffer<uint> _CandidateState;
 RWStructuredBuffer<uint> _SpawnOccupancy;
@@ -230,9 +241,8 @@ bool AllocateSurfelSlot(out uint surfel_index)
 
 float ComputeRawDesiredRadius(float3 world_position)
 {
-    float view_distance = max(distance(_CameraPos.xyz, world_position), 0.001f);
-    float world_size_per_pixel = 2.0f * view_distance * _CameraParams.x / max(_CameraParams.y, 1.0f);
-    return world_size_per_pixel * _SurfelParams.y;
+    return SurfelComputeRawDesiredRadius(world_position, _CameraPos.xyz, _CameraParams.x, _CameraParams.y,
+                                         _SurfelParams.y);
 }
 
 float ClampRadiusForCascade(float raw_radius, uint cascade_level)
@@ -244,17 +254,8 @@ float ClampRadiusForCascade(float raw_radius, uint cascade_level)
 float ComputeDesiredRadius(float3 world_position, out uint cascade_level, out bool is_in_grid)
 {
     float raw_radius = ComputeRawDesiredRadius(world_position);
-    cascade_level = 0u;
-    [loop]
-    while (cascade_level + 1u < _CascadeCount)
-    {
-        float cell_size = _GridInfo[cascade_level].w;
-        int3 cell = (int3)floor((world_position - _GridInfo[cascade_level].xyz) / cell_size);
-        if (raw_radius <= cell_size * _SurfelParams.w && IsInsideCell(cell))
-            break;
-
-        ++cascade_level;
-    }
+    cascade_level = SurfelSelectDesiredCascade(world_position, raw_radius, _CameraPos.xyz, _CascadeCount,
+                                                _GridResolution, _SurfelParams.x, _SurfelParams.w, is_in_grid);
 
     float cell_size = _GridInfo[cascade_level].w;
     int3 cell = (int3)floor((world_position - _GridInfo[cascade_level].xyz) / cell_size);
@@ -895,6 +896,171 @@ void SurfelGridFillCS(uint3 dispatch_thread_id : SV_DispatchThreadID)
         return;
 
     ForEachOverlappingCell(surfel, min(surfel._cascade_level, _CascadeCount - 1u), surfel_index, true);
+}
+
+void ForEachQueryGridCell(SurfelData surfel, uint surfel_index, bool fill_index)
+{
+    const uint level = min(surfel._cascade_level, _CascadeCount - 1u);
+    const float cell_size = _GridInfo[level].w;
+    const int3 cell = (int3)floor((surfel._position - _GridInfo[level].xyz) / cell_size);
+    if (!IsInsideCell(cell))
+        return;
+
+    const uint cell_index = GetCellIndex(level, cell);
+    if (fill_index)
+    {
+        uint write_offset;
+        InterlockedAdd(_QueryGridWriteCounters[cell_index], 1u, write_offset);
+        if (write_offset < _QueryGridCells[cell_index]._count)
+            _QueryGridIndices[_QueryGridCells[cell_index]._offset + write_offset] = surfel_index;
+    }
+    else
+    {
+        InterlockedAdd(_QueryGridCells[cell_index]._count, 1u);
+    }
+}
+
+[numthreads(64, 1, 1)]
+void SurfelQueryGridClearCS(uint3 dispatch_thread_id : SV_DispatchThreadID)
+{
+    const uint cell_index = dispatch_thread_id.x;
+    const uint cell_count = GetCellCount();
+    if (cell_index == 0u)
+    {
+        [allow_uav_condition]
+        for (uint counter_index = 0u; counter_index < 5u; ++counter_index)
+            _SurfelQueryDebugCounters[counter_index] = 0u;
+    }
+    if (cell_index >= cell_count)
+        return;
+    _QueryGridCells[cell_index]._offset = 0u;
+    _QueryGridCells[cell_index]._count = 0u;
+    _QueryGridWriteCounters[cell_index] = 0u;
+}
+
+[numthreads(64, 1, 1)]
+void SurfelQueryGridCountCS(uint3 dispatch_thread_id : SV_DispatchThreadID)
+{
+    const uint surfel_index = dispatch_thread_id.x;
+    const uint high_watermark = min(_SurfelStateRead[kSurfelStateHighWatermark], _MaxSurfelCount);
+    if (surfel_index >= high_watermark)
+        return;
+
+    const SurfelData surfel = _SurfelPool[surfel_index];
+    if (IsValidSurfel(surfel))
+        ForEachQueryGridCell(surfel, surfel_index, false);
+}
+
+[numthreads(512, 1, 1)]
+void SurfelQueryGridPrefixLocalCS(uint3 group_id : SV_GroupID, uint3 group_thread_id : SV_GroupThreadID)
+{
+    const uint cell_count = GetCellCount();
+    const uint thread_index = group_thread_id.x;
+    const uint block_start = group_id.x * kScanBlockSize;
+    const uint index0 = block_start + thread_index;
+    const uint index1 = index0 + kScanThreadCount;
+
+    s_scan_local[thread_index] = index0 < cell_count ? _QueryGridCells[index0]._count : 0u;
+    s_scan_local[thread_index + kScanThreadCount] = index1 < cell_count ? _QueryGridCells[index1]._count : 0u;
+    GroupMemoryBarrierWithGroupSync();
+
+    for (uint stride = 1u; stride < kScanBlockSize; stride <<= 1u)
+    {
+        const uint scan_index = (thread_index + 1u) * stride * 2u - 1u;
+        if (scan_index < kScanBlockSize)
+            s_scan_local[scan_index] += s_scan_local[scan_index - stride];
+        GroupMemoryBarrierWithGroupSync();
+    }
+
+    if (thread_index == 0u)
+    {
+        _QueryGridBlockPrefix[group_id.x] = s_scan_local[kScanBlockSize - 1u];
+        s_scan_local[kScanBlockSize - 1u] = 0u;
+    }
+    GroupMemoryBarrierWithGroupSync();
+
+    for (uint stride = kScanBlockSize >> 1u; stride > 0u; stride >>= 1u)
+    {
+        const uint scan_index = (thread_index + 1u) * stride * 2u - 1u;
+        if (scan_index < kScanBlockSize)
+        {
+            const uint left_sum = s_scan_local[scan_index - stride];
+            s_scan_local[scan_index - stride] = s_scan_local[scan_index];
+            s_scan_local[scan_index] += left_sum;
+        }
+        GroupMemoryBarrierWithGroupSync();
+    }
+
+    if (index0 < cell_count)
+        _QueryGridCells[index0]._offset = s_scan_local[thread_index];
+    if (index1 < cell_count)
+        _QueryGridCells[index1]._offset = s_scan_local[thread_index + kScanThreadCount];
+}
+
+[numthreads(1024, 1, 1)]
+void SurfelQueryGridPrefixBlocksCS(uint3 group_thread_id : SV_GroupThreadID)
+{
+    const uint block_count = (GetCellCount() + kScanBlockSize - 1u) / kScanBlockSize;
+    const uint thread_index = group_thread_id.x;
+    const uint index0 = thread_index;
+    const uint index1 = index0 + kScanBlockSize;
+
+    s_scan_blocks[index0] = index0 < block_count ? _QueryGridBlockPrefix[index0] : 0u;
+    s_scan_blocks[index1] = index1 < block_count ? _QueryGridBlockPrefix[index1] : 0u;
+    GroupMemoryBarrierWithGroupSync();
+
+    for (uint stride = 1u; stride < kScanBlockSize * 2u; stride <<= 1u)
+    {
+        const uint scan_index = (thread_index + 1u) * stride * 2u - 1u;
+        if (scan_index < kScanBlockSize * 2u)
+            s_scan_blocks[scan_index] += s_scan_blocks[scan_index - stride];
+        GroupMemoryBarrierWithGroupSync();
+    }
+
+    if (thread_index == 0u)
+        s_scan_blocks[kScanBlockSize * 2u - 1u] = 0u;
+    GroupMemoryBarrierWithGroupSync();
+
+    for (uint stride = kScanBlockSize; stride > 0u; stride >>= 1u)
+    {
+        const uint scan_index = (thread_index + 1u) * stride * 2u - 1u;
+        if (scan_index < kScanBlockSize * 2u)
+        {
+            const uint left_sum = s_scan_blocks[scan_index - stride];
+            s_scan_blocks[scan_index - stride] = s_scan_blocks[scan_index];
+            s_scan_blocks[scan_index] += left_sum;
+        }
+        GroupMemoryBarrierWithGroupSync();
+    }
+
+    if (index0 < block_count)
+        _QueryGridBlockPrefix[index0] = s_scan_blocks[index0];
+    if (index1 < block_count)
+        _QueryGridBlockPrefix[index1] = s_scan_blocks[index1];
+}
+
+[numthreads(256, 1, 1)]
+void SurfelQueryGridPrefixFinalizeCS(uint3 dispatch_thread_id : SV_DispatchThreadID)
+{
+    const uint cell_index = dispatch_thread_id.x;
+    const uint cell_count = GetCellCount();
+    if (cell_index >= cell_count)
+        return;
+
+    _QueryGridCells[cell_index]._offset += _QueryGridBlockPrefix[cell_index / kScanBlockSize];
+}
+
+[numthreads(64, 1, 1)]
+void SurfelQueryGridFillCS(uint3 dispatch_thread_id : SV_DispatchThreadID)
+{
+    const uint surfel_index = dispatch_thread_id.x;
+    const uint high_watermark = min(_SurfelStateRead[kSurfelStateHighWatermark], _MaxSurfelCount);
+    if (surfel_index >= high_watermark)
+        return;
+
+    const SurfelData surfel = _SurfelPool[surfel_index];
+    if (IsValidSurfel(surfel))
+        ForEachQueryGridCell(surfel, surfel_index, true);
 }
 
 [numthreads(64, 1, 1)]

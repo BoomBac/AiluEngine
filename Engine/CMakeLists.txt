@@ -218,8 +218,8 @@ target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Inc)
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext)
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/tracy/public)
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/imgui)
-target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/fbxsdk)
-target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/fbxsdk/include)
+target_include_directories(Engine PUBLIC ${AILU_EXT_PACKAGES_DIR}/fbxsdk)
+target_include_directories(Engine PUBLIC ${AILU_EXT_PACKAGES_DIR}/fbxsdk/include)
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/ImGuizmo)
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/implot)
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/rapidjson)
@@ -271,12 +271,18 @@ if(MSVC)
         /wd4819
         /wd4251
         /utf-8
-        $<$<CONFIG:RelWithDebInfo>:/O1>
-        $<$<CONFIG:RelWithDebInfo>:/Ob1>
-)
+        $<$<CONFIG:RelWithDebInfo>:/Od>
+    )
+
+    # RelWithDebInfo 本身通常已经是 0。
+    # 显式声明，避免未来配置变化。
+    target_compile_definitions(Engine PRIVATE
+        $<$<CONFIG:RelWithDebInfo>:_ITERATOR_DEBUG_LEVEL=0>
+    )
 
     target_compile_options(Engine PRIVATE
-        $<$<CONFIG:Debug>:/RTC1>)
+        $<$<CONFIG:Debug>:/RTC1>
+    )
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
     target_compile_options(Engine PRIVATE -Winvalid-pch)
 endif()
@@ -286,7 +292,7 @@ target_precompile_headers(Engine PRIVATE Inc/pch.h)
 target_link_libraries(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/pix/WinPixEventRuntime.lib;d3d12.lib;dxgi.lib;
 d2d1.lib;dwrite.lib;d3d11.lib;
 imm32.lib;dwmapi.lib;
-        ${ENGINE_ROOT_PATH}/Ext/dxc/lib/x64/dxcompiler.lib;d3dcompiler.lib;dxguid.lib;
+        ${AILU_EXT_PACKAGES_DIR}/dxc/lib/x64/dxcompiler.lib;d3dcompiler.lib;dxguid.lib;
         ${AILU_FBXSDK_LINK_LIB}) # ;msvcrtd.lib
 target_link_libraries(Engine PRIVATE box2d::box2d DirectXTex)
 if (AILU_LUA_SCRIPTING_ENABLED)

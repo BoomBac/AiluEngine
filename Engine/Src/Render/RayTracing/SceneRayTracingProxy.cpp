@@ -8,6 +8,8 @@
 #include "Render/Texture.h"
 #include "pch.h"
 
+#include <cmath>
+#include <limits>
 #include <unordered_set>
 
 namespace Ailu::Render
@@ -308,7 +310,9 @@ namespace Ailu::Render
     {
         _material_data_cache.reserve(200u);
         _unified_light_data_cache.reserve(32u);
+        _unified_light_sampling_cache.reserve(32u);
         _unified_light_buffer = CreateDynamicStructuredBuffer(_unified_light_data_cache, "SceneRayTracingProxy_UnifiedLightBuffer");
+        _unified_light_sampling_buffer = CreateDynamicStructuredBuffer(_unified_light_sampling_cache, "SceneRayTracingProxy_UnifiedLightSamplingBuffer");
         _unified_light_config = ConstantBuffer::Create(sizeof(UnifiedLightBufferConfig), "SceneRayTracingProxy_UnifiedLightConfig");
         _unified_light_config->SetData(reinterpret_cast<const u8 *>(&_unified_light_config_cpu), sizeof(_unified_light_config_cpu));
         _material_data_lut[0] = 0; //default material
@@ -390,6 +394,8 @@ namespace Ailu::Render
     {
         if (scene == nullptr)
         {
+            _unified_light_data_cache.clear();
+            _unified_light_sampling_cache.clear();
             _unified_light_config_cpu = {};
             _unified_light_config->SetData(reinterpret_cast<const u8 *>(&_unified_light_config_cpu), sizeof(_unified_light_config_cpu));
             return;
@@ -1136,6 +1142,8 @@ namespace Ailu::Render
         append_mesh_lights(scene.GetRegister().View<ECS::StaticMeshComponent>());
         append_mesh_lights(scene.GetRegister().View<ECS::CSkeletonMesh>());
 
+        UpdateUnifiedLightSamplingTable();
+
         const u64 required_size = std::max<u64>(1u, _unified_light_data_cache.capacity()) * sizeof(UnifiedLightData);
         if (_unified_light_buffer == nullptr || _unified_light_buffer->GetSize() < required_size)
             _unified_light_buffer = CreateDynamicStructuredBuffer(_unified_light_data_cache, "SceneRayTracingProxy_UnifiedLightBuffer");
@@ -1143,6 +1151,137 @@ namespace Ailu::Render
             _unified_light_buffer->SetData(reinterpret_cast<const u8 *>(_unified_light_data_cache.data()), static_cast<u32>(_unified_light_data_cache.size() * sizeof(UnifiedLightData)));
 
         _unified_light_config->SetData(reinterpret_cast<const u8 *>(&_unified_light_config_cpu), sizeof(_unified_light_config_cpu));
+    }
+
+    float SceneRayTracingProxy::EstimateUnifiedLightSamplingWeight(const UnifiedLightData &light) const
+    {
+        constexpr double kMinWeight = 1.0e-6;
+        const bool radiance_is_finite = std::isfinite(light._radiance.x) && std::isfinite(light._radiance.y) && std::isfinite(light._radiance.z);
+        const double luminance = radiance_is_finite ? std::max(0.0, static_cast<double>(light._radiance.x) * 0.2126 +
+                                                                    static_cast<double>(light._radiance.y) * 0.7152 +
+                                                                    static_cast<double>(light._radiance.z) * 0.0722) : 0.0;
+        if (!std::isfinite(luminance) || luminance <= 0.0)
+            return 0.0f;
+
+        double shape_factor = 1.0;
+        if (light._type == AL_UNIFIED_LIGHT_TYPE_RECT_AREA)
+        {
+            const double cx = static_cast<double>(light._shape_u.y) * light._shape_v.z - static_cast<double>(light._shape_u.z) * light._shape_v.y;
+            const double cy = static_cast<double>(light._shape_u.z) * light._shape_v.x - static_cast<double>(light._shape_u.x) * light._shape_v.z;
+            const double cz = static_cast<double>(light._shape_u.x) * light._shape_v.y - static_cast<double>(light._shape_u.y) * light._shape_v.x;
+            shape_factor = std::sqrt(cx * cx + cy * cy + cz * cz);
+            if (!std::isfinite(shape_factor))
+                shape_factor = 0.0;
+            shape_factor = std::max(kMinWeight, shape_factor);
+        }
+
+        const double weight = std::max(kMinWeight, luminance * shape_factor);
+        return static_cast<float>(std::min(weight, static_cast<double>(std::numeric_limits<float>::max())));
+    }
+
+    void SceneRayTracingProxy::BuildUnifiedLightAliasTable(const Vector<float> &weights,
+                                                           Vector<UnifiedLightSamplingData> &sampling_table) const
+    {
+        const u32 light_count = static_cast<u32>(weights.size());
+        sampling_table.clear();
+        sampling_table.resize(light_count);
+        if (light_count == 0u)
+            return;
+
+        double total_weight = 0.0;
+        for (float weight : weights)
+        {
+            if (std::isfinite(weight) && weight > 0.0f)
+                total_weight += static_cast<double>(weight);
+        }
+
+        if (!std::isfinite(total_weight) || total_weight <= 1.0e-12)
+        {
+            const float pmf = 1.0f / static_cast<float>(light_count);
+            for (u32 index = 0u; index < light_count; ++index)
+                sampling_table[index] = {pmf, 1.0f, index, 0u};
+            return;
+        }
+
+        Vector<double> scaled(light_count);
+        Vector<u32> small_indices;
+        Vector<u32> large_indices;
+        small_indices.reserve(light_count);
+        large_indices.reserve(light_count);
+
+        for (u32 index = 0u; index < light_count; ++index)
+        {
+            const float input_weight = weights[index];
+            const double weight = std::isfinite(input_weight) && input_weight > 0.0f ? static_cast<double>(input_weight) : 0.0;
+            const double pmf = weight / total_weight;
+            sampling_table[index] = {static_cast<float>(pmf), 1.0f, index, 0u};
+            scaled[index] = pmf * static_cast<double>(light_count);
+            if (scaled[index] < 1.0)
+                small_indices.push_back(index);
+            else
+                large_indices.push_back(index);
+        }
+
+        while (!small_indices.empty() && !large_indices.empty())
+        {
+            const u32 small_index = small_indices.back();
+            small_indices.pop_back();
+            const u32 large_index = large_indices.back();
+            large_indices.pop_back();
+
+            sampling_table[small_index]._alias_probability = static_cast<float>(scaled[small_index]);
+            sampling_table[small_index]._alias_index = large_index;
+            scaled[large_index] += scaled[small_index] - 1.0;
+            if (scaled[large_index] < 1.0)
+                small_indices.push_back(large_index);
+            else
+                large_indices.push_back(large_index);
+        }
+
+        for (u32 index : large_indices)
+        {
+            sampling_table[index]._alias_probability = 1.0f;
+            sampling_table[index]._alias_index = index;
+        }
+        for (u32 index : small_indices)
+        {
+            sampling_table[index]._alias_probability = 1.0f;
+            sampling_table[index]._alias_index = index;
+        }
+    }
+
+    void SceneRayTracingProxy::UpdateUnifiedLightSamplingTable()
+    {
+        Vector<float> weights;
+        weights.reserve(_unified_light_data_cache.size());
+        for (const UnifiedLightData &light : _unified_light_data_cache)
+            weights.push_back(EstimateUnifiedLightSamplingWeight(light));
+
+        BuildUnifiedLightAliasTable(weights, _unified_light_sampling_cache);
+        _unified_light_config_cpu._sampling_table_count = static_cast<u32>(_unified_light_sampling_cache.size());
+
+        const u64 required_size = std::max<u64>(1u, _unified_light_sampling_cache.capacity()) * sizeof(UnifiedLightSamplingData);
+        if (_unified_light_sampling_buffer == nullptr || _unified_light_sampling_buffer->GetSize() < required_size)
+            _unified_light_sampling_buffer = CreateDynamicStructuredBuffer(_unified_light_sampling_cache, "SceneRayTracingProxy_UnifiedLightSamplingBuffer");
+        else if (!_unified_light_sampling_cache.empty())
+            _unified_light_sampling_buffer->SetData(reinterpret_cast<const u8 *>(_unified_light_sampling_cache.data()),
+                                                     static_cast<u32>(_unified_light_sampling_cache.size() * sizeof(UnifiedLightSamplingData)));
+
+        AL_ASSERT(_unified_light_sampling_cache.size() == _unified_light_data_cache.size());
+        double pmf_sum = 0.0;
+        const u32 light_count = static_cast<u32>(_unified_light_sampling_cache.size());
+        for (u32 index = 0u; index < light_count; ++index)
+        {
+            const UnifiedLightSamplingData &entry = _unified_light_sampling_cache[index];
+            AL_ASSERT(std::isfinite(entry._pmf));
+            AL_ASSERT(entry._pmf >= 0.0f);
+            AL_ASSERT(std::isfinite(entry._alias_probability));
+            AL_ASSERT(entry._alias_probability >= 0.0f && entry._alias_probability <= 1.0f);
+            AL_ASSERT(entry._alias_index < light_count);
+            pmf_sum += entry._pmf;
+        }
+        if (light_count > 0u)
+            AL_ASSERT(std::abs(pmf_sum - 1.0) < 1.0e-4);
     }
 
 }

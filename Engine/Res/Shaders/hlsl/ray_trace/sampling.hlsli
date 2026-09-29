@@ -71,8 +71,10 @@ float3 SampleGGX(float3 n, float alpha, float u1, float u2)
     float a2 = alpha * alpha;
 
     // ---- 采样 theta_h ----
-    float cosTheta = sqrt((1.0-u1) / (1.0 + (a2 - 1.0) * u1));
-    float sinTheta = sqrt(1.0 - cosTheta * cosTheta);
+    // Compute both components independently; 1 - cos(theta)^2 loses small GGX slopes.
+    float denominator = (1.0 - u1) + a2 * u1;
+    float cosTheta = sqrt(max(0.0, (1.0 - u1) / denominator));
+    float sinTheta = sqrt(max(0.0, a2 * u1 / denominator));
 
     float phi = 2.0 * PI * u2;
 
@@ -126,11 +128,21 @@ float3 SampleGGX_VNDF(float3 n, float3 wo, float alpha, float u1, float u2)
 }
 
 
+// The cross product retains small slopes when dot(n, h) rounds to one.
+float D_PathGGX(float alpha, float3 n, float3 h)
+{
+    float a2 = alpha * alpha;
+    float nh = dot(n, h);
+    float3 tangent_h = cross(n, h);
+    float denominator = dot(tangent_h, tangent_h) + a2 * nh * nh;
+    return a2 / (PI * denominator * denominator);
+}
+
 float PdfGGX(float alpha, float dotNH, float dotVH)
 {
     float nh = saturate(dotNH);
     float vh = max(saturate(dotVH), 1e-4);
-    float D = D_GTR2(max(alpha, 1e-3), nh);
+    float D = D_GTR2(max(alpha, 1e-6), nh);
     // pdf_wi = D(h) * |dot(h, wo)| / 4
     return D * vh / 4.0;
 }
@@ -155,7 +167,7 @@ float PdfGGX_VNDF(
     float nh = saturate(dotNH);
     float vh = max(saturate(dotVH), 1e-4);
     float nv = max(saturate(dotNV), 1e-4);
-    float a = max(alpha, 1e-3);
+    float a = max(alpha, 1e-6);
 
     float D = D_GTR2(a, nh);
 
@@ -169,6 +181,7 @@ struct SampleBRDFResult
 {
     float3 wi;      // 采样方向（世界空间，指向表面外）
     float3 _delta_weight;
+    float _delta_pdf;
     bool _is_delta; // 只有真正的离散镜面方向才可跳过光源 MIS；GGX 玻璃不是 delta
     // 这一步是折射（穿透）还是反射。体积吸收据此判断介质归属。
     bool _is_transmission;
@@ -186,7 +199,7 @@ float ComputeBRDFSpecularSamplingProb(float3 base_color, float metallic)
     float diffuse_weight = Luminance(base_color * (1.0 - metallic));
     float specular_weight = Luminance(f0);
     float denom = max(diffuse_weight + specular_weight, 1e-5);
-    return clamp(specular_weight / denom, 0.05, 0.95);
+    return diffuse_weight <= 0.0f ? 1.0f : clamp(specular_weight / denom, 0.05, 0.95);
 }
 
 float PdfSpecularBRDF(float3 n, float3 wo, float3 wi, float alpha)
@@ -201,11 +214,11 @@ float PdfSpecularBRDF(float3 n, float3 wo, float3 wi, float alpha)
     float vh = max(saturate(dot(wo, h)), 1e-4);
 
 #if defined(SAMPLE_BRDF_VNDF_GGX)
-    float D = D_GTR2(max(alpha, 1e-3), nh);
-    float G1 = SmithG1GGX(max(nv, 1e-4), max(alpha, 1e-3));
+    float D = D_PathGGX(alpha, n, h);
+    float G1 = SmithG1GGX(max(nv, 1e-4), max(alpha, 1e-6));
     return D * G1 * nh / (4.0 * vh * max(nv, 1e-4) + 1e-6);
 #else
-    float D = D_GTR2(max(alpha, 1e-3), nh);
+    float D = D_PathGGX(alpha, n, h);
     return D * nh / (4.0 * vh + 1e-6);
 #endif
 }
@@ -223,9 +236,9 @@ float PdfMixedBRDF(float3 n, float3 wo, float3 wi, float alpha, float3 base_colo
     return lerp(diffuse_pdf, specular_pdf, specular_prob);
 }
 
-float PdfMicrofacetNormal(float alpha, float nh)
+float PdfMicrofacetNormal(float alpha, float3 n, float3 h)
 {
-    return D_GTR2(max(alpha, 1e-4), nh) * nh;
+    return D_PathGGX(alpha, n, h) * saturate(abs(dot(n, h)));
 }
 
 float3 BuildReflectionHalfVector(float3 wo, float3 wi)
@@ -295,9 +308,9 @@ float3 EvalGlassReflectionLobe(float3 n, float3 wo, float3 wi, float3 h,
         return 0.0.xxx;
 
     float nh = saturate(abs(dot(n, h)));
-    float D = D_GTR2(alpha, nh);
+    float D = D_PathGGX(alpha, n, h);
     float G = 4.0f * nl * nv * V_SmithGGXCorrelated(nv, nl, alpha);
-    pdf = PdfMicrofacetNormal(alpha, nh) / max(4.0 * vh, 1e-6);
+    pdf = PdfMicrofacetNormal(alpha, n, h) / max(4.0 * vh, 1e-6);
     return D * G * fresnel / max(4.0 * nl * nv, 1e-6);
 }
 
@@ -326,10 +339,10 @@ float3 EvalGlassTransmissionLobe(float3 n, float3 wo, float3 wi, float3 h,
     if (abs(denom) <= 1e-6)
         return 0.0.xxx;
 
-    float D = D_GTR2(alpha, nh);
+    float D = D_PathGGX(alpha, n, h);
     float G = 4.0f * nl * nv * V_SmithGGXCorrelated(nv, nl, alpha);
     float denom2 = denom * denom;
-    pdf = PdfMicrofacetNormal(alpha, nh) * abs(wi_h) / denom2;
+    pdf = PdfMicrofacetNormal(alpha, n, h) * abs(wi_h) / denom2;
     return (1.0f - fresnel) * D * G * abs(wi_h * wo_h) /
            (max(nl * nv, 1e-6f) * denom2 * eta * eta);
 }
@@ -339,9 +352,10 @@ float3 EvalGlassTransmissionLobe(float3 n, float3 wo, float3 wi, float3 h,
 float3 EvalOpaqueBRDF(TraceContext ctx, float3 n, float3 wo, float3 wi, out float pdf)
 {
     Material mat = ctx._mat;
-    pdf = 1.0;
+    pdf = 0.0;
 
-    float3 h = BuildReflectionHalfVector(wo, wi);
+    float3 h = !mat._is_glass && ctx._lobe == kBSDFLobeReflection && any(ctx._sampled_h != 0.0.xxx)
+        ? ctx._sampled_h : BuildReflectionHalfVector(wo, wi);
     if (all(h == 0.0.xxx))
         return 0.0.xxx;
 
@@ -353,7 +367,7 @@ float3 EvalOpaqueBRDF(TraceContext ctx, float3 n, float3 wo, float3 wi, out floa
         return 0.0.xxx;
 
     float alpha = RoughnessToAlpha(mat._roughness);
-    float D = D_GTR2(alpha, nh);
+    float D = mat._roughness <= 1e-3f ? 0.0f : D_PathGGX(alpha, n, h);
     float V = V_SmithGGXCorrelated(nv, nl, alpha);
     float3 f0 = lerp(DIELECTRIC_SPECULAR.xxx, mat._albedo, mat._metallic.xxx);
     float3 F = F_Schlick(f0, vh);
@@ -517,7 +531,7 @@ float PdfSolidAngleFromArea(float pdf_area, float dist2, float cos_theta_l)
 //     float nh = saturate(dot(n, result.h));
 //     float vh = max(saturate(dot(wo, result.h)), 1e-4);
 //     float nv = max(saturate(dot(n, wo)), 1e-4);
-//     float D = D_GTR2(alpha, nh);
+//     float D = D_PathGGX(alpha, n, h);
 //     float G1 = SmithG1GGX(nv, alpha);
 //     result.pdf = D * G1 * nh / (4.0 * vh * nv + 1e-6);
 // #else
@@ -549,34 +563,7 @@ float3 EvalBRDF(TraceContext ctx,float3 n,float3 wo, float3 wi,out float pdf)
         return EvalGlassBSDF(ctx, n, wo, wi, ctx._lobe, ctx._sampled_h, pdf);
     }
 
-    float3 h = BuildReflectionHalfVector(wo, wi);
-    if (all(h == 0.0.xxx))
-        return 0.0.xxx;
-
-    float nv = saturate(dot(n, wo));
-    float nl = saturate(dot(n, wi));
-    float nh = saturate(dot(n, h));
-    float vh = max(saturate(dot(wo, h)), 1e-4);
-    if (nv <= 0.0 || nl <= 0.0)
-        return 0.0.xxx;
-
-    float alpha = RoughnessToAlpha(ctx._mat._roughness);
-    float D = D_GTR2(alpha, nh);
-    float V = V_SmithGGXCorrelated(nv, nl, alpha);
-    float3 f0 = lerp(DIELECTRIC_SPECULAR.xxx, mat._albedo, mat._metallic.xxx);
-    float3 F = F_Schlick(f0, vh);
-    float3 f_specular = D * V * F;
-    float3 f_diffuse = mat._albedo / PI;
-    float3 kd = (1 - F) * (1 - mat._metallic);
-    float specular_prob = ComputeBRDFSpecularSamplingProb(mat._albedo, mat._metallic);
-    float diffuse_pdf = nl / PI;
-    float specular_pdf = D * nh / (4.0 * vh + 1e-6);
-#if defined(SAMPLE_BRDF_VNDF_GGX)
-    float G1 = SmithG1GGX(max(nv, 1e-4), alpha);
-    specular_pdf = D * G1 * nh / (4.0 * vh * max(nv, 1e-4) + 1e-6);
-#endif
-    pdf = lerp(diffuse_pdf, specular_pdf, specular_prob); 
-    return kd * f_diffuse + f_specular;
+    return EvalOpaqueBRDF(ctx, n, wo, wi, pdf);
 }
 
 // 采样端用它来「先采半程向量，再按 Fresnel 决定这一票是反射还是折射」。
@@ -618,6 +605,38 @@ bool SampleGlassLobeDirection(TraceContext ctx, float3 n, float3 wo, float r1, f
     return true;
 }
 
+SampleBRDFResult SampleOpaqueBRDF(TraceContext ctx, float3 n, float3 wo, float r_select, float r1, float r2)
+{
+    SampleBRDFResult result = (SampleBRDFResult)0;
+    const Material mat = ctx._mat;
+    result._lobe = mat._is_glass ? kBSDFLobeOpaque : kBSDFLobeAnalytic;
+    const float specular_prob = ComputeBRDFSpecularSamplingProb(mat._albedo, mat._metallic);
+    if (r_select < specular_prob)
+    {
+        if (mat._roughness <= 1e-3f)
+        {
+            result._h = n;
+            result.wi = normalize(reflect(-wo, n));
+            result._is_delta = true;
+            float3 f0 = lerp(DIELECTRIC_SPECULAR.xxx, mat._albedo, mat._metallic.xxx);
+            result._delta_weight = F_Schlick(f0, saturate(dot(n, wo))) / specular_prob;
+            result._delta_pdf = (mat._is_glass ? 1.0f - saturate(mat._transmission) : 1.0f) * specular_prob;
+            return result;
+        }
+#if defined(SAMPLE_BRDF_VNDF_GGX)
+        result._h = SampleGGX_VNDF(n, wo, RoughnessToAlpha(mat._roughness), r1, r2);
+#else
+        result._h = SampleGGX(n, RoughnessToAlpha(mat._roughness), r1, r2);
+#endif
+        result.wi = reflect(-wo, result._h);
+        if (!mat._is_glass)
+            result._lobe = kBSDFLobeReflection;
+    }
+    else
+        result.wi = sample_cosine_hemisphere(n, r1, r2);
+    return result;
+}
+
 // 采样一个出射方向。四个随机数严格分工，不复用：
 //   r_select：在「不透明瓣 / 玻璃瓣」之间二选一（权重 1-tr / tr）
 //   r1, r2  ：用于采样微表面法线（或余弦半球）
@@ -628,8 +647,6 @@ SampleBRDFResult SampleBRDF(TraceContext ctx, float3 n, float3 wo, float r_selec
 {
     SampleBRDFResult result = (SampleBRDFResult)0;
     const Material mat = ctx._mat;
-    // 不透明瓣在玻璃材质里要用一个独立编号，避免和「解析反推」路径撞号
-    const uint opaque_lobe = mat._is_glass ? kBSDFLobeOpaque : kBSDFLobeAnalytic;
 
     if (mat._is_glass)
     {
@@ -637,20 +654,7 @@ SampleBRDFResult SampleBRDF(TraceContext ctx, float3 n, float3 wo, float r_selec
         // 采样分布必须和 EvalGlassBSDF 里的混合 pdf 完全一致，否则估计量有偏。
         const float tr = saturate(mat._transmission);
         if (r_select >= tr)
-        {
-            const float specular_prob = ComputeBRDFSpecularSamplingProb(mat._albedo, mat._metallic);
-            if (r_lobe < specular_prob)
-            {
-                result._h = SampleGGX(n, RoughnessToAlpha(mat._roughness), r1, r2);
-                result.wi = reflect(-wo, result._h);
-            }
-            else
-            {
-                result.wi = sample_cosine_hemisphere(n, r1, r2);
-            }
-            result._lobe = opaque_lobe;
-            return result;
-        }
+            return SampleOpaqueBRDF(ctx, n, wo, r_lobe, r1, r2);
 
         result._lobe = kBSDFLobeReflection;
         if (!SampleGlassLobeDirection(ctx, n, wo, r1, r2, r_lobe, result._lobe, result._h, result.wi))
@@ -664,17 +668,7 @@ SampleBRDFResult SampleBRDF(TraceContext ctx, float3 n, float3 wo, float r_selec
         return result;
     }
 
-    const float specular_prob = ComputeBRDFSpecularSamplingProb(mat._albedo, mat._metallic);
-    if (r_select < specular_prob)
-    {
-        result._h = SampleGGX(n, RoughnessToAlpha(mat._roughness), r1, r2);
-        result.wi = reflect(-wo, result._h);
-    }
-    else
-    {
-        result.wi = sample_cosine_hemisphere(n, r1, r2);
-    }
-    return result;
+    return SampleOpaqueBRDF(ctx, n, wo, r_select, r1, r2);
 }
 
 float PointLightDistanceAttenuation(float3 light_pos, float light_range, float3 x)
@@ -813,6 +807,22 @@ LightSample SampleSpotLight(SampleLightData light, float3 x, float2 u)
 }
 
 //返回指向光源的入射方向wi，pdf为该方向的概率密度
+float DirectionalLightAngularRadius(SampleLightData light)
+{
+    return max(light._radius_or_sun_angle, 1e-4f) * (PI / 180.0f);
+}
+
+float DirectionalLightOneMinusCos(SampleLightData light)
+{
+    float sine = sin(0.5f * DirectionalLightAngularRadius(light));
+    return 2.0f * sine * sine;
+}
+
+float DirectionalLightSolidAngle(SampleLightData light)
+{
+    return 2.0f * PI * DirectionalLightOneMinusCos(light);
+}
+
 LightSample SampleLight(SampleLightData light, float3 x, float3 n, inout RandomCtx ctx)
 {
     float2 u = rand2(ctx);
@@ -820,10 +830,9 @@ LightSample SampleLight(SampleLightData light, float3 x, float3 n, inout RandomC
     if (light._type == LIGHT_TYPE_DIRECTIONAL)
     {
         float3 light_dir = normalize(light._direction);
-        float angular_radius = max(light._radius_or_sun_angle, 1e-6);
-        float cos_theta_max = cos(angular_radius);
-        float cos_theta = 1.0 - u.x * (1.0 - cos_theta_max);
-        float sin_theta = sqrt(max(0.0, 1.0 - cos_theta * cos_theta));
+        float one_minus_cos_theta = u.x * DirectionalLightOneMinusCos(light);
+        float cos_theta = 1.0f - one_minus_cos_theta;
+        float sin_theta = sqrt(max(0.0f, one_minus_cos_theta * (2.0f - one_minus_cos_theta)));
         float phi = 2.0 * PI * u.y;
 
         float3 tangent;
@@ -835,11 +844,11 @@ LightSample SampleLight(SampleLightData light, float3 x, float3 n, inout RandomC
             sin(phi) * sin_theta * bitangent +
             cos_theta * light_dir);
 
-        result._pdf = 1.0 / max(2.0 * PI * (1.0 - cos_theta_max), 1e-6);
+        float sun_solid_angle = DirectionalLightSolidAngle(light);
+        result._pdf = 1.0f / sun_solid_angle;
         result._wi = wi;
         result._t = 1e6; // directional light 没有具体位置，设置一个很大的距离
-        float sun_solid_angle = 2.0 * PI * (1.0 - cos(angular_radius));
-        result._radiance = light._color / max(sun_solid_angle, 1e-6);
+        result._radiance = light._color / sun_solid_angle;
         return result;
     }
     else if (light._type == LIGHT_TYPE_RECT_AREA)
@@ -886,10 +895,9 @@ LightSample SampleLight(SampleLightData light, float3 x, float3 n, float2 u)
     if (light._type == LIGHT_TYPE_DIRECTIONAL)
     {
         float3 light_dir = normalize(light._direction);
-        float angular_radius = max(light._radius_or_sun_angle, 1e-6);
-        float cos_theta_max = cos(angular_radius);
-        float cos_theta = 1.0 - u.x * (1.0 - cos_theta_max);
-        float sin_theta = sqrt(max(0.0, 1.0 - cos_theta * cos_theta));
+        float one_minus_cos_theta = u.x * DirectionalLightOneMinusCos(light);
+        float cos_theta = 1.0f - one_minus_cos_theta;
+        float sin_theta = sqrt(max(0.0f, one_minus_cos_theta * (2.0f - one_minus_cos_theta)));
         float phi = 2.0 * PI * u.y;
 
         float3 tangent;
@@ -901,11 +909,11 @@ LightSample SampleLight(SampleLightData light, float3 x, float3 n, float2 u)
             sin(phi) * sin_theta * bitangent +
             cos_theta * light_dir);
 
-        result._pdf = 1.0 / max(2.0 * PI * (1.0 - cos_theta_max), 1e-6);
+        float sun_solid_angle = DirectionalLightSolidAngle(light);
+        result._pdf = 1.0f / sun_solid_angle;
         result._wi = wi;
         result._t = 1e6; // directional light 没有具体位置，设置一个很大的距离
-        float sun_solid_angle = 2.0 * PI * (1.0 - cos(angular_radius));
-        result._radiance = light._color / max(sun_solid_angle, 1e-6);
+        result._radiance = light._color / sun_solid_angle;
         return result;
     }
     else if (light._type == LIGHT_TYPE_RECT_AREA)

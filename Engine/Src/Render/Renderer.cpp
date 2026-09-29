@@ -109,7 +109,6 @@ namespace Ailu::Render
         _material_data_cache.push_back(miss_mat);
         //_features.push_back(_gpu_terrain);
         //_features.push_back(_taa);
-        _is_use_raytracing = true;
     }
 
     Renderer::~Renderer()

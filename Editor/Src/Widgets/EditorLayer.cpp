@@ -461,7 +461,14 @@ namespace Ailu
                     else if (prop_info.GetType() != nullptr && prop_info.GetType()->IsEnum())
                     {
                         const auto *enum_type = static_cast<const Enum *>(prop_info.GetType());
-                        i32 current_value = static_cast<i32>(prop_info.Get<u32>(obj));
+                        u32 current_value = 0u;
+                        switch (enum_type->Size())
+                        {
+                        case sizeof(u8): current_value = prop_info.Get<u8>(obj); break;
+                        case sizeof(u16): current_value = prop_info.Get<u16>(obj); break;
+                        case sizeof(u32): current_value = prop_info.Get<u32>(obj); break;
+                        default: break;
+                        }
                         const String &preview = enum_type->GetNameByIndex(static_cast<u32>(current_value));
                         if (ImGui::BeginCombo(prop_info.Name().c_str(), preview.c_str()))
                         {
@@ -473,9 +480,15 @@ namespace Ailu
                                 const bool is_selected = (enum_value == current_value);
                                 if (ImGui::Selectable(name->c_str(), is_selected))
                                 {
-                                    prop_info.Set<u32>(obj, static_cast<u32>(enum_value));
-                                    changed = true;
-                                    current_value = enum_value;
+                                    const u32 value = static_cast<u32>(enum_value);
+                                    switch (enum_type->Size())
+                                    {
+                                    case sizeof(u8): prop_info.Set<u8>(obj, static_cast<u8>(value)); changed = true; break;
+                                    case sizeof(u16): prop_info.Set<u16>(obj, static_cast<u16>(value)); changed = true; break;
+                                    case sizeof(u32): prop_info.Set<u32>(obj, value); changed = true; break;
+                                    default: break;
+                                    }
+                                    current_value = value;
                                 }
                                 if (is_selected)
                                     ImGui::SetItemDefaultFocus();
@@ -2172,9 +2185,7 @@ namespace Ailu
 
             //g_pRenderer->_shadow_distance = shadow_dis_m * 100.0f;
             static bool s_show_anim_clip = false;
-            // 光追管线开关只存在于这个调试菜单里、且不持久化，无人值守运行永远拿不到它。
-            // AILU_RAYTRACING_PIPELINE=1 让抓帧运行也能确定性地切到光追管线。
-            static bool s_raytracing_pipeline = false;
+            // 调试菜单与自动化接口共享 renderer 的开关，避免每帧覆盖运行时设置。
             ImGui::Checkbox("Expand", &show);
             ImGui::Checkbox("ShowPlotDemo", &s_show_plot_demo);
             ImGui::Checkbox("ShowAssetTable", &s_show_asset_table);
@@ -2187,8 +2198,7 @@ namespace Ailu
             ImGui::Checkbox("ShowStyleThemeEditor", &s_show_style_theme_editor);
             ImGui::Checkbox("ShowResourceBrowser", &s_show_resource_browser);
             ImGui::Checkbox("AllocatorDebug", &s_show_allocator_debug_panel);
-            ImGui::Checkbox("Raytracing Pipeline", &s_raytracing_pipeline);
-            RenderPipeline::Get().GetRenderer()->_is_use_raytracing = s_raytracing_pipeline;
+            ImGui::Checkbox("Raytracing Pipeline", &RenderPipeline::Get().GetRenderer()->_is_use_raytracing);
             if (ImGui::Button("Capture RDG"))
             {
                 RenderPipeline::Get().GetRenderer()->GetRenderGraph()._is_debug = true;

@@ -10,6 +10,14 @@ namespace Ailu
 {
     namespace Render
     {   
+        AENUM()
+        enum class EPathTracerAccumulationMode : u8
+        {
+            kDisabled,
+            kReference,
+            kRealtime
+        };
+
         class GIPass;
         ACLASS()
         class AILU_API RayTraceGI : public RenderFeature
@@ -25,7 +33,7 @@ namespace Ailu
             APROPERTY(Range(0,20))
             u32 _debug_hit_box = 0u;
             APROPERTY()
-            bool _is_temporal_denoise = false;
+            EPathTracerAccumulationMode _accumulation_mode = EPathTracerAccumulationMode::kDisabled;
             APROPERTY()
             bool _is_show_debug = false;
             APROPERTY()
@@ -33,9 +41,15 @@ namespace Ailu
             APROPERTY()
             bool _enable_mnee = false;
             APROPERTY()
+            bool _use_power_weighted_light_sampling = true;
+            APROPERTY()
             bool _enable_ris = true;
             APROPERTY()
             bool _enable_resampling = true;
+            bool _enable_environment_nee = true;
+            // 0: final output, 1: raw, 2: previous, 3: current, 4: validation, 5: history length.
+            APROPERTY(Range(0,5))
+            u32 _debug_temporal_target = 0u;
         private:
             Scope<GIPass> _gi_pass;
             AssetRef<ComputeShader> _gi_compute_shader;
@@ -65,8 +79,14 @@ namespace Ailu
             void OnRecordRenderGraph(RDG::RenderGraph& graph, RenderingData& rendering_data) final;
         public:
             Vector2f _debug_pos;
-            bool _is_temporal_denoise = false;
+            EPathTracerAccumulationMode _accumulation_mode = EPathTracerAccumulationMode::kDisabled;
             bool _use_hardware_ray_tracing = false;
+            bool _enable_mnee = false;
+            bool _use_power_weighted_light_sampling = true;
+            bool _enable_ris = true;
+            bool _enable_resampling = true;
+            bool _enable_environment_nee = true;
+            u32 _debug_temporal_target = 0u;
         private:
             bool MakesureTarget(const RenderingData& rendering_data);
             bool CanUseHardwareRayTracing() const;
@@ -77,24 +97,45 @@ namespace Ailu
             AssetRef<RayTracingShader> _gi_raytracing_shader;
             ComputeShaderKernelId _kernel_primary_ray = kInvalidComputeShaderKernelId;
             ComputeShaderKernelId _kernel_denoise = kInvalidComputeShaderKernelId;
+            ComputeShaderKernelId _kernel_build_environment_weights = kInvalidComputeShaderKernelId;
+            ComputeShaderKernelId _kernel_build_environment_cdf = kInvalidComputeShaderKernelId;
             Ref<GPUBuffer> _debug_buffer = nullptr;
             Ref<GPUBuffer> _debug_index_buffer = nullptr;
             Ref<GPUBuffer> _arg_buffer = nullptr;
             Ref<Material> _debug_line_mat;
-            Ref<Texture2D> _gi_texture_a;
-            Ref<Texture2D> _gi_texture_b;
-            RDG::RGHandle _cur_target_handle;
-            RDG::RGHandle _history_target_handle;
+            Ref<Texture2D> _raw_path_trace_texture;
+            Ref<Texture2D> _history_texture_a;
+            Ref<Texture2D> _history_texture_b;
+            Ref<Texture2D> _temporal_debug_texture;
+            Ref<RenderTexture> _environment_distribution_texture;
+            RDG::RGHandle _raw_path_trace_handle;
+            RDG::RGHandle _history_prev_handle;
+            RDG::RGHandle _history_curr_handle;
+            RDG::RGHandle _temporal_debug_handle;
+            RDG::RGHandle _environment_distribution_handle;
             Ref<ConstantBuffer> _raygen_data;
             Scope<SceneRayTracingProxy> _scene_rt_proxy;
             RayGenConstantBuffer _raygen_cb{};
             bool _is_target_for_hardware_rt = false;
             bool _is_cur_a = true;
+            bool _is_history_a = true;
+            bool _temporal_history_valid = false;
+            u64 _last_history_signature = 0u;
+            bool _has_history_signature = false;
+            Vector3f _previous_camera_position = Vector3f::kZero;
+            Vector3f _previous_camera_forward = Vector3f::kForward;
+            Vector3f _previous_camera_up = Vector3f::kUp;
+            bool _has_previous_camera = false;
+            EPathTracerAccumulationMode _previous_accumulation_mode = EPathTracerAccumulationMode::kDisabled;
+            bool _has_previous_accumulation_mode = false;
             u32 _tile_frame_counter = 0u;
             Ref<GPUBuffer> _reservoir_a = nullptr;
             Ref<GPUBuffer> _reservoir_b = nullptr;
             Ref<GPUBuffer> _surface_buffer_a = nullptr;
             Ref<GPUBuffer> _surface_buffer_b = nullptr;
+            Texture *_environment_distribution_source = nullptr;
+            u64 _environment_distribution_revision = 0u;
+            bool _environment_distribution_dirty = true;
         };
     }
 } // namespace Ailu

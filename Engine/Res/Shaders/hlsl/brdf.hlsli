@@ -36,7 +36,7 @@ float D_GTR2(float alpha, float dotNH)
 {
 	float a2 = alpha * alpha;
 	float cos2th = dotNH * dotNH;
-	float den = (1.0 + (a2 - 1.0) * cos2th);
+	float den = max(1.0 - cos2th, 0.0) + a2 * cos2th;
 	
 	return a2 / (PI * den * den);
 }

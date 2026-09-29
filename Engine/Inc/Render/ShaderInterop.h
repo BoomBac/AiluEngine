@@ -128,7 +128,15 @@ namespace Ailu::Render
         uint _light_count;
         uint _finite_light_count;
         uint _triangle_light_count;
-        uint _reserved0;
+        uint _sampling_table_count;
+    };
+
+    struct UnifiedLightSamplingData
+    {
+        float _pmf;
+        float _alias_probability;
+        uint _alias_index;
+        uint _padding;
     };
 
 #ifdef __cplusplus
@@ -389,6 +397,7 @@ namespace Ailu::Render
     static_assert((sizeof(CBufferPerCameraData) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
     static_assert((sizeof(UnifiedLightData) % 16) == 0, "Unified light data must be 16-byte aligned");
     static_assert((sizeof(UnifiedLightBufferConfig) % 16) == 0, "Unified light config must be 16-byte aligned");
+    static_assert(sizeof(UnifiedLightSamplingData) == 16, "Unified light sampling data must be 16 bytes");
 #else
 #define PerMaterialCBufferBegin                   \
     cbuffer CBufferPerMaterialData : register(b1) \

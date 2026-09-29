@@ -57,6 +57,13 @@ TraceContext CreatePathTraceContext(Material material, bool front_face)
     return trace_context;
 }
 
+bool HasContinuousPathBSDF(Material material)
+{
+    if (material._roughness > 1e-3f)
+        return true;
+    return material._metallic < 1.0f && (!material._is_glass || material._transmission < 1.0f);
+}
+
 // 介质内传播的 Beer-Lambert 衰减。
 // absorption 是每单位长度的吸收系数 (1/世界单位)，distance 是这一段在介质里走的距离。
 // absorption 为 0 时严格返回 1（exp(-0) == 1），所以无损介质的行为与改动前逐像素一致。

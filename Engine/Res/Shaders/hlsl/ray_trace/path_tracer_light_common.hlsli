@@ -76,6 +76,48 @@ float GetUnifiedLightSelectionPMF(uint light_count)
     return light_count > 0u ? rcp((float)light_count) : 0.0;
 }
 
+#if defined(PATH_TRACER_POWER_LIGHT_SAMPLING)
+#if defined(DXR)
+StructuredBuffer<UnifiedLightSamplingData> _UnifiedLightSamplingTable : register(t8, space0);
+#else
+StructuredBuffer<UnifiedLightSamplingData> _UnifiedLightSamplingTable;
+#endif
+#endif
+
+float GetPathUnifiedLightSelectionPMF(uint light_index, uint light_count)
+{
+#if defined(PATH_TRACER_POWER_LIGHT_SAMPLING)
+    if (light_index >= light_count)
+        return 0.0f;
+    return _UnifiedLightSamplingTable[light_index]._pmf;
+#else
+    return GetUnifiedLightSelectionPMF(light_count);
+#endif
+}
+
+uint SamplePathUnifiedLightIndex(float random_value, uint light_count, out float selection_pmf)
+{
+    selection_pmf = 0.0f;
+    if (light_count == 0u)
+        return 0u;
+
+#if defined(PATH_TRACER_POWER_LIGHT_SAMPLING)
+    const float safe_random = min(random_value, 0.99999994f);
+    const float scaled_random = safe_random * float(light_count);
+    const uint bucket_index = min((uint)scaled_random, light_count - 1u);
+    const float alias_random = frac(scaled_random);
+    const UnifiedLightSamplingData bucket = _UnifiedLightSamplingTable[bucket_index];
+    const uint light_index = alias_random < bucket._alias_probability ? bucket_index : bucket._alias_index;
+    selection_pmf = GetPathUnifiedLightSelectionPMF(light_index, light_count);
+    return light_index;
+#else
+    const float safe_random = min(max(random_value, 0.0f), 0.99999994f);
+    const uint light_index = min((uint)(safe_random * float(light_count)), light_count - 1u);
+    selection_pmf = GetPathUnifiedLightSelectionPMF(light_index, light_count);
+    return light_index;
+#endif
+}
+
 float GetLightShadowRayTMax(LightSample light_sample)
 {
     return light_sample._t > FLOAT_EPSILON ? light_sample._t : 1e20;
@@ -404,9 +446,40 @@ float PdfMeshLight(SampleLightData light, float3 x, float3 wi)
     return PdfSolidAngleFromArea(rcp(max(area, 1e-6)), light_t * light_t, cos_theta_l);
 }
 
+float PdfDirectionalLight(SampleLightData light, float3 wi)
+{
+    float3 light_direction = normalize(light._direction);
+    float3 tangent_direction = cross(light_direction, wi);
+    float sine_radius = sin(DirectionalLightAngularRadius(light));
+    if (dot(light_direction, wi) <= 0.0f || dot(tangent_direction, tangent_direction) > sine_radius * sine_radius)
+        return 0.0f;
+    return 1.0f / DirectionalLightSolidAngle(light);
+}
+
+// Directional lights live at infinity, so BSDF rays evaluate them only after a scene miss.
+float3 EvaluateDirectionalLightMiss(uint light_count, float3 wi, float bsdf_pdf, bool carry_mis)
+{
+    float3 radiance = 0.0.xxx;
+    float selection_pmf = GetUnifiedLightSelectionPMF(light_count);
+    for (uint light_index = 0u; light_index < light_count; ++light_index)
+    {
+        SampleLightData light = DecodeUnifiedLightEntry(LoadUnifiedLight(light_index));
+        if (light._type != LIGHT_TYPE_DIRECTIONAL)
+            continue;
+        float light_pdf = PdfDirectionalLight(light, wi);
+        if (light_pdf <= 0.0f)
+            continue;
+        float mis_weight = carry_mis ? PowerHeuristic(bsdf_pdf, light_pdf * selection_pmf) : 1.0f;
+        radiance += light._color * light_pdf * mis_weight;
+    }
+    return radiance;
+}
+
 float PdfUnifiedLight(uint light_index, float3 x, float3 wi)
 {
     SampleLightData light = DecodeUnifiedLightEntry(LoadUnifiedLight(light_index));
+    if (light._type == LIGHT_TYPE_DIRECTIONAL)
+        return PdfDirectionalLight(light, wi);
     if (light._type == LIGHT_TYPE_RECT_AREA)
         return PdfAreaLight(light, x, wi);
     if (light._type == LIGHT_TYPE_TRIANGLE_AREA)

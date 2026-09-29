@@ -2,7 +2,7 @@
 #ifndef __FPX_PARSER_H__
 #define __FPX_PARSER_H__
 #include "Animation/Clip.h"
-#include "Ext/fbxsdk/include/fbxsdk.h"
+#include "fbxsdk.h"
 #include "Framework/Common/TimeMgr.h"
 #include "Framework/Interface/IParser.h"
 

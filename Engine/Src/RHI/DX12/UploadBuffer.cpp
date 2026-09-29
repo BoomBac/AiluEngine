@@ -31,7 +31,8 @@ namespace Ailu::RHI::DX12
         {
             auto large_page = CreateLargePage(sizeInBytes, alignment);
             Allocation allocation{};
-            AL_ASSERT(large_page->Allocate(sizeInBytes, alignment, allocation));
+            const bool allocated = large_page->Allocate(sizeInBytes, alignment, allocation);
+            AL_ASSERT(allocated);
             return allocation;
         }
 

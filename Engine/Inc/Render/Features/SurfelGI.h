@@ -159,6 +159,7 @@ namespace Ailu::Render
         bool _grid_dirty = true;
         bool _migration_finalize_pending = false;
         bool _debug_readback_pending = false;
+        bool _query_debug_readback_pending = false;
         u32 _debug_stats_frame_counter = 0u;
         u32 _resource_max_surfel_count = 0u;
         u32 _resource_grid_resolution = 0u;
@@ -180,6 +181,12 @@ namespace Ailu::Render
         ComputeShaderKernelId _grid_prefix_blocks_kernel = kInvalidComputeShaderKernelId;
         ComputeShaderKernelId _grid_prefix_finalize_kernel = kInvalidComputeShaderKernelId;
         ComputeShaderKernelId _grid_fill_kernel = kInvalidComputeShaderKernelId;
+        ComputeShaderKernelId _query_grid_clear_kernel = kInvalidComputeShaderKernelId;
+        ComputeShaderKernelId _query_grid_count_kernel = kInvalidComputeShaderKernelId;
+        ComputeShaderKernelId _query_grid_prefix_local_kernel = kInvalidComputeShaderKernelId;
+        ComputeShaderKernelId _query_grid_prefix_blocks_kernel = kInvalidComputeShaderKernelId;
+        ComputeShaderKernelId _query_grid_prefix_finalize_kernel = kInvalidComputeShaderKernelId;
+        ComputeShaderKernelId _query_grid_fill_kernel = kInvalidComputeShaderKernelId;
         ComputeShaderKernelId _migration_resolve_kernel = kInvalidComputeShaderKernelId;
         ComputeShaderKernelId _migration_recycle_kernel = kInvalidComputeShaderKernelId;
         ComputeShaderKernelId _coverage_kernel = kInvalidComputeShaderKernelId;
@@ -223,6 +230,11 @@ namespace Ailu::Render
         Ref<GPUBuffer> _grid_write_counters;
         Ref<GPUBuffer> _grid_indices;
         Ref<GPUBuffer> _grid_block_prefix;
+        Ref<GPUBuffer> _query_grid_cells;
+        Ref<GPUBuffer> _query_grid_write_counters;
+        Ref<GPUBuffer> _query_grid_indices;
+        Ref<GPUBuffer> _query_grid_block_prefix;
+        Ref<GPUBuffer> _query_debug_counters;
         Ref<GPUBuffer> _surfel_candidates;
         Ref<GPUBuffer> _candidate_state;
         Ref<GPUBuffer> _spawn_occupancy;

@@ -28,6 +28,44 @@ struct SurfelLightingData
     uint _inheritance_depth;
 };
 
+float4 SurfelComputeGridInfo(float3 camera_position, uint level, uint grid_resolution, float base_cell_size)
+{
+    const float cell_size = base_cell_size * exp2((float)level);
+    const float3 center = floor(camera_position / cell_size) * cell_size;
+    const float world_size = cell_size * (float)grid_resolution;
+    return float4(center - world_size * 0.5f, cell_size);
+}
+
+float SurfelComputeRawDesiredRadius(float3 world_position, float3 camera_position, float tan_half_fov,
+                                    float screen_height, float target_pixel_radius)
+{
+    const float view_distance = max(distance(camera_position, world_position), 0.001f);
+    const float world_size_per_pixel = 2.0f * view_distance * tan_half_fov / max(screen_height, 1.0f);
+    return world_size_per_pixel * target_pixel_radius;
+}
+
+uint SurfelSelectDesiredCascade(float3 world_position, float raw_radius, float3 camera_position,
+                                uint cascade_count, uint grid_resolution, float base_cell_size,
+                                float max_radius_scale, out bool is_in_grid)
+{
+    uint cascade_level = 0u;
+    [loop]
+    while (cascade_level + 1u < cascade_count)
+    {
+        const float4 grid_info = SurfelComputeGridInfo(camera_position, cascade_level, grid_resolution,
+                                                        base_cell_size);
+        const int3 cell = (int3)floor((world_position - grid_info.xyz) / grid_info.w);
+        if (raw_radius <= grid_info.w * max_radius_scale && all(cell >= 0) && all(cell < (int)grid_resolution))
+            break;
+        ++cascade_level;
+    }
+
+    const float4 grid_info = SurfelComputeGridInfo(camera_position, cascade_level, grid_resolution, base_cell_size);
+    const int3 cell = (int3)floor((world_position - grid_info.xyz) / grid_info.w);
+    is_in_grid = all(cell >= 0) && all(cell < (int)grid_resolution);
+    return cascade_level;
+}
+
 static const uint kSurfelValid = 1u;
 static const uint kSurfelNeedsOverlapResolve = 1u << 1u;
 static const uint kSurfelMigratedFiner = 1u << 2u;

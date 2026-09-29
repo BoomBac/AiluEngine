@@ -4,6 +4,7 @@
 #include "Framework/Common/Allocator.hpp"
 #include "Framework/Common/ResourceMgr.h"
 #include "Render/Buffer.h"
+#include "Render/Camera.h"
 #include "Render/CommandBuffer.h"
 #include "Render/GraphicsContext.h"
 #include "Render/Gizmo.h"
@@ -21,6 +22,8 @@
 #include "Render/FrameResource.h"
 #include "Render/RenderGraph/RenderGraph.h"
 
+#include <cmath>
+
 /* 模版说明
 0 = 天空，大气和体积云绘制时会与其进行相等判断
 1 = 静态物体
@@ -31,6 +34,21 @@ namespace Ailu::Render
 {
     namespace
     {
+        const ShaderPropertyId kSurfelQueryEnabledPropertyId = Shader::PropertyID("_SurfelQueryEnabled");
+        const ShaderPropertyId kSurfelPoolPropertyId = Shader::PropertyID("_SurfelPool");
+        const ShaderPropertyId kSurfelLightingPropertyId = Shader::PropertyID("_SurfelLighting");
+        const ShaderPropertyId kSurfelStatePropertyId = Shader::PropertyID("_SurfelState");
+        const ShaderPropertyId kSurfelQueryGridCellsPropertyId = Shader::PropertyID("_SurfelQueryGridCells");
+        const ShaderPropertyId kSurfelQueryGridIndicesPropertyId = Shader::PropertyID("_SurfelQueryGridIndices");
+        const ShaderPropertyId kSurfelQueryDebugCountersPropertyId = Shader::PropertyID("_SurfelQueryDebugCounters");
+        const ShaderPropertyId kSurfelGridResolutionPropertyId = Shader::PropertyID("_SurfelGridResolution");
+        const ShaderPropertyId kSurfelCascadeCountPropertyId = Shader::PropertyID("_SurfelCascadeCount");
+        const ShaderPropertyId kSurfelMaxCountPropertyId = Shader::PropertyID("_SurfelMaxCount");
+        const ShaderPropertyId kSurfelBaseCellSizePropertyId = Shader::PropertyID("_SurfelBaseCellSize");
+        const ShaderPropertyId kSurfelTanHalfFovPropertyId = Shader::PropertyID("_SurfelTanHalfFov");
+        const ShaderPropertyId kSurfelTargetPixelRadiusPropertyId = Shader::PropertyID("_SurfelTargetPixelRadius");
+        const ShaderPropertyId kSurfelQueryDebugEnabledPropertyId = Shader::PropertyID("_SurfelQueryDebugEnabled");
+
         struct QueuedDrawItem
         {
             VertexBuffer *_vertex_buffer = nullptr;
@@ -892,19 +910,23 @@ namespace Ailu::Render
                                       _surfel_gi->_surfel_pool != nullptr &&
                                       _surfel_gi->_surfel_lighting != nullptr &&
                                       _surfel_gi->_surfel_state != nullptr &&
-                                      _surfel_gi->_grid_cells != nullptr && _surfel_gi->_grid_indices != nullptr;
+                                      _surfel_gi->_query_grid_cells != nullptr &&
+                                      _surfel_gi->_query_grid_indices != nullptr &&
+                                      _surfel_gi->_query_debug_counters != nullptr;
         RDG::RGHandle surfel_pool;
         RDG::RGHandle surfel_lighting;
         RDG::RGHandle surfel_state;
-        RDG::RGHandle surfel_grid_cells;
-        RDG::RGHandle surfel_grid_indices;
+        RDG::RGHandle surfel_query_grid_cells;
+        RDG::RGHandle surfel_query_grid_indices;
+        RDG::RGHandle surfel_query_debug_counters;
         if (use_surfel_query)
         {
             surfel_pool = graph.Import(_surfel_gi->_surfel_pool.get());
             surfel_lighting = graph.Import(_surfel_gi->_surfel_lighting.get());
             surfel_state = graph.Import(_surfel_gi->_surfel_state.get());
-            surfel_grid_cells = graph.Import(_surfel_gi->_grid_cells.get());
-            surfel_grid_indices = graph.Import(_surfel_gi->_grid_indices.get());
+            surfel_query_grid_cells = graph.Import(_surfel_gi->_query_grid_cells.get());
+            surfel_query_grid_indices = graph.Import(_surfel_gi->_query_grid_indices.get());
+            surfel_query_debug_counters = graph.Import(_surfel_gi->_query_debug_counters.get());
         }
         graph.AddPass(_name, RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
                       { 
@@ -936,13 +958,16 @@ namespace Ailu::Render
                               builder.Read(surfel_pool, EResourceUsage::kReadSRV);
                               builder.Read(surfel_lighting, EResourceUsage::kReadSRV);
                               builder.Read(surfel_state, EResourceUsage::kReadSRV);
-                              builder.Read(surfel_grid_cells, EResourceUsage::kReadSRV);
-                              builder.Read(surfel_grid_indices, EResourceUsage::kReadSRV);
+                              builder.Read(surfel_query_grid_cells, EResourceUsage::kReadSRV);
+                              builder.Read(surfel_query_grid_indices, EResourceUsage::kReadSRV);
+                              builder.Read(surfel_query_debug_counters, EResourceUsage::kWriteUAV);
                           }
                           rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target);
                       },
-                          [this, use_surfel_query, surfel_pool, surfel_lighting, surfel_state, surfel_grid_cells,
-                           surfel_grid_indices](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
+                          [this, use_surfel_query, surfel_pool, surfel_lighting, surfel_state,
+                           surfel_query_grid_cells, surfel_query_grid_indices, surfel_query_debug_counters](RDG::RenderGraph &graph,
+                                                                                 CommandBuffer *cmd,
+                                                                                 const RenderingData &data)
                       {
                             _p_lighting_material->SetTexture("_GBuffer0", graph.Resolve<Texture>(data._rg_handles._gbuffers[0]));
                             _p_lighting_material->SetTexture("_GBuffer1", graph.Resolve<Texture>(data._rg_handles._gbuffers[1]));
@@ -988,24 +1013,36 @@ namespace Ailu::Render
                             GPUBuffer *ddgi_probe_data = data._ddgi_lighting._probe_data_handle.IsValid()
                                 ? graph.Resolve<GPUBuffer>(data._ddgi_lighting._probe_data_handle) : nullptr;
                             _p_lighting_material->SetBuffer("_DDGI_ProbeData", ddgi_probe_data);
-                            _p_lighting_material->SetInt("_SurfelQueryEnabled", use_surfel_query ? 1 : 0);
+                            _p_lighting_material->SetInt(kSurfelQueryEnabledPropertyId, use_surfel_query ? 1 : 0);
                             if (use_surfel_query)
                             {
-                                _p_lighting_material->SetBuffer("_SurfelPool", graph.Resolve<GPUBuffer>(surfel_pool));
-                                _p_lighting_material->SetBuffer("_SurfelLighting",
+                                _p_lighting_material->SetBuffer(kSurfelPoolPropertyId, graph.Resolve<GPUBuffer>(surfel_pool));
+                                _p_lighting_material->SetBuffer(kSurfelLightingPropertyId,
                                                                graph.Resolve<GPUBuffer>(surfel_lighting));
-                                _p_lighting_material->SetBuffer("_SurfelState", graph.Resolve<GPUBuffer>(surfel_state));
-                                _p_lighting_material->SetBuffer("_SurfelGridCells",
-                                                               graph.Resolve<GPUBuffer>(surfel_grid_cells));
-                                _p_lighting_material->SetBuffer("_SurfelGridIndices",
-                                                               graph.Resolve<GPUBuffer>(surfel_grid_indices));
-                                _p_lighting_material->SetInt("_SurfelGridResolution",
+                                _p_lighting_material->SetBuffer(kSurfelStatePropertyId, graph.Resolve<GPUBuffer>(surfel_state));
+                                _p_lighting_material->SetBuffer(kSurfelQueryGridCellsPropertyId,
+                                                               graph.Resolve<GPUBuffer>(surfel_query_grid_cells));
+                                _p_lighting_material->SetBuffer(kSurfelQueryGridIndicesPropertyId,
+                                                               graph.Resolve<GPUBuffer>(surfel_query_grid_indices));
+                                _p_lighting_material->SetBuffer(kSurfelQueryDebugCountersPropertyId,
+                                                               graph.Resolve<GPUBuffer>(surfel_query_debug_counters));
+                                _p_lighting_material->SetInt(kSurfelGridResolutionPropertyId,
                                     static_cast<i32>(_surfel_gi->_resource_grid_resolution));
-                                _p_lighting_material->SetInt("_SurfelCascadeCount",
+                                _p_lighting_material->SetInt(kSurfelCascadeCountPropertyId,
                                     static_cast<i32>(_surfel_gi->_resource_cascade_count));
-                                _p_lighting_material->SetInt("_SurfelMaxCount",
+                                _p_lighting_material->SetInt(kSurfelMaxCountPropertyId,
                                     static_cast<i32>(_surfel_gi->_resource_max_surfel_count));
-                                _p_lighting_material->SetFloat("_SurfelBaseCellSize", _surfel_gi->_settings._base_cell_size);
+                                _p_lighting_material->SetFloat(kSurfelBaseCellSizePropertyId,
+                                                               _surfel_gi->_settings._base_cell_size);
+                                _p_lighting_material->SetFloat(kSurfelTanHalfFovPropertyId,
+                                    std::tan(data._camera->FovH() * 3.14159265358979323846f / 360.0f));
+                                _p_lighting_material->SetFloat(kSurfelTargetPixelRadiusPropertyId,
+                                                               _surfel_gi->_settings._target_pixel_radius);
+                                _p_lighting_material->SetInt(
+                                    kSurfelQueryDebugEnabledPropertyId,
+                                    (_surfel_gi->_settings._debug_draw_surfels ||
+                                     _surfel_gi->_settings._debug_coverage || _surfel_gi->_settings._debug_draw_tile_grid)
+                                        ? 1 : 0);
                             }
                             cmd->SetRenderTargetLoadAction(data._rg_handles._color_target, ELoadStoreAction::kNotCare);
                             cmd->SetRenderTarget(data._rg_handles._color_target);
@@ -1036,21 +1073,35 @@ namespace Ailu::Render
                                       _surfel_gi->_surfel_pool != nullptr &&
                                       _surfel_gi->_surfel_lighting != nullptr &&
                                       _surfel_gi->_surfel_state != nullptr &&
-                                      _surfel_gi->_grid_cells != nullptr && _surfel_gi->_grid_indices != nullptr;
-        _p_lighting_material->SetInt("_SurfelQueryEnabled", use_surfel_query ? 1 : 0);
+                                      _surfel_gi->_query_grid_cells != nullptr &&
+                                      _surfel_gi->_query_grid_indices != nullptr &&
+                                      _surfel_gi->_query_debug_counters != nullptr;
+        _p_lighting_material->SetInt(kSurfelQueryEnabledPropertyId, use_surfel_query ? 1 : 0);
         if (use_surfel_query)
         {
-            _p_lighting_material->SetBuffer("_SurfelPool", _surfel_gi->_surfel_pool.get());
-            _p_lighting_material->SetBuffer("_SurfelLighting", _surfel_gi->_surfel_lighting.get());
-            _p_lighting_material->SetBuffer("_SurfelState", _surfel_gi->_surfel_state.get());
-            _p_lighting_material->SetBuffer("_SurfelGridCells", _surfel_gi->_grid_cells.get());
-            _p_lighting_material->SetBuffer("_SurfelGridIndices", _surfel_gi->_grid_indices.get());
-            _p_lighting_material->SetInt("_SurfelGridResolution",
+            _p_lighting_material->SetBuffer(kSurfelPoolPropertyId, _surfel_gi->_surfel_pool.get());
+            _p_lighting_material->SetBuffer(kSurfelLightingPropertyId, _surfel_gi->_surfel_lighting.get());
+            _p_lighting_material->SetBuffer(kSurfelStatePropertyId, _surfel_gi->_surfel_state.get());
+            _p_lighting_material->SetBuffer(kSurfelQueryGridCellsPropertyId, _surfel_gi->_query_grid_cells.get());
+            _p_lighting_material->SetBuffer(kSurfelQueryGridIndicesPropertyId, _surfel_gi->_query_grid_indices.get());
+            _p_lighting_material->SetBuffer(kSurfelQueryDebugCountersPropertyId,
+                                            _surfel_gi->_query_debug_counters.get());
+            _p_lighting_material->SetInt(kSurfelGridResolutionPropertyId,
                 static_cast<i32>(_surfel_gi->_resource_grid_resolution));
-            _p_lighting_material->SetInt("_SurfelCascadeCount",
+            _p_lighting_material->SetInt(kSurfelCascadeCountPropertyId,
                 static_cast<i32>(_surfel_gi->_resource_cascade_count));
-            _p_lighting_material->SetInt("_SurfelMaxCount", static_cast<i32>(_surfel_gi->_resource_max_surfel_count));
-            _p_lighting_material->SetFloat("_SurfelBaseCellSize", _surfel_gi->_settings._base_cell_size);
+            _p_lighting_material->SetInt(kSurfelMaxCountPropertyId,
+                                         static_cast<i32>(_surfel_gi->_resource_max_surfel_count));
+            _p_lighting_material->SetFloat(kSurfelBaseCellSizePropertyId, _surfel_gi->_settings._base_cell_size);
+            _p_lighting_material->SetFloat(kSurfelTanHalfFovPropertyId,
+                                           std::tan(rendering_data._camera->FovH() *
+                                                    3.14159265358979323846f / 360.0f));
+            _p_lighting_material->SetFloat(kSurfelTargetPixelRadiusPropertyId,
+                                           _surfel_gi->_settings._target_pixel_radius);
+            _p_lighting_material->SetInt(kSurfelQueryDebugEnabledPropertyId,
+                                         (_surfel_gi->_settings._debug_draw_surfels ||
+                                          _surfel_gi->_settings._debug_coverage ||
+                                          _surfel_gi->_settings._debug_draw_tile_grid) ? 1 : 0);
         }
         auto cmd = CommandBufferPool::Get("DeferredLightingPass");
         {

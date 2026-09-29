@@ -7,6 +7,8 @@
 #include "Render/Renderer.h"
 #include "Render/CommandBuffer.h"
 #include "Render/RenderGraph/RenderGraph.h"
+#include "Animation/SkinningSystem.h"
+#include <type_traits>
 
 namespace Ailu
 {
@@ -16,6 +18,225 @@ namespace Ailu
         static u32 s_debug_collect_begin_frame = 0u;
         static bool s_is_debug_collecting = false;
         static u32 kCollectDebugFrameNum = 1u;
+        namespace
+        {
+            class PathTracerHistoryHasher
+            {
+            public:
+                void Add(const Vector3f &value)
+                {
+                    Add(value.x);
+                    Add(value.y);
+                    Add(value.z);
+                }
+
+                void Add(const Vector4f &value)
+                {
+                    Add(value.x);
+                    Add(value.y);
+                    Add(value.z);
+                    Add(value.w);
+                }
+
+                void Add(const Color &value)
+                {
+                    Add(value.r);
+                    Add(value.g);
+                    Add(value.b);
+                    Add(value.a);
+                }
+
+                template<typename T>
+                void Add(const T &value)
+                {
+                    static_assert(std::is_trivially_copyable_v<T>);
+                    const auto *bytes = reinterpret_cast<const u8 *>(&value);
+                    for (size_t index = 0u; index < sizeof(T); ++index)
+                    {
+                        _value ^= bytes[index];
+                        _value *= 1099511628211ull;
+                    }
+                }
+
+                template<typename T>
+                void AddPointer(const T *value)
+                {
+                    const uintptr_t address = reinterpret_cast<uintptr_t>(value);
+                    Add(address);
+                }
+
+                u64 Value() const { return _value; }
+
+            private:
+                u64 _value = 14695981039346656037ull;
+            };
+
+            void AddMaterialHistory(PathTracerHistoryHasher &hasher, const Material *material)
+            {
+                hasher.AddPointer(material);
+                if (material == nullptr)
+                    return;
+
+                hasher.Add(material->PropertyVersion());
+                const auto assets = material->CaptureAssetSnapshots();
+                hasher.Add(assets._shader_revision);
+                for (const auto &[property_id, revision] : assets._texture_revisions)
+                {
+                    hasher.Add(property_id);
+                    hasher.Add(revision);
+                }
+                for (const auto &[property_id, texture] : material->BoundTextures())
+                {
+                    hasher.Add(property_id);
+                    hasher.AddPointer(texture);
+                    const u64 texture_hash = texture != nullptr ? texture->HashCode() : 0u;
+                    hasher.Add(texture_hash);
+                }
+            }
+
+            template<typename TRenderable>
+            void AddRenderableHistory(PathTracerHistoryHasher &hasher, const SceneManagement::Scene &scene)
+            {
+                const auto &reg = scene.GetRegister();
+                const auto view = reg.View<TRenderable>();
+                const u64 count = view.size();
+                hasher.Add(count);
+                for (u64 index = 0u; index < view.size(); ++index)
+                {
+                    const auto &renderable = view[index];
+                    const ECS::Entity entity = reg.GetEntity<TRenderable>(index);
+                    hasher.Add(entity);
+                    const bool enabled = scene.IsEntityEnabled(entity) && reg.IsComponentEnabled<TRenderable>(entity);
+                    hasher.Add(enabled);
+                    hasher.AddPointer(renderable._p_mesh.get());
+                    const u64 material_count = renderable._p_mats.size();
+                    hasher.Add(material_count);
+                    for (const auto &material : renderable._p_mats)
+                        AddMaterialHistory(hasher, material.get());
+                    if constexpr (std::is_same_v<TRenderable, ECS::CSkeletonMesh>)
+                    {
+                        hasher.Add(ECS::SkinningSystem::ResolveSkinVersion(renderable._p_mesh.get(),
+                                                                           static_cast<u32>(entity)));
+                    }
+                }
+            }
+
+            u64 BuildPathTracerHistorySignature(const RenderingData &rendering_data, bool enable_mnee,
+                                                bool enable_power_weighted_light_sampling, bool enable_ris,
+                                                bool enable_resampling, bool enable_environment_nee,
+                                                EPathTracerAccumulationMode accumulation_mode)
+            {
+                PathTracerHistoryHasher hasher;
+                hasher.Add(enable_mnee);
+                hasher.Add(enable_power_weighted_light_sampling);
+                hasher.Add(enable_ris);
+                hasher.Add(enable_resampling);
+                hasher.Add(enable_environment_nee);
+                hasher.Add(accumulation_mode);
+                hasher.Add(rendering_data._width);
+                hasher.Add(rendering_data._height);
+
+                if (rendering_data._camera != nullptr)
+                {
+                    const Camera &camera = *rendering_data._camera;
+                    hasher.Add(camera.Type());
+                    hasher.Add(camera.Aspect());
+                    hasher.Add(camera.Near());
+                    hasher.Add(camera.Far());
+                    hasher.Add(camera.FovH());
+                    hasher.Add(camera.Size());
+                    const Matrix4x4f &projection = camera.GetProjNoJitter();
+                    for (u32 row = 0u; row < 4u; ++row)
+                        for (u32 column = 0u; column < 4u; ++column)
+                            hasher.Add(projection[row][column]);
+                }
+
+                if (rendering_data._scene != nullptr)
+                {
+                    const auto &scene = *rendering_data._scene;
+                    hasher.Add(scene.StructureRevision());
+                    AddRenderableHistory<ECS::StaticMeshComponent>(hasher, scene);
+                    AddRenderableHistory<ECS::CSkeletonMesh>(hasher, scene);
+
+                    const auto &reg = scene.GetRegister();
+                    const auto lights = reg.View<ECS::LightComponent>();
+                    const u64 light_count = lights.size();
+                    hasher.Add(light_count);
+                    for (u64 index = 0u; index < lights.size(); ++index)
+                    {
+                        const ECS::Entity entity = reg.GetEntity<ECS::LightComponent>(index);
+                        const bool enabled = scene.IsEntityEnabled(entity) &&
+                                             reg.IsComponentEnabled<ECS::LightComponent>(entity);
+                        hasher.Add(entity);
+                        hasher.Add(enabled);
+                        hasher.Add(lights[index]._type);
+                        const auto &light = lights[index]._light;
+                        hasher.Add(light._light_pos);
+                        hasher.Add(light._light_dir);
+                        hasher.Add(light._light_color);
+                        hasher.Add(light._light_param);
+                        for (const Vector3f &point : light._area_points)
+                            hasher.Add(point);
+                        hasher.Add(light._is_two_side);
+                        const auto &shadow = lights[index]._shadow;
+                        hasher.Add(shadow._is_cast_shadow);
+                        hasher.Add(shadow._constant_bias);
+                        hasher.Add(shadow._slope_bias);
+                        hasher.Add(shadow._padding);
+                    }
+                }
+
+                if (rendering_data._environment != nullptr)
+                {
+                    const auto &environment = *rendering_data._environment;
+                    hasher.AddPointer(environment._source);
+                    hasher.Add(environment._source_revision);
+                    hasher.Add(environment._intensity);
+                    hasher.Add(environment._rotation);
+                    hasher.Add(environment._render_sky);
+                    hasher.Add(environment._enable_ibl);
+                    hasher.Add(environment._is_texture_source);
+                    hasher.Add(environment._sky_color);
+                    hasher.Add(environment._ground_color);
+                }
+
+                if (rendering_data._primitive_data != nullptr)
+                {
+                    const u64 primitive_count = rendering_data._primitive_data->size();
+                    hasher.Add(primitive_count);
+                    for (const PrimitiveData &primitive : *rendering_data._primitive_data)
+                    {
+                        for (u32 row = 0u; row < 4u; ++row)
+                            for (u32 column = 0u; column < 4u; ++column)
+                                hasher.Add(primitive._local_to_world[row][column]);
+                        hasher.Add(primitive._entity_id);
+                        hasher.Add(primitive._material_id);
+                        hasher.Add(primitive._submesh_id);
+                        hasher.Add(primitive._flags);
+                        hasher.Add(primitive._global_triangle_offset);
+                        hasher.Add(primitive._submesh_triangle_count);
+                    }
+                }
+
+                if (rendering_data._scene_primitives != nullptr)
+                {
+                    const u64 primitive_count = rendering_data._scene_primitives->size();
+                    hasher.Add(primitive_count);
+                    for (const ScenePrimitive &primitive : *rendering_data._scene_primitives)
+                    {
+                        hasher.Add(primitive._entity_id);
+                        hasher.Add(primitive._submesh_index);
+                        hasher.Add(primitive._flags);
+                        hasher.AddPointer(primitive._mesh);
+                        hasher.AddPointer(primitive._vertex_buffer);
+                        hasher.AddPointer(primitive._index_buffer);
+                        hasher.Add(primitive._vertex_buffer != nullptr ? primitive._vertex_buffer->GetViewVersion() : 0u);
+                        hasher.Add(primitive._index_buffer != nullptr ? primitive._index_buffer->GetViewVersion() : 0u);
+                    }
+                }
+                return hasher.Value();
+            }
+        }
 #pragma region RayTraceGI
         RayTraceGI::RayTraceGI() : RenderFeature("RayTraceGI")
         {
@@ -42,14 +263,32 @@ namespace Ailu
                 _gi_compute_shader->EnableKeyword("PATH_TRACER_MNEE");
             else
                 _gi_compute_shader->DisableKeyword("PATH_TRACER_MNEE");
+            if (_use_power_weighted_light_sampling)
+            {
+                _gi_compute_shader->EnableKeyword("PATH_TRACER_POWER_LIGHT_SAMPLING");
+                if (_gi_raytracing_shader != nullptr)
+                    _gi_raytracing_shader->EnableKeyword("PATH_TRACER_POWER_LIGHT_SAMPLING");
+            }
+            else
+            {
+                _gi_compute_shader->DisableKeyword("PATH_TRACER_POWER_LIGHT_SAMPLING");
+                if (_gi_raytracing_shader != nullptr)
+                    _gi_raytracing_shader->DisableKeyword("PATH_TRACER_POWER_LIGHT_SAMPLING");
+            }
             if (s_is_debug_collecting && s_global_frame_counter - s_debug_collect_begin_frame >= kCollectDebugFrameNum)
             {
                 s_is_debug_collecting = false;
                 _debug_pos = {-1.0f, -1.0f};
             }
             _gi_pass->_debug_pos = _debug_pos;
-            _gi_pass->_is_temporal_denoise = _is_temporal_denoise;
+            _gi_pass->_accumulation_mode = _accumulation_mode;
             _gi_pass->_use_hardware_ray_tracing = _use_hardware_ray_tracing;
+            _gi_pass->_enable_mnee = _enable_mnee;
+            _gi_pass->_use_power_weighted_light_sampling = _use_power_weighted_light_sampling;
+            _gi_pass->_enable_ris = _enable_ris;
+            _gi_pass->_enable_resampling = _enable_resampling;
+            _gi_pass->_enable_environment_nee = _enable_environment_nee;
+            _gi_pass->_debug_temporal_target = _debug_temporal_target;
             _gi_compute_shader->SetInts("_PickPixel", {(i32)_debug_pos.x, (i32)_debug_pos.y});
             if (_debug_pos.x >= 0 && _debug_pos.y >= 0)
             {
@@ -108,6 +347,8 @@ namespace Ailu
             _debug_line_mat = MakeRef<Material>(ResourceMgr::Get().Load<Shader>(L"Shaders/hlsl/ray_trace/raytrace_debug_draw.alasset").get(), "RayDebugLineMat");
             _kernel_primary_ray = cs->FindKernel("PrimaryRay");
             _kernel_denoise = cs->FindKernel("Denoise");
+            _kernel_build_environment_weights = cs->FindKernel("BuildEnvironmentWeights");
+            _kernel_build_environment_cdf = cs->FindKernel("BuildEnvironmentCDF");
             _event = static_cast<ERenderPassEvent>(static_cast<u16>(ERenderPassEvent::kAfterTransparent) - 5u);//before copy color
             _scene_rt_proxy = MakeScope<SceneRayTracingProxy>();
             _raygen_data = ConstantBuffer::Create(sizeof(RayGenConstantBuffer), "RayTraceGI_RayGenData");
@@ -162,7 +403,6 @@ namespace Ailu
         {
             static Matrix4x4f s_prev_view_proj = Matrix4x4f::Identity();
             static u32 s_frame_counter = 0u;
-            static bool s_prev_temporal_denoise = false;
             const auto& cur_vp_mat = rendering_data._camera->GetViewProj();
             bool is_camera_dirty = false;
             for (u32 i = 0; i < 4; i++)
@@ -178,28 +418,104 @@ namespace Ailu
                 if (is_camera_dirty)
                     break;
             }
-            const bool denoise_just_enabled = _is_temporal_denoise && !s_prev_temporal_denoise;
+            const bool accumulation_enabled = _accumulation_mode != EPathTracerAccumulationMode::kDisabled;
+            const bool accumulation_just_enabled = accumulation_enabled &&
+                (!_has_previous_accumulation_mode ||
+                 _previous_accumulation_mode == EPathTracerAccumulationMode::kDisabled);
             const bool target_recreated = MakesureTarget(rendering_data);
-            if (is_camera_dirty || denoise_just_enabled || target_recreated)
+            const u64 history_signature = BuildPathTracerHistorySignature(rendering_data, _enable_mnee,
+                                                                           _use_power_weighted_light_sampling,
+                                                                           _enable_ris, _enable_resampling,
+                                                                           _enable_environment_nee, _accumulation_mode);
+            const Vector3f camera_position = rendering_data._camera->Position();
+            const Vector3f camera_forward = rendering_data._camera->Forward();
+            const Vector3f camera_up = rendering_data._camera->Up();
+            // Small camera motion remains reprojected by stage 2; only a discontinuous camera cut resets all pixels.
+            const bool camera_cut = _has_previous_camera &&
+                (Magnitude(camera_position - _previous_camera_position) > 1.0f ||
+                 DotProduct(camera_forward, _previous_camera_forward) < 0.9f ||
+                 DotProduct(camera_up, _previous_camera_up) < 0.9f);
+            const bool reference_camera_changed =
+                _accumulation_mode == EPathTracerAccumulationMode::kReference && is_camera_dirty;
+            const bool history_inputs_changed = _has_history_signature && history_signature != _last_history_signature;
+            const bool reset_history = history_inputs_changed || camera_cut || reference_camera_changed ||
+                                       accumulation_just_enabled || target_recreated;
+            if (is_camera_dirty || reset_history)
             {
                 s_frame_counter = 0u;
             }
             else
                 ++s_frame_counter;
-            s_prev_temporal_denoise = _is_temporal_denoise;
+            _previous_accumulation_mode = _accumulation_mode;
+            _has_previous_accumulation_mode = true;
             s_prev_view_proj = rendering_data._camera->GetViewProj();
-            _cur_target_handle = graph.Import(_is_cur_a ? _gi_texture_a.get() : _gi_texture_b.get());
-            _history_target_handle = graph.Import(_is_cur_a ? _gi_texture_b.get() : _gi_texture_a.get());
+            _last_history_signature = history_signature;
+            _has_history_signature = true;
+            _previous_camera_position = camera_position;
+            _previous_camera_forward = camera_forward;
+            _previous_camera_up = camera_up;
+            _has_previous_camera = true;
+            _raw_path_trace_handle = graph.Import(_raw_path_trace_texture.get());
+            _environment_distribution_handle = graph.Import(_environment_distribution_texture.get());
+            Texture *environment_source = rendering_data._environment != nullptr ?
+                rendering_data._environment->_sky_cubemap.get() : nullptr;
+            const u64 environment_revision = rendering_data._environment != nullptr ?
+                rendering_data._environment->_source_revision : 0u;
+            if (_environment_distribution_dirty || environment_source != _environment_distribution_source ||
+                environment_revision != _environment_distribution_revision)
+            {
+                _environment_distribution_source = environment_source;
+                _environment_distribution_revision = environment_revision;
+                _environment_distribution_dirty = false;
+                graph.AddPass("Build PathTracer Environment Distribution", RDG::PassDesc(RDG::EPassType::kCompute),
+                    [&](RDG::RenderGraphBuilder &builder)
+                    {
+                        builder.Read(rendering_data._rg_handles._environment_sky);
+                        _environment_distribution_handle = builder.Write(_environment_distribution_handle,
+                                                                         EResourceUsage::kWriteUAV);
+                    },
+                    [this](RDG::RenderGraph &pass_graph, CommandBuffer *cmd, const RenderingData &data)
+                    {
+                        Texture *distribution = pass_graph.Resolve<Texture>(_environment_distribution_handle);
+                        _gi_compute_shader->SetTexture(_kernel_build_environment_weights, "_EnvironmentSky",
+                            pass_graph.Resolve<Texture>(data._rg_handles._environment_sky));
+                        _gi_compute_shader->SetTexture(_kernel_build_environment_weights,
+                            "_EnvironmentDistributionOutput", distribution);
+                        const u16 resolution = static_cast<u16>(distribution->Height());
+                        const auto [groups_x, groups_y, groups_z] =
+                            _gi_compute_shader->CalculateDispatchNum(_kernel_build_environment_weights,
+                                                                      distribution->Width(), resolution, 1u);
+                        cmd->Dispatch(_gi_compute_shader.get(), _kernel_build_environment_weights,
+                                      groups_x, groups_y, groups_z);
+                        cmd->UavBarrier(distribution);
+                        _gi_compute_shader->SetTexture(_kernel_build_environment_cdf,
+                            "_EnvironmentDistributionOutput", distribution);
+                        cmd->Dispatch(_gi_compute_shader.get(), _kernel_build_environment_cdf, 1u, 1u, 1u);
+                    });
+            }
+            _history_prev_handle = graph.Import(_is_history_a ? _history_texture_b.get() : _history_texture_a.get());
+            _history_curr_handle = graph.Import(_is_history_a ? _history_texture_a.get() : _history_texture_b.get());
+            _temporal_debug_handle = graph.Import(_temporal_debug_texture.get());
             _gi_compute_shader->SetInt("_frame_index", s_frame_counter);
+            if (reset_history)
+                _temporal_history_valid = false;
+            _gi_compute_shader->SetBool("_temporal_history_valid", _temporal_history_valid);
+            _gi_compute_shader->SetInt("_accumulation_mode", static_cast<i32>(_accumulation_mode));
+            _gi_compute_shader->SetInt("_debug_temporal_target", (i32)_debug_temporal_target);
+            _gi_compute_shader->SetBool("_enable_environment_nee", _enable_environment_nee);
             _gi_compute_shader->SetInt("_prev_surface_buffer_idx", _is_cur_a ? (_surface_buffer_b ? _surface_buffer_b->GetBindlessUAVIndex() : -1) : (_surface_buffer_a ? _surface_buffer_a->GetBindlessUAVIndex() : -1));
             _gi_compute_shader->SetInt("_curr_surface_buffer_idx", _is_cur_a ? (_surface_buffer_a ? _surface_buffer_a->GetBindlessUAVIndex() : -1) : (_surface_buffer_b ? _surface_buffer_b->GetBindlessUAVIndex() : -1));
 
             const bool use_hardware_ray_tracing = CanUseHardwareRayTracing();
+            if (!use_hardware_ray_tracing && _scene_rt_proxy != nullptr)
+                _scene_rt_proxy->SyncLightCache(SceneManagement::SceneMgr::Get().ActiveScene());
             GPUBuffer *prev_reservoir = _is_cur_a ? _reservoir_b.get() : _reservoir_a.get();
             GPUBuffer *curr_reservoir = _is_cur_a ? _reservoir_a.get() : _reservoir_b.get();
             GPUBuffer *prev_surface_buffer = _is_cur_a ? _surface_buffer_b.get() : _surface_buffer_a.get();
             GPUBuffer *curr_surface_buffer = _is_cur_a ? _surface_buffer_a.get() : _surface_buffer_b.get();
             GPUBuffer *unified_light_data = _scene_rt_proxy != nullptr ? _scene_rt_proxy->GetUnifiedLightData() : nullptr;
+            GPUBuffer *unified_light_sampling_data = _scene_rt_proxy != nullptr ?
+                _scene_rt_proxy->GetUnifiedLightSamplingData() : nullptr;
             RayTracingScene *rt_scene = use_hardware_ray_tracing && _scene_rt_proxy != nullptr ? _scene_rt_proxy->GetScene() : nullptr;
             if (use_hardware_ray_tracing && _scene_rt_proxy != nullptr && rt_scene != nullptr)
             {
@@ -208,11 +524,12 @@ namespace Ailu
             }
             if (!use_hardware_ray_tracing && _scene_rt_proxy != nullptr)
             {
-                _scene_rt_proxy->SyncLightCache(SceneManagement::SceneMgr::Get().ActiveScene());
                 auto light_data = _scene_rt_proxy->GetUnifiedLightData();
                 if (!light_data->IsReady())
                     return;
                 _gi_compute_shader->SetBuffer("_UnifiedLights", _scene_rt_proxy->GetUnifiedLightData());
+                if (_use_power_weighted_light_sampling)
+                    _gi_compute_shader->SetBuffer(_kernel_primary_ray, "_UnifiedLightSamplingTable", unified_light_sampling_data);
             }
             {
                 graph.AddPass(use_hardware_ray_tracing ? "RayTrace GI DXR" : "RayTrace GI", RDG::PassDesc(RDG::EPassType::kCompute), [&, this](RDG::RenderGraphBuilder &builder)
@@ -224,6 +541,7 @@ namespace Ailu
                         builder.Read(rendering_data._rg_handles._depth_tex);
                         builder.Read(rendering_data._rg_handles._motion_vector_tex);
                         builder.Read(rendering_data._rg_handles._environment_sky);
+                        builder.Read(_environment_distribution_handle);
                         if (prev_reservoir != nullptr)
                             builder.Read(builder.Import(prev_reservoir));
                         if (curr_reservoir != nullptr)
@@ -234,6 +552,8 @@ namespace Ailu
                             (void) builder.Write(builder.Import(curr_surface_buffer), EResourceUsage::kWriteUAV);
                         if (unified_light_data != nullptr)
                             builder.Read(builder.Import(unified_light_data));
+                        if (_use_power_weighted_light_sampling && unified_light_sampling_data != nullptr)
+                            builder.Read(builder.Import(unified_light_sampling_data));
                         if (rt_scene != nullptr)
                             builder.Read(builder.Import(rt_scene), EResourceUsage::kAccelStructRead);
                         if (use_hardware_ray_tracing && _scene_rt_proxy != nullptr)
@@ -248,14 +568,18 @@ namespace Ailu
                             (void) builder.Write(builder.Import(_debug_buffer.get()), EResourceUsage::kWriteUAV);
                         if (_debug_index_buffer != nullptr)
                             (void) builder.Write(builder.Import(_debug_index_buffer.get()), EResourceUsage::kWriteUAV);
-                        _cur_target_handle = builder.Write(_cur_target_handle,EResourceUsage::kWriteUAV);
+                        _raw_path_trace_handle = builder.Write(_raw_path_trace_handle, EResourceUsage::kWriteUAV);
                     },
-                    [this, use_hardware_ray_tracing](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
+                    [this, use_hardware_ray_tracing, prev_reservoir, curr_reservoir](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
                     {
+                    auto *output = graph.Resolve<Texture>(_raw_path_trace_handle);
+                    // A newly resized Raw texture may still be awaiting GPU creation. Skipping the dispatch
+                    // prevents a missing UAV binding from retaining the distribution builder's UAV.
+                    if (output == nullptr || !output->IsReady())
+                        return;
                     if (use_hardware_ray_tracing)
                     {
                         auto *rt_scene = _scene_rt_proxy->GetScene();
-                        auto *output = graph.Resolve<Texture>(_cur_target_handle);
                         if (rt_scene == nullptr || rt_scene->NeedsUpdate() || !_scene_rt_proxy->HasRenderableScene() ||
                             output == nullptr || !rt_scene->IsReady())
                             return;
@@ -274,6 +598,7 @@ namespace Ailu
                         g_perCamData->SetData(reinterpret_cast<const u8 *>(&g_camData), sizeof(CBufferPerCameraData));
             
                         _gi_raytracing_shader->SetScene(rt_scene);
+                        _gi_raytracing_shader->SetInt("_enable_environment_nee", _enable_environment_nee ? 1 : 0);
                         _gi_raytracing_shader->SetBuffer("g_primitive_data", _scene_rt_proxy->GetPrimitiveData());
                         _gi_raytracing_shader->SetBuffer("g_rayGenCB", _raygen_data.get());
                         _gi_raytracing_shader->SetBuffer("g_perSceneData", data._p_per_scene_cbuf);
@@ -281,8 +606,13 @@ namespace Ailu
                         _gi_raytracing_shader->SetBuffer("g_material_data", _scene_rt_proxy->GetMaterialData());
                         _gi_raytracing_shader->SetBuffer("_UnifiedLights", _scene_rt_proxy->GetUnifiedLightData());
                         _gi_raytracing_shader->SetBuffer("_UnifiedLightConfig", _scene_rt_proxy->GetUnifiedLightConfig());
+                        if (_use_power_weighted_light_sampling)
+                            _gi_raytracing_shader->SetBuffer("_UnifiedLightSamplingTable",
+                                                             _scene_rt_proxy->GetUnifiedLightSamplingData());
                          _gi_raytracing_shader->SetTexture("_EnvironmentSky",
                                                           graph.Resolve<Texture>(data._rg_handles._environment_sky));
+                        _gi_raytracing_shader->SetTexture("_EnvironmentDistribution",
+                                                          graph.Resolve<Texture>(_environment_distribution_handle));
                         _gi_raytracing_shader->SetTexture("RenderTarget", output);
                         cmd->DispatchRays(_gi_raytracing_shader.get(), rt_scene, static_cast<u16>(data._width), static_cast<u16>(data._height), 1u);
                         return;
@@ -321,6 +651,8 @@ namespace Ailu
                                                        graph.Resolve<Texture>(data._rg_handles._motion_vector_tex));
                         Texture *environment_sky = graph.Resolve<Texture>(data._rg_handles._environment_sky);
                         _gi_compute_shader->SetTexture(_kernel_primary_ray, "_EnvironmentSky", environment_sky);
+                        _gi_compute_shader->SetTexture(_kernel_primary_ray, "_EnvironmentDistribution",
+                                                       graph.Resolve<Texture>(_environment_distribution_handle));
                         //_gi_compute_shader->SetBuffer("_debug_rays", _debug_buffer.get());
                         //_gi_compute_shader->SetBuffer("_debug_ray_indices", &*_debug_index_buffer);
                         auto light_count = _scene_rt_proxy->GetUnifiedLightCount();
@@ -328,47 +660,91 @@ namespace Ailu
                         _gi_compute_shader->SetInts("_GI_TileOffset", {(i32) tile_offset_x, (i32) tile_offset_y});
                         _gi_compute_shader->SetInts("_GI_TileSize", {(i32) tile_size_x, (i32) tile_size_y});
                         _gi_compute_shader->SetTexture(_kernel_primary_ray, "_GI_Texture",
-                                                       graph.Resolve<Texture>(_cur_target_handle));
+                                                       graph.Resolve<Texture>(_raw_path_trace_handle));
                         _gi_compute_shader->SetBuffer(_kernel_primary_ray, "g_prev_reservoir",
-                                                      _is_cur_a ? _reservoir_b.get() : _reservoir_a.get());
+                                                      prev_reservoir);
                         _gi_compute_shader->SetBuffer(_kernel_primary_ray, "g_curr_reservoir",
-                                                      _is_cur_a ? _reservoir_a.get() : _reservoir_b.get());
+                                                      curr_reservoir);
                         cmd->Dispatch(_gi_compute_shader.get(), _kernel_primary_ray, x, y, 1);
                     } });
             }
             ++_tile_frame_counter;
-            if (_is_temporal_denoise)
+            if (_accumulation_mode != EPathTracerAccumulationMode::kDisabled)
             {
                 graph.AddPass("Denoise", RDG::PassDesc(RDG::EPassType::kCompute), [&, this](RDG::RenderGraphBuilder &builder)
                 {
-                    builder.Read(_cur_target_handle);
-                    builder.Read(_history_target_handle);
+                    builder.Read(_raw_path_trace_handle);
+                    builder.Read(_history_prev_handle);
                     builder.Read(rendering_data._rg_handles._motion_vector_tex);
-                    _cur_target_handle = builder.Write(_cur_target_handle,EResourceUsage::kWriteUAV);
+                    builder.Read(rendering_data._rg_handles._gbuffers[0]);
+                    builder.Read(rendering_data._rg_handles._depth_tex);
+                    if (prev_surface_buffer != nullptr)
+                        builder.Read(builder.Import(prev_surface_buffer), EResourceUsage::kWriteUAV);
+                    if (curr_surface_buffer != nullptr)
+                        (void) builder.Write(builder.Import(curr_surface_buffer), EResourceUsage::kWriteUAV);
+                    _history_curr_handle = builder.Write(_history_curr_handle, EResourceUsage::kWriteUAV);
+                    _temporal_debug_handle = builder.Write(_temporal_debug_handle, EResourceUsage::kWriteUAV);
                 },
-                [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
+                [this, prev_surface_buffer, curr_surface_buffer](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
                 {
+                // Surface history stays in UAV state across frames; order its reads and writes explicitly.
+                if (prev_surface_buffer != nullptr)
+                    cmd->UavBarrier(prev_surface_buffer);
+                if (curr_surface_buffer != nullptr)
+                    cmd->UavBarrier(curr_surface_buffer);
                 Vector4f params = {1.0f, 1.0f, (f32) (data._width), (f32) (data._height)};
                 params.x /= params.z;
                 params.y /= params.w;
                 u16 w = (u16) params.z, h = (u16) params.w;
                 {
                     auto [x, y, z] = _gi_compute_shader->CalculateDispatchNum(_kernel_denoise, w, h, 1);
-                    _gi_compute_shader->SetTexture(_kernel_denoise, "_CurrentTarget",
-                                                   graph.Resolve<Texture>(_cur_target_handle));
-                    _gi_compute_shader->SetTexture(_kernel_denoise, "_HistoryTarget",
-                                                   graph.Resolve<Texture>(_history_target_handle));
+                    _gi_compute_shader->SetTexture(_kernel_denoise, "_PathTraceRaw",
+                                                   graph.Resolve<Texture>(_raw_path_trace_handle));
+                    _gi_compute_shader->SetTexture(_kernel_denoise, "_HistoryPrev",
+                                                   graph.Resolve<Texture>(_history_prev_handle));
+                    _gi_compute_shader->SetTexture(_kernel_denoise, "_HistoryCurr",
+                                                   graph.Resolve<Texture>(_history_curr_handle));
+                    _gi_compute_shader->SetTexture(_kernel_denoise, "_MotionVectorTexture",
+                                                   graph.Resolve<Texture>(data._rg_handles._motion_vector_tex));
+                    _gi_compute_shader->SetTexture(_kernel_denoise, "_GBuffer0",
+                                                   graph.Resolve<Texture>(data._rg_handles._gbuffers[0]));
+                    _gi_compute_shader->SetTexture(_kernel_denoise, "_CameraDepthTexture",
+                                                   graph.Resolve<Texture>(data._rg_handles._depth_tex));
+                    _gi_compute_shader->SetTexture(_kernel_denoise, "_TemporalDebug",
+                                                   graph.Resolve<Texture>(_temporal_debug_handle));
+                    _gi_compute_shader->SetInt("_prev_surface_buffer_idx",
+                                               prev_surface_buffer != nullptr ? prev_surface_buffer->GetBindlessUAVIndex() : -1);
+                    _gi_compute_shader->SetInt("_curr_surface_buffer_idx",
+                                               curr_surface_buffer != nullptr ? curr_surface_buffer->GetBindlessUAVIndex() : -1);
                     cmd->Dispatch(_gi_compute_shader.get(), _kernel_denoise, x, y, 1);
+                    _temporal_history_valid = true;
                 } });
+                _is_history_a = !_is_history_a;
             }
             _is_cur_a = !_is_cur_a;
+            RDG::RGHandle final_target_handle = accumulation_enabled ? _history_curr_handle : _raw_path_trace_handle;
             graph.AddPass("Debug GI", RDG::PassDesc(), [&, this](RDG::RenderGraphBuilder &builder)
                           {
-                    builder.Read(_cur_target_handle);
+                    builder.Read(final_target_handle);
+                    builder.Read(_raw_path_trace_handle);
+                    builder.Read(_history_prev_handle);
+                    builder.Read(_history_curr_handle);
+                    if (accumulation_enabled && _debug_temporal_target >= 4u)
+                        builder.Read(_temporal_debug_handle);
                     rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target); 
-                    }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
+                    }, [this, accumulation_enabled](RDG::RenderGraph &graph, CommandBuffer *cmd,
+                                                     const RenderingData &data)
                 { 
-                    cmd->Blit(_cur_target_handle,data._rg_handles._color_target);
+                    RDG::RGHandle display_target = accumulation_enabled ? _history_curr_handle : _raw_path_trace_handle;
+                    if (_debug_temporal_target == 1u)
+                        display_target = _raw_path_trace_handle;
+                    else if (_debug_temporal_target == 2u)
+                        display_target = _history_prev_handle;
+                    else if (_debug_temporal_target == 3u)
+                        display_target = _history_curr_handle;
+                    else if (accumulation_enabled && _debug_temporal_target >= 4u)
+                        display_target = _temporal_debug_handle;
+                    cmd->Blit(display_target, data._rg_handles._color_target);
                 });
             if (!use_hardware_ray_tracing)
             {
@@ -404,7 +780,15 @@ namespace Ailu
         bool GIPass::MakesureTarget(const RenderingData &rendering_data)
         {
             bool recreated = false;
-            if (_gi_texture_a == nullptr || _gi_texture_a->Width() != rendering_data._width || _gi_texture_a->Height() != rendering_data._height)
+            if (_environment_distribution_texture == nullptr)
+            {
+                constexpr u16 kEnvironmentDistributionResolution = 64u;
+                _environment_distribution_texture = RenderTexture::Create(kEnvironmentDistributionResolution * 6u,
+                    kEnvironmentDistributionResolution, "RayTraceGI_EnvironmentDistribution",
+                    ERenderTargetFormat::kRGBAFloat, false, true, true);
+                _environment_distribution_dirty = true;
+            }
+            if (_raw_path_trace_texture == nullptr || _raw_path_trace_texture->Width() != rendering_data._width || _raw_path_trace_texture->Height() != rendering_data._height)
             {
                 TextureDesc desc;
                 desc._width = rendering_data._width;
@@ -412,12 +796,20 @@ namespace Ailu
                 desc._format = EALGFormat::kALGFormatR32G32B32A32_FLOAT;
                 desc._is_random_access = true;
                 desc._mip_num = 0;
-                _gi_texture_a = Texture2D::Create(desc);
-                _gi_texture_a->Apply();
-                _gi_texture_a->Name("RayTraceGI_A");
-                _gi_texture_b = Texture2D::Create(desc);
-                _gi_texture_b->Apply();
-                _gi_texture_b->Name("RayTraceGI_B");
+                _raw_path_trace_texture = Texture2D::Create(desc);
+                _raw_path_trace_texture->Apply();
+                _raw_path_trace_texture->Name("RayTraceGI_PathTraceRaw");
+                _history_texture_a = Texture2D::Create(desc);
+                _history_texture_a->Apply();
+                _history_texture_a->Name("RayTraceGI_HistoryA");
+                _history_texture_b = Texture2D::Create(desc);
+                _history_texture_b->Apply();
+                _history_texture_b->Name("RayTraceGI_HistoryB");
+                _temporal_debug_texture = Texture2D::Create(desc);
+                _temporal_debug_texture->Apply();
+                _temporal_debug_texture->Name("RayTraceGI_TemporalDebug");
+                _is_history_a = true;
+                _temporal_history_valid = false;
                 recreated = true;
                 BufferDesc buf_desc;
                 buf_desc._element_num = rendering_data._width * rendering_data._height;

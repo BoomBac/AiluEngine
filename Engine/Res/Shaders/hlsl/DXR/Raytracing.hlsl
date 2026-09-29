@@ -12,6 +12,7 @@
 #define DXR
 
 #pragma multi_compile _ PATH_TRACER_MNEE
+#pragma multi_compile _ PATH_TRACER_POWER_LIGHT_SAMPLING
 
 #if defined(AL_PACKAGE_SHADER_INTEROP)
 #include "../../ShaderInterop.h"
@@ -35,6 +36,10 @@ StructuredBuffer<MaterialData> g_material_data : register(t7);
 ConstantBuffer<CBufferPerSceneData> g_perSceneData : register(b0);
 ConstantBuffer<CBufferPerCameraData> g_perCamData : register(b1);
 ConstantBuffer<UnifiedLightBufferConfig> _UnifiedLightConfig : register(b2);
+cbuffer PathTracerSettings : register(b3)
+{
+    uint _enable_environment_nee;
+};
 
 RWTexture2D<float4> RenderTarget : register(u0);
 

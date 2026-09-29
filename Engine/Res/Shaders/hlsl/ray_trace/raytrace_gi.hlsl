@@ -34,10 +34,14 @@
 
 #pragma kernel RayGen
 #pragma kernel PrimaryRay
+#pragma kernel BuildEnvironmentWeights
+#pragma kernel BuildEnvironmentCDF
 #pragma multi_compile PrimaryRay _ PATH_TRACER_MNEE
+#pragma multi_compile PrimaryRay _ PATH_TRACER_POWER_LIGHT_SAMPLING
 #pragma kernel Denoise
 
-#define MAX_ACCUMULATED_FRAMES 4096
+#define MAX_ACCUMULATED_FRAMES 64
+#define MAX_REFERENCE_HISTORY_LENGTH 16777216u
 #define ADDITIONAL_SAMPLING 1
 #define PER_FRAME_SAMPLES 4
 
@@ -58,8 +62,12 @@ CBUFFER_START(ComputeCB)
     uint _scene_bindless_idx;
     bool _enable_ris;
     bool _enable_resampling;
+    bool _enable_environment_nee;
     uint _prev_surface_buffer_idx;
     uint _curr_surface_buffer_idx;
+    bool _temporal_history_valid;
+    uint _debug_temporal_target;
+    int _accumulation_mode;
 CBUFFER_END
 
 // ===== Debug 宏定义 =====
@@ -902,60 +910,223 @@ void PrimaryRay(CSInput input)
     _GI_Texture[pixel] = float4(color, 1.0);
 }
 
-TEXTURE2D(_HistoryTarget)
-RWTEXTURE2D(_CurrentTarget,float4)
+TEXTURE2D(_PathTraceRaw)
+TEXTURE2D(_HistoryPrev)
+RWTEXTURE2D(_HistoryCurr,float4)
+RWTEXTURE2D(_TemporalDebug,float4)
 
 [shader("compute")]
 [numthreads(16,16,1)]
 void Denoise(CSInput input)
 {
     uint2 pixel = input.DispatchThreadID.xy;
-    float3 current = _CurrentTarget[pixel].rgb;
-    float2 motion = _MotionVectorTexture[pixel].rg;
-    float2 uv = (float2(pixel) + 0.5.xx) * _ScreenParams.xy;
-    float2 history_uv = uv - motion;
-
-    if (any(history_uv != saturate(history_uv)))
-    {
-        _CurrentTarget[pixel] = float4(current, 1.0);
+    if (any(pixel >= uint2(_ScreenParams.zw)))
         return;
-    }
+    float3 current = _PathTraceRaw[pixel].rgb;
+    float depth = _CameraDepthTexture[pixel].r;
+    float3 current_normal = normalize(UnpackNormal(_GBuffer0[pixel].xy));
+    float current_depth = Linear01Depth(depth, _ProjectionParams.y, _ProjectionParams.z);
+    float current_view_depth = LinearEyeDepth(depth, _ProjectionParams.y, _ProjectionParams.z);
+    float depth_range = _ProjectionParams.z - _ProjectionParams.y;
+    Surface current_surface = (Surface)0;
+    current_surface._normal = current_normal;
+    current_surface._geo_normal = current_normal;
+    current_surface._linear_depth = current_depth;
+    bool current_surface_valid = IsValidSurface(current_surface);
+    bool history_valid = _temporal_history_valid && current_surface_valid &&
+                         valid_bindless_handle(_prev_surface_buffer_idx);
+    float3 history_color = 0.0;
+    float history_length = 0.0;
 
-    int2 history_pixel = int2(history_uv * _ScreenParams.zw);
-    int2 history_max = int2(_ScreenParams.zw) - int2(1, 1);
-    history_pixel = clamp(history_pixel, int2(0, 0), history_max);
-
-    float3 history = SAMPLE_TEXTURE2D_LOD(_HistoryTarget,g_LinearClampSampler,history_uv,0).rgb;//  _HistoryTarget[history_pixel].rgb;
-    float a = 1.0 / clamp((float)_frame_index + 1.0, 1.0, MAX_ACCUMULATED_FRAMES);
-    _CurrentTarget[pixel].rgb = lerp(history, current, a);
-    return;
-
-    int2 max_pixel = int2(_ScreenParams.zw) - int2(1, 1);
-    float3 neighborhood_min = 1e20.xxx;
-    float3 neighborhood_max = -1e20.xxx;
-
-    [unroll]
-    for (int y = -1; y <= 1; ++y)
+    // Reference accumulation is an unclamped progressive mean at the same pixel. The CPU resets its
+    // history whenever the camera moves, so reprojection and adaptive realtime weighting are not applied.
+    if (_accumulation_mode == 1 && history_valid)
     {
-        [unroll]
-        for (int x = -1; x <= 1; ++x)
+        Surface history_surface = BINDLESS_RWBUFFER_LOAD_INDEX(Surface, _prev_surface_buffer_idx,
+                                                               PixelToLinearIndex(pixel));
+        float relative_depth_error = abs(history_surface._linear_depth - current_depth) * depth_range /
+                                     max(current_view_depth, 1e-3);
+        history_valid = IsValidSurface(history_surface) && history_surface._roughness >= 1.0 &&
+                        relative_depth_error <= 0.002 && dot(current_normal, history_surface._normal) >= 0.995;
+        if (history_valid)
         {
-            int2 sample_pixel = clamp(int2(pixel) + int2(x, y), int2(0, 0), max_pixel);
-            float3 sample_color = _CurrentTarget[uint2(sample_pixel)].rgb;
-            neighborhood_min = min(neighborhood_min, sample_color);
-            neighborhood_max = max(neighborhood_max, sample_color);
+            history_color = _HistoryPrev[pixel].rgb;
+            history_length = history_surface._roughness;
+        }
+    }
+    // Realtime accumulation reprojects four validated taps. Raw clamp bounds are supported by compatible
+    // previous-frame neighbors so stochastic dark samples do not erase accumulated indirect lighting.
+    else if (_accumulation_mode == 2 && history_valid)
+    {
+        float2 motion = _MotionVectorTexture[pixel].rg;
+        float2 uv = (float2(pixel) + 0.5.xx) * _ScreenParams.xy;
+        float2 history_uv = uv - motion;
+        bool inside_screen = all(history_uv >= 0.0.xx) && all(history_uv < 1.0.xx);
+        history_valid = inside_screen;
+        float expected_previous_depth = current_depth - _MotionVectorTexture[pixel].z;
+        float2 history_position = history_uv * _ScreenParams.zw - 0.5;
+        int2 history_base = int2(floor(history_position));
+        float2 history_fraction = frac(history_position);
+        float history_weight = 0.0;
+        if (history_valid)
+        {
+            [unroll]
+            for (uint tap = 0u; tap < 4u; ++tap)
+            {
+                int2 offset = int2(tap & 1u, tap >> 1u);
+                int2 history_pixel = history_base + offset;
+                float2 weights = lerp(1.0 - history_fraction, history_fraction, float2(offset));
+                float weight = weights.x * weights.y;
+                if (weight <= 1e-4 || any(history_pixel < 0) || any(history_pixel >= int2(_ScreenParams.zw)))
+                    continue;
+                Surface history_surface = BINDLESS_RWBUFFER_LOAD_INDEX(Surface, _prev_surface_buffer_idx,
+                                                                       PixelToLinearIndex(uint2(history_pixel)));
+                float relative_depth_error =
+                    abs(history_surface._linear_depth - expected_previous_depth) * depth_range /
+                    max(current_view_depth, 1e-3);
+                if (!IsValidSurface(history_surface) || history_surface._roughness < 1.0 ||
+                    relative_depth_error > 0.02 || dot(current_normal, history_surface._normal) < 0.92)
+                    continue;
+                history_color += _HistoryPrev[history_pixel].rgb * weight;
+                history_length += history_surface._roughness * weight;
+                history_weight += weight;
+            }
+            history_valid = history_weight >= 0.999;
+            if (history_valid)
+            {
+                history_color /= history_weight;
+                history_length /= history_weight;
+            }
+        }
+    }
+    else
+        history_valid = false;
+
+    uint history_cap = _accumulation_mode == 1 ? MAX_REFERENCE_HISTORY_LENGTH :
+                                                (uint)MAX_ACCUMULATED_FRAMES;
+    uint next_history_length = current_surface_valid
+        ? (history_valid ? min((uint)round(history_length) + 1u, history_cap) : 1u)
+        : 0u;
+    float3 resolved = current;
+    if (history_valid)
+    {
+        if (_accumulation_mode == 1)
+            resolved = (history_color * history_length + current) / (history_length + 1.0);
+        else
+        {
+            int2 raw_min_pixel = max(int2(pixel) - 1, 0);
+            int2 raw_max_pixel = min(int2(pixel) + 1, int2(_ScreenParams.zw) - 1);
+            float3 neighborhood_min = current;
+            float3 neighborhood_max = current;
+            const float3 kLuminanceWeights = float3(0.2126, 0.7152, 0.0722);
+            const float kStableCurrentWeight = 0.05;
+            float luminance_sum = 0.0;
+            float luminance_squared_sum = 0.0;
+            [unroll]
+            for (int y = -1; y <= 1; ++y)
+            {
+                [unroll]
+                for (int x = -1; x <= 1; ++x)
+                {
+                    int2 raw_pixel = clamp(int2(pixel) + int2(x, y), raw_min_pixel, raw_max_pixel);
+                    float3 raw_color = _PathTraceRaw[raw_pixel].rgb;
+                    neighborhood_min = min(neighborhood_min, raw_color);
+                    neighborhood_max = max(neighborhood_max, raw_color);
+                    float raw_luminance = dot(raw_color, kLuminanceWeights);
+                    luminance_sum += raw_luminance;
+                    luminance_squared_sum += raw_luminance * raw_luminance;
+                }
+            }
+            // Exclude the center so an isolated firefly cannot widen its own history bounds. Read only
+            // completed previous-frame history, validating each neighbor against the reprojected surface.
+            float3 history_neighbor_sum = 0.0;
+            float3 history_neighbor_squared_sum = 0.0;
+            float history_luminance_sum = 0.0;
+            float history_luminance_squared_sum = 0.0;
+            float history_luminance_variance = 0.0;
+            uint history_neighbor_count = 0u;
+            float3 temporal_motion = _MotionVectorTexture[pixel].xyz;
+            int2 history_center = int2(floor(float2(pixel) - temporal_motion.xy * _ScreenParams.zw + 0.5));
+            float expected_previous_depth = current_depth - temporal_motion.z;
+            [unroll]
+            for (int history_y = -1; history_y <= 1; ++history_y)
+            {
+                [unroll]
+                for (int history_x = -1; history_x <= 1; ++history_x)
+                {
+                    int2 history_pixel = history_center + int2(history_x, history_y);
+                    if ((history_x == 0 && history_y == 0) || any(history_pixel < 0) ||
+                        any(history_pixel >= int2(_ScreenParams.zw)))
+                        continue;
+                    Surface history_surface = BINDLESS_RWBUFFER_LOAD_INDEX(Surface, _prev_surface_buffer_idx,
+                                                                           PixelToLinearIndex(uint2(history_pixel)));
+                    float relative_depth_error =
+                        abs(history_surface._linear_depth - expected_previous_depth) * depth_range /
+                        max(current_view_depth, 1e-3);
+                    if (!IsValidSurface(history_surface) || history_surface._roughness < 1.0 ||
+                        relative_depth_error > 0.02 || dot(current_normal, history_surface._normal) < 0.92)
+                        continue;
+                    float3 history_neighbor = _HistoryPrev[history_pixel].rgb;
+                    history_neighbor_sum += history_neighbor;
+                    history_neighbor_squared_sum += history_neighbor * history_neighbor;
+                    float history_neighbor_luminance = dot(history_neighbor, kLuminanceWeights);
+                    history_luminance_sum += history_neighbor_luminance;
+                    history_luminance_squared_sum += history_neighbor_luminance * history_neighbor_luminance;
+                    ++history_neighbor_count;
+                }
+            }
+            if (history_neighbor_count >= 3u)
+            {
+                float3 history_mean = history_neighbor_sum / (float)history_neighbor_count;
+                float3 history_variance = max(history_neighbor_squared_sum / (float)history_neighbor_count -
+                                             history_mean * history_mean, 0.0);
+                float3 history_deviation = 3.0 * sqrt(history_variance);
+                neighborhood_min = min(neighborhood_min, max(history_mean - history_deviation, 0.0));
+                neighborhood_max = max(neighborhood_max, history_mean + history_deviation);
+                float history_luminance_mean = history_luminance_sum / (float)history_neighbor_count;
+                history_luminance_variance = max(history_luminance_squared_sum / (float)history_neighbor_count -
+                                                history_luminance_mean * history_luminance_mean, 0.0);
+            }
+            float3 clamped_history = clamp(history_color, neighborhood_min, neighborhood_max);
+            float motion_pixels = length(_MotionVectorTexture[pixel].rg * _ScreenParams.zw);
+            float luminance_mean = luminance_sum / 9.0;
+            float luminance_variance = max(luminance_squared_sum / 9.0 - luminance_mean * luminance_mean, 0.0);
+            // For an EMA with weight a, Var(history) = a / (2 - a) * Var(raw). Recover a conservative raw
+            // noise estimate from compatible histories when this frame's small neighborhood is all dark.
+            luminance_variance = max(luminance_variance, history_luminance_variance *
+                                                        (2.0 - kStableCurrentWeight) / kStableCurrentWeight);
+            float luminance_history = dot(clamped_history, kLuminanceWeights);
+            // Ignore differences inside the raw neighborhood's stochastic noise range. Coherent lighting
+            // changes still raise the current weight, while individual dark or bright paths do not reset history.
+            float luminance_difference = max(abs(luminance_mean - luminance_history) -
+                                            2.0 * sqrt(luminance_variance), 0.0);
+            float luminance_delta = luminance_difference / max(max(luminance_mean, luminance_history), 0.05);
+            // A single dark path sample is not evidence that the lighting or surface changed.
+            bool reject_history = motion_pixels > 8.0;
+            if (reject_history)
+            {
+                history_valid = false;
+                next_history_length = 1u;
+            }
+            else
+            {
+                float motion_weight = lerp(kStableCurrentWeight, 0.20, saturate(motion_pixels / 8.0));
+                float luminance_weight = 0.20 * saturate(luminance_delta);
+                float current_weight = max(rcp((float)next_history_length), max(motion_weight, luminance_weight));
+                resolved = lerp(clamped_history, current, current_weight);
+            }
         }
     }
 
-    float3 clamped_history = clamp(history, neighborhood_min, neighborhood_max);
-    float motion_pixels = length(motion * _ScreenParams.zw);
-    float history_luma = Luminance(clamped_history);
-    float current_luma = Luminance(current);
-    float luma_delta = abs(history_luma - current_luma) / max(max(history_luma, current_luma), 1e-3);
-    //float a = 1.0 / clamp((float)_frame_index + 1.0, 1.0, MAX_ACCUMULATED_FRAMES);
-    float current_weight = max(a, saturate(0.08 + motion_pixels * 0.12 + luma_delta * 0.4));
-
-    float3 blended = lerp(clamped_history, current, current_weight);
-    _CurrentTarget[pixel] = float4(blended, 1.0);
-    //_CurrentTarget[pixel] = float4(motion.xy * 4,0.0, 1.0);
+    current_surface._roughness = (float)next_history_length;
+    if (valid_bindless_handle(_curr_surface_buffer_idx))
+        BINDLESS_RWBUFFER_STORE_INDEX(Surface, _curr_surface_buffer_idx, PixelToLinearIndex(pixel), current_surface);
+    _HistoryCurr[pixel] = float4(resolved, 1.0);
+    float history_ratio = saturate((float)next_history_length /
+                                   (_accumulation_mode == 1 ? 4096.0 : 64.0));
+    float3 heatmap = history_ratio < 0.5 ? lerp(float3(0, 0, 1), float3(0, 1, 0), history_ratio * 2.0) :
+                                               lerp(float3(0, 1, 0), float3(1, 0, 0), (history_ratio - 0.5) * 2.0);
+    _TemporalDebug[pixel] = _debug_temporal_target == 4u
+        ? (history_valid ? float4(0, 1, 0, 1) : float4(1, 0, 0, 1))
+        : float4(heatmap, 1.0);
 }

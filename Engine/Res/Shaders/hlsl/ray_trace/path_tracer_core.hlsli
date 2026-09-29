@@ -9,44 +9,86 @@
 
 float3 EvaluatePathDirectLighting(PathHit hit, TraceContext trace_context, float3 wo, inout RandomCtx random_context)
 {
+    float3 direct_lighting = 0.0.xxx;
+    // Ordinary NEE evaluates only continuous lobes. Delta emission hits are handled by TracePath.
+    if (!HasContinuousPathBSDF(hit._material))
+        return direct_lighting;
     uint light_count = GetUnifiedLightCount();
-    if (light_count == 0u)
-        return 0.0.xxx;
-
-    uint light_index = min((uint)(rand(random_context) * light_count), light_count - 1u);
-    LightSample light_sample = SampleUnifiedLight(light_index, hit._world_position, hit._shading_normal,
-                                                  random_context);
-    const float light_selection_pmf = GetUnifiedLightSelectionPMF(light_count);
-    const float light_pdf = light_sample._pdf * light_selection_pmf;
-    float cos_theta = DirectLightCosTheta(trace_context._mat, hit._shading_normal, light_sample._wi);
-    if (light_pdf <= 1e-6f || !any(light_sample._radiance > 0.0.xxx) ||
-        (!hit._material._is_glass && cos_theta <= 1e-6f))
-        return 0.0.xxx;
-
-    const float shadow_t_max = GetLightShadowRayTMax(light_sample) * 0.98f;
-    const float3 shadow_origin = OffsetPathRayOrigin(hit._world_position, hit._geometric_normal,
-                                                    light_sample._wi, hit._hit_t);
-#if defined(PATH_TRACER_MNEE)
-    const PathHit blocker = TracePathSegment(shadow_origin, light_sample._wi, shadow_t_max);
-    if (blocker._type != kPathHitMiss)
+    if (light_count > 0u)
     {
-        if (blocker._type != kPathHitSurface || !blocker._material._is_smooth_dielectric ||
-            blocker._front_face == 0u)
-            return 0.0.xxx;
-        return EvaluateManifoldDirectLighting(hit, trace_context, wo, light_index, light_selection_pmf,
-                                              light_sample, blocker);
-    }
+        float light_selection_pmf = 0.0f;
+        uint light_index = SamplePathUnifiedLightIndex(rand(random_context), light_count, light_selection_pmf);
+        LightSample light_sample = SampleUnifiedLight(light_index, hit._world_position, hit._shading_normal,
+                                                      random_context);
+        const float light_pdf = light_sample._pdf * light_selection_pmf;
+        float cos_theta = DirectLightCosTheta(trace_context._mat, hit._shading_normal, light_sample._wi);
+        if (light_pdf > 1e-6f && any(light_sample._radiance > 0.0.xxx) &&
+            (hit._material._is_glass || cos_theta > 1e-6f))
+        {
+            const float shadow_t_max = GetLightShadowRayTMax(light_sample) * 0.98f;
+            const float3 shadow_origin = OffsetPathRayOrigin(hit._world_position, hit._geometric_normal,
+                                                            light_sample._wi, hit._hit_t);
+#if defined(PATH_TRACER_MNEE)
+            const PathHit blocker = TracePathSegment(shadow_origin, light_sample._wi, shadow_t_max);
+            if (blocker._type == kPathHitMiss)
+            {
 #else
-    if (IsPathOccluded(shadow_origin, light_sample._wi, shadow_t_max))
-        return 0.0.xxx;
+            if (!IsPathOccluded(shadow_origin, light_sample._wi, shadow_t_max))
+            {
 #endif
+                if (cos_theta > 1e-6f)
+                {
+                    float bsdf_pdf = 0.0f;
+                    const float3 bsdf = EvalBRDF(trace_context, hit._shading_normal, wo, light_sample._wi, bsdf_pdf);
+                    const float mis_weight = PowerHeuristic(light_pdf, bsdf_pdf);
+                    direct_lighting += light_sample._radiance * bsdf * cos_theta * (mis_weight / light_pdf);
+                }
+            }
+#if defined(PATH_TRACER_MNEE)
+            else if (blocker._type == kPathHitSurface && blocker._material._is_smooth_dielectric && blocker._front_face != 0u)
+            {
+                direct_lighting += EvaluateManifoldDirectLighting(hit, trace_context, wo, light_index,
+                                                                  light_selection_pmf, light_sample, blocker);
+            }
+#endif
+        }
+    }
 
-    if (cos_theta <= 1e-6f)
-        return 0.0.xxx;
-    float bsdf_pdf = 0.0f;
-    const float3 bsdf = EvalBRDF(trace_context, hit._shading_normal, wo, light_sample._wi, bsdf_pdf);
-    const float mis_weight = PowerHeuristic(light_pdf, bsdf_pdf);
-    return light_sample._radiance * bsdf * cos_theta * (mis_weight / light_pdf);
+    if (_enable_environment_nee)
+    {
+        EnvironmentSample environment_sample = SampleEnvironment(random_context);
+        float environment_cos_theta = DirectLightCosTheta(trace_context._mat, hit._shading_normal,
+                                                           environment_sample._direction);
+        if (environment_sample._pdf > 1e-8f && any(environment_sample._radiance > 0.0.xxx) &&
+            (hit._material._is_glass || environment_cos_theta > 1e-6f))
+        {
+            const float3 shadow_origin = OffsetPathRayOrigin(hit._world_position, hit._geometric_normal,
+                                                            environment_sample._direction, hit._hit_t);
+            if (!IsPathOccluded(shadow_origin, environment_sample._direction, kPathMaxRayT))
+            {
+                float bsdf_pdf = 0.0f;
+                const float3 bsdf = EvalBRDF(trace_context, hit._shading_normal, wo,
+                                             environment_sample._direction, bsdf_pdf);
+                const float mis_weight = PowerHeuristic(environment_sample._pdf, bsdf_pdf);
+                direct_lighting += environment_sample._radiance * bsdf * environment_cos_theta *
+                                   (mis_weight / environment_sample._pdf);
+            }
+        }
+    }
+    return direct_lighting;
+}
+
+PathBounceSample MakeOpaqueDeltaBounce(PathHit hit, SampleBRDFResult sample)
+{
+    PathBounceSample bounce = (PathBounceSample)0;
+    bounce._valid = sample._delta_pdf > 0.0f && dot(hit._shading_normal, sample.wi) > 0.0f;
+    bounce._is_delta = true;
+    bounce._carry_mis = false;
+    bounce._pdf = sample._delta_pdf;
+    bounce._throughput_weight = sample._delta_weight;
+    bounce._ray_direction = sample.wi;
+    bounce._ray_origin = OffsetPathRayOrigin(hit._world_position, hit._geometric_normal, sample.wi, hit._hit_t);
+    return bounce;
 }
 
 PathBounceSample SamplePathBounce(PathHit hit, TraceContext trace_context, float3 wo, inout RandomCtx random_context)
@@ -98,6 +140,8 @@ PathBounceSample SamplePathBounce(PathHit hit, TraceContext trace_context, float
                                                     random_values.y, random_values.z, rand(random_context));
         if (all(opaque_sample.wi == 0.0.xxx))
             return bounce;
+        if (opaque_sample._is_delta)
+            return MakeOpaqueDeltaBounce(hit, opaque_sample);
 
         float opaque_pdf = 0.0f;
         trace_context._lobe = opaque_sample._lobe;
@@ -122,6 +166,8 @@ PathBounceSample SamplePathBounce(PathHit hit, TraceContext trace_context, float
                                          random_values.x, random_values.y, random_values.z, rand(random_context));
     if (all(sample.wi == 0.0.xxx))
         return bounce;
+    if (sample._is_delta)
+        return MakeOpaqueDeltaBounce(hit, sample);
 
     float bsdf_pdf = 0.0f;
     // 关键：把采样端选中的瓣和采样到的半程向量回填进 trace_context 再求值。
@@ -178,15 +224,19 @@ float3 TracePath(uint2 pixel, float3 ray_origin, float3 ray_direction, uint max_
     float3 medium_sigma_a = 0.0.xxx;
 
     [loop]
-    for (uint depth = 0u; depth < max_depth; ++depth)
+    // Trace the terminal segment too: last-bounce NEE and BSDF environment hits need the same depth limit.
+    for (uint depth = 0u; depth <= max_depth; ++depth)
     {
         PathHit hit = TracePathRay(ray_origin, ray_direction);
         if (hit._type == kPathHitMiss)
         {
             // 离开介质前的最后一段也要衰减
             throughput *= ApplyMediumAbsorption(medium_sigma_a, hit._hit_t);
-            // 当前没有环境光的 NEE 样本；miss 是环境的唯一采样路径，权重必须为 1。
-            radiance += throughput * EvaluateEnvironmentRadiance(ray_direction);
+            float environment_mis_weight = 1.0f;
+            if (_enable_environment_nee && has_previous_bsdf_sample)
+                environment_mis_weight = PowerHeuristic(previous_bsdf_pdf, PdfEnvironment(ray_direction));
+            radiance += throughput * EvaluateEnvironmentRadiance(ray_direction) * environment_mis_weight;
+            radiance += throughput * EvaluateDirectionalLightMiss(GetUnifiedLightCount(), ray_direction, previous_bsdf_pdf, has_previous_bsdf_sample);
             break;
         }
 
@@ -212,6 +262,9 @@ float3 TracePath(uint2 pixel, float3 ray_origin, float3 ray_direction, uint max_
             radiance += throughput * hit._light_radiance * mis_weight;
             break;
         }
+
+        if (depth == max_depth)
+            break;
 
         // 表面之前的那一段按当前介质衰减（光线离开介质时，这一段仍是介质内的行程）
         throughput *= ApplyMediumAbsorption(medium_sigma_a, hit._hit_t);

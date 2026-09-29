@@ -1,4 +1,5 @@
 #include "Automation/AutomationCaptureService.h"
+#include "EditorApp.h"
 
 #include "Framework/Common/Log.h"
 #include "Framework/Common/Profiler.h"
@@ -8,6 +9,7 @@
 #include "Render/ImageCapture/ImageCaptureService.h"
 #include "Render/RenderPipeline.h"
 #include "Render/Renderer.h"
+#include "Render/Features/RayTraceGI.h"
 #include "Scene/Component.h"
 #include "Scene/Scene.h"
 
@@ -189,6 +191,7 @@ namespace Ailu
                 desc._input_schema.AddParam("output_directory",
                                             "Output directory relative to the project root.",
                                             EAutomationValueType::kString);
+                desc._input_schema.AddParam("output_format", "png (default) or dds_native for linear floating-point validation.", EAutomationValueType::kString);
                 registry.Register("render.capture_pass", std::move(desc), HandleCapturePass);
             }
             {
@@ -218,6 +221,110 @@ namespace Ailu
                 desc._description = "List render features with their active state.";
                 desc._permission = EAutomationPermission::kReadOnly;
                 registry.Register("render.list_features", std::move(desc), HandleListFeatures);
+            }
+            {
+                AutomationMethodDesc desc;
+                desc._name = "render.path_tracer_settings";
+                desc._description = "Read or change runtime PathTracer settings and SceneView output size for render validation; does not save the scene.";
+                desc._permission = EAutomationPermission::kExternalEffect;
+                desc._input_schema.AddParam("enabled", "Enable PathTracer rendering.", EAutomationValueType::kBool);
+                desc._input_schema.AddParam("hardware_ray_tracing", "Use DXR instead of Compute.", EAutomationValueType::kBool);
+                desc._input_schema.AddParam("temporal", "Enable temporal accumulation.", EAutomationValueType::kBool);
+                desc._input_schema.AddParam("accumulation_mode", "disabled, reference or realtime accumulation.",
+                                            EAutomationValueType::kString);
+                desc._input_schema.AddParam("use_power_weighted_light_sampling", "Use power-weighted Alias light selection; false selects Uniform.", EAutomationValueType::kBool);
+                desc._input_schema.AddParam("enable_mnee", "Enable PathTracer MNEE.", EAutomationValueType::kBool);
+                desc._input_schema.AddParam("enable_ris", "Enable PathTracer light RIS.", EAutomationValueType::kBool);
+                desc._input_schema.AddParam("enable_resampling", "Enable PathTracer reservoir resampling.", EAutomationValueType::kBool);
+                desc._input_schema.AddParam("enable_environment_nee", "Use Environment NEE/MIS; false selects the BSDF-only baseline.", EAutomationValueType::kBool);
+                desc._input_schema.AddParam("debug_target", "0 final, 1 raw, 2 prev, 3 curr, 4 validity, 5 length.",
+                                            EAutomationValueType::kInteger);
+                desc._input_schema.AddParam("output_size", "SceneView render dimensions [width,height], each 16 to 4095.", EAutomationValueType::kVector);
+                registry.Register("render.path_tracer_settings", std::move(desc), [](EditorAutomationContext &, const AutomationObject &arguments)
+                {
+                    auto *pipeline = RenderPipeline::Instance();
+                    auto *renderer = pipeline != nullptr ? pipeline->GetRenderer() : nullptr;
+                    auto *editor = EditorApp::GetEditor();
+                    auto *camera = editor != nullptr ? editor->GetSceneCamera() : nullptr;
+                    RayTraceGI *path_tracer = nullptr;
+                    if (renderer != nullptr)
+                        for (auto *feature : renderer->GetFeatures())
+                            if (feature->Name() == "RayTraceGI")
+                                path_tracer = dynamic_cast<RayTraceGI *>(feature);
+                    if (path_tracer == nullptr || camera == nullptr)
+                        return AutomationResult::Fail(AutomationErrors::kEditorNotReady, "PathTracer or SceneView camera is unavailable");
+                    for (const char *key : {"enabled", "hardware_ray_tracing", "temporal", "enable_mnee",
+                                             "enable_ris", "enable_resampling", "enable_environment_nee"})
+                        if (const auto it = arguments.find(key); it != arguments.end() && !it->second.IsBool())
+                            return AutomationResult::Fail(AutomationErrors::kInvalidArgument, std::format("{} must be a boolean", key));
+                    if (const auto it = arguments.find("debug_target"); it != arguments.end() &&
+                        (!it->second.IsInt() || it->second.AsInt() < 0 || it->second.AsInt() > 5))
+                        return AutomationResult::Fail(AutomationErrors::kInvalidArgument, "debug_target must be 0 to 5");
+                    if (const auto it = arguments.find("accumulation_mode"); it != arguments.end() &&
+                        (!it->second.IsString() || (it->second.AsString() != "disabled" &&
+                         it->second.AsString() != "reference" && it->second.AsString() != "realtime")))
+                        return AutomationResult::Fail(AutomationErrors::kInvalidArgument,
+                                                      "accumulation_mode must be disabled, reference or realtime");
+                    auto output_size = camera->OutputSize();
+                    if (const auto it = arguments.find("output_size"); it != arguments.end())
+                    {
+                        if (!it->second.IsArray() || it->second.AsArray().size() != 2u)
+                            return AutomationResult::Fail(AutomationErrors::kInvalidArgument, "output_size must be [width,height]");
+                        const auto &values = it->second.AsArray();
+                        for (const auto &value : values)
+                            if (!value.IsInt() || value.AsInt() < 16 || value.AsInt() > 4095)
+                                return AutomationResult::Fail(AutomationErrors::kInvalidArgument, "output dimensions must be integers from 16 to 4095");
+                        output_size = {static_cast<u32>(values[0].AsInt()), static_cast<u32>(values[1].AsInt())};
+                    }
+                    const bool hardware_supported = GraphicsContext::Get().IsHardwareRayTracingSupported();
+                    if (arguments.contains("hardware_ray_tracing") && arguments.at("hardware_ray_tracing").AsBool() && !hardware_supported)
+                        return AutomationResult::Fail(AutomationErrors::kInvalidArgument, "hardware ray tracing is unsupported");
+                    if (arguments.contains("enabled")) renderer->_is_use_raytracing = arguments.at("enabled").AsBool();
+                    if (arguments.contains("hardware_ray_tracing")) path_tracer->_use_hardware_ray_tracing = arguments.at("hardware_ray_tracing").AsBool();
+                    if (arguments.contains("temporal"))
+                        path_tracer->_accumulation_mode = arguments.at("temporal").AsBool()
+                            ? Render::EPathTracerAccumulationMode::kRealtime
+                            : Render::EPathTracerAccumulationMode::kDisabled;
+                    if (arguments.contains("accumulation_mode"))
+                    {
+                        const auto &mode = arguments.at("accumulation_mode").AsString();
+                        path_tracer->_accumulation_mode = mode == "reference"
+                            ? Render::EPathTracerAccumulationMode::kReference
+                            : mode == "realtime" ? Render::EPathTracerAccumulationMode::kRealtime
+                                                  : Render::EPathTracerAccumulationMode::kDisabled;
+                    }
+                    if (arguments.contains("use_power_weighted_light_sampling"))
+                        path_tracer->_use_power_weighted_light_sampling = arguments.at("use_power_weighted_light_sampling").AsBool();
+                    if (arguments.contains("enable_mnee"))
+                        path_tracer->_enable_mnee = arguments.at("enable_mnee").AsBool();
+                    if (arguments.contains("enable_ris")) path_tracer->_enable_ris = arguments.at("enable_ris").AsBool();
+                    if (arguments.contains("enable_resampling"))
+                        path_tracer->_enable_resampling = arguments.at("enable_resampling").AsBool();
+                    if (arguments.contains("enable_environment_nee"))
+                        path_tracer->_enable_environment_nee = arguments.at("enable_environment_nee").AsBool();
+                    if (arguments.contains("debug_target")) path_tracer->_debug_temporal_target = static_cast<u32>(arguments.at("debug_target").AsInt());
+                    if (arguments.contains("output_size")) camera->OutputSize(static_cast<u16>(output_size.x), static_cast<u16>(output_size.y));
+                    AutomationObject result;
+                    result.emplace("enabled", AutomationValue(renderer->_is_use_raytracing));
+                    result.emplace("hardware_ray_tracing", AutomationValue(path_tracer->_use_hardware_ray_tracing));
+                    result.emplace("hardware_supported", AutomationValue(hardware_supported));
+                    const char *mode_name = "disabled";
+                    if (path_tracer->_accumulation_mode == Render::EPathTracerAccumulationMode::kReference)
+                        mode_name = "reference";
+                    else if (path_tracer->_accumulation_mode == Render::EPathTracerAccumulationMode::kRealtime)
+                        mode_name = "realtime";
+                    result.emplace("temporal", AutomationValue(
+                        path_tracer->_accumulation_mode == Render::EPathTracerAccumulationMode::kRealtime));
+                    result.emplace("accumulation_mode", AutomationValue(mode_name));
+                    result.emplace("use_power_weighted_light_sampling", AutomationValue(path_tracer->_use_power_weighted_light_sampling));
+                    result.emplace("enable_mnee", AutomationValue(path_tracer->_enable_mnee));
+                    result.emplace("enable_ris", AutomationValue(path_tracer->_enable_ris));
+                    result.emplace("enable_resampling", AutomationValue(path_tracer->_enable_resampling));
+                    result.emplace("enable_environment_nee", AutomationValue(path_tracer->_enable_environment_nee));
+                    result.emplace("debug_target", AutomationValue(path_tracer->_debug_temporal_target));
+                    result.emplace("output_size", AutomationValue(AutomationArray{AutomationValue(output_size.x), AutomationValue(output_size.y)}));
+                    return AutomationResult::Ok(AutomationValue(std::move(result)));
+                });
             }
         }
 
@@ -309,6 +416,9 @@ namespace Ailu
                     AutomationErrors::kInvalidArgument, "pass_name is required"));
             }
 
+            const String output_format = arg_string("output_format", "png");
+            if (output_format != "png" && output_format != "dds_native")
+                return AutomationResult::Fail(AutomationErrors::kInvalidArgument, "output_format must be png or dds_native");
             ActiveCaptureSession &session = SessionSlot();
             // 旧会话先收尾，避免选择器残留。
             if (session._session_id != 0u)
@@ -325,7 +435,7 @@ namespace Ailu
             ImageCaptureSequenceDesc desc;
             desc._frame_count = static_cast<u32>(frame_count);
             desc._frame_interval = 1u;
-            desc._output_format = EImageCaptureOutputFormat::kPng;
+            desc._output_format = output_format == "dds_native" ? EImageCaptureOutputFormat::kDdsNative : EImageCaptureOutputFormat::kPng;
             desc._file_prefix = file_prefix;
             desc._output_directory = ToWChar(output_directory);
             const ImageCaptureSessionId session_id = ImageCaptureService::BeginSequence(desc);

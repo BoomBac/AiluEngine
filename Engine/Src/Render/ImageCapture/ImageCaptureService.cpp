@@ -244,16 +244,17 @@ bool BuildCpuImage(const ImageCaptureReadbackData &data, ImageCaptureCpuImage &i
     image._sub_resources.reserve(data._sub_resources.size());
     for (const auto &source: data._sub_resources)
     {
-        if (source._row_pitch == 0u || source._row_size == 0u || source._row_count == 0u || source._slice_pitch == 0u)
+        if (source._row_pitch == 0u || source._row_size == 0u || source._row_count == 0u || source._slice_pitch == 0u || source._depth == 0u || source._row_size > source._row_pitch)
         {
             error = "GPU readback returned an invalid footprint";
             return false;
         }
 
-        const u64 source_size = static_cast<u64>(source._slice_pitch) * source._depth;
         const u64 last_row_end = static_cast<u64>(source._row_pitch) * (source._row_count - 1u) + source._row_size;
+        // GetCopyableFootprints excludes unused padding after the final row of the final slice.
+        const u64 source_size = static_cast<u64>(source._slice_pitch) * (source._depth - 1u) + last_row_end;
         if (source._offset > data._data.size() || source_size > data._data.size() - source._offset ||
-            last_row_end > data._data.size() - source._offset ||
+            last_row_end > source._slice_pitch ||
             source._row_size > std::numeric_limits<u32>::max())
         {
             error = "GPU readback footprint exceeds mapped data";

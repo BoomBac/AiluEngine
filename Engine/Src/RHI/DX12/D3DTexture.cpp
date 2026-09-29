@@ -163,7 +163,9 @@ namespace Ailu::RHI::DX12
                     auto [cur_mip_width, cur_mip_height] = CalculateMipSize(_width, _height, static_cast<u16>(i));
                     u64 row_pitch = 0u;
                     u64 slice_pitch = 0u;
-                    AL_ASSERT(CalculateTextureDataLayout(_pixel_format, cur_mip_width, cur_mip_height, row_pitch, slice_pitch));
+                    const bool is_layout_valid = CalculateTextureDataLayout(_pixel_format, cur_mip_width, cur_mip_height,
+                                                                            row_pitch, slice_pitch);
+                    AL_ASSERT(is_layout_valid);
                     AL_ASSERT(source._size == slice_pitch);
                     subdata.pData = imported_pixel_data.data() + source._offset;
                     subdata.RowPitch = static_cast<LONG_PTR>(row_pitch);

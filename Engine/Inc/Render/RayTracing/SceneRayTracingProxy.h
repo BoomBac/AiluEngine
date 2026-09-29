@@ -40,9 +40,11 @@ namespace Ailu::Render
         }
         GPUBuffer *GetMaterialData() const { return _material_buffer.get(); }
         GPUBuffer *GetUnifiedLightData() const { return _unified_light_buffer.get(); }
+        GPUBuffer *GetUnifiedLightSamplingData() const { return _unified_light_sampling_buffer.get(); }
         ConstantBuffer *GetUnifiedLightConfig() const { return _unified_light_config.get(); }
         u32 GetUnifiedLightCount() const { return _unified_light_config_cpu._light_count; }
         const Vector<UnifiedLightData> &GetUnifiedLights() const { return _unified_light_data_cache; }
+        const Vector<UnifiedLightSamplingData> &GetUnifiedLightSamplingTable() const { return _unified_light_sampling_cache; }
         bool HasRenderableScene() const
         {
             return !_has_pending_swap && _scene_primitive_buffer != nullptr && FrontSlot()._scene != nullptr &&
@@ -128,6 +130,9 @@ namespace Ailu::Render
         void ClearSlot(ProxyBufferSlot &slot);
         void UpdateMaterials(const SceneManagement::Scene &scene);
         void UpdateUnifiedLights(const SceneManagement::Scene &scene);
+        void UpdateUnifiedLightSamplingTable();
+        float EstimateUnifiedLightSamplingWeight(const UnifiedLightData &light) const;
+        void BuildUnifiedLightAliasTable(const Vector<float> &weights, Vector<UnifiedLightSamplingData> &sampling_table) const;
 
         ProxyBufferSlot &FrontSlot() { return _slots[_front_slot]; }
         const ProxyBufferSlot &FrontSlot() const { return _slots[_front_slot]; }
@@ -146,6 +151,8 @@ namespace Ailu::Render
         Ref<GPUBuffer> _material_buffer;
         Vector<UnifiedLightData> _unified_light_data_cache;
         Ref<GPUBuffer> _unified_light_buffer;
+        Vector<UnifiedLightSamplingData> _unified_light_sampling_cache;
+        Ref<GPUBuffer> _unified_light_sampling_buffer;
         Ref<ConstantBuffer> _unified_light_config;
         UnifiedLightBufferConfig _unified_light_config_cpu = {};
         Vector<PrimitiveData> *_scene_primitive_data = nullptr;

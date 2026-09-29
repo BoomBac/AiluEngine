@@ -57,6 +57,11 @@ namespace Ailu::Render
         const ShaderPropertyId kGridIndicesPropertyId = Shader::PropertyID("_GridIndices");
         const ShaderPropertyId kGridIndicesReadPropertyId = Shader::PropertyID("_GridIndicesRead");
         const ShaderPropertyId kGridBlockPrefixPropertyId = Shader::PropertyID("_GridBlockPrefix");
+        const ShaderPropertyId kQueryGridCellsPropertyId = Shader::PropertyID("_QueryGridCells");
+        const ShaderPropertyId kQueryGridWriteCountersPropertyId = Shader::PropertyID("_QueryGridWriteCounters");
+        const ShaderPropertyId kQueryGridIndicesPropertyId = Shader::PropertyID("_QueryGridIndices");
+        const ShaderPropertyId kQueryGridBlockPrefixPropertyId = Shader::PropertyID("_QueryGridBlockPrefix");
+        const ShaderPropertyId kQueryDebugCountersPropertyId = Shader::PropertyID("_SurfelQueryDebugCounters");
         const ShaderPropertyId kSurfelDispatchArgsPropertyId = Shader::PropertyID("_SurfelDispatchArgs");
         const ShaderPropertyId kDrawArgsPropertyId = Shader::PropertyID("_DrawArgs");
         const ShaderPropertyId kCameraDepthTexturePropertyId = Shader::PropertyID("_CameraDepthTexture");
@@ -223,6 +228,12 @@ namespace Ailu::Render
             _grid_prefix_blocks_kernel = _compute_shader->FindKernel("SurfelGridPrefixBlocksCS");
             _grid_prefix_finalize_kernel = _compute_shader->FindKernel("SurfelGridPrefixFinalizeCS");
             _grid_fill_kernel = _compute_shader->FindKernel("SurfelGridFillCS");
+            _query_grid_clear_kernel = _compute_shader->FindKernel("SurfelQueryGridClearCS");
+            _query_grid_count_kernel = _compute_shader->FindKernel("SurfelQueryGridCountCS");
+            _query_grid_prefix_local_kernel = _compute_shader->FindKernel("SurfelQueryGridPrefixLocalCS");
+            _query_grid_prefix_blocks_kernel = _compute_shader->FindKernel("SurfelQueryGridPrefixBlocksCS");
+            _query_grid_prefix_finalize_kernel = _compute_shader->FindKernel("SurfelQueryGridPrefixFinalizeCS");
+            _query_grid_fill_kernel = _compute_shader->FindKernel("SurfelQueryGridFillCS");
             _migration_resolve_kernel = _compute_shader->FindKernel("SurfelMigrationResolveCS");
             _migration_recycle_kernel = _compute_shader->FindKernel("SurfelMigrationRecycleCS");
             _coverage_kernel = _compute_shader->FindKernel("SurfelCoverageCS");
@@ -336,6 +347,11 @@ namespace Ailu::Render
         _grid_write_counters.reset();
         _grid_indices.reset();
         _grid_block_prefix.reset();
+        _query_grid_cells.reset();
+        _query_grid_write_counters.reset();
+        _query_grid_indices.reset();
+        _query_grid_block_prefix.reset();
+        _query_debug_counters.reset();
         _surfel_candidates.reset();
         _candidate_state.reset();
         _spawn_occupancy.reset();
@@ -349,8 +365,10 @@ namespace Ailu::Render
         const u64 cell_count64 = static_cast<u64>(grid_resolution) * grid_resolution * grid_resolution * cascade_count;
         const u64 block_count64 = (cell_count64 + kScanBlockSize - 1u) / kScanBlockSize;
         const u64 grid_index_count64 = static_cast<u64>(max_surfel_count) * kMaxNeighborCells;
+        const u64 query_grid_index_count64 = static_cast<u64>(max_surfel_count);
         if (cell_count64 > std::numeric_limits<u32>::max() || block_count64 > kMaxScanBlockCount ||
-            grid_index_count64 > std::numeric_limits<u32>::max())
+            grid_index_count64 > std::numeric_limits<u32>::max() ||
+            query_grid_index_count64 > std::numeric_limits<u32>::max())
         {
             LOG_ERROR("SurfelGI: unsupported resource dimensions, resolution={}, cascades={}, surfels={}, blocks={}",
                       grid_resolution, cascade_count, max_surfel_count, block_count64);
@@ -394,6 +412,16 @@ namespace Ailu::Render
                                       "SurfelGI_GridIndices");
         _grid_block_prefix = create_buffer(EGPUBufferTarget::kStructured, sizeof(u32), static_cast<u32>(block_count64),
                                             "SurfelGI_GridBlockPrefix");
+        _query_grid_cells = create_buffer(EGPUBufferTarget::kStructured, sizeof(SurfelGridCellData),
+                                          static_cast<u32>(cell_count64), "SurfelGI_QueryGridCells");
+        _query_grid_write_counters = create_buffer(EGPUBufferTarget::kStructured, sizeof(u32),
+                                                   static_cast<u32>(cell_count64), "SurfelGI_QueryGridWriteCounters");
+        _query_grid_indices = create_buffer(EGPUBufferTarget::kStructured, sizeof(u32),
+                                            static_cast<u32>(query_grid_index_count64), "SurfelGI_QueryGridIndices");
+        _query_grid_block_prefix = create_buffer(EGPUBufferTarget::kStructured, sizeof(u32),
+                                                 static_cast<u32>(block_count64), "SurfelGI_QueryGridBlockPrefix");
+        _query_debug_counters = create_buffer(EGPUBufferTarget::kStructured, sizeof(u32), 5u,
+                                              "SurfelGI_QueryDebugCounters");
         _candidate_state = create_buffer(EGPUBufferTarget::kStructured, sizeof(u32), 6u, "SurfelGI_CandidateState");
         _spawn_occupancy = create_buffer(EGPUBufferTarget::kStructured, sizeof(u32), static_cast<u32>(cell_count64),
                                          "SurfelGI_SpawnOccupancy");
@@ -422,6 +450,11 @@ namespace Ailu::Render
         _grid_cells->SetData(cell_zeroes);
         _grid_write_counters->SetData(Vector<u32>(static_cast<u32>(cell_count64)));
         _grid_block_prefix->SetData(Vector<u32>(static_cast<u32>(block_count64)));
+        _query_grid_cells->SetData(cell_zeroes);
+        _query_grid_write_counters->SetData(Vector<u32>(static_cast<u32>(cell_count64)));
+        _query_grid_indices->SetData(Vector<u32>(static_cast<u32>(query_grid_index_count64)));
+        _query_grid_block_prefix->SetData(Vector<u32>(static_cast<u32>(block_count64)));
+        _query_debug_counters->SetData(Vector<u32>(5u));
         _candidate_state->SetData(Vector<u32>(6u));
         _spawn_occupancy->SetData(Vector<u32>(static_cast<u32>(cell_count64)));
         SurfelDispatchArguments dispatch_args;
@@ -513,6 +546,11 @@ namespace Ailu::Render
         _compute_shader->SetBuffer(kGridIndicesPropertyId, _grid_indices.get());
         _compute_shader->SetBuffer(kGridIndicesReadPropertyId, _grid_indices.get());
         _compute_shader->SetBuffer(kGridBlockPrefixPropertyId, _grid_block_prefix.get());
+        _compute_shader->SetBuffer(kQueryGridCellsPropertyId, _query_grid_cells.get());
+        _compute_shader->SetBuffer(kQueryGridWriteCountersPropertyId, _query_grid_write_counters.get());
+        _compute_shader->SetBuffer(kQueryGridIndicesPropertyId, _query_grid_indices.get());
+        _compute_shader->SetBuffer(kQueryGridBlockPrefixPropertyId, _query_grid_block_prefix.get());
+        _compute_shader->SetBuffer(kQueryDebugCountersPropertyId, _query_debug_counters.get());
         _compute_shader->SetBuffer(kSurfelDispatchArgsPropertyId, _surfel_dispatch_args.get());
         _compute_shader->SetBuffer(kDrawArgsPropertyId, _draw_args.get());
     }
@@ -550,8 +588,11 @@ namespace Ailu::Render
                              _surfel_free_list.get(), _surfel_deferred_free_list.get(),
                              _active_surfel_indices.get(), _surfel_active_list_indices.get(),
                              _surfel_frame_state.get(), _grid_cells.get(), _grid_write_counters.get(),
-                             _grid_indices.get(), _grid_block_prefix.get(), _candidate_state.get(),
-                             _spawn_occupancy.get(), _surfel_dispatch_args.get(), _draw_args.get()})
+                             _grid_indices.get(), _grid_block_prefix.get(), _query_grid_cells.get(),
+                             _query_grid_write_counters.get(), _query_grid_indices.get(),
+                             _query_grid_block_prefix.get(), _candidate_state.get(),
+                             _spawn_occupancy.get(), _surfel_dispatch_args.get(), _draw_args.get(),
+                             _query_debug_counters.get()})
         {
             if (buffer == nullptr || !buffer->IsReady())
                 return;
@@ -598,6 +639,7 @@ namespace Ailu::Render
                 {
                     _debug_stats_frame_counter = 0u;
                     _debug_readback_pending = true;
+                    _query_debug_readback_pending = true;
                 }
             }
             renderer.EnqueuePass(&_placement_pass);
@@ -657,6 +699,10 @@ namespace Ailu::Render
         RDG::RGHandle grid_write_counters = graph.Import(_feature->_grid_write_counters.get());
         RDG::RGHandle grid_indices = graph.Import(_feature->_grid_indices.get());
         RDG::RGHandle grid_block_prefix = graph.Import(_feature->_grid_block_prefix.get());
+        RDG::RGHandle query_grid_cells = graph.Import(_feature->_query_grid_cells.get());
+        RDG::RGHandle query_grid_write_counters = graph.Import(_feature->_query_grid_write_counters.get());
+        RDG::RGHandle query_grid_indices = graph.Import(_feature->_query_grid_indices.get());
+        RDG::RGHandle query_grid_block_prefix = graph.Import(_feature->_query_grid_block_prefix.get());
         RDG::RGHandle surfel_pool = graph.Import(_feature->_surfel_pool.get());
         RDG::RGHandle surfel_state = graph.Import(_feature->_surfel_state.get());
         RDG::RGHandle surfel_free_list = graph.Import(_feature->_surfel_free_list.get());
@@ -1058,6 +1104,94 @@ namespace Ailu::Render
                 });
         }
 
+        graph.AddPass("Surfel Query Grid Clear", RDG::PassDesc(RDG::EPassType::kCompute),
+            [&, this](RDG::RenderGraphBuilder &builder)
+            {
+                query_grid_cells = builder.WriteAfter(query_grid_cells, EResourceUsage::kWriteUAV);
+                query_grid_write_counters = builder.Write(query_grid_write_counters, EResourceUsage::kWriteUAV);
+            },
+            [this, cell_count](RDG::RenderGraph &, CommandBuffer *cmd, const RenderingData &data)
+            {
+                _feature->SetComputeParameters(data);
+                cmd->Dispatch(_feature->_compute_shader.get(), _feature->_query_grid_clear_kernel,
+                              CalculateDispatchCount(cell_count, 64u), 1u, 1u);
+                cmd->UavBarrier();
+            });
+
+        graph.AddPass("Surfel Query Grid Count", RDG::PassDesc(RDG::EPassType::kCompute),
+            [&, this](RDG::RenderGraphBuilder &builder)
+            {
+                builder.Read(surfel_pool, EResourceUsage::kReadSRV);
+                builder.Read(surfel_state, EResourceUsage::kReadSRV);
+                builder.Read(dispatch_args, EResourceUsage::kIndirectArgument);
+                query_grid_cells = builder.WriteAfter(query_grid_cells, EResourceUsage::kWriteUAV);
+            },
+            [this](RDG::RenderGraph &, CommandBuffer *cmd, const RenderingData &data)
+            {
+                _feature->SetComputeParameters(data);
+                cmd->Dispatch(_feature->_compute_shader.get(), _feature->_query_grid_count_kernel,
+                              _feature->_surfel_dispatch_args.get(), 0u);
+                cmd->UavBarrier(_feature->_query_grid_cells.get());
+            });
+
+        graph.AddPass("Surfel Query Grid Prefix Local", RDG::PassDesc(RDG::EPassType::kCompute),
+            [&, this](RDG::RenderGraphBuilder &builder)
+            {
+                query_grid_cells = builder.WriteAfter(query_grid_cells, EResourceUsage::kWriteUAV);
+                query_grid_block_prefix = builder.WriteAfter(query_grid_block_prefix, EResourceUsage::kWriteUAV);
+            },
+            [this](RDG::RenderGraph &, CommandBuffer *cmd, const RenderingData &data)
+            {
+                _feature->SetComputeParameters(data);
+                cmd->Dispatch(_feature->_compute_shader.get(), _feature->_query_grid_prefix_local_kernel,
+                              _feature->_resource_grid_block_count, 1u, 1u);
+                cmd->UavBarrier();
+            });
+
+        graph.AddPass("Surfel Query Grid Prefix Blocks", RDG::PassDesc(RDG::EPassType::kCompute),
+            [&, this](RDG::RenderGraphBuilder &builder)
+            {
+                query_grid_block_prefix = builder.WriteAfter(query_grid_block_prefix, EResourceUsage::kWriteUAV);
+            },
+            [this](RDG::RenderGraph &, CommandBuffer *cmd, const RenderingData &data)
+            {
+                _feature->SetComputeParameters(data);
+                cmd->Dispatch(_feature->_compute_shader.get(), _feature->_query_grid_prefix_blocks_kernel, 1u, 1u, 1u);
+                cmd->UavBarrier(_feature->_query_grid_block_prefix.get());
+            });
+
+        graph.AddPass("Surfel Query Grid Prefix Finalize", RDG::PassDesc(RDG::EPassType::kCompute),
+            [&, this](RDG::RenderGraphBuilder &builder)
+            {
+                builder.Read(query_grid_block_prefix, EResourceUsage::kWriteUAV);
+                query_grid_cells = builder.WriteAfter(query_grid_cells, EResourceUsage::kWriteUAV);
+            },
+            [this, cell_count](RDG::RenderGraph &, CommandBuffer *cmd, const RenderingData &data)
+            {
+                _feature->SetComputeParameters(data);
+                cmd->Dispatch(_feature->_compute_shader.get(), _feature->_query_grid_prefix_finalize_kernel,
+                              CalculateDispatchCount(cell_count, kScanFinalizeThreadCount), 1u, 1u);
+                cmd->UavBarrier(_feature->_query_grid_cells.get());
+            });
+
+        graph.AddPass("Surfel Query Grid Fill", RDG::PassDesc(RDG::EPassType::kCompute),
+            [&, this](RDG::RenderGraphBuilder &builder)
+            {
+                builder.Read(surfel_pool, EResourceUsage::kReadSRV);
+                builder.Read(surfel_state, EResourceUsage::kReadSRV);
+                builder.Read(dispatch_args, EResourceUsage::kIndirectArgument);
+                builder.Read(query_grid_cells, EResourceUsage::kWriteUAV);
+                query_grid_write_counters = builder.WriteAfter(query_grid_write_counters, EResourceUsage::kWriteUAV);
+                query_grid_indices = builder.Write(query_grid_indices, EResourceUsage::kWriteUAV);
+            },
+            [this](RDG::RenderGraph &, CommandBuffer *cmd, const RenderingData &data)
+            {
+                _feature->SetComputeParameters(data);
+                cmd->Dispatch(_feature->_compute_shader.get(), _feature->_query_grid_fill_kernel,
+                              _feature->_surfel_dispatch_args.get(), 0u);
+                cmd->UavBarrier();
+            });
+
         add_prepare_draw_args();
     }
 
@@ -1259,7 +1393,9 @@ namespace Ailu::Render
                                   _feature->_disk_material != nullptr;
         const bool finalize_migration = _feature->_migration_finalize_pending &&
                                         _feature->_compute_shader != nullptr && _feature->_surfel_pool != nullptr;
-        if (!draw_coverage && !draw_tile_grid && !draw_surfels && !finalize_migration)
+        const bool read_query_debug = _feature->_query_debug_readback_pending &&
+                                      _feature->_query_debug_counters != nullptr;
+        if (!draw_coverage && !draw_tile_grid && !draw_surfels && !finalize_migration && !read_query_debug)
             return;
 
         RDG::RGHandle color_target = rendering_data.FinalColorHandle();
@@ -1271,6 +1407,7 @@ namespace Ailu::Render
         RDG::RGHandle surfel_lighting;
         RDG::RGHandle surfel_state;
         RDG::RGHandle dispatch_args;
+        RDG::RGHandle query_debug_counters;
         if (draw_surfels || finalize_migration)
         {
             surfel_pool = graph.Import(_feature->_surfel_pool.get());
@@ -1285,6 +1422,8 @@ namespace Ailu::Render
             surfel_state = graph.Import(_feature->_surfel_state.get());
             dispatch_args = graph.Import(_feature->_surfel_dispatch_args.get());
         }
+        if (read_query_debug)
+            query_debug_counters = graph.Import(_feature->_query_debug_counters.get());
         if (draw_coverage || draw_tile_grid || draw_surfels)
         {
             graph.AddPass("Surfel Debug Overlay", RDG::PassDesc(),
@@ -1364,6 +1503,28 @@ namespace Ailu::Render
                     cmd->UavBarrier(_feature->_surfel_pool.get());
                 });
             _feature->_migration_finalize_pending = false;
+        }
+
+        if (read_query_debug)
+        {
+            graph.AddPass("Surfel Query Debug Readback", RDG::PassDesc(RDG::EPassType::kCompute),
+                [&, this](RDG::RenderGraphBuilder &builder)
+                {
+                    builder.Read(query_debug_counters, EResourceUsage::kWriteUAV);
+                },
+                [this](RDG::RenderGraph &, CommandBuffer *cmd, const RenderingData &)
+                {
+                    _feature->_query_debug_readback_pending = false;
+                    cmd->ReadbackBuffer(_feature->_query_debug_counters.get(), false, sizeof(u32) * 5u,
+                        [](const u8 *bytes, u32 size)
+                        {
+                            if (bytes == nullptr || size < sizeof(u32) * 5u)
+                                return;
+                            const auto *counters = reinterpret_cast<const u32 *>(bytes);
+                            LOG_INFO("SurfelGI query: pixels={} cascades={} candidates={} fallback_pixels={} "
+                                     "max_candidates={}", counters[0], counters[1], counters[2], counters[3], counters[4]);
+                        });
+                });
         }
     }
 }
