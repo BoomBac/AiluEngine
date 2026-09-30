@@ -215,6 +215,7 @@ namespace Ailu
                     {
                         const auto &ds = RenderingStates::DisplayData();
                         const auto gpu_resolve = GpuResourceRegistry::GetResolveStats();
+                        const auto registry_sync = GpuResourceRegistry::Get().GetSyncStats();
                         auto counter = [](u64 value) { return AutomationValue(static_cast<double>(value)); };
                         AutomationObject stats{
                             {"material_capture_count", counter(ds.MaterialCaptureCount)},
@@ -238,6 +239,12 @@ namespace Ailu
                             {"gpu_resource_resolve_count", counter(gpu_resolve._total_resolve_count)},
                             {"gpu_resource_resolve_invalid_count", counter(gpu_resolve._invalid_handle_resolve_count)},
                             {"gpu_resource_resolve_locked_count", counter(gpu_resolve._locked_resolve_count)},
+                            {"gpu_registry_sync_count", counter(registry_sync._sync_count)},
+                            {"gpu_registry_applied_add_count", counter(registry_sync._applied_add_count)},
+                            {"gpu_registry_applied_retire_count", counter(registry_sync._applied_retire_count)},
+                            {"gpu_registry_collected_resource_count", counter(registry_sync._collected_resource_count)},
+                            {"gpu_registry_max_pending_add_count", counter(registry_sync._max_pending_add_count)},
+                            {"gpu_registry_max_pending_retire_count", counter(registry_sync._max_pending_retire_count)},
                             {"cpu_render_recording_ms", counter(static_cast<u64>(ds.CpuRenderRecordingTimeMs * 1000.0f))},
                             {"cpu_render_recording_graph_count", counter(ds.CpuRenderRecordingFrameCount)},
                         };

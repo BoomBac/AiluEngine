@@ -199,6 +199,7 @@ namespace Ailu::RHI::DX12
         void ReportDeviceRemoved(HRESULT operation_hr, const char *operation);
     private:
         void Destroy();
+        void SyncGpuResourcesForImmediateRecording();
         void LoadPipeline();
         void LoadAssets();
         bool BeginPixCapture();

@@ -1080,8 +1080,9 @@ namespace Ailu::RHI::DX12
         _cmd_worker->Push(cmd->TakeCommands(), std::move(params));
     }
 
-    void D3DContext::ExecuteCommandBufferSync(Ref<CommandBuffer> &cmd)
+    void D3DContext::SyncGpuResourcesForImmediateRecording()
     {
+        AL_ASSERT(Application::IsMainThread());
         // 资产预览/初始化使用即时录制，也可能带有尚未发布的临时 RT。
         auto *pipeline = RenderPipeline::Instance();
         if (Application::Get()._is_multi_thread_rendering.load() && pipeline != nullptr &&
@@ -1091,6 +1092,11 @@ namespace Ailu::RHI::DX12
             pipeline->SetRenderThreadFramePending(false);
         }
         GpuResourceRegistry::Get().Sync(GetFenceValueGPU());
+    }
+
+    void D3DContext::ExecuteCommandBufferSync(Ref<CommandBuffer> &cmd)
+    {
+        SyncGpuResourcesForImmediateRecording();
         auto released_temp_rts = cmd->TakeReleasedTempRTs();
         auto rhi_cmd = RHICommandBufferPool::Get(cmd->Name());
         rhi_cmd->RecordingContext().AccumulateRenderingStatesData(cmd->TakeRenderingStatesData());
@@ -3150,6 +3156,7 @@ namespace Ailu::RHI::DX12
     }
     void D3DContext::SubmitGpuCommandSync(GfxCommand *cmd)
     {
+        SyncGpuResourcesForImmediateRecording();
         auto rhi_cmd = RHICommandBufferPool::Get("SyncTask");
         ProcessGpuCommand(cmd, rhi_cmd.get());
         ExecuteRHICommandBuffer(rhi_cmd.get());

@@ -12,7 +12,6 @@ namespace Ailu::Render
 #if defined(_DEBUG)
         std::atomic<u64> s_gpu_resolve_count{0u};
         std::atomic<u64> s_gpu_resolve_invalid_handle_count{0u};
-        std::atomic<u64> s_gpu_resolve_locked_count{0u};
 #endif
         // 最近一次帧边界快照，供自动化/UI 读取（与 RenderingStates::DisplayData 同语义）。
         GpuResourceResolveStats s_resolve_snapshot;
@@ -30,7 +29,6 @@ namespace Ailu::Render
 #if defined(_DEBUG)
         stats._total_resolve_count = s_gpu_resolve_count.exchange(0u, std::memory_order_acq_rel);
         stats._invalid_handle_resolve_count = s_gpu_resolve_invalid_handle_count.exchange(0u, std::memory_order_acq_rel);
-        stats._locked_resolve_count = s_gpu_resolve_locked_count.exchange(0u, std::memory_order_acq_rel);
 #endif
         s_resolve_snapshot = stats;
         return stats;
@@ -46,7 +44,6 @@ namespace Ailu::Render
 #if defined(_DEBUG)
         s_gpu_resolve_count.store(0u, std::memory_order_relaxed);
         s_gpu_resolve_invalid_handle_count.store(0u, std::memory_order_relaxed);
-        s_gpu_resolve_locked_count.store(0u, std::memory_order_relaxed);
 #endif
     }
 
@@ -73,25 +70,18 @@ namespace Ailu::Render
 
     GpuResource *GpuResourceRegistry::Resolve(GpuResourceHandle handle)
     {
-        // 无效句柄在加锁前直接拒绝：普通 draw 的 per-object cbuffer / indirect arg buffer
-        // 大多为空句柄，不应为此获取 shared_mutex。
 #if defined(_DEBUG)
+        AL_ASSERT(!_is_syncing.load(std::memory_order_acquire));
         s_gpu_resolve_count.fetch_add(1u, std::memory_order_relaxed);
 #endif
-        if (!handle.IsValid() || handle._index >= _slot_count.load(std::memory_order_acquire))
+        if (handle._index >= _published_slot_count)
         {
 #if defined(_DEBUG)
             s_gpu_resolve_invalid_handle_count.fetch_add(1u, std::memory_order_relaxed);
 #endif
             return nullptr;
         }
-#if defined(_DEBUG)
-        s_gpu_resolve_locked_count.fetch_add(1u, std::memory_order_relaxed);
-#endif
-        std::shared_lock lock(_resource_mutex);
-        if (handle._index >= _slots.size())
-            return nullptr;
-        auto &slot = _slots[handle._index];
+        auto &slot = _published_slots[handle._index];
         if (slot._state != EGpuResourceSlotState::kAlive || slot._generation != handle._generation)
             return nullptr;
         return slot._resource.get();
@@ -100,22 +90,17 @@ namespace Ailu::Render
     const GpuResource *GpuResourceRegistry::Resolve(GpuResourceHandle handle) const
     {
 #if defined(_DEBUG)
+        AL_ASSERT(!_is_syncing.load(std::memory_order_acquire));
         s_gpu_resolve_count.fetch_add(1u, std::memory_order_relaxed);
 #endif
-        if (!handle.IsValid() || handle._index >= _slot_count.load(std::memory_order_acquire))
+        if (handle._index >= _published_slot_count)
         {
 #if defined(_DEBUG)
             s_gpu_resolve_invalid_handle_count.fetch_add(1u, std::memory_order_relaxed);
 #endif
             return nullptr;
         }
-#if defined(_DEBUG)
-        s_gpu_resolve_locked_count.fetch_add(1u, std::memory_order_relaxed);
-#endif
-        std::shared_lock lock(_resource_mutex);
-        if (handle._index >= _slots.size())
-            return nullptr;
-        const auto &slot = _slots[handle._index];
+        const auto &slot = _published_slots[handle._index];
         if (slot._state != EGpuResourceSlotState::kAlive || slot._generation != handle._generation)
             return nullptr;
         return slot._resource.get();
@@ -156,11 +141,27 @@ namespace Ailu::Render
         return stats;
     }
 
+    GpuResourceSyncStats GpuResourceRegistry::GetSyncStats() const
+    {
+        GpuResourceSyncStats stats;
+#if defined(_DEBUG)
+        stats._sync_count = _sync_count.load(std::memory_order_relaxed);
+        stats._applied_add_count = _applied_add_count.load(std::memory_order_relaxed);
+        stats._applied_retire_count = _applied_retire_count.load(std::memory_order_relaxed);
+        stats._collected_resource_count = _collected_resource_count.load(std::memory_order_relaxed);
+        stats._max_pending_add_count = _max_pending_add_count.load(std::memory_order_relaxed);
+        stats._max_pending_retire_count = _max_pending_retire_count.load(std::memory_order_relaxed);
+#endif
+        return stats;
+    }
+
     void GpuResourceRegistry::Sync(u64 completed_fence)
     {
         PROFILE_BLOCK_CPU("GpuResourceRegistry::Sync")
-        // 阶段 2B 的过渡保护：保留独占锁，与 Resolve 的 shared lock 配对。
-        std::unique_lock lock(_resource_mutex);
+#if defined(_DEBUG)
+        const bool was_syncing = _is_syncing.exchange(true, std::memory_order_acq_rel);
+        AL_ASSERT(!was_syncing);
+#endif
         Vector<PendingGpuResourceAdd> pending_adds;
         Vector<PendingGpuResourceRetire> pending_retires;
         {
@@ -179,7 +180,6 @@ namespace Ailu::Render
             slot._resource = std::move(pending._resource);
             slot._state = EGpuResourceSlotState::kAlive;
         }
-        _slot_count.store(static_cast<u32>(_slots.size()), std::memory_order_release);
 
         Vector<GpuResourceHandle> available_handles;
         for (const auto &pending : pending_retires)
@@ -198,18 +198,41 @@ namespace Ailu::Render
         }
         // 包括 fence 0 在内，统一只在 Sync 中析构，不持有 pending mutex。
         while (!_retired_resources.empty() && _retired_resources.front()._fence <= completed_fence)
+        {
             _retired_resources.pop_front();
+#if defined(_DEBUG)
+            _collected_resource_count.fetch_add(1u, std::memory_order_relaxed);
+#endif
+        }
+#if defined(_DEBUG)
+        _sync_count.fetch_add(1u, std::memory_order_relaxed);
+        _applied_add_count.fetch_add(pending_adds.size(), std::memory_order_relaxed);
+        _applied_retire_count.fetch_add(available_handles.size(), std::memory_order_relaxed);
+        if (pending_adds.size() > _max_pending_add_count.load(std::memory_order_relaxed))
+            _max_pending_add_count.store(pending_adds.size(), std::memory_order_relaxed);
+        if (pending_retires.size() > _max_pending_retire_count.load(std::memory_order_relaxed))
+            _max_pending_retire_count.store(pending_retires.size(), std::memory_order_relaxed);
+#endif
         if (!available_handles.empty())
         {
             std::lock_guard pending_lock(_pending_mutation_mutex);
             for (const auto handle : available_handles)
                 _available_handles.emplace_back(handle);
         }
+        _published_slots = _slots.data();
+        _published_slot_count = static_cast<u32>(_slots.size());
+#if defined(_DEBUG)
+        _is_syncing.store(false, std::memory_order_release);
+#endif
     }
 
     void GpuResourceRegistry::Clear()
     {
         // 仅用于 worker 停止后的 shutdown；pending 资源析构不能持有 pending mutex。
+#if defined(_DEBUG)
+        const bool was_syncing = _is_syncing.exchange(true, std::memory_order_acq_rel);
+        AL_ASSERT(!was_syncing);
+#endif
         Vector<PendingGpuResourceAdd> pending_adds;
         {
             std::lock_guard lock(_pending_mutation_mutex);
@@ -226,17 +249,18 @@ namespace Ailu::Render
 
         // Resource destructors may release nested Ref objects, which re-enter Release().
         // Do not hold _pending_release_mutex while unique_ptr destructors are running.
-        {
-            std::unique_lock lock(_resource_mutex);
-            _retired_resources.clear();
-            _slots.clear();
-            _slot_count.store(0u, std::memory_order_release);
-        }
+        _retired_resources.clear();
+        _slots.clear();
+        _published_slots = nullptr;
+        _published_slot_count = 0u;
 
         {
             std::lock_guard lock(_pending_release_mutex);
             _pending_releases.clear();
         }
+#if defined(_DEBUG)
+        _is_syncing.store(false, std::memory_order_release);
+#endif
     }
 
     #pragma region GpuResource

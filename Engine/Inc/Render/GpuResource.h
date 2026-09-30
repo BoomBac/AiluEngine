@@ -12,7 +12,6 @@
 #include <deque>
 #include <memory>
 #include <mutex>
-#include <shared_mutex>
 #include <atomic>
 #include <type_traits>
 #include "generated/GpuResource.gen.h"
@@ -80,6 +79,16 @@ namespace Ailu::Render
         u32 _pending_retire_count = 0u;
     };
 
+    struct GpuResourceSyncStats
+    {
+        u64 _sync_count = 0u;
+        u64 _applied_add_count = 0u;
+        u64 _applied_retire_count = 0u;
+        u64 _collected_resource_count = 0u;
+        u64 _max_pending_add_count = 0u;
+        u64 _max_pending_retire_count = 0u;
+    };
+
     // 仅 Debug 启用 Resolve 诊断计数；其他配置的统计接口返回零，避免热路径中的全局 atomic RMW。
     struct GpuResourceResolveStats
     {
@@ -117,16 +126,26 @@ namespace Ailu::Render
         void Retire(GpuResourceHandle handle, u64 fence);
         void Release(GpuResourceHandle handle);
         Vector<GpuResourceHandle> TakePendingReleases();
-        // 在 frontend/RHI 帧同步点发布排队修改；阶段 2B 仍保留 Resolve 的 shared_mutex。
+        // 只能在无 Resolve reader 的 frontend/RHI 同步点调用；两次 Sync 之间槽位完全冻结。
         void Sync(u64 completed_fence);
         GpuResourcePendingStats GetPendingStats() const;
+        GpuResourceSyncStats GetSyncStats() const;
         void Clear();
 
     private:
-        // 槽位数量在写锁内更新，加锁前用这个原子镜像做快速越界/无效句柄判断。
-        std::atomic<u32> _slot_count{0u};
-        mutable std::shared_mutex _resource_mutex;
+#if defined(_DEBUG)
+        std::atomic<bool> _is_syncing{false};
+        std::atomic<u64> _sync_count{0u};
+        std::atomic<u64> _applied_add_count{0u};
+        std::atomic<u64> _applied_retire_count{0u};
+        std::atomic<u64> _collected_resource_count{0u};
+        std::atomic<u64> _max_pending_add_count{0u};
+        std::atomic<u64> _max_pending_retire_count{0u};
+#endif
         Vector<GpuResourceSlot> _slots;
+        // Sync 发布的只读视图，避免 /Od 热路径重复展开 Vector 的 size/operator[]。
+        GpuResourceSlot *_published_slots = nullptr;
+        u32 _published_slot_count = 0u;
         std::deque<RetiredGpuResource> _retired_resources;
         mutable std::mutex _pending_mutation_mutex;
         Vector<PendingGpuResourceAdd> _pending_adds;
