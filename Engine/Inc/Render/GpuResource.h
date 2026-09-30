@@ -62,7 +62,7 @@ namespace Ailu::Render
         std::unique_ptr<GpuResource> _resource;
     };
 
-    // Resolve 路径的轻量计数，用于验证无效句柄不再获取 shared_mutex。
+    // 仅 Debug 启用 Resolve 诊断计数；其他配置的统计接口返回零，避免热路径中的全局 atomic RMW。
     struct GpuResourceResolveStats
     {
         u64 _total_resolve_count = 0u;

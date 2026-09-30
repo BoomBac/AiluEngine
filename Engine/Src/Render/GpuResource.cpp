@@ -8,9 +8,11 @@ namespace Ailu::Render
 {
     namespace
     {
+#if defined(_DEBUG)
         std::atomic<u64> s_gpu_resolve_count{0u};
         std::atomic<u64> s_gpu_resolve_invalid_handle_count{0u};
         std::atomic<u64> s_gpu_resolve_locked_count{0u};
+#endif
         // 最近一次帧边界快照，供自动化/UI 读取（与 RenderingStates::DisplayData 同语义）。
         GpuResourceResolveStats s_resolve_snapshot;
     }
@@ -24,9 +26,11 @@ namespace Ailu::Render
     GpuResourceResolveStats GpuResourceRegistry::TakeResolveStats()
     {
         GpuResourceResolveStats stats;
+#if defined(_DEBUG)
         stats._total_resolve_count = s_gpu_resolve_count.exchange(0u, std::memory_order_acq_rel);
         stats._invalid_handle_resolve_count = s_gpu_resolve_invalid_handle_count.exchange(0u, std::memory_order_acq_rel);
         stats._locked_resolve_count = s_gpu_resolve_locked_count.exchange(0u, std::memory_order_acq_rel);
+#endif
         s_resolve_snapshot = stats;
         return stats;
     }
@@ -38,9 +42,11 @@ namespace Ailu::Render
 
     void GpuResourceRegistry::ResetResolveStats()
     {
+#if defined(_DEBUG)
         s_gpu_resolve_count.store(0u, std::memory_order_relaxed);
         s_gpu_resolve_invalid_handle_count.store(0u, std::memory_order_relaxed);
         s_gpu_resolve_locked_count.store(0u, std::memory_order_relaxed);
+#endif
     }
 
     GpuResourceHandle GpuResourceRegistry::Add(std::unique_ptr<GpuResource> resource)
@@ -74,13 +80,19 @@ namespace Ailu::Render
     {
         // 无效句柄在加锁前直接拒绝：普通 draw 的 per-object cbuffer / indirect arg buffer
         // 大多为空句柄，不应为此获取 shared_mutex。
+#if defined(_DEBUG)
         s_gpu_resolve_count.fetch_add(1u, std::memory_order_relaxed);
+#endif
         if (!handle.IsValid() || handle._index >= _slot_count.load(std::memory_order_acquire))
         {
+#if defined(_DEBUG)
             s_gpu_resolve_invalid_handle_count.fetch_add(1u, std::memory_order_relaxed);
+#endif
             return nullptr;
         }
+#if defined(_DEBUG)
         s_gpu_resolve_locked_count.fetch_add(1u, std::memory_order_relaxed);
+#endif
         std::shared_lock lock(_resource_mutex);
         if (handle._index >= _slots.size())
             return nullptr;
@@ -92,13 +104,19 @@ namespace Ailu::Render
 
     const GpuResource *GpuResourceRegistry::Resolve(GpuResourceHandle handle) const
     {
+#if defined(_DEBUG)
         s_gpu_resolve_count.fetch_add(1u, std::memory_order_relaxed);
+#endif
         if (!handle.IsValid() || handle._index >= _slot_count.load(std::memory_order_acquire))
         {
+#if defined(_DEBUG)
             s_gpu_resolve_invalid_handle_count.fetch_add(1u, std::memory_order_relaxed);
+#endif
             return nullptr;
         }
+#if defined(_DEBUG)
         s_gpu_resolve_locked_count.fetch_add(1u, std::memory_order_relaxed);
+#endif
         std::shared_lock lock(_resource_mutex);
         if (handle._index >= _slots.size())
             return nullptr;
