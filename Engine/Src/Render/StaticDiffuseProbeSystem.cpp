@@ -132,6 +132,8 @@ namespace Ailu::Render
         u32 total_probe_count = 0u;
         for (const Group &group : _groups)
             total_probe_count += group._data->_grid.ProbeCount();
+        const u32 reserved_probe_count = std::min(total_probe_count, RenderConstants::kMaxStaticDiffuseProbeCount);
+        out_probes.reserve(reserved_probe_count);
 
         u32 skipped_probe_count = 0u;
         out_groups.reserve(_groups.size());
@@ -171,7 +173,6 @@ namespace Ailu::Render
         }
         // 补齐到容量上限，使着色器 GetDimensions 返回的组数与实际分配一致。
         out_groups.resize(RenderConstants::kMaxStaticDiffuseProbeGroupCount);
-        out_probes.resize(RenderConstants::kMaxStaticDiffuseProbeCount);
         if (skipped_probe_count > 0u)
             LOG_WARNING("Static diffuse probe GPU data trimmed: {} of {} probes exceed the {}-probe GPU budget; "
                         "lower the probe group counts",

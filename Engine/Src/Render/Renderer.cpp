@@ -544,7 +544,6 @@ namespace Ailu::Render
         _static_probe_system.BuildGPUData(_static_diffuse_probe_groups, _static_diffuse_probe_data);
         AL_ASSERT(_static_diffuse_probe_groups.size() <= RenderConstants::kMaxStaticDiffuseProbeGroupCount);
         AL_ASSERT(_static_diffuse_probe_data.size() <= RenderConstants::kMaxStaticDiffuseProbeCount);
-        _static_diffuse_probe_groups.resize(RenderConstants::kMaxStaticDiffuseProbeGroupCount);
         HashMap<ECS::Entity, u32> gi_data_indices;
         auto collect_gi_data = [this, &r, &gi_data_indices](auto &renderables)
         {
