@@ -7,6 +7,7 @@
 #include "Framework/Core/Containers/Map.h"
 #include "Framework/Core/Containers/Array.h"
 #include "Framework/Math/Geometry.h"
+#include "Render/DrawSubmission.h"
 #include "Texture.h"
 #include "PostprocessSettings.h"
 #include "SphericalHarmonics.h"
@@ -93,6 +94,7 @@ namespace Ailu::Render
         Material *_material = nullptr;
         VertexBuffer *_vertex_buffer = nullptr;
         IndexBuffer *_index_buffer = nullptr;
+        DrawGeometryId _geometry_id = 0u;
         AABB _world_bounds{};
         u16 _submesh_index = 0u;
         u16 _flags = 0u;
@@ -107,6 +109,7 @@ namespace Ailu::Render
         Material *_material;
         VertexBuffer *_vertex_buffer = nullptr;
         IndexBuffer *_index_buffer = nullptr;
+        DrawGeometryId _geometry_id = 0u;
         u16 _flags = 0u;
         u32 _entity = 0u;
     };

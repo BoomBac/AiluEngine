@@ -191,7 +191,7 @@ namespace Ailu::Render
                 return;
             }
 
-            const ShaderPropertyId per_obj_id = RenderPropertyIds::PerObject();
+            const static ShaderPropertyId per_obj_id = RenderPropertyIds::PerObject();
             constexpr i16 kInvalidSlot = -1;
             // 槽位直接取 layout 声明，随后先更新 command_resources，再解析本 draw 的绑定。
             i16 per_obj_slot = kInvalidSlot;

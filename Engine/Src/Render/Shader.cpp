@@ -488,6 +488,13 @@ namespace Ailu::Render
         return pass_index;
     }
 
+    i16 Shader::ShadowCasterPassIndex()
+    {
+        if (_shadow_caster_pass_index == -2)
+            _shadow_caster_pass_index = FindPass("ShadowCaster");
+        return _shadow_caster_pass_index;
+    }
+
     ShaderVariantHash Shader::ConstructVariantHash(u16 pass_index, const std::set<String> &kw_seq) const
     {
         std::set<String> active_kw_seq;
@@ -683,6 +690,7 @@ namespace Ailu::Render
         _variant_state.clear();
         // pass 列表即将重建，索引缓存必须失效，否则会给出过期/越界的 pass index。
         _pass_name_to_index.clear();
+        _shadow_caster_pass_index = -2;
         List<String> lines{};
         String line{};
         u32 line_count = 0;

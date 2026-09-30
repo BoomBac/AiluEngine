@@ -28,6 +28,10 @@ namespace Ailu::Render
         u64 DrawInstancedBatchCount = 0u;
         u64 DrawInstancedPrimitiveCount = 0u;
         u64 DrawNonContiguousBatchCount = 0u;
+        u64 MaterialSubmissionCacheHitCount = 0u;
+        u64 MaterialSubmissionCacheMissCount = 0u;
+        u64 PipelineInternCount = 0u;
+        u64 MaterialInternCount = 0u;
         u64 MaterialBindingResolveCount = 0u;
         u64 MaterialBindingGlobalUpdateCount = 0u;
         u64 MaterialBindingCacheHitCount = 0u;
@@ -87,6 +91,10 @@ namespace Ailu::Render
         u64 DrawInstancedBatchCount = 0u;
         u64 DrawInstancedPrimitiveCount = 0u;
         u64 DrawNonContiguousBatchCount = 0u;
+        u64 MaterialSubmissionCacheHitCount = 0u;
+        u64 MaterialSubmissionCacheMissCount = 0u;
+        u64 PipelineInternCount = 0u;
+        u64 MaterialInternCount = 0u;
         u64 MaterialBindingResolveCount = 0u;
         u64 MaterialBindingGlobalUpdateCount = 0u;
         u64 MaterialBindingCacheHitCount = 0u;
@@ -142,6 +150,10 @@ namespace Ailu::Render
             DrawInstancedBatchCount += other.DrawInstancedBatchCount;
             DrawInstancedPrimitiveCount += other.DrawInstancedPrimitiveCount;
             DrawNonContiguousBatchCount += other.DrawNonContiguousBatchCount;
+            MaterialSubmissionCacheHitCount += other.MaterialSubmissionCacheHitCount;
+            MaterialSubmissionCacheMissCount += other.MaterialSubmissionCacheMissCount;
+            PipelineInternCount += other.PipelineInternCount;
+            MaterialInternCount += other.MaterialInternCount;
             MaterialBindingResolveCount += other.MaterialBindingResolveCount;
             MaterialBindingGlobalUpdateCount += other.MaterialBindingGlobalUpdateCount;
             MaterialBindingCacheHitCount += other.MaterialBindingCacheHitCount;
@@ -195,6 +207,10 @@ namespace Ailu::Render
             data.DrawInstancedBatchCount += DrawInstancedBatchCount;
             data.DrawInstancedPrimitiveCount += DrawInstancedPrimitiveCount;
             data.DrawNonContiguousBatchCount += DrawNonContiguousBatchCount;
+            data.MaterialSubmissionCacheHitCount += MaterialSubmissionCacheHitCount;
+            data.MaterialSubmissionCacheMissCount += MaterialSubmissionCacheMissCount;
+            data.PipelineInternCount += PipelineInternCount;
+            data.MaterialInternCount += MaterialInternCount;
             data.MaterialBindingResolveCount += MaterialBindingResolveCount;
             data.MaterialBindingGlobalUpdateCount += MaterialBindingGlobalUpdateCount;
             data.MaterialBindingCacheHitCount += MaterialBindingCacheHitCount;

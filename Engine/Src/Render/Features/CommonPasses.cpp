@@ -57,10 +57,12 @@ namespace Ailu::Render
             CBufferPrimitiveDrawData _primitive_draw_data{};
             u32 _render_queue = Shader::kRenderQueueOpaque;
             f32 _view_depth = 0.0f;
+            bool _submission_cache_hit = false;
         };
 
         QueuedDrawItem MakeQueuedDrawItem(u32 render_queue, const RenderableObjectData &object, Material *material,
-                                          u16 pass_index, bool force_alpha_test = false)
+                                          u16 pass_index, bool force_alpha_test = false,
+                                          u32 variant_override_hash = UINT32_MAX)
         {
             QueuedDrawItem item{};
             AL_ASSERT(render_queue <= 0xffffu);
@@ -72,19 +74,16 @@ namespace Ailu::Render
             item._command._pass_index = pass_index;
             item._render_queue = render_queue;
             item._view_depth = object._distance_to_cam;
-            item._command._variant_hash = material->ActiveVariantHash(pass_index);
+            item._command._variant_hash = variant_override_hash != UINT32_MAX
+                ? variant_override_hash : material->ActiveVariantHash(pass_index);
             item._command._stencil_ref = (object._flags & kPrimitivePerObjectMotion) ? 1u : 0u;
             item._command._flags = kPreparedDrawAllowInstancing;
             if (render_queue >= Shader::kRenderQueueTransparent)
                 item._command._flags = kPreparedDrawPreserveOrder;
             if (force_alpha_test)
                 item._command._flags |= kPreparedDrawForceAlphaTest;
-            if (force_alpha_test && material->GetActiveShader() != nullptr)
-            {
-                auto keywords = material->ActiveKeywords(pass_index);
-                keywords.insert("ALPHA_TEST");
-                item._command._variant_hash = material->GetActiveShader()->ConstructVariantHash(pass_index, keywords);
-            }
+            if (force_alpha_test && variant_override_hash == UINT32_MAX)
+                item._command._variant_hash = material->GetShadowVariantHash(pass_index, false, true);
             if (const auto *shader = material->GetActiveShader(); shader != nullptr)
             {
                 auto raster_state = shader->PipelineRasterizerState(pass_index);
@@ -95,21 +94,20 @@ namespace Ailu::Render
                     shader->PipelineBlendState(pass_index).Hash(), raster_state.Hash(),
                     shader->PipelineDepthStencilState(pass_index).Hash(),
                     static_cast<u8>(shader->PipelineTopology(pass_index))};
-                item._command._pipeline_state_id = DrawSubmissionRegistry::Get().InternPipeline(pipeline_key);
+                const MaterialStateKey material_key{material->ID(), material->DrawStateVersion(),
+                                                     item._command._variant_hash, pass_index};
+                const auto state_ids = material->GetDrawSubmissionStateIds(pipeline_key, material_key);
+                item._command._pipeline_state_id = state_ids._pipeline_state_id;
+                item._command._material_state_id = state_ids._material_state_id;
+                item._submission_cache_hit = state_ids._cache_hit;
             }
-            const MaterialStateKey material_key{material->ID(), material->DrawStateVersion(),
-                                                 item._command._variant_hash, pass_index};
-            item._command._material_state_id = DrawSubmissionRegistry::Get().InternMaterial(material_key);
-            DrawGeometryKey geometry_key{};
-            geometry_key._vertex_buffer = object._vertex_buffer != nullptr
-                ? object._vertex_buffer->TypedHandle<BufferTag>() : BufferHandle{};
-            geometry_key._index_buffer = object._index_buffer != nullptr
-                ? object._index_buffer->TypedHandle<BufferTag>() : BufferHandle{};
-            geometry_key._vertex_buffer_id = object._vertex_buffer != nullptr ? object._vertex_buffer->ID() : 0u;
-            geometry_key._index_buffer_id = object._index_buffer != nullptr ? object._index_buffer->ID() : 0u;
-            geometry_key._index_count = object._index_buffer != nullptr ? object._index_buffer->GetCount() : 0u;
-            geometry_key._submesh_index = object._submesh_index;
-            item._command._geometry_id = DrawSubmissionRegistry::Get().InternGeometry(geometry_key);
+            else
+            {
+                const MaterialStateKey material_key{material->ID(), material->DrawStateVersion(),
+                                                     item._command._variant_hash, pass_index};
+                item._command._material_state_id = DrawSubmissionRegistry::Get().InternMaterial(material_key);
+            }
+            item._command._geometry_id = object._geometry_id;
             const DrawStateBucketKey bucket_key{item._command._pipeline_state_id,
                 item._command._material_state_id, item._command._geometry_id,
                 render_queue, item._command._stencil_ref, static_cast<u16>(item._command._flags)};
@@ -161,18 +159,29 @@ namespace Ailu::Render
 
             CommandRenderingStatesData submission_stats{};
             submission_stats.DrawSortItemCount = items.size();
+            for (const auto &item : items)
+            {
+                if (item._submission_cache_hit)
+                    ++submission_stats.MaterialSubmissionCacheHitCount;
+                else
+                {
+                    ++submission_stats.MaterialSubmissionCacheMissCount;
+                    ++submission_stats.PipelineInternCount;
+                    ++submission_stats.MaterialInternCount;
+                }
+            }
             if (items.size() > 1u)
             {
-                Vector<VisibleDrawItem> visible_items;
-                visible_items.reserve(items.size());
+                struct SortedDrawRef
+                {
+                    DrawSortKey _sort_key{};
+                    u32 _item_index = 0u;
+                };
+                Vector<SortedDrawRef> sorted_refs;
+                sorted_refs.reserve(items.size());
                 for (u32 item_index = 0u; item_index < items.size(); ++item_index)
                 {
-                    VisibleDrawItem visible_item;
                     const PreparedDrawCommand &command = items[item_index]._command;
-                    visible_item._command = &command;
-                    visible_item._state_bucket_id = command._state_bucket_id;
-                    visible_item._primitive_index = items[item_index]._primitive_draw_data._primitive_base;
-                    visible_item._submission_index = item_index;
                     DrawSortInput sort_input{};
                     sort_input._render_queue = items[item_index]._render_queue;
                     sort_input._depth_bucket = policy == EDrawSortPolicy::kTransparent
@@ -182,59 +191,47 @@ namespace Ailu::Render
                     sort_input._material_state_id = command._material_state_id;
                     sort_input._state_bucket_id = command._state_bucket_id;
                     sort_input._submission_index = item_index;
-                    visible_item._sort_key = BuildDrawSortKey(policy, sort_input);
-                    visible_items.emplace_back(visible_item);
+                    sorted_refs.emplace_back(SortedDrawRef{BuildDrawSortKey(policy, sort_input), item_index});
                 }
 #if AILU_ENABLE_ENGINE_PROFILER || defined(TRACY_ENABLE)
-                std::sort(visible_items.begin(), visible_items.end(), [&submission_stats](const VisibleDrawItem &lhs, const VisibleDrawItem &rhs)
+                std::sort(sorted_refs.begin(), sorted_refs.end(), [&submission_stats](const SortedDrawRef &lhs, const SortedDrawRef &rhs)
                 {
                     ++submission_stats.DrawSortCompareCount;
                     return lhs._sort_key < rhs._sort_key;
                 });
 #else
-                std::sort(visible_items.begin(), visible_items.end(), [](const VisibleDrawItem &lhs, const VisibleDrawItem &rhs)
+                std::sort(sorted_refs.begin(), sorted_refs.end(), [](const SortedDrawRef &lhs, const SortedDrawRef &rhs)
                 {
                     return lhs._sort_key < rhs._sort_key;
                 });
 #endif
-                Vector<QueuedDrawItem> sorted_items;
-                sorted_items.reserve(items.size());
-                for (const VisibleDrawItem &visible_item : visible_items)
-                    sorted_items.emplace_back(std::move(items[visible_item._submission_index]));
-                items.swap(sorted_items);
-                visible_items.clear();
-                visible_items.reserve(items.size());
-                for (u32 item_index = 0u; item_index < items.size(); ++item_index)
-                {
-                    VisibleDrawItem visible_item;
-                    visible_item._command = &items[item_index]._command;
-                    visible_item._state_bucket_id = items[item_index]._command._state_bucket_id;
-                    visible_item._primitive_index = items[item_index]._primitive_draw_data._primitive_base;
-                    visible_item._submission_index = item_index;
-                    visible_items.emplace_back(visible_item);
-                }
 
                 Vector<QueuedDrawBatch> batches;
                 batches.reserve(items.size());
-                for (u32 begin = 0u; begin < visible_items.size();)
+                for (u32 begin = 0u; begin < sorted_refs.size();)
                 {
                     u32 end = begin + 1u;
-                    while (end < visible_items.size())
+                    while (end < sorted_refs.size())
                     {
 #if AILU_ENABLE_ENGINE_PROFILER || defined(TRACY_ENABLE)
                         ++submission_stats.DrawBatchCompareCount;
 #endif
-                        if (!CanMergeInstances(visible_items[begin], visible_items[end]))
+                        const PreparedDrawCommand &lhs = items[sorted_refs[begin]._item_index]._command;
+                        const PreparedDrawCommand &rhs = items[sorted_refs[end]._item_index]._command;
+                        if (lhs._state_bucket_id == 0u || lhs._state_bucket_id != rhs._state_bucket_id
+                            || (lhs._flags & kPreparedDrawAllowInstancing) == 0u
+                            || (lhs._flags & kPreparedDrawPreserveOrder) != 0u)
                             break;
                         ++end;
                     }
-                    const u32 item_index = visible_items[begin]._submission_index;
+                    const u32 item_index = sorted_refs[begin]._item_index;
                     const u32 instance_count = end - begin;
                     CBufferPrimitiveDrawData draw_data = items[item_index]._primitive_draw_data;
                     bool is_contiguous = true;
                     for (u32 index = begin + 1u; index < end; ++index)
                     {
-                        if (visible_items[index]._primitive_index != draw_data._primitive_base + index - begin)
+                        const u32 primitive_index = items[sorted_refs[index]._item_index]._primitive_draw_data._primitive_base;
+                        if (primitive_index != draw_data._primitive_base + index - begin)
                         {
                             is_contiguous = false;
                             break;
@@ -245,7 +242,8 @@ namespace Ailu::Render
                         ++submission_stats.DrawNonContiguousBatchCount;
                         auto allocation = FrameResource::Active()->AllocatePrimitiveIndices(instance_count);
                         for (u32 index = 0u; index < instance_count; ++index)
-                            allocation._cpu_ptr[index] = visible_items[begin + index]._primitive_index;
+                            allocation._cpu_ptr[index] = items[sorted_refs[begin + index]._item_index]
+                                ._primitive_draw_data._primitive_base;
                         draw_data._instance_index_offset = allocation._offset;
                         draw_data._flags |= kPrimitiveDrawUseInstanceIndex;
                     }
@@ -368,24 +366,18 @@ namespace Ailu::Render
                     Material *shadow_material = object._material;
                     if (shadow_material == nullptr || shadow_material->GetActiveShader() == nullptr)
                         continue;
-                    const i16 shadow_pass = shadow_material->GetActiveShader()->FindPass("ShadowCaster");
+                    const i16 shadow_pass = shadow_material->GetActiveShader()->ShadowCasterPassIndex();
                     if (shadow_pass == -1)
                         continue;
-                    if (is_point_shadow)
-                        shadow_material->EnableKeyword("CAST_POINT_SHADOW");
-                    else
-                        shadow_material->DisableKeyword("CAST_POINT_SHADOW");
+                    const bool force_alpha_test = shadow_material->SurfaceType() == ESurfaceType::kTransparent;
+                    const ShaderVariantHash variant_hash = shadow_material->GetShadowVariantHash(
+                        static_cast<u16>(shadow_pass), is_point_shadow, force_alpha_test);
                     draw_items.emplace_back(MakeQueuedDrawItem(queue, object, shadow_material,
                                                                static_cast<u16>(shadow_pass),
-                                                               shadow_material->SurfaceType() == ESurfaceType::kTransparent));
+                                                               force_alpha_test, variant_hash));
                 }
             }
             EmitQueuedDraws(cmd, draw_items, EDrawSortPolicy::kShadow);
-            if (is_point_shadow)
-            {
-                for (const auto &item : draw_items)
-                    item._command._material->DisableKeyword("CAST_POINT_SHADOW");
-            }
         }
     }
 

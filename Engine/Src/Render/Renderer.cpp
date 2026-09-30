@@ -3,6 +3,7 @@
 #include "Framework/Common/Profiler.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Render/Material.h"
+#include "Render/DrawSubmission.h"
 #include "Framework/Common/TimeMgr.h"
 #include "Framework/Common/Application.h"
 #include "Render/Gizmo.h"
@@ -673,6 +674,7 @@ namespace Ailu::Render
                             data._submesh_triangle_count = mesh->GetTriangleCount(submesh_index);
                             chunk._primitives.emplace_back(ScenePrimitive{static_cast<u32>(chunk._primitives.size()),
                                 static_cast<u32>(entity), mesh, material, vertex_buffer, index_buffer,
+                                0u,
                                 renderable._transformed_aabbs[submesh_index + 1u], submesh_index, static_cast<u16>(data._flags)});
                             chunk._primitive_data.emplace_back(data);
                         }
@@ -694,6 +696,19 @@ namespace Ailu::Render
 
         build_chunks(s.GetRegister().View<ECS::StaticMeshComponent>(), false);
         build_chunks(s.GetRegister().View<ECS::CSkeletonMesh>(), true);
+        for (auto &primitive : _scene_primitives)
+        {
+            DrawGeometryKey geometry_key{};
+            geometry_key._vertex_buffer = primitive._vertex_buffer != nullptr
+                ? primitive._vertex_buffer->TypedHandle<BufferTag>() : BufferHandle{};
+            geometry_key._index_buffer = primitive._index_buffer != nullptr
+                ? primitive._index_buffer->TypedHandle<BufferTag>() : BufferHandle{};
+            geometry_key._vertex_buffer_id = primitive._vertex_buffer != nullptr ? primitive._vertex_buffer->ID() : 0u;
+            geometry_key._index_buffer_id = primitive._index_buffer != nullptr ? primitive._index_buffer->ID() : 0u;
+            geometry_key._index_count = primitive._index_buffer != nullptr ? primitive._index_buffer->GetCount() : 0u;
+            geometry_key._submesh_index = primitive._submesh_index;
+            primitive._geometry_id = DrawSubmissionRegistry::Get().InternGeometry(geometry_key);
+        }
         AL_ASSERT(_primitive_data.size() <= RenderConstants::kMaxRenderObjectCount);
         auto *primitive_buffer = _cur_fs->GetScenePrimitiveBuffer(s.HashCode());
         auto *primitive_gi_buffer = _cur_fs->GetScenePrimitiveGIDataBuffer(s.HashCode());
@@ -729,9 +744,18 @@ namespace Ailu::Render
             if ((primitive._flags & kPrimitiveSkinned) == 0u)
                 continue;
             if (auto *vertex_buffer = ECS::SkinningSystem::ResolveVertexBuffer(primitive._mesh, primitive._entity_id);
-                vertex_buffer != nullptr)
+                vertex_buffer != nullptr && vertex_buffer != primitive._vertex_buffer)
             {
                 primitive._vertex_buffer = vertex_buffer;
+                DrawGeometryKey geometry_key{};
+                geometry_key._vertex_buffer = vertex_buffer->TypedHandle<BufferTag>();
+                geometry_key._index_buffer = primitive._index_buffer != nullptr
+                    ? primitive._index_buffer->TypedHandle<BufferTag>() : BufferHandle{};
+                geometry_key._vertex_buffer_id = vertex_buffer->ID();
+                geometry_key._index_buffer_id = primitive._index_buffer != nullptr ? primitive._index_buffer->ID() : 0u;
+                geometry_key._index_count = primitive._index_buffer != nullptr ? primitive._index_buffer->GetCount() : 0u;
+                geometry_key._submesh_index = primitive._submesh_index;
+                primitive._geometry_id = DrawSubmissionRegistry::Get().InternGeometry(geometry_key);
             }
         }
         for (auto &view : _view_data)
@@ -742,7 +766,10 @@ namespace Ailu::Render
                 for (auto &object : objects)
                 {
                     if (object._primitive_index < _scene_primitives.size())
+                    {
                         object._vertex_buffer = _scene_primitives[object._primitive_index]._vertex_buffer;
+                        object._geometry_id = _scene_primitives[object._primitive_index]._geometry_id;
+                    }
                 }
             }
         }
@@ -1342,7 +1369,8 @@ namespace Ailu::Render
             const u32 queue_id = primitive._material->RenderQueue();
             output[queue_id].emplace_back(RenderableObjectData{primitive._primitive_index,
                 Distance(primitive._world_bounds.Center(), input._camera_position), primitive._submesh_index, primitive._mesh,
-                primitive._material, primitive._vertex_buffer, primitive._index_buffer, primitive._flags, primitive._entity_id});
+                primitive._material, primitive._vertex_buffer, primitive._index_buffer, primitive._geometry_id,
+                primitive._flags, primitive._entity_id});
         }
         for (auto &it: output)
         {

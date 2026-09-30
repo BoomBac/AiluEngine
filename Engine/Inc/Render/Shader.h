@@ -313,6 +313,7 @@ namespace Ailu::Render
         }
         const i16 PassCount() const { return static_cast<i16>(_passes.size()); }
         i16 FindPass(String pass_name);
+        i16 ShadowCasterPassIndex();
         //根据任意字符序列构建变体hash，并返回合法的序列
         ShaderVariantHash ConstructVariantHash(u16 pass_index, const std::set<String> &kw_seq, std::set<String> &active_kw_seq) const;
         ShaderVariantHash ConstructVariantHash(u16 pass_index, const std::set<String> &kw_seq) const;
@@ -378,6 +379,7 @@ namespace Ailu::Render
         Vector<Map<ShaderVariantHash, EShaderVariantState>> _variant_state;
         // pass 名 -> pass index 的惰性缓存，shader 重建（PreProcessShader）时清空。
         Map<String, i16> _pass_name_to_index;
+        i16 _shadow_caster_pass_index = -2;
         std::atomic<bool> _is_pass_elements_init = false;
         ETopology _topology = ETopology::kTriangle;
         Map<String, Vector<String>> _keywords_props;

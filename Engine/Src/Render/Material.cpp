@@ -76,6 +76,8 @@ namespace Ailu::Render
         _prop_views = std::move(other._prop_views);
         _property_blocks = std::move(other._property_blocks);
         _binding_cache.clear();
+        _draw_submission_cache.clear();
+        _shadow_variant_cache.clear();
         for (auto &cache : _frame_property_block_cache)
             cache = {};
         _bind_textures_by_id = std::move(other._bind_textures_by_id);
@@ -805,6 +807,60 @@ namespace Ailu::Render
         return _pass_variants[pass_index]._keywords;
     };
 
+    Material::DrawSubmissionStateIds Material::GetDrawSubmissionStateIds(
+        const DrawPipelineStateKey &pipeline_key, const MaterialStateKey &material_key) const
+    {
+        if (!_draw_submission_cache.empty()
+            && _draw_submission_cache.front()._material_key._draw_state_version != _draw_state_version)
+            _draw_submission_cache.clear();
+        for (const auto &entry : _draw_submission_cache)
+        {
+            if (entry._pipeline_key == pipeline_key && entry._material_key == material_key)
+                return {entry._pipeline_state_id, entry._material_state_id, true};
+        }
+
+        DrawSubmissionCacheEntry entry{};
+        entry._pipeline_key = pipeline_key;
+        entry._material_key = material_key;
+        entry._pipeline_state_id = DrawSubmissionRegistry::Get().InternPipeline(pipeline_key);
+        entry._material_state_id = DrawSubmissionRegistry::Get().InternMaterial(material_key);
+        _draw_submission_cache.emplace_back(entry);
+        return {entry._pipeline_state_id, entry._material_state_id, false};
+    }
+
+    ShaderVariantHash Material::GetShadowVariantHash(u16 pass_index, bool point_shadow, bool force_alpha_test) const
+    {
+        Shader *shader = _p_active_shader;
+        if (shader == nullptr || pass_index >= _pass_variants.size())
+            return 0u;
+
+        const ShaderVariantHash active_variant_hash = _pass_variants[pass_index]._variant_hash;
+        const u64 shader_id = shader->ID();
+        if (!_shadow_variant_cache.empty()
+            && (_shadow_variant_cache.front()._draw_state_version != _draw_state_version
+                || _shadow_variant_cache.front()._shader_id != shader_id))
+            _shadow_variant_cache.clear();
+        for (const auto &entry : _shadow_variant_cache)
+        {
+            if (entry._shader_id == shader_id && entry._draw_state_version == _draw_state_version
+                && entry._active_variant_hash == active_variant_hash && entry._pass_index == pass_index
+                && entry._point_shadow == point_shadow && entry._force_alpha_test == force_alpha_test)
+                return entry._variant_hash;
+        }
+
+        auto keywords = ActiveKeywords(pass_index);
+        if (point_shadow)
+            keywords.insert("CAST_POINT_SHADOW");
+        else
+            keywords.erase("CAST_POINT_SHADOW");
+        if (force_alpha_test)
+            keywords.insert("ALPHA_TEST");
+        const ShaderVariantHash variant_hash = shader->ConstructVariantHash(pass_index, keywords);
+        _shadow_variant_cache.emplace_back(ShadowVariantCacheEntry{shader_id, _draw_state_version,
+            active_variant_hash, variant_hash, pass_index, point_shadow, force_alpha_test});
+        return variant_hash;
+    }
+
     u32 Material::GetUint(const String &name)
     {
         const auto value = GetUint(ShaderPropertyRegistry::Get().Intern(name));
@@ -1358,6 +1414,8 @@ namespace Ailu::Render
     void Material::ResetMaterialCaches()
     {
         _binding_cache.clear();
+        _draw_submission_cache.clear();
+        _shadow_variant_cache.clear();
         for (auto &cache : _frame_property_block_cache)
             cache = {};
     }

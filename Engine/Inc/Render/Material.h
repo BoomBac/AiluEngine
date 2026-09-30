@@ -18,6 +18,7 @@
 #include "Texture.h"
 #include "RenderConstants.h"
 #include "MaterialDrawState.h"
+#include "DrawSubmission.h"
 #include "RenderingStates.h"
 #include <atomic>
 #include <map>
@@ -114,6 +115,13 @@ namespace Ailu::Render
         };
 
     public:
+        struct DrawSubmissionStateIds
+        {
+            GraphicsPipelineStateId _pipeline_state_id = 0u;
+            MaterialStateId _material_state_id = 0u;
+            bool _cache_hit = false;
+        };
+
         struct PropertyBlock
         {
             u8* _data = nullptr;
@@ -264,6 +272,9 @@ namespace Ailu::Render
                                                    bool upload_to_gpu, CommandRenderingStatesData *statistics = nullptr);
         u32 PropertyVersion() const { return _property_data_version + _resource_binding_version; }
         u32 DrawStateVersion() const { return _draw_state_version; }
+        DrawSubmissionStateIds GetDrawSubmissionStateIds(const DrawPipelineStateKey &pipeline_key,
+                                                         const MaterialStateKey &material_key) const;
+        ShaderVariantHash GetShadowVariantHash(u16 pass_index, bool point_shadow, bool force_alpha_test) const;
         std::set<String>& SavedKeyworkds() { return _all_keywords; }
         virtual void Construct(bool first_time);
         ESurfaceType SurfaceType() const;
@@ -276,6 +287,25 @@ namespace Ailu::Render
     protected:
 
     private:
+        struct DrawSubmissionCacheEntry
+        {
+            DrawPipelineStateKey _pipeline_key{};
+            MaterialStateKey _material_key{};
+            GraphicsPipelineStateId _pipeline_state_id = 0u;
+            MaterialStateId _material_state_id = 0u;
+        };
+        struct ShadowVariantCacheEntry
+        {
+            u64 _shader_id = 0u;
+            u32 _draw_state_version = 0u;
+            ShaderVariantHash _active_variant_hash = 0u;
+            ShaderVariantHash _variant_hash = 0u;
+            u16 _pass_index = 0u;
+            bool _point_shadow = false;
+            bool _force_alpha_test = false;
+        };
+        mutable Vector<DrawSubmissionCacheEntry> _draw_submission_cache;
+        mutable Vector<ShadowVariantCacheEntry> _shadow_variant_cache;
         struct BindState
         {
             u16 _pass_index = 0;
