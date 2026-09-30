@@ -62,6 +62,24 @@ namespace Ailu::Render
         std::unique_ptr<GpuResource> _resource;
     };
 
+    struct PendingGpuResourceAdd
+    {
+        GpuResourceHandle _handle;
+        std::unique_ptr<GpuResource> _resource;
+    };
+
+    struct PendingGpuResourceRetire
+    {
+        GpuResourceHandle _handle;
+        u64 _fence = 0u;
+    };
+
+    struct GpuResourcePendingStats
+    {
+        u32 _pending_add_count = 0u;
+        u32 _pending_retire_count = 0u;
+    };
+
     // 仅 Debug 启用 Resolve 诊断计数；其他配置的统计接口返回零，避免热路径中的全局 atomic RMW。
     struct GpuResourceResolveStats
     {
@@ -99,7 +117,9 @@ namespace Ailu::Render
         void Retire(GpuResourceHandle handle, u64 fence);
         void Release(GpuResourceHandle handle);
         Vector<GpuResourceHandle> TakePendingReleases();
-        void Collect(u64 completed_fence);
+        // 在 frontend/RHI 帧同步点发布排队修改；阶段 2B 仍保留 Resolve 的 shared_mutex。
+        void Sync(u64 completed_fence);
+        GpuResourcePendingStats GetPendingStats() const;
         void Clear();
 
     private:
@@ -107,8 +127,12 @@ namespace Ailu::Render
         std::atomic<u32> _slot_count{0u};
         mutable std::shared_mutex _resource_mutex;
         Vector<GpuResourceSlot> _slots;
-        Vector<u32> _free_indices;
         std::deque<RetiredGpuResource> _retired_resources;
+        mutable std::mutex _pending_mutation_mutex;
+        Vector<PendingGpuResourceAdd> _pending_adds;
+        Vector<PendingGpuResourceRetire> _pending_retires;
+        Vector<GpuResourceHandle> _available_handles;
+        u32 _next_slot_index = 0u;
         std::mutex _pending_release_mutex;
         Vector<GpuResourceHandle> _pending_releases;
     };

@@ -414,6 +414,7 @@ namespace Ailu::RHI::DX12
                     PROFILE_BLOCK_CPU("GpuCommandWorker_WaitForMain");
                     Application::Get().WaitForMain();
                 }
+                GpuResourceRegistry::Get().Sync(_ctx->GetFenceValueGPU());
                 // 帧边界取走本帧 Resolve 计数快照：与渲染无重叠，自动化读数稳定。
                 Render::GpuResourceRegistry::TakeResolveStats();
                 ImageCaptureService::Tick();
@@ -618,6 +619,7 @@ namespace Ailu::RHI::DX12
     void GpuCommandWorker::RunSync()
     {
         PROFILE_BLOCK_CPU("GpuCommandWorker::RunSync")
+        GpuResourceRegistry::Get().Sync(_ctx->GetFenceValueGPU());
         Vector<Ref<RHICommandBuffer>> recorded_cmds;
         Vector<WaitHandle> record_jobs;
         const auto wait_record_jobs = [&record_jobs]()
@@ -1080,6 +1082,15 @@ namespace Ailu::RHI::DX12
 
     void D3DContext::ExecuteCommandBufferSync(Ref<CommandBuffer> &cmd)
     {
+        // 资产预览/初始化使用即时录制，也可能带有尚未发布的临时 RT。
+        auto *pipeline = RenderPipeline::Instance();
+        if (Application::Get()._is_multi_thread_rendering.load() && pipeline != nullptr &&
+            pipeline->NeedWaitForRenderThread() && Application::Get().GetFrameCount() > 0u)
+        {
+            Application::Get().WaitForRender();
+            pipeline->SetRenderThreadFramePending(false);
+        }
+        GpuResourceRegistry::Get().Sync(GetFenceValueGPU());
         auto released_temp_rts = cmd->TakeReleasedTempRTs();
         auto rhi_cmd = RHICommandBufferPool::Get(cmd->Name());
         rhi_cmd->RecordingContext().AccumulateRenderingStatesData(cmd->TakeRenderingStatesData());
@@ -1178,7 +1189,6 @@ namespace Ailu::RHI::DX12
                 d3dcmd->Finalize();
                 d3dcmd->RunPostSubmitCallbacks(submitted_fence);
             }
-            GpuResourceRegistry::Get().Collect(_p_cmd_buffer_fence->GetCompletedValue());
         }
         for (auto &queue_state_cmd: queue_state_cmds)
         {
@@ -1198,7 +1208,7 @@ namespace Ailu::RHI::DX12
         // Ensure that the GPU is no longer referencing resources that are about to be
         // cleaned up by the destructor.
         WaitForGpu();
-        GpuResourceRegistry::Get().Collect(_p_cmd_buffer_fence->GetCompletedValue());
+        GpuResourceRegistry::Get().Sync(_p_cmd_buffer_fence->GetCompletedValue());
         GpuResourceRegistry::Get().Clear();
 
         // #if defined(TRACY_ENABLE)
@@ -2159,10 +2169,13 @@ namespace Ailu::RHI::DX12
             return;
         }
 
-        auto cmd = CommandPool::Get().Alloc<CommandGpuResourceUpload>();
-        cmd->_res = res != nullptr ? res->Handle() : GpuResourceHandle{};
-        cmd->_params = params;
-        SubmitGpuCommandSync(cmd);
+        // 同步创建时资源可能仍在 pending add 中；使用调用者持有的指针，不提前发布 Registry。
+        auto rhi_cmd = RHICommandBufferPool::Get("SyncTask");
+        res->Upload(this, rhi_cmd.get(), params);
+        res->Name(res->Name());
+        res->SetCreatedFence(_fence_value + 1u);
+        ExecuteRHICommandBuffer(rhi_cmd.get());
+        RHICommandBufferPool::Release(rhi_cmd);
     }
 
     void D3DContext::ProcessGpuCommand(GfxCommand *cmd, RHICommandBuffer *cmd_buffer)

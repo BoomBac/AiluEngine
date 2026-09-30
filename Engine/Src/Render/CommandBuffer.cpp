@@ -152,12 +152,12 @@ namespace Ailu::Render
             return _resolved_command_bindings;
         }
 
-        void PushMaterialState(CommandDraw *cmd, Material *mat, u32 variant_override_hash = UINT32_MAX)
+        void PushMaterialState(CommandDraw *cmd, Material *mat, u32 variant_override_hash = UINT32_MAX,
+                               ConstantBuffer *per_obj_cb = nullptr)
         {
             cmd->_variant_override_hash = variant_override_hash;
             ++_rendering_states_data.MaterialCaptureCount;
-            // This is the frontend command-construction boundary. Resolve handles here so
-            // deferred DX12 recording consumes only the captured MaterialDrawState snapshot.
+            // Frontend captures caller-owned resources; new handles may still be pending until RHI frame sync.
             if (mat == nullptr)
                 return;
             // 资产引用的重新解析由 AssetRegistry 的发布监听器打脏标记，这里只在版本变化时
@@ -172,9 +172,6 @@ namespace Ailu::Render
             if (binding_layout == nullptr)
             {
                 // 布局不可用时退回按名解析路径，保证行为不变。
-                auto *per_obj_cb = cmd->_per_obj_cb.IsValid()
-                    ? static_cast<ConstantBuffer *>(GpuResourceRegistry::Get().Resolve(cmd->_per_obj_cb))
-                    : nullptr;
                 if (per_obj_cb != nullptr)
                 {
                     auto &binding = _command_resources[RenderPropertyIds::PerObject()];
@@ -205,9 +202,6 @@ namespace Ailu::Render
             }
             if (per_obj_slot != kInvalidSlot)
             {
-                auto *per_obj_cb = cmd->_per_obj_cb.IsValid()
-                    ? static_cast<ConstantBuffer *>(GpuResourceRegistry::Get().Resolve(cmd->_per_obj_cb))
-                    : nullptr;
                 if (per_obj_cb != nullptr)
                 {
                     // 将per-object cbuffer烘焙进command_resources，CaptureDrawState会写入binding snapshot，
@@ -460,7 +454,7 @@ namespace Ailu::Render
             cmd->_per_obj_cb = GetBufferHandle(per_obj_cb);
             cmd->_pass_index = pass_index;
             cmd->_instance_count = 1u;
-            PushMaterialState(cmd, mat);
+            PushMaterialState(cmd, mat, UINT32_MAX, per_obj_cb);
             cmd->_index_start = index_start;
             cmd->_index_num = index_num;
             _commands.push_back(cmd);
@@ -473,7 +467,7 @@ namespace Ailu::Render
             cmd->_per_obj_cb = GetBufferHandle(per_obj_cb);
             cmd->_pass_index = pass_index;
             cmd->_instance_count = instance_count;
-            PushMaterialState(cmd, mat);
+            PushMaterialState(cmd, mat, UINT32_MAX, per_obj_cb);
             _commands.push_back(cmd);
         }
         void DrawIndexedInstanced(VertexBuffer *vb, IndexBuffer *ib, ConstantBuffer *per_obj_cb, Material *mat,
@@ -487,7 +481,7 @@ namespace Ailu::Render
             cmd->_pass_index = pass_index;
             cmd->_instance_count = instance_count;
             cmd->_start_instance = start_instance;
-            PushMaterialState(cmd, mat);
+            PushMaterialState(cmd, mat, UINT32_MAX, per_obj_cb);
             cmd->_index_start = index_start;
             cmd->_index_num = index_num;
             _commands.push_back(cmd);
@@ -693,7 +687,7 @@ namespace Ailu::Render
             cmd->_instance_count = instance_count;
             cmd->_sub_mesh = 0u;
             cmd->_pass_index = 0u;
-            PushMaterialState(cmd, material);
+            PushMaterialState(cmd, material, UINT32_MAX, per_obj_cb);
             _commands.emplace_back(cmd);
         }
         void DrawMesh(Mesh *mesh, Material *material, ConstantBuffer *per_obj_cb, u16 sub_mesh, u32 instance_count)
@@ -705,7 +699,7 @@ namespace Ailu::Render
             cmd->_instance_count = instance_count;
             cmd->_sub_mesh = sub_mesh;
             cmd->_pass_index = 0u;
-            PushMaterialState(cmd, material);
+            PushMaterialState(cmd, material, UINT32_MAX, per_obj_cb);
             _commands.emplace_back(cmd);
         }
         void DrawMesh(Mesh *mesh, Material *material, ConstantBuffer *per_obj_cb, u16 sub_mesh, u16 pass_index, u32 instance_count)
@@ -717,7 +711,7 @@ namespace Ailu::Render
             cmd->_instance_count = instance_count;
             cmd->_sub_mesh = sub_mesh;
             cmd->_pass_index = pass_index;
-            PushMaterialState(cmd, material);
+            PushMaterialState(cmd, material, UINT32_MAX, per_obj_cb);
             _commands.emplace_back(cmd);
         }
         void DrawMesh(Mesh *mesh, Material *material, const Matrix4x4f &world_mat, u16 sub_mesh, u16 pass_index, u32 instance_count)

@@ -136,6 +136,7 @@ namespace Ailu::Render
             SetRenderThreadFramePending(false);
             SceneManagement::SceneMgr::Get().ReleaseRetiredRuntimeScene();
         }
+        GpuResourceRegistry::Get().Sync(GraphicsContext::Get().GetFenceValueGPU());
         _frame_res_manager->NewFrame();
         Setup();
         const Scene &scene = *SceneManagement::SceneMgr::Get().ActiveScene();
