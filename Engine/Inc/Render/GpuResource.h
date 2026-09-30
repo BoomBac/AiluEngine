@@ -13,6 +13,7 @@
 #include <memory>
 #include <mutex>
 #include <shared_mutex>
+#include <atomic>
 #include <type_traits>
 #include "generated/GpuResource.gen.h"
 namespace Ailu::Render
@@ -61,6 +62,14 @@ namespace Ailu::Render
         std::unique_ptr<GpuResource> _resource;
     };
 
+    // Resolve 路径的轻量计数，用于验证无效句柄不再获取 shared_mutex。
+    struct GpuResourceResolveStats
+    {
+        u64 _total_resolve_count = 0u;
+        u64 _invalid_handle_resolve_count = 0u;
+        u64 _locked_resolve_count = 0u;
+    };
+
     class AILU_API GpuResourceRegistry
     {
     public:
@@ -69,6 +78,10 @@ namespace Ailu::Render
         GpuResourceRegistry &operator=(const GpuResourceRegistry &) = delete;
 
         static GpuResourceRegistry &Get();
+        // 原子取走并清零当帧累计值，供帧边界快照使用（避免读取时与下一帧并发累加）。
+        static GpuResourceResolveStats TakeResolveStats();
+        static GpuResourceResolveStats GetResolveStats();
+        static void ResetResolveStats();
 
         GpuResourceHandle Add(std::unique_ptr<GpuResource> resource);
         GpuResource *Resolve(GpuResourceHandle handle);
@@ -90,6 +103,8 @@ namespace Ailu::Render
         void Clear();
 
     private:
+        // 槽位数量在写锁内更新，加锁前用这个原子镜像做快速越界/无效句柄判断。
+        std::atomic<u32> _slot_count{0u};
         mutable std::shared_mutex _resource_mutex;
         Vector<GpuResourceSlot> _slots;
         Vector<u32> _free_indices;
@@ -144,6 +159,9 @@ namespace Ailu::Render
             } _buffer_binder;
         } _params;
     };
+    // 热路径上按值传递，且 _ub_binder._gpu_ptr 直接当作根CBV地址使用：
+    // 一旦被意外的 pack 指令改变布局，两者都会静默出错。
+    static_assert(sizeof(BindParams) == 16u, "BindParams layout must stay packed-free");
     struct UploadParams
     {
         virtual ~UploadParams() = default;
@@ -202,7 +220,9 @@ namespace Ailu::Render
         u64 _mem_size = 0u;
         u64 _created_fence = ~u64(0);
         GpuResourceHandle _handle;
-        EGpuResType _res_type;
+        // 必须显式初始化：未初始化时 GetResourceType() 会返回调试填充值，
+        // 依赖资源类型分派的逻辑（例如常量缓冲绑定）会随之走错分支。
+        EGpuResType _res_type = EGpuResType::kBuffer;
         bool _is_ready_for_rendering = false;
     };
 

@@ -1,4 +1,4 @@
-﻿#include "Render/Material.h"
+#include "Render/Material.h"
 #include "Assets/Asset.h"
 #include "Framework/Common/Log.h"
 #include "Framework/Common/ResourceMgr.h"
@@ -32,6 +32,7 @@ namespace Ailu::Render
             Construct(true);
             _p_active_shader->AddMaterialRef(this);
         }
+        RegisterAssetReferenceListener();
         ++s_total_material_num;
     }
 
@@ -47,6 +48,15 @@ namespace Ailu::Render
     {
         if (this == &other)
             return *this;
+        // Existing listener for this object remains valid. Remove the source listener because
+        // its callback captures the source object's address.
+        if (other._asset_listener_id != 0u)
+        {
+            ResourceMgr::Get().GetMutableAssetRegistry().RemovePublishedListener(other._asset_listener_id);
+            other._asset_listener_id = 0u;
+        }
+        if (_asset_listener_id == 0u)
+            RegisterAssetReferenceListener();
         if (_p_active_shader != nullptr)
             _p_active_shader->RemoveMaterialRef(this);
         _name = other._name;
@@ -83,6 +93,9 @@ namespace Ailu::Render
         _use_legacy_path_tracer_absorption = other._use_legacy_path_tracer_absorption;
         _property_data_version = other._property_data_version;
         _resource_binding_version = other._resource_binding_version;
+        _draw_state_version = other._draw_state_version;
+        _asset_reference_version.store(other._asset_reference_version.load(std::memory_order_relaxed), std::memory_order_relaxed);
+        _resolved_asset_reference_version = other._resolved_asset_reference_version;
         other._p_shader = nullptr;
         other._p_active_shader = nullptr;
         return *this;
@@ -128,6 +141,7 @@ namespace Ailu::Render
         _render_queue = other._render_queue;
         _property_data_version = other._property_data_version;
         _resource_binding_version = other._resource_binding_version;
+        _draw_state_version = other._draw_state_version;
     }
     Material::Material(Material &&other) noexcept
     {
@@ -147,6 +161,7 @@ namespace Ailu::Render
         _properties = std::move(other._properties);
         _prop_views = std::move(other._prop_views);
         _property_blocks = std::move(other._property_blocks);
+        ResetMaterialCaches();
         _bind_textures_by_id = std::move(other._bind_textures_by_id);
         _bind_buffers_by_id = std::move(other._bind_buffers_by_id);
         _common_uint_property = std::move(other._common_uint_property);
@@ -162,15 +177,38 @@ namespace Ailu::Render
         _use_legacy_path_tracer_absorption = other._use_legacy_path_tracer_absorption;
         _property_data_version = other._property_data_version;
         _resource_binding_version = other._resource_binding_version;
+        _draw_state_version = other._draw_state_version;
+        // The listener captures an object address, so rebind it after moving the state.
+        if (other._asset_listener_id != 0u)
+        {
+            ResourceMgr::Get().GetMutableAssetRegistry().RemovePublishedListener(other._asset_listener_id);
+            other._asset_listener_id = 0u;
+        }
+        RegisterAssetReferenceListener();
+        _asset_reference_version.store(other._asset_reference_version.load(std::memory_order_relaxed),
+                                       std::memory_order_relaxed);
+        _resolved_asset_reference_version = other._resolved_asset_reference_version;
         other._p_shader = nullptr;
         other._p_active_shader = nullptr;
+        ++s_total_material_num;
     }
 
     Material::~Material()
     {
+        if (_asset_listener_id != 0u)
+            ResourceMgr::Get().GetMutableAssetRegistry().RemovePublishedListener(_asset_listener_id);
         if (_p_active_shader != nullptr)
             _p_active_shader->RemoveMaterialRef(this);
         --s_total_material_num;
+    }
+
+    void Material::RegisterAssetReferenceListener()
+    {
+        // shader / texture 资产发布是资产引用唯一需要重新解析的时机；
+        // 监听器只递增一个原子版本号，真正的解析推迟到下一次 RefreshAssetReferences。
+        _asset_listener_id = ResourceMgr::Get().GetMutableAssetRegistry().AddPublishedListener(
+                [this](const AssetPublishedEvent &)
+                { MarkAssetReferencesDirty(); });
     }
 
     void Material::UpdateShaderHandle()
@@ -203,7 +241,7 @@ namespace Ailu::Render
         return snapshot;
     }
 
-    void Material::RefreshAssetReferences()
+    void Material::RefreshAssetReferencesImpl(u32 version)
     {
         AssetSnapshot snapshot = CaptureAssetSnapshots();
         if (snapshot._shader != nullptr && snapshot._shader.get() != _p_shader)
@@ -215,24 +253,70 @@ namespace Ailu::Render
             if (bound_texture == _bind_textures_by_id.end() || bound_texture->second != texture.get())
                 SetTexture(property_id, const_cast<Texture *>(texture.get()));
         }
+        // 在标记“已解析”版本之前重新读取：解析期间新发布的资产保持待处理状态，
+        // 由下一次 RefreshAssetReferences 处理，不会被这次解析吞掉。
+        const u32 latest_version = _asset_reference_version.load(std::memory_order_relaxed);
+        _resolved_asset_reference_version = latest_version == version ? version : version + 1u;
+    }
+
+    void Material::ApplyResolvedResource(BindState &state, const ResolvedResourceBinding &binding,
+                                         GpuResource *resource, u16 priority)
+    {
+        if (resource == nullptr)
+            return;
+        // 优先级数字越小越优先（Global < Cmd < Local）
+        if (state._bind_res_priority[binding._bind_slot] > priority)
+            return;
+        state._bind_res[binding._bind_slot] = resource;
+        state._bind_res_type[binding._bind_slot] = binding._resource_type;
+        state._bind_res_priority[binding._bind_slot] = priority;
+        state._max_bind_slot = std::max<u16>(state._max_bind_slot, binding._bind_slot);
+    }
+
+    void Material::ApplyGlobalBindings(BindingCacheEntry &cache, const ShaderGlobalResourceSnapshot &global_resources)
+    {
+        auto &state = cache._state;
+        for (const auto &resolved_binding : cache._global_res_bindings)
+        {
+            // 只有该槽位仍由全局层占有时才回退，避免清掉材质本地/命令级覆盖
+            if (state._bind_res_priority[resolved_binding._bind_slot] <= PipelineResource::kPriorityGlobal)
+            {
+                state._bind_res[resolved_binding._bind_slot] = nullptr;
+                state._bind_res_type[resolved_binding._bind_slot] = EBindResDescType::kUnknown;
+                state._bind_res_priority[resolved_binding._bind_slot] = 0u;
+                state._bind_addi_info[resolved_binding._bind_slot] = {};
+            }
+            const auto it = global_resources._resources.find(resolved_binding._property_id);
+            if (it != global_resources._resources.end())
+                ApplyResolvedResource(state, resolved_binding, it->second._resource, PipelineResource::kPriorityGlobal);
+        }
     }
 
     MaterialDrawState Material::CaptureDrawState(u16 pass_index, u32 frame_slot, u64 frame_count, FrameAllocator &allocator,
                                                  const ShaderGlobalResourceSnapshot &global_resources,
-                                                 const HashMap<ShaderPropertyId, CommandResourceBinding> *command_resources,
-                                                 CommandRenderingStatesData *statistics) const
+                                                 const Vector<ResolvedCommandBinding> *command_resources,
+                                                 CommandRenderingStatesData *statistics,
+                                                 u32 variant_override_hash)
     {
         if (_p_active_shader == nullptr || pass_index >= _pass_variants.size())
             return {};
         AL_ASSERT(pass_index < _pass_variants.size());
-        const auto variant_hash = _pass_variants[pass_index]._variant_hash;
+        const auto variant_hash = variant_override_hash == UINT32_MAX
+            ? _pass_variants[pass_index]._variant_hash : variant_override_hash;
         const ShaderBindingLayout *binding_layout = _p_active_shader->GetBindingLayout(pass_index, variant_hash);
-        // Capture may run on UI and RenderGraph recording threads at once.  Keep its
-        // resolution cache local until a frame-local cache is justified by profiling.
-        BindingCacheEntry cache;
         const u32 layout_version = binding_layout == nullptr ? 0u : binding_layout->Version();
-        BindState cur_state;
+        // 同一 Material + pass 只保留一份 binding 缓存：pass 的 active variant 由
+        // _pass_variants[pass_index]._variant_hash 唯一确定。缓存中的材质/全局绑定状态不含任何
+        // command 级覆盖，每次 Draw 只读取它的副本再合并本 draw 的 command_resources。
+        // 该缓存由 render 线程独占（RenderGraph::Execute 串行录制）；若后续引入并行录制，
+        // 需要为每个 entry 加锁或改为 per-recording-thread 缓存。
+        if (_binding_cache.size() != _pass_variants.size())
+            _binding_cache.resize(_pass_variants.size());
+        BindingCacheEntry &cache = _binding_cache[pass_index];
         const auto &global_res_registry = global_resources;
+        const bool global_layout_changed = !cache._valid || cache._global_res_layout_version != global_res_registry._layout_version;
+        const bool global_binding_changed = !cache._valid || cache._global_res_binding_version != global_res_registry._binding_version;
+
         u32 material_binding_invalid_reasons = 0u;
         if (cache._resource_binding_version != _resource_binding_version)
             material_binding_invalid_reasons |= 1u << 0u;
@@ -240,129 +324,107 @@ namespace Ailu::Render
             material_binding_invalid_reasons |= 1u << 1u;
         if (cache._variant_hash != variant_hash)
             material_binding_invalid_reasons |= 1u << 2u;
-        if (cache._global_res_layout_version != global_res_registry._layout_version)
+        if (global_layout_changed)
             material_binding_invalid_reasons |= 1u << 3u;
-        if (cache._global_res_binding_version != global_res_registry._binding_version)
+        if (global_binding_changed)
             material_binding_invalid_reasons |= 1u << 4u;
-        const bool is_material_cache_hit = material_binding_invalid_reasons == 0u;
-        if (cache._resource_binding_version == _resource_binding_version && cache._layout_version == layout_version && cache._variant_hash == variant_hash
-            && cache._global_res_layout_version == global_res_registry._layout_version
-            && cache._global_res_binding_version == global_res_registry._binding_version)
+        // 需要重新解析材质本地资源/全局表的完整重建条件；仅有 global binding version
+        // 变化时只更新缓存的全局资源指针，不重复做 property -> slot 解析。
+        const bool needs_full_rebuild = !cache._valid || (material_binding_invalid_reasons & ~(1u << 4u)) != 0u;
+        const bool cache_hit = cache._valid && material_binding_invalid_reasons == 0u;
+
+        if (cache_hit)
         {
             if (statistics != nullptr) ++statistics->MaterialBindingCacheHitCount;
-            cur_state = cache._state;
+        }
+        else if (!needs_full_rebuild)
+        {
+            if (statistics != nullptr) ++statistics->MaterialBindingGlobalUpdateCount;
+            ApplyGlobalBindings(cache, global_res_registry);
         }
         else
         {
-            auto apply_resolved_resource = [&](const ResolvedResourceBinding &binding, GpuResource *resource, u16 priority)
-            {
-                if (resource == nullptr)
-                    return;
-                if (cur_state._bind_res_priority[binding._bind_slot] > priority)
-                    return;
-                cur_state._bind_res[binding._bind_slot] = resource;
-                cur_state._bind_res_type[binding._bind_slot] = binding._resource_type;
-                cur_state._bind_res_priority[binding._bind_slot] = priority;
-                cur_state._max_bind_slot = std::max<u16>(cur_state._max_bind_slot, binding._bind_slot);
-            };
-            auto clear_resolved_global_resource = [&](const ResolvedResourceBinding &binding)
-            {
-                if (cur_state._bind_res_priority[binding._bind_slot] > PipelineResource::kPriorityGlobal)
-                    return;
-                cur_state._bind_res[binding._bind_slot] = nullptr;
-                cur_state._bind_res_type[binding._bind_slot] = EBindResDescType::kUnknown;
-                cur_state._bind_res_priority[binding._bind_slot] = 0u;
-            };
+            if (statistics != nullptr) ++statistics->MaterialBindingResolveCount;
             auto resolve_resource = [&](ShaderPropertyId property_id, ResolvedResourceBinding &out_binding)
             {
                 if (binding_layout == nullptr)
                     return false;
-                const auto *binding = binding_layout->Find(property_id);
-                if (binding == nullptr || binding->_bind_slot < 0 || binding->_bind_slot >= 32)
+                const auto *layout_binding = binding_layout->Find(property_id);
+                if (layout_binding == nullptr || layout_binding->_bind_slot < 0 || layout_binding->_bind_slot >= 32)
                     return false;
                 out_binding._property_id = property_id;
-                out_binding._bind_slot = static_cast<u8>(binding->_bind_slot);
-                out_binding._resource_type = binding->_resource_type;
+                out_binding._bind_slot = static_cast<u8>(layout_binding->_bind_slot);
+                out_binding._resource_type = layout_binding->_resource_type;
                 return true;
             };
-            auto apply_resource = [&](ShaderPropertyId property_id, GpuResource *resource, u16 priority)
+            auto &state = cache._state;
+            state._pass_index = pass_index;
+            state._max_bind_slot = 0u;
+            state._variant_hash = variant_hash;
+            state._bind_res.fill(nullptr);
+            state._bind_res_type.fill(EBindResDescType::kUnknown);
+            state._bind_res_priority.fill(0u);
+            for (const auto &[property_id, texture] : _bind_textures_by_id)
             {
                 ResolvedResourceBinding resolved_binding;
-                if (!resolve_resource(property_id, resolved_binding))
-                    return;
-                apply_resolved_resource(resolved_binding, resource, priority);
-            };
-            auto apply_global_bindings = [&]()
+                if (resolve_resource(property_id, resolved_binding))
+                    ApplyResolvedResource(state, resolved_binding, texture, PipelineResource::kPriorityLocal);
+            }
+            for (const auto &[property_id, buffer] : _bind_buffers_by_id)
             {
-                for (const auto &resolved_binding : cache._global_res_bindings)
-                {
-                    clear_resolved_global_resource(resolved_binding);
-                    const auto it = global_res_registry._resources.find(resolved_binding._property_id);
-                    if (it != global_res_registry._resources.end())
-                        apply_resolved_resource(resolved_binding, it->second._resource, PipelineResource::kPriorityGlobal);
-                }
-            };
-
-            const bool needs_full_rebuild = cache._resource_binding_version != _resource_binding_version || cache._layout_version != layout_version
-                || cache._variant_hash != variant_hash || cache._global_res_layout_version != global_res_registry._layout_version;
-            if (needs_full_rebuild)
+                ResolvedResourceBinding resolved_binding;
+                if (resolve_resource(property_id, resolved_binding))
+                    ApplyResolvedResource(state, resolved_binding, buffer, PipelineResource::kPriorityLocal);
+            }
+            if (global_layout_changed || cache._global_res_bindings.empty())
             {
-                if (statistics != nullptr) ++statistics->MaterialBindingResolveCount;
-                cur_state._pass_index = pass_index;
-                cur_state._max_bind_slot = 0u;
-                cur_state._variant_hash = variant_hash;
-                memset(cur_state._bind_res.data(), 0, sizeof(GpuResource *) * 32);
-                cur_state._bind_res_type.fill(EBindResDescType::kUnknown);
-                memset(cur_state._bind_res_priority.data(), 0u, sizeof(u16) * 32);
-                for (const auto &[property_id, texture] : _bind_textures_by_id)
-                    apply_resource(property_id, texture, PipelineResource::kPriorityLocal);
-                for (const auto &[property_id, buffer] : _bind_buffers_by_id)
-                    apply_resource(property_id, buffer, PipelineResource::kPriorityLocal);
-                if (cache._layout_version != layout_version || cache._variant_hash != variant_hash
-                    || cache._global_res_layout_version != global_res_registry._layout_version)
-                {
-                    cache._global_res_bindings.clear();
+                cache._global_res_bindings.clear();
                 for (const auto &it : global_res_registry._resources)
-                    {
-                        ResolvedResourceBinding resolved_binding;
-                        if (resolve_resource(it.first, resolved_binding))
-                            cache._global_res_bindings.emplace_back(resolved_binding);
-                    }
+                {
+                    ResolvedResourceBinding resolved_binding;
+                    // 全局表可能含有超出绑定槽范围的条目；旧实现同样不会让它生效，
+                    // 但写入 state 会越界，因此这里必须挡掉。
+                    if (!resolve_resource(it.first, resolved_binding))
+                        continue;
+                    if (resolved_binding._bind_slot >= 32u)
+                        continue;
+                    cache._global_res_bindings.emplace_back(resolved_binding);
                 }
-                apply_global_bindings();
             }
-            else
-            {
-                cur_state = cache._state;
-                apply_global_bindings();
-            }
-            cur_state._cbuf_bind_slot = _p_active_shader->_passes[pass_index]._variants[variant_hash]._per_mat_buf_bind_slot;
-            cache._resource_binding_version = _resource_binding_version;
-            cache._layout_version = layout_version;
-            cache._variant_hash = variant_hash;
-            cache._global_res_layout_version = global_res_registry._layout_version;
-            cache._global_res_binding_version = global_res_registry._binding_version;
-            cache._state = cur_state;
+            ApplyGlobalBindings(cache, global_res_registry);
+            const auto &pass_variant = _p_active_shader->_passes[pass_index]._variants.at(variant_hash);
+            cache._cbuf_bind_slot = pass_variant._per_mat_buf_bind_slot;
+            cache._valid = true;
         }
 
-        // CommandBuffer资源属于当前draw，不能写入材质的跨命令缓存。
-        if (command_resources != nullptr && binding_layout != nullptr)
+        cache._resource_binding_version = _resource_binding_version;
+        cache._layout_version = layout_version;
+        cache._variant_hash = variant_hash;
+        cache._global_res_layout_version = global_res_registry._layout_version;
+        cache._global_res_binding_version = global_res_registry._binding_version;
+
+        // 复制一份本 draw 的绑定状态，再合并 command 级覆盖；命令级资源属于当前 draw，
+        // 不能写回材质的跨 draw 缓存。
+        BindState cur_state = cache._state;
+        if (command_resources != nullptr && !command_resources->empty())
         {
-            for (const auto &[property_id, command_binding] : *command_resources)
+            for (const auto &resolved: *command_resources)
             {
-                const auto *binding = binding_layout->Find(property_id);
-                if (binding == nullptr || binding->_bind_slot < 0 || binding->_bind_slot >= 32)
+                if (!resolved._is_ok || resolved._binding._resource == nullptr)
                     continue;
-                if (cur_state._bind_res_priority[binding->_bind_slot] > PipelineResource::kPriorityCmd)
+                const u16 slot = static_cast<u16>(resolved._bind_slot);
+                if (cur_state._bind_res_priority[slot] > PipelineResource::kPriorityCmd)
                     continue;
-                if (command_binding._resource == nullptr)
-                    continue;
-                if (cur_state._bind_res[binding->_bind_slot] != nullptr && statistics != nullptr)
+                if (cur_state._bind_res[slot] != nullptr && statistics != nullptr)
                     ++statistics->PipelineResourceOverrideCount;
-                cur_state._bind_res[binding->_bind_slot] = command_binding._resource;
-                cur_state._bind_res_type[binding->_bind_slot] = binding->_resource_type;
-                cur_state._bind_res_priority[binding->_bind_slot] = PipelineResource::kPriorityCmd;
-                cur_state._max_bind_slot = std::max<u16>(cur_state._max_bind_slot, static_cast<u16>(binding->_bind_slot));
+                cur_state._bind_res[slot] = resolved._binding._resource;
+                // 必须使用命令级绑定自身的类型，而不是 layout 声明的类型：SetGlobalBuffer(raw 数据)
+                // 写入的是 kConstBufferRaw（GPU 地址随绑定携带），而 layout 只声明 kConstBuffer。
+                // 沿用 layout 类型会把上传缓冲当成普通常量缓冲绑定，走读未初始化 GPU 地址的分支。
+                cur_state._bind_res_type[slot] = resolved._binding._resource_type;
+                cur_state._bind_res_priority[slot] = PipelineResource::kPriorityCmd;
+                cur_state._bind_addi_info[slot] = resolved._binding._addi_info;
+                cur_state._max_bind_slot = std::max<u16>(cur_state._max_bind_slot, slot);
             }
         }
 
@@ -371,8 +433,33 @@ namespace Ailu::Render
         if (!cur_state._is_ready)
         {
             if (_p_active_shader->GetVariantState(pass_index, variant_hash) == EShaderVariantState::kReady)
-            {
                 cur_state._is_ready = true;
+        }
+        const auto &pass_variant = _p_active_shader->_passes[pass_index]._variants.at(variant_hash);
+        // 材质属性块走已有的帧缓存：同材质 + 同 pass + 同帧 + 属性版本未变化时
+        // 复用 CPU block 与 GPU 上传，不再每个 Draw 重新分配并 memcpy。
+        // has_mat_slot 语义与修复前保持一致：只由 shader 的 per-material cbuffer 槽位决定，
+        // 材质块始终最后写入 snapshot（与 command cbuffer 的先后顺序不变）。
+        const bool has_mat_slot = cache._cbuf_bind_slot >= 0;
+        const PropertyBlockView block = GetPropertyBlockForFrame(pass_index, frame_slot, frame_count, allocator,
+                                                                 has_mat_slot, statistics);
+        const bool has_material_block = has_mat_slot && block._size > 0u && block._gpu_handle != 0u;
+
+        u16 entry_count = 0u;
+        for (u16 slot = 0u; slot <= cur_state._max_bind_slot; ++slot)
+        {
+            // 必须与下面的写入循环使用完全相同的判定条件，否则 entries 容量会算少并越界写。
+            if (cur_state._bind_res[slot] != nullptr)
+                ++entry_count;
+        }
+        u16 cbuf_entry_count = 0u;
+        if (command_resources != nullptr && !command_resources->empty())
+        {
+            for (const auto &resolved: *command_resources)
+            {
+                if (!resolved._is_ok || !resolved._is_cbuffer || !resolved._has_gpu_handle)
+                    continue;
+                ++cbuf_entry_count;
             }
         }
 
@@ -381,88 +468,19 @@ namespace Ailu::Render
         draw_state._pass_index = pass_index;
         draw_state._variant_hash = variant_hash;
         draw_state._is_ready = cur_state._is_ready;
-        draw_state._pipeline_shader_hash = _p_active_shader->_passes[pass_index]._variants[variant_hash]._shader_hash;
+        draw_state._pipeline_shader_hash = pass_variant._shader_hash;
         RasterizerState raster_state = _p_active_shader->PipelineRasterizerState(pass_index);
         raster_state._cull_mode = _cull_mode;
         raster_state.Hash(RasterizerState::_s_hash_obj.GenHash(raster_state));
         draw_state._raster_state_hash = raster_state.Hash();
         draw_state._material_version = PropertyVersion();
         draw_state._material_binding_invalid_reasons = material_binding_invalid_reasons;
-        draw_state._material_binding_result = is_material_cache_hit ? 0u :
-            ((material_binding_invalid_reasons & ((1u << 0u) | (1u << 1u) | (1u << 2u) | (1u << 3u))) != 0u ? 2u : 1u);
+        draw_state._material_binding_result = cache_hit ? 0u : (needs_full_rebuild ? 2u : 1u);
         draw_state._binding_layout_version = layout_version;
         draw_state._global_layout_version = global_res_registry._layout_version;
         draw_state._global_binding_version = global_res_registry._binding_version;
         draw_state._cull_mode = _cull_mode;
-        auto is_command_cbuffer_slot = [&](u16 slot)
-        {
-            if (command_resources == nullptr || binding_layout == nullptr)
-                return false;
-            for (const auto &[property_id, command_binding] : *command_resources)
-            {
-                if (command_binding._resource_type != EBindResDescType::kConstBuffer
-                    && command_binding._resource_type != EBindResDescType::kConstBufferRaw)
-                    continue;
-                if (command_binding._addi_info._gpu_handle == 0u)
-                    continue;
-                const auto *binding = binding_layout->Find(property_id);
-                if (binding != nullptr && binding->_bind_slot == slot)
-                    return true;
-            }
-            return false;
-        };
-        u16 entry_count = 0u;
-        for (u16 slot = 0u; slot <= cur_state._max_bind_slot; ++slot)
-        {
-            GpuResource *res = cur_state._bind_res[slot];
-            if (res == nullptr || is_command_cbuffer_slot(slot))
-                continue;
-            ++entry_count;
-        }
-        // 录制阶段通过SetGlobalBuffer设置的命名const buffer也烘焙进snapshot，
-        // 使RHI draw路径无需再遍历_allocations，只回放_bindings即可
-        u16 cbuf_entry_count = 0u;
-        if (command_resources != nullptr && binding_layout != nullptr)
-        {
-            for (const auto &[property_id, command_binding] : *command_resources)
-            {
-                if (command_binding._resource_type != EBindResDescType::kConstBuffer
-                    && command_binding._resource_type != EBindResDescType::kConstBufferRaw)
-                    continue;
-                if (command_binding._addi_info._gpu_handle == 0u)
-                    continue;
-                const auto *binding = binding_layout->Find(property_id);
-                if (binding == nullptr || binding->_bind_slot < 0 || binding->_bind_slot >= 32)
-                    continue;
-                if (binding->_resource_type != EBindResDescType::kConstBuffer
-                    && binding->_resource_type != EBindResDescType::kConstBufferRaw)
-                    continue;
-                ++cbuf_entry_count;
-            }
-        }
-        // 将材质属性块(raw cbuffer)烘焙进snapshot，RHI draw路径只回放snapshot即可，
-        // 无需在D3DContext再单独上传/绑定per-material cbuffer
-        const bool has_mat_slot = cur_state._cbuf_bind_slot >= 0;
-        PropertyBlockView block;
-        const auto &material_block = _property_blocks[pass_index];
-        block._data = allocator.Allocate<u8>(material_block._size);
-        block._size = material_block._size;
-        if (block._data != nullptr && block._size > 0u)
-            memcpy(block._data, material_block._data, block._size);
-        if (has_mat_slot && block._size > 0u)
-        {
-            const auto upload = FrameResourceManager::Get().AllocFrameUpload(block._size, 256u);
-            if (upload._cpu_ptr != nullptr)
-                memcpy(upload._cpu_ptr, block._data, block._size);
-            block._upload_buffer = upload._owner;
-            block._gpu_handle = upload._gpu_handle;
-            if (statistics != nullptr)
-            {
-                ++statistics->MaterialCBufferUploadCount;
-                statistics->MaterialCBufferUploadBytes += block._size;
-            }
-        }
-        const bool has_material_block = has_mat_slot && block._size > 0u && block._gpu_handle != 0u;
+
         auto *entries = allocator.Allocate<PipelineBindingSnapshotEntry>(entry_count + cbuf_entry_count + (has_material_block ? 1u : 0u));
         draw_state._bindings._entries = entries;
         draw_state._bindings._entry_count = static_cast<u16>(entry_count + cbuf_entry_count + (has_material_block ? 1u : 0u));
@@ -470,7 +488,7 @@ namespace Ailu::Render
         for (u16 slot = 0u; slot <= cur_state._max_bind_slot; ++slot)
         {
             GpuResource *res = cur_state._bind_res[slot];
-            if (res == nullptr || is_command_cbuffer_slot(slot))
+            if (res == nullptr)
                 continue;
             auto &binding = entries[entry_index++];
             auto res_type = cur_state._bind_res_type[slot];
@@ -482,46 +500,43 @@ namespace Ailu::Render
             binding._resource_type = res_type;
             binding._slot = slot;
             binding._priority = cur_state._bind_res_priority[slot];
-            binding._addi_info = {};
+            binding._addi_info = cur_state._bind_addi_info[slot];
             draw_state._bindings._max_slot = slot;
             draw_state._bindings._binding_mask |= 1u << slot;
         }
-        if (command_resources != nullptr && binding_layout != nullptr)
+        // 录制阶段通过SetGlobalBuffer设置的命名const buffer也烘焙进snapshot，
+        // 使RHI draw路径无需再遍历_allocations，只回放_bindings即可
+        if (command_resources != nullptr && !command_resources->empty())
         {
-            for (const auto &[property_id, command_binding] : *command_resources)
+            for (const auto &resolved: *command_resources)
             {
-                if (command_binding._resource_type != EBindResDescType::kConstBuffer
-                    && command_binding._resource_type != EBindResDescType::kConstBufferRaw)
+                if (!resolved._is_ok || !resolved._is_cbuffer || !resolved._has_gpu_handle)
                     continue;
-                if (command_binding._addi_info._gpu_handle == 0u)
-                    continue;
-                const auto *binding = binding_layout->Find(property_id);
-                if (binding == nullptr || binding->_bind_slot < 0 || binding->_bind_slot >= 32)
-                    continue;
-                if (binding->_resource_type != EBindResDescType::kConstBuffer
-                    && binding->_resource_type != EBindResDescType::kConstBufferRaw)
-                    continue;
+                const u16 slot = static_cast<u16>(resolved._bind_slot);
                 auto &cbuf_binding = entries[entry_index++];
-                cbuf_binding._resource = command_binding._resource != nullptr ? command_binding._resource->Handle() : GpuResourceHandle{};
-                cbuf_binding._resource_type = command_binding._resource_type;
-                cbuf_binding._slot = static_cast<u16>(binding->_bind_slot);
+                cbuf_binding._resource = resolved._binding._resource != nullptr ? resolved._binding._resource->Handle() : GpuResourceHandle{};
+                cbuf_binding._resource_type = resolved._binding._resource_type;
+                cbuf_binding._slot = slot;
                 cbuf_binding._priority = PipelineResource::kPriorityCmd;
-                cbuf_binding._addi_info = command_binding._addi_info;
-                draw_state._bindings._max_slot = std::max(draw_state._bindings._max_slot, cbuf_binding._slot);
-                draw_state._bindings._binding_mask |= 1u << cbuf_binding._slot;
+                cbuf_binding._addi_info = resolved._binding._addi_info;
+                draw_state._bindings._max_slot = std::max(draw_state._bindings._max_slot, slot);
+                draw_state._bindings._binding_mask |= 1u << slot;
             }
         }
+        // 将材质属性块(raw cbuffer)烘焙进snapshot，RHI draw路径只回放snapshot即可，
+        // 无需在D3DContext再单独上传/绑定per-material cbuffer
         if (has_material_block)
         {
+            const u16 mat_slot = static_cast<u16>(cache._cbuf_bind_slot);
             auto &mat_binding = entries[entry_index++];
             mat_binding._resource = block._upload_buffer != nullptr ? block._upload_buffer->Handle() : GpuResourceHandle{};
             mat_binding._resource_type = EBindResDescType::kConstBufferRaw;
-            mat_binding._slot = static_cast<u16>(cur_state._cbuf_bind_slot);
+            mat_binding._slot = mat_slot;
             mat_binding._priority = PipelineResource::kPriorityCmd;
             mat_binding._addi_info = {};
             mat_binding._addi_info._gpu_handle = block._gpu_handle;
-            draw_state._bindings._max_slot = std::max(draw_state._bindings._max_slot, mat_binding._slot);
-            draw_state._bindings._binding_mask |= 1u << mat_binding._slot;
+            draw_state._bindings._max_slot = std::max(draw_state._bindings._max_slot, mat_slot);
+            draw_state._bindings._binding_mask |= 1u << mat_slot;
         }
         return draw_state;
     }
@@ -1387,7 +1402,10 @@ namespace Ailu::Render
         if (frame_cache.size() != _property_blocks.size())
             frame_cache.resize(_property_blocks.size());
         auto &cache = frame_cache[pass_index];
-        if (cache._property_data_version == _property_data_version && cache._frame_count == frame_count && cache._block._data != nullptr)
+        // upload_to_gpu 时要求缓存里已经有可用的GPU地址：先以 upload_to_gpu=false 调用过
+        // 的 block 只有CPU副本，不能当成命中复用（T3 的情况A）。
+        if (cache._property_data_version == _property_data_version && cache._frame_count == frame_count
+            && cache._block._data != nullptr && !(upload_to_gpu && cache._block._gpu_handle == 0u))
         {
             // 帧内块缓存命中，复用已上传的GPU handle，无需重复上传
             if (upload_to_gpu && cache._block._size > 0u && cache._block._gpu_handle != 0u)

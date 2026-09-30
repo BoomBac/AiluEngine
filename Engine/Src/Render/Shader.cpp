@@ -19,6 +19,18 @@
 
 namespace Ailu::Render
 {
+    // 内置 property 名只在首次使用时 Intern 一次，之后热路径只读取已缓存的 id。
+    // 名称与 RenderConstants::kCBufNamePer* 保持一致（这里刻意不 include RenderConstants.h，
+    // 避免 Render 头之间的循环依赖）。
+    static RenderPropertyIds::LazyId s_per_object_property_id;
+    static RenderPropertyIds::LazyId s_per_camera_property_id;
+    static RenderPropertyIds::LazyId s_per_material_property_id;
+    static RenderPropertyIds::LazyId s_per_scene_property_id;
+    const ShaderPropertyId &RenderPropertyIds::PerObject() { return Resolve(s_per_object_property_id, "CBufferPerObjectData"); }
+    const ShaderPropertyId &RenderPropertyIds::PerCamera() { return Resolve(s_per_camera_property_id, "CBufferPerCameraData"); }
+    const ShaderPropertyId &RenderPropertyIds::PerMaterial() { return Resolve(s_per_material_property_id, "CBufferPerMaterialData"); }
+    const ShaderPropertyId &RenderPropertyIds::PerScene() { return Resolve(s_per_scene_property_id, "CBufferPerSceneData"); }
+
 #pragma region Utils
     static List<String> ReadFileToLines(const String &sys_path, u32 &line_count, String begin = "", String end = "")
     {
@@ -465,9 +477,15 @@ namespace Ailu::Render
     }
     i16 Shader::FindPass(String pass_name)
     {
+        // ShadowCaster/DepthOnly/MotionVector 这类查询每帧每对象都会发生，
+        // 缓存之后只有首次（或 shader 重建后首次）才做字符串比较。
+        if (const auto cached = _pass_name_to_index.find(pass_name); cached != _pass_name_to_index.end())
+            return cached->second;
         auto it = std::find_if(_passes.begin(), _passes.end(), [&](const ShaderPass &shader_pass) -> bool
                                { return pass_name == shader_pass._name; });
-        return it != _passes.end() ? (i16) it->_index : -1;
+        const i16 pass_index = it != _passes.end() ? (i16) it->_index : -1;
+        _pass_name_to_index.emplace(std::move(pass_name), pass_index);
+        return pass_index;
     }
 
     ShaderVariantHash Shader::ConstructVariantHash(u16 pass_index, const std::set<String> &kw_seq) const
@@ -663,6 +681,8 @@ namespace Ailu::Render
         bool is_process_succeed = true;
         auto previous_variant_state = std::move(_variant_state);
         _variant_state.clear();
+        // pass 列表即将重建，索引缓存必须失效，否则会给出过期/越界的 pass index。
+        _pass_name_to_index.clear();
         List<String> lines{};
         String line{};
         u32 line_count = 0;

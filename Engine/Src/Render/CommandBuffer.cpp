@@ -8,6 +8,7 @@
 #include "Render/Material.h"
 #include "Render/GraphicsContext.h"
 #include "Render/Renderer.h"
+#include <atomic>
 #include <Framework/Common/Application.h>
 #include <Framework/Common/ResourceMgr.h>
 #include <Render/GraphicsPipelineStateObject.h>
@@ -115,40 +116,130 @@ namespace Ailu::Render
         ~Impl() = default;
 
     private:
-        void PushMaterialState(CommandDraw *cmd, Material *mat)
+        // 同一 pass 的 binding layout 在一次录制内固定；把 property -> slot 的解析结果缓存下来，
+        // CaptureDrawState 只需遍历一次很小的 resolved 列表，不再重复做 layout 查找。
+        // 解析结果类型与 Material::CaptureDrawState 共用。
+        // command_resources 的任何一个写入点都递增该版本，ResolveCommandBindings 据此重建。
+        std::atomic<u32> _command_resources_version{0u};
+
+        const Vector<Material::ResolvedCommandBinding> &ResolveCommandBindings(const ShaderBindingLayout *layout)
         {
+            AL_ASSERT(layout != nullptr);
+            const u32 version = _command_resources_version.load(std::memory_order_relaxed);
+            if (_resolved_command_bindings_layout == layout && _resolved_command_bindings_version == version)
+                return _resolved_command_bindings;
+            _resolved_command_bindings_layout = layout;
+            _resolved_command_bindings_version = version;
+            _resolved_command_bindings.clear();
+            _resolved_command_bindings.reserve(_command_resources.size());
+            for (const auto &[property_id, command_binding] : _command_resources)
+            {
+                Material::ResolvedCommandBinding resolved;
+                resolved._property_id = property_id;
+                resolved._binding = command_binding;
+                const auto *layout_binding = layout->Find(property_id);
+                if (layout_binding != nullptr && layout_binding->_bind_slot >= 0 && layout_binding->_bind_slot < 32)
+                {
+                    resolved._bind_slot = layout_binding->_bind_slot;
+                    resolved._layout_type = static_cast<i32>(layout_binding->_resource_type);
+                    resolved._is_cbuffer = layout_binding->_resource_type == EBindResDescType::kConstBuffer
+                        || layout_binding->_resource_type == EBindResDescType::kConstBufferRaw;
+                    resolved._has_gpu_handle = command_binding._addi_info._gpu_handle != 0u;
+                    resolved._is_ok = true;
+                }
+                _resolved_command_bindings.emplace_back(resolved);
+            }
+            return _resolved_command_bindings;
+        }
+
+        void PushMaterialState(CommandDraw *cmd, Material *mat, u32 variant_override_hash = UINT32_MAX)
+        {
+            cmd->_variant_override_hash = variant_override_hash;
             ++_rendering_states_data.MaterialCaptureCount;
             // This is the frontend command-construction boundary. Resolve handles here so
             // deferred DX12 recording consumes only the captured MaterialDrawState snapshot.
             if (mat == nullptr)
                 return;
+            // 资产引用的重新解析由 AssetRegistry 的发布监听器打脏标记，这里只在版本变化时
+            // 真正解析一次（未变化时只是一次原子读），不再每个 Draw 走 asset handle resolve。
             mat->RefreshAssetReferences();
-            const ShaderPropertyId per_obj_id = ShaderPropertyRegistry::Get().Intern(RenderConstants::kCBufNamePerObject);
-            auto *per_obj_cb = static_cast<ConstantBuffer *>(GpuResourceRegistry::Get().Resolve(cmd->_per_obj_cb));
-            if (per_obj_cb != nullptr)
+            const ShaderBindingLayout *binding_layout = nullptr;
+            if (Shader *shader = mat->GetActiveShader(); shader != nullptr
+                && cmd->_pass_index < static_cast<u16>(shader->PassCount()))
+                binding_layout = shader->GetBindingLayout(cmd->_pass_index,
+                    cmd->_variant_override_hash == UINT32_MAX
+                        ? mat->ActiveVariantHash(cmd->_pass_index) : cmd->_variant_override_hash);
+            if (binding_layout == nullptr)
             {
-                // 将per-object cbuffer烘焙进command_resources，CaptureDrawState会写入binding snapshot，
-                // RHI draw路径只回放snapshot，无需在D3DContext再单独绑定
-                auto &binding = _command_resources[per_obj_id];
-                binding._resource = per_obj_cb;
-                binding._resource_type = EBindResDescType::kConstBuffer;
-                binding._addi_info = {};
+                // 布局不可用时退回按名解析路径，保证行为不变。
+                auto *per_obj_cb = cmd->_per_obj_cb.IsValid()
+                    ? static_cast<ConstantBuffer *>(GpuResourceRegistry::Get().Resolve(cmd->_per_obj_cb))
+                    : nullptr;
+                if (per_obj_cb != nullptr)
+                {
+                    auto &binding = _command_resources[RenderPropertyIds::PerObject()];
+                    binding._resource = per_obj_cb;
+                    binding._resource_type = EBindResDescType::kConstBuffer;
+                    binding._addi_info = {};
+                    _command_resources_version.fetch_add(1u, std::memory_order_relaxed);
+                }
+                cmd->_material_id = mat->ID();
+                cmd->_material_draw_state = mat->CaptureDrawState(cmd->_pass_index,
+                                                                  FrameResourceManager::Get().GetActiveFrameSlot(),
+                                                                  g_pGfxContext->GetFrameCount(),
+                                                                  *FrameResourceManager::Get().GetActiveFrameAllocator(),
+                                                                  _global_resource_snapshot,
+                                                                  nullptr, &_rendering_states_data,
+                                                                  cmd->_variant_override_hash);
+                return;
             }
-            else
+
+            const ShaderPropertyId per_obj_id = RenderPropertyIds::PerObject();
+            constexpr i16 kInvalidSlot = -1;
+            // 槽位直接取 layout 声明，随后先更新 command_resources，再解析本 draw 的绑定。
+            i16 per_obj_slot = kInvalidSlot;
+            if (const auto *per_obj_binding = binding_layout->Find(per_obj_id);
+                per_obj_binding != nullptr && per_obj_binding->_bind_slot >= 0 && per_obj_binding->_bind_slot < 32)
             {
-                // 本draw未提供per-object cbuffer；若command_resources里残留的是上一个per_obj_cb draw烘焙的
-                // ConstantBuffer，则移除，避免串到本次draw（SetGlobalBuffer烘焙的raw upload不在此列）
-                auto it = _command_resources.find(per_obj_id);
-                if (it != _command_resources.end() && it->second._resource_type == EBindResDescType::kConstBuffer)
-                    _command_resources.erase(it);
+                per_obj_slot = static_cast<i16>(per_obj_binding->_bind_slot);
             }
+            if (per_obj_slot != kInvalidSlot)
+            {
+                auto *per_obj_cb = cmd->_per_obj_cb.IsValid()
+                    ? static_cast<ConstantBuffer *>(GpuResourceRegistry::Get().Resolve(cmd->_per_obj_cb))
+                    : nullptr;
+                if (per_obj_cb != nullptr)
+                {
+                    // 将per-object cbuffer烘焙进command_resources，CaptureDrawState会写入binding snapshot，
+                    // RHI draw路径只回放snapshot，无需在D3DContext再单独绑定
+                    auto &binding = _command_resources[per_obj_id];
+                    binding._resource = per_obj_cb;
+                    binding._resource_type = EBindResDescType::kConstBuffer;
+                    binding._addi_info = {};
+                    _command_resources_version.fetch_add(1u, std::memory_order_relaxed);
+                }
+                else
+                {
+                    // 本draw的per-object cbuffer句柄无效；若command_resources里残留的是上一个
+                    // per_obj_cb draw烘焙的ConstantBuffer，则移除，避免串到本次draw
+                    // （SetGlobalBuffer烘焙的raw upload不在此列）
+                    auto it = _command_resources.find(per_obj_id);
+                    if (it != _command_resources.end() && it->second._resource_type == EBindResDescType::kConstBuffer)
+                    {
+                        _command_resources.erase(it);
+                        _command_resources_version.fetch_add(1u, std::memory_order_relaxed);
+                    }
+                }
+            }
+            const auto &resolved_bindings = ResolveCommandBindings(binding_layout);
             cmd->_material_id = mat->ID();
             cmd->_material_draw_state = mat->CaptureDrawState(cmd->_pass_index,
-                                                                       FrameResourceManager::Get().GetActiveFrameSlot(),
-                                                                       g_pGfxContext->GetFrameCount(),
-                                                                       *FrameResourceManager::Get().GetActiveFrameAllocator(),
-                                                                       _global_resource_snapshot,
-                                                                       &_command_resources, &_rendering_states_data);
+                                                              FrameResourceManager::Get().GetActiveFrameSlot(),
+                                                              g_pGfxContext->GetFrameCount(),
+                                                              *FrameResourceManager::Get().GetActiveFrameAllocator(),
+                                                              _global_resource_snapshot,
+                                                              &resolved_bindings, &_rendering_states_data,
+                                                              cmd->_variant_override_hash);
         }
 
     public:
@@ -166,6 +257,8 @@ namespace Ailu::Render
             }
             _commands.clear();
             _command_resources.clear();
+            _resolved_command_bindings_layout = nullptr;
+            _resolved_command_bindings.clear();
             _render_target_load_actions.clear();
             _leased_temp_rts.clear();
             _released_temp_rts.clear();
@@ -400,7 +493,7 @@ namespace Ailu::Render
             _commands.push_back(cmd);
         }
         void DrawSceneMesh(VertexBuffer *vb, IndexBuffer *ib, Material *material, u16 submesh_index, u16 pass_index,
-                           const CBufferPrimitiveDrawData &draw_data, u32 instance_count)
+                           const CBufferPrimitiveDrawData &draw_data, u32 instance_count, u32 variant_override_hash)
         {
             auto cmd = CommandPool::Get().Alloc<CommandDraw>();
             cmd->_vb = GetBufferHandle(vb);
@@ -410,7 +503,7 @@ namespace Ailu::Render
             cmd->_primitive_draw_data = draw_data;
             cmd->_is_scene_primitive_draw = true;
             cmd->_instance_count = instance_count;
-            PushMaterialState(cmd, material);
+            PushMaterialState(cmd, material, variant_override_hash);
             _commands.push_back(cmd);
         }
         void SetViewport(Rect viewport)
@@ -543,6 +636,7 @@ namespace Ailu::Render
             binding._resource_type = EBindResDescType::kConstBufferRaw;
             binding._addi_info = {};
             binding._addi_info._gpu_handle = alloc._gpu_handle;
+            _command_resources_version.fetch_add(1u, std::memory_order_relaxed);
         };
         void SetGlobalBuffer(const String &name, ConstantBuffer *buffer)
         {
@@ -550,6 +644,7 @@ namespace Ailu::Render
             binding._resource = buffer;
             binding._resource_type = EBindResDescType::kConstBuffer;
             binding._addi_info = {};
+            _command_resources_version.fetch_add(1u, std::memory_order_relaxed);
         }
         void SetGlobalBuffer(const String &name, GPUBuffer *buffer)
         {
@@ -558,6 +653,7 @@ namespace Ailu::Render
             binding._resource_type = buffer != nullptr && buffer->IsRandomAccess()
                 ? EBindResDescType::kRWBuffer : EBindResDescType::kBuffer;
             binding._addi_info = {};
+            _command_resources_version.fetch_add(1u, std::memory_order_relaxed);
         }
 
         void SetGlobalTexture(const String &name, Texture *tex)
@@ -566,6 +662,7 @@ namespace Ailu::Render
             binding._resource = tex;
             binding._resource_type = EBindResDescType::kTexture2D;
             binding._addi_info = {};
+            _command_resources_version.fetch_add(1u, std::memory_order_relaxed);
         }
         void SetGlobalTexture(const String &name, RTHandle handle)
         {
@@ -876,6 +973,10 @@ namespace Ailu::Render
         // CommandBuffer局部资源，以kPriorityCmd烘焙进draw state snapshot
         HashMap<ShaderPropertyId, CommandResourceBinding> _command_resources;
         HashMap<RenderTexture *, ELoadStoreAction> _render_target_load_actions;
+        // 上一次 ResolveCommandBindings 对应的 layout/版本；换 pass 或 command_resources 变化时失效。
+        const ShaderBindingLayout *_resolved_command_bindings_layout = nullptr;
+        u32 _resolved_command_bindings_version = 0u;
+        Vector<Material::ResolvedCommandBinding> _resolved_command_bindings;
         Vector<RTHandle> _leased_temp_rts;
         Vector<RTHandle> _released_temp_rts;
         CommandRenderingStatesData _rendering_states_data;
@@ -1076,9 +1177,11 @@ namespace Ailu::Render
         _impl->DrawMesh(mesh,material,per_obj_data,sub_mesh,pass_index,instance_count);
     }
     void CommandBuffer::DrawSceneMesh(VertexBuffer *vb, IndexBuffer *ib, Material *material, u16 submesh_index, u16 pass_index,
-                                      const CBufferPrimitiveDrawData &draw_data, u32 instance_count)
+                                      const CBufferPrimitiveDrawData &draw_data, u32 instance_count,
+                                      u32 variant_override_hash)
     {
-        _impl->DrawSceneMesh(vb, ib, material, submesh_index, pass_index, draw_data, instance_count);
+        _impl->DrawSceneMesh(vb, ib, material, submesh_index, pass_index, draw_data, instance_count,
+                             variant_override_hash);
     }
     
     void CommandBuffer::DrawMeshIndirect(Mesh *mesh,u16 sub_mesh, Material *material ,u16 pass_index,GPUBuffer* arg_buffer,u32 arg_offset)
@@ -1184,6 +1287,11 @@ namespace Ailu::Render
     Vector<RTHandle> CommandBuffer::TakeReleasedTempRTs()
     {
         return _impl->TakeReleasedTempRTs();
+    }
+
+    void CommandBuffer::AddDrawSubmissionStats(const CommandRenderingStatesData &stats)
+    {
+        _impl->_rendering_states_data.Accumulate(stats);
     }
 
     CommandRenderingStatesData CommandBuffer::TakeRenderingStatesData()

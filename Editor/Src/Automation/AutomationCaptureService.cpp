@@ -5,8 +5,10 @@
 #include "Framework/Common/Profiler.h"
 #include "Project/ProjectManager.h"
 #include "Render/GraphicsContext.h"
+#include "Render/GpuResource.h"
 #include "Render/ImageCapture/Adapters/RenderGraphImageCaptureBridge.h"
 #include "Render/ImageCapture/ImageCaptureService.h"
+#include "Render/RenderingStates.h"
 #include "Render/RenderPipeline.h"
 #include "Render/Renderer.h"
 #include "Render/Features/RayTraceGI.h"
@@ -200,6 +202,47 @@ namespace Ailu
                 desc._description = "Query the active capture session state and the files it has written.";
                 desc._permission = EAutomationPermission::kReadOnly;
                 registry.Register("render.capture_status", std::move(desc), HandleCaptureStatus);
+            }
+            {
+                AutomationMethodDesc desc;
+                desc._name = "render.submission_stats";
+                desc._description =
+                    "Read the last completed frame's CPU render submission counters (material binding cache, "
+                    "material cbuffer frame cache, GPU resource resolve). Used to validate render hot-path work.";
+                desc._permission = EAutomationPermission::kReadOnly;
+                registry.Register("render.submission_stats", std::move(desc),
+                    [](EditorAutomationContext &, const AutomationObject &) -> AutomationResult
+                    {
+                        const auto &ds = RenderingStates::DisplayData();
+                        const auto gpu_resolve = GpuResourceRegistry::GetResolveStats();
+                        auto counter = [](u64 value) { return AutomationValue(static_cast<double>(value)); };
+                        AutomationObject stats{
+                            {"material_capture_count", counter(ds.MaterialCaptureCount)},
+                            {"material_binding_full_rebuild_count", counter(ds.MaterialBindingResolveCount)},
+                            {"material_binding_global_update_count", counter(ds.MaterialBindingGlobalUpdateCount)},
+                            {"material_binding_cache_hit_count", counter(ds.MaterialBindingCacheHitCount)},
+                            {"material_cbuffer_upload_count", counter(ds.MaterialCBufferUploadCount)},
+                            {"material_cbuffer_upload_bytes", counter(ds.MaterialCBufferUploadBytes)},
+                            {"material_cbuffer_cache_hit_count", counter(ds.MaterialCBufferCacheHitCount)},
+                            {"draw_command_count", counter(ds.DrawCommandCount)},
+                            {"frame_rate_fps", AutomationValue(static_cast<double>(ds.FrameRate))},
+                            {"draw_sort_item_count", counter(ds.DrawSortItemCount)},
+                            {"draw_sort_compare_count", counter(ds.DrawSortCompareCount)},
+                            {"draw_batch_compare_count", counter(ds.DrawBatchCompareCount)},
+                            {"draw_state_bucket_count", counter(ds.DrawStateBucketCount)},
+                            {"draw_batch_count", counter(ds.DrawBatchCount)},
+                            {"draw_instanced_batch_count", counter(ds.DrawInstancedBatchCount)},
+                            {"draw_instanced_primitive_count", counter(ds.DrawInstancedPrimitiveCount)},
+                            {"draw_non_contiguous_batch_count", counter(ds.DrawNonContiguousBatchCount)},
+                            {"pipeline_resource_override_count", counter(ds.PipelineResourceOverrideCount)},
+                            {"gpu_resource_resolve_count", counter(gpu_resolve._total_resolve_count)},
+                            {"gpu_resource_resolve_invalid_count", counter(gpu_resolve._invalid_handle_resolve_count)},
+                            {"gpu_resource_resolve_locked_count", counter(gpu_resolve._locked_resolve_count)},
+                            {"cpu_render_recording_ms", counter(static_cast<u64>(ds.CpuRenderRecordingTimeMs * 1000.0f))},
+                            {"cpu_render_recording_graph_count", counter(ds.CpuRenderRecordingFrameCount)},
+                        };
+                        return AutomationResult::Ok(AutomationValue(std::move(stats)));
+                    });
             }
             {
                 AutomationMethodDesc desc;

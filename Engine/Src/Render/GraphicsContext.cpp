@@ -1,4 +1,4 @@
-#include "Render/GraphicsContext.h"
+﻿#include "Render/GraphicsContext.h"
 #include "Framework/Common/Allocator.hpp"
 #include "Framework/Common/Application.h"
 #include "RHI/DX12/D3DContext.h"
@@ -32,7 +32,12 @@ namespace Ailu::Render
     void GraphicsContext::FinalizeGlobalContext()
     {
         if (g_pGfxContext != nullptr)
+        {
+            // 先停掉命令 worker 线程（join），之后才允许回收命令 payload，
+            // 否则 worker 仍可能在 Alloc/DeAlloc 上访问已释放的池。
+            g_pGfxContext->SetMultiThreadRendering(false);
             g_pGfxContext->WaitForGpu();
+        }
         ImGuiRenderer::Shutdown();
         ConstBufferPool::ShutDown();
 		GraphicsPipelineStateMgr::Shutdown();

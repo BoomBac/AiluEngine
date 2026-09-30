@@ -1,4 +1,4 @@
-#include "EditorApp.h"
+﻿#include "EditorApp.h"
 #include "Automation/AIAssistant.h"
 #include "Automation/AutomationAdapter.h"
 #include "Automation/AutomationAssetService.h"

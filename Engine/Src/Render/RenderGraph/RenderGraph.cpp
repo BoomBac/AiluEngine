@@ -6,6 +6,8 @@
 #include "Render/FrameResource.h"
 #include "Framework/Common/Profiler.h"
 #include "Framework/Common/RenderDebugConfig.h"
+#include "Render/RenderingStates.h"
+#include <chrono>
 #if AILU_ENABLE_FRAME_DEBUGGER
 #include "Render/FrameDebugger/FrameCaptureService.h"
 #include "Render/FrameDebugger/FrameCaptureTypes.h"
@@ -917,6 +919,8 @@ namespace Ailu
             if (!PrepareResources())
                 return;
             PROFILE_BLOCK_CPU("RenderGraph::Execute")
+            // ExecuteCommandBuffer 只把命令推给 worker，前面这段 pass 循环就是纯 CPU 命令录制时间。
+            const auto record_start = std::chrono::steady_clock::now();
             for (const auto &compiled_pass: _compiled_passes)
             {
                 auto *pass = compiled_pass._pass;
@@ -955,6 +959,12 @@ namespace Ailu
                     CommandBufferPool::Release(cmd);
                 }
             }
+            // ExecuteCommandBuffer 只把命令推给 worker，上面这段 pass 循环就是纯 CPU 命令录制时间。
+            auto &record_stats = RenderingStates::RenderData();
+            record_stats.CpuRenderRecordingTimeMs += static_cast<f32>(
+                std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - record_start).count());
+            if (record_stats.CpuRenderRecordingFrameCount < 0xFFFFu)
+                ++record_stats.CpuRenderRecordingFrameCount;
         }
 
         String RenderGraph::GetResourceName(RGHandle handle) const

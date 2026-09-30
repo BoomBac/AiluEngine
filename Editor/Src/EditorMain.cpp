@@ -1,5 +1,6 @@
 #include "Ailu.h"
 #include "EditorApp.h"
+#include "Framework/Common/CrashHandler.h"
 #include "Framework/Common/Log.h"
 
 #include <shellapi.h>
@@ -38,6 +39,8 @@ int WINAPI WinMain(
     // _CrtSetBreakAlloc(4627010);
 #endif
 
+    pow2::Assert::SetLoggingHandler();
+    InstallCrashHandler();
     int argument_count = 0;
     LPWSTR *arguments = CommandLineToArgvW(GetCommandLineW(), &argument_count);
     if (arguments == nullptr)
@@ -70,6 +73,7 @@ int WINAPI WinMain(
 
     app.Tick(16.6f);
     app.Finalize();
+    UninstallCrashHandler();
 
 #ifdef _DEBUG_MEM_LEAK
     _CrtDumpMemoryLeaks();

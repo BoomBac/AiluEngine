@@ -21,6 +21,8 @@ namespace Ailu
             typedef FailBehavior (*Handler)(const char *condition, const char *msg, const char *file, int line);
             Handler GetHandler();
             void SetHandler(Handler newHandler);
+            // 用写入 FileAppender_log.txt 的处理器替换默认断言处理器，便于定位静默中断。
+            AILU_API void SetLoggingHandler();
             AILU_API FailBehavior ReportFailure(const char *condition, const char *file, int line, const char *msg, ...);
         }// namespace Assert
     }// namespace pow2

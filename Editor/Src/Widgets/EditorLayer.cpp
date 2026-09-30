@@ -20,6 +20,7 @@
 #include "Render/Features/VolumetricFog.h"
 #include "Render/Gizmo.h"
 #include "Render/GraphicsContext.h"
+#include "Render/GpuResource.h"
 #include "Render/RenderingData.h"
 #include "UI/TextRenderer.h"
 //#include <Framework/Common/Application.h>
@@ -2045,7 +2046,8 @@ namespace Ailu
                 const u64 pso_total = ds.PsoCacheHitCount + ds.PsoCacheMissCount;
                 const u64 vb_bind_total = ds.VbBindCacheHitCount + ds.VbBindCacheMissCount;
                 const u64 root_slot_total = ds.ActualRootSlotBindCount + ds.SkippedRootSlotBindCount;
-                const u64 material_binding_total = ds.MaterialBindingResolveCount + ds.MaterialBindingCacheHitCount;
+                const u64 material_binding_total = ds.MaterialBindingResolveCount + ds.MaterialBindingGlobalUpdateCount
+                    + ds.MaterialBindingCacheHitCount;
                 const u64 material_upload_total = ds.MaterialCBufferUploadCount + ds.MaterialCBufferCacheHitCount;
 
                 ImGui::Text("Draw Commands: %llu", static_cast<unsigned long long>(ds.DrawCommandCount));
@@ -2067,8 +2069,20 @@ namespace Ailu
                             percent(ds.VbBindCacheHitCount, vb_bind_total));
                 ImGui::Separator();
                 ImGui::Text("Material Capture: %llu", static_cast<unsigned long long>(ds.MaterialCaptureCount));
-                ImGui::Text("Material Binding Resolve/Cache: %llu / %llu (%.1f%% cache)",
+                ImGui::Text("Draw Sort Items/Sort Comparisons: %llu / %llu (batch comparisons %llu)",
+                            static_cast<unsigned long long>(ds.DrawSortItemCount),
+                            static_cast<unsigned long long>(ds.DrawSortCompareCount),
+                            static_cast<unsigned long long>(ds.DrawBatchCompareCount));
+                ImGui::Text("Draw Buckets/Batches: %llu / %llu",
+                            static_cast<unsigned long long>(ds.DrawStateBucketCount),
+                            static_cast<unsigned long long>(ds.DrawBatchCount));
+                ImGui::Text("Instanced Batches/Primitives: %llu / %llu (non-contiguous %llu)",
+                            static_cast<unsigned long long>(ds.DrawInstancedBatchCount),
+                            static_cast<unsigned long long>(ds.DrawInstancedPrimitiveCount),
+                            static_cast<unsigned long long>(ds.DrawNonContiguousBatchCount));
+                ImGui::Text("Material Binding Full/Global/Hit: %llu / %llu / %llu (%.1f%% hit)",
                             static_cast<unsigned long long>(ds.MaterialBindingResolveCount),
+                            static_cast<unsigned long long>(ds.MaterialBindingGlobalUpdateCount),
                             static_cast<unsigned long long>(ds.MaterialBindingCacheHitCount),
                             percent(ds.MaterialBindingCacheHitCount, material_binding_total));
                 ImGui::Text("Material CBuffer Upload/Cache: %llu / %llu (%.1f%% cache)",
@@ -2087,6 +2101,11 @@ namespace Ailu
                             static_cast<unsigned long long>(ds.ResourceMarkRequestCount),
                             static_cast<unsigned long long>(ds.UniqueResourceMarkCount),
                             percent(ds.UniqueResourceMarkCount, ds.ResourceMarkRequestCount));
+                const auto gpu_resolve = Render::GpuResourceRegistry::GetResolveStats();
+                ImGui::Text("Gpu Resolve: %llu (invalid fast reject %llu, locked %llu)",
+                            static_cast<unsigned long long>(gpu_resolve._total_resolve_count),
+                            static_cast<unsigned long long>(gpu_resolve._invalid_handle_resolve_count),
+                            static_cast<unsigned long long>(gpu_resolve._locked_resolve_count));
             }
             if (ImGui::CollapsingHeader("Features"))
             {

@@ -156,7 +156,8 @@ namespace Ailu
                                   u16 pass_index, u32 instance_count, u32 start_instance = 0u, u32 index_start = 0u,
                                   u32 index_num = 0u);
         void DrawSceneMesh(VertexBuffer *vb, IndexBuffer *ib, Material *material, u16 submesh_index, u16 pass_index,
-                           const CBufferPrimitiveDrawData &draw_data, u32 instance_count = 1u);
+                           const CBufferPrimitiveDrawData &draw_data, u32 instance_count = 1u,
+                           u32 variant_override_hash = UINT32_MAX);
 
         void SetViewport(Rect iewport);
         void SetScissorRect(Rect rect,u16 index = 0u);
@@ -219,6 +220,7 @@ namespace Ailu
         // Move-out temporary RTs whose pool leases can be released after GPU submission.
         Vector<RTHandle> TakeReleasedTempRTs();
         CommandRenderingStatesData TakeRenderingStatesData();
+        void AddDrawSubmissionStats(const CommandRenderingStatesData &stats);
         // Read-only access to internal commands (for synchronous processing).
         const Vector<GfxCommand *> &GetCommands() const;
 

@@ -246,10 +246,22 @@ namespace Ailu
                 _p_cmd->SetDescriptorHeaps(1u, &heap);
                 return true;
             }
+            /// @brief 根CBV只能接受真实存在的GPU虚拟地址。0/调试填充值（未初始化内存）会让
+            /// 调试层报 SET_ROOT_CONSTANT_BUFFER_VIEW_INVALID 并中断，这里提前挡掉并留下线索。
+            static bool IsRootViewAddressValid(D3D12_GPU_VIRTUAL_ADDRESS address)
+            {
+                constexpr u64 kMaxPlausibleGpuAddress = 0x0000'FFFF'FFFF'FFFFull;
+                return address != 0u && address <= kMaxPlausibleGpuAddress;
+            }
             bool SetGraphicsRootConstantBufferView(u16 slot, D3D12_GPU_VIRTUAL_ADDRESS address)
             {
                 if (slot >= 32u)
                     return false;
+                if (!IsRootViewAddressValid(address))
+                {
+                    LOG_ERROR("[DX12] SetGraphicsRootConstantBufferView rejected slot {} address {:#x}", slot, address);
+                    return false;
+                }
                 const u64 slot_bit = 1ull << slot;
                 if ((_graphics_state_cache._native_root_valid_mask & slot_bit) != 0u &&
                     _graphics_state_cache._native_root_slot_types[slot] == 1u &&

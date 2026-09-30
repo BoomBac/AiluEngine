@@ -246,6 +246,8 @@ namespace Ailu
         }
 
         [[nodiscard]] const AssetRegistry &GetAssetRegistry() const { return _asset_registry; }
+        // 资产发布监听需要非 const 访问（Material 用它跟踪 shader/texture 热重载）。
+        [[nodiscard]] AssetRegistry &GetMutableAssetRegistry() { return _asset_registry; }
 
         Asset *GetAsset(const WString &asset_path) const;
         Vector<Asset *> GetAssets(const ISearchFilter &filter) const;

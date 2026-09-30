@@ -117,17 +117,6 @@ namespace Ailu
             _scripts.reset();
         }
 
-        if (_resources)
-        {
-            _resources->ReleaseRuntimeResources();
-            _resources.reset();
-        }
-
-        if (_audio_initialized)
-        {
-            Audio::Shutdown();
-            _audio_initialized = false;
-        }
         if (_gizmo_initialized)
         {
             Render::Gizmo::Shutdown();
@@ -139,6 +128,17 @@ namespace Ailu
             _ui_initialized = false;
         }
 
+        if (_resources)
+        {
+            _resources->ReleaseRuntimeResources();
+            _resources.reset();
+        }
+
+        if (_audio_initialized)
+        {
+            Audio::Shutdown();
+            _audio_initialized = false;
+        }
         if (_graphics)
         {
             if (_window)

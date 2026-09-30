@@ -549,6 +549,12 @@ namespace Ailu::RHI::DX12
 
             if (entry._resource_type == EBindResDescType::kConstBufferRaw)
             {
+                if (!D3DCommandBuffer::IsRootViewAddressValid(entry._addi_info._gpu_handle))
+                {
+                    LOG_ERROR("D3DRayTracingShader rejected raw constant buffer on slot {} address {:#x}",
+                              slot, entry._addi_info._gpu_handle);
+                    continue;
+                }
                 d3d_cmd->NativeCmdList()->SetComputeRootConstantBufferView(slot, entry._addi_info._gpu_handle);
                 continue;
             }

@@ -100,15 +100,26 @@ namespace Ailu::RHI::DX12
     }
     void UploadBuffer::BindImpl(RHICommandBuffer *rhi_cmd, const BindParams& params)
     {
-        if (&params == nullptr)
+        if (rhi_cmd == nullptr)
             return;
         GpuResource::BindImpl(rhi_cmd, params);
         auto d3dcmd = dynamic_cast<D3DCommandBuffer *>(rhi_cmd);
+        if (d3dcmd == nullptr)
+            return;
         auto dxcmd = d3dcmd->NativeCmdList();
+        const D3D12_GPU_VIRTUAL_ADDRESS gpu_address = params._params._ub_binder._gpu_ptr;
+        // GPU地址由绑定方通过 _addi_info 传入：为0或调试填充值时说明绑定信息没送到，
+        // 直接下发会被调试层判为 SET_ROOT_CONSTANT_BUFFER_VIEW_INVALID 并中断。
+        if (!D3DCommandBuffer::IsRootViewAddressValid(gpu_address))
+        {
+            LOG_ERROR("[DX12] UploadBuffer::BindImpl rejected {} slot {} address {:#x} (compute={})",
+                      Name(), params._slot, static_cast<u64>(gpu_address), params._is_compute_pipeline);
+            return;
+        }
         if (params._is_compute_pipeline)
-            dxcmd->SetComputeRootConstantBufferView(params._slot, params._params._ub_binder._gpu_ptr);
+            dxcmd->SetComputeRootConstantBufferView(params._slot, gpu_address);
         else
-            d3dcmd->SetGraphicsRootConstantBufferView(params._slot, params._params._ub_binder._gpu_ptr);
+            d3dcmd->SetGraphicsRootConstantBufferView(params._slot, gpu_address);
     }
     UploadBuffer::Page::Page(const String &name, size_t sizeInBytes)
         : m_PageSize(sizeInBytes), m_Offset(0), m_CPUPtr(nullptr), m_GPUPtr(D3D12_GPU_VIRTUAL_ADDRESS(0))

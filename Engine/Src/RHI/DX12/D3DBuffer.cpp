@@ -647,7 +647,15 @@ namespace Ailu::RHI::DX12
     void D3DConstantBuffer::BindImpl(RHICommandBuffer *rhi_cmd, const BindParams& params)
     {
         auto d3dcmd = dynamic_cast<D3DCommandBuffer *>(rhi_cmd);
+        if (d3dcmd == nullptr)
+            return;
         auto cmd = d3dcmd->NativeCmdList();
+        if (!D3DCommandBuffer::IsRootViewAddressValid(_alloc._gpu_ptr))
+        {
+            LOG_ERROR("[DX12] D3DConstantBuffer::BindImpl rejected slot {} address {:#x} (compute={})",
+                      params._slot, static_cast<u64>(_alloc._gpu_ptr), params._is_compute_pipeline);
+            return;
+        }
         if (params._is_compute_pipeline)
             cmd->SetComputeRootConstantBufferView(params._slot, _alloc._gpu_ptr);
         else

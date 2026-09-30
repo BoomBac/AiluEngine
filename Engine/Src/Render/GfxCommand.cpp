@@ -1,4 +1,4 @@
-//
+﻿//
 // Created by 22292 on 2025/3/17.
 //
 #include "Render/GfxCommand.h"
@@ -129,5 +129,6 @@ namespace Ailu::Render
         }
 
         AL_DELETE(g_pCommandPool);
+        g_pCommandPool = nullptr;
     }
 }// namespace Ailu

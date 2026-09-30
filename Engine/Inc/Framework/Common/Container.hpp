@@ -1,4 +1,4 @@
-#ifndef __CONTAINER_H__
+﻿#ifndef __CONTAINER_H__
 #define __CONTAINER_H__
 #include "Framework/Core/CoreMinimal.h"
 
@@ -181,6 +181,17 @@ namespace Ailu
             {
                 std::lock_guard<std::mutex> lock(_mutex);
                 _queue.clear();
+            }
+            /// @brief 与另一个队列交换内容（本类不可移动，因为内含 mutex/condition_variable）。
+            /// 两个锁按地址顺序获取，避免并发交换时互相死锁。
+            void Swap(ParallelQueue &other)
+            {
+                if (this == &other)
+                    return;
+                ParallelQueue *first = this < &other ? this : &other;
+                ParallelQueue *second = this < &other ? &other : this;
+                std::scoped_lock lock(first->_mutex, second->_mutex);
+                _queue.swap(other._queue);
             }
         private:
             mutable std::mutex _mutex;

@@ -1081,6 +1081,12 @@ namespace Ailu::RHI::DX12
             params._is_random_access = entry._resource_type == EBindResDescType::kRWBuffer;
             if (entry._resource_type == EBindResDescType::kConstBufferRaw)
             {
+                if (!D3DCommandBuffer::IsRootViewAddressValid(entry._addi_info._gpu_handle))
+                {
+                    LOG_ERROR("D3DComputeShader rejected raw constant buffer on slot {} address {:#x}",
+                              entry._slot, entry._addi_info._gpu_handle);
+                    continue;
+                }
                 native_cmd->SetComputeRootConstantBufferView(entry._slot, entry._addi_info._gpu_handle);
             }
             else if (entry._resource_type == EBindResDescType::kTexture2D ||

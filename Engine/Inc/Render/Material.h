@@ -19,6 +19,7 @@
 #include "RenderConstants.h"
 #include "MaterialDrawState.h"
 #include "RenderingStates.h"
+#include <atomic>
 #include <map>
 #include <unordered_set>
 #include "generated/Material.gen.h"
@@ -194,10 +195,23 @@ namespace Ailu::Render
         //开启一个关键字并关闭同组的其他关键字
         void EnableKeyword(const String &keyword);
         void DisableKeyword(const String &keyword);
+        // CommandBuffer 预解析好的 command 级绑定：property -> slot 只解析一次，
+        // CaptureDrawState 直接按 slot 合并，不再重复做 layout 查找。
+        struct ResolvedCommandBinding
+        {
+            ShaderPropertyId _property_id = kInvalidShaderPropertyId;
+            CommandResourceBinding _binding;
+            i16 _bind_slot = -1;
+            i32 _layout_type = 0;
+            bool _is_cbuffer = false;
+            bool _has_gpu_handle = false;
+            bool _is_ok = false;
+        };
         MaterialDrawState CaptureDrawState(u16 pass_index, u32 frame_slot, u64 frame_count, FrameAllocator &allocator,
                                            const ShaderGlobalResourceSnapshot &global_resources,
-                                           const HashMap<ShaderPropertyId, CommandResourceBinding> *command_resources = nullptr,
-                                           CommandRenderingStatesData *statistics = nullptr) const;
+                                           const Vector<ResolvedCommandBinding> *command_resources = nullptr,
+                                           CommandRenderingStatesData *statistics = nullptr,
+                                           u32 variant_override_hash = UINT32_MAX);
         [[nodiscard]] Shader *GetShader() const { return _p_shader; };
         [[nodiscard]] Shader *GetActiveShader() const { return _p_active_shader; };
         static ShaderPropertyId SurfacePropertyId() { return ShaderPropertyRegistry::Get().Intern("_surface"); }
@@ -215,8 +229,16 @@ namespace Ailu::Render
             UpdateTextureHandle(ShaderPropertyRegistry::Get().Intern(name), guid);
         }
         [[nodiscard]] AssetSnapshot CaptureAssetSnapshots() const;
-        // Command construction calls this before CaptureDrawState; render recording only consumes the snapshot.
-        void RefreshAssetReferences();
+        // 资产发布（初次加载/热重载）时由 AssetRegistry 监听器递增，作为“资产引用是否需要重新解析”的标志。
+        [[nodiscard]] u32 AssetReferenceVersion() const { return _asset_reference_version.load(std::memory_order_relaxed); }
+        // Draw 热路径入口：只在资产版本变化时才真正解析资产引用。
+        void RefreshAssetReferences()
+        {
+            const u32 version = _asset_reference_version.load(std::memory_order_relaxed);
+            if (version == _resolved_asset_reference_version)
+                return;
+            RefreshAssetReferencesImpl(version);
+        }
         [[nodiscard]] const Guid &TextureGuid(const String &name) const
         {
             auto iter = _texture_guids.find(name);
@@ -241,6 +263,7 @@ namespace Ailu::Render
         PropertyBlockView GetPropertyBlockForFrame(u16 pass_index, u32 frame_slot, u64 frame_count, FrameAllocator &allocator,
                                                    bool upload_to_gpu, CommandRenderingStatesData *statistics = nullptr);
         u32 PropertyVersion() const { return _property_data_version + _resource_binding_version; }
+        u32 DrawStateVersion() const { return _draw_state_version; }
         std::set<String>& SavedKeyworkds() { return _all_keywords; }
         virtual void Construct(bool first_time);
         ESurfaceType SurfaceType() const;
@@ -263,6 +286,9 @@ namespace Ailu::Render
             Array<GpuResource*,32> _bind_res;
             Array<EBindResDescType,32u> _bind_res_type;
             Array<u16,32u> _bind_res_priority;
+            // kConstBufferRaw 绑定（SetGlobalBuffer 直接给GPU地址）的附加信息，
+            // 必须随绑定一起进snapshot，否则RHI层拿不到根CBV的GPU地址。
+            Array<PipelineResource::AddiInfo,32u> _bind_addi_info;
         };
         struct ResolvedResourceBinding
         {
@@ -277,7 +303,10 @@ namespace Ailu::Render
             ShaderVariantHash _variant_hash = 0u;
             u64 _global_res_layout_version = 0u;
             u64 _global_res_binding_version = 0u;
+            i16 _cbuf_bind_slot = -1;
+            bool _valid = false;
             Vector<ResolvedResourceBinding> _global_res_bindings;
+            // 该 state 只含材质/全局绑定，不含 command 级覆盖，命中后按副本合并本 draw 的 command_resources。
             BindState _state;
         };
         struct FramePropertyBlockCache
@@ -290,8 +319,14 @@ namespace Ailu::Render
         {
             Vector<u8> _data;
         };
-        Vector<BindingCacheEntry> _binding_cache;
+        // 每个 pass 一份 binding 缓存（同一 pass 同时只有一个 active variant）。
+        mutable Vector<BindingCacheEntry> _binding_cache;
         Array<Vector<FramePropertyBlockCache>, RenderConstants::kFrameCount + 1u> _frame_property_block_cache;
+        // 把已解析的绑定写入 state：优先级数字越小越优先（Global < Cmd < Local）。
+        static void ApplyResolvedResource(BindState &state, const ResolvedResourceBinding &binding,
+                                          GpuResource *resource, u16 priority);
+        // 只用缓存的 property -> slot 映射刷新全局资源指针，不重新做 layout 查找。
+        static void ApplyGlobalBindings(BindingCacheEntry &cache, const ShaderGlobalResourceSnapshot &global_resources);
     private:
         void UpdateShaderHandle();
         void UpdateTextureHandle(ShaderPropertyId property_id, const Guid &guid);
@@ -300,9 +335,12 @@ namespace Ailu::Render
         void MarkTextureUsed(std::initializer_list<ETextureUsage> usages, bool used);
         void SyncPropertyValue(ShaderPropertyId property_id);
         void RebuildShaderState(bool first_time);
+        void RefreshAssetReferencesImpl(u32 version);
+        void RegisterAssetReferenceListener();
+        void MarkAssetReferencesDirty() { _asset_reference_version.fetch_add(1u, std::memory_order_relaxed); }
     protected:
-        void MarkPropertyDataDirty() { ++_property_data_version; }
-        void MarkResourceBindingsDirty() { ++_resource_binding_version; }
+        void MarkPropertyDataDirty() { ++_property_data_version; ++_draw_state_version; }
+        void MarkResourceBindingsDirty() { ++_resource_binding_version; ++_draw_state_version; }
         void MarkPropertiesDirty()
         {
             MarkPropertyDataDirty();
@@ -334,6 +372,7 @@ namespace Ailu::Render
         Vector<PropertyBlock> _property_blocks;
         u32 _property_data_version = 1u;
         u32 _resource_binding_version = 1u;
+        u32 _draw_state_version = 1u;
         Map<ShaderPropertyId, Texture *> _bind_textures_by_id{};
         Map<ShaderPropertyId, GPUBuffer *> _bind_buffers_by_id{};
         //非shader使用的变量
@@ -349,6 +388,14 @@ namespace Ailu::Render
         u32 _sampler_mask = 0u;
         bool _is_standard_lit = false;
         bool _use_legacy_path_tracer_absorption = false;
+        // 资产发布版本：AssetRegistry 监听线程写，draw/录制线程只读。
+        std::atomic<u32> _asset_reference_version{0u};
+        // 已经解析进 _shader_handle / _bind_textures_by_id 的资产版本。
+        u32 _resolved_asset_reference_version = static_cast<u32>(-1);
+        // AssetRegistry 发布监听器句柄，0 表示未注册（无关联资产的运行时材质）。
+        // 监听器闭包捕获 Material 的 this，移动构造/移动赋值时必须显式转移或注销，
+        // 否则发布事件会回调到已销毁的对象。
+        u64 _asset_listener_id = 0u;
     };
 }// namespace Ailu
 

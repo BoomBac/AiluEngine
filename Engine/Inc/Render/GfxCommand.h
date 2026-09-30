@@ -1,4 +1,4 @@
-#ifndef __GPU_COMMAND__H_
+﻿#ifndef __GPU_COMMAND__H_
 #define __GPU_COMMAND__H_
 
 #include "Framework/Common/Allocator.hpp"
@@ -124,6 +124,7 @@ namespace Ailu::Render
         BufferHandle _ib;
         u32 _material_id = 0u;
         u16 _pass_index;
+        u32 _variant_override_hash = UINT32_MAX;
         BufferHandle _per_obj_cb;
         CBufferPrimitiveDrawData _primitive_draw_data{};
         bool _is_scene_primitive_draw = false;

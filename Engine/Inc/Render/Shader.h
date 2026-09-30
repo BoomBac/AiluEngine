@@ -376,6 +376,8 @@ namespace Ailu::Render
         u32 _binding_layout_version = 1u;
         std::set<Material *> _reference_mats;
         Vector<Map<ShaderVariantHash, EShaderVariantState>> _variant_state;
+        // pass 名 -> pass index 的惰性缓存，shader 重建（PreProcessShader）时清空。
+        Map<String, i16> _pass_name_to_index;
         std::atomic<bool> _is_pass_elements_init = false;
         ETopology _topology = ETopology::kTriangle;
         Map<String, Vector<String>> _keywords_props;

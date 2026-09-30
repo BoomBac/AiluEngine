@@ -20,7 +20,16 @@ namespace Ailu::Render
         u64 VbBindCacheHitCount = 0u;
         u64 VbBindCacheMissCount = 0u;
         u64 MaterialCaptureCount = 0u;
+        u64 DrawSortItemCount = 0u;
+        u64 DrawSortCompareCount = 0u;
+        u64 DrawBatchCompareCount = 0u;
+        u64 DrawStateBucketCount = 0u;
+        u64 DrawBatchCount = 0u;
+        u64 DrawInstancedBatchCount = 0u;
+        u64 DrawInstancedPrimitiveCount = 0u;
+        u64 DrawNonContiguousBatchCount = 0u;
         u64 MaterialBindingResolveCount = 0u;
+        u64 MaterialBindingGlobalUpdateCount = 0u;
         u64 MaterialBindingCacheHitCount = 0u;
         u64 PipelineResourceSubmitCount = 0u;
         u64 PipelineResourceOverrideCount = 0u;
@@ -43,6 +52,9 @@ namespace Ailu::Render
         u32 LastCommandSubmissionIndex = 0u;
         f32 CommandRecordingTimeMs = 0.0f;
         f32 CommandSubmissionTimeMs = 0.0f;
+        // CPU 命令录制（RenderGraph pass 循环）的累计耗时与图执行次数，用于热路径优化验收。
+        f32 CpuRenderRecordingTimeMs = 0.0f;
+        u32 CpuRenderRecordingFrameCount = 0u;
         u32 _flag;
 
         // Properties — set periodically by render thread
@@ -67,7 +79,16 @@ namespace Ailu::Render
         u64 VbBindCacheHitCount = 0u;
         u64 VbBindCacheMissCount = 0u;
         u64 MaterialCaptureCount = 0u;
+        u64 DrawSortItemCount = 0u;
+        u64 DrawSortCompareCount = 0u;
+        u64 DrawBatchCompareCount = 0u;
+        u64 DrawStateBucketCount = 0u;
+        u64 DrawBatchCount = 0u;
+        u64 DrawInstancedBatchCount = 0u;
+        u64 DrawInstancedPrimitiveCount = 0u;
+        u64 DrawNonContiguousBatchCount = 0u;
         u64 MaterialBindingResolveCount = 0u;
+        u64 MaterialBindingGlobalUpdateCount = 0u;
         u64 MaterialBindingCacheHitCount = 0u;
         u64 PipelineResourceSubmitCount = 0u;
         u64 PipelineResourceOverrideCount = 0u;
@@ -90,6 +111,9 @@ namespace Ailu::Render
         u32 LastCommandSubmissionIndex = 0u;
         f32 CommandRecordingTimeMs = 0.0f;
         f32 CommandSubmissionTimeMs = 0.0f;
+        // CPU 命令录制（RenderGraph pass 循环）的累计耗时与图执行次数，用于热路径优化验收。
+        f32 CpuRenderRecordingTimeMs = 0.0f;
+        u32 CpuRenderRecordingFrameCount = 0u;
         u32 _flag;
 
         void Reset() { memset(this, 0, offsetof(CommandRenderingStatesData, _flag)); }
@@ -110,7 +134,16 @@ namespace Ailu::Render
             VbBindCacheHitCount += other.VbBindCacheHitCount;
             VbBindCacheMissCount += other.VbBindCacheMissCount;
             MaterialCaptureCount += other.MaterialCaptureCount;
+            DrawSortItemCount += other.DrawSortItemCount;
+            DrawSortCompareCount += other.DrawSortCompareCount;
+            DrawBatchCompareCount += other.DrawBatchCompareCount;
+            DrawStateBucketCount += other.DrawStateBucketCount;
+            DrawBatchCount += other.DrawBatchCount;
+            DrawInstancedBatchCount += other.DrawInstancedBatchCount;
+            DrawInstancedPrimitiveCount += other.DrawInstancedPrimitiveCount;
+            DrawNonContiguousBatchCount += other.DrawNonContiguousBatchCount;
             MaterialBindingResolveCount += other.MaterialBindingResolveCount;
+            MaterialBindingGlobalUpdateCount += other.MaterialBindingGlobalUpdateCount;
             MaterialBindingCacheHitCount += other.MaterialBindingCacheHitCount;
             PipelineResourceSubmitCount += other.PipelineResourceSubmitCount;
             PipelineResourceOverrideCount += other.PipelineResourceOverrideCount;
@@ -134,6 +167,8 @@ namespace Ailu::Render
                 ? other.LastCommandSubmissionIndex : LastCommandSubmissionIndex;
             CommandRecordingTimeMs += other.CommandRecordingTimeMs;
             CommandSubmissionTimeMs += other.CommandSubmissionTimeMs;
+            CpuRenderRecordingTimeMs += other.CpuRenderRecordingTimeMs;
+            CpuRenderRecordingFrameCount += other.CpuRenderRecordingFrameCount;
         }
 
         void MergeTo(RenderingStatesData &data) const
@@ -152,7 +187,16 @@ namespace Ailu::Render
             data.VbBindCacheHitCount += VbBindCacheHitCount;
             data.VbBindCacheMissCount += VbBindCacheMissCount;
             data.MaterialCaptureCount += MaterialCaptureCount;
+            data.DrawSortItemCount += DrawSortItemCount;
+            data.DrawSortCompareCount += DrawSortCompareCount;
+            data.DrawBatchCompareCount += DrawBatchCompareCount;
+            data.DrawStateBucketCount += DrawStateBucketCount;
+            data.DrawBatchCount += DrawBatchCount;
+            data.DrawInstancedBatchCount += DrawInstancedBatchCount;
+            data.DrawInstancedPrimitiveCount += DrawInstancedPrimitiveCount;
+            data.DrawNonContiguousBatchCount += DrawNonContiguousBatchCount;
             data.MaterialBindingResolveCount += MaterialBindingResolveCount;
+            data.MaterialBindingGlobalUpdateCount += MaterialBindingGlobalUpdateCount;
             data.MaterialBindingCacheHitCount += MaterialBindingCacheHitCount;
             data.PipelineResourceSubmitCount += PipelineResourceSubmitCount;
             data.PipelineResourceOverrideCount += PipelineResourceOverrideCount;
@@ -176,6 +220,8 @@ namespace Ailu::Render
                 ? LastCommandSubmissionIndex : data.LastCommandSubmissionIndex;
             data.CommandRecordingTimeMs += CommandRecordingTimeMs;
             data.CommandSubmissionTimeMs += CommandSubmissionTimeMs;
+            data.CpuRenderRecordingTimeMs += CpuRenderRecordingTimeMs;
+            data.CpuRenderRecordingFrameCount += CpuRenderRecordingFrameCount;
         }
     };
 

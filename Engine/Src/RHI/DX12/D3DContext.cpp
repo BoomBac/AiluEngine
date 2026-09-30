@@ -160,6 +160,14 @@ namespace Ailu::RHI::DX12
                                                     : 0u);
                         }
                         ++s_debug_message_kinds[kind_index]._count;
+                        // ERROR/CORRUPTION 立刻落盘：批量刷新有帧间隔，若首个错误会触发中断，
+                        // 攒在计数里的那条就永远看不到。
+                        if (message->Severity >= D3D12_MESSAGE_SEVERITY_ERROR)
+                        {
+                            LOG_ERROR("D3D12 debug layer immediate: severity={}, id={}, desc={}",
+                                      static_cast<u32>(message->Severity), static_cast<u32>(message->ID),
+                                      message->pDescription != nullptr ? message->pDescription : "");
+                        }
                     }
                     // Anything past the read cap, plus whatever the store itself had to discard at its own
                     // message-count limit, is counted but not described.
@@ -406,6 +414,8 @@ namespace Ailu::RHI::DX12
                     PROFILE_BLOCK_CPU("GpuCommandWorker_WaitForMain");
                     Application::Get().WaitForMain();
                 }
+                // 帧边界取走本帧 Resolve 计数快照：与渲染无重叠，自动化读数稳定。
+                Render::GpuResourceRegistry::TakeResolveStats();
                 ImageCaptureService::Tick();
 #if AILU_ENABLE_FRAME_DEBUGGER
                 Render::FrameDebugger::FrameCaptureService::BeginFrame(_ctx->GetFrameCount());

@@ -268,6 +268,26 @@ namespace Ailu
             std::vector<String> _id_to_name;
         };
 
+        // 内置 shader property 名字在 shader 编译期就已经 Intern，运行热路径只需要读取缓存 id，
+        // 避免每 draw 走 ShaderPropertyRegistry 的 mutex + 字符串哈希。
+        struct AILU_API RenderPropertyIds
+        {
+            struct LazyId
+            {
+                ShaderPropertyId _id = kInvalidShaderPropertyId;
+            };
+            static const ShaderPropertyId &Resolve(LazyId &cache, const String &name)
+            {
+                if (cache._id == kInvalidShaderPropertyId)
+                    cache._id = ShaderPropertyRegistry::Get().Intern(name);
+                return cache._id;
+            }
+            [[nodiscard]] static const ShaderPropertyId &PerObject();
+            [[nodiscard]] static const ShaderPropertyId &PerCamera();
+            [[nodiscard]] static const ShaderPropertyId &PerMaterial();
+            [[nodiscard]] static const ShaderPropertyId &PerScene();
+        };
+
         using ComputeShaderKernelId = u16;
         inline constexpr ComputeShaderKernelId kInvalidComputeShaderKernelId = static_cast<ComputeShaderKernelId>(-1);
 
