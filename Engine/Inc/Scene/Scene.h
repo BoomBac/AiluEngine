@@ -124,6 +124,8 @@ namespace Ailu
             Render::GPUBuffer *GetBLASBuffer() const { return &*_blas_buffer; };
             Render::GPUBuffer *GetTLASBuffer() const { return &*_tlas_buffer; };
             u32 GetTLASNodeCount() const { return (u32) _tlas_nodes.size(); };
+            u64 TlasRebuildCount() const { return _tlas_rebuild_count; }
+            u64 TlasSkippedRebuildCount() const { return _tlas_skipped_rebuild_count; }
             u32 GetBLASNodeCount() const { return _blas_node_count; };
         private:
             void BeginUpdate();
@@ -142,7 +144,7 @@ namespace Ailu
             void DeletePendingEntities();
             void Clear();
             void Update(f32 dt);
-            void RebuildBVHTree();
+            bool RebuildBVHTree();
             void UpdateGpuScene();
             void ProcessSceneCommands();
 
@@ -169,6 +171,17 @@ namespace Ailu
 
         private:
             bool _dirty = true;
+            bool _tlas_dirty = true;
+            u32 _last_tlas_renderable_count = 0u;
+            u64 _tlas_rebuild_count = 0u;
+            u64 _tlas_skipped_rebuild_count = 0u;
+            struct TlasRenderable
+            {
+                ECS::Entity _entity;
+                const Mesh *_mesh;
+                u32 _submesh_count;
+            };
+            Vector<TlasRenderable> _tlas_renderables;
             u64 _structure_revision = 1u;
             u64 _edit_revision = 1u;
             u16 _total_renderable_count = 0u;

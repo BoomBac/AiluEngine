@@ -4,6 +4,7 @@
 #include "Render/GraphicsContext.h"
 #include "Render/Renderer.h"
 #include "RHI/DX12/D3DBuffer.h"
+#include "RHI/DX12/UploadBuffer.h"
 #include "Framework/Core/CoreMinimal.h"
 #include "Framework/Common/Assert.h"
 #include "Framework/Common/Allocator.hpp"
@@ -19,6 +20,16 @@ namespace Ailu::Render
         }
 
         void GPUBuffer::SetData(const u8 *data, u32 size)
+        {
+                SetDataInternal(data, size, false);
+        }
+
+        void GPUBuffer::SetPersistentData(const u8 *data, u32 size)
+        {
+                SetDataInternal(data, size, true);
+        }
+
+        void GPUBuffer::SetDataInternal(const u8 *data, u32 size, bool persistent)
         {
                 AL_ASSERT(data != nullptr || size == 0u);
                 AL_ASSERT(size <= _mem_size);
@@ -36,10 +47,30 @@ namespace Ailu::Render
                                 memcpy(_initial_data, data, size);
                         }
                         _current_data_version = {};
+                        _persistent_upload.reset();
                         return;
                 }
 
-                auto upload = FrameResourceManager::Get().AllocFrameUpload(size, 16u);
+                FrameUploadAllocation upload;
+                if (persistent && size != 0u)
+                {
+                        auto owner = AdoptGpuResource(new RHI::DX12::UploadBuffer(
+                                std::format("{}_persistent_upload", Name()), Math::AlignTo(size, 256u)));
+                        const auto allocation = owner->Allocate(size, 16u);
+                        upload._owner = owner.get();
+                        upload._cpu_ptr = allocation.CPU;
+                        upload._gpu_handle = allocation.GPU;
+                        upload._native_page = {RendererAPI::ERenderAPI::kDirectX12, allocation._page_res};
+                        upload._offset = allocation._offset;
+                        upload._size = size;
+                        _persistent_upload = std::move(owner);
+                }
+                else
+                {
+                        _persistent_upload.reset();
+                        if (size != 0u)
+                                upload = FrameResourceManager::Get().AllocFrameUpload(size, 16u);
+                }
                 if (size != 0u)
                         memcpy(upload._cpu_ptr, data, size);
                 _current_data_version._upload = upload;

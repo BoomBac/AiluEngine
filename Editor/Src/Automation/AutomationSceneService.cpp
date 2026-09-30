@@ -181,6 +181,10 @@ namespace Ailu
                 result.emplace("scene_structure_revision", AutomationValue(scene->StructureRevision()));
                 result.emplace("scene_edit_revision", AutomationValue(scene->EditRevision()));
                 result.emplace("entity_count", AutomationValue(scene->EntityNum()));
+                result.emplace("tlas_rebuild_count", AutomationValue(static_cast<double>(scene->TlasRebuildCount())));
+                result.emplace("tlas_skipped_rebuild_count",
+                               AutomationValue(static_cast<double>(scene->TlasSkippedRebuildCount())));
+                result.emplace("tlas_node_count", AutomationValue(scene->GetTLASNodeCount()));
             }
             else
             {

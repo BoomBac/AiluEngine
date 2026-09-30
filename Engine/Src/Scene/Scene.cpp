@@ -154,6 +154,9 @@ namespace Ailu::SceneManagement
         _blas_buffer.reset();
         _tlas_buffer.reset();
         _tlas_nodes.clear();
+        _tlas_renderables.clear();
+        _last_tlas_renderable_count = 0u;
+        _tlas_dirty = true;
         _bvh_nodes_range.clear();
         _mesh_bvh_node_triangle_offset.clear();
         _triangle_count = 0u;
@@ -169,6 +172,7 @@ namespace Ailu::SceneManagement
     void Scene::MarkDirty()
     {
         _dirty = true;
+        _tlas_dirty = true;
         //编辑行为（MarkEdited / TouchStructure）均汇聚于此；由 Editor 驱动时才标记所属 Asset。
         //运行时 Scene 副本不会被注册为 Asset，GetLinkedAsset 返回 nullptr 自动规避。
         ResourceMgr::Get().MarkAssetDirty(this);
@@ -898,7 +902,11 @@ namespace Ailu::SceneManagement
         {
             //这里是一个小热点
             const bool has_history = transform._world_version > 1u;
-            const Transform render_transform = has_history && !transform._reset_render_interpolation
+            const bool unchanged = transform._prev_position == transform._position &&
+                                   transform._prev_rotation == transform._rotation &&
+                                   transform._prev_scale == transform._scale;
+            // Mixing identical snapshots can round differently as alpha changes and spuriously dirty the TLAS.
+            const Transform render_transform = has_history && !transform._reset_render_interpolation && !unchanged
                                                    ? Transform::Mix(
                                                            Transform(transform._prev_position, transform._prev_rotation, transform._prev_scale),
                                                            Transform(transform._position, transform._rotation, transform._scale),
@@ -923,6 +931,8 @@ namespace Ailu::SceneManagement
     {
         auto &reg = _register;
         u32 index = 0;
+        u32 renderable_count = 0u;
+        u32 aabb_count = 0u;
         for (auto &component: reg.View<ECS::StaticMeshComponent>())
         {
             const ECS::Entity entity = reg.GetEntity<ECS::StaticMeshComponent>(index);
@@ -935,11 +945,51 @@ namespace Ailu::SceneManagement
             {
                 const auto *transform = reg.GetComponent<ECS::StaticMeshComponent, ECS::TransformComponent>(index);
                 auto &bound_box = component._p_mesh->BoundBox();
+                const TlasRenderable renderable{entity, component._p_mesh.get(), component._p_mesh->SubmeshCount()};
+                if (renderable_count == _tlas_renderables.size())
+                {
+                    _tlas_renderables.push_back(renderable);
+                    _tlas_dirty = true;
+                    _dirty = true;
+                }
+                else
+                {
+                    auto &previous = _tlas_renderables[renderable_count];
+                    if (previous._entity != entity || previous._mesh != renderable._mesh ||
+                        previous._submesh_count != renderable._submesh_count)
+                    {
+                        _tlas_dirty = true;
+                        _dirty = true;
+                    }
+                    previous = renderable;
+                }
+                ++renderable_count;
+                if (component._transformed_aabbs.size() != bound_box.size())
+                {
+                    component._transformed_aabbs.resize(bound_box.size());
+                    _tlas_dirty = true;
+                    _dirty = true;
+                }
                 for (i32 i = 0; i < bound_box.size(); ++i)
-                    component._transformed_aabbs[i] = bound_box[i] * transform->GetRenderWorldMatrix();
+                {
+                    const auto transformed_aabb = bound_box[i] * transform->GetRenderWorldMatrix();
+                    auto &previous = component._transformed_aabbs[i];
+                    if (!(previous._min == transformed_aabb._min) || !(previous._max == transformed_aabb._max))
+                        _tlas_dirty = true;
+                    previous = transformed_aabb;
+                }
+                if (!bound_box.empty())
+                    aabb_count += static_cast<u32>(bound_box.size() - 1u);
             }
             ++index;
         }
+        if (renderable_count != _tlas_renderables.size() || aabb_count != _last_tlas_renderable_count)
+        {
+            _tlas_dirty = true;
+            _dirty = true;
+        }
+        _tlas_renderables.resize(renderable_count);
+        _last_tlas_renderable_count = aabb_count;
 
         index = 0;
         for (auto &component: reg.View<ECS::CSkeletonMesh>())
@@ -998,7 +1048,16 @@ namespace Ailu::SceneManagement
 
     void Scene::UpdateAccelerationStructures()
     {
-        RebuildBVHTree();
+        if (!_tlas_dirty)
+        {
+            ++_tlas_skipped_rebuild_count;
+            return;
+        }
+        if (RebuildBVHTree())
+        {
+            _tlas_dirty = false;
+            ++_tlas_rebuild_count;
+        }
     }
 
     void Scene::UpdateGpuSceneIfNeeded()
@@ -1041,16 +1100,18 @@ namespace Ailu::SceneManagement
         UpdateBounds();
         UpdateCameras();
         _register.ExecutePhase(ECS::ESystemPhase::kRenderData, delta_time);
-        UpdateAccelerationStructures();
         EndUpdate();
+        UpdateAccelerationStructures();
         UpdateGpuSceneIfNeeded();
     }
 
     static Vector<LBVHNode> s_temp_tlas_gpu_data;
 
-    void Scene::RebuildBVHTree()
+    bool Scene::RebuildBVHTree()
     {
         PROFILE_BLOCK_CPU("Scene::RebuildBVHTree")
+        if (!_tlas_buffer)
+            return false;
         u32 index = 0;
         Vector<AABB> aabbs;
         for (auto &comp: _register.View<ECS::StaticMeshComponent>())
@@ -1067,6 +1128,12 @@ namespace Ailu::SceneManagement
                 }
             }
         }
+        if (aabbs.empty())
+        {
+            _tlas_nodes.clear();
+            _tlas_buffer->SetPersistentData(nullptr, 0u);
+            return true;
+        }
         BVHBuilder builder(aabbs);
         auto ret = builder.Build(1);
         u64 node_size = ret._nodes.size();
@@ -1079,8 +1146,10 @@ namespace Ailu::SceneManagement
             const auto &node = _tlas_nodes[i];
             s_temp_tlas_gpu_data.emplace_back(node._aabb._min, (f32) node._child_index_or_first, node._aabb._max, (f32) node._count_or_flag);
         }
-        _tlas_buffer->SetData(reinterpret_cast<const u8 *>(s_temp_tlas_gpu_data.data()), (u32) (node_size * sizeof(LBVHNode)));
+        _tlas_buffer->SetPersistentData(reinterpret_cast<const u8 *>(s_temp_tlas_gpu_data.data()),
+                                        static_cast<u32>(node_size * sizeof(LBVHNode)));
         s_temp_tlas_gpu_data.clear();
+        return true;
     }
 
     void Scene::UpdateGpuScene()
@@ -1277,11 +1346,14 @@ namespace Ailu::SceneManagement
         if (auto it = _all_scene.find(scene_path); it != _all_scene.end())
         {
             _p_current = it->second.get();
+            _p_current->_tlas_dirty = true;
             return it->second;
         }
         auto s = ResourceMgr::Get().Load<Scene>(scene_path);
         _all_scene[scene_path] = s;
         _p_current = s.get();
+        if (_p_current != nullptr)
+            _p_current->_tlas_dirty = true;
         return s;
         //bool test = false;
         //if (test)
@@ -1309,6 +1381,7 @@ namespace Ailu::SceneManagement
         _scene_before_temporary = _p_current;
         _temporary_scene = std::move(scene);
         _p_current = _temporary_scene.get();
+        _p_current->_tlas_dirty = true;
         _temporary_prefab_asset_guid = prefab_asset_guid;
         _temporary_prefab_root_entity = prefab_root_entity;
         _temporary_scene_initial_edit_revision = _temporary_scene->EditRevision();
@@ -1322,6 +1395,8 @@ namespace Ailu::SceneManagement
             return;
         ScriptSystem::Get().OnSceneDestroyed(_temporary_scene.get());
         _p_current = _scene_before_temporary;
+        if (_p_current != nullptr)
+            _p_current->_tlas_dirty = true;
         _scene_before_temporary = nullptr;
         _retired_temporary_scene = std::move(_temporary_scene);
         _temporary_prefab_asset_guid = Guid::EmptyGuid();
@@ -1342,6 +1417,7 @@ namespace Ailu::SceneManagement
         InstantiateRuntimeMaterials(*_runtime_scene);
         _runtime_scene_src = _p_current;
         _p_current = _runtime_scene;
+        _p_current->_tlas_dirty = true;
         Camera::sMain = _runtime_scene->FindMainCamera();
         Camera::sCurrent = Camera::sMain != nullptr ? Camera::sMain : Camera::sScene;
     }
@@ -1352,6 +1428,9 @@ namespace Ailu::SceneManagement
         // before deferring destruction.
         ScriptSystem::Get().OnSceneDestroyed(_runtime_scene);
         _p_current = _runtime_scene_src;
+        // Runtime copies share GPU buffers; restore the editor scene's TLAS contents on reactivation.
+        if (_p_current != nullptr)
+            _p_current->_tlas_dirty = true;
         _runtime_scene_src = nullptr;
         if (Application::Get()._is_multi_thread_rendering.load())
         {

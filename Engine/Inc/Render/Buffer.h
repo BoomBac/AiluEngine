@@ -169,10 +169,13 @@ namespace Ailu
                 SetData(reinterpret_cast<const u8 *>(data.data()), static_cast<u32>(data_size));
             }
             void SetData(const u8 *data, u32 size);
+            // Retain upload storage for data versions reused across frame-slot resets.
+            void SetPersistentData(const u8 *data, u32 size);
             [[nodiscard]] const BufferDataVersion &CurrentDataVersion() const { return _current_data_version; }
 
         protected:
             virtual bool IsPhysicalResourceCreated() const { return false; }
+            void SetDataInternal(const u8 *data, u32 size, bool persistent);
 
         protected:
             BufferDesc _desc;
@@ -181,6 +184,7 @@ namespace Ailu
             u8 *_initial_data = nullptr;
             u32 _initial_data_size = 0u;
             BufferDataVersion _current_data_version;
+            Ref<GpuResource> _persistent_upload;
             u64 _data_generation = 0u;
             i32 _bindless_srv_index = -1;
             i32 _bindless_uav_index = -1;
