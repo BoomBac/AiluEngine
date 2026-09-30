@@ -14,6 +14,7 @@
 
 namespace Ailu
 {
+    class PluginManager;
     using Math::Vector2f;
     using Math::Vector2UInt;
     using Math::Vector3f;
@@ -99,6 +100,7 @@ namespace Ailu
             FirstPersonCameraController &GetSceneCameraController() { return *_camera_controller; }
             Camera *GetSceneCamera() { return _p_scene_camera; }
             EditorAutomationService *GetAutomationService() { return _automation_service.get(); }
+            PluginManager *GetPluginManager() { return _plugin_manager.get(); }
         private:
             bool OnGetFocus(WindowFocusEvent &e) final;
             bool OnLostFocus(WindowLostFocusEvent &e) final;
@@ -124,6 +126,8 @@ namespace Ailu
             ResourceReloadService _resource_reload_service;
             Scope<EditorAutomationService> _automation_service;
             Scope<AutomationPipeServer> _pipe_server;
+            Scope<PluginManager> _plugin_manager;
+            Delegate<>::Handle _plugin_tick_handle = Delegate<>::kInvalidHandle;
             bool _is_resource_reload_configured = false;
         };// namespace Editor
     }// namespace Editor

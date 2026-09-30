@@ -140,6 +140,13 @@ Editor-owned service shutdown 应早于其依赖的 Engine subsystem 完全销�
 
 ## Future plugin system constraint
 
+Current plugin hosting is implemented by Engine `PluginManager` and owned by `EditorApp`. The manager is
+initialized after successful base Application initialization, ticked from an Editor-owned before-update delegate,
+and shut down/destroyed after unsubscribing that delegate and before other Editor service/Application teardown.
+`GetPluginManager()` permits explicit manual loading. Editor scans Engine and Project Plugins roots, then loads
+only manifests marked autoload. There is no plugin UI. Engine-owned registration records release before
+OnUnload/Destroy; concrete Editor menu/panel/callback extension services remain follow-up work.
+
 若动态插件同时支持 runtime 和 Editor：
 
 建议从一开始区分 capability：

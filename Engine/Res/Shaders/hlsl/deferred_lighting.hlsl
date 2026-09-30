@@ -21,7 +21,6 @@
 #include "lighting.hlsli"
 #include "shadow.hlsli"
 #include "fullscreen_quad.hlsli"
-#include "froxel_common.hlsli"
 #include "static_diffuse_probe.hlsli"
 #include "ray_trace/ddgi_common.hlsli"
 #include "surfel_common.hlsli"
@@ -33,7 +32,6 @@ TEXTURE2D(_GBuffer2)
 TEXTURE2D(_GBuffer3)
 TEXTURE2D(_CameraDepthTexture)
 
-TEXTURE3D(_VolumetricLightTexture)
 Texture2D _DDGI_IrradianceAtlas : register(t22);
 Texture2D<float2> _DDGI_DistanceAtlas : register(t23);
 StructuredBuffer<DDGIProbeData> _DDGI_ProbeData : register(t24);
@@ -433,23 +431,6 @@ bool SampleDDGIIrradiance(float3 world_position, float3 normal_ws, out float3 ir
 //     return normalize(ray);
 // }
 
-float4 RaymarchVolumetric(float3 uvw,float scene_depth)
-{
-    if (any(uvw < 0) || any(uvw > 1))
-        return 0;
-	uint w, h, d;
-	_VolumetricLightTexture.GetDimensions(w, h, d);
-	uint z = (uint)(uvw.z * d);
-	float slice_far = SliceDistance(z+1,_ProjectionParams.y,_ProjectionParams.z);
-	float slice_near = SliceDistance(z,_ProjectionParams.y,_ProjectionParams.z);
-	float view_z = LinearEyeDepth(scene_depth,_ProjectionParams.y,_ProjectionParams.z);
-	float fade = saturate((view_z - slice_near) / (slice_far - slice_near));
-	// if (slice_far > view_z)
-	// 	return 0;
-	float4 light_and_slice_far = _VolumetricLightTexture.SampleLevel(g_PointClampSampler, uvw, 0);
-    return _VolumetricLightTexture.SampleLevel(g_LinearClampSampler, uvw, 0);
-}
-
 FullScreenPSInput FullscreenVSMain(FullScreenVSInput i);
 
 float4 DeferredLightingPSMain(FullScreenPSInput input) : SV_TARGET
@@ -507,10 +488,6 @@ float4 DeferredLightingPSMain(FullScreenPSInput input) : SV_TARGET
         float3 light = max(0.0, CalculateLightPBR(surface_data, world_pos.xyz, input.uv, diffuse_irradiance,
                                                  environment_irradiance, has_diffuse_gi));
 	light += surface_data.emssive;
-    float3 vol_light_uvw = WorldToVolumetricVoxelUVW(world_pos.xyz,_MatrixV,_MatrixP,_ProjectionParams.y,_ProjectionParams.z);
-	float4 vol_light = RaymarchVolumetric(vol_light_uvw,depth);
-	//light = vol_light.r == 19.5? float3(0,1,0) : float3(1,0,0);
-	light += vol_light.rgb;
 	//light = LinearEyeDepth(depth,_ProjectionParams.z,_ProjectionParams.y).xxxx;
     //light = Linear01Depth(depth,_ZBufferParams).xxxx;
     //light = Linear01DepthNew(depth,100.0f,1.0f).xxxx;

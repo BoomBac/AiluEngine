@@ -1,0 +1,12 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "e8fdf603-a9ee-4fa8-aeda-b94f54cf00a1",
+        "_asset_type": "Ailu::Render::Shader",
+        "_asset_name": "volumetric_fog_composite",
+        "_dependencies": []
+    },
+    "_file": "volumetric_fog_composite.hlsl",
+    "_vs_entry": "FullscreenVSMain",
+    "_ps_entry": "FogCompositePSMain"
+}

@@ -162,6 +162,12 @@ Resize 属于危险的资源生命周期边界。
 
 上层 feature 应以 capability 为条件，不要通过 concrete adapter/device 强转判断。
 
+## Compute texture array SRVs
+
+`ComputeShader::CaptureDispatchState` selects the main SRV for a default `Texture2DArray` binding
+(`_sub_res == UINT32_MAX`), exposing all array layers to shader indexing such as directional CSM.
+An explicit array subresource binding retains its single-layer/mip view; UAV selection is unchanged.
+
 ## Change checklist
 
 修改 RHI/DX12 时检查：

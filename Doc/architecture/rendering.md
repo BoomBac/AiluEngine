@@ -191,6 +191,21 @@ RenderPass 表达渲染工作单元。
 
 ## RenderingData
 
+### Volumetric fog composition
+
+`VolumetricFog` owns the injection/integration pass and a separate `VolumetricFog_Composite` pass.
+Injection/integration runs after deferred lighting, before sky/composition, and publishes the written RenderGraph handle.
+The accumulation texture stores integrated scattering in RGB and transmittance in alpha. Composition runs after sky
+and before transparency, samples the current view depth (sky uses the full volume), and blends `scattering +
+transmittance * destination`. Deferred lighting does not sample fog. Transparent material fog is not implemented by
+this full-screen pass; it requires evaluation at each transparent surface's own depth.
+
+Fog extinction is `0.01 * _fog_density` per meter. Injected lighting is treated as a unit-albedo source function;
+integration multiplies it by slice opacity, without dividing by density. A small-optical-depth series avoids loss of
+scattering precision near zero density. `_fog_distance` (default 50 meters) bounds the froxel domain independently of
+the camera far plane. Generation and composition share the same clamped domain; distant geometry and sky sample the
+last slice. A changed domain near/far rejects temporal injection history for the next dispatch.
+
 `RenderingData` 是 pass/feature 与 renderer preparation 之间的重要数据桥梁。
 
 新增共享 per-frame rendering data 时先判断：

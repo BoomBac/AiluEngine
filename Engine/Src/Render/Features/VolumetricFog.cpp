@@ -61,13 +61,16 @@ namespace Ailu
                 auto *main_light_shadow_map = graph.Resolve<Texture>(data._rg_handles._main_light_shadow_map);
                 if (cur_light == nullptr || history_light == nullptr || main_light_shadow_map == nullptr)
                     return;
-                const Camera* cam = Camera::sSelected? Camera::sSelected : data._camera;
+                const Camera *cam = data._camera;
+                const f32 fog_far = std::max(cam->Near() * 1.001f, std::min(cam->Far(), _fog_distance));
                 _volumetric_fog->SetMatrix("_matrix_iv",MatrixInverse(cam->GetView()));
                 _volumetric_fog->SetMatrix("_matrix_ip",MatrixInverse(cam->GetProjNoJitter()));
                 _volumetric_fog->SetMatrix("_matrix_pre_v",_matrix_prev_v);
                 _volumetric_fog->SetMatrix("_matrix_pre_p",_matrix_prev_p);
                 _volumetric_fog->SetFloat("_cam_near", cam->Near());
-                _volumetric_fog->SetFloat("_cam_far", cam->Far());
+                _volumetric_fog->SetFloat("_cam_far", fog_far);
+                const bool history_matches = _history_near == cam->Near() && _history_far == fog_far;
+                _volumetric_fog->SetBool("_temporal_reprojection", _temporal_reprojection && history_matches);
                 _volumetric_fog->SetVector("_cam_pos", cam->Position());
                 //_volumetric_fog->SetVector("_zmax_uv_scale", maxz_sample_uv_scale);
                 _volumetric_fog->SetTexture(_light_injection_kernel, "_VolumetricLight", cur_light);
@@ -79,12 +82,15 @@ namespace Ailu
                 cmd->Dispatch(_volumetric_fog.get(), _light_injection_kernel, x, y, z);
                 _matrix_prev_p = cam->GetProjNoJitter();
                 _matrix_prev_v = cam->GetView();
+                _history_near = cam->Near();
+                _history_far = fog_far;
             });
             graph.AddPass("VolumetricFog_LightIntegration", RDG::PassDesc(RDG::EPassType::kCompute), [&, this](RDG::RenderGraphBuilder &builder)
             {
                 builder.Read(_inject_handle);
                 //builder.Read(s_max_z_handle);
                 _accum_handle = builder.Write(rendering_data._rg_handles._volumetric_fog_accum, EResourceUsage::kWriteUAV);
+                rendering_data._rg_handles._volumetric_fog_accum = _accum_handle;
             },
             [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
             {
@@ -137,11 +143,45 @@ namespace Ailu
         {
         }
         #pragma endregion
+
+        VolumetricFogCompositePass::VolumetricFogCompositePass() : RenderPass("VolumetricFog_Composite")
+        {
+            _event = ERenderPassEvent::kAfterSkybox;
+            auto shader = ResourceMgr::Get().Load<Shader>(L"Shaders/hlsl/volumetric_fog_composite.alasset");
+            _composite_material = MakeRef<Material>(shader.get(), "VolumetricFogComposite");
+        }
+
+        void VolumetricFogCompositePass::OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data)
+        {
+            if (!rendering_data._rg_handles._volumetric_fog_accum.IsValid())
+                return;
+            const auto fog_handle = rendering_data._rg_handles._volumetric_fog_accum;
+            const auto depth_handle = rendering_data._rg_handles._depth_tex;
+            graph.AddPass(_name, RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
+            {
+                builder.Read(fog_handle);
+                builder.Read(depth_handle);
+                // Keep the existing sky/opaque color as the blend destination without sampling it as an SRV.
+                rendering_data._rg_handles._color_target = builder.WriteAfter(rendering_data._rg_handles._color_target,
+                                                                             EResourceUsage::kWriteRTV);
+            }, [this, fog_handle, depth_handle](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
+            {
+                _composite_material->SetTexture("_VolumetricFogAccum", graph.Resolve<Texture>(fog_handle));
+                _composite_material->SetTexture("_CameraDepthTexture", graph.Resolve<Texture>(depth_handle));
+                const auto *cam = data._camera;
+                _composite_material->SetFloat("_fog_far", std::max(cam->Near() * 1.001f,
+                                                                  std::min(cam->Far(), _fog_distance)));
+                cmd->SetRenderTargetLoadAction(data._rg_handles._color_target, ELoadStoreAction::kLoad);
+                cmd->SetRenderTarget(data._rg_handles._color_target);
+                cmd->DrawFullScreenQuad(_composite_material.get());
+            });
+        }
         
         #pragma region VolumetricFog
         VolumetricFog::VolumetricFog() : RenderFeature("VolumetricFog")
         {
             _volumetric_fog_pass = MakeScope<VolumetricFogPass>();
+            _composite_pass = MakeScope<VolumetricFogCompositePass>();
             TextureDesc desc;
             desc._width = _voxel_num.x;
             desc._height = _voxel_num.y;
@@ -182,11 +222,15 @@ namespace Ailu
         void VolumetricFog::AddRenderPasses(Renderer &renderer, const RenderingData &rendering_data)
         {
             _volumetric_fog_pass->_debug_voxel_pos = _debug_voxel_pos;
+            _volumetric_fog_pass->_fog_distance = _fog_distance;
+            _volumetric_fog_pass->_temporal_reprojection = _temporal_reprojection;
+            _composite_pass->_fog_distance = _fog_distance;
             _volumetric_fog_pass->_cur_light_texture = _is_cur_a? _volumetric_light_a.get() : _volumetric_light_b.get();
             _volumetric_fog_pass->_history_light_texture = _is_cur_a? _volumetric_light_b.get() : _volumetric_light_a.get();
             _volumetric_fog_pass->_accum_texture = _accum_texture.get();
             _is_cur_a = !_is_cur_a;
             renderer.EnqueuePass(_volumetric_fog_pass.get());
+            renderer.EnqueuePass(_composite_pass.get());
         }
         void VolumetricFog::OnPropertyChanged(const PropertyInfo &prop)
         {

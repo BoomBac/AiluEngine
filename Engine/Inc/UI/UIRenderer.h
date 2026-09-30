@@ -13,6 +13,7 @@
 #include "Framework/Core/Containers/Array.h"
 #include "DrawerBlock.h"
 #include "Render/Texture.h"
+#include "Render/FrameResource.h"
 #include "Style/UIStyleBasic.h"
 #include "Style/UIStyles.h"
 #include <functional>
@@ -150,20 +151,21 @@ namespace Ailu
             u16 _frame_index = 0u;
             Ref<ConstantBuffer> _obj_cb;
             Scope<TextRenderer> _text_renderer;
-            Array<Vector<DrawerBlock *>, Render::RenderConstants::kFrameCount> _drawer_blocks;
-            Array<HashMap<Window *, Vector<DrawerBlock *>>, Render::RenderConstants::kFrameCount> _window_drawer_blocks;
+            Array<Vector<DrawerBlock *>, Render::FrameResourceManager::kFrameResourceSlotCount> _drawer_blocks;
+            Array<HashMap<Window *, Vector<DrawerBlock *>>, Render::FrameResourceManager::kFrameResourceSlotCount>
+                    _window_drawer_blocks;
             struct WidgetDrawerBlocks
             {
                 Widget *_widget = nullptr;
                 Vector<DrawerBlock *> _cpu_blocks = {};
-                Array<Vector<DrawerBlock *>, Render::RenderConstants::kFrameCount> _blocks = {};
-                Array<u64, Render::RenderConstants::kFrameCount> _gpu_revisions = {};
+                Array<Vector<DrawerBlock *>, Render::FrameResourceManager::kFrameResourceSlotCount> _blocks = {};
+                Array<u64, Render::FrameResourceManager::kFrameResourceSlotCount> _gpu_revisions = {};
                 u64 _build_revision = 0u;
             };
             Vector<WidgetDrawerBlocks> _widget_drawer_blocks;
             Vector<WidgetSubmitEntry> _submit_entries;
             DrawerBlock *_text_block;
-            Vector<DrawerBlock *> _popup_backdrop_blocks;
+            Array<Vector<DrawerBlock *>, Render::FrameResourceManager::kFrameResourceSlotCount> _popup_backdrop_blocks;
             u32 _popup_backdrop_block_index = 0u;
             //暂时每个widget独立一个block,0保留为全局绘制
             u16 _cur_widget_index = 0u;

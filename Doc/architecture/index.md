@@ -9,6 +9,7 @@
 | Area | Document | Primary code |
 | --- | --- | --- |
 | Runtime lifecycle | `runtime-lifecycle.md` | `Application`, `EngineRuntime` |
+| Plugin foundation | `plugin-system.md` | `DynamicLibrary`, `PluginApi`, standalone plugin smoke tests |
 | Threading | `threading.md` | `JobSystem`, `ThreadPool`, Application render sync |
 | Scene / ECS | `scene-ecs.md` | `Engine/Inc/Scene`, ECS components/register |
 | Assets | `asset-system.md` | `ResourceMgr`, `AssetRegistry`, asset documents/artifacts |

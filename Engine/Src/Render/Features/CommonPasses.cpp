@@ -984,16 +984,6 @@ namespace Ailu::Render
         shadow_desc._dimension = ETextureDimension::kCubeArray;
         _dummy_point_light_shadow_map = RenderTexture::Create(shadow_desc, "_DummyPointLightShadowMap");
 
-        TextureDesc volumetric_desc;
-        volumetric_desc._width = 1u;
-        volumetric_desc._height = 1u;
-        volumetric_desc._depth = 1u;
-        volumetric_desc._format = EALGFormat::kALGFormatR16G16B16A16_FLOAT;
-        volumetric_desc._mip_num = 1u;
-        _dummy_volumetric_light = Texture3D::Create(volumetric_desc);
-        _dummy_volumetric_light->Name("_DummyVolumetricLight");
-        _dummy_volumetric_light->SetPixel(0u, 0u, 0u, Colors::kBlack, 0u);
-        _dummy_volumetric_light->Apply();
         _event = static_cast<ERenderPassEvent>(static_cast<u16>(ERenderPassEvent::kBeforeDeferedLighting) + 25u);
     }
 
@@ -1040,8 +1030,6 @@ namespace Ailu::Render
                           }
                           if (rendering_data._rg_handles._ao_tex.IsValid())
                               builder.Read(rendering_data._rg_handles._ao_tex);
-                          if (rendering_data._rg_handles._volumetric_fog_accum.IsValid())
-                              builder.Read(rendering_data._rg_handles._volumetric_fog_accum);
                           builder.Read(rendering_data._rg_handles._environment_diffuse);
                           builder.Read(rendering_data._rg_handles._environment_specular);
                           if (rendering_data._ddgi_lighting._irradiance_atlas_handle.IsValid())
@@ -1097,11 +1085,6 @@ namespace Ailu::Render
                             auto *occlusion_tex = data._rg_handles._ao_tex.IsValid()
                                 ? graph.Resolve<Texture>(data._rg_handles._ao_tex) : nullptr;
                             _p_lighting_material->SetTexture("_OcclusionTex", occlusion_tex ? occlusion_tex : Texture::s_p_default_white);
-                            auto *volumetric_light = data._rg_handles._volumetric_fog_accum.IsValid()
-                                ? graph.Resolve<Texture>(data._rg_handles._volumetric_fog_accum) : nullptr;
-                            _p_lighting_material->SetTexture("_VolumetricLightTexture",
-                                                              volumetric_light ? volumetric_light
-                                                                               : _dummy_volumetric_light.get());
                             Texture *ddgi_atlas = data._ddgi_lighting._irradiance_atlas_handle.IsValid()
                                 ? graph.Resolve<Texture>(data._ddgi_lighting._irradiance_atlas_handle) : nullptr;
                             Texture *ddgi_distance_atlas = data._ddgi_lighting._distance_atlas_handle.IsValid()

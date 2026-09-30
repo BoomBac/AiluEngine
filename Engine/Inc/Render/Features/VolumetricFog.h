@@ -11,6 +11,7 @@ namespace Ailu
     namespace Render
     {
         class VolumetricFogPass;
+        class VolumetricFogCompositePass;
         ACLASS()
         class AILU_API VolumetricFog : public RenderFeature
         {
@@ -27,6 +28,8 @@ namespace Ailu
             bool _debug_voxel_pos = false;
             APROPERTY(Range(0.0f,10.0f))
             f32 _fog_density = 1.0f;
+            APROPERTY(Range(1.0f,1000.0f))
+            f32 _fog_distance = 50.0f;
             APROPERTY()
             bool _temporal_reprojection = false;
             APROPERTY(Range(0.0f,1.0f))
@@ -37,6 +40,7 @@ namespace Ailu
             f32 _intensity = 1.0f;
         private:
             Scope<VolumetricFogPass> _volumetric_fog_pass;
+            Scope<VolumetricFogCompositePass> _composite_pass;
             Ref<Texture3D> _volumetric_light_a, _volumetric_light_b;
             Ref<Texture3D> _accum_texture;
             bool _is_cur_a = true;
@@ -57,6 +61,8 @@ namespace Ailu
         public:
             bool _debug_voxel_pos = false;
             Vector3UInt _voxel_num;
+            f32 _fog_distance = 50.0f;
+            bool _temporal_reprojection = false;
         private:
             AssetRef<ComputeShader> _volumetric_fog;
             AssetRef<ComputeShader> _max_z_cs;
@@ -70,8 +76,20 @@ namespace Ailu
             RDG::RGHandle _accum_handle;
             Ref<Material> _debug_material;
             Matrix4x4f _matrix_prev_v, _matrix_prev_p;
+            f32 _history_near = 0.0f;
+            f32 _history_far = 0.0f;
         };
 
+        class VolumetricFogCompositePass : public RenderPass
+        {
+        public:
+            VolumetricFogCompositePass();
+            void OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data) override;
+            f32 _fog_distance = 50.0f;
+
+        private:
+            Ref<Material> _composite_material;
+        };
 
     } // namespace Render
 }

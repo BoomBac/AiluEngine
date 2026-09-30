@@ -107,11 +107,17 @@ void LightInjection(CSInput input)
 }
 
 // https://github.com/Unity-Technologies/VolumetricLighting/blob/master/Assets/VolumetricFog/Shaders/Scatter.compute
-float4 accumulate(float thickness, float3 accum_scattering, float accum_transmittance, float3 slice_scattering, float slice_density)
+float4 AccumulateFog(float thickness, float3 accum_scattering, float accum_transmittance,
+                     float3 slice_scattering, float slice_density)
 {
-    const float slice_transmittance = exp(-slice_density * thickness * 0.01f);
-
-    float3 slice_scattering_integral = slice_scattering * (1.0 - slice_transmittance) / max(slice_density, 1e-6f);
+    const float optical_depth = max(slice_density, 0.0f) * max(thickness, 0.0f) * 0.01f;
+    const float slice_transmittance = exp(-optical_depth);
+    // Avoid cancellation near zero density. Injected lighting is the source function (unit scattering albedo),
+    // so density scales both scattering and extinction through optical depth; no division by density is needed.
+    const float slice_opacity = optical_depth < 1e-3f
+        ? optical_depth * (1.0f - 0.5f * optical_depth + optical_depth * optical_depth / 6.0f)
+        : 1.0f - slice_transmittance;
+    float3 slice_scattering_integral = slice_scattering * slice_opacity;
 
     accum_scattering += slice_scattering_integral * accum_transmittance;
     accum_transmittance *= slice_transmittance;
@@ -172,8 +178,8 @@ void LightIntegration(uint3 id : SV_DispatchThreadID)
         float slice_density = _FogDensity;
         float slice_z_far = SliceDistance(z + 1, _cam_near, _cam_far);
         //slice_z_far = min(slice_z_far, view_z);
-        accum_scattering_transmittance = accumulate(slice_z_far - slice_z_near, accum_scattering_transmittance.rgb, 
+        accum_scattering_transmittance = AccumulateFog(slice_z_far - slice_z_near, accum_scattering_transmittance.rgb,
             accum_scattering_transmittance.a, slice_scattering, slice_density);
-        _FogAccum[cur_id] = float4(accum_scattering_transmittance.rgb, z);
+        _FogAccum[cur_id] = accum_scattering_transmittance;
     }
 }

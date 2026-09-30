@@ -61,6 +61,10 @@ GPU queues
 
 `JobGroup` 适合“一组并行工作 + 一个明确 join point”。
 
+`JobGroup::Done()` 在 `_wait_mutex` 锁内递减计数并完成通知；`IsDone()` 和 `Wait(group)` 的完成判断通过同一把锁同步。
+因此 `Wait(group)` 返回后可销毁 group，不会与最后一个 worker 的条件变量通知并发。等待线程在锁外执行 `WorkOnce()`。
+调用方仍须保证 dispatch 已结束、没有其他线程继续等待或访问 group，且不能在未完成时销毁 group。
+
 当前内部名为 `LockFreeJobQueue` 的队列实现实际上仍使用 mutex；不要根据类型名假设它是 lock-free。
 
 ### JobSystem usage principles
@@ -171,6 +175,14 @@ read hot path:
 不要让 worker 随意长期持有临时帧内存地址。
 
 ## Shutdown requirements
+
+`PluginManager` is owner-thread-only: initialization, queries, Load/Unload/Tick/Shutdown and destruction stay
+on its constructing thread. Reentrant lifecycle operations during plugin execution are rejected. Plugin-owned
+workers/jobs must stop and join/wait before OnUnload returns. The threaded smoke fixture verifies this over
+100 repeated load/unload cycles; the manager does not add plugin ownership tracking to JobSystem.
+Manifest scan/load and registration mutation have the same affinity/reentrancy checks. Engine-owned
+registration scopes close before OnUnload so teardown cannot add new records. The process-wide atomic token
+counter supplies identity only; module/registry lifetime remains explicitly owned by the manager.
 
 所有 worker system 在 shutdown 时都必须满足：
 

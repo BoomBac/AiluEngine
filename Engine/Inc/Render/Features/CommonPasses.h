@@ -150,7 +150,6 @@ namespace Ailu
             Ref<RenderTexture> _dummy_main_light_shadow_map;
             Ref<RenderTexture> _dummy_add_light_shadow_maps;
             Ref<RenderTexture> _dummy_point_light_shadow_map;
-            Ref<Texture3D> _dummy_volumetric_light;
         };
 
         class SkyPass : public RenderPass

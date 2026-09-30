@@ -41,6 +41,12 @@ Editor 通过 `EditorApp : Application` 在基础 runtime 上增加 Editor-only 
 - editor layers；
 - automation service；
 - automation pipe server。
+- PluginManager（EditorApp owns; before-update Tick; unload before other Editor services and Application teardown）。
+
+The Editor manager scans Engine/Project Plugins roots after base initialization and explicitly loads autoload
+manifests. Each module owns an Engine-side registration scope. Shutdown stops Tick/new registration entry,
+releases host records, calls OnUnload (including worker/job drain), destroys the plugin instance, clears exports
+and finally unloads the DLL. Scope metadata contains no plugin-owned cleanup closure.
 
 ## Application responsibilities
 

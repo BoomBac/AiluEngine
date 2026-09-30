@@ -45,7 +45,7 @@ namespace Ailu
 
     private:
         std::atomic<u32> _remaining{0u};
-        std::mutex _wait_mutex;
+        mutable std::mutex _wait_mutex;
         std::condition_variable _wait_cv;
     };
 

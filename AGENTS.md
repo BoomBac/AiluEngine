@@ -94,7 +94,8 @@ cmake --build --preset build-develop
 
 Architecture 文档描述“现在是什么”。
 
-ExecPlan 描述“这次任务准备把它变成什么”。
+ExecPlan 描述“这次任务准备把它变成什么”，对拆分式 ExecPlan，只读取 README.md、progress.md 和当前 milestone 文件；
+除非当前阶段明确依赖，否则不要读取其他 milestone 文件。
 
 ## 6. Generated reflection code
 

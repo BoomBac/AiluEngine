@@ -61,7 +61,8 @@ namespace Ailu
                 frame_blocks.push_back(AL_NEW(DrawerBlock, _default_material,9600u));
             }
             _text_block = AL_NEW(DrawerBlock,MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/default_text.alasset"), "DefaultTextMaterial"));
-            _popup_backdrop_blocks.push_back(AL_NEW(DrawerBlock, _default_material, 8u));
+            for (auto &frame_blocks: _popup_backdrop_blocks)
+                frame_blocks.push_back(AL_NEW(DrawerBlock, _default_material, 8u));
             _text_renderer = MakeScope<TextRenderer>();
         }
         UIRenderer::~UIRenderer()
@@ -94,9 +95,11 @@ namespace Ailu
                 }
             }
             AL_DELETE(_text_block);
-            for (auto *block: _popup_backdrop_blocks)
-                AL_DELETE(block);
-            _popup_backdrop_blocks.clear();
+            for (auto &frame_blocks: _popup_backdrop_blocks)
+            {
+                for (auto *block: frame_blocks)
+                    AL_DELETE(block);
+            }
         }
 
         void UIRenderer::Render(CommandBuffer *cmd)
@@ -107,7 +110,8 @@ namespace Ailu
 
         void UIRenderer::Prepare()
         {
-            _frame_index = Render::g_pGfxContext != nullptr ? static_cast<u16>(Render::g_pGfxContext->GetFrameCount() % RenderConstants::kFrameCount) : 0u;
+            // NewFrame has waited for this slot's GPU work before any mapped UI buffers are rewritten.
+            _frame_index = static_cast<u16>(FrameResourceManager::Get().GetActiveFrameSlot());
             ResetFrameStats();
             _cur_global_block_index = 0u;
             for (auto *block: _drawer_blocks[_frame_index])
@@ -242,7 +246,7 @@ namespace Ailu
                     entry->_gpu_revisions.fill(0u);
                     if (!_cache_build_pending_resource)
                     {
-                        for (u16 frame_index = 0u; frame_index < RenderConstants::kFrameCount; ++frame_index)
+                        for (u16 frame_index = 0u; frame_index < entry->_gpu_revisions.size(); ++frame_index)
                             canvas->ClearPaintInvalidation(frame_index);
                     }
                     if (is_debug_reflector_visible)
@@ -785,7 +789,8 @@ namespace Ailu
         void UIRenderer::SyncWidgetFrameBlocks(Widget *widget)
         {
             auto *entry = GetWidgetBlockEntry(widget);
-            if (entry == nullptr || _frame_index >= RenderConstants::kFrameCount || entry->_gpu_revisions[_frame_index] == entry->_build_revision)
+            if (entry == nullptr || _frame_index >= entry->_blocks.size() ||
+                entry->_gpu_revisions[_frame_index] == entry->_build_revision)
                 return;
             auto &source_blocks = entry->_cpu_blocks;
             auto &target_blocks = entry->_blocks[_frame_index];
@@ -929,9 +934,10 @@ namespace Ailu
             if (rect.z <= 1.0f || rect.w <= 1.0f)
                 return;
 
-            if (_popup_backdrop_block_index >= _popup_backdrop_blocks.size())
-                _popup_backdrop_blocks.push_back(AL_NEW(DrawerBlock, _default_material, 8u));
-            DrawerBlock *backdrop_block = _popup_backdrop_blocks[_popup_backdrop_block_index++];
+            auto &backdrop_blocks = _popup_backdrop_blocks[_frame_index];
+            if (_popup_backdrop_block_index >= backdrop_blocks.size())
+                backdrop_blocks.push_back(AL_NEW(DrawerBlock, _default_material, 8u));
+            DrawerBlock *backdrop_block = backdrop_blocks[_popup_backdrop_block_index++];
             backdrop_block->ResetBuildData();
             _frame_backdrop_blur_cache.erase(color);
 

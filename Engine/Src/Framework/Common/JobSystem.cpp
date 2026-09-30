@@ -15,7 +15,8 @@ namespace Ailu
 {
     JobGroup::~JobGroup()
     {
-        AL_ASSERT(IsDone());
+        const bool is_done = IsDone();
+        AL_ASSERT(is_done);
     }
 
     void JobGroup::Add(u32 count)
@@ -26,6 +27,8 @@ namespace Ailu
 
     void JobGroup::Done()
     {
+        // Keep the final notification alive until completion observers acquire this same mutex.
+        std::lock_guard lock(_wait_mutex);
         const u32 previous = _remaining.fetch_sub(1u, std::memory_order_acq_rel);
         AL_ASSERT(previous > 0u);
 
@@ -35,6 +38,7 @@ namespace Ailu
 
     bool JobGroup::IsDone() const
     {
+        std::lock_guard lock(_wait_mutex);
         return _remaining.load(std::memory_order_acquire) == 0u;
     }
 
@@ -363,10 +367,11 @@ namespace Ailu
                 continue;
 
             std::unique_lock lock(group._wait_mutex);
-            if (group.IsDone())
+            auto is_done = [&group]() { return group._remaining.load(std::memory_order_acquire) == 0u; };
+            if (is_done())
                 break;
 
-            group._wait_cv.wait_for(lock, std::chrono::microseconds(100), [&group]() { return group.IsDone(); });
+            group._wait_cv.wait_for(lock, std::chrono::microseconds(100), is_done);
         }
     }
 }// namespace Ailu

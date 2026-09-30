@@ -23,6 +23,7 @@
 #include "Framework/Common/FileManager.h"
 #include "Framework/Common/Allocator.hpp"
 #include "Framework/Common/JobSystem.h"
+#include "Framework/Plugin/PluginManager.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Objects/Type.h"
 #include "Render/Camera.h"
@@ -89,6 +90,20 @@ namespace Ailu
             _camera_controller = MakeScope<FirstPersonCameraController>();
             LoadEditorConfig(desc);
             auto ret = Application::Initialize(desc,init_ctx);
+            if (ret != 0)
+                return ret;
+            _plugin_manager = MakeScope<PluginManager>();
+            if (!_plugin_manager->Initialize())
+                return 1;
+            _plugin_tick_handle = _before_update.Subscribe([this]
+            {
+                if (_plugin_manager)
+                    _plugin_manager->Tick(TimeMgr::s_delta_time);
+            });
+            LOG_INFO("[Plugin] Editor host initialized");
+            _plugin_manager->ScanPlugins({(fs::path(Application::GetAiluRoot()) / L"Plugins").wstring(),
+                (fs::path(ProjectManager::Get().CurrentProject().RootDirectory()) / L"Plugins").wstring()});
+            _plugin_manager->LoadAutoloadPlugins();
             _p_input_layer = AL_NEW_TAG(EMemoryTag::kEditor, InputLayer);
             PushLayer(_p_input_layer);
             _pipeline = AL_NEW_TAG(EMemoryTag::kEditor, CommonRenderPipeline);
@@ -159,6 +174,14 @@ namespace Ailu
         }
         void EditorApp::Finalize()
         {
+            _before_update.Unsubscribe(_plugin_tick_handle);
+            _plugin_tick_handle = Delegate<>::kInvalidHandle;
+            if (_plugin_manager)
+            {
+                _plugin_manager->Shutdown();
+                _plugin_manager.reset();
+            }
+            LOG_INFO("[Plugin] Editor tick unsubscribed and host shut down before Application teardown");
             SaveEditorConfig();
             AssetPreviewGenerator::Shutdown();
             if (_pipe_server)

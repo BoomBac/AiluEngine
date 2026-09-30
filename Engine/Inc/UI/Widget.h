@@ -7,7 +7,7 @@
 
 #include "UIElement.h"
 #include "Framework/Core/Containers/Array.h"
-#include "Render/RenderConstants.h"
+#include "Render/FrameResource.h"
 #include "Objects/Serialize.h"
 #include "generated/Widget.gen.h"
 
@@ -115,7 +115,7 @@ namespace Ailu
             UIElement *_last_invalidation_source = nullptr;
             EUIInvalidationReason _last_invalidation_reasons = EUIInvalidationReason::kNone;
             u64 _invalidation_count = 0u;
-            Array<bool, Render::RenderConstants::kFrameCount> _is_paint_cache_frame_valid = {};
+            Array<bool, Render::FrameResourceManager::kFrameResourceSlotCount> _is_paint_cache_frame_valid = {};
             Vector<UIElement*> _prev_hover_path;
             bool _is_popup = false;
             // 双击检测状态

@@ -155,11 +155,11 @@ namespace Ailu
         }
         bool Widget::IsPaintCacheDirty(u16 frame_index) const
         {
-            return frame_index >= Render::RenderConstants::kFrameCount || !_is_paint_cache_frame_valid[frame_index];
+            return frame_index >= _is_paint_cache_frame_valid.size() || !_is_paint_cache_frame_valid[frame_index];
         }
         void Widget::ClearPaintInvalidation(u16 frame_index)
         {
-            if (frame_index < Render::RenderConstants::kFrameCount)
+            if (frame_index < _is_paint_cache_frame_valid.size())
                 _is_paint_cache_frame_valid[frame_index] = true;
             bool is_all_frame_valid = true;
             for (const auto is_valid: _is_paint_cache_frame_valid)
