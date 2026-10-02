@@ -58,7 +58,37 @@ namespace Ailu::Render
         RDG::RGHandle _cloud_cur_handle{};
         RDG::RGHandle _cloud_history_handle{};
         RDG::RGHandle _sky_view_lut_handle{};
-        bool _is_cur_a;
+        bool _is_cur_a = true;
+        bool _history_valid = false;
+        bool _history_write_executed = false;
+        bool _reprojection_executed = false;
+        bool _rg_commit_done = false;
+        u64 _history_camera_hash = 0u;
+        u64 _last_render_frame = 0u;
+        Vector2f _previous_uv_jitter = Vector2f::kZero;
+        Vector3f _previous_position = Vector3f::kZero;
+        Vector3f _previous_forward = Vector3f::kZero;
+        Vector3f _previous_up = Vector3f::kZero;
+        f32 _previous_height = 0.0f;
+        f32 _previous_thickness = 0.0f;
+        f32 _previous_density_multiplier = 0.0f;
+        f32 _previous_threshold = 0.0f;
+        f32 _previous_type_offset = 0.0f;
+        f32 _previous_speed = 0.0f;
+        f32 _previous_exposure = 0.0f;
+        Vector3f _previous_base_pos = Vector3f::kZero;
+        Vector3f _previous_absorption = Vector3f::kZero;
+        Vector3f _previous_scattering = Vector3f::kZero;
+        f32 _previous_fov = 0.0f;
+        f32 _previous_aspect = 0.0f;
+        f32 _previous_near = 0.0f;
+        f32 _previous_far = 0.0f;
+        u8 _previous_projection_type = 0u;
+        bool _previous_tile_render = false;
+        bool _previous_high_quality = false;
+        u32 _history_width = 0u;
+        u32 _history_height = 0u;
+        bool _has_rendered = false;
     };
     ACLASS()
     class AILU_API VolumetricClouds : public RenderFeature

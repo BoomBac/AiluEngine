@@ -476,7 +476,6 @@ float4 DeferredLightingPSMain(FullScreenPSInput input) : SV_TARGET
 	    }
 	#endif
 	uint material_id = (uint)gbuf2.r;
-	//return float4(surface_data.wnormal,1);
 #ifdef DEBUG_NORMAL
 	return float4(surface_data.wnormal,1);
 #elif DEBUG_ALBEDO

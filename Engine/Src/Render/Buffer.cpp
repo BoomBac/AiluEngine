@@ -183,6 +183,8 @@ namespace Ailu::Render
 		}
 		if (stream_index >= _gpu_stream_buffers.size())
 			_gpu_stream_buffers.resize(stream_index + 1u);
+		if (_gpu_stream_buffers[stream_index].get() != buffer || _stream_data[stream_index]._size != size)
+			++_view_version;
 		_gpu_stream_buffers[stream_index] = std::dynamic_pointer_cast<GPUBuffer>(buffer->SharedFromThis());
 		_stream_data[stream_index] = {nullptr, size, false};
 		_vertices_count = size / _buffer_layout.GetStride(stream_index);

@@ -92,7 +92,7 @@ namespace Ailu
             APROPERTY(Range(0,8))
             u32 _max_local_lights = 8u;
             APROPERTY(Range(0.0f,10.0f))
-            f32 _fog_density = 1.0f;
+            f32 _fog_density = 0.1f;
             APROPERTY(Range(-1000.0f,1000.0f))
             f32 _fog_height = 0.0f;
             APROPERTY(Range(0.0f,1.0f))

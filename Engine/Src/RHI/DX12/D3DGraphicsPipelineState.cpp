@@ -75,6 +75,7 @@ namespace Ailu::RHI::DX12
             D3D12_INPUT_ELEMENT_DESC desc = *(_d3d_pso_desc.InputLayout.pInputElementDescs + i);
             desc.SemanticName = Render::RenderConstants::GetVertexSemanticName(layout_descs[i]._semantic);
             desc.SemanticIndex = Render::RenderConstants::GetVertexSemanticIndex(layout_descs[i]._semantic);
+            desc.InputSlot = layout_descs[i].Stream;
             v.push_back(desc);
         }
         _d3d_pso_desc.NumRenderTargets = _state_desc._rt_state._color_rt[0] == EALGFormat::kALGFormatUNKOWN ? 0 : _state_desc._rt_state._color_rt_num;

@@ -103,9 +103,15 @@ namespace Ailu::RHI::DX12
         g_camData._CameraPos = cam.Position();
         g_camData._MatrixV = cam.GetView();
         g_camData._MatrixP = cam.GetProj();
-        g_camData._MatrixVP = cam.GetViewProj();
-        g_camData._MatrixVP_NoJitter = cam.GetViewProj();
+        g_camData._MatrixVP = cam.GetViewProjJittered();
+        g_camData._MatrixVP_NoJitter = cam.GetViewProjNoJitter();
         g_camData._MatrixIVP = MatrixInverse(g_camData._MatrixVP);
+        g_camData._MatrixVP_Pre = cam.GetPrevViewProj();
+        const auto &jitter = cam.GetJitter();
+        g_camData._matrix_jitter_x = jitter.x;
+        g_camData._matrix_jitter_y = jitter.y;
+        g_camData._uv_jitter_x = jitter.z;
+        g_camData._uv_jitter_y = jitter.w;
 
         g_rayGenData->SetData(reinterpret_cast<u8 *>(&m_rayGenCB), sizeof(RayGenConstantBuffer));
         g_perSceneData->SetData(reinterpret_cast<u8 *>(&g_sceneData), sizeof(CBufferPerSceneData));

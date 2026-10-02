@@ -241,7 +241,106 @@ Is it GPU resource?
 
 不要把所有数据都塞进一个全局 RenderingData。
 
+## Camera matrices and jitter
+
+`Camera` owns the single projection jitter used by the current raster view. It stores both the stable no-jitter projection
+and the current render projection. `GetProj()` returns the render projection; `GetProjNoJitter()` returns the stored stable
+projection. `GetViewProj()` retains its compatibility meaning and returns the stable current VP. New code that needs an
+explicit meaning should use `GetViewProjNoJitter()` or `GetViewProjJittered()`.
+
+The per-camera constant buffer follows the same contract:
+
+```text
+_MatrixVP             current jittered render VP
+_MatrixIVP            inverse of _MatrixVP
+_MatrixVP_NoJitter    current stable VP
+_MatrixVP_Pre         previous stable VP
+```
+
+Call `Camera::MarkTemporalHistoryReset()` after a camera cut or teleport to make the next render frame use its current stable VP
+as the previous VP, preventing a one-frame camera-motion spike.
+
+Camera culling uses the stable no-jitter VP. Camera render-ray corners are derived separately from the jittered VP and feed
+the screen-ray constants used by volumetric clouds. Perspective and orthographic camera jitter both store projection-space
+NDC displacement in `Camera::_jitter.xy`; `Camera::_jitter.zw` stores the corresponding top-left-origin texture-UV delta.
+Perspective editor screen/world conversion uses the stable projection so picking and gizmo interaction do not follow
+sub-pixel render jitter. A custom view/projection supplied through `SetViewAndProj()` has zero jitter and identical stable
+and render matrices.
+
+`RenderPipeline::Render()` prepares each registered camera through `Camera::PrepareRenderFrame(frame_index)` after waiting
+for the previous render worker and before view/culling preparation. This refresh samples projection jitter from the graphics
+frame index and updates render VP/ray corners without
+rebuilding stable projection, view or culling planes. It is independent of input/controller updates, including idle 2D
+views. History advances only at this synchronized boundary, once per supplied render frame index, using a per-camera
+last-rendered stable VP snapshot. Controller matrix rebuilds, `LookTo()` and `SetViewAndProj()` do not advance history.
+The first rendered view and an explicitly reset view use previous=current; skipped render frames retain the last rendered
+VP. Cubemap face cameras are prepared at their synchronized render entry. Custom view/projection cameras retain zero jitter.
+Orthographic Camera width defaults to 10 world units; AA continues to default to None.
+
+When `VolumetricClouds` is registered as a renderer feature, its tiled temporal pass runs at event 455, after
+`MotionVector` (450) and before Sprite (460) / forward transparency (475). `CloudMain` uses Camera's jittered render-ray
+corners. Cloud history reprojection uses no-jitter MotionVector data plus the previous-minus-current Camera UV jitter;
+invalid history is seeded by a full-resolution Cloud dispatch before tiled reuse resumes. Resize, camera/projection
+discontinuity, render gaps, camera changes and Cloud parameter changes invalidate this history. The feature is currently
+not added to `Renderer::_features` by default, so this temporal Cloud path remains opt-in.
+Cloud explicitly reads the environment system's `_rg_handles._sky_view_lut` at record time; no sky-LUT global slot is
+required. Missing inputs or skipped history-producing work prevent composition and history commit.
+
+## TAA blended responsiveness
+
+The native RenderGraph TAA feature records `TAAOpaqueSnapshot` at event456, after MotionVector450 / Cloud455 and before Sprite460
+and forward transparency475. The pass captures its source handle at record time and copies the pre-blend HDR color into
+a transient RG texture. `TemporalAA` compares the composed input against that snapshot; a component difference above
+0.001 HDR marks a responsive pixel. This is color-affecting coverage, rather than a material-ID or geometric coverage mask.
+
+Each camera's TAA history owns two R8_UNORM responsive textures alongside its two color textures. The resolve writes
+every current mask pixel, explicitly reads the previous mask/snapshot in RG, and rotates both histories after dispatch.
+Current responsive coverage and the expanded, reprojected previous coverage return raw current color, protecting both
+blended content and newly uncovered background. Alpha-test deferred coverage remains in core TAA. The global history
+factor is unchanged. The legacy non-RG resolve binds the resources but disables this snapshot-based policy.
+
+Core clipping retains RGB luminance/coverage behavior and independently clamps history Co/Cg to the current 3x3 chroma
+envelope. This rejects stale colors without coupling tiny R11G11B10 chroma quantization differences to luminance rejection.
+The policy does not supply transparent object velocity; changes below the mask threshold still use ordinary TAA.
+
+`billboard.hlsl` intentionally removes projection jitter for stable blended rasterization. Perspective matrices remove
+the shader-side `[0][2]`/`[1][2]` offsets; orthographic matrices remove `[0][3]`/`[1][3]`. Actual Editor GizmoPass icons
+write final color after postprocess; pre-TAA billboard behavior is a separate supported test path.
+
+## RayTraceGI camera temporal contract
+
+RayTraceGI camera-change detection uses `Camera::GetViewProjNoJitter()`, so Halton camera jitter does not reset temporal
+history or reference accumulation. Its current GBuffer/depth reconstruction uses the jittered inverse VP from the current
+camera view. The DXR path builds its camera constants from that same view and keeps previous VP stable/no-jitter.
+
+Realtime RTGI reprojection combines no-jitter MotionVector data with Camera's top-left-origin UV jitter delta:
+`history_uv = current_uv - motion + previous_jitter_uv - current_jitter_uv`. Reservoir validation, primary denoise taps
+and clamp-neighbor centers derive from this corrected history location. Reference accumulation maps camera jitter only;
+real camera movement resets its progressive mean. Camera identity, cuts, resize/target recreation, history signatures and
+`Camera::MarkTemporalHistoryReset()` invalidate RTGI history. Camera exposes a monotonically increasing reset revision so
+TAA and RTGI independently observe explicit resets even after PrepareRenderFrame consumes the pending Camera flag.
+
+RTGI's GIPass runs at kAfterMotionVector (455), producing opaque scene color before TAAOpaqueSnapshot456 and Sprite460.
+Persistent raw/history/debug outputs are RenderTexture resources, and reservoir/surface buffers use CreateSync so resize
+resources exist before their first dispatch. History validity, previous UV jitter and ping-pong rotation commit after the
+actual primary/denoise dispatch; skipped primary work cannot commit denoise history. These are single-camera resources;
+the M7 fixture does not establish multi-camera isolation or interactive acceptance.
+
 ## Frame resources
+
+### TAA accumulation and presentation coordinates
+
+TAA color histories remain on each frame's jittered raster grid. History reprojection uses the stable MotionVector
+plus `previous_jitter_uv - current_jitter_uv`. The `TemporalAA` pass publishes this accumulation as
+`_taa_history_color`; it is not a stable screen image. `TemporalAAStabilize` reads the completed accumulation and
+samples `stable_uv + current_jitter_uv` with the existing bicubic filter into a separate transient UAV. Its output is
+`_taa_color`, consumed by PostprocessStack/Bloom/ToneMapping. The presentation image never feeds back into history.
+Policy A current and reprojected previous responsive coverage, plus the stabilization filter footprint around current
+coverage, retain current pixels, including billboards intentionally rasterized without jitter. Previous coverage is read
+only with valid history. The legacy path uses a feature-owned, per-camera presentation
+texture allocated only when that path executes; dimension/format changes release it with the histories.
+Core/history regression captures use `_taa_history_color`; screen stability acceptance uses `_taa_color` and final
+ToneMapping output. Passing the history reprojection oracle alone does not prove stable presentation.
 
 Renderer/RenderPipeline 使用 frame-slot/frame-resource 结构。
 
@@ -330,3 +429,18 @@ Debug authoring provides medium selection/extinction, transformed volume bounds 
 `_jitter_enabled=false` is a deterministic validation setting; production defaults to enabled.
 `VolumetricFogSmoke` verifies conservative jittered bounds, optional JSON compatibility, disabled entity cloning,
 prefab property overrides/revert and native volume DDS capture. GPU timings include `VolumetricFog_LocalLights` separately from total injection.
+
+## MotionVector deformation and variant contracts
+
+MotionVector UV0 is TEXCOORD0; previous local positions are TEXCOORD1 (float3). Its alpha clip uses material alpha
+multiplied by sampled albedo alpha, matching GBuffer. The draw selects CPU_DEFORM from the vertex layout without
+changing shared Material keywords. The legacy object-motion attachment loads existing camera motion and scene depth.
+
+SkinningSystem owns current/previous position buffers per mesh and entity. Changed poses rotate outputs once per frame;
+stationary, initial and discontinuous submissions bind current positions as previous. CPU and Compute paths share this
+history contract. GPU vertex-stream changes invalidate view versions and refresh native DX12 views before state/binding.
+
+Material resource bindings and frame constant blocks resolve against the actual draw variant. Global slot caches rebuild
+on variant/layout changes; constant blocks include variant/layout versions and canonical material values.
+Standard Lit's uploaded `_SamplerMask` comes from the current texture-use state. Its uploaded `_MaterialID` keeps the
+existing mapping (checker = 2, otherwise = 0), after canonical/serialized values are copied into the variant layout.

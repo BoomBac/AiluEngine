@@ -220,12 +220,15 @@ namespace Ailu
         public:
             MotionVectorPass();
             ~MotionVectorPass();
+            void SetDebugViewActive(bool active) { _is_debug_view_active = active; }
             void OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data) final;
             void Execute(GraphicsContext *context, RenderingData &rendering_data) final;
             void BeginPass(GraphicsContext *context) final;
             void EndPass(GraphicsContext *context) final;
         private:
             Ref<Material> _motion_vector_mat;
+            Ref<Material> _motion_vector_debug_mat;
+            bool _is_debug_view_active = false;
         };
 
         class HZBPass : public RenderPass

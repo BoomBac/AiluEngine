@@ -181,33 +181,55 @@ namespace Ailu::Render
     {
         if (!force && !_is_dirty)
             return;
-        if (g_pGfxContext)
+        _is_custom_vp = false;
+        _forward = _rotation * Vector3f::kForward;
+        _up = _rotation * Vector3f::kUp;
+        _right = CrossProduct(_up, _forward);
+        RebuildCameraMatrices();
+    }
+
+    void Camera::PrepareRenderFrame(u64 frame_index)
+    {
+        if (!_has_previous_vp_update_frame || frame_index != _prev_vp_matrix_update_frame)
         {
-            u64 cur_frame = g_pGfxContext->GetFrameCount();
-            if (cur_frame != _prev_vp_matrix_update_frame)
-            {
-                _prev_view_proj_matrix = _no_jitter_view_proj_matrix;
-                _prev_vp_matrix_update_frame = cur_frame;
-            }
+            _prev_view_proj_matrix = !_has_previous_vp_update_frame || _temporal_history_reset_pending
+                                        ? _no_jitter_view_proj_matrix : _last_rendered_view_proj_matrix;
+            _last_rendered_view_proj_matrix = _no_jitter_view_proj_matrix;
+            _prev_vp_matrix_update_frame = frame_index;
+            _has_previous_vp_update_frame = true;
+            _temporal_history_reset_pending = false;
         }
+        RefreshRenderMatrices();
+    }
+
+    void Camera::RebuildCameraMatrices()
+    {
         if (_camera_type == ECameraType::kPerspective)
-            BuildPerspectiveFovLHMatrix(_proj_matrix, _fov_h * k2Radius, _aspect, _near_clip, _far_clip);
+            BuildPerspectiveFovLHMatrix(_proj_matrix_no_jitter, _fov_h * k2Radius, _aspect, _near_clip, _far_clip);
         else
         {
             float left = -_size * 0.5f;
             float right = _size * 0.5f;
             float top = (_size * 0.5f) / _aspect;
             float bottom = -(_size * 0.5f) / _aspect;
-            BuildOrthographicMatrix(_proj_matrix, left, right, top, bottom,_near_clip, _far_clip);
+            BuildOrthographicMatrix(_proj_matrix_no_jitter, left, right, top, bottom,_near_clip, _far_clip);
         }
-        _forward = _rotation * Vector3f::kForward;
-        _up = _rotation * Vector3f::kUp;
-        _right = CrossProduct(_up, _forward);
         BuildViewMatrixLookToLH(_view_matrix, _position, _forward, _up);
-        _no_jitter_view_proj_matrix = _view_matrix * _proj_matrix;
+        _no_jitter_view_proj_matrix = _view_matrix * _proj_matrix_no_jitter;
+        RefreshRenderMatrices();
+        CalculateCullingFrustum();
+    }
+
+    void Camera::RefreshRenderMatrices()
+    {
+        if (_is_custom_vp)
+            return;
+        _proj_matrix = _proj_matrix_no_jitter;
+        _jitter = Vector4f::kZero;
         if (_anti_aliasing == EAntiAliasing::kTAA)
             ProcessJitter();
-        CalculateFrustum();
+        _jittered_view_proj_matrix = _view_matrix * _proj_matrix;
+        CalculateRenderRayCorners();
     }
 
     void Camera::SetLens(float fovy, float aspect, float nz, float fz)
@@ -264,7 +286,7 @@ namespace Ailu::Render
             //--------------------------------------------
             // 透视相机
             //--------------------------------------------
-            Matrix4x4f inv_proj = MatrixInverse(_proj_matrix);
+            Matrix4x4f inv_proj = MatrixInverse(_proj_matrix_no_jitter);
 
             // 在投影空间中从 NDC 转到相机空间
             Vector4f clip_pos(ndc_x, ndc_y, 1.0f, 1.0f);
@@ -329,7 +351,7 @@ namespace Ailu::Render
         else
         {
             // 相机空间 → 裁剪空间
-            Vector4f clip_pos = TransformVector(_proj_matrix, view_pos);
+            Vector4f clip_pos = TransformVector(_proj_matrix_no_jitter, view_pos);
 
             // 透视除法 → NDC
             if (clip_pos.w != 0.0f)
@@ -350,36 +372,14 @@ namespace Ailu::Render
 
     void Camera::LookTo(const Vector3f &direction, const Vector3f &up)
     {
-        if (g_pGfxContext)
-        {
-            u64 cur_frame = g_pGfxContext->GetFrameCount();
-            if (cur_frame != _prev_vp_matrix_update_frame)
-            {
-                _prev_view_proj_matrix = _no_jitter_view_proj_matrix;
-                _prev_vp_matrix_update_frame = cur_frame;
-            }
-        }
+        _is_custom_vp = false;
         _forward = direction;
         _right = CrossProduct(up, _forward);
         _up = CrossProduct(_forward, _right);
         _forward = Normalize(_forward);
         _right = Normalize(_right);
         _up = Normalize(_up);
-        if (_camera_type == ECameraType::kPerspective)
-            BuildPerspectiveFovLHMatrix(_proj_matrix, _fov_h * k2Radius, _aspect, _near_clip, _far_clip);
-        else
-        {
-            float left = -_size * 0.5f;
-            float right = _size * 0.5f;
-            float top = (_size * 0.5f) / _aspect;
-            float bottom = -(_size * 0.5f) / _aspect;
-            BuildOrthographicMatrix(_proj_matrix, left, right, top, bottom,_near_clip,_far_clip);
-        }
-        BuildViewMatrixLookToLH(_view_matrix, _position, _forward, _up);
-        _no_jitter_view_proj_matrix = _view_matrix * _proj_matrix;
-        if (_anti_aliasing == EAntiAliasing::kTAA)
-            ProcessJitter();
-        CalculateFrustum();
+        RebuildCameraMatrices();
     }
 
     bool Camera::IsInFrustum(const Vector3f &pos)
@@ -394,16 +394,26 @@ namespace Ailu::Render
     }
 
 
+    bool Camera::IsInFrustum(const AABB &bounds) const
+    {
+        return ViewFrustum::Conatin(_vf, bounds);
+    }
+
     void Camera::SetViewAndProj(const Matrix4x4f &view, const Matrix4x4f &proj)
     {
+        _is_custom_vp = true;
         _view_matrix = view;
+        _proj_matrix_no_jitter = proj;
         _proj_matrix = proj;
-        CalculateFrustum();
+        _jitter = Vector4f::kZero;
+        _no_jitter_view_proj_matrix = view * proj;
+        _jittered_view_proj_matrix = _no_jitter_view_proj_matrix;
+        CalculateCullingFrustum();
+        CalculateRenderRayCorners();
     }
-    void Camera::CalculateFrustum()
+    void Camera::CalculateCullingFrustum()
     {
-        Matrix4x4f ivp = _view_matrix * _proj_matrix;
-        ivp = MatrixInverse(ivp);
+        Matrix4x4f ivp = MatrixInverse(_no_jitter_view_proj_matrix);
         Vector4f temp = TransformVector(ivp,Vector4f(-1.0,-1.0,kZNear,1.0));
         _near_bottom_left = temp.xyz / temp.w;
         temp = TransformVector(ivp, Vector4f(1.0, -1.0, kZNear, 1.0));
@@ -451,6 +461,19 @@ namespace Ailu::Render
         // _vf._planes[3]._distance = -DotProduct(_vf._planes[3]._normal, _near_bottom_left);
         // _vf._planes[4]._distance = -DotProduct(_vf._planes[4]._normal, _far_bottom_left);
         // _vf._planes[5]._distance = -DotProduct(_vf._planes[5]._normal, _far_bottom_right);
+    }
+
+    void Camera::CalculateRenderRayCorners()
+    {
+        Matrix4x4f inverse_view_proj = MatrixInverse(_jittered_view_proj_matrix);
+        Vector4f corner = TransformVector(inverse_view_proj, Vector4f(-1.0f, 1.0f, kZFar, 1.0f));
+        _render_far_top_left = corner.xyz / corner.w;
+        corner = TransformVector(inverse_view_proj, Vector4f(1.0f, 1.0f, kZFar, 1.0f));
+        _render_far_top_right = corner.xyz / corner.w;
+        corner = TransformVector(inverse_view_proj, Vector4f(-1.0f, -1.0f, kZFar, 1.0f));
+        _render_far_bottom_left = corner.xyz / corner.w;
+        corner = TransformVector(inverse_view_proj, Vector4f(1.0f, -1.0f, kZFar, 1.0f));
+        _render_far_bottom_right = corner.xyz / corner.w;
     }
     Camera &Camera::GetCubemapGenCamera(const Camera &base_cam, ECubemapFace face)
     {
@@ -555,10 +578,10 @@ namespace Ailu::Render
         // lb = Normalize(_far_bottom_left - _near_bottom_left);
         // rt = Normalize(_far_top_right - _near_top_right);
         // rb = Normalize(_far_bottom_right - _near_bottom_right);
-        lt = _far_top_left;
-        lb = _far_bottom_left;
-        rt = _far_top_right;
-        rb = _far_bottom_right;
+        lt = _render_far_top_left;
+        lb = _render_far_bottom_left;
+        rt = _render_far_top_right;
+        rb = _render_far_bottom_right;
     }
     void Camera::ProcessJitter()
     {
@@ -566,8 +589,10 @@ namespace Ailu::Render
         g_halton_seq.Get(offset_x, offset_y,g_pGfxContext? g_pGfxContext->GetFrameCount():0u);
         if (_camera_type == ECameraType::kOrthographic)
         {
-            _proj_matrix[0][3] -= (offset_x * 2 - 1) / (f32)_pixel_width;
-            _proj_matrix[1][3] -= (offset_y * 2 - 1) / (f32)_pixel_height;
+            _jitter.x = (offset_x * 2.0f - 1.0f) / static_cast<f32>(_pixel_width) * _jitter_scale;
+            _jitter.y = (offset_y * 2.0f - 1.0f) / static_cast<f32>(_pixel_height) * _jitter_scale;
+            _proj_matrix[3][0] += _jitter.x;
+            _proj_matrix[3][1] += _jitter.y;
         }
         else
         {
@@ -576,7 +601,7 @@ namespace Ailu::Render
             _proj_matrix[2][0] += _jitter.x;
             _proj_matrix[2][1] += _jitter.y;
         }
-        _jitter.z = (offset_x - 0.5f) / (f32)_pixel_width  * _jitter_scale;
-        _jitter.w = (offset_y - 0.5f) / (f32)_pixel_height * _jitter_scale;
+        _jitter.z = _jitter.x * 0.5f;
+        _jitter.w = -_jitter.y * 0.5f;
     }
 }// namespace Ailu

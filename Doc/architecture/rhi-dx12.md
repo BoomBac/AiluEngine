@@ -183,3 +183,10 @@ An explicit array subresource binding retains its single-layer/mip view; UAV sel
 - multithread record/submission；
 - RenderGraph integration；
 - capture/readback path。
+
+## Vertex input slot contract
+
+DX12 input slots use the shader reflection register / VertexBufferLayoutDesc::Stream. Reflection enumeration order is
+not the binding slot: system-value inputs such as SV_INSTANCEID can make them differ. Compiled and hydrated layouts
+must keep the same slots. GPU-backed vertex streams may rotate without recreating their VertexBuffer; stream changes
+advance its view version, and native resources/addresses refresh before resource-state transitions and vertex binding.

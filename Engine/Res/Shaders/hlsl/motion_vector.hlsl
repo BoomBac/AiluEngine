@@ -9,6 +9,16 @@
 //ZTest: Always
 //ZWrite: Off
 //pass end::
+//pass begin::
+//name: Internal/MotionVectorDebug
+//vert: FullscreenVSMain
+//pixel: MotionVectorDebugPSMain
+//Cull: Back
+//Queue: Opaque
+//Fill: Solid
+//ZTest: Always
+//ZWrite: Off
+//pass end::
 //info end
 #define AL_SCENE_PRIMITIVE 1
 #include "common.hlsli"
@@ -35,10 +45,10 @@ struct VertInput
 	float3 position : POSITION;
 	uint instance_id : SV_INSTANCEID;
 #if defined(CPU_DEFORM)
-    float3 position_prev : TEXCOORD0;
+    float3 position_prev : TEXCOORD1;
 #endif
 #if defined(ALPHA_TEST)
-    float2 uv : TEXCOORD1;
+    float2 uv : TEXCOORD0;
 #endif
 };
 
@@ -78,7 +88,9 @@ float4 MotionVectorPSMain(VertOutput input) : SV_TARGET
     if ((input.primitive_flags & kPrimitiveForceZeroMotion) != 0u)
         return float4(0,0,0,0);
 #if defined(ALPHA_TEST)
-	float4 base_color = _SamplerMask & 1? _AlbedoTex.Sample(g_LinearWrapSampler, input.uv) : _AlbedoValue;
+	float4 base_color = _AlbedoValue;
+    if ((_SamplerMask & 1) != 0)
+        base_color *= _AlbedoTex.Sample(g_LinearWrapSampler, input.uv);
 	clip(base_color.a - _AlphaCulloff);
 #endif
 	return float4(CalculateNdcMotionFormClip(input.clip_pos_cur, input.clip_pos_pre), 1.0);
@@ -87,6 +99,7 @@ float4 MotionVectorPSMain(VertOutput input) : SV_TARGET
 
 FullScreenPSInput FullscreenVSMain(FullScreenVSInput v);
 TEXTURE2D(_CameraDepthTexture)
+TEXTURE2D(_MotionVectorDebugTexture)
 
 float4 CameraMotionVectorPSMain(FullScreenPSInput input) : SV_TARGET
 {
@@ -96,4 +109,13 @@ float4 CameraMotionVectorPSMain(FullScreenPSInput input) : SV_TARGET
     float4 cur_clip_pos = mul(_MatrixVP_NoJitter, float4(world_pos,1.0f));
     float4 pre_clip_pos = mul(_MatrixVP_Pre, float4(world_pos,1.0f));
 	return float4(CalculateNdcMotionFormClip(cur_clip_pos, pre_clip_pos), 1.0);
+}
+
+float4 MotionVectorDebugPSMain(FullScreenPSInput input) : SV_TARGET
+{
+    float2 motion = SAMPLE_TEXTURE2D(_MotionVectorDebugTexture, g_PointClampSampler, input.uv).xy;
+    float2 positive = saturate(motion * 256.0);
+    float2 negative = saturate(-motion * 256.0);
+    float magnitude = saturate(length(motion) * 256.0);
+    return float4(saturate(positive.x + negative.y), saturate(positive.y + negative.x), magnitude, 1.0);
 }

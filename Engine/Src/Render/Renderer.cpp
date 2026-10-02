@@ -86,7 +86,7 @@ namespace Ailu::Render
         _sprite = _owned_features.back();
         //_features.push_back(_vxgi);
         //_features.push_back(_cloud);
-        //_features.push_back(_taa);
+        _features.push_back(_taa);
         _features.push_back(_ssao);
         _features.push_back(_raytrace_gi);
         _raytrace_gi->SetActive(false);
@@ -187,6 +187,7 @@ namespace Ailu::Render
                     tmp_cam._is_scene_camera = false;
                     tmp_cam._postprocess_enabled = false;
                     tmp_cam.OutputSize(cam.TargetTexture()->Width(), cam.TargetTexture()->Height());
+                    tmp_cam.PrepareRenderFrame(_p_context->GetFrameCount());
                     const u16 dst_view_index = cam.TargetTexture()->CalculateViewIndex(Texture::ETextureViewType::kRTV, face, 0, 0);
                     DoRender(tmp_cam, s, request, shadow_set_ptr, i == 1u && request._enable_shadows,
                              _is_use_render_graph ? cam.TargetTexture() : nullptr, dst_view_index);
@@ -303,8 +304,6 @@ namespace Ailu::Render
             auto mv_desc = TextureDesc(_rendering_data._width, _rendering_data._height, ERenderTargetFormat::kRGHalf);
             mv_desc._format = EALGFormat::kALGFormatR16G16B16A16_FLOAT;
             _rendering_data._rg_handles._motion_vector_tex = _rd_graph->CreateResource(mv_desc, RenderResourceName::kMotionVectorTex);
-            mv_desc = TextureDesc(_rendering_data._width, _rendering_data._height, ERenderTargetFormat::kDepth);
-            _rendering_data._rg_handles._motion_vector_depth = _rd_graph->CreateResource(mv_desc, RenderResourceName::kMotionVectorDepth);
             auto hzb_desc = TextureDesc((_rendering_data._width + 1) >> 1, (_rendering_data._height + 1) >> 1, ERenderTargetFormat::kRFloat);
             hzb_desc._is_random_access = true;
             hzb_desc._mip_num = Texture::MaxMipmapCount(hzb_desc._width, hzb_desc._height);
@@ -1035,6 +1034,23 @@ namespace Ailu::Render
 
     void Renderer::PrepareCamera(const Camera &cam)
     {
+        if (cam.ConsumeTemporalDebugFrame())
+        {
+            const Vector4f jitter = cam._anti_aliasing == EAntiAliasing::kTAA ? cam.GetJitter() : Vector4f::kZero;
+            const Matrix4x4f &jittered_vp = cam.GetViewProjJittered();
+            const Matrix4x4f &no_jitter_vp = cam.GetViewProjNoJitter();
+            const Vector3f probe_point = cam.Position() + cam.Forward() * std::max(cam.Near() * 2.0f, 1.0f);
+            const Vector4f no_jitter_clip = TransformVector(no_jitter_vp, Vector4f(probe_point, 1.0f));
+            const Vector4f jittered_clip = TransformVector(jittered_vp, Vector4f(probe_point, 1.0f));
+            const Vector2f uv_delta(
+                jittered_clip.x / jittered_clip.w * 0.5f - no_jitter_clip.x / no_jitter_clip.w * 0.5f,
+                no_jitter_clip.y / no_jitter_clip.w * 0.5f - jittered_clip.y / jittered_clip.w * 0.5f);
+            LOG_INFO("Camera temporal debug frame={} hash={} aa={} matrix_jitter=({}, {}) uv_jitter=({}, {}) "
+                     "projected_uv_delta=({}, {}) vp_offset=({}, {}) vp_no_jitter_offset=({}, {})",
+                     g_pGfxContext->GetFrameCount(), cam.HashCode(), static_cast<i32>(cam._anti_aliasing), jitter.x,
+                     jitter.y, jitter.z, jitter.w, uv_delta.x, uv_delta.y, jittered_vp[2][0], jittered_vp[2][1],
+                     no_jitter_vp[2][0], no_jitter_vp[2][1]);
+        }
         //auto cam_hash = cam.HashCode();
         auto cam_cb_data = ConstantBuffer::As<CBufferPerCameraData>(_cur_fs->GetCameraCB(cam.HashCode()));
         *cam_cb_data = {};
@@ -1045,11 +1061,10 @@ namespace Ailu::Render
         cam_cb_data->_CameraPos = cam.Position();
         cam_cb_data->_MatrixV = cam.GetView();
         cam_cb_data->_MatrixP = cam.GetProj();
-        cam_cb_data->_MatrixVP = cam.GetViewProj();
-        cam_cb_data->_MatrixVP_NoJitter = cam.GetViewProj();
+        cam_cb_data->_MatrixVP = cam.GetViewProjJittered();
+        cam_cb_data->_MatrixVP_NoJitter = cam.GetViewProjNoJitter();
         cam_cb_data->_MatrixIVP = MatrixInverse(cam_cb_data->_MatrixVP);
-        auto prev_cam_cb_data = ConstantBuffer::As<CBufferPerCameraData>(_prev_fs->GetCameraCB(_active_camera_hash));
-        cam_cb_data->_MatrixVP_Pre = prev_cam_cb_data->_MatrixVP_NoJitter;
+        cam_cb_data->_MatrixVP_Pre = cam.GetPrevViewProj();
         auto& jitter = cam.GetJitter();
         cam_cb_data->_matrix_jitter_x = jitter.x;
         cam_cb_data->_matrix_jitter_y = jitter.y;

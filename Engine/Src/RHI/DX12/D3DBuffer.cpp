@@ -407,8 +407,17 @@ namespace Ailu::RHI::DX12
         auto *d3d_cmd = dynamic_cast<D3DCommandBuffer *>(rhi_cmd);
         if (d3d_cmd == nullptr)
             return;
+        // GPU streams can rotate at a frame boundary without recreating the vertex buffer.
         for (u32 stream = 0u; stream < _vertex_buffers.size(); ++stream)
         {
+            if (auto *gpu_stream = GetGpuStream(static_cast<u8>(stream)); gpu_stream != nullptr)
+            {
+                auto *d3d_stream = static_cast<D3DGPUBuffer *>(gpu_stream);
+                _vertex_buffers[stream] = d3d_stream->Resource();
+                _buffer_views[stream].BufferLocation = d3d_stream->GetGPUVirtualAddress();
+                _buffer_views[stream].StrideInBytes = _buffer_layout.GetStride(stream);
+                _buffer_views[stream].SizeInBytes = static_cast<u32>(_stream_data[stream]._size);
+            }
             if (_vertex_buffers[stream] && !IsUploadHeapResource(_vertex_buffers[stream].Get()))
                 d3d_cmd->RequireState(_vertex_buffers[stream], state, sub_res);
         }

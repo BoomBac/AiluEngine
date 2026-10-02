@@ -101,6 +101,12 @@ add_executable(Test
 set_target_properties(Test PROPERTIES OUTPUT_NAME "Test")
 ailu_configure_test_target(Test)
 
+add_executable(CameraTemporalHistorySmoke "CameraTemporalHistorySmoke.cpp")
+ailu_configure_test_target(CameraTemporalHistorySmoke)
+add_custom_command(TARGET CameraTemporalHistorySmoke POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:Engine>" "$<TARGET_FILE_DIR:CameraTemporalHistorySmoke>"
+    VERBATIM)
+
 if (AILU_ENABLE_LUA_SCRIPTING)
     add_executable(ScriptSmoke "ScriptSmoke.cpp")
     set_target_properties(ScriptSmoke PROPERTIES OUTPUT_NAME "ScriptSmoke")
@@ -218,3 +224,18 @@ add_custom_command(TARGET VolumetricFogSmoke POST_BUILD
 
 target_sources(VolumetricFogSmoke PRIVATE ${ENGINE_ROOT_PATH}/Src/Render/ImageCapture/DdsCaptureEncoder.cpp)
 target_link_libraries(VolumetricFogSmoke PRIVATE DirectXTex)
+
+add_executable(MotionVectorGpuAcceptance MotionVectorGpuAcceptance.cpp)
+ailu_configure_test_target(MotionVectorGpuAcceptance)
+target_link_libraries(MotionVectorGpuAcceptance PRIVATE d3d12)
+add_custom_command(TARGET MotionVectorGpuAcceptance POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:Engine>" "$<TARGET_FILE_DIR:MotionVectorGpuAcceptance>"
+    VERBATIM)
+
+add_executable(TaaGpuAcceptance TaaGpuAcceptance.cpp
+    ${ENGINE_ROOT_PATH}/Src/Render/Features/TemporalAA.cpp)
+ailu_configure_test_target(TaaGpuAcceptance)
+target_link_libraries(TaaGpuAcceptance PRIVATE d3d12)
+add_custom_command(TARGET TaaGpuAcceptance POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:Engine>" "$<TARGET_FILE_DIR:TaaGpuAcceptance>"
+    VERBATIM)

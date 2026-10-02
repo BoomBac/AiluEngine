@@ -12,8 +12,11 @@ namespace Ailu::Render
     void PostprocessStack::OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data)
     {
         const PostprocessSettings &settings = rendering_data._postprocess_settings;
-        RDG::RGHandle color = rendering_data._rg_handles._color_tex.IsValid()
-            ? rendering_data._rg_handles._color_tex : rendering_data._rg_handles._color_target;
+        RDG::RGHandle color = rendering_data._rg_handles._taa_color.IsValid()
+            ? rendering_data._rg_handles._taa_color
+            : rendering_data._rg_handles._color_tex.IsValid()
+                ? rendering_data._rg_handles._color_tex
+                : rendering_data._rg_handles._color_target;
         if (settings._bloom._enabled)
             color = _bloom.Record(graph, color, rendering_data, settings._bloom);
         if (settings._tone_mapping._mode != EToneMappingMode::kNone)

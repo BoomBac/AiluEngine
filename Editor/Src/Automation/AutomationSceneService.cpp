@@ -9,11 +9,13 @@
 #include "Framework/Common/Utils.h"
 #include "Project/ProjectManager.h"
 #include "Render/Camera.h"
+#include "Render/GraphicsContext.h"
 #include "Scene/Component.h"
 #include "Scene/Scene.h"
 
 #include <cmath>
 #include <format>
+#include <tuple>
 
 namespace Ailu
 {
@@ -113,6 +115,8 @@ namespace Ailu
                 desc._name = "editor.get_scene_camera";
                 desc._description = "Read the current SceneView camera pose and its controller target.";
                 desc._permission = EAutomationPermission::kReadOnly;
+                desc._input_schema.AddParam("test_boxes", "Native frustum checks: [{min:[x,y,z],max:[x,y,z]}].",
+                                            EAutomationValueType::kObject, false, true);
                 registry.Register("editor.get_scene_camera", std::move(desc), HandleGetSceneCamera);
             }
             {
@@ -129,6 +133,12 @@ namespace Ailu
                                             EAutomationValueType::kFloat);
                 desc._input_schema.AddParam("snap", "Apply position and orientation immediately; defaults to true.",
                                             EAutomationValueType::kBool);
+                desc._input_schema.AddParam("aa_mode", "Runtime AA mode: 0 None, 1 FXAA, 2 TAA.",
+                                            EAutomationValueType::kInteger);
+                desc._input_schema.AddParam("projection_type", "Runtime projection: 0 orthographic, 1 perspective.",
+                                            EAutomationValueType::kInteger);
+                desc._input_schema.AddParam("orthographic_size", "Positive orthographic width in world units.",
+                                            EAutomationValueType::kFloat);
                 registry.Register("editor.set_scene_camera", std::move(desc), HandleSetSceneCamera);
             }
             {
@@ -207,7 +217,7 @@ namespace Ailu
         }
 
         AutomationResult AutomationSceneService::HandleGetSceneCamera(EditorAutomationContext &,
-                                                                        const AutomationObject &)
+                                                                        const AutomationObject &arguments)
         {
             EditorApp *editor = EditorApp::GetEditor();
             if (editor == nullptr || editor->GetSceneCamera() == nullptr)
@@ -226,6 +236,60 @@ namespace Ailu
             result.emplace("pitch_degrees", AutomationValue(controller._rotation.x));
             result.emplace("yaw_degrees", AutomationValue(controller._rotation.y));
             result.emplace("fov_degrees", AutomationValue(camera.FovH()));
+            result.emplace("aa_mode", AutomationValue(static_cast<i32>(camera._anti_aliasing)));
+            result.emplace("projection_type", AutomationValue(static_cast<i32>(camera.Type())));
+            result.emplace("orthographic_size", AutomationValue(camera.Size()));
+            result.emplace("frame", AutomationValue(Render::g_pGfxContext->GetFrameCount()));
+            result.emplace("width", AutomationValue(camera.OutputSize().x));
+            result.emplace("height", AutomationValue(camera.OutputSize().y));
+            const auto matrix_value = [](const Matrix4x4f &matrix)
+            {
+                AutomationArray values;
+                for (u32 row = 0; row < 4u; ++row)
+                    for (u32 column = 0; column < 4u; ++column)
+                        values.emplace_back(AutomationValue(matrix[row][column]));
+                return AutomationValue(std::move(values));
+            };
+            result.emplace("projection_stable", matrix_value(camera.GetProjNoJitter()));
+            result.emplace("vp_stable", matrix_value(camera.GetViewProjNoJitter()));
+            result.emplace("vp_render", matrix_value(camera.GetViewProjJittered()));
+            result.emplace("ivp_render", matrix_value(MatrixInverse(camera.GetViewProjJittered())));
+            result.emplace("vp_previous", matrix_value(camera.GetPrevViewProj()));
+            const auto &jitter = camera.GetJitter();
+            result.emplace("jitter", AutomationValue(AutomationArray{
+                AutomationValue(jitter.x), AutomationValue(jitter.y),
+                AutomationValue(jitter.z), AutomationValue(jitter.w)}));
+            AutomationArray planes;
+            for (const auto &plane : camera.GetViewFrustum()._planes)
+                planes.emplace_back(AutomationValue(AutomationArray{
+                    AutomationValue(plane._normal.x), AutomationValue(plane._normal.y),
+                    AutomationValue(plane._normal.z), AutomationValue(plane._distance)}));
+            result.emplace("frustum_planes", AutomationValue(std::move(planes)));
+            Vector3f lt, lb, rt, rb;
+            camera.GetCornerInWorld(lt, lb, rt, rb);
+            result.emplace("render_corners", AutomationValue(AutomationArray{
+                ToAutomationVector3(lt), ToAutomationVector3(lb), ToAutomationVector3(rt), ToAutomationVector3(rb)}));
+            if (const auto it = arguments.find("test_boxes"); it != arguments.end())
+            {
+                if (!it->second.IsArray() || it->second.AsArray().size() > 16u)
+                    return AutomationResult::Fail(AutomationErrors::kInvalidArgument, "at most 16 test boxes are supported");
+                AutomationArray visibility;
+                for (const auto &value : it->second.AsArray())
+                {
+                    Vector3f minimum, maximum;
+                    if (!value.IsObject())
+                        return AutomationResult::Fail(AutomationErrors::kInvalidArgument, "each test box must be an object");
+                    const auto &box = value.AsObject();
+                    if (!box.contains("min") || !box.contains("max") ||
+                        !TryReadVector3(box.at("min"), minimum) || !TryReadVector3(box.at("max"), maximum) ||
+                        minimum.x > maximum.x || minimum.y > maximum.y || minimum.z > maximum.z)
+                        return AutomationResult::Fail(AutomationErrors::kInvalidArgument, "invalid test box bounds");
+                    visibility.emplace_back(AutomationValue(camera.IsInFrustum(AABB(minimum, maximum))));
+                }
+                result.emplace("box_visibility", AutomationValue(std::move(visibility)));
+            }
+
+
             return AutomationResult::Ok(AutomationValue(std::move(result)));
         }
 
@@ -242,7 +306,21 @@ namespace Ailu
             f32 pitch = controller._rotation.x;
             f32 yaw = controller._rotation.y;
             f32 fov = camera->FovH();
-            bool has_update = false;
+            f32 orthographic_size = camera->Size();
+            i64 aa_mode = static_cast<i32>(camera->_anti_aliasing);
+            i64 projection_type = static_cast<i32>(camera->Type());
+            for (const auto &[name, maximum, value] :
+                 {std::tuple{"aa_mode", 2, &aa_mode}, std::tuple{"projection_type", 1, &projection_type}})
+            {
+                const auto it = arguments.find(name);
+                if (it == arguments.end())
+                    continue;
+                if (!it->second.IsInt() || it->second.AsInt() < 0 || it->second.AsInt() > maximum)
+                    return AutomationResult::Fail(AutomationErrors::kInvalidArgument,
+                                                  std::format("{} must be an integer from 0 to {}", name, maximum));
+                *value = it->second.AsInt();
+            }
+            bool has_update = arguments.contains("aa_mode") || arguments.contains("projection_type");
 
             if (const auto it = arguments.find("position"); it != arguments.end())
             {
@@ -272,9 +350,16 @@ namespace Ailu
                                                   "fov_degrees must be greater than 1 and less than 179");
                 has_update = true;
             }
+            if (arguments.contains("orthographic_size"))
+            {
+                if (!TryReadFloat(arguments, "orthographic_size", orthographic_size) || orthographic_size <= 0.0f)
+                    return AutomationResult::Fail(AutomationErrors::kInvalidArgument,
+                                                  "orthographic_size must be finite and positive");
+                has_update = true;
+            }
             if (!has_update)
                 return AutomationResult::Fail(AutomationErrors::kInvalidArgument,
-                                              "provide position, pitch_degrees, yaw_degrees or fov_degrees");
+                                              "provide pose, fov_degrees, aa_mode or projection_type");
 
             bool snap = true;
             if (const auto it = arguments.find("snap"); it != arguments.end())
@@ -293,6 +378,14 @@ namespace Ailu
             }
             controller._camera_fov_h = fov;
             camera->FovH(fov);
+            camera->_anti_aliasing = static_cast<Render::EAntiAliasing>(aa_mode);
+            camera->Type(static_cast<Render::ECameraType>(projection_type));
+            if (arguments.contains("orthographic_size"))
+                camera->Size(orthographic_size);
+            camera->MarkDirty();
+            camera->RecalculateMatrix();
+            if (arguments.contains("aa_mode"))
+                camera->EnableTemporalDebugFrames();
 
             return HandleGetSceneCamera(context, AutomationObject{});
         }

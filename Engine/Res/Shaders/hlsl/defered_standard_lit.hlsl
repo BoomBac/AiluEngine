@@ -36,7 +36,7 @@
 //Queue: Opaque
 //Fill: Solid
 //ZTest: LEqual
-//ZWrite: On
+//ZWrite: Off
 //multi_compile _ ALPHA_TEST
 //multi_compile _ CPU_DEFORM
 //pass end::
@@ -124,16 +124,15 @@ float3 Checkerboard(float2 uv, float scale)
 GBuffer GBufferPSMain(StandardPSInput input) : SV_TARGET
 {
 	SurfaceData surface_data;
-	if (_MaterialID == 0 || _MaterialID == 1)// Defualt
+	if (_MaterialID != 2)// Default, including legacy or unsupported material IDs.
 	{
 		InitSurfaceData(input, surface_data);
 	}
-	else if (_MaterialID == 2) // scheckboard
+	else // checkerboard
 	{
 		InitSurfaceDataCheckboard(input, surface_data);
 		//surface_data.albedo.rgb = Checkerboard(input.uv0, 20);
 	}
-	else {};
 #ifdef ALPHA_TEST
 	clip(surface_data.albedo.a - _AlphaCulloff);
 #endif

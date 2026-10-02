@@ -46,8 +46,17 @@ PSInput VSMain(VSInput v)
     float3 scaleRotatePos = mul((float3x3)_MatrixWorld, v.position);
     view_pos += float3(scaleRotatePos.xy, -scaleRotatePos.z);
     float4x4 proj = _MatrixP;
-    proj[0][2] -= _matrix_jitter_x;
-    proj[1][2] -= _matrix_jitter_y;
+    // Orthographic jitter translates clip XY; perspective jitter offsets the view-Z projection terms.
+    if (proj[3][3] > 0.5)
+    {
+        proj[0][3] -= _matrix_jitter_x;
+        proj[1][3] -= _matrix_jitter_y;
+    }
+    else
+    {
+        proj[0][2] -= _matrix_jitter_x;
+        proj[1][2] -= _matrix_jitter_y;
+    }
     result.position = mul(proj,float4(view_pos,1));
     result.view_depth = view_pos.z;
     result.uv = v.uv;

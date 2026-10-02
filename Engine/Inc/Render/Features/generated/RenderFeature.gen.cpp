@@ -63,6 +63,7 @@ initializer._str_to_enum_lut["kAfterDeferedLighting"] = 300;
 initializer._str_to_enum_lut["kBeforeSkybox"] = 350;
 initializer._str_to_enum_lut["kAfterSkybox"] = 400;
 initializer._str_to_enum_lut["kBeforeTransparent"] = 450;
+initializer._str_to_enum_lut["kAfterMotionVector"] = 455;
 initializer._str_to_enum_lut["kBeforeSprite"] = 460;
 initializer._str_to_enum_lut["kAfterSprite"] = 490;
 initializer._str_to_enum_lut["kAfterTransparent"] = 500;

@@ -112,6 +112,7 @@ namespace Ailu::ECS
         {
             Render::Mesh *_mesh = nullptr;
             Ref<Render::GPUBuffer> _position_buffer;
+            Ref<Render::GPUBuffer> _previous_position_buffer;
             Ref<Render::GPUBuffer> _normal_buffer;
             Ref<Render::GPUBuffer> _tangent_buffer;
             Ref<Render::VertexBuffer> _vertex_buffer;
@@ -127,6 +128,7 @@ namespace Ailu::ECS
             Vector<Matrix4x4f> _pose_snapshot;
         };
 
+        void UpdatePositionStreams(SkinCacheEntry &entry, bool use_previous);
         bool EnsureComputeShader();
         void EnsureStructuredBuffers();
         SkinCacheEntry *FindEntry(SkinHandle handle);

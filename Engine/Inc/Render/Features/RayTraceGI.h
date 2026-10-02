@@ -103,10 +103,10 @@ namespace Ailu
             Ref<GPUBuffer> _debug_index_buffer = nullptr;
             Ref<GPUBuffer> _arg_buffer = nullptr;
             Ref<Material> _debug_line_mat;
-            Ref<Texture2D> _raw_path_trace_texture;
-            Ref<Texture2D> _history_texture_a;
-            Ref<Texture2D> _history_texture_b;
-            Ref<Texture2D> _temporal_debug_texture;
+            Ref<RenderTexture> _raw_path_trace_texture;
+            Ref<RenderTexture> _history_texture_a;
+            Ref<RenderTexture> _history_texture_b;
+            Ref<RenderTexture> _temporal_debug_texture;
             Ref<RenderTexture> _environment_distribution_texture;
             RDG::RGHandle _raw_path_trace_handle;
             RDG::RGHandle _history_prev_handle;
@@ -125,6 +125,9 @@ namespace Ailu
             Vector3f _previous_camera_position = Vector3f::kZero;
             Vector3f _previous_camera_forward = Vector3f::kForward;
             Vector3f _previous_camera_up = Vector3f::kUp;
+            const Camera *_previous_camera = nullptr;
+            u64 _previous_camera_reset_revision = 0u;
+            Vector2f _previous_uv_jitter = Vector2f::kZero;
             bool _has_previous_camera = false;
             EPathTracerAccumulationMode _previous_accumulation_mode = EPathTracerAccumulationMode::kDisabled;
             bool _has_previous_accumulation_mode = false;

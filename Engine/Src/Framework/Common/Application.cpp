@@ -533,6 +533,8 @@ namespace Ailu
 
     void Application::OnEvent(Event &e)
     {
+        if (!_is_handling_event.load())
+            return;
         UpdatePlatformEventState(e);
 #if defined(SEPARATE_LOGIC_THREAD)
         EventDispather dispather(e);

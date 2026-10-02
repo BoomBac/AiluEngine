@@ -862,7 +862,7 @@ namespace Ailu::RHI::DX12
                     _pass_elements[pass_index]._variants[variant_hash]._vertex_input_layout[layout_index] =
                         D3D12_INPUT_ELEMENT_DESC{Render::RenderConstants::GetVertexSemanticName(semantic),
                                                   Render::RenderConstants::GetVertexSemanticIndex(semantic),
-                                                  D3DConvertUtils::GetGXGIFormatByShaderDataType(data_type), i, 0,
+                                                  D3DConvertUtils::GetGXGIFormatByShaderDataType(data_type), input_desc.Register, 0,
                                                   D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0};
                     vb_input_desc.emplace_back(semantic, data_type, input_desc.Register);
                 }

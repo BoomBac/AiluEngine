@@ -20,6 +20,8 @@ CBUFFER_START(CloudInfo)
     float _Threshold;
     float _thickness;
     uint2 _pixel_offset;
+    float2 _JitterPrev;
+    float2 _JitterCur;
 CBUFFER_END
 
 TEXTURE3D(_ShapeNoise)
@@ -362,7 +364,7 @@ void CloudReprojection(CSInput input)
         return;
     float2 uv = (pixel_index + 0.5.xx) * _CloudTex_TexelSize.xy;
     float2 mv = _MotionVectorTexture[pixel_index].xy;
-    float2 prev_uv = uv - mv;
+    float2 prev_uv = uv - mv + (_JitterPrev - _JitterCur);
     if (any(prev_uv != saturate(prev_uv)))
     {
         _CloudTex[input.DispatchThreadID.xy] = float4(0,0,0,1);

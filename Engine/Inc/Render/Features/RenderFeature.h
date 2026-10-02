@@ -43,6 +43,7 @@ namespace Ailu
             kBeforeSkybox = 350,
             kAfterSkybox = 400,
             kBeforeTransparent = 450,
+            kAfterMotionVector = 455,
             kBeforeSprite = 460,
             kAfterSprite = 490,
             kAfterTransparent = 500,
@@ -94,7 +95,7 @@ namespace Ailu
         class AILU_API RenderFeature : public Object, public NonCopyable
         {
         public:
-            RenderFeature(const String &name): Object(name){};
+            RenderFeature(const String &name): Object(name), _is_active(true){};
             ~RenderFeature() {};
             virtual void AddRenderPasses(Renderer &renderer, const RenderingData & rendering_data) {};
             bool IsActive() const { return _is_active; };

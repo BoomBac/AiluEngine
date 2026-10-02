@@ -83,6 +83,8 @@ namespace Ailu
             UI::Dropdown *_dropdown_2d_orientation = nullptr;
             UI::Button *_btn_perspective = nullptr;
             UI::Button *_btn_snap = nullptr;
+            UI::Button *_btn_taa_test = nullptr;
+            UI::Button *_btn_motion_vector_debug = nullptr;
             UI::Border *_camera_preview_frame = nullptr;
             UI::Image *_camera_preview = nullptr;
             Render::ECameraType _stored_camera_type;
@@ -94,6 +96,7 @@ namespace Ailu
             bool _is_scene_toolbar_ortho_cached = false;
             bool _is_scene_toolbar_snap_cached = false;
             bool _is_scene_toolbar_state_dirty = true;
+            bool _is_motion_vector_debug_enabled = false;
             Vector2f _mouse_pos;
             Vector2f _view_size = Vector2f::kZero;
             Vector2UInt _pending_output_size = Vector2UInt::kZero;

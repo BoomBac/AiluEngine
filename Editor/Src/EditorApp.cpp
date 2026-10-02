@@ -247,7 +247,7 @@ namespace Ailu
             //        it.SetValueFromString(&_editor_config, itt->second);
             //}
             _p_scene_camera = AL_NEW_TAG(EMemoryTag::kEditor, Camera);
-            _p_scene_camera->_anti_aliasing = EAntiAliasing::kNone;
+            _p_scene_camera->_anti_aliasing = EAntiAliasing::kTAA;
             _p_scene_camera->Name("SceneCamera");
             _p_scene_camera->Position(_editor_config._position);
             _p_scene_camera->Rotation(_editor_config._rotation);

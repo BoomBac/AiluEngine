@@ -99,7 +99,7 @@ namespace Ailu
                 const float &Size() const { return _size; }
 
             protected:
-                float _size;
+                float _size = 10.0f;
         public:
             inline static Camera *sCurrent = nullptr;
             inline static Camera *sMain = nullptr;
@@ -117,6 +117,15 @@ namespace Ailu
             Camera();
             Camera(float aspect, float near_clip = 10.0f, float far_clip = 10000.0f, ECameraType camera_type = ECameraType::kPerspective);
             void RecalculateMatrix(bool force = false);
+            // Advance history once per rendered frame after render synchronization, then refresh projection jitter.
+            void PrepareRenderFrame(u64 frame_index);
+            // Align previous-frame temporal state to the current camera after a cut or teleport.
+            void MarkTemporalHistoryReset()
+            {
+                _temporal_history_reset_pending = true;
+                ++_temporal_history_reset_revision;
+            }
+            u64 GetTemporalHistoryResetRevision() const { return _temporal_history_reset_revision; }
             void SetLens(float fovh, float aspect, float nz, float fz);
 
             void OutputSize(u16 w, u16 h)
@@ -129,19 +138,15 @@ namespace Ailu
             //包括抖动的透视矩阵
             const Matrix4x4f &GetProj() const { return _proj_matrix; }
 
-            const Matrix4x4f GetProjNoJitter() const
-            {
-                Matrix4x4f p = _proj_matrix;
-                p[2][0] -= _jitter.x;
-                p[2][1] -= _jitter.y;
-                return p;
-            }
+            const Matrix4x4f &GetProjNoJitter() const { return _proj_matrix_no_jitter; }
             Vector3f ScreenToWorld(const Vector2f &screen_pos, f32 depth = 0.0f) const;
             Vector2f WorldToScreen(const Vector3f& world_pos) const;
 
             const Matrix4x4f &GetView() const { return _view_matrix; }
-            /// @brief 返回当前帧的透视投影矩阵（不包括抖动）
+            /// @brief 返回当前帧稳定的 no-jitter VP 矩阵；保留旧调用点语义。
             const Matrix4x4f &GetViewProj() const { return _no_jitter_view_proj_matrix; }
+            const Matrix4x4f &GetViewProjNoJitter() const { return _no_jitter_view_proj_matrix; }
+            const Matrix4x4f &GetViewProjJittered() const { return _jittered_view_proj_matrix; }
             /// @brief 返回上一帧的透视投影矩阵（不包括抖动）
             const Matrix4x4f &GetPrevViewProj() const { return _prev_view_proj_matrix; }
             /// @brief 返回当前帧抖动
@@ -149,6 +154,7 @@ namespace Ailu
             const Vector4f &GetJitter() const { return _jitter; }
             void LookTo(const Vector3f &direction, const Vector3f &up);
             bool IsInFrustum(const Vector3f &pos);
+            bool IsInFrustum(const AABB &bounds) const;
             void MarkDirty() { _is_dirty = true; }
             const ViewFrustum &GetViewFrustum() const { return _vf; }
             void SetRenderer(Renderer *r);
@@ -168,6 +174,17 @@ namespace Ailu
             friend Archive &operator>>(Archive &ar, Camera &c);
             Vector4f GetZBufferParams() const { return _zbuffer_params; }
             Vector4f GetProjParams() const { return _proj_params; }
+            void EnableTemporalDebugFrames(u32 frame_count = 8u) const
+            {
+                _temporal_debug_frames_remaining = frame_count;
+            }
+            bool ConsumeTemporalDebugFrame() const
+            {
+                if (_temporal_debug_frames_remaining == 0u)
+                    return false;
+                --_temporal_debug_frames_remaining;
+                return true;
+            }
 
         public:
             u32 _layer_mask = (u32) -1;
@@ -180,17 +197,26 @@ namespace Ailu
             f32 _jitter_scale = 1.0f;
 
         private:
-            void CalculateFrustum();
+            void RebuildCameraMatrices();
+            void RefreshRenderMatrices();
+            void CalculateCullingFrustum();
+            void CalculateRenderRayCorners();
             void ProcessJitter();
 
         private:
             bool _is_custom_vp = false;
+            bool _has_previous_vp_update_frame = false;
+            bool _temporal_history_reset_pending = false;
+            u64 _temporal_history_reset_revision = 0u;
             ViewFrustum _vf;
             bool _is_dirty = true;
             Matrix4x4f _view_matrix{};
             Matrix4x4f _proj_matrix{};
+            Matrix4x4f _proj_matrix_no_jitter{};
             Matrix4x4f _no_jitter_view_proj_matrix{};
+            Matrix4x4f _jittered_view_proj_matrix{};
             Matrix4x4f _prev_view_proj_matrix{};
+            Matrix4x4f _last_rendered_view_proj_matrix{};
             Vector4f _zbuffer_params;
             Vector4f _proj_params;
             Vector3f _near_top_left;
@@ -201,11 +227,16 @@ namespace Ailu
             Vector3f _far_top_right;
             Vector3f _far_bottom_left;
             Vector3f _far_bottom_right;
+            Vector3f _render_far_top_left;
+            Vector3f _render_far_top_right;
+            Vector3f _render_far_bottom_left;
+            Vector3f _render_far_bottom_right;
             Vector4f _jitter;
             u16 _pixel_width = 800u, _pixel_height = 450u;
             Renderer *_renderer = nullptr;
             RenderTexture *_target_texture = nullptr;
             u64 _prev_vp_matrix_update_frame = 0u;
+            mutable u32 _temporal_debug_frames_remaining = 0u;
         };
 
         Archive &operator<<(Archive &ar, const Camera &c);

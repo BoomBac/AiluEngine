@@ -33,8 +33,8 @@ namespace Ailu::Render
         cam_cb_data->_CameraPos = cam.Position();
         cam_cb_data->_MatrixV = cam.GetView();
         cam_cb_data->_MatrixP = cam.GetProj();
-        cam_cb_data->_MatrixVP = cam_cb_data->_MatrixV * cam_cb_data->_MatrixP;
-        cam_cb_data->_MatrixVP_NoJitter = cam.GetViewProj();
+        cam_cb_data->_MatrixVP = cam.GetViewProjJittered();
+        cam_cb_data->_MatrixVP_NoJitter = cam.GetViewProjNoJitter();
         cam_cb_data->_MatrixIVP = MatrixInverse(cam_cb_data->_MatrixVP);
         cam_cb_data->_MatrixVP_Pre = cam.GetPrevViewProj();
         auto &jitter = cam.GetJitter();
@@ -139,6 +139,9 @@ namespace Ailu::Render
         GpuResourceRegistry::Get().Sync(GraphicsContext::Get().GetFenceValueGPU());
         _frame_res_manager->NewFrame();
         Setup();
+        for (auto *camera : _cameras)
+            if (camera != nullptr)
+                camera->PrepareRenderFrame(GraphicsContext::Get().GetFrameCount());
         const Scene &scene = *SceneManagement::SceneMgr::Get().ActiveScene();
         bool has_cubemap_camera = false;
         for (auto *camera : _cameras)

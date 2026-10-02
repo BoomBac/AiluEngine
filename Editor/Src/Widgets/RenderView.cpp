@@ -5,6 +5,7 @@
 #include "Render/Camera.h"
 #include "Render/AssetPreviewMaterial.h"
 #include "Render/RenderPipeline.h"
+#include "Render/Renderer.h"
 #include "Render/Texture.h"
 #include "EditorApp.h"
 #include "Widgets/EditorLayer.h"
@@ -656,6 +657,39 @@ namespace Ailu
                 e._is_handled = true;
             };
 
+            _btn_taa_test = _scene_toolbar->AddChild<UI::Button>("TAA Jitter Off");
+            _btn_taa_test->GetSlotAs<UI::LinearSlot>()
+                    .SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFill)
+                    .Size({kSceneToolbarButtonWidth, 24.0f});
+            _btn_taa_test->OnMouseClick() += [this](UI::UIEvent &e)
+            {
+                if (Camera::sCurrent != nullptr)
+                {
+                    const bool enable_jitter = Camera::sCurrent->_anti_aliasing != Render::EAntiAliasing::kTAA;
+                    Camera::sCurrent->_anti_aliasing = enable_jitter ? Render::EAntiAliasing::kTAA
+                                                                       : Render::EAntiAliasing::kNone;
+                    Camera::sCurrent->MarkDirty();
+                    Camera::sCurrent->EnableTemporalDebugFrames();
+                    _btn_taa_test->SetText(enable_jitter ? "TAA Jitter On" : "TAA Jitter Off");
+                    ApplySceneToolbarButtonStyle(_btn_taa_test, enable_jitter);
+                }
+                e._is_handled = true;
+            };
+
+            _btn_motion_vector_debug = _scene_toolbar->AddChild<UI::Button>("Motion Debug");
+            _btn_motion_vector_debug->GetSlotAs<UI::LinearSlot>()
+                    .SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFill)
+                    .Size({kSceneToolbarButtonWidth, 24.0f});
+            ApplySceneToolbarButtonStyle(_btn_motion_vector_debug, false);
+            _btn_motion_vector_debug->OnMouseClick() += [this](UI::UIEvent &e)
+            {
+                _is_motion_vector_debug_enabled = !_is_motion_vector_debug_enabled;
+                if (s_renderer != nullptr)
+                    s_renderer->SetMotionVectorDebugView(_is_motion_vector_debug_enabled);
+                ApplySceneToolbarButtonStyle(_btn_motion_vector_debug, _is_motion_vector_debug_enabled);
+                e._is_handled = true;
+            };
+
             UpdateSceneToolbarLayout();
             UpdateSceneToolbarState();
         }
@@ -664,8 +698,8 @@ namespace Ailu
             if (_scene_toolbar_bg == nullptr)
                 return;
 
-            const f32 min_width = kSceneToolbarButtonWidth * 2.0f + kSceneToolbarDropdownWidth + kSceneToolbarSmallButtonWidth +
-                                  kSceneToolbarButtonGap * 3.0f + 14.0f;
+            const f32 min_width = kSceneToolbarButtonWidth * 4.0f + kSceneToolbarDropdownWidth +
+                                  kSceneToolbarSmallButtonWidth + kSceneToolbarButtonGap * 4.0f + 14.0f;
             const f32 available_width = std::max(min_width, _view_size.x - kSceneToolbarLeft * 2.0f);
             const f32 toolbar_width = std::min(available_width, min_width);
             _scene_toolbar_bg->GetSlotAs<UI::CanvasSlot>()

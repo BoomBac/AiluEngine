@@ -60,7 +60,6 @@ namespace Ailu
             inline static const String kPointLightShadowMap = "_PointLightShadowMaps";
             inline static const String kHZB = "_HZB";
             inline static const String kMotionVectorTex = "_CameraMotionVector";
-            inline static const String kMotionVectorDepth = "_CameraMotionDepth";
         };
         class AILU_API Renderer : public NonCopyable
         {
@@ -99,6 +98,7 @@ namespace Ailu
             RenderTexture *TargetTexture();
             void AddFeature(RenderFeature *feature) { _features.emplace_back(feature); };
             void SetShadingMode(EShadingMode mode) { _mode = mode; }
+            void SetMotionVectorDebugView(bool active) { _motion_vector_pass->SetDebugViewActive(active); }
             void SetupFrameResource(FrameResource *prev_fr, FrameResource *cur_fr);
             RDG::RenderGraph& GetRenderGraph() { return *_rd_graph; }
         public:

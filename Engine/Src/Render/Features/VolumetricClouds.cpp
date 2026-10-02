@@ -7,6 +7,7 @@
 #include "Inc/Framework/Common/ResourceMgr.h"
 #include "Inc/Framework/Math/Random.hpp"
 #include "Inc/Render/Gizmo.h"
+#include "Render/Camera.h"
 #include "Inc/Render/Renderer.h"
 #include "Render/CommandBuffer.h"
 #include "Render/RenderGraph/RenderGraph.h"
@@ -39,7 +40,7 @@ namespace Ailu::Render
         _weather_map = ResourceMgr::Get().Load<Texture2D>(EnginePath::kEngineTexturePathW + L"weather_map.alasset", &setting);
         auto cloud_shader = ResourceMgr::Get().Load<Shader>(L"Shaders/hlsl/global_volumetric_cloud.alasset");
         _global_cloud = MakeRef<Material>(cloud_shader.get(), "Runtime/VolumetricClouds");
-        _event = ERenderPassEvent::kAfterSkybox;
+        _event = ERenderPassEvent::kAfterMotionVector;
         _noise_gen = ResourceMgr::Get().LoadAssetRef<ComputeShader>(L"Shaders/hlsl/Compute/volumetric_noise_generator.alasset");
         _cloud_gen = ResourceMgr::Get().LoadAssetRef<ComputeShader>(L"Shaders/hlsl/Compute/volumetric_cloud.alasset");
         _cloud_main_kernel = _cloud_gen->FindKernel("CloudMain");
@@ -97,17 +98,92 @@ namespace Ailu::Render
         _detail_noise->GenerateMipmap();
         ResourceMgr::Get().RegisterResource(L"Runtime/CloudTex", _shape_noise);
         _blue_noise = ResourceMgr::Get().Load<Texture2D>(EnginePath::kEngineTexturePathW + L"blue_noise.alasset");
-        _is_cur_a = true;
     }
     VolumetricCloudsPass::~VolumetricCloudsPass()
     {
     }
     void VolumetricCloudsPass::OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data)
     {
+        if (rendering_data._camera == nullptr)
+            return;
+
+        const auto depth_handle = rendering_data._rg_handles._depth_tex;
+        const auto sky_view_lut_handle = rendering_data._rg_handles._sky_view_lut;
+        const auto motion_handle = rendering_data._rg_handles._motion_vector_tex;
+        if (!depth_handle.IsValid() || !sky_view_lut_handle.IsValid())
+        {
+            _history_valid = false;
+            return;
+        }
+
         EnsureRenderTargets(rendering_data);
         UpdateShaderParams();
 
-        if (_params._is_tile_render)
+        const Camera &camera = *rendering_data._camera;
+        const u64 camera_hash = camera.HashCode();
+        const u64 frame_index = g_pGfxContext != nullptr ? g_pGfxContext->GetFrameCount() : 0u;
+        const Vector3f camera_position = camera.Position();
+        const Vector3f camera_forward = camera.Forward();
+        const Vector3f camera_up = camera.Up();
+        const Vector4f camera_jitter = camera.GetJitter();
+        const Vector2f current_uv_jitter(camera_jitter.z, camera_jitter.w);
+        const bool changed_camera = _has_rendered && _history_camera_hash != camera_hash;
+        const bool changed_dimensions = _history_width != rendering_data._width ||
+                                        _history_height != rendering_data._height;
+        const bool skipped_frame = _has_rendered && frame_index != _last_render_frame + 1u;
+        const bool camera_cut = _has_rendered &&
+            (Math::Magnitude(camera_position - _previous_position) > 1.0f ||
+             Math::DotProduct(camera_forward, _previous_forward) < 0.5f ||
+             Math::DotProduct(camera_up, _previous_up) < 0.5f ||
+             static_cast<u8>(camera.Type()) != _previous_projection_type ||
+             std::abs(camera.FovH() - _previous_fov) > 1.0f ||
+             std::abs(camera.Aspect() - _previous_aspect) > 1.0e-3f ||
+             std::abs(camera.Near() - _previous_near) > std::max(_previous_near, 1.0e-3f) * 0.1f ||
+             std::abs(camera.Far() - _previous_far) > std::max(_previous_far, 1.0e-3f) * 0.1f);
+        const bool cloud_settings_changed = _has_rendered &&
+            (_params._height != _previous_height || _params._thickness != _previous_thickness ||
+             _params._density_multply != _previous_density_multiplier || _params._threshold != _previous_threshold ||
+             _params._params.w != _previous_type_offset || _params._params.z != _previous_speed ||
+             _params._exposure != _previous_exposure || _params._base_pos.x != _previous_base_pos.x ||
+             _params._base_pos.y != _previous_base_pos.y || _params._base_pos.z != _previous_base_pos.z ||
+             _params._absorption.x != _previous_absorption.x || _params._absorption.y != _previous_absorption.y ||
+             _params._absorption.z != _previous_absorption.z || _params._scattering.x != _previous_scattering.x ||
+             _params._scattering.y != _previous_scattering.y || _params._scattering.z != _previous_scattering.z ||
+             _params._is_tile_render != _previous_tile_render ||
+             _params._is_high_quailty != _previous_high_quality);
+        if (changed_camera || changed_dimensions || skipped_frame || camera_cut || cloud_settings_changed ||
+            rendering_data._is_res_changed)
+            _history_valid = false;
+
+        _history_width = rendering_data._width;
+        _history_height = rendering_data._height;
+        _history_write_executed = false;
+        _reprojection_executed = false;
+        _rg_commit_done = false;
+        const bool can_reproject = _history_valid;
+        const bool tile_render = _params._is_tile_render;
+        const Vector2f previous_uv_jitter = can_reproject ? _previous_uv_jitter : current_uv_jitter;
+        const Vector3f current_position = camera_position;
+        const Vector3f current_forward = camera_forward;
+        const Vector3f current_up = camera_up;
+        const f32 current_height = _params._height;
+        const f32 current_thickness = _params._thickness;
+        const f32 current_density_multiplier = _params._density_multply;
+        const f32 current_threshold = _params._threshold;
+        const f32 current_type_offset = _params._params.w;
+        const f32 current_speed = _params._params.z;
+        const f32 current_exposure = _params._exposure;
+        const Vector3f current_base_pos = _params._base_pos;
+        const Vector3f current_absorption = _params._absorption;
+        const Vector3f current_scattering = _params._scattering;
+        const bool current_high_quality = _params._is_high_quailty;
+        const f32 current_fov = camera.FovH();
+        const f32 current_aspect = camera.Aspect();
+        const f32 current_near = camera.Near();
+        const f32 current_far = camera.Far();
+        const u8 current_projection_type = static_cast<u8>(camera.Type());
+
+        if (tile_render && can_reproject)
             _cloud_gen->EnableKeyword("_TILE_RENDER");
         else
             _cloud_gen->DisableKeyword("_TILE_RENDER");
@@ -136,16 +212,19 @@ namespace Ailu::Render
         {
             _cloud_cur_handle = builder.Import(_is_cur_a ? _cloud_rt_a.get() : _cloud_rt_b.get());
             _cloud_history_handle = builder.Import(_is_cur_a ? _cloud_rt_b.get() : _cloud_rt_a.get());
-            builder.Read(rendering_data._rg_handles._depth_tex);
-            _sky_view_lut_handle = builder.ReadGlobalTexture(Shader::PropertyID("_TexSkyViewLUT"));
-            builder.Read(_cloud_history_handle);
+            builder.Read(depth_handle);
+            builder.Read(sky_view_lut_handle);
+            if (can_reproject)
+                builder.Read(_cloud_history_handle);
             _cloud_cur_handle = builder.Write(_cloud_cur_handle, EResourceUsage::kWriteUAV);
-            }, [this, cur_offset](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
+            }, [this, cur_offset, tile_render, can_reproject, depth_handle, sky_view_lut_handle]
+               (RDG::RenderGraph &graph, CommandBuffer *cmd,
+                                                               const RenderingData &data)
         {
             auto *cur_rt = graph.Resolve<RenderTexture>(_cloud_cur_handle);
             auto *history_rt = graph.Resolve<RenderTexture>(_cloud_history_handle);
-            auto *depth_tex = graph.Resolve<Texture>(data._rg_handles._depth_tex);
-            auto *sky_view_lut = graph.Resolve<Texture>(_sky_view_lut_handle);
+            auto *depth_tex = graph.Resolve<Texture>(depth_handle);
+            auto *sky_view_lut = graph.Resolve<Texture>(sky_view_lut_handle);
             if (cur_rt == nullptr || history_rt == nullptr || depth_tex == nullptr || sky_view_lut == nullptr)
                 return;
 
@@ -157,32 +236,42 @@ namespace Ailu::Render
             _cloud_gen->SetVector("_CloudTex_TexelSize", cur_rt->TexelSize());
             _cloud_gen->SetTexture(_cloud_main_kernel, "_CameraDepthTexture", depth_tex);
             _cloud_gen->SetTexture(_cloud_main_kernel, "_TexSkyViewLUT", sky_view_lut);
-            _cloud_gen->SetVector("_pixel_offset", Vector4f((f32) cur_offset.x, (f32) cur_offset.y, 0.f, 0.f));
+            const Vector2UInt offset = tile_render && can_reproject ? cur_offset : Vector2UInt(0u, 0u);
+            _cloud_gen->SetVector("_pixel_offset", Vector4f((f32) offset.x, (f32) offset.y, 0.f, 0.f));
             _cloud_gen->SetTexture(_cloud_main_kernel, "_CloudTex", cur_rt);
             {
-                auto [x, y, z] = _cloud_gen->CalculateDispatchNum(_cloud_main_kernel, rt_desc._width >> (_params._is_tile_render ? 2 : 0), rt_desc._height >> (_params._is_tile_render ? 2 : 0), 1);
+                auto [x, y, z] = _cloud_gen->CalculateDispatchNum(
+                    _cloud_main_kernel, rt_desc._width >> (tile_render && can_reproject ? 2 : 0),
+                    rt_desc._height >> (tile_render && can_reproject ? 2 : 0), 1);
                 cmd->Dispatch(_cloud_gen.get(), _cloud_main_kernel, x, y, 1);
             }
+            _history_write_executed = true;
         });
-        if (_params._is_tile_render)
+        if (tile_render && can_reproject)
         {
             graph.AddPass("VolumetricClouds_TileReproject", RDG::PassDesc(), [&, this](RDG::RenderGraphBuilder &builder)
             {
                 builder.Read(_cloud_cur_handle);
                 builder.Read(_cloud_history_handle);
-                builder.Read(rendering_data._rg_handles._motion_vector_tex);
+                builder.Read(motion_handle);
                 _cloud_cur_handle = builder.Write(_cloud_cur_handle, EResourceUsage::kWriteUAV);
-            }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
+            }, [this, previous_uv_jitter, current_uv_jitter, motion_handle](RDG::RenderGraph &graph, CommandBuffer *cmd,
+                                                             const RenderingData &data)
             {
                 auto rt_desc = data._camera_data._camera_color_target_desc;
-                _cloud_gen->SetTexture(_cloud_reprojection_kernel, "_CloudTex",
-                                       graph.Resolve<RenderTexture>(_cloud_cur_handle));
-                _cloud_gen->SetTexture(_cloud_reprojection_kernel, "_CloudHistoryTex",
-                                       graph.Resolve<RenderTexture>(_cloud_history_handle));
-                _cloud_gen->SetTexture(_cloud_reprojection_kernel, "_MotionVectorTexture",
-                                       graph.Resolve<Texture>(data._rg_handles._motion_vector_tex));
+                auto *cloud_rt = graph.Resolve<RenderTexture>(_cloud_cur_handle);
+                auto *history_rt = graph.Resolve<RenderTexture>(_cloud_history_handle);
+                auto *motion_texture = graph.Resolve<Texture>(motion_handle);
+                if (!_history_write_executed || cloud_rt == nullptr || history_rt == nullptr || motion_texture == nullptr)
+                    return;
+                _cloud_gen->SetTexture(_cloud_reprojection_kernel, "_CloudTex", cloud_rt);
+                _cloud_gen->SetTexture(_cloud_reprojection_kernel, "_CloudHistoryTex", history_rt);
+                _cloud_gen->SetTexture(_cloud_reprojection_kernel, "_MotionVectorTexture", motion_texture);
+                _cloud_gen->SetVector("_JitterPrev", Vector4f(previous_uv_jitter.x, previous_uv_jitter.y, 0.0f, 0.0f));
+                _cloud_gen->SetVector("_JitterCur", Vector4f(current_uv_jitter.x, current_uv_jitter.y, 0.0f, 0.0f));
                 auto [x, y, z] = _cloud_gen->CalculateDispatchNum(_cloud_reprojection_kernel, rt_desc._width, rt_desc._height, 1);
                 cmd->Dispatch(_cloud_gen.get(), _cloud_reprojection_kernel, x, y, 1);
+                _reprojection_executed = true;
             });
         }
 
@@ -192,21 +281,60 @@ namespace Ailu::Render
             builder.Read(_cloud_cur_handle);
             builder.Read(rendering_data._rg_handles._color_target, EResourceUsage::kWriteRTV);
             rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target);
-        }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
+        }, [this, camera_hash, frame_index, current_uv_jitter, current_position, current_forward, current_up,
+            current_height, current_thickness, current_density_multiplier, current_threshold, current_type_offset,
+            current_speed, current_exposure, current_base_pos, current_absorption, current_scattering,
+            current_high_quality, current_fov, current_aspect, current_near, current_far, current_projection_type,
+            tile_render, can_reproject]
+           (RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
         {
             auto *cur_rt = graph.Resolve<RenderTexture>(_cloud_cur_handle);
-            if (cur_rt == nullptr)
+            if (cur_rt == nullptr || !_history_write_executed ||
+                (tile_render && can_reproject && !_reprojection_executed))
+            {
+                _history_valid = false;
                 return;
+            }
 
-            cmd->SetRenderTargetLoadAction(data._rg_handles._color_target, ELoadStoreAction::kNotCare);
+            cmd->SetRenderTargetLoadAction(data._rg_handles._color_target, ELoadStoreAction::kLoad);
             cmd->SetRenderTarget(data._rg_handles._color_target);
             _global_cloud->SetTexture("_CloudTex", cur_rt);
             cmd->DrawFullScreenQuad(_global_cloud.get(), 1);
-            _is_cur_a = !_is_cur_a;
+            if (_history_write_executed && (!tile_render || !can_reproject || _reprojection_executed))
+            {
+                _is_cur_a = !_is_cur_a;
+                _history_valid = true;
+                _history_camera_hash = camera_hash;
+                _last_render_frame = frame_index;
+                _previous_uv_jitter = current_uv_jitter;
+                _previous_position = current_position;
+                _previous_forward = current_forward;
+                _previous_up = current_up;
+                _previous_height = current_height;
+                _previous_thickness = current_thickness;
+                _previous_density_multiplier = current_density_multiplier;
+                _previous_threshold = current_threshold;
+                _previous_type_offset = current_type_offset;
+                _previous_speed = current_speed;
+                _previous_exposure = current_exposure;
+                _previous_base_pos = current_base_pos;
+                _previous_absorption = current_absorption;
+                _previous_scattering = current_scattering;
+                _previous_tile_render = tile_render;
+                _previous_high_quality = current_high_quality;
+                _previous_fov = current_fov;
+                _previous_aspect = current_aspect;
+                _previous_near = current_near;
+                _previous_far = current_far;
+                _previous_projection_type = current_projection_type;
+                _has_rendered = true;
+                _rg_commit_done = true;
+            }
         });
     }
     void VolumetricCloudsPass::Execute(GraphicsContext *context, RenderingData &rendering_data)
     {
+        _rg_commit_done = false;
         EnsureRenderTargets(rendering_data);
         //https://www.diva-portal.org/smash/get/diva2:1223894/FULLTEXT01.pdf  Real-time rendering of volumetric clouds 3.2.1.4
         static const Vector2UInt kOffsetTable[16] = {
@@ -275,7 +403,9 @@ namespace Ailu::Render
     }
     void VolumetricCloudsPass::EndPass(GraphicsContext *context)
     {
-        _is_cur_a = !_is_cur_a;
+        if (!_rg_commit_done)
+            _is_cur_a = !_is_cur_a;
+        _rg_commit_done = false;
     }
     void VolumetricCloudsPass::Setup(f32 speed)
     {

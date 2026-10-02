@@ -1,4 +1,5 @@
 #pragma kernel CSMain
+#pragma kernel CSStabilize
 
 #include "cs_common.hlsli"
 #include "../color_space_utils.hlsli"
@@ -13,18 +14,26 @@ CBUFFER_START(TAA_CB)
     float _VarianceClampScale;
     float _Sharpness;
     float _HistoryFactor;
+    float _HistoryValid;
+    float _ReactiveValid;
 CBUFFER_END
 
 TEXTURE2D(_CurrentColor)
 TEXTURE2D(_HistoryColor)
 TEXTURE2D(_CameraDepthTexture)
 TEXTURE2D(_MotionVectorTexture)
+TEXTURE2D(_OpaqueColor)
+TEXTURE2D(_PreviousReactive)
 RWTEXTURE2D(_CurrentTarget,float3)
+RWTEXTURE2D(_CurrentReactive,float)
+TEXTURE2D(_ResolvedColor)
+TEXTURE2D(_ResolvedReactive)
+RWTEXTURE2D(_StableTarget,float3)
 
 #define _JitterPrev _Jitter.xy
 #define _JitterCur _Jitter.zw
 
-//#define TAA_YCOCG 1
+#define TAA_YCOCG 0
 #define _USE_DILATION 1
 #define _FILTER_CENTER 1
 
@@ -132,12 +141,15 @@ half4 GetCurColorSamples(float2 uv, out half4 samples[9],bool filter_center = fa
     }
     if (filter_center)
     {
-        half4 center = 0.0.xxxx;
+        float4 center = 0.0.xxxx;
+        float weight_sum = 0.0;
         for(int i = 0; i < 9; i++)
         {
-            center += samples[i] * MitchellFilter(length(kOffsets[i]));
+            float weight = MitchellFilter(length(kOffsets[i]));
+            center += samples[i] * weight;
+            weight_sum += weight;
         }
-        return center;
+        return center / weight_sum;
     }
     return samples[4];
 }
@@ -164,15 +176,9 @@ float3 Filter(float3 samples[9])
 void MinMax(half4 samples[9], out half4 min_color, out half4 max_color,float clamp_quality)
 {
     half4 color[9];
-    color[0] = SceneToWorkingSpace(samples[0]);
-    color[1] = SceneToWorkingSpace(samples[1]);
-    color[2] = SceneToWorkingSpace(samples[2]);
-    color[3] = SceneToWorkingSpace(samples[3]);
-    color[4] = SceneToWorkingSpace(samples[4]);
-    color[5] = SceneToWorkingSpace(samples[5]);
-    color[6] = SceneToWorkingSpace(samples[6]);
-    color[7] = SceneToWorkingSpace(samples[7]);
-    color[8] = SceneToWorkingSpace(samples[8]);
+    // Neighborhood samples are already in working space.
+    for (int i = 0; i < 9; ++i)
+        color[i] = samples[i];
     min_color = max_color = color[0];
     for(int i = 0; i < 9; i++)
     {
@@ -193,8 +199,9 @@ void MinMax(half4 samples[9], out half4 min_color, out half4 max_color,float cla
         half4 std_dev = sqrt(abs(m2 * per_sample - mean * mean));
         half4 dev_min = mean - _VarianceClampScale * std_dev;
         half4 dev_max = mean + _VarianceClampScale * std_dev;
-        min_color = min(min_color,dev_min);
-        max_color = max(max_color,dev_max);
+        // Variance rejection intersects the current color envelope; it must not admit stale brighter/darker colors.
+        min_color = max(min_color,dev_min);
+        max_color = min(max_color,dev_max);
     }
 }
 //clamp和clip，想象一个二维空间将点p限制到一个aabb，前者去aabb 四个顶点的其中一个，后者则表示p到aabb中心的连线与aabb边的交点
@@ -212,6 +219,63 @@ half4 ClipColor(half4 color,half4 min_color, half4 max_color)
         return p_clip + v_clip / ma_unit;
     else
         return color;
+}
+
+void ExpandStaticCoverageBounds(float2 uv, float2 motion, half4 history_color, half4 samples[9],
+                                inout half4 min_color, inout half4 max_color)
+{
+    // A jittered subpixel feature can miss the inner 3x3. Keep clipping to current colors, but include a one-pixel
+    // coverage guard for stationary geometry. Moving geometry retains the original rejection footprint.
+    if (any(abs(motion) * _SourceTex_TexelSize.zw >= 0.5) ||
+        (!any(history_color.rgb < min_color.rgb) && !any(history_color.rgb > max_color.rgb)))
+        return;
+    for (int i = 1; i < 9; ++i)
+    {
+        if (any(samples[i].rgb != samples[0].rgb))
+            return;
+    }
+    half4 guard_min = min_color;
+    half4 guard_max = max_color;
+    int coverage_samples = 0;
+    for (int y = -2; y <= 2; ++y)
+    {
+        for (int x = -2; x <= 2; ++x)
+        {
+            if (abs(x) != 2 && abs(y) != 2)
+                continue;
+            half4 sample_color = SceneToWorkingSpace(SAMPLE_TEXTURE2D_LOD(_CurrentColor, g_PointClampSampler,
+                uv + float2(x, y) * _SourceTex_TexelSize.xy, 0));
+            coverage_samples += any(sample_color.rgb != samples[0].rgb) ? 1 : 0;
+            guard_min = min(guard_min, sample_color);
+            guard_max = max(guard_max, sample_color);
+        }
+    }
+    // At most one quarter of the 16 outer taps may differ: sparse thin coverage, not a filled edge.
+    if (coverage_samples > 0 && coverage_samples <= 4)
+    {
+        min_color = guard_min;
+        max_color = guard_max;
+    }
+}
+
+half4 ClipHistoryChroma(half4 history_color, half4 samples[9])
+{
+#if !TAA_YCOCG
+    // Preserve the accepted RGB luminance/coverage filter. Clipping the full YCoCg ray makes tiny
+    // R11G11B10 quantization chroma differences unnecessarily reject luminance history on thin geometry.
+    float2 chroma_min = RGBToYCoCg(samples[0].rgb).yz;
+    float2 chroma_max = chroma_min;
+    for (int i = 1; i < 9; ++i)
+    {
+        float2 chroma = RGBToYCoCg(samples[i].rgb).yz;
+        chroma_min = min(chroma_min, chroma);
+        chroma_max = max(chroma_max, chroma);
+    }
+    float3 history_ycocg = RGBToYCoCg(history_color.rgb);
+    history_ycocg.yz = clamp(history_ycocg.yz, chroma_min, chroma_max);
+    history_color.rgb = YCoCgToRGB(history_ycocg);
+#endif
+    return history_color;
 }
 
 
@@ -274,31 +338,94 @@ void CSMain(CSInput input)
     VALID_INDEX(_SourceTex_TexelSize.zw)
     int2 pixel_index = input.DispatchThreadID.xy;
     float2 uv = (input.DispatchThreadID.xy + 0.5.xx) * _SourceTex_TexelSize.xy;
+    float3 raw_current = _CurrentColor[pixel_index].rgb;
+    // A changed composed color is responsive even when its blended layer has no object velocity.
+    float reactive = _ReactiveValid > 0.5 && any(abs(raw_current - _OpaqueColor[pixel_index].rgb) > 0.001) ? 1 : 0;
+    _CurrentReactive[pixel_index] = reactive;
+    half4 cur_color = SceneToWorkingSpace(float4(raw_current, 1));
+    if (_HistoryValid < 0.5 || _HistoryFactor <= 0.0)
+    {
+        _CurrentTarget[pixel_index] = raw_current;
+        return;
+    }
 #ifdef _USE_DILATION
     float2 mv = SAMPLE_TEXTURE2D_LOD(_MotionVectorTexture, g_PointClampSampler, GetClosestFragment(uv),0).xy;
 #else
     float2 mv = SAMPLE_TEXTURE2D_LOD(_MotionVectorTexture, g_PointClampSampler, uv,0).xy;
 #endif//_USE_DILATION
-    half4 cur_color = SceneToWorkingSpace(_CurrentColor[pixel_index]);
-    float2 prev_uv = uv - mv;
+    float2 prev_uv = uv - mv + (_JitterPrev - _JitterCur);
     if (any(prev_uv != saturate(prev_uv)))
     {
-        _CurrentTarget[pixel_index] = WorkingSpaceToScene(cur_color).rgb;
+        _CurrentTarget[pixel_index] = raw_current;
         return;
+    }
+    if (_ReactiveValid > 0.5)
+    {
+        // Retain previous coverage to reject color on newly uncovered background. Expand for history filter support.
+        float previous_reactive = 0;
+        for (int y = -1; y <= 1; ++y)
+            for (int x = -1; x <= 1; ++x)
+                previous_reactive = max(previous_reactive, SAMPLE_TEXTURE2D_LOD(_PreviousReactive,
+                    g_LinearClampSampler, prev_uv + float2(x, y) * _SourceTex_TexelSize.xy, 0).r);
+        if (reactive > 0 || previous_reactive > 0)
+        {
+            _CurrentTarget[pixel_index] = raw_current;
+            return;
+        }
     }
     half4 samples[9];
     half4 aabb_min,aabb_max;
 #if defined(_FILTER_CENTER)
-    cur_color = SceneToWorkingSpace(GetCurColorSamples(uv,samples,true));
+    cur_color = GetCurColorSamples(uv,samples,true);
 #else
     GetCurColorSamples(uv,samples);
 #endif
     MinMax(samples,aabb_min,aabb_max,_ClampQuality);
     //cur_color = CAS_Sharpen(cur_color,aabb_min,aabb_max,_Sharpness);
     half4 history_color = _HistoryQuality>= 2? SampleBicubic5TapHalf(_HistoryColor,prev_uv,_SourceTex_TexelSize) : SceneToWorkingSpace(SAMPLE_TEXTURE2D_LOD(_HistoryColor, g_LinearClampSampler, prev_uv,0));
+    ExpandStaticCoverageBounds(uv, mv, history_color, samples, aabb_min, aabb_max);
     half4 clamped_history = _ClampQuality>= 2? ClipColor(history_color,aabb_min,aabb_max) : clamp(history_color,aabb_min,aabb_max);
+    clamped_history = ClipHistoryChroma(clamped_history, samples);
     //half4 clamped_history = ClipColor(history_color,aabb_min,aabb_max);
-    half4 final_color = lerp(cur_color,clamped_history,0.95);
+    half history_factor = saturate((half)_HistoryFactor);
+    half4 final_color = lerp(cur_color, clamped_history, history_factor);
     //final_color = CAS_Sharpen(final_color,aabb_min,aabb_max,_Sharpness);
     _CurrentTarget[pixel_index] = WorkingSpaceToScene(final_color).xyz;
+}
+
+[numthreads(GROUP_SIZE,GROUP_SIZE,1)]
+void CSStabilize(CSInput input)
+{
+    VALID_INDEX(_SourceTex_TexelSize.zw)
+    int2 pixel_index = input.DispatchThreadID.xy;
+    float2 uv = (pixel_index + 0.5.xx) * _SourceTex_TexelSize.xy;
+    // History stays on the jittered raster grid. Only presentation samples the stable pixel's raster location.
+    float2 source_uv = uv + _JitterCur;
+    if (_ReactiveValid > 0.5)
+    {
+        // Policy A layers (including stable billboards) retain current-frame pixels; avoid filtering across their edge.
+        float reactive = _ResolvedReactive[pixel_index].r;
+        // The resolve also protects newly uncovered pixels using last frame's responsive coverage.
+        if (_HistoryValid > 0.5)
+        {
+            float2 motion = SAMPLE_TEXTURE2D_LOD(_MotionVectorTexture, g_PointClampSampler, GetClosestFragment(uv), 0).xy;
+            float2 previous_uv = uv - motion + (_JitterPrev - _JitterCur);
+            if (all(previous_uv == saturate(previous_uv)))
+                for (int y = -1; y <= 1; ++y)
+                    for (int x = -1; x <= 1; ++x)
+                        reactive = max(reactive, SAMPLE_TEXTURE2D_LOD(_PreviousReactive, g_LinearClampSampler,
+                            previous_uv + float2(x, y) * _SourceTex_TexelSize.xy, 0).r);
+        }
+        for (int y = -2; y <= 2; ++y)
+            for (int x = -2; x <= 2; ++x)
+                reactive = max(reactive, SAMPLE_TEXTURE2D_LOD(_ResolvedReactive, g_PointClampSampler,
+                    source_uv + float2(x, y) * _SourceTex_TexelSize.xy, 0).r);
+        if (reactive > 0)
+        {
+            _StableTarget[pixel_index] = _ResolvedColor[pixel_index].rgb;
+            return;
+        }
+    }
+    _StableTarget[pixel_index] = max(WorkingSpaceToScene(
+        SampleBicubic5TapHalf(_ResolvedColor, source_uv, _SourceTex_TexelSize)).rgb, 0.0.xxx);
 }

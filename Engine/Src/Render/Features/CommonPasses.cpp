@@ -1870,7 +1870,9 @@ namespace Ailu::Render
     MotionVectorPass::MotionVectorPass() : RenderPass("MotionVectorPass")
     {
         _event = ERenderPassEvent::kBeforeTransparent;
-        _motion_vector_mat = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/motion_vector.alasset"), "Runtime/MotionVector");
+        auto *motion_vector_shader = ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/motion_vector.alasset");
+        _motion_vector_mat = MakeRef<Material>(motion_vector_shader, "Runtime/MotionVector");
+        _motion_vector_debug_mat = MakeRef<Material>(motion_vector_shader, "Runtime/MotionVectorDebug");
     }
 
     MotionVectorPass::~MotionVectorPass()
@@ -1880,7 +1882,7 @@ namespace Ailu::Render
     void Ailu::Render::MotionVectorPass::OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data)
     {
         graph.AddPass("StaticMotion", RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
-                      { 
+                      {
                           builder.Read(rendering_data._rg_handles._depth_tex);
                           rendering_data._rg_handles._motion_vector_tex = builder.Write(rendering_data._rg_handles._motion_vector_tex);
                       }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data)
@@ -1890,13 +1892,15 @@ namespace Ailu::Render
                           cmd->DrawFullScreenQuad(_motion_vector_mat.get(), 0); 
                       });
         graph.AddPass("DynamicMotion", RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
-                      { 
-                          builder.Read(rendering_data._rg_handles._motion_vector_tex);
-                          rendering_data._rg_handles._motion_vector_tex = builder.Write(rendering_data._rg_handles._motion_vector_tex);
-                          rendering_data._rg_handles._motion_vector_depth = builder.Write(rendering_data._rg_handles._motion_vector_depth,EResourceUsage::kDSV);
-                      }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data)
                       {
-                          cmd->SetRenderTarget(rendering_data._rg_handles._motion_vector_tex,rendering_data._rg_handles._motion_vector_depth);
+                            builder.Read(rendering_data._rg_handles._motion_vector_tex);
+                            builder.Read(rendering_data._rg_handles._depth_target, EResourceUsage::kDSV);
+                            rendering_data._rg_handles._motion_vector_tex = builder.Write(
+                                rendering_data._rg_handles._motion_vector_tex);
+                        }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data)
+                        {
+                            cmd->SetRenderTarget(rendering_data._rg_handles._motion_vector_tex,
+                                                 rendering_data._rg_handles._depth_target);
                           for (auto &it: *rendering_data._cull_results)
                           {
                               auto &[queue, objs] = it;
@@ -1908,26 +1912,47 @@ namespace Ailu::Render
                                   i16 mv_pass = obj._material->GetActiveShader()->FindPass("MotionVector");
                                   if (mv_pass != -1)
                                       cmd->DrawSceneMesh(obj._vertex_buffer, obj._index_buffer, obj._material, obj._submesh_index,
-                                                         mv_pass, CBufferPrimitiveDrawData{obj._primitive_index}, 1u);
+                                                         mv_pass, CBufferPrimitiveDrawData{obj._primitive_index}, 1u,
+                                                         obj._material->GetMotionVectorVariantHash(mv_pass, obj._vertex_buffer));
                               }
                           }
                       });
+        if (_is_debug_view_active)
+        {
+            graph.AddPass("MotionVectorDebugView", RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
+                          {
+                              builder.Read(rendering_data._rg_handles._motion_vector_tex);
+                              RDG::RGHandle &color_target = rendering_data._rg_handles._color_target;
+                              builder.Read(color_target, EResourceUsage::kWriteRTV);
+                              color_target = builder.Write(color_target);
+                          }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
+                          {
+                              cmd->SetRenderTarget(data._rg_handles._color_target);
+                              _motion_vector_debug_mat->SetTexture(
+                                  "_MotionVectorDebugTexture", graph.Resolve<Texture>(data._rg_handles._motion_vector_tex));
+                              const i16 pass = _motion_vector_debug_mat->GetActiveShader()->FindPass(
+                                  "Internal/MotionVectorDebug");
+                              cmd->DrawFullScreenQuad(_motion_vector_debug_mat.get(), static_cast<u16>(pass));
+                          });
+        }
     }
 
     void MotionVectorPass::Execute(GraphicsContext *context, RenderingData &rendering_data)
     {
         auto cmd = CommandBufferPool::Get(_name);
         RTHandle motion_vector_rt = cmd->GetTempRT(rendering_data._width, rendering_data._height, "_MotionVectorTexture", ERenderTargetFormat::kRGHalf, false, false, false);
-        RTHandle motion_vector_depth = cmd->GetTempRT(rendering_data._width, rendering_data._height, "_MotionVectorDepth", ERenderTargetFormat::kDepth, false, false, false);
         cmd->Clear();
         {
             PROFILE_BLOCK_GPU(cmd.get(), "CameraMotionVector")
             //camera motion vector
-            cmd->SetRenderTarget(motion_vector_rt, motion_vector_depth);
-            //cmd->ClearRenderTarget(motion_vector_rt, motion_vector_depth,Colors::kBlack,kZFar);
+            cmd->SetRenderTarget(motion_vector_rt);
+            //cmd->ClearRenderTarget(motion_vector_rt, Colors::kBlack);
             _motion_vector_mat->SetTexture("_CameraDepthTexture", rendering_data._camera_depth_tex_handle);
             cmd->DrawFullScreenQuad(_motion_vector_mat.get(), 0);
             //object motion vector
+            cmd->SetRenderTargetLoadAction(motion_vector_rt, ELoadStoreAction::kLoad);
+            cmd->SetRenderTargetLoadAction(rendering_data._camera_depth_target_handle, ELoadStoreAction::kLoad);
+            cmd->SetRenderTarget(motion_vector_rt, rendering_data._camera_depth_target_handle);
             for (auto &it: *rendering_data._cull_results)
             {
                 auto &[queue, objs] = it;
@@ -1939,11 +1964,11 @@ namespace Ailu::Render
                     i16 mv_pass = obj._material->GetActiveShader()->FindPass("MotionVector");
                     if (mv_pass != -1)
                         cmd->DrawSceneMesh(obj._vertex_buffer, obj._index_buffer, obj._material, obj._submesh_index,
-                                           mv_pass, CBufferPrimitiveDrawData{obj._primitive_index}, 1u);
+                                           mv_pass, CBufferPrimitiveDrawData{obj._primitive_index}, 1u,
+                                                         obj._material->GetMotionVectorVariantHash(mv_pass, obj._vertex_buffer));
                 }
             }
         }
-        cmd->ReleaseTempRT(motion_vector_depth);
         cmd->ReleaseTempRT(motion_vector_rt);
         context->ExecuteCommandBuffer(cmd);
         CommandBufferPool::Release(cmd);

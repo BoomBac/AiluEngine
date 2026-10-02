@@ -271,6 +271,7 @@ namespace Ailu::Render
         RTHandle _final_rt_handle;
         RTHandle _camera_opaque_tex_handle;
         RTHandle _camera_depth_tex_handle;
+        RTHandle _motion_vector_tex_handle;
         RenderTexture* _postprocess_input;
         Rect _viewport, _scissor_rect;
         u32 _width, _height;
@@ -290,11 +291,14 @@ namespace Ailu::Render
             // 这样 PostprocessStack 不会把 _color_target 改写成另一个资源，导致注册在它之前的 Pass 绑错目标。
             RDG::RGHandle         _color_target;
             RDG::RGHandle         _color_tex;
+            RDG::RGHandle         _taa_color;
+            RDG::RGHandle         _taa_history_color; // Jittered accumulation; _taa_color is stable presentation.
+            RDG::RGHandle         _taa_opaque_color;
+            RDG::RGHandle         _taa_reactive;
             RDG::RGHandle         _final_color;
             RDG::RGHandle         _depth_target;
             RDG::RGHandle         _depth_tex;
             RDG::RGHandle         _motion_vector_tex;
-            RDG::RGHandle         _motion_vector_depth;
             RDG::RGHandle         _hzb;
             RDG::RGHandle         _main_light_shadow_map;
             RDG::RGHandle         _addi_shadow_maps;
@@ -340,6 +344,11 @@ namespace Ailu::Render
         void Reset()
         {
             _postprocess_input = nullptr;
+            _motion_vector_tex_handle = RTHandle{};
+            _rg_handles._taa_color = {};
+            _rg_handles._taa_history_color = {};
+            _rg_handles._taa_opaque_color = {};
+            _rg_handles._taa_reactive = {};
             _ddgi_lighting = {};
             _rg_handles._surfel_coverage = {};
         }

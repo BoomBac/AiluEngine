@@ -269,11 +269,13 @@ namespace Ailu::Render
             return &_property_blocks[block_index];
         }
         PropertyBlockView GetPropertyBlockForFrame(u16 pass_index, u32 frame_slot, u64 frame_count, FrameAllocator &allocator,
-                                                   bool upload_to_gpu, CommandRenderingStatesData *statistics = nullptr);
+                                                   bool upload_to_gpu, CommandRenderingStatesData *statistics = nullptr,
+                                                   u32 variant_override_hash = UINT32_MAX);
         u32 PropertyVersion() const { return _property_data_version + _resource_binding_version; }
         u32 DrawStateVersion() const { return _draw_state_version; }
         DrawSubmissionStateIds GetDrawSubmissionStateIds(const DrawPipelineStateKey &pipeline_key,
                                                          const MaterialStateKey &material_key) const;
+        ShaderVariantHash GetMotionVectorVariantHash(u16 pass_index, const VertexBuffer *vertex_buffer) const;
         ShaderVariantHash GetShadowVariantHash(u16 pass_index, bool point_shadow, bool force_alpha_test) const;
         std::set<String>& SavedKeyworkds() { return _all_keywords; }
         virtual void Construct(bool first_time);
@@ -341,6 +343,8 @@ namespace Ailu::Render
         };
         struct FramePropertyBlockCache
         {
+            u32 _variant_hash = UINT32_MAX;
+            u32 _layout_version = 0u;
             u32 _property_data_version = 0u;
             u64 _frame_count = static_cast<u64>(-1);
             PropertyBlockView _block;

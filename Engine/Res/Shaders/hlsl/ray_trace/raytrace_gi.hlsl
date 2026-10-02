@@ -68,6 +68,7 @@ CBUFFER_START(ComputeCB)
     bool _temporal_history_valid;
     uint _debug_temporal_target;
     int _accumulation_mode;
+    float4 _CameraUvJitter; // previous UV jitter.xy, current UV jitter.zw
 CBUFFER_END
 
 // ===== Debug 宏定义 =====
@@ -523,7 +524,7 @@ Reservoir TemporalReuse(uint2 pixel,Reservoir r,Surface surface,inout RandomCtx 
 
     float3 motion = _MotionVectorTexture[pixel].rgb;
     float2 uv = (float2(pixel) + 0.5.xx) * _ScreenParams.xy;
-    float2 history_uv = uv - motion.xy;
+    float2 history_uv = uv - motion.xy + _CameraUvJitter.xy - _CameraUvJitter.zw;
     float expected01_depth = surface._linear_depth - motion.z;
     bool is_valid_history = all(history_uv >= 0) && all(history_uv < 1.0.xx);
     if (!is_valid_history)
@@ -937,20 +938,29 @@ void Denoise(CSInput input)
                          valid_bindless_handle(_prev_surface_buffer_idx);
     float3 history_color = 0.0;
     float history_length = 0.0;
+    float2 uv = (float2(pixel) + 0.5.xx) * _ScreenParams.xy;
+    float2 camera_jitter_delta = _CameraUvJitter.xy - _CameraUvJitter.zw;
+    float2 history_uv = uv + camera_jitter_delta;
+    if (_accumulation_mode == 2)
+        history_uv -= _MotionVectorTexture[pixel].rg;
+    float2 history_position = history_uv * _ScreenParams.zw - 0.5;
 
-    // Reference accumulation is an unclamped progressive mean at the same pixel. The CPU resets its
-    // history whenever the camera moves, so reprojection and adaptive realtime weighting are not applied.
+    // Reference accumulation is an unclamped progressive mean. It remaps camera jitter only; real camera
+    // movement still resets reference history, and motion-vector reprojection remains realtime-only.
     if (_accumulation_mode == 1 && history_valid)
     {
+        history_valid = all(history_uv >= 0.0.xx) && all(history_uv < 1.0.xx);
+        int2 history_pixel = clamp(int2(history_uv * _ScreenParams.zw), int2(0, 0),
+                                   int2(_ScreenParams.zw) - 1);
         Surface history_surface = BINDLESS_RWBUFFER_LOAD_INDEX(Surface, _prev_surface_buffer_idx,
-                                                               PixelToLinearIndex(pixel));
+                                                               PixelToLinearIndex(uint2(history_pixel)));
         float relative_depth_error = abs(history_surface._linear_depth - current_depth) * depth_range /
                                      max(current_view_depth, 1e-3);
-        history_valid = IsValidSurface(history_surface) && history_surface._roughness >= 1.0 &&
+        history_valid = history_valid && IsValidSurface(history_surface) && history_surface._roughness >= 1.0 &&
                         relative_depth_error <= 0.002 && dot(current_normal, history_surface._normal) >= 0.995;
         if (history_valid)
         {
-            history_color = _HistoryPrev[pixel].rgb;
+            history_color = _HistoryPrev[history_pixel].rgb;
             history_length = history_surface._roughness;
         }
     }
@@ -958,13 +968,9 @@ void Denoise(CSInput input)
     // previous-frame neighbors so stochastic dark samples do not erase accumulated indirect lighting.
     else if (_accumulation_mode == 2 && history_valid)
     {
-        float2 motion = _MotionVectorTexture[pixel].rg;
-        float2 uv = (float2(pixel) + 0.5.xx) * _ScreenParams.xy;
-        float2 history_uv = uv - motion;
         bool inside_screen = all(history_uv >= 0.0.xx) && all(history_uv < 1.0.xx);
         history_valid = inside_screen;
         float expected_previous_depth = current_depth - _MotionVectorTexture[pixel].z;
-        float2 history_position = history_uv * _ScreenParams.zw - 0.5;
         int2 history_base = int2(floor(history_position));
         float2 history_fraction = frac(history_position);
         float history_weight = 0.0;
@@ -1046,7 +1052,7 @@ void Denoise(CSInput input)
             float history_luminance_variance = 0.0;
             uint history_neighbor_count = 0u;
             float3 temporal_motion = _MotionVectorTexture[pixel].xyz;
-            int2 history_center = int2(floor(float2(pixel) - temporal_motion.xy * _ScreenParams.zw + 0.5));
+            int2 history_center = int2(floor(history_position + 0.5));
             float expected_previous_depth = current_depth - temporal_motion.z;
             [unroll]
             for (int history_y = -1; history_y <= 1; ++history_y)

@@ -7,101 +7,75 @@
 #include "Framework/Core/Containers/Map.h"
 #include "Framework/Math/ALMath.hpp"
 #include "Render/CoreType.h"
-#include <vector>
+#include "Render/Texture.h"
 #include "generated/TemporalAA.gen.h"
 
 namespace Ailu::Render
 {
-    struct HaltonSequence
-    {
-        int count;
-        int index;
-        std::vector<float> arrX;
-        std::vector<float> arrY;
+    class Camera;
 
-        Matrix4x4f prevViewProj;
-        u64 frameCount;
-        HaltonSequence() = default;
-        HaltonSequence(int count) : count(count), index(0), arrX(count), arrY(count), frameCount(0)
-        {
-            for (int i = 0; i < count; ++i)
-            {
-                arrX[i] = get(i, 2);
-            }
-
-            for (int i = 0; i < count; ++i)
-            {
-                arrY[i] = get(i, 3);
-            }
-        }
-
-        float get(int index, int base_)
-        {
-            float fraction = 1.0f;
-            float result = 0.0f;
-
-            while (index > 0)
-            {
-                fraction /= base_;
-                result += fraction * (index % base_);
-                index /= base_;
-            }
-
-            return result;
-        }
-
-        void Get(float &x, float &y)
-        {
-            if (++index == count) index = 1;
-            x = arrX[index];
-            y = arrY[index];
-        }
-    };
-
-    class TAAPreparePass : public RenderPass
+    class TAAReactivePreparePass : public RenderPass
     {
     public:
-        TAAPreparePass();
-        void Setup(Matrix4x4f jitter);
-        virtual ~TAAPreparePass();
-        void Execute(GraphicsContext *context, RenderingData &rendering_data) override;
-        void BeginPass(GraphicsContext *context) override;
-        void EndPass(GraphicsContext *context) override;
-
-    private:
-        Matrix4x4f _jitter_matrix;
+        TAAReactivePreparePass();
+        void OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data) override;
     };
 
     class TAAExecutePass : public RenderPass
     {
-        struct TAAInfo
+        struct TAAHistoryState
         {
-            Matrix4x4f _pre_matrix;
-            bool _first_tick;
             Ref<RenderTexture> _target_a;
             Ref<RenderTexture> _target_b;
-            bool _is_cur_a;
+            Ref<RenderTexture> _reactive_a;
+            Ref<RenderTexture> _reactive_b;
+            Ref<RenderTexture> _stable_target;
+            Vector2f _previous_uv_jitter = Vector2f::kZero;
+            Vector3f _previous_position = Vector3f::kZero;
+            Vector3f _previous_forward = Vector3f::kZero;
+            Vector3f _previous_up = Vector3f::kZero;
+            f32 _previous_fov = 0.0f;
+            f32 _previous_near = 0.0f;
+            f32 _previous_far = 0.0f;
+            f32 _previous_aspect = 0.0f;
+            u8 _projection_type = 0u;
+            u32 _width = 0u;
+            u32 _height = 0u;
+            EALGFormat _format = EALGFormat::kALGFormatUNKOWN;
+            u64 _last_render_frame = 0u;
+            u64 _camera_reset_revision = 0u;
+            const Camera *_camera_identity = nullptr;
+            bool _write_a = true;
+            bool _history_valid = false;
+            bool _has_rendered = false;
         };
 
     public:
         TAAExecutePass();
-        virtual ~TAAExecutePass();
+        ~TAAExecutePass() override = default;
         void Execute(GraphicsContext *context, RenderingData &rendering_data) override;
-        void BeginPass(GraphicsContext *context) override;
         void EndPass(GraphicsContext *context) override;
-        void Setup(Matrix4x4f pre_matrix, Matrix4x4f cur_matrix, Material *taa_mat, int camera_hash, Vector2f jitter,Vector4f params,Vector4f quality);
+        void Setup(const Camera &camera, u64 frame_index, u32 width, u32 height, Vector2f current_uv_jitter,
+                   Vector4f params, Vector4f quality);
+        void Setup(const Camera &camera, u64 frame_index, u32 width, u32 height, Vector2f current_uv_jitter,
+                   const TextureDesc &color_desc, Vector4f params, Vector4f quality);
+        void OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data) override;
+        void InvalidateHistory(u64 camera_hash);
+        void InvalidateAllHistory();
+        u64 GetHistoryCameraCount() const { return static_cast<u64>(_infos.size()); }
 
     private:
-        Map<u64, TAAInfo> _infos;
-        u64 _cur_camera_hash;
-        Vector4f _jitter;
-        Vector4f _params;
-        Vector4f _quality;
-        Material *_taa_material;
-        Matrix4x4f _cur_vp_matrix;
-        Ref<ConstantBuffer> _origin_camera_cbuf;
+        Map<u64, TAAHistoryState> _infos;
+        u64 _cur_camera_hash = 0u;
+        u64 _current_frame_index = 0u;
+        const Camera *_current_camera = nullptr;
+        Vector2f _current_uv_jitter = Vector2f::kZero;
+        Vector4f _params = Vector4f::kZero;
+        Vector4f _quality = Vector4f::kZero;
+        bool _resolve_executed = false;
         AssetRef<ComputeShader> _taa_gen;
         ComputeShaderKernelId _taa_kernel = kInvalidComputeShaderKernelId;
+        ComputeShaderKernelId _stabilize_kernel = kInvalidComputeShaderKernelId;
     };
 
     ACLASS()
@@ -110,12 +84,11 @@ namespace Ailu::Render
         GENERATED_BODY()
     public:
         TemporalAA();
-        ~TemporalAA();
-        void AddRenderPasses(Renderer &renderer, const RenderingData & rendering_data) override;
+        ~TemporalAA() override = default;
+        void AddRenderPasses(Renderer &renderer, const RenderingData &rendering_data) override;
+        u64 GetHistoryCameraCount() const { return _execute_pass.GetHistoryCameraCount(); }
         APROPERTY(Range(0.0f,1.0f))
         f32 _history_factor = 0.95f;
-        APROPERTY(Range(0.0f,1.0f))
-        f32 _jitter_scale = 0.9f;
         APROPERTY(Range(0.0f, 2.0f))
         f32 _clamp_quality = 2.0f;
         APROPERTY(Range(0.0f, 2.0f))
@@ -127,10 +100,8 @@ namespace Ailu::Render
         APROPERTY(Range(0.0f, 4.0f))
         f32 _sharpness = 1.0f;
     private:
+        TAAReactivePreparePass _prepare_pass;
         TAAExecutePass _execute_pass;
-        TAAPreparePass _prepare_pass;
-        Map<u64, HaltonSequence> _halton_sequence;
-        Ref<Material> _taa;
     };
-}// namespace Ailu
+}
 #endif// __TAA_H__

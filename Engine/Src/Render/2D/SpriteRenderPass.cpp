@@ -40,6 +40,7 @@ namespace Ailu::Render
             RDG::PassDesc(),
             [&](RDG::RenderGraphBuilder &builder)
             {
+                // M5 Policy B: sprites enter the pre-TAA color without sprite velocity or a reactive mask.
                 // Preserve the existing background for alpha blending.
                 builder.Read(rendering_data._rg_handles._color_target, EResourceUsage::kWriteRTV);
                 rendering_data._rg_handles._color_target =

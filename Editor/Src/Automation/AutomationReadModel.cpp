@@ -335,6 +335,18 @@ namespace Ailu
                 ComponentDescriptor desc;
                 desc._stable_type = "Ailu.ECS.CCamera";
                 desc._display_name = "Camera";
+                AddField<ECS::CCamera>(desc, "_camera._anti_aliasing", "AA Mode", EAutomationValueType::kInteger,
+                    "Camera", [](const ECS::CCamera &c)
+                    {
+                        return ToAutomationValue(static_cast<i32>(c._camera._anti_aliasing));
+                    },
+                    [](ECS::CCamera &c, const AutomationValue &value)
+                    {
+                        if (!value.IsInt() || value.AsInt() < 0 || value.AsInt() > 2) return false;
+                        c._camera._anti_aliasing = static_cast<Render::EAntiAliasing>(value.AsInt());
+                        c._camera.MarkTemporalHistoryReset();
+                        return true;
+                    });
                 AddField<ECS::CCamera>(desc, "_camera._fov_h", "FOV", EAutomationValueType::kFloat, "Camera",
                                        [](const ECS::CCamera &c) { return ToAutomationValue(c._camera.FovH()); },
                                        [](ECS::CCamera &c, const AutomationValue &v) { c._camera.FovH(ToFloat(v)); return true; });

@@ -378,7 +378,8 @@ namespace Ailu::Render
                 if (resolve_resource(property_id, resolved_binding))
                     ApplyResolvedResource(state, resolved_binding, buffer, PipelineResource::kPriorityLocal);
             }
-            if (global_layout_changed || cache._global_res_bindings.empty())
+            if (global_layout_changed || cache._layout_version != layout_version || cache._variant_hash != variant_hash ||
+                cache._global_res_bindings.empty())
             {
                 cache._global_res_bindings.clear();
                 for (const auto &it : global_res_registry._resources)
@@ -444,7 +445,7 @@ namespace Ailu::Render
         // 材质块始终最后写入 snapshot（与 command cbuffer 的先后顺序不变）。
         const bool has_mat_slot = cache._cbuf_bind_slot >= 0;
         const PropertyBlockView block = GetPropertyBlockForFrame(pass_index, frame_slot, frame_count, allocator,
-                                                                 has_mat_slot, statistics);
+                                                                 has_mat_slot, statistics, variant_hash);
         const bool has_material_block = has_mat_slot && block._size > 0u && block._gpu_handle != 0u;
 
         u16 entry_count = 0u;
@@ -1014,6 +1015,21 @@ namespace Ailu::Render
         _on_property_changed_router.Invoke(property_id);
     }
 
+    ShaderVariantHash Material::GetMotionVectorVariantHash(u16 pass_index, const VertexBuffer *vertex_buffer) const
+    {
+        auto keywords = ActiveKeywords(pass_index);
+        const auto &elements = vertex_buffer->GetLayout().GetBufferDesc();
+        const bool deform = std::any_of(elements.begin(), elements.end(), [](const auto &element)
+        {
+            return element._semantic == EVertexSemantic::kTexcoord1 && element.Type == EShaderDateType::kFloat3;
+        });
+        if (deform)
+            keywords.insert("CPU_DEFORM");
+        else
+            keywords.erase("CPU_DEFORM");
+        return _p_active_shader->ConstructVariantHash(pass_index, keywords);
+    }
+
     void Material::EnableKeyword(const String &keyword)
     {
         if (_p_active_shader == nullptr)
@@ -1452,8 +1468,12 @@ namespace Ailu::Render
 
     Material::PropertyBlockView Material::GetPropertyBlockForFrame(u16 pass_index, u32 frame_slot, u64 frame_count,
                                                                     FrameAllocator &allocator, bool upload_to_gpu,
-                                                                    CommandRenderingStatesData *statistics)
+                                                                    CommandRenderingStatesData *statistics, u32 variant_override_hash)
     {
+        const u32 variant_hash = variant_override_hash == UINT32_MAX
+            ? _pass_variants[pass_index]._variant_hash : variant_override_hash;
+        const auto *layout = _p_active_shader->GetBindingLayout(pass_index, variant_hash);
+        const u32 layout_version = layout == nullptr ? 0u : layout->Version();
         AL_ASSERT(pass_index < _property_blocks.size());
         AL_ASSERT(frame_slot < _frame_property_block_cache.size());
         auto &frame_cache = _frame_property_block_cache[frame_slot];
@@ -1462,7 +1482,8 @@ namespace Ailu::Render
         auto &cache = frame_cache[pass_index];
         // upload_to_gpu 时要求缓存里已经有可用的GPU地址：先以 upload_to_gpu=false 调用过
         // 的 block 只有CPU副本，不能当成命中复用（T3 的情况A）。
-        if (cache._property_data_version == _property_data_version && cache._frame_count == frame_count
+        if (cache._variant_hash == variant_hash && cache._layout_version == layout_version
+            && cache._property_data_version == _property_data_version && cache._frame_count == frame_count
             && cache._block._data != nullptr && !(upload_to_gpu && cache._block._gpu_handle == 0u))
         {
             // 帧内块缓存命中，复用已上传的GPU handle，无需重复上传
@@ -1474,12 +1495,35 @@ namespace Ailu::Render
         cache._block._data = allocator.Allocate<u8>(block._size);
         cache._block._size = block._size;
         memcpy(cache._block._data, block._data, block._size);
+        // A newly ready variant can expose constants absent from the previous variant. Resolve values by property ID.
+        if (layout != nullptr)
+        {
+            auto copy_value = [&](ShaderPropertyId property_id, const void *value, u32 size)
+            {
+                const auto *binding = layout->Find(property_id);
+                if (binding == nullptr || binding->_buffer_size == 0u ||
+                    binding->_buffer_offset + binding->_buffer_size > block._size)
+                    return;
+                memcpy(cache._block._data + binding->_buffer_offset, value, std::min(size, binding->_buffer_size));
+            };
+            for (const auto &[property_id, value] : _property_values)
+                copy_value(property_id, value._data.data(), static_cast<u32>(value._data.size()));
+            for (const auto &[name, value] : _common_uint_property)
+                copy_value(ShaderPropertyRegistry::Get().Intern(name), &value, sizeof(value));
+            if (_is_standard_lit)
+            {
+                // Standard Lit derives these GPU values; serialized authoring values must not overwrite them.
+                const u32 material_id = _material_id == EMaterialID::kChecker ? static_cast<u32>(_material_id) : 0u;
+                copy_value(ShaderPropertyRegistry::Get().Intern("_MaterialID"), &material_id, sizeof(material_id));
+                copy_value(ShaderPropertyRegistry::Get().Intern("_SamplerMask"), &_sampler_mask, sizeof(_sampler_mask));
+            }
+        }
         if (upload_to_gpu && block._size > 0u)
         {
             // 直接烘焙进binding snapshot，RHI draw路径无需再单独上传/绑定per-material cbuffer
             auto upload = FrameResourceManager::Get().AllocFrameUpload(block._size, 256u);
             if (upload._cpu_ptr != nullptr)
-                memcpy(upload._cpu_ptr, block._data, block._size);
+                memcpy(upload._cpu_ptr, cache._block._data, block._size);
             cache._block._upload_buffer = upload._owner;
             cache._block._gpu_handle = upload._gpu_handle;
             if (statistics != nullptr)
@@ -1488,6 +1532,8 @@ namespace Ailu::Render
                 statistics->MaterialCBufferUploadBytes += block._size;
             }
         }
+        cache._variant_hash = variant_hash;
+        cache._layout_version = layout_version;
         cache._property_data_version = _property_data_version;
         cache._frame_count = frame_count;
         return cache._block;

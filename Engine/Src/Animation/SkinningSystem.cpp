@@ -186,13 +186,15 @@ namespace Ailu::ECS
         entry._handle = SkinHandle{_next_skin_id++};
         entry._position_buffer = CreateOutputBuffer(vertex_count, sizeof(Vector3f),
                                                      std::format("{}_SkinPosition_{}", mesh->Name(), entry._handle._id));
+        entry._previous_position_buffer = CreateOutputBuffer(vertex_count, sizeof(Vector3f),
+            std::format("{}_SkinPreviousPosition_{}", mesh->Name(), entry._handle._id));
         if (mesh->GetNormalStream() >= 0)
             entry._normal_buffer = CreateOutputBuffer(vertex_count, sizeof(Vector3f),
                                                       std::format("{}_SkinNormal_{}", mesh->Name(), entry._handle._id));
         if (mesh->GetTangentStream() >= 0)
             entry._tangent_buffer = CreateOutputBuffer(vertex_count, sizeof(Vector4f),
                                                        std::format("{}_SkinTangent_{}", mesh->Name(), entry._handle._id));
-        if (entry._position_buffer == nullptr ||
+        if (entry._position_buffer == nullptr || entry._previous_position_buffer == nullptr ||
             (mesh->GetNormalStream() >= 0 && entry._normal_buffer == nullptr) ||
             (mesh->GetTangentStream() >= 0 && entry._tangent_buffer == nullptr))
             return nullptr;
@@ -215,6 +217,8 @@ namespace Ailu::ECS
 
             if (desc_it->_semantic == Render::EVertexSemantic::kPosition)
                 entry._vertex_buffer->SetGpuStream(entry._position_buffer.get(), stream_size, stream);
+            else if (desc_it->_semantic == Render::EVertexSemantic::kTexcoord1)
+                entry._vertex_buffer->SetGpuStream(entry._position_buffer.get(), stream_size, stream);
             else if (desc_it->_semantic == Render::EVertexSemantic::kNormal && entry._normal_buffer != nullptr)
                 entry._vertex_buffer->SetGpuStream(entry._normal_buffer.get(), stream_size, stream);
             else if (desc_it->_semantic == Render::EVertexSemantic::kTangent && entry._tangent_buffer != nullptr)
@@ -230,6 +234,22 @@ namespace Ailu::ECS
             return &cache_it->second;
         _handles[cache_it->second._handle._id] = key;
         return &cache_it->second;
+    }
+
+    void SkinningSystem::UpdatePositionStreams(SkinCacheEntry &entry, bool use_previous)
+    {
+        const auto &layout = entry._vertex_buffer->GetLayout();
+        for (const auto &element : layout.GetBufferDesc())
+        {
+            Render::GPUBuffer *buffer = nullptr;
+            if (element._semantic == Render::EVertexSemantic::kPosition)
+                buffer = entry._position_buffer.get();
+            else if (element._semantic == Render::EVertexSemantic::kTexcoord1)
+                buffer = use_previous ? entry._previous_position_buffer.get() : entry._position_buffer.get();
+            if (buffer != nullptr)
+                entry._vertex_buffer->SetGpuStream(buffer, entry._vertex_count * layout.GetStride(element.Stream),
+                                                  element.Stream);
+        }
     }
 
     SkinHandle SkinningSystem::Acquire(Render::SkeletonMesh *mesh, PoseHandle pose_handle, u32 entity)
@@ -259,13 +279,20 @@ namespace Ailu::ECS
         SkinCacheEntry *entry = cache_it == _cache.end() ? CreateEntry(mesh, pose_handle, key) : &cache_it->second;
         if (entry == nullptr)
             return {};
+        if (std::find(_job_handles.begin(), _job_handles.end(), entry->_handle) != _job_handles.end())
+            return entry->_handle;
+        const bool use_previous = entry->_output_valid && entry->_last_used_frame + 1u == _frame_index;
         entry->_last_used_frame = _frame_index;
         _entity_handles[entity] = entry->_handle;
         const u64 pose_version = _pose_versions[pose_handle._id];
         if (entry->_output_valid && entry->_skin_version == pose_version)
+        {
+            UpdatePositionStreams(*entry, false);
             return entry->_handle;
-        if (std::find(_job_handles.begin(), _job_handles.end(), entry->_handle) != _job_handles.end())
-            return entry->_handle;
+        }
+        if (entry->_output_valid)
+            std::swap(entry->_position_buffer, entry->_previous_position_buffer);
+        UpdatePositionStreams(*entry, use_previous);
 
         SkinningJobData job;
         job._position_srv = static_cast<u32>(position_srv);
@@ -343,6 +370,7 @@ namespace Ailu::ECS
                     continue;
                 if (entry->_position_buffer != nullptr)
                     _output_handles.emplace_back(graph.Import(entry->_position_buffer.get()));
+                _output_handles.emplace_back(graph.Import(entry->_previous_position_buffer.get()));
                 if (entry->_normal_buffer != nullptr)
                     _output_handles.emplace_back(graph.Import(entry->_normal_buffer.get()));
                 if (entry->_tangent_buffer != nullptr)
@@ -382,6 +410,7 @@ namespace Ailu::ECS
                               const auto output_handle = builder.Write(builder.Import(entry->_position_buffer.get()),
                                                                         Render::EResourceUsage::kWriteUAV);
                               _output_handles.emplace_back(output_handle);
+                              _output_handles.emplace_back(builder.Import(entry->_previous_position_buffer.get()));
                               if (entry->_normal_buffer != nullptr)
                                   _output_handles.emplace_back(
                                       builder.Write(builder.Import(entry->_normal_buffer.get()),
@@ -455,6 +484,9 @@ namespace Ailu::ECS
         SkinCacheEntry *entry = cache_it == _cache.end() ? CreateEntry(mesh, {}, key) : &cache_it->second;
         if (entry == nullptr)
             return;
+        if (entry->_last_used_frame == _frame_index && (entry->_cpu_upload_pending || entry->_output_valid))
+            return;
+        const bool use_previous = entry->_output_valid && entry->_last_used_frame + 1u == _frame_index;
         entry->_last_used_frame = _frame_index;
         _entity_handles[entity] = entry->_handle;
 
@@ -462,7 +494,13 @@ namespace Ailu::ECS
         if (!pose_changed)
             pose_changed = !std::equal(entry->_pose_snapshot.begin(), entry->_pose_snapshot.end(), pose_palette.begin());
         if (!pose_changed && entry->_output_valid)
+        {
+            UpdatePositionStreams(*entry, false);
             return;
+        }
+        if (entry->_output_valid)
+            std::swap(entry->_position_buffer, entry->_previous_position_buffer);
+        UpdatePositionStreams(*entry, use_previous);
 
         entry->_pose_snapshot.assign(pose_palette.begin(), pose_palette.end());
         ++entry->_skin_version;

@@ -349,7 +349,8 @@ namespace Ailu
             _kernel_denoise = cs->FindKernel("Denoise");
             _kernel_build_environment_weights = cs->FindKernel("BuildEnvironmentWeights");
             _kernel_build_environment_cdf = cs->FindKernel("BuildEnvironmentCDF");
-            _event = static_cast<ERenderPassEvent>(static_cast<u16>(ERenderPassEvent::kAfterTransparent) - 5u);//before copy color
+            // Produce opaque RT color before TAAOpaqueSnapshot456 and Sprite460.
+            _event = ERenderPassEvent::kAfterMotionVector;
             _scene_rt_proxy = MakeScope<SceneRayTracingProxy>();
             _raygen_data = ConstantBuffer::Create(sizeof(RayGenConstantBuffer), "RayTraceGI_RayGenData");
             BufferDesc desc;
@@ -403,7 +404,8 @@ namespace Ailu
         {
             static Matrix4x4f s_prev_view_proj = Matrix4x4f::Identity();
             static u32 s_frame_counter = 0u;
-            const auto& cur_vp_mat = rendering_data._camera->GetViewProj();
+            const auto &camera = *rendering_data._camera;
+            const auto &cur_vp_mat = camera.GetViewProjNoJitter();
             bool is_camera_dirty = false;
             for (u32 i = 0; i < 4; i++)
             {
@@ -431,6 +433,9 @@ namespace Ailu
             const Vector3f camera_forward = rendering_data._camera->Forward();
             const Vector3f camera_up = rendering_data._camera->Up();
             // Small camera motion remains reprojected by stage 2; only a discontinuous camera cut resets all pixels.
+            const bool camera_changed = _has_previous_camera && _previous_camera != rendering_data._camera;
+            const bool explicit_reset = _has_previous_camera &&
+                _previous_camera_reset_revision != camera.GetTemporalHistoryResetRevision();
             const bool camera_cut = _has_previous_camera &&
                 (Magnitude(camera_position - _previous_camera_position) > 1.0f ||
                  DotProduct(camera_forward, _previous_camera_forward) < 0.9f ||
@@ -438,8 +443,14 @@ namespace Ailu
             const bool reference_camera_changed =
                 _accumulation_mode == EPathTracerAccumulationMode::kReference && is_camera_dirty;
             const bool history_inputs_changed = _has_history_signature && history_signature != _last_history_signature;
-            const bool reset_history = history_inputs_changed || camera_cut || reference_camera_changed ||
-                                       accumulation_just_enabled || target_recreated;
+            const bool reset_history = history_inputs_changed || camera_changed || camera_cut || explicit_reset ||
+                                       reference_camera_changed || accumulation_just_enabled || target_recreated;
+            const Vector2f current_uv_jitter(camera.GetJitter().z, camera.GetJitter().w);
+            const Vector2f previous_uv_jitter = reset_history || !_temporal_history_valid
+                ? current_uv_jitter
+                : _previous_uv_jitter;
+            const Vector4f camera_uv_jitter(previous_uv_jitter.x, previous_uv_jitter.y,
+                                             current_uv_jitter.x, current_uv_jitter.y);
             if (is_camera_dirty || reset_history)
             {
                 s_frame_counter = 0u;
@@ -448,12 +459,14 @@ namespace Ailu
                 ++s_frame_counter;
             _previous_accumulation_mode = _accumulation_mode;
             _has_previous_accumulation_mode = true;
-            s_prev_view_proj = rendering_data._camera->GetViewProj();
+            s_prev_view_proj = camera.GetViewProjNoJitter();
             _last_history_signature = history_signature;
             _has_history_signature = true;
             _previous_camera_position = camera_position;
             _previous_camera_forward = camera_forward;
             _previous_camera_up = camera_up;
+            _previous_camera = rendering_data._camera;
+            _previous_camera_reset_revision = camera.GetTemporalHistoryResetRevision();
             _has_previous_camera = true;
             _raw_path_trace_handle = graph.Import(_raw_path_trace_texture.get());
             _environment_distribution_handle = graph.Import(_environment_distribution_texture.get());
@@ -531,6 +544,7 @@ namespace Ailu
                 if (_use_power_weighted_light_sampling)
                     _gi_compute_shader->SetBuffer(_kernel_primary_ray, "_UnifiedLightSamplingTable", unified_light_sampling_data);
             }
+            const auto raw_executed = std::make_shared<bool>(false);
             {
                 graph.AddPass(use_hardware_ray_tracing ? "RayTrace GI DXR" : "RayTrace GI", RDG::PassDesc(RDG::EPassType::kCompute), [&, this](RDG::RenderGraphBuilder &builder)
                     {
@@ -570,7 +584,10 @@ namespace Ailu
                             (void) builder.Write(builder.Import(_debug_index_buffer.get()), EResourceUsage::kWriteUAV);
                         _raw_path_trace_handle = builder.Write(_raw_path_trace_handle, EResourceUsage::kWriteUAV);
                     },
-                    [this, use_hardware_ray_tracing, prev_reservoir, curr_reservoir](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
+                    [this, use_hardware_ray_tracing, prev_reservoir, curr_reservoir, camera_uv_jitter,
+                     raw_executed, accumulation_enabled,
+                     camera_ptr = rendering_data._camera](RDG::RenderGraph &graph, CommandBuffer *cmd,
+                                                          const RenderingData &data)
                     {
                     auto *output = graph.Resolve<Texture>(_raw_path_trace_handle);
                     // A newly resized Raw texture may still be awaiting GPU creation. Skipping the dispatch
@@ -584,7 +601,7 @@ namespace Ailu
                             output == nullptr || !rt_scene->IsReady())
                             return;
 
-                        auto cam = *Camera::sCurrent;
+                        const Camera &cam = *camera_ptr;
                         f32 f = cam.Far(), n = cam.Near();
                         u32 pixel_width = cam.OutputSize().x, pixel_height = cam.OutputSize().y;
                         g_camData._ScreenParams = Vector4f(1.0f / (f32) pixel_width, 1.0f / (f32) pixel_height, (f32) pixel_width, (f32) pixel_height);
@@ -592,9 +609,15 @@ namespace Ailu
                         g_camData._CameraPos = cam.Position();
                         g_camData._MatrixV = cam.GetView();
                         g_camData._MatrixP = cam.GetProj();
-                        g_camData._MatrixVP = cam.GetViewProj();
-                        g_camData._MatrixVP_NoJitter = cam.GetViewProj();
+                        g_camData._MatrixVP = cam.GetViewProjJittered();
+                        g_camData._MatrixVP_NoJitter = cam.GetViewProjNoJitter();
                         g_camData._MatrixIVP = MatrixInverse(g_camData._MatrixVP);
+                        g_camData._MatrixVP_Pre = cam.GetPrevViewProj();
+                        const auto &jitter = cam.GetJitter();
+                        g_camData._matrix_jitter_x = jitter.x;
+                        g_camData._matrix_jitter_y = jitter.y;
+                        g_camData._uv_jitter_x = jitter.z;
+                        g_camData._uv_jitter_y = jitter.w;
                         g_perCamData->SetData(reinterpret_cast<const u8 *>(&g_camData), sizeof(CBufferPerCameraData));
             
                         _gi_raytracing_shader->SetScene(rt_scene);
@@ -615,6 +638,8 @@ namespace Ailu
                                                           graph.Resolve<Texture>(_environment_distribution_handle));
                         _gi_raytracing_shader->SetTexture("RenderTarget", output);
                         cmd->DispatchRays(_gi_raytracing_shader.get(), rt_scene, static_cast<u16>(data._width), static_cast<u16>(data._height), 1u);
+                        *raw_executed = true;
+                        if (!accumulation_enabled) _is_cur_a = !_is_cur_a;
                         return;
                     }
 
@@ -649,6 +674,7 @@ namespace Ailu
                                                        graph.Resolve<Texture>(data._rg_handles._depth_tex));
                         _gi_compute_shader->SetTexture(_kernel_primary_ray, "_MotionVectorTexture",
                                                        graph.Resolve<Texture>(data._rg_handles._motion_vector_tex));
+                        _gi_compute_shader->SetVector("_CameraUvJitter", camera_uv_jitter);
                         Texture *environment_sky = graph.Resolve<Texture>(data._rg_handles._environment_sky);
                         _gi_compute_shader->SetTexture(_kernel_primary_ray, "_EnvironmentSky", environment_sky);
                         _gi_compute_shader->SetTexture(_kernel_primary_ray, "_EnvironmentDistribution",
@@ -666,6 +692,8 @@ namespace Ailu
                         _gi_compute_shader->SetBuffer(_kernel_primary_ray, "g_curr_reservoir",
                                                       curr_reservoir);
                         cmd->Dispatch(_gi_compute_shader.get(), _kernel_primary_ray, x, y, 1);
+                        *raw_executed = true;
+                        if (!accumulation_enabled) _is_cur_a = !_is_cur_a;
                     } });
             }
             ++_tile_frame_counter;
@@ -685,8 +713,14 @@ namespace Ailu
                     _history_curr_handle = builder.Write(_history_curr_handle, EResourceUsage::kWriteUAV);
                     _temporal_debug_handle = builder.Write(_temporal_debug_handle, EResourceUsage::kWriteUAV);
                 },
-                [this, prev_surface_buffer, curr_surface_buffer](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
+                [this, prev_surface_buffer, curr_surface_buffer, camera_uv_jitter, current_uv_jitter, raw_executed](
+                    RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
                 {
+                    if (!*raw_executed)
+                    {
+                        _temporal_history_valid = false;
+                        return;
+                    }
                 // Surface history stays in UAV state across frames; order its reads and writes explicitly.
                 if (prev_surface_buffer != nullptr)
                     cmd->UavBarrier(prev_surface_buffer);
@@ -710,6 +744,7 @@ namespace Ailu
                                                    graph.Resolve<Texture>(data._rg_handles._gbuffers[0]));
                     _gi_compute_shader->SetTexture(_kernel_denoise, "_CameraDepthTexture",
                                                    graph.Resolve<Texture>(data._rg_handles._depth_tex));
+                    _gi_compute_shader->SetVector("_CameraUvJitter", camera_uv_jitter);
                     _gi_compute_shader->SetTexture(_kernel_denoise, "_TemporalDebug",
                                                    graph.Resolve<Texture>(_temporal_debug_handle));
                     _gi_compute_shader->SetInt("_prev_surface_buffer_idx",
@@ -718,10 +753,11 @@ namespace Ailu
                                                curr_surface_buffer != nullptr ? curr_surface_buffer->GetBindlessUAVIndex() : -1);
                     cmd->Dispatch(_gi_compute_shader.get(), _kernel_denoise, x, y, 1);
                     _temporal_history_valid = true;
+                    _previous_uv_jitter = current_uv_jitter;
+                    _is_history_a = !_is_history_a;
+                    _is_cur_a = !_is_cur_a;
                 } });
-                _is_history_a = !_is_history_a;
             }
-            _is_cur_a = !_is_cur_a;
             RDG::RGHandle final_target_handle = accumulation_enabled ? _history_curr_handle : _raw_path_trace_handle;
             graph.AddPass("Debug GI", RDG::PassDesc(), [&, this](RDG::RenderGraphBuilder &builder)
                           {
@@ -795,19 +831,11 @@ namespace Ailu
                 desc._height = rendering_data._height;
                 desc._format = EALGFormat::kALGFormatR32G32B32A32_FLOAT;
                 desc._is_random_access = true;
-                desc._mip_num = 0;
-                _raw_path_trace_texture = Texture2D::Create(desc);
-                _raw_path_trace_texture->Apply();
-                _raw_path_trace_texture->Name("RayTraceGI_PathTraceRaw");
-                _history_texture_a = Texture2D::Create(desc);
-                _history_texture_a->Apply();
-                _history_texture_a->Name("RayTraceGI_HistoryA");
-                _history_texture_b = Texture2D::Create(desc);
-                _history_texture_b->Apply();
-                _history_texture_b->Name("RayTraceGI_HistoryB");
-                _temporal_debug_texture = Texture2D::Create(desc);
-                _temporal_debug_texture->Apply();
-                _temporal_debug_texture->Name("RayTraceGI_TemporalDebug");
+                desc._mip_num = 1;
+                _raw_path_trace_texture = RenderTexture::Create(desc, "RayTraceGI_PathTraceRaw");
+                _history_texture_a = RenderTexture::Create(desc, "RayTraceGI_HistoryA");
+                _history_texture_b = RenderTexture::Create(desc, "RayTraceGI_HistoryB");
+                _temporal_debug_texture = RenderTexture::Create(desc, "RayTraceGI_TemporalDebug");
                 _is_history_a = true;
                 _temporal_history_valid = false;
                 recreated = true;
@@ -818,8 +846,8 @@ namespace Ailu
                 buf_desc._is_random_write = true;
                 buf_desc._format = EALGFormat::kALGFormatUNKOWN;
                 buf_desc._target = EGPUBufferTarget::kStructured;
-                _reservoir_a = GPUBuffer::Create(buf_desc);
-                _reservoir_b = GPUBuffer::Create(buf_desc);
+                _reservoir_a = GPUBuffer::CreateSync(buf_desc);
+                _reservoir_b = GPUBuffer::CreateSync(buf_desc);
                 _reservoir_a->Name("RayTraceGI_ReservoirA");
                 _reservoir_b->Name("RayTraceGI_ReservoirB");
                 // Vector<u8> reservoir_zero(buf_desc._size, 0u);
@@ -827,8 +855,8 @@ namespace Ailu
                 // _reservoir_b->SetData(reservoir_zero);
                 buf_desc._element_size = 64u;//sizeof(Surface) restir_di.hlsli
                 buf_desc._size = buf_desc._element_num * buf_desc._element_size;
-                _surface_buffer_a = GPUBuffer::Create(buf_desc);
-                _surface_buffer_b = GPUBuffer::Create(buf_desc);
+                _surface_buffer_a = GPUBuffer::CreateSync(buf_desc);
+                _surface_buffer_b = GPUBuffer::CreateSync(buf_desc);
                 _surface_buffer_a->Name("RayTraceGI_SurfaceBufferA");
                 _surface_buffer_b->Name("RayTraceGI_SurfaceBufferB");
                 // Vector<u8> surface_zero(buf_desc._size, 0u);

@@ -223,3 +223,6 @@ Static access required:
 架构文档不假设这些问题已经被完全解决。
 
 新增代码的目标是不要继续扩大隐式 ownership。
+
+During shutdown, Application disables event handling before releasing layers and runtime services. OnEvent checks this
+flag before platform/layer dispatch, since DestroyWindow can synchronously emit events after LayerStack destruction.
