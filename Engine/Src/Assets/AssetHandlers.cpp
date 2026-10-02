@@ -1812,6 +1812,12 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
             component._camera.MarkDirty();
             component._camera.RecalculateMatrix(true);
         }
+        if (entity_doc._has_local_fog_volume_component)
+        {
+            reg.AddComponent<ECS::LocalFogVolumeComponent>(entity) = entity_doc._local_fog_volume_component;
+            reg.SetComponentEnabled<ECS::LocalFogVolumeComponent>(
+                entity, !is_component_disabled(entity_doc, "LocalFogVolumeComponent"));
+        }
         if (entity_doc._has_postprocess_volume_component)
         {
             auto &component = reg.AddComponent<ECS::PostprocessVolumeComponent>(entity);

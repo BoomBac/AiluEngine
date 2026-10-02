@@ -312,6 +312,19 @@ namespace Ailu
                 AddField<ECS::LightComponent>(desc, "_light._light_color", "Light Color", EAutomationValueType::kColor, "Light",
                                               [](const ECS::LightComponent &c) { return ToAutomationValue(c._light._light_color); },
                                               [](ECS::LightComponent &c, const AutomationValue &v) { c._light._light_color = ToColor(v); return true; });
+                AddField<ECS::LightComponent>(desc, "_light._light_param", "Range/Cone Parameters",
+                    EAutomationValueType::kVector, "Light",
+                    [](const ECS::LightComponent &c) { return ToAutomationValue(c._light._light_param); },
+                    [](ECS::LightComponent &c, const AutomationValue &v)
+                    {
+                        if (!v.IsArray() || v.AsArray().size() != 4u)
+                            return false;
+                        for (const auto &element : v.AsArray())
+                            if (!element.IsNumber() || !std::isfinite(element.AsFloat()))
+                                return false;
+                        c._light._light_param = ToVector4f(v);
+                        return true;
+                    });
                 AddField<ECS::LightComponent>(desc, "_shadow._is_cast_shadow", "Cast Shadow", EAutomationValueType::kBool, "Light",
                                               [](const ECS::LightComponent &c) { return ToAutomationValue(c._shadow._is_cast_shadow); },
                                               [](ECS::LightComponent &c, const AutomationValue &v) { c._shadow._is_cast_shadow = ToBool(v); return true; });

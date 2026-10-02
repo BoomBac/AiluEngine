@@ -41,25 +41,7 @@ StructuredBuffer<float4> g_environment_sh : register(t18);
 
 
 
-float GetDistanceAtt(float distance,float atten_radius)
-{
-	float atten = 1.0f;
-	float inv_sqr_atten = Pow2(atten_radius) / (Pow2(distance) + 1);
-	float window_func = Pow2(saturate(1-Pow4(distance / atten_radius)));
-	return inv_sqr_atten * window_func;
-}
-// On the CPU
-// float lightAngleScale = 1.0 f / max (0.001f, ( cosInner - cosOuter ));
-// float lightAngleOffset = -cosOuter * angleScale ;
-// float normalizedLightVector: pos - light_pos
-float GetAngleAtt(float3 normalizedLightVector ,float3 lightDir,float lightAngleScale ,float lightAngleOffset)
-{
-	float cd = dot (lightDir,normalizedLightVector );
-	float attenuation = saturate ( cd * lightAngleScale + lightAngleOffset ) ;
-	// smooth the transition
-	attenuation *= attenuation ;
-	return attenuation;
-}
+#include "punctual_lighting.hlsli"
 
 float3 GetPointLightIrridance(uint index,float3 world_pos)
 {

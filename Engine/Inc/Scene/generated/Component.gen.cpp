@@ -489,6 +489,146 @@ return Ailu::ECS::EnvironmentComponent::StaticType();
 return Ailu::ECS::EnvironmentComponent::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_EnvironmentComponent(&Ailu::ECS::EnvironmentComponent::StaticType, "Ailu::ECS::EnvironmentComponent");
+const Ailu::Type* Ailu::ECS::Z_Construct_LocalFogVolumeComponent_Type()
+{
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "LocalFogVolumeComponent";
+initializer._size = sizeof(Ailu::ECS::LocalFogVolumeComponent);
+initializer._full_name = "Ailu::ECS::LocalFogVolumeComponent";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu::ECS";
+initializer._base_name = "";
+initializer._constructor = []()->Ailu::ECS::LocalFogVolumeComponent* {return new Ailu::ECS::LocalFogVolumeComponent;};
+Meta meta_enabled;
+meta_enabled.Set("Category","");
+meta_enabled.Set("IsColor",false);
+meta_enabled.Set("IsRange",false);
+meta_enabled.Set("IsFloatRange",true);
+meta_enabled.Set("RangeMin",(f32)0);
+meta_enabled.Set("RangeMax",(f32)1);
+MemberBuilder builder_enabled;
+builder_enabled._name = "_enabled";
+builder_enabled._type_name = "bool";
+builder_enabled._offset = offsetof(LocalFogVolumeComponent,_enabled);
+builder_enabled._is_const = false;
+builder_enabled._is_static = false;
+builder_enabled._is_public = false;
+builder_enabled._is_pointer = false;
+builder_enabled._is_ref = false;
+builder_enabled._is_template = false;
+builder_enabled._meta = meta_enabled;
+builder_enabled._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_enabled._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_enabled));
+Meta meta_shape;
+meta_shape.Set("Category","");
+meta_shape.Set("IsColor",false);
+meta_shape.Set("IsRange",false);
+meta_shape.Set("IsFloatRange",true);
+meta_shape.Set("RangeMin",(f32)0);
+meta_shape.Set("RangeMax",(f32)1);
+MemberBuilder builder_shape;
+builder_shape._name = "_shape";
+builder_shape._type_name = "Ailu::ECS::ELocalFogVolumeShape";
+builder_shape._offset = offsetof(LocalFogVolumeComponent,_shape);
+builder_shape._is_const = false;
+builder_shape._is_static = false;
+builder_shape._is_public = false;
+builder_shape._is_pointer = false;
+builder_shape._is_ref = false;
+builder_shape._is_template = false;
+builder_shape._meta = meta_shape;
+builder_shape._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<ELocalFogVolumeShape>);
+builder_shape._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<ELocalFogVolumeShape>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_shape));
+Meta meta_density;
+meta_density.Set("Category","");
+meta_density.Set("IsColor",false);
+meta_density.Set("IsRange",true);
+meta_density.Set("IsFloatRange",true);
+meta_density.Set("RangeMin",(f32)0);
+meta_density.Set("RangeMax",(f32)10);
+MemberBuilder builder_density;
+builder_density._name = "_density";
+builder_density._type_name = "f32";
+builder_density._offset = offsetof(LocalFogVolumeComponent,_density);
+builder_density._is_const = false;
+builder_density._is_static = false;
+builder_density._is_public = false;
+builder_density._is_pointer = false;
+builder_density._is_ref = false;
+builder_density._is_template = false;
+builder_density._meta = meta_density;
+builder_density._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_density._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_density));
+Meta meta_scattering_albedo;
+meta_scattering_albedo.Set("Category","");
+meta_scattering_albedo.Set("IsColor",false);
+meta_scattering_albedo.Set("IsRange",false);
+meta_scattering_albedo.Set("IsFloatRange",true);
+meta_scattering_albedo.Set("RangeMin",(f32)0);
+meta_scattering_albedo.Set("RangeMax",(f32)1);
+MemberBuilder builder_scattering_albedo;
+builder_scattering_albedo._name = "_scattering_albedo";
+builder_scattering_albedo._type_name = "Vector3f";
+builder_scattering_albedo._offset = offsetof(LocalFogVolumeComponent,_scattering_albedo);
+builder_scattering_albedo._is_const = false;
+builder_scattering_albedo._is_static = false;
+builder_scattering_albedo._is_public = false;
+builder_scattering_albedo._is_pointer = false;
+builder_scattering_albedo._is_ref = false;
+builder_scattering_albedo._is_template = false;
+builder_scattering_albedo._meta = meta_scattering_albedo;
+builder_scattering_albedo._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector3f>);
+builder_scattering_albedo._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector3f>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_scattering_albedo));
+Meta meta_edge_fade;
+meta_edge_fade.Set("Category","");
+meta_edge_fade.Set("IsColor",false);
+meta_edge_fade.Set("IsRange",true);
+meta_edge_fade.Set("IsFloatRange",true);
+meta_edge_fade.Set("RangeMin",(f32)0.001);
+meta_edge_fade.Set("RangeMax",(f32)0.5);
+MemberBuilder builder_edge_fade;
+builder_edge_fade._name = "_edge_fade";
+builder_edge_fade._type_name = "f32";
+builder_edge_fade._offset = offsetof(LocalFogVolumeComponent,_edge_fade);
+builder_edge_fade._is_const = false;
+builder_edge_fade._is_static = false;
+builder_edge_fade._is_public = false;
+builder_edge_fade._is_pointer = false;
+builder_edge_fade._is_ref = false;
+builder_edge_fade._is_template = false;
+builder_edge_fade._meta = meta_edge_fade;
+builder_edge_fade._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_edge_fade._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_edge_fade));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+const Ailu::Type* Ailu::ECS::LocalFogVolumeComponent::GetPrivateStaticClass()
+{
+	static const Ailu::Type* type = Z_Construct_LocalFogVolumeComponent_Type();
+	return type;
+}
+
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::ECS::LocalFogVolumeComponent>()
+{
+return Ailu::ECS::LocalFogVolumeComponent::StaticType();
+}
+    const Type *Ailu::ECS::LocalFogVolumeComponent::GetType()
+{
+return Ailu::ECS::LocalFogVolumeComponent::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_LocalFogVolumeComponent(&Ailu::ECS::LocalFogVolumeComponent::StaticType, "Ailu::ECS::LocalFogVolumeComponent");
 const Ailu::Type* Ailu::ECS::Z_Construct_PostprocessVolumeComponent_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -1705,6 +1845,31 @@ template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::ECS::EEnvironmentSource>()
 return s_enum_type_EEnvironmentSource.get();
 }
 //Enum EEnvironmentSource end...........................
+
+static std::unique_ptr<Ailu::Enum> s_enum_type_ELocalFogVolumeShape = nullptr;
+//Enum ELocalFogVolumeShape begin...........................
+const Ailu::Enum* Z_Construct_Enum_Ailu_ECS_ELocalFogVolumeShape_Type()
+{
+if(s_enum_type_ELocalFogVolumeShape == nullptr)
+{
+EnumInitializer initializer;
+initializer._name = "ELocalFogVolumeShape";
+initializer._namespace = "Ailu::ECS";
+initializer._full_name = "Ailu::ECS::ELocalFogVolumeShape";
+initializer._size = sizeof(Ailu::ECS::ELocalFogVolumeShape);
+initializer._str_to_enum_lut["kBox"] = 0;
+initializer._str_to_enum_lut["kSphere"] = 1;
+s_enum_type_ELocalFogVolumeShape = std::make_unique<Ailu::Enum>(initializer);
+Ailu::Enum::RegisterEnum(s_enum_type_ELocalFogVolumeShape.get());
+}
+return s_enum_type_ELocalFogVolumeShape.get();
+}
+static Ailu::EnumTypeRegister g_register_ELocalFogVolumeShape(Z_Construct_Enum_Ailu_ECS_ELocalFogVolumeShape_Type);
+template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::ECS::ELocalFogVolumeShape>()
+{
+return s_enum_type_ELocalFogVolumeShape.get();
+}
+//Enum ELocalFogVolumeShape end...........................
 
 static std::unique_ptr<Ailu::Enum> s_enum_type_EDDGIProbeDebugMode = nullptr;
 //Enum EDDGIProbeDebugMode begin...........................

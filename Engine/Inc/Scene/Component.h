@@ -431,6 +431,33 @@ public:                                                                 \
             f32 _mipmap = 0.0f;
         };
 
+        AENUM()
+        enum class ELocalFogVolumeShape : u32
+        {
+            kBox,
+            kSphere
+        };
+
+        ASTRUCT()
+        struct AILU_API LocalFogVolumeComponent
+        {
+            GENERATED_BODY()
+            DECLARE_COMPONENT(LocalFogVolumeComponent, "Ailu.ECS.LocalFogVolumeComponent")
+
+            APROPERTY()
+            bool _enabled = true;
+            APROPERTY()
+            ELocalFogVolumeShape _shape = ELocalFogVolumeShape::kBox;
+            // Extinction per world unit; box domain [-0.5,0.5], sphere radius 1.
+            APROPERTY(Range(0.0f,10.0f))
+            f32 _density = 0.1f;
+            APROPERTY()
+            Vector3f _scattering_albedo = Vector3f::kOne;
+            // Fade distance in normalized local coordinates.
+            APROPERTY(Range(0.001f,0.5f))
+            f32 _edge_fade = 0.1f;
+        };
+
         ASTRUCT()
         struct AILU_API PostprocessVolumeComponent
         {

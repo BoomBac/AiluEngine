@@ -229,7 +229,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::InputActionAssetD
 //Class InputActionAssetDocument end...........................
 
 //Class StaticDiffuseProbeDataAssetDocument begin...........................
-#define ASSETDOCUMENT_GEN_H_1281_GENERATED_BODY \
+#define ASSETDOCUMENT_GEN_H_1292_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_StaticDiffuseProbeDataAssetDocument_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -245,7 +245,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::StaticDiffuseProb
 //Class StaticDiffuseProbeDataAssetDocument end...........................
 
 //Class GraphAssetDocument begin...........................
-#define ASSETDOCUMENT_GEN_H_1298_GENERATED_BODY \
+#define ASSETDOCUMENT_GEN_H_1309_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_GraphAssetDocument_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -261,7 +261,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::GraphAssetDocumen
 //Class GraphAssetDocument end...........................
 
 //Class SceneAssetDocument begin...........................
-#define ASSETDOCUMENT_GEN_H_1318_GENERATED_BODY \
+#define ASSETDOCUMENT_GEN_H_1329_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_SceneAssetDocument_Type();\
                                 static const Type* GetPrivateStaticClass();\

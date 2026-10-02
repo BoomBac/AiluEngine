@@ -58,13 +58,23 @@ bool DdsCaptureEncoder::Encode(const ImageCaptureCpuImage &image, const WString 
             return false;
         }
 
-        DirectX::Image &out = images.emplace_back();
-        out.width = subresource._width;
-        out.height = subresource._height;
-        out.format = metadata.format;
-        out.rowPitch = subresource._row_pitch;
-        out.slicePitch = subresource._slice_pitch;
-        out.pixels = const_cast<uint8_t *>(subresource._data);
+        // D3D12 has one subresource per volume mip; DirectXTex expects one Image per depth slice.
+        const u32 depth = metadata.dimension == DirectX::TEX_DIMENSION_TEXTURE3D ? subresource._depth : 1u;
+        if (depth == 0u || u64(subresource._slice_pitch) * depth > subresource._data_size)
+        {
+            error = "DDS encoder received an incomplete volume footprint";
+            return false;
+        }
+        for (u32 slice = 0u; slice < depth; ++slice)
+        {
+            DirectX::Image &out = images.emplace_back();
+            out.width = subresource._width;
+            out.height = subresource._height;
+            out.format = metadata.format;
+            out.rowPitch = subresource._row_pitch;
+            out.slicePitch = subresource._slice_pitch;
+            out.pixels = const_cast<uint8_t *>(subresource._data + u64(slice) * subresource._slice_pitch);
+        }
     }
 
     const HRESULT result = DirectX::SaveToDDSFile(images.data(), images.size(), metadata, DirectX::DDS_FLAGS_NONE,

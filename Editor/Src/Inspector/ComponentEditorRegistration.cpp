@@ -67,6 +67,8 @@ namespace Ailu
             registry.RegisterCustom<ECS::RigidBody2DComponent, RigidBody2DComponentEditor>("Rigid Body 2D", "Physics", 320);
             registry.RegisterCustom<ECS::Collider2DComponent, Collider2DComponentEditor>("Collider 2D", "Physics", 330);
 
+            registry.Register<ECS::LocalFogVolumeComponent>("Local Fog Volume", "Rendering", 236);
+
             registry.Register<ECS::CVXGI>("VXGI", "Rendering", 260);
 
             registry.Register<ECS::AudioSourceComponent>("Audio Source", "Audio", 400);

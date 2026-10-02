@@ -55,16 +55,27 @@ float3 WorldToVolumetricVoxelUVW(float3 world_pos,float4x4 matrix_v,float4x4 mat
     return float3(uv, t);
 }
 
-#define VOXEL_SLICE_COUNT 96
-
-float SliceDistance(int z,float n, float f)
+float3 WorldToVolumetricVoxelUVW(float3 world_pos, float4x4 matrix_v, float4x4 matrix_p,
+                                 float _cam_near, float _cam_far, out float4 clip, out float3 view_pos)
 {
-    return n * pow(f / n, (float(z)) / float(VOXEL_SLICE_COUNT));
+    view_pos = mul(matrix_v, float4(world_pos, 1.0)).xyz;
+    clip = mul(matrix_p, float4(view_pos, 1.0));
+    float safe_w = abs(clip.w) > 1e-6f ? clip.w : 1.0f;
+    float3 ndc = clip.xyz / safe_w;
+    float2 uv = ndc.xy * 0.5f + 0.5f;
+    float z = abs(view_pos.z);
+    float slice = log(max(z, 1e-6f) / _cam_near) / log(_cam_far / _cam_near);
+    return float3(uv, slice);
 }
 
-float SliceThickness(int z,float n, float f)
+float SliceDistance(int z, float n, float f, uint slice_count)
 {
-    return abs(SliceDistance(z + 1, n, f) - SliceDistance(z, n, f));
+    return n * pow(f / n, (float(z)) / float(slice_count));
+}
+
+float SliceThickness(int z, float n, float f, uint slice_count)
+{
+    return abs(SliceDistance(z + 1, n, f, slice_count) - SliceDistance(z, n, f, slice_count));
 }
 
 #endif//_FROXEL_COMMON_H_

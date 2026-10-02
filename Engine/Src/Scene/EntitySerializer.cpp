@@ -190,6 +190,12 @@ namespace Ailu::SceneManagement
             entity_doc._camera_component._size = camera->_camera.Size();
             mark_disabled.template operator()<ECS::CCamera>("CCamera");
         }
+        if (const auto *volume = registry.GetComponent<ECS::LocalFogVolumeComponent>(entity); volume != nullptr)
+        {
+            entity_doc._has_local_fog_volume_component = true;
+            entity_doc._local_fog_volume_component = *volume;
+            mark_disabled.template operator()<ECS::LocalFogVolumeComponent>("LocalFogVolumeComponent");
+        }
         if (const auto *postprocess = registry.GetComponent<ECS::PostprocessVolumeComponent>(entity); postprocess != nullptr)
         {
             entity_doc._has_postprocess_volume_component = true;
@@ -375,6 +381,7 @@ namespace Ailu::SceneManagement
             ECS::LightComponent::StaticComponentTypeId(),
             ECS::CCamera::StaticComponentTypeId(),
             ECS::PostprocessVolumeComponent::StaticComponentTypeId(),
+            ECS::LocalFogVolumeComponent::StaticComponentTypeId(),
             ECS::CLightProbe::StaticComponentTypeId(),
             ECS::CLightProbeGroup::StaticComponentTypeId(),
             ECS::DDGIVolumeComponent::StaticComponentTypeId(),

@@ -21,6 +21,7 @@
 //info end
 
 #include "common.hlsli"
+#include "volumetric_fog_common.hlsli"
 
 struct VSInput
 {
@@ -33,6 +34,7 @@ struct PSInput
 	float4 position : SV_POSITION;
     float2 uv : TEXCOORD0;
     float3 world_pos : TEXCOORD1;
+    float view_depth : TEXCOORD2;
 };
 TEXTURE2D(_MainTex)
 
@@ -47,6 +49,7 @@ PSInput VSMain(VSInput v)
     proj[0][2] -= _matrix_jitter_x;
     proj[1][2] -= _matrix_jitter_y;
     result.position = mul(proj,float4(view_pos,1));
+    result.view_depth = view_pos.z;
     result.uv = v.uv;
     result.world_pos = GetObjectWorldPos();
 	return result;
@@ -56,7 +59,10 @@ float4 PSMain(PSInput input) : SV_TARGET
 {
     float alpha = SAMPLE_TEXTURE2D(_MainTex,g_LinearClampSampler,input.uv).a;
     float dis_attenuation = distance(input.world_pos,GetCameraPositionWS()) / 100.0f;
-    return float4(1.0,1.0,1.0,alpha * lerp(0.0f,1.0f,dis_attenuation));
+    float final_alpha = alpha * lerp(0.0f,1.0f,dis_attenuation);
+    float3 color = ApplyVolumetricFogStraight(float3(1.0f, 1.0f, 1.0f),
+                                               input.position.xy * _ScreenParams.xy, input.view_depth);
+    return float4(color, final_alpha);
 }
 
 uint PSMainPickBuffer(PSInput input) : SV_TARGET

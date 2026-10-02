@@ -1699,7 +1699,8 @@ namespace Ailu::Render
                 const bool is_default_array = texture != nullptr &&
                     texture->Dimension() == ETextureDimension::kTex2DArray && params._sub_res == UINT32_MAX;
                 if (!is_uav && params._face == static_cast<u16>(ECubemapFace::kUnknown) && texture != nullptr &&
-                    (texture->Dimension() == ETextureDimension::kCube || is_default_array))
+                    (texture->Dimension() == ETextureDimension::kCube ||
+                     texture->Dimension() == ETextureDimension::kCubeArray || is_default_array))
                     entry->_view_index = Texture::kMainSRVIndex;
                 else if (auto *texture3d = dynamic_cast<Texture3D *>(resource))
                     entry->_view_index = texture3d->CalculateViewIndex(

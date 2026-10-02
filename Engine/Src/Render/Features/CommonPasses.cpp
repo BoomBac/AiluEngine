@@ -407,10 +407,14 @@ namespace Ailu::Render
     void Ailu::Render::ForwardPass::OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData & rendering_data)
     {
         const bool use_shadow_maps = rendering_data._shadow_set != nullptr && rendering_data._shadow_set->_valid;
+        const bool use_volumetric_fog = rendering_data._rg_handles._volumetric_fog_accum.IsValid();
+        const auto fog_handle = rendering_data._rg_handles._volumetric_fog_accum;
         graph.AddPass(_name, RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
                       { 
                           builder.Read(rendering_data._rg_handles._color_target, EResourceUsage::kWriteRTV);
                           builder.Read(rendering_data._rg_handles._depth_target, EResourceUsage::kDSV);
+                          if (use_volumetric_fog)
+                              builder.Read(fog_handle);
                           if (use_shadow_maps)
                           {
                               builder.Read(rendering_data._rg_handles._main_light_shadow_map);
@@ -426,7 +430,8 @@ namespace Ailu::Render
                           rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target);
                           rendering_data._rg_handles._depth_target = builder.Write(rendering_data._rg_handles._depth_target,EResourceUsage::kDSV);
                       }, 
-        [this, use_shadow_maps](RDG::RenderGraph& graph,CommandBuffer* cmd, const RenderingData &rendering_data){
+        [this, use_shadow_maps, use_volumetric_fog, fog_handle](RDG::RenderGraph& graph,CommandBuffer* cmd,
+                                                                const RenderingData &rendering_data){
         auto &all_renderable = *rendering_data._cull_results;
         u32 lowerBound = Shader::kRenderQueueOpaque, upperBound = Shader::kRenderQueueEnd;
         auto filtered = all_renderable | std::views::filter([lowerBound, upperBound](const auto &kv)
@@ -456,6 +461,8 @@ namespace Ailu::Render
             cmd->SetGlobalTexture("PrefilterEnvTex", graph.Resolve<Texture>(rendering_data._rg_handles._environment_specular));
         }
         cmd->SetGlobalTexture("_OcclusionTex", occlusion_tex ? occlusion_tex : Texture::s_p_default_white);
+        if (use_volumetric_fog)
+            cmd->SetGlobalTexture("_VolumetricFogAccum", graph.Resolve<Texture>(fog_handle));
         cmd->SetGlobalTexture(RenderResourceName::kMainLightShadowMap, main_light_shadow_map);
         cmd->SetGlobalTexture(RenderResourceName::kAddLightShadowMap, add_light_shadow_maps);
         cmd->SetGlobalTexture(RenderResourceName::kPointLightShadowMap, point_light_shadow_maps);

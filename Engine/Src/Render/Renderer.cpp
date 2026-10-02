@@ -181,6 +181,7 @@ namespace Ailu::Render
             {
                 for (u16 i = 1; i <= 6; i++)
                 {
+                    _is_rendering_cubemap = true;
                     auto face = (ECubemapFace) i;
                     Camera &tmp_cam = Camera::GetCubemapGenCamera(cam, face);
                     tmp_cam._is_scene_camera = false;
@@ -189,6 +190,7 @@ namespace Ailu::Render
                     const u16 dst_view_index = cam.TargetTexture()->CalculateViewIndex(Texture::ETextureViewType::kRTV, face, 0, 0);
                     DoRender(tmp_cam, s, request, shadow_set_ptr, i == 1u && request._enable_shadows,
                              _is_use_render_graph ? cam.TargetTexture() : nullptr, dst_view_index);
+                    _is_rendering_cubemap = false;
                     if (!_is_use_render_graph)
                     {
                         auto cmd = CommandBufferPool::Get("FinalBlit");
@@ -444,8 +446,7 @@ namespace Ailu::Render
         }
         _rendering_data._rg_handles._volumetric_fog_accum = {};
         auto *volumetric_fog = dynamic_cast<VolumetricFog *>(_fog);
-        if (_is_use_render_graph && volumetric_fog != nullptr && volumetric_fog->IsActive() &&
-            volumetric_fog->GetAccTexture() != nullptr)
+        if (_is_use_render_graph && volumetric_fog != nullptr && volumetric_fog->GetAccTexture() != nullptr)
             _rendering_data._rg_handles._volumetric_fog_accum = _rd_graph->Import(volumetric_fog->GetAccTexture());
         std::stable_sort(_render_passes.begin(), _render_passes.end(), [](RenderPass *a, RenderPass *b) -> bool
                          { return *a < *b; });

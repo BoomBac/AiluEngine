@@ -365,7 +365,9 @@ namespace Ailu::Render
         float4 _DirectionalShadowParams;
         float4 _DirectionalShadowMapParams;
         uint _RenderFeatureFlags;
-        float3 _render_view_padding0;
+        float _volumetric_fog_far;
+        float _volumetric_fog_enabled;
+        float _render_view_padding0;
         float4 _render_view_padding[9];
     } AL_SHADER_INTEROP_CBUFFER_END
 

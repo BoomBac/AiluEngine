@@ -26,6 +26,7 @@
 
 #include "common.hlsli"
 #include "lighting.hlsli"
+#include "volumetric_fog_common.hlsli"
 
 PerMaterialCBufferBegin
 	float4 _DeepColor;
@@ -51,7 +52,10 @@ StandardPSInput ForwardVSMain(StandardVSInput v)
 
 float4 ForwardPSMain(StandardPSInput input) : SV_TARGET
 {
-    return _DeepColor;
+    float3 color = _DeepColor.rgb;
+    float view_depth = mul(_MatrixV, float4(input.world_pos, 1.0f)).z;
+    color = ApplyVolumetricFogStraight(color, input.position.xy * _ScreenParams.xy, view_depth);
+    return float4(color, _DeepColor.a);
 }
 
 StandardPSInput VSMain(StandardVSInput v)

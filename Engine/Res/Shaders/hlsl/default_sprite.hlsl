@@ -12,6 +12,7 @@
 //info end
 
 #include "common.hlsli"
+#include "volumetric_fog_common.hlsli"
 
 PerMaterialCBufferBegin
     uint _base_instance_index;
@@ -43,6 +44,7 @@ struct PSInput
     float4 position : SV_POSITION;
     float2 uv : TEXCOORD0;
     float4 color : COLOR0;
+    float view_depth : TEXCOORD1;
 };
 
 TEXTURE2D(_MainTex)
@@ -74,6 +76,7 @@ PSInput VSMain(VSInput input)
 
     PSInput output;
     output.position = mul(_MatrixVP, world_position);
+    output.view_depth = mul(_MatrixV, world_position).z;
     output.uv = instance.uv_rect.xy + uv * instance.uv_rect.zw;
     output.color = instance.color;
 
@@ -83,5 +86,7 @@ PSInput VSMain(VSInput input)
 float4 PSMain(PSInput input) : SV_TARGET
 {
     float4 tex_color = SAMPLE_TEXTURE2D_LOD(_MainTex, g_LinearClampSampler, input.uv, 0);
-    return tex_color * input.color;
+    float4 color = tex_color * input.color;
+    color.rgb = ApplyVolumetricFogStraight(color.rgb, input.position.xy * _ScreenParams.xy, input.view_depth);
+    return color;
 }

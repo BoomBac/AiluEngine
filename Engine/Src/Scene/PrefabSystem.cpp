@@ -19,6 +19,8 @@ namespace Ailu::SceneManagement
             if (component_name == ECS::LightComponent::StaticTypeName()) return entity_doc._has_light_component;
             if (component_name == ECS::CCamera::StaticTypeName()) return entity_doc._has_camera_component;
             if (component_name == ECS::CLightProbe::StaticTypeName()) return entity_doc._has_lightprobe_component;
+            if (component_name == ECS::LocalFogVolumeComponent::StaticTypeName())
+                return entity_doc._has_local_fog_volume_component;
             if (component_name == ECS::DDGIVolumeComponent::StaticTypeName()) return entity_doc._has_ddgi_volume_component;
             if (component_name == ECS::SurfelGIComponent::StaticTypeName()) return entity_doc._has_surfel_gi_component;
             if (component_name == ECS::EnvironmentComponent::StaticTypeName()) return entity_doc._has_environment_component;
@@ -285,6 +287,12 @@ namespace Ailu::SceneManagement
                 registry.SetComponentEnabled<ECS::CLightProbeGroup>(
                     entity, !is_component_disabled(entity_doc, "CLightProbeGroup"));
             }
+            if (entity_doc._has_local_fog_volume_component)
+            {
+                registry.AddComponent<ECS::LocalFogVolumeComponent>(entity) = entity_doc._local_fog_volume_component;
+                registry.SetComponentEnabled<ECS::LocalFogVolumeComponent>(
+                    entity, !is_component_disabled(entity_doc, "LocalFogVolumeComponent"));
+            }
             if (entity_doc._has_ddgi_volume_component)
             {
                 auto &component = registry.AddComponent<ECS::DDGIVolumeComponent>(entity);
@@ -540,6 +548,38 @@ namespace Ailu::SceneManagement
                 reverted = true;
             }
         }
+        else if (component == ECS::LocalFogVolumeComponent::StaticTypeName() &&
+                 entity_doc._has_local_fog_volume_component)
+        {
+            auto *volume = scene.GetRegister().GetComponent<ECS::LocalFogVolumeComponent>(entity);
+            if (volume == nullptr)
+                return false;
+            if (property == "_enabled")
+            {
+                volume->_enabled = entity_doc._local_fog_volume_component._enabled;
+                reverted = true;
+            }
+            if (property == "_shape")
+            {
+                volume->_shape = entity_doc._local_fog_volume_component._shape;
+                reverted = true;
+            }
+            if (property == "_density")
+            {
+                volume->_density = entity_doc._local_fog_volume_component._density;
+                reverted = true;
+            }
+            if (property == "_scattering_albedo")
+            {
+                volume->_scattering_albedo = entity_doc._local_fog_volume_component._scattering_albedo;
+                reverted = true;
+            }
+            if (property == "_edge_fade")
+            {
+                volume->_edge_fade = entity_doc._local_fog_volume_component._edge_fade;
+                reverted = true;
+            }
+        }
         else if (component == ECS::LightComponent::StaticTypeName() && entity_doc._has_light_component)
         {
             auto *light = scene.GetRegister().GetComponent<ECS::LightComponent>(entity);
@@ -660,6 +700,10 @@ namespace Ailu::SceneManagement
             if (created._root != ECS::kInvalidEntity)
             {
                 scene.MutablePrefabInstances().pop_back();
+                // Instantiate can reallocate the instance vector; reacquire the original instance afterwards.
+                instance = FindPrefabInstance(scene, root_entity);
+                if (instance == nullptr)
+                    return false;
                 if (!prefab_entity._parent.IsEmpty())
                 {
                     const ECS::Entity parent = FindInstanceEntity(scene, root_entity, prefab_entity._parent);
@@ -689,7 +733,7 @@ namespace Ailu::SceneManagement
             if (entity == ECS::kInvalidEntity)
                 continue;
             const SceneEntityDocument &entity_doc = prefab_entity._entity;
-            auto has_override = [instance, &prefab_entity](StringView component, StringView property)
+            auto has_override = [&instance, &prefab_entity](StringView component, StringView property)
             {
                 return std::any_of(instance->_overrides.begin(), instance->_overrides.end(),
                                    [&prefab_entity, component, property](const PrefabOverride &override)
@@ -706,6 +750,10 @@ namespace Ailu::SceneManagement
             if (temporary_result._root != ECS::kInvalidEntity)
             {
                 scene.MutablePrefabInstances().pop_back();
+                // Instantiate can reallocate the instance vector; reacquire the original instance afterwards.
+                instance = FindPrefabInstance(scene, root_entity);
+                if (instance == nullptr)
+                    return false;
                 const ECS::ComponentTypeId persistent_id_type = ECS::PersistentIdComponent::StaticComponentTypeId();
                 const ECS::ComponentTypeId hierarchy_type = ECS::CHierarchy::StaticComponentTypeId();
                 const ECS::ComponentTypeId tag_type = ECS::TagComponent::StaticComponentTypeId();
@@ -806,6 +854,14 @@ namespace Ailu::SceneManagement
                 component._draw_probes = document._draw_probes;
                 registry.SetComponentEnabled<ECS::CLightProbeGroup>(
                     entity, !IsComponentDisabled(entity_doc, "CLightProbeGroup"));
+                refreshed = true;
+            }
+            if (entity_doc._has_local_fog_volume_component &&
+                registry.GetComponent<ECS::LocalFogVolumeComponent>(entity) == nullptr)
+            {
+                registry.AddComponent<ECS::LocalFogVolumeComponent>(entity) = entity_doc._local_fog_volume_component;
+                registry.SetComponentEnabled<ECS::LocalFogVolumeComponent>(
+                    entity, !IsComponentDisabled(entity_doc, "LocalFogVolumeComponent"));
                 refreshed = true;
             }
             if (entity_doc._has_ddgi_volume_component &&
@@ -1020,6 +1076,23 @@ namespace Ailu::SceneManagement
                 }
             }
 
+            if (entity_doc._has_local_fog_volume_component)
+            {
+                if (auto *volume = registry.GetComponent<ECS::LocalFogVolumeComponent>(entity))
+                {
+                    if (!has_override(ECS::LocalFogVolumeComponent::StaticTypeName(), "_enabled"))
+                        volume->_enabled = entity_doc._local_fog_volume_component._enabled;
+                    if (!has_override(ECS::LocalFogVolumeComponent::StaticTypeName(), "_shape"))
+                        volume->_shape = entity_doc._local_fog_volume_component._shape;
+                    if (!has_override(ECS::LocalFogVolumeComponent::StaticTypeName(), "_density"))
+                        volume->_density = entity_doc._local_fog_volume_component._density;
+                    if (!has_override(ECS::LocalFogVolumeComponent::StaticTypeName(), "_scattering_albedo"))
+                        volume->_scattering_albedo = entity_doc._local_fog_volume_component._scattering_albedo;
+                    if (!has_override(ECS::LocalFogVolumeComponent::StaticTypeName(), "_edge_fade"))
+                        volume->_edge_fade = entity_doc._local_fog_volume_component._edge_fade;
+                    refreshed = true;
+                }
+            }
             for (ECS::ComponentTypeId type_id : scene.GetRegister().GetEntityComponentTypes(entity))
             {
                 const StringView component_name = ECS::GetComponentStableName(type_id);

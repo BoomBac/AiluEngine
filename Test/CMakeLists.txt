@@ -209,3 +209,12 @@ target_link_libraries(JobGroupLifetimeSmoke PRIVATE dbghelp)
 add_custom_command(TARGET JobGroupLifetimeSmoke POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:Engine>" "$<TARGET_FILE_DIR:JobGroupLifetimeSmoke>"
     VERBATIM)
+
+add_executable(VolumetricFogSmoke VolumetricFogSmoke.cpp)
+ailu_configure_test_target(VolumetricFogSmoke)
+add_custom_command(TARGET VolumetricFogSmoke POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:Engine>" "$<TARGET_FILE_DIR:VolumetricFogSmoke>"
+    VERBATIM)
+
+target_sources(VolumetricFogSmoke PRIVATE ${ENGINE_ROOT_PATH}/Src/Render/ImageCapture/DdsCaptureEncoder.cpp)
+target_link_libraries(VolumetricFogSmoke PRIVATE DirectXTex)

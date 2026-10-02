@@ -259,12 +259,13 @@ float ApplyShadowAddLight(float4 shadow_coord,float nl, float3 world_pos,int sha
 }
 
 
-float ApplyShadowPointLight(float shadow_near,float shadow_far ,float nl, float3 world_pos,float3 light_pos,int shadow_index)
+float ApplyShadowPointLightIndexed(float shadow_near, float shadow_far, float nl, float3 world_pos,
+    float3 light_pos, int light_index, int shadow_index)
 {
 	float dis = distance(light_pos,world_pos);
 	if(dis > shadow_far)
 		return 1.0;
-	float z_bias = GetShadowDepthBias(nl,_PointLights[shadow_index]._constant_bias,_PointLights[shadow_index]._slope_bias);
+	float z_bias = GetShadowDepthBias(nl,_PointLights[light_index]._constant_bias,_PointLights[light_index]._slope_bias);
 	//z_bias = clamp(z_bias, 0, 0.5);
 	float3 shaodw_dir = normalize(world_pos - light_pos);
 #if defined(_REVERSED_Z)
@@ -287,5 +288,10 @@ float ApplyShadowPointLight(float shadow_near,float shadow_far ,float nl, float3
 	}
 	//shadow_factor =  (1.0 - shadow_factor) * ShadowDistaanceAtten(dis,shadow_far);
 	return shadow_factor;// *= lerp(1,0.0,saturate(dis/_MainLightShadowDistance));
+}
+float ApplyShadowPointLight(float shadow_near, float shadow_far, float nl, float3 world_pos,
+    float3 light_pos, int shadow_index)
+{
+    return ApplyShadowPointLightIndexed(shadow_near, shadow_far, nl, world_pos, light_pos, shadow_index, shadow_index);
 }
 #endif

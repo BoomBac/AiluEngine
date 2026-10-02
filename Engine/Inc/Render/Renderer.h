@@ -80,6 +80,7 @@ namespace Ailu
                 return _render_request._purpose == ERenderPurpose::kReflectionProbe ||
                        _render_request._purpose == ERenderPurpose::kStaticDiffuseProbe;
             }
+            bool IsRenderingCubemap() const { return _is_rendering_cubemap; }
             void BeginScene(const Camera &cam, const Scene &s);
             void EndScene(const Scene &s);
             void FrameCleanup();
@@ -105,6 +106,7 @@ namespace Ailu
             bool _is_use_render_graph = true;
             bool _is_use_raytracing = false;
         private:
+            bool _is_rendering_cubemap = false;
             void BuildScenePrimitives(const Scene &s);
             void RefreshScenePrimitiveVertexBuffers();
             void PrepareScene(const Scene &s);

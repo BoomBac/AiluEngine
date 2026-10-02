@@ -67,6 +67,7 @@ namespace Ailu::SceneManagement
         _register.RegisterComponent<ECS::CCamera>();
         _register.RegisterComponent<ECS::EnvironmentComponent>();
         _register.RegisterComponent<ECS::PostprocessVolumeComponent>();
+        _register.RegisterComponent<ECS::LocalFogVolumeComponent>();
         _register.RegisterComponent<ECS::CHierarchy>();
         _register.RegisterComponent<ECS::CLightProbe>();
         _register.RegisterComponent<ECS::CLightProbeGroup>();

@@ -52,8 +52,24 @@ template<>
 AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::ECS::EnvironmentComponent>();
 //Struct EnvironmentComponent end...........................
 
+//Struct LocalFogVolumeComponent begin...........................
+#define COMPONENT_GEN_H_444_GENERATED_BODY \
+                            private: \
+                                friend const Type* Z_Construct_LocalFogVolumeComponent_Type();\
+                                static const Type* GetPrivateStaticClass();\
+                            public:\
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                const Type  *GetType();
+                            namespace Ailu {class Type;}
+namespace Ailu::ECS{
+struct LocalFogVolumeComponent ;
+}
+template<>
+AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::ECS::LocalFogVolumeComponent>();
+//Struct LocalFogVolumeComponent end...........................
+
 //Struct PostprocessVolumeComponent begin...........................
-#define COMPONENT_GEN_H_437_GENERATED_BODY \
+#define COMPONENT_GEN_H_464_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_PostprocessVolumeComponent_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -69,7 +85,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::ECS::Postprocess
 //Struct PostprocessVolumeComponent end...........................
 
 //Struct CLightProbeGroup begin...........................
-#define COMPONENT_GEN_H_522_GENERATED_BODY \
+#define COMPONENT_GEN_H_549_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_CLightProbeGroup_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -85,7 +101,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::ECS::CLightProbe
 //Struct CLightProbeGroup end...........................
 
 //Struct DDGIVolumeComponent begin...........................
-#define COMPONENT_GEN_H_556_GENERATED_BODY \
+#define COMPONENT_GEN_H_583_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_DDGIVolumeComponent_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -101,7 +117,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::ECS::DDGIVolumeC
 //Struct DDGIVolumeComponent end...........................
 
 //Struct SurfelGIComponent begin...........................
-#define COMPONENT_GEN_H_593_GENERATED_BODY \
+#define COMPONENT_GEN_H_620_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_SurfelGIComponent_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -151,6 +167,15 @@ enum class EEnvironmentSource : i32;
 template<>
 AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::ECS::EEnvironmentSource>();
 //Enum EEnvironmentSource end...........................
+
+//Enum ELocalFogVolumeShape begin...........................
+const Ailu::Enum* Z_Construct_Enum_Ailu_ECS_ELocalFogVolumeShape_Type();
+namespace Ailu::ECS {
+enum class ELocalFogVolumeShape : u32;
+}
+template<>
+AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::ECS::ELocalFogVolumeShape>();
+//Enum ELocalFogVolumeShape end...........................
 
 //Enum EDDGIProbeDebugMode begin...........................
 const Ailu::Enum* Z_Construct_Enum_Ailu_ECS_EDDGIProbeDebugMode_Type();

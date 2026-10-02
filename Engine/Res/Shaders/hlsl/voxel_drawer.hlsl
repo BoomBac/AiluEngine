@@ -30,6 +30,7 @@ PerMaterialCBufferBegin
 	float4 _GridSize;
 	float4 _GridCenter;
 	uint   _DebugMip;
+	float  _DebugExtinction;
 PerMaterialCBufferEnd
 
 struct VSInput
@@ -64,8 +65,18 @@ struct VoxelOut
 VoxelOut ForwardPSMain(PSInput input)
 {
 	VoxelOut ret;
-	ret.color = LOAD_TEXTURE3D_LOD(_VoxelSrc,input.uvw,_DebugMip);
-	clip(ret.color.a - 0.2);
+	const float4 voxel = LOAD_TEXTURE3D_LOD(_VoxelSrc,input.uvw,_DebugMip);
+	if (_DebugExtinction > 0.5f)
+	{
+		const float extinction_visual = saturate(voxel.a * 10.0f);
+		ret.color = float4(extinction_visual.xxx, 1.0f);
+		clip(extinction_visual - 0.02f);
+	}
+	else
+	{
+		ret.color = voxel;
+		clip(ret.color.a - 0.2f);
+	}
 	//ret.depth = input.color.a > 0.5f? input.position.z : 1.0f;
 	return ret;
 }

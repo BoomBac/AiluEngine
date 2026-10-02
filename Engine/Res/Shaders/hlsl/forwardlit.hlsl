@@ -53,6 +53,7 @@
 #include "lighting.hlsli"
 #include "shadow_caster.hlsli"
 #endif
+#include "volumetric_fog_common.hlsli"
 
 StandardPSInput ForwardVSMain(StandardVSInput v)
 {
@@ -97,5 +98,7 @@ float4 ForwardPSMain(StandardPSInput input) : SV_TARGET
 #endif
     float3 light = max(0.0, CalculateLightPBR(surface_data, input.world_pos, input.uv0, irradiance, irradiance, false));
     light += surface_data.emssive;
+    float view_depth = mul(_MatrixV, float4(input.world_pos, 1.0f)).z;
+    light = ApplyVolumetricFogStraight(light, input.position.xy * _ScreenParams.xy, view_depth);
     return float4(light, alpha);
 }

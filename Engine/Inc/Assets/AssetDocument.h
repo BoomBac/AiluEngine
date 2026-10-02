@@ -1063,6 +1063,8 @@ namespace Ailu
         inline static const String kSpriteRendererComponent = "_sprite_renderer_component";
         inline static const String kHasVxgiComponent = "_has_vxgi_component";
         inline static const String kVxgiComponent = "_vxgi_component";
+        inline static const String kLocalFogVolumeComponent = "_local_fog_volume_component";
+        inline static const String kHasLocalFogVolumeComponent = "_has_local_fog_volume_component";
         inline static const String kHasPostprocessVolumeComponent = "_has_postprocess_volume_component";
         inline static const String kPostprocessVolumeComponent = "_postprocess_volume_component";
         inline static const String kDisabledComponents = "_disabled_components";
@@ -1114,6 +1116,9 @@ namespace Ailu
                 SerializerWrapper<SceneAnimatorComponentDocument>::Serialize(&_animator_component, ar, &kAnimatorComponent);
             if (_has_vxgi_component)
                 SerializerWrapper<SceneVXGIComponentDocument>::Serialize(&_vxgi_component, ar, &kVxgiComponent);
+            if (_has_local_fog_volume_component)
+                SerializerWrapper<ECS::LocalFogVolumeComponent>::Serialize(
+                    &_local_fog_volume_component, ar, &kLocalFogVolumeComponent);
             if (_has_postprocess_volume_component)
                 SerializerWrapper<ScenePostprocessVolumeComponentDocument>::Serialize(&_postprocess_volume_component, ar,
                                                                                         &kPostprocessVolumeComponent);
@@ -1182,6 +1187,8 @@ namespace Ailu
             deserialize_component(_has_animator_component, _animator_component, kHasAnimatorComponent, kAnimatorComponent);
             deserialize_component(_has_sprite_renderer_component, _sprite_renderer_component, kHasSpriteRendererComponent, kSpriteRendererComponent);
             deserialize_component(_has_vxgi_component, _vxgi_component, kHasVxgiComponent, kVxgiComponent);
+            deserialize_component(_has_local_fog_volume_component, _local_fog_volume_component,
+                                  kHasLocalFogVolumeComponent, kLocalFogVolumeComponent);
             deserialize_component(_has_postprocess_volume_component, _postprocess_volume_component,
                                   kHasPostprocessVolumeComponent, kPostprocessVolumeComponent);
         }
@@ -1265,6 +1272,10 @@ namespace Ailu
         bool _has_vxgi_component = false;
         APROPERTY()
         SceneVXGIComponentDocument _vxgi_component;
+        APROPERTY()
+        bool _has_local_fog_volume_component = false;
+        APROPERTY()
+        ECS::LocalFogVolumeComponent _local_fog_volume_component;
         APROPERTY()
         bool _has_postprocess_volume_component = false;
         APROPERTY()

@@ -32,25 +32,35 @@ namespace Ailu::Render
 
         SortSprites();
         _batcher->Build(_render_data);
+        const bool use_volumetric_fog = rendering_data._rg_handles._volumetric_fog_accum.IsValid();
+        const auto fog_handle = rendering_data._rg_handles._volumetric_fog_accum;
 
         graph.AddPass(
             "SpriteRenderPass",
             RDG::PassDesc(),
             [&](RDG::RenderGraphBuilder &builder)
             {
-                // Write to color target
+                // Preserve the existing background for alpha blending.
+                builder.Read(rendering_data._rg_handles._color_target, EResourceUsage::kWriteRTV);
                 rendering_data._rg_handles._color_target =
                     builder.Write(rendering_data._rg_handles._color_target);
                 // Read depth (optional, for depth testing)
                 builder.Read(rendering_data._rg_handles._depth_target, EResourceUsage::kDSV);
+                if (use_volumetric_fog)
+                    builder.Read(fog_handle);
             },
-            [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
+            [this, use_volumetric_fog, fog_handle](RDG::RenderGraph &graph, CommandBuffer *cmd,
+                                                   const RenderingData &data)
             {
                 RenderTexture *color_target =
                     graph.Resolve<RenderTexture>(data._rg_handles._color_target);
                 RenderTexture *depth_target =
                     graph.Resolve<RenderTexture>(data._rg_handles._depth_target);
+                if (use_volumetric_fog)
+                    cmd->SetGlobalTexture("_VolumetricFogAccum", graph.Resolve<Texture>(fog_handle));
 
+                cmd->SetRenderTargetLoadAction(color_target, ELoadStoreAction::kLoad);
+                cmd->SetRenderTargetLoadAction(depth_target, ELoadStoreAction::kLoad);
                 _batcher->Render(cmd, color_target, depth_target);
             });
     }
@@ -76,6 +86,8 @@ namespace Ailu::Render
         RenderTexture *depth_target =
             g_pRenderTexturePool->Get(rendering_data._camera_depth_target_handle);
 
+        cmd->SetRenderTargetLoadAction(color_target, ELoadStoreAction::kLoad);
+        cmd->SetRenderTargetLoadAction(depth_target, ELoadStoreAction::kLoad);
         _batcher->Render(cmd.get(), color_target, depth_target);
 
         context->ExecuteCommandBuffer(cmd);

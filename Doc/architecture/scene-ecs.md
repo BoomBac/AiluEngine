@@ -218,3 +218,14 @@ Is it asset/import state?
 - script references；
 - render thread lifetime；
 - renderer caches。
+
+## Local fog volume persistence
+
+`LocalFogVolumeComponent` is a reflected optional component with enabled, Box/Sphere shape, extinction density,
+RGB scattering albedo and normalized-local edge fade. Entity document snapshots/load, prefab instantiate/refresh/
+property revert, generic entity cloning and Inspector registration retain fields and component enabled state.
+Old scene documents lacking `_local_fog_volume_component` load with the component absent.
+Render-only upload, froxel resources and temporal caches belong to `VolumetricFog`, not Scene.
+
+Prefab refresh temporarily instantiates snapshot entities. It reacquires the original `PrefabInstance` pointer
+following a temporary instantiation because the instance vector can reallocate; override checks follow that pointer.
