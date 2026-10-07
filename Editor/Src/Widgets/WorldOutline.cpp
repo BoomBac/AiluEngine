@@ -16,6 +16,7 @@
 #include "UI/Container.h"
 #include "UI/UIFramework.h"
 #include "Ext/imgui/imgui.h"
+#include <cctype>
 
 namespace Ailu
 {
@@ -31,7 +32,45 @@ namespace Ailu
         class WorldOutline::SceneTreeDataSource final : public ITreeViewDataSource
         {
         public:
-            void SetScene(Scene* scene) { _scene = scene; }
+            void SetScene(Scene* scene)
+            {
+                _scene = scene;
+                RebuildSearchMatches();
+            }
+
+            void SetSearch(const String &query)
+            {
+                _search_query.clear();
+                _search_query.reserve(query.size());
+                for (unsigned char c : query)
+                    _search_query.push_back(static_cast<char>(std::tolower(c)));
+                RebuildSearchMatches();
+            }
+
+            bool HasSearch() const { return !_search_query.empty(); }
+
+            std::unordered_set<TreeItemId> GetSearchExpansionItems() const
+            {
+                std::unordered_set<TreeItemId> expanded_items;
+                if (!_scene || _search_query.empty())
+                    return expanded_items;
+
+                for (TreeItemId item : _search_matches)
+                {
+                    ECS::Entity current = ToEntity(item);
+                    std::unordered_set<ECS::Entity> visited;
+                    for (u32 depth = 0u; depth < 256u && visited.insert(current).second; ++depth)
+                    {
+                        const auto *hierarchy = _scene->GetRegister().GetComponent<ECS::CHierarchy>(current);
+                        if (hierarchy == nullptr || hierarchy->_parent == ECS::kInvalidEntity ||
+                            _scene->IsSceneRoot(hierarchy->_parent))
+                            break;
+                        current = hierarchy->_parent;
+                        expanded_items.insert(ToTreeItem(current));
+                    }
+                }
+                return expanded_items;
+            }
 
             static TreeItemId ToTreeItem(ECS::Entity e)
             {
@@ -55,7 +94,8 @@ namespace Ailu
                 u32 count = 0u;
                 while (child != ECS::kInvalidEntity && count < 1000u)
                 {
-                    if (reg.IsAlive(child) && !_scene->IsSceneRoot(child) && reg.HasComponent<ECS::CHierarchy>(child))
+                    if (IsVisible(child) && reg.IsAlive(child) && !_scene->IsSceneRoot(child) &&
+                        reg.HasComponent<ECS::CHierarchy>(child))
                         roots.push_back(ToTreeItem(child));
                     const auto *child_hierarchy = reg.GetComponent<ECS::CHierarchy>(child);
                     child = child_hierarchy != nullptr ? child_hierarchy->_next_sibling : ECS::kInvalidEntity;
@@ -84,7 +124,7 @@ namespace Ailu
                         LOG_WARNING("SceneTreeDataSource: cycle detected at entity {}", child);
                         break;
                     }
-                    if (reg.IsAlive(child) && reg.HasComponent<ECS::CHierarchy>(child))
+                    if (IsVisible(child) && reg.IsAlive(child) && reg.HasComponent<ECS::CHierarchy>(child))
                         children.push_back(ToTreeItem(child));
                     auto* child_hier = reg.GetComponent<ECS::CHierarchy>(child);
                     ECS::Entity next = (child_hier ? child_hier->_next_sibling : ECS::kInvalidEntity);
@@ -142,7 +182,80 @@ namespace Ailu
             }
 
         private:
+            bool IsVisible(ECS::Entity entity) const
+            {
+                return _search_query.empty() || _search_matches.contains(ToTreeItem(entity));
+            }
+
+            void RebuildSearchMatches()
+            {
+                _search_matches.clear();
+                if (_scene == nullptr || _search_query.empty())
+                    return;
+
+                auto &reg = _scene->GetRegister();
+                Vector<ECS::Entity> pending;
+                const auto *root_hierarchy = reg.GetComponent<ECS::CHierarchy>(_scene->SceneRoot());
+                if (root_hierarchy == nullptr)
+                    return;
+
+                std::unordered_set<ECS::Entity> visited;
+                ECS::Entity child = root_hierarchy->_first_child;
+                for (u32 count = 0u; child != ECS::kInvalidEntity && count < 10000u; ++count)
+                {
+                    if (!visited.insert(child).second)
+                        break;
+                    pending.push_back(child);
+                    const auto *hierarchy = reg.GetComponent<ECS::CHierarchy>(child);
+                    child = hierarchy != nullptr ? hierarchy->_next_sibling : ECS::kInvalidEntity;
+                }
+
+                visited.clear();
+                while (!pending.empty() && visited.size() < 10000u)
+                {
+                    const ECS::Entity entity = pending.back();
+                    pending.pop_back();
+                    if (!visited.insert(entity).second || !_scene->IsValidEntity(entity) || _scene->IsSceneRoot(entity))
+                        continue;
+
+                    const auto *tag = reg.GetComponent<ECS::TagComponent>(entity);
+                    String lowered_name = tag != nullptr ? tag->_name : String{};
+                    std::transform(lowered_name.begin(), lowered_name.end(), lowered_name.begin(),
+                                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+                    if (lowered_name.find(_search_query) != String::npos)
+                        _search_matches.insert(ToTreeItem(entity));
+
+                    const auto *hierarchy = reg.GetComponent<ECS::CHierarchy>(entity);
+                    if (hierarchy == nullptr)
+                        continue;
+                    child = hierarchy->_first_child;
+                    for (u32 count = 0u; child != ECS::kInvalidEntity && count < 1000u; ++count)
+                    {
+                        pending.push_back(child);
+                        const auto *child_hierarchy = reg.GetComponent<ECS::CHierarchy>(child);
+                        child = child_hierarchy != nullptr ? child_hierarchy->_next_sibling : ECS::kInvalidEntity;
+                    }
+                }
+
+                Vector<TreeItemId> matches(_search_matches.begin(), _search_matches.end());
+                for (TreeItemId item : matches)
+                {
+                    ECS::Entity current = ToEntity(item);
+                    for (u32 depth = 0u; depth < 256u; ++depth)
+                    {
+                        const auto *hierarchy = reg.GetComponent<ECS::CHierarchy>(current);
+                        if (hierarchy == nullptr || hierarchy->_parent == ECS::kInvalidEntity ||
+                            _scene->IsSceneRoot(hierarchy->_parent))
+                            break;
+                        current = hierarchy->_parent;
+                        _search_matches.insert(ToTreeItem(current));
+                    }
+                }
+            }
+
             Scene* _scene = nullptr;
+            String _search_query;
+            std::unordered_set<TreeItemId> _search_matches;
         };
 
         // =========================================================================
@@ -211,6 +324,68 @@ namespace Ailu
                 {
                     auto new_entity = scene->AddObject("GameObject");
                     Selection::SetSelection(new_entity);
+                }
+            };
+
+            auto *search_row = vb->AddChild<HorizontalBox>();
+            search_row->GetSlotAs<LinearSlot>().SizePolicy(ESizePolicy::kFill, ESizePolicy::kFixed)
+                .Size(Vector2f(0.0f, 24.0f));
+            auto *search_label = search_row->AddChild<Text>("Search");
+            search_label->GetSlotAs<LinearSlot>().SizePolicy(ESizePolicy::kFixed, ESizePolicy::kFill)
+                .Size(Vector2f(48.0f, 0.0f)).Margin(Padding(4.0f, 0.0f, 2.0f, 0.0f));
+            search_label->_vertical_align = EAlignment::kCenter;
+            _search_input = search_row->AddChild<InputBlock>();
+            _search_input->Name("WorldOutlineSearch");
+            _search_input->SetContent("");
+            _search_input->GetSlotAs<LinearSlot>().SizePolicy(ESizePolicy::kFill, ESizePolicy::kFixed)
+                .Size(Vector2f(0.0f, 22.0f)).Margin(Padding(2.0f, 0.0f, 2.0f, 0.0f));
+            _search_input->_on_content_changed += [this](String value)
+            {
+                const bool starting_search = _search_text.empty() && !value.empty();
+                if (starting_search)
+                {
+                    _expanded_items_before_search.clear();
+                    if (SceneMgr::Get().ActiveScene() != nullptr)
+                    {
+                        Vector<TreeItemId> pending = _data_source->GetRootItems();
+                        std::unordered_set<TreeItemId> visited;
+                        while (!pending.empty() && visited.size() < 10000u)
+                        {
+                            const TreeItemId item = pending.back();
+                            pending.pop_back();
+                            if (!visited.insert(item).second)
+                                continue;
+                            if (_tree_view->IsExpanded(item))
+                                _expanded_items_before_search.insert(item);
+                            const auto children = _data_source->GetChildren(item);
+                            pending.insert(pending.end(), children.begin(), children.end());
+                        }
+                    }
+                    _has_expansion_snapshot = true;
+                }
+
+                _search_text = std::move(value);
+                _data_source->SetSearch(_search_text);
+                if (_search_text.empty())
+                {
+                    if (_has_expansion_snapshot)
+                        _tree_view->SetExpandedItems(_expanded_items_before_search);
+                    else
+                        _tree_view->Refresh();
+                    _expanded_items_before_search.clear();
+                    _has_expansion_snapshot = false;
+                }
+                else
+                {
+                    _tree_view->SetExpandedItems(_data_source->GetSearchExpansionItems());
+                }
+            };
+            _search_input->OnKeyDown() += [this](UIEvent &event)
+            {
+                if (event._key_code == EKey::kESCAPE && !_search_text.empty())
+                {
+                    _search_input->SetContent("");
+                    event._is_handled = true;
                 }
             };
 
@@ -317,6 +492,11 @@ namespace Ailu
             if (scene != _observed_scene)
             {
                 _observed_scene = scene;
+                _search_text.clear();
+                _search_input->SetContent("");
+                _data_source->SetSearch({});
+                _expanded_items_before_search.clear();
+                _has_expansion_snapshot = false;
                 _data_source->SetScene(scene);
                 _tree_view->SetDataSource(scene ? _data_source.get() : nullptr);
                 _observed_structure_revision = scene ? scene->StructureRevision() : 0;
@@ -339,6 +519,11 @@ namespace Ailu
                 {
                     _observed_structure_revision = rev;
                     _observed_edit_revision = edit_rev;
+                    if (_data_source->HasSearch())
+                    {
+                        _data_source->SetSearch(_search_text);
+                        _tree_view->SetExpandedItems(_data_source->GetSearchExpansionItems());
+                    }
                     _tree_view->Refresh();
                 }
             }
@@ -349,6 +534,14 @@ namespace Ailu
             {
                 _observed_selection_revision = sel_rev;
                 SyncSelectionFromEngine();
+            }
+
+            if (IsFocus() && Input::IsKeyJustPressed(EKey::kF) &&
+                (Input::IsKeyDown(EKey::kCONTROL) || Input::IsKeyDown(EKey::kLCONTROL) ||
+                 Input::IsKeyDown(EKey::kRCONTROL)))
+            {
+                _search_input->RequestFocus();
+                _search_input->SetCursorToEnd();
             }
         }
 

@@ -52,6 +52,11 @@ namespace Ailu
             UI::CheckBox *_entity_enabled_checkbox = nullptr;
             UI::Button *_add_component_button = nullptr;
             ECS::Entity _selected_entity = ECS::kInvalidEntity;
+            Vector<ECS::Entity> _selected_entities;
+            SceneManagement::Scene *_selected_scene = nullptr;
+            u64 _scene_structure_revision = 0;
+            u32 _selection_subscription = 0;
+            Vector<UI::Button *> _single_entity_buttons;
             bool _needs_rebuild = true;
             Vector<ObjectDetailComponentEntry> _component_entries;
         };

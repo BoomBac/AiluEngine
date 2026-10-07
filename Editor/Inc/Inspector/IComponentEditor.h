@@ -18,6 +18,7 @@ namespace Ailu
             virtual ~IComponentEditor() = default;
             virtual void Build(ComponentEditorContext &context) = 0;
             virtual void Refresh(ComponentEditorContext &context) {}
+            virtual bool SupportsMultiEdit() const { return false; }
             virtual bool NeedsRebuild(const ComponentEditorContext &context) const { return false; }
         };
     }// namespace Editor

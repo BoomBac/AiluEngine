@@ -351,18 +351,20 @@ bpy bug
 
 # Progress
 
-- [ ] plugin target 编译。
-- [ ] manifest 被扫描。
-- [ ] autoload 成功。
-- [ ] server bind loopback。
-- [ ] hello。
-- [ ] version mismatch。
-- [ ] ping/pong。
-- [ ] malformed payload guard。
-- [ ] client disconnect。
-- [ ] plugin unload while connected。
-- [ ] worker join。
+- [x] plugin target 源码实现并由 `build-debug` 编译。
+- [ ] manifest 被 Editor 扫描。
+- [ ] Editor autoload 成功。
+- [ ] Editor 运行时 server bind loopback。
+- [ ] live HELLO/HELLO_ACK。
+- [ ] live version mismatch。
+- [ ] live PING/PONG 1000 次。
+- [ ] live malformed payload cases。
+- [ ] live client disconnect。
+- [ ] active client 下 plugin unload。
+- [ ] unload 时 worker join。
 - [ ] DLL unload 后端口可立即重新 bind。
+
+源码实现包含上述 transport 和生命周期路径；未运行 Editor、smoke client 或卸载验收时，不将这些运行时项目标为通过。
 
 ---
 

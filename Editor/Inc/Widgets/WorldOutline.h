@@ -3,6 +3,7 @@
 #define __WORLD_OUTLINE_H__
 #include "Dock/DockWindow.h"
 #include "Scene/Scene.h"
+#include <unordered_set>
 #include "generated/WorldOutline.gen.h"
 
 namespace Ailu
@@ -12,6 +13,7 @@ namespace Ailu
         class TreeView;
         class Text;
         class Button;
+        class InputBlock;
     }
     namespace Editor
     {
@@ -36,6 +38,7 @@ namespace Ailu
             void ExitTemporaryPrefabScene();
 
             UI::TreeView* _tree_view = nullptr;
+            UI::InputBlock* _search_input = nullptr;
             UI::Text* _scene_title = nullptr;
             UI::Button* _back_button = nullptr;
             UI::Button* _add_button = nullptr;
@@ -47,6 +50,9 @@ namespace Ailu
             u64 _observed_structure_revision = 0;
             u64 _observed_edit_revision = 0;
             u64 _observed_selection_revision = 0;
+            String _search_text;
+            std::unordered_set<u64> _expanded_items_before_search;
+            bool _has_expansion_snapshot = false;
         };
     }// namespace Editor
 }// namespace Ailu

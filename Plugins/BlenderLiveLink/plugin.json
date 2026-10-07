@@ -1,0 +1,9 @@
+{
+    "id": "com.ailu.blender_livelink",
+    "name": "Blender Live Link",
+    "version": "0.1.0",
+    "api_version": 1,
+    "type": "editor",
+    "library": "bin/{config}/AiluBlenderLiveLink.dll",
+    "autoload": true
+}

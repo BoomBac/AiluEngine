@@ -303,7 +303,8 @@ namespace Ailu::RHI::DX12
                     RenderTexture::ReleaseTempRT(handle);
             });
         }
-        const bool emit_pix_event = g_engine_config._enable_pix && !group._params._is_end_frame && !group._params._name.empty();
+        const bool emit_pix_event = g_engine_config._enable_pix && !group._params._is_end_frame &&
+                                    !group._params._is_render_graph_pass && !group._params._name.empty();
 
 #if AILU_ENABLE_FRAME_DEBUGGER
         Render::FrameDebugger::FrameCaptureSession *capture_session = Render::FrameDebugger::FrameCaptureService::ActiveSession();
@@ -1072,6 +1073,7 @@ namespace Ailu::RHI::DX12
     void D3DContext::ExecuteCommandBuffer(Ref<CommandBuffer> &cmd)
     {
         SubmitParams params{cmd->Name()};
+        params._is_render_graph_pass = cmd->IsRenderGraphCommandBuffer();
         params._released_temp_rts = cmd->TakeReleasedTempRTs();
         params._rendering_states_data = cmd->TakeRenderingStatesData();
 #if AILU_ENABLE_FRAME_DEBUGGER

@@ -2,8 +2,9 @@
 
 > Status: Active
 >
-> Current Milestone: M0 — Plugin Scaffold + Loopback Transport
+> Current Milestone: M6 implementation complete; final runtime acceptance pending
 >
+> Last Updated: 2026-10-04
 > Last Updated Baseline: AiluEngine_Source(20260930-154655)
 
 ---
@@ -156,7 +157,7 @@ Engine/Src/Render/Camera.cpp
 
 ## M0 — Plugin Scaffold + Loopback Transport
 
-Status:
+Status: IMPLEMENTED; runtime acceptance pending
 
 ```text
 CURRENT
@@ -170,22 +171,23 @@ milestones/m0-plugin-transport.md
 
 Progress:
 
-- [ ] AiluBlenderLiveLink target。
-- [ ] plugin.json。
-- [ ] autoload。
-- [ ] loopback TCP。
-- [ ] worker lifecycle。
-- [ ] protocol header。
-- [ ] HELLO。
-- [ ] PING。
-- [ ] malformed guard。
-- [ ] active-client unload test。
+- [x] AiluBlenderLiveLink target 编译通过。
+- [x] plugin.json，autoload=true。
+- [x] loopback TCP server source。
+- [x] worker start/stop/join 和 socket shutdown source。
+- [x] 固定 little-endian protocol header。
+- [x] HELLO/HELLO_ACK 与 PING/PONG source。
+- [x] magic/version/payload length/truncated payload guard source。
+- [ ] Editor autoload 和 live bind 验收（尝试启动；运行环境用户目录指向 `CodexSandboxOffline`，与源码根目录不一致，插件无法按既有扫描路径发现）。
+- [ ] HELLO + 1000 次 PING/PONG smoke（transport smoke client 已提供，未能连接 Editor）。
+- [ ] malformed client cases（未能连接 Editor）。
+- [ ] active-client plugin unload、reload 和 port rebind 验收（未能连接 Editor）。
 
 ---
 
 ## M1 — Session Identity + Transient Scene + Transform
 
-Status:
+Status: IMPLEMENTED; Blender/Editor acceptance pending
 
 ```text
 NOT STARTED
@@ -199,22 +201,16 @@ milestones/m1-session-transform.md
 
 Progress:
 
-- [ ] generic transient entity semantics。
-- [ ] Blender addon skeleton。
-- [ ] persistent UUID。
-- [ ] session root。
-- [ ] Full Sync。
-- [ ] create/delete。
-- [ ] hierarchy。
-- [ ] transform。
-- [ ] coordinate golden tests。
-- [ ] save exclusion。
+- [x] generic transient entity semantics（TagComponent runtime-only flag）。
+- [x] Blender addon skeleton / persistent UUID / session root / Full Sync / create-delete / hierarchy / transform。
+- [x] Scene Asset save exclusion。
+- [ ] coordinate golden tests and Blender/Editor scene acceptance（Blender unavailable）。
 
 ---
 
 ## M2 — Static Mesh
 
-Status:
+Status: IMPLEMENTED; Blender/Editor acceptance pending
 
 ```text
 NOT STARTED
@@ -228,20 +224,15 @@ milestones/m2-static-mesh.md
 
 Progress:
 
-- [ ] evaluated mesh。
-- [ ] binary payload。
-- [ ] runtime Mesh。
-- [ ] normals/tangents/UV。
-- [ ] submesh。
-- [ ] bounds。
-- [ ] debounce。
+- [x] evaluated mesh / binary payload / runtime Mesh construction。
+- [x] normals/tangents/UV / submesh grouping / bounds / debounce。
 - [ ] large mesh validation。
 
 ---
 
 ## M3 — Material + Texture
 
-Status:
+Status: IMPLEMENTED; Blender/Editor acceptance pending
 
 ```text
 NOT STARTED
@@ -255,20 +246,15 @@ milestones/m3-material-texture.md
 
 Progress:
 
-- [ ] Principled material。
-- [ ] scalar PBR。
-- [ ] BaseColor texture。
-- [ ] Normal texture。
-- [ ] RM packing。
-- [ ] packed/generated image。
-- [ ] material slots。
-- [ ] reload/cache。
+- [x] Principled material / scalar PBR / BaseColor and Normal textures。
+- [x] RM packing / packed and generated image export / material slots / transient texture cache。
+- [ ] image and material visual validation。
 
 ---
 
 ## M4 — Light + Camera
 
-Status:
+Status: IMPLEMENTED; Blender/Editor acceptance pending
 
 ```text
 NOT STARTED
@@ -282,20 +268,15 @@ milestones/m4-light-camera.md
 
 Progress:
 
-- [ ] Sun。
-- [ ] Point。
-- [ ] Spot。
-- [ ] Rect Area。
-- [ ] intensity mapping。
-- [ ] Perspective。
-- [ ] Orthographic。
+- [x] Sun / Point / Spot / rectangular Area light mapping。
+- [x] intensity mapping / Perspective and Orthographic camera mapping。
 - [ ] semantic orientation validation。
 
 ---
 
 ## M5 — Incremental + Reconnect
 
-Status:
+Status: IMPLEMENTED; Blender/Editor acceptance pending
 
 ```text
 NOT STARTED
@@ -309,20 +290,16 @@ milestones/m5-incremental-reconnect.md
 
 Progress:
 
-- [ ] depsgraph dirty collector。
-- [ ] debounce。
-- [ ] coalescing。
-- [ ] deletion。
-- [ ] bounded queue。
-- [ ] reconnect。
-- [ ] full resync。
-- [ ] play mode recovery。
+- [x] depsgraph dirty collector / debounce / deletion detection。
+- [x] coalescing / bounded queue / reconnect and full resync。
+- [x] play mode and scene-switch recovery paths。
+- [ ] continuous edit and recovery stress validation。
 
 ---
 
 ## M6 — Stability + Package
 
-Status:
+Status: IMPLEMENTED; final acceptance pending
 
 ```text
 NOT STARTED
@@ -336,40 +313,26 @@ milestones/m6-stability-package.md
 
 Progress:
 
-- [ ] stress。
-- [ ] metrics。
-- [ ] memory cleanup。
-- [ ] Blender addon zip。
-- [ ] Ailu plugin deploy。
-- [ ] final acceptance。
+- [ ] stress / metrics / memory cleanup validation。
+- [x] Blender addon zip built and package layout inspected。
+- [x] Ailu plugin manifest and Debug DLL deploy layout present。
+- [x] user README and PowerShell transport smoke client。
+- [ ] final Editor + Blender acceptance。
 
 ---
 
 # Current Milestone
 
 ```text
-M0 — Plugin Scaffold + Loopback Transport
+M6 implementation complete; Editor/Blender runtime acceptance pending
 ```
 
 当前 Next Actions：
 
-1. 在实际仓库中确认插件 target 的 CMake 接入习惯。
-2. 创建 `Plugins/BlenderLiveLink` target。
-3. 创建 `plugin.json`。
-4. 只实现空插件 Load/Tick/Unload。
-5. 加入 `LiveLinkServer`。
-6. loopback bind。
-7. Python smoke client HELLO/PING。
-8. active client 下执行 plugin unload。
-9. 把实际测试结果写回本文件。
-
-在 M0 完成前：
-
-```text
-不要实现 Scene Entity
-不要实现 Mesh
-不要实现 Blender depsgraph
-```
+1. 在具有一致用户目录与源码根路径的 Windows 环境启动 Editor，完成 M0 transport smoke。
+2. 复测 Blender Cube 全量同步，确认 WorldOutline 中 Cube 子节点、Static Mesh 可见和重复同步稳定。
+3. 在 Blender 中安装 Add-on 并完成 M1–M5 场景、资源与恢复验收。
+4. 完成 M6 压力、内存、性能和视觉验收后再将各 milestone 标为 PASS。
 
 ---
 
@@ -392,27 +355,46 @@ M0 — Plugin Scaffold + Loopback Transport
 - [x] 选定 Principled-only Material MVP。
 - [x] 选定 loopback TCP。
 - [x] 完成 ExecPlan 拆分。
-- [ ] 开始 M0 代码实现。
+- [x] 完成 M0–M6 插件、协议、session、资源同步、增量同步和 Add-on 源码实现。
+- [x] 完成 `cmake --build --preset build-debug`（2026-10-04；exit 0）。
+- [x] 构建 Blender Add-on zip 并检查包内目录结构。
+- [x] 修复 Full Sync 覆盖 `Connected` 状态的问题并重新打包；Full Sync 不再使面板误显示为未连接。
+- [x] 根据 Blender 5.0.1 崩溃栈修复 evaluated mesh UV 读取：先批量复制 UV 数据，再计算 tangents，避免使用可能失效的 UV RNA collection 项。
+- [x] 修复重复 Full Sync 根节点：在当前 Scene 复用一个 transient LiveLink root 并清理其余匹配根；C++ 编译通过，最终 DLL 链接因 Editor 正在加载该 DLL 而被 `LNK1168` 阻止。
+- [x] 根据运行时诊断修复 64 位 ECS Entity 被 `unsigned int` 截断：LiveLink 根节点与实体映射统一使用 `ECS::Entity`；`AiluBlenderLiveLink` Debug target 构建通过。
+- [x] ObjectUpsert 失败诊断改为仅输出 Warning，避免大型场景全量同步时逐对象刷屏。
+- [x] 修复 LiveLink Mesh bounds 数量不满足 Renderer 约定的问题：生成整体 bounds 加每个 submesh 的 bounds，并初始化 StaticMeshComponent transformed bounds，避免 `Renderer.cpp` 对 `_transformed_aabbs[submesh_index + 1]` 越界。
+- [x] 修复 Blender 5 全量同步 Sun 时的 Python TypeError：光线方向矩阵乘法改用 `mathutils.Vector`；重新生成 Add-on ZIP。
+- [x] 修复 transport smoke client 的 PowerShell 多行条件语法；PowerShell AST parse 通过。
+- [x] 尝试 Editor runtime acceptance；确认当前 sandbox 用户目录不匹配是阻塞原因，测试进程已停止且 Editor 配置已恢复。
 
 ---
 
 # Latest Validation
 
-当前仅完成：
+通过：
 
 ```text
-source-level architecture inspection
+cmake --build --preset build-debug
+git diff --check
+BuildBlenderLiveLinkAddon.ps1 and ZIP package layout inspection
+PowerShell AST parse for `livelink_smoke_client.ps1`
+`cmake --build --preset build-debug --target AiluBlenderLiveLink`（exit 0；包含 ObjectUpsert 诊断日志）
+`git diff --check -- Plugins/BlenderLiveLink`（exit 0）
+`cmake --build --preset build-debug`（2026-10-05；exit 0，包含 Mesh bounds 修复）
+`BuildBlenderLiveLinkAddon.ps1`（exit 0，包含 Blender Vector 类型修复）
 ```
 
-尚未执行：
+尚未通过/无法执行：
 
 ```text
-Live Link build
-Live Link runtime test
-Blender addon test
+Editor autoload/live bind (startup path resolves under `C:\Users\CodexSandboxOffline\OneDrive\AiluEngine`, while this checkout is `C:\Users\BoomBac\OneDrive\AiluEngine`); after the latest DLL rebuild, the Blender Cube full-sync retest and diagnostic log review are also pending.
+HELLO/PING-PONG and malformed packet smoke (no server listener)
+active-client unload/reload and port rebind
+Blender add-on syntax/runtime, scene synchronization, and visual acceptance (Blender and Python interpreter unavailable)
 ```
 
-所以不得把任何 milestone 标记为 PASS。
+M0 runtime and M1–M6 Editor/Blender acceptance remain pending. M1–M6 source implementation proceeded because the user explicitly requested completion through M6 in one task; no runtime or visual gates are marked PASS.
 
 ---
 
@@ -799,8 +781,8 @@ play-mode recovery
 当前：
 
 ```text
-Planning complete
-Implementation not started
+M0 implementation in progress
+Debug build passed; runtime acceptance pending
 ```
 
 最终完成时修改为：
@@ -848,3 +830,234 @@ AiluEngine Blender Live Link MVP complete
 5. 新发现进入 `Surprises & Discoveries`。
 6. 新架构选择进入 `Decision Log`。
 7. 当前 milestone 全部 PASS 后再切换到下一 milestone。
+
+---
+
+# M6 Performance Optimization — 2026-10-05
+
+## Changes
+
+- Blender full-sync and dirty-update batches export each material GUID once.
+- Roughness/metallic packing uses NumPy vectorization, caches identical inputs, and removes its temporary Image datablock after saving.
+- Ailu texture cache shares resources by normalized path, texture content/color space, and file fingerprint across materials.
+- Packed/generated Blender images are saved once until an image/material/node-tree update invalidates the cache.
+
+## Validation
+
+- `cmake --build --preset build-debug`: PASS; `AiluBlenderLiveLink.dll` linked.
+- `Tools/Blender/BuildBlenderLiveLinkAddon.ps1`: PASS; rebuilt ZIP contains updated sync modules.
+- Blender Python syntax/runtime and Pine Forest before/after timing: NOT RUN (Blender executable unavailable in this environment).
+- M6 measured performance and large-scene runtime acceptance remain pending.
+
+# External Texture Load Guard — 2026-10-06
+
+The `LoadExternalTexture` overloads now reject unsupported extensions, invalid setting types, and null/failed parser results before calling `Apply()`. This prevents a null `Ref<Texture2D>` from reaching `GpuResource::SetCreatedFence()` and replaces throwing reference `dynamic_cast` with a checked pointer cast so invalid settings produce a logged load failure instead of `std::bad_cast`.
+
+Validation: `cmake --build --preset build-debug` PASS. Editor runtime reproduction remains pending.
+
+# M6 Transfer and Import Diagnostics — 2026-10-06
+
+## Changes
+
+- Blender full sync reports scene scan, material/object extraction, geometry export, generation time, object/mesh/material counts, and bytes plus `sendall`/queue-wait totals grouped by protocol message type.
+- Slow per-mesh export and slow material preparation emit object/material name, payload size or texture-path count, and elapsed time.
+- Ailu reports receive time, main-thread queue wait, Apply time, message counts/bytes by type, and slow individual Apply commands.
+- Each Ailu texture-cache miss reports local file size, texture usage, load result, and total parser-plus-Apply time; exceptions include the path and exception text.
+- Texture paths are sent over TCP; image bytes are read from the referenced local path by Ailu. The new logs keep those costs distinct.
+
+## Validation
+
+- `cmake --build --preset build-debug`: PASS; Blender Live Link DLL linked.
+- `Tools/Blender/BuildBlenderLiveLinkAddon.ps1`: PASS; ZIP rebuilt.
+- Python `py_compile`: NOT RUN; the installed Windows Store Python launcher cannot start in this environment.
+- Blender runtime timing and Hidden Alley import: PENDING; no Blender executable is available here.
+- M6 measured performance and Editor/Blender runtime acceptance remain pending.
+
+# HDR and Invalid Image Robustness — 2026-10-06
+
+## Changes
+
+- Blender Live Link converts external EXR images to temporary PNG files before transfer, including files using compression that the engine's TinyEXR build cannot decode. Color EXRs are converted from linear Rec.709 values for PNG output; data maps retain their numeric channel values.
+- Roughness/metallic packing now skips scalar images that remain empty after reload, handles unreadable pixel buffers, and only emits a packed texture when at least one source channel was copied.
+- HDRParser now accepts both RGB and RGBA float buffers, copies decoded pixels into engine-owned memory, and frees decoder buffers with their matching allocator. Invalid dimensions/channel counts fail cleanly.
+
+## Validation
+
+- `cmake --build --preset build-debug`: PASS; Engine, Editor, and Blender Live Link targets linked.
+- `Tools/Blender/BuildBlenderLiveLinkAddon.ps1`: PASS; rebuilt `Tools/Blender/dist/ailu_live_link.zip`.
+- Python syntax/runtime and Hidden Alley Blender-to-Editor reproduction: NOT RUN; Blender 5.0 executable and bundled Python are unavailable in this environment.
+- DWA-compressed EXR still cannot be decoded directly by the engine TinyEXR parser; Live Link avoids this by converting it inside Blender. Direct `HDRParser` use on unsupported DWA EXRs remains unsupported.
+
+# Preserve Live Link Scene Across Transport Interruptions — 2026-10-06
+
+## Findings and Changes
+
+- A client disconnect and incoming-command queue overflow both called `Clear()`, which removed the transient Live Link root and therefore all imported scene entities. This explains the scene clearing observed after the client disconnected and reconnected.
+- Disconnect/overflow now preserve current entities, meshes, materials, and textures, while setting `_needs_full_resync` and ending any interrupted sync. Reconnection's next full-sync `Begin/End` reconciles the existing scene against the new Blender snapshot.
+- Rebuilt the Blender add-on ZIP; verified it contains the zero-dimension roughness/metallic guards from the prior fix.
+
+## Validation
+
+- `cmake --build --preset build-debug`: PASS; `AiluBlenderLiveLink.dll` linked.
+- `Tools/Blender/BuildBlenderLiveLinkAddon.ps1`: PASS; rebuilt `Tools/Blender/dist/ailu_live_link.zip` and inspected packed `material_sync.py` for invalid-dimension and empty-channel guards.
+- Targeted `git diff --check`: PASS.
+- Editor reconnect and Hidden Alley runtime reproduction: PENDING; cannot run Blender/Editor scene sync in this environment.
+- The reported 28.55 MB mesh took 780.21 ms in Apply; this is a performance warning but is not itself evidence of why the TCP client disconnected.
+
+# TLAS Buffer Capacity on Large Live Link Reimport — 2026-10-06
+
+## Findings and Changes
+
+- Crash at `GPUBuffer::SetDataInternal` was the TLAS upload size assertion: `Scene` allocated 2000 `LBVHNode` elements while `kMaxRenderObjectCount` is 2000 and `BVHBuilder::Build(1)` can produce up to roughly `2N - 1` nodes.
+- Scene now reserves `2 * RenderConstants::kMaxRenderObjectCount` TLAS nodes and asserts the builder output remains within that supported capacity.
+
+## Validation
+
+- `cmake --build --preset build-debug`: PASS; Engine, Editor, and Blender Live Link targets linked.
+- Targeted `git diff --check`: PASS.
+- Runtime reimport of the user's scene and GPU stress validation: PENDING; not run in this environment.
+
+# Hidden Alley Missing Texture Export — 2026-10-09
+
+## Findings and Changes
+
+- Direct-image-only discovery dropped base color paths behind Hue/Saturation, Gamma, Mix and Moss_Global groups.
+  Image discovery now follows reroutes and group socket identifiers, retaining the primary image branch through
+  adjustments/layers. Mix factors are not selected as color sources. Approximations and unsupported branches are logged.
+- Shader discovery follows the active Material Output through groups/reroutes. `floor_01_Main_02` uses a Principled
+  inside its group; choosing the first root-level Principled previously selected an unused node.
+- Linked base color images now use a white factor because Ailu multiplies image samples by `_AlbedoValue`, whereas
+  Blender replaces the linked socket's default. RM packing respects RGB/alpha selection and writes Non-Color data.
+- Normal layers/Bump retain a primary normal map where available. Height, color adjustments, procedural masks,
+  world-space projection and Mapping transforms are still approximations, not a full shader graph translation.
+- Packed/generated image export uses `save_copy` and restores path/format, preserving the source image configuration.
+
+## Validation
+
+- Blender 5.0.1 background export of `I:/Downloads/hidden_alley/ph_hidden_alley.blend`: base-color paths increased
+  from 81 to 108; 27 additional materials retain their source image, including brick walls, wood walls and floor.
+  Updated export produced 117 material payloads, zero exceptions and zero nonexistent output texture paths.
+- `Tools/Blender/tests/material_sync_smoke.py`: PASS in Blender 5.0.1; covers layer versus mask selection, group
+  routing, active grouped shader, normal/Bump fallback, scalar channels, linear RM, base factor, image state and cycles.
+- `cmake --build --preset build-debug`: PASS after allowing the existing external F-drive build output directory.
+- Add-on ZIP rebuilt and checked against source; targeted `git diff --check`: PASS.
+- Evidence: `Saved/BlenderTextureValidation/{scene_nodes,before,after}.json`, `smoke.log`, `build-debug.log`.
+- Fresh Blender-to-Editor sync, GPU texture binding and final visual acceptance: PENDING. No Editor was running;
+  background export proves source discovery and file preparation only. Install the rebuilt ZIP and run Full Sync.
+
+# Hidden Alley Foliage and Transparent Overlay Follow-up — 2026-10-09
+
+## Findings and Changes
+
+- `grass_medium_01.001`, `weed_plant_02` and both tree leaf materials route their grouped Principled through
+  Mix Shader/Add Shader. Discovery now walks these shader branches with the correct group-instance context.
+- Foliage uses separate alpha images or transparent/opaque Mix Shader factors. The add-on packs the mask into
+  base-color PNG alpha, handles either transparent-branch direction, and sends optional `alpha_test`, `alpha_cutoff`
+  and `double_sided` fields. The host applies existing Standard Lit AlphaTest and cull APIs, including reset to opaque.
+- `Material.001` on `decal_plane_mural` and `decal_plane_HavenAuto` actively outputs only Transparent BSDF; the old
+  fallback picked an unused Principled and made these planes opaque. Pure transparent outputs now use zero alpha
+  with clipping, preserving their invisibility instead of obscuring surfaces behind them.
+- Shader layering/translucency remains an explicit approximation. This adds foliage cutouts, not full alpha blending.
+
+## Validation
+
+- Blender 5.0.1 full Hidden Alley export: 121 material payloads, 112 base-color paths, zero exceptions and missing files.
+  Grass, weeds, both leaf materials, ivy and potted leaves all export alpha cutouts; `Material.001` exports alpha zero.
+- Blender smoke PASS: layered shaders inside groups, separate alpha packing and RGB preservation, reversed opacity,
+  pure transparent output priority, plus the prior image/RM/routing regression gates.
+- `cmake --build --preset build-debug`: PASS, including updated `AiluBlenderLiveLink.dll`.
+- Editor GPU validation: first attempt exceeded the 120-second startup wait while shaders were being prepared.
+  All nine backed-up configuration/session files were restored; only the test process was stopped. A bounded retry
+  with a 360-second startup wait uses a fresh evidence directory beside Debug `Editor.exe`.
+- Export/smoke/build evidence: `Saved/BlenderTextureValidation/followup-20261009/`.
+- Add-on ZIP rebuilt, bytecode excluded, packaged `material_sync.py` checked against source; targeted diff check PASS.
+- GPU acceptance remains FAILED / NOT ACCEPTED: runs 02-05 transported four sets of three 1280x704 GBuffer PNGs.
+  Run 02 could not read the sandbox-created temp texture. Runs 03-05 used workspace copies and logged successful
+  albedo/normal/RM imports, but the sentinel-colored test geometry was not visible as expected; run 05 produced
+  thin edge-like output despite inspected entity local transforms matching the requested pose. The image gates
+  did not establish alpha cutout or overlay invisibility. No general rendering change was made on this evidence.
+  Final run 05 has three consecutive `engine_frame` values per case and finite pixels, which are transport/integrity
+  evidence only. All nine backed-up configuration/session files were restored after every run.
+- GPU evidence is beside the exercised executable at
+  `F:/AiluEngine/artifacts/out/editor/bin/x64/debug/BlenderAlphaValidation-20261009-{01..05}/`.
+  Full Hidden Alley runtime visual acceptance remains open; restart the updated Debug Editor and reinstall the ZIP.
+
+# Hidden Alley Material Graph Coverage Repair — 2026-10-09
+
+- Added native CPU Cycles channel baking for complex surface graphs, including nested shader groups/Mix/Add,
+  group defaults, scalar masks, color adjustments, Mapping/UV/world coordinates and procedural Bump. Bake atlases
+  and material identities are coordinated with mesh/object transport; compatible UV-only instances share resources.
+- Alpha supports continuous blending and clipping, opaque culling is synchronized, image/group dependencies mark
+  affected objects dirty, and explicit empty texture paths clear stale host bindings. Optional shader keywords
+  preserve linear opacity and emission texture strength without changing existing material asset defaults.
+- Surface-only non-Principled materials now export; volume-only helpers remain invisible and explicitly report
+  unsupported volume transport. Shader lobe equivalence, ray/view-dependent effects and world lighting remain limits.
+- Both Blender 5.0.1 smoke suites PASS. All 122 Hidden Alley mesh-slot materials export with zero exceptions and
+  missing files; original datablock counts restored. Debug build PASS; ZIP's 13 Python modules match source.
+- GPU run 04 PASS for controlled color changes, alpha cutout, transparent queue, continuous composition, texture
+  unlink and restoration. 30 PNG frames / ten sequences, 1280x704, consecutive engine_frame per three-frame set.
+  All nine backed-up files restored. Evidence:
+  F:/AiluEngine/artifacts/out/editor/bin/x64/debug/BlenderMaterialBakeValidation-20261009-04/analysis.json.
+- Full Hidden Alley live Editor appearance/performance remains open. First complex sync is more expensive because
+  native bakes run on Blender's main thread. Details: completed/blender-material-graph-repair.md.
+
+# Import Descriptor Page Growth Crash — 2026-10-09
+
+- Fixed GPUVisibleDescriptorAllocator's staging-page pointer invalidation when its vector grew beyond ten pages.
+  Allocations borrow page pointers; deque now preserves addresses. Removed the shared first-allocation reserve flag
+  and ten-page assertion. Shader-visible heap capacities and fence/lifetime policy remain unchanged.
+- Debug build PASS. Native DX12 regression PASS for two independent allocators: 16 pages/16,369 descriptors each,
+  concurrent old-page copies, release/reuse/generation checks and zero D3D12 ERROR/CORRUPTION messages.
+  All nine backed-up files restored. Evidence: Debug Editor directory/DescriptorPageGrowthValidation-20261009-02/.
+- Full Hidden Alley import and visual acceptance remain open. Details: completed/descriptor-page-growth-crash.md.
+
+# Blender Native Node Clone Crash — 2026-10-09
+
+- Supplied Blender native/Python stack points to ChannelGraph.output while constructing RNA node input wrappers.
+  Removed writes to shared node-type registration/bl_* properties; snapshot source inputs before recursive cloning.
+  Source confirms unsafe shared-type writes; exact native crash has not been reproduced.
+- Old code fails a native instance-write audit on bl_idname; repaired code passes and clones 1,488 real graphs.
+  Interactive timer node-path test covers all 1,620 material/object combinations with restored datablock counts.
+  Graph-only fixture does not bake textures or encode mesh payloads. Native Cycles smoke and 122 material
+  representative exports PASS at 16px; zero missing paths/exceptions. Debug build PASS.
+- ZIP rebuilt and installed/enabled in Blender 5.0; 13 files match, fresh startup hash verified. Full scene
+  bake/mesh/Editor transport and visual acceptance remain open. Details: completed/blender-node-clone-crash.md.
+
+# Blender Python Transport Thread Crash — 2026-10-09
+
+- Second supplied crash is in network worker queue.get/PyException_SetTraceback while the main thread executes
+  Blender timer/operators. Removed persistent Python worker; existing timer drives bounded nonblocking socket
+  connect/handshake, fragmented reads, partial sends and retries. Packet generation advances sends during Full Sync.
+- Real TCP regressions PASS for partial 8MB writes/SHA256, fragmented ACK, rejection, disconnect/reconnect,
+  invalid packet, coalescing/deletion, overflow and refused port. Native timer Cycles regression while connected
+  PASS for both source and installed module; four packets received, only MainThread, Thread.start forbidden.
+- Debug build/package/install/startup PASS; 13 modules verified. Restart Blender to unload the old worker/module.
+  Exact native crash determinism and full Hidden Alley import/visual/performance acceptance remain open.
+  Details: completed/blender-threaded-transport-crash.md.
+
+# Blender Full Sync Performance Regression — 2026-10-09
+
+- Repaired per-object over-baking, retained channel/image buffers and scene-wide mesh cache. AUTO uses supported
+  shared image materials/source UVs and explicit approximations; unresolved graphs use 256px native fallback.
+  Explicit BAKE keeps native evaluation/unique atlas/1024px quality. Four mesh LRU entries and per-pass cleanup.
+- Bulk typed mesh encoding and indexed mesh-loop vertices preserve corner attributes while avoiding Python tuple
+  expansion and single-mesh 256MiB overflow. Missing/failed tangents use a deterministic default.
+- Full Hidden Alley default-quality native UI timer + complete binary mesh encoding + real TCP peer PASS:
+  3m26s, 1,363 meshes, 182 materials, 2,967 packets, 784,883,856 bytes; OS process peak working set 5.86GiB.
+  Source datablock counts, scene and view layer restored. Earlier guarded/overflow runs are recorded as failures.
+- Direct/native/indexed mesh/lifetime regressions, Debug build, package/install and installed TCP/native timer PASS.
+  13 installed Python modules verified; restart Blender. Actual Editor import/VRAM/visual acceptance remains open.
+  Details: completed/blender-sync-performance-regression.md; Saved/BlenderTextureValidation/performance-full-scene-05.json.
+
+# Blender Export Self-Generated Updates — 2026-10-10
+
+- Supplied FullSync summary ends one batch; later material packets are new incremental messages. Reproduced
+  exporter-induced feedback: native procedural plane sent nine idle object/material/mesh updates in 1.5 seconds.
+- Full/incremental exports suppress exporter side effects and drain deferred source view-layer notifications
+  before restoring tracking. Real pending edits are processed before entry; no time window drops user edits.
+- Source/installed native timer regressions PASS: no idle resend, transform/material edits each send one update,
+  no subsequent self-trigger; exception cleanup restores tracking. Native dependency/channel regression PASS.
+- Full Hidden Alley default-quality native export/idle PASS: 199.125s / 2,967 full messages / zero idle updates;
+  a transform edit still sends exactly one object/material/mesh update. Recording peer, not live Editor acceptance.
+- Debug build/package/install PASS; 13 installed files verified, backup 20261010-003212. Restart Blender.
+  Details: completed/blender-sync-self-generated-updates.md; Saved/BlenderTextureValidation/sync-idle-full-scene.json.

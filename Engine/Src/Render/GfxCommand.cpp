@@ -113,19 +113,69 @@ namespace Ailu::Render
     {
         if (g_pCommandPool == nullptr)
         {
-            g_pCommandPool = AL_NEW_TAG(EMemoryTag::kRenderer, CommandPool);
+            auto command_pool = AL_NEW_TAG(EMemoryTag::kRenderer, CommandPool);
+            if (command_pool == nullptr)
+                throw std::bad_alloc();
+            g_pCommandPool = command_pool;
+            g_pCommandPool->_owned_payloads.reserve(kCommandPoolPayloadCount);
             for (u32 i = 0; i < kCommandPoolPayloadCount; ++i)
-                g_pCommandPool->_payload_pool.Push(AL_NEW(CommandPayload));
+            {
+                auto payload = AL_NEW(CommandPayload);
+                if (payload == nullptr)
+                    throw std::bad_alloc();
+                g_pCommandPool->_owned_payloads.push_back(payload);
+                g_pCommandPool->_payload_pool.Push(payload);
+            }
         }
     }
+
+    CommandPayload *CommandPool::AcquirePayload()
+    {
+        auto payload = _payload_pool.Pop().value_or(nullptr);
+        if (payload == nullptr)
+        {
+            std::lock_guard lock(_growth_mutex);
+            payload = _payload_pool.Pop().value_or(nullptr);
+            if (payload == nullptr)
+            {
+                _owned_payloads.reserve(_owned_payloads.size() + kCommandPoolPayloadGrowthCount);
+                for (u32 i = 0; i < kCommandPoolPayloadGrowthCount; ++i)
+                {
+                    auto new_payload = AL_NEW(CommandPayload);
+                    if (new_payload == nullptr)
+                        break;
+
+                    _owned_payloads.push_back(new_payload);
+                    if (payload == nullptr)
+                        payload = new_payload;
+                    else
+                        _payload_pool.Push(new_payload);
+                }
+
+                if (payload == nullptr)
+                {
+                    LOG_ERROR("Failed to grow GPU command payload pool; allocation returned null");
+                    throw std::bad_alloc();
+                }
+
+                LOG_WARNING("Expanded GPU command payload pool to {} payloads", _owned_payloads.size());
+            }
+        }
+
+        payload->_in_use.store(true, std::memory_order_release);
+        return payload;
+    }
+
     void CommandPool::Shutdown()
     {
         if (g_pCommandPool == nullptr)
             return;
 
-        while (auto payload = g_pCommandPool->_payload_pool.Pop())
+        for (auto &payload : g_pCommandPool->_owned_payloads)
         {
-            AL_DELETE(payload.value());
+            if (payload->_in_use.load(std::memory_order_acquire))
+                DestroyCommand(static_cast<GfxCommand *>(static_cast<void *>(payload->Data())));
+            AL_DELETE(payload);
         }
 
         AL_DELETE(g_pCommandPool);

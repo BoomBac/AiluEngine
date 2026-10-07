@@ -1572,7 +1572,9 @@ namespace Ailu
                         SceneMgr::Get().ActiveScene()->RemoveObject(e);
                     Selection::RemoveSlection();
                 }
-                if (key_e.GetKeyCode() == EKey::kF)
+                if (key_e.GetKeyCode() == EKey::kF &&
+                    !Input::IsKeyDown(EKey::kCONTROL) && !Input::IsKeyDown(EKey::kLCONTROL) &&
+                    !Input::IsKeyDown(EKey::kRCONTROL))
                 {
                     static u16 s_count = 1;
                     Solver::s_is_apply_constraint = s_count % 2;

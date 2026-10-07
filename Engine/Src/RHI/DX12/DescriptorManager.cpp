@@ -282,13 +282,6 @@ namespace Ailu::RHI::DX12
 	GPUVisibleDescriptorAllocation GPUVisibleDescriptorAllocator::Allocate(u16 num, D3D12_DESCRIPTOR_HEAP_TYPE type)
 	{
 		std::lock_guard lock(_mutex);
-		static bool s_first_alloc = true;
-		if (s_first_alloc)
-		{
-			//防止vec扩容后，原有的allocation中存储的page指针失效
-			_pages.reserve(10);
-			s_first_alloc = false;
-		}
 		AL_ASSERT_MSG(num < kMaxDescriptorNumPerPage, "GPUVisibleDescriptorAllocator bad alloc: num to large!");
 		if (!_page_free_space_lut.contains(type))
 		{
@@ -302,7 +295,6 @@ namespace Ailu::RHI::DX12
             if (page_it == _page_free_space_lut[type].end())
             {
                 page_it = AddNewPage(type);
-                AL_ASSERT(_pages.size() <= 10);
             }
 		}
 		auto& page = _pages[page_it->second];

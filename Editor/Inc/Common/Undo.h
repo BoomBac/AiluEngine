@@ -11,6 +11,7 @@
 #include "Scene/Component.h"
 #include "Scene/Scene.h"
 #include "Scene/SceneCommand.h"
+#include "Framework/Core/Delegate.h"
 #include <stack>
 
 namespace Ailu
@@ -230,6 +231,7 @@ private:                                                                  \
         class CommandManager
         {
         public:
+            Delegate<>::EventView BeforeHistoryChange() { return _before_history_change.GetEventView(); }
             void ExecuteCommand(std::unique_ptr<ICommand> command)
             {
                 command->Execute();
@@ -242,6 +244,7 @@ private:                                                                  \
 
             void Undo()
             {
+                _before_history_change.Invoke();
                 if (!m_UndoStack.empty())
                 {
                     auto command = std::move(m_UndoStack.top());
@@ -254,6 +257,7 @@ private:                                                                  \
 
             void Redo()
             {
+                _before_history_change.Invoke();
                 if (!m_RedoStack.empty())
                 {
                     auto command = std::move(m_RedoStack.top());
@@ -265,6 +269,7 @@ private:                                                                  \
             }
             const List<ICommand *> &UndoViews() const { return _undo_views; }
         private:
+            Delegate<> _before_history_change;
             std::stack<std::unique_ptr<ICommand>> m_UndoStack;
             std::stack<std::unique_ptr<ICommand>> m_RedoStack;
             List<ICommand *> _undo_views;

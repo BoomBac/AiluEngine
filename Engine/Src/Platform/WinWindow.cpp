@@ -665,6 +665,7 @@ namespace Ailu
                 if (wParam == SIZE_MINIMIZED)
                 {
                     WindowMinimizeEvent e;
+                    e._window = this;
                     _data.Handler(e);
                 }
                 else

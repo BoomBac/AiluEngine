@@ -64,7 +64,7 @@ namespace Ailu
                 if (auto *title_widget = header_box->ChildAt(0))
                     title_widget->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto);
 
-                if (info._is_enableable && info._is_enabled && info._set_enabled)
+                if (_selected_entities.size() == 1 && info._is_enableable && info._is_enabled && info._set_enabled)
                 {
                     auto *enabled_checkbox = header_box->AddChild<UI::CheckBox>();
                     enabled_checkbox->SetChecked(info._is_enabled(SceneMgr::Get().ActiveScene()->GetRegister(), entity));
@@ -119,6 +119,13 @@ namespace Ailu
             ComponentEditorContext context;
             context._scene = SceneMgr::Get().ActiveScene();
             context._entity = _selected_entity;
+            context._entities = _selected_entities;
+            context._is_current = [scene = context._scene, revision = Selection::Revision(),
+                                   structure_revision = context._scene->StructureRevision()]
+            {
+                return SceneMgr::Get().ActiveScene() == scene && Selection::Revision() == revision &&
+                    scene->StructureRevision() == structure_revision;
+            };
             context._component_info = &info;
             context._content = static_cast<UI::VerticalBox *>(block->GetContent()->AddChild<UI::VerticalBox>());
             context._request_rebuild = [this]()
@@ -145,11 +152,13 @@ namespace Ailu
             _entity_enabled_checkbox->_on_click += [this](bool checked)
             {
                 auto *scene = SceneMgr::Get().ActiveScene();
-                if (scene != nullptr && _selected_entity != ECS::kInvalidEntity)
+                if (scene == _selected_scene && _selected_entities.size() == 1 && scene != nullptr &&
+                    scene->IsValidEntity(_selected_entity))
                     scene->SetEntityEnabled(_selected_entity, checked);
             };
             _add_component_button = name_row->AddChild<UI::Button>();
             _add_component_button->SetText("+");
+            _single_entity_buttons.push_back(_add_component_button);
             _add_component_button->GetSlotAs<UI::LinearSlot>()
                     .SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFixed)
                     .Size({UI::CollapsibleView::s_header_height, UI::CollapsibleView::s_header_height});
@@ -160,13 +169,14 @@ namespace Ailu
             };
             auto *unpack_button = name_row->AddChild<UI::Button>();
             unpack_button->SetText("Unpack");
+            _single_entity_buttons.push_back(unpack_button);
             unpack_button->GetSlotAs<UI::LinearSlot>()
                     .SizePolicy(UI::ESizePolicy::kAuto, UI::ESizePolicy::kFixed)
                     .Size({64.0f, UI::CollapsibleView::s_header_height});
             unpack_button->OnMouseClick() += [this](UI::UIEvent &e)
             {
                 auto *scene = SceneMgr::Get().ActiveScene();
-                if (scene != nullptr && _selected_entity != ECS::kInvalidEntity &&
+                if (_selected_entities.size() == 1 && scene != nullptr && _selected_entity != ECS::kInvalidEntity &&
                     SceneManagement::PrefabSystem::Unpack(*scene, _selected_entity))
                     _needs_rebuild = true;
                 e._is_handled = true;
@@ -175,13 +185,14 @@ namespace Ailu
             {
                 auto *button = name_row->AddChild<UI::Button>();
                 button->SetText(String(text));
+                _single_entity_buttons.push_back(button);
                 button->GetSlotAs<UI::LinearSlot>()
                         .SizePolicy(UI::ESizePolicy::kAuto, UI::ESizePolicy::kFixed)
                         .Size({64.0f, UI::CollapsibleView::s_header_height});
                 button->OnMouseClick() += [this, action = std::forward<decltype(action)>(action)](UI::UIEvent &e)
                 {
                     auto *scene = SceneMgr::Get().ActiveScene();
-                    if (scene != nullptr && _selected_entity != ECS::kInvalidEntity)
+                    if (_selected_entities.size() == 1 && scene != nullptr && _selected_entity != ECS::kInvalidEntity)
                     {
                         const Guid *root_guid = scene->FindEntityGuid(_selected_entity);
                         if (root_guid != nullptr)
@@ -205,12 +216,14 @@ namespace Ailu
             };
             auto *refresh_button = name_row->AddChild<UI::Button>();
             refresh_button->SetText("Refresh");
+            _single_entity_buttons.push_back(refresh_button);
             refresh_button->GetSlotAs<UI::LinearSlot>()
                     .SizePolicy(UI::ESizePolicy::kAuto, UI::ESizePolicy::kFixed)
                     .Size({64.0f, UI::CollapsibleView::s_header_height});
             refresh_button->OnMouseClick() += [this](UI::UIEvent &e)
             {
-                if (auto *scene = SceneMgr::Get().ActiveScene(); scene != nullptr && _selected_entity != ECS::kInvalidEntity &&
+                if (auto *scene = SceneMgr::Get().ActiveScene(); _selected_entities.size() == 1 && scene != nullptr &&
+                    _selected_entity != ECS::kInvalidEntity &&
                     SceneManagement::PrefabSystem::Refresh(*scene, _selected_entity))
                     _needs_rebuild = true;
                 e._is_handled = true;
@@ -219,13 +232,15 @@ namespace Ailu
             { SceneManagement::PrefabSystem::RevertAll(scene, root, prefab); });
             _vb->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto);
 
-            Selection::on_selection_changed += [this]()
+            _selection_subscription = Selection::on_selection_changed += [this]()
             {
                 _needs_rebuild = true;
             };
         }
         ObjectDetail::~ObjectDetail()
         {
+            Selection::on_selection_changed.Unsubscribe(_selection_subscription);
+            ClearComponentEntries();
             JsonArchive ar;
             ar << *_content_widget;
             ar.Save("ObjectDetailLayout.json");
@@ -234,7 +249,7 @@ namespace Ailu
         void ObjectDetail::ShowAddComponentPopup(UI::UIElement *anchor)
         {
             auto *scene = SceneMgr::Get().ActiveScene();
-            if (_selected_entity == ECS::kInvalidEntity || scene == nullptr || anchor == nullptr)
+            if (_selected_entities.size() != 1 || _selected_entity == ECS::kInvalidEntity || scene == nullptr || anchor == nullptr)
                 return;
 
             auto popup = MakeRef<UI::VerticalBox>();
@@ -320,11 +335,11 @@ namespace Ailu
             if (scene == nullptr)
                 return;
 
-            entry._block = CreateComponentBlock(info, entity, info._allow_remove);
+            entry._block = CreateComponentBlock(info, entity, _selected_entities.size() == 1 && info._allow_remove);
 
-            if (info._create_editor)
+            entry._custom_editor = ComponentEditorRegistry::Get().CreateEditor(info, _selected_entities.size() > 1);
+            if (entry._custom_editor != nullptr)
             {
-                entry._custom_editor = info._create_editor();
                 auto context = BuildContext(info, entry._block);
                 entry._custom_editor->Build(context);
             }
@@ -367,6 +382,10 @@ namespace Ailu
                 if (!info._has_component || !info._has_component(registry, entity))
                     continue;
 
+                if (!std::all_of(_selected_entities.begin(), _selected_entities.end(), [&](ECS::Entity target)
+                    { return info._has_component(registry, target); }))
+                    continue;
+
                 BuildComponentEntry(info, entity);
             }
         }
@@ -375,30 +394,44 @@ namespace Ailu
         {
             DockWindow::Update(dt);
 
-            const ECS::Entity selected = Selection::FirstEntity();
+            auto *scene = SceneMgr::Get().ActiveScene();
+            Vector<ECS::Entity> entities;
+            if (scene != nullptr)
+                for (auto entity : Selection::SelectedEntities())
+                    if (scene->IsValidEntity(entity))
+                        entities.push_back(entity);
+            const ECS::Entity selected = entities.empty() ? ECS::kInvalidEntity : entities.front();
+            const bool single_selection = entities.size() == 1;
+            _entity_enabled_checkbox->SetInteractiveEnabled(single_selection);
+            for (auto *button : _single_entity_buttons)
+                button->SetInteractiveEnabled(single_selection);
             if (selected == ECS::kInvalidEntity)
             {
-                if (_selected_entity != ECS::kInvalidEntity)
+                if (!_selected_entities.empty())
                 {
                     _selected_entity = ECS::kInvalidEntity;
+                    _selected_entities.clear();
+                    _selected_scene = nullptr;
                     _name_text->SetText("Name: (No Selection)");
                     ClearComponentEntries();
                 }
                 return;
             }
 
-            if (_selected_entity != selected || _needs_rebuild)
+            if (_selected_scene != scene || _selected_entities != entities || _needs_rebuild ||
+                _scene_structure_revision != scene->StructureRevision())
             {
                 _selected_entity = selected;
+                _selected_entities = std::move(entities);
+                _selected_scene = scene;
                 Rebuild(selected);
+                _scene_structure_revision = scene->StructureRevision();
                 _needs_rebuild = false;
             }
 
-            auto *scene = SceneMgr::Get().ActiveScene();
-            if (scene == nullptr)
-                return;
-
-            if (auto comp = scene->GetRegister().GetComponent<ECS::TagComponent>(selected); comp != nullptr)
+            if (_selected_entities.size() > 1)
+                _name_text->SetText(std::format("{} entities selected", _selected_entities.size()));
+            else if (auto comp = scene->GetRegister().GetComponent<ECS::TagComponent>(selected); comp != nullptr)
             {
                 _name_text->SetText(comp->_name);
             }
@@ -411,6 +444,7 @@ namespace Ailu
                 ComponentEditorContext context;
                 context._scene = scene;
                 context._entity = selected;
+                context._entities = _selected_entities;
                 context._component_info = entry._component_info;
                 context._content = entry._block != nullptr
                     ? static_cast<UI::VerticalBox *>(entry._block->GetContent()->ChildAt(0))

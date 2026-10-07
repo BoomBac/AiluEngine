@@ -120,6 +120,9 @@ add_custom_target(ailu_reflection_run
 # 添加engine子目录
 add_subdirectory(Engine)
 
+# Editor plugins are discovered from <AiluRoot>/Plugins.
+add_subdirectory(Plugins/BlenderLiveLink)
+
 # 添加editor子目录
 add_subdirectory(Editor)
 # add_subdirectory(Player)

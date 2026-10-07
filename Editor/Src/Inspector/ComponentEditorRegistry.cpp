@@ -1,5 +1,6 @@
 #include "Inspector/ComponentEditorRegistry.h"
 #include "Scene/Scene.h"
+#include "Inspector/MultiComponentEditor.h"
 
 namespace Ailu
 {
@@ -33,6 +34,14 @@ namespace Ailu
         {
             static ComponentEditorRegistry s_instance;
             return s_instance;
+        }
+
+        Scope<IComponentEditor> ComponentEditorRegistry::CreateEditor(const ComponentEditorInfo &info, bool multi_edit) const
+        {
+            auto editor = info._create_editor ? info._create_editor() : nullptr;
+            if (multi_edit && (editor == nullptr || !editor->SupportsMultiEdit()))
+                return MakeScope<MultiComponentEditor>();
+            return editor;
         }
 
         const ComponentEditorInfo *ComponentEditorRegistry::Find(ECS::ComponentTypeId component_type) const

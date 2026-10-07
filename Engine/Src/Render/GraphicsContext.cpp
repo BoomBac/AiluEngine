@@ -38,6 +38,7 @@ namespace Ailu::Render
             g_pGfxContext->SetMultiThreadRendering(false);
             g_pGfxContext->WaitForGpu();
         }
+        CommandBufferPool::ReleaseAll();
         ImGuiRenderer::Shutdown();
         ConstBufferPool::ShutDown();
 		GraphicsPipelineStateMgr::Shutdown();

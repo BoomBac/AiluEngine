@@ -381,3 +381,5 @@ FodyWeavers.xsd
 Engine/Engine.zip
 Editor/Editor.zip
 AiluEngine_Source.zip
+Saved/
+Tools/Blender/tests/

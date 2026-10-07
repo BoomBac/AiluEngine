@@ -352,22 +352,24 @@ Ailu Editor UI 非本 milestone 必须项。
 
 # Progress
 
-- [ ] depsgraph handler。
-- [ ] dirty classification。
-- [ ] timer flush。
-- [ ] delete detection。
-- [ ] transform debounce。
-- [ ] mesh debounce。
-- [ ] material debounce。
-- [ ] Ailu command coalesce。
-- [ ] delete precedence。
-- [ ] queue byte bound。
-- [ ] overflow recovery。
-- [ ] reconnect。
-- [ ] auto full sync。
-- [ ] scene switch recovery。
-- [ ] play mode recovery。
-- [ ] status UI。
+- [x] depsgraph handler。
+- [x] dirty classification。
+- [x] timer flush。
+- [x] delete detection。
+- [x] transform debounce。
+- [x] mesh debounce。
+- [x] material debounce。
+- [x] Ailu command coalesce。
+- [x] delete precedence。
+- [x] queue byte bound。
+- [x] overflow recovery source path。
+- [x] reconnect。
+- [x] auto full sync。
+- [x] scene switch recovery。
+- [x] play mode recovery。
+- [x] status UI。
+
+源码与 Editor Debug 构建通过；连续编辑、断连恢复和 overflow recovery 压力验收未运行。
 
 ---
 

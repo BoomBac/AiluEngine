@@ -2,6 +2,7 @@
 #include "Framework/Parser/HDRParser.h"
 #include "Framework/Common/Allocator.hpp"
 #include "Framework/Common/StackTrace.h"
+#include <cstdlib>
 //#ifndef STB_IMAGE_IMPLEMENTATION
 //#define STB_IMAGE_IMPLEMENTATION
 //#endif // !STB_IMAGE_IMPLEMENTATION
@@ -57,15 +58,17 @@ namespace Ailu
 	bool HDRParser::LoadTextureData(const WString &sys_path,TextureLoadData& data)
 	{
 		//stbi_set_flip_vertically_on_load(true);
-		i32 w,h,n;
+		i32 w = 0, h = 0, n = 0;
 		auto sys_path_n = ToChar(sys_path);
         f32 *raw_data = nullptr;
+        bool is_exr = false;
         if (su::EndWith(sys_path_n, "hdr"))
         {
             raw_data = stbi_loadf(sys_path_n.data(), &w, &h, &n, 0);
         }
         else if (su::EndWith(sys_path_n, "exr"))
         {
+            is_exr = true;
             const char *err = nullptr;
             if (int ret = LoadEXR(&raw_data, &w, &h, sys_path_n.data(), &err); ret != TINYEXR_SUCCESS)
             {
@@ -86,22 +89,20 @@ namespace Ailu
 		}
 		else
 		{
-			if (n == 3)
+			if (w <= 0 || h <= 0 || w > UINT16_MAX || h > UINT16_MAX || (n != 3 && n != 4))
 			{
-				const size_t data_size = static_cast<size_t>(w) * static_cast<size_t>(h) * static_cast<size_t>(n);
-				f32 *new_data = AL_ALLOC_TAG(EMemoryTag::kTemporary, f32, data_size);
-				memcpy(new_data, raw_data, data_size * sizeof(f32));
-				stbi_image_free(raw_data);
-				data._width = w;
-				data._height = h;
-				data._format = ETextureFormat::kRGBFloat;
-				data._data.emplace_back(reinterpret_cast<u8 *>(new_data));
-			}
-			else
-			{
-				LOG_WARNING("Unsupported HDR format: {} with 4 channel", sys_path_n);
+				LOG_ERROR("Unsupported HDR dimensions or channel count: {} ({}x{}, {} channels)", sys_path_n, w, h, n);
+				is_exr ? std::free(raw_data) : stbi_image_free(raw_data);
 				return false;
 			}
+			const size_t data_size = static_cast<size_t>(w) * static_cast<size_t>(h) * static_cast<size_t>(n);
+			f32 *new_data = AL_ALLOC_TAG(EMemoryTag::kTemporary, f32, data_size);
+			memcpy(new_data, raw_data, data_size * sizeof(f32));
+			is_exr ? std::free(raw_data) : stbi_image_free(raw_data);
+			data._width = static_cast<u16>(w);
+			data._height = static_cast<u16>(h);
+			data._format = n == 3 ? ETextureFormat::kRGBFloat : ETextureFormat::kRGBAFloat;
+			data._data.emplace_back(reinterpret_cast<u8 *>(new_data));
 		}
 		return true;
 	}

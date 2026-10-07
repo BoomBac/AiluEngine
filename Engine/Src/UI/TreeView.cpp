@@ -700,6 +700,15 @@ namespace Ailu
             }
         }
 
+        void TreeView::SetExpandedItems(const std::unordered_set<TreeItemId> &items)
+        {
+            if (!_data_source)
+                return;
+
+            _expanded_items = items;
+            Refresh();
+        }
+
         bool TreeView::IsExpanded(TreeItemId item) const
         {
             return _expanded_items.contains(item);

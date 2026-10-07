@@ -8,6 +8,8 @@
 //Queue: Transparent
 //Blend: Src,OneMinusSrc
 //multi_compile _ ALPHA_TEST
+//multi_compile _ EMISSION_TEXTURE_FACTOR
+//multi_compile _ LINEAR_ALPHA
 //multi_compile _ PER_OBJECT_CB
 //pass end::
 //pass begin::
@@ -86,7 +88,9 @@ float4 ForwardPSMain(StandardPSInput input) : SV_TARGET
 	SurfaceData surface_data;
 	InitSurfaceData(input, surface_data);
 	float alpha = surface_data.albedo.a;
+#ifndef LINEAR_ALPHA
 	alpha = pow(alpha,0.4545);
+#endif
 #ifdef ALPHA_TEST
 	clip(alpha - _AlphaCulloff);
 #endif

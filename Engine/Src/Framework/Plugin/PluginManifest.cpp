@@ -7,6 +7,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <string_view>
 
 namespace Ailu
 {
@@ -59,7 +60,19 @@ namespace Ailu
             const String type = document["type"].GetString();
             if (type != "runtime" && type != "editor")
                 return reject("type must be runtime or editor");
-            const String library = document["library"].GetString();
+            String library = document["library"].GetString();
+            constexpr std::string_view kBuildConfigToken = "{config}";
+            size_t config_token = library.find(kBuildConfigToken);
+            while (config_token != String::npos)
+            {
+#if defined(AILU_BUILD_CONFIG_NAME)
+                constexpr std::string_view kBuildConfigName = AILU_BUILD_CONFIG_NAME;
+                library.replace(config_token, kBuildConfigToken.size(), kBuildConfigName);
+                config_token = library.find(kBuildConfigToken, config_token + kBuildConfigName.size());
+#else
+                return reject("library uses {config} but build configuration is unavailable");
+#endif
+            }
             const auto relative_library = fs::u8path(library).lexically_normal();
             if (relative_library.empty() || relative_library == "." || relative_library.has_root_path()
                 || *relative_library.begin() == ".." || library.find(':') != String::npos)

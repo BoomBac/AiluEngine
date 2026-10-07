@@ -990,6 +990,10 @@ namespace Ailu::Render
     {
         _impl->SetRenderGraph(render_graph, Name());
     }
+    bool CommandBuffer::IsRenderGraphCommandBuffer() const
+    {
+        return _impl->_render_graph != nullptr;
+    }
     void CommandBuffer::Clear()
     {
 #if AILU_ENABLE_FRAME_DEBUGGER

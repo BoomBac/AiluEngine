@@ -2230,6 +2230,9 @@ bool SceneAssetHandler::Save(const AssetSaveContext &context)
         ECS::Entity entity = reg.GetEntity<ECS::TagComponent>(index);
         if (scene->IsSceneRoot(entity))
             continue;
+        const auto *tag = reg.GetComponent<ECS::TagComponent>(entity);
+        if (tag != nullptr && tag->_is_transient)
+            continue;
 
         const auto sibling_it = entity_sibling_index.find(entity);
         const u32 sibling_index = sibling_it != entity_sibling_index.end() ? sibling_it->second : 0u;

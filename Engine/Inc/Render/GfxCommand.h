@@ -13,12 +13,14 @@
 #include "ImageCapture/ImageCaptureTypes.h"
 #include "MaterialDrawState.h"
 #include "RenderConstants.h"
+#include <atomic>
 #include <cstddef>
 #include <functional>
 #include <mutex>
 #include <new>
 #include "Framework/Common/Allocator.hpp"
 #include <type_traits>
+#include <vector>
 
 namespace Ailu::Render
 {
@@ -365,6 +367,7 @@ namespace Ailu::Render
     struct alignas(kCommandPayloadAlign) CommandPayload
     {
         u8 _storage[kCommandPayloadSize];
+        std::atomic_bool _in_use{false};
 
         void *Data() { return _storage; }
         const void *Data() const { return _storage; }
@@ -393,6 +396,7 @@ namespace Ailu::Render
     {
     public:
         inline static constexpr u32 kCommandPoolPayloadCount = 5000u;
+        inline static constexpr u32 kCommandPoolPayloadGrowthCount = 256u;
     public:
         CommandPool() = default;
         ~CommandPool() = default;
@@ -402,21 +406,38 @@ namespace Ailu::Render
         template<typename T>
         T *Alloc()
         {
-            auto payload = _payload_pool.Pop().value_or(nullptr);
-            if (payload == nullptr)
-                return nullptr;
-            return ConstructCommand<T>(payload);
+            auto payload = AcquirePayload();
+            try
+            {
+                return ConstructCommand<T>(payload);
+            }
+            catch (...)
+            {
+                payload->_in_use.store(false, std::memory_order_release);
+                _payload_pool.Push(payload);
+                throw;
+            }
         }
         void DeAlloc(GfxCommand *cmd)
         {
             if (cmd == nullptr)
                 return;
+            auto payload = CommandPayload::FromCommand(cmd);
+            if (!payload->_in_use.exchange(false, std::memory_order_acq_rel))
+            {
+                LOG_WARNING("Ignoring duplicate GPU command deallocation");
+                return;
+            }
             DestroyCommand(cmd);
-            _payload_pool.Push(CommandPayload::FromCommand(cmd));
+            _payload_pool.Push(payload);
         }
 
     private:
+        CommandPayload *AcquirePayload();
+
         Core::ParallelQueue<CommandPayload *> _payload_pool;
+        std::vector<CommandPayload *> _owned_payloads;
+        std::mutex _growth_mutex;
     };
 }// namespace Ailu
 

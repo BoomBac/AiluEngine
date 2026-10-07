@@ -7,6 +7,7 @@
 //Queue: Opaque
 //Stencil: {Ref:1,Comp:Always,Pass:Replace}
 //multi_compile _ ALPHA_TEST
+//multi_compile _ EMISSION_TEXTURE_FACTOR
 //pass end::
 //pass begin::
 //name: ShadowCaster
@@ -27,6 +28,7 @@
 //Conservative: On
 //Queue: Opaque
 //multi_compile _ ALPHA_TEST
+//multi_compile _ EMISSION_TEXTURE_FACTOR
 //pass end::
 //pass begin::
 //name: MotionVector

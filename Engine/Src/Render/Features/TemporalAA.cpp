@@ -329,6 +329,8 @@ namespace Ailu::Render
         stable_desc._height = static_cast<u16>(height);
         stable_desc._format = history._format;
         stable_desc._is_random_access = true;
+        // The stabilization dispatch fully initializes this target. Preserve its result when later bound as an RTV.
+        stable_desc._load = ELoadStoreAction::kNotCare;
         const auto stable_target = graph.CreateResource(stable_desc, "_TemporalAA_Stable");
         const auto resolved_color = *taa_output;
         const auto resolved_reactive = *reactive_output;
@@ -385,6 +387,7 @@ namespace Ailu::Render
                              ERenderTargetFormat::kDefaultHDR);
             desc._format = history._format;
             desc._is_random_access = true;
+            desc._load = ELoadStoreAction::kNotCare;
             history._stable_target = RenderTexture::Create(desc, "_TemporalAA_Stable");
         }
         auto cmd = CommandBufferPool::Get("Temporal AA");

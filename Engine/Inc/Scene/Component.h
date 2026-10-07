@@ -119,6 +119,7 @@ public:                                                                 \
             String _tag = "Untagged";
             u32 _layer_mask = 1u;
             Guid _prefab_entity = Guid::EmptyGuid();
+            bool _is_transient = false;
         };
 
 

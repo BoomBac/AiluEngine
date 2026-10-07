@@ -1124,8 +1124,18 @@ namespace Ailu
                 _is_dropdown_open = true;
             };
         }
+        void Dropdown::SetMixed(bool mixed)
+        {
+            if (_is_mixed == mixed)
+                return;
+            _is_mixed = mixed;
+            if (_text != nullptr)
+                _text->SetText(GetSelectedText());
+            InvalidatePaint();
+        }
         void Dropdown::SetSelectedIndex(i32 index, bool notify)
         {
+            SetMixed(false);
             if (_selected_index == index)
             {
                 if (_selected_index >= 0 && _selected_index < static_cast<i32>(_items.size()))
@@ -1144,6 +1154,8 @@ namespace Ailu
 
         String Dropdown::GetSelectedText() const
         {
+            if (_is_mixed)
+                return "Multiple values";
             if (_selected_index >= 0 && _selected_index < static_cast<i32>(_items.size()))
                 return _items[_selected_index];
             return _items.empty() ? "null" : _items[0];

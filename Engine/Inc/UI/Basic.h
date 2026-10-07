@@ -149,7 +149,9 @@ namespace Ailu
         public:
             CheckBox();
             Vector2f MeasureDesiredSize() override;
-            void SetChecked(bool is_checked);
+            void SetChecked(bool is_checked, bool notify = true);
+            void SetMixed(bool mixed);
+            bool IsMixed() const { return _is_mixed; }
             bool IsChecked() const { return _is_checked; }
             UICheckBoxStyleOverride &GetStyleOverride() { return _style_override; }
 
@@ -165,6 +167,7 @@ namespace Ailu
             UIStyleId _style_id;
             UICheckBoxStyleOverride _style_override;
             UICheckBoxStyle _resolved_style;
+            bool _is_mixed = false;
             APROPERTY()
             bool _is_checked = false;
         };

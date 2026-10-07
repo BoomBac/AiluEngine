@@ -2,112 +2,167 @@
 #include "Inspector/ComponentEditorRegistry.h"
 #include "Inspector/ComponentEditorHelpers.h"
 #include "Scene/Scene.h"
+#include "Framework/Common/Input.h"
+#include "UI/UIFramework.h"
+#include <cmath>
 
 using namespace Ailu;
 using namespace Ailu::UI;
-using SceneManagement::SceneMgr;
 
-namespace Ailu
+namespace Ailu::Editor
 {
-    namespace Editor
+    TransformComponentEditor::~TransformComponentEditor()
     {
-        void TransformComponentEditor::Build(ComponentEditorContext &context)
+        if (_command_manager != nullptr && _command_manager == g_pCommandMgr)
+            _command_manager->BeforeHistoryChange().Unsubscribe(_history_subscription);
+        FinishEdit();
+    }
+
+    void TransformComponentEditor::FinishEdit()
+    {
+        if (_pending_command != nullptr && _pending_command->HasChanges() && g_pCommandMgr != nullptr)
+            g_pCommandMgr->ExecuteCommand(std::move(_pending_command));
+        _pending_command.reset();
+        _editing_block = nullptr;
+    }
+
+    void TransformComponentEditor::Build(ComponentEditorContext &context)
+    {
+        if (context._scene == nullptr || context._content == nullptr)
+            return;
+        if (g_pCommandMgr != nullptr && _command_manager == nullptr)
         {
-            auto entity = context._entity;
-            auto &r = SceneMgr::Get().ActiveScene()->GetRegister();
-            auto *comp = r.GetComponent<ECS::TransformComponent>(entity);
-            if (comp == nullptr || context._content == nullptr)
-                return;
-
-            auto pos_block = Editor::AddVec3InputRow(context._content, "Position", "0000");
-            auto rot_block = Editor::AddVec3InputRow(context._content, "Rotation");
-            auto scale_block = Editor::AddVec3InputRow(context._content, "Scale");
-            for (u32 i = 0; i < 3; ++i)
+            _command_manager = g_pCommandMgr;
+            _history_subscription = _command_manager->BeforeHistoryChange().Subscribe([this]()
             {
-                _position_blocks[i] = pos_block[i];
-                _rotation_blocks[i] = rot_block[i];
-                _scale_blocks[i] = scale_block[i];
-            }
-
-            for (auto i = 0; i < 3; i++)
-            {
-                pos_block[i]->_on_content_changed += [entity, i, context](String content)
-                {
-                    auto &reg = SceneMgr::Get().ActiveScene()->GetRegister();
-                    if (auto tcomp = reg.GetComponent<ECS::TransformComponent>(entity); tcomp != nullptr)
-                    {
-                        if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
-                        {
-                            Vector3f position = tcomp->GetLocalPosition();
-                            position[i] = opt.value();
-                            if (tcomp->SetLocalPosition(position))
-                            {
-                                tcomp->ResetRenderInterpolation();
-                                context.MarkSceneDirty();
-                            }
-                        }
-                    }
-                };
-                rot_block[i]->_on_content_changed += [entity, i, context](String content)
-                {
-                    auto &reg = SceneMgr::Get().ActiveScene()->GetRegister();
-                    if (auto tcomp = reg.GetComponent<ECS::TransformComponent>(entity); tcomp != nullptr)
-                    {
-                        if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
-                        {
-                            Vector3f euler = Quaternion::EulerAngles(tcomp->_local_transform._rotation);
-                            euler[i] = opt.value();
-                            if (tcomp->SetLocalRotation(Quaternion::EulerAngles(euler)))
-                            {
-                                tcomp->ResetRenderInterpolation();
-                                context.MarkSceneDirty();
-                            }
-                        }
-                    }
-                };
-                scale_block[i]->_on_content_changed += [entity, i, context](String content)
-                {
-                    auto &reg = SceneMgr::Get().ActiveScene()->GetRegister();
-                    if (auto tcomp = reg.GetComponent<ECS::TransformComponent>(entity); tcomp != nullptr)
-                    {
-                        if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
-                        {
-                            Vector3f scale = tcomp->GetLocalScale();
-                            scale[i] = opt.value();
-                            if (tcomp->SetLocalScale(scale))
-                            {
-                                tcomp->ResetRenderInterpolation();
-                                context.MarkSceneDirty();
-                            }
-                        }
-                    }
-                };
-            }
-
-            Refresh(context);
+                auto *block = _editing_block;
+                FinishEdit();
+                if (block != nullptr && UIManager::Get() != nullptr)
+                    UIManager::Get()->ClearFocus(block);
+            });
         }
-
-        void TransformComponentEditor::Refresh(ComponentEditorContext &context)
+        auto scene = std::dynamic_pointer_cast<SceneManagement::Scene>(context._scene->SharedFromThis());
+        Vector<ECS::Entity> entities = context._entities;
+        if (entities.empty())
+            entities.push_back(context._entity);
+        Vector<Guid> guids;
+        for (auto entity : entities)
+            if (const auto *guid = context._scene->FindEntityGuid(entity))
+                guids.push_back(*guid);
+        if (scene == nullptr)
+            context._content->AddChild<Text>("Runtime edits are not added to Undo");
+        auto position = AddVec3InputRow(context._content, "Position");
+        auto rotation = AddVec3InputRow(context._content, "Rotation");
+        auto scale = AddVec3InputRow(context._content, "Scale");
+        for (u32 axis = 0; axis < 3; ++axis)
         {
-            auto *comp = context.GetComponent<ECS::TransformComponent>();
-            if (comp == nullptr)
-                return;
-
-            const auto set_block = [](InputBlock *block, f32 value)
+            _position_blocks[axis] = position[axis];
+            _rotation_blocks[axis] = rotation[axis];
+            _scale_blocks[axis] = scale[axis];
+        }
+        const auto bind = [this, weak_scene = Weak<SceneManagement::Scene>(scene), entities, guids,
+                           runtime_scene = scene == nullptr ? context._scene : nullptr]
+            (InputBlock *block, ETransformProperty property, u32 axis)
+        {
+            block->_on_content_changed +=
+                [this, weak_scene, entities, guids, runtime_scene, block, property, axis](String content)
             {
-                if (block != nullptr && !block->IsEditing())
-                    block->SetContent(std::format("{:.2f}", value), false);
+                auto scene = weak_scene.lock();
+                const auto value = StringUtils::ParseFloat(content);
+                if (!value.has_value() || !std::isfinite(*value))
+                    return;
+                auto *active_scene = SceneManagement::SceneMgr::Get().ActiveScene();
+                // Play-mode copies are SceneMgr-owned raw objects; never retain them in the undo stack.
+                if (runtime_scene != nullptr && active_scene == runtime_scene)
+                {
+                    bool changed = false;
+                    for (const auto &guid : guids)
+                    {
+                        const auto entity = active_scene->FindEntity(guid);
+                        if (!active_scene->IsValidEntity(entity))
+                            continue;
+                        auto *component = active_scene->GetRegister().GetComponent<ECS::TransformComponent>(entity);
+                        if (component != nullptr)
+                            changed |= TransformPropertyCommand::WriteValue(*component, property, axis, *value);
+                    }
+                    if (changed)
+                        active_scene->MarkEdited();
+                    return;
+                }
+                if (scene == nullptr || scene.get() != active_scene)
+                    return;
+                if (_editing_block != block)
+                    FinishEdit();
+                if (_pending_command == nullptr)
+                {
+                    _pending_command = MakeScope<TransformPropertyCommand>(scene, entities, property, axis);
+                    _editing_block = block;
+                }
+                _pending_command->Preview(*value);
             };
-            set_block(_position_blocks[0], comp->_local_transform._position.x);
-            set_block(_position_blocks[1], comp->_local_transform._position.y);
-            set_block(_position_blocks[2], comp->_local_transform._position.z);
-            const Vector3f euler = Quaternion::EulerAngles(comp->_local_transform._rotation);
-            set_block(_rotation_blocks[0], euler.x);
-            set_block(_rotation_blocks[1], euler.y);
-            set_block(_rotation_blocks[2], euler.z);
-            set_block(_scale_blocks[0], comp->_local_transform._scale.x);
-            set_block(_scale_blocks[1], comp->_local_transform._scale.y);
-            set_block(_scale_blocks[2], comp->_local_transform._scale.z);
+            block->_on_focus_lost += [this]() { FinishEdit(); };
+            block->OnMouseUp() += [this, block](UIEvent &)
+            {
+                if (!block->IsEditing())
+                    FinishEdit();
+            };
+            block->OnKeyDown() += [this](UIEvent &event)
+            {
+                if (event._key_code == EKey::kRETURN)
+                    FinishEdit();
+            };
+        };
+        for (u32 axis = 0; axis < 3; ++axis)
+        {
+            bind(position[axis], ETransformProperty::kPosition, axis);
+            bind(rotation[axis], ETransformProperty::kRotation, axis);
+            bind(scale[axis], ETransformProperty::kScale, axis);
         }
-    }// namespace Editor
-}// namespace Ailu
+        Refresh(context);
+    }
+
+    void TransformComponentEditor::Refresh(ComponentEditorContext &context)
+    {
+        if (context._scene == nullptr)
+            return;
+        if (_editing_block != nullptr && !_editing_block->IsEditing() && !_editing_block->IsDragAdjusting())
+            FinishEdit();
+        Vector<ECS::Entity> entities = context._entities;
+        if (entities.empty())
+            entities.push_back(context._entity);
+        const auto refresh = [&context, &entities](InputBlock **blocks, ETransformProperty property)
+        {
+            Vector3f first;
+            bool has_value = false;
+            bool mixed[3] = {};
+            for (auto entity : entities)
+            {
+                if (!context._scene->IsValidEntity(entity))
+                    continue;
+                const auto *component = context.Registry().GetComponent<ECS::TransformComponent>(entity);
+                if (component == nullptr)
+                    continue;
+                const auto value = TransformPropertyCommand::ReadValue(*component, property);
+                if (!has_value)
+                {
+                    first = value;
+                    has_value = true;
+                }
+                else
+                {
+                    for (u32 axis = 0; axis < 3; ++axis)
+                        mixed[axis] |= std::abs(first[axis] - value[axis]) > 0.00001f;
+                }
+            }
+            for (u32 axis = 0; axis < 3; ++axis)
+            {
+                auto *block = blocks[axis];
+                if (block != nullptr && !block->IsEditing() && !block->IsDragAdjusting())
+                    block->SetContent(!has_value || mixed[axis] ? "--" : std::format("{:.2f}", first[axis]), false);
+            }
+        };
+        refresh(_position_blocks, ETransformProperty::kPosition);
+        refresh(_rotation_blocks, ETransformProperty::kRotation);
+        refresh(_scale_blocks, ETransformProperty::kScale);
+    }
+}

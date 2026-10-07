@@ -241,6 +241,16 @@ Is it GPU resource?
 
 不要把所有数据都塞进一个全局 RenderingData。
 
+## Directional shadow near-plane coverage
+
+`DrawShadowView` sets `_ZBufferParams.z = 1` in the shadow-only camera buffer for directional views, including
+camera cascades and probe orthographic shadows. Other shadow views leave it zero; point shadows retain their
+near/far values in `.xy`. `shadow_caster.hlsli` uses the flag to pancake vertex depth onto the light near plane:
+`min(z, w)` for reverse Z and `max(z, 0)` otherwise. XY, world position, far clipping, alpha testing and CPU
+caster culling remain unchanged. This preserves projected coverage when an otherwise visible caster crosses
+the fixed-margin light near plane, without extra scene traversal, draws, resources or shader variants.
+It does not include casters entirely outside the CPU shadow frustum.
+
 ## Camera matrices and jitter
 
 `Camera` owns the single projection jitter used by the current raster view. It stores both the stable no-jitter projection

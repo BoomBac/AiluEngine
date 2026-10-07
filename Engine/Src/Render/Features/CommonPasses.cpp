@@ -354,6 +354,8 @@ namespace Ailu::Render
             CBufferPerCameraData camera_data{};
             camera_data._MatrixVP = view._shadow_matrix;
             camera_data._CameraPos = Vector4f(view._light_world_position, 0.0f);
+            // Shadow-caster VS uses z only for directional near-plane pancaking.
+            camera_data._ZBufferParams.z = view._type == EShadowViewType::kDirectional ? 1.0f : 0.0f;
             if (is_point_shadow)
                 camera_data._ZBufferParams = Vector4f(view._camera_near, view._camera_far, 0.0f, 0.0f);
             cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &camera_data, RenderConstants::kPerCameraDataSize);

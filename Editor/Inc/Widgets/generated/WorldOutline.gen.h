@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __WORLDOUTLINE_GEN_H__
 //Class WorldOutline begin...........................
-#define WORLDOUTLINE_GEN_H_21_GENERATED_BODY \
+#define WORLDOUTLINE_GEN_H_23_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_WorldOutline_Type();\
                                 static const Type* GetPrivateStaticClass();\

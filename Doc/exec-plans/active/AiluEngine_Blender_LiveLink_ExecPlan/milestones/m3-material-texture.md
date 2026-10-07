@@ -402,24 +402,26 @@ Material::s_checker/default
 
 # Progress
 
-- [ ] material UUID。
-- [ ] Principled discovery。
-- [ ] BaseColor factor。
-- [ ] Roughness scalar。
-- [ ] Metallic scalar。
-- [ ] Emission scalar。
-- [ ] BaseColor image。
-- [ ] Normal Map image。
-- [ ] regular image path。
-- [ ] packed/generated export。
-- [ ] texture usage color space。
-- [ ] Texture cache。
-- [ ] material slot binding。
-- [ ] RM pack。
-- [ ] IOR。
-- [ ] Transmission。
-- [ ] unsupported warning。
-- [ ] material revision/coalesce。
+- [x] material UUID。
+- [x] Principled discovery。
+- [x] BaseColor factor。
+- [x] Roughness scalar。
+- [x] Metallic scalar。
+- [x] Emission scalar。
+- [x] BaseColor image。
+- [x] Normal Map image。
+- [x] regular image path。
+- [x] packed/generated export。
+- [x] texture usage color space。
+- [x] Texture cache。
+- [x] material slot binding。
+- [x] RM pack。
+- [x] IOR。
+- [x] Transmission。
+- [x] unsupported warning。
+- [x] material revision/coalesce source path。
+
+源码与 Editor Debug 构建通过；Blender image API、纹理 reload 和材质外观未运行验收。
 
 ---
 

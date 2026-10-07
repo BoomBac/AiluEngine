@@ -120,8 +120,7 @@ namespace Ailu::SceneManagement
             BufferDesc buf_desc;
             buf_desc._is_random_write = false;
             buf_desc._target = EGPUBufferTarget::kStructured;
-            buf_desc._size = buf_desc._element_size * buf_desc._element_num;
-            buf_desc._element_num = 2000;
+            buf_desc._element_num = RenderConstants::kMaxRenderObjectCount * 2u;
             buf_desc._element_size = sizeof(LBVHNode);
             buf_desc._size = buf_desc._element_size * buf_desc._element_num;
             _tlas_buffer = GPUBuffer::Create(buf_desc);
@@ -1138,8 +1137,8 @@ namespace Ailu::SceneManagement
         BVHBuilder builder(aabbs);
         auto ret = builder.Build(1);
         u64 node_size = ret._nodes.size();
+        AL_ASSERT(node_size <= RenderConstants::kMaxRenderObjectCount * 2u);
         _tlas_nodes = std::move(ret._nodes);
-        //AL_ASSERT(_tlas_nodes.size() < RenderConstants::kMaxRenderObjectCount * 2);
         for (u64 i = 0; i < node_size; i++)
         {
             if (_tlas_nodes[i].IsLeaf())

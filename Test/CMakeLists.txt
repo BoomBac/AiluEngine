@@ -217,6 +217,19 @@ add_custom_command(TARGET JobGroupLifetimeSmoke POST_BUILD
     VERBATIM)
 
 add_executable(VolumetricFogSmoke VolumetricFogSmoke.cpp)
+add_executable(InspectorMultiEditSmoke InspectorMultiEditSmoke.cpp
+    ${CMAKE_SOURCE_DIR}/Editor/Src/Inspector/TransformPropertyCommand.cpp
+    ${CMAKE_SOURCE_DIR}/Editor/Src/Inspector/ComponentEditorRegistry.cpp
+    ${CMAKE_SOURCE_DIR}/Editor/Src/Inspector/MultiComponentEditor.cpp
+    ${CMAKE_SOURCE_DIR}/Editor/Src/Inspector/ComponentInspectorFields.cpp
+    ${CMAKE_SOURCE_DIR}/Editor/Src/Inspector/ReflectedInspectorFields.cpp
+    ${CMAKE_SOURCE_DIR}/Editor/Src/Inspector/ScriptInspectorFields.cpp
+    ${CMAKE_SOURCE_DIR}/Editor/Src/Inspector/Collider2DInspectorFields.cpp
+    ${CMAKE_SOURCE_DIR}/Editor/Src/Inspector/MeshInspectorFields.cpp
+    ${CMAKE_SOURCE_DIR}/Editor/Src/Inspector/ComponentEditors/TransformComponentEditor.cpp)
+ailu_configure_test_target(InspectorMultiEditSmoke)
+add_custom_command(TARGET InspectorMultiEditSmoke POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:Engine>" "$<TARGET_FILE_DIR:InspectorMultiEditSmoke>")
 ailu_configure_test_target(VolumetricFogSmoke)
 add_custom_command(TARGET VolumetricFogSmoke POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:Engine>" "$<TARGET_FILE_DIR:VolumetricFogSmoke>"
@@ -226,6 +239,13 @@ target_sources(VolumetricFogSmoke PRIVATE ${ENGINE_ROOT_PATH}/Src/Render/ImageCa
 target_link_libraries(VolumetricFogSmoke PRIVATE DirectXTex)
 
 add_executable(MotionVectorGpuAcceptance MotionVectorGpuAcceptance.cpp)
+add_executable(DescriptorPageGrowthSmoke DescriptorPageGrowthSmoke.cpp
+    ${ENGINE_ROOT_PATH}/Src/RHI/DX12/DescriptorManager.cpp)
+ailu_configure_test_target(DescriptorPageGrowthSmoke)
+target_link_libraries(DescriptorPageGrowthSmoke PRIVATE d3d12)
+add_custom_command(TARGET DescriptorPageGrowthSmoke POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:Engine>" "$<TARGET_FILE_DIR:DescriptorPageGrowthSmoke>"
+    VERBATIM)
 ailu_configure_test_target(MotionVectorGpuAcceptance)
 target_link_libraries(MotionVectorGpuAcceptance PRIVATE d3d12)
 add_custom_command(TARGET MotionVectorGpuAcceptance POST_BUILD

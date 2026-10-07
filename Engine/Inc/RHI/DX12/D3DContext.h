@@ -59,6 +59,7 @@ namespace Ailu::RHI::DX12
     {
         String _name;
         bool _is_end_frame = false;
+        bool _is_render_graph_pass = false;
         Vector<Render::RTHandle> _released_temp_rts;
         Render::CommandRenderingStatesData _rendering_states_data;
 #if AILU_ENABLE_FRAME_DEBUGGER

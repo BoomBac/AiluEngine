@@ -342,21 +342,23 @@ Camera::Size
 
 # Progress
 
-- [ ] SUN。
-- [ ] POINT。
-- [ ] SPOT。
-- [ ] AREA square。
-- [ ] AREA rectangle。
-- [ ] direction conversion。
-- [ ] angle conversion。
-- [ ] intensity scale。
-- [ ] perspective camera。
-- [ ] camera forward/up。
-- [ ] FovH degree。
-- [ ] aspect。
-- [ ] orthographic。
-- [ ] type mutation。
-- [ ] delete cleanup。
+- [x] SUN。
+- [x] POINT。
+- [x] SPOT。
+- [x] AREA square。
+- [x] AREA rectangle。
+- [x] direction conversion source path。
+- [x] angle conversion。
+- [x] intensity scale。
+- [x] perspective camera。
+- [x] camera forward/up source path。
+- [x] FovH degree。
+- [x] aspect。
+- [x] orthographic。
+- [x] type mutation。
+- [x] delete cleanup。
+
+源码与 Editor Debug 构建通过；Blender scene orientation、光照和相机 framing 验收未运行。
 
 ---
 

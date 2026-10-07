@@ -379,23 +379,25 @@ revision <= current
 
 # Progress
 
-- [ ] evaluated mesh extraction。
-- [ ] cleanup on exception。
-- [ ] triangle flatten。
-- [ ] normals。
-- [ ] tangents。
-- [ ] uv0。
-- [ ] material submesh grouping。
-- [ ] binary encoder。
-- [ ] binary decoder bounds check。
-- [ ] runtime Mesh create。
-- [ ] SetBounds。
-- [ ] Apply。
-- [ ] StaticMeshComponent binding。
-- [ ] mesh pointer replacement。
-- [ ] revision reject。
-- [ ] debounce。
+- [x] evaluated mesh extraction。
+- [x] cleanup on exception。
+- [x] triangle flatten。
+- [x] normals。
+- [x] tangents。
+- [x] uv0。
+- [x] material submesh grouping。
+- [x] binary encoder。
+- [x] binary decoder bounds check。
+- [x] runtime Mesh create。
+- [x] SetBounds。
+- [x] Apply。
+- [x] StaticMeshComponent binding。
+- [x] mesh pointer replacement。
+- [x] revision reject。
+- [x] debounce。
 - [ ] large mesh test。
+
+源码与 Editor Debug 构建通过；Blender evaluated mesh 与 large mesh 场景验收未运行。
 
 ---
 

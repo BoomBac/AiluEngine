@@ -47,6 +47,9 @@ void InitSurfaceData(StandardPSInput input,out SurfaceData surface)
 	if(_SamplerMask & 4)
 	{
 		surface.emssive = _EmissionTex.Sample(g_LinearWrapSampler, input.uv0).rgb;
+#ifdef EMISSION_TEXTURE_FACTOR
+        surface.emssive *= _EmissionValue.rgb;
+#endif
 	}
 	else 
 		surface.emssive = _EmissionValue.rgb;

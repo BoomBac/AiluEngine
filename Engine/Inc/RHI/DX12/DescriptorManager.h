@@ -8,6 +8,7 @@
 #include "Render/RenderingStates.h"
 #include <d3dx12.h>
 #include <mutex>
+#include <deque>
 /*
 高性能的gpu可见堆管理方式为将堆分为两个部分，一个cpu可见，一个gpu可见，前者用于存储实际资源，实际尺寸庞大，可容纳大量的描述符，
 后者只用于提交至管线，每次dc/dp之前，根据跟签名的描述符表布局和资源，从前者拷贝描述符到后者，资源可能分散存储在前者（资源可能在不同的堆），按照根前面的布局将其组织成相邻的
@@ -251,10 +252,10 @@ namespace Ailu::RHI::DX12
 		// Staging pages are CPU-visible descriptor heaps used to build SRV/UAV descriptors.
 		// The shader-visible heap used for binding is a separate heap (MainHeap).
 		inline static const u16 kMaxDescriptorNumPerPage = 1024;
-		inline static const u32 kMainHeapDescriptorNum = 8192;
-		// Bindless region configuration (default enabled).
-		inline static const u32 kBindlessSRVCapacity = 512;
-		inline static const u32 kBindlessUAVCapacity = 512;
+		inline static const u32 kMainHeapDescriptorNum = 131072;
+		// Reserve stable bindless ranges up front; the remaining heap space is used by the descriptor ring.
+		inline static const u32 kBindlessSRVCapacity = 65536;
+		inline static const u32 kBindlessUAVCapacity = 16384;
 		GPUVisibleDescriptorAllocator();
 		~GPUVisibleDescriptorAllocator();
 		GPUVisibleDescriptorAllocation Allocate(u16 num = 1u, D3D12_DESCRIPTOR_HEAP_TYPE type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
@@ -293,7 +294,8 @@ namespace Ailu::RHI::DX12
 		void RecordDescriptorCopy(bool allocation);
 		ComPtr<ID3D12DescriptorHeap> _main_heap;
 		u16 _desc_size;
-		Vector<DescriptorPage> _pages;
+        // Allocations retain page pointers; appending staging pages must not relocate existing pages.
+        std::deque<DescriptorPage> _pages;
 		//page_available_desc_num,_page_id
 		Map<D3D12_DESCRIPTOR_HEAP_TYPE, std::multimap<u16, u16>> _page_free_space_lut;
 		std::mutex _mutex;

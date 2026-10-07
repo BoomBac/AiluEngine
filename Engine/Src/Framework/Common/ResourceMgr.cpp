@@ -1437,10 +1437,22 @@ namespace Ailu
 		}
 		else
 		{
-		};
-		AL_ASSERT(tex_parser != nullptr);
+			LOG_ERROR(L"Unsupported external texture extension '{}' for {}", ToWChar(ext.c_str()), sys_path);
+			return nullptr;
+		}
+		const auto *texture_settings = dynamic_cast<const TextureImportSetting *>(&settings);
+		if (texture_settings == nullptr)
+		{
+			LOG_ERROR(L"Invalid import settings for external texture {}", sys_path);
+			return nullptr;
+		}
 		LOG_INFO(L"Start load image file {}...", sys_path);
-		auto tex = tex_parser->Parser(sys_path, dynamic_cast<const TextureImportSetting &>(settings));
+		auto tex = tex_parser->Parser(sys_path, *texture_settings);
+		if (tex == nullptr)
+		{
+			LOG_ERROR(L"External texture parser returned no texture for {}", sys_path);
+			return nullptr;
+		}
 		tex->Apply();
 		return tex;
 	}
@@ -1463,12 +1475,29 @@ namespace Ailu
 		}
 		else
 		{
-		};
-		AL_ASSERT(tex_parser != nullptr);
+			LOG_ERROR(L"Unsupported external texture extension '{}' for {}", ToWChar(ext.c_str()), sys_path);
+			return false;
+		}
+		const auto *texture_settings = dynamic_cast<const TextureImportSetting *>(&settings);
+		if (texture_settings == nullptr)
+		{
+			LOG_ERROR(L"Invalid import settings for external texture {}", sys_path);
+			return false;
+		}
+		if (tex == nullptr)
+		{
+			LOG_ERROR(L"Cannot import external texture {} into a null texture", sys_path);
+			return false;
+		}
 		LOG_INFO(L"Start load image file {}...", sys_path);
-		bool ret = tex_parser->Parser(sys_path, tex, dynamic_cast<const TextureImportSetting &>(settings));
+		const bool ret = tex_parser->Parser(sys_path, tex, *texture_settings);
+		if (!ret)
+		{
+			LOG_ERROR(L"External texture parser failed for {}", sys_path);
+			return false;
+		}
 		tex->Apply();
-		return ret;
+		return true;
 	}
 
 	Ref<Object> ResourceMgr::Load(const WString& asset_path,const ImportSetting* settings,const Type* type)

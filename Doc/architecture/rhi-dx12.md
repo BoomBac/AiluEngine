@@ -71,6 +71,10 @@ CPU `delete`/Ref 归零不一定意味着 native resource 可以立即释放。
 
 延迟释放/keep-alive 应基于实际 GPU completion。
 
+`GPUVisibleDescriptorAllocator` owns CPU staging pages in address-stable storage. Each allocation borrows a
+`DescriptorPage*`; appending pages must preserve every existing page address until allocator teardown. Staging
+page growth is separate from the fixed shader-visible MainHeap and its persistent bindless regions/descriptor ring.
+
 ## Command submission
 
 区分：

@@ -67,6 +67,34 @@ Editor-specific lifecycle 应在 Editor 层接入，而不是让 EngineRuntime �
 
 如果某功能在 Player 运行时不需要，应先问是否真的应该放 Engine。
 
+## Entity Inspector selection and edits
+
+`WorldOutline` publishes its multi-selection to Editor `Selection`. `ObjectDetail` filters valid entities,
+shows the intersection of their registered components, and rebuilds on selection, active scene or scene
+structure changes. `ComponentEditorContext::_entities` is the selected target snapshot; `_entity` remains
+available to single-entity editors. `ComponentEditorRegistry::CreateEditor()` retains editors with native
+multi-edit support and otherwise uses `MultiComponentEditor`; existing single-selection editors remain.
+
+The multi-editor uses explicit schemas for custom components and reflection bindings for generic components.
+It reads every selected entity before showing a field, indicates mixed boolean/enum/asset/scalar values,
+and writes absolute values only to that field (one axis for vectors). Script properties intersect by asset,
+name and value type; Collider2D shapes and material slots intersect by index and compatible field type.
+Subtype-specific fields require compatibility on every target. Component enabled state supports multi-edit;
+persistent identity and hierarchy relationships remain read-only. Schema signatures detect dynamic changes
+without recreating all bindings every frame. Popup callbacks reject changed selections and expired panels.
+
+Transform supports per-axis mixed values and absolute local-coordinate multi-edit. Its commands retain
+weak Scene ownership and entity GUIDs, resolve components for each application, and use existing setters
+plus interpolation reset and scene dirty tracking. Live input changes become one command on Return,
+focus loss, drag release or panel destruction. `CommandManager::BeforeHistoryChange()` lets an active
+edit commit before Undo/Redo. Generic property commands also retain weak Scene ownership and entity GUIDs,
+and own value snapshots (including coupled animator state and dynamic arrays), never component addresses.
+Material parameter snapshots retain their original asset so reassignment cannot redirect Undo. UI input
+constraints do not clamp restored snapshots. Serialized changes mark the scene/material asset dirty;
+runtime probe/bake/spawn actions stay transient. Existing component serialization coverage remains unchanged.
+Raw SceneMgr-owned play-mode copies retain direct editing without runtime pointers in Undo. Multi-selection
+component add/remove, entity enabled state and Prefab actions are currently unavailable.
+
 ## Runtime-facing extension
 
 Editor 经常需要驱动 Engine，例如：

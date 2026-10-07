@@ -196,6 +196,8 @@ namespace Ailu
             Dropdown(const Vector<String> &items);
             ~Dropdown() = default;
             void SetSelectedIndex(i32 index, bool notify = true);
+            void SetMixed(bool mixed);
+            bool IsMixed() const { return _is_mixed; }
             int GetSelectedIndex() const { return _selected_index; }
             String GetSelectedText() const;
             void SetItems(const Vector<String> &items) { _items = items; }
@@ -224,6 +226,7 @@ namespace Ailu
             APROPERTY()
             Vector<String> _items;
             i32 _selected_index = -1;
+            bool _is_mixed = false;
             Vector4f _button_rect;
             Border *_border;
             HorizontalBox *_root;

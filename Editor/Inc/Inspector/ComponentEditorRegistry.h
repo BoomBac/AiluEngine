@@ -27,9 +27,11 @@ namespace Ailu
         {
             SceneManagement::Scene *_scene = nullptr;
             ECS::Entity _entity = ECS::kInvalidEntity;
+            Vector<ECS::Entity> _entities;
             const struct ComponentEditorInfo *_component_info = nullptr;
             UI::VerticalBox *_content = nullptr;
             std::function<void()> _request_rebuild;
+            std::function<bool()> _is_current;
 
             ECS::Register &Registry() const;
             void *ComponentInstance() const;
@@ -79,6 +81,7 @@ namespace Ailu
 
             const Vector<ComponentEditorInfo> &Components() const { return _components; }
             const ComponentEditorInfo *Find(ECS::ComponentTypeId component_type) const;
+            Scope<IComponentEditor> CreateEditor(const ComponentEditorInfo &info, bool multi_edit) const;
 
         private:
             void RegisterInternal(ComponentEditorInfo &&info);

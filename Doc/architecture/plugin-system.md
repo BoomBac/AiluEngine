@@ -94,7 +94,9 @@ Scanning does not load DLLs. `DiscoveredPlugins()` returns an Engine-owned snaps
 The strict v1 schema has exactly seven fields: id, name, version, api_version, type, library and autoload.
 Strings must be nonempty without embedded NUL; api_version must be a compatible uint32; type is runtime/editor;
 autoload is a boolean. Library paths must be relative and remain within the manifest directory, including
-symlink resolution. There is no dependency graph, override priority or engine-version resolution.
+symlink resolution. The `{config}` token in a library path expands to the lowercase active CMake configuration
+(for example, `debug` or `relwithdebinfo`) before path validation. There is no dependency graph, override priority
+or engine-version resolution.
 
 `LoadPlugin(String id)` loads a discovered entry. `LoadAutoloadPlugins()` tries all marked entries, preserving
 successful loads while reporting failures; repeated calls skip already loaded IDs. Manual path loading is
@@ -126,3 +128,42 @@ Standalone M0–M6 runners pass, including M3 threaded x100 and M5/M6 rejection/
 Editor runner's `-TestManifest` option additionally creates a temporary project manifest, checks discover-only
 and autoload cases and removes only its verified fixture path in finally. See the completed plugin-system
 execution plan for exact evidence, commands and existing non-plugin Editor error/warning limitations.
+
+## Blender Live Link material conversion
+
+The Blender add-on owns complex surface evaluation on Blender's main thread. `material_bake.py` creates isolated
+CPU Cycles scenes and evaluated meshes; `mesh_sync.py` transmits the same UVs used by channel/normal bakes.
+AUTO exports supported primary image branches as shared PBR materials, retaining source UVs and reporting
+coordinate/layer adjustments as approximations. Unresolved graphs bake at 256px using existing UVs when available;
+their overlap may approximate spatial variations. Explicit `ailu_export_mode=BAKE` uses native graph evaluation,
+unique atlases and a 1024px default. Baked coordinate-sensitive graphs and modifiers keep object-specific identities.
+Full Sync creates object identities first, then streams each object's material/mesh packets consecutively; host
+material updates already rebind pending object GUID references. Four LRU mesh entries bound cache lifetime.
+Channel materials/images are released after each pass. Clean file image buffers newly loaded by export are freed;
+preloaded/dirty/generated user buffers are retained. Cache invalidation and shutdown release temporary meshes. Source
+scene/view-layer state is restored, and incremental synchronization waits for Object Mode.
+Full/incremental exports suppress their own depsgraph notifications and explicitly drain deferred view-layer
+updates before restoring change tracking. Pending real edits are processed before entering suppression; no
+post-export time window discards user edits. FullSync end closes one batch; later user edits are still incremental.
+Node cloning copies instance settings only; RNA registration properties and `bl_*` metadata are excluded because
+their setters modify shared Blender node types. Source socket collections are snapshotted before recursive cloning.
+
+The add-on's existing main-thread timer also owns its nonblocking TCP socket. Connect/handshake, fragmented reads,
+partial writes and reconnect advance through `LinkConnection.poll()`; packet generation polls between messages
+so lengthy Full Sync callbacks can still advance sends. Socket writes have a per-poll time/byte budget. Disconnect
+closes the socket and discards pending packets/diagnostics. No persistent Python network thread runs alongside
+Blender operators or Cycles; Blender's Python integration does not support that concurrency.
+
+Mesh encoding uses typed arrays and Blender foreach_get rather than per-corner Python tuples/floats. One vertex per
+mesh loop preserves split attributes; triangles reference these vertices instead of duplicating every corner.
+Wire layout, basis conversion, bounds and material grouping remain protocol v1. Missing/failed tangent generation
+uses a deterministic tangent default rather than reading uninitialized loop tangent data.
+
+Material messages optionally carry `alpha_blend`, `alpha_test`, `double_sided` and `emission_texture_factor`.
+The host uses existing Standard Lit surface/cull APIs. Explicit empty texture paths remove old bindings; absent
+fields retain the previous protocol-v1 behavior. Live Link continuous opacity opts into `LINEAR_ALPHA`; emission
+textures opt into `EMISSION_TEXTURE_FACTOR`. Existing material assets retain their shader keyword defaults.
+
+Native value/coordinate graphs are baked, but shader lobes remain Standard Lit approximations. Camera-ray selection
+and view-dependent effects become static; world lighting and volume transport are not implemented by surface
+material messages. Volume-only helpers export an invisible surface instead of an opaque checker fallback.

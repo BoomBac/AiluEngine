@@ -69,7 +69,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::UI::CheckBox>();
 //Class CheckBox end...........................
 
 //Class Border begin...........................
-#define BASIC_GEN_H_177_GENERATED_BODY \
+#define BASIC_GEN_H_180_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_Border_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -85,7 +85,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::UI::Border>();
 //Class Border end...........................
 
 //Class InputBlock begin...........................
-#define BASIC_GEN_H_221_GENERATED_BODY \
+#define BASIC_GEN_H_224_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_InputBlock_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -101,7 +101,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::UI::InputBlock>()
 //Class InputBlock end...........................
 
 //Class Image begin...........................
-#define BASIC_GEN_H_288_GENERATED_BODY \
+#define BASIC_GEN_H_291_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_Image_Type();\
                                 static const Type* GetPrivateStaticClass();\

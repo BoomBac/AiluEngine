@@ -1733,10 +1733,11 @@ M6
 # Current Milestone
 
 ```text
-M0 — Plugin Scaffold + Loopback Transport
+M6 implementation complete; runtime acceptance pending
 ```
 
-当前尚未实现 Blender Live Link 代码。
+M0–M6 source implementation and Debug build are complete. Editor transport and Blender scene/visual
+acceptance remain pending; see `progress.md` for the runtime environment blocker and exact evidence levels.
 
 M0 的任务不是“同步 Cube”，而是验证：
 
@@ -1768,7 +1769,7 @@ Blender test client
 [done] 检查 Light / Camera representation
 [done] 确定 Mesh custom binary strategy
 [done] 确定 transient session requirement
-[todo] M0 implementation
+[in progress] M0 plugin scaffold and loopback transport implemented; Debug build passed, runtime acceptance pending
 ```
 
 实时进度维护在：

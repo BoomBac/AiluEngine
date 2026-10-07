@@ -546,7 +546,7 @@ namespace Ailu
         {
             OnMouseClick() += [this](UIEvent &e)
             {
-                SetChecked(!_is_checked);
+                SetChecked(_is_mixed || !_is_checked);
             };
         }
 
@@ -565,10 +565,15 @@ namespace Ailu
                 box_brush = _is_checked ? &_resolved_style._checked_hovered : &_resolved_style._unchecked_hovered;
             Vector4f box_rect = {_content_rect.x, _content_rect.y, _resolved_style._box_size.x, _resolved_style._box_size.y};
             r.DrawQuad(box_rect,_matrix, *box_brush);
-            if (_is_checked)
+            if (_is_checked || _is_mixed)
             {
                 const f32 width = box_rect.z * 0.28f;
                 Vector4f fill_rect = {box_rect.x + width, box_rect.y + width, box_rect.z - width * 2.0f, box_rect.w - width * 2.0f};
+                if (_is_mixed)
+                {
+                    fill_rect.y = box_rect.y + box_rect.w * 0.45f;
+                    fill_rect.w = box_rect.w * 0.1f;
+                }
                 UIBrush mark;
                 mark._type = EUIBrushType::kColor;
                 mark._tint = _resolved_style._mark_color;
@@ -622,13 +627,22 @@ namespace Ailu
                     return &_resolved_style._normal;
             }
         }
-        void CheckBox::SetChecked(bool is_checked)
+        void CheckBox::SetMixed(bool mixed)
         {
-            if (_is_checked == is_checked)
+            if (_is_mixed == mixed)
                 return;
+            _is_mixed = mixed;
+            InvalidatePaint();
+        }
+        void CheckBox::SetChecked(bool is_checked, bool notify)
+        {
+            if (_is_checked == is_checked && !_is_mixed)
+                return;
+            _is_mixed = false;
             _is_checked = is_checked;
             InvalidatePaint();
-            _on_click_delegate.Invoke(_is_checked);
+            if (notify)
+                _on_click_delegate.Invoke(_is_checked);
         }
 #pragma endregion
 

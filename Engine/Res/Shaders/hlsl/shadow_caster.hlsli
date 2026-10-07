@@ -25,6 +25,17 @@ PSInput VSMain(VSInput v)
 	const PrimitiveData primitive = LoadPrimitive(v.instance_id);
 	result.world_pos = TransformPrimitiveToWorld(primitive, v.position).xyz;
 	result.position = TransformPrimitiveToClipSpace(primitive, v.position);
+#ifndef CAST_POINT_SHADOW
+	// Directional shadow views use _ZBufferParams.z as the near-plane pancaking flag.
+	if (_ZBufferParams.z > 0.0)
+	{
+#if defined(_REVERSED_Z)
+		result.position.z = min(result.position.z, result.position.w);
+#else
+		result.position.z = max(result.position.z, 0.0);
+#endif
+	}
+#endif
 	result.uv = v.uv;
 	return result;
 }

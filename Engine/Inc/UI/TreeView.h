@@ -93,6 +93,7 @@ namespace Ailu
             void ClearSelection(bool notify = true);
 
             void SetExpanded(TreeItemId item, bool expanded);
+            void SetExpandedItems(const std::unordered_set<TreeItemId> &items);
             bool IsExpanded(TreeItemId item) const;
             void ToggleExpanded(TreeItemId item);
             void SetExpandOnRowClick(bool enabled) { _expand_on_row_click = enabled; }

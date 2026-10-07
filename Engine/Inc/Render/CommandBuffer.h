@@ -114,6 +114,7 @@ namespace Ailu
         CommandBuffer(String name);
         ~CommandBuffer() override;
         void SetRenderGraph(RDG::RenderGraph *render_graph);
+        bool IsRenderGraphCommandBuffer() const;
 #if AILU_ENABLE_FRAME_DEBUGGER
         void SetCapturePassMetadata(const Render::FrameDebugger::CapturePassMetadata &metadata) { _capture_pass_metadata = metadata; }
         const Render::FrameDebugger::CapturePassMetadata &CapturePassMetadata() const { return _capture_pass_metadata; }

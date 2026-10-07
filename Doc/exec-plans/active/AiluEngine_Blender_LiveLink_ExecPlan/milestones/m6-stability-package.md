@@ -322,6 +322,7 @@ Troubleshooting
 
 # Progress
 
+- [x] Full-sync transfer/import timing instrumentation source and build validated; live scene metrics pending.
 - [ ] metrics。
 - [ ] connect x100。
 - [ ] unload x50 active client。
@@ -330,12 +331,14 @@ Troubleshooting
 - [ ] 500k mesh。
 - [ ] queue stability。
 - [ ] memory cleanup。
-- [ ] temp cache cleanup。
-- [ ] error UX。
-- [ ] Blender zip。
-- [ ] Ailu plugin staging。
-- [ ] user README。
-- [ ] final validation report。
+- [x] temp texture cache cleanup source path。
+- [x] error UX source path。
+- [x] Blender zip built and package contents inspected。
+- [x] Ailu plugin manifest and Debug DLL staging layout。
+- [x] user README。
+- [x] final validation report in `../progress.md`。
+
+Blender/Editor-dependent stress, memory, and visual acceptance remain pending.
 
 ---
 

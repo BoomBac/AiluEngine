@@ -379,23 +379,25 @@ ClearSession
 
 # Progress
 
-- [ ] transient entity generic support。
-- [ ] Scene save skip transient。
+- [x] transient entity generic support。
+- [x] Scene save skip transient。
 - [ ] Blender addon enable/disable。
-- [ ] Connect/Disconnect panel。
-- [ ] object UUID。
-- [ ] session UUID。
-- [ ] duplicate UUID repair。
-- [ ] full sync begin/end。
-- [ ] create。
-- [ ] delete。
-- [ ] rename。
-- [ ] hierarchy。
-- [ ] transform。
+- [x] Connect/Disconnect panel。
+- [x] object UUID。
+- [x] session UUID。
+- [x] duplicate UUID repair。
+- [x] full sync begin/end。
+- [x] create。
+- [x] delete。
+- [x] rename。
+- [x] hierarchy。
+- [x] transform。
 - [ ] coordinate golden tests。
-- [ ] reconnect full sync。
-- [ ] play mode suspend。
-- [ ] temporary scene suspend。
+- [x] reconnect full sync source path。
+- [x] play mode suspend source path。
+- [x] temporary scene suspend source path。
+
+源码与 Editor Debug 构建通过；Blender add-on 注册、live scene sync 和坐标 golden tests 未运行。
 
 ---
 
