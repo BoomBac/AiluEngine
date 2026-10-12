@@ -1,4 +1,5 @@
 #include "Assets/AssetHandlers.h"
+#include <fstream>
 #include "Animation/AnimationControllerAsset.h"
 #include "Animation/BlendSpace.h"
 #include "Animation/Clip.h"
@@ -1068,10 +1069,6 @@ Scope<Asset> MaterialAssetHandler::Load(const AssetLoadContext &context)
             }
             mat->SetVector(prop._name, prop._value);
         }
-        if (std::any_of(doc._vector_properties.begin(), doc._vector_properties.end(), [](const auto &prop) {
-                return prop._name == "_AttenuationColor";
-            }))
-            mat->UsePathTracerAttenuationProperties();
         for (auto &prop : doc._uint_properties)
             mat->SetInt(prop._name, prop._value);
         for (auto &prop : doc._int_vector_properties)
@@ -1316,6 +1313,24 @@ static Scope<Asset> LoadMeshImpl(const AssetLoadContext &context)
         slot_material_guids.emplace_back(material_guid.empty() ? Guid::EmptyGuid() : Guid(material_guid));
 
     const WString source_system_path = context._resource_mgr->GetResSysPath(resolved_file);
+    // Durable procedural mesh source, independent of disposable DDC and external DCC files.
+    if (std::filesystem::path(source_system_path).extension() == L".almesh")
+    {
+        std::ifstream source(source_system_path, std::ios::binary);
+        Vector<u8> bytes((std::istreambuf_iterator<char>(source)), std::istreambuf_iterator<char>());
+        MeshArtifact artifact;
+        AssetArtifactKey native_key;
+        native_key._artifact_version = kMeshArtifactVersion;
+        if (!source.is_open() || source.bad() || !DeserializeMeshArtifact(bytes, native_key, artifact))
+            return nullptr;
+        auto mesh = CreateMeshFromArtifact(artifact);
+        if (!mesh) return nullptr;
+        mesh->Apply();
+        auto asset = MakeScope<Asset>(Guid(doc._header._guid), Mesh::StaticType(), context._asset_path);
+        asset->_p_obj = mesh;
+        asset->_external_asset_path = file;
+        return asset;
+    }
     AssetArtifactKey artifact_key;
     SourceFingerprint source_fingerprint;
     artifact_key._importer_version = 3u;
@@ -1476,7 +1491,26 @@ bool MeshAssetHandler::Save(const AssetSaveContext &context)
 {
     MeshAssetDocument doc;
     doc._header = MakeAssetDocumentHeader(context._asset);
-    doc._file = ToChar(MakeStoredExternalAssetPath(context._asset->_external_asset_path));
+    if (context._asset->_external_asset_path.empty()
+        || std::filesystem::path(context._asset->_external_asset_path).extension() == L".almesh")
+    {
+        const auto *mesh = dynamic_cast<const Mesh*>(context._asset->_p_obj.get());
+        if (!mesh || dynamic_cast<const SkeletonMesh*>(mesh)) return false;
+        MeshArtifact artifact;
+        Vector<u8> bytes;
+        AssetArtifactKey native_key;
+        native_key._artifact_version = kMeshArtifactVersion;
+        const WString native_path = context._asset_path + L".almesh";
+        const WString native_system_path = context._resource_mgr->GetResSysPath(native_path);
+        std::filesystem::create_directories(std::filesystem::path(native_system_path).parent_path());
+        if (!BuildMeshArtifact(*mesh, artifact) || !SerializeMeshArtifact(artifact, native_key, bytes)) return false;
+        std::ofstream source(native_system_path, std::ios::binary | std::ios::trunc);
+        source.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+        source.close();
+        if (!source) return false;
+        doc._file = ToChar(MakeStoredExternalAssetPath(native_path));
+    }
+    if (doc._file.empty()) doc._file = ToChar(MakeStoredExternalAssetPath(context._asset->_external_asset_path));
     doc._inner_file_name = context._asset->_p_obj->Name();
 
     if (const auto *setting = context._resource_mgr->GetImportSetting(context._asset_path))
@@ -1688,6 +1722,8 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
         if (auto *tag = reg.GetComponent<ECS::TagComponent>(new_entity))
         {
             tag->_tag = entity_doc._tag_component._tag;
+            tag->_source_scene_guid = entity_doc._tag_component._source_scene_guid;
+            tag->_source_object_guid = entity_doc._tag_component._source_object_guid;
             tag->_layer_mask = entity_doc._tag_component._layer_mask;
         }
 
@@ -1809,6 +1845,12 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
             component._camera.Near(entity_doc._camera_component._near_clip);
             component._camera.FovH(entity_doc._camera_component._fov_h);
             component._camera.Size(entity_doc._camera_component._size);
+            component._camera.SetLocalViewAxes(entity_doc._camera_component._local_forward, entity_doc._camera_component._local_up);
+            component._camera.ProjectionOffset(entity_doc._camera_component._projection_offset);
+            component._camera.ReverseProjectionX(entity_doc._camera_component._reverse_projection_x);
+            component._camera.LockAspect(entity_doc._camera_component._lock_aspect);
+            component._camera.RenderScale(entity_doc._camera_component._render_scale);
+            component._camera.UpsamplingFilter(static_cast<Render::EUpsamplingFilter>(entity_doc._camera_component._upsampling_filter));
             component._camera.MarkDirty();
             component._camera.RecalculateMatrix(true);
         }

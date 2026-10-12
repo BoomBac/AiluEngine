@@ -26,7 +26,8 @@ namespace Ailu::Render
         {
             AddTraceResourceReads(builder);
         }
-        void SyncLightCache(const SceneManagement::Scene *scene);
+        void SyncLightCache(const SceneManagement::Scene *scene, Vector<PrimitiveData> *primitive_data = nullptr,
+                            const Vector<ScenePrimitive> *scene_primitives = nullptr);
 
         RayTracingScene *GetScene() const { return FrontSlot()._scene.get(); }
         GPUBuffer *GetVertexData() const { return FrontSlot()._vertex_data.get(); }
@@ -41,6 +42,7 @@ namespace Ailu::Render
         GPUBuffer *GetMaterialData() const { return _material_buffer.get(); }
         GPUBuffer *GetUnifiedLightData() const { return _unified_light_buffer.get(); }
         GPUBuffer *GetUnifiedLightSamplingData() const { return _unified_light_sampling_buffer.get(); }
+        GPUBuffer *GetPathLightLookup() const { return _path_light_lookup_buffer.get(); }
         ConstantBuffer *GetUnifiedLightConfig() const { return _unified_light_config.get(); }
         u32 GetUnifiedLightCount() const { return _unified_light_config_cpu._light_count; }
         const Vector<UnifiedLightData> &GetUnifiedLights() const { return _unified_light_data_cache; }
@@ -153,6 +155,8 @@ namespace Ailu::Render
         Ref<GPUBuffer> _unified_light_buffer;
         Vector<UnifiedLightSamplingData> _unified_light_sampling_cache;
         Ref<GPUBuffer> _unified_light_sampling_buffer;
+        Vector<u32> _path_light_lookup_cache;
+        Ref<GPUBuffer> _path_light_lookup_buffer;
         Ref<ConstantBuffer> _unified_light_config;
         UnifiedLightBufferConfig _unified_light_config_cpu = {};
         Vector<PrimitiveData> *_scene_primitive_data = nullptr;

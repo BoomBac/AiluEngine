@@ -19,10 +19,22 @@ namespace Ailu
         {
             _host = context._host;
             _host->LogInfo(TEST_PLUGIN_ID ":load");
+            if (auto* progress_host = dynamic_cast<IPluginProgressHost*>(_host))
+                progress_host->ReportProgress(TEST_PLUGIN_ID, "probe begin", 0, EPluginProgressState::kBegin);
             return TEST_PLUGIN_MODE != 3;
         }
-        void OnUnload() noexcept override { _host->LogInfo(TEST_PLUGIN_ID ":unload"); }
-        void Tick(f32) noexcept override { _host->LogInfo(TEST_PLUGIN_ID ":tick"); }
+        void OnUnload() noexcept override
+        {
+            if (auto* progress_host = dynamic_cast<IPluginProgressHost*>(_host))
+                progress_host->ReportProgress(TEST_PLUGIN_ID, "probe unload", 1, EPluginProgressState::kCancelled);
+            _host->LogInfo(TEST_PLUGIN_ID ":unload");
+        }
+        void Tick(f32) noexcept override
+        {
+            if (auto* progress_host = dynamic_cast<IPluginProgressHost*>(_host))
+                progress_host->ReportProgress(TEST_PLUGIN_ID, "probe update", 1, EPluginProgressState::kRunning);
+            _host->LogInfo(TEST_PLUGIN_ID ":tick");
+        }
     private:
         IPluginHost* _host = nullptr;
     };

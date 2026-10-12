@@ -57,3 +57,28 @@ return s_enum_type_ECameraType.get();
 }
 //Enum ECameraType end...........................
 
+static std::unique_ptr<Ailu::Enum> s_enum_type_EUpsamplingFilter = nullptr;
+//Enum EUpsamplingFilter begin...........................
+const Ailu::Enum* Z_Construct_Enum_Ailu_Render_EUpsamplingFilter_Type()
+{
+if(s_enum_type_EUpsamplingFilter == nullptr)
+{
+EnumInitializer initializer;
+initializer._name = "EUpsamplingFilter";
+initializer._namespace = "Ailu::Render";
+initializer._full_name = "Ailu::Render::EUpsamplingFilter";
+initializer._size = sizeof(Ailu::Render::EUpsamplingFilter);
+initializer._str_to_enum_lut["kBilinear"] = 0;
+initializer._str_to_enum_lut["kPoint"] = 1;
+s_enum_type_EUpsamplingFilter = std::make_unique<Ailu::Enum>(initializer);
+Ailu::Enum::RegisterEnum(s_enum_type_EUpsamplingFilter.get());
+}
+return s_enum_type_EUpsamplingFilter.get();
+}
+static Ailu::EnumTypeRegister g_register_EUpsamplingFilter(Z_Construct_Enum_Ailu_Render_EUpsamplingFilter_Type);
+template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::EUpsamplingFilter>()
+{
+return s_enum_type_EUpsamplingFilter.get();
+}
+//Enum EUpsamplingFilter end...........................
+

@@ -2,6 +2,8 @@
 #define __RENDER_VIEW__
 #include "Dock/DockWindow.h"
 #include "Common/CameraControllers.h"
+#include "Framework/Core/Containers/Vector.h"
+#include "Framework/Core/String.h"
 #include "generated/RenderView.gen.h"
 
 namespace Ailu
@@ -21,12 +23,18 @@ namespace Ailu
         class Border;
         class Button;
         class Canvas;
+        class CheckBox;
         class Dropdown;
         class HorizontalBox;
+        class InputBlock;
         class Image;
         class Text;
         class VerticalBox;
         class SplitView;
+    }
+    namespace SceneManagement
+    {
+        class Scene;
     }
     namespace Editor
     {
@@ -60,8 +68,18 @@ namespace Ailu
             SceneView();
             void Update(f32 dt) final;
         private:
+            struct PendingPlaceActorSpawn
+            {
+                String _id;
+                Vector3f _position;
+                SceneManagement::Scene *_scene = nullptr;
+            };
+
             void UpdateCameraOutputSize(f32 dt);
+            void ProcessPendingPlaceActorSpawns();
             void BuildSceneToolbar();
+            void BuildSceneCameraSettings();
+            void UpdateSceneCameraSettings();
             void UpdateSceneToolbarLayout();
             void UpdateSceneToolbarBackdrop();
             void UpdateSceneToolbarState();
@@ -85,6 +103,18 @@ namespace Ailu
             UI::Button *_btn_snap = nullptr;
             UI::Button *_btn_taa_test = nullptr;
             UI::Button *_btn_motion_vector_debug = nullptr;
+            UI::Button *_btn_camera_settings = nullptr;
+            UI::Border *_camera_settings_panel = nullptr;
+            UI::HorizontalBox *_camera_fov_row = nullptr;
+            UI::HorizontalBox *_camera_size_row = nullptr;
+            UI::InputBlock *_camera_fov_input = nullptr;
+            UI::InputBlock *_camera_near_input = nullptr;
+            UI::InputBlock *_camera_far_input = nullptr;
+            UI::InputBlock *_camera_size_input = nullptr;
+            UI::Dropdown *_camera_aa_dropdown = nullptr;
+            UI::InputBlock *_camera_render_scale_input = nullptr;
+            UI::Dropdown *_camera_upsampling_dropdown = nullptr;
+            UI::CheckBox *_camera_postprocess_checkbox = nullptr;
             UI::Border *_camera_preview_frame = nullptr;
             UI::Image *_camera_preview = nullptr;
             Render::ECameraType _stored_camera_type;
@@ -98,6 +128,7 @@ namespace Ailu
             bool _is_scene_toolbar_state_dirty = true;
             bool _is_motion_vector_debug_enabled = false;
             Vector2f _mouse_pos;
+            Vector<PendingPlaceActorSpawn> _pending_place_actor_spawns;
             Vector2f _view_size = Vector2f::kZero;
             Vector2UInt _pending_output_size = Vector2UInt::kZero;
             Vector2UInt _committed_output_size = Vector2UInt::kZero;

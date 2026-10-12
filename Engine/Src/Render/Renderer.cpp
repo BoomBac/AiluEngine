@@ -106,7 +106,8 @@ namespace Ailu::Render
         miss_mat._emission_tex = RenderConstants::kInvalidBindlessHandle;
         miss_mat._metallic = 0.0f;
         miss_mat._roughness = 1.0f;
-        miss_mat._metallic_roughness_tex = RenderConstants::kInvalidBindlessHandle;
+        miss_mat._roughness_tex = RenderConstants::kInvalidBindlessHandle;
+        miss_mat._metallic_tex = RenderConstants::kInvalidBindlessHandle;
         _material_data_cache.push_back(miss_mat);
         //_features.push_back(_gpu_terrain);
         //_features.push_back(_taa);
@@ -171,7 +172,9 @@ namespace Ailu::Render
                     auto cmd = CommandBufferPool::Get("FinalBlit");
                     {
                         PROFILE_BLOCK_GPU(cmd.get(), cmd->Name())
-                        cmd->Blit(_rendering_data._camera_color_target_handle, cam.TargetTexture());
+                        auto blit_material = ResourceMgr::Get().Get<Material>(L"Runtime/Material/Blit");
+                        const u16 pass_index = cam.UpsamplingFilter() == EUpsamplingFilter::kPoint ? 1u : 0u;
+                        cmd->Blit(_rendering_data._camera_color_target_handle, cam.TargetTexture(), blit_material, pass_index);
                     }
                     _p_context->ExecuteCommandBuffer(cmd);
                     CommandBufferPool::Release(cmd);
@@ -197,8 +200,10 @@ namespace Ailu::Render
                         auto cmd = CommandBufferPool::Get("FinalBlit");
                         {
                             PROFILE_BLOCK_GPU(cmd.get(), cmd->Name())
+                            auto blit_material = ResourceMgr::Get().Get<Material>(L"Runtime/Material/Blit");
+                            const u16 pass_index = cam.UpsamplingFilter() == EUpsamplingFilter::kPoint ? 1u : 0u;
                             cmd->Blit(g_pRenderTexturePool->Get(_rendering_data._camera_color_target_handle), cam.TargetTexture(), 0,
-                                      dst_view_index, nullptr);
+                                      dst_view_index, blit_material, pass_index);
                         }
                         _p_context->ExecuteCommandBuffer(cmd);
                         CommandBufferPool::Release(cmd);
@@ -240,18 +245,20 @@ namespace Ailu::Render
     void Renderer::BeginScene(const Camera &cam, const Scene &s)
     {
         _active_camera_hash = cam.HashCode();
-        u32 pixel_width = cam.OutputSize().x, pixel_height = cam.OutputSize().y;
+        const Vector2D<u32> render_size = cam.RenderSize();
+        u32 pixel_width = render_size.x, pixel_height = render_size.y;
         _rendering_data._width = pixel_width;
         _rendering_data._height = pixel_height;
         if (_is_use_render_graph)
         {
-            if (_presentation_texture == nullptr || _presentation_texture->Width() != pixel_width ||
-                _presentation_texture->Height() != pixel_height)
+            const Vector2D<u32> output_size = cam.OutputSize();
+            if (_presentation_texture == nullptr || _presentation_texture->Width() != output_size.x ||
+                _presentation_texture->Height() != output_size.y)
             {
                 Ref<RenderTexture> matching_texture = nullptr;
                 for (auto &texture: _presentation_texture_cache)
                 {
-                    if (texture->Width() == pixel_width && texture->Height() == pixel_height)
+                    if (texture->Width() == output_size.x && texture->Height() == output_size.y)
                     {
                         matching_texture = texture;
                         break;
@@ -263,7 +270,7 @@ namespace Ailu::Render
                 }
                 else
                 {
-                    _presentation_texture = RenderTexture::Create(pixel_width, pixel_height, "RendererPresentation",
+                    _presentation_texture = RenderTexture::Create(output_size.x, output_size.y, "RendererPresentation",
                                                                   ERenderTargetFormat::kDefaultHDR);
                     _presentation_texture_cache.emplace_back(_presentation_texture);
                     LOG_WARNING("Expand _presentation_texture_cache to {}",_presentation_texture_cache.size());
@@ -1055,7 +1062,8 @@ namespace Ailu::Render
         auto cam_cb_data = ConstantBuffer::As<CBufferPerCameraData>(_cur_fs->GetCameraCB(cam.HashCode()));
         *cam_cb_data = {};
         f32 f = cam.Far(), n = cam.Near();
-        u32 pixel_width = cam.OutputSize().x, pixel_height = cam.OutputSize().y;
+        const Vector2D<u32> render_size = cam.RenderSize();
+        u32 pixel_width = render_size.x, pixel_height = render_size.y;
         cam_cb_data->_ScreenParams = Vector4f(1.0f / (f32) pixel_width,1.0f / (f32) pixel_height,(f32)pixel_width,(f32)pixel_height);
         Camera::CalculateZBUfferAndProjParams(cam,cam_cb_data->_ZBufferParams,cam_cb_data->_ProjectionParams);
         cam_cb_data->_CameraPos = cam.Position();
@@ -1109,7 +1117,8 @@ namespace Ailu::Render
     {
         dst._base_color_tex         = RenderConstants::kInvalidBindlessHandle;
         dst._normal_tex             = RenderConstants::kInvalidBindlessHandle;
-        dst._metallic_roughness_tex = RenderConstants::kInvalidBindlessHandle;
+        dst._roughness_tex = RenderConstants::kInvalidBindlessHandle;
+        dst._metallic_tex = RenderConstants::kInvalidBindlessHandle;
         dst._emission_tex           = RenderConstants::kInvalidBindlessHandle;
         dst._emission_strength      = 0.0f;
         dst._sigma_a                = Vector3f::kZero;
@@ -1134,10 +1143,10 @@ namespace Ailu::Render
             {
                 dst._normal_tex = normal_tex->GetBindlessSRVIndex();
             }
-            if (auto mr_tex = src->MainTex(ETextureUsage::kRoughness); mr_tex)
-            {
-                dst._metallic_roughness_tex = mr_tex->GetBindlessSRVIndex();
-            }
+            if (auto roughness_tex = src->MainTex(ETextureUsage::kRoughness); roughness_tex)
+                dst._roughness_tex = roughness_tex->GetBindlessSRVIndex();
+            if (auto metallic_tex = src->MainTex(ETextureUsage::kMetallic); metallic_tex)
+                dst._metallic_tex = metallic_tex->GetBindlessSRVIndex();
             const auto *emission_prop = src->MainProperty(ETextureUsage::kEmission);
             if (emission_prop != nullptr)
             {
@@ -1165,7 +1174,6 @@ namespace Ailu::Render
 
         // dst._base_color_tex    = src.base_color_tex ? src.base_color_tex->BindlessIndex() : kInvalidTex;
         // dst._normal_tex        = src.normal_tex     ? src.normal_tex->BindlessIndex()     : kInvalidTex;
-        // dst._metallic_roughness_tex = src.mr_tex ? src.mr_tex->BindlessIndex() : kInvalidTex;
         // dst._emission_tex      = src.emission_tex ? src.emission_tex->BindlessIndex() : kInvalidTex;
 
         // dst._flags = 0;
@@ -1234,17 +1242,20 @@ namespace Ailu::Render
                 {
                     builder.Read(source_handle);
                     output_handle = builder.Write(target_handle);
-                }, [source_handle, target_handle, output_view_index](RDG::RenderGraph &graph, CommandBuffer *cmd,
+                }, [source_handle, target_handle, output_view_index,
+                 point_sampling = cam.UpsamplingFilter() == EUpsamplingFilter::kPoint](RDG::RenderGraph &graph, CommandBuffer *cmd,
                                                                        const RenderingData &)
                 {
                     auto *src = graph.Resolve<Texture>(source_handle);
                     auto *dst = graph.Resolve<RenderTexture>(target_handle);
                     if (src == nullptr || dst == nullptr)
                         return;
+                    auto blit_material = ResourceMgr::Get().Get<Material>(L"Runtime/Material/Blit");
+                    const u16 pass_index = point_sampling ? 1u : 0u;
                     if (output_view_index >= 0)
-                        cmd->Blit(src, dst, 0, static_cast<u16>(output_view_index), nullptr);
+                        cmd->Blit(src, dst, 0, static_cast<u16>(output_view_index), blit_material, pass_index);
                     else
-                        cmd->Blit(src, dst);
+                        cmd->Blit(src, dst, blit_material, pass_index);
                 });
                 const RDG::RGHandle presentation_read_handle = output_handle;
                 _rd_graph->AddPass("PreparePresentation", RDG::PassDesc(), [presentation_read_handle](RDG::RenderGraphBuilder &builder)

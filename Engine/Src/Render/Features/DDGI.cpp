@@ -1176,7 +1176,8 @@ namespace Ailu::Render
             }
             else
             {
-                _scene_rt_proxy->SyncLightCache(rendering_data._scene);
+                _scene_rt_proxy->SyncLightCache(rendering_data._scene, rendering_data._primitive_data,
+                                               rendering_data._scene_primitives);
             }
         }
         renderer.EnqueuePass(_probe_trace_pass.get());

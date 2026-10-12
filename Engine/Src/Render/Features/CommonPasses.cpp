@@ -408,6 +408,37 @@ namespace Ailu::Render
 
     void Ailu::Render::ForwardPass::OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData & rendering_data)
     {
+        bool has_thin_glass = false;
+        bool has_transparent = false;
+        for (const auto &[queue, objects] : *rendering_data._cull_results)
+        {
+            if (queue < Shader::kRenderQueueTransparent)
+                continue;
+            has_transparent |= !objects.empty();
+            for (const auto &object : objects)
+                has_thin_glass |= object._material != nullptr && object._material->GetFloat("_Transmission") > 0.f;
+        }
+        if (!has_transparent)
+            return;
+        RDG::RGHandle glass_color{};
+        if (has_thin_glass)
+        {
+            const auto source = rendering_data._rg_handles._color_target;
+            auto desc = rendering_data._camera_data._camera_color_target_desc;
+            desc._width = static_cast<u16>(rendering_data._width);
+            desc._height = static_cast<u16>(rendering_data._height);
+            const auto snapshot = graph.CreateResource(desc, "_ThinGlassSceneColor");
+            auto output = std::make_shared<RDG::RGHandle>();
+            graph.AddPass("ThinGlassSceneColor", {}, [source, snapshot, output](RDG::RenderGraphBuilder &builder)
+            {
+                builder.Read(source);
+                *output = builder.Write(snapshot);
+            }, [source, output](RDG::RenderGraph &, CommandBuffer *cmd, const RenderingData &)
+            {
+                cmd->Blit(source, *output);
+            });
+            glass_color = *output;
+        }
         const bool use_shadow_maps = rendering_data._shadow_set != nullptr && rendering_data._shadow_set->_valid;
         const bool use_volumetric_fog = rendering_data._rg_handles._volumetric_fog_accum.IsValid();
         const auto fog_handle = rendering_data._rg_handles._volumetric_fog_accum;
@@ -415,6 +446,8 @@ namespace Ailu::Render
                       { 
                           builder.Read(rendering_data._rg_handles._color_target, EResourceUsage::kWriteRTV);
                           builder.Read(rendering_data._rg_handles._depth_target, EResourceUsage::kDSV);
+                          if (glass_color.IsValid())
+                              builder.Read(glass_color);
                           if (use_volumetric_fog)
                               builder.Read(fog_handle);
                           if (use_shadow_maps)
@@ -432,7 +465,7 @@ namespace Ailu::Render
                           rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target);
                           rendering_data._rg_handles._depth_target = builder.Write(rendering_data._rg_handles._depth_target,EResourceUsage::kDSV);
                       }, 
-        [this, use_shadow_maps, use_volumetric_fog, fog_handle](RDG::RenderGraph& graph,CommandBuffer* cmd,
+        [this, use_shadow_maps, use_volumetric_fog, fog_handle, glass_color](RDG::RenderGraph& graph,CommandBuffer* cmd,
                                                                 const RenderingData &rendering_data){
         auto &all_renderable = *rendering_data._cull_results;
         u32 lowerBound = Shader::kRenderQueueOpaque, upperBound = Shader::kRenderQueueEnd;
@@ -457,6 +490,8 @@ namespace Ailu::Render
         auto *occlusion_tex = rendering_data._rg_handles._ao_tex.IsValid()
             ? graph.Resolve<Texture>(rendering_data._rg_handles._ao_tex) : Texture::s_p_default_white;
         cmd->SetGlobalTexture("IBLLut", _brdf_lut.get());
+        cmd->SetGlobalTexture("_ThinGlassSceneColor", glass_color.IsValid()
+            ? graph.Resolve<Texture>(glass_color) : Texture::s_p_default_black);
         if (rendering_data._environment != nullptr)
         {
             cmd->SetGlobalTexture("RadianceTex", graph.Resolve<Texture>(rendering_data._rg_handles._environment_diffuse));
@@ -520,6 +555,7 @@ namespace Ailu::Render
         {
             PROFILE_BLOCK_GPU(cmd.get(), _name)
             cmd->SetGlobalTexture("IBLLut", _brdf_lut.get());
+            cmd->SetGlobalTexture("_ThinGlassSceneColor", Texture::s_p_default_black);
             if (rendering_data._environment != nullptr)
             {
                 cmd->SetGlobalTexture("RadianceTex", rendering_data._environment->_diffuse_irradiance.get());
@@ -1434,6 +1470,8 @@ namespace Ailu::Render
                     Gizmo::DrawLine(axis[1].xy, axis[1].zw, Colors::kRed);
                     Gizmo::DrawLine(axis[2].xy, axis[2].zw, Colors::kBlue);
                     bool is_2d_grid = Is2DGridCamera(rendering_data);
+                    cmd->SetRenderTargetLoadAction(rendering_data.FinalColorHandle(), ELoadStoreAction::kLoad);
+                    cmd->SetRenderTargetLoadAction(rendering_data._rg_handles._depth_target, ELoadStoreAction::kLoad);
                     if (is_2d_grid)
                         cmd->SetRenderTarget(rendering_data.FinalColorHandle());
                     else

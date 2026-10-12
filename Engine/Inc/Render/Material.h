@@ -73,8 +73,8 @@ namespace Ailu::Render
         inline static const Info kAlbedo{"Albedo", "_AlbedoTex", "_AlbedoValue", 1};
         inline static const Info kNormal{"Normal", "_NormalTex", "_NormalValue", 2};
         inline static const Info kEmission{"Emission", "_EmissionTex", "_EmissionValue", 4};
-        inline static const Info kRoughness{"Roughness", "_RoughnessMetallicTex", "_RoughnessValue", 8};
-        inline static const Info kMetallic{"Metallic", "_RoughnessMetallicTex", "_MetallicValue", 8};
+        inline static const Info kRoughness{"Roughness", "_RoughnessTex", "_RoughnessValue", 8};
+        inline static const Info kMetallic{"Metallic", "_MetallicTex", "_MetallicValue", 64};
         inline static const Info kSpecular{"Specular", "_SpecularTex", "_SpecularValue", 16};
         inline static const Info kAnisotropy{"Anisotropy", "_AnisotropyTex", "_Anisotropy", 32};
         static const Info &GetInfoByUsage(ETextureUsage usage)
@@ -182,7 +182,6 @@ namespace Ailu::Render
         float GetFloat(const String &name);
         float GetFloat(ShaderPropertyId property_id);
         Vector3f GetPathTracerSigmaA();
-        void UsePathTracerAttenuationProperties() { _use_legacy_path_tracer_absorption = false; }
         void SetCullMode(ECullMode mode);
         [[nodiscard]] ECullMode GetCullMode() const;
         [[nodiscard]] ShaderVariantHash ActiveVariantHash(u16 pass_index) const;
@@ -421,7 +420,6 @@ namespace Ailu::Render
         u16 _material_id_offset = 0u;
         u32 _sampler_mask = 0u;
         bool _is_standard_lit = false;
-        bool _use_legacy_path_tracer_absorption = false;
         // 资产发布版本：AssetRegistry 监听线程写，draw/录制线程只读。
         std::atomic<u32> _asset_reference_version{0u};
         // 已经解析进 _shader_handle / _bind_textures_by_id 的资产版本。

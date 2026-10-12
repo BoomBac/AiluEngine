@@ -28,7 +28,8 @@
 //	_AlbedoTex("Albedo",Texture2D) = "white"
 //	_NormalTex("Normal",Texture2D) = "white"
 //	_EmissionTex("Emission",Texture2D) = "white"
-//	_RoughnessMetallicTex("RoughnessMetallicTex",Texture2D) = "white"
+//	_RoughnessTex("Roughness Texture",Texture2D) = "white"
+//	_MetallicTex("Metallic Texture",Texture2D) = "white"
 //	_SpecularTex("Specular",Texture2D) = "white"
 //	_AlbedoValue("BaseColor",Color) = (1,1,1,0)
 //	[HDR]_EmissionValue("Emission",Color) = (0,0,0,0)
@@ -38,7 +39,6 @@
 //	_Anisotropy("Anisotropy",Range(0,1)) = 0
 //	_IOR("IOR",Range(0,3)) = 1
 //	_Transmission("Transmission",Range(0,1)) = 0
-	//	_Absorption("Legacy Volume Absorption (per world unit)",Range(0,100)) = 0
 	//	_AttenuationColor("Attenuation Color",Color) = (1,1,1,1)
 	//	_AttenuationDistance("Attenuation Distance",Range(0,1000)) = 1
 //}
@@ -56,6 +56,7 @@
 #include "shadow_caster.hlsli"
 #endif
 #include "volumetric_fog_common.hlsli"
+Texture2D _ThinGlassSceneColor;
 
 StandardPSInput ForwardVSMain(StandardVSInput v)
 {
@@ -100,9 +101,36 @@ float4 ForwardPSMain(StandardPSInput input) : SV_TARGET
     if (HasPrimitiveStaticGI(primitive))
         irradiance = EvaluatePrimitiveStaticIrradiance(primitive, surface_data.wnormal);
 #endif
-    float3 light = max(0.0, CalculateLightPBR(surface_data, input.world_pos, input.uv0, irradiance, irradiance, false));
+    float2 screen_uv = input.position.xy * _ScreenParams.xy;
+    float transmission = saturate(_Transmission) * (1.0 - saturate(surface_data.metallic));
+#if defined(PER_OBJECT_CB)
+    transmission = 0.0;
+#else
+    uint glass_width, glass_height;
+    _ThinGlassSceneColor.GetDimensions(glass_width, glass_height);
+    transmission *= glass_width > 1 && glass_height > 1 ? 1.0 : 0.0;
+#endif
+    float dielectric_specular = 0.04;
+    if (transmission > 0.0)
+    {
+        float ior = max(_IOR, 1.0);
+        dielectric_specular = pow((ior - 1.0) / (ior + 1.0), 2.0);
+    }
+    float3 light = max(0.0, CalculateLightPBR(surface_data, input.world_pos, input.uv0, irradiance, irradiance,
+                                            false, 1.0 - transmission, dielectric_specular));
     light += surface_data.emssive;
     float view_depth = mul(_MatrixV, float4(input.world_pos, 1.0f)).z;
-    light = ApplyVolumetricFogStraight(light, input.position.xy * _ScreenParams.xy, view_depth);
+    if (transmission > 0.0)
+    {
+        float nv = saturate(abs(dot(normalize(_CameraPos.xyz - input.world_pos), surface_data.wnormal)));
+        float fresnel = dielectric_specular > 0.0 ? F_Schlick(dielectric_specular.xxx, nv).r : 0.0;
+        float3 throughput = transmission * (1.0 - fresnel) * saturate(surface_data.albedo.rgb);
+        // The snapshot is already fogged. Only the new surface contribution needs foreground fog.
+        float4 fog = SampleVolumetricFog(screen_uv, view_depth);
+        light = light * saturate(fog.a) + (1.0 - throughput) * fog.rgb;
+        light += throughput * _ThinGlassSceneColor.SampleLevel(g_LinearClampSampler, screen_uv, 0).rgb;
+    }
+    else
+        light = ApplyVolumetricFogStraight(light, screen_uv, view_depth);
     return float4(light, alpha);
 }

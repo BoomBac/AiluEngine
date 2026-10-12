@@ -423,9 +423,7 @@ namespace Ailu
                     PlaceActorSpawnContext context;
                     context._scene = scene;
                     context._position = _drag_preview_pos;
-                    const ECS::Entity new_entity = PlaceActorRegistry::Get().Spawn(place_payload->_id, context);
-                    if (new_entity != ECS::kInvalidEntity)
-                        Selection::SetSelection(new_entity);
+                    _pending_place_actor_spawns.push_back({place_payload->_id, context._position, scene});
                     return;
                 }
                 auto *asset = static_cast<Asset *>(payload._data);
@@ -471,8 +469,27 @@ namespace Ailu
             };
             _source->SetDropHandler(handler);
         }
+        void SceneView::ProcessPendingPlaceActorSpawns()
+        {
+            auto *active_scene = SceneMgr::Get().ActiveScene();
+            for (const auto &pending_spawn : _pending_place_actor_spawns)
+            {
+                if (active_scene == nullptr || active_scene != pending_spawn._scene)
+                    continue;
+
+                PlaceActorSpawnContext context;
+                context._scene = active_scene;
+                context._position = pending_spawn._position;
+                const ECS::Entity new_entity = PlaceActorRegistry::Get().Spawn(pending_spawn._id, context);
+                if (new_entity != ECS::kInvalidEntity)
+                    Selection::SetSelection(new_entity);
+            }
+            _pending_place_actor_spawns.clear();
+        }
+
         void SceneView::Update(f32 dt)
         {
+            ProcessPendingPlaceActorSpawns();
             RenderView::Update(dt);
             if (Application::Get()._is_playing_mode)
             {
@@ -690,9 +707,206 @@ namespace Ailu
                 e._is_handled = true;
             };
 
+            BuildSceneCameraSettings();
             UpdateSceneToolbarLayout();
             UpdateSceneToolbarState();
         }
+
+        void SceneView::BuildSceneCameraSettings()
+        {
+            _btn_camera_settings = _view_canvas->AddChild<UI::Button>("Camera");
+            _btn_camera_settings->GetSlotAs<UI::CanvasSlot>()
+                    .Position({12.0f, kSceneToolbarTop})
+                    .Size({76.0f, 28.0f});
+            ApplySceneToolbarButtonStyle(_btn_camera_settings, false);
+            _btn_camera_settings->OnMouseClick() += [this](UI::UIEvent &e)
+            {
+                const bool open = _camera_settings_panel != nullptr && !_camera_settings_panel->IsVisible();
+                if (_camera_settings_panel != nullptr)
+                    _camera_settings_panel->SetVisible(open);
+                if (open)
+                    UpdateSceneCameraSettings();
+                ApplySceneToolbarButtonStyle(_btn_camera_settings, open);
+                e._is_handled = true;
+            };
+
+            _camera_settings_panel = _view_canvas->AddChild<UI::Border>();
+            _camera_settings_panel->GetSlotAs<UI::CanvasSlot>()
+                    .Position({12.0f, kSceneToolbarTop + 34.0f})
+                    .Size({276.0f, 292.0f});
+            _camera_settings_panel->Thickness(1.0f);
+            _camera_settings_panel->CornerRadius(5.0f);
+            _camera_settings_panel->_bg_color = Color(0.06f, 0.07f, 0.09f, 0.94f);
+            _camera_settings_panel->_border_color = Color(1.0f, 1.0f, 1.0f, 0.20f);
+            _camera_settings_panel->GetStyleOverride().SetBackground(MakeSceneToolbarBrush(_camera_settings_panel->_bg_color));
+            _camera_settings_panel->GetStyleOverride().SetBorderColor(_camera_settings_panel->_border_color);
+            _camera_settings_panel->GetStyleOverride().SetBorderWidth(1.0f);
+            _camera_settings_panel->GetStyleOverride().SetCornerRadius(5.0f);
+
+            auto *content = _camera_settings_panel->AddChild<UI::VerticalBox>();
+            content->SlotPadding() = UI::Padding(10.0f, 8.0f, 10.0f, 8.0f);
+            content->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
+            auto *title = content->AddChild<UI::Text>("Scene Camera");
+            title->FontSize(15.0f);
+            title->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed).Size({0.0f, 24.0f});
+            auto *frustum_title = content->AddChild<UI::Text>("Frustum");
+            frustum_title->FontSize(12.0f);
+            frustum_title->_color = Color(0.72f, 0.76f, 0.82f, 1.0f);
+            frustum_title->GetSlotAs<UI::LinearSlot>()
+                    .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed).Size({0.0f, 20.0f});
+
+            auto add_float_row = [content](const String &label, const String &value, UI::HorizontalBox **out_row)
+            {
+                auto *row = content->AddChild<UI::HorizontalBox>();
+                if (out_row != nullptr)
+                    *out_row = row;
+                row->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed).Size({0.0f, 28.0f});
+                row->AddChild<UI::Text>(label)->GetSlotAs<UI::LinearSlot>()
+                        .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill).FillRate(1.0f);
+                auto *input = row->AddChild<UI::InputBlock>(value);
+                input->GetSlotAs<UI::LinearSlot>()
+                        .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill).FillRate(1.0f);
+                return input;
+            };
+
+            _camera_fov_input = add_float_row("FOV", "60", &_camera_fov_row);
+            _camera_fov_input->_on_content_changed += [this](String value)
+            {
+                if (Camera *camera = Camera::sCurrent; camera != nullptr)
+                {
+                    if (const auto parsed = StringUtils::ParseFloat(value); parsed.has_value())
+                    {
+                        camera->FovH(std::clamp(parsed.value(), 1.0f, 179.0f));
+                        camera->MarkDirty();
+                        camera->RecalculateMatrix(true);
+                    }
+                }
+            };
+            _camera_near_input = add_float_row("Near", "0.1", nullptr);
+            _camera_near_input->_on_content_changed += [this](String value)
+            {
+                if (Camera *camera = Camera::sCurrent; camera != nullptr)
+                {
+                    if (const auto parsed = StringUtils::ParseFloat(value); parsed.has_value())
+                    {
+                        camera->Near(std::clamp(parsed.value(), 0.001f, std::max(0.002f, camera->Far() - 0.001f)));
+                        _camera_controller->_camera_near = camera->Near();
+                        camera->MarkDirty();
+                        camera->RecalculateMatrix(true);
+                    }
+                }
+            };
+            _camera_far_input = add_float_row("Far", "1000", nullptr);
+            _camera_far_input->_on_content_changed += [this](String value)
+            {
+                if (Camera *camera = Camera::sCurrent; camera != nullptr)
+                {
+                    if (const auto parsed = StringUtils::ParseFloat(value); parsed.has_value())
+                    {
+                        camera->Far(std::max(parsed.value(), camera->Near() + 0.001f));
+                        _camera_controller->_camera_far = camera->Far();
+                        camera->MarkDirty();
+                        camera->RecalculateMatrix(true);
+                    }
+                }
+            };
+            _camera_render_scale_input = add_float_row("Render Scale", "1.00", nullptr);
+            _camera_render_scale_input->_on_content_changed += [this](String value)
+            {
+                if (Camera *camera = Camera::sCurrent; camera != nullptr)
+                {
+                    if (const auto parsed = StringUtils::ParseFloat(value); parsed.has_value())
+                        camera->RenderScale(parsed.value());
+                }
+            };
+
+            _camera_size_input = add_float_row("Ortho Size", "10", &_camera_size_row);
+            _camera_size_input->_on_content_changed += [this](String value)
+            {
+                if (Camera *camera = Camera::sCurrent; camera != nullptr && camera->Type() == Render::ECameraType::kOrthographic)
+                {
+                    if (const auto parsed = StringUtils::ParseFloat(value); parsed.has_value())
+                    {
+                        camera->Size(std::max(parsed.value(), 0.01f));
+                        camera->MarkDirty();
+                        camera->RecalculateMatrix(true);
+                    }
+                }
+            };
+
+            auto *aa_row = content->AddChild<UI::HorizontalBox>();
+            aa_row->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed).Size({0.0f, 28.0f});
+            aa_row->AddChild<UI::Text>("Anti-aliasing")->GetSlotAs<UI::LinearSlot>()
+                    .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill).FillRate(1.0f);
+            _camera_aa_dropdown = aa_row->AddChild<UI::Dropdown>(Vector<String>{"None", "FXAA", "TAA"});
+            _camera_aa_dropdown->GetSlotAs<UI::LinearSlot>()
+                    .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill).FillRate(1.0f);
+            _camera_aa_dropdown->_on_selected_changed += [](i32 index)
+            {
+                if (Camera *camera = Camera::sCurrent; camera != nullptr && index >= 0 && index <= 2)
+                    camera->_anti_aliasing = static_cast<Render::EAntiAliasing>(index);
+            };
+
+            auto *upsampling_row = content->AddChild<UI::HorizontalBox>();
+            upsampling_row->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed).Size({0.0f, 28.0f});
+            upsampling_row->AddChild<UI::Text>("Upsampling")->GetSlotAs<UI::LinearSlot>()
+                    .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill).FillRate(1.0f);
+            _camera_upsampling_dropdown = upsampling_row->AddChild<UI::Dropdown>(Vector<String>{"Bilinear", "Point"});
+            _camera_upsampling_dropdown->GetSlotAs<UI::LinearSlot>()
+                    .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill).FillRate(1.0f);
+            _camera_upsampling_dropdown->_on_selected_changed += [](i32 index)
+            {
+                if (Camera *camera = Camera::sCurrent; camera != nullptr && index >= 0 && index <= 1)
+                    camera->UpsamplingFilter(static_cast<Render::EUpsamplingFilter>(index));
+            };
+
+            auto *postprocess_row = content->AddChild<UI::HorizontalBox>();
+            postprocess_row->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed).Size({0.0f, 28.0f});
+            postprocess_row->AddChild<UI::Text>("Post-processing")->GetSlotAs<UI::LinearSlot>()
+                    .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill).FillRate(1.0f);
+            _camera_postprocess_checkbox = postprocess_row->AddChild<UI::CheckBox>();
+            _camera_postprocess_checkbox->GetSlotAs<UI::LinearSlot>()
+                    .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill).FillRate(1.0f);
+            _camera_postprocess_checkbox->_on_click += [](bool enabled)
+            {
+                if (Camera *camera = Camera::sCurrent; camera != nullptr)
+                    camera->_postprocess_enabled = enabled;
+            };
+
+            _camera_settings_panel->SetVisible(false);
+        }
+
+        void SceneView::UpdateSceneCameraSettings()
+        {
+            Camera *camera = Camera::sCurrent;
+            if (camera == nullptr)
+                return;
+
+            if (_camera_fov_input != nullptr)
+                _camera_fov_input->SetContent(std::format("{:.2f}", camera->FovH()), false);
+            if (_camera_near_input != nullptr)
+                _camera_near_input->SetContent(std::format("{:.3f}", camera->Near()), false);
+            if (_camera_far_input != nullptr)
+                _camera_far_input->SetContent(std::format("{:.2f}", camera->Far()), false);
+            if (_camera_size_input != nullptr)
+            {
+                const bool is_orthographic = camera->Type() == Render::ECameraType::kOrthographic;
+                if (_camera_fov_row != nullptr)
+                    _camera_fov_row->SetVisible(!is_orthographic);
+                if (_camera_size_row != nullptr)
+                    _camera_size_row->SetVisible(is_orthographic);
+                _camera_size_input->SetContent(std::format("{:.2f}", camera->Size()), false);
+            }
+            if (_camera_aa_dropdown != nullptr)
+                _camera_aa_dropdown->SetSelectedIndex(static_cast<i32>(camera->_anti_aliasing), false);
+            if (_camera_render_scale_input != nullptr)
+                _camera_render_scale_input->SetContent(std::format("{:.2f}", camera->RenderScale()), false);
+            if (_camera_upsampling_dropdown != nullptr)
+                _camera_upsampling_dropdown->SetSelectedIndex(static_cast<i32>(camera->UpsamplingFilter()), false);
+            if (_camera_postprocess_checkbox != nullptr)
+                _camera_postprocess_checkbox->SetChecked(camera->_postprocess_enabled, false);
+        }
+
         void SceneView::UpdateSceneToolbarLayout()
         {
             if (_scene_toolbar_bg == nullptr)
@@ -705,6 +919,21 @@ namespace Ailu
             _scene_toolbar_bg->GetSlotAs<UI::CanvasSlot>()
                     .Position({kSceneToolbarLeft, kSceneToolbarTop})
                     .Size({toolbar_width, kSceneToolbarHeight});
+            constexpr f32 kCameraSettingsButtonWidth = 76.0f;
+            constexpr f32 kCameraSettingsPanelWidth = 276.0f;
+            constexpr f32 kSceneViewRightMargin = 12.0f;
+            if (_btn_camera_settings != nullptr)
+            {
+                const f32 button_x = std::max(0.0f, _view_size.x - kCameraSettingsButtonWidth - kSceneViewRightMargin);
+                _btn_camera_settings->GetSlotAs<UI::CanvasSlot>()
+                        .Position({button_x, kSceneToolbarTop});
+            }
+            if (_camera_settings_panel != nullptr)
+            {
+                const f32 panel_x = std::max(0.0f, _view_size.x - kCameraSettingsPanelWidth - kSceneViewRightMargin);
+                _camera_settings_panel->GetSlotAs<UI::CanvasSlot>()
+                        .Position({panel_x, kSceneToolbarTop + 34.0f});
+            }
         }
         void SceneView::UpdateSceneToolbarBackdrop()
         {
@@ -715,6 +944,8 @@ namespace Ailu
             const Vector4f source_rect = _source->GetArrangeRect();
             if (_dropdown_2d_orientation != nullptr)
                 _dropdown_2d_orientation->SetPopupBackdrop(main_target, source_rect);
+            if (_camera_aa_dropdown != nullptr)
+                _camera_aa_dropdown->SetPopupBackdrop(main_target, source_rect);
             const Vector4f toolbar_rect = _scene_toolbar_bg->GetArrangeRect();
             if (source_rect.z <= 1.0f || source_rect.w <= 1.0f || toolbar_rect.z <= 1.0f || toolbar_rect.w <= 1.0f)
                 return;
@@ -733,6 +964,23 @@ namespace Ailu
             style._background = backdrop_brush;
             style._override_mask |= (u32)EUIControlVisualOverride::kBackground;
             _scene_toolbar_bg->InvalidateStyle(EStyleInvalidation::kPaintOnly);
+
+            if (_camera_settings_panel != nullptr && _camera_settings_panel->IsVisible())
+            {
+                const Vector4f panel_rect = _camera_settings_panel->GetArrangeRect();
+                if (panel_rect.z > 1.0f && panel_rect.w > 1.0f)
+                {
+                    backdrop_brush._tint = Color(1.0f, 1.0f, 1.0f, 0.90f);
+                    backdrop_brush._uv_rect = {
+                            (panel_rect.x - source_rect.x) / source_rect.z,
+                            (panel_rect.y - source_rect.y) / source_rect.w,
+                            panel_rect.z / source_rect.z,
+                            panel_rect.w / source_rect.w};
+                    auto &panel_style = _camera_settings_panel->GetStyleOverride();
+                    panel_style.SetBackground(backdrop_brush);
+                    _camera_settings_panel->InvalidateStyle(EStyleInvalidation::kPaintOnly);
+                }
+            }
         }
         void SceneView::UpdateSceneToolbarState()
         {
@@ -860,8 +1108,10 @@ namespace Ailu
                 return;
             }
 
-            const u16 kPreviewWidth = static_cast<u16>(kPreviewRTSize.x);
-            const u16 kPreviewHeight = static_cast<u16>(kPreviewRTSize.y);
+            const f32 preview_aspect = camera_component->_camera.LockAspect()
+                ? std::max(camera_component->_camera.Aspect(), 0.001f) : kPreviewRTSize.x / kPreviewRTSize.y;
+            const u16 kPreviewWidth = static_cast<u16>(std::max(1.f, std::min(kPreviewRTSize.x, kPreviewRTSize.y * preview_aspect)));
+            const u16 kPreviewHeight = static_cast<u16>(std::max(1.f, std::min(kPreviewRTSize.y, kPreviewRTSize.x / preview_aspect)));
             const f32 kPreviewMargin = 12.0f;
             if (_camera_preview_texture == nullptr || _camera_preview_texture->Width() != kPreviewWidth ||
                 _camera_preview_texture->Height() != kPreviewHeight)

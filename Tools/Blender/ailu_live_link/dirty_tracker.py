@@ -4,10 +4,11 @@ from contextlib import contextmanager
 import bpy
 
 from . import identity, material_sync, protocol
-from .object_sync import sync_object
+from .object_sync import sync_instances, sync_object, _instance_states
 
 _dirty = {}
 _known_guids = set()
+_last_render_settings = ()
 _last_full_sync = 0.0
 _quiet_seconds = 0.12
 _export_depth = 0
@@ -80,30 +81,50 @@ def remove_handler():
         bpy.app.handlers.depsgraph_update_post.remove(_depsgraph_update)
     _dirty.clear()
     _known_guids.clear()
+    _instance_states.clear()
     material_sync.invalidate_image_cache()
 
 
 def mark_synced(scene):
+    global _last_render_settings
+    render = scene.render
+    _last_render_settings = (render.resolution_x, render.resolution_y, render.pixel_aspect_x, render.pixel_aspect_y)
     _known_guids.clear()
     _known_guids.update(identity.get_guid(obj) for obj in scene.objects)
     _dirty.clear()
 
 
 def flush(context, link):
+    global _last_render_settings
     if not link.connected or context.mode != "OBJECT":
         return
     now = time.monotonic()
+    render = context.scene.render
+    render_settings = (render.resolution_x, render.resolution_y, render.pixel_aspect_x, render.pixel_aspect_y)
+    if render_settings != _last_render_settings:
+        for obj in context.scene.objects:
+            if obj.type == "CAMERA":
+                _dirty[identity.get_guid(obj)] = (obj.name, now - _quiet_seconds)
+        _last_render_settings = render_settings
+    identity.repair_duplicate_guids(context.scene.objects)
     current = {identity.get_guid(obj): obj for obj in context.scene.objects}
+    # New objects (including duplicates with repaired identities) must not depend on a depsgraph notification.
+    for guid in current.keys() - _known_guids:
+        _dirty.setdefault(guid, (current[guid].name, now - _quiet_seconds))
     removed = _known_guids - current.keys()
     for guid in removed:
         link.send_json(protocol.OBJECT_DELETE, {"guid": guid})
     _known_guids.intersection_update(current.keys())
     sent_materials = set()
+    changed_objects = []
     for guid, (name, changed_at) in list(_dirty.items()):
         if now - changed_at < _quiet_seconds:
             continue
         obj = current.get(guid)
         if obj is not None:
             sync_object(context, obj, link, sent_materials)
+            changed_objects.append(obj)
             _known_guids.add(guid)
         _dirty.pop(guid, None)
+    if changed_objects or removed:
+        sync_instances(context, link, sent_materials, changed_objects)

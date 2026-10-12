@@ -182,8 +182,8 @@ namespace Ailu::Render
         if (!force && !_is_dirty)
             return;
         _is_custom_vp = false;
-        _forward = _rotation * Vector3f::kForward;
-        _up = _rotation * Vector3f::kUp;
+        _forward = Normalize(_rotation * _local_forward);
+        _up = Normalize(_rotation * _local_up);
         _right = CrossProduct(_up, _forward);
         RebuildCameraMatrices();
     }
@@ -214,6 +214,10 @@ namespace Ailu::Render
             float bottom = -(_size * 0.5f) / _aspect;
             BuildOrthographicMatrix(_proj_matrix_no_jitter, left, right, top, bottom,_near_clip, _far_clip);
         }
+        if (_reverse_projection_x) _proj_matrix_no_jitter[0][0] = -_proj_matrix_no_jitter[0][0];
+        const u32 offset_row = _camera_type == ECameraType::kPerspective ? 2u : 3u;
+        _proj_matrix_no_jitter[offset_row][0] += _projection_offset.x;
+        _proj_matrix_no_jitter[offset_row][1] += _projection_offset.y;
         BuildViewMatrixLookToLH(_view_matrix, _position, _forward, _up);
         _no_jitter_view_proj_matrix = _view_matrix * _proj_matrix_no_jitter;
         RefreshRenderMatrices();
@@ -248,6 +252,15 @@ namespace Ailu::Render
         float ndc_y = 1.0f - 2.0f * screen_pos.y / vp_size.y;
         Matrix4x4f inv_view = MatrixInverse(_view_matrix);
 
+        if (_camera_type == ECameraType::kOrthographic && (_reverse_projection_x || _projection_offset != Vector2f::kZero))
+        {
+            if (depth == 0.0f) return Normalize(_forward);
+            const auto inv_proj = MatrixInverse(_proj_matrix_no_jitter);
+            Vector4f local = TransformVector(inv_proj, Vector4f(ndc_x, ndc_y, kZNear, 1.0f));
+            local /= local.w;
+            local.z = depth;
+            return TransformCoord(inv_view, local.xyz);
+        }
         if (_camera_type == ECameraType::kOrthographic)
         {
             //--------------------------------------------
@@ -324,6 +337,12 @@ namespace Ailu::Render
         // -----------------------------------------------------
         // 正交相机
         // -----------------------------------------------------
+        if (_camera_type == ECameraType::kOrthographic && (_reverse_projection_x || _projection_offset != Vector2f::kZero))
+        {
+            Vector4f clip_pos = TransformVector(_proj_matrix_no_jitter, view_pos);
+            clip_pos /= clip_pos.w;
+            return Vector2f((clip_pos.x * 0.5f + 0.5f) * vp_size.x, (0.5f - clip_pos.y * 0.5f) * vp_size.y);
+        }
         if (_camera_type == ECameraType::kOrthographic)
         {
             // 构造正交投影参数
@@ -452,6 +471,10 @@ namespace Ailu::Render
         _vf._planes[5]._point = rightPlaneCenter;
         for (int i = 0; i < 6; ++i)
         {
+            // Projection reflections reverse corner winding; keep all planes pointing away from the interior.
+            const Vector3f interior = (nearPlaneCenter + farPlaneCenter) * 0.5f;
+            if (DotProduct(_vf._planes[i]._normal, interior - _vf._planes[i]._point) > 0.0f)
+                _vf._planes[i]._normal = -_vf._planes[i]._normal;
             _vf._planes[i]._normal = Normalize(_vf._planes[i]._normal);
             _vf._planes[i]._distance = -DotProduct(_vf._planes[i]._normal, _vf._planes[i]._point);
         }
@@ -565,7 +588,7 @@ namespace Ailu::Render
         _pixel_width = w;
         _pixel_height = h;
         f32 new_aspect = (f32) w / (f32) h;
-        if (new_aspect != _aspect)
+        if (!_lock_aspect && new_aspect != _aspect)
         {
             _aspect = new_aspect;
             MarkDirty();
@@ -589,15 +612,17 @@ namespace Ailu::Render
         g_halton_seq.Get(offset_x, offset_y,g_pGfxContext? g_pGfxContext->GetFrameCount():0u);
         if (_camera_type == ECameraType::kOrthographic)
         {
-            _jitter.x = (offset_x * 2.0f - 1.0f) / static_cast<f32>(_pixel_width) * _jitter_scale;
-            _jitter.y = (offset_y * 2.0f - 1.0f) / static_cast<f32>(_pixel_height) * _jitter_scale;
+            const Vector2D<u32> render_size = RenderSize();
+            _jitter.x = (offset_x * 2.0f - 1.0f) / static_cast<f32>(render_size.x) * _jitter_scale;
+            _jitter.y = (offset_y * 2.0f - 1.0f) / static_cast<f32>(render_size.y) * _jitter_scale;
             _proj_matrix[3][0] += _jitter.x;
             _proj_matrix[3][1] += _jitter.y;
         }
         else
         {
-            _jitter.x = (offset_x * 2 - 1) / (f32)_pixel_width  * _jitter_scale;
-            _jitter.y = (offset_y * 2 - 1) / (f32)_pixel_height * _jitter_scale;
+            const Vector2D<u32> render_size = RenderSize();
+            _jitter.x = (offset_x * 2 - 1) / static_cast<f32>(render_size.x) * _jitter_scale;
+            _jitter.y = (offset_y * 2 - 1) / static_cast<f32>(render_size.y) * _jitter_scale;
             _proj_matrix[2][0] += _jitter.x;
             _proj_matrix[2][1] += _jitter.y;
         }

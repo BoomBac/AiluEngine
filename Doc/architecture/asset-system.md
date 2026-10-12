@@ -133,6 +133,14 @@ Is this editor-only workflow?
 
 再选择位置。
 
+## Synchronous import result
+
+`ResourceMgr::ImportResource()` runs synchronously and returns the first runtime object for which asset creation succeeded.
+A null result means no registered output (including unsupported/missing input, an invalid destination, duplicate input, or importer failure).
+This API does not distinguish those null-result causes or expose partial sub-asset failure details. Editor batch progress uses this
+result for file-level success/failure; it does not infer success merely from returning normally. Single-file import may still stall the
+main thread; Editor queue preparation/yielding only gives drawing opportunities between files.
+
 ## Asset domains and paths
 
 当前可见 domain/path scheme 包括：
@@ -239,3 +247,11 @@ stop new async work
 - Editor browser/import UI；
 - runtime pointer lifetime；
 - async shutdown。
+
+## Durable procedural mesh sources
+
+MeshAssetHandler saves a non-skeletal mesh with no external model source as a .almesh sidecar beside its .alasset document.
+The sidecar uses the existing versioned MeshArtifact container and a native key with kMeshArtifactVersion; it is durable
+source data, not disposable DDC. Load recognizes the .almesh source, restores CPU/derived geometry and uploads it through
+the normal Mesh path. Existing FBX/glTF import and DDC paths remain unchanged. Skeleton meshes still require their existing
+source pipeline. Keep the sidecar with the document when moving or distributing these assets.

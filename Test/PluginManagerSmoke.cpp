@@ -51,6 +51,14 @@ int main()
         PluginManager manager;
         Require(!manager.LoadPlugin(path.wstring()), "Load before initialization rejected");
         Require(manager.Initialize(), "Initialize");
+        std::vector<EPluginProgressState> progress_states;
+        manager.SetProgressCallback([&](const char* title, const char* message, u64 completed, EPluginProgressState state)
+        {
+            Require(title && message, "Progress strings available during callback");
+            Require(completed == (state == EPluginProgressState::kBegin ? 0u : 1u), "Progress counter transported");
+            progress_states.push_back(state);
+            if (state == EPluginProgressState::kRunning) throw std::runtime_error("Callback failure is contained by host");
+        });
         Require(manager.LoadPlugin(path.wstring()), "Load");
         Require(manager.LoadedPluginCount() == 1 && manager.IsLoaded("com.ailu.test.lifecycle"), "Lookup/count");
         Require(!manager.LoadPlugin(path.wstring()), "Duplicate same DLL rejected");
@@ -79,6 +87,9 @@ int main()
             "Wrong-thread calls rejected");
         Require(manager.UnloadPlugin("com.ailu.test.lifecycle"), "Unload");
         Require(GetModuleHandleW(path.c_str()) == nullptr, "No extra reference after same-DLL duplicate");
+        Require(progress_states == std::vector<EPluginProgressState>{EPluginProgressState::kBegin,
+            EPluginProgressState::kRunning, EPluginProgressState::kCancelled}, "Optional progress ABI and unload termination");
+        manager.SetProgressCallback({});
         for (const auto* file : {L"AiluPluginInvalid.dll", L"AiluPluginNullCreate.dll", L"AiluPluginLoadFail.dll",
             L"AiluPluginMissingDescriptor.dll", L"AiluPluginMissingCreate.dll", L"AiluPluginMissingDestroy.dll"})
         {

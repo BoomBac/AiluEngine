@@ -233,6 +233,8 @@ namespace Ailu
                 }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data)
                 {
                 ECS::Register &r = SceneMgr::Get().ActiveScene()->GetRegister();
+                cmd->SetRenderTargetLoadAction(rendering_data.FinalColorHandle(), ELoadStoreAction::kLoad);
+                cmd->SetRenderTargetLoadAction(rendering_data._rg_handles._depth_target, ELoadStoreAction::kLoad);
                 cmd->SetRenderTarget(rendering_data.FinalColorHandle(),
                                      rendering_data._rg_handles._depth_target);
                 if (auto &selected = Editor::Selection::SelectedEntities(); selected.size() > 0)
@@ -411,6 +413,7 @@ namespace Ailu
                 }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data)
                           { 
                     _editor_outline->SetTexture("_SelectBuffer", graph.Resolve<Texture>(select_buf));
+                    cmd->SetRenderTargetLoadAction(rendering_data.FinalColorHandle(), ELoadStoreAction::kLoad);
                     cmd->SetRenderTarget(rendering_data.FinalColorHandle());
                     cmd->DrawFullScreenQuad(_editor_outline.get(),2); });
         }

@@ -9,6 +9,8 @@
 #include "Framework/Core/Containers/Vector.h"
 #include "Framework/Math/Vector.hpp"
 #include "Widgets/EditorLayer.h"
+#include "Common/EditorProgressService.h"
+#include "Framework/Common/JobSystem.h"
 #include <filesystem>
 #include "generated/EditorApp.gen.h"
 
@@ -100,6 +102,8 @@ namespace Ailu
             FirstPersonCameraController &GetSceneCameraController() { return *_camera_controller; }
             Camera *GetSceneCamera() { return _p_scene_camera; }
             EditorAutomationService *GetAutomationService() { return _automation_service.get(); }
+            EditorProgressService &GetProgressService() { return _progress_service; }
+            void StartProgressDemo();
             PluginManager *GetPluginManager() { return _plugin_manager.get(); }
         private:
             bool OnGetFocus(WindowFocusEvent &e) final;
@@ -129,6 +133,8 @@ namespace Ailu
             Scope<PluginManager> _plugin_manager;
             Delegate<>::Handle _plugin_tick_handle = Delegate<>::kInvalidHandle;
             bool _is_resource_reload_configured = false;
+            EditorProgressService _progress_service;
+            JobGroup _progress_demo_jobs;
         };// namespace Editor
     }// namespace Editor
 }// namespace Ailu

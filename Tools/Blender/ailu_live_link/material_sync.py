@@ -8,7 +8,7 @@ from . import identity, protocol
 from .mesh_sync import _temp_dir
 
 _packed_image_cache = {}
-_roughness_metallic_cache = {}
+_scalar_image_cache = {}
 
 
 def _shader_source(socket, groups=(), visited=None):
@@ -36,6 +36,44 @@ def _shader_source(socket, groups=(), visited=None):
     return node, groups
 
 
+def _surface_lobes(socket, groups=()):
+    visited = set()
+
+    def lobes(value, groups=()):
+        source = _shader_source(value, groups)
+        if source is None:
+            return {"other"}
+        node, groups = source
+        key = (node.as_pointer(), tuple(group.as_pointer() for group in groups))
+        if key in visited or len(visited) >= 64:
+            return {"other"}
+        visited.add(key)
+        try:
+            if node.type in {"BSDF_DIFFUSE", "BSDF_GLOSSY"}:
+                return {node.type}
+            if node.type in {"BSDF_TRANSPARENT", "EMISSION"}:
+                return {"neutral"}
+            if node.type in {"MIX_SHADER", "ADD_SHADER"}:
+                inputs = list(node.inputs)[1:] if node.type == "MIX_SHADER" else list(node.inputs)
+                return lobes(inputs[0], groups) | lobes(inputs[1], groups)
+            return {"other"}
+        finally:
+            visited.remove(key)
+
+    return lobes(socket, groups)
+
+
+def is_diffuse_only(socket):
+    """Preserve Diffuse closures without mistaking a mixed Glossy/Principled branch for diffuse-only."""
+    closures = _surface_lobes(socket)
+    return "BSDF_DIFFUSE" in closures and closures <= {"BSDF_DIFFUSE", "neutral"}
+
+
+def is_diffuse_glossy(socket, groups=()):
+    closures = _surface_lobes(socket, groups)
+    return {"BSDF_DIFFUSE", "BSDF_GLOSSY"} <= closures <= {"BSDF_DIFFUSE", "BSDF_GLOSSY", "neutral"}
+
+
 def _principled_source(socket, groups=(), visited=None):
     if visited is None:
         visited = set()
@@ -47,7 +85,7 @@ def _principled_source(socket, groups=(), visited=None):
     if key in visited or len(visited) >= 64:
         return None
     visited.add(key)
-    if node.type in {"BSDF_PRINCIPLED", "BSDF_DIFFUSE", "BSDF_GLOSSY", "EMISSION"}:
+    if node.type in {"BSDF_PRINCIPLED", "BSDF_DIFFUSE", "BSDF_GLOSSY", "BSDF_GLASS", "BSDF_REFRACTION", "EMISSION"}:
         return node, groups
     if node.type in {"MIX_SHADER", "ADD_SHADER"}:
         inputs = node.inputs[1:] if node.type == "MIX_SHADER" else node.inputs
@@ -56,6 +94,23 @@ def _principled_source(socket, groups=(), visited=None):
             if result:
                 return result
     return None
+
+
+def transmission_parameters(surface):
+    """Preserve the primary dielectric closure even when other channels need a native texture bake."""
+    source = _principled_source(surface)
+    if source is None:
+        return {"transmission": 0.0, "ior": 1.5}
+    node, groups = source
+    def scalar(names, default):
+        socket = next((node.inputs.get(name) for name in names if node.inputs.get(name) is not None), None)
+        value = _constant_input(socket, groups)
+        if socket is not None and socket.is_linked and value is None:
+            print(f"[BlenderLiveLink] Dielectric approximation: {node.name!r} {socket.name!r} uses socket default")
+        return float(value if value is not None else socket.default_value if socket else default)
+    transmission = (1.0 if node.type in {"BSDF_GLASS", "BSDF_REFRACTION"}
+                    else scalar(("Transmission Weight", "Transmission"), 0.0))
+    return {"transmission": max(0.0, min(1.0, transmission)), "ior": max(1.0, scalar(("IOR",), 1.5))}
 
 
 def _opacity_source(socket, groups=(), visited=None):
@@ -88,7 +143,7 @@ def _opacity_source(socket, groups=(), visited=None):
 
 def invalidate_image_cache():
     _packed_image_cache.clear()
-    _roughness_metallic_cache.clear()
+    _scalar_image_cache.clear()
     from . import material_bake
     material_bake.invalidate()
 
@@ -385,109 +440,49 @@ def _pack_base_alpha(material, base_source, alpha_source, base_color, invert_alp
     return path
 
 
-def _pack_roughness_metallic(principled, material, approximations=None, groups=()):
-    rough_socket = principled.inputs.get("Roughness")
-    metal_socket = principled.inputs.get("Metallic")
-    rough_source = _scalar_source(rough_socket, approximations, groups)
-    metal_source = _scalar_source(metal_socket, approximations, groups)
-    rough_image = rough_source[0] if rough_source else None
-    metal_image = metal_source[0] if metal_source else None
-    if not rough_image and not metal_image:
+def _export_scalar_texture(principled, material, input_name, approximations=None, groups=()):
+    source = _scalar_source(principled.inputs.get(input_name), approximations, groups)
+    if source is None:
         return ""
-
-    def image_dimensions(image):
-        if image is None:
-            return None
+    image, source_channel = source
+    width, height = (int(value) for value in image.size)
+    if width <= 0 or height <= 0:
+        try:
+            image.reload()
+        except (ReferenceError, RuntimeError):
+            pass
         width, height = (int(value) for value in image.size)
-        if width <= 0 or height <= 0:
-            try:
-                image.reload()
-            except (ReferenceError, RuntimeError):
-                pass
-            width, height = (int(value) for value in image.size)
-        if width <= 0 or height <= 0:
-            print(
-                f"[BlenderLiveLink] Skip scalar image with invalid dimensions: "
-                f"image={image.name_full!r}, size={tuple(image.size)}"
-            )
-            return None
-        return width, height
-
-    rough_size = image_dimensions(rough_image)
-    metal_size = image_dimensions(metal_image)
-    if rough_size is None:
-        rough_image = None
-    if metal_size is None:
-        metal_image = None
-    if rough_image is None and metal_image is None:
+    if width <= 0 or height <= 0:
+        print(f"[BlenderLiveLink] Skip scalar image with invalid dimensions: image={image.name_full!r}")
         return ""
-    rough_constant = _constant_input(rough_socket, groups)
-    metal_constant = _constant_input(metal_socket, groups)
-    rough_default = float(rough_constant if rough_constant is not None
-                          else rough_socket.default_value if rough_socket else 0.5)
-    metal_default = float(metal_constant if metal_constant is not None
-                          else metal_socket.default_value if metal_socket else 0.0)
-    cache_key = (
-        material.as_pointer(),
-        rough_image.as_pointer() if rough_image else 0,
-        metal_image.as_pointer() if metal_image else 0,
-        rough_size if rough_image else (),
-        metal_size if metal_image else (),
-        rough_default,
-        metal_default,
-        rough_source[1] if rough_source else None,
-        metal_source[1] if metal_source else None,
-    )
-    cached_path = _roughness_metallic_cache.get(cache_key)
+    cache_key = (material.as_pointer(), input_name, image.as_pointer(), width, height, source_channel)
+    cached_path = _scalar_image_cache.get(cache_key)
     if cached_path and os.path.isfile(cached_path):
         return cached_path
-
-    width = max(rough_size[0] if rough_image else 1, metal_size[0] if metal_image else 1)
-    height = max(rough_size[1] if rough_image else 1, metal_size[1] if metal_image else 1)
-    result = np.zeros((height, width, 4), dtype=np.float32)
-    result[:, :, 0] = cache_key[5]
-    result[:, :, 1] = cache_key[6]
-    result[:, :, 3] = 1.0
-
-    def copy_channel(image, channel, source_channel):
-        source_width, source_height = image.size
-        pixels = np.empty(source_width * source_height * 4, dtype=np.float32)
-        try:
-            image.pixels.foreach_get(pixels)
-        except (RuntimeError, ValueError) as error:
-            print(f"[BlenderLiveLink] Skip unreadable scalar image: image={image.name_full!r}, error={error}")
-            return False
-        if pixels.size != source_width * source_height * 4:
-            print(f"[BlenderLiveLink] Skip incomplete scalar image: image={image.name_full!r}")
-            return False
-        pixels = pixels.reshape((source_height, source_width, 4))
-        pixels = (pixels[:, :, source_channel] if source_channel is not None
-                  else pixels[:, :, :3] @ np.array((0.2126, 0.7152, 0.0722), dtype=np.float32))
-        y_indices = np.minimum(source_height - 1, np.arange(height) * source_height // height)
-        x_indices = np.minimum(source_width - 1, np.arange(width) * source_width // width)
-        result[:, :, channel] = pixels[y_indices[:, None], x_indices[None, :]]
-        return True
-
-    copied_channels = 0
-    if rough_image:
-        copied_channels += copy_channel(rough_image, 0, rough_source[1])
-    if metal_image:
-        copied_channels += copy_channel(metal_image, 1, metal_source[1])
-    if copied_channels == 0:
+    pixels = np.empty(width * height * 4, dtype=np.float32)
+    try:
+        image.pixels.foreach_get(pixels)
+    except (RuntimeError, ValueError) as error:
+        print(f"[BlenderLiveLink] Skip unreadable scalar image: image={image.name_full!r}, error={error}")
         return ""
-
-    packed = bpy.data.images.new(f"{material.name_full}_AiluRM", width=width, height=height, alpha=True,
-        float_buffer=True)
+    pixels = pixels.reshape((height, width, 4))
+    scalar = (pixels[:, :, source_channel] if source_channel is not None
+              else pixels[:, :, :3] @ np.array((0.2126, 0.7152, 0.0722), dtype=np.float32))
+    result = np.ones((height, width, 4), dtype=np.float32)
+    result[:, :, :3] = scalar[:, :, None]
+    packed = bpy.data.images.new(f"{material.name_full}_Ailu{input_name}", width=width, height=height,
+                                 alpha=True, float_buffer=True)
     try:
         packed.colorspace_settings.name = "Non-Color"
         packed.pixels.foreach_set(result.ravel())
-        packed.filepath_raw = os.path.join(_temp_dir(), material.name_full.replace("/", "_") + "_rm.png")
+        filename = identity.get_guid(material) + "_scalar_" + input_name.lower() + ".png"
+        packed.filepath_raw = os.path.join(_temp_dir(), filename)
         packed.file_format = "PNG"
         packed.save()
         path = packed.filepath_raw
     finally:
         bpy.data.images.remove(packed)
-    _roughness_metallic_cache[cache_key] = path
+    _scalar_image_cache[cache_key] = path
     return path
 
 
@@ -495,15 +490,24 @@ def _pack_roughness_metallic(principled, material, approximations=None, groups=(
 def temporary_image_buffers():
     # Image decoding/Cycles may populate source buffers that were not resident before this operation.
     # Release only newly loaded, reloadable clean files; keep user-painted/generated/preloaded images intact.
+    started = time.perf_counter()
     unloaded = [image for image in bpy.data.images
                 if image.source == "FILE" and not image.has_data and not image.is_dirty]
+    scanned = time.perf_counter()
     try:
         yield
     finally:
+        cleanup_start = time.perf_counter()
+        released = 0
         for image in unloaded:
             if (image.has_data and not image.is_dirty
                     and (image.packed_file or os.path.isfile(bpy.path.abspath(image.filepath, library=image.library)))):
                 image.buffers_free()
+                released += 1
+        if released:
+            print(f"[BlenderLiveLink] Source image buffers: released={released} "
+                  f"scan={(scanned - started) * 1000:.2f}ms "
+                  f"free={(time.perf_counter() - cleanup_start) * 1000:.2f}ms")
 
 
 def export_material(material, link, obj=None):
@@ -523,13 +527,14 @@ def _export_material(material, link, obj=None):
             "material_guid": material_bake.material_guid(material, obj), "name": material.name_full,
             "base_color": [0.0] * 4, "roughness": 0.5, "metallic": 0.0,
             "emission": [0.0] * 3, "emission_strength": 0.0,
-            "base_color_path": "", "normal_path": "", "emission_path": "", "roughness_metallic_path": "",
+            "base_color_path": "", "normal_path": "", "emission_path": "",
+            "roughness_path": "", "metallic_path": "",
             "alpha_test": True, "alpha_blend": False, "double_sided": not material.use_backface_culling,
         })
         if output.inputs["Volume"].is_linked:
             print(f"[BlenderLiveLink] Volume not transferred: material={material.name_full!r}; surface stays invisible")
         return
-    if obj is not None and material_bake.object_needs_bake(obj):
+    if obj is not None and material_bake.requires_bake_for_object(material, obj):
         material_bake.export(material, obj, link)
         return
     if not material.use_nodes:
@@ -537,7 +542,8 @@ def _export_material(material, link, obj=None):
             "material_guid": identity.get_guid(material), "name": material.name_full,
             "base_color": list(material.diffuse_color), "roughness": material.roughness,
             "metallic": material.metallic, "emission": [0.0] * 3, "emission_strength": 0.0,
-            "base_color_path": "", "normal_path": "", "emission_path": "", "roughness_metallic_path": "",
+            "base_color_path": "", "normal_path": "", "emission_path": "",
+            "roughness_path": "", "metallic_path": "",
             "alpha_test": False, "alpha_blend": material.diffuse_color[3] < 1.0,
             "double_sided": not material.use_backface_culling,
         })
@@ -553,7 +559,8 @@ def _export_material(material, link, obj=None):
             "material_guid": identity.get_guid(material), "name": material.name_full,
             "base_color": [1.0, 1.0, 1.0, 0.0], "roughness": 0.5, "metallic": 0.0,
             "emission": [0.0, 0.0, 0.0], "emission_strength": 0.0,
-            "base_color_path": "", "normal_path": "", "emission_path": "", "roughness_metallic_path": "",
+            "base_color_path": "", "normal_path": "", "emission_path": "",
+            "roughness_path": "", "metallic_path": "",
             "alpha_test": True, "alpha_cutoff": 0.5, "double_sided": False,
         })
         return
@@ -593,8 +600,16 @@ def _export_material(material, link, obj=None):
         "normal_path": _linked_image(principled.inputs.get("Normal"), normal_map=True, approximations=approximations,
                                      groups=groups),
         "emission_path": _linked_image(emission_socket, approximations=approximations, groups=groups),
-        "roughness_metallic_path": _pack_roughness_metallic(principled, material, approximations, groups),
+        "roughness_path": _export_scalar_texture(principled, material, "Roughness", approximations, groups),
+        "metallic_path": _export_scalar_texture(principled, material, "Metallic", approximations, groups),
     }
+    value.update(transmission_parameters(surface))
+    for channel in ("roughness", "metallic"):
+        if value[channel + "_path"]:
+            value[channel] = 1.0
+    if is_diffuse_only(surface):
+        # Diffuse roughness describes Oren-Nayar scattering, not the engine's GGX reflection width.
+        value.update(roughness=1.0, metallic=0.0, roughness_path="", metallic_path="")
     # A linked texture replaces the Blender socket default; Ailu multiplies its texture by this factor.
     if value["base_color_path"]:
         value["base_color"] = [1.0, 1.0, 1.0, 1.0]
@@ -631,7 +646,7 @@ def _export_material(material, link, obj=None):
     value["alpha_cutoff"] = float(np.clip(material.get("ailu_alpha_cutoff", 0.5), 0.0, 1.0))
     value["double_sided"] = not material.use_backface_culling
     if opacity is not None or (active_shader and active_shader[0].type in {"MIX_SHADER", "ADD_SHADER"}):
-        approximations.add("shader layers: Principled with alpha cutout; translucency omitted")
+        approximations.add("shader layers: primary surface closure and alpha coverage; extra reflection lobes omitted")
     if approximations:
         print(f"[BlenderLiveLink] Material approximation: material={material.name_full!r}, "
               f"details={', '.join(sorted(approximations))}")
@@ -644,7 +659,7 @@ def _export_material(material, link, obj=None):
     export_ms = (time.perf_counter() - export_start) * 1000.0
     if export_ms >= 50.0:
         texture_paths = sum(bool(value[key]) for key in (
-            "base_color_path", "normal_path", "emission_path", "roughness_metallic_path"
+            "base_color_path", "normal_path", "emission_path", "roughness_path", "metallic_path"
         ))
         print(
             f"[BlenderLiveLink] Slow material export: material={material.name_full!r} "
@@ -656,6 +671,8 @@ def send_object_materials(obj, link, sent_materials=None):
     from . import material_bake
     if sent_materials is None:
         sent_materials = set()
+    with temporary_image_buffers():
+        material_bake.prepare_object_materials(obj, sent_materials)
     for slot in obj.material_slots:
         material = slot.material
         if not material:

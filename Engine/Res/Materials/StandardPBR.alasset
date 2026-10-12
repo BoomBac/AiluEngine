@@ -25,9 +25,6 @@
             "_value": 0
         }],
     "_float_properties": [{
-            "_name": "_Absorption",
-            "_value": 0.0
-        }, {
             "_name": "_AlphaCulloff",
             "_value": 0.0
         }, {
@@ -76,10 +73,13 @@
             "_name": "_EmissionTex",
             "_texture_guid": ""
         }, {
+            "_name": "_MetallicTex",
+            "_texture_guid": ""
+        }, {
             "_name": "_NormalTex",
             "_texture_guid": ""
         }, {
-            "_name": "_RoughnessMetallicTex",
+            "_name": "_RoughnessTex",
             "_texture_guid": ""
         }, {
             "_name": "_SpecularTex",

@@ -317,6 +317,8 @@ namespace Ailu::Render
                                                                        EResourceUsage::kDSV);
         }, [this](RDG::RenderGraph &, CommandBuffer *cmd, const RenderingData &pass_rendering_data)
         {
+            cmd->SetRenderTargetLoadAction(pass_rendering_data.FinalColorHandle(), ELoadStoreAction::kLoad);
+            cmd->SetRenderTargetLoadAction(pass_rendering_data._rg_handles._depth_target, ELoadStoreAction::kLoad);
             cmd->SetRenderTarget(pass_rendering_data.FinalColorHandle(),
                                  pass_rendering_data._rg_handles._depth_target);
             cmd->SetViewport(pass_rendering_data._viewport);

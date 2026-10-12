@@ -20,6 +20,7 @@ namespace Ailu
 	{
 		class RenderView;
         class CommonView;
+        class EditorProgressPanel;
 		class EditorLayer : public Layer
 		{
 		public:
@@ -63,7 +64,8 @@ namespace Ailu
             //   AILU_AUTOCAP_FORMAT    "png" (default) or "dds"
             void UpdateAutoCapture();
 		private:
-			Ref<UI::Widget> _main_widget = nullptr;
+			Scope<EditorProgressPanel> _progress_panel;
+            Ref<UI::Widget> _main_widget = nullptr;
             Ref<UI::Widget> _toolbar_widget = nullptr;
             Ref<UI::Widget> _status_bar_widget = nullptr;
             UI::Border *_toolbar_border = nullptr;

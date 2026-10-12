@@ -934,7 +934,8 @@ void Denoise(CSInput input)
     current_surface._geo_normal = current_normal;
     current_surface._linear_depth = current_depth;
     bool current_surface_valid = IsValidSurface(current_surface);
-    bool history_valid = _temporal_history_valid && current_surface_valid &&
+    const bool reference_accumulation = _accumulation_mode == 1;
+    bool history_valid = _temporal_history_valid && (reference_accumulation || current_surface_valid) &&
                          valid_bindless_handle(_prev_surface_buffer_idx);
     float3 history_color = 0.0;
     float history_length = 0.0;
@@ -945,22 +946,16 @@ void Denoise(CSInput input)
         history_uv -= _MotionVectorTexture[pixel].rg;
     float2 history_position = history_uv * _ScreenParams.zw - 0.5;
 
-    // Reference accumulation is an unclamped progressive mean. It remaps camera jitter only; real camera
-    // movement still resets reference history, and motion-vector reprojection remains realtime-only.
-    if (_accumulation_mode == 1 && history_valid)
+    // Reference averages independent samples of the same output pixel. Camera/scene changes reset the whole
+    // history on the CPU; raster depth, normals and subpixel jitter must not reject a static pixel's samples.
+    if (reference_accumulation && history_valid)
     {
-        history_valid = all(history_uv >= 0.0.xx) && all(history_uv < 1.0.xx);
-        int2 history_pixel = clamp(int2(history_uv * _ScreenParams.zw), int2(0, 0),
-                                   int2(_ScreenParams.zw) - 1);
         Surface history_surface = BINDLESS_RWBUFFER_LOAD_INDEX(Surface, _prev_surface_buffer_idx,
-                                                               PixelToLinearIndex(uint2(history_pixel)));
-        float relative_depth_error = abs(history_surface._linear_depth - current_depth) * depth_range /
-                                     max(current_view_depth, 1e-3);
-        history_valid = history_valid && IsValidSurface(history_surface) && history_surface._roughness >= 1.0 &&
-                        relative_depth_error <= 0.002 && dot(current_normal, history_surface._normal) >= 0.995;
+                                                               PixelToLinearIndex(pixel));
+        history_valid = history_surface._roughness >= 1.0;
         if (history_valid)
         {
-            history_color = _HistoryPrev[history_pixel].rgb;
+            history_color = _HistoryPrev[pixel].rgb;
             history_length = history_surface._roughness;
         }
     }
@@ -1010,7 +1005,7 @@ void Denoise(CSInput input)
 
     uint history_cap = _accumulation_mode == 1 ? MAX_REFERENCE_HISTORY_LENGTH :
                                                 (uint)MAX_ACCUMULATED_FRAMES;
-    uint next_history_length = current_surface_valid
+    uint next_history_length = (reference_accumulation || current_surface_valid)
         ? (history_valid ? min((uint)round(history_length) + 1u, history_cap) : 1u)
         : 0u;
     float3 resolved = current;

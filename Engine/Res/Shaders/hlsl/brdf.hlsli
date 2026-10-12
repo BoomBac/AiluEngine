@@ -246,14 +246,15 @@ float Diffuse_Frostbite(float nov,float nol,float loh,float linear_roughness)
 
 
 //--------------------------------------------------Env----------------------------------------------------------
-float3 EnvBRDF(float metallic, float3 base_color, float2 lut)
+float3 EnvBRDF(float metallic, float3 base_color, float2 lut, float dielectric_specular = 0.04)
 {
-    float3 f0 = lerp(F0, base_color.rgb, metallic);
-    return f0 * lut.x + lut.y;
+    float3 f0 = lerp(dielectric_specular.xxx, base_color.rgb, metallic);
+    return f0 * lut.x + lut.y * (dielectric_specular > 0.0 || metallic > 0.0 ? 1.0 : 0.0);
 }
 //--------------------------------------------------Env----------------------------------------------------------
 
-float3 CookTorranceBRDF(SurfaceData surface, ShadingData s)
+float3 CookTorranceBRDF(SurfaceData surface, ShadingData s, float diffuse_scale = 1.0,
+                      float dielectric_specular = DIELECTRIC_SPECULAR)
 {
     if (s.nl <= 0.0 || s.nv <= 0.0)
         return 0.0.xxx;
@@ -266,11 +267,11 @@ float3 CookTorranceBRDF(SurfaceData surface, ShadingData s)
 
     float G = V_SmithGGXCorrelated(s.nv, s.nl, alpha);
 
-    float3 f0 = lerp(DIELECTRIC_SPECULAR.xxx,
+    float3 f0 = lerp(dielectric_specular.xxx,
                      surface.albedo.rgb,
                      surface.metallic.xxx);
 
-    float3 F = F_Schlick(f0, s.vh);
+    float3 F = F_Schlick(f0, s.vh) * (dielectric_specular > 0.0 || surface.metallic > 0.0 ? 1.0 : 0.0);
 
     float3 specular = D * G * F;
 
@@ -279,7 +280,7 @@ float3 CookTorranceBRDF(SurfaceData surface, ShadingData s)
 
     float3 diffuse = Diffuse_Lambert(diffuse_color);
 
-    return kd * diffuse + specular;
+    return diffuse_scale * kd * diffuse + specular;
 }
 
 

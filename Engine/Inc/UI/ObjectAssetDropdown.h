@@ -33,6 +33,7 @@ namespace Ailu
             void SetAllowNone(bool allow_none);
             bool AllowsNone() const { return _allow_none; }
             void SetSelectedGuid(const Guid &guid, bool notify = false);
+            void SetUnregisteredSelectionLabel(const String &label);
             const Guid &GetSelectedGuid() const { return _selected_guid; }
             Asset *GetSelectedAsset() const;
             Object *GetSelectedObject() const;
@@ -60,6 +61,7 @@ namespace Ailu
             const Type *_object_type = nullptr;
             Vector<Entry> _entries;
             Guid _selected_guid = Guid::EmptyGuid();
+            String _unregistered_selection_label;
             bool _allow_none = true;
             bool _is_syncing_selection = false;
             inline static AssetIconProvider s_asset_icon_provider;

@@ -1160,6 +1160,14 @@ namespace Ailu
                 return _items[_selected_index];
             return _items.empty() ? "null" : _items[0];
         }
+
+        void Dropdown::SetDisplayText(const String &text)
+        {
+            if (_text == nullptr)
+                return;
+            _text->SetText(text, false);
+            InvalidatePaint();
+        }
         void Dropdown::SetPopupBackdrop(Render::Texture *texture, const Vector4f &source_rect)
         {
             _popup_backdrop_texture = texture;

@@ -27,6 +27,12 @@ namespace Ailu
             kOrthographic,
             kPerspective
         };
+        AENUM()
+        enum class EUpsamplingFilter : u8
+        {
+            kBilinear,
+            kPoint
+        };
         const String &CameraTypeToString(ECameraType type);
         ECameraType CameraTypeFromString(const String &str);
 
@@ -127,12 +133,35 @@ namespace Ailu
             }
             u64 GetTemporalHistoryResetRevision() const { return _temporal_history_reset_revision; }
             void SetLens(float fovh, float aspect, float nz, float fz);
+            void SetLocalViewAxes(const Vector3f& forward, const Vector3f& up)
+            {
+                _local_forward = Normalize(forward);
+                _local_up = Normalize(up);
+                MarkDirty();
+            }
+            const Vector3f& LocalForward() const { return _local_forward; }
+            const Vector3f& LocalUp() const { return _local_up; }
+            void ProjectionOffset(const Vector2f& value) { _projection_offset = value; MarkDirty(); }
+            const Vector2f& ProjectionOffset() const { return _projection_offset; }
+            void ReverseProjectionX(bool value) { _reverse_projection_x = value; MarkDirty(); }
+            bool ReverseProjectionX() const { return _reverse_projection_x; }
+            void LockAspect(bool value) { _lock_aspect = value; }
+            bool LockAspect() const { return _lock_aspect; }
+            void RenderScale(f32 value) { _render_scale = std::clamp(value, 0.1f, 2.0f); }
+            f32 RenderScale() const { return _render_scale; }
+            void UpsamplingFilter(EUpsamplingFilter value) { _upsampling_filter = value; }
+            EUpsamplingFilter UpsamplingFilter() const { return _upsampling_filter; }
+            Vector2D<u32> RenderSize() const
+            {
+                return Vector2D<u32>{std::max<u32>(1u, static_cast<u32>(std::round(_pixel_width * _render_scale))),
+                                     std::max<u32>(1u, static_cast<u32>(std::round(_pixel_height * _render_scale)))};
+            }
 
             void OutputSize(u16 w, u16 h)
             {
                 _pixel_width = w;
                 _pixel_height = h;
-                _aspect = (f32) _pixel_width / (f32) _pixel_height;
+                if (!_lock_aspect && h != 0u) _aspect = (f32) _pixel_width / (f32) _pixel_height;
             };
             Vector2D<u32> OutputSize() const { return Vector2D<u32>{_pixel_width, _pixel_height}; }
             //包括抖动的透视矩阵
@@ -197,6 +226,13 @@ namespace Ailu
             f32 _jitter_scale = 1.0f;
 
         private:
+            Vector3f _local_forward = Vector3f::kForward;
+            Vector3f _local_up = Vector3f::kUp;
+            Vector2f _projection_offset = Vector2f::kZero;
+            bool _reverse_projection_x = false;
+            bool _lock_aspect = false;
+            f32 _render_scale = 1.0f;
+            EUpsamplingFilter _upsampling_filter = EUpsamplingFilter::kBilinear;
             void RebuildCameraMatrices();
             void RefreshRenderMatrices();
             void CalculateCullingFrustum();

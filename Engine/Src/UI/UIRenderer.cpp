@@ -480,6 +480,8 @@ namespace Ailu
         {
             if (element == nullptr || brush._type != EUIBrushType::kBackdropBlur)
                 return brush;
+            if (brush._texture != nullptr)
+                return brush;
             Widget *widget = element->GetOwningWidget();
             if (widget == nullptr)
                 return brush;

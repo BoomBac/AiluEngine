@@ -37,16 +37,17 @@ bool LoadTraceTriangle(PrimitiveData primitive, uint triangle_index, out Triangl
         return false;
     }
 
-    ByteAddressBuffer index_buffer = g_bindless_index_buffer[primitive._index_bindless_idx];
+    ByteAddressBuffer index_buffer = g_bindless_index_buffer[NonUniformResourceIndex(primitive._index_bindless_idx)];
     uint3 indices = index_buffer.Load3((primitive._submesh_triangle_offset + triangle_index) * 12u);
-    ByteAddressBuffer position_buffer = g_bindless_vertex_buffer[primitive._position_bindless_idx];
+    ByteAddressBuffer position_buffer =
+        g_bindless_vertex_buffer[NonUniformResourceIndex(primitive._position_bindless_idx)];
     tri.v0 = LoadTraceFloat3(position_buffer, indices.x * 12u);
     tri.v1 = LoadTraceFloat3(position_buffer, indices.y * 12u);
     tri.v2 = LoadTraceFloat3(position_buffer, indices.z * 12u);
 
     if (valid_bindless_buffer(primitive._normal_bindless_idx))
     {
-        ByteAddressBuffer normal_buffer = g_bindless_vertex_buffer[primitive._normal_bindless_idx];
+        ByteAddressBuffer normal_buffer = g_bindless_vertex_buffer[NonUniformResourceIndex(primitive._normal_bindless_idx)];
         tri.n0 = LoadTraceFloat3(normal_buffer, indices.x * 12u);
         tri.n1 = LoadTraceFloat3(normal_buffer, indices.y * 12u);
         tri.n2 = LoadTraceFloat3(normal_buffer, indices.z * 12u);
@@ -61,7 +62,7 @@ bool LoadTraceTriangle(PrimitiveData primitive, uint triangle_index, out Triangl
 
     if (valid_bindless_buffer(primitive._uv_bindless_idx))
     {
-        ByteAddressBuffer uv_buffer = g_bindless_vertex_buffer[primitive._uv_bindless_idx];
+        ByteAddressBuffer uv_buffer = g_bindless_vertex_buffer[NonUniformResourceIndex(primitive._uv_bindless_idx)];
         tri.uv0 = LoadTraceFloat2(uv_buffer, indices.x * 8u);
         tri.uv1 = LoadTraceFloat2(uv_buffer, indices.y * 8u);
         tri.uv2 = LoadTraceFloat2(uv_buffer, indices.z * 8u);

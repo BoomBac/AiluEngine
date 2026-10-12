@@ -2485,6 +2485,8 @@ namespace Ailu
 				loaded_objects.pop();
 				continue;
 			}
+			if (ret_res == nullptr)
+				ret_res = obj;
 			new_asset->_external_asset_path = MakeStoredExternalAssetPath(external_asset_path);
 			if (auto *material = dynamic_cast<Material *>(obj.get()); material != nullptr)
 				material_asset_guids.emplace(material, new_asset->GetGuid());

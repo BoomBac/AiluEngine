@@ -1,5 +1,9 @@
 # AiluEngine Blender Live Link — Progress
 
+> 2026-10-12 follow-up: persistence requirements supersede the original transient-only and external-texture-only constraints below.
+> Current persistence implementation and validation: `../../completed/blender-link-persistence.md`.
+> Imported entities/resources now persist in the project; reconnect reconciles a snapshot before resuming incremental updates.
+
 > Status: Active
 >
 > Current Milestone: M6 implementation complete; final runtime acceptance pending

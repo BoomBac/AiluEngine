@@ -4,6 +4,8 @@
 #include "LiveLinkSession.h"
 #include <new>
 #include <string>
+#include <string_view>
+#include <cstdlib>
 
 namespace Ailu
 {
@@ -18,19 +20,51 @@ namespace Ailu
         if (_host || context._api_version != kPluginApiVersion || !context._host || !context._host->IsMainThread())
             return false;
         _host = context._host;
+        _progress_host = dynamic_cast<IPluginProgressHost*>(_host);
         try
         {
             _server = MakeScope<LiveLinkServer>();
-            _session = MakeScope<LiveLinkSession>();
-            if (!_server->Start())
+            char* disable_mesh_cache = nullptr;
+            size_t cache_option_size = 0u;
+            _dupenv_s(&disable_mesh_cache, &cache_option_size, "AILU_BLENDER_LIVE_LINK_DISABLE_MESH_CACHE");
+            const bool share_meshes = disable_mesh_cache == nullptr || std::string_view(disable_mesh_cache) != "1";
+            std::free(disable_mesh_cache);
+            _session = MakeScope<LiveLinkSession>(share_meshes);
+            _full_sync_budget_ms = 32u;
+            char* budget_text = nullptr;
+            size_t budget_text_size = 0u;
+            if (_dupenv_s(&budget_text, &budget_text_size, "AILU_BLENDER_LIVE_LINK_FULL_SYNC_BUDGET_MS") == 0
+                && budget_text != nullptr)
+            {
+                char* end = nullptr;
+                const auto budget_ms = std::strtoul(budget_text, &end, 10);
+                if (end != budget_text && *end == '\0' && budget_ms >= 4u && budget_ms <= 64u)
+                    _full_sync_budget_ms = static_cast<u32>(budget_ms);
+            }
+            std::free(budget_text);
+            u16 port = 17777u;
+            char *port_text = nullptr;
+            size_t port_text_size = 0u;
+            if (_dupenv_s(&port_text, &port_text_size, "AILU_BLENDER_LIVE_LINK_PORT") == 0 && port_text != nullptr)
+            {
+                char *end = nullptr;
+                const auto parsed_port = std::strtoul(port_text, &end, 10);
+                if (end != port_text && *end == '\0' && parsed_port > 0u && parsed_port <= 65535u)
+                    port = static_cast<u16>(parsed_port);
+            }
+            std::free(port_text);
+            const auto endpoint = std::string("127.0.0.1:") + std::to_string(port);
+            if (!_server->Start(port))
             {
                 _server.reset();
                 _session.reset();
-                _host->LogError("[BlenderLiveLink] Failed to start loopback server on 127.0.0.1:17777");
+                _host->LogError(("[BlenderLiveLink] Failed to start loopback server on " + endpoint).c_str());
                 _host = nullptr;
                 return false;
             }
-            _host->LogInfo("[BlenderLiveLink] Server listening on 127.0.0.1:17777");
+            _host->LogInfo(("[BlenderLiveLink] Server listening on " + endpoint).c_str());
+            _host->LogInfo(("[BlenderLiveLink] Full Sync tick budget: "
+                + std::to_string(_full_sync_budget_ms) + " ms; incremental: 4 ms").c_str());
             return true;
         }
         catch (...)
@@ -43,8 +77,16 @@ namespace Ailu
         }
     }
 
+    void BlenderLiveLinkPlugin::ReportProgress(const char* message, EPluginProgressState state) noexcept
+    {
+        if (_progress_host) _progress_host->ReportProgress("Blender Live Link: Full Sync", message, _progress_completed, state);
+        _progress_active = state == EPluginProgressState::kBegin || state == EPluginProgressState::kRunning;
+    }
+
     void BlenderLiveLinkPlugin::OnUnload() noexcept
     {
+        if (_progress_active) ReportProgress("Plugin unloaded", EPluginProgressState::kCancelled);
+        _progress_host = nullptr;
         if (_server)
         {
             _server->Stop();
@@ -60,6 +102,7 @@ namespace Ailu
     {
         if (!_host || !_server)
             return;
+        const auto tick_start = std::chrono::steady_clock::now();
         LiveLinkCommand command{};
         while (_server->TryPopCommand(command))
         {
@@ -70,6 +113,8 @@ namespace Ailu
                 break;
             case ELiveLinkCommandType::kClientDisconnected:
                 _host->LogInfo("[BlenderLiveLink] Client disconnected");
+                if (_progress_active) ReportProgress("Disconnected before Full Sync completed", EPluginProgressState::kFailed);
+                _full_sync_metrics._active = false;
                 _session->Apply(command);
                 break;
             case ELiveLinkCommandType::kClientRejected:
@@ -90,6 +135,10 @@ namespace Ailu
                     == static_cast<unsigned short>(ELiveLinkMessageType::kFullSyncEnd);
                 if (is_sync_begin)
                 {
+                    if (_progress_active) ReportProgress("Replaced by a new Full Sync", EPluginProgressState::kCancelled);
+                    _progress_completed = 0;
+                    _progress_failed = false;
+                    ReportProgress("Receiving Blender data", EPluginProgressState::kBegin);
                     _full_sync_metrics = {};
                     _full_sync_metrics._active = true;
                     _full_sync_metrics._started = std::chrono::steady_clock::now();
@@ -99,6 +148,21 @@ namespace Ailu
                     ? 0ull : static_cast<unsigned long long>(std::chrono::duration_cast<std::chrono::microseconds>(
                         apply_start - command._queued_at).count());
                 _session->Apply(command);
+                if (_progress_active)
+                {
+                    _progress_failed |= !_session->LastApplySucceeded();
+                    if (!_session->LastApplySucceeded())
+                    {
+                        const std::string failure = "[BlenderLiveLink] Apply failed: type=" + std::to_string(message_type)
+                            + ", sequence=" + std::to_string(command._sequence);
+                        _host->LogWarning(failure.c_str());
+                    }
+                    if (!is_sync_begin && !is_sync_end) ++_progress_completed;
+                    const char* stage = message_type == 20u ? "Applying mesh" : message_type == 21u ? "Applying material"
+                        : message_type == 12u ? "Applying object" : "Receiving Blender data";
+                    const std::string message = std::string(stage) + " (" + std::to_string(_progress_completed) + " packets applied)";
+                    ReportProgress(message.c_str(), EPluginProgressState::kRunning);
+                }
                 const auto apply_us = static_cast<unsigned long long>(
                     std::chrono::duration_cast<std::chrono::microseconds>(
                         std::chrono::steady_clock::now() - apply_start).count());
@@ -152,14 +216,23 @@ namespace Ailu
                     }
                     _host->LogInfo(summary.c_str());
                     _full_sync_metrics._active = false;
+                    ReportProgress(_progress_failed ? "Full Sync completed with apply failures; see log" : "Full Sync completed",
+                        _progress_failed ? EPluginProgressState::kFailed : EPluginProgressState::kCompleted);
                 }
                 break;
             }
             case ELiveLinkCommandType::kQueueOverflow:
                 _host->LogWarning("[BlenderLiveLink] Incoming queue limit reached; reconnect and full sync required");
+                if (_progress_active) ReportProgress("Receive queue overflow; reconnect and Full Sync required", EPluginProgressState::kFailed);
+                _full_sync_metrics._active = false;
                 _session->Apply(command);
                 break;
             }
+            // Yield after Begin and between bounded batches so the Editor can display progress.
+            if (command._type == ELiveLinkCommandType::kMessage
+                && command._message_type == static_cast<unsigned short>(ELiveLinkMessageType::kFullSyncBegin)) break;
+            const auto budget_ms = _full_sync_metrics._active ? _full_sync_budget_ms : 4u;
+            if (std::chrono::steady_clock::now() - tick_start >= std::chrono::milliseconds(budget_ms)) break;
         }
     }
 }

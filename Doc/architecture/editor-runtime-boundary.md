@@ -152,6 +152,29 @@ Engine/plugin infrastructure
 
 共同组成，而不必把所有协议和 UI 都放进 Engine core。
 
+## Editor progress
+
+`EditorApp` owns `EditorProgressService`; `EditorLayer` owns the floating `EditorProgressPanel` and unregisters it in OnDetach.
+The service is state only and does not schedule work or reference UI. Copyable handles share task ownership, so producers can
+outlive registry cleanup without holding a service or Widget pointer. Per-task short locks serialize counters, messages and terminal
+transitions; registry locks only protect membership. Terminal updates are immutable and cancellation requests remain distinct
+from producer acknowledgement. Completed/cancelled rows expire after two seconds; failures retain their reason until dismissed,
+with a maximum of sixteen retained failures. The panel uses three persistent rows, Canvas fill bars, popup ordering and a status
+summary while retaining Scene/Selection/FPS information. Cards use the existing backdrop-blur brush with a translucent dark tint
+and 10px rounded corners; inset progress tracks/fills use 3px corners. UI mutation stays on the main thread.
+
+The Debug toolbar Menu > Progress Demo dispatches three test producers through JobSystem. EditorApp stops accepting tasks and
+requests cancellation before waiting for its demo JobGroup, then proceeds with normal Editor/Engine shutdown. Other producer owners
+must stop/wait their own work; a progress task does not own execution and cancelling it cannot kill a worker or synchronous operation.
+`AssetBrowser` supplies the EditorApp-owned service to its `AssetImportController`. Each batch retains one progress handle;
+appended files increase its total and each queued item preserves its destination. Browser Update ticks the main-thread queue:
+a preparation frame precedes each synchronous direct import, and the next file never starts recursively from a dialog callback.
+Texture/Mesh confirmation, skipping and external popup closure account for one file exactly once. Group-scoped popup closure and
+weak lifetime guards keep callbacks from touching a destroyed Browser/controller. Successful imports notify the Browser once;
+null results/exceptions count as failures while remaining files continue. Queue cancellation only stops pending files at a safe point;
+it cannot interrupt synchronous ImportResource. Batch summaries report success/skipped/failed totals. The active ExecPlan tracks
+M2 runtime acceptance; yielding between files does not make single-file import asynchronous.
+
 ## Shutdown
 
 Editor-owned service shutdown 应早于其依赖的 Engine subsystem 完全销毁。
@@ -189,3 +212,15 @@ Importer/tool extension
 Engine core 的 plugin manager 可以负责 DLL/lifecycle，但 Editor-specific registration 应通过 Editor 提供的 host API 完成。
 
 不要让 Engine plugin ABI 直接依赖 Editor concrete class。
+
+## Blender Live Link progress reporting
+
+PluginManager implements an optional IPluginProgressHost side interface, discovered through RTTI from IPluginHost.
+The existing ABI v1 host vtable and PluginContext layout remain unchanged; compatible C++ toolchains remain required.
+EditorApp supplies a host-owned callback that copies strings into EditorProgressHandle state, retaining one handle per title.
+The Engine host checks owner-thread affinity and contains callback exceptions. No Editor types or plugin closures cross the ABI.
+Blender Full Sync begins one non-cancellable indeterminate task, reports apply stages and packet counts, and terminates on End,
+disconnect, overflow, replacement Begin or unload. LiveLinkSession exposes the last Apply result so failed data does not report
+successful completion. Begin yields the current Tick; subsequent batches yield after approximately 4ms between commands.
+Individual synchronous Apply calls remain non-interruptible. Incremental updates do not create progress cards. The transport
+and Blender add-on protocol remain unchanged; this task is not a percentage of Blender bake or network byte completion.

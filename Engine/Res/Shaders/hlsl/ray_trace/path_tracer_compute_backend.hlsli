@@ -44,6 +44,7 @@ PathHit MakeComputePathSurfaceHit(TraceSurface surface, TraceHit trace_hit, floa
     hit._front_face = dot(ray_direction, surface._geometric_normal) < 0.0f ? 1u : 0u;
     hit._front_face = surface._front_face;
     hit._material = CreatePathMaterial(g_material_buffer[surface._material_index], surface._uv);
+    hit._light_index = 0xffffffffu;
     return hit;
 }
 
@@ -67,6 +68,7 @@ PathHit TracePathRay(float3 ray_origin, float3 ray_direction)
     uint light_index = 0u;
     float light_t = geometry_t;
     LightSample light_sample = (LightSample)0;
+    // Keep the software fallback until its BVH hit coverage matches the hardware TLAS.
     bool hit_light = FindClosestUnifiedLightHit(_light_count, ray_origin, ray_direction, geometry_t,
                                                 light_index, light_t, light_sample);
     if (hit_light && light_t < geometry_t)

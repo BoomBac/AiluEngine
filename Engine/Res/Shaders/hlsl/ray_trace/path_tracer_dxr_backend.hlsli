@@ -33,16 +33,17 @@ bool LoadDxrPathTriangle(PrimitiveData primitive, uint triangle_index, out Trian
         !valid_bindless_buffer(primitive._index_bindless_idx))
         return false;
 
-    ByteAddressBuffer index_buffer = g_bindless_index_buffer[primitive._index_bindless_idx];
+    ByteAddressBuffer index_buffer = g_bindless_index_buffer[NonUniformResourceIndex(primitive._index_bindless_idx)];
     uint3 indices = index_buffer.Load3((primitive._submesh_triangle_offset + triangle_index) * 12u);
-    ByteAddressBuffer position_buffer = g_bindless_vertex_buffer[primitive._position_bindless_idx];
+    ByteAddressBuffer position_buffer =
+        g_bindless_vertex_buffer[NonUniformResourceIndex(primitive._position_bindless_idx)];
     triangle_data.v0 = LoadBindlessFloat3(position_buffer, indices.x * 12u);
     triangle_data.v1 = LoadBindlessFloat3(position_buffer, indices.y * 12u);
     triangle_data.v2 = LoadBindlessFloat3(position_buffer, indices.z * 12u);
 
     if (valid_bindless_buffer(primitive._normal_bindless_idx))
     {
-        ByteAddressBuffer normal_buffer = g_bindless_vertex_buffer[primitive._normal_bindless_idx];
+        ByteAddressBuffer normal_buffer = g_bindless_vertex_buffer[NonUniformResourceIndex(primitive._normal_bindless_idx)];
         triangle_data.n0 = LoadBindlessFloat3(normal_buffer, indices.x * 12u);
         triangle_data.n1 = LoadBindlessFloat3(normal_buffer, indices.y * 12u);
         triangle_data.n2 = LoadBindlessFloat3(normal_buffer, indices.z * 12u);
@@ -57,7 +58,7 @@ bool LoadDxrPathTriangle(PrimitiveData primitive, uint triangle_index, out Trian
 
     if (valid_bindless_buffer(primitive._uv_bindless_idx))
     {
-        ByteAddressBuffer uv_buffer = g_bindless_vertex_buffer[primitive._uv_bindless_idx];
+        ByteAddressBuffer uv_buffer = g_bindless_vertex_buffer[NonUniformResourceIndex(primitive._uv_bindless_idx)];
         triangle_data.uv0 = LoadBindlessFloat2(uv_buffer, indices.x * 8u);
         triangle_data.uv1 = LoadBindlessFloat2(uv_buffer, indices.y * 8u);
         triangle_data.uv2 = LoadBindlessFloat2(uv_buffer, indices.z * 8u);
@@ -131,6 +132,7 @@ PathHit MakeDxrPathSurfaceHit(RayPayload payload, float3 ray_direction)
     float2 uv = triangle_data.uv0 * barycentrics.x + triangle_data.uv1 * barycentrics.y +
                 triangle_data.uv2 * barycentrics.z;
     hit._material = CreatePathMaterial(g_material_data[primitive._material_id], uv);
+    ResolvePathSurfaceEmission(hit, ray_direction, uv, GetUnifiedLightCount());
     return hit;
 }
 
@@ -186,7 +188,7 @@ PathHit TracePathRay(float3 ray_origin, float3 ray_direction)
     uint light_index = 0u;
     float light_t = max_light_t;
     LightSample light_sample = (LightSample)0;
-    bool hit_light = FindClosestUnifiedLightHit(GetUnifiedLightCount(), ray_origin, ray_direction, max_light_t,
+    bool hit_light = FindClosestPathAnalyticLightHit(GetUnifiedLightCount(), ray_origin, ray_direction, max_light_t,
                                                 light_index, light_t, light_sample);
     if (hit_light && (payload._hit == 0u || light_t < payload._hit_t))
         return MakeDxrPathLightHit(ray_origin, ray_direction, light_t, light_index, light_sample);

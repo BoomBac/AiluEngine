@@ -23,6 +23,7 @@ struct Material
     // 之前这里被当作布尔用（>0 即玻璃），0.64 的材质被当成 100% 玻璃，
     // 本该由那 36% 漫反射填亮的区域因此直接黑掉。
     float  _transmission;
+    float _opacity;
     // RGB 体积吸收系数 (1/世界单位)，0 = 无损介质。
     float3 _sigma_a;
     float3 _emission;

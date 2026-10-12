@@ -78,10 +78,10 @@ bool LoadTraversalTriangleFromOriginalMesh(PrimitiveData inst, uint scene_triang
     if (submesh_local_triangle_index >= inst._submesh_triangle_count)
         return false;
 
-    ByteAddressBuffer index_buffer = g_bindless_index_buffer[inst._index_bindless_idx];
+    ByteAddressBuffer index_buffer = g_bindless_index_buffer[NonUniformResourceIndex(inst._index_bindless_idx)];
     uint3 tri_indices = index_buffer.Load3(submesh_local_triangle_index * 12u);
 
-    ByteAddressBuffer position_buffer = g_bindless_vertex_buffer[inst._position_bindless_idx];
+    ByteAddressBuffer position_buffer = g_bindless_vertex_buffer[NonUniformResourceIndex(inst._position_bindless_idx)];
     tri.v0 = HitLoadBindlessFloat3(position_buffer, tri_indices.x * 12u);
     tri.v1 = HitLoadBindlessFloat3(position_buffer, tri_indices.y * 12u);
     tri.v2 = HitLoadBindlessFloat3(position_buffer, tri_indices.z * 12u);

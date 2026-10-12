@@ -259,3 +259,39 @@ target_link_libraries(TaaGpuAcceptance PRIVATE d3d12)
 add_custom_command(TARGET TaaGpuAcceptance POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:Engine>" "$<TARGET_FILE_DIR:TaaGpuAcceptance>"
     VERBATIM)
+
+# Editor progress state tests require no window, renderer or initialized runtime.
+add_executable(EditorProgressSmoke EditorProgressSmoke.cpp "${CMAKE_SOURCE_DIR}/Editor/Src/Common/EditorProgressService.cpp")
+target_include_directories(EditorProgressSmoke PRIVATE "${EDITOR_ROOT_PATH}/Inc" "${ENGINE_ROOT_PATH}/Inc")
+target_compile_features(EditorProgressSmoke PRIVATE cxx_std_20)
+if (MSVC)
+    target_compile_options(EditorProgressSmoke PRIVATE /utf-8)
+endif()
+
+add_executable(AssetImportQueueSmoke AssetImportQueueSmoke.cpp
+    "${CMAKE_SOURCE_DIR}/Editor/Src/Widgets/AssetImportController.cpp"
+    "${CMAKE_SOURCE_DIR}/Editor/Src/Common/EditorProgressService.cpp"
+    "${CMAKE_SOURCE_DIR}/Editor/Src/Common/EditorPopup.cpp")
+ailu_configure_test_target(AssetImportQueueSmoke)
+add_custom_command(TARGET AssetImportQueueSmoke POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:Engine>" "$<TARGET_FILE_DIR:AssetImportQueueSmoke>"
+    VERBATIM)
+
+add_executable(BlenderMeshCacheSmoke BlenderMeshCacheSmoke.cpp)
+ailu_configure_test_target(BlenderMeshCacheSmoke)
+add_custom_command(TARGET BlenderMeshCacheSmoke POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:Engine>" "$<TARGET_FILE_DIR:BlenderMeshCacheSmoke>"
+    VERBATIM)
+
+add_executable(BlenderPersistenceSmoke BlenderPersistenceSmoke.cpp)
+ailu_configure_test_target(BlenderPersistenceSmoke)
+add_custom_command(TARGET BlenderPersistenceSmoke POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:Engine>" "$<TARGET_FILE_DIR:BlenderPersistenceSmoke>"
+    VERBATIM)
+
+add_executable(BlenderCameraSmoke BlenderCameraSmoke.cpp
+    "${ENGINE_ROOT_PATH}/Src/Framework/Math/Transform.cpp")
+ailu_configure_test_target(BlenderCameraSmoke)
+add_custom_command(TARGET BlenderCameraSmoke POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:Engine>" "$<TARGET_FILE_DIR:BlenderCameraSmoke>"
+    VERBATIM)

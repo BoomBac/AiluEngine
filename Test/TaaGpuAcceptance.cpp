@@ -348,6 +348,7 @@ public:
 #include "TaaCloudAcceptance.h"
 #include "TaaRtgiAcceptance.h"
 #include "TaaM8Acceptance.h"
+#include "PathLightLookupSmoke.h"
 
 int wmain(int argc, wchar_t **argv)
 {
@@ -356,7 +357,10 @@ int wmain(int argc, wchar_t **argv)
     const bool control_mode = argc == 5 && WString(argv[4]) == L"--scene-controls";
     const bool transparent_mode = argc == 5 && WString(argv[4]) == L"--transparent";
     const bool cloud_mode = argc == 5 && WString(argv[4]) == L"--cloud";
-    const bool rtgi_mode = argc == 5 && WString(argv[4]) == L"--rtgi";
+    const bool lookup_mode = argc == 5 && WString(argv[4]) == L"--path-light-lookup";
+    const bool reference_sky_mode = argc == 5 && WString(argv[4]) == L"--rtgi-reference-sky";
+    const bool bindless_mode = argc == 5 && WString(argv[4]) == L"--rtgi-bindless";
+    const bool rtgi_mode = reference_sky_mode || bindless_mode || (argc == 5 && WString(argv[4]) == L"--rtgi");
     const bool m8_long_run = argc == 5 && WString(argv[4]) == L"--m8-longrun";
     const bool m8_performance = argc == 5 && WString(argv[4]) == L"--m8-performance";
     const bool m8_mode = argc == 5 && (WString(argv[4]) == L"--m8" || m8_long_run || m8_performance);
@@ -424,6 +428,7 @@ int wmain(int argc, wchar_t **argv)
     Scope<TaaRtgiAcceptance> rtgi_feature;
     Scope<TaaM8Acceptance> m8_feature;
     Ref<Material> bright_material;
+    Vector<Ref<Texture2D>> path_test_textures;
     ECS::Entity rails_entity = ECS::kInvalidEntity;
     ECS::Entity occluder_entity = ECS::kInvalidEntity;
     if (transparent_mode)
@@ -477,7 +482,28 @@ int wmain(int argc, wchar_t **argv)
         dark_material->SetVector("_AlbedoValue", Vector4f(0.f, 0.f, 0.f, 1.f));
         bright_material->SetVector("_EmissionValue", Vector4f(.8f, .8f, .8f, 1.f));
         dark_material->SetVector("_EmissionValue", Vector4f(.04f, .04f, .04f, 1.f));
-        scene->AddObject(CreateTaaSceneMesh(true), dark_material);
+        if (bindless_mode)
+        {
+            const Ref<Material> materials[] = {bright_material, dark_material};
+            for (u32 material_index = 0; material_index < 2u; ++material_index)
+            {
+                auto texture = Texture2D::Create(8u, 8u, ETextureFormat::kRGBA32);
+                Vector<u8> pixels(8u * 8u * 4u, 0u);
+                for (u32 pixel_index = 0; pixel_index < 64u; ++pixel_index)
+                {
+                    pixels[pixel_index * 4u + material_index * 2u] = 255u;
+                    pixels[pixel_index * 4u + 3u] = 255u;
+                }
+                texture->SetPixelData(pixels.data(), 0u, 0u);
+                texture->ApplySync();
+                materials[material_index]->SetTexture(ETextureUsage::kEmission, texture.get());
+                materials[material_index]->SetVector("_EmissionValue", Vector4f(1.f));
+                materials[material_index]->SetFloat("_MetallicValue", 1.f);
+                materials[material_index]->SetFloat("_RoughnessValue", 0.f);
+                path_test_textures.push_back(texture);
+            }
+        }
+        if (!reference_sky_mode) scene->AddObject(CreateTaaSceneMesh(true), dark_material);
         rails_entity = scene->AddObject(CreateTaaSceneMesh(false), bright_material);
         if (control_mode)
         {
@@ -493,7 +519,12 @@ int wmain(int argc, wchar_t **argv)
         ++frame;
         if (renderdoc_api && (frame == 140u || (m8_performance && frame == 540u)))
             renderdoc_api->TriggerMultiFrameCapture(2u);
-        if (frame == 90u && !transparent_mode && !cloud_mode && !rtgi_mode && !m8_mode)
+        if (lookup_mode && frame == 90u)
+        {
+            failed = !RunPathLightLookupSmoke(argv[2]);
+        }
+        if (lookup_mode && frame == 95u) app.Stop();
+        if (frame == 90u && !lookup_mode && !transparent_mode && !cloud_mode && !rtgi_mode && !m8_mode)
         {
             if (scene_mode)
             {

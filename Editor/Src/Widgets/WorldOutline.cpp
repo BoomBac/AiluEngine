@@ -9,6 +9,7 @@
 #include "Framework/Common/Input.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Framework/Events/Event.h"
+#include "Render/Camera.h"
 #include "Scene/PrefabSystem.h"
 #include "Scene/Scene.h"
 #include "UI/TreeView.h"
@@ -661,6 +662,67 @@ namespace Ailu
                 scene->Reparent(child, entity);
                 Selection::SetSelection(child);
             }});
+
+            if (reg.HasComponent<ECS::CCamera>(entity))
+            {
+                actions.push_back({"Align View to Camera", [scene, entity]()
+                {
+                    if (!scene->IsValidEntity(entity))
+                        return;
+
+                    auto *transform = scene->GetRegister().GetComponent<ECS::TransformComponent>(entity);
+                    auto *editor = EditorApp::GetEditor();
+                    Render::Camera *scene_camera = editor != nullptr ? editor->GetSceneCamera() : nullptr;
+                    if (transform == nullptr || scene_camera == nullptr)
+                        return;
+
+                    const Matrix4x4f &world_matrix = transform->GetWorldMatrix();
+                    const Vector3f position(world_matrix[3][0], world_matrix[3][1], world_matrix[3][2]);
+                    const Quaternion rotation = Quaternion::FromMat4f(world_matrix);
+                    const Vector3f forward = rotation * Vector3f::kForward;
+                    const f32 pitch = -std::asin(std::clamp(forward.y, -1.0f, 1.0f)) * Math::kRadToDeg;
+                    const f32 yaw = std::atan2(forward.x, forward.z) * Math::kRadToDeg;
+
+                    editor->GetSceneCameraController().SnapTo(position, pitch, yaw);
+                    scene_camera->MarkTemporalHistoryReset();
+                }});
+
+                actions.push_back({"Align Camera to View", [scene, entity]()
+                {
+                    if (!scene->IsValidEntity(entity))
+                        return;
+
+                    auto &register_ref = scene->GetRegister();
+                    auto *transform = register_ref.GetComponent<ECS::TransformComponent>(entity);
+                    auto *editor = EditorApp::GetEditor();
+                    Render::Camera *scene_camera = editor != nullptr ? editor->GetSceneCamera() : nullptr;
+                    if (transform == nullptr || scene_camera == nullptr)
+                        return;
+
+                    Vector3f local_position = scene_camera->Position();
+                    Quaternion local_rotation = scene_camera->Rotation();
+                    if (auto *hierarchy = register_ref.GetComponent<ECS::CHierarchy>(entity);
+                        hierarchy != nullptr && hierarchy->_parent != ECS::kInvalidEntity &&
+                        !scene->IsSceneRoot(hierarchy->_parent) && scene->IsValidEntity(hierarchy->_parent))
+                    {
+                        if (auto *parent_transform = register_ref.GetComponent<ECS::TransformComponent>(hierarchy->_parent))
+                        {
+                            const Matrix4x4f local_matrix = MatrixTranslation(local_position) *
+                                                            Math::MatrixInverse(parent_transform->GetWorldMatrix());
+                            local_position = Vector3f(local_matrix[3][0], local_matrix[3][1], local_matrix[3][2]);
+                            local_rotation = local_rotation * Quaternion::Inverse(parent_transform->GetRotation());
+                        }
+                    }
+
+                    const bool position_changed = transform->SetLocalPosition(local_position);
+                    const bool rotation_changed = transform->SetLocalRotation(local_rotation);
+                    if (position_changed || rotation_changed)
+                    {
+                        transform->ResetRenderInterpolation();
+                        scene->MarkEdited();
+                    }
+                }});
+            }
 
             if (has_parent)
             {

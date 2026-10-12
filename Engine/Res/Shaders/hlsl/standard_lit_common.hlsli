@@ -6,7 +6,8 @@
 
 Texture2D _AlbedoTex : register(t0);
 Texture2D _NormalTex : register(t1);
-Texture2D _RoughnessMetallicTex : register(t2);
+Texture2D _RoughnessTex : register(t2);
+Texture2D _MetallicTex : register(t5);
 Texture2D _SpecularTex : register(t3);
 Texture2D _EmissionTex : register(t4);
 
@@ -22,9 +23,6 @@ PerMaterialCBufferBegin
 	float  _AlphaCulloff;
 	float _IOR;
 	float _Transmission;
-	// 体积吸收系数 (1/世界单位)，Beer-Lambert: T = exp(-_Absorption * 介质内行程)。
-	// Legacy PathTracer property; new materials use attenuation color and distance below.
-	float _Absorption;
 	float4 _AttenuationColor;
 	float _AttenuationDistance;
 PerMaterialCBufferEnd
@@ -53,17 +51,12 @@ void InitSurfaceData(StandardPSInput input,out SurfaceData surface)
 	}
 	else 
 		surface.emssive = _EmissionValue.rgb;
-	if(_SamplerMask & 8)
-	{
-		float2 roughness_and_metallic = _RoughnessMetallicTex.Sample(g_LinearWrapSampler, input.uv0).rg;
-		surface.roughness = roughness_and_metallic.r;
-		surface.metallic = roughness_and_metallic.g;
-	}
-	else
-	{
-		surface.roughness = _RoughnessValue;
-		surface.metallic = _MetallicValue;
-	}
+    surface.roughness = _RoughnessValue;
+    surface.metallic = _MetallicValue;
+    if (_SamplerMask & 8)
+        surface.roughness *= _RoughnessTex.Sample(g_LinearWrapSampler, input.uv0).r;
+    if (_SamplerMask & 64)
+        surface.metallic *= _MetallicTex.Sample(g_LinearWrapSampler, input.uv0).r;
 	if (_SamplerMask & 16)
 		surface.specular = _SpecularTex.Sample(g_LinearWrapSampler, input.uv0).rgb;
 	else

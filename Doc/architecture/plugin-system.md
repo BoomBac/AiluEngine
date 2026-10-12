@@ -29,7 +29,7 @@ pointer aliases and dynamic discovery, so their modules receive no plugin export
 
 The descriptor uses DLL-owned static C strings. The host copies id/name/version before unload and does not
 retain the raw descriptor. `PluginContext` provides the API version and a borrowed `IPluginHost` pointer.
-The host offers only logging and a main-thread query. It must outlive plugin use, including `OnUnload`.
+The v1 host interface offers logging and a main-thread query; an optional side interface supplies progress reporting. It must outlive plugin use, including `OnUnload`.
 The plugin interface offers `OnLoad`, `OnUnload` and `Tick`; no exception may cross the DLL boundary.
 
 Concrete objects are allocated and destroyed inside the plugin DLL through Create/Destroy. The host never
@@ -131,8 +131,28 @@ execution plan for exact evidence, commands and existing non-plugin Editor error
 
 ## Blender Live Link material conversion
 
+Pure Diffuse BSDF closures (including mixtures with Transparent/Emission but no reflective closure) are approximated
+as Standard Lit with roughness=1 and metallic=0. Direct and native-baked exports omit roughness/metallic texture paths
+for this case: Blender's Diffuse roughness controls diffuse scattering rather than GGX reflection width.
+Standalone Glossy, Principled, Glass and mixtures containing Principled/Glass closures retain their existing conversion.
+
+Diffuse + Glossy mixtures containing only these closures and Transparent/Emission helpers use separate normalized
+lobe weights: diffuse pigment comes only from Diffuse closures, and GGX roughness only from Glossy closures.
+Glossy mixture weight does not become metallic. Native channel graphs evaluate nested Mix/Add, node group inputs
+and spatial texture weights. Zero reflection weight falls back to roughness 1; zero diffuse weight uses black
+diffuse pigment. Independent reflection strength is not transported; Standard Lit remains an approximation.
+
+The Editor plugin listens on loopback port 17777 by default. `AILU_BLENDER_LIVE_LINK_PORT` optionally selects
+a process-local port (1 through 65535) for isolated diagnostics; invalid values retain the default. The headless
+BMW exporter honors the same override. This does not change installed Blender preferences or protocol v1.
+
+For an Add Shader whose primary closure is Glass/Refraction, channel baking retains that closure's color,
+roughness and zero metallic value. Auxiliary Glossy pigment/metalness is not averaged into glass transmission;
+coverage and emission retain their existing composition. Additional reflection layers remain an approximation.
+
 The Blender add-on owns complex surface evaluation on Blender's main thread. `material_bake.py` creates isolated
-CPU Cycles scenes and evaluated meshes; `mesh_sync.py` transmits the same UVs used by channel/normal bakes.
+CPU Cycles scenes and evaluated meshes; `mesh_sync.py` transmits the bake/source UVs with V converted to `1 - V`
+for the engine's top-origin image sampling. Tangent handedness changes with that UV reflection.
 AUTO exports supported primary image branches as shared PBR materials, retaining source UVs and reporting
 coordinate/layer adjustments as approximations. Unresolved graphs bake at 256px using existing UVs when available;
 their overlap may approximate spatial variations. Explicit `ailu_export_mode=BAKE` uses native graph evaluation,
@@ -159,6 +179,14 @@ mesh loop preserves split attributes; triangles reference these vertices instead
 Wire layout, basis conversion, bounds and material grouping remain protocol v1. Missing/failed tangent generation
 uses a deterministic tangent default rather than reading uninitialized loop tangent data.
 
+Evaluated mesh instances are flattened into transient root children using their depsgraph world transforms.
+Session, instancer, source GUID and persistent instance path determine stable UUIDs. Each source is encoded once
+per instance update group, then protocol-v1 mesh packets use distinct instance GUID/revision headers. Placement-only
+updates reuse existing meshes; source edits resend affected geometry and removed instances send deletion messages.
+Original objects use view-layer visibility; mesh camera visibility is approximated by entity visibility, including
+camera-invisible emitter helpers. This also removes those meshes from GI/shadows; independent ray visibility and
+per-instance world-coordinate material rebaking are not implemented. Non-TRS shear remains outside transform transport.
+
 Material messages optionally carry `alpha_blend`, `alpha_test`, `double_sided` and `emission_texture_factor`.
 The host uses existing Standard Lit surface/cull APIs. Explicit empty texture paths remove old bindings; absent
 fields retain the previous protocol-v1 behavior. Live Link continuous opacity opts into `LINEAR_ALPHA`; emission
@@ -167,3 +195,112 @@ textures opt into `EMISSION_TEXTURE_FACTOR`. Existing material assets retain the
 Native value/coordinate graphs are baked, but shader lobes remain Standard Lit approximations. Camera-ray selection
 and view-dependent effects become static; world lighting and volume transport are not implemented by surface
 material messages. Volume-only helpers export an invisible surface instead of an opaque checker fallback.
+
+## Blender Live Link progress reporting
+
+PluginManager implements an optional IPluginProgressHost side interface, discovered through RTTI from IPluginHost.
+The existing ABI v1 host vtable and PluginContext layout remain unchanged; compatible C++ toolchains remain required.
+EditorApp supplies a host-owned callback that copies strings into EditorProgressHandle state, retaining one handle per title.
+The Engine host checks owner-thread affinity and contains callback exceptions. No Editor types or plugin closures cross the ABI.
+Blender Full Sync begins one non-cancellable indeterminate task, reports apply stages and packet counts, and terminates on End,
+disconnect, overflow, replacement Begin or unload. LiveLinkSession exposes the last Apply result so failed data does not report
+successful completion. Begin yields the current Tick; subsequent Full Sync batches yield after approximately 32ms
+between commands. Incremental updates retain the 4ms budget. The diagnostic environment option
+`AILU_BLENDER_LIVE_LINK_FULL_SYNC_BUDGET_MS` accepts 4 through 64ms, sampled at plugin load.
+Individual synchronous Apply calls remain non-interruptible. Incremental updates do not create progress cards. The transport
+and Blender add-on protocol remain unchanged; this task is not a percentage of Blender bake or network byte completion.
+
+The Blender add-on disconnects on Full Sync export exceptions without sending End, so the host ends the interrupted
+progress task and preserves the partial scene for a later full resync. Operator errors are reported and the timer
+catches export errors without unregistering itself. Collection mesh geometry is encoded before material export;
+empty evaluated meshes skip surface baking and empty meshes without UVs skip atlas projection.
+
+LiveLinkSession shares immutable Mesh resources for exactly equal protocol geometry bodies (excluding object GUID
+and revision). The session-owned cache uses sampled fingerprints only for bucket selection and compares every byte
+before reuse, including bounds, vertex attributes, index buffers and material-slot mapping. Entity transforms and
+material bindings remain independent; geometry updates publish a new Mesh rather than modifying a shared Mesh.
+Cache entries hold weak Mesh references and at most 128 MiB of canonical payload bytes. Expired entries are pruned
+on publish, delete and completed sync; reset/unload clears the cache. Mesh CPU derivation and GPU upload retain their
+existing main-thread ownership. `AILU_BLENDER_LIVE_LINK_DISABLE_MESH_CACHE=1` selects the uncached import control for
+diagnostics without changing protocol v1 or Blender preferences.
+
+Native Blender graph baking groups uncached surface materials on an object by resolution, keeping one temporary
+scene context per batch. Each slot retains its own image targets, including isolated targets for non-batched slots.
+Duplicate slots share their material target. A batch contains at most four materials and caps estimated retained
+pixel arrays at 128 MiB; a single oversized material uses the existing single-material path. Alpha, GGX roughness and
+metallic are evaluated through the previous red-channel semantics and packed into a single RGB emission
+bake, then written to the existing independent texture files. Color, emission, tangent-space normal and
+coverage retain separate passes. Diffuse-only closures omit roughness/metallic graph evaluation and files
+that the transport would discard. Resolution, Cycles samples and per-pass image/material cleanup remain
+unchanged; context restoration runs before removing the temporary scene, including export exceptions. Batch
+preparation populates the existing material payload cache; material packets retain their previous slot order.
+When every material in a batch has provably zero emission, the emission pass is omitted. The exporter retains
+the independent emission PNG and copies the color EMIT target's raster alpha into zero RGB pixels. This leaves
+normal/coverage baking and pass order unchanged. Closure defaults and zero-only Mix/Add branches are
+recognized conservatively; unknown, spatial or nonzero emission retains native baking. PNG diagnostics separate
+pixel preparation from encode/write, and source image diagnostics record newly loaded buffers released and
+scan/free costs; those costs do not isolate decoding performed inside Cycles.
+For primitive closures with unlinked finite alpha/roughness/metallic defaults, the packed scalar pass can also
+be omitted if every material in the batch qualifies. Scalar reconstruction is deferred until the existing
+coverage pass completes, multiplying coverage RGB by the defaults. Layered or linked scalar channels retain
+native baking. Exported independent scalar files, material factors and opacity classification stay unchanged;
+native shader arithmetic and reconstruction can differ by one 8-bit quantization level. Alpha defaults near
+the 0.02/0.98 opacity thresholds retain native baking to avoid rounding changing the classification.
+
+FullSync owns an explicit Blender ExportSession inside dirty_tracker export suppression. It acquires the
+source evaluated depsgraph once for the fixed snapshot and releases the reference on completion/failure;
+incremental exports continue acquiring their current depsgraph. Object bake calls use temp_override without
+switching the window scene. UV atlas Edit Mode operators retain window switching and finally restoration.
+All Blender RNA and bake calls stay on the main thread. Temporary-scene reuse remains a diagnostic option,
+disabled by default; repeated context/depsgraph work was more significant than scene creation itself.
+
+On Windows with Blender's bundled Python available, FullSync starts one hidden PNG encoder process. Blender
+performs the existing color conversion and copies quantized top-to-bottom RGBA8 bytes through a bounded pipe.
+The worker uses only Python standard-library PNG/zlib encoding, atomic file replacement and ready markers;
+it never imports bpy. Material payloads wait for their files and are drained before FullSync End. Failure
+disconnects the incomplete snapshot, invalidates its bake payloads and closes/reaps the process in finally.
+Native image saving remains the fallback when the automatic worker cannot start or is unavailable; incremental
+exports keep native saving. The worker is scoped to the sync and owns no persistent Blender data or preferences.
+
+Diagnostic environment controls are `AILU_BLENDER_BAKE_CONTEXT_OVERRIDE_ONLY` and
+`AILU_BLENDER_BAKE_REUSE_DEPSGRAPH` (default 1), `AILU_BLENDER_BAKE_PNG_PROCESS` (default AUTO; 0/1 force
+native/process), `AILU_BLENDER_BAKE_REUSE_SCENE` (default 0), and `AILU_BLENDER_BAKE_DEVICE` (default CPU;
+CUDA/OPTIX diagnostic NVIDIA device selection). GPU diagnostics restore device preferences without saving
+them. Only CUDA was measured in the pipeline task; it was slower and failed strict material-factor equality.
+Session diagnostics separately record context restoration, source graph acquisition and atlas evaluation;
+parent process CPU time excludes the independent encoder and must not be reported as total pipeline CPU work.
+
+## Blender Live Link persistence and reconnect
+
+Imported entities are durable scene entities. Optional tag source scene/object GUIDs identify the Blender association;
+engine persistent entity GUIDs remain independent when sources collide. Old scene documents default to unlinked.
+The root carries only the source scene GUID. Plugin unload, disconnect and scene switches discard runtime tracking
+without deleting persisted content. Begin rebuilds tracking from the active scene and resets per-connection revisions.
+A complete successful snapshot reparents retained objects before deleting unseen objects of this source; interrupted
+or failed snapshots never prune unseen objects. Different source scenes retain separate roots.
+
+Meshes, materials and copied texture sources are registered/saved under project://BlenderLiveLink/<source-scene-guid>/.
+Meshes use immutable assets when geometry changes, so previously shared objects can diverge safely. Validated equal
+incoming geometry reuses a loaded mesh without rebuilding or resaving it. Old mesh assets are retained; no automatic
+orphan deletion is performed. Texture documents preserve color/data/normal import settings and refer to project copies,
+not Blender bake cache paths. Blender owns imported transform/hierarchy/visibility/geometry/material fields; engine-side
+overrides are not tracked in this version.
+
+Blender sends a full snapshot after reconnect, source scene switch or file load, then uses dirty incremental updates.
+New/duplicated objects repair GUID collisions before membership comparison. Protocol v1 is unchanged: reconnect still
+transmits full geometry/material payloads; hash negotiation and offline delta replay are not implemented. Save both the
+.blend file (source identities) and engine scene after completed sync. Switching the active engine scene while connected
+requires a Full Sync to establish its new baseline.
+
+## Blender Live Link camera projection
+
+Camera entities keep the ordinary orientation-preserving Blender-to-engine object transform and hierarchy. The
+camera interprets converted local forward (0,-1,0) and up (0,0,-1); projection X is reversed to preserve Blender
+screen-right rather than mirror the image. These optional Camera settings survive scene/prefab save/load.
+
+The add-on derives actual frame extents from Camera.view_frame(scene): perspective extents at unit depth give
+vertical FOV and NDC lens offsets; orthographic extents give width and offsets. This includes Sensor Fit, portrait
+frames and pixel aspect. Protocol v1 CAMERA_UPSERT adds optional fov_y_degrees and projection_offset fields.
+The host converts legacy fov_degrees (horizontal) to vertical when the new field is absent. Imported camera aspect
+is locked against output-size changes. The dirty tracker refreshes cameras when render dimensions/pixel aspect change,
+even without an object depsgraph update. Panoramic cameras, cropped render borders, DOF and general sheared rigs are not covered.

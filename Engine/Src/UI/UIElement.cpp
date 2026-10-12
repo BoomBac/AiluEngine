@@ -655,6 +655,9 @@ namespace Ailu
 
         UIElement *UIElement::HitTest(Vector2f pos)
         {
+            if (!_is_visible)
+                return nullptr;
+
             Vector2f lpos = TransformCoord(_inv_matrix, {pos, 0.0f}).xy;
             if (!IsPointInside(lpos))
                 return nullptr;

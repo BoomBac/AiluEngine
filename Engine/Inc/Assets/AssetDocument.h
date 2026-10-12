@@ -557,6 +557,10 @@ namespace Ailu
         String _tag = "Untagged";
         APROPERTY()
         u32 _layer_mask = 1u;
+        APROPERTY()
+        String _source_scene_guid;
+        APROPERTY()
+        String _source_object_guid;
     };
 
     ASTRUCT()
@@ -716,6 +720,20 @@ namespace Ailu
         f32 _fov_h = 60.0f;
         APROPERTY()
         f32 _size = 1.0f;
+        APROPERTY()
+        Vector3f _local_forward = Vector3f::kForward;
+        APROPERTY()
+        Vector3f _local_up = Vector3f::kUp;
+        APROPERTY()
+        Vector2f _projection_offset = Vector2f::kZero;
+        APROPERTY()
+        bool _reverse_projection_x = false;
+        APROPERTY()
+        bool _lock_aspect = false;
+        APROPERTY()
+        f32 _render_scale = 1.0f;
+        APROPERTY()
+        u8 _upsampling_filter = 0u;
     };
 
     ASTRUCT()

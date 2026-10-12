@@ -9,28 +9,27 @@ float4 SamplePathTexture2D(uint texture_handle, float2 uv)
 {
     if (!valid_bindless_handle(texture_handle))
         return 1.0.xxxx;
-    return SAMPLE_TEXTURE2D_LOD(g_bindless_texture2d[texture_handle], g_LinearClampSampler, uv, 0.0f);
+    return SAMPLE_TEXTURE2D_LOD(g_bindless_texture2d[NonUniformResourceIndex(texture_handle)],
+                                g_LinearClampSampler, uv, 0.0f);
 }
 
 bool IsPathMaterialTransmissive(MaterialData material_data)
 {
-    return material_data._transmission > 0.0f && material_data._metallic < 1.0f;
+    return material_data._transmission > 0.0f &&
+           (valid_bindless_handle(material_data._metallic_tex) || material_data._metallic < 1.0f);
 }
 
 Material CreatePathMaterial(MaterialData material_data, float2 uv)
 {
     Material material = (Material)0;
-    material._albedo = max(material_data._base_color * SamplePathTexture2D(material_data._base_color_tex, uv).rgb,
-                           0.0f.xxx);
+    float4 base_sample = SamplePathTexture2D(material_data._base_color_tex, uv);
+    material._albedo = max(material_data._base_color * base_sample.rgb, 0.0f.xxx);
+    material._opacity = (material_data._flags & AL_MATERIAL_FLAG_ALPHA_BLEND) != 0u
+        ? saturate(material_data._opacity * base_sample.a) : 1.0f;
 
-    material._roughness = clamp(material_data._roughness, 0.0f, 1.0f);
-    material._metallic = saturate(material_data._metallic);
-    if (valid_bindless_handle(material_data._metallic_roughness_tex))
-    {
-        float2 roughness_metallic = SamplePathTexture2D(material_data._metallic_roughness_tex, uv).rg;
-        material._roughness = clamp(roughness_metallic.r, 0.0f, 1.0f);
-        material._metallic = saturate(roughness_metallic.g);
-    }
+    material._roughness = clamp(
+        material_data._roughness * SamplePathTexture2D(material_data._roughness_tex, uv).r, 0.0f, 1.0f);
+    material._metallic = saturate(material_data._metallic * SamplePathTexture2D(material_data._metallic_tex, uv).r);
 
     material._anisotropy = material_data._anisotropy;
     material._ior = max(material_data._ior, 1.0001f);
@@ -41,7 +40,7 @@ Material CreatePathMaterial(MaterialData material_data, float2 uv)
     if (valid_bindless_handle(material_data._emission_tex))
         emission = SamplePathTexture2D(material_data._emission_tex, uv).rgb;
     material._emission = max(emission * max(material_data._emission_strength, 0.0f), 0.0f.xxx);
-    material._is_glass = IsPathMaterialTransmissive(material_data);
+    material._is_glass = material._transmission > 0.0f && material._metallic < 1.0f;
     material._is_smooth_dielectric = material._is_glass && material._roughness <= 1e-3f;
     return material;
 }

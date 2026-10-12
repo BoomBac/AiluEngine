@@ -313,6 +313,9 @@ namespace Ailu::Render
         _unified_light_sampling_cache.reserve(32u);
         _unified_light_buffer = CreateDynamicStructuredBuffer(_unified_light_data_cache, "SceneRayTracingProxy_UnifiedLightBuffer");
         _unified_light_sampling_buffer = CreateDynamicStructuredBuffer(_unified_light_sampling_cache, "SceneRayTracingProxy_UnifiedLightSamplingBuffer");
+        _path_light_lookup_cache.resize(4u, 0u);
+        _path_light_lookup_buffer =
+            CreateDynamicStructuredBuffer(_path_light_lookup_cache, "SceneRayTracingProxy_PathLightLookup");
         _unified_light_config = ConstantBuffer::Create(sizeof(UnifiedLightBufferConfig), "SceneRayTracingProxy_UnifiedLightConfig");
         _unified_light_config->SetData(reinterpret_cast<const u8 *>(&_unified_light_config_cpu), sizeof(_unified_light_config_cpu));
         _material_data_lut[0] = 0; //default material
@@ -324,7 +327,8 @@ namespace Ailu::Render
         miss_mat._emission_tex = RenderConstants::kInvalidBindlessHandle;
         miss_mat._metallic = 0.0f;
         miss_mat._roughness = 1.0f;
-        miss_mat._metallic_roughness_tex = RenderConstants::kInvalidBindlessHandle;
+        miss_mat._roughness_tex = RenderConstants::kInvalidBindlessHandle;
+        miss_mat._metallic_tex = RenderConstants::kInvalidBindlessHandle;
         _material_data_cache.push_back(miss_mat);
         _material_buffer = CreateDynamicStructuredBuffer(_material_data_cache, "SceneRayTracingProxy_MaterialBuffer");
     }
@@ -337,7 +341,7 @@ namespace Ailu::Render
         _scene_primitive_data = primitive_data;
         _scene_primitive_buffer = primitive_buffer;
         _scene_primitives = scene_primitives;
-        SyncLightCache(scene);
+        SyncLightCache(scene, primitive_data, scene_primitives);
         if (scene == nullptr)
             return;
 
@@ -390,13 +394,18 @@ namespace Ailu::Render
         UpdateTransforms(FrontSlot(), _transforms);
     }
 
-    void SceneRayTracingProxy::SyncLightCache(const SceneManagement::Scene *scene)
+    void SceneRayTracingProxy::SyncLightCache(const SceneManagement::Scene *scene, Vector<PrimitiveData> *primitive_data,
+                                             const Vector<ScenePrimitive> *scene_primitives)
     {
+        _scene_primitive_data = primitive_data;
+        _scene_primitives = scene_primitives;
         if (scene == nullptr)
         {
             _unified_light_data_cache.clear();
             _unified_light_sampling_cache.clear();
             _unified_light_config_cpu = {};
+            _path_light_lookup_cache.assign(4u, 0u);
+            _path_light_lookup_buffer->SetData(_path_light_lookup_cache);
             _unified_light_config->SetData(reinterpret_cast<const u8 *>(&_unified_light_config_cpu), sizeof(_unified_light_config_cpu));
             return;
         }
@@ -1002,17 +1011,25 @@ namespace Ailu::Render
     {
         dst._base_color_tex         = RenderConstants::kInvalidBindlessHandle;
         dst._normal_tex             = RenderConstants::kInvalidBindlessHandle;
-        dst._metallic_roughness_tex = RenderConstants::kInvalidBindlessHandle;
+        dst._roughness_tex = RenderConstants::kInvalidBindlessHandle;
+        dst._metallic_tex = RenderConstants::kInvalidBindlessHandle;
         dst._emission_tex           = RenderConstants::kInvalidBindlessHandle;
         dst._emission_strength      = 0.0f;
         dst._sigma_a                = Vector3f::kZero;
+        dst._opacity                = 1.0f;
+        dst._flags                  = 0u;
         if (src != nullptr && src->IsStandardLit())
         {
             // Mirror the raster standard lit path: only the checker id is forwarded, everything else is standard.
             dst._material_id = src->MaterialID() == EMaterialID::kChecker ? AL_MATERIAL_ID_CHECKER : AL_MATERIAL_ID_STANDARD;
             const auto *albedo_prop = src->MainProperty(ETextureUsage::kAlbedo);
             if (albedo_prop != nullptr)
+            {
                 dst._base_color = albedo_prop->GetValue<Vector4f>().xyz;
+                dst._opacity = albedo_prop->GetValue<Vector4f>().w;
+            }
+            if (src->SurfaceType() == ESurfaceType::kTransparent)
+                dst._flags |= AL_MATERIAL_FLAG_ALPHA_BLEND;
             if (auto base_color_tex = src->MainTex(ETextureUsage::kAlbedo); base_color_tex)
             {
                 dst._base_color_tex = base_color_tex->GetBindlessSRVIndex();
@@ -1027,10 +1044,10 @@ namespace Ailu::Render
             {
                 dst._normal_tex = normal_tex->GetBindlessSRVIndex();
             }
-            if (auto mr_tex = src->MainTex(ETextureUsage::kRoughness); mr_tex)
-            {
-                dst._metallic_roughness_tex = mr_tex->GetBindlessSRVIndex();
-            }
+            if (auto roughness_tex = src->MainTex(ETextureUsage::kRoughness); roughness_tex)
+                dst._roughness_tex = roughness_tex->GetBindlessSRVIndex();
+            if (auto metallic_tex = src->MainTex(ETextureUsage::kMetallic); metallic_tex)
+                dst._metallic_tex = metallic_tex->GetBindlessSRVIndex();
             const auto *emission_prop = src->MainProperty(ETextureUsage::kEmission);
             if (emission_prop != nullptr)
             {
@@ -1058,7 +1075,6 @@ namespace Ailu::Render
 
         // dst._base_color_tex    = src.base_color_tex ? src.base_color_tex->BindlessIndex() : kInvalidTex;
         // dst._normal_tex        = src.normal_tex     ? src.normal_tex->BindlessIndex()     : kInvalidTex;
-        // dst._metallic_roughness_tex = src.mr_tex ? src.mr_tex->BindlessIndex() : kInvalidTex;
         // dst._emission_tex      = src.emission_tex ? src.emission_tex->BindlessIndex() : kInvalidTex;
 
         // dst._flags = 0;
@@ -1122,16 +1138,38 @@ namespace Ailu::Render
 
         u32 scene_triangle_offset = 0u;
         u32 instance_index_offset = 0u;
-        auto append_mesh_lights = [this, &scene_triangle_offset, &instance_index_offset](auto &mesh_components)
+        HashMap<u64, u32> primitive_indices;
+        if (_scene_primitives != nullptr)
         {
+            for (const auto &primitive : *_scene_primitives)
+                primitive_indices[(static_cast<u64>(primitive._entity_id) << 32u) | primitive._submesh_index] =
+                    primitive._primitive_index;
+        }
+        auto append_mesh_lights = [this, &scene, &primitive_indices, &scene_triangle_offset,
+                                   &instance_index_offset](auto &mesh_components)
+        {
+            using ComponentType = std::remove_cvref_t<decltype(*mesh_components.begin())>;
+            u64 entity_index = 0u;
             for (const auto &mesh_comp : mesh_components)
             {
-                const auto lights = BuildUnifiedLight(mesh_comp, scene_triangle_offset, instance_index_offset);
-                const auto light_num = static_cast<u32>(lights.size());
-                _unified_light_data_cache.insert(_unified_light_data_cache.end(), lights.begin(), lights.end());
-                _unified_light_config_cpu._light_count += light_num;
-                _unified_light_config_cpu._finite_light_count += light_num;
-                _unified_light_config_cpu._triangle_light_count += light_num;
+                const auto entity = scene.GetRegister().GetEntity<ComponentType>(entity_index++);
+                auto lights = BuildUnifiedLight(mesh_comp, scene_triangle_offset, instance_index_offset);
+                for (auto &light : lights)
+                {
+                    if (_scene_primitives != nullptr)
+                    {
+                        const u32 submesh_index = static_cast<u32>(light._shadow_index) - instance_index_offset;
+                        const auto key = (static_cast<u64>(static_cast<u32>(entity)) << 32u) | submesh_index;
+                        const auto it = primitive_indices.find(key);
+                        if (it == primitive_indices.end())
+                            continue;
+                        light._shadow_index = static_cast<i32>(it->second);
+                    }
+                    _unified_light_data_cache.push_back(light);
+                    ++_unified_light_config_cpu._light_count;
+                    ++_unified_light_config_cpu._finite_light_count;
+                    ++_unified_light_config_cpu._triangle_light_count;
+                }
                 if (mesh_comp._p_mesh)
                 {
                     scene_triangle_offset += mesh_comp._p_mesh->GetTriangleCount();
@@ -1141,6 +1179,57 @@ namespace Ailu::Render
         };
         append_mesh_lights(scene.GetRegister().View<ECS::StaticMeshComponent>());
         append_mesh_lights(scene.GetRegister().View<ECS::CSkeletonMesh>());
+
+        // Header: primitive count, direction count, analytic count, primitive-offset table start.
+        // Lists contain original light indices, preserving alias sampling and all external light references.
+        const u32 primitive_count = _scene_primitive_data != nullptr ? static_cast<u32>(_scene_primitive_data->size()) : 0u;
+        _path_light_lookup_cache.assign(4u, 0u);
+        _path_light_lookup_cache[0] = primitive_count;
+        for (u32 light_index = 0u; light_index < _unified_light_data_cache.size(); ++light_index)
+        {
+            if (_unified_light_data_cache[light_index]._type == AL_UNIFIED_LIGHT_TYPE_DIRECTIONAL)
+            {
+                _path_light_lookup_cache.push_back(light_index);
+                ++_path_light_lookup_cache[1];
+            }
+        }
+        for (u32 light_index = 0u; light_index < _unified_light_data_cache.size(); ++light_index)
+        {
+            const auto type = _unified_light_data_cache[light_index]._type;
+            if (type != AL_UNIFIED_LIGHT_TYPE_DIRECTIONAL && type != AL_UNIFIED_LIGHT_TYPE_TRIANGLE_AREA)
+            {
+                _path_light_lookup_cache.push_back(light_index);
+                ++_path_light_lookup_cache[2];
+            }
+        }
+        const u32 offset_table_start = static_cast<u32>(_path_light_lookup_cache.size());
+        _path_light_lookup_cache[3] = offset_table_start;
+        _path_light_lookup_cache.resize(offset_table_start + primitive_count, RenderConstants::kInvalidBindlessHandle);
+        for (u32 light_index = 0u; light_index < _unified_light_data_cache.size(); ++light_index)
+        {
+            const auto &light = _unified_light_data_cache[light_index];
+            const u32 primitive_index = static_cast<u32>(light._shadow_index);
+            if (light._type != AL_UNIFIED_LIGHT_TYPE_TRIANGLE_AREA || primitive_index >= primitive_count)
+                continue;
+            const u32 triangle_count = (*_scene_primitive_data)[primitive_index]._submesh_triangle_count;
+            if (light._tri_index >= triangle_count)
+                continue;
+            u32 triangle_start = _path_light_lookup_cache[offset_table_start + primitive_index];
+            if (triangle_start == RenderConstants::kInvalidBindlessHandle)
+            {
+                triangle_start = static_cast<u32>(_path_light_lookup_cache.size());
+                _path_light_lookup_cache[offset_table_start + primitive_index] = triangle_start;
+                _path_light_lookup_cache.resize(triangle_start + triangle_count,
+                                               RenderConstants::kInvalidBindlessHandle);
+            }
+            _path_light_lookup_cache[triangle_start + light._tri_index] = light_index;
+        }
+        const u64 lookup_size = _path_light_lookup_cache.capacity() * sizeof(u32);
+        if (_path_light_lookup_buffer == nullptr || _path_light_lookup_buffer->GetSize() < lookup_size)
+            _path_light_lookup_buffer =
+                CreateDynamicStructuredBuffer(_path_light_lookup_cache, "SceneRayTracingProxy_PathLightLookup");
+        else
+            _path_light_lookup_buffer->SetData(_path_light_lookup_cache);
 
         UpdateUnifiedLightSamplingTable();
 

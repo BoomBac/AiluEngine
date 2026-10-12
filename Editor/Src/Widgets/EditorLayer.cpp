@@ -1,4 +1,5 @@
 #include "Widgets/EditorLayer.h"
+#include "Widgets/EditorProgressPanel.h"
 #include "Framework/Common/Allocator.hpp"
 #include "Automation/AutomationService.h"
 #include "Widgets/AIAssistantWindow.h"
@@ -1318,6 +1319,7 @@ namespace Ailu
                 }
             };
 
+            _progress_panel = MakeScope<EditorProgressPanel>(EditorApp::GetEditor()->GetProgressService());
             BuildEditorChrome();
 
             if (!DockManager::Get().HasDock("Ailu::Editor::PlaceActor"))
@@ -1332,6 +1334,7 @@ namespace Ailu
 
         void EditorLayer::OnDetach()
         {
+            _progress_panel.reset();
             if (_toolbar_widget)
                 UI::UIManager::Get()->UnRegisterWidget(_toolbar_widget.get());
             if (_status_bar_widget)
@@ -1749,6 +1752,9 @@ namespace Ailu
                 Vector<UI::MenuEntry> entries;
                 entries.push_back({"Scene", {}, false, std::move(scene_entries)});
                 entries.push_back({"Play Mode", {}, false, std::move(play_entries)});
+#ifdef _DEBUG
+                entries.push_back({"Progress Demo", []() { EditorApp::GetEditor()->StartProgressDemo(); }});
+#endif
                 UI::Menu::ShowAt(menu_button, entries);
                 e._is_handled = true;
             };
@@ -1889,6 +1895,7 @@ namespace Ailu
             DockManager::Get().SetMainDockArea({0.0f, g_editor_style._toolbar_height}, {window_size.x, dock_height});
 
             auto *scene = SceneMgr::Get().ActiveScene();
+            if (_progress_panel) _progress_panel->Update(dt, window_size, g_editor_style._toolbar_height, g_editor_style._status_bar_height);
             const String scene_name = scene ? scene->Name() : String("No Scene");
             String selection_name = "No Selection";
             if (scene && _selected_entity != ECS::kInvalidEntity && scene->IsValidEntity(_selected_entity))
@@ -1929,11 +1936,10 @@ namespace Ailu
 
             if (_status_left_text)
             {
-                _status_left_text->SetText(std::format("{}   Scene: {}   Selection: {}",
-                                                       _editor_status_message,
-                                                       scene_name,
-                                                       selection_name),
-                                           false);
+                const String progress_summary = _progress_panel ? _progress_panel->Summary() : String{};
+                const String text = std::format("{}   Scene: {}   Selection: {}{}{}", _editor_status_message, scene_name,
+                    selection_name, progress_summary.empty() ? "" : "   ", progress_summary);
+                if (_status_left_text->GetText() != text) _status_left_text->SetText(text, false);
             }
             if (_status_right_text)
             {

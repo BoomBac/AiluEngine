@@ -36,7 +36,7 @@ try {
   Write('entity.json', await Rpc('scene.inspect_entity', {entity_guid: fixture.object.guid, include_properties: true}));
   const materials = {...fixture.materials, constant: {...fixture.materials.red,
     base_color: [0, 1, 0, 1], emission: [0, 1, 0], base_color_path: '', emission_path: '',
-    normal_path: '', roughness_metallic_path: '', alpha_test: false, alpha_blend: false}};
+    normal_path: '', roughness_path: '', metallic_path: '', alpha_test: false, alpha_blend: false}};
   for (const name of ['blue', 'red', 'blend', 'cutout', 'constant']) {
     Send(21, materials[name]);
     await Delay(1800);

@@ -34,12 +34,9 @@ float3 GIReadMaterialEmission(MaterialData material, float2 uv)
 float GIReadMaterialMetallic(MaterialData material, float2 uv)
 {
     float metallic = material._metallic;
-    if (valid_bindless_handle(material._metallic_roughness_tex))
-    {
-        const float2 roughness_metallic = SAMPLE_TEXTURE2D_LOD(
-            g_bindless_texture2d[material._metallic_roughness_tex], g_LinearClampSampler, uv, 0.0f).rg;
-        metallic = roughness_metallic.g;
-    }
+    if (valid_bindless_handle(material._metallic_tex))
+        metallic *= SAMPLE_TEXTURE2D_LOD(
+            g_bindless_texture2d[NonUniformResourceIndex(material._metallic_tex)], g_LinearClampSampler, uv, 0.0f).r;
     return saturate(metallic);
 }
 

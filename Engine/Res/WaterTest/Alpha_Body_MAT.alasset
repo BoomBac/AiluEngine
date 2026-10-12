@@ -15,7 +15,10 @@
             "_name": "_NormalTex",
             "_texture_guid": ""
         }, {
-            "_name": "_RoughnessMetallicTex",
+            "_name": "_RoughnessTex",
+            "_texture_guid": ""
+        }, {
+            "_name": "_MetallicTex",
             "_texture_guid": ""
         }, {
             "_name": "_SpecularTex",

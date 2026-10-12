@@ -92,7 +92,6 @@ namespace Ailu::Render
         _material_id_offset = other._material_id_offset;
         _sampler_mask = other._sampler_mask;
         _is_standard_lit = other._is_standard_lit;
-        _use_legacy_path_tracer_absorption = other._use_legacy_path_tracer_absorption;
         _property_data_version = other._property_data_version;
         _resource_binding_version = other._resource_binding_version;
         _draw_state_version = other._draw_state_version;
@@ -132,7 +131,6 @@ namespace Ailu::Render
         _material_id_offset = other._material_id_offset;
         _sampler_mask = other._sampler_mask;
         _is_standard_lit = other._is_standard_lit;
-        _use_legacy_path_tracer_absorption = other._use_legacy_path_tracer_absorption;
         _bind_textures_by_id = other._bind_textures_by_id;
         _bind_buffers_by_id = other._bind_buffers_by_id;
 
@@ -176,7 +174,6 @@ namespace Ailu::Render
         _material_id_offset = other._material_id_offset;
         _sampler_mask = other._sampler_mask;
         _is_standard_lit = other._is_standard_lit;
-        _use_legacy_path_tracer_absorption = other._use_legacy_path_tracer_absorption;
         _property_data_version = other._property_data_version;
         _resource_binding_version = other._resource_binding_version;
         _draw_state_version = other._draw_state_version;
@@ -606,10 +603,6 @@ namespace Ailu::Render
 
     void Material::SetFloat(ShaderPropertyId property_id, const float &f)
     {
-        if (property_id == ShaderPropertyRegistry::Get().Intern("_Absorption"))
-            _use_legacy_path_tracer_absorption = true;
-        else if (property_id == ShaderPropertyRegistry::Get().Intern("_AttenuationDistance"))
-            _use_legacy_path_tracer_absorption = false;
         if (_p_active_shader == nullptr)
             return;
         const size_t pass_count = std::min({_p_active_shader->_passes.size(), _pass_variants.size(),
@@ -687,8 +680,6 @@ namespace Ailu::Render
 
     void Material::SetVector(ShaderPropertyId property_id, const Vector4f &vector)
     {
-        if (property_id == ShaderPropertyRegistry::Get().Intern("_AttenuationColor"))
-            _use_legacy_path_tracer_absorption = false;
         if (_p_active_shader == nullptr)
             return;
         const size_t pass_count = std::min({_p_active_shader->_passes.size(), _pass_variants.size(),
@@ -771,12 +762,6 @@ namespace Ailu::Render
 
     Vector3f Material::GetPathTracerSigmaA()
     {
-        if (_use_legacy_path_tracer_absorption)
-        {
-            const float legacy_absorption = std::max(0.0f, GetFloat("_Absorption"));
-            return Vector3f(legacy_absorption);
-        }
-
         const Vector3f attenuation_color = GetVector("_AttenuationColor").xyz;
         const float attenuation_distance = GetFloat("_AttenuationDistance");
         if (attenuation_distance <= 0.0f)
@@ -910,22 +895,6 @@ namespace Ailu::Render
         else if (Asset *linked_asset = ResourceMgr::Get().GetLinkedAsset(texture); linked_asset != nullptr)
             _texture_guids[name] = linked_asset->GetGuid();
         SetTexture(ShaderPropertyRegistry::Get().Intern(name), texture);
-
-        if (!_is_standard_lit)
-            return;
-        if (name == StandardMaterialProperty::kAlbedo._tex_name)
-            MarkTextureUsed({ETextureUsage::kAlbedo}, texture != nullptr);
-        else if (name == StandardMaterialProperty::kEmission._tex_name)
-            MarkTextureUsed({ETextureUsage::kEmission}, texture != nullptr);
-        else if (name == StandardMaterialProperty::kRoughness._tex_name)
-            MarkTextureUsed({ETextureUsage::kRoughness}, texture != nullptr);
-        else if (name == StandardMaterialProperty::kMetallic._tex_name)
-            MarkTextureUsed({ETextureUsage::kMetallic}, texture != nullptr);
-        else if (name == StandardMaterialProperty::kSpecular._tex_name)
-            MarkTextureUsed({ETextureUsage::kSpecular}, texture != nullptr);
-        else if (name == StandardMaterialProperty::kNormal._tex_name)
-            MarkTextureUsed({ETextureUsage::kNormal}, texture != nullptr);
-        else {}
     }
 
     void Material::SetTexture(ShaderPropertyId property_id, Texture *texture)
@@ -942,6 +911,25 @@ namespace Ailu::Render
         {
             if (_properties.find(name) != _properties.end())
                 _properties[name]._value_ptr = reinterpret_cast<void *>(texture);
+        }
+        if (texture == nullptr)
+            _texture_guids[name] = Guid::EmptyGuid();
+        else if (Asset *linked_asset = ResourceMgr::Get().GetLinkedAsset(texture); linked_asset != nullptr)
+            _texture_guids[name] = linked_asset->GetGuid();
+        if (_is_standard_lit)
+        {
+            if (name == StandardMaterialProperty::kAlbedo._tex_name)
+                MarkTextureUsed({ETextureUsage::kAlbedo}, texture != nullptr);
+            else if (name == StandardMaterialProperty::kEmission._tex_name)
+                MarkTextureUsed({ETextureUsage::kEmission}, texture != nullptr);
+            else if (name == StandardMaterialProperty::kRoughness._tex_name)
+                MarkTextureUsed({ETextureUsage::kRoughness}, texture != nullptr);
+            else if (name == StandardMaterialProperty::kMetallic._tex_name)
+                MarkTextureUsed({ETextureUsage::kMetallic}, texture != nullptr);
+            else if (name == StandardMaterialProperty::kSpecular._tex_name)
+                MarkTextureUsed({ETextureUsage::kSpecular}, texture != nullptr);
+            else if (name == StandardMaterialProperty::kNormal._tex_name)
+                MarkTextureUsed({ETextureUsage::kNormal}, texture != nullptr);
         }
         MarkResourceBindingsDirty();
         _on_property_changed_router.Invoke(property_id);
@@ -1079,13 +1067,7 @@ namespace Ailu::Render
 
     void Material::RemoveTexture(const String &name)
     {
-        _texture_guids[name] = Guid::EmptyGuid();
-        ShaderPropertyId property_id = ShaderPropertyRegistry::Get().Intern(name);
-        if (auto it = _bind_textures_by_id.find(property_id); it != _bind_textures_by_id.end() && it->second == nullptr)
-            return;
-        _bind_textures_by_id[property_id] = nullptr;
-        MarkResourceBindingsDirty();
-        _on_property_changed_router.Invoke(property_id);
+        SetTexture(name, static_cast<Texture *>(nullptr));
     }
 
     List<std::tuple<String, float>> Material::GetAllFloatValue()
@@ -1560,8 +1542,11 @@ namespace Ailu::Render
                 mask = b_use ? mask | StandardMaterialProperty::kMetallic._mask_flag : mask & (~StandardMaterialProperty::kMetallic._mask_flag);
                 break;
             case ETextureUsage::kSpecular:
-                mask = b_use ? StandardMaterialProperty::kSpecular._mask_flag : mask & (~StandardMaterialProperty::kSpecular._mask_flag);
+            {
+                const u32 flag = StandardMaterialProperty::kSpecular._mask_flag;
+                mask = b_use ? mask | flag : mask & ~flag;
                 break;
+            }
             default:
                 break;
         }

@@ -41,6 +41,15 @@ namespace Ailu
         virtual bool IsMainThread() const noexcept = 0;
     };
 
+    // Optional side interface: ABI v1 host/context layouts remain unchanged. Owner-thread only.
+    enum class EPluginProgressState : u8 { kBegin, kRunning, kCompleted, kFailed, kCancelled };
+    class IPluginProgressHost
+    {
+    public:
+        virtual ~IPluginProgressHost() = default;
+        virtual void ReportProgress(const char* title, const char* message, u64 completed, EPluginProgressState state) noexcept = 0;
+    };
+
     struct PluginContext
     {
         u32 _api_version = kPluginApiVersion;

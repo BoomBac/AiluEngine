@@ -521,7 +521,8 @@ namespace Ailu
 
             const bool use_hardware_ray_tracing = CanUseHardwareRayTracing();
             if (!use_hardware_ray_tracing && _scene_rt_proxy != nullptr)
-                _scene_rt_proxy->SyncLightCache(SceneManagement::SceneMgr::Get().ActiveScene());
+                _scene_rt_proxy->SyncLightCache(SceneManagement::SceneMgr::Get().ActiveScene(),
+                                               rendering_data._primitive_data, rendering_data._scene_primitives);
             GPUBuffer *prev_reservoir = _is_cur_a ? _reservoir_b.get() : _reservoir_a.get();
             GPUBuffer *curr_reservoir = _is_cur_a ? _reservoir_a.get() : _reservoir_b.get();
             GPUBuffer *prev_surface_buffer = _is_cur_a ? _surface_buffer_b.get() : _surface_buffer_a.get();
@@ -541,6 +542,8 @@ namespace Ailu
                 if (!light_data->IsReady())
                     return;
                 _gi_compute_shader->SetBuffer("_UnifiedLights", _scene_rt_proxy->GetUnifiedLightData());
+                _gi_compute_shader->SetBuffer(_kernel_primary_ray, "_PathLightLookup",
+                                             _scene_rt_proxy->GetPathLightLookup());
                 if (_use_power_weighted_light_sampling)
                     _gi_compute_shader->SetBuffer(_kernel_primary_ray, "_UnifiedLightSamplingTable", unified_light_sampling_data);
             }
@@ -566,6 +569,8 @@ namespace Ailu
                             (void) builder.Write(builder.Import(curr_surface_buffer), EResourceUsage::kWriteUAV);
                         if (unified_light_data != nullptr)
                             builder.Read(builder.Import(unified_light_data));
+                        if (_scene_rt_proxy != nullptr && _scene_rt_proxy->GetPathLightLookup() != nullptr)
+                            builder.Read(builder.Import(_scene_rt_proxy->GetPathLightLookup()));
                         if (_use_power_weighted_light_sampling && unified_light_sampling_data != nullptr)
                             builder.Read(builder.Import(unified_light_sampling_data));
                         if (rt_scene != nullptr)
@@ -628,6 +633,7 @@ namespace Ailu
                         _gi_raytracing_shader->SetBuffer("g_perCamData", g_perCamData.get());
                         _gi_raytracing_shader->SetBuffer("g_material_data", _scene_rt_proxy->GetMaterialData());
                         _gi_raytracing_shader->SetBuffer("_UnifiedLights", _scene_rt_proxy->GetUnifiedLightData());
+                        _gi_raytracing_shader->SetBuffer("_PathLightLookup", _scene_rt_proxy->GetPathLightLookup());
                         _gi_raytracing_shader->SetBuffer("_UnifiedLightConfig", _scene_rt_proxy->GetUnifiedLightConfig());
                         if (_use_power_weighted_light_sampling)
                             _gi_raytracing_shader->SetBuffer("_UnifiedLightSamplingTable",

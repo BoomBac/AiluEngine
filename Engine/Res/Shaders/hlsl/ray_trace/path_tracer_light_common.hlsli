@@ -7,6 +7,13 @@
 #include "../bindless.hlsli"
 #include "../sampler.hlsli"
 #include "gpu_scene.hlsli"
+#include "path_tracer_common.hlsli"
+
+#if defined(DXR)
+StructuredBuffer<uint> _PathLightLookup : register(t9, space0);
+#else
+StructuredBuffer<uint> _PathLightLookup;
+#endif
 
 float3 LoadBindlessFloat3(ByteAddressBuffer buffer, uint byte_offset)
 {
@@ -26,17 +33,17 @@ bool LoadHitTriangleData(uint tri_idx,int vert_buffer,int nor_buffer,int uv_buff
     if (!valid_bindless_buffer(vert_buffer) || !valid_bindless_buffer(nor_buffer) || !valid_bindless_buffer(uv_buffer) || !valid_bindless_buffer(idx_buffer))
         return false;
 
-    ByteAddressBuffer index_buffer = g_bindless_index_buffer[idx_buffer];
+    ByteAddressBuffer index_buffer = g_bindless_index_buffer[NonUniformResourceIndex(idx_buffer)];
     uint3 tri_indices = index_buffer.Load3(tri_idx * 12u);
 
-    ByteAddressBuffer position_buffer = g_bindless_vertex_buffer[vert_buffer];
+    ByteAddressBuffer position_buffer = g_bindless_vertex_buffer[NonUniformResourceIndex(vert_buffer)];
     tri.v0 = LoadBindlessFloat3(position_buffer, tri_indices.x * 12u);
     tri.v1 = LoadBindlessFloat3(position_buffer, tri_indices.y * 12u);
     tri.v2 = LoadBindlessFloat3(position_buffer, tri_indices.z * 12u);
 
     if (valid_bindless_buffer(nor_buffer))
     {
-        ByteAddressBuffer normal_buffer = g_bindless_vertex_buffer[nor_buffer];
+        ByteAddressBuffer normal_buffer = g_bindless_vertex_buffer[NonUniformResourceIndex(nor_buffer)];
         tri.n0 = LoadBindlessFloat3(normal_buffer, tri_indices.x * 12u);
         tri.n1 = LoadBindlessFloat3(normal_buffer, tri_indices.y * 12u);
         tri.n2 = LoadBindlessFloat3(normal_buffer, tri_indices.z * 12u); 
@@ -51,7 +58,7 @@ bool LoadHitTriangleData(uint tri_idx,int vert_buffer,int nor_buffer,int uv_buff
 
     if (valid_bindless_buffer(uv_buffer))
     {
-        ByteAddressBuffer uv_data = g_bindless_vertex_buffer[uv_buffer];
+        ByteAddressBuffer uv_data = g_bindless_vertex_buffer[NonUniformResourceIndex(uv_buffer)];
         tri.uv0 = LoadBindlessFloat2(uv_data, tri_indices.x * 8u);
         tri.uv1 = LoadBindlessFloat2(uv_data, tri_indices.y * 8u);
         tri.uv2 = LoadBindlessFloat2(uv_data, tri_indices.z * 8u);
@@ -93,6 +100,15 @@ float GetPathUnifiedLightSelectionPMF(uint light_index, uint light_count)
 #else
     return GetUnifiedLightSelectionPMF(light_count);
 #endif
+}
+
+uint GetPathTriangleLightIndex(uint primitive_index, uint triangle_index)
+{
+    if (primitive_index >= _PathLightLookup[0] ||
+        triangle_index >= g_primitive_data[primitive_index]._submesh_triangle_count)
+        return 0xffffffffu;
+    const uint triangle_start = _PathLightLookup[_PathLightLookup[3] + primitive_index];
+    return triangle_start == 0xffffffffu ? 0xffffffffu : _PathLightLookup[triangle_start + triangle_index];
 }
 
 uint SamplePathUnifiedLightIndex(float random_value, uint light_count, out float selection_pmf)
@@ -184,7 +200,8 @@ float3 EvaluateTriangleLightRadiance(SampleLightData light, float2 uv)
 {
     float3 radiance = light._color;
     if (valid_bindless_handle(light._emissive_map))
-        radiance *= SAMPLE_TEXTURE2D_LOD(g_bindless_texture2d[light._emissive_map], g_LinearClampSampler, uv, 0).rgb;
+        radiance *= SAMPLE_TEXTURE2D_LOD(g_bindless_texture2d[NonUniformResourceIndex(light._emissive_map)],
+                                        g_LinearClampSampler, uv, 0).rgb;
     return radiance;
 }
 
@@ -446,6 +463,21 @@ float PdfMeshLight(SampleLightData light, float3 x, float3 wi)
     return PdfSolidAngleFromArea(rcp(max(area, 1e-6)), light_t * light_t, cos_theta_l);
 }
 
+void ResolvePathSurfaceEmission(inout PathHit hit, float3 ray_direction, float2 uv, uint light_count)
+{
+    hit._light_index = GetPathTriangleLightIndex(hit._primitive_index, hit._triangle_index);
+    if (hit._light_index == 0xffffffffu)
+        return;
+    const SampleLightData light = DecodeUnifiedLightEntry(LoadUnifiedLight(hit._light_index));
+    const TriangleData triangle_data = LoadTriangleAreaLightData(light);
+    const float3 normal = GetTriangleAreaLightNormal(triangle_data);
+    const float light_cos = light._is_double_sided ? abs(dot(normal, -ray_direction)) : dot(normal, -ray_direction);
+    const float area = 0.5f * length(cross(triangle_data.v1 - triangle_data.v0, triangle_data.v2 - triangle_data.v0));
+    hit._light_pdf = light_cos > FLOAT_EPSILON && area > FLOAT_EPSILON ?
+        GetPathUnifiedLightSelectionPMF(hit._light_index, light_count) * hit._hit_t * hit._hit_t / (area * light_cos) : 0.0f;
+    hit._light_radiance = light_cos > 0.0f ? EvaluateTriangleLightRadiance(light, uv) : 0.0.xxx;
+}
+
 float PdfDirectionalLight(SampleLightData light, float3 wi)
 {
     float3 light_direction = normalize(light._direction);
@@ -456,20 +488,31 @@ float PdfDirectionalLight(SampleLightData light, float3 wi)
     return 1.0f / DirectionalLightSolidAngle(light);
 }
 
+float PowerHeuristicThree(float technique_pdf, float other_pdf, float third_pdf)
+{
+    const float scale = max(technique_pdf, max(other_pdf, third_pdf));
+    if (scale <= 0.0f)
+        return 0.0f;
+    const float3 relative_pdf = float3(technique_pdf, other_pdf, third_pdf) / scale;
+    return relative_pdf.x * relative_pdf.x / dot(relative_pdf, relative_pdf);
+}
+
 // Directional lights live at infinity, so BSDF rays evaluate them only after a scene miss.
 float3 EvaluateDirectionalLightMiss(uint light_count, float3 wi, float bsdf_pdf, bool carry_mis)
 {
     float3 radiance = 0.0.xxx;
-    float selection_pmf = GetUnifiedLightSelectionPMF(light_count);
-    for (uint light_index = 0u; light_index < light_count; ++light_index)
+    for (uint index = 0u; index < _PathLightLookup[1]; ++index)
     {
+        const uint light_index = _PathLightLookup[4u + index];
         SampleLightData light = DecodeUnifiedLightEntry(LoadUnifiedLight(light_index));
         if (light._type != LIGHT_TYPE_DIRECTIONAL)
             continue;
         float light_pdf = PdfDirectionalLight(light, wi);
         if (light_pdf <= 0.0f)
             continue;
-        float mis_weight = carry_mis ? PowerHeuristic(bsdf_pdf, light_pdf * selection_pmf) : 1.0f;
+        const float selection_pmf = GetPathUnifiedLightSelectionPMF(light_index, light_count);
+        // The sun has its own NEE sample in addition to unified-light selection and BSDF sampling.
+        float mis_weight = carry_mis ? PowerHeuristicThree(bsdf_pdf, light_pdf * selection_pmf, light_pdf) : 1.0f;
         radiance += light._color * light_pdf * mis_weight;
     }
     return radiance;
@@ -595,6 +638,32 @@ bool FindClosestUnifiedLightHit(uint light_num,float3 ray_origin, float3 ray_dir
     }
 
     return hit_anything;
+}
+
+bool FindClosestPathAnalyticLightHit(uint light_count, float3 ray_origin, float3 ray_direction, float max_t,
+                                    out uint light_index, out float light_t, out LightSample light_sample)
+{
+    bool found = false;
+    light_index = 0u;
+    light_t = max_t;
+    light_sample = (LightSample)0;
+    const uint list_start = 4u + _PathLightLookup[1];
+    for (uint index = 0u; index < _PathLightLookup[2]; ++index)
+    {
+        const uint candidate_index = _PathLightLookup[list_start + index];
+        float candidate_t;
+        LightSample candidate_sample;
+        if (!EvaluateUnifiedLightHit(light_count, candidate_index, ray_origin, ray_direction, candidate_t, candidate_sample) ||
+            candidate_t >= light_t)
+            continue;
+        candidate_sample._pdf = PdfUnifiedLight(candidate_index, ray_origin, ray_direction) *
+                                GetPathUnifiedLightSelectionPMF(candidate_index, light_count);
+        found = true;
+        light_index = candidate_index;
+        light_t = candidate_t;
+        light_sample = candidate_sample;
+    }
+    return found;
 }
 
 float DirectLightCosTheta(Material mat, float3 n, float3 wi)

@@ -1,4 +1,5 @@
 #include "Widgets/AssetBrowser.h"
+#include "EditorApp.h"
 #include "Framework/Common/Allocator.hpp"
 
 #include "Animation/AnimationControllerAsset.h"
@@ -194,7 +195,7 @@ namespace Ailu
             }
         }// namespace
 
-        AssetBrowser::AssetBrowser() : DockWindow("Asset Browser")
+        AssetBrowser::AssetBrowser() : DockWindow("Asset Browser"), _import_controller(EditorApp::GetEditor()->GetProgressService())
         {
             _sv = _content_root->AddChild<UI::SplitView>();
             _sv->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
@@ -1190,6 +1191,7 @@ namespace Ailu
         void AssetBrowser::Update(f32 dt)
         {
             DockWindow::Update(dt);
+            _import_controller.Tick();
 
             if (!Input::IsKeyDown(EKey::kLBUTTON))
             {

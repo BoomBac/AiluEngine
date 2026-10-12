@@ -1,6 +1,7 @@
 #pragma once
 
 #include "LiveLinkCommandQueue.h"
+#include "Framework/Core/Types.h"
 #include <atomic>
 #include <thread>
 
@@ -14,7 +15,7 @@ namespace Ailu
         LiveLinkServer(const LiveLinkServer&) = delete;
         LiveLinkServer& operator=(const LiveLinkServer&) = delete;
 
-        bool Start();
+        bool Start(u16 port = 17777u);
         void Stop() noexcept;
         bool TryPopCommand(LiveLinkCommand& command);
 

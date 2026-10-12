@@ -12,7 +12,6 @@ namespace Ailu
     namespace
     {
         constexpr SOCKET kInvalidSocket = INVALID_SOCKET;
-        constexpr u16 kPort = 17777u;
 
         SOCKET UnpackSocket(unsigned long long value) noexcept
         {
@@ -98,7 +97,7 @@ namespace Ailu
         Stop();
     }
 
-    bool LiveLinkServer::Start()
+    bool LiveLinkServer::Start(u16 port)
     {
         if (_worker.joinable() || _winsock_started)
             return false;
@@ -123,7 +122,7 @@ namespace Ailu
         }
         sockaddr_in address{};
         address.sin_family = AF_INET;
-        address.sin_port = htons(kPort);
+        address.sin_port = htons(port);
         if (InetPtonA(AF_INET, "127.0.0.1", &address.sin_addr) != 1
             || bind(listen_socket, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) == SOCKET_ERROR
             || listen(listen_socket, 1) == SOCKET_ERROR)

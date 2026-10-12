@@ -196,6 +196,7 @@ namespace Ailu
             Dropdown(const Vector<String> &items);
             ~Dropdown() = default;
             void SetSelectedIndex(i32 index, bool notify = true);
+            void SetDisplayText(const String &text);
             void SetMixed(bool mixed);
             bool IsMixed() const { return _is_mixed; }
             int GetSelectedIndex() const { return _selected_index; }

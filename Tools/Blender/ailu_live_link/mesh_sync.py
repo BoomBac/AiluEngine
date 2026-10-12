@@ -66,10 +66,13 @@ def encode_mesh(obj, depsgraph):
             loop_signs = np.empty(len(mesh.loops), dtype=np.float32)
             mesh.loops.foreach_get("bitangent_sign", loop_signs)
             tangents[:, :3] = convert_basis(loop_tangents.reshape(-1, 3), normalize=True)
-            tangents[:, 3] = np.where(loop_signs < 0, -1.0, 1.0)
+            tangents[:, 3] = np.where(loop_signs < 0, 1.0, -1.0)
         else:
             tangents[:] = (1.0, 0.0, 0.0, 1.0)
         uvs = np.asarray(uv_values, dtype=np.float32).reshape(-1, 2)
+        if uv_layer:
+            # Blender UVs start at the bottom; Ailu samples imported images from the top.
+            uvs[:, 1] = 1.0 - uvs[:, 1]
         material_indices = np.empty(len(mesh.loop_triangles), dtype=np.int32)
         mesh.loop_triangles.foreach_get("material_index", material_indices)
         np.maximum(material_indices, 0, out=material_indices)
@@ -109,3 +112,10 @@ def send_mesh(obj, depsgraph, link):
             f"encode_ms={encode_ms:.2f} enqueue_ms={enqueue_ms:.2f} queued={queued}"
         )
     return queued
+
+
+def send_instance_mesh(payload, guid, link):
+    guid_bytes = guid.encode("ascii")
+    revision = _mesh_revision.get(guid_bytes, 0) + 1
+    _mesh_revision[guid_bytes] = revision
+    return link.send(protocol.MESH_UPSERT, struct.pack("<36sQ", guid_bytes, revision) + payload[44:])

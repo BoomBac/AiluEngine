@@ -208,7 +208,7 @@ namespace Ailu
         };
     }
 
-    class PluginManager::Impl final : public IPluginHost
+    class PluginManager::Impl final : public IPluginHost, public IPluginProgressHost
     {
     public:
         void LogInfo(const char* message) noexcept override
@@ -224,6 +224,12 @@ namespace Ailu
             try { LOG_ERROR("[Plugin] {}", message ? message : ""); } catch (...) {}
         }
         bool IsMainThread() const noexcept override { return std::this_thread::get_id() == _owner_thread; }
+        void ReportProgress(const char* title, const char* message, u64 completed, EPluginProgressState state) noexcept override
+        {
+            if (!IsMainThread() || !_progress_callback) return;
+            try { _progress_callback(title, message, completed, state); } catch (...) {}
+        }
+        ProgressCallback _progress_callback;
         bool CheckOwner() const
         {
             if (IsMainThread())
@@ -268,6 +274,12 @@ namespace Ailu
         if (!_impl->IsMainThread() || _impl->_busy)
             std::terminate();
         Shutdown();
+    }
+
+    void PluginManager::SetProgressCallback(ProgressCallback callback)
+    {
+        if (!_impl->CheckOwner() || _impl->_busy) return;
+        _impl->_progress_callback = std::move(callback);
     }
 
     bool PluginManager::Initialize()

@@ -89,6 +89,8 @@ namespace Ailu
 
         void ObjectAssetDropdown::SetSelectedGuid(const Guid &guid, bool notify)
         {
+            if (!guid.IsEmpty())
+                _unregistered_selection_label.clear();
             _selected_guid = guid;
             if (!guid.IsEmpty() && FindEntryIndex(guid) < 0)
                 RefreshItems();
@@ -98,6 +100,13 @@ namespace Ailu
             _is_syncing_selection = false;
             if (notify && index < 0)
                 _on_object_asset_selected_delegate.Invoke(nullptr, nullptr, Guid::EmptyGuid());
+        }
+
+        void ObjectAssetDropdown::SetUnregisteredSelectionLabel(const String &label)
+        {
+            _unregistered_selection_label = label;
+            if (_selected_guid.IsEmpty() && !_unregistered_selection_label.empty())
+                SetDisplayText(_unregistered_selection_label);
         }
 
         Asset *ObjectAssetDropdown::GetSelectedAsset() const
@@ -171,6 +180,8 @@ namespace Ailu
             _is_syncing_selection = true;
             Dropdown::SetSelectedIndex(FindEntryIndex(_selected_guid));
             _is_syncing_selection = false;
+            if (_selected_guid.IsEmpty() && !_unregistered_selection_label.empty())
+                SetDisplayText(_unregistered_selection_label);
         }
 
         bool ObjectAssetDropdown::IsTypeCompatible(const Type *requested_type, const Type *actual_type)
@@ -187,6 +198,8 @@ namespace Ailu
 
         void ObjectAssetDropdown::SelectEntry(i32 index, bool notify)
         {
+            if (notify)
+                _unregistered_selection_label.clear();
             if (_allow_none && index == 0)
             {
                 _selected_guid = Guid::EmptyGuid();

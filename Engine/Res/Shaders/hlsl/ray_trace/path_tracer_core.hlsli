@@ -40,7 +40,10 @@ float3 EvaluatePathDirectLighting(PathHit hit, TraceContext trace_context, float
                 {
                     float bsdf_pdf = 0.0f;
                     const float3 bsdf = EvalBRDF(trace_context, hit._shading_normal, wo, light_sample._wi, bsdf_pdf);
-                    const float mis_weight = PowerHeuristic(light_pdf, bsdf_pdf);
+                    const SampleLightData selected_light = DecodeUnifiedLightEntry(LoadUnifiedLight(light_index));
+                    const float mis_weight = selected_light._type == LIGHT_TYPE_DIRECTIONAL
+                        ? PowerHeuristicThree(light_pdf, bsdf_pdf, light_sample._pdf)
+                        : PowerHeuristic(light_pdf, bsdf_pdf);
                     direct_lighting += light_sample._radiance * bsdf * cos_theta * (mis_weight / light_pdf);
                 }
             }
@@ -52,6 +55,26 @@ float3 EvaluatePathDirectLighting(PathHit hit, TraceContext trace_context, float
             }
 #endif
         }
+    }
+
+    // Sample the few directional lights independently: thousands of mesh emitters must not starve the sun.
+    for (uint direction_index = 0u; direction_index < _PathLightLookup[1]; ++direction_index)
+    {
+        const uint light_index = _PathLightLookup[4u + direction_index];
+        const LightSample light_sample = SampleUnifiedLight(light_index, hit._world_position,
+                                                            hit._shading_normal, random_context);
+        const float cos_theta = DirectLightCosTheta(trace_context._mat, hit._shading_normal, light_sample._wi);
+        if (light_sample._pdf <= 0.0f || cos_theta <= 1e-6f || !any(light_sample._radiance > 0.0.xxx))
+            continue;
+        const float3 shadow_origin = OffsetPathRayOrigin(hit._world_position, hit._geometric_normal,
+                                                        light_sample._wi, hit._hit_t);
+        if (IsPathOccluded(shadow_origin, light_sample._wi, GetLightShadowRayTMax(light_sample)))
+            continue;
+        float bsdf_pdf = 0.0f;
+        const float3 bsdf = EvalBRDF(trace_context, hit._shading_normal, wo, light_sample._wi, bsdf_pdf);
+        const float unified_pdf = light_sample._pdf * GetPathUnifiedLightSelectionPMF(light_index, light_count);
+        const float mis_weight = PowerHeuristicThree(light_sample._pdf, unified_pdf, bsdf_pdf);
+        direct_lighting += light_sample._radiance * bsdf * cos_theta * (mis_weight / light_sample._pdf);
     }
 
     if (_enable_environment_nee)
@@ -223,9 +246,10 @@ float3 TracePath(uint2 pixel, float3 ray_origin, float3 ray_direction, uint max_
     // 当前所在介质每单位长度的吸收系数。0 = 在空气里（或无损介质）。
     float3 medium_sigma_a = 0.0.xxx;
 
-    [loop]
     // Trace the terminal segment too: last-bounce NEE and BSDF environment hits need the same depth limit.
-    for (uint depth = 0u; depth <= max_depth; ++depth)
+    uint depth = 0u;
+    [loop]
+    for (uint segment = 0u; segment <= max_depth + 16u; ++segment)
     {
         PathHit hit = TracePathRay(ray_origin, ray_direction);
         if (hit._type == kPathHitMiss)
@@ -250,7 +274,7 @@ float3 TracePath(uint2 pixel, float3 ray_origin, float3 ray_direction, uint max_
                 const uint light_count = GetUnifiedLightCount();
                 mis_weight = EvaluateManifoldHitMIS(manifold_path, manifold_receiver_position, hit._light_index,
                                                     manifold_receiver_bsdf_pdf, hit._world_position,
-                                                    GetUnifiedLightSelectionPMF(light_count));
+                                                    GetPathUnifiedLightSelectionPMF(hit._light_index, light_count));
             }
             else if (has_previous_bsdf_sample)
 #else
@@ -263,15 +287,36 @@ float3 TracePath(uint2 pixel, float3 ray_origin, float3 ray_direction, uint max_
             break;
         }
 
-        if (depth == max_depth)
-            break;
-
         // 表面之前的那一段按当前介质衰减（光线离开介质时，这一段仍是介质内的行程）
         throughput *= ApplyMediumAbsorption(medium_sigma_a, hit._hit_t);
 
+        // Coverage is a null event, independent of dielectric refraction. Preserve MIS across the straight ray.
+        if (hit._material._opacity < 1.0f && rand(random_context) >= hit._material._opacity)
+        {
+            ray_origin = OffsetPathRayOrigin(hit._world_position, hit._geometric_normal, ray_direction, hit._hit_t);
+            continue;
+        }
+
+        float emission_mis_weight = 1.0f;
+        if (hit._light_index != 0xffffffffu)
+        {
+#if defined(PATH_TRACER_MNEE)
+            if (has_manifold_receiver && manifold_path._vertex_count > 0u)
+                emission_mis_weight = EvaluateManifoldHitMIS(manifold_path, manifold_receiver_position, hit._light_index,
+                    manifold_receiver_bsdf_pdf, hit._world_position,
+                    GetPathUnifiedLightSelectionPMF(hit._light_index, GetUnifiedLightCount()));
+            else
+#endif
+            if (has_previous_bsdf_sample)
+                emission_mis_weight = PowerHeuristic(previous_bsdf_pdf, hit._light_pdf);
+        }
+        const float3 emission = hit._light_index != 0xffffffffu ? hit._light_radiance : hit._material._emission;
+        radiance += throughput * emission * emission_mis_weight;
+        if (depth == max_depth)
+            break;
+
         TraceContext trace_context = CreatePathTraceContext(hit._material, hit._front_face != 0u);
         float3 wo = -ray_direction;
-        radiance += throughput * hit._material._emission;
 
         // 临时诊断开关：定义后只统计穿透/反射到几何体或环境的能量，跳过直接光与光源采样，
         // 用来区分「黑边来自几何/遍历」还是「来自光照估计」。排查完应保持注释状态。
@@ -321,6 +366,7 @@ float3 TracePath(uint2 pixel, float3 ray_origin, float3 ray_direction, uint max_
         has_previous_bsdf_sample = bounce._carry_mis;
         ray_origin = bounce._ray_origin;
         ray_direction = bounce._ray_direction;
+        ++depth;
     }
 
     return max(radiance, 0.0.xxx);

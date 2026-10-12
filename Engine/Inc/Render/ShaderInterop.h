@@ -46,6 +46,7 @@
 #define AL_MATERIAL_ID_STANDARD 0u
 #define AL_MATERIAL_ID_SUBSURFACE 1u
 #define AL_MATERIAL_ID_CHECKER 2u
+#define AL_MATERIAL_FLAG_ALPHA_BLEND 1u
 // C++
 #ifdef __cplusplus
 namespace Ailu::Render
@@ -257,10 +258,11 @@ namespace Ailu::Render
 
         uint _base_color_tex;
         uint _normal_tex;
-        uint _metallic_roughness_tex;
+        uint _roughness_tex;
+        uint _metallic_tex;
         uint _emission_tex;
 
-        uint _opacity_tex;
+        float _opacity;             // Base alpha; texture alpha comes from _base_color_tex. Reuses reserved slot.
         uint _material_id;           // EMaterialID (AL_MATERIAL_ID_*), decides how the maps above are interpreted
         // RGB 体积吸收系数 (1/世界单位)，Beer-Lambert: T = exp(-sigma_a * 介质内行程)。
         float3 _sigma_a;
@@ -268,9 +270,9 @@ namespace Ailu::Render
     };
 
 #ifdef __cplusplus
-    static_assert(offsetof(MaterialData, _sigma_a) == 76u, "MaterialData::_sigma_a layout changed");
-    static_assert(offsetof(MaterialData, _flags) == 88u, "MaterialData::_flags layout changed");
-    static_assert(sizeof(MaterialData) == 92u, "MaterialData stride changed");
+    static_assert(offsetof(MaterialData, _sigma_a) == 80u, "MaterialData::_sigma_a layout changed");
+    static_assert(offsetof(MaterialData, _flags) == 92u, "MaterialData::_flags layout changed");
+    static_assert(sizeof(MaterialData) == 96u, "MaterialData stride changed");
 #endif
 
     

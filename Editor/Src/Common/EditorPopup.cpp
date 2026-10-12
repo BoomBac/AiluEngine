@@ -224,7 +224,8 @@ namespace Ailu
         void EditorPopup::ShowDialogAt(Vector2f popup_pos, const String &popup_name, const String &title, Vector2f size,
                                        const std::function<void(UI::VerticalBox *content, UI::Text *title_text)> &build_content,
                                        const Vector<PopupDialogAction> &actions,
-                                       const std::function<void()> &on_shown, bool is_modal)
+                                       const std::function<void()> &on_shown, bool is_modal,
+                                       const std::function<void()> &on_closed, u64 popup_group_id)
         {
             auto root = MakeRef<UI::Border>();
             root->Name(popup_name);
@@ -329,7 +330,7 @@ namespace Ailu
 
             ApplyPopupStyles(root.get());
             UI::UIManager::Get()->HidePopup();
-            UI::UIManager::Get()->ShowPopupAt(popup_pos.x, popup_pos.y, root, nullptr, nullptr, is_modal);
+            UI::UIManager::Get()->ShowPopupAt(popup_pos.x, popup_pos.y, root, on_closed, nullptr, is_modal, true, popup_group_id);
             title_text->SetText(title, false);
             title_text->_color = Colors::kWhite;
             if (on_shown)

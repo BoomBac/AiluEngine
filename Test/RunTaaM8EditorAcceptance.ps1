@@ -2,7 +2,9 @@ param(
     [Parameter(Mandatory)][string]$EditorDirectory,
     [Parameter(Mandatory)][string]$ProjectFile,
     [Parameter(Mandatory)][string]$OutputDirectory,
-    [string]$DriverFile = 'Test/TaaCombinationEditorAcceptance.mjs'
+    [string]$DriverFile = 'Test/TaaCombinationEditorAcceptance.mjs',
+    [ValidateRange(1, 900)][int]$StartupTimeoutSeconds = 120,
+    [ValidateRange(1, 1800)][int]$DriverTimeoutSeconds = 360
 )
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
@@ -46,7 +48,7 @@ try {
         -WorkingDirectory $repo -WindowStyle Hidden -PassThru `
         -RedirectStandardOutput "$output_directory/stdout.log" -RedirectStandardError "$output_directory/stderr.log"
     $ready = $false
-    for ($attempt = 0; $attempt -lt 120; ++$attempt) {
+    for ($attempt = 0; $attempt -lt $StartupTimeoutSeconds; ++$attempt) {
         Start-Sleep -Seconds 1
         if ($process.HasExited) { break }
         $session_path = "$project_directory/.ailu/editor_session.json"
@@ -57,13 +59,15 @@ try {
     }
     [pscustomobject]@{pid=$process.Id; ready=$ready; exited=$process.HasExited;
         executable="$editor_directory/Editor.exe"} | ConvertTo-Json | Set-Content "$output_directory/startup.json"
-    if (-not $ready) { throw 'Editor did not publish its automation session within 120 seconds.' }
+    if (-not $ready) { throw "Editor did not publish its automation session within $StartupTimeoutSeconds seconds." }
     $arguments = @('"' + "$output_directory/driver.mjs" + '"', '"' + $project_directory + '"',
         '"' + $output_directory + '"')
     $driver = Start-Process -FilePath 'node' -ArgumentList $arguments -WorkingDirectory $repo -WindowStyle Hidden `
         -PassThru -RedirectStandardOutput "$output_directory/driver.log" `
         -RedirectStandardError "$output_directory/driver_error.log"
-    if (-not $driver.WaitForExit(360000)) { throw 'Editor acceptance driver exceeded 360 seconds.' }
+    if (-not $driver.WaitForExit($DriverTimeoutSeconds * 1000)) {
+        throw "Editor acceptance driver exceeded $DriverTimeoutSeconds seconds."
+    }
     $driver.Refresh()
     $exit_code = $driver.ExitCode
     Get-Content "$output_directory/driver.log" -Tail 12

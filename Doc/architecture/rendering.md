@@ -15,6 +15,27 @@
 
 ## Current high-level flow
 
+### Raster thin glass
+
+Standard Lit transparent materials with `_Transmission > 0` use straight screen-space background transmission
+in `forwardlit.hlsl`. Live Link routes transmissive materials to the transparent queue independently of alpha;
+manually authored materials must use the Transparent surface type. Coverage alpha remains independent of transmission.
+
+When a visible transparent material has transmission, `ForwardPass::OnRecordRenderGraph` records a
+`ThinGlassSceneColor` HDR snapshot immediately before `TransparentPass`. The graph owns this per-view transient;
+the forward pass explicitly reads it and binds `_ThinGlassSceneColor`. This works with TAA disabled
+and never reads from its active color render target. The snapshot includes earlier opaque, cloud and Sprite passes.
+
+Transmission reduces the diffuse lobe and composites tinted background throughput with IOR-based dielectric reflection.
+IOR=1 produces no dielectric reflection. Ordinary shading retains existing BRDF defaults. Surface fog is applied
+without fogging the captured background a second time. Asset previews and the legacy non-RG path retain ordinary shading.
+
+This first model has no physical refraction offset, glass thickness/absorption or ordered multilayer transmission;
+all glass samples the same pre-transparent snapshot. Shadow maps still use the existing opaque/alpha-test caster policy.
+
+Postprocess overlays (PickBuffer, selection outline, GizmoPass and EditorDebugPass) explicitly load their existing
+final color/depth attachments before drawing. They preserve the scene independently of transient texture load defaults.
+
 当前主要路径可以概括为：
 
 ```text
@@ -325,8 +346,8 @@ camera view. The DXR path builds its camera constants from that same view and ke
 
 Realtime RTGI reprojection combines no-jitter MotionVector data with Camera's top-left-origin UV jitter delta:
 `history_uv = current_uv - motion + previous_jitter_uv - current_jitter_uv`. Reservoir validation, primary denoise taps
-and clamp-neighbor centers derive from this corrected history location. Reference accumulation maps camera jitter only;
-real camera movement resets its progressive mean. Camera identity, cuts, resize/target recreation, history signatures and
+and clamp-neighbor centers derive from this corrected history location. Reference accumulation averages independent samples at a fixed output pixel, including sky pixels;
+raster depth/normal rejection and jitter reprojection do not apply. Real camera movement resets its progressive mean. Camera identity, cuts, resize/target recreation, history signatures and
 `Camera::MarkTemporalHistoryReset()` invalidate RTGI history. Camera exposes a monotonically increasing reset revision so
 TAA and RTGI independently observe explicit resets even after PrepareRenderFrame consumes the pending Camera flag.
 
@@ -337,6 +358,38 @@ actual primary/denoise dispatch; skipped primary work cannot commit denoise hist
 the M7 fixture does not establish multi-camera isolation or interactive acceptance.
 
 ## Frame resources
+
+### Path tracer emissive hits
+
+Blender Live Link sends optional `transmission` and `ior` parameters for the primary Glass/Refraction/Principled
+closure, including materials converted by native channel baking. Old messages default to transmission 0 and IOR 1.5.
+Layered extra reflection lobes and spatially varying transmission/IOR are explicit conversion approximations.
+Path material glass classification uses the metallic value after texture sampling, rather than a texture multiplier.
+Transient `MaterialData` reuses its reserved opacity-texture word for scalar base alpha, retaining the 92-byte stride.
+Transparent surface alpha is stochastic null coverage, separate from physical dielectric transmission. Null crossings
+preserve previous BSDF MIS state and do not consume BSDF depth; total traversal is bounded by max depth plus 17 segments.
+This coverage support applies to path continuation. Shadow-ray coverage and full Blender closure matching are not implied.
+
+SceneRayTracingProxy extracts mesh lights using Renderer ScenePrimitive indices. Its `_PathLightLookup` uint buffer
+contains a four-word header (primitive count, directional count, analytic count, primitive-table start), original
+light-index lists for directional and analytic lights, per-primitive triangle-table offsets, and triangle-to-light
+indices. Non-emissive primitives/filtered triangles use UINT32_MAX; instance-specific tables distinguish shared meshes.
+The proxy updates the lookup with the unified lights; RayTraceGI registers its RenderGraph read and binds it for
+Compute PrimaryRay and DXR. This is transient runtime data and does not change serialized/reflected asset layouts.
+
+DXR path rays reuse their nearest scene hit for emissive triangles, then read the corresponding light and its actual
+uniform/alias selection PMF for emission MIS. Emissive surfaces retain BSDF scattering, and terminal-depth surface
+emission is evaluated. Only finite analytic lights require separate software intersection; miss rays iterate the
+directional index list. Compute PrimaryRay retains the full finite-light intersection fallback until its software BVH
+has equivalent hit coverage. The full unified-light list and alias NEE sampling remain available to other GI consumers.
+
+Path tracer bindless mesh and texture reads use `NonUniformResourceIndex`: hit instances, material texture handles
+and sampled-light resources can differ between rays in the same wave. This applies to both DXR and Compute tracing.
+
+Continuous path BSDFs additionally sample each directional light directly, using the small directional lookup list.
+The directional NEE, unified-light NEE and BSDF miss techniques use a three-way power heuristic with their actual
+PDFs. This prevents the sun from receiving rare, large NEE weights when the unified list contains many mesh emitters.
+Delta paths retain their ordinary emission-hit treatment. Finite light sampling and its alias table stay unchanged.
 
 ### TAA accumulation and presentation coordinates
 
@@ -392,6 +445,20 @@ Scene 中仍存在 GPU scene/BVH/BLAS/TLAS 数据。
 新 renderer-only cache 应谨慎决定 ownership，不继续无条件放入 Scene。
 
 ## Change checklist
+
+Standard Lit exposes independent `_RoughnessTex` and `_MetallicTex` scalar maps. Both sample red in linear data space;
+the resulting roughness/metallic equals the sample multiplied by `_RoughnessValue`/`_MetallicValue`, respectively.
+Without a map the scalar stands alone. Forward/deferred and shared Compute/DXR material evaluation use this contract;
+GI metallic evaluation uses the same factor. Sampler-mask bits are 8 for roughness and 64 for metallic.
+Inspector rows derive from shader metadata, and property-ID texture assignment maintains these flags and asset GUIDs.
+Transient CPU/HLSL `MaterialData` stores two independent bindless handles and has a 96-byte stride.
+Standard Lit volume attenuation uses only `_AttenuationColor` and `_AttenuationDistance`; the legacy scalar
+`_Absorption` property and loader/setter compatibility have been removed. Cloud/fog absorption is independent.
+
+Blender Live Link exports/imports `roughness_path` and `metallic_path` separately, including baked material graphs.
+Connected scalar images are converted to Non-Color red-channel maps and use factor 1, since Blender replaces socket
+defaults with linked values. Baked maps also use factor 1. Old externally stored packed maps require re-export or
+reassignment to the separate slots; bundled empty packed slots have been migrated.
 
 修改 rendering 时检查：
 
@@ -454,3 +521,21 @@ Material resource bindings and frame constant blocks resolve against the actual 
 on variant/layout changes; constant blocks include variant/layout versions and canonical material values.
 Standard Lit's uploaded `_SamplerMask` comes from the current texture-use state. Its uploaded `_MaterialID` keeps the
 existing mapping (checker = 2, otherwise = 0), after canonical/serialized values are copied into the variant layout.
+
+## Imported camera view basis and projection
+
+Camera defaults remain local +Z forward/+Y up with the ordinary symmetric projection. Optional local view axes,
+projection X reversal, NDC projection offset and aspect lock support imported camera conventions without changing
+entity transforms or child hierarchy. Scene camera documents persist these settings; old documents retain defaults.
+The historical FovH API/_fov_h field is consumed as a vertical field of view by BuildPerspectiveFovLHMatrix.
+
+RecalculateMatrix applies the configured local axes to the camera rotation, then builds the ordinary view and
+projection with optional X reversal and off-center offsets. Culling planes are oriented away from the frustum
+interior, including reflected screen axes. Screen/world conversion uses the configured projection for imported
+orthographic cameras. OutputSize and SetPixelSize preserve source aspect when locked. Camera updates use the
+TransformSystem's cached world rotation, avoiding quaternion extraction from a scaled world matrix.
+
+The Editor preview fits a locked camera's source aspect inside its existing preview bounds. This changes preview
+texture/display dimensions, not the source projection. Existing native camera defaults and preview ratio remain unchanged.
+
+Camera render scale multiplies the camera output dimensions for internal GBuffer, depth, and color resources. The final presentation blit restores output dimensions using the camera's bilinear or point upsampling choice; a scale of 1 preserves the original dimensions.

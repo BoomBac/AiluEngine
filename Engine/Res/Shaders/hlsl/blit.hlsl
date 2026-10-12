@@ -21,3 +21,18 @@ float4 PSMainCopy(FullScreenPSInput input) : SV_TARGET
 {
 	return SAMPLE_TEXTURE2D_LOD(_BlitSourceTex, g_LinearClampSampler, input.uv, 0);
 }
+
+//pass begin::
+//name: blit_point
+//vert: FullscreenVSMain
+//pixel: PSMainCopyPoint
+//Cull: Back
+//Queue: Opaque
+//Fill: Solid
+//ZTest: Always
+//ZWrite: Off
+//pass end::
+float4 PSMainCopyPoint(FullScreenPSInput input) : SV_TARGET
+{
+	return SAMPLE_TEXTURE2D_LOD(_BlitSourceTex, g_PointClampSampler, input.uv, 0);
+}

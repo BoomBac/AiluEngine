@@ -22,5 +22,14 @@ template<>
 AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::ECameraType>();
 //Enum ECameraType end...........................
 
+//Enum EUpsamplingFilter begin...........................
+const Ailu::Enum* Z_Construct_Enum_Ailu_Render_EUpsamplingFilter_Type();
+namespace Ailu::Render {
+enum class EUpsamplingFilter : u8;
+}
+template<>
+AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::EUpsamplingFilter>();
+//Enum EUpsamplingFilter end...........................
+
 #undef CURRENT_FILE_ID
 #define CURRENT_FILE_ID CAMERA_GEN_H

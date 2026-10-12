@@ -5,6 +5,7 @@
 #include "Framework/Plugin/PluginApi.h"
 #include "Framework/Plugin/PluginManifest.h"
 #include "Framework/Plugin/PluginRegistration.h"
+#include <functional>
 
 namespace Ailu
 {
@@ -33,6 +34,8 @@ namespace Ailu
         PluginManager();
         ~PluginManager();
         bool Initialize();
+        using ProgressCallback = std::function<void(const char*, const char*, u64, EPluginProgressState)>;
+        void SetProgressCallback(ProgressCallback callback);
         void Shutdown();
         bool LoadPlugin(const WString& path);
         bool LoadPlugin(const String& plugin_id);

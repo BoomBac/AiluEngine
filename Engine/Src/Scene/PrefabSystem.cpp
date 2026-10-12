@@ -263,6 +263,12 @@ namespace Ailu::SceneManagement
                 component._camera.Near(entity_doc._camera_component._near_clip);
                 component._camera.FovH(entity_doc._camera_component._fov_h);
                 component._camera.Size(entity_doc._camera_component._size);
+                component._camera.SetLocalViewAxes(entity_doc._camera_component._local_forward, entity_doc._camera_component._local_up);
+                component._camera.ProjectionOffset(entity_doc._camera_component._projection_offset);
+                component._camera.ReverseProjectionX(entity_doc._camera_component._reverse_projection_x);
+                component._camera.LockAspect(entity_doc._camera_component._lock_aspect);
+                component._camera.RenderScale(entity_doc._camera_component._render_scale);
+                component._camera.UpsamplingFilter(static_cast<Render::EUpsamplingFilter>(entity_doc._camera_component._upsampling_filter));
                 component._camera.MarkDirty();
                 component._camera.RecalculateMatrix(true);
                 registry.SetComponentEnabled<ECS::CCamera>(entity, !is_component_disabled(entity_doc, "CCamera"));
@@ -829,6 +835,12 @@ namespace Ailu::SceneManagement
                 component._camera.Near(entity_doc._camera_component._near_clip);
                 component._camera.FovH(entity_doc._camera_component._fov_h);
                 component._camera.Size(entity_doc._camera_component._size);
+                component._camera.SetLocalViewAxes(entity_doc._camera_component._local_forward, entity_doc._camera_component._local_up);
+                component._camera.ProjectionOffset(entity_doc._camera_component._projection_offset);
+                component._camera.ReverseProjectionX(entity_doc._camera_component._reverse_projection_x);
+                component._camera.LockAspect(entity_doc._camera_component._lock_aspect);
+                component._camera.RenderScale(entity_doc._camera_component._render_scale);
+                component._camera.UpsamplingFilter(static_cast<Render::EUpsamplingFilter>(entity_doc._camera_component._upsampling_filter));
                 component._camera.RecalculateMatrix(true);
                 registry.SetComponentEnabled<ECS::CCamera>(entity, !IsComponentDisabled(entity_doc, "CCamera"));
                 refreshed = true;

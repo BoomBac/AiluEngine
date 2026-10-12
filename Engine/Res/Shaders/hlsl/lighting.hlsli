@@ -63,11 +63,12 @@ float3 GetSpotLightIrridance(uint index,float3 world_pos)
 	return _SpotLights[index]._LightColor * atten;
 }
 
-float3 AmbientLighting(SurfaceData surface,ShadingData data,float3 irradiance, float3 prefiltered_color, float2 lut)
+float3 AmbientLighting(SurfaceData surface, ShadingData data, float3 irradiance, float3 prefiltered_color, float2 lut,
+                       float diffuse_scale = 1.0, float dielectric_specular = 0.04)
 {
 #ifdef _MULTI_SCATTER
 	//https://bruop.github.io/ibl/
-	float3 f0 = lerp(F0, surface.albedo.rgb, surface.metallic);
+	float3 f0 = lerp(dielectric_specular.xxx, surface.albedo.rgb, surface.metallic);
 	// Roughness dependent fresnel, from Fdez-Aguera
     float3 Fr = max((1.0 - surface.roughness).xxx, f0) - f0;
     float3 k_S = f0 + Fr * pow(1.0 - data.nv, 5.0);
@@ -77,12 +78,14 @@ float3 AmbientLighting(SurfaceData surface,ShadingData data,float3 irradiance, f
     float3 F_avg = f0 + (1.0 - f0) / 21.0;
     float3 FmsEms = Ems * FssEss * F_avg / (1.0 - F_avg * Ems);
     float3 k_D = surface.albedo.rgb * (1.0 - FssEss - FmsEms);
-        return FssEss * prefiltered_color + (FmsEms + k_D) * irradiance;
+        float reflection_scale = dielectric_specular > 0.0 || surface.metallic > 0.0 ? 1.0 : 0.0;
+        return reflection_scale * (FssEss * prefiltered_color + FmsEms * irradiance)
+            + diffuse_scale * k_D * irradiance;
 #else
         float3 diffuse = (1.0 - surface.metallic) * surface.albedo.rgb;
         diffuse *= irradiance * INV_PI;
-        float3 specular = prefiltered_color * EnvBRDF(surface.metallic,surface.albedo.rgb,lut);
-        return diffuse + specular;
+        float3 specular = prefiltered_color * EnvBRDF(surface.metallic, surface.albedo.rgb, lut, dielectric_specular);
+        return diffuse_scale * diffuse + specular;
 #endif//_MULTI_SCATTER
 }
 uint GetGlobalDirectionalLightCount()
@@ -154,7 +157,8 @@ float3 EvaluateEnvironmentIrradiance(float3 normal_ws)
 }
 
 float3 CalculateLightPBR(SurfaceData surface, float3 world_pos, float2 screen_uv, float3 diffuse_irradiance,
-                        float3 environment_irradiance, bool has_diffuse_gi)
+                        float3 environment_irradiance, bool has_diffuse_gi, float diffuse_scale = 1.0,
+                        float dielectric_specular = 0.04)
 {
 #if defined(DEBUG_GI)
 	return VoxelGI(world_pos,surface.wnormal);
@@ -178,7 +182,7 @@ float3 CalculateLightPBR(SurfaceData surface, float3 world_pos, float2 screen_uv
 			                                   _DirectionalLights[i]._constant_bias, _DirectionalLights[i]._slope_bias);
 		}
 		light_data.shadow_atten = shadow_factor;
-		float3 f = CookTorranceBRDF(surface, shading_data);
+		float3 f = CookTorranceBRDF(surface, shading_data, diffuse_scale, dielectric_specular);
 		light += light_data.shadow_atten * f * shading_data.nl * _DirectionalLights[i]._LightColor;
 	}
 	shadow_factor = 1.0;
@@ -192,7 +196,8 @@ float3 CalculateLightPBR(SurfaceData surface, float3 world_pos, float2 screen_uv
 				world_pos,light_data.light_pos,j);
 		}
 		light_data.shadow_atten = shadow_factor;
-		light += light_data.shadow_atten * CookTorranceBRDF(surface, shading_data) * shading_data.nl * light_data.light_color;
+		light += light_data.shadow_atten * CookTorranceBRDF(surface, shading_data, diffuse_scale, dielectric_specular)
+            * shading_data.nl * light_data.light_color;
 	}
 	shadow_factor = 1.0;
 	for (uint k = 0; k < GetGlobalSpotLightCount(); k++)
@@ -206,7 +211,8 @@ float3 CalculateLightPBR(SurfaceData surface, float3 world_pos, float2 screen_uv
 				_SpotLights[k]._constant_bias,_SpotLights[k]._slope_bias);
 		}
 		light_data.shadow_atten = shadow_factor;
-		light += light_data.shadow_atten * CookTorranceBRDF(surface, shading_data) * shading_data.nl * light_data.light_color;
+		light += light_data.shadow_atten * CookTorranceBRDF(surface, shading_data, diffuse_scale, dielectric_specular)
+            * shading_data.nl * light_data.light_color;
 	}
 	shadow_factor = 1.0;
 	for (uint z = 0; z < GetGlobalAreaLightCount(); z++)
@@ -226,8 +232,10 @@ float3 CalculateLightPBR(SurfaceData surface, float3 world_pos, float2 screen_uv
 		rect[3] = _AreaLights[z]._points[3].xyz;
 		float3 diffuse = LTC_Evaluate(surface.wnormal,  shading_data.view_dir, world_pos, Identity(), rect, _AreaLights[z]._is_twosided);
 		float3 specular = LTC_Evaluate(surface.wnormal, shading_data.view_dir, world_pos, Minv, rect, _AreaLights[z]._is_twosided);
-		specular *= (F0 * t2.x + (1.0f - F0) * t2.y);
-		diffuse *= (1.0 - surface.metallic) * surface.albedo.rgb;
+        float3 area_f0 = dielectric_specular.xxx;
+        specular *= (area_f0 * t2.x + (1.0 - area_f0) * t2.y)
+            * (dielectric_specular > 0.0 || surface.metallic > 0.0 ? 1.0 : 0.0);
+        diffuse *= diffuse_scale * (1.0 - surface.metallic) * surface.albedo.rgb;
 		if(_AreaLights[z]._shadowmap_index != -1)
 		{ 
 			float4 shadow_pos = mul(_AreaLights[z]._shadow_matrix,float4(world_pos,1.0));
@@ -246,10 +254,11 @@ float3 CalculateLightPBR(SurfaceData surface, float3 world_pos, float2 screen_uv
 	float ao = SAMPLE_TEXTURE2D(_OcclusionTex,g_LinearClampSampler,screen_uv).r;// * g_IndirectLightingIntensity;
 	float voxel_shadow = 1.0;//ConeTraceShadow(world_pos + surface.wnormal * 0.05,-_DirectionalLights[0]._LightPosOrDir);
 	float environment_scale = g_EnvironmentIntensity * g_EnvironmentEnabled;
-	float3 environment_light = AmbientLighting(surface, shading_data, environment_irradiance, radiance, lut) *
+	float3 environment_light = AmbientLighting(surface, shading_data, environment_irradiance, radiance, lut,
+                                              diffuse_scale, dielectric_specular) *
 	                           environment_scale;
 	float3 diffuse_gi_light = has_diffuse_gi
-	    ? AmbientLighting(surface, shading_data, diffuse_irradiance, 0.0.xxx, lut)
+	    ? AmbientLighting(surface, shading_data, diffuse_irradiance, 0.0.xxx, lut, diffuse_scale, dielectric_specular)
 	    : 0.0.xxx;
 	// Surfel supplies surface-reflected light only; direct diffuse and specular environment light stay in IBL.
 	light += voxel_shadow * (environment_light + diffuse_gi_light) * ao;

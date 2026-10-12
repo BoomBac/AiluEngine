@@ -1,3 +1,4 @@
+#include <map>
 #include "EditorApp.h"
 #include "Automation/AIAssistant.h"
 #include "Automation/AutomationAdapter.h"
@@ -95,6 +96,26 @@ namespace Ailu
             _plugin_manager = MakeScope<PluginManager>();
             if (!_plugin_manager->Initialize())
                 return 1;
+            _plugin_manager->SetProgressCallback([this, tasks = std::map<String, EditorProgressHandle>{}]
+                (const char* title, const char* message, u64 completed, EPluginProgressState state) mutable
+            {
+                const String key = title ? title : "Plugin task";
+                if (state == EPluginProgressState::kBegin)
+                {
+                    auto found = tasks.find(key);
+                    if (found != tasks.end()) found->second.Cancel();
+                    tasks[key] = _progress_service.BeginTask(key, 0, false);
+                }
+                auto found = tasks.find(key);
+                if (found == tasks.end()) return;
+                auto& handle = found->second;
+                handle.SetCompleted(completed);
+                handle.SetMessage(message ? message : "");
+                if (state == EPluginProgressState::kCompleted) handle.Complete();
+                else if (state == EPluginProgressState::kFailed) handle.Fail(message ? message : "Plugin task failed");
+                else if (state == EPluginProgressState::kCancelled) handle.Cancel();
+                if (state != EPluginProgressState::kBegin && state != EPluginProgressState::kRunning) tasks.erase(found);
+            });
             _plugin_tick_handle = _before_update.Subscribe([this]
             {
                 if (_plugin_manager)
@@ -174,6 +195,8 @@ namespace Ailu
         }
         void EditorApp::Finalize()
         {
+            _progress_service.Shutdown();
+            JobSystem::Get().Wait(_progress_demo_jobs);
             _before_update.Unsubscribe(_plugin_tick_handle);
             _plugin_tick_handle = Delegate<>::kInvalidHandle;
             if (_plugin_manager)
@@ -213,6 +236,34 @@ namespace Ailu
                 FileManager::DeleteDirectory(dp);
             LogMgr::Shutdown();
         }
+        void EditorApp::StartProgressDemo()
+        {
+#ifdef _DEBUG
+            for (u32 index = 0; index < 3; ++index)
+            {
+                auto handle = _progress_service.BeginTask(index == 0 ? "Progress demo: complete" :
+                    (index == 1 ? "Progress demo: failure" : "Progress demo: cancel"), index == 2 ? 0 : 100, index == 2);
+                if (!handle.Id()) continue;
+                JobSystem::Get().Dispatch(_progress_demo_jobs, [handle, index]() mutable
+                {
+                    try
+                    {
+                        handle.SetMessage("Background work (safe cancellation points)");
+                        for (u32 step = 0; step < 100; ++step)
+                        {
+                            if (handle.IsCancellationRequested()) { handle.Cancel(); return; }
+                            std::this_thread::sleep_for(std::chrono::milliseconds(80 + index * 40));
+                            handle.Advance();
+                            if (index == 1 && step == 50) { handle.Fail("Simulated failure: dismiss to close"); return; }
+                        }
+                        handle.Complete();
+                    }
+                    catch (const std::exception &error) { handle.Fail(error.what()); LOG_ERROR("Progress demo: {}", error.what()); }
+                    catch (...) { handle.Fail("Unknown demo exception"); LOG_ERROR("Progress demo: unknown exception"); }
+                });
+            }
+#endif
+        }
         void EditorApp::Tick(f32 delta_time)
         {
             // Application::Tick enters the main loop and does not return, so the
@@ -247,7 +298,7 @@ namespace Ailu
             //        it.SetValueFromString(&_editor_config, itt->second);
             //}
             _p_scene_camera = AL_NEW_TAG(EMemoryTag::kEditor, Camera);
-            _p_scene_camera->_anti_aliasing = EAntiAliasing::kTAA;
+            _p_scene_camera->_anti_aliasing = EAntiAliasing::kNone;
             _p_scene_camera->Name("SceneCamera");
             _p_scene_camera->Position(_editor_config._position);
             _p_scene_camera->Rotation(_editor_config._rotation);

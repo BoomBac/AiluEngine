@@ -106,6 +106,8 @@ namespace Ailu::SceneManagement
             entity_doc._tag_component._name = tag->_name;
             entity_doc._tag_component._tag = tag->_tag;
             entity_doc._tag_component._layer_mask = tag->_layer_mask;
+            entity_doc._tag_component._source_scene_guid = tag->_source_scene_guid;
+            entity_doc._tag_component._source_object_guid = tag->_source_object_guid;
         }
 
         auto asset_guid_string = [](Object *object)
@@ -188,6 +190,13 @@ namespace Ailu::SceneManagement
             entity_doc._camera_component._near_clip = camera->_camera.Near();
             entity_doc._camera_component._fov_h = camera->_camera.FovH();
             entity_doc._camera_component._size = camera->_camera.Size();
+            entity_doc._camera_component._local_forward = camera->_camera.LocalForward();
+            entity_doc._camera_component._local_up = camera->_camera.LocalUp();
+            entity_doc._camera_component._projection_offset = camera->_camera.ProjectionOffset();
+            entity_doc._camera_component._reverse_projection_x = camera->_camera.ReverseProjectionX();
+            entity_doc._camera_component._lock_aspect = camera->_camera.LockAspect();
+            entity_doc._camera_component._render_scale = camera->_camera.RenderScale();
+            entity_doc._camera_component._upsampling_filter = static_cast<u8>(camera->_camera.UpsamplingFilter());
             mark_disabled.template operator()<ECS::CCamera>("CCamera");
         }
         if (const auto *volume = registry.GetComponent<ECS::LocalFogVolumeComponent>(entity); volume != nullptr)

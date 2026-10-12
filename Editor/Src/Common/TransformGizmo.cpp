@@ -790,7 +790,8 @@ namespace Ailu
 
         void TransformGizmo::Draw()
         {
-            if (!Target()) 
+            auto *target = Target();
+            if (target == nullptr || target->_world_dirty)
                 return;
             if (_mode == EGizmoMode::kTranslate)
             {

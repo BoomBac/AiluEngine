@@ -3,8 +3,9 @@ param(
     [Parameter(Mandatory)][string]$ProjectFile,
     [Parameter(Mandatory)][string]$OutputDirectory,
     [ValidateSet('--transparent', '--scene-controls', '--rg', '--cloud', '--rtgi', '--m8',
-        '--m8-longrun', '--m8-performance')]
-    [string]$Mode = '--transparent'
+        '--m8-longrun', '--m8-performance', '--path-light-lookup', '--rtgi-reference-sky', '--rtgi-bindless')]
+    [string]$Mode = '--transparent',
+    [ValidateRange(1, 1800)][int]$TimeoutSeconds = 240
 )
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
@@ -42,9 +43,12 @@ Copy-Item -LiteralPath "$repo/Test/TaaTransparentAcceptance.h" -Destination $out
 if ($Mode -eq '--cloud') {
     Copy-Item -LiteralPath "$repo/Test/TaaCloudAcceptance.h" -Destination $output_directory
 }
-if ($Mode -eq '--rtgi') {
+if ($Mode -in @('--rtgi', '--rtgi-reference-sky', '--rtgi-bindless')) {
     Copy-Item -LiteralPath "$repo/Test/TaaRtgiAcceptance.h" -Destination $output_directory
     Copy-Item -LiteralPath "$repo/Test/TaaRtgiReconstruction.hlsl" -Destination $output_directory
+}
+if ($Mode -eq '--path-light-lookup') {
+    Copy-Item -LiteralPath "$repo/Test/PathLightLookupSmoke.h" -Destination $output_directory
 }
 Copy-Item -LiteralPath "$repo/Test/TaaGpuAcceptance.cpp" -Destination $output_directory
 if ($Mode -in @('--m8', '--m8-longrun', '--m8-performance')) {
@@ -61,9 +65,9 @@ try {
         -WorkingDirectory $repo -WindowStyle Hidden -PassThru `
         -RedirectStandardOutput "$output_directory/run.log" -RedirectStandardError "$output_directory/stderr.log"
     $process.Handle | Out-Null # Retain the native process handle before it exits so ExitCode remains available.
-    if (-not $process.WaitForExit(240000)) {
+    if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
         Stop-Process -Id $process.Id
-        throw 'Acceptance fixture exceeded the bounded 240 second runtime.'
+        throw "Acceptance fixture exceeded the bounded $TimeoutSeconds second runtime."
     }
     $process.Refresh()
     $exit_code = $process.ExitCode

@@ -1,0 +1,69 @@
+{
+  "blender_version": "5.0.1",
+  "destination": "C:\\Users\\liusongchen_e\\AppData\\Roaming\\Blender Foundation\\Blender\\5.0\\scripts\\addons\\ailu_live_link",
+  "backup": "C:\\Users\\liusongchen_e\\OneDrive\\AiluEngine\\.codex\\tmp\\blender-addon-install-20261012-175054",
+  "enabled": true,
+  "reload_handler_registered": true,
+  "files": [
+    {
+      "path": "__init__.py",
+      "sha256": "5b733f8409775f729d2d6003effbf65bb26ba06191cd056a82bbfadc5b3c50b2"
+    },
+    {
+      "path": "addon.py",
+      "sha256": "56d3d35d0ed8f44e007467167435af2079d57e5f9219dc3656979ce6237e5aa8"
+    },
+    {
+      "path": "camera_sync.py",
+      "sha256": "7c10885295b378d48e539454ef2bdd91af80ea0e32c00228425c773ed62e275b"
+    },
+    {
+      "path": "connection.py",
+      "sha256": "3d65ee9c7de12879da84d0687528e60c0c2a8527a08b3b6b926975b867224eab"
+    },
+    {
+      "path": "coordinate.py",
+      "sha256": "d314392324bcc3f74e20d9c58226dd1e94b07b23bdd4a80be0125e221109dd8a"
+    },
+    {
+      "path": "dirty_tracker.py",
+      "sha256": "e6e21e5750d150630b65cd9cd13307cd3b1e42deeb79d31a73d76358a7bad3de"
+    },
+    {
+      "path": "identity.py",
+      "sha256": "30afb26143a7e17199e6be2b5e746e3b1d908c43e0c1a0c74ec8e916300efed7"
+    },
+    {
+      "path": "light_sync.py",
+      "sha256": "0c5e362832ec809a697a855816adb4f8c19f2e0a8562a4e2e80cf426c8c10259"
+    },
+    {
+      "path": "material_bake.py",
+      "sha256": "1649937e7e968d53dc939f1ed60841fbdd0b4645b02c3b4c3486d45bef8712fa"
+    },
+    {
+      "path": "material_sync.py",
+      "sha256": "4de6561ea101d9a97b7cbfb039a594d23d1cc024f3404c16b17614fc50db1705"
+    },
+    {
+      "path": "mesh_sync.py",
+      "sha256": "472f74a828f6646a67f009631c157e89bf8d7c6e938440ccc26714c20329cd01"
+    },
+    {
+      "path": "object_sync.py",
+      "sha256": "a24f96046b5ad2de17381ac96d78dc20b4203926d4b32925c8edd2b47d58a83f"
+    },
+    {
+      "path": "png_encoder.py",
+      "sha256": "4410882380b7b02e029e90b9a1b1ba23151ce38f65a4c0e7b3606e533f8aa71e"
+    },
+    {
+      "path": "png_worker.py",
+      "sha256": "294a4385ad91aef5ef0d9cc78bdce867266e18c32d4586903b69dfb6cd28eb37"
+    },
+    {
+      "path": "protocol.py",
+      "sha256": "4bf986ba91a4a094671f29d9dcb03c727f35c4dd67eebf22189b0c026f1715ce"
+    }
+  ]
+}

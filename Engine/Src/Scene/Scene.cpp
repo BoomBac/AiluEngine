@@ -1026,7 +1026,7 @@ namespace Ailu::SceneManagement
                 continue;
             const auto &world_matrix = transform->GetWorldMatrix();
             component._camera.Position(Vector3f(world_matrix[3][0], world_matrix[3][1], world_matrix[3][2]));
-            component._camera.Rotation(Quaternion::FromMat4f(world_matrix));
+            component._camera.Rotation(transform->GetRotation());
             component._camera.RecalculateMatrix(true);
         }
     }

@@ -27,7 +27,8 @@ namespace Ailu::Render
         entry._frustum = cam.GetViewFrustum();
         entry._cam_hash = cam.HashCode();
         auto cam_cb_data = &entry._camera_data;
-        u32 pixel_width = cam.OutputSize().x, pixel_height = cam.OutputSize().y;
+        const Vector2D<u32> render_size = cam.RenderSize();
+        u32 pixel_width = render_size.x, pixel_height = render_size.y;
         cam_cb_data->_ScreenParams = Vector4f(1.0f / (f32) pixel_width, 1.0f / (f32) pixel_height, (f32) pixel_width, (f32) pixel_height);
         Camera::CalculateZBUfferAndProjParams(cam, cam_cb_data->_ZBufferParams, cam_cb_data->_ProjectionParams);
         cam_cb_data->_CameraPos = cam.Position();

@@ -43,6 +43,21 @@ namespace Ailu
                 context.MarkSceneDirty();
             });
 
+            Editor::AddFloatInputRow(context._content, "Render Scale", std::format("{:.2f}", comp->_camera.RenderScale()), [comp, context](f32 value)
+            {
+                comp->_camera.RenderScale(value);
+                context.MarkSceneDirty();
+            });
+
+            auto upsampling_dropdown = Editor::AddDropdownRow(context._content, "Upsampling", Vector<String>{"Bilinear", "Point"});
+            upsampling_dropdown->SetSelectedIndex(static_cast<i32>(comp->_camera.UpsamplingFilter()));
+            upsampling_dropdown->_on_selected_changed += [comp, context](i32 index)
+            {
+                if (index < 0 || index > 1) return;
+                comp->_camera.UpsamplingFilter(static_cast<Render::EUpsamplingFilter>(index));
+                context.MarkSceneDirty();
+            };
+
             if (comp->_camera.Type() == Render::ECameraType::kOrthographic)
             {
                 Editor::AddFloatInputRow(context._content, "Size", std::format("{}", comp->_camera.Size()), [comp, context](f32 v)

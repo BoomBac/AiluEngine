@@ -180,30 +180,17 @@ def Main(root):
                     gates[name + '_explicit_reset'] = (
                         reset[56]['history_length_max'] <= 1 and reset[56]['raw_error'] < .001)
                 else:
-                    oracle, opposite, uncertain_counts = [], [], []
+                    oracle = []
                     for j in range(1, 32):
-                        h, w = pairs[j]['depth'].shape[:2]
-                        yy, xx = np.mgrid[:h, :w]
-                        du = float(segment[j - 1]['jitter_x']) - float(segment[j]['jitter_x'])
-                        dv = float(segment[j - 1]['jitter_y']) - float(segment[j]['jitter_y'])
-                        roi = np.zeros((h, w), bool); roi[30:150, 20:300] = True
-                        for sign, destination in [(1, oracle), (-1, opposite)]:
-                            px = ((xx + .5) + sign * du * w).astype(np.float32)
-                            py = ((yy + .5) + sign * dv * h).astype(np.float32)
-                            uncertain = (np.abs(px - np.rint(px)) < 1e-4) | (np.abs(py - np.rint(py)) < 1e-4)
-                            hx = np.clip(px.astype(int), 0, w - 1)
-                            hy = np.clip(py.astype(int), 0, h - 1)
-                            previous = pairs[j - 1]['history'][hy, hx, :3]
-                            old_length = length[j - 1][hy, hx]
-                            mask = roi & (length[j] > 1) & (old_length > 0) & ~uncertain
-                            if sign == 1: uncertain_counts.append(int((roi & uncertain).sum()))
-                            predicted = ((previous * old_length[..., None] + pairs[j]['raw'][..., :3]) /
-                                         (old_length[..., None] + 1))
-                            if mask.any(): destination.append(Rms((predicted - pairs[j]['history'][..., :3])[mask]))
+                        previous = pairs[j - 1]['history'][..., :3]
+                        old_length = length[j - 1]
+                        predicted = ((previous * old_length[..., None] + pairs[j]['raw'][..., :3]) /
+                                     (old_length[..., None] + 1))
+                        oracle.append(Rms(predicted - pairs[j]['history'][..., :3]))
                     result['reference_oracle_rms_max'] = max(oracle)
-                    result['reference_opposite_rms_mean'] = float(np.mean(opposite))
-                    result['reference_integer_boundary_uncertain_pixels'] = sum(uncertain_counts)
-                    result['reference_robust_pairs'] = len(oracle)
+                    result['reference_fixed_pixel_pairs'] = len(oracle)
+                    gates[name + '_reference_samples_retained'] = all(
+                        bool(np.all(length[j] == j + 1)) for j in range(32))
                     gates[name + '_reference_mean'] = max(oracle) < .001
                     result['real_camera_change_length_max'] = float(length[48].max())
                     gates[name + '_real_camera_reset'] = length[48].max() <= 1
@@ -291,10 +278,10 @@ def Main(root):
                'normal agreement checks the known world normal. Compute PrimaryRay independently jitters its '
                'primary samples, while DXR primary rays use current jittered IVP; this measurement does not '
                'switch the production kernel to the currently inactive GBuffer RayGen.', '',
-               'Reference mean replay uses actual preceding GPU history. Nearest-pixel coordinates within1e-4 '
-               'pixels of integer boundaries are reported as uncertain rather than used as a bit-exact oracle. '
-               'Each case records robust-pair counts, excluded pixel observations, correct/opposite sign errors '
-               'and actual history-length progression. The reference replay threshold is unchanged.', '',
+               'Reference mean replay uses actual preceding GPU history at the same output pixel. '
+               'Primary-ray jitter changes samples, not the history address. Each static pixel must retain '
+               'every sample, including sky and silhouette pixels; the history length must grow from 1 to 32. '
+               'The reference mean RMS threshold remains 0.001.', '',
                'Evidence: analysis.json, montage.png, m7_observations.csv, m7_graph.csv, ../engine.log, '
                'validation.txt in run1, ../restoration.json and ../run_summary.json. '
                'Fixture exit code, D3D12 severity counts and restoration must be read from those records '

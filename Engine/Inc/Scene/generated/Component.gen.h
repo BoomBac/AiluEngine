@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __COMPONENT_GEN_H__
 //Struct ScriptPropertyData begin...........................
-#define COMPONENT_GEN_H_308_GENERATED_BODY \
+#define COMPONENT_GEN_H_310_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_ScriptPropertyData_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -21,7 +21,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::ECS::ScriptPrope
 //Struct ScriptPropertyData end...........................
 
 //Struct ProceduralSkySettings begin...........................
-#define COMPONENT_GEN_H_393_GENERATED_BODY \
+#define COMPONENT_GEN_H_395_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_ProceduralSkySettings_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -37,7 +37,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::ECS::ProceduralS
 //Struct ProceduralSkySettings end...........................
 
 //Struct EnvironmentComponent begin...........................
-#define COMPONENT_GEN_H_405_GENERATED_BODY \
+#define COMPONENT_GEN_H_407_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_EnvironmentComponent_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -53,7 +53,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::ECS::Environment
 //Struct EnvironmentComponent end...........................
 
 //Struct LocalFogVolumeComponent begin...........................
-#define COMPONENT_GEN_H_445_GENERATED_BODY \
+#define COMPONENT_GEN_H_447_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_LocalFogVolumeComponent_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -69,7 +69,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::ECS::LocalFogVol
 //Struct LocalFogVolumeComponent end...........................
 
 //Struct PostprocessVolumeComponent begin...........................
-#define COMPONENT_GEN_H_465_GENERATED_BODY \
+#define COMPONENT_GEN_H_467_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_PostprocessVolumeComponent_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -85,7 +85,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::ECS::Postprocess
 //Struct PostprocessVolumeComponent end...........................
 
 //Struct CLightProbeGroup begin...........................
-#define COMPONENT_GEN_H_550_GENERATED_BODY \
+#define COMPONENT_GEN_H_552_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_CLightProbeGroup_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -101,7 +101,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::ECS::CLightProbe
 //Struct CLightProbeGroup end...........................
 
 //Struct DDGIVolumeComponent begin...........................
-#define COMPONENT_GEN_H_584_GENERATED_BODY \
+#define COMPONENT_GEN_H_586_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_DDGIVolumeComponent_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -117,7 +117,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::ECS::DDGIVolumeC
 //Struct DDGIVolumeComponent end...........................
 
 //Struct SurfelGIComponent begin...........................
-#define COMPONENT_GEN_H_621_GENERATED_BODY \
+#define COMPONENT_GEN_H_623_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_SurfelGIComponent_Type();\
                                 static const Type* GetPrivateStaticClass();\

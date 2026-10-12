@@ -2,7 +2,9 @@ param(
     [Parameter(Mandatory)][string]$EditorDirectory,
     [Parameter(Mandatory)][string]$ProjectFile,
     [Parameter(Mandatory)][string]$OutputDirectory,
-    [string]$DriverFile = 'Test/GBufferMaterialEditorAcceptance.mjs'
+    [string]$DriverFile = 'Test/GBufferMaterialEditorAcceptance.mjs',
+    [ValidateRange(1, 600)][int]$StartupTimeoutSeconds = 120,
+    [switch]$EarlyDriver
 )
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
@@ -34,14 +36,22 @@ $backups | ConvertTo-Json | Set-Content "$output_directory/backups.json"
 $process = $null
 $driver = $null
 $exit_code = -1
+$original_editor_pid = $env:AILU_EXPECTED_EDITOR_PID
 try {
     Copy-Item -LiteralPath "$repo/$DriverFile" -Destination "$output_directory/driver.mjs"
     Copy-Item -LiteralPath "$repo/Test/TaaEditorAcceptanceClient.mjs" -Destination $output_directory
     $process = Start-Process -FilePath "$editor_directory/Editor.exe" -ArgumentList ('"' + $ProjectFile + '"') `
         -WorkingDirectory $repo -WindowStyle Hidden -PassThru `
         -RedirectStandardOutput "$output_directory/stdout.log" -RedirectStandardError "$output_directory/stderr.log"
+    if ($EarlyDriver) {
+        $env:AILU_EXPECTED_EDITOR_PID = [string]$process.Id
+        $driver = Start-Process -FilePath 'node' -ArgumentList @(
+            ('"' + "$output_directory/driver.mjs" + '"'), ('"' + $project_directory + '"'),
+            ('"' + $output_directory + '"')) -WorkingDirectory $repo -WindowStyle Hidden -PassThru `
+            -RedirectStandardOutput "$output_directory/driver.log" -RedirectStandardError "$output_directory/driver_error.log"
+    }
     $ready = $false
-    for ($attempt = 0; $attempt -lt 120; ++$attempt) {
+    for ($attempt = 0; $attempt -lt $StartupTimeoutSeconds; ++$attempt) {
         Start-Sleep -Seconds 1
         if ($process.HasExited) { break }
         $session_path = "$project_directory/.ailu/editor_session.json"
@@ -52,12 +62,18 @@ try {
     }
     [pscustomobject]@{pid=$process.Id; ready=$ready; exited=$process.HasExited;
         executable="$editor_directory/Editor.exe"} | ConvertTo-Json | Set-Content "$output_directory/startup.json"
-    if (-not $ready) { throw 'Editor did not publish its automation session within 120 seconds.' }
-    & node "$output_directory/driver.mjs" $project_directory $output_directory > "$output_directory/driver.log" 2> "$output_directory/driver_error.log"
-    $exit_code = $LASTEXITCODE
+    if (-not $ready) { throw "Editor did not publish its automation session within $StartupTimeoutSeconds seconds." }
+    if ($EarlyDriver) {
+        if (-not $driver.WaitForExit(120000)) { throw 'Early capture driver exceeded its runtime limit.' }
+        $exit_code = $driver.ExitCode
+    } else {
+        & node "$output_directory/driver.mjs" $project_directory $output_directory > "$output_directory/driver.log" 2> "$output_directory/driver_error.log"
+        $exit_code = $LASTEXITCODE
+    }
     Get-Content "$output_directory/driver.log" -Tail 12
     Get-Content "$output_directory/driver_error.log" -Tail 12
 } finally {
+    $env:AILU_EXPECTED_EDITOR_PID = $original_editor_pid
     if ($driver -and -not $driver.HasExited) { Stop-Process -Id $driver.Id; $driver.WaitForExit() }
     if ($process -and -not $process.HasExited) { Stop-Process -Id $process.Id; $process.WaitForExit() }
     if (Test-Path -LiteralPath "$repo/FileAppender_log.txt") {

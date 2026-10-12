@@ -37,50 +37,107 @@ namespace Ailu
             }
         }// namespace
 
+        AssetImportController::AssetImportController(EditorProgressService &service, ImportCallback import_resource)
+            : _service(service), _import_resource(std::move(import_resource)) {}
+
+        AssetImportController::~AssetImportController()
+        {
+            _lifetime.reset();
+            if (_popup_group_id) UIManager::Get()->HidePopupGroup(_popup_group_id);
+            if (_progress.Id()) { _progress.SetMessage("Import queue owner closed"); _progress.Cancel(); }
+        }
+
         void AssetImportController::QueueFiles(const Vector<WString> &files, const fs::path &target_directory, Vector2f popup_pos)
         {
-            if (files.empty())
-                return;
-
-            const bool was_empty = _queue.empty();
-            _popup_pos = popup_pos;
-            for (const auto &file: files)
+            if (files.empty()) return;
+            if (_progress.IsCancellationRequested()) CancelQueued();
+            if (_queue.empty())
             {
-                LOG_INFO(L"AssetBrowser: drop file {}", file);
-                _queue.push_back({file, target_directory});
+                _progress = _service.BeginTask("Asset import", 0, true);
+                if (!_progress.Id()) return;
+                _total = _succeeded = _skipped = _failed = 0;
+                _last_error.clear();
+                _progress.SetMessage("Queued files; cancel stops pending imports");
             }
-            if (was_empty)
-                ProcessNext();
+            _popup_pos = popup_pos;
+            for (const auto &file : files) _queue.push_back({file, target_directory});
+            _total += files.size();
+            _progress.SetTotal(_total);
+        }
+
+        void AssetImportController::Tick()
+        {
+            if (_queue.empty()) return;
+            if (_progress.IsCancellationRequested()) { CancelQueued(); return; }
+            if (!_waiting_for_settings) ProcessNext();
         }
 
         void AssetImportController::ProcessNext()
         {
-            while (!_queue.empty())
+            const PendingImport item = _queue.front();
+            if (!_prepared)
             {
-                const PendingImport &item = _queue.front();
-                const EImportPopupType type = GetImportPopupType(item._sys_path);
-                if (type == EImportPopupType::kDirect)
-                {
-                    ResourceMgr::Get().ImportResource(item._sys_path, item._target_directory.wstring());
-                    NotifyImported();
-                    FinishCurrent();
-                    continue;
-                }
-                ShowImportDialog(item);
-                return;
+                _progress.SetMessage("Preparing: " + ToChar(fs::path(item._sys_path).filename().wstring()));
+                _prepared = true;
+                return; // Give UI a frame to show the filename before a synchronous call can stall it.
             }
+            if (GetImportPopupType(item._sys_path) == EImportPopupType::kDirect)
+                ImportCurrent(ImportSetting::Default());
+            else
+            {
+                _waiting_for_settings = true;
+                _progress.SetMessage("Waiting for settings: " + ToChar(fs::path(item._sys_path).filename().wstring()));
+                try { ShowImportDialog(item); }
+                catch (const std::exception &error)
+                {
+                    _last_error = error.what();
+                    LOG_ERROR("Asset import dialog: {}", error.what());
+                    const u64 popup_group_id = _popup_group_id;
+                    _popup_group_id = 0;
+                    FinishCurrent(false);
+                    if (popup_group_id) UIManager::Get()->HidePopupGroup(popup_group_id);
+                }
+            }
+        }
+
+        void AssetImportController::ImportCurrent(const ImportSetting &setting)
+        {
+            if (_queue.empty()) return;
+            if (_progress.IsCancellationRequested()) { CancelQueued(); return; }
+            const PendingImport item = _queue.front();
+            bool success = false;
+            try
+            {
+                _progress.SetMessage("Importing: " + ToChar(fs::path(item._sys_path).filename().wstring()));
+                success = _import_resource ? _import_resource(item._sys_path, item._target_directory.wstring(), setting) :
+                    ResourceMgr::Get().ImportResource(item._sys_path, item._target_directory.wstring(), setting) != nullptr;
+                if (!success) _last_error = "No resource produced: " + ToChar(fs::path(item._sys_path).filename().wstring());
+            }
+            catch (const std::exception &error) { _last_error = error.what(); LOG_ERROR("Asset import: {}", error.what()); }
+            catch (...) { _last_error = "Unknown import exception"; LOG_ERROR("Asset import: unknown exception"); }
+            FinishCurrent(success);
+            if (success) NotifyImported();
         }
 
         void AssetImportController::ShowImportDialog(const PendingImport &item)
         {
             const String file_name = fs::path(item._sys_path).filename().string();
-            const WString sys_path = item._sys_path;
-            const fs::path target_directory = item._target_directory;
-            const auto finish_popup = [this]()
+            const std::weak_ptr<int> lifetime = _lifetime;
+            const auto on_closed = [this, lifetime]()
             {
-                UIManager::Get()->HidePopup();
-                FinishCurrent();
+                if (lifetime.expired()) return;
+                _popup_group_id = 0;
+                if (_waiting_for_settings) FinishCurrent(false, true);
             };
+            const auto finish_popup = [this, lifetime](const ImportSetting *setting)
+            {
+                if (lifetime.expired() || !_waiting_for_settings) return;
+                const u64 popup_group_id = _popup_group_id;
+                if (setting) ImportCurrent(*setting);
+                else FinishCurrent(false, true);
+                UIManager::Get()->HidePopupGroup(popup_group_id);
+            };
+            _popup_group_id = UIManager::Get()->CreatePopupGroup();
 
             switch (GetImportPopupType(item._sys_path))
             {
@@ -114,20 +171,18 @@ namespace Ailu
                                               };
                                           },
                                           {
-                                                  {"Import", [this, sys_path, target_directory, setting, finish_popup]() -> std::optional<String>
+                                                  {"Import", [setting, finish_popup]() -> std::optional<String>
                                                    {
-                                                       ResourceMgr::Get().ImportResource(sys_path, target_directory.wstring(), *setting);
-                                                       NotifyImported();
-                                                       finish_popup();
+                                                       finish_popup(setting.get());
                                                        return std::nullopt;
                                                    }, false, false},
                                                   {"Cancel", [finish_popup]() -> std::optional<String>
                                                    {
-                                                       finish_popup();
+                                                       finish_popup(nullptr);
                                                        return std::nullopt;
                                                    }, false, false}
                                           },
-                                          {}, true);
+                                          {}, true, on_closed, _popup_group_id);
                 return;
             }
             case EImportPopupType::kMesh:
@@ -213,36 +268,66 @@ namespace Ailu
                                               };
                                           },
                                           {
-                                                  {"Import", [this, sys_path, target_directory, setting, finish_popup]() -> std::optional<String>
+                                                  {"Import", [setting, finish_popup]() -> std::optional<String>
                                                    {
-                                                       ResourceMgr::Get().ImportResource(sys_path, target_directory.wstring(), *setting);
-                                                       NotifyImported();
-                                                       finish_popup();
+                                                       finish_popup(setting.get());
                                                        return std::nullopt;
                                                    }, false, false},
                                                   {"Cancel", [finish_popup]() -> std::optional<String>
                                                    {
-                                                       finish_popup();
+                                                       finish_popup(nullptr);
                                                        return std::nullopt;
                                                    }, false, false}
                                           },
-                                          {}, true);
+                                          {}, true, on_closed, _popup_group_id);
                 return;
             }
             case EImportPopupType::kDirect:
             default:
-                ResourceMgr::Get().ImportResource(sys_path, target_directory.wstring());
-                NotifyImported();
-                finish_popup();
+                ImportCurrent(ImportSetting::Default());
                 return;
             }
         }
 
-        void AssetImportController::FinishCurrent()
+        void AssetImportController::FinishCurrent(bool success, bool skipped)
         {
-            if (!_queue.empty())
-                _queue.erase(_queue.begin());
-            ProcessNext();
+            if (_queue.empty()) return;
+            if (skipped) ++_skipped;
+            else if (success) ++_succeeded;
+            else ++_failed;
+            _progress.Advance();
+            _queue.erase(_queue.begin());
+            _prepared = _waiting_for_settings = false;
+            if (_queue.empty()) FinishBatch();
+        }
+
+        String AssetImportController::Summary() const
+        {
+            return std::format("Success {} / Skipped {} / Failed {}", _succeeded, _skipped, _failed);
+        }
+
+        void AssetImportController::FinishBatch(bool cancelled)
+        {
+            const String summary = Summary();
+            _progress.SetMessage(summary);
+            if (cancelled) _progress.Cancel();
+            else if (_failed) _progress.Fail(summary + "; " + _last_error);
+            else _progress.Complete();
+            LOG_INFO("Asset import batch: {}{}", summary, cancelled ? " (cancelled)" : "");
+            _progress = {};
+        }
+
+        void AssetImportController::CancelQueued()
+        {
+            // Main-thread safe point: never interrupts an ImportResource call in progress.
+            const u64 popup_group_id = _popup_group_id;
+            _popup_group_id = 0;
+            _waiting_for_settings = _prepared = false;
+            if (popup_group_id) UIManager::Get()->HidePopupGroup(popup_group_id);
+            _skipped += _queue.size();
+            _progress.Advance(_queue.size());
+            _queue.clear();
+            FinishBatch(true);
         }
 
         void AssetImportController::NotifyImported()

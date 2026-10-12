@@ -91,8 +91,10 @@ namespace Ailu
                 else if (property->_type == Render::EShaderPropertyType::kTexture2D && texture_dropdown != nullptr)
                 {
                     auto *texture = reinterpret_cast<Render::Texture *>(property->_value_ptr);
-                    texture_dropdown->SetSelectedGuid(texture == nullptr ? Guid::EmptyGuid() :
-                                                       ResourceMgr::Get().GetAssetGuid(texture), false);
+                    const Guid guid = texture == nullptr ? Guid::EmptyGuid() : ResourceMgr::Get().GetAssetGuid(texture);
+                    texture_dropdown->SetSelectedGuid(guid, false);
+                    texture_dropdown->SetUnregisteredSelectionLabel(texture != nullptr && guid.IsEmpty()
+                        ? std::format("Runtime: {}", texture->Name()) : String{});
                 }
             }
 
@@ -200,6 +202,8 @@ namespace Ailu
                     auto *texture = reinterpret_cast<Render::Texture *>(prop._value_ptr);
                     if (texture != nullptr)
                         dropdown->SetSelectedGuid(ResourceMgr::Get().GetAssetGuid(texture));
+                    if (texture != nullptr && ResourceMgr::Get().GetAssetGuid(texture).IsEmpty())
+                        dropdown->SetUnregisteredSelectionLabel(std::format("Runtime: {}", texture->Name()));
                     dropdown->_on_object_asset_selected += [property_id, obj](Asset *, Object *selected, const Guid &)
                     {
                         obj->SetTexture(property_id, dynamic_cast<Render::Texture2D *>(selected));
@@ -256,9 +260,17 @@ namespace Ailu
             const auto request_rebuild = context._request_rebuild;
 
             {
+                const Guid mesh_guid = comp->_mesh_guid.IsEmpty()
+                    ? ResourceMgr::Get().GetAssetGuid(comp->_p_mesh.get()) : comp->_mesh_guid;
                 auto *dropdown = Editor::AddObjectAssetDropdownRow(context._content, "Mesh", TMesh::StaticType(),
-                                                                    comp->_mesh_guid.IsEmpty() ?
-                                                                        ResourceMgr::Get().GetAssetGuid(comp->_p_mesh.get()) : comp->_mesh_guid);
+                                                                    mesh_guid);
+                if (comp->_p_mesh != nullptr && mesh_guid.IsEmpty())
+                {
+                    const auto *tag = context.Registry().GetComponent<ECS::TagComponent>(context._entity);
+                    dropdown->SetUnregisteredSelectionLabel(tag != nullptr
+                        ? std::format("Runtime: {}", tag->_name)
+                        : std::format("Runtime: {}", comp->_p_mesh->Name()));
+                }
                 dropdown->_on_object_asset_selected += [comp, request_rebuild](Asset *, Object *selected, const Guid &)
                 {
                     comp->_p_mesh = selected == nullptr ? nullptr :
@@ -325,6 +337,9 @@ namespace Ailu
                         ? comp->_material_guids[slot_index] : ResourceMgr::Get().GetAssetGuid(material.get());
                     auto *material_dropdown = Editor::AddObjectAssetDropdownRow(materials_content,
                         std::format("Material[{}]", slot_index), Render::Material::StaticType(), selected_guid);
+                    if (material != nullptr && selected_guid.IsEmpty())
+                        material_dropdown->SetUnregisteredSelectionLabel(
+                            std::format("Runtime: {}", material->Name()));
                     material_dropdown->_on_object_asset_selected += [comp, slot_index, request_rebuild]
                         (Asset *, Object *selected, const Guid &)
                     {

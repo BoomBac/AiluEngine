@@ -1,5 +1,7 @@
 #include "LiveLinkSession.h"
 #include "LiveLinkProtocol.h"
+#include "Assets/Asset.h"
+#include <stdexcept>
 #include "Framework/Common/Application.h"
 #include "Framework/Common/Log.h"
 #include "Framework/Common/ResourceMgr.h"
@@ -25,11 +27,25 @@ namespace Ailu
         using Scene = SceneManagement::Scene;
         constexpr std::string_view kLiveLinkRootPrefix = "__BlenderLiveLink_";
 
+        bool IsSourceGuid(std::string_view value) noexcept
+        {
+            if (value.size() != 36u) return false;
+            for (size_t index = 0u; index < value.size(); ++index)
+            {
+                if (index == 8u || index == 13u || index == 18u || index == 23u)
+                {
+                    if (value[index] != '-') return false;
+                }
+                else if (!std::isxdigit(static_cast<unsigned char>(value[index]))) return false;
+            }
+            return true;
+        }
+
         bool IsLiveLinkRoot(const ECS::TagComponent& tag) noexcept
         {
             const std::string_view name(tag._name);
-            return tag._is_transient && name.starts_with(kLiveLinkRootPrefix)
-                && name.size() == kLiveLinkRootPrefix.size() + 8u;
+            return !tag._source_scene_guid.empty() && tag._source_object_guid.empty()
+                && name.starts_with(kLiveLinkRootPrefix);
         }
 
         bool ReadString(const rapidjson::Value& object, const char* key, std::string& value)
@@ -114,6 +130,7 @@ namespace Ailu
 
     void LiveLinkSession::Apply(const LiveLinkCommand& command) noexcept
     {
+        _last_apply_succeeded = false;
         try
         {
             if (command._type == ELiveLinkCommandType::kClientDisconnected)
@@ -156,11 +173,15 @@ namespace Ailu
                 std::string session_guid;
                 if (!document.IsObject() || !ReadString(document, "session_guid", session_guid))
                     return;
-                Begin(session_guid);
+                _last_apply_succeeded = Begin(session_guid);
+            }
+            else if (_scene == nullptr || _needs_full_resync)
+            {
+                return; // Never apply a delta to a different scene or an interrupted baseline.
             }
             else if (type == ELiveLinkMessageType::kObjectUpsert)
             {
-                _last_object_upsert_succeeded = UpsertObject(std::string(
+                _last_apply_succeeded = _last_object_upsert_succeeded = UpsertObject(std::string(
                     reinterpret_cast<const char*>(command._payload.data()), command._payload.size()));
             }
             else if (type == ELiveLinkMessageType::kObjectDelete)
@@ -170,11 +191,13 @@ namespace Ailu
                 std::string guid;
                 if (document.IsObject() && ReadString(document, "guid", guid))
                 {
+                    _last_apply_succeeded = true;
                     const auto iter = _entities.find(guid);
                     if (iter != _entities.end())
                     {
                         _scene->RemoveObject(iter->second);
                         _meshes.erase(guid);
+                        _mesh_cache.Prune();
                         _mesh_revisions.erase(guid);
                         _mesh_material_slots.erase(guid);
                         _entity_material_guids.erase(guid);
@@ -185,58 +208,74 @@ namespace Ailu
                 }
             }
             else if (type == ELiveLinkMessageType::kMeshUpsert)
-                UpsertMesh(command._payload);
+                _last_apply_succeeded = UpsertMesh(command._payload);
             else if (type == ELiveLinkMessageType::kMaterialUpsert)
-                UpsertMaterial(std::string(reinterpret_cast<const char*>(command._payload.data()),
+                _last_apply_succeeded = UpsertMaterial(std::string(reinterpret_cast<const char*>(command._payload.data()),
                     command._payload.size()));
             else if (type == ELiveLinkMessageType::kLightUpsert)
-                UpsertLight(std::string(reinterpret_cast<const char*>(command._payload.data()),
+                _last_apply_succeeded = UpsertLight(std::string(reinterpret_cast<const char*>(command._payload.data()),
                     command._payload.size()));
             else if (type == ELiveLinkMessageType::kCameraUpsert)
-                UpsertCamera(std::string(reinterpret_cast<const char*>(command._payload.data()),
+                _last_apply_succeeded = UpsertCamera(std::string(reinterpret_cast<const char*>(command._payload.data()),
                     command._payload.size()));
             else if (type == ELiveLinkMessageType::kFullSyncEnd)
+            {
+                _last_apply_succeeded = _full_sync_active && !_needs_full_resync;
                 End();
+                _last_apply_succeeded &= !_needs_full_resync;
+            }
+            else
+                _last_apply_succeeded = true;
+            if (_full_sync_active && !_last_apply_succeeded) _full_sync_failed = true;
+            if (_last_apply_succeeded && _scene) _scene->MarkEdited();
         }
         catch (...)
         {
+            _last_apply_succeeded = false;
             _needs_full_resync = true;
         }
+    }
+
+    std::wstring LiveLinkSession::AssetPath(const std::string& category, const std::string& guid) const
+    {
+        return ToWChar("project://BlenderLiveLink/" + _session_guid + "/" + category + "/" + guid + ".alasset");
     }
 
     bool LiveLinkSession::Begin(const std::string& session_guid)
     {
         Scene* active_scene = ActiveEditScene();
-        Guid parsed_guid(session_guid);
-        if (active_scene == nullptr || !parsed_guid.IsValid())
-            return false;
-        if (_scene != active_scene)
-            ResetSceneState();
+        const Guid parsed_guid(session_guid);
+        if (!active_scene || !IsSourceGuid(session_guid)) return false;
+        // Forget runtime handles without deleting the durable imported scene.
+        ResetSceneState();
         _scene = active_scene;
-        _session_guid = session_guid;
+        _session_guid = parsed_guid.ToString();
         auto& registry = _scene->GetRegister();
-        ECS::Entity root = _root_entity != ECS::kInvalidEntity && _scene->IsValidEntity(_root_entity)
-            ? _root_entity : ECS::kInvalidEntity;
         u32 index = 0u;
         for (const auto& tag : registry.View<ECS::TagComponent>())
         {
             const ECS::Entity entity = registry.GetEntity<ECS::TagComponent>(index++);
-            if (!IsLiveLinkRoot(tag) || entity == root)
-                continue;
-            if (root == ECS::kInvalidEntity)
-                root = entity;
-            else
-                _scene->RemoveObject(entity);
+            if (tag._source_scene_guid != _session_guid) continue;
+            if (IsLiveLinkRoot(tag))
+                _root_entity = entity;
+            else if (!tag._source_object_guid.empty())
+            {
+                _entities[tag._source_object_guid] = entity;
+                if (registry.GetComponent<ECS::StaticMeshComponent>(entity)) _object_types[tag._source_object_guid] = "MESH";
+                else if (registry.GetComponent<ECS::LightComponent>(entity)) _object_types[tag._source_object_guid] = "LIGHT";
+                else if (registry.GetComponent<ECS::CCamera>(entity)) _object_types[tag._source_object_guid] = "CAMERA";
+                else _object_types[tag._source_object_guid] = "EMPTY";
+            }
         }
-        if (root == ECS::kInvalidEntity)
-            root = _scene->AddObject("__BlenderLiveLink_" + session_guid.substr(0u, 8u), Guid::Generate());
-        auto* root_tag = _scene->GetRegister().GetComponent<ECS::TagComponent>(root);
-        if (root_tag == nullptr)
-            return false;
-        root_tag->_is_transient = true;
-        _root_entity = root;
-        _seen.clear();
+        if (_root_entity == ECS::kInvalidEntity)
+            _root_entity = _scene->AddObject("__BlenderLiveLink_" + _session_guid.substr(0u, 8u), Guid::Generate());
+        auto* root_tag = registry.GetComponent<ECS::TagComponent>(_root_entity);
+        if (!root_tag) return false;
+        root_tag->_is_transient = false;
+        root_tag->_source_scene_guid = _session_guid;
+        root_tag->_source_object_guid.clear();
         _full_sync_active = true;
+        _full_sync_failed = false;
         _needs_full_resync = false;
         return true;
     }
@@ -268,7 +307,7 @@ namespace Ailu
         ReadString(document, "parent_guid", parent_guid);
         ReadString(document, "object_type", object_type);
         Guid guid(guid_text);
-        if (!guid.IsValid())
+        if (!IsSourceGuid(guid_text))
             return false;
 
         ECS::Entity entity = ECS::kInvalidEntity;
@@ -278,8 +317,15 @@ namespace Ailu
         else
         {
             entity = _scene->FindEntity(guid);
+            if (entity != ECS::kInvalidEntity)
+            {
+                const auto* existing_tag = _scene->GetRegister().GetComponent<ECS::TagComponent>(entity);
+                if (!existing_tag || (!existing_tag->_is_transient
+                    && (existing_tag->_source_scene_guid != _session_guid || existing_tag->_source_object_guid != guid_text)))
+                    entity = ECS::kInvalidEntity; // Source identity is scoped; do not take ownership of another source.
+            }
             if (entity == ECS::kInvalidEntity)
-                entity = _scene->AddObject(name, guid, false);
+                entity = _scene->AddObject(name, _scene->HasEntityGuid(guid) ? Guid::Generate() : guid, false);
             _entities[guid_text] = entity;
         }
         auto& registry = _scene->GetRegister();
@@ -300,7 +346,9 @@ namespace Ailu
         auto* tag = registry.GetComponent<ECS::TagComponent>(entity);
         if (tag == nullptr)
             return false;
-        tag->_is_transient = true;
+        tag->_is_transient = false;
+        tag->_source_scene_guid = _session_guid;
+        tag->_source_object_guid = guid_text;
         tag->_name = name;
         const auto visible_field = document.FindMember("visible");
         if (visible_field != document.MemberEnd() && visible_field->value.IsBool())
@@ -387,6 +435,17 @@ namespace Ailu
         if (vertex_bytes > payload.size() - offset)
             return false;
 
+        // GUID and revision identify the object update; the remaining validated bytes identify shared geometry.
+        const std::span<const unsigned char> geometry(payload.data() + kGuidSize + sizeof(u64),
+                                                      payload.size() - kGuidSize - sizeof(u64));
+        if (auto cached = _mesh_cache.Find(geometry); cached._mesh)
+        {
+            const auto previous_revision = _mesh_revisions.find(guid_text);
+            if (previous_revision == _mesh_revisions.end() || revision > previous_revision->second)
+                PublishMesh(guid_text, entity_iter->second, cached._mesh, cached._material_slots, revision);
+            return true;
+        }
+
         Vector<Vector3f> positions;
         Vector<Vector3f> normals;
         Vector<Vector4f> tangents;
@@ -460,7 +519,28 @@ namespace Ailu
 
         const auto previous_revision = _mesh_revisions.find(guid_text);
         if (previous_revision != _mesh_revisions.end() && revision <= previous_revision->second)
-            return false;
+            return true; // A stale/duplicate mesh is already applied, not an import failure.
+        const auto* existing = _scene->GetRegister().GetComponent<ECS::StaticMeshComponent>(entity_iter->second);
+        const auto equal_bytes = [](const auto& source, const auto& incoming)
+        {
+            return source.size() == incoming.size() && (source.empty()
+                || std::memcmp(source.data(), incoming.data(), source.size() * sizeof(incoming[0])) == 0);
+        };
+        if (existing && existing->_p_mesh)
+        {
+            const auto& previous = existing->_p_mesh;
+            bool identical = previous->SubmeshCount() == submeshes.size() && equal_bytes(previous->GetVertices(), positions)
+                && equal_bytes(previous->GetNormals(), normals) && equal_bytes(previous->GetTangents(), tangents)
+                && equal_bytes(previous->GetUVs(), uvs);
+            for (u16 index = 0u; identical && index < previous->SubmeshCount(); ++index)
+                identical = equal_bytes(previous->GetIndices(index), submeshes[index]);
+            if (identical)
+            {
+                PublishMesh(guid_text, entity_iter->second, previous, material_slots, revision);
+                _mesh_cache.Store(geometry, previous, material_slots);
+                return true;
+            }
+        }
         auto mesh = MakeRef<Render::Mesh>("BlenderLiveLink_" + guid_text);
         mesh->SetVertices(std::move(positions));
         mesh->SetNormals(std::move(normals));
@@ -482,15 +562,31 @@ namespace Ailu
         }
         mesh->SetBounds(std::span<const AABB>(mesh_bounds.data(), mesh_bounds.size()));
         mesh->Apply();
+        PublishMesh(guid_text, entity_iter->second, mesh, material_slots, revision);
+        _mesh_cache.Store(geometry, mesh, material_slots);
+        return true;
+    }
 
+    void LiveLinkSession::PublishMesh(const std::string& guid, ECS::Entity entity, const Ref<Render::Mesh>& mesh,
+                                     const std::vector<u32>& material_slots, u64 revision)
+    {
+        auto& resources = ResourceMgr::Get();
+        if (resources.GetAssetGuid(mesh.get()).IsEmpty())
+        {
+            // Published meshes may be shared by objects which diverge later; never overwrite their durable source.
+            auto* asset = resources.CreateAsset(AssetPath("Meshes", Guid::Generate().ToString()), mesh);
+            if (!asset || !resources.SaveAsset(asset)) throw std::runtime_error("Live Link mesh persistence failed");
+        }
         auto& registry = _scene->GetRegister();
-        auto* component = registry.GetComponent<ECS::StaticMeshComponent>(entity_iter->second);
+        auto* component = registry.GetComponent<ECS::StaticMeshComponent>(entity);
         if (component == nullptr)
-            component = &registry.AddComponent<ECS::StaticMeshComponent>(entity_iter->second);
+            component = &registry.AddComponent<ECS::StaticMeshComponent>(entity);
         component->_p_mesh = mesh;
-        component->_transformed_aabbs.resize(mesh_bounds.size());
+        component->_mesh_guid = resources.GetAssetGuid(mesh.get());
+        component->_material_guids.clear();
+        component->_transformed_aabbs.resize(mesh->BoundBox().size());
         component->_p_mats.clear();
-        const auto object_materials = _entity_material_guids.find(guid_text);
+        const auto object_materials = _entity_material_guids.find(guid);
         if (object_materials != _entity_material_guids.end())
         {
             for (u32 slot : material_slots)
@@ -509,10 +605,10 @@ namespace Ailu
         }
         else
             component->_p_mats.push_back(Render::Material::s_checker.lock());
-        _meshes[guid_text] = std::move(mesh);
-        _mesh_material_slots[guid_text] = std::move(material_slots);
-        _mesh_revisions[guid_text] = revision;
-        return true;
+        _meshes[guid] = mesh;
+        _mesh_material_slots[guid] = material_slots;
+        _mesh_revisions[guid] = revision;
+        _mesh_cache.Prune();
     }
 
     bool LiveLinkSession::UpsertMaterial(const std::string& payload)
@@ -522,10 +618,15 @@ namespace Ailu
         std::string material_guid;
         if (!document.IsObject() || !ReadString(document, "material_guid", material_guid))
             return false;
+        if (!IsSourceGuid(material_guid)) return false;
         auto iter = _materials.find(material_guid);
         if (iter == _materials.end())
         {
-            auto material = Render::Material::CreateStandard("BlenderLiveLink_" + material_guid);
+            std::string material_name;
+            ReadString(document, "name", material_name);
+            if (material_name.empty())
+                material_name = "BlenderLiveLink_" + material_guid;
+            auto material = Render::Material::CreateStandard(material_name);
             if (!material)
                 return false;
             iter = _materials.emplace(material_guid, std::move(material)).first;
@@ -536,10 +637,12 @@ namespace Ailu
             if (field != document.MemberEnd() && field->value.IsNumber())
                 output = field->value.GetFloat();
         };
-        f32 roughness = 0.5f, metallic = 0.f, emission_strength = 0.f;
+        f32 roughness = 0.5f, metallic = 0.f, emission_strength = 0.f, transmission = 0.f, ior = 1.5f;
         read_float("roughness", roughness);
         read_float("metallic", metallic);
         read_float("emission_strength", emission_strength);
+        read_float("transmission", transmission);
+        read_float("ior", ior);
         const auto alpha_test_field = document.FindMember("alpha_test");
         const bool alpha_test = alpha_test_field != document.MemberEnd() && alpha_test_field->value.IsBool()
             && alpha_test_field->value.GetBool();
@@ -551,9 +654,10 @@ namespace Ailu
             && double_sided_field->value.GetBool();
         f32 alpha_cutoff = 0.5f;
         read_float("alpha_cutoff", alpha_cutoff);
-        iter->second->SurfaceType(alpha_blend ? Render::ESurfaceType::kTransparent
+        const bool thin_glass = transmission > 0.f;
+        iter->second->SurfaceType((alpha_blend || thin_glass) ? Render::ESurfaceType::kTransparent
             : (alpha_test ? Render::ESurfaceType::kAlphaTest : Render::ESurfaceType::kOpaque));
-        if (alpha_blend)
+        if (alpha_blend || thin_glass)
             iter->second->EnableKeyword("LINEAR_ALPHA");
         else
             iter->second->DisableKeyword("LINEAR_ALPHA");
@@ -567,6 +671,8 @@ namespace Ailu
         iter->second->SetCullMode(double_sided ? Render::ECullMode::kNone : Render::ECullMode::kBack);
         iter->second->SetFloat("_RoughnessValue", std::clamp(roughness, 0.f, 1.f));
         iter->second->SetFloat("_MetallicValue", std::clamp(metallic, 0.f, 1.f));
+        iter->second->SetFloat("_Transmission", std::clamp(transmission, 0.f, 1.f));
+        iter->second->SetFloat("_IOR", std::max(ior, 1.f));
         Vector4f base_color(0.8f, 0.8f, 0.8f, 1.f);
         const auto color = document.FindMember("base_color");
         if (color != document.MemberEnd() && color->value.IsArray() && color->value.Size() == 4u)
@@ -649,8 +755,18 @@ namespace Ailu
                 LOG_INFO(L"[BlenderLiveLink] Texture import: {} ({} bytes, usage={}, cache=miss, result={}, {:.3f} ms)",
                     ToWChar(path), has_file_size ? file_size : 0ull, static_cast<unsigned int>(usage),
                     loaded ? L"ok" : L"failed", load_us / 1000.0);
-                if (!loaded)
-                    return;
+                if (!loaded) throw std::runtime_error("Live Link texture import failed");
+                auto& resources = ResourceMgr::Get();
+                const auto texture_path = AssetPath("Textures", material_guid + "_" + field_name);
+                const auto source_path = texture_path + std::filesystem::path(path).extension().wstring();
+                const auto source_system_path = resources.GetResSysPath(source_path);
+                std::filesystem::create_directories(std::filesystem::path(source_system_path).parent_path());
+                std::filesystem::copy_file(std::filesystem::path(path), source_system_path, std::filesystem::copy_options::overwrite_existing);
+                auto* asset = resources.CreateAsset(texture_path, loaded);
+                if (!asset) throw std::runtime_error("Live Link texture registration failed");
+                asset->_external_asset_path = source_path;
+                resources.SetImportSetting(texture_path, settings);
+                if (!resources.SaveAsset(asset)) throw std::runtime_error("Live Link texture persistence failed");
                 texture = _textures.emplace(cache_key, std::move(loaded)).first;
             }
             iter->second->SetTexture(usage, texture->second.get());
@@ -658,7 +774,17 @@ namespace Ailu
         load_texture("base_color_path", Render::ETextureUsage::kAlbedo);
         load_texture("normal_path", Render::ETextureUsage::kNormal);
         load_texture("emission_path", Render::ETextureUsage::kEmission);
-        load_texture("roughness_metallic_path", Render::ETextureUsage::kRoughness);
+        load_texture("roughness_path", Render::ETextureUsage::kRoughness);
+        load_texture("metallic_path", Render::ETextureUsage::kMetallic);
+        auto& resources = ResourceMgr::Get();
+        const auto material_path = AssetPath("Materials", material_guid);
+        const auto material_system_path = resources.GetResSysPath(material_path);
+        std::filesystem::create_directories(std::filesystem::path(material_system_path).parent_path());
+        auto* material_asset = resources.GetLinkedAsset(iter->second.get());
+        if (!material_asset) material_asset = resources.CreateAsset(material_path, iter->second);
+        if (!material_asset) return false;
+        material_asset->MarkDirty();
+        if (!resources.SaveAsset(material_asset)) return false;
         for (const auto& [object_guid, guids] : _entity_material_guids)
         {
             if (std::find(guids.begin(), guids.end(), material_guid) == guids.end())
@@ -673,6 +799,7 @@ namespace Ailu
             if (component == nullptr)
                 continue;
             component->_p_mats.clear();
+            component->_material_guids.clear();
             for (u32 slot : slots->second)
             {
                 const std::string slot_guid = slot < guids.size() ? guids[slot] : std::string{};
@@ -781,6 +908,27 @@ namespace Ailu
         read_float("ortho_size", ortho_size);
         read_float("near_clip", near_clip);
         read_float("far_clip", far_clip);
+        const auto vertical_fov = document.FindMember("fov_y_degrees");
+        if (vertical_fov != document.MemberEnd() && vertical_fov->value.IsNumber())
+            fov_degrees = vertical_fov->value.GetFloat();
+        else
+            fov_degrees = 2.0f * std::atan(std::tan(fov_degrees * Math::k2Radius * 0.5f) / std::max(aspect, 0.001f)) / Math::k2Radius;
+        Vector2f projection_offset = Vector2f::kZero;
+        const auto offset = document.FindMember("projection_offset");
+        if (offset != document.MemberEnd())
+        {
+            if (!offset->value.IsArray() || offset->value.Size() != 2u
+                || !offset->value[0].IsNumber() || !offset->value[1].IsNumber()) return false;
+            projection_offset = Vector2f(offset->value[0].GetFloat(), offset->value[1].GetFloat());
+        }
+        if (!std::isfinite(fov_degrees) || !std::isfinite(aspect) || !std::isfinite(ortho_size)
+            || !std::isfinite(near_clip) || !std::isfinite(far_clip)
+            || !std::isfinite(projection_offset.x) || !std::isfinite(projection_offset.y)) return false;
+        // The entity remains in the ordinary converted object basis; only the camera interprets its local view axes.
+        camera.SetLocalViewAxes(Vector3f(0.f, -1.f, 0.f), Vector3f(0.f, 0.f, -1.f));
+        camera.ReverseProjectionX(true);
+        camera.ProjectionOffset(projection_offset);
+        camera.LockAspect(true);
         camera.Type(type == "ORTHO" ? Render::ECameraType::kOrthographic : Render::ECameraType::kPerspective);
         camera.FovH(std::clamp(fov_degrees, 1.f, 179.f));
         camera.Aspect(std::max(aspect, 0.001f));
@@ -792,10 +940,21 @@ namespace Ailu
 
     void LiveLinkSession::End() noexcept
     {
-        if (!_full_sync_active || _scene == nullptr || _scene != ActiveEditScene())
+        if (!_full_sync_active || _full_sync_failed || _scene == nullptr || _scene != ActiveEditScene())
         {
             _needs_full_resync = true;
             return;
+        }
+        for (const auto& [guid, parent_guid] : _parent_guids)
+        {
+            const auto child = _entities.find(guid);
+            const auto parent = _entities.find(parent_guid);
+            const ECS::Entity parent_entity = parent == _entities.end() || !_seen.contains(parent_guid) ? _root_entity : parent->second;
+            if (child != _entities.end() && child->second != parent_entity && !_scene->Reparent(child->second, parent_entity, false))
+            {
+                _needs_full_resync = true;
+                return;
+            }
         }
         for (auto iter = _entities.begin(); iter != _entities.end();)
         {
@@ -813,15 +972,8 @@ namespace Ailu
             else
                 ++iter;
         }
-        for (const auto& [guid, parent_guid] : _parent_guids)
-        {
-            const auto child = _entities.find(guid);
-            const auto parent = parent_guid.empty() ? _entities.end() : _entities.find(parent_guid);
-            const ECS::Entity parent_entity = parent == _entities.end() ? _root_entity : parent->second;
-            if (child != _entities.end() && parent_entity != ECS::kInvalidEntity && child->second != parent_entity)
-                _scene->Reparent(child->second, parent_entity, false);
-        }
         _full_sync_active = false;
+        _mesh_cache.Prune();
     }
 
     void LiveLinkSession::Clear() noexcept
@@ -829,6 +981,7 @@ namespace Ailu
         ResetSceneState();
         _needs_full_resync = true;
         _meshes.clear();
+        _mesh_cache.Clear();
         _materials.clear();
         _textures.clear();
         _mesh_revisions.clear();
@@ -836,8 +989,6 @@ namespace Ailu
 
     void LiveLinkSession::ResetSceneState() noexcept
     {
-        if (_scene != nullptr && _root_entity != ECS::kInvalidEntity && _scene->IsValidEntity(_root_entity))
-            _scene->RemoveObject(_root_entity);
         _scene = nullptr;
         _root_entity = ECS::kInvalidEntity;
         _session_guid.clear();
@@ -848,9 +999,12 @@ namespace Ailu
         _entity_material_guids.clear();
         _mesh_material_slots.clear();
         _meshes.clear();
+        _mesh_cache.Clear();
         _materials.clear();
         _textures.clear();
         _mesh_revisions.clear();
         _full_sync_active = false;
+        _full_sync_failed = false;
+        _needs_full_resync = true;
     }
 }

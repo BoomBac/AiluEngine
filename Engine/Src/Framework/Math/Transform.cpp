@@ -32,7 +32,7 @@ namespace Ailu
             const f32 wz2 = t._rotation.w * z2;
 
             m[1][0] = (xy2 - wz2) * t._scale.y;
-            m[0][1] = (xy2 + wz2) * t._scale.z;
+            m[0][1] = (xy2 + wz2) * t._scale.x;
         }
         {
             const f32 xz2 = t._rotation.x * z2;

@@ -58,7 +58,8 @@
 //	_AlbedoTex("Albedo",Texture2D) = "white"
 //	_NormalTex("Normal",Texture2D) = "white"
 //	_EmissionTex("Emission",Texture2D) = "white"
-//	_RoughnessMetallicTex("RoughnessMetallicTex",Texture2D) = "white"
+//	_RoughnessTex("Roughness Texture",Texture2D) = "white"
+//	_MetallicTex("Metallic Texture",Texture2D) = "white"
 //	_SpecularTex("Specular",Texture2D) = "white"
 //	_AlbedoValue("BaseColor",Color) = (1,1,1,0)
 //	[HDR]_EmissionValue("Emission",Color) = (0,0,0,0)
@@ -68,7 +69,6 @@
 //	_Anisotropy("Anisotropy",Range(0,1)) = 0
 //	_IOR("IOR",Range(0,3)) = 1
 //	_Transmission("Transmission",Range(0,1)) = 0
-	//	_Absorption("Legacy Volume Absorption (per world unit)",Range(0,100)) = 0
 	//	_AttenuationColor("Attenuation Color",Color) = (1,1,1,1)
 	//	_AttenuationDistance("Attenuation Distance",Range(0,1000)) = 1
 //}
