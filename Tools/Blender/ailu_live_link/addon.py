@@ -32,6 +32,9 @@ class AILU_OT_full_sync(bpy.types.Operator):
         if not connection.connection.connected:
             self.report({"ERROR"}, "Connect to Ailu first")
             return {"CANCELLED"}
+        if dirty_tracker.is_transforming(context):
+            self.report({"ERROR"}, "Finish the active transform before Full Sync")
+            return {"CANCELLED"}
         try:
             object_sync.full_sync(context, connection.connection)
         except Exception as error:
@@ -88,7 +91,8 @@ def _timer():
     context = bpy.context
     try:
         scene_guid = identity.get_session_guid(context.scene) if link.connected and context.scene else ""
-        if link.connected and context.scene and (not _was_connected or scene_guid != _synced_scene_guid):
+        if (link.connected and context.scene and not dirty_tracker.is_transforming(context)
+                and (not _was_connected or scene_guid != _synced_scene_guid)):
             object_sync.full_sync(context, link)
             dirty_tracker.mark_synced(context.scene)
             _synced_scene_guid = scene_guid

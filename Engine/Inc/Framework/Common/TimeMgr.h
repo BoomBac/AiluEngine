@@ -98,7 +98,7 @@ namespace Ailu
     {
     public:
         IGPUTimer() = default;
-        ~IGPUTimer() = default;
+        virtual ~IGPUTimer() = default;
 
         IGPUTimer(const IGPUTimer&) = delete;
         IGPUTimer& operator=(const IGPUTimer&) = delete;

@@ -230,7 +230,8 @@ namespace Ailu::Render
             return;
         _proj_matrix = _proj_matrix_no_jitter;
         _jitter = Vector4f::kZero;
-        if (_anti_aliasing == EAntiAliasing::kTAA)
+        if ((_anti_aliasing == EAntiAliasing::kTAA && ResolvedTemporalMode() == EResolvedTemporalMode::kTAA) ||
+            IsTemporalUpscalingActive())
             ProcessJitter();
         _jittered_view_proj_matrix = _view_matrix * _proj_matrix;
         CalculateRenderRayCorners();

@@ -88,21 +88,27 @@ def _full_sync(context, link):
         link.end_diagnostic_batch(diagnostic_batch, (time.perf_counter() - full_start) * 1000.0, phases, counts)
 
 
-def sync_object(context, obj, link, sent_materials=None):
+def sync_object(context, obj, link, sent_materials=None, update_geometry=True, update_materials=True,
+                update_data=True):
     from . import dirty_tracker
     with dirty_tracker.export_scope(context):
         scene_objects = set(context.scene.objects)
         link.send_json(protocol.OBJECT_UPSERT, _object_value(obj, scene_objects))
         if obj.type == "MESH":
-            material_sync.send_object_materials(obj, link, sent_materials)
-            mesh_sync.send_mesh(obj, context.evaluated_depsgraph_get(), link)
+            if update_materials:
+                material_sync.send_object_materials(obj, link, sent_materials)
+            if update_geometry:
+                mesh_sync.send_mesh(obj, context.evaluated_depsgraph_get(), link)
         elif obj.type == "LIGHT":
-            light_sync.export_light(obj, link)
+            if update_data:
+                light_sync.export_light(obj, link)
         elif obj.type == "CAMERA":
-            camera_sync.export_camera(obj, context.scene, link)
+            if update_data:
+                camera_sync.export_camera(obj, context.scene, link)
 
 
-def sync_instances(context, link, sent_materials=None, changed_objects=(), full=False, phases=None):
+def sync_instances(context, link, sent_materials=None, changed_objects=(), full=False, phases=None,
+                   update_materials=True):
     """Flatten evaluated mesh instances using stable identities and their final world transforms."""
     from . import dirty_tracker
     with dirty_tracker.export_scope(context):
@@ -138,7 +144,8 @@ def sync_instances(context, link, sent_materials=None, changed_objects=(), full=
             payload = mesh_sync.encode_mesh(obj, context.evaluated_depsgraph_get())
             if payload is not None:
                 material_start = time.perf_counter()
-                material_sync.send_object_materials(obj, link, sent_materials)
+                if update_materials:
+                    material_sync.send_object_materials(obj, link, sent_materials)
                 material_ms += (time.perf_counter() - material_start) * 1000.0
                 for guid in guids:
                     mesh_sync.send_instance_mesh(payload, guid, link)

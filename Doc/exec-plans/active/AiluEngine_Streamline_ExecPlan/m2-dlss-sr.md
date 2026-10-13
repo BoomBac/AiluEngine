@@ -133,23 +133,26 @@ velocity *= 0.5;
 
 ## Current Milestone
 
-M2（进入条件：M0/M1 已验收）。
+M2（用户于 2026-10-12 明确要求开始实现；M0/M1 的未完成验收继续保留，不视为通过）。
 
 ## Progress
 
-- [ ] EffectiveTemporalMode 在创建 Camera 矩阵/资源之前得出
-- [ ] 分辨率使用 SDK optimal settings，不覆盖用户 RenderScale
-- [ ] Camera Jitter 与 SR/TAA 互斥正确
+- [x] EffectiveTemporalMode 在创建 Camera 矩阵/资源之前得出
+- [x] 分辨率使用 SDK optimal settings，不覆盖用户 RenderScale
+- [x] Camera Jitter 与 SR/TAA 调度互斥已接入；像素 convention 仍待实测
 - [ ] Depth/MV/Color/Exposure 约定逐一验证
-- [ ] `StreamlineSrPass` RG 读写、输出 UAV、Evaluate 与资源状态校验
-- [ ] Postprocess 根据 input 实际分辨率建立纹理
-- [ ] 成功与失败路径都能产生合法图像
-- [ ] UI 中 requested/available/effective 可诊断、完成切换
+- [x] `StreamlineSrPass` RG 读写、输出 UAV 与 Evaluate 调用已接入；资源状态仍待 PIX/Debug Layer 校验
+- [x] Postprocess 根据 RG input 实际分辨率建立纹理
+- [x] Evaluate 前写入 output-size spatial fallback；Evaluate 失败后保留该 fallback 并下帧退回
+- [x] Camera C++ API 可读写 requested/available/effective；Inspector UI 尚未接入
 - [ ] Debug Layer/PIX 和真实 RTX 运行验证
 
 ## Decision Log
 
 SDK optimal sizes、MV 坐标约定、Depth 取用方案、状态 table 和 fallback 实现须记到 progress。任何时域 Pass 大规模重构都应先证明当前局部修补不可行。
+
+- 2026-10-12：Camera `RenderScale` 保持为用户配置；effective DLSS render size 只保存在当帧解析状态。SR output 使用 RGBA16F，以满足 output UAV 的格式需求。
+- 2026-10-12：Evaluate 之前执行 output-size spatial fallback；SL API 与 frame token 通过同一 SDK API mutex 串行化。M1 的 native callback state restore 尚未 GPU 验收，因此当前实现不能据 build 结果宣称状态闭环通过。
 
 ## Surprises & Discoveries
 
@@ -188,7 +191,78 @@ M3 将覆盖长时间运行、多 Camera、Window Resize、资源持有与 FPS �
 
 ## Outcomes
 
-待填写：SDK options、每种模式输入输出尺寸、D3D12 validation、失败回退与截图路径/性能数字。
+SDK options 和 pass 已接入；每种模式实际输入/输出尺寸、D3D12 validation、失败回退图像、截图路径及性能数字待 RTX 实机验收。
+
+### 2026-10-12 · 开启失败修复
+
+- 用户日志：SDK/DLSS SR/plugin 支持检测通过；frame 1140 在 `slAllocateResources` 返回 25
+  (`eErrorInvalidParameter`)，随后触发 SR 禁用和 spatial fallback。
+- SDK v2.14.1 `sl.dlss/dlssEntry.cpp` 的显式分配使用 `EventData{viewport, 0}`，调用
+  `dlssBeginEvent` 后仅检查是否已创建 handle，未传播 begin 返回值。桥接已按实际 FrameToken
+  设置 constants/tags，因此显式分配的 frame 0 与当前帧不匹配。
+- 移除显式分配调用及两个分配缓存，保留当前帧 constants/tags，让 `slEvaluateFeature` 自动初始化和重建。
+  官方 ProgrammingGuideDLSS §8 明确支持 evaluate 时初始化；SDK begin callback 处理 mode/size 变化。
+- 验证：`cmake --build --preset build-debug` 退出码 0；`StreamlineDx12BridgeSmoke` 和
+  `CameraTemporalHistorySmoke` 退出码 0。Smoke 不覆盖实际 DLSS evaluate 成功或输出质量。
+- 本次无运行中的 Editor，未执行 DLSS 开启/Resize/连续帧抓取；M2 实机验收仍 Pending。
+- SDK 依据：https://github.com/NVIDIA-RTX/Streamline/blob/v2.14.1/source/plugins/sl.dlss/dlssEntry.cpp
+  和 https://github.com/NVIDIA-RTX/Streamline/blob/v2.14.1/docs/ProgrammingGuideDLSS.md 。
+
+### 2026-10-12 · render scale 0.7 开关 DLSS 后叠加偏移
+
+- 用户截图：场景 cube 与 Editor 网格/灯光图标相对位置明显变化；Quality 截图状态文本仍为 Off，
+  因此截图本身不能证明所用 binary 的 evaluate 状态。
+- 源码确认：全尺寸 SR/postprocess color 与低尺寸 scene DSV 一起绑定，DX12 `kSetTarget` 分支
+  用所有附件的最小尺寸裁剪 viewport/scissor。EditorDebug 还显式设置输入分辨率 viewport。
+- 修复：PostprocessStack 在颜色/深度尺寸不一致时创建独立 `PostprocessOverlayDepth`，使用新增 Blit
+  depth pass 最近点采样写入 DSV；Gizmo、Pick、EditorDebug 改用 `FinalDepthHandle()`，EditorDebug/Gizmo
+  使用 final color 尺寸。场景输入深度、配置 render scale 和 SDK optimal size 决策保持原有职责。
+- Shader：`dxc -T ps_6_0 -E PSMainCopyDepth` 编译通过。深度使用原场景深度；时域 jitter 引起的
+  亚像素遮挡边缘及实际开关画面仍需实机连续帧验证。
+- 验证结果见 progress；本次无运行中的 Editor，尚无修复后的 live capture。
+
+### 2026-10-12 · DLSS Off 黑天空复现与修复
+
+- 用户授权后台启动 Editor；使用实际 `Editor.exe` 的新目录 `DlssSkyRegression_20261012` 保存隔离场景、
+  captures、analysis.json 和配置备份，场景来自 `AiluTestProj/Assets/scene/empty.almap` 的副本。
+- 首轮纠正本次深度拷贝接入错误：共享 Blit 新增 pass 在 metadata 的 `info end` 之后，未被引擎解析。
+  恢复公共 Blit，改为独立 `postprocess_overlay_depth.hlsl`，PostprocessStack 持有 Shader/Material 并使用 pass 0。
+  修复后仍能复现黑天空，故该接入错误不能当作天空根因。
+- 分层捕获确认：DrawSkyBox 已黑；透射率 LUT 有值（RGB mean=101.242），SkyView RGBA 全 0；
+  CopyColor/FinalBlit 传递了黑天空。截图对应的天空问题发生在后处理/Editor overlay 之前。
+- 临时每帧 SkyView 更新探针恢复天空；常量快照 frame-upload 假设未通过图像验证，已完整撤回。
+  单线程对照未完成启动，无有效结果。
+- 最终仅将 Environment.cpp `_sky_lut_dirty=false` 从注册 pass 后移入 execute callback 的 dispatch 后，
+  保留原有按需更新。每帧探针已撤回，Shader.cpp 与公共 Blit 没有本次遗留修改。
+- 最终 `build-debug` 退出码 0；独立 depth PS DXC 编译通过。正常多线程/graphics-job 配置下，最终
+  SkyView 连续 8 帧（3165-3172）RGB mean=42.417、alpha=255；FinalBlit 连续 8 帧（3207-3214）
+  896x512、天空上方 ROI mean=152.264，最大相邻像素差=2；实际检查图像确认天空恢复。
+- 后台进程已退出，EditorConfig/EngineConfig/dock_layout/main_widget 配置逐字节恢复并校验。
+  此次覆盖 DLSS Off 的天空回归，未将 DLSS Quality/MV/Depth/完整 M2 验收标为通过。
+
+### 2026-10-13 · 黑天空的具体触发链复核
+
+- 用户要求定位本次改动的具体触发原因，不能以改变 SkyView dirty 时机代替根因诊断。
+  新证据目录：`F:/AiluEngine/artifacts/out/editor/bin/x64/debug/SkyRootCause_20261013_001/`。
+- 恢复旧 dirty 行为并加入临时日志：frame 0 注册 `EnvironmentSkyLUT` 后清除 dirty，但整图编译失败，
+  没有 SkyView execute 日志。明确错误为 `PickBuffer / PostprocessOverlayDepth is read before its first write`。
+- 首帧 Postprocess 输入日志：SR 和 TAA handle 都是 3452816845 (`0xCDCDCDCD`)，实际 scene color 为 6.1。
+  错选未初始化 SR handle 后，GetTextureDesc 回退默认 4x4，最终 color=4x4、scene depth=896x512，
+  因此 DLSS Off 首帧也进入新增的深度补齐分支。frame 1/2 Reset 后 SR/TAA=0，尺寸恢复 896x512。
+- 深度补齐分支忽略 `builder.Write` 返回的新版本，并将创建时的 v0 交给 PickBuffer；v0 没有 producer，
+  validation 中止整图。旧 dirty 已清除，后续帧不再生成 SkyView，导致持续黑天空。
+- 这是本次新增路径引入的组合回归。原有 SkyView dirty 逻辑不是本次新增的触发点。
+- 确定性 regression：在 0xCD 填充存储上构造 RenderingData，修复前 CameraTemporalHistorySmoke 退出码 1。
+- 实际修复：value-initialize `_rg_handles`；将 `PostprocessOverlayDepth` 的最新已写入版本传给后续 overlay。
+  SkyView dirty 行为恢复原样，Environment.cpp 最终无本任务 diff。此前帧内常量快照假设已撤回，不能视为根因。
+- 冷启动对照保持旧 SkyView dirty 行为：frame 0 SR/TAA=0、color/depth=896x512、图编译成功，
+  有 `EnvironmentSkyLUT` execute 日志。首帧没有 Read-invalid / read-before-first-write 错误。
+- 修复后 SkyView 连续 8 帧（531-538），192x192，RGB mean=42.417、alpha=255；FinalBlit 连续 8 帧
+  （576-583），896x512，RGB mean=92.110，最大相邻差=2；图像检查确认天空及 cube 环境光均恢复。
+  上轮只推迟 dirty 的补偿仍留下 cube 环境光黑暗，因为首次被中止的还有 cubemap/SH 生成。
+- CameraTemporalHistorySmoke 的复用内存 regression 修复前退出码 1、修复后退出码 0。
+  本次不以之前长期运行正常为否定新增路径回归的依据；直接触发点来自本次句柄选择和新增深度 pass。
+- 临时日志已移除；测试 Editor 已退出；四项 Editor 配置逐字节恢复，见 restoration.json。
 
 ## Resume Protocol
 

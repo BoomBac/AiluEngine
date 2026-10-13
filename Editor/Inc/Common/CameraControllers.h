@@ -14,6 +14,7 @@ namespace Ailu
     namespace Render
     {
         class Camera;
+        enum class ECameraType;
     }
 
     namespace Editor
@@ -34,8 +35,15 @@ namespace Ailu
             void Attach(Render::Camera *camera);
             void SetTargetPosition(const Vector3f &position, bool is_force = false);
             void SetTargetRotation(f32 x, f32 y, bool is_force = false);
+            void SetTargetRotation(const Quaternion &rotation, bool is_force = false);
             // Teleport the camera and its interpolation state at once (pitch/yaw in degrees).
             void SnapTo(const Vector3f &position, f32 pitch, f32 yaw);
+            // Teleport the camera and its interpolation state with a complete orientation.
+            void SnapTo(const Vector3f &position, const Quaternion &rotation);
+            // Match the rendered view, including imported local axes and lens settings.
+            void SnapTo(const Render::Camera &camera);
+            bool RestoreProjection();
+            void ResetRoll();
             void Move(const Vector3f &d);
             void Interpolate(float speed);
             void Accelerate(bool faster) { _cur_move_speed = faster ? _fast_camera_move_speed : _base_camera_move_speed; };
@@ -54,9 +62,27 @@ namespace Ailu
             f32 _camera_far = 1000.0f;
 
         private:
+            void UpdatePitchYaw();
+
+        private:
+            struct ProjectionState
+            {
+                Render::ECameraType _type{};
+                f32 _fov = 60.0f;
+                f32 _near = 0.01f;
+                f32 _far = 1000.0f;
+                f32 _size = 10.0f;
+                f32 _aspect = 1.0f;
+                Vector2f _offset = Vector2f::kZero;
+                bool _reverse_x = false;
+                bool _lock_aspect = false;
+            };
+            ProjectionState _projection_before_align;
+            bool _restore_projection_pending = false;
             Render::Camera *_p_camera = nullptr;
-            Quaternion _rot_object_x;
-            Quaternion _rot_world_y;
+            Quaternion _current_rotation = Quaternion::Identity();
+            Quaternion _target_rotation = Quaternion::Identity();
+            f32 _roll_degrees = 0.0f;
         };
 
         class OrbitCameraController : public ICameraController

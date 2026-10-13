@@ -2,6 +2,8 @@
 param(
     [Alias('SourceRepository')][string]$source_repository,
     [Alias('FbxSdkRoot')][string]$fbx_sdk_root,
+    [Alias('FsrSdkRoot')][string]$fsr_sdk_root,
+    [Alias('StreamlineSdkRoot')][string]$streamline_sdk_root,
     [switch]$force
 )
 
@@ -84,6 +86,84 @@ function Install-PackageTree($package, [string]$source_path) {
     }
 }
 
+function Install-FidelityFxPackage($package, [string]$source_root) {
+    $destination = [IO.Path]::GetFullPath((Join-Path $repo_root ($package.installPath -replace '/', '\')))
+    if (-not $source_root) {
+        if (Test-Path -LiteralPath $destination -PathType Container) {
+            Install-PackageTree $package $destination
+        }
+        else {
+            Write-Host "$($package.name) $($package.version): skipped; pass -FsrSdkRoot <SDK folder> to install it."
+        }
+        return
+    }
+
+    $source_root = (Resolve-Path -LiteralPath $source_root).Path
+    $fidelityfx_root = Join-Path $source_root 'Kits\FidelityFX'
+    if (-not (Test-Path -LiteralPath $fidelityfx_root -PathType Container) -and
+        (Test-Path -LiteralPath (Join-Path $source_root 'api\include\ffx_api.h') -PathType Leaf)) {
+        $fidelityfx_root = $source_root
+    }
+    if (-not (Test-Path -LiteralPath (Join-Path $fidelityfx_root 'api\include\ffx_api.h') -PathType Leaf) -or
+        -not (Test-Path -LiteralPath (Join-Path $fidelityfx_root 'signedbin\amd_fidelityfx_loader_dx12.dll') -PathType Leaf)) {
+        throw "FsrSdkRoot must contain Kits\FidelityFX or be the FidelityFX package folder: $source_root"
+    }
+
+    $package_source = Join-Path $packages_root ('.fidelityfx-source-' + [Guid]::NewGuid().ToString('N'))
+    try {
+        $fidelityfx_destination = Join-Path $package_source 'Kits\FidelityFX'
+        New-Item -ItemType Directory -Path $fidelityfx_destination -Force | Out-Null
+        Get-ChildItem -LiteralPath $fidelityfx_root -Force | Copy-Item -Destination $fidelityfx_destination -Recurse -Force
+        Install-PackageTree $package $package_source
+    }
+    finally {
+        if (Test-Path -LiteralPath $package_source) {
+            Remove-Item -LiteralPath $package_source -Recurse -Force
+        }
+    }
+}
+
+function Install-StreamlinePackage($package, [string]$source_root) {
+    $destination = [IO.Path]::GetFullPath((Join-Path $repo_root ($package.installPath -replace '/', '\')))
+    if (-not $source_root) {
+        if (Test-Path -LiteralPath $destination -PathType Container) {
+            Install-PackageTree $package $destination
+        }
+        else {
+            Write-Host "$($package.name) $($package.version): skipped; pass -StreamlineSdkRoot <SDK folder> to install it."
+        }
+        return
+    }
+
+    $source_root = (Resolve-Path -LiteralPath $source_root).Path
+    if (-not (Test-Path -LiteralPath (Join-Path $source_root 'include\sl.h') -PathType Leaf) -or
+        -not (Test-Path -LiteralPath (Join-Path $source_root 'bin\x64\sl.interposer.dll') -PathType Leaf)) {
+        throw "StreamlineSdkRoot must contain include\sl.h and bin\x64\sl.interposer.dll: $source_root"
+    }
+
+    # Keep only the public headers, shipping x64 runtime payload, and upstream license notices.
+    $package_source = Join-Path $packages_root ('.streamline-source-' + [Guid]::NewGuid().ToString('N'))
+    try {
+        $include_destination = Join-Path $package_source 'include'
+        $runtime_destination = Join-Path $package_source 'bin\x64'
+        New-Item -ItemType Directory -Path $include_destination,$runtime_destination -Force | Out-Null
+        Get-ChildItem -LiteralPath (Join-Path $source_root 'include') -Force | Copy-Item -Destination $include_destination -Recurse -Force
+        Get-ChildItem -LiteralPath (Join-Path $source_root 'bin\x64') -File -Force | Copy-Item -Destination $runtime_destination -Force
+        foreach ($license_name in @('license.txt', '3rd-party-licenses.md')) {
+            $license_path = Join-Path $source_root $license_name
+            if (Test-Path -LiteralPath $license_path -PathType Leaf) {
+                Copy-Item -LiteralPath $license_path -Destination $package_source -Force
+            }
+        }
+        Install-PackageTree $package $package_source
+    }
+    finally {
+        if (Test-Path -LiteralPath $package_source) {
+            Remove-Item -LiteralPath $package_source -Recurse -Force
+        }
+    }
+}
+
 function Get-DxcSource($package) {
     if ($source_repository) {
         $local_source = Join-Path $source_repository 'Engine\Ext\dxc'
@@ -147,3 +227,9 @@ if ($version_text -notmatch 'FBXSDK_VERSION_MAJOR\s+2020' -or $version_text -not
     throw "Expected FBX SDK $($fbx.version), but the version header differs: $version_header"
 }
 Install-PackageTree $fbx $fbx_source
+
+$fidelityfx = $manifest.packages | Where-Object name -eq 'fidelityfx-sdk' | Select-Object -First 1
+Install-FidelityFxPackage $fidelityfx $fsr_sdk_root
+
+$streamline = $manifest.packages | Where-Object name -eq 'streamline-sdk' | Select-Object -First 1
+Install-StreamlinePackage $streamline $streamline_sdk_root

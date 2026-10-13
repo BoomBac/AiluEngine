@@ -1,6 +1,9 @@
 #include "Render/Camera.h"
+#include "Render/RenderingData.h"
 
+#include <cstring>
 #include <iostream>
+#include <new>
 #include <stdexcept>
 
 using namespace Ailu;
@@ -67,12 +70,25 @@ namespace
         Require(Equal(camera.GetPrevViewProj(), before_custom), "custom VP must retain previous rendered state");
         Require(Equal(camera.GetViewProjJittered(), camera.GetViewProjNoJitter()), "custom VP must remain jitter-free");
     }
+
+    void CheckFirstFrameHandles()
+    {
+        // Reused heap storage must not select a temporal output before its first producer is registered.
+        alignas(RenderingData) u8 storage[sizeof(RenderingData)];
+        std::memset(storage, 0xCD, sizeof(storage));
+        auto *data = new (storage) RenderingData;
+        const bool valid = !data->_rg_handles._upscaled_color.IsValid() && !data->_rg_handles._taa_color.IsValid() &&
+                           !data->_rg_handles._final_color.IsValid() && !data->_rg_handles._final_depth.IsValid();
+        data->~RenderingData();
+        Require(valid, "first-frame temporal/final handles must be invalid even in reused heap storage");
+    }
 }
 
 int main()
 {
     try
     {
+        CheckFirstFrameHandles();
         CheckHistory(ECameraType::kPerspective);
         CheckHistory(ECameraType::kOrthographic);
         std::cout << "CameraTemporalHistorySmoke PASS: first frame, rebuild, skipped/duplicate, reset, custom VP\n";

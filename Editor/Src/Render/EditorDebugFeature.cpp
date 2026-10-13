@@ -311,18 +311,20 @@ namespace Ailu::Render
             // 编辑器叠加画在后处理结果之上，不再写场景颜色。
             RDG::RGHandle &color_target = rendering_data.FinalColorHandle();
             builder.Read(color_target, EResourceUsage::kWriteRTV);
-            builder.Read(rendering_data._rg_handles._depth_target, EResourceUsage::kDSV);
+            builder.Read(rendering_data.FinalDepthHandle(), EResourceUsage::kDSV);
             color_target = builder.Write(color_target);
-            rendering_data._rg_handles._depth_target = builder.Write(rendering_data._rg_handles._depth_target,
+            rendering_data.FinalDepthHandle() = builder.Write(rendering_data.FinalDepthHandle(),
                                                                        EResourceUsage::kDSV);
-        }, [this](RDG::RenderGraph &, CommandBuffer *cmd, const RenderingData &pass_rendering_data)
+        }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &pass_rendering_data)
         {
             cmd->SetRenderTargetLoadAction(pass_rendering_data.FinalColorHandle(), ELoadStoreAction::kLoad);
-            cmd->SetRenderTargetLoadAction(pass_rendering_data._rg_handles._depth_target, ELoadStoreAction::kLoad);
+            cmd->SetRenderTargetLoadAction(pass_rendering_data.FinalDepthHandle(), ELoadStoreAction::kLoad);
             cmd->SetRenderTarget(pass_rendering_data.FinalColorHandle(),
-                                 pass_rendering_data._rg_handles._depth_target);
-            cmd->SetViewport(pass_rendering_data._viewport);
-            cmd->SetScissorRect(pass_rendering_data._scissor_rect);
+                                 pass_rendering_data.FinalDepthHandle());
+            const TextureDesc color_desc = graph.GetTextureDesc(pass_rendering_data.FinalColorHandle());
+            const Rect viewport(0, 0, color_desc._width, color_desc._height);
+            cmd->SetViewport(viewport);
+            cmd->SetScissorRect(viewport);
             DrawLightProbeGroups(pass_rendering_data);
             DrawDDGIVolumes(pass_rendering_data);
             Gizmo::Submit(cmd, &pass_rendering_data);

@@ -78,11 +78,11 @@ M0。
 
 ## Progress
 
-- [ ] 真实源码/SDK/GPU/构建信息记录到 `progress.md`
-- [ ] SDK 可选开关 + 同版本 SDK 依赖 / 安全加载
-- [ ] Runtime 初始化、Shutdown、capability、日志
-- [ ] Manual Hooking 所需 native/proxy 接线完成
-- [ ] `presentCommon` 每帧命中（包括 Resize 后）
+- [x] 真实源码/SDK/GPU/构建信息记录到 `progress.md`
+- [x] SDK 可选开关 + 同版本 SDK 依赖 / 安全加载（on/off 构建及缺 DLL 回退实测）
+- [x] Runtime 初始化、Shutdown、capability、日志（隔离 RTX fixture 三次受控退出）
+- [x] Manual Hooking 所需 native/proxy 接线完成（实际已使用的主窗口 API；失败 upgrade 不发布 borrowed 引用）
+- [x] `presentCommon` 每帧命中（包括 Resize 后；生产 DLL 直接断点 606/606；最终三次 30/30）
 - [ ] SL off / SL unavailable / SL loaded 三种路径验收
 
 ## Decision Log
@@ -117,7 +117,9 @@ M1 加入 FrameToken、Viewport、CommandCustom 入口和原生资源生命周�
 
 ## Outcomes
 
-待执行者填写：新增/修改文件、build 日志路径、hook 断点证据、capability 与退出结果。
+2026-10-12 用户授权后已修复接口失败 ownership、native GetDesc 路由及退出时 COM 引用残留。
+生产 SDK 的直接 hook 配对与最终三次 zero-live-object 退出通过；最新证据见 `m0-repair-20261012.md`。
+完整 SDK-off/非 RTX/最终视觉矩阵仍未完成，整体继续留在 M0，不推进 M1。
 
 ## Resume Protocol
 

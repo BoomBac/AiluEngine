@@ -26,10 +26,12 @@ Engine/Ext/
 ├─ stb/               # Vendor source
 └─ Packages/          # Local SDK/package install; ignored by Git
    ├─ dxc/
-   └─ fbxsdk/
+   ├─ fbxsdk/
+   ├─ fidelityfx-sdk-2.3.0/
+   └─ streamline-sdk-2.14.1/
 ```
 
-The package lock is `Scripts/packages.json`. `Scripts/setup_ext.ps1` installs and verifies the pinned DXC package, imports the FBX SDK from an installed SDK folder, and verifies each package tree before installation. On this machine it can import the existing files from the sibling `AiluEngineOldd` checkout.
+The package lock is `Scripts/packages.json`. `Scripts/setup_ext.ps1` installs and verifies the pinned DXC package, imports the FBX and FidelityFX SDKs from local SDK folders, trims the NVIDIA Streamline package to its public headers and x64 runtime, and verifies each resulting package tree. The large SDK packages stay under the Git-ignored `Engine/Ext/Packages/` directory.
 
 ```powershell
 .\Scripts\setup_ext.ps1
@@ -40,9 +42,13 @@ On another machine, provide the source checkout or FBX SDK folder explicitly:
 ```powershell
 .\Scripts\setup_ext.ps1 -SourceRepository 'D:\src\AiluEngineOldd'
 .\Scripts\setup_ext.ps1 -FbxSdkRoot 'C:\Program Files\Autodesk\FBX\FBX SDK\2020.2.1'
+.\Scripts\setup_ext.ps1 -FsrSdkRoot 'D:\SDKs\FidelityFX-SDK-2.3.0'
+.\Scripts\setup_ext.ps1 -StreamlineSdkRoot 'D:\SDKs\streamline-sdk-v2.14.1'
 ```
 
-Install Autodesk FBX SDK 2020.2.1 under its license; do not commit or redistribute the SDK package. DXC 1.7.2308 is pinned to the [Microsoft release](https://github.com/microsoft/DirectXShaderCompiler/releases/tag/v1.7.2308).
+Install Autodesk FBX SDK 2020.2.1 under its license. Use the official AMD FidelityFX SDK 2.3.0 and NVIDIA Streamline SDK 2.14.1 packages; the lock records their source and tree checksums. The NVIDIA archive is additionally checked against its release SHA-256. These local SDKs are ignored by Git; follow the corresponding vendor license and do not commit or redistribute their runtime binaries. DXC 1.7.2308 is pinned to the [Microsoft release](https://github.com/microsoft/DirectXShaderCompiler/releases/tag/v1.7.2308).
+
+To compile both temporal upscaling backends, configure with `AILU_WITH_FSR=ON` and `AILU_WITH_STREAMLINE=ON`. Their default SDK roots point at the versioned package directories above; both compile options remain off by default.
 
 ## Submodule workflow
 
@@ -92,8 +98,8 @@ The `.gitmodules` branch setting guides `git submodule update --remote`; it does
 ## New-machine restore
 
 1. Clone AiluEngine with recursive submodules.
-2. Install Autodesk FBX SDK 2020.2.1 under its license.
-3. Run `Scripts/setup_ext.ps1`, passing `-FbxSdkRoot` if the SDK is not available from a legacy checkout.
+2. Install Autodesk FBX SDK 2020.2.1 and download the vendor SDK packages under their licenses.
+3. Run `Scripts/setup_ext.ps1`, passing `-FbxSdkRoot`, `-FsrSdkRoot`, and `-StreamlineSdkRoot` for SDK sources that are not already installed.
 4. Configure and build AiluEngine normally.
 
 The restore flow uses Git for pinned source, the main repository for small vendored source and project assets, and the package setup script for large binary dependencies.

@@ -83,6 +83,9 @@ namespace Ailu
             Mesh();
             explicit Mesh(String name);
             ~Mesh();
+            static Ref<Mesh> CreateFromData(String name, Vector<Vector3f> &&vertices, Vector<Vector3f> &&normals,
+                                            Vector<Vector4f> &&tangents, Vector<Vector2f> &&uvs,
+                                            Vector<Vector<u32>> &&submeshes, const AABB &bounds);
             virtual void Apply();
             virtual void BuildDerivedData();
             virtual void UploadGpuResources();

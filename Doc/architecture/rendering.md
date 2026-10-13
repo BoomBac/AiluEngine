@@ -35,6 +35,17 @@ all glass samples the same pre-transparent snapshot. Shadow maps still use the e
 
 Postprocess overlays (PickBuffer, selection outline, GizmoPass and EditorDebugPass) explicitly load their existing
 final color/depth attachments before drawing. They preserve the scene independently of transient texture load defaults.
+When postprocessing produces a larger color output (DLSS SR), `PostprocessOverlayDepth` point-samples the scene depth
+into a matching DSV. Depth-tested overlays use `RenderingData::FinalDepthHandle()` and the final color dimensions;
+the original scene depth and render viewport remain at the scene input resolution. This avoids DX12 clamping the
+overlay viewport to the smaller scene depth attachment.
+The overlay depth copy uses its own `postprocess_overlay_depth.hlsl` shader/pass 0, leaving the shared Blit shader
+unchanged. Shader pass metadata must be declared inside the `//info begin` / `//info end` block.
+
+`RenderingData` value-initializes its graph handles so the first frame cannot select an unproduced temporal output.
+Overlay consumers receive the depth version written by the producer (`GetTexture` after registration), rather than
+the creation-time v0 handle, which has no producer. A graph validation failure can skip one-time environment work;
+this must be fixed at the invalid access rather than hidden by changing the SkyView update schedule.
 
 当前主要路径可以概括为：
 
@@ -185,6 +196,17 @@ RenderFeature
 ## RenderFeature
 
 `RenderFeature` 是当前较合理的可选渲染扩展点。
+
+The Streamline DLSS and optional FidelityFX FSR DX12 backends share one temporal-mode resolver and RenderGraph SR
+feature. The resolver selects the effective mode and render size before `PrepareRenderFrame`, so jitter and frame
+resources use the selected input dimensions. The pass evaluates SR after color/depth/motion-vector production and
+before postprocessing; postprocessing reads the upscaled color handle and derives source dimensions from the graph
+texture description. TAA history is invalidated while either SR mode is active. The pass records a spatial upscale
+fallback before native SDK evaluation. Scene View's camera settings expose FSR beside DLSS in the upsampling selector;
+The camera stores a shared super-resolution mode (Off, DLSS or FSR) and quality (Quality, Balanced, Performance
+or Ultra Performance). DLSS maps the shared quality to its supported modes; FSR supports all four qualities. The
+selected FSR quality drives the SDK render-resolution query and resulting dispatch dimensions.
+FSR SDK dispatch, motion-vector/depth conventions, and DX12 state restoration still require runtime validation.
 
 适合：
 
@@ -539,3 +561,14 @@ The Editor preview fits a locked camera's source aspect inside its existing prev
 texture/display dimensions, not the source projection. Existing native camera defaults and preview ratio remain unchanged.
 
 Camera render scale multiplies the camera output dimensions for internal GBuffer, depth, and color resources. The final presentation blit restores output dimensions using the camera's bilinear or point upsampling choice; a scale of 1 preserves the original dimensions.
+
+## Path tracer GGX sampling
+
+Compute and DXR share `ray_trace/sampling.hlsli`. `SAMPLE_BRDF_VNDF_GGX` defaults to 1 for Heitz 2018
+visible-normal sampling; setting it to 0 before inclusion selects the legacy NDF control. The numeric switch
+controls opaque specular and rough dielectric sampling together with their evaluation/MIS PDFs.
+VNDF reflection has direction PDF `D(h) * G1(wo) / (4 * abs(n.wo))`. Dielectric transmission uses the same
+conditional microfacet-normal PDF followed by the existing refraction Jacobian and Fresnel lobe probability.
+Normals face the incident path direction at both front-face and back-face hits. Rejected directions terminate
+the sample without resampling or renormalization. BSDF values, discrete mirror events and random streams retain
+their existing contracts; switching the sampler requires shader recompilation and fresh reference accumulation.

@@ -50,6 +50,7 @@ namespace Ailu::Render
                 AL_DELETE(g_pGfxContext);
                 g_pGfxContext = nullptr;
         RHI::DX12::GpuResourceManager::Shutdown();
+        RHI::DX12::D3DContext::ReportLiveObjects();
         }
     GraphicsContext &GraphicsContext::Get()
     {

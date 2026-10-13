@@ -19,14 +19,18 @@ namespace Ailu::Render
     RDG::RGHandle BloomPass::Record(RDG::RenderGraph &graph, RDG::RGHandle source, const RenderingData &rendering_data,
                                     const BloomSettings &settings)
     {
-        const u16 iterator_count = std::min<u16>(Texture::MaxMipmapCount(rendering_data._width, rendering_data._height), _mip_count);
+        (void) rendering_data;
+        const TextureDesc source_desc = graph.GetTextureDesc(source);
+        const u32 source_width = source_desc._width;
+        const u32 source_height = source_desc._height;
+        const u16 iterator_count = std::min<u16>(Texture::MaxMipmapCount(source_width, source_height), _mip_count);
         Vector<RDG::RGHandle> bloom_mips;
         bloom_mips.reserve(iterator_count);
         for (u16 i = 1u; i <= iterator_count; ++i)
         {
             TextureDesc desc;
-            desc._width = std::max<u32>(1u, rendering_data._width >> i);
-            desc._height = std::max<u32>(1u, rendering_data._height >> i);
+            desc._width = std::max<u32>(1u, source_width >> i);
+            desc._height = std::max<u32>(1u, source_height >> i);
             desc._format = ConvertRenderTextureFormatToPixelFormat(ERenderTargetFormat::kDefaultHDR);
             desc._is_color_target = true;
             desc._load = ELoadStoreAction::kNotCare;
@@ -37,17 +41,19 @@ namespace Ailu::Render
         {
             const RDG::RGHandle input = i == 0u ? source : bloom_mips[i - 1u];
             const RDG::RGHandle output = bloom_mips[i];
-            graph.AddPass(std::format("BloomDownsample_{}", i), RDG::PassDesc(), [input, output](RDG::RenderGraphBuilder &builder)
+            graph.AddPass(std::format("BloomDownsample_{}", i), RDG::PassDesc(),
+                          [input, output](RDG::RenderGraphBuilder &builder)
             {
                 builder.Read(input);
                 (void) builder.Write(output);
-            }, [this, input, output, settings, i](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
+            }, [this, input, output, settings, i, source_width, source_height](RDG::RenderGraph &graph,
+                                                                               CommandBuffer *cmd, const RenderingData &)
             {
                 cmd->SetRenderTarget(graph.GetTexture(std::format("BloomMip_{}", i)));
                 const f32 mip_scale = static_cast<f32>(i + 1u);
                 const f32 blur_radius = settings._radius / mip_scale;
-                const f32 input_width = static_cast<f32>(std::max<u32>(1u, data._width >> i));
-                const f32 input_height = static_cast<f32>(std::max<u32>(1u, data._height >> i));
+                const f32 input_width = static_cast<f32>(std::max<u32>(1u, source_width >> i));
+                const f32 input_height = static_cast<f32>(std::max<u32>(1u, source_height >> i));
                 _bloom_mats[i]->SetVector("_SampleParams",
                                           Vector4f(1.0f / input_width, 1.0f / input_height, blur_radius, settings._intensity));
                 _bloom_mats[i]->SetTexture("_SourceTex", graph.Resolve<Texture>(input));
@@ -64,11 +70,12 @@ namespace Ailu::Render
             {
                 builder.Read(current);
                 (void) builder.Write(output);
-            }, [this, current, output, settings, i](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
+            }, [this, current, output, settings, i, source_width, source_height](RDG::RenderGraph &graph,
+                                                                                 CommandBuffer *cmd, const RenderingData &)
             {
                 cmd->SetRenderTarget(graph.GetTexture(std::format("BloomMip_{}", i - 2u)));
-                const f32 width = static_cast<f32>(std::max<u32>(1u, data._width >> (i - 1u)));
-                const f32 height = static_cast<f32>(std::max<u32>(1u, data._height >> (i - 1u)));
+                const f32 width = static_cast<f32>(std::max<u32>(1u, source_width >> (i - 1u)));
+                const f32 height = static_cast<f32>(std::max<u32>(1u, source_height >> (i - 1u)));
                 _bloom_mats[i - 1u]->SetVector("_SampleParams",
                                                Vector4f(1.0f / width, 1.0f / height,
                                                         settings._radius / static_cast<f32>(i), settings._intensity));
@@ -78,7 +85,7 @@ namespace Ailu::Render
             bloom_mips[i - 2u] = graph.GetTexture(std::format("BloomMip_{}", i - 2u));
         }
 
-        TextureDesc output_desc(rendering_data._width, rendering_data._height, ERenderTargetFormat::kDefaultHDR);
+        TextureDesc output_desc(source_width, source_height, ERenderTargetFormat::kDefaultHDR);
         output_desc._is_color_target = true;
         output_desc._load = ELoadStoreAction::kNotCare;
         const RDG::RGHandle output = graph.CreateResource(output_desc, "BloomColor");

@@ -24,6 +24,8 @@
 #include "Render/GraphicsContext.h"
 #include "Render/GfxCommand.h"
 #include "D3DResource.h"
+#include "RHI/DX12/FsrRuntime.h"
+#include "RHI/DX12/StreamlineRuntime.h"
 #include "D3DQueueResourceStateTracker.h"
 #include "Platform/WinWindow.h"
 #include "Framework/Math/ALMath.hpp"
@@ -165,6 +167,8 @@ namespace Ailu::RHI::DX12
         f32 TotalGPUMemeryUsage() final;
 
         ID3D12Device5* GetDevice() { return m_device.Get(); };
+        FsrRuntime& GetFsrRuntime() { return _fsr_runtime; }
+        StreamlineRuntime& GetStreamlineRuntime() { return _streamline_runtime; }
         void TrackResource(ComPtr<ID3D12Resource> resource);
         void SetExternalState(const D3DResource &resource, Render::EResourceState state,
                               u32 sub_res = Render::kTotalSubRes)
@@ -198,6 +202,7 @@ namespace Ailu::RHI::DX12
         bool IsHardwareRayTracingSupported() const final;
         bool IsInlineRayTracingSupported() const final;
         void ReportDeviceRemoved(HRESULT operation_hr, const char *operation);
+        static void ReportLiveObjects();
     private:
         void Destroy();
         void SyncGpuResourcesForImmediateRecording();
@@ -227,6 +232,10 @@ namespace Ailu::RHI::DX12
         // Pipeline objects.
         ComPtr<ID3D12Device5> m_device;
         ComPtr<ID3D12CommandQueue> m_commandQueue;
+        ComPtr<ID3D12Device> _streamline_device_proxy;
+        FsrRuntime _fsr_runtime;
+        StreamlineRuntime _streamline_runtime;
+        bool _streamline_hooks_ready = false;
 
         TracyD3D12Ctx _tracy_d3d12_ctx = nullptr;
         ComPtr<IDXGIAdapter4> _p_adapter;

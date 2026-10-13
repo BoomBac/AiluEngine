@@ -19,6 +19,12 @@ function pointers, descriptors and callbacks before unload. Operations on the sa
 serialization; it has no internal synchronization. Logging uses `LogMgr`, which must already be initialized
 and remain alive for failure reporting.
 
+Long-lived Engine resources must be constructed by Engine APIs before they are retained by assets, scenes or
+other Engine systems. A plugin may prepare/import resource data, but must not create a plugin-local
+`shared_ptr` control block for an object that can outlive the plugin; its deleter/control-block code can reside
+in the plugin DLL after that DLL is unloaded. Plugin-owned temporary objects must be destroyed during
+`OnUnload` before `FreeLibrary`.
+
 ## ABI v1
 
 `Engine/Inc/Framework/Plugin/PluginApi.h` defines four fixed C exports with explicit Windows `__cdecl`:
@@ -165,6 +171,8 @@ scene/view-layer state is restored, and incremental synchronization waits for Ob
 Full/incremental exports suppress their own depsgraph notifications and explicitly drain deferred view-layer
 updates before restoring change tracking. Pending real edits are processed before entering suppression; no
 post-export time window discards user edits. FullSync end closes one batch; later user edits are still incremental.
+Incremental material-only edits coalesce for 450 ms before the main-thread Cycles bake. Each bake batch writes channel
+PNGs to unique temporary paths so queued material packets cannot read a later bake's overwritten files.
 Node cloning copies instance settings only; RNA registration properties and `bl_*` metadata are excluded because
 their setters modify shared Blender node types. Source socket collections are snapshotted before recursive cloning.
 
@@ -280,7 +288,9 @@ A complete successful snapshot reparents retained objects before deleting unseen
 or failed snapshots never prune unseen objects. Different source scenes retain separate roots.
 
 Meshes, materials and copied texture sources are registered/saved under project://BlenderLiveLink/<source-scene-guid>/.
-Meshes use immutable assets when geometry changes, so previously shared objects can diverge safely. Validated equal
+The Engine creates procedural Mesh objects from the plugin's transferred CPU geometry; the plugin does not create
+the long-lived Mesh shared_ptr. Meshes use immutable assets when geometry changes, so previously shared objects can
+diverge safely. Validated equal
 incoming geometry reuses a loaded mesh without rebuilding or resaving it. Old mesh assets are retained; no automatic
 orphan deletion is performed. Texture documents preserve color/data/normal import settings and refer to project copies,
 not Blender bake cache paths. Blender owns imported transform/hierarchy/visibility/geometry/material fields; engine-side

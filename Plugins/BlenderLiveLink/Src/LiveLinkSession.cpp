@@ -541,27 +541,10 @@ namespace Ailu
                 return true;
             }
         }
-        auto mesh = MakeRef<Render::Mesh>("BlenderLiveLink_" + guid_text);
-        mesh->SetVertices(std::move(positions));
-        mesh->SetNormals(std::move(normals));
-        mesh->SetTangents(std::move(tangents));
-        mesh->SetUVs(std::move(uvs));
-        for (auto& indices : submeshes)
-            mesh->AddSubmesh(std::move(indices));
         const AABB bounds(Vector3f(bounds_values[0], bounds_values[1], bounds_values[2]),
             Vector3f(bounds_values[3], bounds_values[4], bounds_values[5]));
-        std::vector<AABB> mesh_bounds;
-        mesh_bounds.reserve(static_cast<size_t>(submesh_count) + 1u);
-        mesh_bounds.push_back(bounds);
-        for (const auto& indices : submeshes)
-        {
-            AABB submesh_bounds = AABB::Infinity();
-            for (u32 vertex_index : indices)
-                AABB::Encapsulate(submesh_bounds, positions[vertex_index]);
-            mesh_bounds.push_back(indices.empty() ? bounds : submesh_bounds);
-        }
-        mesh->SetBounds(std::span<const AABB>(mesh_bounds.data(), mesh_bounds.size()));
-        mesh->Apply();
+        auto mesh = Render::Mesh::CreateFromData("BlenderLiveLink_" + guid_text, std::move(positions),
+            std::move(normals), std::move(tangents), std::move(uvs), std::move(submeshes), bounds);
         PublishMesh(guid_text, entity_iter->second, mesh, material_slots, revision);
         _mesh_cache.Store(geometry, mesh, material_slots);
         return true;

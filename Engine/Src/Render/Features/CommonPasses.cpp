@@ -1459,9 +1459,9 @@ namespace Ailu::Render
                     // Gizmo 叠加在后处理结果之上，不再读写场景颜色。
                     RDG::RGHandle &color_target = rendering_data.FinalColorHandle();
                     builder.Read(color_target, EResourceUsage::kWriteRTV);
-                    builder.Read(rendering_data._rg_handles._depth_target, EResourceUsage::kDSV);
+                    builder.Read(rendering_data.FinalDepthHandle(), EResourceUsage::kDSV);
                     color_target = builder.Write(color_target);
-                    rendering_data._rg_handles._depth_target = builder.Write(rendering_data._rg_handles._depth_target,EResourceUsage::kDSV);
+                    rendering_data.FinalDepthHandle() = builder.Write(rendering_data.FinalDepthHandle(),EResourceUsage::kDSV);
                 },[this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data)
                 {
                     Vector4f axis[3];
@@ -1471,17 +1471,21 @@ namespace Ailu::Render
                     Gizmo::DrawLine(axis[2].xy, axis[2].zw, Colors::kBlue);
                     bool is_2d_grid = Is2DGridCamera(rendering_data);
                     cmd->SetRenderTargetLoadAction(rendering_data.FinalColorHandle(), ELoadStoreAction::kLoad);
-                    cmd->SetRenderTargetLoadAction(rendering_data._rg_handles._depth_target, ELoadStoreAction::kLoad);
+                    cmd->SetRenderTargetLoadAction(rendering_data.FinalDepthHandle(), ELoadStoreAction::kLoad);
                     if (is_2d_grid)
                         cmd->SetRenderTarget(rendering_data.FinalColorHandle());
                     else
-                        cmd->SetRenderTarget(rendering_data.FinalColorHandle(), rendering_data._rg_handles._depth_target);
+                        cmd->SetRenderTarget(rendering_data.FinalColorHandle(), rendering_data.FinalDepthHandle());
+
+                    const TextureDesc color_desc = graph.GetTextureDesc(rendering_data.FinalColorHandle());
+                    cmd->SetViewport(Rect(0, 0, color_desc._width, color_desc._height));
+                    cmd->SetScissorRect(Rect(0, 0, color_desc._width, color_desc._height));
 
                     Matrix4x4f grid_plane_pos = GetGridPlaneMatrix(rendering_data);
                     SetGridPlaneAxisMode(mat_gird_plane, rendering_data);
                     cmd->DrawMesh(Mesh::s_plane.lock().get(), mat_gird_plane, grid_plane_pos);
                     if (is_2d_grid)
-                        cmd->SetRenderTarget(rendering_data.FinalColorHandle(), rendering_data._rg_handles._depth_target);
+                        cmd->SetRenderTarget(rendering_data.FinalColorHandle(), rendering_data.FinalDepthHandle());
                     u16 entity_index = 0;
                     for (auto &light_comp: SceneMgr::Get().ActiveScene()->GetRegister().View<ECS::LightComponent>())
                     {

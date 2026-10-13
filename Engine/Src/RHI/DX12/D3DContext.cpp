@@ -9,6 +9,8 @@
 #include "Framework/Common/Profiler.h"
 #include "Framework/Common/RenderDebugConfig.h"
 #include "RHI/DX12/D3DCommandBuffer.h"
+#include "RHI/DX12/StreamlineDx12Bridge.h"
+#include "RHI/DX12/D3DRootSignaturePool.h"
 #include "RHI/DX12/D3DGPUTimer.h"
 #include "RHI/DX12/D3DSwapchain.h"
 #include "RHI/DX12/GPUResourceManager.h"
@@ -162,7 +164,9 @@ namespace Ailu::RHI::DX12
                         ++s_debug_message_kinds[kind_index]._count;
                         // ERROR/CORRUPTION 立刻落盘：批量刷新有帧间隔，若首个错误会触发中断，
                         // 攒在计数里的那条就永远看不到。
-                        if (message->Severity >= D3D12_MESSAGE_SEVERITY_ERROR)
+                        // D3D12 severity values are ordered from most to least severe, so WARNING (2)
+                        // must not enter the immediate error path.
+                        if (message->Severity <= D3D12_MESSAGE_SEVERITY_ERROR)
                         {
                             LOG_ERROR("D3D12 debug layer immediate: severity={}, id={}, desc={}",
                                       static_cast<u32>(message->Severity), static_cast<u32>(message->ID),
@@ -676,24 +680,29 @@ namespace Ailu::RHI::DX12
                                    DXGI_QUERY_VIDEO_MEMORY_INFO *p_local_video_memory_info,
                                    DXGI_QUERY_VIDEO_MEMORY_INFO *p_non_local_video_memory_info)
     {
-        IDXGIAdapter *pAdapter = nullptr;
-        IDXGIAdapter4 *pAdapter4 = nullptr;
+        ComPtr<IDXGIAdapter> adapter;
+        ComPtr<IDXGIAdapter4> adapter4;
         *ppAdapter = nullptr;
-        for (UINT adapterIndex = 0; DXGI_ERROR_NOT_FOUND != pFactory->EnumAdapters(adapterIndex, &pAdapter); adapterIndex++)
+        for (UINT adapter_index = 0;; ++adapter_index)
         {
+            const HRESULT enum_result = pFactory->EnumAdapters(adapter_index, adapter.ReleaseAndGetAddressOf());
+            if (enum_result == DXGI_ERROR_NOT_FOUND)
+                break;
+            ThrowIfFailed(enum_result);
+            adapter4.Reset();
+            if (FAILED(adapter.As(&adapter4)))
+                continue;
             DXGI_ADAPTER_DESC3 desc{};
-            LOG_INFO("Info(Adapter index: {})------------------------------------------------------------------------------", adapterIndex);
-            if (SUCCEEDED(pAdapter->QueryInterface(IID_PPV_ARGS(&pAdapter4))))
-            {
-                pAdapter4->GetDesc3(&desc);
-                LOG_INFO(L"Description: {}", desc.Description);
-                LOG_INFO("DedicatedSystemMemory: {} mb", desc.DedicatedSystemMemory / 1024 / 1024);
-                LOG_INFO("SharedSystemMemory: {} mb", desc.SharedSystemMemory / 1024 / 1024);
-            }
+            LOG_INFO("Info(Adapter index: {})------------------------------------------------------------------------------",
+                     adapter_index);
+            ThrowIfFailed(adapter4->GetDesc3(&desc));
+            LOG_INFO(L"Description: {}", desc.Description);
+            LOG_INFO("DedicatedSystemMemory: {} mb", desc.DedicatedSystemMemory / 1024 / 1024);
+            LOG_INFO("SharedSystemMemory: {} mb", desc.SharedSystemMemory / 1024 / 1024);
             //
             // Obtain the default video memory information for the local and non-local segment groups.
             //
-            if (FAILED(pAdapter4->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, p_local_video_memory_info)))
+            if (FAILED(adapter4->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, p_local_video_memory_info)))
             {
                 LOG_ERROR("Failed to query initial video memory info for local segment group");
             }
@@ -708,7 +717,7 @@ namespace Ailu::RHI::DX12
                 LOG_INFO("CurrentUsage: {} mb", p_local_video_memory_info->CurrentUsage / 1024 / 1024);
             }
 
-            if (FAILED(pAdapter4->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL, p_non_local_video_memory_info)))
+            if (FAILED(adapter4->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL, p_non_local_video_memory_info)))
             {
                 LOG_ERROR("Failed to query initial video memory info for non-local segment group");
             }
@@ -729,9 +738,13 @@ namespace Ailu::RHI::DX12
             }
             // Check to see if the adapter supports Direct3D 12, but don't create the
             // actual device yet.
-            if (SUCCEEDED(D3D12CreateDevice(pAdapter4, D3D_FEATURE_LEVEL_11_0, __uuidof(ID3D12Device), nullptr))) { break; }
+            if (SUCCEEDED(D3D12CreateDevice(adapter4.Get(), D3D_FEATURE_LEVEL_11_0, __uuidof(ID3D12Device), nullptr)))
+            {
+                *ppAdapter = adapter4.Detach();
+                return;
+            }
         }
-        *ppAdapter = pAdapter4;
+        ThrowIfFailed(DXGI_ERROR_NOT_FOUND);
     }
     static RENDERDOC_API_1_1_2 *s_rdc_api = nullptr;
     static HMODULE s_rdc_module = nullptr;
@@ -807,6 +820,20 @@ namespace Ailu::RHI::DX12
     }
     namespace D3DConvertUtils
     {
+        Rect ClampViewportToTarget(Rect viewport, u32 target_width, u32 target_height)
+        {
+            if (target_width == 0u || target_height == 0u)
+                return Rect();
+
+            const u32 left = std::min<u32>(viewport.left, target_width - 1u);
+            const u32 top = std::min<u32>(viewport.top, target_height - 1u);
+            viewport.left = static_cast<u16>(left);
+            viewport.top = static_cast<u16>(top);
+            viewport.width = static_cast<u16>(std::min<u32>(viewport.width, target_width - left));
+            viewport.height = static_cast<u16>(std::min<u32>(viewport.height, target_height - top));
+            return viewport;
+        }
+
         D3D12_VIEWPORT ToD3DViewport(const Rect &viewport)
         {
             D3D12_VIEWPORT ret;
@@ -1013,7 +1040,10 @@ namespace Ailu::RHI::DX12
     {
         g_pGfxContext = this;
         _fence_value = 0u;
+        _streamline_hooks_ready = false;
+        _streamline_runtime.Init();
         LoadPipeline();
+        _fsr_runtime.Init(m_device.Get());
         LoadAssets();
         _readback_pool = MakeScope<ReadbackBufferPool>(m_device.Get());
         _p_gpu_timer = MakeScope<D3DGPUTimer>(m_device.Get(), m_commandQueue.Get(), RenderConstants::kFrameCount);
@@ -1216,8 +1246,16 @@ namespace Ailu::RHI::DX12
         // Ensure that the GPU is no longer referencing resources that are about to be
         // cleaned up by the destructor.
         WaitForGpu();
+        _fsr_runtime.Shutdown();
         GpuResourceRegistry::Get().Sync(_p_cmd_buffer_fence->GetCompletedValue());
         GpuResourceRegistry::Get().Clear();
+        _render_windows.clear();
+        _p_gpu_timer.reset();
+        D3DRootSignaturePool::Get().Clear();
+        m_commandQueue.Reset();
+        _streamline_device_proxy.Reset();
+        _streamline_runtime.Shutdown();
+        _streamline_hooks_ready = false;
 
         // #if defined(TRACY_ENABLE)
         //         if (_tracy_d3d12_ctx)
@@ -1234,12 +1272,34 @@ namespace Ailu::RHI::DX12
         //_p_gpu_timer->ReleaseDevice();
         //在这里析构分配器应该会有问题，纹理实际在在这之后还需要归还之前的分配
         D3DDescriptorMgr::Shutdown();
-        // 在程序终止时调用 ReportLiveObjects() 函数
-        IDXGIDebug1 *pDebug = nullptr;
-        if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&pDebug))))
+    }
+
+    void D3DContext::ReportLiveObjects()
+    {
+        ComPtr<IDXGIDebug1> debug;
+        ComPtr<IDXGIInfoQueue> messages;
+        if (FAILED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&debug))) ||
+            FAILED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&messages))))
         {
-            pDebug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_SUMMARY);
-            pDebug->Release();
+            LOG_INFO("DXGI live-object report unavailable after graphics teardown.");
+            return;
+        }
+        messages->ClearStoredMessages(DXGI_DEBUG_ALL);
+        const auto flags = static_cast<DXGI_DEBUG_RLO_FLAGS>(
+                DXGI_DEBUG_RLO_SUMMARY | DXGI_DEBUG_RLO_DETAIL | DXGI_DEBUG_RLO_IGNORE_INTERNAL);
+        const HRESULT result = debug->ReportLiveObjects(DXGI_DEBUG_ALL, flags);
+        const UINT64 count = messages->GetNumStoredMessages(DXGI_DEBUG_ALL);
+        LOG_INFO("DXGI live-object report after graphics teardown: hr=0x{:08X}, messages={}",
+                 static_cast<u32>(result), count);
+        for (UINT64 index = 0; index < count; ++index)
+        {
+            SIZE_T message_size = 0;
+            if (FAILED(messages->GetMessage(DXGI_DEBUG_ALL, index, nullptr, &message_size)))
+                continue;
+            Vector<u8> storage(message_size);
+            auto* message = reinterpret_cast<DXGI_INFO_QUEUE_MESSAGE*>(storage.data());
+            if (SUCCEEDED(messages->GetMessage(DXGI_DEBUG_ALL, index, message, &message_size)))
+                LOG_INFO("DXGI live-object report: {}", message->pDescription);
         }
     }
 
@@ -1405,6 +1465,14 @@ namespace Ailu::RHI::DX12
         ThrowIfFailed(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory)));
         GetHardwareAdapter(factory.Get(), _p_adapter.GetAddressOf(), &_local_video_memory_info, &_non_local_video_memory_info);
         ThrowIfFailed(D3D12CreateDevice(_p_adapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&m_device)));
+        ComPtr<ID3D12Device> native_device;
+        ThrowIfFailed(m_device.As(&native_device));
+        DXGI_ADAPTER_DESC3 adapter_desc{};
+        ThrowIfFailed(_p_adapter->GetDesc3(&adapter_desc));
+        LOG_INFO("DX12 adapter: {} (vendor=0x{:04X}, device=0x{:04X}).", ToChar(adapter_desc.Description),
+                 adapter_desc.VendorId, adapter_desc.DeviceId);
+        const bool streamline_device_attached = _streamline_runtime.AttachD3D12Device(
+                native_device.Get(), &adapter_desc.AdapterLuid, sizeof(adapter_desc.AdapterLuid));
         LOG_INFO("DRED diagnostics: breadcrumbs={}, page_fault={}",
                  g_engine_config._enable_dred_breadcrumbs, g_engine_config._enable_dred_page_fault);
         const auto raytracing_tier = GetDirectXRaytracingTier(_p_adapter.Get());
@@ -1442,7 +1510,28 @@ namespace Ailu::RHI::DX12
         D3D12_COMMAND_QUEUE_DESC queueDesc = {};
         queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
         queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-        ThrowIfFailed(m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_commandQueue)));
+        _streamline_device_proxy.Reset();
+        if (streamline_device_attached &&
+            StreamlineDx12Bridge::UpgradeDevice(_streamline_runtime, native_device.Get(),
+                                                _streamline_device_proxy.GetAddressOf()))
+        {
+            const HRESULT queue_hr = _streamline_device_proxy->CreateCommandQueue(
+                    &queueDesc, IID_PPV_ARGS(&m_commandQueue));
+            if (SUCCEEDED(queue_hr))
+            {
+                _streamline_hooks_ready = true;
+                LOG_INFO("Streamline: hooked ID3D12Device::CreateCommandQueue.");
+            }
+            else
+            {
+                LOG_WARNING("Streamline: proxy CreateCommandQueue failed (hr=0x{:08X}); using native DX12.",
+                            static_cast<u32>(queue_hr));
+                _streamline_device_proxy.Reset();
+                ThrowIfFailed(m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_commandQueue)));
+            }
+        }
+        else
+            ThrowIfFailed(m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_commandQueue)));
 
         // #if defined(TRACY_ENABLE)
         //     _tracy_d3d12_ctx = TracyD3D12Context(m_device.Get(), m_commandQueue.Get());
@@ -1559,6 +1648,16 @@ namespace Ailu::RHI::DX12
 
         ComPtr<IDXGIFactory6> factory;
         ThrowIfFailed(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory)));
+        ComPtr<IDXGIFactory6> proxy_factory;
+        ComPtr<IDXGIFactory> native_base_factory;
+        ThrowIfFailed(factory.As(&native_base_factory));
+        if (_streamline_hooks_ready &&
+            !StreamlineDx12Bridge::UpgradeFactory(_streamline_runtime, native_base_factory.Get(),
+                                                  proxy_factory.GetAddressOf()))
+        {
+            _streamline_hooks_ready = false;
+            LOG_WARNING("Streamline: factory proxy unavailable; this window will use native DXGI.");
+        }
 
         auto ctx = MakeScope<RenderWindowCtx>();
         ctx->_window = window;
@@ -1582,6 +1681,8 @@ namespace Ailu::RHI::DX12
             initializer._command_queue = m_commandQueue.Get();
             initializer._device = m_device.Get();
             initializer._factory = factory.Get();
+            initializer._proxy_factory = proxy_factory.Get();
+            initializer._streamline_runtime = _streamline_hooks_ready ? &_streamline_runtime : nullptr;
             initializer._format =
                     RenderConstants::kColorRange == EColorRange::kLDR ? RenderConstants::kLDRFormat : RenderConstants::kHDRFormat;
             initializer._is_fullscreen = false;
@@ -2232,8 +2333,10 @@ namespace Ailu::RHI::DX12
                     d3dcmd->SetActiveRenderTarget(depth_target);
                     d3dcmd->_color_count = 0u;
                     d3dcmd->_depth = drt->TargetCPUHandle(d3dcmd, set_cmd->_depth_index);
-                    d3dcmd->_scissors[0] = D3DConvertUtils::ToD3DRect(set_cmd->_viewports[0]);
-                    d3dcmd->_viewports[0] = D3DConvertUtils::ToD3DViewport(set_cmd->_viewports[0]);
+                    const Rect viewport = D3DConvertUtils::ClampViewportToTarget(
+                            set_cmd->_viewports[0], depth_target->Width(), depth_target->Height());
+                    d3dcmd->_scissors[0] = D3DConvertUtils::ToD3DRect(viewport);
+                    d3dcmd->_viewports[0] = D3DConvertUtils::ToD3DViewport(viewport);
                     d3dcmd->SetRenderTargets(0u, nullptr, d3dcmd->_depth);
                     d3dcmd->SetScissors(1u, d3dcmd->_scissors.data());
                     d3dcmd->SetViewports(1u, d3dcmd->_viewports.data());
@@ -2252,6 +2355,16 @@ namespace Ailu::RHI::DX12
                         is_depth_valid
                                 ? static_cast<D3DRenderTexture *>(depth_target)->TargetCPUHandle(d3dcmd, set_cmd->_depth_index)
                                 : nullptr;
+                u32 target_width = is_depth_valid ? depth_target->Width() : UINT32_MAX;
+                u32 target_height = is_depth_valid ? depth_target->Height() : UINT32_MAX;
+                for (u16 i = 0; i < set_cmd->_color_target_num; ++i)
+                {
+                    auto *color_target = static_cast<RenderTexture *>(GpuResourceRegistry::Get().Resolve(set_cmd->_color_target[i]));
+                    if (color_target == nullptr)
+                        return;
+                    target_width = std::min<u32>(target_width, color_target->Width());
+                    target_height = std::min<u32>(target_height, color_target->Height());
+                }
                 D3D12_CPU_DESCRIPTOR_HANDLE handles[RenderConstants::kMaxMRTNum]{};
                 for (u16 i = 0; i < d3dcmd->_color_count; ++i)
                 {
@@ -2259,8 +2372,10 @@ namespace Ailu::RHI::DX12
                     if (color_target == nullptr)
                         return;
                     d3dcmd->SetActiveRenderTarget(color_target);
-                    d3dcmd->_scissors[i] = D3DConvertUtils::ToD3DRect(set_cmd->_viewports[i]);
-                    d3dcmd->_viewports[i] = D3DConvertUtils::ToD3DViewport(set_cmd->_viewports[i]);
+                    const Rect viewport = D3DConvertUtils::ClampViewportToTarget(
+                            set_cmd->_viewports[i], target_width, target_height);
+                    d3dcmd->_scissors[i] = D3DConvertUtils::ToD3DRect(viewport);
+                    d3dcmd->_viewports[i] = D3DConvertUtils::ToD3DViewport(viewport);
                     EALGFormat color_format = color_target->PixelFormat();
                     cmd_buffer->RecordingContext().SetRenderTargetState(
                             color_format, is_depth_valid ? depth_target->PixelFormat() : EALGFormat::kALGFormatUNKOWN,
@@ -2288,6 +2403,7 @@ namespace Ailu::RHI::DX12
         {
             auto custom_cmd = static_cast<CommandCustom *>(cmd);
             custom_cmd->_func(cmd_buffer);
+            d3dcmd->ResetGraphicsStateCache();
         }
         else if (cmd->GetCmdType() == EGpuCommandType::kScissorRect)
         {

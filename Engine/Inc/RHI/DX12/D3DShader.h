@@ -282,7 +282,8 @@ namespace Ailu::RHI::DX12
         static D3D12_DEPTH_STENCIL_DESC ConvertToD3D12DepthStencilDesc(const DepthStencilState &state)
         {
             auto ds_state = CD3DX12_DEPTH_STENCIL_DESC(CD3DX12_DEFAULT{});
-            ds_state.DepthEnable = state._depth_test_func != ECompareFunc::kAlways && state._depth_test_func != ECompareFunc::kNever;
+            ds_state.DepthEnable = state._b_depth_write ||
+                                   (state._depth_test_func != ECompareFunc::kAlways && state._depth_test_func != ECompareFunc::kNever);
             ds_state.DepthFunc = ConvertToD3D12CompareFunc(state._depth_test_func);
             ds_state.StencilEnable = state._b_front_stencil;
             if (state._b_front_stencil)

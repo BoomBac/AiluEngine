@@ -2297,9 +2297,9 @@ namespace Ailu
             Vector3f cam_pos = cam_controller._target_pos;
             Vector2f cam_rot = cam_controller._rotation;
             ImGui::DragFloat3("CameraPos", cam_pos.data, 0.1f);
-            ImGui::DragFloat2("CameraRot", cam_rot.data, 0.1f);
+            if (ImGui::DragFloat2("CameraRot", cam_rot.data, 0.1f))
+                cam_controller.SetTargetRotation(cam_rot.x, cam_rot.y, true);
             cam_controller.SetTargetPosition(cam_pos, true);
-            cam_controller.SetTargetRotation(cam_rot.x, cam_rot.y, true);
             static bool s_draw_scene_bvh = false;
             static bool s_draw_mesh_bvh = false;
             //bvh debug

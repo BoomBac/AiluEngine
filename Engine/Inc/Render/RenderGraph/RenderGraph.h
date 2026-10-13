@@ -198,6 +198,7 @@ namespace Ailu::Render::RDG
         RGHandle GetTexture(const String &name);
         RGHandle GetBuffer(const String &name);
         String GetResourceName(RGHandle handle) const;
+        TextureDesc GetTextureDesc(RGHandle handle) const;
         u32 GetPassNameOrdinal(const CompiledRenderPass &compiled_pass) const;
 
         // 添加一个渲染Pass

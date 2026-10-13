@@ -13,6 +13,8 @@ namespace Ailu
 {
 	namespace RHI::DX12
 	{
+		class StreamlineRuntime;
+
         struct D3DSwapchainInitializer
         {
             DXGI_SWAP_CHAIN_DESC1 _swapchain_desc;
@@ -21,6 +23,8 @@ namespace Ailu
             Window* _window;
             ID3D12CommandQueue *_command_queue;
             IDXGIFactory6 *_factory;
+            IDXGIFactory6 *_proxy_factory = nullptr;
+            StreamlineRuntime *_streamline_runtime = nullptr;
             bool _is_fullscreen = false;
             Vector<D3D12_CPU_DESCRIPTOR_HANDLE> _rtvs;
         };
@@ -49,6 +53,8 @@ namespace Ailu
             };
         private:
             ComPtr<IDXGISwapChain3> _swapchain;
+            ComPtr<IDXGISwapChain3> _native_swapchain;
+            bool _is_streamline_proxy = false;
             Vector<D3DResource> _back_buffers;
             Vector<D3D12_CPU_DESCRIPTOR_HANDLE> _rtvs;
             ID3D12Device *_device;

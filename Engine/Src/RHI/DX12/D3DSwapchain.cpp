@@ -1,4 +1,6 @@
 #include "RHI/DX12/D3DSwapchain.h"
+#include "RHI/DX12/StreamlineDx12Bridge.h"
+#include "RHI/DX12/StreamlineRuntime.h"
 #include "RHI/DX12/dxhelper.h"
 #include "RHI/DX12/D3DCommandBuffer.h"
 #include "RHI/DX12/D3DContext.h"
@@ -21,7 +23,29 @@ namespace Ailu::RHI::DX12
         _back_buffers.resize(initializer._swapchain_desc.BufferCount);
         _pixel_format = initializer._format;
         ComPtr<IDXGISwapChain1> swapChain;
-        ThrowIfFailed(initializer._factory->CreateSwapChainForHwnd(initializer._command_queue, (HWND) initializer._window->GetNativeWindowPtr(), &initializer._swapchain_desc, nullptr, nullptr, &swapChain));
+        IDXGIFactory6* creation_factory = initializer._proxy_factory != nullptr
+                                                  ? initializer._proxy_factory : initializer._factory;
+        ThrowIfFailed(creation_factory->CreateSwapChainForHwnd(initializer._command_queue,
+                                                                (HWND) initializer._window->GetNativeWindowPtr(),
+                                                                &initializer._swapchain_desc, nullptr, nullptr,
+                                                                &swapChain));
+        _is_streamline_proxy = initializer._streamline_runtime != nullptr && initializer._proxy_factory != nullptr;
+        if (_is_streamline_proxy)
+        {
+            ComPtr<IDXGISwapChain1> native_swapchain;
+            if (StreamlineDx12Bridge::UpgradeSwapchain(*initializer._streamline_runtime, swapChain.Get(),
+                                                        native_swapchain.GetAddressOf()))
+            {
+                ThrowIfFailed(native_swapchain.As(&_native_swapchain));
+            }
+            else
+            {
+                LOG_ERROR("Streamline: native swapchain lookup failed; aborting incomplete DXGI initialization.");
+                ThrowIfFailed(E_NOINTERFACE);
+            }
+        }
+        else
+            ThrowIfFailed(swapChain.As(&_native_swapchain));
         // This sample does not support fullscreen transitions.
         ThrowIfFailed(initializer._factory->MakeWindowAssociation((HWND)initializer._window->GetNativeWindowPtr(), DXGI_MWA_NO_ALT_ENTER));
         ThrowIfFailed(swapChain->SetFullscreenState(FALSE, nullptr));
@@ -36,6 +60,9 @@ namespace Ailu::RHI::DX12
         }
         _load_action = Render::ELoadStoreAction::kNotCare;
         _cur_backbuf_index = _swapchain->GetCurrentBackBufferIndex();
+        if (_is_streamline_proxy)
+            LOG_INFO("Streamline: hooked DXGI swapchain APIs for window '{}'.",
+                     ToChar(initializer._window->GetTitle()));
         SetCreatedFence(0u);
         RegisterWindowBackBuffer(_window, this);
     }
@@ -44,6 +71,7 @@ namespace Ailu::RHI::DX12
     {
         UnregisterWindowBackBuffer(_window);
         for (u16 i = 0; i < _buffer_num; i++) _back_buffers[i].Reset();
+        _native_swapchain.Reset();
         _swapchain.Reset();
     }
     void D3DSwapchainTexture::PreparePresent(RHICommandBuffer *cmd)
@@ -54,6 +82,9 @@ namespace Ailu::RHI::DX12
 
     void D3DSwapchainTexture::Present()
     {
+        static std::atomic<bool> s_logged_streamline_present = false;
+        if (_is_streamline_proxy && !s_logged_streamline_present.exchange(true))
+            LOG_INFO("Streamline: first proxy Present observed.");
         const HRESULT present_hr = _swapchain->Present(1, 0);
         if (FAILED(present_hr))
             static_cast<D3DContext &>(Render::GraphicsContext::Get()).ReportDeviceRemoved(present_hr, "IDXGISwapChain::Present");
@@ -102,7 +133,7 @@ namespace Ailu::RHI::DX12
             _back_buffers[i].Reset();
         SwapchainTexture::Resize(w, h);
         DXGI_SWAP_CHAIN_DESC desc = {};
-        _swapchain->GetDesc(&desc);
+        ThrowIfFailed(_native_swapchain->GetDesc(&desc));
         const HRESULT hr = _swapchain->ResizeBuffers(_buffer_num, w, h, desc.BufferDesc.Format, desc.Flags);
         if (FAILED(hr))
         {

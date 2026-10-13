@@ -7,23 +7,46 @@
 
 namespace Ailu::Editor
 {
+    namespace
+    {
+        Quaternion BuildRotationFromPitchYaw(f32 pitch, f32 yaw)
+        {
+            const Quaternion yaw_rotation = Quaternion::AngleAxis(yaw, Vector3f::kUp);
+            const Vector3f right = yaw_rotation * Vector3f::kRight;
+            const Quaternion pitch_rotation = Quaternion::AngleAxis(pitch, right);
+            return yaw_rotation * pitch_rotation;
+        }
+
+        f32 ExtractRollDegrees(const Quaternion &rotation, f32 pitch, f32 yaw)
+        {
+            const Quaternion base_rotation = BuildRotationFromPitchYaw(pitch, yaw);
+            const Quaternion local_rotation = rotation * Quaternion::Inverse(base_rotation);
+            return 2.0f * std::atan2(local_rotation.z, local_rotation.w) * Math::kRadToDeg;
+        }
+    }
+
     FirstPersonCameraController::FirstPersonCameraController()
         : FirstPersonCameraController(nullptr)
     {
     }
 
     FirstPersonCameraController::FirstPersonCameraController(Render::Camera *camera)
-        : _p_camera(camera)
     {
+        Attach(camera);
     }
 
     void FirstPersonCameraController::Attach(Render::Camera *camera)
     {
         _p_camera = camera;
-        _rot_world_y = Quaternion::AngleAxis(_rotation.y, Vector3f::kUp);
-        Vector3f new_camera_right = _rot_world_y * Vector3f::kRight;
-        _rot_object_x = Quaternion::AngleAxis(_rotation.x, new_camera_right);
-        _target_pos = camera->Position();
+        _restore_projection_pending = false;
+        if (_p_camera == nullptr)
+            return;
+
+        _current_rotation = _p_camera->Rotation();
+        _target_rotation = _current_rotation;
+        _target_pos = _p_camera->Position();
+        UpdatePitchYaw();
+        _roll_degrees = ExtractRollDegrees(_target_rotation, _rotation.x, _rotation.y);
     }
 
     void FirstPersonCameraController::Move(const Vector3f &d)
@@ -39,6 +62,24 @@ namespace Ailu::Editor
             return;
         _rotation.x = x;
         _rotation.y = y;
+        const Quaternion base_rotation = BuildRotationFromPitchYaw(x, y);
+        _target_rotation = Quaternion::AngleAxis(_roll_degrees, Vector3f::kForward) * base_rotation;
+    }
+
+    void FirstPersonCameraController::SetTargetRotation(const Quaternion &rotation, bool is_force)
+    {
+        if (!_is_receive_input && !is_force)
+            return;
+        _target_rotation = rotation;
+        UpdatePitchYaw();
+        _roll_degrees = ExtractRollDegrees(_target_rotation, _rotation.x, _rotation.y);
+    }
+
+    void FirstPersonCameraController::UpdatePitchYaw()
+    {
+        const Vector3f forward = _target_rotation * Vector3f::kForward;
+        _rotation.x = -std::asin(std::clamp(forward.y, -1.0f, 1.0f)) * Math::kRadToDeg;
+        _rotation.y = std::atan2(forward.x, forward.z) * Math::kRadToDeg;
     }
 
     // Teleport the camera and its interpolation state in one step.  Interpolate() eases the
@@ -46,30 +87,106 @@ namespace Ailu::Editor
     // target alone still leaves the camera on its old attitude for dozens of frames.
     void FirstPersonCameraController::SnapTo(const Vector3f &position, f32 pitch, f32 yaw)
     {
-        _rotation = Vector2f(pitch, yaw);
-        _rot_world_y = Quaternion::AngleAxis(yaw, Vector3f::kUp);
-        const Vector3f right = _rot_world_y * Vector3f::kRight;
-        _rot_object_x = Quaternion::AngleAxis(pitch, right);
+        _roll_degrees = 0.0f;
+        SnapTo(position, BuildRotationFromPitchYaw(pitch, yaw));
+    }
+
+    void FirstPersonCameraController::SnapTo(const Vector3f &position, const Quaternion &rotation)
+    {
+        _target_rotation = rotation;
+        _current_rotation = rotation;
         _target_pos = position;
+        UpdatePitchYaw();
+        _roll_degrees = ExtractRollDegrees(_target_rotation, _rotation.x, _rotation.y);
         if (_p_camera != nullptr)
         {
             _p_camera->Position(position);
-            _p_camera->Rotation(_rot_world_y * _rot_object_x);
+            _p_camera->Rotation(_current_rotation);
             _p_camera->RecalculateMatrix(true);
         }
+    }
+
+    void FirstPersonCameraController::SnapTo(const Render::Camera &camera)
+    {
+        if (_p_camera == nullptr)
+            return;
+
+        if (!_restore_projection_pending)
+        {
+            _projection_before_align = {_p_camera->Type(), _camera_fov_h, _camera_near, _camera_far,
+                                        _p_camera->Size(), _p_camera->Aspect(), _p_camera->ProjectionOffset(),
+                                        _p_camera->ReverseProjectionX(), _p_camera->LockAspect()};
+            _restore_projection_pending = true;
+        }
+        const Vector3f forward = camera.Rotation() * camera.LocalForward();
+        const Vector3f up = camera.Rotation() * camera.LocalUp();
+        const Quaternion rotation = Quaternion::LookRotation(forward, up);
+        _camera_fov_h = camera.FovH();
+        _camera_near = camera.Near();
+        _camera_far = camera.Far();
+        _is_receive_input = camera.Type() == Render::ECameraType::kPerspective;
+        _p_camera->SetLocalViewAxes(Vector3f::kForward, Vector3f::kUp);
+        _p_camera->Type(camera.Type());
+        _p_camera->FovH(_camera_fov_h);
+        _p_camera->Near(_camera_near);
+        _p_camera->Far(_camera_far);
+        _p_camera->Size(camera.Size());
+        _p_camera->Aspect(camera.Aspect());
+        _p_camera->LockAspect(true);
+        _p_camera->ProjectionOffset(camera.ProjectionOffset());
+        _p_camera->ReverseProjectionX(camera.ReverseProjectionX());
+        SnapTo(camera.Position(), rotation);
+        _p_camera->MarkTemporalHistoryReset();
+    }
+
+    bool FirstPersonCameraController::RestoreProjection()
+    {
+        if (_p_camera == nullptr || !_restore_projection_pending)
+            return false;
+
+        const auto &state = _projection_before_align;
+        _camera_fov_h = state._fov;
+        _camera_near = state._near;
+        _camera_far = state._far;
+        _is_receive_input = state._type == Render::ECameraType::kPerspective;
+        _p_camera->Type(state._type);
+        _p_camera->FovH(_camera_fov_h);
+        _p_camera->Near(_camera_near);
+        _p_camera->Far(_camera_far);
+        _p_camera->Size(state._size);
+        _p_camera->Aspect(state._aspect);
+        _p_camera->LockAspect(state._lock_aspect);
+        _p_camera->ProjectionOffset(state._offset);
+        _p_camera->ReverseProjectionX(state._reverse_x);
+        const auto output_size = _p_camera->OutputSize();
+        if (!state._lock_aspect && output_size.x > 0u && output_size.y > 0u)
+            _p_camera->SetPixelSize(output_size.x, output_size.y);
+        ResetRoll();
+        _p_camera->MarkTemporalHistoryReset();
+        _restore_projection_pending = false;
+        return true;
+    }
+
+    void FirstPersonCameraController::ResetRoll()
+    {
+        if (_p_camera == nullptr)
+            return;
+        _roll_degrees = 0.0f;
+        _target_rotation = BuildRotationFromPitchYaw(_rotation.x, _rotation.y);
+        _current_rotation = _target_rotation;
+        _p_camera->Rotation(_current_rotation);
+        _p_camera->RecalculateMatrix(true);
     }
 
     void FirstPersonCameraController::Interpolate(float speed)
     {
         _fast_camera_move_speed = _base_camera_move_speed * 3.0f;
-        Quaternion new_quat_y = Quaternion::AngleAxis(_rotation.y, Vector3f::kUp);
-        Vector3f new_camera_right = new_quat_y * Vector3f::kRight;
-        auto new_quat_x = Quaternion::AngleAxis(_rotation.x, new_camera_right);
-        _rot_object_x = Quaternion::NLerp(_rot_object_x, new_quat_x, speed);
-        _rot_world_y = Quaternion::NLerp(_rot_world_y, new_quat_y, speed);
+        Quaternion target_rotation = _target_rotation;
+        if (Quaternion::Dot(_current_rotation, target_rotation) < 0.0f)
+            target_rotation = Quaternion(-target_rotation.x, -target_rotation.y, -target_rotation.z, -target_rotation.w);
+        _current_rotation = Quaternion::NLerp(_current_rotation, target_rotation, speed);
         _p_camera->Position(Lerp(_p_camera->Position(), _target_pos, speed));
-        auto r = _rot_world_y * _rot_object_x;
-        _p_camera->Rotation(r);
+        _p_camera->Rotation(_current_rotation);
         _p_camera->RecalculateMatrix(true);
     }
 

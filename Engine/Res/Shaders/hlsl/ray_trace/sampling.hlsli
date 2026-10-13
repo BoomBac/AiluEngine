@@ -33,7 +33,10 @@ float2 rand2(inout RandomCtx ctx)
     return float2(rand(ctx), rand(ctx));
 }
 
-//#define SAMPLE_BRDF_VNDF_GGX 1
+// 1: Heitz 2018 visible GGX normals; 0: legacy NDF sampling for controlled comparisons.
+#ifndef SAMPLE_BRDF_VNDF_GGX
+#define SAMPLE_BRDF_VNDF_GGX 1
+#endif
 //#define SAMPLE_BRDF_COSINE_HEMISPHERE 1
 // n：单位法线（世界空间）
 // 返回矩阵列为 (tangent, bitangent, normal)
@@ -89,41 +92,25 @@ float3 SampleGGX(float3 n, float alpha, float u1, float u2)
 
 float3 SampleGGX_VNDF(float3 n, float3 wo, float alpha, float u1, float u2)
 {
-    // ---- 构建局部坐标 ----
+    // Heitz, Sampling the GGX Distribution of Visible Normals (JCGT 2018, corrected 2019).
+    // https://jcgt.org/published/0007/04/01/ -- n faces wo, including dielectric exits.
     float3 t, b;
     build_onb(n, t, b);
-
-    float3 V = float3(dot(wo,t), dot(wo,b), dot(wo,n));
-
-    // ---- stretch view ----
-    float3 Vh = normalize(float3(alpha * V.x, alpha * V.y, V.z));
-
-    // ---- 构建正交基 ----
-    float lensq = Vh.x*Vh.x + Vh.y*Vh.y;
-
-    float3 T1 = lensq > 0 ? float3(-Vh.y, Vh.x, 0) * rsqrt(lensq) : float3(1,0,0);
-    float3 T2 = cross(Vh, T1);
-
-    // ---- 采样圆盘 ----
-    float r = sqrt(u1);
-    float phi = 2.0 * PI * u2;
-
+    float3 view = float3(dot(wo, t), dot(wo, b), dot(wo, n));
+    float3 stretched_view = normalize(float3(alpha * view.xy, view.z));
+    float length_squared = dot(stretched_view.xy, stretched_view.xy);
+    float3 tangent = length_squared > 0.0f
+        ? float3(-stretched_view.y, stretched_view.x, 0.0f) * rsqrt(length_squared) : float3(1, 0, 0);
+    float3 bitangent = cross(stretched_view, tangent);
+    float r = sqrt(saturate(u1));
+    float phi = 2.0f * PI * u2;
     float t1 = r * cos(phi);
     float t2 = r * sin(phi);
-
-    float s = 0.5 * (1.0 + Vh.z);
-    t2 = lerp(sqrt(1.0 - t1*t1), t2, s);
-
-    // ---- 投影回 hemisphere ----
-    float3 Nh =
-        t1 * T1 +
-        t2 * T2 +
-        sqrt(max(0.0, 1.0 - t1*t1 - t2*t2)) * Vh;
-
-    // ---- unstretch ----
-    float3 h = normalize(float3(alpha * Nh.x, alpha * Nh.y, max(0.0, Nh.z)));
-
-    // ---- 局部转世界 ----
+    float blend = 0.5f * (1.0f + stretched_view.z);
+    t2 = lerp(sqrt(max(0.0f, 1.0f - t1 * t1)), t2, blend);
+    float3 normal = t1 * tangent + t2 * bitangent +
+                    sqrt(max(0.0f, 1.0f - t1 * t1 - t2 * t2)) * stretched_view;
+    float3 h = normalize(float3(alpha * normal.xy, max(0.0f, normal.z)));
     return normalize(h.x * t + h.y * b + h.z * n);
 }
 
@@ -213,10 +200,11 @@ float PdfSpecularBRDF(float3 n, float3 wo, float3 wi, float alpha)
     float nh = saturate(dot(n, h));
     float vh = max(saturate(dot(wo, h)), 1e-4);
 
-#if defined(SAMPLE_BRDF_VNDF_GGX)
+#if SAMPLE_BRDF_VNDF_GGX
     float D = D_PathGGX(alpha, n, h);
-    float G1 = SmithG1GGX(max(nv, 1e-4), max(alpha, 1e-6));
-    return D * G1 * nh / (4.0 * vh * max(nv, 1e-4) + 1e-6);
+    // p(h|wo) = D(h) G1(wo) (wo.h)/(n.wo); reflection Jacobian cancels wo.h.
+    float g1_over_nv = 2.0f / (nv + sqrt(alpha * alpha + (1.0f - alpha * alpha) * nv * nv));
+    return D * g1_over_nv * 0.25f;
 #else
     float D = D_PathGGX(alpha, n, h);
     return D * nh / (4.0 * vh + 1e-6);
@@ -236,9 +224,18 @@ float PdfMixedBRDF(float3 n, float3 wo, float3 wi, float alpha, float3 base_colo
     return lerp(diffuse_pdf, specular_pdf, specular_prob);
 }
 
-float PdfMicrofacetNormal(float alpha, float3 n, float3 h)
+float PdfMicrofacetNormal(float alpha, float3 n, float3 wo, float3 h)
 {
+#if SAMPLE_BRDF_VNDF_GGX
+    float nv = abs(dot(n, wo));
+    float vh = dot(wo, h);
+    if (nv <= 0.0f || vh <= 0.0f || dot(n, h) <= 0.0f)
+        return 0.0f;
+    float g1_over_nv = 2.0f / (nv + sqrt(alpha * alpha + (1.0f - alpha * alpha) * nv * nv));
+    return D_PathGGX(alpha, n, h) * g1_over_nv * vh;
+#else
     return D_PathGGX(alpha, n, h) * saturate(abs(dot(n, h)));
+#endif
 }
 
 float3 BuildReflectionHalfVector(float3 wo, float3 wi)
@@ -290,7 +287,7 @@ float GlassReflectionSelectProb(TraceContext ctx, float3 wo, float3 h)
     return FresnelDielectric(dot(wo, h), ctx._ior_i, ctx._ior_t);
 }
 
-// 反射瓣：f = D * G * F / (4 |n·wo| |n·wi|)，pdf = D * nh / (4 |wo·h|)
+// 反射瓣：f = D * G * F / (4 |n·wo| |n·wi|)，pdf = p(h|wo) / (4 |wo·h|)
 //
 // pdf 里那个 1/(4|wo·h|) 不能省：它是「半程向量分布 -> 出射方向分布」的 Jacobian。
 // 少了它 pdf 会偏大 4 倍，反射能量被压到 1/4（法线入射实测 0.013 而非 0.052）。
@@ -310,7 +307,7 @@ float3 EvalGlassReflectionLobe(float3 n, float3 wo, float3 wi, float3 h,
     float nh = saturate(abs(dot(n, h)));
     float D = D_PathGGX(alpha, n, h);
     float G = 4.0f * nl * nv * V_SmithGGXCorrelated(nv, nl, alpha);
-    pdf = PdfMicrofacetNormal(alpha, n, h) / max(4.0 * vh, 1e-6);
+    pdf = PdfMicrofacetNormal(alpha, n, wo, h) / max(4.0 * vh, 1e-6);
     return D * G * fresnel / max(4.0 * nl * nv, 1e-6);
 }
 
@@ -342,7 +339,7 @@ float3 EvalGlassTransmissionLobe(float3 n, float3 wo, float3 wi, float3 h,
     float D = D_PathGGX(alpha, n, h);
     float G = 4.0f * nl * nv * V_SmithGGXCorrelated(nv, nl, alpha);
     float denom2 = denom * denom;
-    pdf = PdfMicrofacetNormal(alpha, n, h) * abs(wi_h) / denom2;
+    pdf = PdfMicrofacetNormal(alpha, n, wo, h) * abs(wi_h) / denom2;
     return (1.0f - fresnel) * D * G * abs(wi_h * wo_h) /
            (max(nl * nv, 1e-6f) * denom2 * eta * eta);
 }
@@ -377,9 +374,9 @@ float3 EvalOpaqueBRDF(TraceContext ctx, float3 n, float3 wo, float3 wi, out floa
     float specular_prob = ComputeBRDFSpecularSamplingProb(mat._albedo, mat._metallic);
     float diffuse_pdf = nl / PI;
     float specular_pdf = D * nh / (4.0 * vh + 1e-6);
-#if defined(SAMPLE_BRDF_VNDF_GGX)
-    float G1 = SmithG1GGX(max(nv, 1e-4), alpha);
-    specular_pdf = D * G1 * nh / (4.0 * vh * max(nv, 1e-4) + 1e-6);
+#if SAMPLE_BRDF_VNDF_GGX
+    float g1_over_nv = 2.0f / (nv + sqrt(alpha * alpha + (1.0f - alpha * alpha) * nv * nv));
+    specular_pdf = D * g1_over_nv * 0.25f;
 #endif
     pdf = lerp(diffuse_pdf, specular_pdf, specular_prob);
     return kd * f_diffuse + f_specular;
@@ -572,7 +569,11 @@ bool SampleGlassLobeDirection(TraceContext ctx, float3 n, float3 wo, float r1, f
                               out uint lobe, out float3 h, out float3 wi)
 {
     lobe = kBSDFLobeReflection;
+#if SAMPLE_BRDF_VNDF_GGX
+    h = SampleGGX_VNDF(n, wo, RoughnessToAlpha(ctx._mat._roughness), r1, r2);
+#else
     h = SampleGGX(n, RoughnessToAlpha(ctx._mat._roughness), r1, r2);
+#endif
     if (dot(h, n) < 0.0)
         h = -h;
 
@@ -623,7 +624,7 @@ SampleBRDFResult SampleOpaqueBRDF(TraceContext ctx, float3 n, float3 wo, float r
             result._delta_pdf = (mat._is_glass ? 1.0f - saturate(mat._transmission) : 1.0f) * specular_prob;
             return result;
         }
-#if defined(SAMPLE_BRDF_VNDF_GGX)
+#if SAMPLE_BRDF_VNDF_GGX
         result._h = SampleGGX_VNDF(n, wo, RoughnessToAlpha(mat._roughness), r1, r2);
 #else
         result._h = SampleGGX(n, RoughnessToAlpha(mat._roughness), r1, r2);

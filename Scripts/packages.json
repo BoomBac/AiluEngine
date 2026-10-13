@@ -19,6 +19,29 @@
       "sizeBytes": 839406743,
       "treeSha256": "502486231c97a13d39429c7dddde5f3e5361cf657dda1e1affa8c703abc27ef1",
       "distribution": "Install from Autodesk under its license; do not redistribute the SDK package."
+    },
+    {
+      "name": "fidelityfx-sdk",
+      "version": "2.3.0",
+      "sourceUrl": "https://github.com/GPUOpen-LibrariesAndSDKs/FidelityFX-SDK/releases/tag/v2.3.0",
+      "headersSourceUrl": "https://github.com/GPUOpen-LibrariesAndSDKs/FidelityFX-SDK/tree/v2.3.0",
+      "installPath": "Engine/Ext/Packages/fidelityfx-sdk-2.3.0",
+      "fileCount": 10,
+      "sizeBytes": 28858538,
+      "treeSha256": "e4c177831a63687b65f218087775bccfe8803ee1502f6523d8a765c2b239a1de",
+      "runtimeFiles": "Kits/FidelityFX/signedbin/amd_fidelityfx_loader_dx12.dll; Kits/FidelityFX/signedbin/amd_fidelityfx_upscaler_dx12.dll",
+      "distribution": "Local ignored package; use AMD SDK terms and do not commit or redistribute the runtime binaries."
+    },
+    {
+      "name": "streamline-sdk",
+      "version": "2.14.1",
+      "sourceUrl": "https://github.com/NVIDIA-RTX/Streamline/releases/download/v2.14.1/streamline-sdk-v2.14.1.zip",
+      "archiveSha256": "92c4d954631a1710da86ca3fa8d5034f2b9503838c95fc4ae977ae149319781b",
+      "installPath": "Engine/Ext/Packages/streamline-sdk-2.14.1",
+      "fileCount": 45,
+      "sizeBytes": 124603750,
+      "treeSha256": "911e3af85541391d346b27f9d8063fb2153804b166be448b6b830cd0db5161bf",
+      "distribution": "Local ignored package; includes NVIDIA DLSS SDK/plugin binaries under their SDK license. Do not commit or redistribute them."
     }
   ]
 }

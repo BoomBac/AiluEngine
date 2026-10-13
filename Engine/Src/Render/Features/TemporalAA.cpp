@@ -31,6 +31,11 @@ namespace Ailu::Render
             return;
 
         const Camera &camera = *rendering_data._camera;
+        if (camera.IsTemporalUpscalingActive())
+        {
+            _execute_pass.InvalidateHistory(camera.HashCode());
+            return;
+        }
         const u64 camera_hash = camera.HashCode();
         if (camera._anti_aliasing != EAntiAliasing::kTAA)
         {

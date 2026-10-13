@@ -284,16 +284,20 @@ namespace Ailu
                 }
                 else if (e._key_code == EKey::kRBUTTON)
                 {
+                    const bool restored_projection = _camera_controller->RestoreProjection();
                     _is_camera_input_active = true;
                     Vector4f rect = e._current_target->GetArrangeRect();
                     Vector2f local_pos = e._mouse_position - rect.xy;
                     if (IsSceneCamera2D())
                     {
+                        _canvas_camera_controller.Attach(Camera::sCurrent);
                         _canvas_camera_controller.BeginDrag(local_pos);
                     }
                     else
                     {
                         _camera_controller->_is_receive_input = true;
+                        if (!restored_projection)
+                            _camera_controller->ResetRoll();
                         _camera_input_last_mouse_pos = Input::GetGlobalMousePosAccurate();
                         _has_camera_input_last_mouse_pos = true;
                         SetCursor(NULL);
@@ -387,8 +391,10 @@ namespace Ailu
             };
             _source->OnMouseScroll() += [this](UI::UIEvent &e)
             {
+                _camera_controller->RestoreProjection();
                 if (IsSceneCamera2D())
                 {
+                    _canvas_camera_controller.Attach(Camera::sCurrent);
                     _canvas_camera_controller.Zoom(e._scroll_delta);
                 }
                 else
@@ -501,6 +507,7 @@ namespace Ailu
             }
             UpdateCameraPreview();
             UpdateCameraOutputSize(dt);
+            UpdateSuperResolutionStatus();
             SetSource(Render::RenderPipeline::Get().GetTarget(0));
             UpdateDragPreview();
             UpdateSceneToolbarBackdrop();
@@ -533,6 +540,8 @@ namespace Ailu
                                                _drag_preview_material.get());
             }
             ProcessCameraInput(dt);
+            if (_camera_settings_panel != nullptr && _camera_settings_panel->IsVisible())
+                UpdateSceneCameraTransformSettings();
         }
         void SceneView::UpdateDragPreview()
         {
@@ -733,7 +742,7 @@ namespace Ailu
             _camera_settings_panel = _view_canvas->AddChild<UI::Border>();
             _camera_settings_panel->GetSlotAs<UI::CanvasSlot>()
                     .Position({12.0f, kSceneToolbarTop + 34.0f})
-                    .Size({276.0f, 292.0f});
+                    .Size({276.0f, 348.0f});
             _camera_settings_panel->Thickness(1.0f);
             _camera_settings_panel->CornerRadius(5.0f);
             _camera_settings_panel->_bg_color = Color(0.06f, 0.07f, 0.09f, 0.94f);
@@ -743,12 +752,61 @@ namespace Ailu
             _camera_settings_panel->GetStyleOverride().SetBorderWidth(1.0f);
             _camera_settings_panel->GetStyleOverride().SetCornerRadius(5.0f);
 
-            auto *content = _camera_settings_panel->AddChild<UI::VerticalBox>();
+            auto *settings_scroll = _camera_settings_panel->AddChild<UI::ScrollView>();
+            settings_scroll->GetSlotAs<UI::LinearSlot>()
+                    .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
+            UIControlVisual transparent_scroll_visual;
+            transparent_scroll_visual._background._type = EUIBrushType::kNone;
+            auto &scroll_style = settings_scroll->GetStyleOverride();
+            scroll_style.SetNormal(transparent_scroll_visual);
+            scroll_style.SetHovered(transparent_scroll_visual);
+            scroll_style.SetFocused(transparent_scroll_visual);
+            scroll_style.SetDisabled(transparent_scroll_visual);
+            auto *content = settings_scroll->AddChild<UI::VerticalBox>();
             content->SlotPadding() = UI::Padding(10.0f, 8.0f, 10.0f, 8.0f);
-            content->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill);
+            content->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto);
             auto *title = content->AddChild<UI::Text>("Scene Camera");
             title->FontSize(15.0f);
             title->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed).Size({0.0f, 24.0f});
+            auto add_vector_row = [content](const String &label, UI::InputBlock **inputs)
+            {
+                auto *row = content->AddChild<UI::HorizontalBox>();
+                row->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed).Size({0.0f, 28.0f});
+                row->AddChild<UI::Text>(label)->GetSlotAs<UI::LinearSlot>()
+                        .SizePolicy(UI::ESizePolicy::kFixed, UI::ESizePolicy::kFill).Size({58.0f, 0.0f});
+                for (u32 axis = 0; axis < 3; ++axis)
+                {
+                    auto *input = row->AddChild<UI::InputBlock>("0.00");
+                    input->GetSlotAs<UI::LinearSlot>()
+                            .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill).FillRate(1.0f);
+                    inputs[axis] = input;
+                }
+            };
+            add_vector_row("Position", _camera_position_inputs);
+            add_vector_row("Rotation°", _camera_rotation_inputs);
+            for (u32 axis = 0; axis < 3; ++axis)
+            {
+                _camera_position_inputs[axis]->_on_content_changed += [this, axis](String value)
+                {
+                    Camera *camera = Camera::sCurrent;
+                    const auto parsed = StringUtils::ParseFloat(value);
+                    if (camera == nullptr || !parsed.has_value() || !std::isfinite(*parsed))
+                        return;
+                    Vector3f position = camera->Position();
+                    position[axis] = *parsed;
+                    SetSceneCameraTransform(position, camera->Rotation());
+                };
+                _camera_rotation_inputs[axis]->_on_content_changed += [this, axis](String value)
+                {
+                    Camera *camera = Camera::sCurrent;
+                    const auto parsed = StringUtils::ParseFloat(value);
+                    if (camera == nullptr || !parsed.has_value() || !std::isfinite(*parsed))
+                        return;
+                    Vector3f rotation = Quaternion::EulerAngles(camera->Rotation());
+                    rotation[axis] = *parsed;
+                    SetSceneCameraTransform(camera->Position(), Quaternion::EulerAngles(rotation));
+                };
+            }
             auto *frustum_title = content->AddChild<UI::Text>("Frustum");
             frustum_title->FontSize(12.0f);
             frustum_title->_color = Color(0.72f, 0.76f, 0.82f, 1.0f);
@@ -847,17 +905,30 @@ namespace Ailu
                     camera->_anti_aliasing = static_cast<Render::EAntiAliasing>(index);
             };
 
-            auto *upsampling_row = content->AddChild<UI::HorizontalBox>();
+            _camera_upsampling_row = content->AddChild<UI::HorizontalBox>();
+            auto *upsampling_row = _camera_upsampling_row;
             upsampling_row->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed).Size({0.0f, 28.0f});
             upsampling_row->AddChild<UI::Text>("Upsampling")->GetSlotAs<UI::LinearSlot>()
                     .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill).FillRate(1.0f);
-            _camera_upsampling_dropdown = upsampling_row->AddChild<UI::Dropdown>(Vector<String>{"Bilinear", "Point"});
+            _camera_upsampling_dropdown = upsampling_row->AddChild<UI::Dropdown>(
+                    Vector<String>{"Bilinear", "Point", "DLSS", "FSR"});
             _camera_upsampling_dropdown->GetSlotAs<UI::LinearSlot>()
                     .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill).FillRate(1.0f);
-            _camera_upsampling_dropdown->_on_selected_changed += [](i32 index)
+            _camera_upsampling_dropdown->_on_selected_changed += [this](i32 index)
             {
-                if (Camera *camera = Camera::sCurrent; camera != nullptr && index >= 0 && index <= 1)
+                Camera *camera = Camera::sCurrent;
+                if (camera == nullptr || index < 0 || index > 3)
+                    return;
+                if (index < 2)
+                {
                     camera->UpsamplingFilter(static_cast<Render::EUpsamplingFilter>(index));
+                    camera->SuperResolutionMode(Render::ESuperResolutionMode::kOff);
+                }
+                else if (index == 2)
+                    camera->SuperResolutionMode(Render::ESuperResolutionMode::kDlss);
+                else
+                    camera->SuperResolutionMode(Render::ESuperResolutionMode::kFsr);
+                UpdateSceneCameraSettings();
             };
 
             auto *postprocess_row = content->AddChild<UI::HorizontalBox>();
@@ -876,12 +947,74 @@ namespace Ailu
             _camera_settings_panel->SetVisible(false);
         }
 
+        void SceneView::SetSuperResolutionControls(bool enabled, bool fsr_selected)
+        {
+            if (_camera_upsampling_row == nullptr)
+                return;
+
+            auto *content = static_cast<UI::VerticalBox *>(_camera_upsampling_row->GetParent());
+            if (content == nullptr)
+                return;
+            if (enabled == (_camera_sr_row != nullptr))
+            {
+                if (enabled)
+                {
+                    auto *label = _camera_sr_row->ChildAt(0)->As<UI::Text>();
+                    if (label != nullptr)
+                        label->SetText("SR Quality");
+                    if (_camera_sr_quality_dropdown != nullptr)
+                        _camera_sr_quality_dropdown->SetItems(fsr_selected
+                                ? Vector<String>{"Quality", "Balanced", "Performance", "Ultra Performance"}
+                                : Vector<String>{"Quality", "Balanced", "Performance"});
+                }
+                return;
+            }
+
+            if (!enabled)
+            {
+                UI::HorizontalBox *sr_row = _camera_sr_row;
+                UI::Text *sr_status = _camera_sr_status;
+                _camera_sr_row = nullptr;
+                _camera_sr_quality_dropdown = nullptr;
+                _camera_sr_status = nullptr;
+                content->RemoveChild(sr_row);
+                content->RemoveChild(sr_status);
+                return;
+            }
+
+            _camera_sr_row = content->AddChild<UI::HorizontalBox>();
+            _camera_sr_row->GetSlotAs<UI::LinearSlot>()
+                    .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed).Size({0.0f, 28.0f});
+            _camera_sr_row->AddChild<UI::Text>("SR Quality")
+                    ->GetSlotAs<UI::LinearSlot>()
+                    .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill).FillRate(1.0f);
+            _camera_sr_quality_dropdown = _camera_sr_row->AddChild<UI::Dropdown>(fsr_selected
+                    ? Vector<String>{"Quality", "Balanced", "Performance", "Ultra Performance"}
+                    : Vector<String>{"Quality", "Balanced", "Performance"});
+            _camera_sr_quality_dropdown->GetSlotAs<UI::LinearSlot>()
+                    .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill).FillRate(1.0f);
+            _camera_sr_quality_dropdown->_on_selected_changed += [this](i32 index)
+            {
+                if (Camera *camera = Camera::sCurrent; camera != nullptr && index >= 0 && index <= 3)
+                {
+                    camera->SuperResolutionQuality(static_cast<Render::ESuperResolutionQuality>(index));
+                    UpdateSceneCameraSettings();
+                }
+            };
+            _camera_sr_status = content->AddChild<UI::Text>(
+                    fsr_selected ? "FSR inactive; standard rendering" : "DLSS inactive; standard rendering");
+            const u32 insert_index = static_cast<u32>(content->IndexOf(_camera_upsampling_row) + 1);
+            content->MoveChild(_camera_sr_row, insert_index);
+            content->MoveChild(_camera_sr_status, insert_index + 1);
+        }
+
         void SceneView::UpdateSceneCameraSettings()
         {
             Camera *camera = Camera::sCurrent;
             if (camera == nullptr)
                 return;
 
+            UpdateSceneCameraTransformSettings();
             if (_camera_fov_input != nullptr)
                 _camera_fov_input->SetContent(std::format("{:.2f}", camera->FovH()), false);
             if (_camera_near_input != nullptr)
@@ -892,19 +1025,98 @@ namespace Ailu
             {
                 const bool is_orthographic = camera->Type() == Render::ECameraType::kOrthographic;
                 if (_camera_fov_row != nullptr)
+                {
                     _camera_fov_row->SetVisible(!is_orthographic);
+                    _camera_fov_row->GetSlotAs<UI::LinearSlot>().Size({0.0f, is_orthographic ? 0.0f : 28.0f});
+                }
                 if (_camera_size_row != nullptr)
+                {
                     _camera_size_row->SetVisible(is_orthographic);
+                    _camera_size_row->GetSlotAs<UI::LinearSlot>().Size({0.0f, is_orthographic ? 28.0f : 0.0f});
+                }
                 _camera_size_input->SetContent(std::format("{:.2f}", camera->Size()), false);
             }
             if (_camera_aa_dropdown != nullptr)
                 _camera_aa_dropdown->SetSelectedIndex(static_cast<i32>(camera->_anti_aliasing), false);
             if (_camera_render_scale_input != nullptr)
                 _camera_render_scale_input->SetContent(std::format("{:.2f}", camera->RenderScale()), false);
+            const bool dlss_selected = camera->SuperResolutionMode() == Render::ESuperResolutionMode::kDlss;
+            const bool fsr_selected = camera->SuperResolutionMode() == Render::ESuperResolutionMode::kFsr;
+            const bool super_resolution_selected = dlss_selected || fsr_selected;
+            SetSuperResolutionControls(super_resolution_selected, fsr_selected);
             if (_camera_upsampling_dropdown != nullptr)
-                _camera_upsampling_dropdown->SetSelectedIndex(static_cast<i32>(camera->UpsamplingFilter()), false);
+                _camera_upsampling_dropdown->SetSelectedIndex(
+                        dlss_selected ? 2 : fsr_selected ? 3 : static_cast<i32>(camera->UpsamplingFilter()), false);
+            if (_camera_sr_quality_dropdown != nullptr)
+                _camera_sr_quality_dropdown->SetSelectedIndex(
+                        static_cast<i32>(camera->SuperResolutionQuality()), false);
+            UpdateSuperResolutionStatus();
             if (_camera_postprocess_checkbox != nullptr)
                 _camera_postprocess_checkbox->SetChecked(camera->_postprocess_enabled, false);
+        }
+
+        void SceneView::SetSceneCameraTransform(const Vector3f &position, const Quaternion &rotation)
+        {
+            Camera *camera = Camera::sCurrent;
+            if (camera == nullptr)
+                return;
+
+            camera->Position(position);
+            camera->Rotation(rotation);
+            camera->RecalculateMatrix(true);
+            _camera_controller->SnapTo(position, rotation);
+            if (IsSceneCamera2D())
+            {
+                _stored_camera_position = position;
+                _stored_camera_rotation = rotation;
+                _canvas_camera_controller.SetViewBasis(rotation * Vector3f::kForward, rotation * Vector3f::kUp);
+            }
+        }
+
+        void SceneView::UpdateSceneCameraTransformSettings()
+        {
+            Camera *camera = Camera::sCurrent;
+            if (camera == nullptr)
+                return;
+
+            const Vector3f position = camera->Position();
+            const Vector3f rotation = Quaternion::EulerAngles(camera->Rotation());
+            for (u32 axis = 0; axis < 3; ++axis)
+            {
+                if (_camera_position_inputs[axis] != nullptr && !_camera_position_inputs[axis]->IsEditing() &&
+                    !_camera_position_inputs[axis]->IsDragAdjusting())
+                    _camera_position_inputs[axis]->SetContent(std::format("{:.2f}", position[axis]), false);
+                if (_camera_rotation_inputs[axis] != nullptr && !_camera_rotation_inputs[axis]->IsEditing() &&
+                    !_camera_rotation_inputs[axis]->IsDragAdjusting())
+                    _camera_rotation_inputs[axis]->SetContent(std::format("{:.2f}", rotation[axis]), false);
+            }
+        }
+
+        void SceneView::UpdateSuperResolutionStatus()
+        {
+            Camera *camera = Camera::sCurrent;
+            if (camera == nullptr || _camera_sr_status == nullptr)
+                return;
+
+            if (camera->IsDlssSRActive())
+            {
+                const Vector2D<u32> render_size = camera->RenderSize();
+                const Vector2D<u32> output_size = camera->OutputSize();
+                _camera_sr_status->SetText(std::format("Active DLSS: {}x{} -> {}x{}",
+                                                       render_size.x, render_size.y, output_size.x,
+                                                       output_size.y));
+            }
+            else if (camera->IsFsrSRActive())
+            {
+                const Vector2D<u32> render_size = camera->RenderSize();
+                const Vector2D<u32> output_size = camera->OutputSize();
+                _camera_sr_status->SetText(std::format("Active FSR: {}x{} -> {}x{}",
+                                                       render_size.x, render_size.y, output_size.x,
+                                                       output_size.y));
+            }
+            else
+                _camera_sr_status->SetText(camera->SuperResolutionMode() == Render::ESuperResolutionMode::kFsr
+                        ? "FSR inactive; standard rendering" : "DLSS inactive; standard rendering");
         }
 
         void SceneView::UpdateSceneToolbarLayout()
@@ -1010,7 +1222,7 @@ namespace Ailu
             {
                 _stored_camera_type = Camera::sCurrent->Type();
                 _stored_camera_position = Camera::sCurrent->Position();
-                _stored_camera_rotation = _camera_controller->_rotation;
+                _stored_camera_rotation = Camera::sCurrent->Rotation();
                 _stored_camera_size = Camera::sCurrent->Size();
                 _has_stored_perspective_camera = true;
             }
@@ -1047,7 +1259,7 @@ namespace Ailu
                 Camera::sCurrent->Size(_stored_camera_size);
                 _camera_controller->_is_receive_input = true;
                 _camera_controller->SetTargetPosition(_stored_camera_position, true);
-                _camera_controller->SetTargetRotation(_stored_camera_rotation.x, _stored_camera_rotation.y, true);
+                _camera_controller->SetTargetRotation(_stored_camera_rotation, true);
             }
             else
             {
@@ -1189,6 +1401,7 @@ namespace Ailu
             constexpr f32 kReferenceFrameRate = 60.0f;
             if (IsSceneCamera2D())
             {
+                _canvas_camera_controller.Attach(Camera::sCurrent);
                 if (!Input::IsKeyDown(EKey::kRBUTTON))
                 {
                     _is_camera_input_active = false;

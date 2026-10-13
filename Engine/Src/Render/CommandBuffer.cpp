@@ -250,6 +250,8 @@ namespace Ailu::Render
                     CommandPool::Get().DeAlloc(cmd);
             }
             _commands.clear();
+            for (Rect &viewport : _viewports)
+                viewport = Rect();
             _command_resources.clear();
             _resolved_command_bindings_layout = nullptr;
             _resolved_command_bindings.clear();
@@ -259,6 +261,12 @@ namespace Ailu::Render
             _render_graph = nullptr;
             _rendering_states_data.Reset();
             _global_resource_snapshot = Shader::CaptureGlobalResourceSnapshot();
+        }
+        void RecordNativeCallback(std::function<void(RHICommandBuffer *)> callback)
+        {
+            auto *cmd = CommandPool::Get().Alloc<CommandCustom>();
+            cmd->_func = std::move(callback);
+            _commands.emplace_back(cmd);
         }
         void ClearRenderTarget(Color color, f32 depth, u8 stencil)
         {
@@ -993,6 +1001,20 @@ namespace Ailu::Render
     bool CommandBuffer::IsRenderGraphCommandBuffer() const
     {
         return _impl->_render_graph != nullptr;
+    }
+    void CommandBuffer::RecordNativeCallback(std::function<void(RHICommandBuffer *)> callback)
+    {
+        if (!callback)
+        {
+            LOG_ERROR("CommandBuffer::RecordNativeCallback requires a valid callback");
+            return;
+        }
+        if (RendererAPI::GetAPI() != RendererAPI::ERenderAPI::kDirectX12)
+        {
+            LOG_ERROR("CommandBuffer::RecordNativeCallback is only supported by the DirectX 12 backend");
+            return;
+        }
+        _impl->RecordNativeCallback(std::move(callback));
     }
     void CommandBuffer::Clear()
     {

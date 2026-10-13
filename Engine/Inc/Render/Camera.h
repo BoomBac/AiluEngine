@@ -33,6 +33,26 @@ namespace Ailu
             kBilinear,
             kPoint
         };
+        enum class ESuperResolutionMode : u8
+        {
+            kOff,
+            kDlss,
+            kFsr
+        };
+        enum class ESuperResolutionQuality : u8
+        {
+            kQuality,
+            kBalanced,
+            kPerformance,
+            kUltraPerformance
+        };
+        enum class EResolvedTemporalMode : u8
+        {
+            kSpatial,
+            kTAA,
+            kDlssSR,
+            kFsrSR
+        };
         const String &CameraTypeToString(ECameraType type);
         ECameraType CameraTypeFromString(const String &str);
 
@@ -149,12 +169,56 @@ namespace Ailu
             bool LockAspect() const { return _lock_aspect; }
             void RenderScale(f32 value) { _render_scale = std::clamp(value, 0.1f, 2.0f); }
             f32 RenderScale() const { return _render_scale; }
+            void SuperResolutionMode(ESuperResolutionMode value)
+            {
+                if (_super_resolution_mode == value)
+                    return;
+                _super_resolution_mode = value;
+                if (value == ESuperResolutionMode::kDlss &&
+                    _super_resolution_quality == ESuperResolutionQuality::kUltraPerformance)
+                    _super_resolution_quality = ESuperResolutionQuality::kPerformance;
+                MarkTemporalHistoryReset();
+            }
+            ESuperResolutionMode SuperResolutionMode() const { return _super_resolution_mode; }
+            void SuperResolutionQuality(ESuperResolutionQuality value)
+            {
+                if (_super_resolution_mode == ESuperResolutionMode::kDlss &&
+                    value == ESuperResolutionQuality::kUltraPerformance)
+                    value = ESuperResolutionQuality::kPerformance;
+                if (_super_resolution_quality == value)
+                    return;
+                _super_resolution_quality = value;
+                MarkTemporalHistoryReset();
+            }
+            ESuperResolutionQuality SuperResolutionQuality() const { return _super_resolution_quality; }
+            bool IsDlssAvailable() const { return _dlss_available; }
+            bool IsFsrAvailable() const { return _fsr_available; }
+            EResolvedTemporalMode ResolvedTemporalMode() const { return _resolved_temporal_mode; }
+            bool IsDlssSRActive() const { return _resolved_temporal_mode == EResolvedTemporalMode::kDlssSR; }
+            bool IsFsrSRActive() const { return _resolved_temporal_mode == EResolvedTemporalMode::kFsrSR; }
+            bool IsTemporalUpscalingActive() const { return IsDlssSRActive() || IsFsrSRActive(); }
+            void ResolveTemporalMode(EResolvedTemporalMode mode, Vector2D<u32> render_size, bool dlss_available,
+                                     bool fsr_available = false)
+            {
+                if (_resolved_temporal_mode != mode || _resolved_render_size.x != render_size.x ||
+                    _resolved_render_size.y != render_size.y || _dlss_available != dlss_available ||
+                    _fsr_available != fsr_available)
+                    MarkTemporalHistoryReset();
+                _resolved_temporal_mode = mode;
+                _resolved_render_size = render_size;
+                _dlss_available = dlss_available;
+                _fsr_available = fsr_available;
+            }
             void UpsamplingFilter(EUpsamplingFilter value) { _upsampling_filter = value; }
             EUpsamplingFilter UpsamplingFilter() const { return _upsampling_filter; }
-            Vector2D<u32> RenderSize() const
+            Vector2D<u32> ConfiguredRenderSize() const
             {
                 return Vector2D<u32>{std::max<u32>(1u, static_cast<u32>(std::round(_pixel_width * _render_scale))),
                                      std::max<u32>(1u, static_cast<u32>(std::round(_pixel_height * _render_scale)))};
+            }
+            Vector2D<u32> RenderSize() const
+            {
+                return IsTemporalUpscalingActive() ? _resolved_render_size : ConfiguredRenderSize();
             }
 
             void OutputSize(u16 w, u16 h)
@@ -232,6 +296,12 @@ namespace Ailu
             bool _reverse_projection_x = false;
             bool _lock_aspect = false;
             f32 _render_scale = 1.0f;
+            ESuperResolutionMode _super_resolution_mode = ESuperResolutionMode::kOff;
+            ESuperResolutionQuality _super_resolution_quality = ESuperResolutionQuality::kQuality;
+            EResolvedTemporalMode _resolved_temporal_mode = EResolvedTemporalMode::kSpatial;
+            Vector2D<u32> _resolved_render_size = {1u, 1u};
+            bool _dlss_available = false;
+            bool _fsr_available = false;
             EUpsamplingFilter _upsampling_filter = EUpsamplingFilter::kBilinear;
             void RebuildCameraMatrices();
             void RefreshRenderMatrices();

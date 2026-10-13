@@ -20,6 +20,7 @@
 #include "Render/Features/DDGI.h"
 #include "Render/Features/SurfelGI.h"
 #include "Render/2D/SpriteRenderFeature.h"
+#include "Render/Features/StreamlineSrPass.h"
 #include "Render/RenderPipeline.h"
 #include "Render/RenderingData.h"
 #include "Render/CommandBuffer.h"
@@ -84,6 +85,8 @@ namespace Ailu::Render
         _lighting_pass->SetSurfelGI(static_cast<SurfelGIFeature *>(_surfel_gi));
         _owned_features.push_back(AL_NEW_TAG(EMemoryTag::kRenderer, SpriteRenderFeature));
         _sprite = _owned_features.back();
+        _owned_features.push_back(AL_NEW_TAG(EMemoryTag::kRenderer, StreamlineSrFeature));
+        _streamline_sr = _owned_features.back();
         //_features.push_back(_vxgi);
         //_features.push_back(_cloud);
         _features.push_back(_taa);
@@ -97,6 +100,7 @@ namespace Ailu::Render
         _features.push_back(_ddgi);
         _features.push_back(_surfel_gi);
         _features.push_back(_sprite);
+        _features.push_back(_streamline_sr);
         _material_data_lut[0] = 0; //default material
         MaterialData miss_mat{};
         miss_mat._base_color = float3(1.0f, 0.0f, 1.0f);//洋红色
@@ -1043,7 +1047,10 @@ namespace Ailu::Render
     {
         if (cam.ConsumeTemporalDebugFrame())
         {
-            const Vector4f jitter = cam._anti_aliasing == EAntiAliasing::kTAA ? cam.GetJitter() : Vector4f::kZero;
+              const Vector4f jitter = (cam._anti_aliasing == EAntiAliasing::kTAA &&
+                                       cam.ResolvedTemporalMode() == EResolvedTemporalMode::kTAA) ||
+                                              cam.IsTemporalUpscalingActive()
+                                        ? cam.GetJitter() : Vector4f::kZero;
             const Matrix4x4f &jittered_vp = cam.GetViewProjJittered();
             const Matrix4x4f &no_jitter_vp = cam.GetViewProjNoJitter();
             const Vector3f probe_point = cam.Position() + cam.Forward() * std::max(cam.Near() * 2.0f, 1.0f);

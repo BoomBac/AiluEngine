@@ -974,6 +974,13 @@ namespace Ailu
             return {};
         }
 
+        TextureDesc RenderGraph::GetTextureDesc(RGHandle handle) const
+        {
+            if (auto *node = const_cast<RenderGraph *>(this)->GetResourceNode(handle); node != nullptr && node->_is_tex)
+                return node->_tex_desc;
+            return TextureDesc{};
+        }
+
         u32 RenderGraph::GetPassNameOrdinal(const CompiledRenderPass &compiled_pass) const
         {
             u32 ordinal = 0u;

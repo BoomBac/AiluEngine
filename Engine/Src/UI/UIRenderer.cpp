@@ -24,7 +24,7 @@ namespace Ailu
         static UIRenderer *s_Renderer = nullptr;
         namespace
         {
-            constexpr u16 kBackdropBlurDownsample = 1u;
+            constexpr u16 kBackdropBlurDownsample = 2u;
             constexpr u16 kMaxTempRTDimension = 4095u;
             using UIClock = std::chrono::high_resolution_clock;
 

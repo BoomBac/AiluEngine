@@ -18,6 +18,8 @@ namespace Ailu::Render
     private:
         BloomPass _bloom;
         ToneMappingPass _tone_mapping;
+        Ref<Shader> _overlay_depth_shader;
+        Ref<Material> _overlay_depth_material;
     };
 }
 

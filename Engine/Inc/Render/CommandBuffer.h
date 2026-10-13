@@ -115,6 +115,9 @@ namespace Ailu
         ~CommandBuffer() override;
         void SetRenderGraph(RDG::RenderGraph *render_graph);
         bool IsRenderGraphCommandBuffer() const;
+        /// @brief Record a callback for the active RHI command buffer on the backend recording thread.
+        /// The callback is value-owned by the command packet and must not capture stack references.
+        void RecordNativeCallback(std::function<void(RHICommandBuffer *)> callback);
 #if AILU_ENABLE_FRAME_DEBUGGER
         void SetCapturePassMetadata(const Render::FrameDebugger::CapturePassMetadata &metadata) { _capture_pass_metadata = metadata; }
         const Render::FrameDebugger::CapturePassMetadata &CapturePassMetadata() const { return _capture_pass_metadata; }

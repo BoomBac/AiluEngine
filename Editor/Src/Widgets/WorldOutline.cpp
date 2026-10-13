@@ -670,21 +670,20 @@ namespace Ailu
                     if (!scene->IsValidEntity(entity))
                         return;
 
-                    auto *transform = scene->GetRegister().GetComponent<ECS::TransformComponent>(entity);
+                    auto &register_ref = scene->GetRegister();
+                    auto *transform = register_ref.GetComponent<ECS::TransformComponent>(entity);
+                    auto *camera_component = register_ref.GetComponent<ECS::CCamera>(entity);
                     auto *editor = EditorApp::GetEditor();
                     Render::Camera *scene_camera = editor != nullptr ? editor->GetSceneCamera() : nullptr;
-                    if (transform == nullptr || scene_camera == nullptr)
+                    if (transform == nullptr || camera_component == nullptr || scene_camera == nullptr)
                         return;
 
                     const Matrix4x4f &world_matrix = transform->GetWorldMatrix();
-                    const Vector3f position(world_matrix[3][0], world_matrix[3][1], world_matrix[3][2]);
-                    const Quaternion rotation = Quaternion::FromMat4f(world_matrix);
-                    const Vector3f forward = rotation * Vector3f::kForward;
-                    const f32 pitch = -std::asin(std::clamp(forward.y, -1.0f, 1.0f)) * Math::kRadToDeg;
-                    const f32 yaw = std::atan2(forward.x, forward.z) * Math::kRadToDeg;
-
-                    editor->GetSceneCameraController().SnapTo(position, pitch, yaw);
-                    scene_camera->MarkTemporalHistoryReset();
+                    auto &camera = camera_component->_camera;
+                    camera.Position(Vector3f(world_matrix[3][0], world_matrix[3][1], world_matrix[3][2]));
+                    camera.Rotation(transform->GetRotation());
+                    camera.RecalculateMatrix(true);
+                    editor->GetSceneCameraController().SnapTo(camera);
                 }});
 
                 actions.push_back({"Align Camera to View", [scene, entity]()

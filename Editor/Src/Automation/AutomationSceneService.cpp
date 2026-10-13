@@ -135,6 +135,7 @@ namespace Ailu
                                             EAutomationValueType::kBool);
                 desc._input_schema.AddParam("aa_mode", "Runtime AA mode: 0 None, 1 FXAA, 2 TAA.",
                                             EAutomationValueType::kInteger);
+                desc._input_schema.AddParam("fsr_enabled", "Request FSR Quality for this SceneView camera.", EAutomationValueType::kBool);
                 desc._input_schema.AddParam("projection_type", "Runtime projection: 0 orthographic, 1 perspective.",
                                             EAutomationValueType::kInteger);
                 desc._input_schema.AddParam("orthographic_size", "Positive orthographic width in world units.",
@@ -237,6 +238,11 @@ namespace Ailu
             result.emplace("yaw_degrees", AutomationValue(controller._rotation.y));
             result.emplace("fov_degrees", AutomationValue(camera.FovH()));
             result.emplace("aa_mode", AutomationValue(static_cast<i32>(camera._anti_aliasing)));
+            result.emplace("fsr_enabled", AutomationValue(
+                    camera.SuperResolutionMode() == Render::ESuperResolutionMode::kFsr));
+            result.emplace("fsr_active", AutomationValue(camera.IsFsrSRActive()));
+            result.emplace("render_width", AutomationValue(camera.RenderSize().x));
+            result.emplace("render_height", AutomationValue(camera.RenderSize().y));
             result.emplace("projection_type", AutomationValue(static_cast<i32>(camera.Type())));
             result.emplace("orthographic_size", AutomationValue(camera.Size()));
             result.emplace("frame", AutomationValue(Render::g_pGfxContext->GetFrameCount()));
@@ -320,7 +326,9 @@ namespace Ailu
                                                   std::format("{} must be an integer from 0 to {}", name, maximum));
                 *value = it->second.AsInt();
             }
-            bool has_update = arguments.contains("aa_mode") || arguments.contains("projection_type");
+            if (const auto it = arguments.find("fsr_enabled"); it != arguments.end() && !it->second.IsBool())
+                return AutomationResult::Fail(AutomationErrors::kInvalidArgument, "fsr_enabled must be a boolean");
+            bool has_update = arguments.contains("aa_mode") || arguments.contains("projection_type") || arguments.contains("fsr_enabled");
 
             if (const auto it = arguments.find("position"); it != arguments.end())
             {
@@ -379,6 +387,13 @@ namespace Ailu
             controller._camera_fov_h = fov;
             camera->FovH(fov);
             camera->_anti_aliasing = static_cast<Render::EAntiAliasing>(aa_mode);
+            if (arguments.contains("fsr_enabled"))
+            {
+                if (arguments.at("fsr_enabled").AsBool())
+                    camera->SuperResolutionMode(Render::ESuperResolutionMode::kFsr);
+                else if (camera->SuperResolutionMode() == Render::ESuperResolutionMode::kFsr)
+                    camera->SuperResolutionMode(Render::ESuperResolutionMode::kOff);
+            }
             camera->Type(static_cast<Render::ECameraType>(projection_type));
             if (arguments.contains("orthographic_size"))
                 camera->Size(orthographic_size);

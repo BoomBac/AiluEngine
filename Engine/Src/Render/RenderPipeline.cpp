@@ -1,6 +1,7 @@
 ﻿#include "Render/RenderPipeline.h"
 #include "Framework/Common/JobSystem.h"
 #include "Render/GraphicsContext.h"
+#include "Render/StreamlineSR.h"
 #include "Render/Material.h"
 #include "Framework/Common/Allocator.hpp"
 #include "Framework/Common/Application.h"
@@ -142,7 +143,10 @@ namespace Ailu::Render
         Setup();
         for (auto *camera : _cameras)
             if (camera != nullptr)
+            {
+                SuperResolution::ResolveCamera(*camera);
                 camera->PrepareRenderFrame(GraphicsContext::Get().GetFrameCount());
+            }
         const Scene &scene = *SceneManagement::SceneMgr::Get().ActiveScene();
         bool has_cubemap_camera = false;
         for (auto *camera : _cameras)

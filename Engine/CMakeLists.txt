@@ -2,6 +2,10 @@
 cmake_minimum_required(VERSION 4.1)
 project (AiluEngine)
 option(AILU_ENABLE_LUA_SCRIPTING "Enable Lua + sol2 scripting support" OFF)
+option(AILU_WITH_STREAMLINE "Enable NVIDIA Streamline support on the DX12 backend" OFF)
+set(AILU_STREAMLINE_SDK_ROOT "${AILU_EXT_PACKAGES_DIR}/streamline-sdk-2.14.1" CACHE PATH "Streamline SDK root directory (v2.14.1 or newer)")
+option(AILU_WITH_FSR "Enable AMD FidelityFX FSR 3.1.5 support on the DX12 backend" OFF)
+set(AILU_FSR_SDK_ROOT "${AILU_EXT_PACKAGES_DIR}/fidelityfx-sdk-2.3.0" CACHE PATH "AMD FidelityFX SDK 2.3.0 root directory")
 set(AILU_SOL2_INCLUDE_DIR "" CACHE PATH "Path to sol2 include root containing sol/sol.hpp")
 set(AILU_LUA_INCLUDE_DIR "" CACHE PATH "Path to Lua headers containing lua.hpp")
 set(AILU_LUA_LIBRARY "" CACHE FILEPATH "Path to the Lua library file")
@@ -223,6 +227,40 @@ target_include_directories(Engine PUBLIC ${AILU_EXT_PACKAGES_DIR}/fbxsdk/include
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/ImGuizmo)
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/implot)
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/rapidjson)
+if (AILU_WITH_STREAMLINE)
+        if (NOT EXISTS "${AILU_STREAMLINE_SDK_ROOT}/include/sl.h")
+                message(FATAL_ERROR "AILU_WITH_STREAMLINE requires AILU_STREAMLINE_SDK_ROOT "
+                                    "to point to an installed Streamline SDK.")
+        endif()
+        if (NOT EXISTS "${AILU_STREAMLINE_SDK_ROOT}/bin/x64/sl.interposer.dll")
+                message(FATAL_ERROR "Streamline SDK runtime is missing bin/x64/sl.interposer.dll.")
+        endif()
+        target_include_directories(Engine PRIVATE "${AILU_STREAMLINE_SDK_ROOT}/include")
+        target_compile_definitions(Engine PRIVATE AILU_WITH_STREAMLINE=1)
+        target_link_libraries(Engine PRIVATE version.lib)
+else()
+        target_compile_definitions(Engine PRIVATE AILU_WITH_STREAMLINE=0)
+endif()
+if (AILU_WITH_FSR)
+        set(AILU_FSR_API_INCLUDE "${AILU_FSR_SDK_ROOT}/Kits/FidelityFX/api/include")
+        set(AILU_FSR_UPSCALER_INCLUDE "${AILU_FSR_SDK_ROOT}/Kits/FidelityFX/upscalers/include")
+        set(AILU_FSR_SIGNED_BIN "${AILU_FSR_SDK_ROOT}/Kits/FidelityFX/signedbin")
+        foreach(AILU_FSR_REQUIRED_FILE
+                "${AILU_FSR_API_INCLUDE}/ffx_api.h"
+                "${AILU_FSR_API_INCLUDE}/dx12/ffx_api_dx12.h"
+                "${AILU_FSR_UPSCALER_INCLUDE}/ffx_upscale.h"
+                "${AILU_FSR_SIGNED_BIN}/amd_fidelityfx_loader_dx12.dll"
+                "${AILU_FSR_SIGNED_BIN}/amd_fidelityfx_upscaler_dx12.dll")
+                if (NOT EXISTS "${AILU_FSR_REQUIRED_FILE}")
+                        message(FATAL_ERROR "AILU_WITH_FSR requires FidelityFX SDK 2.3.0 files; missing ${AILU_FSR_REQUIRED_FILE}")
+                endif()
+        endforeach()
+        target_include_directories(Engine PRIVATE "${AILU_FSR_API_INCLUDE}" "${AILU_FSR_UPSCALER_INCLUDE}")
+        target_compile_definitions(Engine PRIVATE AILU_WITH_FSR=1)
+        target_link_libraries(Engine PRIVATE wintrust.lib version.lib)
+else()
+        target_compile_definitions(Engine PRIVATE AILU_WITH_FSR=0)
+endif()
 if (AILU_LUA_SCRIPTING_ENABLED)
         target_include_directories(Engine PUBLIC ${AILU_SOL2_INCLUDE_DIR})
         target_include_directories(Engine PUBLIC ${AILU_LUA_INCLUDE_DIR})
@@ -316,6 +354,28 @@ add_custom_command(TARGET Engine POST_BUILD
         COMMENT "Running post-build script..."
         VERBATIM
         )
+if (AILU_WITH_STREAMLINE)
+        foreach(AILU_STREAMLINE_APP editor player test)
+                add_custom_command(TARGET Engine POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E make_directory
+                                "${AiluBuildPath}/out/${AILU_STREAMLINE_APP}/bin/x64/$<LOWER_CASE:$<CONFIG>>/Streamline"
+                COMMAND ${CMAKE_COMMAND} -E copy_directory "${AILU_STREAMLINE_SDK_ROOT}/bin/x64"
+                                "${AiluBuildPath}/out/${AILU_STREAMLINE_APP}/bin/x64/$<LOWER_CASE:$<CONFIG>>/Streamline"
+                        VERBATIM)
+        endforeach()
+endif()
+if (AILU_WITH_FSR)
+        foreach(AILU_FSR_APP editor player test)
+                set(AILU_FSR_APP_RUNTIME "${AiluBuildPath}/out/${AILU_FSR_APP}/bin/x64/$<LOWER_CASE:$<CONFIG>>/FSR")
+                add_custom_command(TARGET Engine POST_BUILD
+                        COMMAND ${CMAKE_COMMAND} -E make_directory "${AILU_FSR_APP_RUNTIME}"
+                        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                                "${AILU_FSR_SIGNED_BIN}/amd_fidelityfx_loader_dx12.dll" "${AILU_FSR_APP_RUNTIME}"
+                        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                                "${AILU_FSR_SIGNED_BIN}/amd_fidelityfx_upscaler_dx12.dll" "${AILU_FSR_APP_RUNTIME}"
+                        VERBATIM)
+        endforeach()
+endif()
 #add_custom_command(TARGET Engine PRE_BUILD
 #        COMMAND ${CMAKE_COMMAND} -E echo "Running pre-build script..."
 #        COMMAND cmd /c "${PROJECT_SOURCE_DIR}/pre_build_script.bat"

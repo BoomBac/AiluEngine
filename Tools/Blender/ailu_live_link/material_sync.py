@@ -144,8 +144,6 @@ def _opacity_source(socket, groups=(), visited=None):
 def invalidate_image_cache():
     _packed_image_cache.clear()
     _scalar_image_cache.clear()
-    from . import material_bake
-    material_bake.invalidate()
 
 
 def _image_path(image, data_map=False):

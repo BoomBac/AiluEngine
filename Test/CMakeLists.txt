@@ -290,8 +290,27 @@ add_custom_command(TARGET BlenderPersistenceSmoke POST_BUILD
     VERBATIM)
 
 add_executable(BlenderCameraSmoke BlenderCameraSmoke.cpp
-    "${ENGINE_ROOT_PATH}/Src/Framework/Math/Transform.cpp")
+    "${ENGINE_ROOT_PATH}/Src/Framework/Math/Transform.cpp"
+    "${EDITOR_ROOT_PATH}/Src/Common/CameraControllers.cpp")
 ailu_configure_test_target(BlenderCameraSmoke)
 add_custom_command(TARGET BlenderCameraSmoke POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:Engine>" "$<TARGET_FILE_DIR:BlenderCameraSmoke>"
+    VERBATIM)
+
+add_executable(StreamlineDx12BridgeSmoke StreamlineDx12BridgeSmoke.cpp
+    "${ENGINE_ROOT_PATH}/Src/RHI/DX12/D3DGPUTimer.cpp"
+    "${ENGINE_ROOT_PATH}/Src/RHI/DX12/StreamlineDx12Bridge.cpp"
+    "${ENGINE_ROOT_PATH}/Src/RHI/DX12/StreamlineRuntime.cpp")
+ailu_configure_test_target(StreamlineDx12BridgeSmoke)
+target_compile_definitions(StreamlineDx12BridgeSmoke PRIVATE AILU_WITH_STREAMLINE=0)
+target_link_libraries(StreamlineDx12BridgeSmoke PRIVATE d3d12 dxgi)
+add_custom_command(TARGET StreamlineDx12BridgeSmoke POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:Engine>" "$<TARGET_FILE_DIR:StreamlineDx12BridgeSmoke>"
+    VERBATIM)
+
+add_executable(D3DDepthStencilSmoke D3DDepthStencilSmoke.cpp "${ENGINE_ROOT_PATH}/Src/Render/PipelineState.cpp")
+target_include_directories(D3DDepthStencilSmoke PRIVATE "${ENGINE_ROOT_PATH}/Src")
+ailu_configure_test_target(D3DDepthStencilSmoke)
+add_custom_command(TARGET D3DDepthStencilSmoke POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:Engine>" "$<TARGET_FILE_DIR:D3DDepthStencilSmoke>"
     VERBATIM)

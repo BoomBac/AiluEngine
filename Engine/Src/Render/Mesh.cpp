@@ -19,6 +19,31 @@ namespace Ailu::Render
 	{
 		_name = name;
 	}
+	Ref<Mesh> Mesh::CreateFromData(String name, Vector<Vector3f> &&vertices, Vector<Vector3f> &&normals,
+		Vector<Vector4f> &&tangents, Vector<Vector2f> &&uvs, Vector<Vector<u32>> &&submeshes,
+		const AABB &bounds)
+	{
+		auto mesh = MakeRef<Mesh>(std::move(name));
+		mesh->SetVertices(std::move(vertices));
+		mesh->SetNormals(std::move(normals));
+		mesh->SetTangents(std::move(tangents));
+		mesh->SetUVs(std::move(uvs));
+
+		Vector<AABB> mesh_bounds;
+		mesh_bounds.reserve(submeshes.size() + 1u);
+		mesh_bounds.push_back(bounds);
+		for (auto &indices : submeshes)
+		{
+			AABB submesh_bounds = AABB::Infinity();
+			for (u32 vertex_index : indices)
+				AABB::Encapsulate(submesh_bounds, mesh->GetVertices()[vertex_index]);
+			mesh_bounds.push_back(indices.empty() ? bounds : submesh_bounds);
+			mesh->AddSubmesh(std::move(indices));
+		}
+		mesh->SetBounds(std::span<const AABB>(mesh_bounds.data(), mesh_bounds.size()));
+		mesh->Apply();
+		return mesh;
+	}
 	Mesh::~Mesh()
 	{
 		Clear();

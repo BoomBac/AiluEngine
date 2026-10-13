@@ -1,4 +1,5 @@
 #include "Assets/AssetDocument.h"
+#include "Common/CameraControllers.h"
 #include "Framework/Common/Log.h"
 #include "Framework/Math/Transform.h"
 #include "Objects/JsonArchive.h"
@@ -67,10 +68,42 @@ int main(int argc, char** argv)
             camera.RecalculateMatrix(true);
             Require(Magnitude(camera.Forward() - ReadVector(fixture["forward"])) < 1e-5f, "Camera forward differs from Blender");
             Require(Magnitude(camera.Up() - ReadVector(fixture["up"])) < 1e-5f, "Camera up differs from Blender");
+            Camera scene_camera;
+            const auto original_type = camera.Type() == ECameraType::kPerspective
+                                           ? ECameraType::kOrthographic : ECameraType::kPerspective;
+            const bool original_lock_aspect = count % 2u == 0u;
+            const f32 original_aspect = original_lock_aspect ? 1.25f : static_cast<f32>(width) / height;
+            scene_camera.Type(original_type);
+            scene_camera.LockAspect(original_lock_aspect);
+            scene_camera.Aspect(original_aspect);
+            scene_camera.Size(23.0f);
+            scene_camera.ProjectionOffset(Vector2f(0.07f, -0.11f));
+            scene_camera.SetPixelSize(width, height);
+            scene_camera.OutputSize(width, height);
+            Editor::FirstPersonCameraController controller(&scene_camera);
+            controller._camera_fov_h = 70.0f;
+            controller._camera_near = 0.03f;
+            controller._camera_far = 500.0f;
+            Require(!controller.RestoreProjection(), "Projection restored without Align");
+            controller.SnapTo(camera);
+            controller.Interpolate(0.5f);
+            Require(Magnitude(scene_camera.Forward() - camera.Forward()) < 1e-5f, "Aligned view forward mismatch");
+            Require(Magnitude(scene_camera.Up() - camera.Up()) < 1e-5f, "Aligned view up mismatch");
+            Require(controller._camera_fov_h == camera.FovH(), "Aligned controller FOV mismatch");
+            Require(controller._camera_near == camera.Near() && controller._camera_far == camera.Far(),
+                    "Aligned controller clipping mismatch");
+            scene_camera.SetPixelSize(width + 64u, height + 64u);
+            Require(scene_camera.Aspect() == camera.Aspect(), "Aligned aspect changed on viewport resize");
+            scene_camera.SetPixelSize(width, height);
+            scene_camera.OutputSize(width, height);
+            scene_camera.RecalculateMatrix(true);
             for (const auto& point : fixture["points"].GetArray())
             {
                 const Vector3f world = ReadVector(point["world"]);
                 const Vector2f screen = camera.WorldToScreen(world);
+                const Vector2f aligned_screen = scene_camera.WorldToScreen(world);
+                Require(std::abs(aligned_screen.x - screen.x) < 0.02f && std::abs(aligned_screen.y - screen.y) < 0.02f,
+                        "Aligned view projection differs from selected camera");
                 const f32 error = std::max(std::abs(screen.x - point["screen"][0].GetFloat()), std::abs(screen.y - point["screen"][1].GetFloat()));
                 max_pixel_error = std::max(max_pixel_error, error);
                 if (error >= 0.02f) throw std::runtime_error(String(fixture["name"].GetString()) + ": projection pixel mismatch");
@@ -88,6 +121,25 @@ int main(int argc, char** argv)
                     Require(DotProduct(camera.ScreenToWorld(screen), camera.Forward()) > 0.99999f, "Orthographic ray direction is reversed");
                 }
             }
+            // A second Align must retain the original viewport settings, rather than the first camera's lens.
+            controller.SnapTo(camera);
+            const Vector3f aligned_position = scene_camera.Position();
+            const Vector3f aligned_forward = scene_camera.Forward();
+            const Vector3f level_right = Quaternion::AngleAxis(controller._rotation.y, Vector3f::kUp) * Vector3f::kRight;
+            const Vector3f level_up = Normalize(CrossProduct(aligned_forward, level_right));
+            Require(controller.RestoreProjection(), "Aligned projection was not restored");
+            Require(scene_camera.Position() == aligned_position && Magnitude(scene_camera.Forward() - aligned_forward) < 1e-5f &&
+                    Magnitude(scene_camera.Up() - level_up) < 1e-5f, "Restore delayed roll reset or changed position/direction");
+            controller.Interpolate(0.5f);
+            Require(scene_camera.Position() == aligned_position && Magnitude(scene_camera.Forward() - aligned_forward) < 1e-5f &&
+                    Magnitude(scene_camera.Up() - level_up) < 1e-5f, "Interpolation reintroduced roll after restore");
+            Require(scene_camera.Type() == original_type && scene_camera.FovH() == 70.0f &&
+                    scene_camera.Near() == 0.03f && scene_camera.Far() == 500.0f && scene_camera.Size() == 23.0f,
+                    "Original viewport lens was not restored");
+            Require(scene_camera.LockAspect() == original_lock_aspect && scene_camera.Aspect() == original_aspect &&
+                    scene_camera.ProjectionOffset() == Vector2f(0.07f, -0.11f) && !scene_camera.ReverseProjectionX(),
+                    "Original viewport projection settings were not restored");
+            Require(!controller.RestoreProjection(), "Projection restoration was not consumed");
             ++count;
         }
         SceneCameraComponentDocument document;

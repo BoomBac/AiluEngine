@@ -291,11 +291,13 @@ namespace Ailu::Render
             // 这样 PostprocessStack 不会把 _color_target 改写成另一个资源，导致注册在它之前的 Pass 绑错目标。
             RDG::RGHandle         _color_target;
             RDG::RGHandle         _color_tex;
+            RDG::RGHandle         _upscaled_color;
             RDG::RGHandle         _taa_color;
             RDG::RGHandle         _taa_history_color; // Jittered accumulation; _taa_color is stable presentation.
             RDG::RGHandle         _taa_opaque_color;
             RDG::RGHandle         _taa_reactive;
             RDG::RGHandle         _final_color;
+            RDG::RGHandle         _final_depth;
             RDG::RGHandle         _depth_target;
             RDG::RGHandle         _depth_tex;
             RDG::RGHandle         _motion_vector_tex;
@@ -313,7 +315,7 @@ namespace Ailu::Render
             RDG::RGHandle         _environment_specular;
             RDG::RGHandle         _environment_transmittance_lut;
             RDG::RGHandle         _environment_mult_scatter_lut;
-        } _rg_handles;
+        } _rg_handles{};
         CommandBuffer *cmd;
         const CullResult *_cull_results;
         const ShadowSet *_shadow_set = nullptr;
@@ -341,11 +343,21 @@ namespace Ailu::Render
         {
             return _rg_handles._final_color.IsValid() ? _rg_handles._final_color : _rg_handles._color_target;
         }
+        RDG::RGHandle &FinalDepthHandle()
+        {
+            return _rg_handles._final_depth.IsValid() ? _rg_handles._final_depth : _rg_handles._depth_target;
+        }
+        const RDG::RGHandle &FinalDepthHandle() const
+        {
+            return _rg_handles._final_depth.IsValid() ? _rg_handles._final_depth : _rg_handles._depth_target;
+        }
         void Reset()
         {
             _postprocess_input = nullptr;
             _motion_vector_tex_handle = RTHandle{};
             _rg_handles._taa_color = {};
+            _rg_handles._upscaled_color = {};
+            _rg_handles._final_depth = {};
             _rg_handles._taa_history_color = {};
             _rg_handles._taa_opaque_color = {};
             _rg_handles._taa_reactive = {};

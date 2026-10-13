@@ -187,6 +187,7 @@ namespace Ailu
             RenderFeature *_ddgi;
             RenderFeature *_surfel_gi;
             RenderFeature *_sprite;
+            RenderFeature *_streamline_sr;
             u64 _active_camera_hash;
 
             RenderingData _rendering_data;

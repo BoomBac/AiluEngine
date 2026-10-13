@@ -79,7 +79,9 @@ namespace Ailu
             void ProcessPendingPlaceActorSpawns();
             void BuildSceneToolbar();
             void BuildSceneCameraSettings();
+            void SetSuperResolutionControls(bool enabled, bool fsr_selected);
             void UpdateSceneCameraSettings();
+            void UpdateSuperResolutionStatus();
             void UpdateSceneToolbarLayout();
             void UpdateSceneToolbarBackdrop();
             void UpdateSceneToolbarState();
@@ -88,6 +90,8 @@ namespace Ailu
             void SetSceneCamera2DOrthographic();
             void SetSceneCamera2DOrthographic(ESceneView2DOrientation orientation);
             void SetSceneCameraPerspective();
+            void SetSceneCameraTransform(const Vector3f &position, const Quaternion &rotation);
+            void UpdateSceneCameraTransformSettings();
             bool IsSceneCamera2D() const;
             Vector2f ViewToRenderPosition(const Vector2f &view_pos) const;
             void ProcessCameraInput(f32 dt);
@@ -105,6 +109,8 @@ namespace Ailu
             UI::Button *_btn_motion_vector_debug = nullptr;
             UI::Button *_btn_camera_settings = nullptr;
             UI::Border *_camera_settings_panel = nullptr;
+            UI::InputBlock *_camera_position_inputs[3] = {};
+            UI::InputBlock *_camera_rotation_inputs[3] = {};
             UI::HorizontalBox *_camera_fov_row = nullptr;
             UI::HorizontalBox *_camera_size_row = nullptr;
             UI::InputBlock *_camera_fov_input = nullptr;
@@ -113,13 +119,17 @@ namespace Ailu
             UI::InputBlock *_camera_size_input = nullptr;
             UI::Dropdown *_camera_aa_dropdown = nullptr;
             UI::InputBlock *_camera_render_scale_input = nullptr;
+            UI::HorizontalBox *_camera_upsampling_row = nullptr;
             UI::Dropdown *_camera_upsampling_dropdown = nullptr;
+            UI::HorizontalBox *_camera_sr_row = nullptr;
+            UI::Dropdown *_camera_sr_quality_dropdown = nullptr;
+            UI::Text *_camera_sr_status = nullptr;
             UI::CheckBox *_camera_postprocess_checkbox = nullptr;
             UI::Border *_camera_preview_frame = nullptr;
             UI::Image *_camera_preview = nullptr;
             Render::ECameraType _stored_camera_type;
             Vector3f _stored_camera_position = Vector3f::kZero;
-            Vector2f _stored_camera_rotation = Vector2f::kZero;
+            Quaternion _stored_camera_rotation = Quaternion::Identity();
             f32 _stored_camera_size = 10.0f;
             ESceneView2DOrientation _scene_2d_orientation = ESceneView2DOrientation::kXY;
             bool _has_stored_perspective_camera = false;

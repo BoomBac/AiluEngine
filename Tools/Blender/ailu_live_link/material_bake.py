@@ -130,7 +130,11 @@ def _SendMaterial(value, link):
 def invalidate():
     _payloads.clear()
     for mesh in _meshes.values():
-        bpy.data.meshes.remove(mesh)
+        try:
+            if mesh.as_pointer():
+                bpy.data.meshes.remove(mesh)
+        except ReferenceError:
+            pass
     _meshes.clear()
 
 
@@ -202,26 +206,55 @@ def requires_bake_for_object(material, obj):
     return material.use_nodes and has_image(material.node_tree)
 
 
+def _tree_uses_spatial_coordinates(tree, visited=None):
+    visited = set() if visited is None else visited
+    if not tree or tree.as_pointer() in visited:
+        return False
+    visited.add(tree.as_pointer())
+    for node in tree.nodes:
+        if node.type == "NEW_GEOMETRY":
+            return True
+        if node.type == "TEX_COORD" and any(
+                socket.is_linked and socket.name != "UV" for socket in node.outputs):
+            return True
+        if node.type == "GROUP" and _tree_uses_spatial_coordinates(node.node_tree, visited):
+            return True
+    return False
+
+
+def _uses_spatial_coordinates(material):
+    return material and material.use_nodes and _tree_uses_spatial_coordinates(material.node_tree)
+
+
+def invalidate_object(obj):
+    """Invalidate only object-specific baked payloads affected by a transform."""
+    spatial_materials = [slot.material for slot in obj.material_slots
+                         if slot.material and _uses_spatial_coordinates(slot.material)]
+    should_resync = False
+    for slot in obj.material_slots:
+        material = slot.material
+        if material and requires_bake_for_object(material, obj):
+            guid = material_guid(material, obj)
+            if material in spatial_materials:
+                _payloads.pop(guid, None)
+                should_resync = True
+            elif guid not in _payloads:
+                should_resync = True
+    return should_resync
+
+
+def invalidate_materials(obj):
+    """Drop cached baked outputs when a material input changes without changing its object atlas."""
+    for slot in obj.material_slots:
+        material = slot.material
+        if material and requires_bake_for_object(material, obj):
+            _payloads.pop(material_guid(material, obj), None)
+
+
 def _bake_identity(obj):
     # Unmodified UV-only mesh instances share both their atlas and channel textures. Coordinate-sensitive or
     # evaluated geometry keeps an object-specific identity; never reuse a world-space bake across instances.
-    visited = set()
-
-    def spatial(tree):
-        if not tree or tree.as_pointer() in visited:
-            return False
-        visited.add(tree.as_pointer())
-        for node in tree.nodes:
-            if node.type == "NEW_GEOMETRY":
-                return True
-            if node.type == "TEX_COORD" and any(socket.is_linked and socket.name != "UV" for socket in node.outputs):
-                return True
-            if node.type == "GROUP" and spatial(node.node_tree):
-                return True
-        return False
-
-    if obj.modifiers or any(spatial(slot.material.node_tree) for slot in obj.material_slots
-                            if slot.material and slot.material.use_nodes):
+    if obj.modifiers or any(_uses_spatial_coordinates(slot.material) for slot in obj.material_slots):
         return identity.get_guid(obj)
     slots = ":".join(identity.get_guid(slot.material) if slot.material else "" for slot in obj.material_slots)
     return identity.get_guid(obj.data) + ":" + obj.data.name_full + ":" + slots + ":" + str(tuple(obj.matrix_world.to_scale()))
@@ -268,8 +301,15 @@ def prepared_mesh(obj, depsgraph):
     global _baking
     key = _bake_identity(obj)
     if key in _meshes:
-        _meshes.move_to_end(key)
-        return _meshes[key]
+        mesh = _meshes[key]
+        try:
+            is_alive = mesh.as_pointer() != 0
+        except ReferenceError:
+            is_alive = False
+        if is_alive:
+            _meshes.move_to_end(key)
+            return mesh
+        del _meshes[key]
     with _Measure("atlas_evaluation"):
         mesh = bpy.data.meshes.new_from_object(obj.evaluated_get(depsgraph), preserve_all_data_layers=True,
                                               depsgraph=depsgraph)
@@ -759,7 +799,7 @@ def _uniform_channel(pixels, component_count, color=False):
 
 
 def _publish_material(material, guid, obj, surface, diffuse_only, channels, link, resolution,
-                      normal_required=True):
+                      normal_required=True, export_id=""):
     from .material_sync import transmission_parameters
     packed = channels.pop("scalars")
     for index, scalar in enumerate(("alpha", "roughness", "metallic")):
@@ -780,6 +820,7 @@ def _publish_material(material, guid, obj, surface, diffuse_only, channels, link
     emission_constant = _uniform_channel(channels["emission"], 3, color=True)
     roughness_constant = _uniform_channel(channels.get("roughness"), 1)
     metallic_constant = _uniform_channel(channels.get("metallic"), 1)
+    image_prefix = f"{guid}_{export_id}" if export_id else guid
     value = {
         "material_guid": guid, "name": material.name_full + "@" + obj.name_full,
         "base_color": [base_scale] * 3 + [1.0], "roughness": 1.0, "metallic": 1.0,
@@ -787,15 +828,15 @@ def _publish_material(material, guid, obj, surface, diffuse_only, channels, link
         "emission_strength": emission_scale,
         "emission_texture_factor": True,
         "base_color_path": ("" if base_color_constant is not None else
-                            _save_pixels(guid + "_base", channels["color"], color=True)),
+                            _save_pixels(image_prefix + "_base", channels["color"], color=True)),
         # PNG quantization cannot encode 0.5 exactly: byte 128 decodes to a tiny positive tangent X/Y offset.
-        "normal_path": (_save_pixels(guid + "_normal", channels["normal"]) if normal_required else ""),
+        "normal_path": (_save_pixels(image_prefix + "_normal", channels["normal"]) if normal_required else ""),
         "emission_path": ("" if emission_constant is not None else
-                          _save_pixels(guid + "_emission", channels["emission"], color=True)),
+                          _save_pixels(image_prefix + "_emission", channels["emission"], color=True)),
         "roughness_path": ("" if diffuse_only or roughness_constant is not None else
-                           _save_pixels(guid + "_roughness", channels["roughness"])),
+                           _save_pixels(image_prefix + "_roughness", channels["roughness"])),
         "metallic_path": ("" if diffuse_only or metallic_constant is not None else
-                          _save_pixels(guid + "_metallic", channels["metallic"])),
+                          _save_pixels(image_prefix + "_metallic", channels["metallic"])),
         "alpha_test": alpha_test, "alpha_blend": continuous,
         "alpha_cutoff": float(np.clip(material.get("ailu_alpha_cutoff", 0.5), 0.0, 1.0)),
         "double_sided": not material.use_backface_culling,
@@ -834,6 +875,7 @@ def _export_materials(materials, obj, link, resolution):
     constant_scalars = {}
     bake_passes = 0
     constant_channels = 0
+    export_id = uuid.uuid4().hex
     timings = {"prepare": 0.0, "graphs": 0.0, "bake": 0.0, "pixels_cleanup": 0.0, "save_publish": 0.0}
     started = time.perf_counter()
     try:
@@ -950,7 +992,7 @@ def _export_materials(materials, obj, link, resolution):
                 packed[:, :, :3] *= np.asarray(constant_scalars[guid], dtype=np.float32)
                 channels["scalars"] = packed
             _publish_material(material, guid, obj, surface, diffuse_only, channels, link, resolution,
-                              normal_required[guid])
+                              normal_required[guid], export_id)
             channels.clear()
         timings["save_publish"] = time.perf_counter() - phase_start
         phases = " ".join(f"{name}={value * 1000:.2f}ms" for name, value in timings.items())

@@ -223,9 +223,9 @@ namespace Ailu
                                      _color_handle = builder.Write(_color_handle);
                                      _depth_handle = builder.Write(_depth_handle,EResourceUsage::kDSV);
                                      builder.Read(rendering_data.FinalColorHandle(), EResourceUsage::kWriteRTV);
-                                     builder.Read(rendering_data._rg_handles._depth_target, EResourceUsage::kDSV);
+                                     builder.Read(rendering_data.FinalDepthHandle(), EResourceUsage::kDSV);
                                      rendering_data.FinalColorHandle() = builder.Write(rendering_data.FinalColorHandle());
-                                     rendering_data._rg_handles._depth_target = builder.Write(rendering_data._rg_handles._depth_target,
+                                     rendering_data.FinalDepthHandle() = builder.Write(rendering_data.FinalDepthHandle(),
                                                                                              EResourceUsage::kDSV);
                                      read_sprite_resources(builder);
                                      read_light_probe_resources(builder);
@@ -234,9 +234,9 @@ namespace Ailu
                 {
                 ECS::Register &r = SceneMgr::Get().ActiveScene()->GetRegister();
                 cmd->SetRenderTargetLoadAction(rendering_data.FinalColorHandle(), ELoadStoreAction::kLoad);
-                cmd->SetRenderTargetLoadAction(rendering_data._rg_handles._depth_target, ELoadStoreAction::kLoad);
+                cmd->SetRenderTargetLoadAction(rendering_data.FinalDepthHandle(), ELoadStoreAction::kLoad);
                 cmd->SetRenderTarget(rendering_data.FinalColorHandle(),
-                                     rendering_data._rg_handles._depth_target);
+                                     rendering_data.FinalDepthHandle());
                 if (auto &selected = Editor::Selection::SelectedEntities(); selected.size() > 0)
                 {
                     for (auto entity: selected)

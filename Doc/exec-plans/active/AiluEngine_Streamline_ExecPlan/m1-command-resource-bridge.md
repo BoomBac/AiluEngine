@@ -87,13 +87,35 @@ M1（进入条件：M0 已经验收并写入 progress）。
 
 ## Progress
 
-- [ ] CommandCustom 公开受控录制函数 + 回调完整析构测试
+- [x] CommandCustom 公开受控录制函数 + CommandPool 管理 callback 生命周期
+- [ ] callback 恰好执行一次、Clear/TakeCommands 后精确析构测试
 - [ ] RG 回调和 GPU 录制线程顺序确认
-- [ ] NativeResource/FrameToken/Viewport 的薄接口
+- [x] DX12 NativeResource 薄接口（null/backend 检查；frame token/viewport 待接入）
 - [ ] GPU Fence 资源保活检查
 - [ ] RG 与 SL 资源 state/barrier 合约记录并测试
 - [ ] 后续 Draw/Dispatch 的 CommandList 状态恢复策略验证
 - [ ] native smoke Pass 通过 debug/PIX
+
+### 初始状态合约（DLSS 尚未执行）
+
+`RecordNativeCallback` 当前只提供同一 RHI command buffer 上的录制回调。M1 smoke callback 不改变资源状态，且暂不调用
+Streamline；因此以下 SL tag state 为 N/A。实际入口状态由 RG 声明的 usage 编译而来，后继状态由下一个 Pass 的
+`RequireState` 产生，不能把该表解释为已验证的 Streamline 内部转换契约。
+
+源码调用链检查：`RenderGraph::Execute` 在 pass 执行前按 `_resource_usages` 录制 `RequireState`，然后按 pass 次序调用
+`GraphicsContext::ExecuteCommandBuffer`；DX12 worker 依次遍历 command group 中的 command，callback 收到该组原有的
+`RHICommandBuffer`。`CommandGroup` 析构时将其 commands 归还 `CommandPool`，所以 callback 捕获对象至少活到 CPU 录制完成；
+RG usage 对应的 DX12 state tracker 负责把 GPU 资源强引用保留到 fence。禁止用 callback 捕获 RG 临时裸指针来替代该流程。
+
+| 资源 | callback 入口状态 | SL tag state | callback 退出状态 | 下一 Pass 预期状态 | 责任方 |
+|---|---|---|---|---|---|
+| input color | `kReadSRV` → `kAllShaderResource` | N/A | 不变（marker-only smoke） | 由后继 Pass usage 推导；SRV 为 `kAllShaderResource` | RenderGraph / RHI tracker |
+| depth | `kReadSRV` → `kAllShaderResource` | N/A | 不变（marker-only smoke） | 由后继 Pass usage 推导；SRV 为 `kAllShaderResource` | RenderGraph / RHI tracker |
+| motion vectors | `kReadSRV` → `kAllShaderResource` | N/A | 不变（marker-only smoke） | 由后继 Pass usage 推导；SRV 为 `kAllShaderResource` | RenderGraph / RHI tracker |
+| output | `kWriteUAV` → `kUnorderedAccess` | N/A | 保持 `kUnorderedAccess`（marker-only smoke） | 后继 SRV 为 `kAllShaderResource`，由下一次 `RequireState` 转换 | RenderGraph / RHI tracker |
+
+在真实 SL 调用前必须以 SDK 行为补齐实际 tag state 与退出 state；若 SL 改变资源状态，需在桥接层同步 tracker，不能
+仅依赖此 marker-only 表。
 
 ## Decision Log
 

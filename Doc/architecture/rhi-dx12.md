@@ -71,6 +71,22 @@ CPU `delete`/Ref 归零不一定意味着 native resource 可以立即释放。
 
 延迟释放/keep-alive 应基于实际 GPU completion。
 
+DX12 teardown stops recording and waits for GPU completion before releasing window swapchains, the GPU timer and
+the root-signature cache. The native swapchain reference is released before its Streamline proxy; the queue is
+released before the device proxy, and Streamline shuts down while the native device is still alive.
+`IGPUTimer` has a virtual destructor because `D3DContext` owns it through the base interface.
+DXGI live-object diagnostics run after both the graphics context and GPU resource manager have been destroyed;
+the report is copied to the engine log and is distinct from process-exit success.
+
+`D3DContext` also owns an optional `FsrRuntime`, independent of Streamline. When enabled, it loads the signed FSR SDK
+DLLs from the `FSR` directory beside the Engine module and queries providers using the native DX12 device; it does
+not proxy the device, factory or swapchain. Shutdown follows the GPU idle wait and precedes native device teardown.
+FSR context creation declares inverted depth when `SystemInfo::kReverseZ` is enabled; the camera uses a finite far plane.
+
+DX12 depth-stencil conversion keeps `DepthEnable` enabled whenever depth writes are requested, including
+`ZTest: Always` / `ZWrite: On`. Unconditional depth-copy passes must still enable the depth stage to write `SV_Depth`;
+turning off the comparison alone must not suppress their writes or preserve stale pooled depth contents.
+
 `GPUVisibleDescriptorAllocator` owns CPU staging pages in address-stable storage. Each allocation borrows a
 `DescriptorPage*`; appending pages must preserve every existing page address until allocator teardown. Staging
 page growth is separate from the fixed shader-visible MainHeap and its persistent bindless regions/descriptor ring.
@@ -87,6 +103,9 @@ GPU completion
 ```
 
 提交函数返回或 command list record 完成不意味着 GPU 已完成。
+
+`CommandBuffer` 的暂存 viewport 是一次性状态：绑定 render target 时消费；`Clear()` 必须重置未消费值，避免池化复用把旧尺寸带到下一个目标。
+DX12 绑定 render target 时还需按当前 RTV/DSV 的最小有效尺寸裁剪 viewport 和 scissor，保证最终提交的绘制区域不越过任一附件；command buffer 缓存重置不能替代此校验。
 
 需要复用 upload/default resource、descriptor、frame arena 或删除资源时，应基于 fence。
 

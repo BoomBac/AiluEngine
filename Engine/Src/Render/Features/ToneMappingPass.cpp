@@ -19,7 +19,9 @@ namespace Ailu::Render
     RDG::RGHandle ToneMappingPass::Record(RDG::RenderGraph &graph, RDG::RGHandle source, const RenderingData &rendering_data,
                                           const ToneMappingSettings &settings)
     {
-        TextureDesc desc(rendering_data._width, rendering_data._height, ERenderTargetFormat::kDefaultHDR);
+        (void) rendering_data;
+        const TextureDesc source_desc = graph.GetTextureDesc(source);
+        TextureDesc desc(source_desc._width, source_desc._height, ERenderTargetFormat::kDefaultHDR);
         desc._is_color_target = true;
         desc._load = ELoadStoreAction::kNotCare;
         const RDG::RGHandle output = graph.CreateResource(desc, "ToneMappedColor");

@@ -134,14 +134,15 @@ Engine/Src/Render/Features/Streamline/StreamlineSrPass.cpp
 
 | 阶段 | 独立可验收结果 | 详情 | 状态 |
 |---|---|---|---|
-| **M0 · SDK/Runtime 最小引导** | 构建可选、启动/关闭安全、capability 输出、Manual Hooking 路径验证 | `m0-sdk-runtime.md` | 未开始 |
-| **M1 · 命令/资源桥接** | 不运行 DLSS，也能在 RG 的正确命令位置验证原生资源、状态/线程/生命周期 | `m1-command-resource-bridge.md` | 未开始 |
-| **M2 · DLSS SR 画面闭环** | RTX 机器上能切换 None/TAA/DLSS SR，真实 render-size→output-size，后处理正确 | `m2-dlss-sr.md` | 未开始 |
+| **M0 · SDK/Runtime 最小引导** | 构建可选、启动/关闭安全、capability 输出、Manual Hooking 路径验证 | `m0-sdk-runtime.md` | 本机修复复验通过；完整矩阵 Blocked，详见 progress |
+| **M1 · 命令/资源桥接** | 不运行 DLSS，也能在 RG 的正确命令位置验证原生资源、状态/线程/生命周期 | `m1-command-resource-bridge.md` | 进行中 |
+| **M2 · DLSS SR 画面闭环** | RTX 机器上能切换 None/TAA/DLSS SR，真实 render-size→output-size，后处理正确 | `m2-dlss-sr.md` | 实现中 |
 | **M3 · 稳定性与扩展就绪** | Resize、Camera 切换、资源复用、失败回退、RenderDoc/PIX、未来 Feature 扩展文档 | `m3-hardening.md` | 未开始 |
 
 ## Current Milestone
 
-**M0**，读取 `m0-sdk-runtime.md`。不要预先实现 M1/M2/M3。M0 未通过，不进入 M1。
+**M2**，读取 `m2-dlss-sr.md`。用户于 2026-10-12 明确要求开始 M2；M1 验收仍未完成，相关缺口保留在 `progress.md`，不视为已通过。
+M0 完整矩阵仍 Blocked，见 `progress.md`。
 
 ## Progress
 
@@ -186,7 +187,9 @@ Engine/Src/Render/Features/Streamline/StreamlineSrPass.cpp
 
 ## Outcomes
 
-当前仅交付**执行计划**，未修改源码、未编译、未调用 Streamline SDK。成果由每个 Milestone 验收后更新 `progress.md`。
+M0 已实现并修复验收发现的 COM ownership/native 路由/teardown 问题，本机 RTX hook 和销毁复验通过；
+完整矩阵尚未完成。最新事实见 `progress.md` 与 `m0-repair-20261012.md`，初次记录见 `m0-acceptance-20261012.md`。
+M2 正在实现；M1/M0 验收缺口仍保留，M3 未开始。
 
 ## Resume Protocol
 
