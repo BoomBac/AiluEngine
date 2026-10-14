@@ -2,6 +2,20 @@
 
 ## Purpose
 
+### OIDN GPU interop
+
+`Engine/Src/RHI/DX12/OidnGpuInteropD3D12` is a private owner used by the standalone spike and the production denoiser.
+It uses dedicated DEFAULT/SHARED committed UAV buffers and separate exportable ready/done fences, with an
+exclusive caller-owned DIRECT queue in the spike. Production external mode uses recorded wait/signal requests on
+D3DCommandBuffer: completed external waits precede ExecuteCommandLists and ready signals follow it under the
+submission lock. Ordinary D3DBuffer allocations remain unchanged; shared resources receive registry GPU handles.
+The optional OIDN 2.5.1 C ABI is loaded dynamically from an explicit absolute runtime directory; only matching
+single-node CUDA LUID devices with required external-memory/semaphore flags are accepted. There is no CPU fallback.
+Normal requests poll completion without a CPU wait. Context-owned lifetime records retain sessions during native
+submission and background OIDN work. Retired sessions synchronize/release on the task pool; context shutdown drains
+them before descriptor/registry destruction. The lifetime list and native session state have separate mutexes.
+No context pointer is captured by an OIDN worker. DLL/device/buffer/semaphore teardown remains ordered.
+
 本文档描述 AiluEngine rendering abstraction 与 DX12 backend 的基本边界。
 
 主要入口：
@@ -184,6 +198,9 @@ Resize 属于危险的资源生命周期边界。
 硬件/inline ray tracing capability 通过 GraphicsContext 查询。
 
 上层 feature 应以 capability 为条件，不要通过 concrete adapter/device 强转判断。
+
+DXR 使用 `D3DCommandBuffer::SetRayTracingPipelineState` 设置 native state object，同时使 graphics PSO 缓存失效。
+Compute 与 DXR 都会替换 command list 的 native pipeline state；之后的 Draw 必须重新绑定 graphics PSO。
 
 ## Compute texture array SRVs
 

@@ -85,7 +85,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::ECS::Postprocess
 //Struct PostprocessVolumeComponent end...........................
 
 //Struct CLightProbeGroup begin...........................
-#define COMPONENT_GEN_H_552_GENERATED_BODY \
+#define COMPONENT_GEN_H_553_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_CLightProbeGroup_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -101,7 +101,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::ECS::CLightProbe
 //Struct CLightProbeGroup end...........................
 
 //Struct DDGIVolumeComponent begin...........................
-#define COMPONENT_GEN_H_586_GENERATED_BODY \
+#define COMPONENT_GEN_H_587_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_DDGIVolumeComponent_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -117,7 +117,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::ECS::DDGIVolumeC
 //Struct DDGIVolumeComponent end...........................
 
 //Struct SurfelGIComponent begin...........................
-#define COMPONENT_GEN_H_623_GENERATED_BODY \
+#define COMPONENT_GEN_H_624_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_SurfelGIComponent_Type();\
                                 static const Type* GetPrivateStaticClass();\

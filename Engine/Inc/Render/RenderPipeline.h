@@ -164,6 +164,9 @@ namespace Ailu::Render
         Vector<Camera *> _cameras;
         Camera *_preview_camera = nullptr;
         RenderTexture *_preview_target = nullptr;
+        u32 _preview_scene_id = 0u;
+        u64 _preview_edit_revision = 0u;
+        bool _is_preview_dirty = true;
         Vector<Scope<Renderer>> _renderers;
         Vector<RenderTexture *> _targets;
         FrameResource *_cur_frame_res;

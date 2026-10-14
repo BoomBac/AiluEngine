@@ -35,12 +35,13 @@ namespace Ailu
 
             const auto *hier = r.GetComponent<CHierarchy>(entity);
             Entity child = hier != nullptr ? hier->_first_child : kInvalidEntity;
-            u32 child_count = 0u;
+            size_t child_count = 0u;
             while (child != kInvalidEntity)
             {
-                if (++child_count > 16384u)
+                if (++child_count > _entities.size())
                 {
-                    LOG_ERROR("TransformSystem::RebuildOrder sibling chain exceeded max entity count at parent {}", entity);
+                    LOG_ERROR("TransformSystem::RebuildOrder sibling chain exceeded transform entity count at parent {}",
+                              entity);
                     break;
                 }
 

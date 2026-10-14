@@ -3,9 +3,9 @@
 
 #include "ddgi_common.hlsli"
 #include "ray_surface.hlsli"
+StructuredBuffer<MaterialData> g_material_buffer;
 #include "gi_ray_lighting.hlsli"
 
-StructuredBuffer<MaterialData> g_material_buffer;
 StructuredBuffer<DDGIProbeData> _probe_data;
 RWStructuredBuffer<DDGIProbeRayData> _probe_ray_data;
 

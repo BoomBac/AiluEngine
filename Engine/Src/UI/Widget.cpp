@@ -10,6 +10,7 @@
 #include "Render/Texture.h"
 #include "UI/UIFramework.h"
 #include "UI/UIRenderer.h"
+#include "Framework/Common/Profiler.h"
 
 namespace Ailu
 {
@@ -90,9 +91,12 @@ namespace Ailu
         }
         void Widget::BindOutput(RenderTexture *color, RenderTexture *depth)
         {
+            if (_is_external_output && _external_color == color && _external_depth == depth)
+                return;
             _external_color = color;
             _external_depth = depth;
             _is_external_output = true;
+            InvalidatePaint(EUIInvalidationReason::kPaint);
         }
 
         void Widget::AddToWidget(Ref<UIElement> root)
@@ -144,8 +148,38 @@ namespace Ailu
             if (_root)
                 _root->Render(r);
         }
+        void Widget::SetUpdateMode(EWidgetUpdateMode mode)
+        {
+            if (_update_mode == mode)
+                return;
+            _update_mode = mode;
+            RequestUpdate();
+        }
+        void Widget::SetTextureCacheMode(EWidgetTextureCacheMode mode)
+        {
+            if (_texture_cache_mode == mode)
+                return;
+            _texture_cache_mode = mode;
+            _texture_cache_dirty = true;
+            RequestUpdate();
+        }
+        void Widget::SetTextureCacheImageRevision(u64 revision)
+        {
+            if (_has_texture_cache_image_revision && _texture_cache_image_revision == revision)
+                return;
+            _has_texture_cache_image_revision = true;
+            _texture_cache_image_revision = revision;
+            _texture_cache_dirty = true;
+        }
         void Widget::InvalidatePaint(EUIInvalidationReason reason, UIElement *source)
         {
+            PROFILE_BLOCK_CPU("Widget::InvalidatePaint")
+            if (HasInvalidation(reason, EUIInvalidationReason::kLayout) ||
+                HasInvalidation(reason, EUIInvalidationReason::kTransform) ||
+                HasInvalidation(reason, EUIInvalidationReason::kHierarchy) ||
+                HasInvalidation(reason, EUIInvalidationReason::kVisibility))
+                RequestUpdate();
+            _texture_cache_dirty = true;
             _paint_cache_dirty_reasons |= reason;
             _last_invalidation_source = source;
             _last_invalidation_reasons = reason;
@@ -209,6 +243,7 @@ namespace Ailu
 
         bool Widget::OnEvent(UIEvent &event)
         {
+            RequestUpdate();
             bool is_event_gen = false;
             if (event._type == UIEvent::EType::kMouseExitWindow)
             {

@@ -242,6 +242,7 @@ namespace Ailu::Render
         void Upload(GraphicsContext* ctx,RHICommandBuffer* rhi_cmd,UploadParams* params);
         void Bind(RHICommandBuffer* rhi_cmd, const BindParams& params);
         u64 GetSize() const {return _mem_size;}
+        u64 UploadRevision() const { return _upload_revision.load(std::memory_order_acquire); }
         GpuResourceHandle Handle() const { return _handle; }
         template<typename tag_t>
         GpuHandle<tag_t> TypedHandle() const { return {_handle._index, _handle._generation}; }
@@ -267,6 +268,7 @@ namespace Ailu::Render
         // 依赖资源类型分派的逻辑（例如常量缓冲绑定）会随之走错分支。
         EGpuResType _res_type = EGpuResType::kBuffer;
         bool _is_ready_for_rendering = false;
+        std::atomic<u64> _upload_revision{0u};
     };
 
     template<typename resource_t>

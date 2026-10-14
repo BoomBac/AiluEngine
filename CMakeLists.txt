@@ -21,6 +21,10 @@ set(AILU_FBXSDK_LINK_LIB
 	$<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>,$<CONFIG:MinSizeRel>>:${AILU_EXT_PACKAGES_DIR}/fbxsdk/lib/vs2019/x64/release/libfbxsdk.lib>)
 
 option(AILU_ENABLE_TRACY "Enable Tracy profiler instrumentation" ON)
+option(AILU_WITH_OIDN_GPU "Enable optional OIDN 2.5.1 CUDA/DX12 dynamic runtime loading" OFF)
+set(AILU_OIDN_RUNTIME_DIRECTORY
+    "${CMAKE_SOURCE_DIR}/.artifacts/out/oidn-2.5.1/package/oidn-2.5.1.x64.windows/bin"
+    CACHE PATH "Absolute directory containing OIDN 2.5.1 CUDA runtime DLLs")
 option(AILU_TRACY_ON_DEMAND "Tracy connects only when profiler is attached" ON)
 option(AILU_TRACY_PROFILE_CALLSITE_SOURCE_LOCATION "Use call-site source locations for CPU profile blocks" OFF)
 option(AILU_ENABLE_ASSERTS "Enable engine assertions" ON)

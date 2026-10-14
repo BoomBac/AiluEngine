@@ -243,12 +243,23 @@ def invalidate_object(obj):
     return should_resync
 
 
-def invalidate_materials(obj):
-    """Drop cached baked outputs when a material input changes without changing its object atlas."""
-    for slot in obj.material_slots:
-        material = slot.material
-        if material and requires_bake_for_object(material, obj):
-            _payloads.pop(material_guid(material, obj), None)
+def invalidate_material(material, obj):
+    """Drop only the baked output affected by a material input change."""
+    if material and requires_bake_for_object(material, obj):
+        _payloads.pop(material_guid(material, obj), None)
+
+
+def invalidate_materials(obj, previous_signature, current_signature):
+    """Drop baked outputs only for materials whose inputs changed on this object."""
+    materials = (
+        slot.material for index, slot in enumerate(obj.material_slots)
+        if index < len(previous_signature) and index < len(current_signature)
+        and previous_signature[index] is not None and current_signature[index] is not None
+        and previous_signature[index][0] == current_signature[index][0]
+        and previous_signature[index] != current_signature[index]
+    )
+    for material in materials:
+        invalidate_material(material, obj)
 
 
 def _bake_identity(obj):

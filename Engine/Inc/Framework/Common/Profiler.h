@@ -89,6 +89,7 @@ namespace Ailu
         static Profiler &Get();
         static void Initialize();
         static void Shutdown();
+        static constexpr bool IsEngineProfilerEnabled() { return AILU_ENABLE_ENGINE_PROFILER != 0; }
 
         u32 StartGpuProfile(Render::RHICommandBuffer *cmdList, const String &name);
         void EndGpuProfile(Render::RHICommandBuffer *cmdList, u32 idx);
@@ -121,6 +122,7 @@ namespace Ailu
             String _name;
             u64 _frame;
         };
+        bool IsRecording() const { return _is_start_record; }
         void StartRecord() { _is_start_record = true; };
         void StopRecord() { _is_start_record = false; };
         HashMap<String, f32> GetPassGPUTime() const

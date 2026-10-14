@@ -177,6 +177,12 @@ namespace Ailu::Render
         void SetMatrix(ShaderPropertyId property_id, const Matrix4x4f &matrix);
         void SetBuffer(const String& name,GPUBuffer* buffer);
         void SetBuffer(ShaderPropertyId property_id, GPUBuffer *buffer);
+        void SetTextureSamplingSettings(ShaderPropertyId property_id, const TextureSamplingSettings &settings);
+        TextureSamplingSettings GetTextureSamplingSettings(ShaderPropertyId property_id) const;
+        SamplerDesc GetTextureSamplerDesc(ShaderPropertyId property_id) const;
+        u32 GetTextureSamplerIndex(ShaderPropertyId property_id) const;
+        void SetSamplerOverride(ShaderPropertyId property_id, const SamplerDesc &desc);
+        void ClearSamplerOverride(ShaderPropertyId property_id);
         const Map<ShaderPropertyId, Texture *> &BoundTextures() const { return _bind_textures_by_id; }
         const Map<ShaderPropertyId, GPUBuffer *> &BoundBuffers() const { return _bind_buffers_by_id; }
         float GetFloat(const String &name);
@@ -345,6 +351,7 @@ namespace Ailu::Render
             u32 _variant_hash = UINT32_MAX;
             u32 _layout_version = 0u;
             u32 _property_data_version = 0u;
+            u64 _sampler_revision = 0u;
             u64 _frame_count = static_cast<u64>(-1);
             PropertyBlockView _block;
         };
@@ -407,6 +414,7 @@ namespace Ailu::Render
         u32 _resource_binding_version = 1u;
         u32 _draw_state_version = 1u;
         Map<ShaderPropertyId, Texture *> _bind_textures_by_id{};
+        Map<ShaderPropertyId, TextureSamplingSettings> _texture_sampling;
         Map<ShaderPropertyId, GPUBuffer *> _bind_buffers_by_id{};
         //非shader使用的变量
         Map<String, u32> _common_uint_property;

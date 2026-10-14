@@ -34,6 +34,9 @@
             "_value": 0
         }],
     "_float_properties": [{
+            "_name": "_AlbedoTexSamplerIndex",
+            "_value": 0.0
+        }, {
             "_name": "_AlphaCulloff",
             "_value": 0.6018
         }, {
@@ -43,19 +46,37 @@
             "_name": "_AttenuationDistance",
             "_value": 0.0
         }, {
+            "_name": "_EmissionTexSamplerIndex",
+            "_value": 0.0
+        }, {
             "_name": "_IOR",
             "_value": 0.0
         }, {
             "_name": "_MaterialID",
             "_value": 0.0
         }, {
+            "_name": "_MetallicTexSamplerIndex",
+            "_value": 0.0
+        }, {
             "_name": "_MetallicValue",
+            "_value": 0.0
+        }, {
+            "_name": "_NormalTexSamplerIndex",
+            "_value": 0.0
+        }, {
+            "_name": "_RoughnessTexSamplerIndex",
             "_value": 0.0
         }, {
             "_name": "_RoughnessValue",
             "_value": 0.0
         }, {
             "_name": "_SamplerMask",
+            "_value": 0.0
+        }, {
+            "_name": "_SpecularTexSamplerIndex",
+            "_value": 0.0
+        }, {
+            "_name": "_TextureViewMipBiasMask",
             "_value": 0.0
         }, {
             "_name": "_Transmission",
@@ -77,22 +98,112 @@
     "_int_vector_properties": [],
     "_texture_properties": [{
             "_name": "_AlbedoTex",
-            "_texture_guid": "eb07fa74-875a-467e-bf40-6d14647da7b4"
+            "_texture_guid": "eb07fa74-875a-467e-bf40-6d14647da7b4",
+            "_sampling": {
+                "_override_sampler": false,
+                "_sampler_desc": {
+                    "_filter": "kTrilinear",
+                    "_address_u": "kRepeat",
+                    "_address_v": "kRepeat",
+                    "_address_w": "kRepeat",
+                    "_max_anisotropy": 16,
+                    "_mip_bias": 0.0,
+                    "_min_lod": 0.0,
+                    "_max_lod": 3.4028234663852886e38,
+                    "_border_color": [0.0, 0.0, 0.0, 0.0]
+                },
+                "_apply_view_mip_bias": true
+            }
         }, {
             "_name": "_EmissionTex",
-            "_texture_guid": ""
+            "_texture_guid": "",
+            "_sampling": {
+                "_override_sampler": false,
+                "_sampler_desc": {
+                    "_filter": "kTrilinear",
+                    "_address_u": "kRepeat",
+                    "_address_v": "kRepeat",
+                    "_address_w": "kRepeat",
+                    "_max_anisotropy": 16,
+                    "_mip_bias": 0.0,
+                    "_min_lod": 0.0,
+                    "_max_lod": 3.4028234663852886e38,
+                    "_border_color": [0.0, 0.0, 0.0, 0.0]
+                },
+                "_apply_view_mip_bias": true
+            }
         }, {
             "_name": "_MetallicTex",
-            "_texture_guid": ""
+            "_texture_guid": "",
+            "_sampling": {
+                "_override_sampler": false,
+                "_sampler_desc": {
+                    "_filter": "kTrilinear",
+                    "_address_u": "kRepeat",
+                    "_address_v": "kRepeat",
+                    "_address_w": "kRepeat",
+                    "_max_anisotropy": 16,
+                    "_mip_bias": 0.0,
+                    "_min_lod": 0.0,
+                    "_max_lod": 3.4028234663852886e38,
+                    "_border_color": [0.0, 0.0, 0.0, 0.0]
+                },
+                "_apply_view_mip_bias": true
+            }
         }, {
             "_name": "_NormalTex",
-            "_texture_guid": "ea68f293-f49a-45f7-a91d-7ac04bfd3433"
+            "_texture_guid": "ea68f293-f49a-45f7-a91d-7ac04bfd3433",
+            "_sampling": {
+                "_override_sampler": false,
+                "_sampler_desc": {
+                    "_filter": "kTrilinear",
+                    "_address_u": "kRepeat",
+                    "_address_v": "kRepeat",
+                    "_address_w": "kRepeat",
+                    "_max_anisotropy": 16,
+                    "_mip_bias": 0.0,
+                    "_min_lod": 0.0,
+                    "_max_lod": 3.4028234663852886e38,
+                    "_border_color": [0.0, 0.0, 0.0, 0.0]
+                },
+                "_apply_view_mip_bias": true
+            }
         }, {
             "_name": "_RoughnessTex",
-            "_texture_guid": ""
+            "_texture_guid": "",
+            "_sampling": {
+                "_override_sampler": false,
+                "_sampler_desc": {
+                    "_filter": "kTrilinear",
+                    "_address_u": "kRepeat",
+                    "_address_v": "kRepeat",
+                    "_address_w": "kRepeat",
+                    "_max_anisotropy": 16,
+                    "_mip_bias": 0.0,
+                    "_min_lod": 0.0,
+                    "_max_lod": 3.4028234663852886e38,
+                    "_border_color": [0.0, 0.0, 0.0, 0.0]
+                },
+                "_apply_view_mip_bias": true
+            }
         }, {
             "_name": "_SpecularTex",
-            "_texture_guid": ""
+            "_texture_guid": "",
+            "_sampling": {
+                "_override_sampler": false,
+                "_sampler_desc": {
+                    "_filter": "kTrilinear",
+                    "_address_u": "kRepeat",
+                    "_address_v": "kRepeat",
+                    "_address_w": "kRepeat",
+                    "_max_anisotropy": 16,
+                    "_mip_bias": 0.0,
+                    "_min_lod": 0.0,
+                    "_max_lod": 3.4028234663852886e38,
+                    "_border_color": [0.0, 0.0, 0.0, 0.0]
+                },
+                "_apply_view_mip_bias": true
+            }
         }],
     "_color_properties": ["_AlbedoValue", "_AttenuationColor", "_EmissionValue", "_SpecularValue"]
 }

@@ -432,6 +432,36 @@ namespace Ailu
             }
             {
                 AutomationMethodDesc desc;
+                desc._name = "render.texture_sampling";
+                desc._permission = EAutomationPermission::kExternalEffect;
+                desc._description = "Get or set global manual and SceneView automatic texture mip bias.";
+                desc._input_schema.AddParam("manual_bias", "Global material mip bias (-16 to 15.99).", EAutomationValueType::kFloat);
+                desc._input_schema.AddParam("auto_bias", "Apply automatic DLSS/FSR bias in SceneView.", EAutomationValueType::kBool);
+                registry.Register("render.texture_sampling", std::move(desc), [](EditorAutomationContext &, const AutomationObject &arguments)
+                {
+                    auto *pipeline = RenderPipeline::Instance();
+                    auto *renderer = pipeline != nullptr ? pipeline->GetRenderer() : nullptr;
+                    auto *editor = EditorApp::GetEditor();
+                    auto *camera = editor != nullptr ? editor->GetSceneCamera() : nullptr;
+                    if (renderer == nullptr || camera == nullptr)
+                        return AutomationResult::Fail(AutomationErrors::kEditorNotReady, "Renderer or SceneView camera is unavailable");
+                    if (const auto it = arguments.find("manual_bias"); it != arguments.end() &&
+                        (!it->second.IsNumber() || !std::isfinite(it->second.AsFloat())))
+                        return AutomationResult::Fail(AutomationErrors::kInvalidArgument, "manual_bias must be finite");
+                    if (const auto it = arguments.find("auto_bias"); it != arguments.end() && !it->second.IsBool())
+                        return AutomationResult::Fail(AutomationErrors::kInvalidArgument, "auto_bias must be boolean");
+                    if (const auto it = arguments.find("manual_bias"); it != arguments.end()) renderer->SetTextureMipBias(static_cast<f32>(it->second.AsFloat()));
+                    if (const auto it = arguments.find("auto_bias"); it != arguments.end()) camera->SetAutoTextureMipBiasEnabled(it->second.AsBool());
+                    AutomationObject result;
+                    result.emplace("manual_bias", AutomationValue(renderer->GetTextureMipBias()));
+                    result.emplace("auto_bias", AutomationValue(camera->IsAutoTextureMipBiasEnabled()));
+                    result.emplace("automatic_bias", AutomationValue(camera->GetAutoTextureMipBias()));
+                    result.emplace("effective_bias", AutomationValue(std::clamp(renderer->GetTextureMipBias() + camera->GetAutoTextureMipBias(), -16.0f, 15.99f)));
+                    return AutomationResult::Ok(AutomationValue(std::move(result)));
+                });
+            }
+            {
+                AutomationMethodDesc desc;
                 desc._name = "render.path_tracer_settings";
                 desc._description = "Read or change runtime PathTracer settings and SceneView output size for render validation; does not save the scene.";
                 desc._permission = EAutomationPermission::kExternalEffect;

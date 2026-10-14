@@ -15,6 +15,7 @@
 #include "Render/Shader.h"
 #include "Render/GraphicsContext.h"
 #include <chrono>
+#include <cmath>
 
 namespace Ailu
 {
@@ -83,6 +84,7 @@ namespace Ailu
                     for (auto *block: frame_blocks)
                         AL_DELETE(block);
                 }
+                AL_DELETE(entry._texture_cache_quad);
             }
             for (auto &frame_window_blocks: _window_drawer_blocks)
             {
@@ -110,9 +112,11 @@ namespace Ailu
 
         void UIRenderer::Prepare()
         {
+            PROFILE_BLOCK_CPU("UIRenderer::Prepare")
             // NewFrame has waited for this slot's GPU work before any mapped UI buffers are rewritten.
             _frame_index = static_cast<u16>(FrameResourceManager::Get().GetActiveFrameSlot());
             ResetFrameStats();
+            const bool collect_widget_draw_stats = Profiler::Get().IsRecording();
             _cur_global_block_index = 0u;
             for (auto *block: _drawer_blocks[_frame_index])
             {
@@ -141,6 +145,7 @@ namespace Ailu
             visible_widgets.reserve(widgets.size());
             for (auto &widget: widgets)
             {
+                PROFILE_BLOCK_CPU("UIRenderer::VisibleWidgetCollect")
                 auto *canvas = widget.get();
                 if (canvas->_visibility == EVisibility::kVisible)
                     visible_widgets.push_back(canvas);
@@ -170,10 +175,12 @@ namespace Ailu
                         AL_DELETE(block);
                     frame_blocks.clear();
                 }
+                AL_DELETE(it->_texture_cache_quad);
                 it = _widget_drawer_blocks.erase(it);
             }
-            const bool is_debug_reflector_visible = UIManager::Get()->IsDebugReflectorVisible();
-            if (is_debug_reflector_visible)
+            _widget_drawer_blocks.reserve(_widget_drawer_blocks.size() + visible_widgets.size());
+            const bool is_debug_paint_dirty_visible = UIManager::Get()->IsDebugPaintDirtyVisible();
+            if (is_debug_paint_dirty_visible)
             {
                 for (auto *canvas: visible_widgets)
                 {
@@ -182,36 +189,62 @@ namespace Ailu
                 }
             }
             Vector<Widget *> updated_widgets;
+            Vector<Widget *> widgets_to_update;
             updated_widgets.reserve(visible_widgets.size());
+            widgets_to_update.reserve(visible_widgets.size());
             for (auto *canvas: visible_widgets)
             {
-                canvas->PreUpdate(dt);
                 updated_widgets.push_back(canvas);
+                if (!is_debug_paint_dirty_visible && !canvas->NeedsUpdate())
+                {
+                    ++_stats._ui_widget_update_skipped_count;
+                    continue;
+                }
+                canvas->_is_update_dirty = false;
+                ++_stats._ui_widget_update_executed_count;
+                PROFILE_BLOCK_CPU("UIRenderer::WidgetPreUpdate")
+                canvas->PreUpdate(dt);
+                widgets_to_update.push_back(canvas);
             }
-            for (auto *canvas: visible_widgets)
+            for (auto *canvas: widgets_to_update)
+            {
+                PROFILE_BLOCK_CPU("UIRenderer::WidgetUpdate")
                 canvas->Update(dt);
+            }
             UI::UIManager::Get()->EnsurePopupWidgetsOnTop();
             visible_widgets.clear();
             visible_widgets.reserve(widgets.size());
             for (auto &widget: widgets)
             {
+                PROFILE_BLOCK_CPU("UIRenderer::VisibleWidgetCollect")
                 auto *canvas = widget.get();
                 if (canvas->_visibility == EVisibility::kVisible)
                     visible_widgets.push_back(canvas);
             }
             for (auto *canvas: visible_widgets)
             {
+                PROFILE_BLOCK_CPU("UIRenderer::LateWidgetUpdate")
                 if (std::find(updated_widgets.begin(), updated_widgets.end(), canvas) != updated_widgets.end())
                     continue;
-                if (is_debug_reflector_visible && canvas->Root() != nullptr)
+                updated_widgets.push_back(canvas);
+                if (!is_debug_paint_dirty_visible && !canvas->NeedsUpdate())
+                {
+                    ++_stats._ui_widget_update_skipped_count;
+                    continue;
+                }
+                if (is_debug_paint_dirty_visible && canvas->Root() != nullptr)
                     canvas->Root()->ClearDebugPaintDirtyRecursive();
+                canvas->_is_update_dirty = false;
+                ++_stats._ui_widget_update_executed_count;
                 canvas->PreUpdate(dt);
                 canvas->Update(dt);
-                updated_widgets.push_back(canvas);
             }
             DragDropManager::Get().Update();
             _submit_entries.clear();
             _submit_entries.reserve(visible_widgets.size());
+            _widget_draw_stats.clear();
+            if (collect_widget_draw_stats)
+                _widget_draw_stats.reserve(visible_widgets.size());
             _cur_widget_index = 1u;
             for (auto *canvas: visible_widgets)
             {
@@ -220,11 +253,10 @@ namespace Ailu
                 _cur_widget_blocks = &cpu_blocks;
                 _cur_widget_block_index = 0u;
                 _cur_widget_block = cpu_blocks.empty() ? nullptr : cpu_blocks[0u];
-                bool is_cpu_blocks_empty = true;
-                for (auto *block: cpu_blocks)
-                    is_cpu_blocks_empty = is_cpu_blocks_empty && (block == nullptr || block->_nodes.empty());
-                if (canvas->IsPaintCacheDirty(_frame_index) || is_cpu_blocks_empty)
+
+                if (canvas->IsPaintCacheDirty(_frame_index) || !entry->_cache_built)
                 {
+                    PROFILE_BLOCK_CPU("UIRenderer::WidgetPaintBuild")
                     for (auto *block: cpu_blocks)
                     {
                         if (block != nullptr)
@@ -240,38 +272,226 @@ namespace Ailu
                         AL_DELETE(cpu_blocks.back());
                         cpu_blocks.pop_back();
                     }
-                    if (is_debug_reflector_visible && canvas->Root() != nullptr)
+                    if (is_debug_paint_dirty_visible && canvas->Root() != nullptr)
                         canvas->Root()->SnapshotPaintDirtyToDebugRecursive();
                     ++entry->_build_revision;
+                    entry->_cache_built = !_cache_build_pending_resource;
                     entry->_gpu_revisions.fill(0u);
                     if (!_cache_build_pending_resource)
                     {
                         for (u16 frame_index = 0u; frame_index < entry->_gpu_revisions.size(); ++frame_index)
                             canvas->ClearPaintInvalidation(frame_index);
                     }
-                    if (is_debug_reflector_visible)
+                    if (is_debug_paint_dirty_visible)
                         DrawDirtyStateOverlay(canvas->Root());
                     ++_stats._ui_cache_miss_count;
                 }
                 else
                 {
-                    if (is_debug_reflector_visible)
+                    if (is_debug_paint_dirty_visible)
                         DrawDirtyStateOverlay(canvas->Root());
                     ++_stats._ui_cache_hit_count;
                 }
+                PROFILE_BLOCK_CPU("UIRenderer::WidgetSync")
                 SyncWidgetFrameBlocks(canvas);
                 auto &blocks = GetWidgetFrameBlocks(canvas);
                 bool has_nodes = false;
+                UIWidgetDrawStats widget_draw_stats;
+                if (collect_widget_draw_stats)
+                    widget_draw_stats._widget_name = canvas->Name();
                 for (auto *block: blocks)
-                    has_nodes = has_nodes || (block != nullptr && !block->_nodes.empty());
+                {
+                    if (block == nullptr)
+                        continue;
+                    if (collect_widget_draw_stats)
+                        widget_draw_stats._draw_node_count += block->_nodes.size();
+                    has_nodes = has_nodes || !block->_nodes.empty();
+                }
+                if (collect_widget_draw_stats)
+                    _widget_draw_stats.push_back(std::move(widget_draw_stats));
                 if (!has_nodes)
                 {
+                    canvas->_texture_cache.reset();
+                    entry->_texture_cache_valid = false;
+                    if (entry->_texture_cache_quad != nullptr)
+                    {
+                        AL_DELETE(entry->_texture_cache_quad);
+                        entry->_texture_cache_quad = nullptr;
+                    }
                     ++_cur_widget_index;
                     continue;
                 }
 
+                const bool use_cache_materials = canvas->_texture_cache_mode == EWidgetTextureCacheMode::kTexture;
+                const bool is_texture_cache_requested = use_cache_materials ||
+                    canvas->_texture_cache_mode == EWidgetTextureCacheMode::kOpaqueTexture;
+                // Enclose fractional Dock bounds in whole pixels so cache/composite sample the same pixel centers.
+                const Vector2f cache_origin{std::floor(canvas->_position.x), std::floor(canvas->_position.y)};
+                const Vector2f widget_size = canvas->GetSize();
+                const Vector2f cache_size{std::ceil(canvas->_position.x + widget_size.x) - cache_origin.x,
+                    std::ceil(canvas->_position.y + widget_size.y) - cache_origin.y};
+                bool is_texture_cache_supported = is_texture_cache_requested && !canvas->IsPopup() &&
+                    canvas->_is_external_output && canvas->_external_color != nullptr && canvas->_external_color->IsSwapChain() &&
+                    canvas->_external_depth == nullptr && entry->_cache_built && !is_debug_paint_dirty_visible &&
+                    std::isfinite(cache_origin.x) && std::isfinite(cache_origin.y);
+                DrawerBlock *first_block = nullptr;
+                u64 image_upload_revision = 0u;
+                if (is_texture_cache_supported)
+                    for (auto *block: blocks)
+                    {
+                        if (block == nullptr || block->_nodes.empty())
+                            continue;
+                        if (first_block == nullptr)
+                            first_block = block;
+                        // Ordinary images and static preview RTs require an audited owner revision contract.
+                        for (const auto &node: block->_nodes)
+                        {
+                            if (node._main_tex != nullptr)
+                                image_upload_revision = image_upload_revision * 1099511628211ull + node._main_tex->UploadRevision();
+                            if (node._is_backdrop_blur ||
+                                (dynamic_cast<RenderTexture *>(node._main_tex) != nullptr && !canvas->_has_texture_cache_image_revision) ||
+                                (node._main_tex != nullptr && !node._main_tex->IsReady()) ||
+                                (node._mat != _default_material.get() && node._mat->GetActiveShader() != _text_block->_mat->GetActiveShader()) ||
+                                (node._mat == _default_material.get() && node._main_tex != nullptr &&
+                                    node._main_tex != Texture::s_p_default_white && !canvas->_has_texture_cache_image_revision))
+                                is_texture_cache_supported = false;
+                        }
+                    }
+                if (entry->_texture_cache_upload_revision != image_upload_revision)
+                {
+                    canvas->_texture_cache_dirty = true;
+                    entry->_texture_cache_upload_revision = image_upload_revision;
+                }
+                // Retain the original opaque toolbar trial; all expanded candidates require alpha composition.
+                is_texture_cache_supported = is_texture_cache_supported && first_block != nullptr &&
+                    (use_cache_materials || (canvas->Name() == "EditorToolbar" && cache_origin.x == 0.0f && cache_origin.y == 0.0f &&
+                        canvas->_external_color == RenderTexture::s_backbuffer));
+                // Geometry may change during fallback; never resume with the previous RT contents.
+                if (!is_texture_cache_supported)
+                    entry->_texture_cache_valid = false;
+                if (canvas->_texture_cache_mode == EWidgetTextureCacheMode::kGeometry)
+                {
+                    canvas->_texture_cache.reset();
+                    entry->_texture_cache_valid = false;
+                    if (entry->_texture_cache_quad != nullptr)
+                    {
+                        AL_DELETE(entry->_texture_cache_quad);
+                        entry->_texture_cache_quad = nullptr;
+                    }
+                }
+                WidgetSubmitEntry submit_entry;
+                submit_entry._widget = canvas;
                 auto [color, depth] = canvas->GetOutput();
-                _submit_entries.push_back({canvas, color, depth});
+                submit_entry._color = color;
+                submit_entry._depth = depth;
+                if (is_texture_cache_supported && !use_cache_materials && _texture_cache_composite_material == nullptr)
+                {
+                    auto cache_shader = ResourceMgr::Get().Load<Shader>(L"Shaders/hlsl/ui_cache_opaque.alasset");
+                    if (cache_shader != nullptr)
+                        _texture_cache_composite_material = MakeRef<Material>(cache_shader.get(), "UITextureCacheOpaque");
+                }
+                if (is_texture_cache_supported && use_cache_materials && _texture_cache_alpha_composite_material == nullptr)
+                {
+                    auto composite_shader = ResourceMgr::Get().Load<Shader>(L"Shaders/hlsl/ui_cache_alpha.alasset");
+                    auto ui_shader = ResourceMgr::Get().Load<Shader>(L"Shaders/hlsl/ui_cache_draw.alasset");
+                    auto text_shader = ResourceMgr::Get().Load<Shader>(L"Shaders/hlsl/ui_cache_text.alasset");
+                    if (composite_shader != nullptr && ui_shader != nullptr && text_shader != nullptr)
+                    {
+                        _texture_cache_alpha_composite_material = MakeRef<Material>(composite_shader.get(), "UITextureCacheAlpha");
+                        _texture_cache_ui_material = MakeRef<Material>(ui_shader.get(), "UITextureCacheDraw");
+                        _texture_cache_ui_material->SetVector("_Color", Colors::kWhite);
+                        _texture_cache_text_material = MakeRef<Material>(text_shader.get(), "UITextureCacheText");
+                        _texture_cache_msdf_material = MakeRef<Material>(text_shader.get(), "UITextureCacheMsdf");
+                        _texture_cache_msdf_material->EnableKeyword("_MSDF");
+                    }
+                }
+                auto cache_composite_material = use_cache_materials ? _texture_cache_alpha_composite_material : _texture_cache_composite_material;
+                if (is_texture_cache_supported && cache_composite_material != nullptr && cache_composite_material->IsReadyForDraw() &&
+                    (!use_cache_materials || (_texture_cache_ui_material->IsReadyForDraw() &&
+                        _texture_cache_text_material->IsReadyForDraw() && _texture_cache_msdf_material->IsReadyForDraw())))
+                {
+                    const bool is_cache_size_valid = std::isfinite(widget_size.x) && std::isfinite(widget_size.y) &&
+                        widget_size.x > 0.0f && widget_size.y > 0.0f && std::isfinite(cache_size.x) && std::isfinite(cache_size.y) &&
+                        cache_size.x >= 1.0f && cache_size.y >= 1.0f && cache_size.x <= 4095.0f && cache_size.y <= 4095.0f;
+                    const u16 cache_width = is_cache_size_valid ? static_cast<u16>(cache_size.x) : 0u;
+                    const u16 cache_height = is_cache_size_valid ? static_cast<u16>(cache_size.y) : 0u;
+                    if (cache_width > 0u && cache_height > 0u)
+                    {
+                        if (canvas->_texture_cache == nullptr || canvas->_texture_cache->Width() != cache_width ||
+                            canvas->_texture_cache->Height() != cache_height)
+                        {
+                            TextureDesc cache_desc(cache_width, cache_height, ERenderTargetFormat::kDefault);
+                            cache_desc._clear_color = Colors::kTransparent;
+                            cache_desc._load = ELoadStoreAction::kLoad;
+                            canvas->_texture_cache = RenderTexture::Create(cache_desc, std::format("UIWidgetCache_{}", canvas->Name()));
+                            if (canvas->_texture_cache != nullptr)
+                            {
+                                canvas->_texture_cache->_load_action = ELoadStoreAction::kLoad;
+                                canvas->_texture_cache_dirty = true;
+                                entry->_texture_cache_valid = false;
+                            }
+                        }
+                        if (canvas->_texture_cache != nullptr)
+                        {
+                            const Vector4f cache_rect{cache_origin.x, cache_origin.y, cache_size.x, cache_size.y};
+                            if (entry->_texture_cache_quad == nullptr)
+                                entry->_texture_cache_quad = AL_NEW(DrawerBlock, cache_composite_material, 6u);
+                            auto *cache_quad = entry->_texture_cache_quad;
+                            const bool needs_quad_build = cache_quad->_mat != cache_composite_material || cache_quad->_nodes.empty() ||
+                                cache_quad->_nodes[0]._main_tex != canvas->_texture_cache.get() ||
+                                entry->_texture_cache_quad_rect.x != cache_rect.x ||
+                                entry->_texture_cache_quad_rect.y != cache_rect.y ||
+                                entry->_texture_cache_quad_rect.z != cache_rect.z ||
+                                entry->_texture_cache_quad_rect.w != cache_rect.w;
+                            if (needs_quad_build)
+                            {
+                                cache_quad->_mat = cache_composite_material;
+                                cache_quad->ResetBuildData();
+                                const Vector3f positions[4] = {{cache_rect.x, cache_rect.y, 0.0f},
+                                    {cache_rect.x + cache_rect.z, cache_rect.y, 0.0f},
+                                    {cache_rect.x, cache_rect.y + cache_rect.w, 0.0f},
+                                    {cache_rect.x + cache_rect.z, cache_rect.y + cache_rect.w, 0.0f}};
+                                const Vector2f uvs[4] = {{0.0f, 0.0f}, {1.0f, 0.0f}, {0.0f, 1.0f}, {1.0f, 1.0f}};
+                                for (u32 vertex_index = 0u; vertex_index < 4u; ++vertex_index)
+                                {
+                                    cache_quad->_pos_buf[vertex_index] = positions[vertex_index];
+                                    cache_quad->_uv_buf[vertex_index] = uvs[vertex_index];
+                                    cache_quad->_color_buf[vertex_index] = Colors::kWhite;
+                                    cache_quad->_rect_buf[vertex_index] = cache_rect;
+                                    cache_quad->_corner_radius_buf[vertex_index] = Vector4f::kZero;
+                                    cache_quad->_border_thickness_buf[vertex_index] = Vector4f::kZero;
+                                }
+                                cache_quad->_index_buf[0] = 0u;
+                                cache_quad->_index_buf[1] = 1u;
+                                cache_quad->_index_buf[2] = 2u;
+                                cache_quad->_index_buf[3] = 1u;
+                                cache_quad->_index_buf[4] = 3u;
+                                cache_quad->_index_buf[5] = 2u;
+                                cache_quad->AppendNode(4u, 6u, cache_composite_material.get(),
+                                                       canvas->_texture_cache.get());
+                                entry->_texture_cache_quad_rect = cache_rect;
+                            }
+                            submit_entry._use_texture_cache = true;
+                            submit_entry._texture_cache_needs_repaint =
+                                canvas->_texture_cache_dirty || !entry->_texture_cache_valid || needs_quad_build;
+                            canvas->_texture_cache_dirty = false;
+                            submit_entry._use_cache_materials = use_cache_materials;
+                            submit_entry._texture_cache_origin = cache_origin;
+                            submit_entry._texture_cache = canvas->_texture_cache;
+                            submit_entry._texture_cache_quad = entry->_texture_cache_quad;
+                            submit_entry._texture_cache_state = entry;
+                            _stats._ui_texture_cache_resident_bytes += static_cast<u64>(cache_width) * cache_height * 4u;
+                            if (submit_entry._texture_cache_needs_repaint)
+                            {
+                                ++_stats._ui_texture_cache_miss_count;
+                                ++_stats._ui_texture_cache_dirty_count;
+                            }
+                            else
+                                ++_stats._ui_texture_cache_hit_count;
+                        }
+                    }
+                }
+                _submit_entries.push_back(std::move(submit_entry));
                 ++_cur_widget_index;
             }
             _cur_widget_block = nullptr;
@@ -284,6 +504,7 @@ namespace Ailu
 
         void UIRenderer::Record(CommandBuffer *cmd)
         {
+            PROFILE_BLOCK_CPU("UIRenderer::Record")
             HashMap<RenderTexture *, RTHandle> composite_target_handles;
             auto get_submit_color = [&](RenderTexture *color) -> RenderTexture *
             {
@@ -310,11 +531,41 @@ namespace Ailu
             };
             for (const auto &entry: _submit_entries)
             {
+                if (!entry._use_texture_cache || !entry._texture_cache_needs_repaint || entry._texture_cache == nullptr)
+                    continue;
+                const auto repaint_start = UIClock::now();
+                cmd->SetRenderTarget(entry._texture_cache.get(), nullptr);
+                cmd->ClearRenderTarget(Color(0.0f, 0.0f, 0.0f, 0.0f));
+                bool is_repaint_complete = true;
+                for (auto *block: GetWidgetFrameBlocks(entry._widget))
+                {
+                    if (block == nullptr || block->_nodes.empty())
+                        continue;
+                    is_repaint_complete = is_repaint_complete && block->IsReady();
+                    for (const auto &node: block->_nodes)
+                        is_repaint_complete = is_repaint_complete && node._mat->IsReadyForDraw();
+                    SubmitBlock(block, cmd, entry._texture_cache.get(), nullptr, entry._texture_cache_origin, entry._use_cache_materials);
+                }
+                if (entry._texture_cache_state != nullptr)
+                    entry._texture_cache_state->_texture_cache_valid = is_repaint_complete;
+                _stats._ui_texture_cache_repaint_time += ElapsedMs(repaint_start);
+            }
+
+            for (const auto &entry: _submit_entries)
+            {
                 if (entry._widget == nullptr || entry._widget->IsPopup())
                     continue;
                 auto *submit_color = get_submit_color(entry._color);
-                for (auto *block: GetWidgetFrameBlocks(entry._widget))
-                    SubmitBlock(block, cmd, submit_color, entry._depth);
+                if (entry._use_texture_cache && entry._texture_cache_quad != nullptr)
+                {
+                    SubmitBlock(entry._texture_cache_quad, cmd, submit_color, entry._depth);
+                    ++_stats._ui_texture_cache_composite_draw_count;
+                }
+                else
+                {
+                    for (auto *block: GetWidgetFrameBlocks(entry._widget))
+                        SubmitBlock(block, cmd, submit_color, entry._depth);
+                }
             }
             //绘制全局gui
             for (auto *block: _drawer_blocks[_frame_index])
@@ -953,8 +1204,9 @@ namespace Ailu
             SubmitBlock(backdrop_block, cmd, color, depth);
         }
 
-        void UIRenderer::SubmitBlock(DrawerBlock *b, CommandBuffer *cmd,RenderTexture* color,RenderTexture* depth)
+        void UIRenderer::SubmitBlock(DrawerBlock *b, CommandBuffer *cmd,RenderTexture* color,RenderTexture* depth, Vector2f origin, bool use_cache_materials)
         {
+            PROFILE_BLOCK_CPU("UIRenderer::SubmitBlock")
             if (color == nullptr)
                 return;
             if (b == nullptr || b->_nodes.empty())
@@ -968,7 +1220,7 @@ namespace Ailu
             f32 aspect = w / h;
             f32 half_width = w * 0.5f, half_height = h * 0.5f;
             BuildViewMatrixLookToLH(view, Vector3f(0.f, 0.f, -50.f), Vector3f::kForward, Vector3f::kUp);
-            BuildOrthographicMatrix(proj, 0.0f, w, 0.0f, h, 1.f, 200.f);
+            BuildOrthographicMatrix(proj, origin.x, origin.x + w, origin.y, origin.y + h, 1.f, 200.f);
             cb_per_cam._MatrixVP = view * proj;
             cb_per_cam._ScreenParams = Vector4f(1.0f / w, 1.0f / h, w, h);
             CBufferPerObjectData per_obj_data;
@@ -1002,21 +1254,29 @@ namespace Ailu
                     else
                         main_tex = GetOrCreateBackdropBlurTexture(node._main_tex, cmd);
                 }
-                node._mat->SetTexture("_MainTex", main_tex ? main_tex : Texture::s_p_default_white);
-                node._mat->SetFloat("_MsdfPxRange", node._msdf_px_range);
+                Material *material = node._mat;
+                if (use_cache_materials)
+                    material = node._mat == _default_material.get() ? _texture_cache_ui_material.get() :
+                        (node._msdf_px_range > 0.0f ? _texture_cache_msdf_material.get() : _texture_cache_text_material.get());
+                material->SetTexture("_MainTex", main_tex ? main_tex : Texture::s_p_default_white);
+                material->SetFloat("_MsdfPxRange", node._msdf_px_range);
+                Rect scissor = full_rect;
                 if (node._is_custom_scissor)
                 {
-                    if (prev_scissor != node._scissor)
-                        cmd->SetScissorRect(node._scissor);
+                    const f32 left = std::clamp(static_cast<f32>(node._scissor.left) - origin.x, 0.0f, w);
+                    const f32 top = std::clamp(static_cast<f32>(node._scissor.top) - origin.y, 0.0f, h);
+                    // UI scissors use (left, top, right, bottom), matching the DX12 conversion, despite the Rect field names.
+                    const f32 right = std::clamp(static_cast<f32>(node._scissor.width) - origin.x, left, w);
+                    const f32 bottom = std::clamp(static_cast<f32>(node._scissor.height) - origin.y, top, h);
+                    if (right <= left || bottom <= top)
+                        continue;
+                    scissor = Rect(static_cast<u16>(left), static_cast<u16>(top), static_cast<u16>(right), static_cast<u16>(bottom));
                 }
-                else
-                {
-                    if (prev_scissor != full_rect)
-                        cmd->SetScissorRect(full_rect);
-                }
-                cmd->DrawIndexed(b->_vbuf.get(), b->_ibuf.get(), _obj_cb.get(), node._mat,0u,node._index_offset,node._index_num);
+                if (prev_scissor != scissor)
+                    cmd->SetScissorRect(scissor);
+                cmd->DrawIndexed(b->_vbuf.get(), b->_ibuf.get(), _obj_cb.get(), material,0u,node._index_offset,node._index_num);
                 ++_stats._ui_draw_call_count;
-                prev_scissor = node._is_custom_scissor ? node._scissor : full_rect;
+                prev_scissor = scissor;
             }
             _stats._ui_submit_time += ElapsedMs(submit_start);
         }

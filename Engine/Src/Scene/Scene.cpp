@@ -16,6 +16,8 @@
 #include "Render/Material.h"
 //#include "pch.h"
 #include <regex>
+#include <unordered_map>
+#include <unordered_set>
 
 #include "Render/ShaderInterop.h"//lbvh
 #include "Render/Gizmo.h"
@@ -120,7 +122,7 @@ namespace Ailu::SceneManagement
             BufferDesc buf_desc;
             buf_desc._is_random_write = false;
             buf_desc._target = EGPUBufferTarget::kStructured;
-            buf_desc._element_num = RenderConstants::kMaxRenderObjectCount * 2u;
+            buf_desc._element_num = RenderConstants::kMaxScenePrimitiveCount * 2u;
             buf_desc._element_size = sizeof(LBVHNode);
             buf_desc._size = buf_desc._element_size * buf_desc._element_num;
             _tlas_buffer = GPUBuffer::Create(buf_desc);
@@ -458,8 +460,11 @@ namespace Ailu::SceneManagement
             if (next_hier)
                 next_hier->_prev_sibling = prev;
         }
+        if (old_parent_hier->_last_child == entity || next == ECS::kInvalidEntity)
+            old_parent_hier->_last_child = prev;
 
-        --old_parent_hier->_children_num;
+        if (old_parent_hier->_children_num > 0u)
+            --old_parent_hier->_children_num;
 
         child_hier->_parent = ECS::kInvalidEntity;
         child_hier->_prev_sibling = ECS::kInvalidEntity;
@@ -477,28 +482,53 @@ namespace Ailu::SceneManagement
             return false;
 
         child_hier->_parent = parent;
+        child_hier->_prev_sibling = ECS::kInvalidEntity;
+        child_hier->_next_sibling = ECS::kInvalidEntity;
 
-        if (parent_hier->_children_num == 0)
+        if (parent_hier->_first_child == ECS::kInvalidEntity)
         {
             parent_hier->_first_child = entity;
+            parent_hier->_last_child = entity;
+            parent_hier->_children_num = 1u;
         }
         else
         {
-            ECS::Entity last_child_entity = parent_hier->_first_child;
+            ECS::Entity last_child_entity = parent_hier->_last_child;
             auto *last_child = _register.GetComponent<ECS::CHierarchy>(last_child_entity);
-            while (last_child && last_child->_next_sibling != ECS::kInvalidEntity)
+            bool recovered_tail = false;
+            size_t sibling_count = 0u;
+            if (last_child == nullptr || last_child->_parent != parent
+                || last_child->_next_sibling != ECS::kInvalidEntity)
             {
-                last_child_entity = last_child->_next_sibling;
+                recovered_tail = true;
+                last_child_entity = parent_hier->_first_child;
                 last_child = _register.GetComponent<ECS::CHierarchy>(last_child_entity);
+                while (last_child && last_child->_next_sibling != ECS::kInvalidEntity)
+                {
+                    if (++sibling_count > _register.EntityNum())
+                    {
+                        child_hier->_parent = ECS::kInvalidEntity;
+                        LOG_ERROR("Scene::LinkAsLastChild found a cyclic sibling chain at parent {}", parent);
+                        return false;
+                    }
+                    last_child_entity = last_child->_next_sibling;
+                    last_child = _register.GetComponent<ECS::CHierarchy>(last_child_entity);
+                }
             }
-            if (last_child)
+            if (!last_child || last_child->_parent != parent)
             {
-                last_child->_next_sibling = entity;
-                child_hier->_prev_sibling = last_child_entity;
+                child_hier->_parent = ECS::kInvalidEntity;
+                return false;
             }
+            last_child->_next_sibling = entity;
+            child_hier->_prev_sibling = last_child_entity;
+            parent_hier->_last_child = entity;
+            if (recovered_tail)
+                parent_hier->_children_num = static_cast<u32>(sibling_count + 2u);
+            else
+                ++parent_hier->_children_num;
         }
 
-        ++parent_hier->_children_num;
         _register.TouchHierarchy();
         return true;
     }
@@ -1137,7 +1167,7 @@ namespace Ailu::SceneManagement
         BVHBuilder builder(aabbs);
         auto ret = builder.Build(1);
         u64 node_size = ret._nodes.size();
-        AL_ASSERT(node_size <= RenderConstants::kMaxRenderObjectCount * 2u);
+        AL_ASSERT(node_size <= RenderConstants::kMaxScenePrimitiveCount * 2u);
         _tlas_nodes = std::move(ret._nodes);
         for (u64 i = 0; i < node_size; i++)
         {
@@ -1155,9 +1185,9 @@ namespace Ailu::SceneManagement
     void Scene::UpdateGpuScene()
     {
         _triangle_count = 0u;
-        u64 mesh_bvh_node_count = 0u;
         _bvh_nodes_range.clear();
         _mesh_bvh_node_triangle_offset.clear();
+        std::unordered_set<const Render::Mesh*> unique_meshes;
         u64 entity_idx = 0u;
         for (auto& c: _register.View<ECS::StaticMeshComponent>())
         {
@@ -1166,45 +1196,60 @@ namespace Ailu::SceneManagement
                 continue;
             if (c._p_mesh == nullptr)
                 continue;
-            _triangle_count += c._p_mesh->GetTriangleCount();
-            mesh_bvh_node_count += c._p_mesh->GetBVHNodes().size();
+            if (unique_meshes.insert(c._p_mesh.get()).second)
+                _triangle_count += c._p_mesh->GetTriangleCount();
         }
+        struct MeshGpuRanges
+        {
+            Vector<Vector2UInt> _node_ranges;
+            Vector<u32> _triangle_offsets;
+        };
+        std::unordered_map<const Render::Mesh*, MeshGpuRanges> mesh_ranges;
         if (_triangle_count > 0)
         {
-            entity_idx = 0u;
             Vector<Render::TriangleData> triangles;
             triangles.reserve(_triangle_count);
             Vector<BVHNode> mesh_bvh_nodes;
-            mesh_bvh_nodes.reserve(mesh_bvh_node_count);
-            u64 triangle_offset = 0u,bvh_offset = 0u;
-            for (auto &c: _register.View<ECS::StaticMeshComponent>())
+            u64 triangle_offset = 0u;
+            u64 bvh_offset = 0u;
+            for (const Render::Mesh* mesh_ptr : unique_meshes)
             {
-                auto current_entity = _register.GetEntity<ECS::StaticMeshComponent>(entity_idx++);
-                if (!IsEntityEnabled(current_entity) || !_register.IsComponentEnabled<ECS::StaticMeshComponent>(current_entity))
-                    continue;
-                auto *mesh = c._p_mesh.get();
-                if (mesh == nullptr)
-                    continue;
-
-                const auto mesh_triangles = mesh->GetTriangleData();
-                const auto mesh_bvh = mesh->GetBVHNodes();
-                for (u16 submesh_index = 0u; submesh_index < mesh->SubmeshCount(); ++submesh_index)
+                const auto& mesh_triangles = mesh_ptr->GetTriangleData();
+                const auto& mesh_bvh = mesh_ptr->GetBVHNodes();
+                auto& ranges = mesh_ranges[mesh_ptr];
+                ranges._node_ranges.resize(mesh_ptr->SubmeshCount());
+                ranges._triangle_offsets.resize(mesh_ptr->SubmeshCount());
+                for (u16 submesh_index = 0u; submesh_index < mesh_ptr->SubmeshCount(); ++submesh_index)
                 {
-                    const u32 current_tri_count = mesh->GetTriangleCount(submesh_index);
-                    const u32 mesh_tri_start = mesh->GetTriangleStart(submesh_index);
-                    const u32 cur_bvh_node_count = mesh->GetBVHNodeCount(submesh_index);
-                    const u32 mesh_bvh_start = mesh->GetBVHNodeStart(submesh_index);
+                    const u32 current_tri_count = mesh_ptr->GetTriangleCount(submesh_index);
+                    const u32 mesh_tri_start = mesh_ptr->GetTriangleStart(submesh_index);
+                    const u32 cur_bvh_node_count = mesh_ptr->GetBVHNodeCount(submesh_index);
+                    const u32 mesh_bvh_start = mesh_ptr->GetBVHNodeStart(submesh_index);
+                    ranges._triangle_offsets[submesh_index] = static_cast<u32>(triangle_offset);
+                    ranges._node_ranges[submesh_index] = Vector2UInt{ static_cast<u32>(bvh_offset), cur_bvh_node_count };
                     if (current_tri_count == 0u || cur_bvh_node_count == 0u)
                         continue;
 
                     triangles.insert(triangles.end(), mesh_triangles.begin() + mesh_tri_start, mesh_triangles.begin() + mesh_tri_start + current_tri_count);
                     mesh_bvh_nodes.insert(mesh_bvh_nodes.end(), mesh_bvh.begin() + mesh_bvh_start, mesh_bvh.begin() + mesh_bvh_start + cur_bvh_node_count);
 
-                    const u64 key = (static_cast<u64>(current_entity) << 32u) | static_cast<u64>(submesh_index);
-                    _bvh_nodes_range[key] = Vector2UInt{ static_cast<u32>(bvh_offset), cur_bvh_node_count };
-                    _mesh_bvh_node_triangle_offset[key] = static_cast<u32>(triangle_offset);
                     triangle_offset += current_tri_count;
                     bvh_offset += cur_bvh_node_count;
+                }
+            }
+            entity_idx = 0u;
+            for (auto& component : _register.View<ECS::StaticMeshComponent>())
+            {
+                const ECS::Entity entity = _register.GetEntity<ECS::StaticMeshComponent>(entity_idx++);
+                if (!IsEntityEnabled(entity) || !_register.IsComponentEnabled<ECS::StaticMeshComponent>(entity)
+                    || !component._p_mesh)
+                    continue;
+                const auto& ranges = mesh_ranges.at(component._p_mesh.get());
+                for (u16 submesh_index = 0u; submesh_index < component._p_mesh->SubmeshCount(); ++submesh_index)
+                {
+                    const u64 key = (static_cast<u64>(entity) << 32u) | static_cast<u64>(submesh_index);
+                    _bvh_nodes_range[key] = ranges._node_ranges[submesh_index];
+                    _mesh_bvh_node_triangle_offset[key] = ranges._triangle_offsets[submesh_index];
                 }
             }
             if (_scene_mesh_data)

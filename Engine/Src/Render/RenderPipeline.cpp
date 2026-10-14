@@ -1,4 +1,4 @@
-﻿#include "Render/RenderPipeline.h"
+#include "Render/RenderPipeline.h"
 #include "Framework/Common/JobSystem.h"
 #include "Render/GraphicsContext.h"
 #include "Render/StreamlineSR.h"
@@ -113,8 +113,13 @@ namespace Ailu::Render
         _cameras.emplace_back(Camera::sCurrent);
         if (_preview_camera != nullptr && _preview_target != nullptr)
         {
-            _preview_camera->TargetTexture(_preview_target);
-            _cameras.emplace_back(_preview_camera);
+            const auto *scene = SceneManagement::SceneMgr::Get().ActiveScene();
+            if (scene != nullptr && (_is_preview_dirty || scene->ID() != _preview_scene_id ||
+                                     scene->EditRevision() != _preview_edit_revision))
+            {
+                _preview_camera->TargetTexture(_preview_target);
+                _cameras.emplace_back(_preview_camera);
+            }
         }
         for (auto &r: _renderers)
             r->SetupFrameResource(&_frame_res[prev_slot], _cur_frame_res);
@@ -122,6 +127,8 @@ namespace Ailu::Render
 
     void RenderPipeline::SetPreviewCamera(Camera *camera, RenderTexture *target)
     {
+        if (_preview_camera != camera || _preview_target != target)
+            _is_preview_dirty = true;
         if (_preview_camera != nullptr && _preview_camera != camera)
             _preview_camera->TargetTexture(nullptr);
         _preview_camera = camera;
@@ -145,7 +152,7 @@ namespace Ailu::Render
             if (camera != nullptr)
             {
                 SuperResolution::ResolveCamera(*camera);
-                camera->PrepareRenderFrame(GraphicsContext::Get().GetFrameCount());
+                camera->PrepareRenderFrame(GraphicsContext::Get().GetFrameCount(), _renderers[0]->GetTextureMipBias());
             }
         const Scene &scene = *SceneManagement::SceneMgr::Get().ActiveScene();
         bool has_cubemap_camera = false;
@@ -190,6 +197,12 @@ namespace Ailu::Render
 //            RenderSingleCamera(*cam, *_renderers[0].get());
 //#endif
             RenderSingleCamera(*cam, *_renderers[0].get(), scene);
+            if (cam == _preview_camera)
+            {
+                _preview_scene_id = scene.ID();
+                _preview_edit_revision = scene.EditRevision();
+                _is_preview_dirty = false;
+            }
             _targets.push_back(_renderers[0]->TargetTexture());
         }
         if (is_parallel_ui_record)

@@ -20,7 +20,7 @@ namespace Ailu::Render
         desc._target = EGPUBufferTarget::kStructured;
         _material_buffer = GPUBuffer::Create(desc);
         _material_buffer->Name(std::format("GlobalMaterialBuffer"));
-        desc._element_num = RenderConstants::kMaxRenderObjectCount;
+        desc._element_num = RenderConstants::kMaxScenePrimitiveCount;
         desc._element_size = sizeof(u32);
         desc._is_random_write = false;
         desc._size = desc._element_num * desc._element_size;
@@ -30,7 +30,7 @@ namespace Ailu::Render
         desc._target = EGPUBufferTarget::kStructured;
         _primitive_index_buffer = GPUBuffer::Create(desc);
         _primitive_index_buffer->Name("FramePrimitiveIndexBuffer");
-        _primitive_indices.reserve(RenderConstants::kMaxRenderObjectCount);
+        _primitive_indices.reserve(RenderConstants::kMaxScenePrimitiveCount);
     }
     FrameResource::~FrameResource()
     {
@@ -70,7 +70,7 @@ namespace Ailu::Render
         if (!_scene_primitive_buffer_lut.contains(hash))
         {
             BufferDesc desc;
-            desc._element_num = RenderConstants::kMaxRenderObjectCount;
+            desc._element_num = RenderConstants::kMaxScenePrimitiveCount;
             desc._element_size = sizeof(PrimitiveData);
             desc._is_random_write = false;
             desc._size = desc._element_size * desc._element_num;
@@ -89,7 +89,7 @@ namespace Ailu::Render
         if (!_scene_primitive_gi_buffer_lut.contains(hash))
         {
             BufferDesc desc;
-            desc._element_num = RenderConstants::kMaxRenderObjectCount;
+            desc._element_num = RenderConstants::kMaxScenePrimitiveCount;
             desc._element_size = sizeof(PrimitiveGIData);
             desc._is_random_write = false;
             desc._size = desc._element_size * desc._element_num;
@@ -140,7 +140,7 @@ namespace Ailu::Render
     }
     PrimitiveIndexAllocation FrameResource::AllocatePrimitiveIndices(u32 count)
     {
-        AL_ASSERT(_primitive_indices.size() + count <= RenderConstants::kMaxRenderObjectCount);
+        AL_ASSERT(_primitive_indices.size() + count <= RenderConstants::kMaxScenePrimitiveCount);
         const u32 offset = static_cast<u32>(_primitive_indices.size());
         _primitive_indices.resize(offset + count);
         return PrimitiveIndexAllocation{_primitive_indices.data() + offset, offset, count};

@@ -142,7 +142,8 @@ namespace Ailu
         {
             kPoint,
             kBilinear,
-            kTrilinear
+            kTrilinear,
+            kAnisotropic
         };
 
         AENUM()
@@ -150,7 +151,44 @@ namespace Ailu
         {
             kClamp,
             kRepeat,
-            kMirror
+            kMirror,
+            kBorder
+        };
+
+        ASTRUCT()
+        struct AILU_API SamplerDesc
+        {
+            GENERATED_BODY()
+            APROPERTY()
+            EFilterMode _filter = EFilterMode::kTrilinear;
+            APROPERTY()
+            EWrapMode _address_u = EWrapMode::kRepeat;
+            APROPERTY()
+            EWrapMode _address_v = EWrapMode::kRepeat;
+            APROPERTY()
+            EWrapMode _address_w = EWrapMode::kRepeat;
+            APROPERTY()
+            u32 _max_anisotropy = 16u;
+            APROPERTY()
+            f32 _mip_bias = 0.0f;
+            APROPERTY()
+            f32 _min_lod = 0.0f;
+            APROPERTY()
+            f32 _max_lod = 3.402823466e+38F;
+            APROPERTY()
+            Vector4f _border_color = Vector4f::kZero;
+        };
+
+        ASTRUCT()
+        struct AILU_API TextureSamplingSettings
+        {
+            GENERATED_BODY()
+            APROPERTY()
+            bool _override_sampler = false;
+            APROPERTY()
+            SamplerDesc _sampler_desc;
+            APROPERTY()
+            bool _apply_view_mip_bias = true;
         };
 
         AENUM()
@@ -556,17 +594,22 @@ namespace Ailu
             protected:
                 ETextureDimension _dimension;
             public:
-                void FilterMode(const EFilterMode &value) { _filter_mode = value; }
-                const EFilterMode &FilterMode() const { return _filter_mode; }
+                void FilterMode(const EFilterMode &value) { _sampler_desc._filter = value; ++_sampler_revision; }
+                const EFilterMode &FilterMode() const { return _sampler_desc._filter; }
 
             protected:
-                EFilterMode _filter_mode;
+                SamplerDesc _sampler_desc;
+                u64 _sampler_revision = 1u;
             public:
-                void WrapMode(const EWrapMode &value) { _wrap_mode = value; }
-                const EWrapMode &WrapMode() const { return _wrap_mode; }
+                void WrapMode(const EWrapMode &value) { _sampler_desc._address_u = _sampler_desc._address_v = _sampler_desc._address_w = value; ++_sampler_revision; }
+                const EWrapMode &WrapMode() const { return _sampler_desc._address_u; }
 
             protected:
-                EWrapMode _wrap_mode;
+            public:
+                // Authoring setters follow the existing texture mutation synchronization contract.
+                void SetSamplerDesc(const SamplerDesc &desc) { _sampler_desc = desc; ++_sampler_revision; }
+                const SamplerDesc &GetSamplerDesc() const { return _sampler_desc; }
+                u64 SamplerRevision() const { return _sampler_revision; }
             public:
                 const EALGFormat &PixelFormat() const { return _pixel_format; }
 

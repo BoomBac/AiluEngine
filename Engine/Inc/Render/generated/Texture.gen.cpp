@@ -186,6 +186,328 @@ return Ailu::Render::RenderTexture::StaticType();
 return Ailu::Render::RenderTexture::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_RenderTexture(&Ailu::Render::RenderTexture::StaticType, "Ailu::Render::RenderTexture");
+const Ailu::Type* Ailu::Render::Z_Construct_SamplerDesc_Type()
+{
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "SamplerDesc";
+initializer._size = sizeof(Ailu::Render::SamplerDesc);
+initializer._full_name = "Ailu::Render::SamplerDesc";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu::Render";
+initializer._base_name = "";
+initializer._constructor = []()->Ailu::Render::SamplerDesc* {return new Ailu::Render::SamplerDesc;};
+Meta meta_filter;
+meta_filter.Set("Category","");
+meta_filter.Set("IsColor",false);
+meta_filter.Set("IsRange",false);
+meta_filter.Set("IsFloatRange",true);
+meta_filter.Set("RangeMin",(f32)0);
+meta_filter.Set("RangeMax",(f32)1);
+MemberBuilder builder_filter;
+builder_filter._name = "_filter";
+builder_filter._type_name = "Ailu::Render::EFilterMode";
+builder_filter._offset = offsetof(SamplerDesc,_filter);
+builder_filter._is_const = false;
+builder_filter._is_static = false;
+builder_filter._is_public = false;
+builder_filter._is_pointer = false;
+builder_filter._is_ref = false;
+builder_filter._is_template = false;
+builder_filter._meta = meta_filter;
+builder_filter._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<EFilterMode>);
+builder_filter._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<EFilterMode>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_filter));
+Meta meta_address_u;
+meta_address_u.Set("Category","");
+meta_address_u.Set("IsColor",false);
+meta_address_u.Set("IsRange",false);
+meta_address_u.Set("IsFloatRange",true);
+meta_address_u.Set("RangeMin",(f32)0);
+meta_address_u.Set("RangeMax",(f32)1);
+MemberBuilder builder_address_u;
+builder_address_u._name = "_address_u";
+builder_address_u._type_name = "Ailu::Render::EWrapMode";
+builder_address_u._offset = offsetof(SamplerDesc,_address_u);
+builder_address_u._is_const = false;
+builder_address_u._is_static = false;
+builder_address_u._is_public = false;
+builder_address_u._is_pointer = false;
+builder_address_u._is_ref = false;
+builder_address_u._is_template = false;
+builder_address_u._meta = meta_address_u;
+builder_address_u._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<EWrapMode>);
+builder_address_u._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<EWrapMode>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_address_u));
+Meta meta_address_v;
+meta_address_v.Set("Category","");
+meta_address_v.Set("IsColor",false);
+meta_address_v.Set("IsRange",false);
+meta_address_v.Set("IsFloatRange",true);
+meta_address_v.Set("RangeMin",(f32)0);
+meta_address_v.Set("RangeMax",(f32)1);
+MemberBuilder builder_address_v;
+builder_address_v._name = "_address_v";
+builder_address_v._type_name = "Ailu::Render::EWrapMode";
+builder_address_v._offset = offsetof(SamplerDesc,_address_v);
+builder_address_v._is_const = false;
+builder_address_v._is_static = false;
+builder_address_v._is_public = false;
+builder_address_v._is_pointer = false;
+builder_address_v._is_ref = false;
+builder_address_v._is_template = false;
+builder_address_v._meta = meta_address_v;
+builder_address_v._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<EWrapMode>);
+builder_address_v._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<EWrapMode>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_address_v));
+Meta meta_address_w;
+meta_address_w.Set("Category","");
+meta_address_w.Set("IsColor",false);
+meta_address_w.Set("IsRange",false);
+meta_address_w.Set("IsFloatRange",true);
+meta_address_w.Set("RangeMin",(f32)0);
+meta_address_w.Set("RangeMax",(f32)1);
+MemberBuilder builder_address_w;
+builder_address_w._name = "_address_w";
+builder_address_w._type_name = "Ailu::Render::EWrapMode";
+builder_address_w._offset = offsetof(SamplerDesc,_address_w);
+builder_address_w._is_const = false;
+builder_address_w._is_static = false;
+builder_address_w._is_public = false;
+builder_address_w._is_pointer = false;
+builder_address_w._is_ref = false;
+builder_address_w._is_template = false;
+builder_address_w._meta = meta_address_w;
+builder_address_w._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<EWrapMode>);
+builder_address_w._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<EWrapMode>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_address_w));
+Meta meta_max_anisotropy;
+meta_max_anisotropy.Set("Category","");
+meta_max_anisotropy.Set("IsColor",false);
+meta_max_anisotropy.Set("IsRange",false);
+meta_max_anisotropy.Set("IsFloatRange",true);
+meta_max_anisotropy.Set("RangeMin",(f32)0);
+meta_max_anisotropy.Set("RangeMax",(f32)1);
+MemberBuilder builder_max_anisotropy;
+builder_max_anisotropy._name = "_max_anisotropy";
+builder_max_anisotropy._type_name = "u32";
+builder_max_anisotropy._offset = offsetof(SamplerDesc,_max_anisotropy);
+builder_max_anisotropy._is_const = false;
+builder_max_anisotropy._is_static = false;
+builder_max_anisotropy._is_public = false;
+builder_max_anisotropy._is_pointer = false;
+builder_max_anisotropy._is_ref = false;
+builder_max_anisotropy._is_template = false;
+builder_max_anisotropy._meta = meta_max_anisotropy;
+builder_max_anisotropy._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<u32>);
+builder_max_anisotropy._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<u32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_max_anisotropy));
+Meta meta_mip_bias;
+meta_mip_bias.Set("Category","");
+meta_mip_bias.Set("IsColor",false);
+meta_mip_bias.Set("IsRange",false);
+meta_mip_bias.Set("IsFloatRange",true);
+meta_mip_bias.Set("RangeMin",(f32)0);
+meta_mip_bias.Set("RangeMax",(f32)1);
+MemberBuilder builder_mip_bias;
+builder_mip_bias._name = "_mip_bias";
+builder_mip_bias._type_name = "f32";
+builder_mip_bias._offset = offsetof(SamplerDesc,_mip_bias);
+builder_mip_bias._is_const = false;
+builder_mip_bias._is_static = false;
+builder_mip_bias._is_public = false;
+builder_mip_bias._is_pointer = false;
+builder_mip_bias._is_ref = false;
+builder_mip_bias._is_template = false;
+builder_mip_bias._meta = meta_mip_bias;
+builder_mip_bias._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_mip_bias._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_mip_bias));
+Meta meta_min_lod;
+meta_min_lod.Set("Category","");
+meta_min_lod.Set("IsColor",false);
+meta_min_lod.Set("IsRange",false);
+meta_min_lod.Set("IsFloatRange",true);
+meta_min_lod.Set("RangeMin",(f32)0);
+meta_min_lod.Set("RangeMax",(f32)1);
+MemberBuilder builder_min_lod;
+builder_min_lod._name = "_min_lod";
+builder_min_lod._type_name = "f32";
+builder_min_lod._offset = offsetof(SamplerDesc,_min_lod);
+builder_min_lod._is_const = false;
+builder_min_lod._is_static = false;
+builder_min_lod._is_public = false;
+builder_min_lod._is_pointer = false;
+builder_min_lod._is_ref = false;
+builder_min_lod._is_template = false;
+builder_min_lod._meta = meta_min_lod;
+builder_min_lod._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_min_lod._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_min_lod));
+Meta meta_max_lod;
+meta_max_lod.Set("Category","");
+meta_max_lod.Set("IsColor",false);
+meta_max_lod.Set("IsRange",false);
+meta_max_lod.Set("IsFloatRange",true);
+meta_max_lod.Set("RangeMin",(f32)0);
+meta_max_lod.Set("RangeMax",(f32)1);
+MemberBuilder builder_max_lod;
+builder_max_lod._name = "_max_lod";
+builder_max_lod._type_name = "f32";
+builder_max_lod._offset = offsetof(SamplerDesc,_max_lod);
+builder_max_lod._is_const = false;
+builder_max_lod._is_static = false;
+builder_max_lod._is_public = false;
+builder_max_lod._is_pointer = false;
+builder_max_lod._is_ref = false;
+builder_max_lod._is_template = false;
+builder_max_lod._meta = meta_max_lod;
+builder_max_lod._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_max_lod._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_max_lod));
+Meta meta_border_color;
+meta_border_color.Set("Category","");
+meta_border_color.Set("IsColor",false);
+meta_border_color.Set("IsRange",false);
+meta_border_color.Set("IsFloatRange",true);
+meta_border_color.Set("RangeMin",(f32)0);
+meta_border_color.Set("RangeMax",(f32)1);
+MemberBuilder builder_border_color;
+builder_border_color._name = "_border_color";
+builder_border_color._type_name = "Vector4f";
+builder_border_color._offset = offsetof(SamplerDesc,_border_color);
+builder_border_color._is_const = false;
+builder_border_color._is_static = false;
+builder_border_color._is_public = false;
+builder_border_color._is_pointer = false;
+builder_border_color._is_ref = false;
+builder_border_color._is_template = false;
+builder_border_color._meta = meta_border_color;
+builder_border_color._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector4f>);
+builder_border_color._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector4f>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_border_color));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+const Ailu::Type* Ailu::Render::SamplerDesc::GetPrivateStaticClass()
+{
+	static const Ailu::Type* type = Z_Construct_SamplerDesc_Type();
+	return type;
+}
+
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::Render::SamplerDesc>()
+{
+return Ailu::Render::SamplerDesc::StaticType();
+}
+    const Type *Ailu::Render::SamplerDesc::GetType()
+{
+return Ailu::Render::SamplerDesc::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_SamplerDesc(&Ailu::Render::SamplerDesc::StaticType, "Ailu::Render::SamplerDesc");
+const Ailu::Type* Ailu::Render::Z_Construct_TextureSamplingSettings_Type()
+{
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "TextureSamplingSettings";
+initializer._size = sizeof(Ailu::Render::TextureSamplingSettings);
+initializer._full_name = "Ailu::Render::TextureSamplingSettings";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu::Render";
+initializer._base_name = "";
+initializer._constructor = []()->Ailu::Render::TextureSamplingSettings* {return new Ailu::Render::TextureSamplingSettings;};
+Meta meta_override_sampler;
+meta_override_sampler.Set("Category","");
+meta_override_sampler.Set("IsColor",false);
+meta_override_sampler.Set("IsRange",false);
+meta_override_sampler.Set("IsFloatRange",true);
+meta_override_sampler.Set("RangeMin",(f32)0);
+meta_override_sampler.Set("RangeMax",(f32)1);
+MemberBuilder builder_override_sampler;
+builder_override_sampler._name = "_override_sampler";
+builder_override_sampler._type_name = "bool";
+builder_override_sampler._offset = offsetof(TextureSamplingSettings,_override_sampler);
+builder_override_sampler._is_const = false;
+builder_override_sampler._is_static = false;
+builder_override_sampler._is_public = false;
+builder_override_sampler._is_pointer = false;
+builder_override_sampler._is_ref = false;
+builder_override_sampler._is_template = false;
+builder_override_sampler._meta = meta_override_sampler;
+builder_override_sampler._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_override_sampler._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_override_sampler));
+Meta meta_sampler_desc;
+meta_sampler_desc.Set("Category","");
+meta_sampler_desc.Set("IsColor",false);
+meta_sampler_desc.Set("IsRange",false);
+meta_sampler_desc.Set("IsFloatRange",true);
+meta_sampler_desc.Set("RangeMin",(f32)0);
+meta_sampler_desc.Set("RangeMax",(f32)1);
+MemberBuilder builder_sampler_desc;
+builder_sampler_desc._name = "_sampler_desc";
+builder_sampler_desc._type_name = "Ailu::Render::SamplerDesc";
+builder_sampler_desc._offset = offsetof(TextureSamplingSettings,_sampler_desc);
+builder_sampler_desc._is_const = false;
+builder_sampler_desc._is_static = false;
+builder_sampler_desc._is_public = false;
+builder_sampler_desc._is_pointer = false;
+builder_sampler_desc._is_ref = false;
+builder_sampler_desc._is_template = false;
+builder_sampler_desc._meta = meta_sampler_desc;
+builder_sampler_desc._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<SamplerDesc>);
+builder_sampler_desc._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<SamplerDesc>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_sampler_desc));
+Meta meta_apply_view_mip_bias;
+meta_apply_view_mip_bias.Set("Category","");
+meta_apply_view_mip_bias.Set("IsColor",false);
+meta_apply_view_mip_bias.Set("IsRange",false);
+meta_apply_view_mip_bias.Set("IsFloatRange",true);
+meta_apply_view_mip_bias.Set("RangeMin",(f32)0);
+meta_apply_view_mip_bias.Set("RangeMax",(f32)1);
+MemberBuilder builder_apply_view_mip_bias;
+builder_apply_view_mip_bias._name = "_apply_view_mip_bias";
+builder_apply_view_mip_bias._type_name = "bool";
+builder_apply_view_mip_bias._offset = offsetof(TextureSamplingSettings,_apply_view_mip_bias);
+builder_apply_view_mip_bias._is_const = false;
+builder_apply_view_mip_bias._is_static = false;
+builder_apply_view_mip_bias._is_public = false;
+builder_apply_view_mip_bias._is_pointer = false;
+builder_apply_view_mip_bias._is_ref = false;
+builder_apply_view_mip_bias._is_template = false;
+builder_apply_view_mip_bias._meta = meta_apply_view_mip_bias;
+builder_apply_view_mip_bias._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_apply_view_mip_bias._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_apply_view_mip_bias));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+const Ailu::Type* Ailu::Render::TextureSamplingSettings::GetPrivateStaticClass()
+{
+	static const Ailu::Type* type = Z_Construct_TextureSamplingSettings_Type();
+	return type;
+}
+
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::Render::TextureSamplingSettings>()
+{
+return Ailu::Render::TextureSamplingSettings::StaticType();
+}
+    const Type *Ailu::Render::TextureSamplingSettings::GetType()
+{
+return Ailu::Render::TextureSamplingSettings::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_TextureSamplingSettings(&Ailu::Render::TextureSamplingSettings::StaticType, "Ailu::Render::TextureSamplingSettings");
 static std::unique_ptr<Ailu::Enum> s_enum_type_ETextureDimension = nullptr;
 //Enum ETextureDimension begin...........................
 const Ailu::Enum* Z_Construct_Enum_Ailu_Render_ETextureDimension_Type()
@@ -229,6 +551,7 @@ initializer._size = sizeof(Ailu::Render::EFilterMode);
 initializer._str_to_enum_lut["kPoint"] = 0;
 initializer._str_to_enum_lut["kBilinear"] = 1;
 initializer._str_to_enum_lut["kTrilinear"] = 2;
+initializer._str_to_enum_lut["kAnisotropic"] = 3;
 s_enum_type_EFilterMode = std::make_unique<Ailu::Enum>(initializer);
 Ailu::Enum::RegisterEnum(s_enum_type_EFilterMode.get());
 }
@@ -255,6 +578,7 @@ initializer._size = sizeof(Ailu::Render::EWrapMode);
 initializer._str_to_enum_lut["kClamp"] = 0;
 initializer._str_to_enum_lut["kRepeat"] = 1;
 initializer._str_to_enum_lut["kMirror"] = 2;
+initializer._str_to_enum_lut["kBorder"] = 3;
 s_enum_type_EWrapMode = std::make_unique<Ailu::Enum>(initializer);
 Ailu::Enum::RegisterEnum(s_enum_type_EWrapMode.get());
 }

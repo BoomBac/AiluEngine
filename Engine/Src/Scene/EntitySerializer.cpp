@@ -197,6 +197,7 @@ namespace Ailu::SceneManagement
             entity_doc._camera_component._lock_aspect = camera->_camera.LockAspect();
             entity_doc._camera_component._render_scale = camera->_camera.RenderScale();
             entity_doc._camera_component._upsampling_filter = static_cast<u8>(camera->_camera.UpsamplingFilter());
+            entity_doc._camera_component._auto_texture_mip_bias = camera->_camera.IsAutoTextureMipBiasEnabled();
             mark_disabled.template operator()<ECS::CCamera>("CCamera");
         }
         if (const auto *volume = registry.GetComponent<ECS::LocalFogVolumeComponent>(entity); volume != nullptr)

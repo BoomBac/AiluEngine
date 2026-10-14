@@ -144,7 +144,7 @@ namespace Ailu
             Camera(float aspect, float near_clip = 10.0f, float far_clip = 10000.0f, ECameraType camera_type = ECameraType::kPerspective);
             void RecalculateMatrix(bool force = false);
             // Advance history once per rendered frame after render synchronization, then refresh projection jitter.
-            void PrepareRenderFrame(u64 frame_index);
+            void PrepareRenderFrame(u64 frame_index, f32 manual_texture_mip_bias = 0.0f);
             // Align previous-frame temporal state to the current camera after a cut or teleport.
             void MarkTemporalHistoryReset()
             {
@@ -191,6 +191,14 @@ namespace Ailu
                 MarkTemporalHistoryReset();
             }
             ESuperResolutionQuality SuperResolutionQuality() const { return _super_resolution_quality; }
+            void SetAutoTextureMipBiasEnabled(bool enabled)
+            {
+                if (_auto_texture_mip_bias == enabled) return;
+                _auto_texture_mip_bias = enabled;
+                MarkTemporalHistoryReset();
+            }
+            bool IsAutoTextureMipBiasEnabled() const { return _auto_texture_mip_bias; }
+            f32 GetAutoTextureMipBias() const;
             bool IsDlssAvailable() const { return _dlss_available; }
             bool IsFsrAvailable() const { return _fsr_available; }
             EResolvedTemporalMode ResolvedTemporalMode() const { return _resolved_temporal_mode; }
@@ -296,6 +304,9 @@ namespace Ailu
             bool _reverse_projection_x = false;
             bool _lock_aspect = false;
             f32 _render_scale = 1.0f;
+            f32 _last_texture_mip_bias = 0.0f;
+            bool _has_texture_mip_bias = false;
+            bool _auto_texture_mip_bias = true;
             ESuperResolutionMode _super_resolution_mode = ESuperResolutionMode::kOff;
             ESuperResolutionQuality _super_resolution_quality = ESuperResolutionQuality::kQuality;
             EResolvedTemporalMode _resolved_temporal_mode = EResolvedTemporalMode::kSpatial;

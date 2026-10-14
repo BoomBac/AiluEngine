@@ -194,7 +194,7 @@ namespace Ailu::Render
                     tmp_cam._is_scene_camera = false;
                     tmp_cam._postprocess_enabled = false;
                     tmp_cam.OutputSize(cam.TargetTexture()->Width(), cam.TargetTexture()->Height());
-                    tmp_cam.PrepareRenderFrame(_p_context->GetFrameCount());
+                    tmp_cam.PrepareRenderFrame(_p_context->GetFrameCount(), GetTextureMipBias());
                     const u16 dst_view_index = cam.TargetTexture()->CalculateViewIndex(Texture::ETextureViewType::kRTV, face, 0, 0);
                     DoRender(tmp_cam, s, request, shadow_set_ptr, i == 1u && request._enable_shadows,
                              _is_use_render_graph ? cam.TargetTexture() : nullptr, dst_view_index);
@@ -610,7 +610,7 @@ namespace Ailu::Render
         auto build_chunks = [this, &s, &r, &gi_data_indices](auto &renderables, bool is_skinned)
         {
             using ComponentType = std::remove_cvref_t<decltype(*renderables.begin())>;
-            constexpr u32 kChunkSize = 32u;
+            constexpr u32 kChunkSize = 256u;
             const u32 renderable_count = static_cast<u32>(renderables.size());
             const u32 chunk_count = (renderable_count + kChunkSize - 1u) / kChunkSize;
             Vector<PrimitiveBuildChunk> chunks(chunk_count);
@@ -720,7 +720,7 @@ namespace Ailu::Render
             geometry_key._submesh_index = primitive._submesh_index;
             primitive._geometry_id = DrawSubmissionRegistry::Get().InternGeometry(geometry_key);
         }
-        AL_ASSERT(_primitive_data.size() <= RenderConstants::kMaxRenderObjectCount);
+        AL_ASSERT(_primitive_data.size() <= RenderConstants::kMaxScenePrimitiveCount);
         auto *primitive_buffer = _cur_fs->GetScenePrimitiveBuffer(s.HashCode());
         auto *primitive_gi_buffer = _cur_fs->GetScenePrimitiveGIDataBuffer(s.HashCode());
         auto *static_probe_group_buffer = _cur_fs->GetStaticDiffuseProbeGroupBuffer(s.HashCode());
@@ -1086,6 +1086,9 @@ namespace Ailu::Render
         cam_cb_data->_uv_jitter_x = jitter.z;
         cam_cb_data->_uv_jitter_y = jitter.w;
         cam.GetCornerInWorld(cam_cb_data->_LT, cam_cb_data->_LB, cam_cb_data->_RT, cam_cb_data->_RB);
+        cam_cb_data->_TextureManualMipBias = GetTextureMipBias();
+        cam_cb_data->_TextureMipBias = std::clamp(cam_cb_data->_TextureManualMipBias +
+            (IsRenderingProbe() ? 0.0f : cam.GetAutoTextureMipBias()), -16.0f, 15.99f);
         cam_cb_data->_RenderFeatureFlags = _render_request._feature_flags;
         ApplyShadowSetToCameraData(*cam_cb_data, _rendering_data._shadow_set);
         _rendering_data._cull_results = _active_view_data != nullptr ? &_active_view_data->_cull_result : nullptr;
@@ -1120,6 +1123,11 @@ namespace Ailu::Render
         camera_data._DirectionalShadowMapParams = Vector4f(texel_size, texel_size, 1.25f, 0.0f);
     }
 
+    void Renderer::SetTextureMipBias(f32 bias)
+    {
+        if (std::isfinite(bias)) _texture_mip_bias.store(std::clamp(bias, -16.0f, 15.99f), std::memory_order_relaxed);
+    }
+
     static void FillMaterialData(Material* src, MaterialData& dst)
     {
         dst._base_color_tex         = RenderConstants::kInvalidBindlessHandle;
@@ -1129,13 +1137,20 @@ namespace Ailu::Render
         dst._emission_tex           = RenderConstants::kInvalidBindlessHandle;
         dst._emission_strength      = 0.0f;
         dst._sigma_a                = Vector3f::kZero;
+        dst._opacity = 1.0f;
+        dst._flags = 0u;
         if (src != nullptr && src->IsStandardLit())
         {
             // Mirror the raster standard lit path: only the checker id is forwarded, everything else is standard.
             dst._material_id = src->MaterialID() == EMaterialID::kChecker ? AL_MATERIAL_ID_CHECKER : AL_MATERIAL_ID_STANDARD;
             const auto *albedo_prop = src->MainProperty(ETextureUsage::kAlbedo);
             if (albedo_prop != nullptr)
+            {
                 dst._base_color = albedo_prop->GetValue<Vector4f>().xyz;
+                dst._opacity = albedo_prop->GetValue<Vector4f>().w;
+            }
+            if (src->SurfaceType() == ESurfaceType::kTransparent)
+                dst._flags |= AL_MATERIAL_FLAG_ALPHA_BLEND;
             if (auto base_color_tex = src->MainTex(ETextureUsage::kAlbedo); base_color_tex)
             {
                 dst._base_color_tex = base_color_tex->GetBindlessSRVIndex();
@@ -1168,6 +1183,17 @@ namespace Ailu::Render
             dst._ior = src->GetFloat("_IOR");
             dst._transmission = src->GetFloat("_Transmission");
             dst._sigma_a = src->GetPathTracerSigmaA();
+            static const ShaderPropertyId s_base_color_texture = ShaderPropertyRegistry::Get().Intern("_AlbedoTex");
+            dst._base_color_sampler = src->GetTextureSamplerIndex(s_base_color_texture);
+            static const ShaderPropertyId s_normal_texture = ShaderPropertyRegistry::Get().Intern("_NormalTex");
+            dst._normal_sampler = src->GetTextureSamplerIndex(s_normal_texture);
+            static const ShaderPropertyId s_roughness_texture = ShaderPropertyRegistry::Get().Intern("_RoughnessTex");
+            dst._roughness_sampler = src->GetTextureSamplerIndex(s_roughness_texture);
+            static const ShaderPropertyId s_metallic_texture = ShaderPropertyRegistry::Get().Intern("_MetallicTex");
+            dst._metallic_sampler = src->GetTextureSamplerIndex(s_metallic_texture);
+            static const ShaderPropertyId s_emission_texture = ShaderPropertyRegistry::Get().Intern("_EmissionTex");
+            dst._emission_sampler = src->GetTextureSamplerIndex(s_emission_texture);
+
         }
         //dst._base_color        = Vector3f::kOne;
         //dst._metallic          = src.metallic;

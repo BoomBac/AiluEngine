@@ -293,11 +293,11 @@ namespace Ailu
                 std::lock_guard<std::mutex> lock(_lock);
                 for (auto &[tid,block_list]: _cpu_profiler_queue)
                 {
-                    i16 call_depth = 0;
+                    i32 call_depth = 0;
                     for (auto &block: block_list)
                     {
                         auto &profile_data = _cpu_profiles[block._profiler_index];
-                        call_depth = block._is_start ? call_depth + 1 : call_depth - 1;
+                        call_depth = block._is_start ? call_depth + 1 : std::max(0, call_depth - 1);
                         if (!block._is_start)
                         {
                             //AL_ASSERT(profile_data._record.size() < 3);
@@ -305,7 +305,9 @@ namespace Ailu
                             {
                                 if (tid == s_main_thread_id)
                                     frame_data._end_time = std::max<f32>(record.value()._duration, frame_data._end_time);
-                                frame_data._data_threads[tid].emplace_back(profile_data.Name, record.value()._start, record.value()._duration, (u16) call_depth);
+                                frame_data._data_threads[tid].emplace_back(profile_data.Name, record.value()._start,
+                                                                          record.value()._duration,
+                                                                          static_cast<u16>(call_depth));
                             }
                             else
                             {
@@ -377,9 +379,10 @@ namespace Ailu
         _tracy_zone.emplace(tracy_source_location, true);
         _tracy_zone->Name(name.c_str(), name.size());
 #endif
-        //std::lock_guard<std::mutex> lock(_mutex);
-        //idx = Profiler::Get().StartCPUProfile(name);
-        //Profiler::Get().AddCPUProfilerHierarchy(true, idx);
+#if AILU_ENABLE_ENGINE_PROFILER
+        idx = Profiler::Get().StartCPUProfile(name);
+        Profiler::Get().AddCPUProfilerHierarchy(true, idx);
+#endif
     }
     CPUProfileBlock::~CPUProfileBlock()
     {
@@ -387,9 +390,10 @@ namespace Ailu
         // Tracy requires zone begin/end on the same thread.
         AL_ASSERT(_owner_thread_id == std::this_thread::get_id());
     #endif
-        //std::lock_guard<std::mutex> lock(_mutex);
-        //Profiler::Get().EndCPUProfile(idx);
-        //Profiler::Get().AddCPUProfilerHierarchy(false, idx);
+#if AILU_ENABLE_ENGINE_PROFILER
+        Profiler::Get().EndCPUProfile(idx);
+        Profiler::Get().AddCPUProfilerHierarchy(false, idx);
+#endif
 
     #if defined(TRACY_ENABLE)
         // End the zone after CPU profiler bookkeeping.

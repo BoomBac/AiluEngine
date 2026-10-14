@@ -35,7 +35,9 @@ namespace Ailu
         bool Begin(const std::string& session_guid);
         std::wstring AssetPath(const std::string& category, const std::string& guid) const;
         bool UpsertObject(const std::string& payload);
-        bool UpsertMesh(const std::vector<unsigned char>& payload);
+        bool UpsertInstanceBatch(const std::string& payload);
+        bool UpsertMesh(const std::vector<unsigned char>& payload, bool prototype_only = false);
+        bool PersistMesh(const Ref<Render::Mesh>& mesh);
         void PublishMesh(const std::string& guid, ECS::Entity entity, const Ref<Render::Mesh>& mesh,
                          const std::vector<u32>& material_slots, u64 revision);
         bool UpsertMaterial(const std::string& payload);

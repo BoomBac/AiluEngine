@@ -19,6 +19,7 @@ namespace Ailu
         class ComputeShader;
         class RayTracingShader;
         class RHICommandBuffer;
+        struct SamplerDesc;
         struct GfxCommand;
         struct UploadParams;
         class AILU_API GraphicsContext
@@ -30,6 +31,7 @@ namespace Ailu
             static void FinalizeGlobalContext();
             static GraphicsContext &Get();
             virtual ~GraphicsContext() = default;
+            virtual u32 GetSamplerIndex(const SamplerDesc &desc) = 0;
             virtual void Init() = 0;
             virtual void Present() = 0;
             virtual void SetMultiThreadRendering(bool enabled) = 0;

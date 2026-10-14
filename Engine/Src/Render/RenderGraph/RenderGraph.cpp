@@ -187,7 +187,10 @@ namespace Ailu
         {
             _global_textures.clear();
             for (auto *pass: _passes)
+            {
+                pass->SetCallback({});
                 _pass_pool.Release(pass);
+            }
             _passes.clear();
             _external_resources.clear();
             _imported_resource_handles.clear();
@@ -901,7 +904,9 @@ namespace Ailu
                 for (const RenderPass *pass: _sorted_passes)
                 {
                     LOG_INFO("pass: {}", pass->_name);
-                    _debug_passes.push_back(*pass);
+                    auto debug_pass = *pass;
+                    debug_pass.SetCallback({});
+                    _debug_passes.push_back(std::move(debug_pass));
                 }
                 _is_debug = false;
                 ExportToFile(L"render_graph.dot");

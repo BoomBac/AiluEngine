@@ -1,13 +1,16 @@
 #include "Dock/DockWindow.h"
 #include "Common/EditorStyle.h"
 #include "Dock/DockManager.h"
+#include "Framework/Common/EngineConfig.h"
 #include "Framework/Common/Input.h"
+#include "Framework/Common/Profiler.h"
 #include "Render/GraphicsContext.h"
 #include "UI/Basic.h"
 #include "UI/Container.h"
 #include "UI/UIFramework.h"
 #include "UI/UIRenderer.h"
 #include <memory>
+#include <cstdlib>
 
 #include "Objects/JsonArchive.h"
 
@@ -118,6 +121,12 @@ namespace Ailu
         {
             _drag_start_mouse_pos = {-1.0f, 0.0f};
             _title_widget = MakeRef<UI::Widget>();
+            _title_widget->SetUpdateMode(UI::EWidgetUpdateMode::kOnDemand);
+            const char *cache_override = std::getenv("AILU_EDITOR_UI_TEXTURE_CACHE");
+            const bool enable_widget_texture_cache = cache_override != nullptr
+                ? (cache_override[0] == '2' && cache_override[1] == '\0') : g_engine_config._enable_editor_widget_texture_cache;
+            if (enable_widget_texture_cache)
+                _title_widget->SetTextureCacheMode(UI::EWidgetTextureCacheMode::kTexture);
             auto c = MakeRef<UI::Canvas>();
             c->GetSlot()->Size(Vector2f(size.x, kTitleBarHeight));
             _title_bar_root = c->AddChild<UI::Border>();
@@ -185,6 +194,8 @@ namespace Ailu
             };
             _title_widget->AddToWidget(c);
             _content_widget = MakeRef<UI::Widget>();
+            if (enable_widget_texture_cache && (title == "WorldOutline" || title == "Object Detail" || title == "Asset Browser"))
+                _content_widget->SetTextureCacheMode(UI::EWidgetTextureCacheMode::kTexture);
             const f32 initial_content_offset_y = kTitleBarHeight - kTitleContentOverlap;
             _content_widget->SetPosition(_position + Vector2f(0.0f, initial_content_offset_y));
             c = MakeRef<UI::Canvas>();
@@ -327,15 +338,21 @@ namespace Ailu
 
         void DockWindow::SetTitleBarVisibility(bool is_visibility, bool is_expand_content)
         {
+            const bool expand_content = !is_visibility && is_expand_content;
+            if (_is_title_bar_visible == is_visibility && _is_expand_content_when_title_hidden == expand_content)
+                return;
             _is_title_bar_visible = is_visibility;
-            _is_expand_content_when_title_hidden = !is_visibility && is_expand_content;
+            _is_expand_content_when_title_hidden = expand_content;
             _title_widget->_visibility = is_visibility ? UI::EVisibility::kVisible : UI::EVisibility::kHide;
             _title_widget->InvalidatePaint(UI::EUIInvalidationReason::kVisibility | UI::EUIInvalidationReason::kPaint);
             _is_dirty = true;
         }
         void DockWindow::SetContentVisibility(bool is_visibility)
         {
-            _content_widget->_visibility = is_visibility ? UI::EVisibility::kVisible : UI::EVisibility::kHide;
+            const UI::EVisibility visibility = is_visibility ? UI::EVisibility::kVisible : UI::EVisibility::kHide;
+            if (_content_widget->_visibility == visibility)
+                return;
+            _content_widget->_visibility = visibility;
             _content_widget->InvalidatePaint(UI::EUIInvalidationReason::kVisibility | UI::EUIInvalidationReason::kPaint);
         }
         String DockWindow::GetTitle() const
@@ -457,6 +474,11 @@ namespace Ailu
         {
             _size = {400.0f, DockWindow::kTitleBarHeight};
             _tab_bar = MakeRef<UI::Widget>();
+            _tab_bar->SetUpdateMode(UI::EWidgetUpdateMode::kOnDemand);
+            if (const char *cache_override = std::getenv("AILU_EDITOR_UI_TEXTURE_CACHE");
+                cache_override != nullptr ? (cache_override[0] == '2' && cache_override[1] == '\0')
+                                          : g_engine_config._enable_editor_widget_texture_cache)
+                _tab_bar->SetTextureCacheMode(UI::EWidgetTextureCacheMode::kTexture);
             _tab_bar->Name("DockTab");
             _tab_bar->SetSize(_size);
             auto c = MakeRef<UI::Canvas>();
@@ -771,6 +793,8 @@ namespace Ailu
 
         void DockTab::SetVisible(bool is_visible)
         {
+            if (_is_visible == is_visible)
+                return;
             _is_visible = is_visible;
             _tab_bar->_visibility = is_visible ? UI::EVisibility::kVisible : UI::EVisibility::kHide;
             _tab_bar->InvalidatePaint(UI::EUIInvalidationReason::kVisibility | UI::EUIInvalidationReason::kPaint);
@@ -826,6 +850,7 @@ namespace Ailu
 
         void DockTab::Update(f32 dt)
         {
+            PROFILE_BLOCK_CPU("DockTab::Update")
             _tab_bar->SetPosition(_position);
             _tab_bar->SetSize({_size.x, DockWindow::kTitleBarHeight});
             _tab_root->GetSlotAs<UI::CanvasSlot>().Size({_size.x, DockWindow::kTitleBarHeight});
@@ -865,11 +890,24 @@ namespace Ailu
                         tab_text->InvalidatePaint();
                 }
             }
-            for (auto &w: _tabs)
+            if (active_item)
             {
-                w->SetRect({_position.x, _position.y, _size.x, _size.y});
-                w->Update(dt);
+                // Nested tabs can become active without changing their outer node's cached rect.
+                active_item->SetRect({_position.x, _position.y, _size.x, _size.y});
+                active_item->Update(dt);
             }
+        }
+
+        void DockTab::UpdateLayout()
+        {
+            if (auto active_item = ActiveItem())
+                active_item->SetRect({_position.x, _position.y, _size.x, _size.y});
+        }
+
+        void DockTab::TickBackground(f32 dt)
+        {
+            for (auto &item: _tabs)
+                item->TickBackground(dt);
         }
 #pragma endregion
     }// namespace Editor

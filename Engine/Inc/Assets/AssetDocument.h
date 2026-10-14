@@ -94,6 +94,8 @@ namespace Ailu
         String _name;
         APROPERTY()
         String _texture_guid;
+        APROPERTY()
+        Render::TextureSamplingSettings _sampling;
     };
 
     ACLASS()
@@ -734,6 +736,8 @@ namespace Ailu
         f32 _render_scale = 1.0f;
         APROPERTY()
         u8 _upsampling_filter = 0u;
+        APROPERTY()
+        bool _auto_texture_mip_bias = true;
     };
 
     ASTRUCT()

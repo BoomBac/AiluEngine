@@ -33,7 +33,7 @@ DepthPSInput DepthOnlyVSMain(DepthVSInput v)
 float DepthOnlyPSMain(DepthPSInput input) : SV_Depth
 {
 #ifdef ALPHA_TEST
-	float4 c = SAMPLE_TEXTURE2D(_AlbedoTex,g_LinearWrapSampler,input.uv);
+	float4 c = _AlbedoTex.SampleBias(g_material_samplers[_AlbedoTexSamplerIndex], input.uv, MaterialViewMipBias(0u));
 	clip(c.a - _AlphaCulloff);
 #endif
     return input.position.z;

@@ -2,6 +2,7 @@
 #define AIL_GI_RAY_LIGHTING_HLSLI
 
 #include "path_tracer_light_common.hlsli"
+#include "../material_sampling.hlsli"
 
 float3 GIReadMaterialAlbedo(MaterialData material, float2 uv)
 {
@@ -10,12 +11,10 @@ float3 GIReadMaterialAlbedo(MaterialData material, float2 uv)
     {
         if (material._material_id == AL_MATERIAL_ID_CHECKER)
         {
-            const float checker = SAMPLE_TEXTURE2D_LOD(
-                g_bindless_texture2d[material._base_color_tex], g_LinearWrapSampler, uv * 10.0f, 0.0f).b;
+            const float checker = SampleMaterialTextureLevel(g_bindless_texture2d[NonUniformResourceIndex(material._base_color_tex)], material._base_color_sampler, uv * 10.0f, 0.0f, MATERIAL_MANUAL_MIP_BIAS).b;
             return lerp(0.4f, 1.0f, checker).xxx;
         }
-        albedo *= SAMPLE_TEXTURE2D_LOD(
-            g_bindless_texture2d[material._base_color_tex], g_LinearClampSampler, uv, 0.0f).rgb;
+        albedo *= SampleMaterialTextureLevel(g_bindless_texture2d[NonUniformResourceIndex(material._base_color_tex)], material._base_color_sampler, uv, 0.0f, MATERIAL_MANUAL_MIP_BIAS).rgb;
     }
     return max(albedo, 0.0f.xxx);
 }
@@ -25,8 +24,7 @@ float3 GIReadMaterialEmission(MaterialData material, float2 uv)
     float3 emission = material._emission;
     if (valid_bindless_handle(material._emission_tex))
     {
-        emission = SAMPLE_TEXTURE2D_LOD(
-            g_bindless_texture2d[material._emission_tex], g_LinearClampSampler, uv, 0.0f).rgb;
+        emission = SampleMaterialTextureLevel(g_bindless_texture2d[NonUniformResourceIndex(material._emission_tex)], material._emission_sampler, uv, 0.0f, MATERIAL_MANUAL_MIP_BIAS).rgb;
     }
     return max(emission * material._emission_strength, 0.0f.xxx);
 }
@@ -35,8 +33,7 @@ float GIReadMaterialMetallic(MaterialData material, float2 uv)
 {
     float metallic = material._metallic;
     if (valid_bindless_handle(material._metallic_tex))
-        metallic *= SAMPLE_TEXTURE2D_LOD(
-            g_bindless_texture2d[NonUniformResourceIndex(material._metallic_tex)], g_LinearClampSampler, uv, 0.0f).r;
+        metallic *= SampleMaterialTextureLevel(g_bindless_texture2d[NonUniformResourceIndex(material._metallic_tex)], material._metallic_sampler, uv, 0.0f, MATERIAL_MANUAL_MIP_BIAS).r;
     return saturate(metallic);
 }
 

@@ -290,7 +290,7 @@ namespace Ailu::Render
     }
 
     Texture::Texture() : _mipmap_count(1), _pixel_format(EALGFormat::kALGFormatUNKOWN), _dimension(ETextureDimension::kUnknown),
-                         _filter_mode(EFilterMode::kBilinear), _wrap_mode(EWrapMode::kClamp), _is_readble(false), _is_srgb(false), _pixel_size(0), _is_random_access(false)
+                         _is_readble(false), _is_srgb(false), _pixel_size(0), _is_random_access(false)
     {
         _res_type = EGpuResType::kTexture;
     }
@@ -299,8 +299,7 @@ namespace Ailu::Render
         _pixel_size = 0u;
         _pixel_format = EALGFormat::kALGFormatUNKOWN;
         _dimension = ETextureDimension::kUnknown;
-        _filter_mode = EFilterMode::kBilinear;
-        _wrap_mode = EWrapMode::kClamp;
+        // GPU resource recreation preserves texture sampling authoring settings.
         _is_readble = false;
         _is_srgb = false;
         _is_random_access = false;

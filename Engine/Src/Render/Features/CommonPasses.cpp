@@ -150,6 +150,8 @@ namespace Ailu::Render
         void EmitQueuedDraws(CommandBuffer *cmd, Vector<QueuedDrawItem> &items,
                              EDrawSortPolicy policy = EDrawSortPolicy::kOpaque)
         {
+            // Each emitted pass captures its own uploaded buffer data version in its draw snapshots.
+            FrameResource::Active()->ResetPrimitiveIndices();
             struct QueuedDrawBatch
             {
                 u32 _item_index = 0u;

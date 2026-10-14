@@ -908,6 +908,11 @@ namespace Ailu::Render
                         pass_pipeline_blend_state._b_enable = true;
                         pass_pipeline_blend_state._src_color = get_ailu_blend_factor(blend_factors[0]);
                         pass_pipeline_blend_state._dst_color = get_ailu_blend_factor(blend_factors[1]);
+                        if (blend_factors.size() == 4u)
+                        {
+                            pass_pipeline_blend_state._src_alpha = get_ailu_blend_factor(blend_factors[2]);
+                            pass_pipeline_blend_state._dst_alpha = get_ailu_blend_factor(blend_factors[3]);
+                        }
                     }
                 }
                 if (need_zbuf_count == 0)
@@ -1694,13 +1699,13 @@ namespace Ailu::Render
                                     resource_type == EBindResDescType::kRWTexture3D;
                 const auto view_type = is_uav ? Texture::ETextureViewType::kUAV : Texture::ETextureViewType::kSRV;
                 auto *texture = dynamic_cast<Texture *>(resource);
-                // A default array binding must expose every slice to shader-side array indexing (for example CSM).
-                // Explicit subresource bindings keep their single-slice view.
-                const bool is_default_array = texture != nullptr &&
-                    texture->Dimension() == ETextureDimension::kTex2DArray && params._sub_res == UINT32_MAX;
+                // Default 2D/array SRVs expose the full mip chain (and array slices).
+                // Explicit subresource bindings retain their single-mip/slice view.
+                const bool is_default_srv = texture != nullptr && params._sub_res == UINT32_MAX &&
+                    (texture->Dimension() == ETextureDimension::kTex2D || texture->Dimension() == ETextureDimension::kTex2DArray);
                 if (!is_uav && params._face == static_cast<u16>(ECubemapFace::kUnknown) && texture != nullptr &&
                     (texture->Dimension() == ETextureDimension::kCube ||
-                     texture->Dimension() == ETextureDimension::kCubeArray || is_default_array))
+                     texture->Dimension() == ETextureDimension::kCubeArray || is_default_srv))
                     entry->_view_index = Texture::kMainSRVIndex;
                 else if (auto *texture3d = dynamic_cast<Texture3D *>(resource))
                     entry->_view_index = texture3d->CalculateViewIndex(

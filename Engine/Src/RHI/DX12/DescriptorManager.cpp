@@ -575,8 +575,67 @@ namespace Ailu::RHI::DX12
     {
         return *g_DescriptorMgr;
     }
+    u32 D3DDescriptorMgr::GetSamplerIndex(const Render::SamplerDesc &desc)
+    {
+        auto finite = [](f32 value, f32 fallback) { return std::isfinite(value) ? value : fallback; };
+        D3D12_SAMPLER_DESC native{};
+        switch (desc._filter)
+        {
+            case EFilterMode::kPoint: native.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT; break;
+            case EFilterMode::kBilinear: native.Filter = D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT; break;
+            case EFilterMode::kAnisotropic: native.Filter = D3D12_FILTER_ANISOTROPIC; break;
+            default: native.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR; break;
+        }
+        auto address = [](EWrapMode mode)
+        {
+            switch (mode)
+            {
+                case EWrapMode::kClamp: return D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+                case EWrapMode::kMirror: return D3D12_TEXTURE_ADDRESS_MODE_MIRROR;
+                case EWrapMode::kBorder: return D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+                default: return D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+            }
+        };
+        native.AddressU = address(desc._address_u);
+        native.AddressV = address(desc._address_v);
+        native.AddressW = address(desc._address_w);
+        native.MaxAnisotropy = std::clamp(desc._max_anisotropy, 1u, 16u);
+        native.MipLODBias = std::clamp(finite(desc._mip_bias, 0.0f), -16.0f, 15.99f);
+        native.MinLOD = std::max(0.0f, finite(desc._min_lod, 0.0f));
+        native.MaxLOD = std::max(native.MinLOD, finite(desc._max_lod, FLT_MAX));
+        native.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+        std::array<u32, 12> key{static_cast<u32>(native.Filter), static_cast<u32>(native.AddressU),
+            static_cast<u32>(native.AddressV), static_cast<u32>(native.AddressW), native.MaxAnisotropy};
+        const f32 values[]{native.MipLODBias, native.MinLOD, native.MaxLOD,
+            finite(desc._border_color.x, 0.0f), finite(desc._border_color.y, 0.0f),
+            finite(desc._border_color.z, 0.0f), finite(desc._border_color.w, 0.0f)};
+        for (u32 i = 0; i < 7u; ++i)
+        {
+            const f32 value = values[i] == 0.0f ? 0.0f : values[i];
+            memcpy(&key[5u + i], &value, sizeof(value));
+            if (i >= 3u) native.BorderColor[i - 3u] = value;
+        }
+        std::lock_guard lock(_sampler_mutex);
+        if (const auto it = _samplers.find(key); it != _samplers.end()) return it->second;
+        if (_samplers.size() >= kSamplerCapacity) throw std::runtime_error("Immutable sampler cache exhausted (2048 states)");
+        const u32 index = static_cast<u32>(_samplers.size());
+        auto *device = static_cast<D3DContext &>(GraphicsContext::Get()).GetDevice();
+        auto cpu = _sampler_heap->GetCPUDescriptorHandleForHeapStart();
+        cpu.ptr += index * device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
+        device->CreateSampler(&native, cpu);
+        _samplers.emplace(key, index);
+        return index;
+    }
+
     D3DDescriptorMgr::D3DDescriptorMgr()
     {
+        auto *device = static_cast<D3DContext &>(GraphicsContext::Get()).GetDevice();
+        D3D12_DESCRIPTOR_HEAP_DESC desc{};
+        desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER;
+        desc.NumDescriptors = kSamplerCapacity;
+        desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+        ThrowIfFailed(device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&_sampler_heap)));
+        GetSamplerIndex(Render::SamplerDesc{});
 		_gpu_alloc = AL_NEW_TAG(EMemoryTag::kRenderer, GPUVisibleDescriptorAllocator);
 		_cpu_alloc = AL_NEW_TAG(EMemoryTag::kRenderer, CPUVisibleDescriptorAllocator);
     }

@@ -299,6 +299,7 @@ namespace Ailu::Render
     void GpuResource::Upload(GraphicsContext* ctx,RHICommandBuffer* rhi_cmd,UploadParams* params)
     {
         UploadImpl(ctx,rhi_cmd,params);
+        _upload_revision.fetch_add(1u, std::memory_order_release);
     }
 
     bool GpuResource::IsReady()

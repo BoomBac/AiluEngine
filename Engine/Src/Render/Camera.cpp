@@ -188,8 +188,22 @@ namespace Ailu::Render
         RebuildCameraMatrices();
     }
 
-    void Camera::PrepareRenderFrame(u64 frame_index)
+    f32 Camera::GetAutoTextureMipBias() const
     {
+        if (!_auto_texture_mip_bias || !IsTemporalUpscalingActive()) return 0.0f;
+        const auto render_size = RenderSize();
+        const auto output_size = OutputSize();
+        if (output_size.x == 0u || render_size.x == 0u) return 0.0f;
+        const f32 ratio = static_cast<f32>(render_size.x) / static_cast<f32>(output_size.x);
+        return std::log2(ratio) + (IsFsrSRActive() ? -1.0f : 0.0f);
+    }
+
+    void Camera::PrepareRenderFrame(u64 frame_index, f32 manual_texture_mip_bias)
+    {
+        const f32 mip_bias = std::clamp(manual_texture_mip_bias + GetAutoTextureMipBias(), -16.0f, 15.99f);
+        if (_has_texture_mip_bias && _last_texture_mip_bias != mip_bias) MarkTemporalHistoryReset();
+        _last_texture_mip_bias = mip_bias;
+        _has_texture_mip_bias = true;
         if (!_has_previous_vp_update_frame || frame_index != _prev_vp_matrix_update_frame)
         {
             _prev_view_proj_matrix = !_has_previous_vp_update_frame || _temporal_history_reset_pending

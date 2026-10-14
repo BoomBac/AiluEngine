@@ -187,10 +187,18 @@ mesh loop preserves split attributes; triangles reference these vertices instead
 Wire layout, basis conversion, bounds and material grouping remain protocol v1. Missing/failed tangent generation
 uses a deterministic tangent default rather than reading uninitialized loop tangent data.
 
-Evaluated mesh instances are flattened into transient root children using their depsgraph world transforms.
-Session, instancer, source GUID and persistent instance path determine stable UUIDs. Each source is encoded once
-per instance update group, then protocol-v1 mesh packets use distinct instance GUID/revision headers. Placement-only
-updates reuse existing meshes; source edits resend affected geometry and removed instances send deletion messages.
+Evaluated mesh instances are imported as root children using their depsgraph world transforms. Session, instancer,
+source GUID and persistent instance path determine stable UUIDs. The protocol-v1 handshake negotiates the
+`instance_batch_v1` and `mesh_prototype_v1` capabilities. Instance-batch packets carry up to 128 object records
+and reference the source object's mesh/material slots. Scene objects send their mesh with the ordinary mesh
+packet. A mesh prototype outside `scene.objects` sends its material data and a prototype-only mesh packet before
+its instance batches; the Engine persists and caches that mesh without creating a scene entity. Generated instances
+do not resend geometry. Placement-only updates send changed instance records, source edits refresh affected
+instances after the source mesh update, and removed or empty-geometry instances send deletion messages. The Engine
+reuses the prototype `Render::Mesh` for each instance. Software ray-tracing triangles and BLAS
+nodes are packed once per unique mesh, while entity/submesh maps retain per-instance lookups. Active scene primitives
+support up to 65,536 entries with TLAS node storage for that many primitives; the legacy RenderPipeline node storage
+remains 2,000.
 Original objects use view-layer visibility; mesh camera visibility is approximated by entity visibility, including
 camera-invisible emitter helpers. This also removes those meshes from GI/shadows; independent ray visibility and
 per-instance world-coordinate material rebaking are not implemented. Non-TRS shear remains outside transform transport.

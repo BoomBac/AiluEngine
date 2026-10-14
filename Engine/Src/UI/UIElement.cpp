@@ -4,6 +4,7 @@
 
 #include "UI/UIElement.h"
 #include "UI/UIRenderer.h"
+#include "Framework/Common/Profiler.h"
 #include "UI/TextRenderer.h"
 #include "UI/UIFramework.h"
 #include "UI/Widget.h"
@@ -242,6 +243,7 @@ namespace Ailu
         }
         void UIElement::Update(f32 dt)
         {
+            PROFILE_BLOCK_CPU("UIElement::Update")
             if (!_is_visible)
                 return;
             if (_parent == nullptr)
@@ -428,6 +430,7 @@ namespace Ailu
         }
         void UIElement::Arrange(f32 x, f32 y, f32 width, f32 height)
         {
+            PROFILE_BLOCK_CPU("UIElement::Arrange")
             const Vector4f new_arrange_rect = {x, y, width, height};
             Vector4f new_content_rect = new_arrange_rect;
             new_content_rect.x += _padding._l;
@@ -435,6 +438,8 @@ namespace Ailu
             new_content_rect.z -= (_padding._l + _padding._r);
             new_content_rect.w -= (_padding._t + _padding._b);
             const bool is_layout_changed = !NearbyEqual(_arrange_rect, new_arrange_rect) || !NearbyEqual(_content_rect, new_content_rect);
+            if (!is_layout_changed && !_is_layout_dirty && !_is_transf_dirty)
+                return;
             const bool needs_post_arrange = _is_layout_dirty || is_layout_changed;
             _arrange_rect = new_arrange_rect;
             _content_rect = new_content_rect;
@@ -682,21 +687,16 @@ namespace Ailu
             _debug_dirty_reasons |= EUIInvalidationReason::kLayout | EUIInvalidationReason::kPaint;
             if (_owning_widget != nullptr)
                 _owning_widget->InvalidatePaint(EUIInvalidationReason::kLayout | EUIInvalidationReason::kPaint, this);
-            //这里可以添加停止策略，例如如果父的 size policy 是 Fixed，只需要局部更新，不冒泡。
-            if (!_is_layout_dirty)
+            // Hidden elements can remain dirty after their ancestors have completed layout.
+            // Local dirtiness therefore cannot suppress propagation in either direction.
+            _is_layout_dirty = true;
+            if (propagate_down)
             {
-                _is_layout_dirty = true;
-                if (propagate_down)
-                {
-                    for (auto &c: _children)
-                        c->InvalidateLayout(true);
-                }
-                else
-                {
-                    if (_parent)
-                        _parent->InvalidateLayout();// 向上传递
-                }
+                for (auto &c: _children)
+                    c->InvalidateLayout(true);
             }
+            else if (_parent)
+                _parent->InvalidateLayout();
         }
         void UIElement::InvalidateTransform()
         {

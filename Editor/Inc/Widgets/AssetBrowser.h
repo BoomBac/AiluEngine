@@ -40,6 +40,7 @@ namespace Ailu
             AssetBrowser();
             ~AssetBrowser() override;
             void Update(f32 dt) final;
+            void TickBackground(f32 dt) override;
 
         private:
             struct SelectedEntry

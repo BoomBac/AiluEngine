@@ -80,6 +80,7 @@ namespace Ailu::Render
         _shadow_variant_cache.clear();
         for (auto &cache : _frame_property_block_cache)
             cache = {};
+        _texture_sampling = std::move(other._texture_sampling);
         _bind_textures_by_id = std::move(other._bind_textures_by_id);
         _bind_buffers_by_id = std::move(other._bind_buffers_by_id);
         _common_uint_property = std::move(other._common_uint_property);
@@ -131,6 +132,7 @@ namespace Ailu::Render
         _material_id_offset = other._material_id_offset;
         _sampler_mask = other._sampler_mask;
         _is_standard_lit = other._is_standard_lit;
+        _texture_sampling = other._texture_sampling;
         _bind_textures_by_id = other._bind_textures_by_id;
         _bind_buffers_by_id = other._bind_buffers_by_id;
 
@@ -162,6 +164,7 @@ namespace Ailu::Render
         _prop_views = std::move(other._prop_views);
         _property_blocks = std::move(other._property_blocks);
         ResetMaterialCaches();
+        _texture_sampling = std::move(other._texture_sampling);
         _bind_textures_by_id = std::move(other._bind_textures_by_id);
         _bind_buffers_by_id = std::move(other._bind_buffers_by_id);
         _common_uint_property = std::move(other._common_uint_property);
@@ -1172,12 +1175,16 @@ namespace Ailu::Render
     List<std::tuple<String, u32>> Material::GetAllUintValue()
     {
         Map<String, u32> value_map{};
+        const auto is_sampler_runtime_property = [](const String &name)
+        {
+            return name == "_TextureViewMipBiasMask" || name.ends_with("TexSamplerIndex");
+        };
         u16 pass_index = 0;
         for (auto &pass: _pass_variants)
         {
             for (auto &[name, bind_info]: _p_active_shader->GetBindResInfo(pass_index, _pass_variants[pass_index]._variant_hash))
             {
-                if (!ShaderBindResourceInfo::s_reversed_res_name.contains(name) && bind_info._res_type & EBindResDescType::kCBufferUInt && bind_info._bind_flag == ShaderBindResourceInfo::kBindFlagPerMaterial)
+                if (!is_sampler_runtime_property(name) && !ShaderBindResourceInfo::s_reversed_res_name.contains(name) && bind_info._res_type & EBindResDescType::kCBufferUInt && bind_info._bind_flag == ShaderBindResourceInfo::kBindFlagPerMaterial)
                 {
                     if (!value_map.contains((name)))
                         value_map[name] = *reinterpret_cast<u32 *>(_property_blocks[pass_index]._data + ShaderBindResourceInfo::GetVariableOffset(bind_info));
@@ -1188,7 +1195,7 @@ namespace Ailu::Render
         List<std::tuple<String, u32>> ret{};
         for (auto &prop: _common_uint_property)
         {
-            if (!value_map.contains(prop.first))
+            if (!is_sampler_runtime_property(prop.first) && !value_map.contains(prop.first))
                 value_map[prop.first] = prop.second;
         }
         for (auto &it: value_map)
@@ -1409,6 +1416,46 @@ namespace Ailu::Render
         return GetShaderProperty(ShaderPropertyRegistry::Get().GetName(property_id));
     }
 
+    void Material::SetTextureSamplingSettings(ShaderPropertyId property_id, const TextureSamplingSettings &settings)
+    {
+        _texture_sampling[property_id] = settings;
+        MarkPropertyDataDirty();
+    }
+
+    TextureSamplingSettings Material::GetTextureSamplingSettings(ShaderPropertyId property_id) const
+    {
+        const auto it = _texture_sampling.find(property_id);
+        return it == _texture_sampling.end() ? TextureSamplingSettings{} : it->second;
+    }
+
+    SamplerDesc Material::GetTextureSamplerDesc(ShaderPropertyId property_id) const
+    {
+        const auto settings = GetTextureSamplingSettings(property_id);
+        if (settings._override_sampler) return settings._sampler_desc;
+        const auto it = _bind_textures_by_id.find(property_id);
+        return it != _bind_textures_by_id.end() && it->second != nullptr ? it->second->GetSamplerDesc() : SamplerDesc{};
+    }
+
+    u32 Material::GetTextureSamplerIndex(ShaderPropertyId property_id) const
+    {
+        return GraphicsContext::Get().GetSamplerIndex(GetTextureSamplerDesc(property_id));
+    }
+
+    void Material::SetSamplerOverride(ShaderPropertyId property_id, const SamplerDesc &desc)
+    {
+        auto settings = GetTextureSamplingSettings(property_id);
+        settings._override_sampler = true;
+        settings._sampler_desc = desc;
+        SetTextureSamplingSettings(property_id, settings);
+    }
+
+    void Material::ClearSamplerOverride(ShaderPropertyId property_id)
+    {
+        auto settings = GetTextureSamplingSettings(property_id);
+        settings._override_sampler = false;
+        SetTextureSamplingSettings(property_id, settings);
+    }
+
     void Material::ResetMaterialCaches()
     {
         _binding_cache.clear();
@@ -1462,9 +1509,12 @@ namespace Ailu::Render
         if (frame_cache.size() != _property_blocks.size())
             frame_cache.resize(_property_blocks.size());
         auto &cache = frame_cache[pass_index];
+        u64 sampler_revision = 0u;
+        for (const auto &[property_id, texture] : _bind_textures_by_id)
+            if (texture != nullptr) sampler_revision = sampler_revision * 1099511628211ull + texture->SamplerRevision() + static_cast<u64>(texture->ID()) * 16777619ull;
         // upload_to_gpu 时要求缓存里已经有可用的GPU地址：先以 upload_to_gpu=false 调用过
         // 的 block 只有CPU副本，不能当成命中复用（T3 的情况A）。
-        if (cache._variant_hash == variant_hash && cache._layout_version == layout_version
+        if (cache._sampler_revision == sampler_revision && cache._variant_hash == variant_hash && cache._layout_version == layout_version
             && cache._property_data_version == _property_data_version && cache._frame_count == frame_count
             && cache._block._data != nullptr && !(upload_to_gpu && cache._block._gpu_handle == 0u))
         {
@@ -1498,6 +1548,24 @@ namespace Ailu::Render
                 const u32 material_id = _material_id == EMaterialID::kChecker ? static_cast<u32>(_material_id) : 0u;
                 copy_value(ShaderPropertyRegistry::Get().Intern("_MaterialID"), &material_id, sizeof(material_id));
                 copy_value(ShaderPropertyRegistry::Get().Intern("_SamplerMask"), &_sampler_mask, sizeof(_sampler_mask));
+                struct SamplerPropertyIds { ShaderPropertyId _texture; ShaderPropertyId _index; };
+                static const SamplerPropertyIds s_sampler_properties[]{
+                    {ShaderPropertyRegistry::Get().Intern("_AlbedoTex"), ShaderPropertyRegistry::Get().Intern("_AlbedoTexSamplerIndex")},
+                    {ShaderPropertyRegistry::Get().Intern("_NormalTex"), ShaderPropertyRegistry::Get().Intern("_NormalTexSamplerIndex")},
+                    {ShaderPropertyRegistry::Get().Intern("_RoughnessTex"), ShaderPropertyRegistry::Get().Intern("_RoughnessTexSamplerIndex")},
+                    {ShaderPropertyRegistry::Get().Intern("_MetallicTex"), ShaderPropertyRegistry::Get().Intern("_MetallicTexSamplerIndex")},
+                    {ShaderPropertyRegistry::Get().Intern("_SpecularTex"), ShaderPropertyRegistry::Get().Intern("_SpecularTexSamplerIndex")},
+                    {ShaderPropertyRegistry::Get().Intern("_EmissionTex"), ShaderPropertyRegistry::Get().Intern("_EmissionTexSamplerIndex")}};
+                static const ShaderPropertyId s_view_bias_mask = ShaderPropertyRegistry::Get().Intern("_TextureViewMipBiasMask");
+                u32 view_bias_mask = 0u;
+                for (u32 i = 0; i < 6u; ++i)
+                {
+                    const auto &ids = s_sampler_properties[i];
+                    const u32 index = GetTextureSamplerIndex(ids._texture);
+                    copy_value(ids._index, &index, sizeof(index));
+                    if (GetTextureSamplingSettings(ids._texture)._apply_view_mip_bias) view_bias_mask |= 1u << i;
+                }
+                copy_value(s_view_bias_mask, &view_bias_mask, sizeof(view_bias_mask));
             }
         }
         if (upload_to_gpu && block._size > 0u)
@@ -1514,6 +1582,7 @@ namespace Ailu::Render
                 statistics->MaterialCBufferUploadBytes += block._size;
             }
         }
+        cache._sampler_revision = sampler_revision;
         cache._variant_hash = variant_hash;
         cache._layout_version = layout_version;
         cache._property_data_version = _property_data_version;

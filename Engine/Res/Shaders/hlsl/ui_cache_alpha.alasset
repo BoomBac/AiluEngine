@@ -1,0 +1,12 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "f7799753-1209-4dbe-8456-dcc69627fef1",
+        "_asset_type": "Ailu::Render::Shader",
+        "_asset_name": "ui_cache_alpha",
+        "_dependencies": []
+    },
+    "_file": "ui_cache_alpha.hlsl",
+    "_vs_entry": "VSMain",
+    "_ps_entry": "PSMain"
+}

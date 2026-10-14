@@ -123,7 +123,7 @@ float3 Checkerboard(float2 uv, float scale)
     return checker ? float3(1.0, 1.0, 1.0) : float3(0.0, 0.0, 0.0);
 }
 
-GBuffer GBufferPSMain(StandardPSInput input) : SV_TARGET
+GBuffer GBufferPSMain(StandardPSInput input, bool is_front_face : SV_IsFrontFace) : SV_TARGET
 {
 	SurfaceData surface_data;
 	if (_MaterialID != 2)// Default, including legacy or unsupported material IDs.
@@ -134,6 +134,26 @@ GBuffer GBufferPSMain(StandardPSInput input) : SV_TARGET
 	{
 		InitSurfaceDataCheckboard(input, surface_data);
 		//surface_data.albedo.rgb = Checkerboard(input.uv0, 20);
+	}
+	const float3 view_dir = normalize(_CameraPos.xyz - input.world_pos);
+	const float shading_nv = dot(surface_data.wnormal, view_dir);
+	if (is_front_face && shading_nv < 0.05f)
+	{
+		float3 geometric_normal = cross(ddx(input.world_pos), ddy(input.world_pos));
+		const float geometric_normal_length_sq = dot(geometric_normal, geometric_normal);
+		if (geometric_normal_length_sq > 1e-12f)
+		{
+			geometric_normal *= rsqrt(geometric_normal_length_sq);
+			if (dot(geometric_normal, view_dir) < 0.0f)
+				geometric_normal = -geometric_normal;
+			const float geometric_nv = dot(geometric_normal, view_dir);
+			const float target_nv = min(0.05f, geometric_nv * 0.5f);
+			if (shading_nv < target_nv && target_nv > 1e-4f)
+			{
+				const float normal_blend = saturate((target_nv - shading_nv) / (geometric_nv - shading_nv));
+				surface_data.wnormal = normalize(lerp(surface_data.wnormal, geometric_normal, normal_blend));
+			}
+		}
 	}
 #ifdef ALPHA_TEST
 	clip(surface_data.albedo.a - _AlphaCulloff);

@@ -523,6 +523,7 @@ public:                                                                 \
         {
             DECLARE_COMPONENT(CHierarchy, "Ailu.ECS.CHierarchy")
             ECS::Entity _first_child = ECS::kInvalidEntity;
+            ECS::Entity _last_child = ECS::kInvalidEntity;
             ECS::Entity _prev_sibling = ECS::kInvalidEntity;
             ECS::Entity _next_sibling = ECS::kInvalidEntity;
             ECS::Entity _parent = ECS::kInvalidEntity;

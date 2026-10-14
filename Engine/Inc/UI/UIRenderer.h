@@ -55,8 +55,22 @@ namespace Ailu
             Vector4f _corner_radius = Vector4f::kZero;
         };
 
+        struct UIWidgetDrawStats
+        {
+            String _widget_name;
+            u64 _draw_node_count = 0u;
+        };
+
         struct UIRenderStats
         {
+            u64 _ui_widget_update_executed_count = 0u;
+            u64 _ui_widget_update_skipped_count = 0u;
+            u64 _ui_texture_cache_hit_count = 0u;
+            u64 _ui_texture_cache_miss_count = 0u;
+            u64 _ui_texture_cache_dirty_count = 0u;
+            u64 _ui_texture_cache_composite_draw_count = 0u;
+            u64 _ui_texture_cache_resident_bytes = 0u;
+            f32 _ui_texture_cache_repaint_time = 0.0f;
             u64 _ui_element_visit_count = 0u;
             u64 _ui_render_impl_count = 0u;
             u64 _ui_layout_count = 0u;
@@ -122,6 +136,7 @@ namespace Ailu
             void ResetFrameStats() { _stats = {}; }
             UIRenderStats &MutableStats() { return _stats; }
             const UIRenderStats &GetFrameStats() const { return _stats; }
+            const Vector<UIWidgetDrawStats> &GetWidgetDrawStats() const { return _widget_draw_stats; }
         private:
             void DrawDebugPannel();
             Vector<struct DrawerBlock *> &FrameBlocks() {return _drawer_blocks[_frame_index];};
@@ -131,6 +146,13 @@ namespace Ailu
                 Widget *_widget = nullptr;
                 RenderTexture *_color = nullptr;
                 RenderTexture *_depth = nullptr;
+                bool _use_texture_cache = false;
+                bool _use_cache_materials = false;
+                bool _texture_cache_needs_repaint = false;
+                Vector2f _texture_cache_origin = Vector2f::kZero;
+                Ref<RenderTexture> _texture_cache;
+                DrawerBlock *_texture_cache_quad = nullptr;
+                struct WidgetDrawerBlocks *_texture_cache_state = nullptr;
             };
             WidgetDrawerBlocks *GetWidgetBlockEntry(Widget *widget);
             Vector<DrawerBlock *> &GetWidgetCpuBlocks(Widget *widget);
@@ -145,7 +167,8 @@ namespace Ailu
                                    Vector4f border_thickness = Vector4f::kZero);
             Render::Texture *GetOrCreateBackdropBlurTexture(Render::Texture *source, CommandBuffer *cmd);
             void SubmitPopupBackdrop(Widget *widget, CommandBuffer *cmd, RenderTexture *color, RenderTexture *depth);
-            void SubmitBlock(DrawerBlock *block, CommandBuffer *cmd,RenderTexture* color,RenderTexture* depth = nullptr);
+            void SubmitBlock(DrawerBlock *block, CommandBuffer *cmd, RenderTexture *color, RenderTexture *depth = nullptr,
+                             Vector2f origin = Vector2f::kZero, bool use_cache_materials = false);
         private:
             inline static const Matrix4x4f kIdentityMatrix = Matrix4x4f::Identity();
             u16 _frame_index = 0u;
@@ -161,6 +184,11 @@ namespace Ailu
                 Array<Vector<DrawerBlock *>, Render::FrameResourceManager::kFrameResourceSlotCount> _blocks = {};
                 Array<u64, Render::FrameResourceManager::kFrameResourceSlotCount> _gpu_revisions = {};
                 u64 _build_revision = 0u;
+                bool _cache_built = false;
+                DrawerBlock *_texture_cache_quad = nullptr;
+                Vector4f _texture_cache_quad_rect = Vector4f::kZero;
+                bool _texture_cache_valid = false;
+                u64 _texture_cache_upload_revision = 0u;
             };
             Vector<WidgetDrawerBlocks> _widget_drawer_blocks;
             Vector<WidgetSubmitEntry> _submit_entries;
@@ -175,6 +203,11 @@ namespace Ailu
             u32 _cur_widget_block_index = 0u;
             Ref<Material> _default_material;
             Ref<Material> _shadow_material;
+            Ref<Material> _texture_cache_composite_material;
+            Ref<Material> _texture_cache_alpha_composite_material;
+            Ref<Material> _texture_cache_ui_material;
+            Ref<Material> _texture_cache_text_material;
+            Ref<Material> _texture_cache_msdf_material;
             AssetRef<Render::ComputeShader> _backdrop_blur_cs;
             Render::ComputeShaderKernelId _backdrop_blur_x_kernel = Render::kInvalidComputeShaderKernelId;
             Render::ComputeShaderKernelId _backdrop_blur_y_kernel = Render::kInvalidComputeShaderKernelId;
@@ -185,6 +218,7 @@ namespace Ailu
             HashMap<u64, u32> _on_sort_order_changed_handle_map;
             Vector<Rect> _scissor_stack;//stack一直报错？
             UIRenderStats _stats;
+            Vector<UIWidgetDrawStats> _widget_draw_stats;
         };
 
     }// namespace UI

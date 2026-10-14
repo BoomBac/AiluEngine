@@ -14,6 +14,7 @@
 #include "Framework/Common/Path.h"
 #include "Framework/Common/FileManager.h"
 #include "pch.h"
+#include "RHI/DX12/D3DStaticSamplers.h"
 
 namespace Ailu::RHI::DX12
 {
@@ -128,21 +129,6 @@ namespace Ailu::RHI::DX12
         constexpr u32 kDxrHitAttributeSize = 2u * sizeof(float);
         constexpr u32 kDxrRayPayloadSize = 96u;
         constexpr u32 kDxrMaxRecursionDepth = 1u;
-
-        const Vector<CD3DX12_STATIC_SAMPLER_DESC> &CreateStaticSampler()
-        {
-            static Vector<CD3DX12_STATIC_SAMPLER_DESC> samplers{
-                    CD3DX12_STATIC_SAMPLER_DESC(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR, D3D12_TEXTURE_ADDRESS_MODE_WRAP, D3D12_TEXTURE_ADDRESS_MODE_WRAP, D3D12_TEXTURE_ADDRESS_MODE_WRAP),
-                    CD3DX12_STATIC_SAMPLER_DESC(1, D3D12_FILTER_MIN_MAG_MIP_LINEAR, D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP),
-                    CD3DX12_STATIC_SAMPLER_DESC(2, D3D12_FILTER_MIN_MAG_MIP_LINEAR, D3D12_TEXTURE_ADDRESS_MODE_BORDER, D3D12_TEXTURE_ADDRESS_MODE_BORDER, D3D12_TEXTURE_ADDRESS_MODE_BORDER),
-                    CD3DX12_STATIC_SAMPLER_DESC(3, D3D12_FILTER_MIN_MAG_MIP_POINT, D3D12_TEXTURE_ADDRESS_MODE_WRAP, D3D12_TEXTURE_ADDRESS_MODE_WRAP, D3D12_TEXTURE_ADDRESS_MODE_WRAP),
-                    CD3DX12_STATIC_SAMPLER_DESC(4, D3D12_FILTER_MIN_MAG_MIP_POINT, D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP),
-                    CD3DX12_STATIC_SAMPLER_DESC(5, D3D12_FILTER_MIN_MAG_MIP_POINT, D3D12_TEXTURE_ADDRESS_MODE_BORDER, D3D12_TEXTURE_ADDRESS_MODE_BORDER, D3D12_TEXTURE_ADDRESS_MODE_BORDER),
-                    CD3DX12_STATIC_SAMPLER_DESC(6, D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT, D3D12_TEXTURE_ADDRESS_MODE_BORDER, D3D12_TEXTURE_ADDRESS_MODE_BORDER, D3D12_TEXTURE_ADDRESS_MODE_BORDER, 0.0f, 16, D3D12_COMPARISON_FUNC_LESS, D3D12_STATIC_BORDER_COLOR_OPAQUE_BLACK),
-                    CD3DX12_STATIC_SAMPLER_DESC(7, D3D12_FILTER_ANISOTROPIC, D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP)};
-            samplers[2].BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
-            return samplers;
-        }
 
         struct DXILExportDesc
         {
@@ -516,8 +502,9 @@ namespace Ailu::RHI::DX12
         if (it == _dxr_variants.end() || it->second._state_object == nullptr || !snapshot._is_ready)
             return;
         const auto &variant = it->second;
-        auto d3dcmd = static_cast<D3DCommandBuffer*>(cmd)->NativeCmdList();
-        d3dcmd->SetPipelineState1(variant._state_object.Get());
+        auto *d3d_cmd = static_cast<D3DCommandBuffer *>(cmd);
+        auto *d3dcmd = d3d_cmd->NativeCmdList();
+        d3d_cmd->SetRayTracingPipelineState(variant._state_object.Get());
         d3dcmd->SetComputeRootSignature(variant._global_root_signature.Get());
         if (!BindResources(cmd, snapshot, variant))
             throw HrException(E_INVALIDARG);
@@ -532,6 +519,11 @@ namespace Ailu::RHI::DX12
                                             const DxrVariant &variant)
     {
         auto *d3d_cmd = static_cast<D3DCommandBuffer *>(cmd);
+        if (variant._material_sampler_slot != static_cast<u16>(-1))
+        {
+            d3d_cmd->SetDescriptorHeap(D3DDescriptorMgr::Get().GetBindHeap(), 1024u);
+            d3d_cmd->NativeCmdList()->SetComputeRootDescriptorTable(variant._material_sampler_slot, D3DDescriptorMgr::Get().GetSamplerTable());
+        }
         bool scene_bound = false;
         for (u16 index = 0u; index < snapshot._entry_count; ++index)
         {
@@ -727,6 +719,7 @@ namespace Ailu::RHI::DX12
         variant._bindless_texture_slot = _bindless_texture_slot;
         variant._bindless_buffer_slot = _bindless_buffer_slot;
         variant._bindless_rw_texture_slot = _bindless_rw_texture_slot;
+        variant._material_sampler_slot = _material_sampler_slot;
         variant._bindless_rw_buffer_slot = _bindless_rw_buffer_slot;
         _is_valid = true;
         return true;
@@ -799,7 +792,7 @@ namespace Ailu::RHI::DX12
     
     void D3DRayTracingShader::GenerateRootSignature()
     {
-        auto static_samplers = CreateStaticSampler();
+        auto static_samplers = GetStaticSamplers();
         ShaderReflectionUtils::GenerateRootSignature(_dev, _bind_res_infos, &_global_root_signature, false, static_samplers);
 
         _has_bindless_texture2d = false;
@@ -809,6 +802,9 @@ namespace Ailu::RHI::DX12
         _bindless_texture_slot = static_cast<u16>(-1);
         _bindless_buffer_slot = static_cast<u16>(-1);
         _bindless_rw_texture_slot = static_cast<u16>(-1);
+        _material_sampler_slot = static_cast<u16>(-1);
+        if (const auto it = _bind_res_infos.find("g_material_samplers"); it != _bind_res_infos.end())
+            _material_sampler_slot = it->second._bind_slot;
         _bindless_rw_buffer_slot = static_cast<u16>(-1);
         if (auto it = _bind_res_infos.find("g_bindless_texture2d"); it != _bind_res_infos.end())
         {

@@ -593,7 +593,7 @@ namespace Ailu::RHI::DX12
             Render::ShaderArtifactCache::Get().LogStats();
         }
         GraphicsPipelineStateMgr::Get().ProcessPendingShaderCompiles();
-        Render::RenderPipeline::Get().FrameCleanup();
+        if (auto *pipeline = Render::RenderPipeline::Instance()) pipeline->FrameCleanup();
         Render::RenderingStates::Reset();
         _next_submission_index.store(0u, std::memory_order_relaxed);
 #if AILU_ENABLE_FRAME_DEBUGGER
@@ -1200,7 +1200,13 @@ namespace Ailu::RHI::DX12
                 PIXBeginEvent(m_commandQueue.Get(), 0u, L"RHICommandBufferBatch");
             {
                 PROFILE_BLOCK_CPU("ExecuteCommandLists")
+                for (D3DCommandBuffer *submitted_cmd : d3d_cmds)
+                    for (const auto &wait : submitted_cmd->ExternalGpuWaits())
+                        ThrowIfFailed(m_commandQueue->Wait(wait._fence.Get(), wait._value));
                 m_commandQueue->ExecuteCommandLists(static_cast<UINT>(native_cmds.size()), native_cmds.data());
+                for (D3DCommandBuffer *submitted_cmd : d3d_cmds)
+                    for (const auto &signal : submitted_cmd->ExternalGpuSignals())
+                        ThrowIfFailed(m_commandQueue->Signal(signal._fence.Get(), signal._value));
                 {
                     std::lock_guard lock(_cmd_fence_mtx);
                     submitted_fence = ++_fence_value;
@@ -1239,6 +1245,23 @@ namespace Ailu::RHI::DX12
         return submitted_fence;
     }
 
+    void D3DContext::RegisterExternalGpuLifetime(std::function<void()> stop, std::function<bool()> retired)
+    {
+        std::lock_guard lock(_external_gpu_lifetime_mutex);
+        _external_gpu_lifetimes.push_back({std::move(stop), std::move(retired)});
+    }
+    void D3DContext::CollectExternalGpuLifetimes(bool drain)
+    {
+        std::lock_guard lock(_external_gpu_lifetime_mutex);
+        if (drain)
+            for (auto &lifetime : _external_gpu_lifetimes) lifetime._stop();
+        std::erase_if(_external_gpu_lifetimes, [drain](auto &lifetime)
+        {
+            if (!drain) return lifetime._retired();
+            while (!lifetime._retired()) Sleep(1);
+            return true;
+        });
+    }
     void D3DContext::Destroy()
     {
         if (Application::Get()._is_multi_thread_rendering.load()) _cmd_worker->Stop();
@@ -1246,6 +1269,7 @@ namespace Ailu::RHI::DX12
         // Ensure that the GPU is no longer referencing resources that are about to be
         // cleaned up by the destructor.
         WaitForGpu();
+        CollectExternalGpuLifetimes(true);
         _fsr_runtime.Shutdown();
         GpuResourceRegistry::Get().Sync(_p_cmd_buffer_fence->GetCompletedValue());
         GpuResourceRegistry::Get().Clear();
@@ -1617,6 +1641,7 @@ namespace Ailu::RHI::DX12
 
     void D3DContext::Present()
     {
+        CollectExternalGpuLifetimes();
         Vector<GfxCommand *> cmds{CommandPool::Get().Alloc<CommandPresent>()};
         _cmd_worker->Push(std::move(cmds), SubmitParams{"Present", true});
         if (!Application::Get()._is_multi_thread_rendering.load()) { _cmd_worker->RunSync(); }

@@ -67,8 +67,10 @@ class LinkConnection:
         # Full Sync can occupy one timer callback for a long time. Advance transport between generated packets.
         self.poll()
         if self._overflow:
-            return False
+            raise ConnectionError(self.last_error or "Send queue full; reconnect and perform Full Sync")
         data = protocol.packet(message_type, self._sequence, payload)
+        if not self._wait_for_send_capacity(len(data)):
+            raise ConnectionError(self.last_error or "Ailu disconnected while sending")
         self._sequence += 1
         enqueue_time = time.perf_counter()
         key = self._coalesce_key(data)
@@ -90,6 +92,7 @@ class LinkConnection:
                     queued_type = int.from_bytes(queued[6:8], "little") if queued else 0
                     queued_key = self._coalesce_key(queued) if queued else None
                     if queued_type in {protocol.OBJECT_UPSERT, protocol.MESH_UPSERT,
+                            protocol.MESH_PROTOTYPE_UPSERT,
                             protocol.LIGHT_UPSERT, protocol.CAMERA_UPSERT} and queued_key:
                         if queued_key[1].strip(b'"') == guid:
                             self._drop_diagnostic_packet(queued)
@@ -111,12 +114,23 @@ class LinkConnection:
                 self._close_socket()
                 self._set_status("Disconnected", self.last_error)
                 self._running = False
-                return False
+                raise ConnectionError(self.last_error)
             self._queued_bytes += len(data)
             self._outgoing.queue.append(data)
             self._track_diagnostic_packet(data, enqueue_time)
             self._outgoing.not_empty.notify()
             return True
+
+    def _wait_for_send_capacity(self, packet_bytes):
+        max_bytes = 256 * 1024 * 1024
+        while self._running and self.connected and not self._overflow:
+            with self._outgoing.mutex, self._queue_lock:
+                if self._outgoing._qsize() < 4096 and self._queued_bytes + packet_bytes <= max_bytes:
+                    return True
+            self.poll()
+            if self._running and self.connected and not self._overflow:
+                time.sleep(0.001)
+        return False
 
     def begin_diagnostic_batch(self, name):
         with self._diagnostic_lock:
@@ -232,7 +246,9 @@ class LinkConnection:
                 if error:
                     raise OSError(error, "Ailu connection failed")
                 self._connecting = False
-                self._wire_packet = protocol.packet(protocol.HELLO, self._sequence, b'{"client":"Blender"}')
+                hello = {"client": "Blender", "features": [
+                    protocol.INSTANCE_BATCH_FEATURE, protocol.MESH_PROTOTYPE_FEATURE]}
+                self._wire_packet = protocol.json_packet(protocol.HELLO, self._sequence, hello)
                 self._sequence += 1
                 self._wire_offset = 0
                 self._wire_hello = True
@@ -272,7 +288,7 @@ class LinkConnection:
             return None
         message_type = int.from_bytes(data[6:8], "little")
         payload = data[protocol.HEADER.size:]
-        if message_type == protocol.MESH_UPSERT and len(payload) >= 36:
+        if message_type in {protocol.MESH_UPSERT, protocol.MESH_PROTOTYPE_UPSERT} and len(payload) >= 36:
             return message_type, payload[:36]
         if message_type not in {protocol.OBJECT_UPSERT, protocol.MATERIAL_UPSERT,
                 protocol.LIGHT_UPSERT, protocol.CAMERA_UPSERT}:
@@ -334,6 +350,10 @@ class LinkConnection:
                 reply = json.loads(payload)
                 if kind != protocol.HELLO_ACK or not isinstance(reply, dict) or reply.get("accepted") is not True:
                     raise ValueError("Ailu rejected protocol v1")
+                features = reply.get("features", [])
+                required_features = {protocol.INSTANCE_BATCH_FEATURE, protocol.MESH_PROTOTYPE_FEATURE}
+                if not isinstance(features, list) or not required_features.issubset(features):
+                    raise ValueError("Ailu plugin lacks Blender instance prototype support; update the Engine plugin")
                 self._set_status("Connected")
                 self._overflow = False
                 self._retry_delay = 0.25

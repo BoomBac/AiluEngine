@@ -79,6 +79,10 @@ SetEntityEnabled
 - dirty state；
 - dependent systems。
 
+`CHierarchy` keeps a runtime-only last-child cache so appending many siblings remains O(1) after the cache is
+initialized. The cache is derived from the serialized first-child/next-sibling links and is rebuilt on first append
+after scene load; it is not part of the persistent scene format.
+
 不要绕过 hierarchy API 直接改 component link，除非当前系统内部实现明确要求这样做。
 
 ## Revisions

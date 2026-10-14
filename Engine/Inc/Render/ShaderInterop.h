@@ -267,12 +267,18 @@ namespace Ailu::Render
         // RGB 体积吸收系数 (1/世界单位)，Beer-Lambert: T = exp(-sigma_a * 介质内行程)。
         float3 _sigma_a;
         uint _flags;                 // MaterialFlags
+        uint _base_color_sampler;
+        uint _normal_sampler;
+        uint _roughness_sampler;
+        uint _metallic_sampler;
+        uint _emission_sampler;
+        uint _sampler_padding[3];
     };
 
 #ifdef __cplusplus
     static_assert(offsetof(MaterialData, _sigma_a) == 80u, "MaterialData::_sigma_a layout changed");
     static_assert(offsetof(MaterialData, _flags) == 92u, "MaterialData::_flags layout changed");
-    static_assert(sizeof(MaterialData) == 96u, "MaterialData stride changed");
+    static_assert(sizeof(MaterialData) == 128u, "MaterialData stride changed");
 #endif
 
     
@@ -369,8 +375,10 @@ namespace Ailu::Render
         uint _RenderFeatureFlags;
         float _volumetric_fog_far;
         float _volumetric_fog_enabled;
-        float _render_view_padding0;
-        float4 _render_view_padding[9];
+        float _TextureMipBias;
+        float _TextureManualMipBias;
+        float3 _texture_bias_padding;
+        float4 _render_view_padding[8];
     } AL_SHADER_INTEROP_CBUFFER_END
 
 #ifdef __cplusplus

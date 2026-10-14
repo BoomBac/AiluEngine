@@ -114,6 +114,8 @@ namespace Ailu
             explicit Slider(const String &name);
             Slider(f32 min, f32 max, f32 value);
             void Update(f32 dt) override;
+            void OnEvent(UIEvent &e) override;
+            bool IsThumbHovered() const { return _is_thumb_hovered; }
             UIElement *HitTest(Vector2f pos) final;
             Vector2f MeasureDesiredSize() override;
             f32 GetValue() const { return _value; }
@@ -134,6 +136,10 @@ namespace Ailu
 
         private:
             Vector4f _bar_rect,_dot_rect;
+            Vector2f _last_mouse_position = Vector2f::kZero;
+            bool _has_mouse_position = false;
+            bool _is_thumb_hovered = false;
+            void UpdateThumbHover();
             UIStyleId _style_id;
             UISliderStyleOverride _style_override;
             UISliderStyle _resolved_style;

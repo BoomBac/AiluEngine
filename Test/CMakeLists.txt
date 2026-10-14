@@ -1,7 +1,20 @@
-﻿project (Test)
+project (Test)
 set(TEST_ROOT_PATH ${CMAKE_SOURCE_DIR}/Test)
 set(ENGINE_ROOT_PATH ${CMAKE_SOURCE_DIR}/Engine)
 set(EDITOR_ROOT_PATH ${CMAKE_SOURCE_DIR}/Editor)
+
+# Standalone M2 executable: no Engine DLL, CUDA SDK headers or OIDN import library.
+add_executable(OidnGpuInteropSpike OidnGpuInteropSpike.cpp
+    "${ENGINE_ROOT_PATH}/Src/RHI/DX12/OidnGpuInteropD3D12.cpp")
+target_include_directories(OidnGpuInteropSpike PRIVATE "${ENGINE_ROOT_PATH}/Src")
+target_compile_definitions(OidnGpuInteropSpike PRIVATE AILU_WITH_OIDN_GPU=$<BOOL:${AILU_WITH_OIDN_GPU}>)
+target_link_libraries(OidnGpuInteropSpike PRIVATE d3d12 dxgi d3dcompiler)
+if(MSVC)
+    target_compile_options(OidnGpuInteropSpike PRIVATE /utf-8)
+endif()
+set_target_properties(OidnGpuInteropSpike PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY_DEBUG "${AiluBuildPath}/out/test/bin/x64/debug"
+    RUNTIME_OUTPUT_DIRECTORY_RELEASE "${AiluBuildPath}/out/test/bin/x64/release")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${AiluBuildPath}/out/test/bin/x64)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${AiluBuildPath}/out/test/bin/x64/debug)
@@ -260,6 +273,13 @@ add_custom_command(TARGET TaaGpuAcceptance POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:Engine>" "$<TARGET_FILE_DIR:TaaGpuAcceptance>"
     VERBATIM)
 
+# UI interaction smoke uses an isolated initialized graphics runtime.
+add_executable(UISliderHoverSmoke UISliderHoverSmoke.cpp)
+ailu_configure_test_target(UISliderHoverSmoke)
+add_custom_command(TARGET UISliderHoverSmoke POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:Engine>" "$<TARGET_FILE_DIR:UISliderHoverSmoke>"
+    VERBATIM)
+
 # Editor progress state tests require no window, renderer or initialized runtime.
 add_executable(EditorProgressSmoke EditorProgressSmoke.cpp "${CMAKE_SOURCE_DIR}/Editor/Src/Common/EditorProgressService.cpp")
 target_include_directories(EditorProgressSmoke PRIVATE "${EDITOR_ROOT_PATH}/Inc" "${ENGINE_ROOT_PATH}/Inc")
@@ -309,8 +329,31 @@ add_custom_command(TARGET StreamlineDx12BridgeSmoke POST_BUILD
     VERBATIM)
 
 add_executable(D3DDepthStencilSmoke D3DDepthStencilSmoke.cpp "${ENGINE_ROOT_PATH}/Src/Render/PipelineState.cpp")
+
+add_executable(PathTracingDenoiserSmoke PathTracingDenoiserSmoke.cpp)
+add_executable(OidnGpuRenderGraphSmoke OidnGpuRenderGraphSmoke.cpp)
+ailu_configure_test_target(OidnGpuRenderGraphSmoke)
+target_link_libraries(OidnGpuRenderGraphSmoke PRIVATE d3d12 dxgi)
+add_custom_command(TARGET OidnGpuRenderGraphSmoke POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:Engine>" "$<TARGET_FILE_DIR:OidnGpuRenderGraphSmoke>"
+    VERBATIM)
+ailu_configure_test_target(PathTracingDenoiserSmoke)
+add_custom_command(TARGET PathTracingDenoiserSmoke POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:Engine>" "$<TARGET_FILE_DIR:PathTracingDenoiserSmoke>"
+    VERBATIM)
 target_include_directories(D3DDepthStencilSmoke PRIVATE "${ENGINE_ROOT_PATH}/Src")
 ailu_configure_test_target(D3DDepthStencilSmoke)
 add_custom_command(TARGET D3DDepthStencilSmoke POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:Engine>" "$<TARGET_FILE_DIR:D3DDepthStencilSmoke>"
+    VERBATIM)
+
+add_executable(SamplerSmoke SamplerSmoke.cpp)
+ailu_configure_test_target(SamplerSmoke)
+add_custom_command(TARGET SamplerSmoke POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:Engine>" "$<TARGET_FILE_DIR:SamplerSmoke>"
+    VERBATIM)
+
+add_custom_command(TARGET SamplerSmoke POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${AILU_EXT_PACKAGES_DIR}/fbxsdk/lib/vs2019/x64/$<IF:$<CONFIG:Debug>,debug,release>/libfbxsdk.dll" "$<TARGET_FILE_DIR:SamplerSmoke>"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${ENGINE_ROOT_PATH}/Ext/pix/WinPixEventRuntime.dll" "$<TARGET_FILE_DIR:SamplerSmoke>"
     VERBATIM)

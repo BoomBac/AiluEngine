@@ -2,8 +2,10 @@
 #define __RAYTRACE_GI_H__
 #include "Assets/AssetRef.h"
 #include "RenderFeature.h"
+#include "Render/Denoiser/PathTracingDenoiser.h"
 #include "Render/RayTracing/SceneRayTracingProxy.h"
 #include "Render/RayTracing/RayTracingShader.h"
+#include <mutex>
 #include "generated/RayTraceGI.gen.h"
 
 namespace Ailu
@@ -28,6 +30,10 @@ namespace Ailu
             ~RayTraceGI() = default;
             void AddRenderPasses(Renderer &renderer, const RenderingData &rendering_data);
             void OnPropertyChanged(const PropertyInfo& prop) override;
+            void SetActive(bool is_active) override;
+            EDenoiserStatus DenoiserStatus() const;
+            String DenoiserReason() const;
+            PathTracingDenoiserDiagnostics DenoiserDiagnostics() const;
             //temp
             Vector2f _debug_pos = Vector2f{-1.0f,-1.0f};
             APROPERTY(Range(0,20))
@@ -36,6 +42,12 @@ namespace Ailu
             EPathTracerAccumulationMode _accumulation_mode = EPathTracerAccumulationMode::kDisabled;
             APROPERTY()
             bool _is_show_debug = false;
+            APROPERTY()
+            EPathTracingDenoiser _denoiser = EPathTracingDenoiser::kNone;
+            APROPERTY()
+            EPathTracingDenoiserQuality _denoiser_quality = EPathTracingDenoiserQuality::kBalanced;
+            APROPERTY(Range(1,256))
+            u32 _denoiser_sample_interval = 32u;
             APROPERTY()
             bool _use_hardware_ray_tracing = false;
             APROPERTY()
@@ -51,6 +63,10 @@ namespace Ailu
             APROPERTY(Range(0,5))
             u32 _debug_temporal_target = 0u;
         private:
+            mutable std::mutex _denoiser_diagnostics_mutex;
+            String _denoiser_reason = "Disabled";
+            EDenoiserStatus _denoiser_status = EDenoiserStatus::kDisabled;
+            PathTracingDenoiserDiagnostics _denoiser_diagnostics;
             Scope<GIPass> _gi_pass;
             AssetRef<ComputeShader> _gi_compute_shader;
             AssetRef<RayTracingShader> _gi_raytracing_shader;
@@ -79,6 +95,11 @@ namespace Ailu
             void OnRecordRenderGraph(RDG::RenderGraph& graph, RenderingData& rendering_data) final;
         public:
             Vector2f _debug_pos;
+            EPathTracingDenoiserQuality _denoiser_quality = EPathTracingDenoiserQuality::kBalanced;
+            u32 _denoiser_sample_interval = 32u;
+            EPathTracingDenoiser _denoiser = EPathTracingDenoiser::kNone;
+            EDenoiserStatus DenoiserStatus() const { return _denoiser_host.Status(); }
+            const char *DenoiserReason() const { return _denoiser_host.Reason(); }
             EPathTracerAccumulationMode _accumulation_mode = EPathTracerAccumulationMode::kDisabled;
             bool _use_hardware_ray_tracing = false;
             bool _enable_mnee = false;
@@ -95,6 +116,16 @@ namespace Ailu
         private:
             AssetRef<ComputeShader> _gi_compute_shader;
             AssetRef<RayTracingShader> _gi_raytracing_shader;
+            PathTracingDenoiserHost _denoiser_host;
+            std::shared_ptr<std::atomic<bool>> _denoiser_active_flag = std::make_shared<std::atomic<bool>>(true);
+            std::atomic<u64> _denoiser_activation_revision{0u};
+            u64 _previous_denoiser_activation_revision = 0u;
+            u64 _denoiser_frame_index = 0u;
+            u64 _denoiser_shader_revision = 0u;
+            u64 _denoiser_rt_shader_revision = 0u;
+            u64 _last_denoiser_engine_frame = 0u;
+            EPathTracingDenoiserQuality _previous_denoiser_quality = EPathTracingDenoiserQuality::kBalanced;
+            u32 _reference_sample_count = 0u;
             ComputeShaderKernelId _kernel_primary_ray = kInvalidComputeShaderKernelId;
             ComputeShaderKernelId _kernel_denoise = kInvalidComputeShaderKernelId;
             ComputeShaderKernelId _kernel_build_environment_weights = kInvalidComputeShaderKernelId;

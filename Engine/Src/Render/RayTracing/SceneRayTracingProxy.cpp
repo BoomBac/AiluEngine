@@ -308,7 +308,6 @@ namespace Ailu::Render
 
     SceneRayTracingProxy::SceneRayTracingProxy()
     {
-        _material_data_cache.reserve(200u);
         _unified_light_data_cache.reserve(32u);
         _unified_light_sampling_cache.reserve(32u);
         _unified_light_buffer = CreateDynamicStructuredBuffer(_unified_light_data_cache, "SceneRayTracingProxy_UnifiedLightBuffer");
@@ -318,19 +317,6 @@ namespace Ailu::Render
             CreateDynamicStructuredBuffer(_path_light_lookup_cache, "SceneRayTracingProxy_PathLightLookup");
         _unified_light_config = ConstantBuffer::Create(sizeof(UnifiedLightBufferConfig), "SceneRayTracingProxy_UnifiedLightConfig");
         _unified_light_config->SetData(reinterpret_cast<const u8 *>(&_unified_light_config_cpu), sizeof(_unified_light_config_cpu));
-        _material_data_lut[0] = 0; //default material
-        MaterialData miss_mat{};
-        miss_mat._base_color = float3(1.0f, 0.0f, 1.0f);//洋红色
-        miss_mat._base_color_tex = RenderConstants::kInvalidBindlessHandle;
-        miss_mat._normal_tex = RenderConstants::kInvalidBindlessHandle;
-        miss_mat._emission = float3(0.0f, 0.0f, 0.0f);
-        miss_mat._emission_tex = RenderConstants::kInvalidBindlessHandle;
-        miss_mat._metallic = 0.0f;
-        miss_mat._roughness = 1.0f;
-        miss_mat._roughness_tex = RenderConstants::kInvalidBindlessHandle;
-        miss_mat._metallic_tex = RenderConstants::kInvalidBindlessHandle;
-        _material_data_cache.push_back(miss_mat);
-        _material_buffer = CreateDynamicStructuredBuffer(_material_data_cache, "SceneRayTracingProxy_MaterialBuffer");
     }
 
 
@@ -356,10 +342,8 @@ namespace Ailu::Render
 
         TrySwapBuffers();
 
-        UpdateMaterials(*scene);
         _transforms.clear();
-        _materials.clear();
-        auto instance_keys = CollectInstanceKeys(*scene, _transforms, _materials);
+        auto instance_keys = CollectInstanceKeys(*scene, _transforms);
         if (instance_keys.empty())
         {
             ClearSlot(FrontSlot());
@@ -413,9 +397,8 @@ namespace Ailu::Render
         UpdateUnifiedLights(*scene);
     }
 
-    Vector<SceneRayTracingProxy::SceneInstanceKey> SceneRayTracingProxy::CollectInstanceKeys(const SceneManagement::Scene &scene,
-                                                                                             Vector<Matrix4x4f> &transforms,
-                                                                                             Vector<Material*> &materials) const
+    Vector<SceneRayTracingProxy::SceneInstanceKey> SceneRayTracingProxy::CollectInstanceKeys(
+        const SceneManagement::Scene &scene, Vector<Matrix4x4f> &transforms) const
     {
         Vector<SceneInstanceKey> instance_keys;
         const auto &reg = scene.GetRegister();
@@ -451,9 +434,6 @@ namespace Ailu::Render
                 for (u32 submesh_index = 0u; submesh_index < mesh->SubmeshCount(); ++submesh_index)
                 {
                     transforms.push_back(transform_comp->GetRenderWorldMatrix());
-                    auto submesh_material = renderable._p_mats.size() > submesh_index
-                        ? renderable._p_mats[submesh_index].get() : nullptr;
-                    materials.push_back(submesh_material);
                 }
             }
         };
@@ -942,8 +922,6 @@ namespace Ailu::Render
                 primitive_data._index_bindless_idx = index_buffer ? static_cast<u32>(index_buffer->GetBindlessSRVIndex()) : RenderConstants::kInvalidBindlessHandle;
                 primitive_data._submesh_triangle_offset = 0u;
                 primitive_data._submesh_triangle_count = mesh ? mesh->GetTriangleCount(static_cast<u16>(submesh_index)) : 0u;
-                primitive_data._material_id = rendering_instance_index < _materials.size() && _materials[rendering_instance_index] != nullptr ?
-                    _material_data_lut[_materials[rendering_instance_index]->HashCode()] : 0u;
                 ++rendering_instance_index;
             }
         }
@@ -1005,117 +983,6 @@ namespace Ailu::Render
         slot._uv_data = nullptr;
         slot._tangent_data = nullptr;
         slot._indices_data = nullptr;
-    }
-
-    static void FillMaterialData(Material* src, MaterialData& dst)
-    {
-        dst._base_color_tex         = RenderConstants::kInvalidBindlessHandle;
-        dst._normal_tex             = RenderConstants::kInvalidBindlessHandle;
-        dst._roughness_tex = RenderConstants::kInvalidBindlessHandle;
-        dst._metallic_tex = RenderConstants::kInvalidBindlessHandle;
-        dst._emission_tex           = RenderConstants::kInvalidBindlessHandle;
-        dst._emission_strength      = 0.0f;
-        dst._sigma_a                = Vector3f::kZero;
-        dst._opacity                = 1.0f;
-        dst._flags                  = 0u;
-        if (src != nullptr && src->IsStandardLit())
-        {
-            // Mirror the raster standard lit path: only the checker id is forwarded, everything else is standard.
-            dst._material_id = src->MaterialID() == EMaterialID::kChecker ? AL_MATERIAL_ID_CHECKER : AL_MATERIAL_ID_STANDARD;
-            const auto *albedo_prop = src->MainProperty(ETextureUsage::kAlbedo);
-            if (albedo_prop != nullptr)
-            {
-                dst._base_color = albedo_prop->GetValue<Vector4f>().xyz;
-                dst._opacity = albedo_prop->GetValue<Vector4f>().w;
-            }
-            if (src->SurfaceType() == ESurfaceType::kTransparent)
-                dst._flags |= AL_MATERIAL_FLAG_ALPHA_BLEND;
-            if (auto base_color_tex = src->MainTex(ETextureUsage::kAlbedo); base_color_tex)
-            {
-                dst._base_color_tex = base_color_tex->GetBindlessSRVIndex();
-            }
-            const auto *metallic_prop = src->MainProperty(ETextureUsage::kMetallic);
-            if (metallic_prop != nullptr)
-                dst._metallic = metallic_prop->GetValue<f32>();
-            const auto *roughness_prop = src->MainProperty(ETextureUsage::kRoughness);
-            if (roughness_prop != nullptr)
-                dst._roughness = std::max(0.0f, roughness_prop->GetValue<f32>());
-            if (auto normal_tex = src->MainTex(ETextureUsage::kNormal); normal_tex)
-            {
-                dst._normal_tex = normal_tex->GetBindlessSRVIndex();
-            }
-            if (auto roughness_tex = src->MainTex(ETextureUsage::kRoughness); roughness_tex)
-                dst._roughness_tex = roughness_tex->GetBindlessSRVIndex();
-            if (auto metallic_tex = src->MainTex(ETextureUsage::kMetallic); metallic_tex)
-                dst._metallic_tex = metallic_tex->GetBindlessSRVIndex();
-            const auto *emission_prop = src->MainProperty(ETextureUsage::kEmission);
-            if (emission_prop != nullptr)
-            {
-                dst._emission = emission_prop->GetValue<Color>().xyz;
-                dst._emission_strength = 1.0f;
-            }
-            if (auto emission_tex = src->MainTex(ETextureUsage::kEmission); emission_tex)
-            {
-                dst._emission_tex = emission_tex->GetBindlessSRVIndex();
-                dst._emission_strength = 1.0f;
-            }
-            dst._ior = src->GetFloat("_IOR");
-            dst._transmission = src->GetFloat("_Transmission");
-            dst._sigma_a = src->GetPathTracerSigmaA();
-        }
-        //dst._base_color        = Vector3f::kOne;
-        //dst._metallic          = src.metallic;
-        //dst._roughness         = src.roughness;
-        //dst._specular          = src.specular;
-        //dst._ior               = src.ior;
-        //dst._opacity           = src.opacity;
-
-        // dst._emission          = src.emission_color;
-        // dst._emission_strength = src.emission_intensity;
-
-        // dst._base_color_tex    = src.base_color_tex ? src.base_color_tex->BindlessIndex() : kInvalidTex;
-        // dst._normal_tex        = src.normal_tex     ? src.normal_tex->BindlessIndex()     : kInvalidTex;
-        // dst._emission_tex      = src.emission_tex ? src.emission_tex->BindlessIndex() : kInvalidTex;
-
-        // dst._flags = 0;
-        // if (src.is_metallic)   dst._flags |= kMaterial_Metallic;
-        // if (src.is_emissive)   dst._flags |= kMaterial_Emissive;
-        // if (src.is_thin)       dst._flags |= kMaterial_Thin;
-    }
-
-    void SceneRayTracingProxy::UpdateMaterials(const SceneManagement::Scene &s)
-    {
-        PROFILE_BLOCK_CPU("Renderer::PrepareMaterial")
-
-        auto collect_materials = [this](auto &renderables)
-        {
-            for (auto &renderable : renderables)
-            {
-                for (auto &material : renderable._p_mats)
-                {
-                    if (material == nullptr)
-                        continue;
-                    if (!_material_data_lut.contains(material->HashCode()))
-                    {
-                        const u32 material_index = static_cast<u32>(_material_data_cache.size());
-                        _material_data_lut[material->HashCode()] = material_index;
-                        _material_data_cache.push_back(MaterialData());
-                    }
-                    FillMaterialData(material.get(), _material_data_cache[_material_data_lut[material->HashCode()]]);
-                }
-            }
-        };
-        collect_materials(s.GetRegister().View<ECS::StaticMeshComponent>());
-        collect_materials(s.GetRegister().View<ECS::CSkeletonMesh>());
-        // 着色器按 material_id 直接索引 g_material_data，buffer 必须能容纳全部材质，
-        // 否则结构化缓冲越界读会触发 device removal。
-        const u64 required_size = std::max<u64>(1u, _material_data_cache.capacity()) * sizeof(MaterialData);
-        if (_material_buffer == nullptr || _material_buffer->GetSize() < required_size)
-            _material_buffer = CreateDynamicStructuredBuffer(_material_data_cache, "SceneRayTracingProxy_MaterialBuffer");
-        else
-            _material_buffer->SetData(
-                (u8*)_material_data_cache.data(),
-                (u32)(_material_data_cache.size() * sizeof(MaterialData)));
     }
 
     void SceneRayTracingProxy::UpdateUnifiedLights(const SceneManagement::Scene &scene)

@@ -39,7 +39,6 @@ namespace Ailu::Render
         {
             return _scene_primitive_buffer;
         }
-        GPUBuffer *GetMaterialData() const { return _material_buffer.get(); }
         GPUBuffer *GetUnifiedLightData() const { return _unified_light_buffer.get(); }
         GPUBuffer *GetUnifiedLightSamplingData() const { return _unified_light_sampling_buffer.get(); }
         GPUBuffer *GetPathLightLookup() const { return _path_light_lookup_buffer.get(); }
@@ -118,7 +117,8 @@ namespace Ailu::Render
             Ref<GPUBuffer> _indices_data;
         };
 
-        Vector<SceneInstanceKey> CollectInstanceKeys(const SceneManagement::Scene &scene, Vector<Matrix4x4f> &transforms, Vector<Material*> &materials) const;
+        Vector<SceneInstanceKey> CollectInstanceKeys(const SceneManagement::Scene &scene,
+                                                   Vector<Matrix4x4f> &transforms) const;
         bool NeedsStructureRebuild(const ProxyBufferSlot &slot, const Vector<SceneInstanceKey> &instance_keys) const;
         Vector<Ref<RayTracingGeometry>> AcquireGeometry(Mesh *mesh, VertexBuffer *vertex_buffer, bool dynamic);
         CachedGeometry *FindCachedGeometry(Mesh *mesh, VertexBuffer *vertex_buffer);
@@ -130,7 +130,6 @@ namespace Ailu::Render
         bool IsSlotReady(ProxyBufferSlot &slot);
         void TrySwapBuffers();
         void ClearSlot(ProxyBufferSlot &slot);
-        void UpdateMaterials(const SceneManagement::Scene &scene);
         void UpdateUnifiedLights(const SceneManagement::Scene &scene);
         void UpdateUnifiedLightSamplingTable();
         float EstimateUnifiedLightSamplingWeight(const UnifiedLightData &light) const;
@@ -147,10 +146,6 @@ namespace Ailu::Render
         u32 _front_slot = 0u;
         bool _has_pending_swap = false;
         Vector<Matrix4x4f> _transforms;
-        Vector<Material*> _materials;
-        Vector<MaterialData> _material_data_cache;
-        Map<u64, u32> _material_data_lut;
-        Ref<GPUBuffer> _material_buffer;
         Vector<UnifiedLightData> _unified_light_data_cache;
         Ref<GPUBuffer> _unified_light_buffer;
         Vector<UnifiedLightSamplingData> _unified_light_sampling_cache;

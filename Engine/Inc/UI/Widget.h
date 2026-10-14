@@ -20,6 +20,19 @@ namespace Ailu
     }
     namespace UI
     {
+        enum class EWidgetTextureCacheMode : u8
+        {
+            kGeometry,
+            kOpaqueTexture,
+            kTexture
+        };
+
+        enum class EWidgetUpdateMode : u8
+        {
+            kEveryFrame,
+            kOnDemand
+        };
+
 
         ASTRUCT()
         struct SlotItemData
@@ -44,6 +57,7 @@ namespace Ailu
             DECLARE_DELEGATE(on_get_focus);
             DECLARE_DELEGATE(on_lost_focus);
             friend class UIManager;
+            friend class UIRenderer;
         public:
             Widget();
             void Destory();
@@ -54,6 +68,13 @@ namespace Ailu
             void AddToWidget(Ref<UIElement> root);
 
             void PreUpdate(f32 dt);
+            void SetUpdateMode(EWidgetUpdateMode mode);
+            void SetTextureCacheMode(EWidgetTextureCacheMode mode);
+            // Opt in only when the owner versions all image/preview content changes.
+            void SetTextureCacheImageRevision(u64 revision);
+            EWidgetUpdateMode UpdateMode() const { return _update_mode; }
+            bool NeedsUpdate() const { return _update_mode == EWidgetUpdateMode::kEveryFrame || _is_update_dirty; }
+            void RequestUpdate() { _is_update_dirty = true; }
             void Update(f32 dt);
             void PostUpdate(f32 dt);
             void Render(UIRenderer &r);
@@ -111,6 +132,13 @@ namespace Ailu
             Render::RenderTexture *_external_color; 
             Render::RenderTexture * _external_depth;
             Ref<UIElement> _root;
+            EWidgetUpdateMode _update_mode = EWidgetUpdateMode::kEveryFrame;
+            EWidgetTextureCacheMode _texture_cache_mode = EWidgetTextureCacheMode::kGeometry;
+            Ref<Render::RenderTexture> _texture_cache;
+            bool _texture_cache_dirty = true;
+            bool _has_texture_cache_image_revision = false;
+            u64 _texture_cache_image_revision = 0u;
+            bool _is_update_dirty = true;
             EUIInvalidationReason _paint_cache_dirty_reasons = EUIInvalidationReason::kPaint;
             UIElement *_last_invalidation_source = nullptr;
             EUIInvalidationReason _last_invalidation_reasons = EUIInvalidationReason::kNone;

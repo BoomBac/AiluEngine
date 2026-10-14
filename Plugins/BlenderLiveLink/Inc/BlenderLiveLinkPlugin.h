@@ -26,9 +26,9 @@ namespace Ailu
             unsigned long long _receive_us = 0u;
             unsigned long long _queue_wait_us = 0u;
             unsigned long long _apply_us = 0u;
-            std::array<unsigned long long, 24u> _counts{};
-            std::array<unsigned long long, 24u> _payload_bytes{};
-            std::array<unsigned long long, 24u> _apply_by_type_us{};
+            std::array<unsigned long long, 32u> _counts{};
+            std::array<unsigned long long, 32u> _payload_bytes{};
+            std::array<unsigned long long, 32u> _apply_by_type_us{};
         };
 
         void ReportProgress(const char* message, EPluginProgressState state) noexcept;

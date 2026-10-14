@@ -6,6 +6,7 @@
 #include "../geometry.hlsli"
 #include "../bindless.hlsli"
 #include "../sampler.hlsli"
+#include "../material_sampling.hlsli"
 #include "gpu_scene.hlsli"
 #include "path_tracer_common.hlsli"
 
@@ -199,9 +200,17 @@ float2 GetTriangleLightUV(TriangleData tri, float2 bary)
 float3 EvaluateTriangleLightRadiance(SampleLightData light, float2 uv)
 {
     float3 radiance = light._color;
-    if (valid_bindless_handle(light._emissive_map))
-        radiance *= SAMPLE_TEXTURE2D_LOD(g_bindless_texture2d[NonUniformResourceIndex(light._emissive_map)],
-                                        g_LinearClampSampler, uv, 0).rgb;
+    if (valid_bindless_handle(light._emissive_map) && light._instance_index != 0xffffffffu)
+    {
+        const uint material_index = g_primitive_data[light._instance_index]._material_id;
+#if defined(DXR)
+        const MaterialData material = g_material_data[material_index];
+#else
+        const MaterialData material = g_material_buffer[material_index];
+#endif
+        radiance *= SampleMaterialTextureLevel(g_bindless_texture2d[NonUniformResourceIndex(light._emissive_map)],
+            material._emission_sampler, uv, 0.0f, MATERIAL_MANUAL_MIP_BIAS).rgb;
+    }
     return radiance;
 }
 

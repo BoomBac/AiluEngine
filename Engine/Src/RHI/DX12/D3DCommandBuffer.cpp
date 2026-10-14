@@ -63,11 +63,14 @@ namespace Ailu::RHI::DX12
         _profiler_stack.clear();
         _uploaded_buffer_versions.clear();
         _post_submit_callbacks.clear();
+        _external_gpu_signals.clear();
+        _external_gpu_waits.clear();
     }
 
     void D3DCommandBuffer::ReleaseTrackedResources()
     {
         _state_tracker.ReleaseRecordedResources();
+        _barrier_resources.clear();
     }
 
     void D3DCommandBuffer::Close()
@@ -133,6 +136,7 @@ namespace Ailu::RHI::DX12
     {
         if (!resource)
             return;
+        _barrier_resources.emplace_back(resource._resource);
         _barrier_cache.emplace_back(CD3DX12_RESOURCE_BARRIER::UAV(resource.Get()));
         if (!_is_batching_barriers)
             FlushResourceBarriers();

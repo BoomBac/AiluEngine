@@ -131,6 +131,60 @@ Editor-specific rendering，例如 picking/debug overlay，可通过 Engine rend
 
 Engine Renderer 不应硬编码 Editor type。
 
+In edit mode, the active GameView selects the active scene's main camera for the existing primary render output;
+returning to SceneView restores the editor scene camera. GameView displays the no-main-camera message in either mode.
+Hidden SceneView panels unregister their selected-camera preview so it cannot redirect the GameView camera into a preview RT.
+Play mode retains runtime scene/camera selection and simulation behavior.
+
+Selected-camera previews retain their output RT between renders. RenderPipeline schedules the preview only after
+selection/target changes or a change in the active Scene ID/EditRevision; the main SceneView camera remains per-frame.
+This uses editing revisions, not the persistent unsaved flag; changes that bypass MarkEdited/TouchStructure do not refresh
+the preview. Preview temporal effects therefore advance only on requested refreshes.
+
+UI layout invalidation propagates upward even when the source or an intermediate ancestor is already dirty.
+Hidden elements can retain local dirty state while visible ancestors complete layout; local dirtiness is not evidence
+that ancestors were notified. Explicit downward invalidation visits the full subtree independently. Visibility changes
+use the same hierarchy/layout invalidation path, so newly shown children are arranged before normal painting.
+
+## Widget paint and texture caches
+
+Editor Widgets retain the Engine UI paint invalidation chain and per-frame geometry buffers. Geometry remains the default;
+optional texture caching changes draw submission, not Dock/business Tick or Scene rendering.
+DockTab synchronizes its active item's rect before Update, including nested tabs whose outer node rect is unchanged;
+hidden tabs defer business updates and receive current bounds when active. The experimental Editor switch
+opts in toolbar/status, Dock title/tab bars and selected WorldOutline/Inspector/AssetBrowser content Widgets. It does not opt in
+SceneView/GameView, Popup or arbitrary plugin content.
+
+`Widget::SetTextureCacheMode(kTexture)` requests a persistent local sRGB RT. UIRenderer validates the actual DrawNodes and
+falls back to Geometry for untracked RenderTexture/backdrop reads, unknown materials, untracked image dependencies, depth
+outputs or invalid/oversized bounds. Standard UI/color/image geometry and the established font shader are supported; images
+require an owner revision contract through Widget::SetTextureCacheImageRevision. AssetBrowser supplies PreviewRevision for
+published static preview RTs; it still rebuilds content when previews change. Upload revisions additionally invalidate cached
+pixels after texture/font reuploads. Live RenderTextures without an audited owner revision still fall back to Geometry.
+Existing `InvalidatePaint`, size/position and output changes dirty the texture; moving or changing its composite material also
+forces repaint. Prepare owns resource selection and submission snapshots; Record uses the snapshotted origin/material mode
+and updates renderer-owned validity. RenderPipeline waits for its UI recording job before submission/frame advancement.
+
+Cache-only UI/font shaders accumulate alpha with `Src,OneMinusSrc,One,OneMinusSrc`; the transparent RT therefore stores
+premultiplied RGB and coverage. Composition uses `One,OneMinusSrc,One,OneMinusSrc`. Shader metadata accepts optional four-factor
+Blend syntax (color source/destination, alpha source/destination); existing two-factor shaders preserve their alpha state.
+Fractional Dock bounds are enclosed by integer pixel edges to preserve sample centers. Local projection and clamped scissor subtract the cache origin, while the composite quad remains in window coordinates.
+UI DrawNode scissors encode `(left, top, right, bottom)` in `Rect.left/top/width/height`, matching DX12 `ToD3DRect`.
+Cache translation subtracts its origin from all four endpoints, clamps them to the target and keeps right/bottom as endpoints;
+it must not add left/top to the width/height fields or convert the result back to extents. Viewport Rect fields still use extents.
+The experimental opt-in is stored in `EngineConfig::_enable_editor_widget_texture_cache` (default false), loaded from
+`Editor/EngineConfig.json` before Dock creation and reapplied after layout restoration. The Reflector checkbox edits this
+configuration directly; normal Application finalization saves it with the other EngineConfig properties. Individual Widget
+modes remain runtime-only. `AILU_EDITOR_UI_TEXTURE_CACHE` is a process-local profiling override (0 = Geometry, 1 = opaque
+toolbar only, 2 = expanded texture caches); it does not change the persisted preference.
+The historical `kOpaqueTexture` toolbar trial remains available; default Geometry and
+unsupported-content fallback remain available for comparison. Live visual/performance acceptance is tracked in the active CPU ExecPlan.
+
+Reflector visibility alone preserves normal Widget update scheduling and texture caches. Its opt-in
+`Visualize paint dirty state` mode snapshots paint dirty state, forces visible Widget updates and falls back to Geometry;
+the Reflector displays this measurement caveat. Selection highlighting is drawn separately and remains available with caches.
+Closing the Reflector disables dirty visualization. These debug flags are runtime-only and are not serialized.
+
 ## Automation
 
 Editor 当前已有 automation service/pipe。

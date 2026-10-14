@@ -45,6 +45,7 @@ namespace Ailu
             virtual Vector2f Size() const = 0;
             virtual void SetRect(Vector4f rect) = 0;
             virtual void Update(f32 dt) = 0;
+            virtual void TickBackground(f32 dt) { (void) dt; }
             virtual bool IsHover(Vector2f pos) const = 0;
             virtual void SetFocus(bool is_focus) = 0;
             virtual void CaptureStandaloneRect() = 0;
@@ -80,6 +81,7 @@ namespace Ailu
             virtual ~DockWindow();
             void SetRect(Vector4f rect);
             virtual void Update(f32 dt);
+            void TickBackground(f32 dt) override { (void) dt; }
             bool IsHover(Vector2f pos) const;
             void SetTitleBarVisibility(bool is_visibility,bool is_expand_content = false);
             void SetContentVisibility(bool is_visibility);
@@ -168,6 +170,8 @@ namespace Ailu
             bool RemoveTab(DockWindow *w);
             Ref<IDockTabItem> RemoveActiveItem();
             void Update(f32 dt);
+            void UpdateLayout();
+            void TickBackground(f32 dt);
             void SetVisible(bool is_visible);
             /// <summary>
             /// 获取鼠标悬浮边缘情况

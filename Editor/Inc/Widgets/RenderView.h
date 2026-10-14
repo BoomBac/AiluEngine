@@ -67,6 +67,7 @@ namespace Ailu
         public:
             SceneView();
             void Update(f32 dt) final;
+            void TickBackground(f32 dt) override;
         private:
             struct PendingPlaceActorSpawn
             {
@@ -119,6 +120,9 @@ namespace Ailu
             UI::InputBlock *_camera_size_input = nullptr;
             UI::Dropdown *_camera_aa_dropdown = nullptr;
             UI::InputBlock *_camera_render_scale_input = nullptr;
+            UI::InputBlock *_camera_mip_bias_input = nullptr;
+            UI::CheckBox *_camera_auto_mip_bias_checkbox = nullptr;
+            UI::Text *_camera_mip_bias_status = nullptr;
             UI::HorizontalBox *_camera_upsampling_row = nullptr;
             UI::Dropdown *_camera_upsampling_dropdown = nullptr;
             UI::HorizontalBox *_camera_sr_row = nullptr;
@@ -159,6 +163,7 @@ namespace Ailu
         public:
             GameView();
             void Update(f32 dt) final;
+            void TickBackground(f32 dt) override;
         private:
             UI::Text *_no_main_camera_text = nullptr;
         };

@@ -13,5 +13,6 @@
     "_enable_dred_breadcrumbs": false,
     "_enable_dred_page_fault": false,
     "_enable_rdc": false,
-    "_enable_pix": true
+    "_enable_pix": false,
+    "_enable_editor_widget_texture_cache": true
 }

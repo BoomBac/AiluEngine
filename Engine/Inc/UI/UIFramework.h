@@ -46,6 +46,11 @@ namespace Ailu
             UIElement *GetDebugHighlightTarget() const { return _debug_highlight_target; }
             void SetDebugReflectorVisible(bool visible) { _is_debug_reflector_visible = visible; }
             bool IsDebugReflectorVisible() const { return _is_debug_reflector_visible; }
+            void SetDebugPaintDirtyVisible(bool visible) { _is_debug_paint_dirty_visible = visible; }
+            bool IsDebugPaintDirtyVisible() const
+            {
+                return _is_debug_reflector_visible && _is_debug_paint_dirty_visible;
+            }
             //弹出一个popup widget,位置基于当前窗口左上角，root则会被添加到popup widget的root(canvas)进行显示
             void ShowPopupAt(f32 x, f32 y, Ref<UIElement> root, std::function<void()> on_close = nullptr,
                              Window *win = nullptr, bool is_modal = false, bool render_backdrop = true,
@@ -75,6 +80,7 @@ namespace Ailu
             UIElement *_hover_target = nullptr;
             UIElement *_debug_highlight_target = nullptr;
             bool _is_debug_reflector_visible = false;
+            bool _is_debug_paint_dirty_visible = false;
             Widget *_pre_hover_widget = nullptr; //记录上一帧鼠标停留的控件,全局共享，widget销毁时检查这个值
             //sort order大的在后面
             Vector<Ref<Widget>> _widgets;

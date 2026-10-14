@@ -39,6 +39,8 @@ namespace Ailu
         bool _enable_rdc;
         APROPERTY(Category = "Debug")
         bool _enable_pix;
+        APROPERTY(Category = "Editor")
+        bool _enable_editor_widget_texture_cache = false;
     };
     extern AILU_API EngineConfig g_engine_config;
 }

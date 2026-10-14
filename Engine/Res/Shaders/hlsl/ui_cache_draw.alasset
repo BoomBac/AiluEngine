@@ -1,0 +1,12 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "e0f23e3b-5c65-4fda-bd3a-c7507516e47d",
+        "_asset_type": "Ailu::Render::Shader",
+        "_asset_name": "ui_cache_draw",
+        "_dependencies": []
+    },
+    "_file": "ui_cache_draw.hlsl",
+    "_vs_entry": "VSMain",
+    "_ps_entry": "PSMain"
+}

@@ -6,6 +6,7 @@ from . import camera_sync, identity, light_sync, material_sync, mesh_sync, proto
 from .coordinate import blender_to_ailu_transform
 
 _instance_states = {}
+_INSTANCE_BATCH_SIZE = 128
 
 
 def _object_value(obj, objects):
@@ -116,6 +117,8 @@ def sync_instances(context, link, sent_materials=None, changed_objects=(), full=
         session_guid = identity.get_session_guid(context.scene)
         changed_guids = {identity.get_guid(obj) for obj in changed_objects}
         groups = {}
+        prototype_objects = {}
+        mesh_changed_guids = set()
         current = {}
         # DepsgraphObjectInstance RNA wrappers expire when the iterator advances; snapshot values now.
         for instance in depsgraph.object_instances:
@@ -123,32 +126,56 @@ def sync_instances(context, link, sent_materials=None, changed_objects=(), full=
                 continue
             obj = instance.object.original
             source_guid = identity.get_guid(obj)
+            prototype_objects[source_guid] = obj
             parent_guid = identity.get_guid(instance.parent.original) if instance.parent else ""
             instance_key = session_guid + ":" + parent_guid + ":" + source_guid + ":" + str(tuple(instance.persistent_id))
             guid = str(uuid.uuid5(uuid.NAMESPACE_URL, instance_key))
             position, rotation, scale = blender_to_ailu_transform(instance.matrix_world.copy())
             value = _object_value(obj, set())
-            value.update(guid=guid, name=obj.name_full + " [Instance]", parent_guid="", visible=instance.show_self and obj.visible_camera,
-                         position=list(position), rotation=[rotation.x, rotation.y, rotation.z, rotation.w], scale=list(scale))
-            state = (tuple(value["position"]), tuple(value["rotation"]), tuple(value["scale"]), tuple(value["material_guids"]), value["visible"])
+            value.update(
+                guid=guid,
+                name=obj.name_full + " [Instance]",
+                parent_guid="",
+                visible=instance.show_self and obj.visible_camera,
+                position=list(position),
+                rotation=[rotation.x, rotation.y, rotation.z, rotation.w],
+                scale=list(scale),
+            )
+            state = (
+                tuple(value["position"]),
+                tuple(value["rotation"]),
+                tuple(value["scale"]),
+                tuple(value["material_guids"]),
+                value["visible"],
+            )
             current[guid] = state
             previous = _instance_states.get(guid)
             mesh_changed = full or previous is None or source_guid in changed_guids
             if mesh_changed or state != previous:
-                link.send_json(protocol.OBJECT_UPSERT, value)
+                groups.setdefault(source_guid, []).append(value)
             if mesh_changed:
-                groups.setdefault(obj, []).append(guid)
+                mesh_changed_guids.add(source_guid)
         sent_materials = set() if sent_materials is None else sent_materials
         material_ms = 0.0
-        for obj, guids in groups.items():
-            payload = mesh_sync.encode_mesh(obj, context.evaluated_depsgraph_get())
-            if payload is not None:
+        source_objects = {identity.get_guid(obj): obj for obj in context.scene.objects if obj.type == "MESH"}
+        for source_guid, instances in groups.items():
+            source_obj = prototype_objects.get(source_guid)
+            is_external_prototype = source_guid not in source_objects
+            if is_external_prototype and source_guid in mesh_changed_guids:
+                mesh_sync.send_mesh(source_obj, depsgraph, link, prototype=True)
+            if source_obj is None or not mesh_sync.has_geometry(source_guid):
+                for instance in instances:
+                    current.pop(instance["guid"], None)
+                continue
+            if update_materials:
                 material_start = time.perf_counter()
-                if update_materials:
-                    material_sync.send_object_materials(obj, link, sent_materials)
+                material_sync.send_object_materials(source_obj, link, sent_materials)
                 material_ms += (time.perf_counter() - material_start) * 1000.0
-                for guid in guids:
-                    mesh_sync.send_instance_mesh(payload, guid, link)
+            for start in range(0, len(instances), _INSTANCE_BATCH_SIZE):
+                link.send_json(protocol.INSTANCE_BATCH_UPSERT, {
+                    "prototype_guid": source_guid,
+                    "instances": instances[start:start + _INSTANCE_BATCH_SIZE],
+                })
         if not full:
             for guid in _instance_states.keys() - current.keys():
                 link.send_json(protocol.OBJECT_DELETE, {"guid": guid})

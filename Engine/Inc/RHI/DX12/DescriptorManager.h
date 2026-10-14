@@ -1,6 +1,8 @@
 #pragma once
 #ifndef __DESCRIPTOR_MGR__
 #define __DESCRIPTOR_MGR__
+#include "Render/Texture.h"
+#include <array>
 #include "Framework/Core/CoreMinimal.h"
 #include "Framework/Core/Containers/Vector.h"
 #include "Framework/Core/Containers/Map.h"
@@ -327,6 +329,10 @@ namespace Ailu::RHI::DX12
 	class D3DDescriptorMgr
 	{
 	public:
+        static constexpr u32 kSamplerCapacity = 2048u;
+        u32 GetSamplerIndex(const Render::SamplerDesc &desc);
+        ID3D12DescriptorHeap *GetSamplerHeap() const { return _sampler_heap.Get(); }
+        D3D12_GPU_DESCRIPTOR_HANDLE GetSamplerTable() const { return _sampler_heap->GetGPUDescriptorHandleForHeapStart(); }
 		static void Init();
 		static void Shutdown();
 		static D3DDescriptorMgr& Get();
@@ -376,6 +382,9 @@ namespace Ailu::RHI::DX12
 			_gpu_alloc->CommitDescriptorsForDispatch(cmd,slot,alloc);
 		}
 	private:
+        ComPtr<ID3D12DescriptorHeap> _sampler_heap;
+        std::map<std::array<u32, 12>, u32> _samplers;
+        std::mutex _sampler_mutex;
 		GPUVisibleDescriptorAllocator* _gpu_alloc;
 		CPUVisibleDescriptorAllocator* _cpu_alloc;
 	};

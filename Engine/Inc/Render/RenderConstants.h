@@ -122,6 +122,7 @@ namespace Ailu::Render
         constexpr static u8 kFrameCount = 2u;
         constexpr static u16 kMaxMaterialDataCount = 512u;
         constexpr static u32 kMaxRenderObjectCount = 2000u;
+        constexpr static u32 kMaxScenePrimitiveCount = 65536u;
         constexpr static u32 kMaxStaticDiffuseProbeGroupCount = 256u;
         constexpr static u32 kMaxStaticDiffuseProbeCount = 16384u;
         constexpr static u32 kMaxPassDataCount = 10u;

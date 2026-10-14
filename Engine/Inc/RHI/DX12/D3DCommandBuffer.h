@@ -1,4 +1,5 @@
 #pragma once
+#include "RHI/DX12/DescriptorManager.h"
 #ifndef __D3D_COMMAND_BUF_H__
 #define __D3D_COMMAND_BUF_H__
 
@@ -192,10 +193,32 @@ namespace Ailu
             void Finalize();
             void AddPostSubmitCallback(std::function<void(u64)> callback) { _post_submit_callbacks.emplace_back(std::move(callback)); }
             void RunPostSubmitCallbacks(u64 fence_value);
+            struct ExternalGpuSignalRequest
+            {
+                ComPtr<ID3D12Fence> _fence;
+                u64 _value = 0u;
+            };
+            void AddExternalGpuSignal(ID3D12Fence *fence, u64 value)
+            {
+                _external_gpu_signals.push_back({fence, value});
+            }
+            const Vector<ExternalGpuSignalRequest> &ExternalGpuSignals() const { return _external_gpu_signals; }
+            void AddCompletedExternalGpuWait(ID3D12Fence *fence, u64 value)
+            {
+                AL_ASSERT(fence != nullptr && fence->GetCompletedValue() >= value);
+                _external_gpu_waits.push_back({fence, value});
+            }
+            const Vector<ExternalGpuSignalRequest> &ExternalGpuWaits() const { return _external_gpu_waits; }
             void UploadDataToBuffer(void *src, u64 src_size, const D3DResource &resource);
             bool EnsureBufferVersion(class D3DGPUBuffer *buffer, const BufferDataVersion &version);
             void ApplyBufferVersion(class D3DGPUBuffer *buffer, const BufferDataVersion &version);
             bool IsGraphicsPSOActive(const void *pso) const { return _graphics_state_cache._pso == pso; }
+            void SetRayTracingPipelineState(ID3D12StateObject *state_object)
+            {
+                // DXR replaces the native PSO too; the next draw must rebind its graphics PSO.
+                _graphics_state_cache._pso = nullptr;
+                _p_cmd->SetPipelineState1(state_object);
+            }
             void SetComputePipelineState(ID3D12PipelineState *native_pso)
             {
                 // Graphics and compute share the native PSO slot on a command list.
@@ -243,7 +266,8 @@ namespace Ailu
                 _graphics_state_cache._native_root_valid_mask &=
                     ~_graphics_state_cache._native_descriptor_table_mask;
                 _cur_cbv_heap_id = heap_id;
-                _p_cmd->SetDescriptorHeaps(1u, &heap);
+                ID3D12DescriptorHeap *heaps[]{heap, D3DDescriptorMgr::Get().GetSamplerHeap()};
+                _p_cmd->SetDescriptorHeaps(2u, heaps);
                 return true;
             }
             /// @brief 根CBV只能接受真实存在的GPU虚拟地址。0/调试填充值（未初始化内存）会让
@@ -553,8 +577,12 @@ namespace Ailu
             std::unordered_set<GpuResource *> _active_render_targets;
             D3DResourceStateTracker _state_tracker;
             Vector<std::function<void(u64)>> _post_submit_callbacks;
+            Vector<ExternalGpuSignalRequest> _external_gpu_signals;
+            Vector<ExternalGpuSignalRequest> _external_gpu_waits;
             // Reusable native barrier scratch buffer. Reserved up front so a batched submission never allocates.
             Vector<D3D12_RESOURCE_BARRIER> _barrier_cache;
+            // UAV barriers may be the only reference when a dispatch is skipped; retain them until this buffer's fence completes.
+            Vector<ComPtr<ID3D12Resource>> _barrier_resources;
             bool _is_batching_barriers = false;
         };
     }// namespace ::RHI::DX12

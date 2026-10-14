@@ -149,6 +149,7 @@ namespace Ailu::RHI::DX12
         D3DContext();
         ~D3DContext();
         void Init() final;
+            u32 GetSamplerIndex(const Render::SamplerDesc &desc) override { return D3DDescriptorMgr::Get().GetSamplerIndex(desc); }
         void Present() final;
         void SetMultiThreadRendering(bool enabled) final;
         u64 GetFenceValueGPU() final;
@@ -167,6 +168,10 @@ namespace Ailu::RHI::DX12
         f32 TotalGPUMemeryUsage() final;
 
         ID3D12Device5* GetDevice() { return m_device.Get(); };
+        ID3D12Fence *SubmissionFence() const { return _p_cmd_buffer_fence.Get(); }
+        // Owner-thread registration/collection. Callbacks must retain COM objects, not the context pointer.
+        void RegisterExternalGpuLifetime(std::function<void()> stop, std::function<bool()> retired);
+        void CollectExternalGpuLifetimes(bool drain = false);
         FsrRuntime& GetFsrRuntime() { return _fsr_runtime; }
         StreamlineRuntime& GetStreamlineRuntime() { return _streamline_runtime; }
         void TrackResource(ComPtr<ID3D12Resource> resource);
@@ -281,6 +286,13 @@ namespace Ailu::RHI::DX12
         WString _pix_capture_name;
         Scope<GpuCommandWorker> _cmd_worker;
         D3DQueueResourceStateTracker _queue_state_tracker;
+        struct ExternalGpuLifetime
+        {
+            std::function<void()> _stop;
+            std::function<bool()> _retired;
+        };
+        Vector<ExternalGpuLifetime> _external_gpu_lifetimes;
+        std::mutex _external_gpu_lifetime_mutex;
         //command signature
         ComPtr<ID3D12CommandSignature> _dispatch_cmd_sig;
         ComPtr<ID3D12CommandSignature> _draw_cmd_sig;

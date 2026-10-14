@@ -224,7 +224,6 @@ namespace Ailu
         bool hello_completed = false;
         while (!_stopping.load())
         {
-            const auto receive_start = std::chrono::steady_clock::now();
             if (!ReceiveExact(client_socket, listen_socket, _stopping, _commands,
                     encoded_header.data(), encoded_header.size()))
                 return;
@@ -257,6 +256,12 @@ namespace Ailu
 
             if (header._payload_size > kMaxLiveLinkPayloadSize)
                 return;
+            // Let TCP apply backpressure instead of overflowing the bounded main-thread command queue.
+            if (hello_completed && header._type != ELiveLinkMessageType::kHello
+                && header._type != ELiveLinkMessageType::kPing
+                && !_commands.WaitForCapacity(header._payload_size, _stopping))
+                return;
+            const auto receive_start = std::chrono::steady_clock::now();
             std::vector<u8> payload;
             try
             {
@@ -273,7 +278,7 @@ namespace Ailu
             if (header._type == ELiveLinkMessageType::kHello)
             {
                 if (!SendPacket(client_socket, ELiveLinkMessageType::kHelloAck, header._sequence,
-                        "{\"accepted\":true,\"protocol_version\":1}"))
+                        "{\"accepted\":true,\"protocol_version\":1,\"features\":[\"instance_batch_v1\",\"mesh_prototype_v1\"]}"))
                     return;
                 hello_completed = true;
                 _commands.Push({ELiveLinkCommandType::kHelloAccepted, header._version});

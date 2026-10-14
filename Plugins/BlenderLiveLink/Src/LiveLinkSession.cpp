@@ -9,6 +9,8 @@
 #include "Render/Mesh.h"
 #include "Scene/Scene.h"
 #include <document.h>
+#include <stringbuffer.h>
+#include <writer.h>
 #include <bit>
 #include <algorithm>
 #include <chrono>
@@ -209,6 +211,11 @@ namespace Ailu
             }
             else if (type == ELiveLinkMessageType::kMeshUpsert)
                 _last_apply_succeeded = UpsertMesh(command._payload);
+            else if (type == ELiveLinkMessageType::kMeshPrototypeUpsert)
+                _last_apply_succeeded = UpsertMesh(command._payload, true);
+            else if (type == ELiveLinkMessageType::kInstanceBatchUpsert)
+                _last_apply_succeeded = UpsertInstanceBatch(std::string(
+                    reinterpret_cast<const char*>(command._payload.data()), command._payload.size()));
             else if (type == ELiveLinkMessageType::kMaterialUpsert)
                 _last_apply_succeeded = UpsertMaterial(std::string(reinterpret_cast<const char*>(command._payload.data()),
                     command._payload.size()));
@@ -406,7 +413,46 @@ namespace Ailu
         return true;
     }
 
-    bool LiveLinkSession::UpsertMesh(const std::vector<unsigned char>& payload)
+    bool LiveLinkSession::UpsertInstanceBatch(const std::string& payload)
+    {
+        rapidjson::Document document;
+        document.Parse(payload.data(), payload.size());
+        std::string prototype_guid;
+        if (!document.IsObject() || !ReadString(document, "prototype_guid", prototype_guid)
+            || !IsSourceGuid(prototype_guid))
+            return false;
+        const auto prototype_mesh = _meshes.find(prototype_guid);
+        const auto material_slots = _mesh_material_slots.find(prototype_guid);
+        if (prototype_mesh == _meshes.end() || material_slots == _mesh_material_slots.end())
+            return false;
+        const auto instances = document.FindMember("instances");
+        if (instances == document.MemberEnd() || !instances->value.IsArray() || instances->value.Empty()
+            || instances->value.Size() > 128u)
+            return false;
+
+        for (const auto& instance : instances->value.GetArray())
+        {
+            if (!instance.IsObject())
+                return false;
+            rapidjson::StringBuffer buffer;
+            rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+            instance.Accept(writer);
+            if (!UpsertObject(std::string(buffer.GetString(), buffer.GetSize())))
+                return false;
+            std::string guid_text;
+            if (!ReadString(instance, "guid", guid_text))
+                return false;
+            const auto entity = _entities.find(guid_text);
+            if (entity == _entities.end() || !_scene->IsValidEntity(entity->second))
+                return false;
+            const auto revision = _mesh_revisions.find(prototype_guid);
+            PublishMesh(guid_text, entity->second, prototype_mesh->second, material_slots->second,
+                        revision == _mesh_revisions.end() ? 1u : revision->second);
+        }
+        return true;
+    }
+
+    bool LiveLinkSession::UpsertMesh(const std::vector<unsigned char>& payload, bool prototype_only)
     {
         constexpr size_t kGuidSize = 36u;
         constexpr size_t kFixedHeaderSize = kGuidSize + sizeof(u64) + sizeof(u32) * 2u + sizeof(f32) * 6u;
@@ -414,7 +460,7 @@ namespace Ailu
             return false;
         const std::string guid_text(reinterpret_cast<const char*>(payload.data()), kGuidSize);
         const auto entity_iter = _entities.find(guid_text);
-        if (entity_iter == _entities.end() || !_scene->IsValidEntity(entity_iter->second))
+        if (!prototype_only && (entity_iter == _entities.end() || !_scene->IsValidEntity(entity_iter->second)))
             return false;
 
         size_t offset = kGuidSize;
@@ -442,7 +488,16 @@ namespace Ailu
         {
             const auto previous_revision = _mesh_revisions.find(guid_text);
             if (previous_revision == _mesh_revisions.end() || revision > previous_revision->second)
-                PublishMesh(guid_text, entity_iter->second, cached._mesh, cached._material_slots, revision);
+            {
+                if (prototype_only)
+                {
+                    _meshes[guid_text] = cached._mesh;
+                    _mesh_material_slots[guid_text] = cached._material_slots;
+                    _mesh_revisions[guid_text] = revision;
+                }
+                else
+                    PublishMesh(guid_text, entity_iter->second, cached._mesh, cached._material_slots, revision);
+            }
             return true;
         }
 
@@ -520,7 +575,8 @@ namespace Ailu
         const auto previous_revision = _mesh_revisions.find(guid_text);
         if (previous_revision != _mesh_revisions.end() && revision <= previous_revision->second)
             return true; // A stale/duplicate mesh is already applied, not an import failure.
-        const auto* existing = _scene->GetRegister().GetComponent<ECS::StaticMeshComponent>(entity_iter->second);
+        const auto* existing = prototype_only ? nullptr
+            : _scene->GetRegister().GetComponent<ECS::StaticMeshComponent>(entity_iter->second);
         const auto equal_bytes = [](const auto& source, const auto& incoming)
         {
             return source.size() == incoming.size() && (source.empty()
@@ -545,21 +601,34 @@ namespace Ailu
             Vector3f(bounds_values[3], bounds_values[4], bounds_values[5]));
         auto mesh = Render::Mesh::CreateFromData("BlenderLiveLink_" + guid_text, std::move(positions),
             std::move(normals), std::move(tangents), std::move(uvs), std::move(submeshes), bounds);
-        PublishMesh(guid_text, entity_iter->second, mesh, material_slots, revision);
+        if (prototype_only)
+        {
+            if (!PersistMesh(mesh)) throw std::runtime_error("Live Link prototype mesh persistence failed");
+            _meshes[guid_text] = mesh;
+            _mesh_material_slots[guid_text] = material_slots;
+            _mesh_revisions[guid_text] = revision;
+        }
+        else
+            PublishMesh(guid_text, entity_iter->second, mesh, material_slots, revision);
         _mesh_cache.Store(geometry, mesh, material_slots);
         return true;
+    }
+
+    bool LiveLinkSession::PersistMesh(const Ref<Render::Mesh>& mesh)
+    {
+        auto& resources = ResourceMgr::Get();
+        if (!resources.GetAssetGuid(mesh.get()).IsEmpty())
+            return true;
+        // Published meshes may be shared by objects which diverge later; never overwrite their durable source.
+        auto* asset = resources.CreateAsset(AssetPath("Meshes", Guid::Generate().ToString()), mesh);
+        return asset && resources.SaveAsset(asset);
     }
 
     void LiveLinkSession::PublishMesh(const std::string& guid, ECS::Entity entity, const Ref<Render::Mesh>& mesh,
                                      const std::vector<u32>& material_slots, u64 revision)
     {
         auto& resources = ResourceMgr::Get();
-        if (resources.GetAssetGuid(mesh.get()).IsEmpty())
-        {
-            // Published meshes may be shared by objects which diverge later; never overwrite their durable source.
-            auto* asset = resources.CreateAsset(AssetPath("Meshes", Guid::Generate().ToString()), mesh);
-            if (!asset || !resources.SaveAsset(asset)) throw std::runtime_error("Live Link mesh persistence failed");
-        }
+        if (!PersistMesh(mesh)) throw std::runtime_error("Live Link mesh persistence failed");
         auto& registry = _scene->GetRegister();
         auto* component = registry.GetComponent<ECS::StaticMeshComponent>(entity);
         if (component == nullptr)

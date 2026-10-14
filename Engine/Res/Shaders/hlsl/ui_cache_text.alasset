@@ -1,0 +1,12 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "e11edc54-3be8-41a7-875d-74e3dd7a1c29",
+        "_asset_type": "Ailu::Render::Shader",
+        "_asset_name": "ui_cache_text",
+        "_dependencies": []
+    },
+    "_file": "ui_cache_text.hlsl",
+    "_vs_entry": "VSMain",
+    "_ps_entry": "PSMain"
+}

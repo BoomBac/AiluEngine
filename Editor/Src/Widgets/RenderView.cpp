@@ -495,7 +495,6 @@ namespace Ailu
 
         void SceneView::Update(f32 dt)
         {
-            ProcessPendingPlaceActorSpawns();
             RenderView::Update(dt);
             if (Application::Get()._is_playing_mode)
             {
@@ -505,6 +504,7 @@ namespace Ailu
                 _camera_preview_frame->SetVisible(false);
                 return;
             }
+            Camera::sCurrent = Camera::sScene;
             UpdateCameraPreview();
             UpdateCameraOutputSize(dt);
             UpdateSuperResolutionStatus();
@@ -543,6 +543,15 @@ namespace Ailu
             if (_camera_settings_panel != nullptr && _camera_settings_panel->IsVisible())
                 UpdateSceneCameraTransformSettings();
         }
+        void SceneView::TickBackground(f32 dt)
+        {
+            (void) dt;
+            ProcessPendingPlaceActorSpawns();
+            if (ContentWidget()->_visibility == UI::EVisibility::kVisible)
+                return;
+            Render::RenderPipeline::Get().SetPreviewCamera(nullptr, nullptr);
+        }
+
         void SceneView::UpdateDragPreview()
         {
             static Asset *s_last_drag_asset = nullptr;
@@ -878,6 +887,26 @@ namespace Ailu
                 }
             };
 
+            _camera_mip_bias_input = add_float_row("Global Mip Bias", "0.00", nullptr);
+            _camera_mip_bias_input->_on_content_changed += [](String value)
+            {
+                const auto parsed = StringUtils::ParseFloat(value);
+                auto *pipeline = Render::RenderPipeline::Instance();
+                if (parsed.has_value() && pipeline != nullptr && pipeline->GetRenderer() != nullptr)
+                    pipeline->GetRenderer()->SetTextureMipBias(parsed.value());
+            };
+            auto *auto_bias_row = content->AddChild<UI::HorizontalBox>();
+            auto_bias_row->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed).Size({0.0f, 28.0f});
+            auto_bias_row->AddChild<UI::Text>("Auto SR Mip Bias")->GetSlotAs<UI::LinearSlot>()
+                    .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill).FillRate(1.0f);
+            _camera_auto_mip_bias_checkbox = auto_bias_row->AddChild<UI::CheckBox>();
+            _camera_auto_mip_bias_checkbox->_on_click += [](bool enabled)
+            {
+                if (Camera *camera = Camera::sCurrent; camera != nullptr) camera->SetAutoTextureMipBiasEnabled(enabled);
+            };
+            _camera_mip_bias_status = content->AddChild<UI::Text>("Mip bias: 0.00");
+            _camera_mip_bias_status->GetSlotAs<UI::LinearSlot>().SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed).Size({0.0f, 24.0f});
+
             _camera_size_input = add_float_row("Ortho Size", "10", &_camera_size_row);
             _camera_size_input->_on_content_changed += [this](String value)
             {
@@ -1038,6 +1067,16 @@ namespace Ailu
             }
             if (_camera_aa_dropdown != nullptr)
                 _camera_aa_dropdown->SetSelectedIndex(static_cast<i32>(camera->_anti_aliasing), false);
+            auto *pipeline = Render::RenderPipeline::Instance();
+            auto *renderer = pipeline != nullptr ? pipeline->GetRenderer() : nullptr;
+            const f32 manual_bias = renderer != nullptr ? renderer->GetTextureMipBias() : 0.0f;
+            if (_camera_mip_bias_input != nullptr)
+                _camera_mip_bias_input->SetContent(std::format("{:.2f}", manual_bias), false);
+            if (_camera_auto_mip_bias_checkbox != nullptr)
+                _camera_auto_mip_bias_checkbox->SetChecked(camera->IsAutoTextureMipBiasEnabled(), false);
+            if (_camera_mip_bias_status != nullptr)
+                _camera_mip_bias_status->SetText(std::format("Mip bias: {:.2f} (auto {:.2f})",
+                    std::clamp(manual_bias + camera->GetAutoTextureMipBias(), -16.0f, 15.99f), camera->GetAutoTextureMipBias()));
             if (_camera_render_scale_input != nullptr)
                 _camera_render_scale_input->SetContent(std::format("{:.2f}", camera->RenderScale()), false);
             const bool dlss_selected = camera->SuperResolutionMode() == Render::ESuperResolutionMode::kDlss;
@@ -1291,9 +1330,13 @@ namespace Ailu
         {
             RenderView::Update(dt);
             const bool is_playing = Application::Get()._is_playing_mode;
-            const bool has_main_camera = is_playing && Camera::sMain != nullptr;
+            auto *scene = SceneMgr::Get().ActiveScene();
+            Camera *main_camera = scene != nullptr ? scene->FindMainCamera() : nullptr;
+            const bool has_main_camera = main_camera != nullptr;
+            if (!is_playing)
+                Camera::sCurrent = has_main_camera ? main_camera : Camera::sScene;
             _source->_visibility = has_main_camera ? UI::EVisibility::kVisible : UI::EVisibility::kHide;
-            _no_main_camera_text->_visibility = is_playing && !has_main_camera ? UI::EVisibility::kVisible : UI::EVisibility::kHide;
+            _no_main_camera_text->_visibility = has_main_camera ? UI::EVisibility::kHide : UI::EVisibility::kVisible;
             if (!has_main_camera)
                 return;
 
@@ -1301,8 +1344,14 @@ namespace Ailu
             constexpr f32 kMaxGameViewOutputSize = 4095.0f;
             const u16 output_width = static_cast<u16>(std::clamp(rect.z, 1.0f, kMaxGameViewOutputSize));
             const u16 output_height = static_cast<u16>(std::clamp(rect.w, 1.0f, kMaxGameViewOutputSize));
-            Camera::sMain->OutputSize(output_width, output_height);
+            main_camera->OutputSize(output_width, output_height);
             SetSource(Render::RenderPipeline::Get().GetTarget(0));
+        }
+        void GameView::TickBackground(f32 dt)
+        {
+            (void) dt;
+            if (!Application::Get()._is_playing_mode && ContentWidget()->_visibility != UI::EVisibility::kVisible)
+                Camera::sCurrent = Camera::sScene;
         }
         void SceneView::UpdateCameraPreview()
         {

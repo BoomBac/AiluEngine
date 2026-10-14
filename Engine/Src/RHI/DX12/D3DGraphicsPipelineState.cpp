@@ -144,6 +144,11 @@ namespace Ailu::RHI::DX12
         if (capture_writer)
             capture_writer->StateCache()._pso_ever_bound = true;
 #endif
+        if (const auto it = _p_bind_res_desc_infos->find("g_material_samplers"); it != _p_bind_res_desc_infos->end())
+        {
+            d3dcmd->SetDescriptorHeap(D3DDescriptorMgr::Get().GetBindHeap(), 1024u);
+            d3dcmd->SetGraphicsRootDescriptorTable(it->second._bind_slot, D3DDescriptorMgr::Get().GetSamplerTable());
+        }
         u32 resolved_slot_mask = 0u;
         for (auto& res : recording_ctx.ResolvedBindResources())
         {

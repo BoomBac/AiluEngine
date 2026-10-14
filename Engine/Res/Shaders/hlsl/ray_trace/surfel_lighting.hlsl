@@ -5,6 +5,7 @@
 #include "../common.hlsli"
 #include "../surfel_common.hlsli"
 #include "ray_surface.hlsli"
+StructuredBuffer<MaterialData> g_material_buffer;
 #include "gi_ray_lighting.hlsli"
 #include "sampling.hlsli"
 #include "path_tracer_environment.hlsli"
@@ -14,7 +15,6 @@ StructuredBuffer<uint> _SurfelStateRead;
 StructuredBuffer<uint> _ActiveSurfelIndices;
 RWStructuredBuffer<SurfelLightingData> _SurfelLighting;
 RWStructuredBuffer<uint> _SurfelFrameState;
-StructuredBuffer<MaterialData> g_material_buffer;
 
 CBUFFER_START(SurfelLightingCB)
     uint _SurfelFrameIndex;

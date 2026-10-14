@@ -136,6 +136,8 @@ namespace Ailu
         ETextureCompression _compression = ETextureCompression::kAuto;
         APROPERTY(Category = "Compression"; Order = 1)
         ETextureCompressionQuality _compression_quality = ETextureCompressionQuality::kNormal;
+        APROPERTY(Category = "Sampling"; Order = 0)
+        Render::SamplerDesc _sampler_desc;
     };
     ASTRUCT()
     struct AILU_API MeshImportSetting : public ImportSetting

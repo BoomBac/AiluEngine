@@ -1,4 +1,5 @@
 #include "Widgets/EditorLayer.h"
+#include <cstdlib>
 #include "Widgets/EditorProgressPanel.h"
 #include "Framework/Common/Allocator.hpp"
 #include "Automation/AutomationService.h"
@@ -18,6 +19,7 @@
 #include "Framework/Common/ResourceMgr.h"
 #include "Framework/Common/TimeMgr.h"
 #include "Render/Features/VolumetricClouds.h"
+#include "Render/Features/RayTraceGI.h"
 #include "Render/Features/VolumetricFog.h"
 #include "Render/Gizmo.h"
 #include "Render/GraphicsContext.h"
@@ -80,6 +82,16 @@ namespace Ailu
     using namespace Render;
     namespace Editor
     {
+        namespace
+        {
+            bool IsTextureCacheCandidate(const String &name)
+            {
+                return name == "EditorToolbar" || name == "EditorStatusBar" || name == "DockTab" || name.ends_with("_title") ||
+                    name == "WorldOutline_content" || name == "ObjectDetail_content" || name == "Object Detail_content" ||
+                    name == "AssetBrowser_content" || name == "Asset Browser_content";
+            }
+        }
+
         namespace
         {
             const char *ThreadStatusToString(Core::EThreadStatus status)
@@ -226,8 +238,9 @@ namespace Ailu
                     flags |= ImGuiTreeNodeFlags_Selected;
                 if (element->GetHierarchyDepth() <= 1u)
                     flags |= ImGuiTreeNodeFlags_DefaultOpen;
-                const bool is_self_dirty = element->IsDebugPaintDirty();
-                const bool is_chain_dirty = !is_self_dirty && HasDirtyDescendant(element);
+                const bool is_dirty_visible = UI::UIManager::Get()->IsDebugPaintDirtyVisible();
+                const bool is_self_dirty = is_dirty_visible && element->IsDebugPaintDirty();
+                const bool is_chain_dirty = is_dirty_visible && !is_self_dirty && HasDirtyDescendant(element);
                 String label = BuildUIReflectorElementLabel(element);
                 if (is_self_dirty)
                     label += " [DIRTY]";
@@ -250,10 +263,14 @@ namespace Ailu
                     return;
                 UI::UIElement *root = widget->Root();
                 const Vector2f size = widget->GetSize();
-                const String label = std::format("{} [sort:{}{}] ({:.0f}x{:.0f})",
+                const char *update_state = "EveryFrame";
+                if (widget->UpdateMode() == UI::EWidgetUpdateMode::kOnDemand)
+                    update_state = widget->NeedsUpdate() ? "OnDemand: Requested" : "OnDemand: Idle";
+                const String label = std::format("{} [sort:{}{}, Update:{}] ({:.0f}x{:.0f})",
                                                  widget->Name(),
                                                  widget->_sort_order,
                                                  widget->_is_external_output ? ", external" : "",
+                                                 update_state,
                                                  size.x,
                                                  size.y);
                 ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_DefaultOpen;
@@ -277,6 +294,27 @@ namespace Ailu
                 if (!ImGui::CollapsingHeader("Render Stats", ImGuiTreeNodeFlags_DefaultOpen))
                     return;
 
+                if (ImGui::Checkbox("Experimental: eligible editor widget texture caches",
+                                   &g_engine_config._enable_editor_widget_texture_cache))
+                {
+                    for (const auto &widget: UI::UIManager::Get()->_widgets)
+                    {
+                        if (!IsTextureCacheCandidate(widget->Name()))
+                            continue;
+                        widget->SetTextureCacheMode(g_engine_config._enable_editor_widget_texture_cache
+                            ? UI::EWidgetTextureCacheMode::kTexture
+                            : UI::EWidgetTextureCacheMode::kGeometry);
+                    }
+                }
+                ImGui::Text("Texture Cache: %llu hit / %llu dirty, %.2f MiB resident, %.3f ms repaint",
+                            static_cast<unsigned long long>(stats._ui_texture_cache_hit_count),
+                            static_cast<unsigned long long>(stats._ui_texture_cache_dirty_count),
+                            stats._ui_texture_cache_resident_bytes / (1024.0f * 1024.0f),
+                            stats._ui_texture_cache_repaint_time);
+
+                ImGui::Text("Widget Update: %llu executed / %llu skipped",
+                            static_cast<unsigned long long>(stats._ui_widget_update_executed_count),
+                            static_cast<unsigned long long>(stats._ui_widget_update_skipped_count));
                 ImGui::Text("Element Visit: %llu", static_cast<unsigned long long>(stats._ui_element_visit_count));
                 ImGui::Text("RenderImpl: %llu", static_cast<unsigned long long>(stats._ui_render_impl_count));
                 ImGui::Text("Layout: %llu", static_cast<unsigned long long>(stats._ui_layout_count));
@@ -873,7 +911,8 @@ namespace Ailu
                 ImGui::Text("Focused: %s", selected->IsFocused() ? "true" : "false");
                 ImGui::Separator();
 
-                if (ImGui::CollapsingHeader("Dirty State", ImGuiTreeNodeFlags_DefaultOpen))
+                if (UI::UIManager::Get()->IsDebugPaintDirtyVisible() &&
+                    ImGui::CollapsingHeader("Dirty State", ImGuiTreeNodeFlags_DefaultOpen))
                 {
                     const String element_reasons = UIInvalidationReasonToString(selected->GetDebugInvalidationReasons());
                     const bool has_dirty_descendant = HasDirtyDescendant(selected);
@@ -958,6 +997,12 @@ namespace Ailu
                 ImGui::Text("Widgets: %llu", static_cast<unsigned long long>(ui_mgr->_widgets.size()));
                 auto mpos = Input::GetGlobalMousePos();
                 ImGui::Text("MousePos: %.0f, %.0f", mpos.x, mpos.y);
+                bool is_paint_dirty_visible = ui_mgr->IsDebugPaintDirtyVisible();
+                if (ImGui::Checkbox("Visualize paint dirty state", &is_paint_dirty_visible))
+                    ui_mgr->SetDebugPaintDirtyVisible(is_paint_dirty_visible);
+                if (is_paint_dirty_visible)
+                    ImGui::TextWrapped("Paint dirty visualization forces Widget updates and Geometry fallback. "
+                                           "Disable it to measure normal cache performance.");
                 ImGui::Separator();
 
                 const float details_width = std::min(360.0f, ImGui::GetContentRegionAvail().x * 0.4f);
@@ -1279,7 +1324,10 @@ namespace Ailu
                     return;
                 widget->SetPosition(position);
                 widget->SetSize(size);
-                widget->Root()->Arrange(0.0f, 0.0f, size.x, size.y);
+                auto *root = widget->Root();
+                const Vector4f root_rect{0.0f, 0.0f, size.x, size.y};
+                if (root->IsLayoutDirty() || root->IsTransformDirty() || !NearbyEqual(root->GetArrangeRect(), root_rect))
+                    root->Arrange(0.0f, 0.0f, size.x, size.y);
             }
         }
 
@@ -1328,6 +1376,14 @@ namespace Ailu
                 place_actor->SetPosition({8.0f, g_editor_style._toolbar_height + 8.0f});
                 DockManager::Get().AddDock(std::move(place_actor));
             }
+
+            // Serialized layouts can replace constructor-created Widgets; reapply runtime-only policy afterwards.
+            if (const char *cache_override = std::getenv("AILU_EDITOR_UI_TEXTURE_CACHE");
+                cache_override != nullptr ? (cache_override[0] == '2' && cache_override[1] == '\0')
+                                          : g_engine_config._enable_editor_widget_texture_cache)
+                for (const auto &widget: UI::UIManager::Get()->_widgets)
+                    if (IsTextureCacheCandidate(widget->Name()))
+                        widget->SetTextureCacheMode(UI::EWidgetTextureCacheMode::kTexture);
 
             //DockManager::Get().AddDock(MakeRef<AIAssistantWindow>());
         }
@@ -1624,6 +1680,7 @@ namespace Ailu
         std::once_flag flag;
         void EditorLayer::OnUpdate(f32 dt)
         {
+            PROFILE_BLOCK_CPU("EditorLayer::OnUpdate")
             // Drain pending automation requests on the editor main thread.
             if (auto *automation = EditorApp::GetEditor()->GetAutomationService())
                 automation->Tick();
@@ -1703,7 +1760,18 @@ namespace Ailu
         void EditorLayer::BuildEditorChrome()
         {
             _toolbar_widget = MakeRef<UI::Widget>();
+            _toolbar_widget->SetUpdateMode(UI::EWidgetUpdateMode::kOnDemand);
             _toolbar_widget->Name("EditorToolbar");
+
+
+            if (const char *cache_override = std::getenv("AILU_EDITOR_UI_TEXTURE_CACHE"); cache_override != nullptr)
+            {
+                if ((cache_override[0] == '1' || cache_override[0] == '2') && cache_override[1] == '\0')
+                    _toolbar_widget->SetTextureCacheMode(cache_override[0] == '1'
+                        ? UI::EWidgetTextureCacheMode::kOpaqueTexture : UI::EWidgetTextureCacheMode::kTexture);
+            }
+            else if (g_engine_config._enable_editor_widget_texture_cache)
+                _toolbar_widget->SetTextureCacheMode(UI::EWidgetTextureCacheMode::kTexture);
             auto toolbar_border = MakeRef<UI::Border>();
             toolbar_border->_bg_color = g_editor_style._toolbar_bg_color;
             toolbar_border->_border_color = g_editor_style._toolbar_border_color;
@@ -1852,6 +1920,11 @@ namespace Ailu
             UI::UIManager::Get()->RegisterWidget(_toolbar_widget);
 
             _status_bar_widget = MakeRef<UI::Widget>();
+            if (const char *cache_override = std::getenv("AILU_EDITOR_UI_TEXTURE_CACHE");
+                cache_override != nullptr ? (cache_override[0] == '2' && cache_override[1] == '\0')
+                                          : g_engine_config._enable_editor_widget_texture_cache)
+                _status_bar_widget->SetTextureCacheMode(UI::EWidgetTextureCacheMode::kTexture);
+            _status_bar_widget->SetUpdateMode(UI::EWidgetUpdateMode::kOnDemand);
             _status_bar_widget->Name("EditorStatusBar");
             _status_bar_widget->_is_receive_event = false;
             auto status_border = MakeRef<UI::Border>();
@@ -1937,19 +2010,31 @@ namespace Ailu
             if (_status_left_text)
             {
                 const String progress_summary = _progress_panel ? _progress_panel->Summary() : String{};
-                const String text = std::format("{}   Scene: {}   Selection: {}{}{}", _editor_status_message, scene_name,
-                    selection_name, progress_summary.empty() ? "" : "   ", progress_summary);
-                if (_status_left_text->GetText() != text) _status_left_text->SetText(text, false);
+                if (!_has_chrome_status_snapshot || _last_chrome_status_message != _editor_status_message ||
+                    _last_chrome_scene_name != scene_name || _last_chrome_selection_name != selection_name ||
+                    _last_chrome_progress_summary != progress_summary)
+                {
+                    const String text = std::format("{}   Scene: {}   Selection: {}{}{}", _editor_status_message, scene_name,
+                        selection_name, progress_summary.empty() ? "" : "   ", progress_summary);
+                    if (_status_left_text->GetText() != text)
+                        _status_left_text->SetText(text, false);
+                    _last_chrome_status_message = _editor_status_message;
+                    _last_chrome_scene_name = scene_name;
+                    _last_chrome_selection_name = selection_name;
+                    _last_chrome_progress_summary = progress_summary;
+                    _has_chrome_status_snapshot = true;
+                }
             }
-            if (_status_right_text)
+            _chrome_stats_refresh_elapsed += dt;
+            if (_status_right_text && _chrome_stats_refresh_elapsed >= 0.25f)
             {
+                _chrome_stats_refresh_elapsed = 0.0f;
                 const auto& ds = RenderingStates::DisplayData();
                 _status_right_text->SetText(std::format("FPS: {:.1f}   Frame: {:.2f} ms",
                                                         ds.FrameRate,
                                                         ds.FrameTime),
                                             false);
             }
-
             auto *ui_mgr = UI::UIManager::Get();
             if (_status_bar_widget)
                 ui_mgr->BringToFrontSilently(_status_bar_widget.get());
@@ -2124,6 +2209,14 @@ namespace Ailu
                     feature->SetActive(active);
                     auto *cur_type = feature->GetType();
                     ImGui::Text("Type: %s", cur_type->Name().c_str());
+                    if (auto *ray_trace = dynamic_cast<Render::RayTraceGI *>(feature))
+                    {
+                        const auto diagnostics = ray_trace->DenoiserDiagnostics();
+                        const auto reason = ray_trace->DenoiserReason();
+                        ImGui::Text("Denoiser: %s", reason.c_str());
+                        ImGui::Text("Source SPP: %u | Result latency: %.2f ms | Shared: %.2f MB",
+                                    diagnostics._last_sample_count, diagnostics._latency_ms, diagnostics._shared_mb);
+                    }
                     ImGui::Text("Members: ");
                     //if (cur_type->BaseType() && cur_type->BaseType() != cur_type)//除去Object
                     {
@@ -2468,7 +2561,10 @@ namespace Ailu
                 ShowUIReflectorWindow(&s_show_ui_reflector);
             UI::UIManager::Get()->SetDebugReflectorVisible(s_show_ui_reflector);
             if (!s_show_ui_reflector)
+            {
                 UI::UIManager::Get()->SetDebugHighlightTarget(nullptr);
+                UI::UIManager::Get()->SetDebugPaintDirtyVisible(false);
+            }
             if (s_show_style_theme_editor)
                 ShowStyleThemeEditorWindow(&s_show_style_theme_editor);
             if (s_show_resource_browser)

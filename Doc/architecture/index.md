@@ -16,6 +16,7 @@
 | Rendering | `rendering.md` | `RenderPipeline`, `Renderer`, `RenderingData` |
 | RenderGraph | `render-graph.md` | `Engine/Inc/Render/RenderGraph` |
 | RHI / DX12 | `rhi-dx12.md` | `GraphicsContext`, `Engine/*/RHI/DX12` |
+| Texture sampling | `texture-sampling.md` | `SamplerDesc`, `Texture`, `Material`, `D3DDescriptorMgr` |
 | Reflection/codegen | `reflection-codegen.md` | `AiluHeadTool`, reflection macros, generated files |
 | Editor/runtime boundary | `editor-runtime-boundary.md` | `EditorApp`, Editor modules, Engine public APIs |
 

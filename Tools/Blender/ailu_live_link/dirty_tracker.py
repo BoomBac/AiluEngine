@@ -140,13 +140,9 @@ def _depsgraph_update(scene, depsgraph):
             continue
         geometry_changed = update.is_updated_geometry or value_type == "Mesh"
         transform_only = value_type == "Object" and update.is_updated_transform and not geometry_changed
-        material_changed = (value_type in {"Image", "Material", "ShaderNodeTree", "Texture"}
-                            or (update.is_updated_shading and not transform_only))
-        if material_changed and not cache_invalidated:
+        if value_type == "Image" and not cache_invalidated:
             material_sync.invalidate_image_cache()
-            material_bake.invalidate()
             cache_invalidated = True
-            bake_invalidated = True
         elif geometry_changed and not bake_invalidated:
             material_bake.invalidate()
             bake_invalidated = True
@@ -159,8 +155,10 @@ def _depsgraph_update(scene, depsgraph):
             if data_changed:
                 update_geometry |= obj.type == "MESH"
                 update_data |= obj.type != "MESH"
-            if any(_uses_data(slot.material, value) for slot in obj.material_slots):
-                update_materials = True
+            for slot in obj.material_slots:
+                if slot.material and _uses_data(slot.material, value):
+                    update_materials = True
+                    material_bake.invalidate_material(slot.material, obj)
             if object_changed and update.is_updated_transform:
                 update_materials |= material_bake.invalidate_object(obj)
             if update_geometry and obj.type == "MESH" and material_bake.object_needs_bake(obj):
@@ -255,7 +253,7 @@ def flush(context, link):
         if previous_material != material_signature:
             _observed_materials[guid] = material_signature
         if previous_material is not None and previous_material != material_signature:
-            material_bake.invalidate_materials(obj)
+            material_bake.invalidate_materials(obj, previous_material, material_signature)
             if guid not in _material_change_logged:
                 material_names = ", ".join(slot.material.name_full for slot in obj.material_slots if slot.material)
                 print(f"[BlenderLiveLink] Material change detected: object={obj.name_full!r}, "

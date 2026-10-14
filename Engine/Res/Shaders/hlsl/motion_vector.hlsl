@@ -90,7 +90,7 @@ float4 MotionVectorPSMain(VertOutput input) : SV_TARGET
 #if defined(ALPHA_TEST)
 	float4 base_color = _AlbedoValue;
     if ((_SamplerMask & 1) != 0)
-        base_color *= _AlbedoTex.Sample(g_LinearWrapSampler, input.uv);
+        base_color *= _AlbedoTex.SampleBias(g_material_samplers[_AlbedoTexSamplerIndex], input.uv, MaterialViewMipBias(0u));
 	clip(base_color.a - _AlphaCulloff);
 #endif
 	return float4(CalculateNdcMotionFormClip(input.clip_pos_cur, input.clip_pos_pre), 1.0);

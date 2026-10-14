@@ -4,6 +4,22 @@
 
 本文档描述 AiluEngine 当前主要 rendering data flow，并明确新旧路径。
 
+### PathTracing denoiser contract
+
+`GIPass` owns an instance-local `PathTracingDenoiserHost`. The independent reflected `EPathTracingDenoiser` setting
+defaults to None; missing properties in existing assets retain that constructor default. Backend/mode switches,
+history reset, target recreation and shader asset revision changes invalidate its generation. Input/output contain
+GPU graph handles, generation, backend identity, dimensions and SPP; no CPU image contract is required.
+The None path creates no SDK resources. The optional OIDN CUDA backend initializes on the background task pool,
+packs current Reference HDR to shared buffers and publishes a separate double-buffered HDR preview only after
+CUDA and DX12 Unpack complete. Unsupported/OFF configurations retain the original source. Debug GI captures
+one selected handle for both setup Read and execute Blit;
+temporal Debug1-5 keep priority over a backend output. Reference history is never overwritten by this host.
+Quality and SPP cadence are reflected settings. Diagnostics are copied under a feature-local mutex for UI readers.
+Feature activation is virtual; RayTraceGI sends an atomic activation notification and revision to invalidate work
+without mutating the render-owned backend from UI. Sessions retire through the DX12 context before graphics shutdown.
+The standalone DX12/OIDN interop and synthetic RenderGraph smoke executables are separate validation paths.
+
 主要入口：
 
 - `Engine/Inc/Render/RenderPipeline.h`
@@ -408,6 +424,11 @@ has equivalent hit coverage. The full unified-light list and alias NEE sampling 
 Path tracer bindless mesh and texture reads use `NonUniformResourceIndex`: hit instances, material texture handles
 and sampled-light resources can differ between rays in the same wave. This applies to both DXR and Compute tracing.
 
+Renderer owns the material-index namespace in `PrimitiveData` and the matching current-frame material buffer.
+Compute and DXR path tracing consume that same buffer; DXR declares its RenderGraph read explicitly.
+SceneRayTracingProxy owns acceleration structures, geometry resources and light data, but does not rewrite material
+indices or maintain a second material table. Common material upload includes coverage alpha and transparent flags.
+
 Continuous path BSDFs additionally sample each directional light directly, using the small directional lookup list.
 The directional NEE, unified-light NEE and BSDF miss techniques use a three-way power heuristic with their actual
 PDFs. This prevents the sun from receiving rare, large NEE weights when the unified list contains many mesh emitters.
@@ -473,7 +494,7 @@ the resulting roughness/metallic equals the sample multiplied by `_RoughnessValu
 Without a map the scalar stands alone. Forward/deferred and shared Compute/DXR material evaluation use this contract;
 GI metallic evaluation uses the same factor. Sampler-mask bits are 8 for roughness and 64 for metallic.
 Inspector rows derive from shader metadata, and property-ID texture assignment maintains these flags and asset GUIDs.
-Transient CPU/HLSL `MaterialData` stores two independent bindless handles and has a 96-byte stride.
+Transient CPU/HLSL `MaterialData` stores two independent bindless handles and has a 128-byte stride.
 Standard Lit volume attenuation uses only `_AttenuationColor` and `_AttenuationDistance`; the legacy scalar
 `_Absorption` property and loader/setter compatibility have been removed. Cloud/fog absorption is independent.
 
@@ -572,3 +593,10 @@ conditional microfacet-normal PDF followed by the existing refraction Jacobian a
 Normals face the incident path direction at both front-face and back-face hits. Rejected directions terminate
 the sample without resampling or renormalization. BSDF values, discrete mirror events and random streams retain
 their existing contracts; switching the sampler requires shader recompilation and fresh reference accumulation.
+
+Compute and DXR preserve authored corner normals, including Blender Live Link smooth/split normals. Before BSDF
+evaluation and sampling, the shared path core falls back to the oriented geometric normal when the interpolated
+shading normal faces away from the incoming ray. This prevents a front-facing smooth surface from returning zero
+solely because its shading normal crosses the view hemisphere at grazing angles; ordinary smooth shading is retained.
+
+Texture sampler ownership, material overrides and per-view mip bias are documented in `texture-sampling.md`.

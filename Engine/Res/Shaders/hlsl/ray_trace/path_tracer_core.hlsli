@@ -317,6 +317,10 @@ float3 TracePath(uint2 pixel, float3 ray_origin, float3 ray_direction, uint max_
 
         TraceContext trace_context = CreatePathTraceContext(hit._material, hit._front_face != 0u);
         float3 wo = -ray_direction;
+        // Smooth corner normals can face away from a grazing ray even on a front-facing triangle.
+        // Use the oriented geometric normal in that case so BSDF evaluation and sampling remain valid.
+        if (dot(hit._shading_normal, wo) <= 0.0f)
+            hit._shading_normal = hit._geometric_normal;
 
         // 临时诊断开关：定义后只统计穿透/反射到几何体或环境的能量，跳过直接光与光源采样，
         // 用来区分「黑边来自几何/遍历」还是「来自光照估计」。排查完应保持注释状态。

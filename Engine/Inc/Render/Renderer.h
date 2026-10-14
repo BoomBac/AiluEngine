@@ -17,6 +17,7 @@
 #include "RendererAPI.h"
 #include "Texture.h"
 #include <functional>
+#include <atomic>
 #include "RenderingData.h"
 #include "Render/Environment.h"
 #include "Render/StaticDiffuseProbeSystem.h"
@@ -69,6 +70,9 @@ namespace Ailu
             using AfterTickEvent = std::function<void()>;
         public:
             inline static RendererAPI::ERenderAPI GetAPI() { return RendererAPI::GetAPI(); }
+            // Thread-safe authoring value; render code snapshots it into each view's frame buffer.
+            void SetTextureMipBias(f32 bias);
+            f32 GetTextureMipBias() const { return _texture_mip_bias.load(std::memory_order_relaxed); }
             Renderer();
             ~Renderer();
             void Render(const Camera &cam, const Scene &s);
@@ -131,6 +135,7 @@ namespace Ailu
             RenderPipeline *_p_cur_pipeline;
             FrameResource *_cur_fs;
             FrameResource *_prev_fs;
+            std::atomic<f32> _texture_mip_bias{0.0f};
             EShadingMode _mode = EShadingMode::kLit;
             RTHandle _camera_color_handle;
             RTHandle _gameview_rt_handle;

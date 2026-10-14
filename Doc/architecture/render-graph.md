@@ -217,3 +217,9 @@ Capture 完成只证明数据被写出，不自动证明：
 - frame resource；
 - capture/debug tooling；
 - multi-thread record path。
+
+## Frame callback ownership
+
+EndFrame releases pass executor captures before returning pooled passes. Debug pass snapshots retain declaration metadata,
+but do not retain live executors. Native command packets own copied callbacks independently until recording/submission;
+external GPU owners must use explicit lifetime/fence records beyond the graph frame.

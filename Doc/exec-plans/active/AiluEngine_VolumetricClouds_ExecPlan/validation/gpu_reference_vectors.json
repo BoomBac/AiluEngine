@@ -1,0 +1,280 @@
+{
+  "note": "独立 CPU double reference 向量；实机需要 shader debug mode 捕获真实数据逐条比较；本文不代表 GPU 已验证。",
+  "world_distance_unit": "meter",
+  "geometry": [
+    {
+      "r_earth": 100,
+      "cloud_bottom": 10,
+      "thickness": 10,
+      "origin": [
+        0,
+        100,
+        0
+      ],
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "expected_segments": [
+        [
+          10,
+          20
+        ]
+      ]
+    },
+    {
+      "r_earth": 100,
+      "cloud_bottom": 10,
+      "thickness": 10,
+      "origin": [
+        0,
+        115,
+        0
+      ],
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "expected_segments": [
+        [
+          0,
+          5
+        ]
+      ]
+    },
+    {
+      "r_earth": 100,
+      "cloud_bottom": 10,
+      "thickness": 10,
+      "origin": [
+        0,
+        115,
+        0
+      ],
+      "direction": [
+        0,
+        -1,
+        0
+      ],
+      "expected_segments": [
+        [
+          0,
+          5
+        ],
+        [
+          225,
+          235
+        ]
+      ]
+    },
+    {
+      "r_earth": 100,
+      "cloud_bottom": 10,
+      "thickness": 10,
+      "origin": [
+        0,
+        130,
+        0
+      ],
+      "direction": [
+        0,
+        -1,
+        0
+      ],
+      "expected_segments": [
+        [
+          10,
+          20
+        ],
+        [
+          240,
+          250
+        ]
+      ]
+    },
+    {
+      "r_earth": 100,
+      "cloud_bottom": 10,
+      "thickness": 10,
+      "origin": [
+        0,
+        130,
+        0
+      ],
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "expected_segments": []
+    }
+  ],
+  "coverage": [
+    {
+      "shape": 0.75,
+      "coverage": 0,
+      "expected": 0.0
+    },
+    {
+      "shape": 0.75,
+      "coverage": 0.25,
+      "expected": 0.0
+    },
+    {
+      "shape": 0.75,
+      "coverage": 0.5,
+      "expected": 0.5
+    },
+    {
+      "shape": 0.75,
+      "coverage": 0.75,
+      "expected": 0.6666666666666666
+    },
+    {
+      "shape": 0.75,
+      "coverage": 1,
+      "expected": 0.75
+    }
+  ],
+  "cloud_type_profile": [
+    {
+      "stratus": 0.1,
+      "cumulus": 0.4,
+      "cumulonimbus": 0.8,
+      "type": 0,
+      "expected": 0.1
+    },
+    {
+      "stratus": 0.1,
+      "cumulus": 0.4,
+      "cumulonimbus": 0.8,
+      "type": 0.25,
+      "expected": 0.25
+    },
+    {
+      "stratus": 0.1,
+      "cumulus": 0.4,
+      "cumulonimbus": 0.8,
+      "type": 0.5,
+      "expected": 0.4
+    },
+    {
+      "stratus": 0.1,
+      "cumulus": 0.4,
+      "cumulonimbus": 0.8,
+      "type": 0.75,
+      "expected": 0.6
+    },
+    {
+      "stratus": 0.1,
+      "cumulus": 0.4,
+      "cumulonimbus": 0.8,
+      "type": 1,
+      "expected": 0.8
+    }
+  ],
+  "homogeneous_slabs": [
+    {
+      "density": 1.0,
+      "sigma_t_per_m": 0.002,
+      "albedo": 0.8,
+      "length_m": 1000,
+      "source_radiance_including_phase": 1.0,
+      "expected_transmittance": 0.1353352832366127,
+      "expected_scattered_radiance": 0.6917317734107099
+    }
+  ],
+  "hg_phase": [
+    {
+      "g": 0,
+      "mu": -1,
+      "phase": 0.07957747154594767
+    },
+    {
+      "g": 0,
+      "mu": 0,
+      "phase": 0.07957747154594767
+    },
+    {
+      "g": 0,
+      "mu": 1,
+      "phase": 0.07957747154594767
+    },
+    {
+      "g": 0.7,
+      "mu": -1,
+      "phase": 0.008260637184700452
+    },
+    {
+      "g": 0.7,
+      "mu": 0,
+      "phase": 0.02231417883943917
+    },
+    {
+      "g": 0.7,
+      "mu": 1,
+      "phase": 1.5031300180901208
+    },
+    {
+      "g": -0.3,
+      "mu": -1,
+      "phase": 0.2111239041014938
+    },
+    {
+      "g": -0.3,
+      "mu": 0,
+      "phase": 0.06363437477239789
+    },
+    {
+      "g": -0.3,
+      "mu": 1,
+      "phase": 0.03296108288885406
+    }
+  ],
+  "composite": [
+    {
+      "scene_rgb": [
+        0.2,
+        0.4,
+        0.8
+      ],
+      "cloud_rgb": [
+        0.3,
+        0.1,
+        0
+      ],
+      "transmittance": 0.25,
+      "expected_final_rgb": [
+        0.35,
+        0.2,
+        0.2
+      ]
+    }
+  ],
+  "tile_resolution_tests": [
+    [
+      16,
+      16
+    ],
+    [
+      317,
+      179
+    ],
+    [
+      321,
+      181
+    ],
+    [
+      101,
+      37
+    ]
+  ],
+  "conventions": [
+    "HG mu = dot(sun_ray_travel_direction, -camera_to_sample_direction)",
+    "Sun ray march uses to_sun_dir = -sun_ray_travel_direction",
+    "Cloud density is dimensionless [0,1]",
+    "cloud A = scalar transmittance, NOT opacity"
+  ]
+}

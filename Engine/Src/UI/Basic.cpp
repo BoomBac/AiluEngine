@@ -453,6 +453,30 @@ namespace Ailu
             _bar_rect = {_content_rect.x, _content_rect.y + (_content_rect.w * 0.5f - bar_height * 0.5f), _content_rect.z, bar_height};
             _dot_rect = {_content_rect.x, _content_rect.y + (_content_rect.w * 0.5f - _resolved_style._thumb_size.y * 0.5f), _resolved_style._thumb_size.x, _resolved_style._thumb_size.y};
             _dot_rect.x = Lerp(_content_rect.x, _content_rect.x + _content_rect.z - _dot_rect.z, value01);
+            UpdateThumbHover();
+        }
+        void Slider::OnEvent(UIEvent &e)
+        {
+            UIElement::OnEvent(e);
+            if (e._type == UIEvent::EType::kMouseEnter || e._type == UIEvent::EType::kMouseMove ||
+                e._type == UIEvent::EType::kMouseDown || e._type == UIEvent::EType::kMouseUp)
+            {
+                _last_mouse_position = e._mouse_position;
+                _has_mouse_position = true;
+            }
+            else if (e._type == UIEvent::EType::kMouseExit)
+                _has_mouse_position = false;
+            UpdateThumbHover();
+        }
+        void Slider::UpdateThumbHover()
+        {
+            const Vector2f local_pos = TransformCoord(_inv_matrix, Vector3f{_last_mouse_position, 0.0f}).xy;
+            const bool is_hovered = _has_mouse_position && IsHovered() && IsInteractiveEnabled() &&
+                IsPointInside(local_pos, _dot_rect);
+            if (_is_thumb_hovered == is_hovered)
+                return;
+            _is_thumb_hovered = is_hovered;
+            InvalidatePaint();
         }
         UIElement *Slider::HitTest(Vector2f pos) 
         {
@@ -475,7 +499,7 @@ namespace Ailu
                 thumb = &_resolved_style._thumb_disabled;
             else if (IsPressed())
                 thumb = &_resolved_style._thumb_pressed;
-            else if (IsHovered())
+            else if (_is_thumb_hovered)
                 thumb = &_resolved_style._thumb_hovered;
             Vector4f thumb_corner = Vector4f(_resolved_style._thumb_corner_radius);
             r.DrawQuad(_dot_rect, _matrix, *thumb, thumb_corner);

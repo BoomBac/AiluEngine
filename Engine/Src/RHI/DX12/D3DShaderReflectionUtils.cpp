@@ -92,6 +92,7 @@ namespace Ailu::RHI::DX12::ShaderReflectionUtils
         else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_SAMPLER)
         {
             ret = std::make_pair(bind_desc.Name, Render::ShaderBindResourceInfo{Render::EBindResDescType::kSampler, static_cast<uint16_t>(bind_desc.BindPoint), 255u, bind_desc.Name});
+            ret.second._register_space = static_cast<u16>(bind_desc.Space);
         }
         else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_STRUCTURED || res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_BYTEADDRESS)
         {
@@ -255,11 +256,13 @@ namespace Ailu::RHI::DX12::ShaderReflectionUtils
                                           capacity,
                                           bindless_it->second._res_slot,
                                           bindless_it->second._register_space,
+                                          range_type == D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER ? D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE :
                                           D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
             rootParameters[root_param_index].InitAsDescriptorTable(1, &ranges[root_param_index]);
             bindless_it->second._bind_slot = root_param_index++;
         };
 
+        append_bindless_table("g_material_samplers", D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER, D3DDescriptorMgr::kSamplerCapacity);
         append_bindless_table("g_bindless_texture2d", D3D12_DESCRIPTOR_RANGE_TYPE_SRV, GPUVisibleDescriptorAllocator::kBindlessSRVCapacity);
         append_bindless_table("g_bindless_buffer", D3D12_DESCRIPTOR_RANGE_TYPE_SRV, GPUVisibleDescriptorAllocator::kBindlessSRVCapacity);
         append_bindless_table("g_bindless_rw_texture2d", D3D12_DESCRIPTOR_RANGE_TYPE_UAV, GPUVisibleDescriptorAllocator::kBindlessUAVCapacity);
@@ -267,7 +270,7 @@ namespace Ailu::RHI::DX12::ShaderReflectionUtils
         for (auto it = bind_res_infos.begin(); it != bind_res_infos.end(); it++)
         {
             auto &desc = it->second;
-            if (desc._name == "g_bindless_texture2d" || desc._name == "g_bindless_buffer" || desc._name == "g_bindless_rw_texture2d" || desc._name == "g_bindless_rw_buffer")
+            if (desc._name == "g_material_samplers" || desc._name == "g_bindless_texture2d" || desc._name == "g_bindless_buffer" || desc._name == "g_bindless_rw_texture2d" || desc._name == "g_bindless_rw_buffer")
                 continue;
             switch (desc._res_type)
             {

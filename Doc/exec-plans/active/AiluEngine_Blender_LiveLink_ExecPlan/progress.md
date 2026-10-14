@@ -6,9 +6,9 @@
 
 > Status: Active
 >
-> Current Milestone: M6 implementation complete; final runtime acceptance pending
+> Current Milestone: Shared Instances M1-M2 implementation complete; runtime acceptance pending
 >
-> Last Updated: 2026-10-04
+> Last Updated: 2026-10-15
 > Last Updated Baseline: AiluEngine_Source(20260930-154655)
 
 ---
@@ -1065,3 +1065,29 @@ Validation: `cmake --build --preset build-debug` PASS. Editor runtime reproducti
   a transform edit still sends exactly one object/material/mesh update. Recording peer, not live Editor acceptance.
 - Debug build/package/install PASS; 13 installed files verified, backup 20261010-003212. Restart Blender.
   Details: completed/blender-sync-self-generated-updates.md; Saved/BlenderTextureValidation/sync-idle-full-scene.json.
+
+# Blender Live Link Receive Queue Backpressure — 2026-10-15
+
+- User log shows Full Sync queue wait reaching 43.9s, then `Incoming queue limit reached`; one 83MB mesh took
+  14.3s in Apply. The network worker previously kept reading and queuing while the main thread built meshes.
+- Added capacity waiting before payload receive. The worker now lets TCP backpressure pace Blender while the
+  bounded main-thread queue drains; one queue slot remains available for disconnect/control handling.
+- Follow-up logs reached sequence 72420 and disconnected without an engine queue-overflow warning. The Blender
+  sender also has a 4096-packet queue limit; it now pumps the socket and waits for queue capacity during Full Sync,
+  and raises on disconnect so an incomplete export is reported instead of silently continuing.
+- `cmake --build --preset build-debug`: PASS; Editor and `AiluBlenderLiveLink.dll` linked.
+- Add-on ZIP rebuilt. Python syntax check could not run because Python is unavailable in this environment.
+  Targeted `git diff --check`: PASS. Runtime Blender-to-Editor reimport remains pending. Backpressure prevents
+  queue overflow but does not reduce the 14.3s single-mesh Apply stall; the supplied `ObjectUpsert failed`
+  warning also lacks its diagnostic detail and needs a fresh full log if it persists.
+
+# Blender Live Link Shared Instances — 2026-10-15
+
+- Implemented protocol-v1 `instance_batch_v1` capability negotiation and batches of up to 128 evaluated instance
+  object records referencing the source mesh. Engine applies the transforms and reuses the source `Render::Mesh`.
+- Scene software ray-tracing triangles and BLAS nodes are stored once per unique mesh; each instance keeps its
+  entity/submesh lookup. Active scene primitive and TLAS storage supports up to 65,536 primitives. Legacy
+  RenderPipeline node capacity remains 2,000.
+- `cmake --build --preset build-debug`: PASS twice. Blender AST and ZIP source parity: PASS. Runtime Full Sync,
+  visual appearance, apply duration and memory comparison remain pending.
+- Details and decisions: `active/blender-live-link-shared-instances.md`.

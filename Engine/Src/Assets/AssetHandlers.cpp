@@ -980,6 +980,7 @@ Scope<Asset> TextureAssetHandler::Load(const AssetLoadContext &context)
         ? doc._header._asset_name
         : ToChar(PathUtils::GetFileName(context._asset_path).c_str());
     tex->Name(texture_name);
+    tex->SetSamplerDesc(json_setting._sampler_desc);
     const auto gpu_upload_start = std::chrono::steady_clock::now();
     tex->Apply();
     gpu_upload_us = ElapsedMicroseconds(gpu_upload_start);
@@ -1016,6 +1017,9 @@ bool TextureAssetHandler::Save(const AssetSaveContext &context)
             doc._import_setting = *tex_setting;
         }
     }
+
+    if (auto *texture = context._asset->As<Texture2D>())
+        doc._import_setting._sampler_desc = texture->GetSamplerDesc();
 
     if (!SaveAssetDocument(context._system_path, doc))
     {
@@ -1077,6 +1081,7 @@ Scope<Asset> MaterialAssetHandler::Load(const AssetLoadContext &context)
 
     for (auto &prop : doc._texture_properties)
     {
+        mat->SetTextureSamplingSettings(ShaderPropertyRegistry::Get().Intern(prop._name), prop._sampling);
         if (prop._texture_guid.empty())
             continue;
         const Guid texture_guid(prop._texture_guid);
@@ -1195,6 +1200,7 @@ bool MaterialAssetHandler::Save(const AssetSaveContext &context)
             }
             AssetTextureBinding entry;
             entry._name = prop->_value_name;
+            entry._sampling = mat->GetTextureSamplingSettings(prop->_property_id);
             entry._texture_guid = tex_guid == Guid::EmptyGuid() ? String{} : tex_guid.ToString();
             doc._texture_properties.push_back(entry);
             if (!tex_guid.IsEmpty())
@@ -1209,6 +1215,7 @@ bool MaterialAssetHandler::Save(const AssetSaveContext &context)
                 continue;
             AssetTextureBinding entry;
             entry._name = name;
+            entry._sampling = mat->GetTextureSamplingSettings(ShaderPropertyRegistry::Get().Intern(name));
             entry._texture_guid = guid.ToString();
             doc._texture_properties.push_back(std::move(entry));
             doc._header._dependencies.emplace_back(guid, EAssetDependencyType::kRuntime);
@@ -1851,6 +1858,7 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
             component._camera.LockAspect(entity_doc._camera_component._lock_aspect);
             component._camera.RenderScale(entity_doc._camera_component._render_scale);
             component._camera.UpsamplingFilter(static_cast<Render::EUpsamplingFilter>(entity_doc._camera_component._upsampling_filter));
+            component._camera.SetAutoTextureMipBiasEnabled(entity_doc._camera_component._auto_texture_mip_bias);
             component._camera.MarkDirty();
             component._camera.RecalculateMatrix(true);
         }

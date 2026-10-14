@@ -2,6 +2,7 @@
 #include "Framework/Common/Allocator.hpp"
 #include "Common/EditorStyle.h"
 #include "EditorApp.h"
+#include "Framework/Common/Profiler.h"
 #include "Framework/Common/Input.h"
 #include "Framework/Events/Event.h"
 #include "UI/Basic.h"
@@ -196,6 +197,7 @@ namespace Ailu
             }
             void UpdateLayout(f32 dt)
             {
+                PROFILE_BLOCK_CPU("DockNode::UpdateLayout")
                 auto inset_panel_rect = [](Vector2f position, Vector2f size) -> Vector4f
                 {
                     const f32 gap = g_editor_style._dock_panel_gap;
@@ -256,12 +258,13 @@ namespace Ailu
                     const Vector4f rect = inset_panel_rect(_position, _size);
                     _tab->_position = rect.xy;
                     _tab->_size = rect.zw;
-                    _tab->Update(dt);
+                    _tab->UpdateLayout();
                 }
             }
 
             void Update(f32 dt)
             {
+                PROFILE_BLOCK_CPU("DockNode::Update")
                 if (_type == EType::kSplit)
                 {
                         if (_left)
@@ -276,6 +279,21 @@ namespace Ailu
                     if (_window)
                         _window->Update(dt);
                 }
+            }
+
+            void TickBackground(f32 dt)
+            {
+                if (_type == EType::kSplit)
+                {
+                    if (_left)
+                        _left->TickBackground(dt);
+                    if (_right)
+                        _right->TickBackground(dt);
+                }
+                else if (_type == EType::kTab && _tab)
+                    _tab->TickBackground(dt);
+                else if (_window)
+                    _window->TickBackground(dt);
             }
 
             void SetOwnWindow(Window *w)
@@ -556,16 +574,25 @@ namespace Ailu
                 if (!_node)
                     return;
                 const f32 content_offset = DockWindow::kTitleBarHeight - DockWindow::kTitleContentOverlap;
-                _node->_position = rect.xy + Vector2f(0.0f, content_offset);
-                _node->_size = {rect.z, std::max(0.0f, rect.w - content_offset)};
-                _node->UpdateLayout(0.0f);
+                const Vector2f position = rect.xy + Vector2f(0.0f, content_offset);
+                const Vector2f size{rect.z, std::max(0.0f, rect.w - content_offset)};
+                if (!NearbyEqual(_node->_position, position) || !NearbyEqual(_node->_size, size))
+                {
+                    _node->_position = position;
+                    _node->_size = size;
+                    _node->UpdateLayout(0.0f);
+                }
             }
             void Update(f32 dt) override
             {
                 if (!_node)
                     return;
-                _node->UpdateLayout(dt);
                 _node->Update(dt);
+            }
+            void TickBackground(f32 dt) override
+            {
+                if (_node)
+                    _node->TickBackground(dt);
             }
             bool IsHover(Vector2f pos) const override
             {
@@ -1559,6 +1586,7 @@ namespace Ailu
 
         void DockManager::Update(f32 dt)
         {
+            PROFILE_BLOCK_CPU("DockManager::Update")
             if (!_pending_remove_docks.empty())
             {
                 Vector<DockWindow *> pending_remove_docks = std::move(_pending_remove_docks);
@@ -1622,6 +1650,7 @@ namespace Ailu
                 {
                     node->UpdateLayout(dt);
                     node->Update(dt);
+                    node->TickBackground(dt);
                     DrawTreeNode(node.get(), 0u, row);
                     //UI::UIRenderer::Get()->DrawText(node->_window->GetTitle(), Vector2f(500.0f, offset_y), 16u, Vector2f::kOne, Colors::kWhite);
                     offset_y += 20.0f;

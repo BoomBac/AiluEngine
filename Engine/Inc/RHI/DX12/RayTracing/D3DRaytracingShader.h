@@ -40,6 +40,7 @@ namespace Ailu::RHI::DX12
             u16 _bindless_buffer_slot = static_cast<u16>(-1);
             u16 _bindless_rw_texture_slot = static_cast<u16>(-1);
             u16 _bindless_rw_buffer_slot = static_cast<u16>(-1);
+        u16 _material_sampler_slot = static_cast<u16>(-1);
         };
         bool BindResources(RHICommandBuffer *cmd, const Render::DispatchBindingSnapshot &snapshot,
                            const DxrVariant &variant);
@@ -63,6 +64,7 @@ namespace Ailu::RHI::DX12
         u16 _bindless_buffer_slot = static_cast<u16>(-1);
         u16 _bindless_rw_texture_slot = static_cast<u16>(-1);
         u16 _bindless_rw_buffer_slot = static_cast<u16>(-1);
+        u16 _material_sampler_slot = static_cast<u16>(-1);
     };
 }
 

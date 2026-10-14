@@ -206,7 +206,7 @@ namespace Ailu
                         + std::to_string(metrics._receive_us / 1000.0) + ", queue_wait_ms="
                         + std::to_string(metrics._queue_wait_us / 1000.0) + ", apply_ms="
                         + std::to_string(metrics._apply_us / 1000.0);
-                    const std::array<unsigned short, 7u> message_types{10u, 11u, 12u, 20u, 21u, 22u, 23u};
+                    const std::array<unsigned short, 9u> message_types{10u, 11u, 12u, 20u, 21u, 22u, 23u, 24u, 31u};
                     for (const unsigned short type : message_types)
                     {
                         summary += ", type" + std::to_string(type) + "="

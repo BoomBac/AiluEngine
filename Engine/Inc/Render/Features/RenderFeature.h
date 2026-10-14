@@ -99,7 +99,7 @@ namespace Ailu
             ~RenderFeature() {};
             virtual void AddRenderPasses(Renderer &renderer, const RenderingData & rendering_data) {};
             bool IsActive() const { return _is_active; };
-            void SetActive(bool is_active) { _is_active = is_active; };
+            virtual void SetActive(bool is_active) { _is_active = is_active; };
 
         protected:
             bool _is_active;

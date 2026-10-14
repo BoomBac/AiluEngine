@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "RHI/DX12/D3DStaticSamplers.h"
 //#include <atlcomcli.h>
 
 #include "Framework/Common/Log.h"
@@ -50,20 +51,6 @@ namespace Ailu::RHI::DX12
         return EShaderDateType::kBool;
     }
 
-    static const Vector<CD3DX12_STATIC_SAMPLER_DESC> &CreateStaticSampler()
-    {
-        static Vector<CD3DX12_STATIC_SAMPLER_DESC> samplers{
-                CD3DX12_STATIC_SAMPLER_DESC(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR, D3D12_TEXTURE_ADDRESS_MODE_WRAP, D3D12_TEXTURE_ADDRESS_MODE_WRAP, D3D12_TEXTURE_ADDRESS_MODE_WRAP),
-                CD3DX12_STATIC_SAMPLER_DESC(1, D3D12_FILTER_MIN_MAG_MIP_LINEAR, D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP),
-                CD3DX12_STATIC_SAMPLER_DESC(2, D3D12_FILTER_MIN_MAG_MIP_LINEAR, D3D12_TEXTURE_ADDRESS_MODE_BORDER, D3D12_TEXTURE_ADDRESS_MODE_BORDER, D3D12_TEXTURE_ADDRESS_MODE_BORDER),
-                CD3DX12_STATIC_SAMPLER_DESC(3, D3D12_FILTER_MIN_MAG_MIP_POINT, D3D12_TEXTURE_ADDRESS_MODE_WRAP, D3D12_TEXTURE_ADDRESS_MODE_WRAP, D3D12_TEXTURE_ADDRESS_MODE_WRAP),
-                CD3DX12_STATIC_SAMPLER_DESC(4, D3D12_FILTER_MIN_MAG_MIP_POINT, D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP),
-                CD3DX12_STATIC_SAMPLER_DESC(5, D3D12_FILTER_MIN_MAG_MIP_POINT, D3D12_TEXTURE_ADDRESS_MODE_BORDER, D3D12_TEXTURE_ADDRESS_MODE_BORDER, D3D12_TEXTURE_ADDRESS_MODE_BORDER),
-                CD3DX12_STATIC_SAMPLER_DESC(6, D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT, D3D12_TEXTURE_ADDRESS_MODE_BORDER, D3D12_TEXTURE_ADDRESS_MODE_BORDER, D3D12_TEXTURE_ADDRESS_MODE_BORDER, 0.0f, 16, D3D12_COMPARISON_FUNC_LESS, D3D12_STATIC_BORDER_COLOR_OPAQUE_BLACK),
-                CD3DX12_STATIC_SAMPLER_DESC(7, D3D12_FILTER_ANISOTROPIC, D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP)};
-        samplers[2].BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
-        return samplers;
-    }
 
     static ComPtr<ID3DBlob> CreateBlobFromBytes(const Vector<u8> &bytes)
     {
@@ -95,6 +82,8 @@ namespace Ailu::RHI::DX12
     {
         auto shader_macros = ConvertShaderMacros(macros);
         shader_macros.emplace_back(Render::ShaderMacro{"SHADER_DXC", "1"});
+        // Root-signature ABI participates in the artifact key even when shader source is unchanged.
+        shader_macros.emplace_back(Render::ShaderMacro{"AILU_SAMPLER_BINDING_VERSION", "1"});
         const WString packaged_shader_interop = PathUtils::ResolveRelPath(L"../ShaderInterop.h", PathUtils::Parent(source_path)).wstring();
         if (FileManager::Exist(packaged_shader_interop))
             shader_macros.emplace_back(Render::ShaderMacro{"AL_PACKAGE_SHADER_INTEROP", "1"});
@@ -547,6 +536,15 @@ namespace Ailu::RHI::DX12
             auto &desc = it->second;
             switch (desc._res_type)
             {
+                case EBindResDescType::kSampler:
+                {
+                    if (desc._name != "g_material_samplers") break;
+                    ranges[root_param_index].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER, D3DDescriptorMgr::kSamplerCapacity,
+                        desc._res_slot, desc._register_space, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE);
+                    rootParameters[root_param_index].InitAsDescriptorTable(1, &ranges[root_param_index]);
+                    desc._bind_slot = root_param_index++;
+                }
+                break;
                 case EBindResDescType::kTexture2D:
                 case EBindResDescType::kUAVTexture2D:
                 case EBindResDescType::kTexture3D:
@@ -582,7 +580,7 @@ namespace Ailu::RHI::DX12
         D3D12_ROOT_SIGNATURE_FLAGS rootSignatureFlags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT | D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS | D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS;
         if (_pass_elements[pass_index]._variants[variant_hash]._p_gblob == nullptr) rootSignatureFlags |= D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
         CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc;
-        auto samplers = CreateStaticSampler();
+        auto samplers = GetStaticSamplers();
         rootSignatureDesc.Init_1_1(root_param_index, rootParameters.data(), static_cast<UINT>(samplers.size()), samplers.data(), rootSignatureFlags);
         ComPtr<ID3DBlob> signature;
         ComPtr<ID3DBlob> error;
@@ -945,6 +943,11 @@ namespace Ailu::RHI::DX12
         auto &cs_ele = _kernels[kernel_index]._variants[cur_state._variant_hash];
         command_buffer->SetComputePipelineState(d3d_ele._pso.Get());
         d3dcmd->SetComputeRootSignature(d3d_ele._p_sig.Get());
+        if (d3d_ele._material_sampler_slot != static_cast<u16>(-1))
+        {
+            command_buffer->SetDescriptorHeap(D3DDescriptorMgr::Get().GetBindHeap(), 1024u);
+            d3dcmd->SetComputeRootDescriptorTable(d3d_ele._material_sampler_slot, D3DDescriptorMgr::Get().GetSamplerTable());
+        }
         for (u16 i = 0; i <= cur_state._max_bind_slot; i++)
         {
             auto it = std::find_if(cs_ele._bind_res_infos.begin(), cs_ele._bind_res_infos.end(), [&](const auto &it) -> bool
@@ -1069,6 +1072,11 @@ namespace Ailu::RHI::DX12
         auto &cs_ele = _kernels[kernel_index]._variants[snapshot._variant_hash];
         d3dcmd->SetComputePipelineState(d3d_ele._pso.Get());
         native_cmd->SetComputeRootSignature(d3d_ele._p_sig.Get());
+        if (d3d_ele._material_sampler_slot != static_cast<u16>(-1))
+        {
+            d3dcmd->SetDescriptorHeap(D3DDescriptorMgr::Get().GetBindHeap(), 1024u);
+            d3dcmd->NativeCmdList()->SetComputeRootDescriptorTable(d3d_ele._material_sampler_slot, D3DDescriptorMgr::Get().GetSamplerTable());
+        }
         for (u16 i = 0u; i < snapshot._entry_count; ++i)
         {
             const auto &entry = snapshot._entries[i];
@@ -1312,7 +1320,9 @@ namespace Ailu::RHI::DX12
             kernel_variant._all_dep_file_pathes.insert(Render::NormalizeShaderDependencyPath(dependency._path));
         for (const auto &binding : artifact._bindings)
         {
-            if (binding._name == "g_bindless_texture2d")
+            if (binding._name == "g_material_samplers")
+                d3d_variant._material_sampler_slot = binding._bind_slot;
+            else if (binding._name == "g_bindless_texture2d")
             {
                 d3d_variant._has_bindless_texture2d = true;
                 d3d_variant._bindless_texture_slot = binding._bind_slot;
@@ -1393,6 +1403,7 @@ namespace Ailu::RHI::DX12
                                           capacity,
                                           bindless_it->second._res_slot,
                                           bindless_it->second._register_space,
+                                          range_type == D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER ? D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE :
                                           D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
             bindless_it->second._bind_slot = root_param_index;
             has_bindless = true;
@@ -1406,7 +1417,10 @@ namespace Ailu::RHI::DX12
         d3d_ele._bindless_texture_slot = static_cast<u16>(-1);
         d3d_ele._bindless_buffer_slot = static_cast<u16>(-1);
         d3d_ele._bindless_rw_texture_slot = static_cast<u16>(-1);
+        d3d_ele._material_sampler_slot = static_cast<u16>(-1);
         d3d_ele._bindless_rw_buffer_slot = static_cast<u16>(-1);
+        bool has_material_samplers = false;
+        append_bindless_table("g_material_samplers", D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER, D3DDescriptorMgr::kSamplerCapacity, has_material_samplers, d3d_ele._material_sampler_slot);
         append_bindless_table("g_bindless_texture2d", D3D12_DESCRIPTOR_RANGE_TYPE_SRV, GPUVisibleDescriptorAllocator::kBindlessSRVCapacity, d3d_ele._has_bindless_texture2d, d3d_ele._bindless_texture_slot);
         append_bindless_table("g_bindless_buffer", D3D12_DESCRIPTOR_RANGE_TYPE_SRV, GPUVisibleDescriptorAllocator::kBindlessSRVCapacity, d3d_ele._has_bindless_buffer, d3d_ele._bindless_buffer_slot);
         append_bindless_table("g_bindless_rw_texture2d", D3D12_DESCRIPTOR_RANGE_TYPE_UAV, GPUVisibleDescriptorAllocator::kBindlessUAVCapacity, d3d_ele._has_bindless_rw_texture2d, d3d_ele._bindless_rw_texture_slot);
@@ -1414,7 +1428,7 @@ namespace Ailu::RHI::DX12
         for (auto it = cs_ele._temp_bind_res_infos.begin(); it != cs_ele._temp_bind_res_infos.end(); it++)
         {
             auto &desc = it->second;
-            if (desc._name == "g_bindless_texture2d" || desc._name == "g_bindless_buffer" || desc._name == "g_bindless_rw_texture2d" || desc._name == "g_bindless_rw_buffer")
+            if (desc._name == "g_material_samplers" || desc._name == "g_bindless_texture2d" || desc._name == "g_bindless_buffer" || desc._name == "g_bindless_rw_texture2d" || desc._name == "g_bindless_rw_buffer")
                 continue;
             if (desc._res_type == EBindResDescType::kTexture2D ||
                 desc._res_type == EBindResDescType::kCubeMap ||
@@ -1459,7 +1473,7 @@ namespace Ailu::RHI::DX12
         auto &sig = d3d_ele._p_sig;
         auto &pso = d3d_ele._pso;
 
-        auto &samplers = CreateStaticSampler();
+        auto &samplers = GetStaticSamplers();
         D3D12_ROOT_SIGNATURE_FLAGS rootSignatureFlags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
         CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc;
         rootSignatureDesc.Init_1_1(root_param_index, rootParameters, static_cast<u32>(samplers.size()), samplers.data(), rootSignatureFlags);

@@ -74,6 +74,12 @@ namespace Ailu
             UI::Border *_status_bar_border = nullptr;
             UI::Text *_status_left_text = nullptr;
             UI::Text *_status_right_text = nullptr;
+            String _last_chrome_scene_name;
+            String _last_chrome_selection_name;
+            String _last_chrome_progress_summary;
+            String _last_chrome_status_message;
+            f32 _chrome_stats_refresh_elapsed = 0.25f;
+            bool _has_chrome_status_snapshot = false;
             String _editor_status_message = "Ready";
             i32 _deferred_lighting_capture_frame_count = 1;
             u64 _deferred_lighting_capture_session_id = 0u;

@@ -1191,7 +1191,6 @@ namespace Ailu
         void AssetBrowser::Update(f32 dt)
         {
             DockWindow::Update(dt);
-            _import_controller.Tick();
 
             if (!Input::IsKeyDown(EKey::kLBUTTON))
             {
@@ -1201,6 +1200,8 @@ namespace Ailu
 
             HandleShortcuts();
             AssetTypeRegistry::Get().BeginFrame();
+            // Published previews are stable between PreviewRevision changes; live view RTs are not used here.
+            _content_widget->SetTextureCacheImageRevision(AssetTypeRegistry::Get().PreviewRevision());
 
             // 启动时预览可能因为 GPU 资源还没就绪而只能先用静态图标；等它就绪后重建一次，
             // 把图标换成真正的预览（AssetTypeRegistry 在重试成功后会抬高版本号）。
@@ -1230,6 +1231,12 @@ namespace Ailu
 
             if (_layout_dirty)
                 RefreshContentLayout();
+        }
+
+        void AssetBrowser::TickBackground(f32 dt)
+        {
+            (void) dt;
+            _import_controller.Tick();
         }
 
         void AssetBrowser::OpenAsset(Asset *asset)

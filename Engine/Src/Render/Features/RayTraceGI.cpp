@@ -91,6 +91,7 @@ namespace Ailu
                     hasher.AddPointer(texture);
                     const u64 texture_hash = texture != nullptr ? texture->HashCode() : 0u;
                     hasher.Add(texture_hash);
+                    hasher.Add(texture != nullptr ? texture->SamplerRevision() : 0u);
                 }
             }
 
@@ -135,6 +136,8 @@ namespace Ailu
                 hasher.Add(accumulation_mode);
                 hasher.Add(rendering_data._width);
                 hasher.Add(rendering_data._height);
+                if (rendering_data._p_per_camera_cbuf != nullptr)
+                    hasher.Add(ConstantBuffer::As<CBufferPerCameraData>(rendering_data._p_per_camera_cbuf)->_TextureManualMipBias);
 
                 if (rendering_data._camera != nullptr)
                 {
@@ -282,6 +285,15 @@ namespace Ailu
             }
             _gi_pass->_debug_pos = _debug_pos;
             _gi_pass->_accumulation_mode = _accumulation_mode;
+            _gi_pass->_denoiser = _denoiser;
+            {
+                std::lock_guard lock(_denoiser_diagnostics_mutex);
+                _denoiser_status = _gi_pass->_denoiser_host.Status();
+                _denoiser_reason = _gi_pass->_denoiser_host.Reason();
+                _denoiser_diagnostics = _gi_pass->_denoiser_host.Diagnostics();
+            }
+            _gi_pass->_denoiser_quality = _denoiser_quality;
+            _gi_pass->_denoiser_sample_interval = _denoiser_sample_interval;
             _gi_pass->_use_hardware_ray_tracing = _use_hardware_ray_tracing;
             _gi_pass->_enable_mnee = _enable_mnee;
             _gi_pass->_use_power_weighted_light_sampling = _use_power_weighted_light_sampling;
@@ -329,6 +341,32 @@ namespace Ailu
                 _gi_compute_shader->SetBool("_enable_resampling", _enable_resampling);
             }
             else {}
+        }
+
+        EDenoiserStatus RayTraceGI::DenoiserStatus() const
+        {
+            std::lock_guard lock(_denoiser_diagnostics_mutex);
+            return _denoiser_status;
+        }
+        void RayTraceGI::SetActive(bool is_active)
+        {
+            if (_is_active == is_active) return;
+            RenderFeature::SetActive(is_active);
+            if (_gi_pass)
+            {
+                _gi_pass->_denoiser_active_flag->store(is_active);
+                ++_gi_pass->_denoiser_activation_revision;
+            }
+        }
+        String RayTraceGI::DenoiserReason() const
+        {
+            std::lock_guard lock(_denoiser_diagnostics_mutex);
+            return _denoiser_reason;
+        }
+        PathTracingDenoiserDiagnostics RayTraceGI::DenoiserDiagnostics() const
+        {
+            std::lock_guard lock(_denoiser_diagnostics_mutex);
+            return _denoiser_diagnostics;
         }
 
 #pragma endregion
@@ -445,6 +483,28 @@ namespace Ailu
             const bool history_inputs_changed = _has_history_signature && history_signature != _last_history_signature;
             const bool reset_history = history_inputs_changed || camera_changed || camera_cut || explicit_reset ||
                                        reference_camera_changed || accumulation_just_enabled || target_recreated;
+            const u64 shader_revision = _gi_compute_shader.Handle().GetRevision();
+            const u64 rt_shader_revision = _gi_raytracing_shader.Handle().GetRevision();
+            const bool shader_changed = shader_revision != _denoiser_shader_revision ||
+                                        rt_shader_revision != _denoiser_rt_shader_revision;
+            _denoiser_shader_revision = shader_revision;
+            _denoiser_rt_shader_revision = rt_shader_revision;
+            const auto previous_denoiser_status = _denoiser_host.Status();
+            const u64 engine_frame = g_pGfxContext->GetFrameCount();
+            const bool render_gap = engine_frame > _last_denoiser_engine_frame + 1u;
+            const bool denoiser_quality_changed = _previous_denoiser_quality != _denoiser_quality;
+            const u64 activation_revision = _denoiser_activation_revision.load();
+            const bool activation_changed = activation_revision != _previous_denoiser_activation_revision;
+            _previous_denoiser_activation_revision = activation_revision;
+            _previous_denoiser_quality = _denoiser_quality;
+            _last_denoiser_engine_frame = engine_frame;
+            _denoiser_host.Configure(_denoiser, _accumulation_mode == EPathTracerAccumulationMode::kReference,
+                                     reset_history || shader_changed || denoiser_quality_changed || render_gap ||
+                                     activation_changed);
+            if (_denoiser_host.Status() != previous_denoiser_status)
+                LOG_INFO("PathTracing denoiser: {}", _denoiser_host.Reason());
+            if (reset_history || shader_changed) _reference_sample_count = 0u;
+            ++_denoiser_frame_index;
             const Vector2f current_uv_jitter(camera.GetJitter().z, camera.GetJitter().w);
             const Vector2f previous_uv_jitter = reset_history || !_temporal_history_valid
                 ? current_uv_jitter
@@ -579,7 +639,7 @@ namespace Ailu
                         {
                             if (auto *instance_data = _scene_rt_proxy->GetPrimitiveData(); instance_data != nullptr)
                                 builder.Read(builder.Import(instance_data));
-                            if (auto *material_data = _scene_rt_proxy->GetMaterialData(); material_data != nullptr)
+                            if (auto *material_data = rendering_data._material_buffer; material_data != nullptr)
                                 builder.Read(builder.Import(material_data));
                             _scene_rt_proxy->AddRayTracingResourceReads(builder);
                         }
@@ -631,7 +691,7 @@ namespace Ailu
                         _gi_raytracing_shader->SetBuffer("g_rayGenCB", _raygen_data.get());
                         _gi_raytracing_shader->SetBuffer("g_perSceneData", data._p_per_scene_cbuf);
                         _gi_raytracing_shader->SetBuffer("g_perCamData", g_perCamData.get());
-                        _gi_raytracing_shader->SetBuffer("g_material_data", _scene_rt_proxy->GetMaterialData());
+                        _gi_raytracing_shader->SetBuffer("g_material_data", data._material_buffer);
                         _gi_raytracing_shader->SetBuffer("_UnifiedLights", _scene_rt_proxy->GetUnifiedLightData());
                         _gi_raytracing_shader->SetBuffer("_PathLightLookup", _scene_rt_proxy->GetPathLightLookup());
                         _gi_raytracing_shader->SetBuffer("_UnifiedLightConfig", _scene_rt_proxy->GetUnifiedLightConfig());
@@ -725,6 +785,8 @@ namespace Ailu
                     if (!*raw_executed)
                     {
                         _temporal_history_valid = false;
+                        _denoiser_host.Reset();
+                        _reference_sample_count = 0u;
                         return;
                     }
                 // Surface history stays in UAV state across frames; order its reads and writes explicitly.
@@ -759,33 +821,43 @@ namespace Ailu
                                                curr_surface_buffer != nullptr ? curr_surface_buffer->GetBindlessUAVIndex() : -1);
                     cmd->Dispatch(_gi_compute_shader.get(), _kernel_denoise, x, y, 1);
                     _temporal_history_valid = true;
+                    if (_accumulation_mode == EPathTracerAccumulationMode::kReference)
+                        ++_reference_sample_count;
                     _previous_uv_jitter = current_uv_jitter;
                     _is_history_a = !_is_history_a;
                     _is_cur_a = !_is_cur_a;
                 } });
             }
-            RDG::RGHandle final_target_handle = accumulation_enabled ? _history_curr_handle : _raw_path_trace_handle;
-            graph.AddPass("Debug GI", RDG::PassDesc(), [&, this](RDG::RenderGraphBuilder &builder)
-                          {
-                    builder.Read(final_target_handle);
-                    builder.Read(_raw_path_trace_handle);
-                    builder.Read(_history_prev_handle);
-                    builder.Read(_history_curr_handle);
-                    if (accumulation_enabled && _debug_temporal_target >= 4u)
-                        builder.Read(_temporal_debug_handle);
-                    rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target); 
-                    }, [this, accumulation_enabled](RDG::RenderGraph &graph, CommandBuffer *cmd,
-                                                     const RenderingData &data)
-                { 
-                    RDG::RGHandle display_target = accumulation_enabled ? _history_curr_handle : _raw_path_trace_handle;
-                    if (_debug_temporal_target == 1u)
-                        display_target = _raw_path_trace_handle;
-                    else if (_debug_temporal_target == 2u)
-                        display_target = _history_prev_handle;
-                    else if (_debug_temporal_target == 3u)
-                        display_target = _history_curr_handle;
-                    else if (accumulation_enabled && _debug_temporal_target >= 4u)
-                        display_target = _temporal_debug_handle;
+            PathTracingDenoiserInput denoiser_input;
+            denoiser_input._radiance = _history_curr_handle;
+            denoiser_input._width = rendering_data._width;
+            denoiser_input._height = rendering_data._height;
+            denoiser_input._frame_index = _denoiser_frame_index;
+            denoiser_input._sample_count = _reference_sample_count;
+            denoiser_input._raw_executed = raw_executed;
+            denoiser_input._radiance_owner = _is_history_a ? _history_texture_a : _history_texture_b;
+            denoiser_input._activation_owner = _denoiser_active_flag;
+            denoiser_input._quality = _denoiser_quality;
+            denoiser_input._sample_interval = _denoiser_sample_interval;
+            denoiser_input._valid_radiance = _temporal_history_valid && _reference_sample_count > 0u;
+            const auto denoiser_output = _denoiser_host.Record(graph, denoiser_input);
+            RDG::RGHandle display_target = accumulation_enabled ? _history_curr_handle : _raw_path_trace_handle;
+            if (_debug_temporal_target == 1u)
+                display_target = _raw_path_trace_handle;
+            else if (_debug_temporal_target == 2u)
+                display_target = _history_prev_handle;
+            else if (_debug_temporal_target == 3u)
+                display_target = _history_curr_handle;
+            else if (accumulation_enabled && _debug_temporal_target >= 4u)
+                display_target = _temporal_debug_handle;
+            else if (_debug_temporal_target == 0u && denoiser_output._valid)
+                display_target = denoiser_output._display_texture;
+            graph.AddPass("Debug GI", RDG::PassDesc(), [&, display_target](RDG::RenderGraphBuilder &builder)
+                {
+                    builder.Read(display_target);
+                    rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target);
+                }, [display_target](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
+                {
                     cmd->Blit(display_target, data._rg_handles._color_target);
                 });
             if (!use_hardware_ray_tracing)

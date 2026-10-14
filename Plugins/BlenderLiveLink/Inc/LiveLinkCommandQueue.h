@@ -2,6 +2,8 @@
 
 #include <deque>
 #include <chrono>
+#include <atomic>
+#include <condition_variable>
 #include <mutex>
 #include <string>
 #include <string_view>
@@ -34,6 +36,16 @@ namespace Ailu
     class LiveLinkCommandQueue final
     {
     public:
+        bool WaitForCapacity(size_t payload_bytes, const std::atomic<bool>& stopping)
+        {
+            if (payload_bytes > kMaxBytes)
+                return false;
+            std::unique_lock lock(_mutex);
+            while (!stopping.load() && !HasCapacity(payload_bytes))
+                _capacity_changed.wait_for(lock, std::chrono::milliseconds(50));
+            return !stopping.load() && HasCapacity(payload_bytes);
+        }
+
         bool Push(LiveLinkCommand command)
         {
             std::lock_guard lock(_mutex);
@@ -44,7 +56,7 @@ namespace Ailu
                 for (auto iter = _commands.begin(); iter != _commands.end();)
                 {
                     if (iter->_type == ELiveLinkCommandType::kMessage
-                        && (iter->_message_type == 12u || iter->_message_type == 20u
+                        && (iter->_message_type == 12u || iter->_message_type == 20u || iter->_message_type == 24u
                             || iter->_message_type == 22u || iter->_message_type == 23u)
                         && CoalesceKey(*iter) == key)
                     {
@@ -89,6 +101,7 @@ namespace Ailu
             _queued_bytes -= _commands.front()._payload.size();
             command = std::move(_commands.front());
             _commands.pop_front();
+            _capacity_changed.notify_all();
             return true;
         }
 
@@ -97,15 +110,23 @@ namespace Ailu
             std::lock_guard lock(_mutex);
             _commands.clear();
             _queued_bytes = 0u;
+            _capacity_changed.notify_all();
         }
 
     private:
+        bool HasCapacity(size_t payload_bytes) const noexcept
+        {
+            return _commands.size() + 1u < kMaxCommands && payload_bytes <= kMaxBytes - _queued_bytes;
+        }
+
         static std::string CoalesceKey(const LiveLinkCommand& command)
         {
             if (command._type != ELiveLinkCommandType::kMessage)
                 return {};
+            if (command._message_type == 31u)
+                return {}; // A batch carries many identities and cannot be safely coalesced by its first GUID.
             const auto& payload = command._payload;
-            if (command._message_type == 20u && payload.size() >= 36u)
+            if ((command._message_type == 20u || command._message_type == 24u) && payload.size() >= 36u)
                 return std::string(payload.begin(), payload.begin() + 36);
             const std::string_view text(reinterpret_cast<const char*>(payload.data()), payload.size());
             size_t start = text.find("\"material_guid\"");
@@ -128,6 +149,7 @@ namespace Ailu
         static constexpr size_t kMaxCommands = 4096u;
         static constexpr size_t kMaxBytes = 256u * 1024u * 1024u;
         std::mutex _mutex;
+        std::condition_variable _capacity_changed;
         std::deque<LiveLinkCommand> _commands;
         size_t _queued_bytes = 0u;
     };

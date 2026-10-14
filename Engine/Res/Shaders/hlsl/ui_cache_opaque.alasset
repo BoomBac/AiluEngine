@@ -1,0 +1,12 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "a14873ce-4fbd-4594-9484-e6448c3200a3",
+        "_asset_type": "Ailu::Render::Shader",
+        "_asset_name": "ui_cache_opaque",
+        "_dependencies": []
+    },
+    "_file": "ui_cache_opaque.hlsl",
+    "_vs_entry": "VSMain",
+    "_ps_entry": "PSMain"
+}

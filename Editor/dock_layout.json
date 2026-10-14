@@ -72,7 +72,7 @@
             "_split_ratio": 0.5,
             "_title": "null",
             "_window_id": 0,
-            "_tab_id": "1",
+            "_tab_id": "0",
             "_window_position": [-858993472.0, -858993472.0],
             "_window_size": [1491.0, 902.0],
             "_position": [2.0, 55.0],
@@ -81,7 +81,7 @@
             "_window_state": ""
         }, {
             "_type_id": "Ailu::Editor::WorldOutline",
-            "_id": 1306,
+            "_id": 1402,
             "_parent_id": 101,
             "_type": 2,
             "_is_vertical_split": true,
@@ -97,7 +97,7 @@
             "_window_state": ""
         }, {
             "_type_id": "Ailu::Editor::PlaceActor",
-            "_id": 1307,
+            "_id": 1403,
             "_parent_id": 101,
             "_type": 2,
             "_is_vertical_split": true,
@@ -129,7 +129,7 @@
             "_window_state": ""
         }, {
             "_type_id": "Ailu::Editor::SceneView",
-            "_id": 1308,
+            "_id": 1404,
             "_parent_id": 5,
             "_type": 2,
             "_is_vertical_split": true,
@@ -145,7 +145,7 @@
             "_window_state": ""
         }, {
             "_type_id": "Ailu::Editor::GameView",
-            "_id": 1309,
+            "_id": 1405,
             "_parent_id": 5,
             "_type": 2,
             "_is_vertical_split": true,

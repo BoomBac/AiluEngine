@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __RAYTRACEGI_GEN_H__
 //Class RayTraceGI begin...........................
-#define RAYTRACEGI_GEN_H_25_GENERATED_BODY \
+#define RAYTRACEGI_GEN_H_27_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_RayTraceGI_Type();\
                                 static const Type* GetPrivateStaticClass();\

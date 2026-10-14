@@ -383,3 +383,7 @@ Editor/Editor.zip
 AiluEngine_Source.zip
 Saved/
 Tools/Blender/tests/
+
+# Local AiluEditor profiling/build artifacts
+/.artifacts/build-debug/
+/.artifacts/diagnostics/editor-ui-cpu/

@@ -7,6 +7,7 @@ import numpy as np
 from . import coordinate, identity, protocol
 
 _mesh_revision = {}
+_mesh_geometry_state = {}
 _session_temp_dir = None
 
 
@@ -97,14 +98,17 @@ def encode_mesh(obj, depsgraph):
             evaluated.to_mesh_clear()
 
 
-def send_mesh(obj, depsgraph, link):
+def send_mesh(obj, depsgraph, link, prototype=False):
     encode_start = time.perf_counter()
+    guid = identity.get_guid(obj)
     payload = encode_mesh(obj, depsgraph)
+    _mesh_geometry_state[guid] = payload is not None
     encode_ms = (time.perf_counter() - encode_start) * 1000.0
     if payload is None:
         return False
     enqueue_start = time.perf_counter()
-    queued = link.send(protocol.MESH_UPSERT, payload)
+    message_type = protocol.MESH_PROTOTYPE_UPSERT if prototype else protocol.MESH_UPSERT
+    queued = link.send(message_type, payload)
     enqueue_ms = (time.perf_counter() - enqueue_start) * 1000.0
     if encode_ms + enqueue_ms >= 50.0:
         print(
@@ -114,8 +118,5 @@ def send_mesh(obj, depsgraph, link):
     return queued
 
 
-def send_instance_mesh(payload, guid, link):
-    guid_bytes = guid.encode("ascii")
-    revision = _mesh_revision.get(guid_bytes, 0) + 1
-    _mesh_revision[guid_bytes] = revision
-    return link.send(protocol.MESH_UPSERT, struct.pack("<36sQ", guid_bytes, revision) + payload[44:])
+def has_geometry(guid):
+    return _mesh_geometry_state.get(guid, False)
