@@ -6,6 +6,8 @@
 #include "Inc/Render/GraphicsContext.h"
 #include "Inc/Render/FrameAllocator.h"
 #include "RHI/DX12/UploadBuffer.h"
+#include <limits>
+#include <stdexcept>
 
 namespace Ailu::Render
 {
@@ -35,6 +37,30 @@ namespace Ailu::Render
     FrameResource::~FrameResource()
     {
     }
+    GPUBuffer *FrameResource::GetAreaLightBuffer(u64 scene_hash, u64 view_hash, u32 count)
+    {
+        static_assert(sizeof(ShaderArealLightData) == 160u);
+        auto &entry = _area_light_buffers[scene_hash][view_hash];
+        constexpr u32 kMaxCapacity = std::numeric_limits<u32>::max() / sizeof(ShaderArealLightData);
+        const u32 required = std::max(1u, count);
+        if (required > kMaxCapacity)
+            throw std::length_error("Raster area-light buffer exceeds the buffer byte-size limit");
+        if (entry._capacity < required)
+        {
+            u32 capacity = std::max(1u, entry._capacity);
+            while (capacity < required)
+                capacity = std::min(capacity * 2u, kMaxCapacity);
+            BufferDesc desc{};
+            desc._element_size = sizeof(ShaderArealLightData);
+            desc._element_num = capacity;
+            desc._size = desc._element_size * capacity;
+            desc._target = EGPUBufferTarget::kStructured;
+            entry._buffer = GPUBuffer::Create(desc, std::format("RasterAreaLights_{}_{}", scene_hash, view_hash));
+            entry._capacity = capacity;
+        }
+        return entry._buffer.get();
+    }
+
     ConstantBuffer *FrameResource::GetMatCB(u32 index)
     {
         AL_ASSERT(index < _mat_cbs.size());

@@ -51,6 +51,7 @@ namespace Ailu::Render
         kReadBack,
         kReadBackTexture,
         kPresent,
+        kEndFrame,
         kScissorRect,
         kBuildAS,
         kDispatchRays,
@@ -264,6 +265,11 @@ namespace Ailu::Render
         void Reset() {}
     };
 
+    struct CommandEndFrame : public TypedGfxCommand<EGpuCommandType::kEndFrame>
+    {
+        void Reset() {}
+    };
+
     struct CommandScissor : public TypedGfxCommand<EGpuCommandType::kScissorRect>
     {
         Array<Rect, RenderConstants::kMaxMRTNum> _rects;
@@ -352,7 +358,7 @@ namespace Ailu::Render
         sizeof(CommandSetTarget), sizeof(CommandClearTarget), sizeof(CommandDraw), sizeof(CommandDispatch),
         sizeof(CommandGpuResourceUpload), sizeof(CommandRequireResourceState), sizeof(CommandUavBarrier),
         sizeof(CommandCustom), sizeof(CommandAllocConstBuffer), sizeof(CommandProfiler),
-        sizeof(CommandCopyCounter), sizeof(CommandPresent), sizeof(CommandScissor), sizeof(CommandDispatchRays),
+        sizeof(CommandCopyCounter), sizeof(CommandPresent), sizeof(CommandEndFrame), sizeof(CommandScissor), sizeof(CommandDispatchRays),
         sizeof(CommandReadBack), sizeof(CommandReadBackTexture), sizeof(CommandBuildAS),
         sizeof(CommandDestroyGpuResource));
 
@@ -360,7 +366,7 @@ namespace Ailu::Render
         alignof(CommandSetTarget), alignof(CommandClearTarget), alignof(CommandDraw), alignof(CommandDispatch),
         alignof(CommandGpuResourceUpload), alignof(CommandRequireResourceState), alignof(CommandUavBarrier),
         alignof(CommandCustom), alignof(CommandAllocConstBuffer), alignof(CommandProfiler),
-        alignof(CommandCopyCounter), alignof(CommandPresent), alignof(CommandScissor), alignof(CommandDispatchRays),
+        alignof(CommandCopyCounter), alignof(CommandPresent), alignof(CommandEndFrame), alignof(CommandScissor), alignof(CommandDispatchRays),
         alignof(CommandReadBack), alignof(CommandReadBackTexture), alignof(CommandBuildAS),
         alignof(CommandDestroyGpuResource));
 

@@ -920,7 +920,7 @@ Scope<Asset> TextureAssetHandler::Load(const AssetLoadContext &context)
                 if (tex != nullptr)
                 {
                     loaded_from_artifact = true;
-                    LOG_INFO(L"Texture artifact cache hit: {}", source_system_path);
+                    LOG_MODULE_DEBUG(ELogModule::kAsset, L"Texture artifact cache hit: {}", source_system_path);
                 }
             }
             runtime_create_us = ElapsedMicroseconds(runtime_create_start);
@@ -984,7 +984,7 @@ Scope<Asset> TextureAssetHandler::Load(const AssetLoadContext &context)
     const auto gpu_upload_start = std::chrono::steady_clock::now();
     tex->Apply();
     gpu_upload_us = ElapsedMicroseconds(gpu_upload_start);
-    LOG_INFO(L"Texture artifact {}: {} (artifact_path={}, has_source_fingerprint={}, cache_available={}, "
+    LOG_MODULE_DEBUG(ELogModule::kAsset, L"Texture artifact {}: {} (artifact_path={}, has_source_fingerprint={}, cache_available={}, "
              L"artifact_exists_before_load={}, artifact_store_attempted={}, artifact_serialized={}, "
              L"artifact_stored={}, artifact_exists_after_store={}, artifact_read={} us, "
              L"native_import={} us, runtime_create={} us, gpu_upload={} us, artifact_write={} us, "
@@ -1377,7 +1377,7 @@ static Scope<Asset> LoadMeshImpl(const AssetLoadContext &context)
                 {
                     mesh_list.emplace_back(std::move(mesh));
                     loaded_from_artifact = true;
-                    LOG_INFO(L"Mesh artifact cache hit: {}", source_system_path);
+                    LOG_MODULE_DEBUG(ELogModule::kAsset, L"Mesh artifact cache hit: {}", source_system_path);
                 }
             }
             runtime_create_us = ElapsedMicroseconds(runtime_create_start);
@@ -1398,7 +1398,7 @@ static Scope<Asset> LoadMeshImpl(const AssetLoadContext &context)
 
     if (!loaded_from_artifact)
     {
-        LOG_INFO(L"Mesh artifact cache miss: {}", source_system_path);
+        LOG_MODULE_DEBUG(ELogModule::kAsset, L"Mesh artifact cache miss: {}", source_system_path);
         const auto native_import_start = std::chrono::steady_clock::now();
         mesh_list = std::move(context._resource_mgr->LoadExternalMesh(resolved_file, setting, clips));
         native_import_us = ElapsedMicroseconds(native_import_start);
@@ -1447,7 +1447,7 @@ static Scope<Asset> LoadMeshImpl(const AssetLoadContext &context)
         mesh_list.front()->Apply();
         gpu_upload_us = ElapsedMicroseconds(gpu_upload_start);
     }
-    LOG_INFO(L"Mesh artifact {}: {} (artifact_path={}, artifact_read={} us, native_import={} us, "
+    LOG_MODULE_DEBUG(ELogModule::kAsset, L"Mesh artifact {}: {} (artifact_path={}, artifact_read={} us, native_import={} us, "
              L"runtime_create={} us, gpu_upload={} us, artifact_write={} us, artifact_size={} bytes)",
              loaded_from_artifact ? L"hit" : L"miss", source_system_path, artifact_path, artifact_read_us,
              native_import_us, runtime_create_us, gpu_upload_us, artifact_write_us, artifact_size);
@@ -1827,19 +1827,7 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
         {
             auto &component = reg.AddComponent<ECS::LightComponent>(entity);
             reg.SetComponentEnabled<ECS::LightComponent>(entity, !is_component_disabled(entity_doc, "LightComponent"));
-            if (!entity_doc._light_component._type.empty())
-                if (const Enum *enum_type = StaticEnum<ECS::ELightType>())
-                {
-                    const i32 enum_index = enum_type->GetIndexByName(entity_doc._light_component._type);
-                    if (enum_index != -1)
-                        component._type = static_cast<ECS::ELightType>(enum_index);
-                }
-            component._light._light_color = entity_doc._light_component._light._light_color;
-            component._light._light_param = entity_doc._light_component._light._light_param;
-            component._light._is_two_side = entity_doc._light_component._light._is_two_side;
-            component._shadow._is_cast_shadow = entity_doc._light_component._shadow._is_cast_shadow;
-            component._shadow._constant_bias = entity_doc._light_component._shadow._constant_bias;
-            component._shadow._slope_bias = entity_doc._light_component._shadow._slope_bias;
+            entity_doc._light_component.ApplyTo(component);
         }
         if (entity_doc._has_camera_component)
         {
@@ -1851,6 +1839,7 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
             component._camera.Far(entity_doc._camera_component._far_clip);
             component._camera.Near(entity_doc._camera_component._near_clip);
             component._camera.FovH(entity_doc._camera_component._fov_h);
+            component._camera.PhysicalSettings(entity_doc._camera_component._physical_camera_settings);
             component._camera.Size(entity_doc._camera_component._size);
             component._camera.SetLocalViewAxes(entity_doc._camera_component._local_forward, entity_doc._camera_component._local_up);
             component._camera.ProjectionOffset(entity_doc._camera_component._projection_offset);
@@ -1957,6 +1946,8 @@ Scope<Asset> SceneAssetHandler::Load(const AssetLoadContext &context)
             const auto &document = entity_doc._environment_component;
             component._source = document._source;
             component._texture = document._texture_guid.empty() ? Guid::EmptyGuid() : Guid(document._texture_guid);
+            component._background_texture = document._background_texture_guid.empty()
+                ? Guid::EmptyGuid() : Guid(document._background_texture_guid);
             component._procedural_sky._sky_color = document._sky_color;
             component._procedural_sky._ground_color = document._ground_color;
             component._intensity = document._intensity;
@@ -2292,14 +2283,19 @@ bool SceneAssetHandler::Save(const AssetSaveContext &context)
 
     for (const auto &entity_doc : doc._entities)
     {
-        if (!entity_doc._has_environment_component || entity_doc._environment_component._texture_guid.empty())
+        if (!entity_doc._has_environment_component)
             continue;
-        const Guid texture_guid(entity_doc._environment_component._texture_guid);
-        if (texture_guid.IsEmpty() || std::any_of(doc._header._dependencies.begin(), doc._header._dependencies.end(),
-                                                   [&texture_guid](const AssetDependency &dependency)
-                                                   { return dependency._guid == texture_guid; }))
-            continue;
-        doc._header._dependencies.emplace_back(texture_guid, EAssetDependencyType::kRuntime);
+        for (const auto &guid_text : {entity_doc._environment_component._texture_guid,
+                                      entity_doc._environment_component._background_texture_guid})
+        {
+            if (guid_text.empty())
+                continue;
+            const Guid texture_guid(guid_text);
+            if (texture_guid.IsEmpty() || std::any_of(doc._header._dependencies.begin(), doc._header._dependencies.end(),
+                [&texture_guid](const AssetDependency &dependency) { return dependency._guid == texture_guid; }))
+                continue;
+            doc._header._dependencies.emplace_back(texture_guid, EAssetDependencyType::kRuntime);
+        }
     }
 
     // 按 GUID 字符串排序，减少 ECS dense storage 调整导致的无意义文件 diff。
@@ -2359,7 +2355,7 @@ Scope<Asset> AnimationClipAssetHandler::Load(const AssetLoadContext &context)
                 asset->_p_obj = loaded_clip;
                 asset->_domain = context._resource_mgr->GetAssetPathDomain(asset->_asset_path);
                 AnimationClipLibrary::AddClip(loaded_clip);
-                LOG_INFO(L"AnimationClip artifact cache hit: {} (read {} us, build {} us)", sys_path,
+                LOG_MODULE_DEBUG(ELogModule::kAsset, L"AnimationClip artifact cache hit: {} (read {} us, build {} us)", sys_path,
                          artifact_read_us, runtime_create_us);
                 return asset;
             }
@@ -2439,11 +2435,11 @@ Scope<Asset> AnimationClipAssetHandler::Load(const AssetLoadContext &context)
             SerializeAnimationClipArtifact(artifact, artifact_key, serialized_artifact))
         {
             if (context._derived_data_cache->Store(Guid(header._guid), artifact_key, serialized_artifact))
-                LOG_INFO(L"AnimationClip artifact rebuilt: {} ({} bytes)", sys_path, serialized_artifact.size());
+                LOG_MODULE_DEBUG(ELogModule::kAsset, L"AnimationClip artifact rebuilt: {} ({} bytes)", sys_path, serialized_artifact.size());
         }
     }
 
-    LOG_INFO(L"AnimationClip JSON load: {} (load {} us, total {} us)", sys_path, json_load_us,
+    LOG_MODULE_DEBUG(ELogModule::kAsset, L"AnimationClip JSON load: {} (load {} us, total {} us)", sys_path, json_load_us,
              ElapsedMicroseconds(load_start));
     
     auto asset = MakeScope<Asset>(Guid(doc._header._guid),AnimationClip::StaticType(),context._asset_path);

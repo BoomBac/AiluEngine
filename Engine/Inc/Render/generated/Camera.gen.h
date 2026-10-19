@@ -4,6 +4,22 @@
 #endif 
 #include "Objects/ReflectTemplate.h"
 #define __CAMERA_GEN_H__
+//Struct PhysicalCameraSettings begin...........................
+#define CAMERA_GEN_H_50_GENERATED_BODY \
+                            private: \
+                                friend const Type* Z_Construct_PhysicalCameraSettings_Type();\
+                                static const Type* GetPrivateStaticClass();\
+                            public:\
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                const Type  *GetType();
+                            namespace Ailu {class Type;}
+namespace Ailu::Render{
+struct PhysicalCameraSettings ;
+}
+template<>
+AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::Render::PhysicalCameraSettings>();
+//Struct PhysicalCameraSettings end...........................
+
 //Enum EAntiAliasing begin...........................
 const Ailu::Enum* Z_Construct_Enum_Ailu_Render_EAntiAliasing_Type();
 namespace Ailu::Render {
@@ -21,6 +37,24 @@ enum class ECameraType : i32;
 template<>
 AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::ECameraType>();
 //Enum ECameraType end...........................
+
+//Enum ELensProjectionMode begin...........................
+const Ailu::Enum* Z_Construct_Enum_Ailu_Render_ELensProjectionMode_Type();
+namespace Ailu::Render {
+enum class ELensProjectionMode : u8;
+}
+template<>
+AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::ELensProjectionMode>();
+//Enum ELensProjectionMode end...........................
+
+//Enum EExposureMode begin...........................
+const Ailu::Enum* Z_Construct_Enum_Ailu_Render_EExposureMode_Type();
+namespace Ailu::Render {
+enum class EExposureMode : u8;
+}
+template<>
+AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::EExposureMode>();
+//Enum EExposureMode end...........................
 
 //Enum EUpsamplingFilter begin...........................
 const Ailu::Enum* Z_Construct_Enum_Ailu_Render_EUpsamplingFilter_Type();

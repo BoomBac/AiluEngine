@@ -531,9 +531,36 @@ namespace Ailu::RHI::DX12
             pass_variant._per_frame_buf_bind_slot = root_param_index;
             rootParameters[root_param_index++].InitAsConstantBufferView(2u);
         }
+        const auto append_bindless_table = [&](const char *name, D3D12_DESCRIPTOR_RANGE_TYPE type, u32 capacity)
+        {
+            const auto it = variant_bind_res_info.find(name);
+            if (it == variant_bind_res_info.end())
+                return;
+            AL_ASSERT(root_param_index < 32u);
+            auto &desc = it->second;
+            const auto flags = type == D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER
+                ? D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE
+                : D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE;
+            ranges[root_param_index].Init(type, capacity, desc._res_slot, desc._register_space, flags);
+            rootParameters[root_param_index].InitAsDescriptorTable(1u, &ranges[root_param_index]);
+            desc._bind_slot = root_param_index++;
+        };
+        append_bindless_table("g_material_samplers", D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER, D3DDescriptorMgr::kSamplerCapacity);
+        append_bindless_table("g_bindless_texture2d", D3D12_DESCRIPTOR_RANGE_TYPE_SRV,
+                              GPUVisibleDescriptorAllocator::kBindlessSRVCapacity);
+        append_bindless_table("g_bindless_buffer", D3D12_DESCRIPTOR_RANGE_TYPE_SRV,
+                              GPUVisibleDescriptorAllocator::kBindlessSRVCapacity);
+        append_bindless_table("g_bindless_rw_texture2d", D3D12_DESCRIPTOR_RANGE_TYPE_UAV,
+                              GPUVisibleDescriptorAllocator::kBindlessUAVCapacity);
+        append_bindless_table("g_bindless_rw_buffer", D3D12_DESCRIPTOR_RANGE_TYPE_UAV,
+                              GPUVisibleDescriptorAllocator::kBindlessUAVCapacity);
         for (auto it = variant_bind_res_info.begin(); it != variant_bind_res_info.end(); it++)
         {
             auto &desc = it->second;
+            if (desc._name == "g_material_samplers" || desc._name == "g_bindless_texture2d" ||
+                desc._name == "g_bindless_buffer" || desc._name == "g_bindless_rw_texture2d" ||
+                desc._name == "g_bindless_rw_buffer")
+                continue;
             switch (desc._res_type)
             {
                 case EBindResDescType::kSampler:
@@ -617,14 +644,14 @@ namespace Ailu::RHI::DX12
         Render::EShaderArtifactInvalidReason reason = Render::EShaderArtifactInvalidReason::kNone;
         if (is_load_cache && artifact_cache.Load(key, artifact, &reason) && HydrateGraphicsVariant(pass_index, variant_hash, artifact))
         {
-            LOG_INFO("ShaderVariant READY shader={} pass={} variant={} source=artifact reason={}", _name, pass_index,
+            LOG_MODULE_DEBUG(ELogModule::kShader, "ShaderVariant READY shader={} pass={} variant={} source=artifact reason={}", _name, pass_index,
                      variant_hash, Render::ShaderArtifactInvalidReasonToString(reason));
             return true;
         }
         if (is_load_cache && artifact_cache.WaitForCompile(key) &&
             artifact_cache.Load(key, artifact, &reason) && HydrateGraphicsVariant(pass_index, variant_hash, artifact))
         {
-            LOG_INFO("ShaderVariant READY shader={} pass={} variant={} source=artifact reason={}", _name, pass_index,
+            LOG_MODULE_DEBUG(ELogModule::kShader, "ShaderVariant READY shader={} pass={} variant={} source=artifact reason={}", _name, pass_index,
                      variant_hash, Render::ShaderArtifactInvalidReasonToString(reason));
             return true;
         }
@@ -693,8 +720,11 @@ namespace Ailu::RHI::DX12
             succeed = false;
         }
         artifact_cache.EndCompile(key);
-        LOG_INFO("ShaderVariant READY shader={} pass={} variant={} source={} reason={}", _name, pass_index, variant_hash,
-                 used_artifact ? "artifact" : "compile", Render::ShaderArtifactInvalidReasonToString(reason));
+        if (succeed)
+        {
+            LOG_MODULE_DEBUG(ELogModule::kShader, "ShaderVariant READY shader={} pass={} variant={} source={} reason={}", _name, pass_index, variant_hash,
+                      used_artifact ? "artifact" : "compile", Render::ShaderArtifactInvalidReasonToString(reason));
+        }
         return succeed;
     }
 
@@ -1228,7 +1258,7 @@ namespace Ailu::RHI::DX12
         Render::EShaderArtifactInvalidReason reason = Render::EShaderArtifactInvalidReason::kNone;
         if (is_load_cache && artifact_cache.Load(key, artifact, &reason) && HydrateComputeVariant(kernel_index, variant_hash, artifact))
         {
-            LOG_INFO("ComputeShaderVariant READY shader={} kernel={} variant={} source=artifact reason={}",
+            LOG_MODULE_DEBUG(ELogModule::kShader, "ComputeShaderVariant READY shader={} kernel={} variant={} source=artifact reason={}",
                      ToChar(_src_file_path), kernel_index, variant_hash,
                      Render::ShaderArtifactInvalidReasonToString(reason));
             return true;
@@ -1236,7 +1266,7 @@ namespace Ailu::RHI::DX12
         if (is_load_cache && artifact_cache.WaitForCompile(key) &&
             artifact_cache.Load(key, artifact, &reason) && HydrateComputeVariant(kernel_index, variant_hash, artifact))
         {
-            LOG_INFO("ComputeShaderVariant READY shader={} kernel={} variant={} source=artifact reason={}",
+            LOG_MODULE_DEBUG(ELogModule::kShader, "ComputeShaderVariant READY shader={} kernel={} variant={} source=artifact reason={}",
                      ToChar(_src_file_path), kernel_index, variant_hash,
                      Render::ShaderArtifactInvalidReasonToString(reason));
             return true;
@@ -1291,9 +1321,12 @@ namespace Ailu::RHI::DX12
             LOG_ERROR("Compile compute shader {} failed: {}", ToChar(_src_file_path), error.what());
         }
         artifact_cache.EndCompile(key);
-        LOG_INFO("ComputeShaderVariant READY shader={} kernel={} variant={} source={} reason={}",
-                 ToChar(_src_file_path), kernel_index, variant_hash, used_artifact ? "artifact" : "compile",
-                 Render::ShaderArtifactInvalidReasonToString(reason));
+        if (succeed)
+        {
+            LOG_MODULE_DEBUG(ELogModule::kShader, "ComputeShaderVariant READY shader={} kernel={} variant={} source={} reason={}",
+                      ToChar(_src_file_path), kernel_index, variant_hash, used_artifact ? "artifact" : "compile",
+                      Render::ShaderArtifactInvalidReasonToString(reason));
+        }
         return succeed;
     }
 

@@ -122,7 +122,8 @@ namespace Ailu::Render
         constexpr static u8 kFrameCount = 2u;
         constexpr static u16 kMaxMaterialDataCount = 512u;
         constexpr static u32 kMaxRenderObjectCount = 2000u;
-        constexpr static u32 kMaxScenePrimitiveCount = 65536u;
+        constexpr static u32 kMaxScenePrimitiveCount = 131072u;
+        constexpr static u32 kMaxSoftwareRayTracingPrimitiveCount = 65536u;
         constexpr static u32 kMaxStaticDiffuseProbeGroupCount = 256u;
         constexpr static u32 kMaxStaticDiffuseProbeCount = 16384u;
         constexpr static u32 kMaxPassDataCount = 10u;
@@ -133,6 +134,7 @@ namespace Ailu::Render
         constexpr static u8 kMaxVertexAttrNum = 10u;
         constexpr static u16 kMaxDirectionalLightNum = kMaxDirectionalLight;
         constexpr static u16 kMaxPointLightNum = kMaxPointLight;
+        constexpr static u16 kMaxPointShadowLightNum = 4u;
         constexpr static u16 kMaxSpotLightNum = kMaxSpotLight;
         constexpr static u16 kMaxAreaLightNum = kMaxAreaLight;
         constexpr static u16 kMaxCascadeShadowMapSplitNum = kMaxCascadeShadowMapSplit;

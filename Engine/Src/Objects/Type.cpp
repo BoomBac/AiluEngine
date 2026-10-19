@@ -184,7 +184,7 @@ namespace Ailu
         auto it = s_global_types.find(name);
         if (it == s_global_types.end())
         {
-            LOG_WARNING("Type::Find: Type not found: {},try register it...", name);
+            LOG_DEBUG("Type::Find: Type not found: {},try register it...", name);
             if (auto itt = s_global_register.find(name); itt != s_global_register.end())
             {
                 s_global_types[name] = const_cast<Type*>(s_global_register[name]());
@@ -333,7 +333,7 @@ namespace Ailu
         {
             auto new_enum = s_registers.front()();
             s_registers.pop();
-            LOG_INFO("Enum::InitTypeInfo: Register enum type: {}", new_enum->Name());
+            LOG_DEBUG("Enum::InitTypeInfo: Register enum type: {}", new_enum->Name());
         }
     }
     void Enum::RegisterEnum(Enum *enum_ptr)

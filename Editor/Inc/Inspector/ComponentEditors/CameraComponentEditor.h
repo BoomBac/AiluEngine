@@ -13,6 +13,8 @@ namespace Ailu
             bool NeedsRebuild(const ComponentEditorContext &context) const override;
         private:
             int _cached_type = -1;
+            int _cached_lens_mode = -1;
+            int _cached_exposure_mode = -1;
         };
     }// namespace Editor
 }// namespace Ailu

@@ -540,7 +540,7 @@ namespace Ailu::RHI::DX12
                     }
                 }
         }
-        LOG_INFO("GpuCommandWorker::RunAsync: Release {} un-executed cmd", _cmd_queue.Size());
+            LOG_MODULE_DEBUG(ELogModule::kRHI, "GpuCommandWorker::RunAsync: Release {} un-executed cmd", _cmd_queue.Size());
         while (!_cmd_queue.Empty()) _cmd_queue.Pop();
     }
     void GpuCommandWorker::EndFrame()
@@ -693,12 +693,12 @@ namespace Ailu::RHI::DX12
             if (FAILED(adapter.As(&adapter4)))
                 continue;
             DXGI_ADAPTER_DESC3 desc{};
-            LOG_INFO("Info(Adapter index: {})------------------------------------------------------------------------------",
+            LOG_MODULE_DEBUG(ELogModule::kRHI, "Info(Adapter index: {})------------------------------------------------------------------------------",
                      adapter_index);
             ThrowIfFailed(adapter4->GetDesc3(&desc));
-            LOG_INFO(L"Description: {}", desc.Description);
-            LOG_INFO("DedicatedSystemMemory: {} mb", desc.DedicatedSystemMemory / 1024 / 1024);
-            LOG_INFO("SharedSystemMemory: {} mb", desc.SharedSystemMemory / 1024 / 1024);
+            LOG_MODULE_DEBUG(ELogModule::kRHI, L"Description: {}", desc.Description);
+            LOG_MODULE_DEBUG(ELogModule::kRHI, "DedicatedSystemMemory: {} mb", desc.DedicatedSystemMemory / 1024 / 1024);
+            LOG_MODULE_DEBUG(ELogModule::kRHI, "SharedSystemMemory: {} mb", desc.SharedSystemMemory / 1024 / 1024);
             //
             // Obtain the default video memory information for the local and non-local segment groups.
             //
@@ -727,10 +727,10 @@ namespace Ailu::RHI::DX12
                 LOG_INFO("AvailableForReservation: {} mb", p_non_local_video_memory_info->AvailableForReservation / 1024 / 1024);
                 LOG_INFO("Budget: {} mb", p_non_local_video_memory_info->Budget / 1024 / 1024);
                 LOG_INFO("CurrentReservation: {} mb", p_non_local_video_memory_info->CurrentReservation / 1024 / 1024);
-                LOG_INFO("CurrentUsage: {} mb", p_non_local_video_memory_info->CurrentUsage / 1024 / 1024);
+                LOG_MODULE_DEBUG(ELogModule::kRHI, "CurrentUsage: {} mb", p_non_local_video_memory_info->CurrentUsage / 1024 / 1024);
             }
 
-            LOG_INFO("-----------------------------------------------------------------------------------------------------");
+            LOG_MODULE_DEBUG(ELogModule::kRHI, "-----------------------------------------------------------------------------------------------------");
             if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
             {
                 // Don't select the Basic Render Driver adapter.
@@ -1061,10 +1061,10 @@ namespace Ailu::RHI::DX12
                 _global_tracked_resource.clear();
 
             origin_res_num -= _global_tracked_resource.size();
-            if (origin_res_num > 0) LOG_WARNING("Release unused upload buffer with num {}.", origin_res_num);
+            if (origin_res_num > 0) LOG_MODULE_DEBUG(ELogModule::kRHI, "Release unused upload buffer with num {}.", origin_res_num);
         }
         g_pRenderTexturePool->TryCleanUp();
-        if (auto num = D3DDescriptorMgr::Get().ReleaseSpace(); num > 0) { LOG_INFO("Release GPUVisibleDescriptor at with num {}.", num); }
+        if (auto num = D3DDescriptorMgr::Get().ReleaseSpace(); num > 0) { LOG_MODULE_DEBUG(ELogModule::kRHI, "Release GPUVisibleDescriptor at with num {}.", num); }
     }
 
     f32 D3DContext::TotalGPUMemeryUsage()
@@ -1097,7 +1097,15 @@ namespace Ailu::RHI::DX12
     const u32 D3DContext::CurBackbufIndex() const
     {
         std::lock_guard<std::mutex> lock(_render_windows_mtx);
+        if (_render_windows.empty())
+            return static_cast<u32>(_frame_count % RenderConstants::kFrameCount);
         return _render_windows[0]->_frame_index;
+    }
+
+    u32 D3DContext::GetSwapchainCount() const
+    {
+        std::lock_guard<std::mutex> lock(_render_windows_mtx);
+        return static_cast<u32>(_render_windows.size());
     }
 
     void D3DContext::ExecuteCommandBuffer(Ref<CommandBuffer> &cmd)
@@ -1641,12 +1649,69 @@ namespace Ailu::RHI::DX12
 
     void D3DContext::Present()
     {
+        ++_present_count;
         CollectExternalGpuLifetimes();
         Vector<GfxCommand *> cmds{CommandPool::Get().Alloc<CommandPresent>()};
         _cmd_worker->Push(std::move(cmds), SubmitParams{"Present", true});
         if (!Application::Get()._is_multi_thread_rendering.load()) { _cmd_worker->RunSync(); }
         // Frameboundary drain: the debug layer store is drained here so a state error cannot hide until exit,
         // and so an undrained store cannot grow without bound across the session.
+        DrainD3DDebugLayerMessages();
+    }
+
+    void D3DContext::EndFrame()
+    {
+        CollectExternalGpuLifetimes();
+        GpuResourceRegistry::Get().Sync(GetFenceValueGPU());
+        GpuResourceRegistry::TakeResolveStats();
+        ImageCaptureService::Tick();
+#if AILU_ENABLE_FRAME_DEBUGGER
+        Render::FrameDebugger::FrameCaptureService::BeginFrame(GetFrameCount());
+#endif
+        Vector<GfxCommand *> cmds{CommandPool::Get().Alloc<CommandEndFrame>()};
+        _cmd_worker->Push(std::move(cmds), SubmitParams{"EndFrame", true});
+        if (!Application::Get()._is_multi_thread_rendering.load())
+            _cmd_worker->RunSync();
+        DrainD3DDebugLayerMessages();
+    }
+
+    void D3DContext::EndFrameImpl(D3DCommandBuffer *cmd)
+    {
+        static TimeMgr s_timer;
+        PROFILE_BLOCK_CPU("OffscreenEndFrame")
+        ExecuteRHICommandBuffer(cmd);
+        ImageCaptureService::Tick();
+
+        if (_frame_count % kResourceCleanupIntervalTick == 0u)
+        {
+            if (!_global_tracked_resource.empty())
+            {
+                u64 origin_res_num = _global_tracked_resource.size();
+                auto it = _global_tracked_resource.lower_bound(_frame_count);
+                if (it != _global_tracked_resource.end())
+                    _global_tracked_resource.erase(_global_tracked_resource.begin(), it);
+                else
+                    _global_tracked_resource.clear();
+                origin_res_num -= _global_tracked_resource.size();
+            LOG_MODULE_DEBUG(ELogModule::kRHI, "D3DContext::EndFrame: Resource cleanup, {} resources released.", origin_res_num);
+            }
+            if (u32 release_size = GpuResourceManager::Get()->ReleaseSpace(); release_size > 0u)
+            LOG_MODULE_DEBUG(ELogModule::kRHI, "D3DContext::EndFrame: Resource cleanup, {} byte released.", release_size);
+            if (RenderTexture::TotalGPUMemerySize() > kMaxRenderTextureMemorySize)
+            {
+                g_pRenderTexturePool->TryCleanUp();
+                D3DDescriptorMgr::Get().ReleaseSpace();
+            }
+        }
+        _readback_pool->Tick(_frame_count);
+        ImageCaptureService::Tick();
+        ++_frame_count;
+        _p_gpu_timer->EndFrame();
+        Profiler::Get().CollectGPUTimeData();
+        auto &render_data = Render::RenderingStates::RenderData();
+        render_data.FrameTime = s_timer.GetElapsedSinceLastLocalMark();
+        render_data.FrameRate = render_data.FrameTime > 0.0f ? 1000.0f / render_data.FrameTime : 0.0f;
+        s_timer.MarkLocal();
         DrainD3DDebugLayerMessages();
     }
 
@@ -1933,11 +1998,11 @@ namespace Ailu::RHI::DX12
                 else
                     _global_tracked_resource.clear();
                 origin_res_num -= _global_tracked_resource.size();
-                LOG_WARNING("D3DContext::Present: Resource cleanup, {} resources released.", origin_res_num);
+                LOG_MODULE_DEBUG(ELogModule::kRHI, "D3DContext::Present: Resource cleanup, {} resources released.", origin_res_num);
             }
             if (u32 release_size = GpuResourceManager::Get()->ReleaseSpace(); release_size > 0)
             {
-                LOG_INFO("D3DContext::Present: Resource cleanup, {} byte released.", release_size);
+                LOG_MODULE_DEBUG(ELogModule::kRHI, "D3DContext::Present: Resource cleanup, {} byte released.", release_size);
             }
             if (RenderTexture::TotalGPUMemerySize() > kMaxRenderTextureMemorySize)
             {
@@ -2502,7 +2567,8 @@ namespace Ailu::RHI::DX12
             if (!material_state._is_ready)
             {
                 LOG_WARNING("[DX12] Draw skipped: shader not ready material={} shader={} vb_handle=({}, {}) ib_handle=({}, {})",
-                            draw_cmd->_material_id, shader, draw_cmd->_vb._index, draw_cmd->_vb._generation,
+                            draw_cmd->_material_id, shader != nullptr ? shader->Name() : String("null"),
+                            draw_cmd->_vb._index, draw_cmd->_vb._generation,
                             draw_cmd->_ib._index, draw_cmd->_ib._generation);
 #if AILU_ENABLE_FRAME_DEBUGGER
                 if (capture_writer)
@@ -3216,6 +3282,19 @@ namespace Ailu::RHI::DX12
                 });
             }
             PresentImpl(d3dcmd);
+        }
+        else if (cmd->GetCmdType() == EGpuCommandType::kEndFrame)
+        {
+            auto pending_releases = GpuResourceRegistry::Get().TakePendingReleases();
+            if (!pending_releases.empty())
+            {
+                d3dcmd->AddPostSubmitCallback([pending_releases = std::move(pending_releases)](u64 fence)
+                {
+                    for (const auto handle: pending_releases)
+                        GpuResourceRegistry::Get().Retire(handle, fence);
+                });
+            }
+            EndFrameImpl(d3dcmd);
         }
         else if (cmd->GetCmdType() == EGpuCommandType::kDestroyGpuResource)
         {

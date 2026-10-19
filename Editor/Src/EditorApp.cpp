@@ -45,6 +45,8 @@
 #include "UI/Widget.h"
 #include "Project/ProjectManager.h"
 
+#include <format>
+
 using namespace Ailu;
 
 namespace Ailu
@@ -58,6 +60,31 @@ namespace Ailu
 
         EditorStyle g_editor_style = {};
         UI::UITheme g_editor_ui_theme = {};
+
+        WString ResolveStartupScenePath()
+        {
+            if (!ProjectManager::Get().HasOpenedProject())
+                return {};
+
+            const auto &project = ProjectManager::Get().CurrentProject();
+            WString startup_scene = project.Descriptor()._startup_scene;
+            if (startup_scene.empty())
+                return {};
+
+            if (startup_scene.starts_with(L"project://"))
+                return ResourceMgr::NormalizeAssetPath(startup_scene, EAssetDomain::kProject);
+
+            startup_scene = PathUtils::FormatFilePath(startup_scene);
+            if (PathUtils::IsSystemPath(startup_scene))
+                return ResourceMgr::NormalizeAssetPath(startup_scene, EAssetDomain::kProject);
+
+            const WString asset_directory = PathUtils::NormalizeRelativeDirectory(project.Descriptor()._asset_directory);
+            const WString asset_prefix = asset_directory.empty() ? WString{} : asset_directory + L'/';
+            if (!asset_prefix.empty() && startup_scene.starts_with(asset_prefix))
+                startup_scene = startup_scene.substr(asset_prefix.size());
+
+            return ResourceMgr::NormalizeAssetPath(L"project://" + startup_scene, EAssetDomain::kProject);
+        }
 
         EditorApp::EditorApp()
         {
@@ -75,13 +102,17 @@ namespace Ailu
         {
             TimeMgr timer;
             timer.Mark();
+            _is_batch_mode = init_ctx._batch;
+            const bool is_offscreen = init_ctx._graphics_mode == EApplicationGraphicsMode::kOffscreen;
+            const bool is_cpu_only = init_ctx._graphics_mode == EApplicationGraphicsMode::kNone;
             LogMgr::Init();
             g_pCommandMgr = AL_NEW_TAG(EMemoryTag::kEditor, CommandManager);
             Enum::InitTypeInfo();
 
-            Application::SetEngineConfigPath(Application::GetUserHomePath() + L"/OneDrive/AiluEngine/Editor/EngineConfig.json");
-            s_editor_root_path = Application::GetUserHomePath() + L"/OneDrive/AiluEngine/Editor/";
-            s_editor_config_path = Application::GetUserHomePath() + L"/OneDrive/AiluEngine/Editor/EditorConfig.json";
+            const WString ailu_root = Application::GetAiluRoot();
+            Application::SetEngineConfigPath(ailu_root + L"Editor/EngineConfig.json");
+            s_editor_root_path = ailu_root + L"Editor/";
+            s_editor_config_path = ailu_root + L"Editor/EditorConfig.json";
             ApplicationDesc desc;
             desc._window_width = 1600;
             desc._window_height = 900;
@@ -90,13 +121,24 @@ namespace Ailu
             desc._window_flags = EWindowFlags::kWindow_NoTitleBar;
             _camera_controller = MakeScope<FirstPersonCameraController>();
             LoadEditorConfig(desc);
+            if (init_ctx._render_width != 0u && init_ctx._render_height != 0u)
+            {
+                desc._gameview_width = init_ctx._render_width;
+                desc._gameview_height = init_ctx._render_height;
+            }
+            if (!init_ctx._scene_path.empty())
+                _opened_scene_path = init_ctx._scene_path;
             auto ret = Application::Initialize(desc,init_ctx);
             if (ret != 0)
                 return ret;
-            _plugin_manager = MakeScope<PluginManager>();
-            if (!_plugin_manager->Initialize())
-                return 1;
-            _plugin_manager->SetProgressCallback([this, tasks = std::map<String, EditorProgressHandle>{}]
+            if (!is_cpu_only)
+            {
+                _plugin_manager = MakeScope<PluginManager>();
+                if (!_plugin_manager->Initialize())
+                    return 1;
+            }
+            if (_plugin_manager != nullptr)
+                _plugin_manager->SetProgressCallback([this, tasks = std::map<String, EditorProgressHandle>{}]
                 (const char* title, const char* message, u64 completed, EPluginProgressState state) mutable
             {
                 const String key = title ? title : "Plugin task";
@@ -116,48 +158,103 @@ namespace Ailu
                 else if (state == EPluginProgressState::kCancelled) handle.Cancel();
                 if (state != EPluginProgressState::kBegin && state != EPluginProgressState::kRunning) tasks.erase(found);
             });
-            _plugin_tick_handle = _before_update.Subscribe([this]
+            if (_plugin_manager != nullptr)
+                _plugin_tick_handle = _before_update.Subscribe([this]
             {
                 if (_plugin_manager)
                     _plugin_manager->Tick(TimeMgr::s_delta_time);
             });
-            LOG_INFO("[Plugin] Editor host initialized");
-            _plugin_manager->ScanPlugins({(fs::path(Application::GetAiluRoot()) / L"Plugins").wstring(),
-                (fs::path(ProjectManager::Get().CurrentProject().RootDirectory()) / L"Plugins").wstring()});
-            _plugin_manager->LoadAutoloadPlugins();
-            _p_input_layer = AL_NEW_TAG(EMemoryTag::kEditor, InputLayer);
-            PushLayer(_p_input_layer);
-            _pipeline = AL_NEW_TAG(EMemoryTag::kEditor, CommonRenderPipeline);
-            Render::RenderPipeline::Register(_pipeline);
+            if (_plugin_manager != nullptr)
             {
+                LOG_INFO("[Plugin] Editor host initialized");
+                _plugin_manager->ScanPlugins({(fs::path(Application::GetAiluRoot()) / L"Plugins").wstring(),
+                    (fs::path(ProjectManager::Get().CurrentProject().RootDirectory()) / L"Plugins").wstring()});
+            }
+            if (_plugin_manager != nullptr && !_is_batch_mode)
+                _plugin_manager->LoadAutoloadPlugins();
+            if (!is_offscreen && !is_cpu_only)
+            {
+                _p_input_layer = AL_NEW_TAG(EMemoryTag::kEditor, InputLayer);
+                PushLayer(_p_input_layer);
+            }
+            if (!is_cpu_only)
+            {
+                _pipeline = AL_NEW_TAG(EMemoryTag::kEditor, CommonRenderPipeline);
+                Render::RenderPipeline::Register(_pipeline);
                 Selection::RemoveSlection();
-                SceneManagement::SceneMgr::Get().OpenScene(_opened_scene_path);
+                if (_opened_scene_path.empty())
+                    _opened_scene_path = ResolveStartupScenePath();
+
+                if (_opened_scene_path.empty())
+                {
+                    _initialization_error_code = "scene_not_found";
+                    _initialization_error_message = "failed to load scene: no startup scene configured";
+                    LOG_ERROR("{}", _initialization_error_message);
+                    Finalize();
+                    return 1;
+                }
+
+                const auto opened_scene = SceneManagement::SceneMgr::Get().OpenScene(_opened_scene_path);
+                if (opened_scene == nullptr)
+                {
+                    _initialization_error_code = "scene_not_found";
+                    _initialization_error_message = std::format("failed to load scene '{}'",
+                        ToChar(_opened_scene_path));
+                    LOG_ERROR("{}", _initialization_error_message);
+                    Finalize();
+                    return 1;
+                }
             }
-            LoadEditorResource();
-            UI::ObjectAssetDropdown::SetAssetIconProvider([](Asset *asset)
-            { return AssetTypeRegistry::Get().GetTypeIcon(asset); });
-            ResourceMgr::Get().MigrateLegacyAssetDocuments();
-            g_editor_style = DefaultDark();
+            if (!is_cpu_only && (is_offscreen || _is_batch_mode))
             {
-                JsonArchive ar;
-                fs::path theme_path = fs::path(s_editor_root_path) / L"Res/UI/EditorStyle.json";
-                ar.Load(theme_path);
-                if (ar.IsLoaded())
-                    ar >> g_editor_style;
+                if (auto *active_scene = SceneManagement::SceneMgr::Get().ActiveScene(); active_scene != nullptr)
+                {
+                    if (auto *main_camera = active_scene->FindMainCamera(); main_camera != nullptr)
+                        Camera::sCurrent = main_camera;
+                }
+                if (auto *target = GetOffscreenTarget(); target != nullptr)
+                {
+                    Camera::sCurrent->OutputSize(target->Width(), target->Height());
+                    Camera::sCurrent->TargetTexture(target);
+                }
             }
-            g_editor_ui_theme = UI::UITheme::DefaultDark();
+            if (!is_offscreen && !is_cpu_only)
             {
-                JsonArchive ar;
-                fs::path theme_path = fs::path(s_editor_root_path) / L"Res/UI/UITheme_Dark.json";
-                ar.Load(theme_path);
-                if (ar.IsLoaded())
-                    ar >> g_editor_ui_theme;
-                UI::UIManager::Get()->SetTheme(&g_editor_ui_theme);
+                LoadEditorResource();
+                UI::ObjectAssetDropdown::SetAssetIconProvider([](Asset *asset)
+                { return AssetTypeRegistry::Get().GetTypeIcon(asset); });
+                if (!_is_batch_mode)
+                    ResourceMgr::Get().MigrateLegacyAssetDocuments();
+                g_editor_style = DefaultDark();
+                {
+                    JsonArchive ar;
+                    fs::path theme_path = fs::path(s_editor_root_path) / L"Res/UI/EditorStyle.json";
+                    ar.Load(theme_path);
+                    if (ar.IsLoaded())
+                        ar >> g_editor_style;
+                }
+                g_editor_ui_theme = UI::UITheme::DefaultDark();
+                {
+                    JsonArchive ar;
+                    fs::path theme_path = fs::path(s_editor_root_path) / L"Res/UI/UITheme_Dark.json";
+                    ar.Load(theme_path);
+                    if (ar.IsLoaded())
+                        ar >> g_editor_ui_theme;
+                    UI::UIManager::Get()->SetTheme(&g_editor_ui_theme);
+                }
             }
-            RegisterComponentEditors();
-            RegisterPlaceActors();
+            if (!is_cpu_only)
+            {
+                RegisterComponentEditors();
+                RegisterPlaceActors();
+            }
             _automation_service = MakeScope<EditorAutomationService>();
             _automation_service->Initialize();
+            _automation_tick_handle = _before_update.Subscribe([this]
+            {
+                if (_automation_service)
+                    _automation_service->Tick();
+            });
             {
                 RegisterDefaultComponentDescriptors();
                 AutomationAdapterRegistry::Get().Initialize();
@@ -173,23 +270,30 @@ namespace Ailu
                 AIAssistantService::Get().SetRegistry(&_automation_service->Registry());
                 AIAssistantService::Get().SetProvider(MakeScope<DemoAIProvider>());
             }
-            _pipe_server = MakeScope<AutomationPipeServer>();
-            _pipe_server->Initialize(*_automation_service);
-            if (ProjectManager::Get().HasOpenedProject())
+            if (!is_cpu_only && !_is_batch_mode)
             {
-                AutomationSessionInfo session_info;
-                session_info._pid = GetCurrentProcessId();
-                session_info._session_id = _pipe_server->SessionId();
-                session_info._pipe_name = _pipe_server->PipeName();
-                session_info._project_path = ToChar(ProjectManager::Get().CurrentProject().RootDirectory());
-                session_info._editor_version = "0.1.0";
-                AutomationSession::Save(ProjectManager::Get().CurrentProject().RootDirectory(), session_info);
+                _pipe_server = MakeScope<AutomationPipeServer>();
+                _pipe_server->Initialize(*_automation_service);
+                if (ProjectManager::Get().HasOpenedProject())
+                {
+                    AutomationSessionInfo session_info;
+                    session_info._pid = GetCurrentProcessId();
+                    session_info._session_id = _pipe_server->SessionId();
+                    session_info._pipe_name = _pipe_server->PipeName();
+                    session_info._project_path = ToChar(ProjectManager::Get().CurrentProject().RootDirectory());
+                    session_info._editor_version = "0.1.0";
+                    AutomationSession::Save(ProjectManager::Get().CurrentProject().RootDirectory(), session_info);
+                }
             }
-            _p_editor_layer = AL_NEW_TAG(EMemoryTag::kEditor, EditorLayer);
-            PushLayer(_p_editor_layer);
+            if (!is_offscreen && !is_cpu_only && !_is_batch_mode)
+            {
+                _p_editor_layer = AL_NEW_TAG(EMemoryTag::kEditor, EditorLayer);
+                PushLayer(_p_editor_layer);
+            }
             _is_playing_mode = false;
             _is_simulate_mode = false;
-            ConfigureResourceReloading();
+            if (!is_offscreen && !is_cpu_only)
+                ConfigureResourceReloading();
             LOG_INFO("EditorApp::Initialize {} cost {}ms", ret,timer.GetElapsedSinceLastMark());
             return ret;
         }
@@ -199,13 +303,16 @@ namespace Ailu
             JobSystem::Get().Wait(_progress_demo_jobs);
             _before_update.Unsubscribe(_plugin_tick_handle);
             _plugin_tick_handle = Delegate<>::kInvalidHandle;
+            _before_update.Unsubscribe(_automation_tick_handle);
+            _automation_tick_handle = Delegate<>::kInvalidHandle;
             if (_plugin_manager)
             {
                 _plugin_manager->Shutdown();
                 _plugin_manager.reset();
             }
             LOG_INFO("[Plugin] Editor tick unsubscribed and host shut down before Application teardown");
-            SaveEditorConfig();
+            if (!_is_batch_mode)
+                SaveEditorConfig();
             AssetPreviewGenerator::Shutdown();
             if (_pipe_server)
                 _pipe_server->Finalize();
@@ -221,19 +328,20 @@ namespace Ailu
             AL_DELETE(_pipeline);
             _pipeline = nullptr;
             Application::Finalize();
-            fs::path p(s_editor_root_path);
-            fs::directory_iterator dir_it(p);
-
-            List<WString> deleted_wpix_files;
-            for (auto it: dir_it)
+            if (!_is_batch_mode)
             {
-                if (su::EndWith(it.path().string(), ".wpix"))
+                fs::path p(s_editor_root_path);
+                fs::directory_iterator dir_it(p);
+
+                List<WString> deleted_wpix_files;
+                for (auto it: dir_it)
                 {
-                    deleted_wpix_files.emplace_back(it.path().wstring());
+                    if (su::EndWith(it.path().string(), ".wpix"))
+                        deleted_wpix_files.emplace_back(it.path().wstring());
                 }
+                for (auto &dp: deleted_wpix_files)
+                    FileManager::DeleteDirectory(dp);
             }
-            for (auto &dp: deleted_wpix_files)
-                FileManager::DeleteDirectory(dp);
             LogMgr::Shutdown();
         }
         void EditorApp::StartProgressDemo()

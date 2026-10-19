@@ -28,7 +28,8 @@ M3 gated by accepted M2; optional nightly self-hosted Windows GPU CI afterwards.
 M3 only after M2.
 
 ## Progress
-Pending.
+- [x] Added `Test/BlenderLinkValidation/m3_stateful_smoke.py`, an actual Blender 5.0.1 scene driver for tracker-level idle, transform, material, mesh, add/delete, reconnect-baseline, and copied save/reopen GUID checks. It writes a per-check JSON report and labels that a recording link was used.
+- [ ] Native Engine RPC correlation for every transition, packet capture/replay, missing-End reconnect recovery, camera/light/visibility/instance cases, and named BMW27/Classroom regressions remain unimplemented.
 
 ## Decision Log
 Native testing proves Blender->wire->Engine; replay isolates Engine receiver/regressions and must have exact packet SHA equality. Preserve source and compare identical hardware/settings for performance.
@@ -39,6 +40,8 @@ BMW tests previously exposed nested collection-instance, geometry/UV issues and 
 ## Validation
 Automate idle, transform-only, mesh/material/texture edit, add/delete, instance, visibility, camera/light and GUID stability; reconnect with edits and missing-End injected failure; copied persistence offline reopen and resync. Real BMW/Classroom native L2 assertions + optional L3 captures. Strict replay 2+ trials with identical packet SHA256 and medians, explicit execution settings; deliberately seeded error must FAIL and recovery succeeds.
 
+The initial M3 smoke validates only the dirty-tracker subset. It does not satisfy native Engine, protocol replay, reconnect recovery, or large-scene acceptance.
+
 ## Acceptance Criteria
 All required synthetic state transitions PASS; BMW/Classroom each either pass supported assertions or are explicitly blocked/inconclusive with artifacts (never false PASS). Cleanup and input hashes pass after repeated runs. Performance labeled separately from correctness.
 
@@ -46,7 +49,7 @@ All required synthetic state transitions PASS; BMW/Classroom each either pass su
 Self-hosted GPU CI/nightly scheduling and expanded shader-oracle coverage after M3.
 
 ## Outcomes
-Pending.
+Partial implementation only. Do not mark M3 accepted until the outstanding Engine and regression gates have repeatable evidence.
 
 ## Resume Protocol
 Use M0-M2 evidence and `progress.md`; mark M3 accepted only with all required checks and repeatable run manifests.

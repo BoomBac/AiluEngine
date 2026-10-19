@@ -32,7 +32,7 @@
             "_value": 0.0
         }, {
             "_name": "_Anisotropy",
-            "_value": 0.344
+            "_value": 0.0
         }, {
             "_name": "_AttenuationDistance",
             "_value": 0.0
@@ -41,7 +41,7 @@
             "_value": 0.0
         }, {
             "_name": "_IOR",
-            "_value": 1.5075
+            "_value": 0.0
         }, {
             "_name": "_MaterialID",
             "_value": 0.0
@@ -59,7 +59,7 @@
             "_value": 0.0
         }, {
             "_name": "_RoughnessValue",
-            "_value": 1.0
+            "_value": 0.0
         }, {
             "_name": "_SamplerMask",
             "_value": 0.0
@@ -71,16 +71,22 @@
             "_value": 0.0
         }, {
             "_name": "_Transmission",
-            "_value": 1.0
+            "_value": 0.0
+        }, {
+            "_name": "_UseSourceDielectric",
+            "_value": 0.0
         }],
     "_vector_properties": [{
             "_name": "_AlbedoValue",
-            "_value": [0.9998, 0.9998, 0.9998, 1.0]
+            "_value": [0.9998, 0.9998, 0.9998, 0.0]
         }, {
             "_name": "_AttenuationColor",
             "_value": [0.9998, 0.9998, 0.9998, 1.0]
         }, {
             "_name": "_EmissionValue",
+            "_value": [0.0, 0.0, 0.0, 0.0]
+        }, {
+            "_name": "_NormalHeightParameters",
             "_value": [0.0, 0.0, 0.0, 0.0]
         }, {
             "_name": "_SpecularValue",

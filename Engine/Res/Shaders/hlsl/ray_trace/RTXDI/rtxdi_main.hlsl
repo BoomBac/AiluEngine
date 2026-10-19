@@ -1337,7 +1337,7 @@ void RayGen(CSInput input)
                 shadingOutput = ShadeSurfaceWithLightSample(lightSample, rab_surface) * RTXDI_GetDIReservoirInvPdf(reservoir);
             shadingOutput += surface_data.emssive;
         }
-        _GI_Texture[pixel] = float4(shadingOutput,1.0);
+        _GI_Texture[pixel] = float4(shadingOutput * GetPreExposure(), 1.0);
     }
     else
     {

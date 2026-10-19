@@ -136,6 +136,9 @@ triangle offsets
 
 这属于现阶段较强耦合区域。
 
+栅格 Scene primitive 缓冲容量由 `RenderConstants::kMaxScenePrimitiveCount` 限制。软件光追 TLAS 使用独立的
+`RenderConstants::kMaxSoftwareRayTracingPrimitiveCount` 输入上限；静态网格子网格边界框数超过该上限时，Scene 清空 CPU/GPU TLAS、跳过 BVH 构建并记录一次警告，该场景不提供软件光追 TLAS。
+
 新增 renderer-only cache 前先判断它是否可以存在于：
 
 - Renderer；
@@ -185,6 +188,13 @@ Scene 的持久化表示通过 asset document 体系完成。
 3. 检查 reflection/generated serialization；
 4. 考虑旧版本迁移；
 5. 保留 stable entity GUID。
+
+`SceneCameraComponentDocument` persists the legacy `_fov_h` field alongside the reflected
+`PhysicalCameraSettings` value. Missing physical-camera data keeps the settings defaults (`LegacyFov` and
+`LegacyManual`), so older scenes preserve their projection and exposure behavior. Camera's standalone text archive
+also appends a versioned optional physical-settings section after the legacy fields. The reflected settings value
+serializes its mode enums as their underlying byte values so scene document serialization does not depend on the
+runtime enum registry having initialized first.
 
 ## Current pressure point
 

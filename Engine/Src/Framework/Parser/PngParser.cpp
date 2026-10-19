@@ -69,10 +69,9 @@ namespace Ailu
                 auto mip_level = desc._mip_num - 1;
                 for (int i = 0; i < mip_level; i++)
                 {
-                    load_data._data.emplace_back(TextureUtils::DownSample(load_data._data.back(), desc._width >> i, desc._height >> i, 4,
-                                                                           import_settings._is_srgb));
-                    if (desc._width >> i == 1)
-                        break;
+                    auto [width, height] = Texture::CalculateMipSize(desc._width, desc._height, i);
+                    load_data._data.emplace_back(TextureUtils::DownSample(load_data._data.back(), width, height, 4,
+                                                                         import_settings._is_srgb));
                 }
             }
             auto tex = Texture2D::Create(desc);
@@ -100,6 +99,12 @@ namespace Ailu
             desc._mip_num = import_settings._generate_mipmap? Texture::MaxMipmapCount(desc._width,desc._height) : 1;
             desc._is_readable = import_settings._is_readable;
             desc._format = ConvertTextureFormatToPixelFormat(import_settings._is_srgb? ETextureFormat::kRGBA8UNormSRGB : ETextureFormat::kRGBA8UNorm);
+            for (u16 i = 0; i + 1 < desc._mip_num; ++i)
+            {
+                auto [width, height] = Texture::CalculateMipSize(desc._width, desc._height, i);
+                load_data._data.emplace_back(TextureUtils::DownSample(load_data._data.back(), width, height, 4,
+                                                                     import_settings._is_srgb));
+            }
             texture->ReCreate(desc);
             for(u16 i = 0; i < load_data._data.size(); ++i)
             {

@@ -20,6 +20,17 @@ Feature activation is virtual; RayTraceGI sends an atomic activation notificatio
 without mutating the render-owned backend from UI. Sessions retire through the DX12 context before graphics shutdown.
 The standalone DX12/OIDN interop and synthetic RenderGraph smoke executables are separate validation paths.
 
+`RayTraceGI::_denoiser_use_guides` optionally enables first-hit guides for OIDN Reference previews; it defaults
+to false for existing assets. Compute and DXR use the same `TracePath` hook after stochastic coverage acceptance
+and before reflection/refraction. Each sample stores illumination-independent albedo (glass uses one) and a unit,
+incident-facing world-space shading normal, then averages both over the same Reference samples. Misses and analytic
+emitters contribute zero; alpha tracks surface coverage. The accumulated normal remains a signed vector mean,
+not a renormalized or display-encoded normal. Guide activation changes reset Reference history and denoiser generation.
+Guide textures are owned by GIPass and exist only while the optional Reference path is enabled; None/Realtime bypass it.
+The private Pack pass snapshots color/albedo/normal into separate float4 planes of one shared input buffer; CUDA
+imports that allocation once. Guides are stochastic, so the RT filter uses `cleanAux=false`. Feature changes retire
+the old session before creating a new filter. Color-only remains the default pending scene quality acceptance.
+
 主要入口：
 
 - `Engine/Inc/Render/RenderPipeline.h`
@@ -28,6 +39,57 @@ The standalone DX12/OIDN interop and synthetic RenderGraph smoke executables are
 - `Engine/Inc/Render/Features/RenderFeature.h`
 - `Engine/Inc/Render/RenderGraph`
 - `Engine/Inc/Render/GraphicsContext.h`
+
+### Postprocess exposure
+
+`PostprocessStack` selects the upscaled, TAA, or scene HDR color and records histogram metering before Bloom.
+`AutoExposurePass` builds a 64-bin log2-luminance histogram from sparse samples, clips configured percentiles,
+and adapts exposure in EV space. Average metering counts samples evenly; center-weighted metering weights center
+samples more heavily. Target EV limits and independent brighten/darken rates are configured by the Postprocess Volume.
+Older settings that omit the directional rates use the legacy shared adaptation speed. Per-camera R32_FLOAT ping-pong
+textures hold the adapted EV on the GPU. The pass
+does not read exposure back to the CPU. `ToneMappingPass` declares the EV texture as an SRV dependency and applies
+`exp2(EV)` to the post-Bloom HDR input; Legacy Manual continues to use the existing scalar exposure. Manual Physical
+uses the camera's physical exposure multiplier. Priority modes solve shutter, aperture, or ISO virtually for the
+current frame, without mutating serialized camera settings. In RenderGraph views, Physical modes pre-expose scene HDR
+color before writing it: Manual Physical uses its configured multiplier, while automatic modes sample the previous
+stable per-camera EV history texture through the camera bindless SRV. The current frame's adapted EV is produced only
+after scene rendering, so it becomes the next frame's pre-exposure. Histogram metering removes the prior EV;
+ToneMapping applies current display exposure divided by current pre-exposure. TAA rescales history between the two
+pre-exposure values and invalidates history when the exposure mode changes. Bloom filters the full HDR input without
+a brightness threshold and composites in the pre-exposed domain. Each upsample loads the existing finer mip and blends
+it equally with the filtered coarser mip, preserving constant-color gain independently of pyramid depth. Both the sampled
+coarser mip and the finer RTV's existing contents are declared graph dependencies. Final composition remains additive
+(`source + intensity * bloom`), so a uniform input has gain `1 + intensity`. Probe rendering and Legacy Manual keep P=1.
+Physical exposure converts SceneLinear luminance to approximate cd/m² through
+`AutoExposureSettings::_scene_luminance_to_cd_m2`. The default 683 reverses the fixed 683 lm/W factor used when
+photometric light inputs are converted to radiometric shader values; Manual Physical applies this scale before its
+EV multiplier, while Auto measures in cd/m² and converts the resulting multiplier back to the SceneLinear domain.
+The coefficient is configurable and affects Physical modes only. This is a source-derived white-light approximation,
+not a measured calibration for sky, IBL, emissive, or legacy contributions; gray-card and light-domain validation is
+recorded separately in the active Physical Camera ExecPlan.
+
+When enabled in the active Postprocess Volume, `DepthOfFieldPass` follows exposure metering and runs before Bloom
+and ToneMapping. It reads the upscaled/TAA HDR color plus device depth, converts depth to linear eye distance using
+the active camera near/far planes, and derives a bounded circle of confusion from sensor height, focal length,
+aperture, and focus distance. The default is disabled; a zero maximum CoC bypasses the effect. The pass owns six
+materials and records half-resolution signed-CoC/color prefiltering, separable foreground-support dilation, separate
+far/near polygonal gathers, and full-resolution composition. RGBA16F intermediates retain signed CoC and premultiplied
+foreground coverage; the final output retains the existing HDR/pre-exposed domain. Each gather uses 256 deterministic
+area-uniform polygon samples and layer-conditioned color reconstruction. Near support extends across sharp-pixel
+boundaries; visible non-near neighbors approximate the background behind near edges before coverage composition.
+Fully occluded surfaces cannot be recovered from screen-space inputs. There is no DOF temporal history. SceneView
+and Camera Inspector expose focus distance and aperture even in Legacy exposure mode because those lens values
+also control depth of field.
+
+The layered DOF path has Debug build, runtime shader, named-pass capture and controlled image validation;
+see the Physical Camera M7 execution record. Motion, vendor upscaling and GPU performance remain unverified for DOF.
+The wider exposure/SR path still requires runtime visual acceptance. The RenderGraph DLSS/FSR bridge records the SR
+input domain and P. GPU-auto
+inputs are normalized to scene-linear before vendor evaluation and restored to the frame's pre-exposed domain before
+PostprocessStack; manual/legacy inputs retain their known scalar P. The non-RenderGraph path keeps P=1 and does not
+enqueue the RenderGraph SR bridge. Vendor runtime/resource-format and image acceptance remain open. Sky, IBL, emissive,
+and UnitlessLegacy calibration also remains open.
 
 ## Current high-level flow
 
@@ -600,3 +662,98 @@ shading normal faces away from the incoming ray. This prevents a front-facing sm
 solely because its shading normal crosses the view hemisphere at grazing angles; ordinary smooth shading is retained.
 
 Texture sampler ownership, material overrides and per-view mip bias are documented in `texture-sampling.md`.
+# Authored light units
+
+`ECS::LightData` stores RGB color separately from scalar intensity, authored intensity unit, range, source radius,
+angular radius, spot cone, and area dimensions. `Scene/LightUnits.h` converts the authored values when `Renderer`
+and `SceneRayTracingProxy` extract their GPU light data.
+
+Directional lights accept lux or radiometric W/m2. Point and spot lights accept candela, lumen, or radiometric W;
+analytic area lights accept lumen, candela, or radiometric W. Photometric values use a fixed 683 lm/W efficacy when
+converted to radiometric shader values. This is an RGB approximation because the renderer does not track a light's
+spectral power distribution. Blender Live Link preserves Blender's W and W/m2 radiometric values.
+
+Each light can enable a blackbody color-temperature filter in Kelvin. It multiplies the authored RGB tint while
+normalizing the estimated linear RGB luminance, so changing temperature changes chromaticity without changing the
+authored intensity. The conversion uses an RGB approximation rather than spectral radiometry.
+
+Point and spot lights use inverse-square attenuation softened by source radius near the emitter. A positive range
+adds a smooth support window without scaling source power; zero range is unbounded. Analytic area lights use the
+same support window. Old scene and prefab light records are recognized through a per-light schema version and
+retain an explicit legacy intensity unit during migration.
+
+Analytic area rendering currently uses rectangular geometry. Although disc shape is stored in scene data, raster
+and RT area-light geometry do not yet represent a true disc. Blender `scene.unit_settings.scale_length` is also not
+applied; imported scene coordinates are interpreted in engine length units.
+
+
+## Tone mapping and shared exposure
+
+Postprocess-enabled views run the shared ToneMapping pass after temporal resolve/super-resolution and HDR Bloom.
+Exposure is a linear multiplier applied once before the selected transform. `None=0` keeps the exposed HDR values
+without curve compression; `ACES=1` retains the existing ACESFilm approximation; `AgX=2` uses the Rec.709 Minimal AgX
+approximation with scene-linear input and display-linear SDR output; `Standard=3` clamps exposed RGB to SDR.
+ACES remains the authored default. Artist Gamma defaults to 1 and is applied after the view transform in encoded
+sRGB, then decoded back to display-linear for the existing final output encoding. Blender exposure EV becomes
+the linear multiplier `2^EV`; Gamma is not folded into material or light values.
+No effective global Postprocess Volume resolves to None, exposure 1 and Bloom off, but still records ToneMapping.
+A camera with postprocessing explicitly disabled bypasses the stack.
+
+ToneMappedColor retains the existing R11G11B10_FLOAT target and FinalBlit handoff. Minimal AgX's final pow(2.2)
+linearizes its fitted display response; it is neither an artist gamma adjustment nor an additional sRGB/PQ encoding.
+This path does not implement full Blender OCIO/Looks or select a display output color space based on RT format.
+Exact sRGB encode/decode helpers use HLSL 2021 `select(condition, true_value, false_value)` in the DXC path;
+their low-light segments are covered by the Standard/Gamma GPU regression.
+
+
+## Blender source display settings and raster area lights
+
+Blender Live Link `scene_display_v1` sends view transform, display device, Look, exposure EV and Gamma during
+Full Sync and on settings changes. The plugin owns a global Postprocess Volume on its imported source root,
+priority 100, Bloom disabled. It supports Standard and Minimal AgX with sRGB and Look None. Unsupported display
+settings disable that source volume and issue a warning; full OCIO/Looks are not implemented. Other authored
+volumes remain independently owned and normal volume priority rules apply.
+
+Raster LTC area lights use `_RasterAreaLights`, a structured SRV with 160-byte entries, instead of the legacy
+four-entry scene cbuffer array. Renderer extraction builds the full area list. FrameResource owns geometrically
+growing buffers per scene/view and frame slot; each view uploads shadow indices after its shadow-set selection.
+Deferred and forward RenderGraph passes explicitly read the imported buffer. Empty lists bind a sentinel entry
+with active count zero. The old cbuffer area array remains reserved for ABI compatibility.
+
+Area lighting count is independent of shadow capacity: the additional spot/area shadow budget remains eight
+slices. Lights beyond that budget illuminate without shadows. Existing directional, point and spot raster arrays
+remain bounded (2/32/4); extraction skips excess entries with a warning instead of writing beyond their arrays.
+
+
+Point raster illumination has 32 entries in the shared ShaderInterop cbuffer. Shader traversal derives its maximum
+from the same shared definition; volumetric-fog hashing, local-light draws and bounds use the corresponding CPU
+capacity instead of a hardcoded four. Point-shadow resources retain four cube maps via the independent
+`kMaxPointShadowLightNum` budget. Additional point lights illuminate without shadows after that budget is used.
+The scene cbuffer remains 256-byte aligned, sizeof-derived, and compile-time bounded to the DX12 64KiB limit.
+
+## Raster surface orientation and source environment
+
+Deferred and forward standard surfaces share face orientation after tangent-space normal evaluation. Backfaces invert
+the shading normal and bitangent using `SV_IsFrontFace`; geometric winding and imported mesh data remain unchanged.
+Material integer property restoration applies `_cull` to the actual raster state, so saved double-sided materials retain
+backface visibility after reloading instead of reverting to the shader's default cull mode.
+Point and spot irradiance helpers already contain radiometric RGB, so callers apply it once. Rectangle radiance
+normalization uses the transformed quad area, shared by raster and RT extraction.
+
+LTC metal F0 blends dielectric F0 with base color using metallic. Live Link preserves Principled IOR and Specular IOR
+Level as a constant dielectric F0; linked spatial values retain the existing approximation boundary. `_UseSourceDielectric`
+defaults to zero for existing materials. Deferred geometry stores resolved dielectric F0 in `_GBuffer3.a`; RGB remains
+environment irradiance. Forward shading resolves the same value directly.
+
+`world_environment_v1` / WorldUpsert 26 imports separate scene-linear HDR lighting and camera-background textures.
+The source root owns its EnvironmentComponent and durable texture assets. EnvironmentSystem owns the runtime references
+and declares both imports through RenderGraph. Existing empty background GUIDs retain the cubemap sky path. A separate
+background samples latlong with longitude wrap and latitude clamp, independently of diffuse/specular IBL selection.
+Texture sky preserves existing color/depth and draws only at far depth with depth writes disabled.
+Both texture GUIDs participate in scene serialization, prefab restoration and runtime asset dependencies.
+
+The Blender exporter evaluates two World branches on temporary CPU scenes with Raw, exposure zero and Gamma one.
+It supports Is Camera Ray branching; other linked Light Path outputs and World Volume report an unsupported diagnostic.
+The current representation is 512x256 latlong, reconstructed from six 128x128 faces, and is an environment approximation.
+World edits invalidate the cached export; exposure/Gamma changes only update display settings. No source blend or global
+preferences are saved. Existing EnvironmentSystem selection rules still choose the lowest enabled environment entity.

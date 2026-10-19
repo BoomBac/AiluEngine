@@ -4,6 +4,7 @@ import importlib.util
 import pathlib
 import sys
 import types
+import uuid
 
 root = pathlib.Path(__file__).resolve().parents[1]
 addon_dir = root / "Tools/Blender/ailu_live_link"
@@ -26,7 +27,8 @@ def module(name):
 sync = module("object_sync")
 sent = []
 sync._instance_states = {}
-sync.sync_object = lambda context, obj, link, materials: sent.append(obj)
+sync._object_affine_helpers = set()
+sync.sync_object = lambda context, obj, link, materials, *flags: sent.append(obj)
 sync.sync_instances = lambda *args, **kwargs: None
 sync.full_sync = lambda context, link: sent.append("full")
 material = module("material_sync")
@@ -43,13 +45,18 @@ class Obj(dict):
     def __init__(self, name, guid):
         super().__init__(ailu_live_link_guid=guid)
         self.name = name
+        self.name_full = name
         self.type = "MESH"
+        self.material_slots = []
+        self.matrix_local = ((1.0, 0.0, 0.0, 0.0), (0.0, 1.0, 0.0, 0.0),
+                             (0.0, 0.0, 1.0, 0.0), (0.0, 0.0, 0.0, 1.0))
 
 original = Obj("Original", "11111111-1111-4111-8111-111111111111")
 duplicate = Obj("Duplicate", identity.get_guid(original))
 scene = types.SimpleNamespace(objects=[original, duplicate], render=types.SimpleNamespace(
     resolution_x=1920, resolution_y=1080, pixel_aspect_x=1.0, pixel_aspect_y=1.0))
-context = types.SimpleNamespace(scene=scene, mode="OBJECT")
+context = types.SimpleNamespace(scene=scene, mode="OBJECT",
+                                window_manager=types.SimpleNamespace(windows=[]))
 link = types.SimpleNamespace(connected=True, send_json=lambda *args: sent.append(args), poll=lambda: None)
 dirty_tracker._known_guids.add(identity.get_guid(original))
 dirty_tracker.flush(context, link)
@@ -61,6 +68,15 @@ dirty_tracker.flush(context, link)
 assert sent == [(protocol.OBJECT_DELETE, {"guid": identity.get_guid(original)})], "Offline membership must detect deletes"
 
 sent.clear()
+deleted_guid = "44444444-4444-4444-8444-444444444444"
+dirty_tracker._known_guids.add(deleted_guid)
+sync._object_affine_helpers.add(deleted_guid)
+dirty_tracker.flush(context, link)
+assert sent == [(protocol.OBJECT_DELETE, {"guid": deleted_guid}),
+                (protocol.OBJECT_DELETE, {"guid": str(uuid.uuid5(uuid.NAMESPACE_URL, deleted_guid + ":affine-parent"))})]
+assert deleted_guid not in sync._object_affine_helpers, "Deleting a source must release its affine helper bookkeeping"
+
+sent.clear()
 duplicate.type = "CAMERA"
 scene.render.resolution_x = 1080
 dirty_tracker.flush(context, link)
@@ -69,7 +85,7 @@ assert sent == [duplicate], "Render dimension changes must refresh camera projec
 from ailu_live_link import addon
 connection.connection = link
 scene = {identity.SESSION_GUID_KEY: "22222222-2222-4222-8222-222222222222"}
-bpy.context = types.SimpleNamespace(scene=scene)
+bpy.context = types.SimpleNamespace(scene=scene, window_manager=types.SimpleNamespace(windows=[]))
 dirty_tracker.mark_synced = lambda scene: None
 dirty_tracker.flush = lambda *args: sent.append("delta")
 sent.clear()

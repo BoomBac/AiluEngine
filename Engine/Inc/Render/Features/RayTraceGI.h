@@ -46,6 +46,8 @@ namespace Ailu
             EPathTracingDenoiser _denoiser = EPathTracingDenoiser::kNone;
             APROPERTY()
             EPathTracingDenoiserQuality _denoiser_quality = EPathTracingDenoiserQuality::kBalanced;
+            APROPERTY()
+            bool _denoiser_use_guides = false;
             APROPERTY(Range(1,256))
             u32 _denoiser_sample_interval = 32u;
             APROPERTY()
@@ -98,6 +100,7 @@ namespace Ailu
             EPathTracingDenoiserQuality _denoiser_quality = EPathTracingDenoiserQuality::kBalanced;
             u32 _denoiser_sample_interval = 32u;
             EPathTracingDenoiser _denoiser = EPathTracingDenoiser::kNone;
+            bool _denoiser_use_guides = false;
             EDenoiserStatus DenoiserStatus() const { return _denoiser_host.Status(); }
             const char *DenoiserReason() const { return _denoiser_host.Reason(); }
             EPathTracerAccumulationMode _accumulation_mode = EPathTracerAccumulationMode::kDisabled;
@@ -126,6 +129,9 @@ namespace Ailu
             u64 _last_denoiser_engine_frame = 0u;
             EPathTracingDenoiserQuality _previous_denoiser_quality = EPathTracingDenoiserQuality::kBalanced;
             u32 _reference_sample_count = 0u;
+            bool _previous_denoiser_use_guides = false;
+            Ref<RenderTexture> _guide_albedo, _guide_normal;
+            RDG::RGHandle _guide_albedo_handle{}, _guide_normal_handle{};
             ComputeShaderKernelId _kernel_primary_ray = kInvalidComputeShaderKernelId;
             ComputeShaderKernelId _kernel_denoise = kInvalidComputeShaderKernelId;
             ComputeShaderKernelId _kernel_build_environment_weights = kInvalidComputeShaderKernelId;

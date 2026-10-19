@@ -27,7 +27,8 @@ namespace Ailu::Render
 		GraphicsPipelineStateMgr::Init();
         ConstBufferPool::Init();
         FrameResourceManager::Init();
-        ImGuiRenderer::Init();
+        if (!Application::Get().IsOffscreen())
+            ImGuiRenderer::Init();
 	}
     void GraphicsContext::FinalizeGlobalContext()
     {
@@ -39,7 +40,8 @@ namespace Ailu::Render
             g_pGfxContext->WaitForGpu();
         }
         CommandBufferPool::ReleaseAll();
-        ImGuiRenderer::Shutdown();
+        if (!Application::Get().IsOffscreen())
+            ImGuiRenderer::Shutdown();
         ConstBufferPool::ShutDown();
 		GraphicsPipelineStateMgr::Shutdown();
         RHICommandBufferPool::Shutdown();

@@ -47,7 +47,7 @@ namespace Ailu::Render
             _resources.emplace_back(AL_NEW(T));
             _states.push_back(0);
             ++_capacity;
-            LOG_WARNING("TResourcePool: Resource pool is full, increasing capacity to {}", _capacity + 1);
+            LOG_DEBUG("TResourcePool: Resource pool is full, increasing capacity to {}", _capacity + 1);
             return _resources.back();
         }
         void Release(T *resource)
@@ -182,7 +182,7 @@ namespace Ailu::Render
             }
             if (released_rt_num > 0)
             {
-                LOG_INFO("THashableResourcePool: Released {} unused resources", released_rt_num);
+                LOG_DEBUG("THashableResourcePool: Released {} unused resources", released_rt_num);
             }
         }
 

@@ -507,8 +507,8 @@ namespace Ailu::Render
             auto *vertex_buffer = r._mesh->GetVertexBuffer().get();
             auto *index_buffer = r._mesh->SubmeshCount() > 0u ? r._mesh->GetIndexBuffer().get() : nullptr;
             LOG_INFO("[Gizmo] Submit preview mesh={} submeshes={} vb={} vb_ready={} vb_handle=({}, {}) ib={} ib_ready={} ib_handle=({}, {})",
-                     r._mesh, r._mesh->SubmeshCount(), vertex_buffer, vertex_buffer->IsReady(),
-                     vertex_buffer->Handle()._index, vertex_buffer->Handle()._generation, index_buffer,
+                     r._mesh->Name(), r._mesh->SubmeshCount(), reinterpret_cast<std::uintptr_t>(vertex_buffer), vertex_buffer->IsReady(),
+                     vertex_buffer->Handle()._index, vertex_buffer->Handle()._generation, reinterpret_cast<std::uintptr_t>(index_buffer),
                      index_buffer != nullptr && index_buffer->IsReady(),
                      index_buffer != nullptr ? index_buffer->Handle()._index : kInvalidGpuHandleIndex,
                      index_buffer != nullptr ? index_buffer->Handle()._generation : 0u);

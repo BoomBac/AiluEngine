@@ -31,10 +31,10 @@ A repeatable suite command returns `summary.json` statuses `PASS / FAIL / INCONC
 Each has its own failure-injection tests and acceptance gate. **Do not begin the next milestone before the current one's required tests PASS.** Each milestone should change the smallest necessary surface and leave reusable evidence.
 
 ## Current Milestone
-M0 (pending). Read `progress.md` then `m0-runner.md`.
+M3 — stateful and real-scene regression. M2 was accepted on 2026-10-16; M3 implementation is partial. See `progress.md` and `m3-behavior.md`.
 
 ## Progress
-Source audit and design files prepared. No code implementing the new unified runner has been written; no local Blender/Editor runtime tests performed in this ChatGPT environment.
+M0, M1, and M2 are accepted. M2 captured deterministic GBuffer/final frames from hidden native Editor/Blender runs and compared repeated Full Sync outputs. M3 has an actual-Blender dirty-tracker smoke driver; Engine RPC correlation and named real-scene regression remain pending.
 
 ## Decision Log
 Keep Skill minimal; deterministic scripts enforce pass/fail. Reuse existing native exporter, packet replay and render capture. Add a separate ground-truth oracle to detect bugs shared by Blender exporter and Engine or masked by replay. Keep current render limitations explicit. Prefer local Windows autonomous runs to unsupported cloud GPU assumptions.
@@ -43,13 +43,13 @@ Keep Skill minimal; deterministic scripts enforce pass/fail. Reuse existing nati
 `scene.query_entities` supports offset/limit/has_more, and `scene.inspect_entity` exposes components/properties. Historical BMW geometry review found visual screenshots were captured before Engine actually finished the Full Sync; correct acceptance must wait until End applied. The native performance exporter directly calls `object_sync.full_sync`, not the registered Blender addon UI.
 
 ## Validation
-Design reviewed against the current GitHub repository; actual runtime/binary/scene validation remains unexecuted. Implementers must record exact commands, exit codes, hashes, current-run logs, Engine RPC/capture evidence and cleanup status. Never state that this document implies a passing native test.
+M0 and M1 were validated with hidden native Editor/Blender runs. Latest M1 structural suite and its run IDs, hashes, Engine RPC evidence, injected corruption results, and cleanup checks are recorded in `progress.md`. This does not imply M2 GPU/render acceptance.
 
 ## Known Follow-ups
 A read-only bulk Engine Blender-link snapshot endpoint may be needed if inspecting ~1000 entities serially is too slow. More sophisticated visual/material oracles and dedicated self-hosted GPU CI are deliberately deferred.
 
 ## Outcomes
-A detailed, split handoff plan and cross-agent Skill design; implementation and execution pending.
+M0 passed with hidden native Editor/Blender execution, packet/apply verification and exception cleanup. M1 passed with independent bpy references and a bounded read-only Engine snapshot. M2 passed deterministic GPU appearance, projection, clipping/blending, replay comparison, and cleanup checks. M3 implementation is in progress and is not accepted.
 
 ## Resume Protocol
 1. Read only README + progress + current milestone file.

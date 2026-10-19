@@ -1,4 +1,5 @@
 #include "Render/Denoiser/PathTracingDenoiser.h"
+#include "Render/Texture.h"
 
 namespace Ailu::Render
 {
@@ -56,7 +57,13 @@ namespace Ailu::Render
         input._generation = _generation;
         input._backend_instance = _backend_instance;
         if (!_backend || !_reference_mode || _selected == EPathTracingDenoiser::kNone ||
-            !input._valid_radiance || !input._radiance.IsValid()) return {};
+            !input._valid_radiance || !input._radiance.IsValid() ||
+            (input._use_guides && (!input._albedo.IsValid() || !input._normal.IsValid() ||
+                                  !input._albedo_owner || !input._normal_owner ||
+                                  input._albedo_owner->Width() != input._width ||
+                                  input._albedo_owner->Height() != input._height ||
+                                  input._normal_owner->Width() != input._width ||
+                                  input._normal_owner->Height() != input._height))) return {};
         const auto output = _backend->Record(graph, input);
         _status = _backend->Status();
         return CanDisplay(input, output) ? output : PathTracingDenoiserOutput{};

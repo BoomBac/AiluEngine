@@ -28,6 +28,7 @@
 #include "Objects/Type.h"
 #include "Objects/JsonArchive.h"
 #include "Render/Features/VolumetricClouds.h"
+#include "Render/Camera.h"
 #include "Render/GraphicsContext.h"
 #include "Render/RenderPipeline.h"
 #include "Project/ProjectManager.h"
@@ -165,7 +166,11 @@ namespace Ailu
         static WString root;
         if (root.empty())
         {
-            root = PathUtils::NormalizeDirectoryPath(GetUserHomePath() + L"OneDrive/AiluEngine");
+#ifdef AILU_SOURCE_ROOT
+            root = PathUtils::NormalizeDirectoryPath(ToWChar(AILU_SOURCE_ROOT));
+#else
+            root = PathUtils::NormalizeDirectoryPath(GetWorkingPath());
+#endif
         }
         return root;
     }
@@ -183,6 +188,11 @@ namespace Ailu
     int Application::Initialize(ApplicationDesc desc,const ApplicationInitContext& init_ctx)
     {
         AL_ASSERT_MSG(sp_instance == nullptr, "Application already init!");
+        _is_batch_mode = init_ctx._batch;
+        _graphics_mode = init_ctx._graphics_mode;
+        _fixed_delta_seconds = init_ctx._fixed_delta_seconds;
+        if (init_ctx._graphics_mode == EApplicationGraphicsMode::kHiddenCompat)
+            desc._window_flags |= EWindowFlags::kWindow_Hidden;
         ObjectRegister::Initialize();
         Enum::InitTypeInfo();
         Allocator::Init();
@@ -210,26 +220,36 @@ namespace Ailu
             ResourceMgr::ConfigEditorResRoot(GetAiluRoot() + L"Editor/Res/");
             LoadEngineConfig();
             _is_multi_thread_rendering.store(g_engine_config.isMultiThreadRender);
+            if (_graphics_mode == EApplicationGraphicsMode::kNone)
+                _is_multi_thread_rendering.store(false);
         }
         //LogMgr::Get().AddAppender(new ConsoleAppender());
-        const WString window_title = g_engine_config.isMultiThreadRender ? L"AiluEngine -mt" : L"AiluEngine";
-        _p_window = std::move(WindowFactory::Create(window_title, desc._window_width, desc._window_height,
-                                                    desc._window_flags));
-        _p_window->SetEventHandler(BIND_EVENT_HANDLER(OnEvent));
-        s_focus_window = _p_window.get();
-        _input_system = MakeScope<InputSystem>();
-        _win_input_backend.Initialize(*_input_system, _p_window.get());
+        if (_graphics_mode != EApplicationGraphicsMode::kOffscreen && _graphics_mode != EApplicationGraphicsMode::kNone)
+        {
+            const WString window_title = g_engine_config.isMultiThreadRender ? L"AiluEngine -mt" : L"AiluEngine";
+            _p_window = std::move(WindowFactory::Create(window_title, desc._window_width, desc._window_height,
+                                                        desc._window_flags));
+            _p_window->SetEventHandler(BIND_EVENT_HANDLER(OnEvent));
+            s_focus_window = _p_window.get();
+        }
+        if (_graphics_mode != EApplicationGraphicsMode::kNone)
+        {
+            _input_system = MakeScope<InputSystem>();
+            _win_input_backend.Initialize(*_input_system, _p_window.get());
+        }
         _layer_stack = AL_NEW_TAG(EMemoryTag::kCore, LayerStack);
         //PushLayer(new UI::UILayer());
 #ifdef DEAR_IMGUI
         //初始化imgui gfx时要求imgui window已经初始化
-        _p_imgui_layer = AL_NEW_TAG(EMemoryTag::kUi, ImGUILayer);
+        if (_p_window != nullptr)
+            _p_imgui_layer = AL_NEW_TAG(EMemoryTag::kUi, ImGUILayer);
 #endif// DEAR_IMGUI
         _runtime = MakeScope<EngineRuntime>();
-        if (!_runtime->Initialize(init_ctx, *_p_window, desc))
+        if (!_runtime->Initialize(init_ctx, _p_window.get(), desc))
             return -1;
 #ifdef DEAR_IMGUI
-        PushLayer(_p_imgui_layer);
+        if (_p_imgui_layer != nullptr)
+            PushLayer(_p_imgui_layer);
 #endif// DEAR_IMGUI
         SetThreadName("MainThread");
     #if defined(TRACY_ENABLE)
@@ -253,8 +273,26 @@ namespace Ailu
         return 0;
     }
 
+    Render::RenderTexture *Application::GetOffscreenTarget() const
+    {
+        return _runtime != nullptr ? _runtime->GetOffscreenTarget() : nullptr;
+    }
+
+    bool Application::ResizeOffscreenTarget(u32 width, u32 height)
+    {
+        if (!IsOffscreen() || _runtime == nullptr || !_runtime->ResizeOffscreenTarget(width, height))
+            return false;
+        if (Camera::sCurrent != nullptr)
+        {
+            Camera::sCurrent->OutputSize(static_cast<u16>(width), static_cast<u16>(height));
+            Camera::sCurrent->TargetTexture(GetOffscreenTarget());
+        }
+        return true;
+    }
+
     void Application::Finalize()
     {
+        if (!_is_batch_mode)
         {
             JsonArchive ar;
             const Type *type = EngineConfig::StaticType();
@@ -269,6 +307,8 @@ namespace Ailu
             g_pGfxContext->SetMultiThreadRendering(false);
             _is_multi_thread_rendering.store(false);
         }
+        if (_runtime)
+            _runtime->WaitForGpu();
         AL_DELETE(_layer_stack);
         _p_imgui_layer = nullptr;
         if (_runtime)
@@ -278,7 +318,8 @@ namespace Ailu
             _runtime->Shutdown();
             _runtime.reset();
         }
-        _win_input_backend.Shutdown(*_input_system);
+        if (_input_system != nullptr)
+            _win_input_backend.Shutdown(*_input_system);
         _input_system.reset();
         _p_window.reset();
         _raw_event_queue.reset();
@@ -296,6 +337,19 @@ namespace Ailu
     {
         TimeMgr::Get().Reset();
 #if defined(SEPARATE_LOGIC_THREAD)
+        if (_is_batch_mode)
+        {
+            while (State() != EApplicationState::EApplicationState_Exit)
+            {
+                InputRouteState::Get().BeginFrame();
+                if (_p_window != nullptr)
+                    _p_window->OnUpdate();
+                LogicLoop();
+                _dispatcher.PumpTasks();
+            }
+            LOG_INFO("Exit");
+            return;
+        }
         std::thread logic_thread = std::thread([&]()
                                                {
             SetThreadName("LogicThread");
@@ -313,7 +367,8 @@ namespace Ailu
             InputRouteState::Get().BeginFrame();
             {
                 PROFILE_BLOCK_CPU("Application::WindowUpdate")
-                _p_window->OnUpdate();
+                if (_p_window != nullptr)
+                    _p_window->OnUpdate();
             }
             {
                 PROFILE_BLOCK_CPU("Application::PumpTasks")
@@ -331,6 +386,7 @@ namespace Ailu
             InputRouteState::Get().BeginFrame();
             {
                 PROFILE_BLOCK_CPU("Application::WindowUpdate")
+            if (_p_window != nullptr)
                 _p_window->OnUpdate();
             }
             {
@@ -612,7 +668,7 @@ namespace Ailu
 #if defined(TRACY_ENABLE)
         ZoneScopedN("Application::LogicLoop");
 #endif
-        const f32 delta_time = TimeMgr::s_delta_time;
+        const f32 delta_time = _fixed_delta_seconds > 0.0f ? _fixed_delta_seconds : TimeMgr::s_delta_time;
         if (State() == EApplicationState::EApplicationState_Pause)
         {
             std::this_thread::sleep_for(std::chrono::milliseconds(500));
@@ -654,6 +710,8 @@ namespace Ailu
 #if defined(TRACY_ENABLE)
         ZoneScopedN("UI::Update + Events");
 #endif
+        if (_input_system == nullptr)
+            return;
         _input_system->Update(delta_time);
         UI::UIManager::Get()->Update(delta_time);
 #if defined(SEPARATE_LOGIC_THREAD)
@@ -720,7 +778,8 @@ namespace Ailu
 #if defined(TRACY_ENABLE)
         ZoneScopedN("SceneTick");
 #endif
-        ScriptSystem::Get().Tick(delta_time);
+        if (!IsCpuOnly())
+            ScriptSystem::Get().Tick(delta_time);
         _fixed_accumulator += delta_time;
 
         u32 fixed_step_count = 0u;
@@ -750,7 +809,8 @@ namespace Ailu
 #if defined(TRACY_ENABLE)
         ZoneScopedN("RenderScene");
 #endif
-        Render::RenderPipeline::Get().Render();
+        if (!IsCpuOnly())
+            Render::RenderPipeline::Get().Render();
     }
 
     void Application::RenderEditor()
@@ -760,6 +820,8 @@ namespace Ailu
 #if defined(TRACY_ENABLE)
         ZoneScopedN("RenderImGui");
 #endif
+        if (_p_imgui_layer == nullptr)
+            return;
         _p_imgui_layer->Begin();
         for (Layer *layer: *_layer_stack)
             layer->OnImguiRender();
@@ -770,7 +832,12 @@ namespace Ailu
     void Application::PresentFrame()
     {
         PROFILE_BLOCK_CPU("Application::Present")
-        g_pGfxContext->Present();
+        if (IsCpuOnly())
+            return;
+        if (IsOffscreen())
+            g_pGfxContext->EndFrame();
+        else
+            g_pGfxContext->Present();
         if (_is_multi_thread_rendering.load())
             Render::RenderPipeline::Get().SetRenderThreadFramePending(true);
         _render_lag -= s_target_lag;

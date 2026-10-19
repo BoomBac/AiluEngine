@@ -1,4 +1,4 @@
-param([string]$InstallRoot = (Join-Path $PSScriptRoot '../.artifacts/out/oidn-2.5.1'))
+param([string]$InstallRoot = (Join-Path $PSScriptRoot '../Engine/Ext/Packages/oidn-2.5.1'))
 $ErrorActionPreference = 'Stop'
 $install_path = [IO.Path]::GetFullPath($InstallRoot)
 $archive_path = Join-Path $install_path 'oidn-2.5.1.x64.windows.zip'

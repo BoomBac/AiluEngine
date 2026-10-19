@@ -193,7 +193,7 @@ namespace Ailu
 
         ResourceMgr();
         ~ResourceMgr();
-        int Initialize();
+        int Initialize(bool cpu_only = false);
         void Finalize();
         void BeginShutdown();
         void Drain();
@@ -202,6 +202,7 @@ namespace Ailu
         auto Begin() { return _asset_db.begin(); };
         auto End() { return _asset_db.end(); };
         u64 AssetNum() { return _asset_db.size(); }
+        bool IsCpuOnly() const { return _cpu_only; }
         //在目标位置创建资产对象并将其注册
         Asset *CreateAsset(const WString &asset_path, Ref<Object> obj, bool overwrite = true);
         void DeleteAsset(Asset *asset);
@@ -496,6 +497,7 @@ namespace Ailu
         u64 _next_asset_reload_listener_id = 1u;
         TaskGroup _task_group;
         bool _is_shutting_down = false;
+        bool _cpu_only = false;
     };
 
     using ResourceSystem = ResourceMgr;

@@ -1,4 +1,5 @@
 #include "Automation/AutomationCaptureService.h"
+#include "Automation/AutomationReadModel.h"
 #include "EditorApp.h"
 
 #include "Framework/Common/Log.h"
@@ -250,6 +251,44 @@ namespace Ailu
                             {"cpu_render_recording_graph_count", counter(ds.CpuRenderRecordingFrameCount)},
                         };
                         return AutomationResult::Ok(AutomationValue(std::move(stats)));
+                    });
+            }
+            {
+                AutomationMethodDesc desc;
+                desc._name = "render.feature_property";
+                desc._description = "Read or write an existing reflected feature property at runtime without saving assets.";
+                desc._permission = EAutomationPermission::kExternalEffect;
+                desc._input_schema.AddParam("name", "Render feature name.", EAutomationValueType::kString, true);
+                desc._input_schema.AddParam("property_path", "Reflected property name.", EAutomationValueType::kString, true);
+                desc._input_schema.AddParam("value", "Optional value; omit to read.", EAutomationValueType::kObject);
+                registry.Register("render.feature_property", std::move(desc),
+                    [](EditorAutomationContext &, const AutomationObject &arguments)
+                    {
+                        const auto name = arguments.find("name"), path = arguments.find("property_path");
+                        if (name == arguments.end() || path == arguments.end() ||
+                            !name->second.IsString() || !path->second.IsString())
+                            return AutomationResult::Fail(AutomationErrors::kInvalidArgument, "name/property_path required");
+                        auto *pipeline = RenderPipeline::Instance();
+                        auto *renderer = pipeline ? pipeline->GetRenderer() : nullptr;
+                        if (!renderer)
+                            return AutomationResult::Fail(AutomationErrors::kEditorNotReady, "Renderer unavailable");
+                        for (auto *feature : renderer->GetFeatures())
+                        {
+                            if (!feature || feature->Name() != name->second.AsString()) continue;
+                            const auto *type = feature->GetType();
+                            const auto *prop = type ? type->FindPropertyByName(path->second.AsString()) : nullptr;
+                            if (!prop)
+                                return AutomationResult::Fail(AutomationErrors::kPropertyNotFound, "Property unavailable");
+                            if (const auto value = arguments.find("value"); value != arguments.end())
+                            {
+                                if (!prop->IsPublic() || prop->IsConst() || prop->IsStatic() ||
+                                    !WriteReflectedProperty(*prop, feature, value->second))
+                                    return AutomationResult::Fail(AutomationErrors::kPropertyNotEditable,
+                                                                  "Property not editable");
+                            }
+                            return AutomationResult::Ok(ReadReflectedProperty(*prop, feature));
+                        }
+                        return AutomationResult::Fail(AutomationErrors::kTargetNotFound, "Feature unavailable");
                     });
             }
             {

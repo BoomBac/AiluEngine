@@ -16,25 +16,37 @@ namespace Ailu::Render
         _material = MakeRef<Material>(_shader.get(), "ToneMapping");
     }
 
-    RDG::RGHandle ToneMappingPass::Record(RDG::RenderGraph &graph, RDG::RGHandle source, const RenderingData &rendering_data,
-                                          const ToneMappingSettings &settings)
+    RDG::RGHandle ToneMappingPass::Record(RDG::RenderGraph &graph, RDG::RGHandle source,
+                                          const RenderingData &rendering_data,
+                                          const ToneMappingSettings &settings, RDG::RGHandle exposure_ev,
+                                          f32 scalar_exposure)
     {
-        (void) rendering_data;
         const TextureDesc source_desc = graph.GetTextureDesc(source);
+        const RDG::RGHandle pre_exposure_ev = rendering_data._rg_handles._pre_exposure_ev;
         TextureDesc desc(source_desc._width, source_desc._height, ERenderTargetFormat::kDefaultHDR);
         desc._is_color_target = true;
         desc._load = ELoadStoreAction::kNotCare;
         const RDG::RGHandle output = graph.CreateResource(desc, "ToneMappedColor");
-        graph.AddPass("ToneMapping", RDG::PassDesc(), [source, output](RDG::RenderGraphBuilder &builder)
+        graph.AddPass("ToneMapping", RDG::PassDesc(), [source, output, exposure_ev, pre_exposure_ev]
+                      (RDG::RenderGraphBuilder &builder)
         {
-            builder.Read(source);
+            builder.Read(source, EResourceUsage::kReadSRV);
+            if (exposure_ev.IsValid())
+                builder.Read(exposure_ev, EResourceUsage::kReadSRV);
+            if (pre_exposure_ev.IsValid())
+                builder.Read(pre_exposure_ev, EResourceUsage::kReadSRV);
             (void) builder.Write(output);
-        }, [this, source, output, settings](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &)
+        }, [this, source, output, exposure_ev, settings, scalar_exposure]
+           (RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &)
         {
             cmd->SetRenderTarget(graph.GetTexture("ToneMappedColor"));
-            _material->SetFloat("_Exposure", settings._exposure);
+            _material->SetFloat("_Exposure", scalar_exposure);
+            _material->SetFloat("_Gamma", settings._gamma);
             _material->SetInt("_ToneMappingMode", static_cast<i32>(settings._mode));
+            _material->SetInt("_UseAutoExposureEV", exposure_ev.IsValid() ? 1 : 0);
             _material->SetTexture("_SourceTex", graph.Resolve<Texture>(source));
+            _material->SetTexture("_AutoExposureEVTex", exposure_ev.IsValid()
+                ? graph.Resolve<Texture>(exposure_ev) : graph.Resolve<Texture>(source));
             cmd->DrawFullScreenQuad(_material.get(), 0);
         });
         return graph.GetTexture("ToneMappedColor");

@@ -13,14 +13,18 @@ def export_light(obj, link):
         "guid": identity.get_guid(obj),
         "type": light.type,
         "color": list(light.color),
-        "energy": float(light.energy),
-        "range": float(getattr(light, "cutoff_distance", 1000.0)),
+        "use_temperature": bool(getattr(light, "use_temperature", False)),
+        "temperature_kelvin": float(getattr(light, "temperature", 6500.0)),
+        "energy": float(light.energy) * (2.0 ** float(getattr(light, "exposure", 0.0))),
+        "range": float(getattr(light, "cutoff_distance", 0.0))
+                 if getattr(light, "use_custom_distance", False) else 0.0,
         "radius": float(getattr(light, "shadow_soft_size", 0.05)),
         "inner_angle_degrees": float(getattr(light, "spot_size", 0.785398) * 57.2957795 *
                                      (1.0 - getattr(light, "spot_blend", 0.0))),
         "outer_angle_degrees": float(getattr(light, "spot_size", 0.785398) * 57.2957795),
         "width": float(getattr(light, "size", 1.0)),
         "height": float(getattr(light, "size_y", getattr(light, "size", 1.0))),
+        "shape": str(getattr(light, "shape", "RECTANGLE")),
         "direction": list(direction),
     }
     link.send_json(protocol.LIGHT_UPSERT, value)

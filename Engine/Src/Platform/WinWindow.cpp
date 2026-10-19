@@ -317,8 +317,11 @@ namespace Ailu
         LONG_PTR style = GetWindowLongPtr(_hwnd, GWL_STYLE);
         //style = style & ~WS_THICKFRAME;
         SetWindowLongPtr(_hwnd, GWL_STYLE, style);
-        ShowWindow(_hwnd, SW_SHOW);
-        UpdateWindow(_hwnd);
+        if ((prop._flag & EWindowFlags::kWindow_Hidden) == 0u)
+        {
+            ShowWindow(_hwnd, SW_SHOW);
+            UpdateWindow(_hwnd);
+        }
         SetWindowText(_hwnd, prop.Title.c_str());
         HANDLE hTitleIcon = LoadImage(0, ResourceMgr::GetResSysPath(L"Icons/app_title_icon.ico").c_str(), IMAGE_ICON, 0, 0, LR_DEFAULTSIZE | LR_LOADFROMFILE);
         HANDLE hIcon = LoadImage(0, ResourceMgr::GetResSysPath(L"Icons/app_icon.ico").c_str(), IMAGE_ICON, 0, 0, LR_DEFAULTSIZE | LR_LOADFROMFILE);
@@ -530,12 +533,18 @@ namespace Ailu
 
     void WinWindow::Shutdown()
     {
-        if (_hwnd == nullptr)
-            return;
-        HWND hwnd = _hwnd;
-        RevokeDragDrop(hwnd);
-        DestroyWindow(hwnd);
-        _hwnd = nullptr;
+        if (_hwnd != nullptr)
+        {
+            HWND hwnd = _hwnd;
+            DestroyWindow(hwnd);
+            // WM_DESTROY normally clears the handle and revokes DragDrop. Keep a
+            // fallback for a failed or externally destroyed HWND.
+            if (_hwnd != nullptr)
+            {
+                RevokeDragDrop(hwnd);
+                _hwnd = nullptr;
+            }
+        }
         if (_ole_initialized)
         {
             OleUninitialize();
@@ -639,7 +648,10 @@ namespace Ailu
                 return 0;
             case WM_DESTROY:
             {
-                WindowCloseEvent e(_hwnd);
+                const HWND destroyed_hwnd = _hwnd != nullptr ? _hwnd : hWnd;
+                RevokeDragDrop(destroyed_hwnd);
+                _hwnd = nullptr;
+                WindowCloseEvent e(destroyed_hwnd);
                 e._window = this;
                 _data.Handler(e);
                 if (this == Application::Get().GetWindowPtr())

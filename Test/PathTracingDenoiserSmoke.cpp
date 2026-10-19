@@ -96,6 +96,9 @@ int main()
         input._sample_count = 1u;
         Require(!PathTracingDenoiserHost::CanDisplay(input, output), "Future SPP must be rejected");
         input._sample_count = 4u;
+        input._use_guides = true;
+        Require(!host.Record(graph, input)._valid, "Requested guides must not silently use color-only inputs");
+        input._use_guides = false;
         input._valid_radiance = false;
         Require(!host.Record(graph, input)._valid, "Invalid radiance must bypass the backend");
         host.Configure(EPathTracingDenoiser::kNone, true, false);

@@ -439,7 +439,8 @@ float4 DeferredLightingPSMain(FullScreenPSInput input) : SV_TARGET
 	float2 gbuf0 = SAMPLE_TEXTURE2D_LOD(_GBuffer0, g_LinearClampSampler, input.uv,0).xy;
 	float4 gbuf1 = _GBuffer1.Sample(g_LinearWrapSampler,input.uv);
 	float4 gbuf2 = _GBuffer2.Sample(g_LinearWrapSampler,input.uv);
-	float3 environment_irradiance = SAMPLE_TEXTURE2D_LOD(_GBuffer3, g_LinearClampSampler, input.uv, 0).rgb;
+	float4 environment_data = SAMPLE_TEXTURE2D_LOD(_GBuffer3, g_LinearClampSampler, input.uv, 0);
+    float3 environment_irradiance = environment_data.rgb;
 	float3 diffuse_irradiance = environment_irradiance;
 	float depth = SAMPLE_TEXTURE2D_LOD(_CameraDepthTexture,g_LinearWrapSampler,input.uv,0).r;
 	float3 world_pos = ComputeWorldSpacePosition(input.uv,depth,_MatrixIVP);
@@ -477,19 +478,19 @@ float4 DeferredLightingPSMain(FullScreenPSInput input) : SV_TARGET
 	#endif
 	uint material_id = (uint)gbuf2.r;
 #ifdef DEBUG_NORMAL
-	return float4(surface_data.wnormal,1);
+	return float4(surface_data.wnormal * GetPreExposure(),1);
 #elif DEBUG_ALBEDO
-	return surface_data.albedo;
+	return float4(surface_data.albedo.rgb * GetPreExposure(), surface_data.albedo.a);
 #elif DEBUG_WORLDPOS
-	return float4(world_pos.xyz,1);
+	return float4(world_pos.xyz * GetPreExposure(),1);
 #else
         const bool has_diffuse_gi = has_ddgi_irradiance || has_surfel_irradiance || has_static_probe_irradiance;
         float3 light = max(0.0, CalculateLightPBR(surface_data, world_pos.xyz, input.uv, diffuse_irradiance,
-                                                 environment_irradiance, has_diffuse_gi));
+                                                 environment_irradiance, has_diffuse_gi, 1.0, environment_data.a));
 	light += surface_data.emssive;
 	//light = LinearEyeDepth(depth,_ProjectionParams.z,_ProjectionParams.y).xxxx;
     //light = Linear01Depth(depth,_ZBufferParams).xxxx;
     //light = Linear01DepthNew(depth,100.0f,1.0f).xxxx;
-	return float4(light, 1.0); 
+	return float4(light * GetPreExposure(), 1.0); 
 #endif 
 }

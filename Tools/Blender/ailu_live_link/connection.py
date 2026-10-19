@@ -92,7 +92,7 @@ class LinkConnection:
                     queued_type = int.from_bytes(queued[6:8], "little") if queued else 0
                     queued_key = self._coalesce_key(queued) if queued else None
                     if queued_type in {protocol.OBJECT_UPSERT, protocol.MESH_UPSERT,
-                            protocol.MESH_PROTOTYPE_UPSERT,
+                            protocol.MESH_PROTOTYPE_UPSERT, protocol.MESH_STATIC_BATCH_UPSERT,
                             protocol.LIGHT_UPSERT, protocol.CAMERA_UPSERT} and queued_key:
                         if queued_key[1].strip(b'"') == guid:
                             self._drop_diagnostic_packet(queued)
@@ -247,7 +247,8 @@ class LinkConnection:
                     raise OSError(error, "Ailu connection failed")
                 self._connecting = False
                 hello = {"client": "Blender", "features": [
-                    protocol.INSTANCE_BATCH_FEATURE, protocol.MESH_PROTOTYPE_FEATURE]}
+                    protocol.INSTANCE_BATCH_FEATURE, protocol.MESH_PROTOTYPE_FEATURE,
+                    protocol.MESH_STATIC_BATCH_FEATURE, protocol.SCENE_DISPLAY_FEATURE, protocol.WORLD_FEATURE]}
                 self._wire_packet = protocol.json_packet(protocol.HELLO, self._sequence, hello)
                 self._sequence += 1
                 self._wire_offset = 0
@@ -288,7 +289,8 @@ class LinkConnection:
             return None
         message_type = int.from_bytes(data[6:8], "little")
         payload = data[protocol.HEADER.size:]
-        if message_type in {protocol.MESH_UPSERT, protocol.MESH_PROTOTYPE_UPSERT} and len(payload) >= 36:
+        if message_type in {protocol.MESH_UPSERT, protocol.MESH_PROTOTYPE_UPSERT,
+                            protocol.MESH_STATIC_BATCH_UPSERT} and len(payload) >= 36:
             return message_type, payload[:36]
         if message_type not in {protocol.OBJECT_UPSERT, protocol.MATERIAL_UPSERT,
                 protocol.LIGHT_UPSERT, protocol.CAMERA_UPSERT}:
@@ -351,9 +353,11 @@ class LinkConnection:
                 if kind != protocol.HELLO_ACK or not isinstance(reply, dict) or reply.get("accepted") is not True:
                     raise ValueError("Ailu rejected protocol v1")
                 features = reply.get("features", [])
-                required_features = {protocol.INSTANCE_BATCH_FEATURE, protocol.MESH_PROTOTYPE_FEATURE}
+                required_features = {protocol.INSTANCE_BATCH_FEATURE, protocol.MESH_PROTOTYPE_FEATURE,
+                                     protocol.MESH_STATIC_BATCH_FEATURE,
+                                     protocol.SCENE_DISPLAY_FEATURE, protocol.WORLD_FEATURE}
                 if not isinstance(features, list) or not required_features.issubset(features):
-                    raise ValueError("Ailu plugin lacks Blender instance prototype support; update the Engine plugin")
+                    raise ValueError("Ailu plugin lacks required Live Link capabilities; update the Engine plugin")
                 self._set_status("Connected")
                 self._overflow = False
                 self._retry_delay = 0.25

@@ -61,6 +61,8 @@ Texture2D _ThinGlassSceneColor;
 StandardPSInput ForwardVSMain(StandardVSInput v)
 {
 	StandardPSInput result;
+        result.object_pos = v.position;
+        result.object_normal = v.normal;
 	v.tangent.xyz *= v.tangent.w;
 #if defined(PER_OBJECT_CB)
         result.position = TransformToClipSpace(v.position);
@@ -84,10 +86,11 @@ StandardPSInput ForwardVSMain(StandardVSInput v)
 	return result;
 }
 
-float4 ForwardPSMain(StandardPSInput input) : SV_TARGET
+float4 ForwardPSMain(StandardPSInput input, bool is_front_face : SV_IsFrontFace) : SV_TARGET
 {
 	SurfaceData surface_data;
 	InitSurfaceData(input, surface_data);
+    OrientSurfaceToFace(surface_data, is_front_face);
 	float alpha = surface_data.albedo.a;
 #ifndef LINEAR_ALPHA
 	alpha = pow(alpha,0.4545);
@@ -110,12 +113,7 @@ float4 ForwardPSMain(StandardPSInput input) : SV_TARGET
     _ThinGlassSceneColor.GetDimensions(glass_width, glass_height);
     transmission *= glass_width > 1 && glass_height > 1 ? 1.0 : 0.0;
 #endif
-    float dielectric_specular = 0.04;
-    if (transmission > 0.0)
-    {
-        float ior = max(_IOR, 1.0);
-        dielectric_specular = pow((ior - 1.0) / (ior + 1.0), 2.0);
-    }
+    float dielectric_specular = ResolveDielectricSpecular(surface_data);
     float3 light = max(0.0, CalculateLightPBR(surface_data, input.world_pos, input.uv0, irradiance, irradiance,
                                             false, 1.0 - transmission, dielectric_specular));
     light += surface_data.emssive;
@@ -132,5 +130,5 @@ float4 ForwardPSMain(StandardPSInput input) : SV_TARGET
     }
     else
         light = ApplyVolumetricFogStraight(light, screen_uv, view_depth);
-    return float4(light, alpha);
+    return float4(light * GetPreExposure(), alpha);
 }

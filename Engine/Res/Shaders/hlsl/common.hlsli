@@ -3,6 +3,7 @@
 #include "cbuffer.hlsli"
 #include "constants.hlsli"
 #include "sampler.hlsli"
+#include "bindless.hlsli"
 
 //directx
 #define UNITY_UV_STARTS_AT_TOP 1
@@ -38,6 +39,19 @@ float Pow2(float x)
 float Pow4(float x)
 {
 	return x*x*x*x;
+}
+
+float GetPreExposureEV()
+{
+    if (valid_bindless_handle(_pre_exposure_ev_texture_index))
+        return g_bindless_texture2d[NonUniformResourceIndex(_pre_exposure_ev_texture_index)]
+            .Load(int3(0, 0, 0)).r;
+    return log2(max(_pre_exposure, 1e-6));
+}
+
+float GetPreExposure()
+{
+    return exp2(clamp(GetPreExposureEV(), -24.0, 24.0));
 }
 float SqrDistance(float3 p1,float3 p2)
 {

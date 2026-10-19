@@ -18,6 +18,8 @@ struct StandardPSInput
         float2 uv0 : TEXCOORD0;
         float3x3 btn : BTN;
         nointerpolation uint primitive_index : TEXCOORD7;
+        float3 object_pos : TEXCOORD4;
+        float3 object_normal : TEXCOORD5;
 };
 
 

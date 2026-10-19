@@ -162,14 +162,7 @@ namespace Ailu::SceneManagement
         if (const auto *light = registry.GetComponent<ECS::LightComponent>(entity); light != nullptr)
         {
             entity_doc._has_light_component = true;
-            if (const Enum *enum_type = StaticEnum<ECS::ELightType>())
-                entity_doc._light_component._type = enum_type->GetNameByEnum(light->_type);
-            entity_doc._light_component._light._light_color = light->_light._light_color;
-            entity_doc._light_component._light._light_param = light->_light._light_param;
-            entity_doc._light_component._light._is_two_side = light->_light._is_two_side;
-            entity_doc._light_component._shadow._is_cast_shadow = light->_shadow._is_cast_shadow;
-            entity_doc._light_component._shadow._constant_bias = light->_shadow._constant_bias;
-            entity_doc._light_component._shadow._slope_bias = light->_shadow._slope_bias;
+            entity_doc._light_component.CaptureFrom(*light);
             mark_disabled.template operator()<ECS::LightComponent>("LightComponent");
         }
         if (const auto *hierarchy = registry.GetComponent<ECS::CHierarchy>(entity); hierarchy != nullptr)
@@ -189,6 +182,7 @@ namespace Ailu::SceneManagement
             entity_doc._camera_component._far_clip = camera->_camera.Far();
             entity_doc._camera_component._near_clip = camera->_camera.Near();
             entity_doc._camera_component._fov_h = camera->_camera.FovH();
+            entity_doc._camera_component._physical_camera_settings = camera->_camera.PhysicalSettings();
             entity_doc._camera_component._size = camera->_camera.Size();
             entity_doc._camera_component._local_forward = camera->_camera.LocalForward();
             entity_doc._camera_component._local_up = camera->_camera.LocalUp();
@@ -292,6 +286,8 @@ namespace Ailu::SceneManagement
             auto &document = entity_doc._environment_component;
             document._source = environment->_source;
             document._texture_guid = environment->_texture.IsEmpty() ? String{} : environment->_texture.ToString();
+            document._background_texture_guid = environment->_background_texture.IsEmpty()
+                ? String{} : environment->_background_texture.ToString();
             document._sky_color = environment->_procedural_sky._sky_color;
             document._ground_color = environment->_procedural_sky._ground_color;
             document._intensity = environment->_intensity;

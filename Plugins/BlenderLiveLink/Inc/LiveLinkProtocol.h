@@ -27,8 +27,11 @@ namespace Ailu
         kLightUpsert = 22,
         kCameraUpsert = 23,
         kMeshPrototypeUpsert = 24,
+        kSceneSettingsUpsert = 25,
+        kWorldUpsert = 26,
         kServerStatus = 30,
         kInstanceBatchUpsert = 31,
+        kMeshStaticBatchUpsert = 32,
     };
 
     struct LiveLinkPacketHeader

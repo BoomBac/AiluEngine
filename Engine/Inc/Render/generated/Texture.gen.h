@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __TEXTURE_GEN_H__
 //Class Texture begin...........................
-#define TEXTURE_GEN_H_571_GENERATED_BODY \
+#define TEXTURE_GEN_H_573_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_Texture_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -21,7 +21,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::Texture>(
 //Class Texture end...........................
 
 //Class Texture2D begin...........................
-#define TEXTURE_GEN_H_694_GENERATED_BODY \
+#define TEXTURE_GEN_H_696_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_Texture2D_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -37,7 +37,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::Texture2D
 //Class Texture2D end...........................
 
 //Class Texture3D begin...........................
-#define TEXTURE_GEN_H_734_GENERATED_BODY \
+#define TEXTURE_GEN_H_736_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_Texture3D_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -53,7 +53,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::Texture3D
 //Class Texture3D end...........................
 
 //Class CubeMap begin...........................
-#define TEXTURE_GEN_H_770_GENERATED_BODY \
+#define TEXTURE_GEN_H_772_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_CubeMap_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -69,7 +69,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::CubeMap>(
 //Class CubeMap end...........................
 
 //Class RenderTexture begin...........................
-#define TEXTURE_GEN_H_803_GENERATED_BODY \
+#define TEXTURE_GEN_H_805_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_RenderTexture_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -85,7 +85,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::RenderTex
 //Class RenderTexture end...........................
 
 //Struct SamplerDesc begin...........................
-#define TEXTURE_GEN_H_161_GENERATED_BODY \
+#define TEXTURE_GEN_H_163_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_SamplerDesc_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -101,7 +101,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::Render::SamplerD
 //Struct SamplerDesc end...........................
 
 //Struct TextureSamplingSettings begin...........................
-#define TEXTURE_GEN_H_185_GENERATED_BODY \
+#define TEXTURE_GEN_H_187_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_TextureSamplingSettings_Type();\
                                 static const Type* GetPrivateStaticClass();\

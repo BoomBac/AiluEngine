@@ -43,6 +43,8 @@ namespace Ailu::Render
                 // M5 Policy B: sprites enter the pre-TAA color without sprite velocity or a reactive mask.
                 // Preserve the existing background for alpha blending.
                 builder.Read(rendering_data._rg_handles._color_target, EResourceUsage::kWriteRTV);
+                if (rendering_data._rg_handles._pre_exposure_ev.IsValid())
+                    builder.Read(rendering_data._rg_handles._pre_exposure_ev, EResourceUsage::kReadSRV);
                 rendering_data._rg_handles._color_target =
                     builder.Write(rendering_data._rg_handles._color_target);
                 // Read depth (optional, for depth testing)

@@ -28,7 +28,7 @@ namespace Ailu::RHI::DX12
                       std::uint32_t render_width, std::uint32_t render_height,
                       std::uint32_t output_width, std::uint32_t output_height,
                       float jitter_x, float jitter_y, float frame_time_ms,
-                      float camera_near, float camera_far, float camera_fov_vertical);
+                      float camera_near, float camera_far, float camera_fov_vertical, float pre_exposure);
 
     private:
         struct Impl;

@@ -20,7 +20,7 @@ namespace Ailu::RHI::DX12
     }
     D3DGraphicsPipelineState::~D3DGraphicsPipelineState()
     {
-        LOG_INFO("Destory gpso {}", _name);
+        LOG_DEBUG("Destory gpso {}", _name);
     }
 
     void D3DGraphicsPipelineState::UploadImpl(GraphicsContext *ctx, RHICommandBuffer *rhi_cmd, UploadParams *params)
@@ -150,6 +150,20 @@ namespace Ailu::RHI::DX12
             d3dcmd->SetGraphicsRootDescriptorTable(it->second._bind_slot, D3DDescriptorMgr::Get().GetSamplerTable());
         }
         u32 resolved_slot_mask = 0u;
+        const auto bind_global_table = [&](const char *name, D3D12_GPU_DESCRIPTOR_HANDLE handle)
+        {
+            const auto it = _p_bind_res_desc_infos->find(name);
+            if (it == _p_bind_res_desc_infos->end())
+                return;
+            d3dcmd->SetDescriptorHeap(D3DDescriptorMgr::Get().GetBindHeap(), 1024u);
+            d3dcmd->SetGraphicsRootDescriptorTable(it->second._bind_slot, handle);
+            resolved_slot_mask |= 1u << it->second._bind_slot;
+        };
+        auto &descriptor_mgr = D3DDescriptorMgr::Get();
+        bind_global_table("g_bindless_texture2d", descriptor_mgr.GetBindlessSRVBaseGpuHandle());
+        bind_global_table("g_bindless_buffer", descriptor_mgr.GetBindlessSRVBaseGpuHandle());
+        bind_global_table("g_bindless_rw_texture2d", descriptor_mgr.GetBindlessUAVBaseGpuHandle());
+        bind_global_table("g_bindless_rw_buffer", descriptor_mgr.GetBindlessUAVBaseGpuHandle());
         for (auto& res : recording_ctx.ResolvedBindResources())
         {
             const u16 slot = res._slot;

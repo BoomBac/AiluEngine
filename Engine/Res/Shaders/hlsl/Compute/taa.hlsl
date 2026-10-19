@@ -16,10 +16,16 @@ CBUFFER_START(TAA_CB)
     float _HistoryFactor;
     float _HistoryValid;
     float _ReactiveValid;
+    float _CurrentPreExposureTextureValid;
+    float _PreviousPreExposureTextureValid;
+    float _CurrentPreExposure;
+    float _PreviousPreExposure;
 CBUFFER_END
 
 TEXTURE2D(_CurrentColor)
 TEXTURE2D(_HistoryColor)
+TEXTURE2D(_CurrentPreExposureEV)
+TEXTURE2D(_PreviousPreExposureEV)
 TEXTURE2D(_CameraDepthTexture)
 TEXTURE2D(_MotionVectorTexture)
 TEXTURE2D(_OpaqueColor)
@@ -383,6 +389,11 @@ void CSMain(CSInput input)
     MinMax(samples,aabb_min,aabb_max,_ClampQuality);
     //cur_color = CAS_Sharpen(cur_color,aabb_min,aabb_max,_Sharpness);
     half4 history_color = _HistoryQuality>= 2? SampleBicubic5TapHalf(_HistoryColor,prev_uv,_SourceTex_TexelSize) : SceneToWorkingSpace(SAMPLE_TEXTURE2D_LOD(_HistoryColor, g_LinearClampSampler, prev_uv,0));
+    float current_pre_exposure = _CurrentPreExposureTextureValid > 0.5
+        ? exp2(_CurrentPreExposureEV.Load(int3(0, 0, 0)).r) : _CurrentPreExposure;
+    float previous_pre_exposure = _PreviousPreExposureTextureValid > 0.5
+        ? exp2(_PreviousPreExposureEV.Load(int3(0, 0, 0)).r) : _PreviousPreExposure;
+    history_color.rgb *= current_pre_exposure / max(previous_pre_exposure, 1e-6);
     ExpandStaticCoverageBounds(uv, mv, history_color, samples, aabb_min, aabb_max);
     half4 clamped_history = _ClampQuality>= 2? ClipColor(history_color,aabb_min,aabb_max) : clamp(history_color,aabb_min,aabb_max);
     clamped_history = ClipHistoryChroma(clamped_history, samples);

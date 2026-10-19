@@ -7,6 +7,9 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#if defined(_DEBUG)
+#include <crtdbg.h>
+#endif
 
 #pragma comment(lib, "Dbghelp.lib")
 
@@ -16,6 +19,9 @@ namespace Ailu
     {
         LPTOP_LEVEL_EXCEPTION_FILTER s_previous_filter = nullptr;
         HANDLE s_process = nullptr;
+#if defined(_DEBUG)
+        _CRT_REPORT_HOOK s_previous_report_hook = nullptr;
+#endif
         // 崩溃时可能已经无法安全使用堆，这里用固定缓冲避免再次分配。
         char s_report_buffer[2048];
 
@@ -127,11 +133,13 @@ namespace Ailu
         LONG WINAPI CrashExceptionHandler(EXCEPTION_POINTERS *exception_info)
         {
             // 报告写在工作目录（编辑器运行目录），与 FileAppender_log.txt 同级，便于一起收集。
-            HANDLE file = CreateFileA("crash.log", GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS,
-                                      FILE_ATTRIBUTE_NORMAL, nullptr);
+            HANDLE file = CreateFileA("crash.log", GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
+                                      OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
 
             if (file != INVALID_HANDLE_VALUE)
             {
+                LARGE_INTEGER end{};
+                SetFilePointerEx(file, end, nullptr, FILE_END);
                 EXCEPTION_RECORD *exception_record = exception_info->ExceptionRecord;
 
                 std::snprintf(s_report_buffer, sizeof(s_report_buffer),
@@ -149,6 +157,7 @@ namespace Ailu
 
                 WriteText(file, s_report_buffer);
 
+                SymRefreshModuleList(s_process);
                 CONTEXT context = *exception_info->ContextRecord;
                 WriteStackTrace(file, &context);
 
@@ -158,6 +167,39 @@ namespace Ailu
 
             return EXCEPTION_EXECUTE_HANDLER;
         }
+
+#if defined(_DEBUG)
+        int __cdecl CrashCrtReportHook(int report_type, char *message, int *return_value)
+        {
+            if (report_type == _CRT_ASSERT)
+            {
+                HANDLE file = CreateFileA("crash.log", GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
+                                          OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+                if (file != INVALID_HANDLE_VALUE)
+                {
+                    LARGE_INTEGER end{};
+                    end.QuadPart = 0;
+                    SetFilePointerEx(file, end, nullptr, FILE_END);
+                    std::snprintf(s_report_buffer, sizeof(s_report_buffer),
+                                  "========================================\r\n"
+                                  "AiluEngine Debug CRT assertion\r\n"
+                                  "Thread: %lu\r\n"
+                                  "========================================\r\n"
+                                  "%s\r\n\r\nStack Trace:\r\n",
+                                  GetCurrentThreadId(), message ? message : "(no assertion text)");
+                    WriteText(file, s_report_buffer);
+                    SymRefreshModuleList(s_process);
+                    CONTEXT context{};
+                    RtlCaptureContext(&context);
+                    WriteStackTrace(file, &context);
+                    WriteText(file, "\r\n");
+                    FlushFileBuffers(file);
+                    CloseHandle(file);
+                }
+            }
+            return s_previous_report_hook ? s_previous_report_hook(report_type, message, return_value) : FALSE;
+        }
+#endif
     }// namespace
 
     void InstallCrashHandler()
@@ -175,12 +217,19 @@ namespace Ailu
         SymInitialize(s_process, nullptr, TRUE);
 
         s_previous_filter = SetUnhandledExceptionFilter(CrashExceptionHandler);
+#if defined(_DEBUG)
+        s_previous_report_hook = _CrtSetReportHook(CrashCrtReportHook);
+#endif
     }
 
     void UninstallCrashHandler()
     {
         SetUnhandledExceptionFilter(s_previous_filter);
         s_previous_filter = nullptr;
+#if defined(_DEBUG)
+        _CrtSetReportHook(s_previous_report_hook);
+        s_previous_report_hook = nullptr;
+#endif
 
         if (s_process != nullptr)
         {

@@ -446,7 +446,8 @@ int wmain(int argc, wchar_t **argv)
         sun._light = {};
         sun._light._light_color = Color(1.f, 1.f, 1.f, 1.f);
         sun._light._light_dir = Vector4f(0.f, -1.f, 0.f, 0.f);
-        sun._light._light_param = Vector4f(1.f, 0.f, 0.f, 0.f);
+        sun._light._intensity = 1.f;
+        sun._light._intensity_unit = ECS::ELightIntensityUnit::kLux;
         sun._shadow = {};
         scene->GetRegister().GetComponent<ECS::TransformComponent>(sun_entity)->SetLocalRotation(
             Quaternion::EulerAngles(90.f, 0.f, 0.f));

@@ -75,7 +75,7 @@ namespace Ailu::RHI::DX12
     OidnGpuInteropD3D12::~OidnGpuInteropD3D12() { Shutdown(); }
     bool OidnGpuInteropD3D12::Initialize(ID3D12Device *device, ID3D12CommandQueue *exclusive_queue, uint32_t width,
                                          uint32_t height, const std::wstring &runtime_directory,
-                                         bool external_queue, int quality)
+                                         bool external_queue, int quality, bool use_guides)
     {
         Shutdown();
         _impl = std::make_unique<Impl>();
@@ -90,7 +90,9 @@ namespace Ailu::RHI::DX12
                 width > 16384u || height > 16384u || quality < 4 || quality > 6)
                 throw std::runtime_error("Invalid device/queue/dimensions; maximum dimension is 16384");
             const uint64_t bytes = uint64_t(width) * height * 16u;
-            if (bytes > std::numeric_limits<uint32_t>::max()) throw std::runtime_error("Shared buffer exceeds 4 GiB");
+            const uint64_t input_bytes = bytes * (use_guides ? 3u : 1u) + (external_queue ? 16u : 0u);
+            if (input_bytes > std::numeric_limits<uint32_t>::max())
+                throw std::runtime_error("Shared input buffer exceeds 4 GiB");
             if (runtime_directory.empty()) throw std::runtime_error("Specify an absolute OIDN 2.5.1 bin directory");
             const std::wstring dll = runtime_directory + L"\\OpenImageDenoise.dll";
             if (dll.size() < 3 || (dll[1] != L':' && dll.substr(0, 2) != L"\\\\"))
@@ -163,7 +165,8 @@ namespace Ailu::RHI::DX12
             p.Check("query external capabilities");
             std::cout << "OIDN 2.5.1 CUDA " << p.oidnGetPhysicalDeviceString(selected, "name")
                       << " LUID=" << luid.HighPart << ':' << luid.LowPart << " nodeMask=" << node_mask
-                      << " memory=" << memory << " semaphore=" << semaphore << " logical_bytes=" << bytes * 2u
+                      << " memory=" << memory << " semaphore=" << semaphore
+                      << " guides=" << use_guides << " logical_bytes=" << input_bytes + bytes
                       << " HDR_CPU_bytes=0\n";
             if ((memory & (kResource | kDedicated)) != (kResource | kDedicated) || !(semaphore & kFence))
                 throw std::runtime_error("Missing D3D12_RESOURCE/DEDICATED or D3D12_FENCE import capability");
@@ -181,20 +184,21 @@ namespace Ailu::RHI::DX12
             desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
             // CUDA imports the dedicated allocation, whose size is aligned, rather than the pixel payload alone.
             constexpr uint64_t kAllocationAlignment = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
-            desc.Width = (bytes + (external_queue ? 16u : 0u) + kAllocationAlignment - 1u) /
-                         kAllocationAlignment * kAllocationAlignment;
             desc.Height = 1u;
             desc.DepthOrArraySize = desc.MipLevels = 1u;
             desc.SampleDesc.Count = 1u;
             desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
             desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-            const auto allocation = device->GetResourceAllocationInfo(0u, 1u, &desc);
-            if (allocation.SizeInBytes == UINT64_MAX || allocation.SizeInBytes < desc.Width)
-                throw std::runtime_error("Invalid shared resource allocation size");
-            std::cout << "GPU shared allocation bytes=" << allocation.SizeInBytes * 2u << '\n';
+            uint64_t allocated_bytes = 0u;
             ID3D12Resource **resources[] = {p._input.GetAddressOf(), p._output.GetAddressOf()};
             for (int i = 0; i < 2; ++i)
             {
+                const uint64_t payload_bytes = i == 0 ? input_bytes : bytes;
+                desc.Width = (payload_bytes + kAllocationAlignment - 1u) / kAllocationAlignment * kAllocationAlignment;
+                const auto allocation = device->GetResourceAllocationInfo(0u, 1u, &desc);
+                if (allocation.SizeInBytes == UINT64_MAX || allocation.SizeInBytes < desc.Width)
+                    throw std::runtime_error("Invalid shared resource allocation size");
+                allocated_bytes += allocation.SizeInBytes;
                 Impl::CheckHr(device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_SHARED, &desc,
                                                               D3D12_RESOURCE_STATE_COMMON, nullptr,
                                                               IID_PPV_ARGS(resources[i])));
@@ -204,6 +208,7 @@ namespace Ailu::RHI::DX12
                 p.Check("import dedicated committed buffer");
                 if (!p._buffers[i]) throw std::runtime_error("Buffer import returned null");
             }
+            std::cout << "GPU shared allocation bytes=" << allocated_bytes << '\n';
             ID3D12Fence **fences[] = {p._ready.GetAddressOf(), p._done.GetAddressOf()};
             for (int i = 0; i < 2; ++i)
             {
@@ -221,6 +226,15 @@ namespace Ailu::RHI::DX12
             if (!p._filter) throw std::runtime_error("Filter creation returned null");
             p.oidnSetFilterImage(p._filter, "color", p._buffers[0], 3, width, height, 0, 16, size_t(width) * 16);
             p.oidnSetFilterImage(p._filter, "output", p._buffers[1], 3, width, height, 0, 16, size_t(width) * 16);
+            if (use_guides)
+            {
+                // Three independent float4 planes share one imported allocation and the same ready/done fences.
+                p.oidnSetFilterImage(p._filter, "albedo", p._buffers[0], 3, width, height,
+                                     size_t(bytes), 16, size_t(width) * 16);
+                p.oidnSetFilterImage(p._filter, "normal", p._buffers[0], 3, width, height,
+                                     size_t(bytes * 2u), 16, size_t(width) * 16);
+                p.oidnSetFilterBool(p._filter, "cleanAux", false);
+            }
             p.oidnSetFilterBool(p._filter, "hdr", true);
             p.oidnSetFilterInt(p._filter, "quality", quality);
             p.oidnCommitFilter(p._filter);

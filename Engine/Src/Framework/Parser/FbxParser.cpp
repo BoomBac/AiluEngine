@@ -546,7 +546,7 @@ namespace Ailu
             int layeredCount = prop.GetSrcObjectCount<FbxLayeredTexture>();
             if (layeredCount > 0)
             {
-                LOG_WARNING("Multi-layer texture not supported yet: {}", prop.GetName());
+                LOG_WARNING("Multi-layer texture not supported yet: {}", prop.GetName().Buffer());
                 for (int layerIndex = 0; layerIndex < layeredCount; ++layerIndex)
                 {
                     FbxLayeredTexture *layeredTexture = prop.GetSrcObject<FbxLayeredTexture>(layerIndex);

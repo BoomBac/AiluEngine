@@ -1,5 +1,6 @@
 ﻿#include "RHI/DX12/D3DTexture.h"
 #include "Framework/Common/ResourceMgr.h"
+#include "Framework/Common/Application.h"
 #include "RHI/DX12/D3DCommandBuffer.h"
 #include "RHI/DX12/D3DContext.h"
 #include "RHI/DX12/D3DShader.h"
@@ -898,6 +899,9 @@ namespace Ailu::RHI::DX12
 
     D3DRenderTexture::~D3DRenderTexture() 
     { 
+        // Registry retirement keeps the texture alive until its GPU fence completes.
+        if (_bindless_srv_index >= 0)
+            D3DDescriptorMgr::Get().ReleaseBindlessSRVIndex(_bindless_srv_index);
     }
 
     void D3DRenderTexture::UploadImpl(GraphicsContext *ctx, RHICommandBuffer *rhi_cmd, UploadParams *params)
@@ -997,6 +1001,20 @@ namespace Ailu::RHI::DX12
         }
         if (_dimension == ETextureDimension::kTex2D || _dimension == ETextureDimension::kTex2DArray)
         {
+            if (_dimension == ETextureDimension::kTex2D)
+            {
+                // Camera pre-exposure reads render textures through the bindless Texture2D table.
+                auto &desc_mgr = D3DDescriptorMgr::Get();
+                if (_bindless_srv_index < 0)
+                    _bindless_srv_index = desc_mgr.AllocBindlessSRVIndex();
+                D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc{};
+                srv_desc.Format = GetCompatibleSRVFormat(_tex_desc.Format);
+                srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+                srv_desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+                srv_desc.Texture2D.MipLevels = _mipmap_count;
+                p_device->CreateShaderResourceView(_p_d3dres.Get(), &srv_desc,
+                                                  desc_mgr.GetBindlessSRVCpuHandle(_bindless_srv_index));
+            }
             for (u16 i = 0; i < view_slice_count; i++)
             {
                 if (is_for_depth) CreateView(ETextureViewType::kDSV, 0, i);
@@ -1428,7 +1446,8 @@ namespace Ailu::RHI::DX12
     {
         if (!_views.contains(view_index)) return 0;
 #if defined(DEAR_IMGUI)
-        ImGuiRenderer::Get().RecordImguiUsedTexture(this);
+        if (!Application::Get().IsOffscreen())
+            ImGuiRenderer::Get().RecordImguiUsedTexture(this);
 #endif
         return D3DDescriptorMgr::Get().GetBindGpuHandle(_views[view_index]._gpu_alloc).ptr;
     }
@@ -1437,7 +1456,8 @@ namespace Ailu::RHI::DX12
     {
         if (!_views.contains(view_index)) return 0;
 #if defined(DEAR_IMGUI)
-        ImGuiRenderer::Get().RecordImguiUsedTexture(this);
+        if (!Application::Get().IsOffscreen())
+            ImGuiRenderer::Get().RecordImguiUsedTexture(this);
 #endif
         return D3DDescriptorMgr::Get().GetBindGpuHandle(_views[view_index]._gpu_alloc).ptr;
         //return _views[view_index]._gpu_handle.ptr;

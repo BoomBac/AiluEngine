@@ -143,10 +143,22 @@ namespace Ailu::Render
 
     void GraphicsPipelineStateMgr::BuildPSOCache()
     {
-        LOG_WARNING("Begin initialize PSO cache...");
+        LOG_MODULE_DEBUG(ELogModule::kRHI, "Begin initialize PSO cache...");
         TimeMgr::Get().Mark();
+        const auto get_valid_shader = [](const WString &path)
+        {
+            auto *shader = ResourceMgr::Get().Get<Shader>(path);
+            if (shader == nullptr || shader->PassCount() == 0)
+            {
+                LOG_ERROR(L"PSO cache skipped invalid shader {}", path);
+                return static_cast<Shader *>(nullptr);
+            }
+            return shader;
+        };
 
-        Shader *shader = ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/defered_standard_lit.alasset");
+        Shader *shader = get_valid_shader(L"Shaders/hlsl/defered_standard_lit.alasset");
+        if (shader == nullptr)
+            return;
         auto pso_desc = GraphicsPipelineStateInitializer::GetNormalOpaquePSODesc();
         pso_desc._input_layout = shader->PipelineInputLayout();
         pso_desc._p_vertex_shader = shader;
@@ -161,7 +173,9 @@ namespace Ailu::Render
         AddPSO(std::move(stand_pso));
 
         memset(&pso_desc, 0, sizeof(GraphicsPipelineStateInitializer));
-        shader = ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/deferred_lighting.alasset");
+        shader = get_valid_shader(L"Shaders/hlsl/deferred_lighting.alasset");
+        if (shader == nullptr)
+            return;
         pso_desc = GraphicsPipelineStateInitializer::GetNormalOpaquePSODesc();
         pso_desc._input_layout = shader->PipelineInputLayout();
         pso_desc._p_vertex_shader = shader;
@@ -173,7 +187,9 @@ namespace Ailu::Render
         AddPSO(std::move(stand_pso));
 
         memset(&pso_desc, 0, sizeof(GraphicsPipelineStateInitializer));
-        shader = ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/blit.alasset");
+        shader = get_valid_shader(L"Shaders/hlsl/blit.alasset");
+        if (shader == nullptr)
+            return;
         for (i16 i = 0; i < shader->PassCount(); i++)
         {
             auto &pass = shader->GetPassInfo(i);
@@ -190,7 +206,9 @@ namespace Ailu::Render
 
 
         memset(&pso_desc, 0, sizeof(GraphicsPipelineStateInitializer));
-        shader = ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/wireframe.alasset");
+        shader = get_valid_shader(L"Shaders/hlsl/wireframe.alasset");
+        if (shader == nullptr)
+            return;
         pso_desc._p_vertex_shader = shader;
         pso_desc._p_pixel_shader = shader;
         pso_desc._depth_stencil_state = TStaticDepthStencilState<false, ECompareFunc::kLessEqual>::GetRHI();
@@ -201,7 +219,9 @@ namespace Ailu::Render
         AddPSO(std::move(wireframe_pso));
 
         memset(&pso_desc, 0, sizeof(GraphicsPipelineStateInitializer));
-        shader = ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/cubemap_gen.alasset");
+        shader = get_valid_shader(L"Shaders/hlsl/cubemap_gen.alasset");
+        if (shader == nullptr)
+            return;
         pso_desc._input_layout = shader->PipelineInputLayout();
         pso_desc._blend_state = shader->PipelineBlendState();
         pso_desc._raster_state = shader->PipelineRasterizerState();
@@ -215,7 +235,9 @@ namespace Ailu::Render
         GraphicsPipelineStateMgr::AddPSO(std::move(pso));
 
         memset(&pso_desc, 0, sizeof(GraphicsPipelineStateInitializer));
-        shader = ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/filter_irradiance.alasset");
+        shader = get_valid_shader(L"Shaders/hlsl/filter_irradiance.alasset");
+        if (shader == nullptr)
+            return;
         for (i16 i = 0; i < shader->PassCount(); i++)
         {
             auto &pass = shader->GetPassInfo(i);
@@ -233,7 +255,9 @@ namespace Ailu::Render
         }
 
         memset(&pso_desc, 0, sizeof(GraphicsPipelineStateInitializer));
-        shader = ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/debug.alasset");
+        shader = get_valid_shader(L"Shaders/hlsl/debug.alasset");
+        if (shader == nullptr)
+            return;
         for (i16 i = 0; i < shader->PassCount(); i++)
         {
             auto &pass = shader->GetPassInfo(i);
@@ -250,7 +274,9 @@ namespace Ailu::Render
             GraphicsPipelineStateMgr::AddPSO(std::move(pso));
         }
         memset(&pso_desc, 0, sizeof(GraphicsPipelineStateInitializer));
-        shader = ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/forwardlit.alasset");
+        shader = get_valid_shader(L"Shaders/hlsl/forwardlit.alasset");
+        if (shader == nullptr)
+            return;
         for (i16 i = 0; i < shader->PassCount(); i++)
         {
             auto &pass = shader->GetPassInfo(i);
@@ -267,7 +293,7 @@ namespace Ailu::Render
             GraphicsPipelineStateMgr::AddPSO(std::move(pso));
         }
 
-        LOG_WARNING("Initialize PSO cache done after {}ms!", TimeMgr::Get().GetElapsedSinceLastMark());
+        LOG_MODULE_DEBUG(ELogModule::kRHI, "Initialize PSO cache done after {}ms!", TimeMgr::Get().GetElapsedSinceLastMark());
     }
 
     void GraphicsPipelineStateMgr::ProcessPendingShaderCompiles()
@@ -295,7 +321,7 @@ namespace Ailu::Render
         if (it != g_pPSOMgr->_pso_library.end()) { g_pPSOMgr->_pso_library[p_gpso->Hash()] = std::move(p_gpso); }
         else
         {
-            LOG_INFO("Add Pso id: {} to library!", p_gpso->Name());
+            LOG_MODULE_DEBUG(ELogModule::kRHI, "Add Pso id: {} to library!", p_gpso->Name());
             g_pPSOMgr->_pso_library.insert(std::make_pair(p_gpso->Hash(), std::move(p_gpso)));
         }
     }
@@ -416,6 +442,16 @@ namespace Ailu::Render
     GraphicsPipelineStateObject *CommandRecordingContext::FindMatchPSO()
     {
         ++_rendering_states_data.PsoLookupCount;
+        if (_current_shader == nullptr)
+        {
+            if (!_pso_creation_attempted)
+            {
+                LOG_WARNING("PSO creation failed during command recording: shader=<null> pass={} variant={}",
+                            _current_pass_index, _current_variant_hash);
+                _pso_creation_attempted = true;
+            }
+            return nullptr;
+        }
         if (_is_pso_dirty)
         {
             ++_rendering_states_data.GfxPsoDirtyCount;

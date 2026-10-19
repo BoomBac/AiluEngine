@@ -10,11 +10,13 @@
 #include "Render/GraphicsContext.h"
 #include "Render/RenderGraph/RenderGraph.h"
 #include "Render/RenderingData.h"
+#include <atomic>
 #include <chrono>
 #include <d3d12sdklayers.h>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <string_view>
 
 using namespace Ailu;
 using namespace Ailu::Render;
@@ -31,8 +33,26 @@ public:
 };
 int wmain(int argc, wchar_t **argv)
 {
+    bool full_hd = false, guides = false;
+    int directory_argument = 1;
+    for (; directory_argument < argc; ++directory_argument)
+    {
+        const std::wstring_view option(argv[directory_argument]);
+        if (option == L"--full-hd") full_hd = true;
+        else if (option == L"--guides") guides = true;
+        else break;
+    }
+    if (argc > directory_argument + 1)
+    {
+        std::cerr << "Usage: OidnGpuRenderGraphSmoke [--full-hd] [--guides] [NEW_OUTPUT_DIRECTORY]\n";
+        return 2;
+    }
+    const u32 target_results = full_hd ? 12u : 100u;
+    const u32 resize_after = target_results / 2u;
+    const u32 high_after = target_results * 3u / 4u;
+    const u32 toggle_interval = full_hd ? 3u : 10u;
     // All writable project/config/log state belongs to a fresh test directory, never to the user's scene.
-    const auto selected_directory = argc > 1 ? std::filesystem::path(argv[1])
+    const auto selected_directory = argc > directory_argument ? std::filesystem::path(argv[directory_argument])
                                              : std::filesystem::path(Application::GetWorkingPath()) /
                                                        (L"OidnRG_" + std::to_wstring(GetTickCount64()));
     const auto directory = std::filesystem::absolute(selected_directory);
@@ -64,7 +84,12 @@ int wmain(int argc, wchar_t **argv)
     app.SetMultiThreadRendering(false);
     ShowWindow(static_cast<HWND>(app.GetWindow().GetNativeWindowPtr()), SW_HIDE);
     std::cerr << "OIDN smoke initialized\n" << std::flush;
+    std::cout << "Mode=" << (full_hd ? "720p/1080p" : "odd-size")
+              << " target_results=" << target_results << '\n';
     bool failed = false, unsupported = false;
+    std::atomic<bool> validation_failed{false};
+    Microsoft::WRL::ComPtr<ID3D12InfoQueue1> callback_queue;
+    DWORD callback_cookie = 0u;
     Microsoft::WRL::ComPtr<ID3D12InfoQueue> queue;
     static_cast<RHI::DX12::D3DContext *>(g_pGfxContext)->GetDevice()->QueryInterface(IID_PPV_ARGS(&queue));
     if (queue)
@@ -72,40 +97,85 @@ int wmain(int argc, wchar_t **argv)
         queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, false);
         queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, false);
     }
+    // The context drains the message store each frame; an exit-only scan can miss earlier failures.
+    if (!queue || FAILED(queue.As(&callback_queue)) ||
+        FAILED(callback_queue->RegisterMessageCallback(
+                [](D3D12_MESSAGE_CATEGORY, D3D12_MESSAGE_SEVERITY severity, D3D12_MESSAGE_ID id,
+                   LPCSTR, void *context)
+                {
+                    if (severity <= D3D12_MESSAGE_SEVERITY_ERROR ||
+                        id == D3D12_MESSAGE_ID_PIPELINE_STATE_TYPE_MISMATCH)
+                        static_cast<std::atomic<bool> *>(context)->store(true);
+                },
+                D3D12_MESSAGE_CALLBACK_FLAG_NONE, &validation_failed, &callback_cookie)))
+    {
+        std::cerr << "D3D12 validation callback unavailable\n";
+        app.Finalize();
+        return 3;
+    }
     {
         PathTracingDenoiserHost host;
-        Ref<RenderTexture> source, display;
+        Ref<RenderTexture> source, display, albedo, normal;
         u32 spp = 0u, ready_count = 0u;
         u64 last_request = 0u;
         const auto started = std::chrono::steady_clock::now();
-        for (u32 frame = 0u; frame < 90000u && ready_count < 100u; ++frame)
+        for (u32 frame = 0u; frame < 90000u && ready_count < target_results; ++frame)
         {
             app.BeginFrame();
             app.UpdateResources(1.0f / 60.0f);
-            const u32 width = ready_count < 50u ? 63u : 127u, height = ready_count < 50u ? 33u : 65u;
+            const bool first_size = ready_count < resize_after;
+            const u32 width = full_hd ? (first_size ? 1280u : 1920u) : (first_size ? 63u : 127u);
+            const u32 height = full_hd ? (first_size ? 720u : 1080u) : (first_size ? 33u : 65u);
             if (!source || source->Width() != width)
             {
                 TextureDesc texture(width, height, ERenderTargetFormat::kRGBAFloat);
                 source = RenderTexture::Create(texture, "OIDN smoke source");
                 display = RenderTexture::Create(texture, "OIDN smoke display");
+                if (guides)
+                {
+                    albedo = RenderTexture::Create(texture, "OIDN smoke albedo");
+                    normal = RenderTexture::Create(texture, "OIDN smoke normal");
+                }
                 host.Reset();
                 spp = 0u;
                 last_request = 0u;
             }
             host.Configure(EPathTracingDenoiser::kOidnGpu, true, false);
-            if (source->IsReady() && display->IsReady())
+            if (source->IsReady() && display->IsReady() && (!guides || (albedo->IsReady() && normal->IsReady())))
             {
                 RDG::RenderGraph graph;
                 graph.CreateResource(TextureDesc(1, 1, ERenderTargetFormat::kRGBAFloat), "Reserved Handle");
                 auto radiance = graph.Import(source.get());
+                RDG::RGHandle albedo_handle{}, normal_handle{};
+                if (guides)
+                {
+                    albedo_handle = graph.Import(albedo.get());
+                    normal_handle = graph.Import(normal.get());
+                }
                 auto raw_executed = std::make_shared<bool>(false);
                 graph.AddPass(
                         "OIDN smoke radiance", RDG::PassDesc(),
-                        [&](RDG::RenderGraphBuilder &builder) { radiance = builder.Write(radiance); },
-                        [source, raw_executed](RDG::RenderGraph &, CommandBuffer *cmd, const RenderingData &)
+                        [&](RDG::RenderGraphBuilder &builder)
+                        {
+                            radiance = builder.Write(radiance);
+                            if (guides)
+                            {
+                                albedo_handle = builder.Write(albedo_handle);
+                                normal_handle = builder.Write(normal_handle);
+                            }
+                        },
+                        [source, albedo, normal, raw_executed](RDG::RenderGraph &, CommandBuffer *cmd,
+                                                             const RenderingData &)
                         {
                             cmd->SetRenderTarget(source.get());
                             cmd->ClearRenderTarget(Color(2.0f, 0.5f, 0.25f, 0.37f));
+                            if (albedo && normal)
+                            {
+                                cmd->SetRenderTarget(albedo.get());
+                                cmd->ClearRenderTarget(Color(0.5f, 0.25f, 0.1f, 1.0f));
+                                cmd->SetRenderTarget(normal.get());
+                                cmd->ClearRenderTarget(Color(0.0f, 0.0f, 1.0f, 1.0f));
+                            }
                             *raw_executed = true;
                         });
                 PathTracingDenoiserInput input;
@@ -116,9 +186,18 @@ int wmain(int argc, wchar_t **argv)
                 input._height = height;
                 input._sample_count = spp;
                 input._valid_radiance = spp > 0u;
-                input._quality =
-                        ready_count < 75u ? EPathTracingDenoiserQuality::kBalanced : EPathTracingDenoiserQuality::kHigh;
+                input._quality = ready_count < high_after ? EPathTracingDenoiserQuality::kBalanced
+                                                         : EPathTracingDenoiserQuality::kHigh;
                 input._sample_interval = 4u;
+                if (guides)
+                {
+                    input._use_guides = ready_count != resize_after; // Exercise guides -> color -> guides retirement.
+                    input._albedo = albedo_handle;
+                    input._normal = normal_handle;
+                    input._albedo_owner = albedo;
+                    input._normal_owner = normal;
+                    if (ready_count < target_results / 4u) input._quality = EPathTracingDenoiserQuality::kFast;
+                }
                 const auto result = host.Record(graph, input);
                 const auto selected = result._valid ? result._display_texture : radiance;
                 const auto target = graph.Import(display.get());
@@ -158,9 +237,11 @@ int wmain(int argc, wchar_t **argv)
                     ++ready_count;
                     const auto metrics = host.Diagnostics();
                     std::cout << "Ready=" << ready_count << " request=" << last_request
+                              << " size=" << width << 'x' << height << " quality=" << static_cast<int>(input._quality)
+                              << " guides=" << input._use_guides
                               << " SPP=" << metrics._last_sample_count << " latency_ms=" << metrics._latency_ms
                               << " shared_mb=" << metrics._shared_mb << '\n';
-                    if (ready_count % 10u == 0u)
+                    if (ready_count % toggle_interval == 0u)
                     {
                         host.Configure(EPathTracingDenoiser::kNone, true, false);
                         host.Configure(EPathTracingDenoiser::kOidnGpu, true, false);
@@ -185,13 +266,13 @@ int wmain(int argc, wchar_t **argv)
             app.PresentFrame();
             app.EndFrame();
             Sleep(1);
-            if (std::chrono::steady_clock::now() - started > std::chrono::seconds(90))
+            if (std::chrono::steady_clock::now() - started > std::chrono::seconds(full_hd ? 180 : 90))
             {
                 failed = true;
                 break;
             }
         }
-        failed |= !unsupported && ready_count < 100u;
+        failed |= !unsupported && ready_count < target_results;
         host.Shutdown();
         // Draining is deliberate at test exit; the production Record path never waits on CUDA.
         g_pGfxContext->WaitForGpu();
@@ -204,7 +285,9 @@ int wmain(int argc, wchar_t **argv)
             queue->GetMessage(i, nullptr, &size);
             std::vector<u8> bytes(size);
             auto *message = reinterpret_cast<D3D12_MESSAGE *>(bytes.data());
-            if (SUCCEEDED(queue->GetMessage(i, message, &size)) && message->Severity <= D3D12_MESSAGE_SEVERITY_ERROR)
+            if (SUCCEEDED(queue->GetMessage(i, message, &size)) &&
+                (message->Severity <= D3D12_MESSAGE_SEVERITY_ERROR ||
+                 message->ID == D3D12_MESSAGE_ID_PIPELINE_STATE_TYPE_MISMATCH))
             {
                 std::cerr << message->pDescription << '\n';
                 failed = true;
@@ -212,6 +295,8 @@ int wmain(int argc, wchar_t **argv)
         }
     }
     app.Finalize();
+    callback_queue->UnregisterMessageCallback(callback_cookie);
+    failed |= validation_failed.load();
     std::cout << "OIDN RG smoke " << (failed ? "failed" : unsupported ? "unsupported" : "passed") << '\n';
     return failed ? 1 : unsupported ? 2 : 0;
 }

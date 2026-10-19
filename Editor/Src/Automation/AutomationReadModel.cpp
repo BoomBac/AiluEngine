@@ -236,7 +236,73 @@ namespace Ailu
                           EAutomationValueType type, StringView category,
                           const std::function<AutomationValue(const TComp &)> &reader,
                           const std::function<bool(TComp &, const AutomationValue &)> &writer = nullptr,
-                          Vector<String> enum_values = {})
+                          Vector<String> enum_values = {});
+
+            void AddCameraPhysicalFloatField(ComponentDescriptor &desc, StringView path, StringView display_name,
+                                             f32 Render::PhysicalCameraSettings::*member)
+            {
+                AddField<ECS::CCamera>(desc, path, display_name, EAutomationValueType::kFloat, "Physical Camera",
+                    [member](const ECS::CCamera &component)
+                    {
+                        return AutomationValue(component._camera.PhysicalSettings().*member);
+                    },
+                    [member](ECS::CCamera &component, const AutomationValue &value)
+                    {
+                        if (!value.IsNumber() || !std::isfinite(value.AsFloat()))
+                            return false;
+                        Render::PhysicalCameraSettings settings = component._camera.PhysicalSettings();
+                        settings.*member = static_cast<f32>(value.AsFloat());
+                        component._camera.PhysicalSettings(settings);
+                        return true;
+                    });
+            }
+
+            void AddAutoExposureFloatField(ComponentDescriptor &desc, StringView path, StringView display_name,
+                                           f32 Render::AutoExposureSettings::*member, f32 minimum, f32 maximum)
+            {
+                AddField<ECS::PostprocessVolumeComponent>(desc, path, display_name, EAutomationValueType::kFloat,
+                    "Auto Exposure",
+                    [member](const ECS::PostprocessVolumeComponent &component)
+                    {
+                        return AutomationValue(component._settings._auto_exposure.*member);
+                    },
+                    [member, minimum, maximum](ECS::PostprocessVolumeComponent &component,
+                                               const AutomationValue &value)
+                    {
+                        if (!value.IsNumber() || !std::isfinite(value.AsFloat()))
+                            return false;
+                        component._settings._auto_exposure.*member = std::clamp(
+                            static_cast<f32>(value.AsFloat()), minimum, maximum);
+                        return true;
+                    });
+            }
+
+            void AddDepthOfFieldFloatField(ComponentDescriptor &desc, StringView path, StringView display_name,
+                                           f32 Render::DepthOfFieldSettings::*member, f32 minimum, f32 maximum)
+            {
+                AddField<ECS::PostprocessVolumeComponent>(desc, path, display_name, EAutomationValueType::kFloat,
+                    "Depth of Field",
+                    [member](const ECS::PostprocessVolumeComponent &component)
+                    {
+                        return AutomationValue(component._settings._depth_of_field.*member);
+                    },
+                    [member, minimum, maximum](ECS::PostprocessVolumeComponent &component,
+                                               const AutomationValue &value)
+                    {
+                        if (!value.IsNumber() || !std::isfinite(value.AsFloat()))
+                            return false;
+                        component._settings._depth_of_field.*member = std::clamp(
+                            static_cast<f32>(value.AsFloat()), minimum, maximum);
+                        return true;
+                    });
+            }
+
+            template<typename TComp>
+            void AddField(ComponentDescriptor &desc, StringView path, StringView display_name,
+                          EAutomationValueType type, StringView category,
+                          const std::function<AutomationValue(const TComp &)> &reader,
+                          const std::function<bool(TComp &, const AutomationValue &)> &writer,
+                          Vector<String> enum_values)
             {
                 ComponentFieldDesc field;
                 field._path = path;
@@ -311,18 +377,64 @@ namespace Ailu
                                               {"kDirectional", "kPoint", "kSpot", "kArea"});
                 AddField<ECS::LightComponent>(desc, "_light._light_color", "Light Color", EAutomationValueType::kColor, "Light",
                                               [](const ECS::LightComponent &c) { return ToAutomationValue(c._light._light_color); },
-                                              [](ECS::LightComponent &c, const AutomationValue &v) { c._light._light_color = ToColor(v); return true; });
-                AddField<ECS::LightComponent>(desc, "_light._light_param", "Range/Cone Parameters",
-                    EAutomationValueType::kVector, "Light",
-                    [](const ECS::LightComponent &c) { return ToAutomationValue(c._light._light_param); },
+                                              [](ECS::LightComponent &c, const AutomationValue &v)
+                                              {
+                                                  c._light._light_color = ToColor(v);
+                                                  c._light._light_color.a = 1.0f;
+                                                  return true;
+                                              });
+                AddField<ECS::LightComponent>(desc, "_light._use_color_temperature", "Use Color Temperature",
+                    EAutomationValueType::kBool, "Light",
+                    [](const ECS::LightComponent &c) { return ToAutomationValue(c._light._use_color_temperature); },
                     [](ECS::LightComponent &c, const AutomationValue &v)
                     {
-                        if (!v.IsArray() || v.AsArray().size() != 4u)
+                        c._light._use_color_temperature = ToBool(v);
+                        return true;
+                    });
+                AddField<ECS::LightComponent>(desc, "_light._color_temperature_kelvin", "Color Temperature (K)",
+                    EAutomationValueType::kFloat, "Light",
+                    [](const ECS::LightComponent &c) { return AutomationValue(c._light._color_temperature_kelvin); },
+                    [](ECS::LightComponent &c, const AutomationValue &v)
+                    {
+                        if (!v.IsNumber() || !std::isfinite(v.AsFloat()))
                             return false;
-                        for (const auto &element : v.AsArray())
-                            if (!element.IsNumber() || !std::isfinite(element.AsFloat()))
-                                return false;
-                        c._light._light_param = ToVector4f(v);
+                        c._light._color_temperature_kelvin = std::clamp(static_cast<f32>(v.AsFloat()), 1000.0f, 40000.0f);
+                        return true;
+                    });
+                AddField<ECS::LightComponent>(desc, "_light._intensity", "Intensity", EAutomationValueType::kFloat,
+                    "Light", [](const ECS::LightComponent &c) { return AutomationValue(c._light._intensity); },
+                    [](ECS::LightComponent &c, const AutomationValue &v)
+                    {
+                        if (!v.IsNumber() || !std::isfinite(v.AsFloat()) || v.AsFloat() < 0.0)
+                            return false;
+                        c._light._intensity = static_cast<f32>(v.AsFloat());
+                        return true;
+                    });
+                AddField<ECS::LightComponent>(desc, "_light._intensity_unit", "Intensity Unit", EAutomationValueType::kEnum,
+                    "Light", [](const ECS::LightComponent &c)
+                    {
+                        return AutomationValue(EnumValueName(c._light._intensity_unit,
+                            "Ailu::ECS::ELightIntensityUnit"));
+                    },
+                    [](ECS::LightComponent &c, const AutomationValue &v)
+                    {
+                        const String name = ToString(v);
+                        if (name == "kCandela") c._light._intensity_unit = ECS::ELightIntensityUnit::kCandela;
+                        else if (name == "kLumen") c._light._intensity_unit = ECS::ELightIntensityUnit::kLumen;
+                        else if (name == "kLux") c._light._intensity_unit = ECS::ELightIntensityUnit::kLux;
+                        else if (name == "kWatt") c._light._intensity_unit = ECS::ELightIntensityUnit::kWatt;
+                        else if (name == "kWattPerSquareMeter") c._light._intensity_unit = ECS::ELightIntensityUnit::kWattPerSquareMeter;
+                        else if (name == "kUnitlessLegacy") c._light._intensity_unit = ECS::ELightIntensityUnit::kUnitlessLegacy;
+                        else return false;
+                        return true;
+                    }, {"kCandela", "kLumen", "kLux", "kWatt", "kWattPerSquareMeter", "kUnitlessLegacy"});
+                AddField<ECS::LightComponent>(desc, "_light._range", "Range", EAutomationValueType::kFloat, "Light",
+                    [](const ECS::LightComponent &c) { return AutomationValue(c._light._range); },
+                    [](ECS::LightComponent &c, const AutomationValue &v)
+                    {
+                        if (!v.IsNumber() || !std::isfinite(v.AsFloat()) || v.AsFloat() < 0.0)
+                            return false;
+                        c._light._range = static_cast<f32>(v.AsFloat());
                         return true;
                     });
                 AddField<ECS::LightComponent>(desc, "_shadow._is_cast_shadow", "Cast Shadow", EAutomationValueType::kBool, "Light",
@@ -349,13 +461,166 @@ namespace Ailu
                     });
                 AddField<ECS::CCamera>(desc, "_camera._fov_h", "FOV", EAutomationValueType::kFloat, "Camera",
                                        [](const ECS::CCamera &c) { return ToAutomationValue(c._camera.FovH()); },
-                                       [](ECS::CCamera &c, const AutomationValue &v) { c._camera.FovH(ToFloat(v)); return true; });
-                AddField<ECS::CCamera>(desc, "_camera._near_clip", "Near", EAutomationValueType::kFloat, "Camera",
-                                       [](const ECS::CCamera &c) { return ToAutomationValue(c._camera.Near()); },
-                                       [](ECS::CCamera &c, const AutomationValue &v) { c._camera.Near(ToFloat(v)); return true; });
-                AddField<ECS::CCamera>(desc, "_camera._far_clip", "Far", EAutomationValueType::kFloat, "Camera",
-                                       [](const ECS::CCamera &c) { return ToAutomationValue(c._camera.Far()); },
-                                       [](ECS::CCamera &c, const AutomationValue &v) { c._camera.Far(ToFloat(v)); return true; });
+                                       [](ECS::CCamera &c, const AutomationValue &v)
+                                       {
+                                           c._camera.FovH(ToFloat(v));
+                                           return true;
+                                       });
+                AddCameraPhysicalFloatField(desc, "physical_settings.sensor_width_mm", "Sensor Width (mm)",
+                    &Render::PhysicalCameraSettings::_sensor_width_mm);
+                AddCameraPhysicalFloatField(desc, "physical_settings.sensor_height_mm", "Sensor Height (mm)",
+                    &Render::PhysicalCameraSettings::_sensor_height_mm);
+                AddCameraPhysicalFloatField(desc, "physical_settings.focal_length_mm", "Focal Length (mm)",
+                    &Render::PhysicalCameraSettings::_focal_length_mm);
+                AddCameraPhysicalFloatField(desc, "physical_settings.aperture_f_number", "Aperture (f/)",
+                    &Render::PhysicalCameraSettings::_aperture_f_number);
+                AddCameraPhysicalFloatField(desc, "physical_settings.shutter_seconds", "Shutter (seconds)",
+                    &Render::PhysicalCameraSettings::_shutter_seconds);
+                AddCameraPhysicalFloatField(desc, "physical_settings.iso", "ISO",
+                    &Render::PhysicalCameraSettings::_iso);
+                AddCameraPhysicalFloatField(desc, "physical_settings.focus_distance_m", "Focus Distance (m)",
+                    &Render::PhysicalCameraSettings::_focus_distance_m);
+                AddCameraPhysicalFloatField(desc, "physical_settings.exposure_compensation_ev",
+                    "Exposure Compensation (EV)", &Render::PhysicalCameraSettings::_exposure_compensation_ev);
+                AddField<ECS::CCamera>(desc, "physical_settings.lens_projection_mode", "Lens Projection",
+                    EAutomationValueType::kEnum, "Physical Camera",
+                    [](const ECS::CCamera &component)
+                    {
+                        return AutomationValue(EnumValueName(component._camera.PhysicalSettings()._lens_projection_mode,
+                            "Ailu::Render::ELensProjectionMode"));
+                    },
+                    [](ECS::CCamera &component, const AutomationValue &value)
+                    {
+                        if (!value.IsString())
+                            return false;
+                        Render::PhysicalCameraSettings settings = component._camera.PhysicalSettings();
+                        if (value.AsString() == "kLegacyFov")
+                            settings._lens_projection_mode = Render::ELensProjectionMode::kLegacyFov;
+                        else if (value.AsString() == "kPhysicalFocalLength")
+                            settings._lens_projection_mode = Render::ELensProjectionMode::kPhysicalFocalLength;
+                        else
+                            return false;
+                        component._camera.PhysicalSettings(settings);
+                        return true;
+                    }, {"kLegacyFov", "kPhysicalFocalLength"});
+                AddField<ECS::CCamera>(desc, "physical_settings.exposure_mode", "Exposure Mode",
+                    EAutomationValueType::kEnum, "Physical Camera",
+                    [](const ECS::CCamera &component)
+                    {
+                        return AutomationValue(EnumValueName(component._camera.PhysicalSettings()._exposure_mode,
+                            "Ailu::Render::EExposureMode"));
+                    },
+                    [](ECS::CCamera &component, const AutomationValue &value)
+                    {
+                        if (!value.IsString())
+                            return false;
+                        constexpr std::array<StringView, 6> kModeNames = {"kLegacyManual", "kManualPhysical", "kAuto",
+                            "kAperturePriority", "kShutterPriority", "kAutoISO"};
+                        const auto it = std::find(kModeNames.begin(), kModeNames.end(), value.AsString());
+                        if (it == kModeNames.end())
+                            return false;
+                        Render::PhysicalCameraSettings settings = component._camera.PhysicalSettings();
+                        settings._exposure_mode = static_cast<Render::EExposureMode>(it - kModeNames.begin());
+                        component._camera.PhysicalSettings(settings);
+                        return true;
+                    }, {"kLegacyManual", "kManualPhysical", "kAuto", "kAperturePriority", "kShutterPriority",
+                        "kAutoISO"});
+                AddField<ECS::CCamera>(desc, "_camera._type", "Projection Type",
+                    EAutomationValueType::kInteger, "Camera",
+                    [](const ECS::CCamera &c)
+                    {
+                        return ToAutomationValue(static_cast<i32>(c._camera.Type()));
+                    });
+                AddField<ECS::CCamera>(desc, "_camera._size", "Orthographic Size",
+                    EAutomationValueType::kFloat, "Camera",
+                    [](const ECS::CCamera &c) { return ToAutomationValue(c._camera.Size()); });
+                AddField<ECS::CCamera>(desc, "_camera._near_clip", "Near",
+                    EAutomationValueType::kFloat, "Camera",
+                    [](const ECS::CCamera &c) { return ToAutomationValue(c._camera.Near()); },
+                    [](ECS::CCamera &c, const AutomationValue &v)
+                    {
+                        c._camera.Near(ToFloat(v));
+                        return true;
+                    });
+                AddField<ECS::CCamera>(desc, "_camera._far_clip", "Far",
+                    EAutomationValueType::kFloat, "Camera",
+                    [](const ECS::CCamera &c) { return ToAutomationValue(c._camera.Far()); },
+                    [](ECS::CCamera &c, const AutomationValue &v)
+                    {
+                        c._camera.Far(ToFloat(v));
+                        return true;
+                    });
+                registry.Register(std::move(desc));
+            }
+
+            {
+                ComponentDescriptor desc;
+                desc._stable_type = "Ailu.ECS.PostprocessVolumeComponent";
+                desc._display_name = "Postprocess Volume";
+                AddAutoExposureFloatField(desc, "_settings._auto_exposure._scene_luminance_to_cd_m2",
+                    "Scene Luminance to cd/m2", &Render::AutoExposureSettings::_scene_luminance_to_cd_m2,
+                    1.0e-6f, 1.0e6f);
+                AddAutoExposureFloatField(desc, "_settings._auto_exposure._low_percentile", "Low Percentile (%)",
+                    &Render::AutoExposureSettings::_low_percentile, 0.0f, 99.8f);
+                AddAutoExposureFloatField(desc, "_settings._auto_exposure._high_percentile", "High Percentile (%)",
+                    &Render::AutoExposureSettings::_high_percentile, 0.1f, 100.0f);
+                AddAutoExposureFloatField(desc, "_settings._auto_exposure._adaptation_speed",
+                    "Legacy Adaptation Speed", &Render::AutoExposureSettings::_adaptation_speed, 0.0f, 100.0f);
+                AddAutoExposureFloatField(desc, "_settings._auto_exposure._adaptation_speed_brighten",
+                    "Speed Brighten (EV/s)", &Render::AutoExposureSettings::_adaptation_speed_brighten, -1.0f, 100.0f);
+                AddAutoExposureFloatField(desc, "_settings._auto_exposure._adaptation_speed_darken",
+                    "Speed Darken (EV/s)", &Render::AutoExposureSettings::_adaptation_speed_darken, -1.0f, 100.0f);
+                AddAutoExposureFloatField(desc, "_settings._auto_exposure._minimum_ev", "Minimum EV",
+                    &Render::AutoExposureSettings::_minimum_ev, -24.0f, 23.9f);
+                AddAutoExposureFloatField(desc, "_settings._auto_exposure._maximum_ev", "Maximum EV",
+                    &Render::AutoExposureSettings::_maximum_ev, -23.9f, 24.0f);
+                AddField<ECS::PostprocessVolumeComponent>(desc, "_settings._auto_exposure._metering_mode",
+                    "Metering", EAutomationValueType::kEnum, "Auto Exposure",
+                    [](const ECS::PostprocessVolumeComponent &component)
+                    {
+                        return AutomationValue(EnumValueName(component._settings._auto_exposure._metering_mode,
+                            "Ailu::Render::EExposureMeteringMode"));
+                    },
+                    [](ECS::PostprocessVolumeComponent &component, const AutomationValue &value)
+                    {
+                        if (!value.IsString())
+                            return false;
+                        if (value.AsString() == "kAverage")
+                            component._settings._auto_exposure._metering_mode = Render::EExposureMeteringMode::kAverage;
+                        else if (value.AsString() == "kCenterWeighted")
+                            component._settings._auto_exposure._metering_mode =
+                                Render::EExposureMeteringMode::kCenterWeighted;
+                        else
+                            return false;
+                        return true;
+                    }, {"kAverage", "kCenterWeighted"});
+                AddField<ECS::PostprocessVolumeComponent>(desc, "_settings._depth_of_field._enabled",
+                    "Depth of Field Enabled", EAutomationValueType::kBool, "Depth of Field",
+                    [](const ECS::PostprocessVolumeComponent &component)
+                    {
+                        return AutomationValue(component._settings._depth_of_field._enabled);
+                    }, [](ECS::PostprocessVolumeComponent &component, const AutomationValue &value)
+                    {
+                        if (!value.IsBool())
+                            return false;
+                        component._settings._depth_of_field._enabled = value.AsBool();
+                        return true;
+                    });
+                AddDepthOfFieldFloatField(desc, "_settings._depth_of_field._maximum_coc_diameter_px",
+                    "Maximum CoC Diameter (px)", &Render::DepthOfFieldSettings::_maximum_coc_diameter_px, 0.0f, 64.0f);
+                AddField<ECS::PostprocessVolumeComponent>(desc, "_settings._depth_of_field._aperture_blade_count",
+                    "Aperture Blade Count", EAutomationValueType::kInteger, "Depth of Field",
+                    [](const ECS::PostprocessVolumeComponent &component)
+                    {
+                        return AutomationValue(component._settings._depth_of_field._aperture_blade_count);
+                    }, [](ECS::PostprocessVolumeComponent &component, const AutomationValue &value)
+                    {
+                        if (!value.IsNumber() || !std::isfinite(value.AsFloat()))
+                            return false;
+                        component._settings._depth_of_field._aperture_blade_count = std::clamp(
+                            static_cast<i32>(std::round(value.AsFloat())), 3, 9);
+                        return true;
+                    });
                 registry.Register(std::move(desc));
             }
 
@@ -474,7 +739,15 @@ namespace Ailu
             {
                 if (const Enum *enum_type = dynamic_cast<const Enum *>(type))
                 {
-                    return AutomationValue(enum_type->GetNameByIndex(static_cast<u32>(prop.Get<i32>(instance))));
+                    u32 index = 0u;
+                    switch (enum_type->Size())
+                    {
+                        case 1u: index = prop.Get<u8>(instance); break;
+                        case 2u: index = prop.Get<u16>(instance); break;
+                        case 4u: index = prop.Get<u32>(instance); break;
+                        default: return AutomationValue{};
+                    }
+                    return AutomationValue(enum_type->GetNameByIndex(index));
                 }
             }
             return AutomationValue{};
@@ -554,10 +827,22 @@ namespace Ailu
                 {
                     const String name = ToString(value);
                     const i32 index = enum_type->GetIndexByName(name);
-                    if (index >= 0)
-                        prop.Set<i32>(instance, index, PropertyInfo::EPropertyChangeSource::kAutomation);
-                    else
-                        prop.Set<i32>(instance, static_cast<i32>(ToInt(value)), PropertyInfo::EPropertyChangeSource::kAutomation);
+                    const i32 enum_value = index >= 0 ? index : static_cast<i32>(ToInt(value));
+                    switch (enum_type->Size())
+                    {
+                        case 1u:
+                            prop.Set<u8>(instance, static_cast<u8>(enum_value),
+                                         PropertyInfo::EPropertyChangeSource::kAutomation);
+                            break;
+                        case 2u:
+                            prop.Set<u16>(instance, static_cast<u16>(enum_value),
+                                          PropertyInfo::EPropertyChangeSource::kAutomation);
+                            break;
+                        case 4u:
+                            prop.Set<i32>(instance, enum_value, PropertyInfo::EPropertyChangeSource::kAutomation);
+                            break;
+                        default: return false;
+                    }
                     return true;
                 }
             }

@@ -177,7 +177,19 @@ namespace Ailu
                         hasher.Add(light._light_pos);
                         hasher.Add(light._light_dir);
                         hasher.Add(light._light_color);
-                        hasher.Add(light._light_param);
+                        hasher.Add(light._use_color_temperature);
+                        hasher.Add(light._color_temperature_kelvin);
+                        hasher.Add(light._intensity);
+                        hasher.Add(light._intensity_unit);
+                        hasher.Add(light._range);
+                        hasher.Add(light._source_radius);
+                        hasher.Add(light._angular_radius);
+                        hasher.Add(light._spot_inner_angle);
+                        hasher.Add(light._spot_outer_angle);
+                        hasher.Add(light._area_width);
+                        hasher.Add(light._area_height);
+                        hasher.Add(light._area_disc_radius);
+                        hasher.Add(light._area_shape);
                         for (const Vector3f &point : light._area_points)
                             hasher.Add(point);
                         hasher.Add(light._is_two_side);
@@ -286,6 +298,7 @@ namespace Ailu
             _gi_pass->_debug_pos = _debug_pos;
             _gi_pass->_accumulation_mode = _accumulation_mode;
             _gi_pass->_denoiser = _denoiser;
+            _gi_pass->_denoiser_use_guides = _denoiser_use_guides;
             {
                 std::lock_guard lock(_denoiser_diagnostics_mutex);
                 _denoiser_status = _gi_pass->_denoiser_host.Status();
@@ -481,8 +494,37 @@ namespace Ailu
             const bool reference_camera_changed =
                 _accumulation_mode == EPathTracerAccumulationMode::kReference && is_camera_dirty;
             const bool history_inputs_changed = _has_history_signature && history_signature != _last_history_signature;
+            const bool use_guides = _denoiser_use_guides && _denoiser == EPathTracingDenoiser::kOidnGpu &&
+                                    _accumulation_mode == EPathTracerAccumulationMode::kReference;
+            const bool guides_changed = use_guides != _previous_denoiser_use_guides;
+            _previous_denoiser_use_guides = use_guides;
             const bool reset_history = history_inputs_changed || camera_changed || camera_cut || explicit_reset ||
-                                       reference_camera_changed || accumulation_just_enabled || target_recreated;
+                                       reference_camera_changed || accumulation_just_enabled || target_recreated ||
+                                       guides_changed;
+            if (use_guides)
+            {
+                _gi_compute_shader->EnableKeyword("PATH_TRACER_OIDN_GUIDES");
+                if (_gi_raytracing_shader) _gi_raytracing_shader->EnableKeyword("PATH_TRACER_OIDN_GUIDES");
+                if (!_guide_albedo || _guide_albedo->Width() != rendering_data._width ||
+                    _guide_albedo->Height() != rendering_data._height)
+                {
+                    TextureDesc desc(rendering_data._width, rendering_data._height, ERenderTargetFormat::kRGBAFloat);
+                    desc._is_random_access = true;
+                    desc._is_linear = true;
+                    _guide_albedo = RenderTexture::Create(desc, "PathTrace FirstHit Albedo");
+                    _guide_normal = RenderTexture::Create(desc, "PathTrace FirstHit Normal");
+                }
+                _guide_albedo_handle = graph.Import(_guide_albedo.get());
+                _guide_normal_handle = graph.Import(_guide_normal.get());
+            }
+            else
+            {
+                _gi_compute_shader->DisableKeyword("PATH_TRACER_OIDN_GUIDES");
+                if (_gi_raytracing_shader) _gi_raytracing_shader->DisableKeyword("PATH_TRACER_OIDN_GUIDES");
+                _guide_albedo.reset();
+                _guide_normal.reset();
+                _guide_albedo_handle = _guide_normal_handle = {};
+            }
             const u64 shader_revision = _gi_compute_shader.Handle().GetRevision();
             const u64 rt_shader_revision = _gi_raytracing_shader.Handle().GetRevision();
             const bool shader_changed = shader_revision != _denoiser_shader_revision ||
@@ -648,9 +690,19 @@ namespace Ailu
                         if (_debug_index_buffer != nullptr)
                             (void) builder.Write(builder.Import(_debug_index_buffer.get()), EResourceUsage::kWriteUAV);
                         _raw_path_trace_handle = builder.Write(_raw_path_trace_handle, EResourceUsage::kWriteUAV);
+                        if (use_guides)
+                        {
+                            if (_reference_sample_count > 0u)
+                            {
+                                builder.Read(_guide_albedo_handle, EResourceUsage::kWriteUAV);
+                                builder.Read(_guide_normal_handle, EResourceUsage::kWriteUAV);
+                            }
+                            _guide_albedo_handle = builder.Write(_guide_albedo_handle, EResourceUsage::kWriteUAV);
+                            _guide_normal_handle = builder.Write(_guide_normal_handle, EResourceUsage::kWriteUAV);
+                        }
                     },
                     [this, use_hardware_ray_tracing, prev_reservoir, curr_reservoir, camera_uv_jitter,
-                     raw_executed, accumulation_enabled,
+                     raw_executed, accumulation_enabled, use_guides,
                      camera_ptr = rendering_data._camera](RDG::RenderGraph &graph, CommandBuffer *cmd,
                                                           const RenderingData &data)
                     {
@@ -659,6 +711,13 @@ namespace Ailu
                     // prevents a missing UAV binding from retaining the distribution builder's UAV.
                     if (output == nullptr || !output->IsReady())
                         return;
+                    if (use_guides)
+                    {
+                        if (!_guide_albedo->IsReady() || !_guide_normal->IsReady()) return;
+                        // Frames without a Pack keep these textures in UAV state; order their running means.
+                        cmd->UavBarrier(_guide_albedo.get());
+                        cmd->UavBarrier(_guide_normal.get());
+                    }
                     if (use_hardware_ray_tracing)
                     {
                         auto *rt_scene = _scene_rt_proxy->GetScene();
@@ -703,6 +762,12 @@ namespace Ailu
                         _gi_raytracing_shader->SetTexture("_EnvironmentDistribution",
                                                           graph.Resolve<Texture>(_environment_distribution_handle));
                         _gi_raytracing_shader->SetTexture("RenderTarget", output);
+                        if (use_guides)
+                        {
+                            _gi_raytracing_shader->SetInt("_PathGuideSampleCount", _reference_sample_count);
+                            _gi_raytracing_shader->SetTexture("_PathGuideAlbedo", _guide_albedo.get());
+                            _gi_raytracing_shader->SetTexture("_PathGuideNormal", _guide_normal.get());
+                        }
                         cmd->DispatchRays(_gi_raytracing_shader.get(), rt_scene, static_cast<u16>(data._width), static_cast<u16>(data._height), 1u);
                         *raw_executed = true;
                         if (!accumulation_enabled) _is_cur_a = !_is_cur_a;
@@ -753,6 +818,14 @@ namespace Ailu
                         _gi_compute_shader->SetInts("_GI_TileSize", {(i32) tile_size_x, (i32) tile_size_y});
                         _gi_compute_shader->SetTexture(_kernel_primary_ray, "_GI_Texture",
                                                        graph.Resolve<Texture>(_raw_path_trace_handle));
+                        if (use_guides)
+                        {
+                            _gi_compute_shader->SetInt("_PathGuideSampleCount", _reference_sample_count);
+                            _gi_compute_shader->SetTexture(_kernel_primary_ray, "_PathGuideAlbedo",
+                                                           _guide_albedo.get());
+                            _gi_compute_shader->SetTexture(_kernel_primary_ray, "_PathGuideNormal",
+                                                           _guide_normal.get());
+                        }
                         _gi_compute_shader->SetBuffer(_kernel_primary_ray, "g_prev_reservoir",
                                                       prev_reservoir);
                         _gi_compute_shader->SetBuffer(_kernel_primary_ray, "g_curr_reservoir",
@@ -838,6 +911,11 @@ namespace Ailu
             denoiser_input._radiance_owner = _is_history_a ? _history_texture_a : _history_texture_b;
             denoiser_input._activation_owner = _denoiser_active_flag;
             denoiser_input._quality = _denoiser_quality;
+            denoiser_input._use_guides = use_guides;
+            denoiser_input._albedo = _guide_albedo_handle;
+            denoiser_input._normal = _guide_normal_handle;
+            denoiser_input._albedo_owner = _guide_albedo;
+            denoiser_input._normal_owner = _guide_normal;
             denoiser_input._sample_interval = _denoiser_sample_interval;
             denoiser_input._valid_radiance = _temporal_history_valid && _reference_sample_count > 0u;
             const auto denoiser_output = _denoiser_host.Record(graph, denoiser_input);

@@ -99,7 +99,7 @@ namespace Ailu
             u32 EntityNum() const { return _register.EntityNum() - (_scene_root != ECS::kInvalidEntity ? 1u : 0u); }
 
             String AcquireName() const { return std::format("new_object_{}", EntityNum()); };
-            Render::GPUBuffer *GetSceneMeshDataBuffer() const{ return &*_scene_mesh_data; };
+            Render::GPUBuffer *GetSceneMeshDataBuffer() const { return _scene_mesh_data.get(); };
             u32 TriangleCount() const { return _triangle_count; };
             //指示实际三角形数据在buffer中的偏移，计算时读取到node.start + offset来索引三角形
             u32 GetTriangleBufferOffset(ECS::Entity entity, u16 submesh_index) const 
@@ -121,8 +121,8 @@ namespace Ailu
                 return Vector2UInt::kZero;
             };
             [[nodiscard]] std::span<const BVHNode> GetBVHNodes() const { return _tlas_nodes; };
-            Render::GPUBuffer *GetBLASBuffer() const { return &*_blas_buffer; };
-            Render::GPUBuffer *GetTLASBuffer() const { return &*_tlas_buffer; };
+            Render::GPUBuffer *GetBLASBuffer() const { return _blas_buffer.get(); };
+            Render::GPUBuffer *GetTLASBuffer() const { return _tlas_buffer.get(); };
             u32 GetTLASNodeCount() const { return (u32) _tlas_nodes.size(); };
             u64 TlasRebuildCount() const { return _tlas_rebuild_count; }
             u64 TlasSkippedRebuildCount() const { return _tlas_skipped_rebuild_count; }
@@ -172,6 +172,7 @@ namespace Ailu
         private:
             bool _dirty = true;
             bool _tlas_dirty = true;
+            bool _tlas_over_capacity_warning_active = false;
             u32 _last_tlas_renderable_count = 0u;
             u64 _tlas_rebuild_count = 0u;
             u64 _tlas_skipped_rebuild_count = 0u;

@@ -55,7 +55,7 @@ float4 ForwardPSMain(StandardPSInput input) : SV_TARGET
     float3 color = _DeepColor.rgb;
     float view_depth = mul(_MatrixV, float4(input.world_pos, 1.0f)).z;
     color = ApplyVolumetricFogStraight(color, input.position.xy * _ScreenParams.xy, view_depth);
-    return float4(color, _DeepColor.a);
+    return float4(color * GetPreExposure(), _DeepColor.a);
 }
 
 StandardPSInput VSMain(StandardVSInput v)

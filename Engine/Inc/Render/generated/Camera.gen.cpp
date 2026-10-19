@@ -6,6 +6,251 @@
 #include <Objects/SerializeSpecializations.h>
 #include <Framework/Common/Log.h>
 using namespace Ailu;
+const Ailu::Type* Ailu::Render::Z_Construct_PhysicalCameraSettings_Type()
+{
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "PhysicalCameraSettings";
+initializer._size = sizeof(Ailu::Render::PhysicalCameraSettings);
+initializer._full_name = "Ailu::Render::PhysicalCameraSettings";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu::Render";
+initializer._base_name = "";
+initializer._constructor = []()->Ailu::Render::PhysicalCameraSettings* {return new Ailu::Render::PhysicalCameraSettings;};
+Meta meta_sensor_width_mm;
+meta_sensor_width_mm.Set("Category","");
+meta_sensor_width_mm.Set("IsColor",false);
+meta_sensor_width_mm.Set("IsRange",false);
+meta_sensor_width_mm.Set("IsFloatRange",true);
+meta_sensor_width_mm.Set("RangeMin",(f32)0);
+meta_sensor_width_mm.Set("RangeMax",(f32)1);
+MemberBuilder builder_sensor_width_mm;
+builder_sensor_width_mm._name = "_sensor_width_mm";
+builder_sensor_width_mm._type_name = "f32";
+builder_sensor_width_mm._offset = offsetof(PhysicalCameraSettings,_sensor_width_mm);
+builder_sensor_width_mm._is_const = false;
+builder_sensor_width_mm._is_static = false;
+builder_sensor_width_mm._is_public = false;
+builder_sensor_width_mm._is_pointer = false;
+builder_sensor_width_mm._is_ref = false;
+builder_sensor_width_mm._is_template = false;
+builder_sensor_width_mm._meta = meta_sensor_width_mm;
+builder_sensor_width_mm._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_sensor_width_mm._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_sensor_width_mm));
+Meta meta_sensor_height_mm;
+meta_sensor_height_mm.Set("Category","");
+meta_sensor_height_mm.Set("IsColor",false);
+meta_sensor_height_mm.Set("IsRange",false);
+meta_sensor_height_mm.Set("IsFloatRange",true);
+meta_sensor_height_mm.Set("RangeMin",(f32)0);
+meta_sensor_height_mm.Set("RangeMax",(f32)1);
+MemberBuilder builder_sensor_height_mm;
+builder_sensor_height_mm._name = "_sensor_height_mm";
+builder_sensor_height_mm._type_name = "f32";
+builder_sensor_height_mm._offset = offsetof(PhysicalCameraSettings,_sensor_height_mm);
+builder_sensor_height_mm._is_const = false;
+builder_sensor_height_mm._is_static = false;
+builder_sensor_height_mm._is_public = false;
+builder_sensor_height_mm._is_pointer = false;
+builder_sensor_height_mm._is_ref = false;
+builder_sensor_height_mm._is_template = false;
+builder_sensor_height_mm._meta = meta_sensor_height_mm;
+builder_sensor_height_mm._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_sensor_height_mm._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_sensor_height_mm));
+Meta meta_focal_length_mm;
+meta_focal_length_mm.Set("Category","");
+meta_focal_length_mm.Set("IsColor",false);
+meta_focal_length_mm.Set("IsRange",false);
+meta_focal_length_mm.Set("IsFloatRange",true);
+meta_focal_length_mm.Set("RangeMin",(f32)0);
+meta_focal_length_mm.Set("RangeMax",(f32)1);
+MemberBuilder builder_focal_length_mm;
+builder_focal_length_mm._name = "_focal_length_mm";
+builder_focal_length_mm._type_name = "f32";
+builder_focal_length_mm._offset = offsetof(PhysicalCameraSettings,_focal_length_mm);
+builder_focal_length_mm._is_const = false;
+builder_focal_length_mm._is_static = false;
+builder_focal_length_mm._is_public = false;
+builder_focal_length_mm._is_pointer = false;
+builder_focal_length_mm._is_ref = false;
+builder_focal_length_mm._is_template = false;
+builder_focal_length_mm._meta = meta_focal_length_mm;
+builder_focal_length_mm._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_focal_length_mm._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_focal_length_mm));
+Meta meta_aperture_f_number;
+meta_aperture_f_number.Set("Category","");
+meta_aperture_f_number.Set("IsColor",false);
+meta_aperture_f_number.Set("IsRange",false);
+meta_aperture_f_number.Set("IsFloatRange",true);
+meta_aperture_f_number.Set("RangeMin",(f32)0);
+meta_aperture_f_number.Set("RangeMax",(f32)1);
+MemberBuilder builder_aperture_f_number;
+builder_aperture_f_number._name = "_aperture_f_number";
+builder_aperture_f_number._type_name = "f32";
+builder_aperture_f_number._offset = offsetof(PhysicalCameraSettings,_aperture_f_number);
+builder_aperture_f_number._is_const = false;
+builder_aperture_f_number._is_static = false;
+builder_aperture_f_number._is_public = false;
+builder_aperture_f_number._is_pointer = false;
+builder_aperture_f_number._is_ref = false;
+builder_aperture_f_number._is_template = false;
+builder_aperture_f_number._meta = meta_aperture_f_number;
+builder_aperture_f_number._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_aperture_f_number._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_aperture_f_number));
+Meta meta_shutter_seconds;
+meta_shutter_seconds.Set("Category","");
+meta_shutter_seconds.Set("IsColor",false);
+meta_shutter_seconds.Set("IsRange",false);
+meta_shutter_seconds.Set("IsFloatRange",true);
+meta_shutter_seconds.Set("RangeMin",(f32)0);
+meta_shutter_seconds.Set("RangeMax",(f32)1);
+MemberBuilder builder_shutter_seconds;
+builder_shutter_seconds._name = "_shutter_seconds";
+builder_shutter_seconds._type_name = "f32";
+builder_shutter_seconds._offset = offsetof(PhysicalCameraSettings,_shutter_seconds);
+builder_shutter_seconds._is_const = false;
+builder_shutter_seconds._is_static = false;
+builder_shutter_seconds._is_public = false;
+builder_shutter_seconds._is_pointer = false;
+builder_shutter_seconds._is_ref = false;
+builder_shutter_seconds._is_template = false;
+builder_shutter_seconds._meta = meta_shutter_seconds;
+builder_shutter_seconds._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_shutter_seconds._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_shutter_seconds));
+Meta meta_iso;
+meta_iso.Set("Category","");
+meta_iso.Set("IsColor",false);
+meta_iso.Set("IsRange",false);
+meta_iso.Set("IsFloatRange",true);
+meta_iso.Set("RangeMin",(f32)0);
+meta_iso.Set("RangeMax",(f32)1);
+MemberBuilder builder_iso;
+builder_iso._name = "_iso";
+builder_iso._type_name = "f32";
+builder_iso._offset = offsetof(PhysicalCameraSettings,_iso);
+builder_iso._is_const = false;
+builder_iso._is_static = false;
+builder_iso._is_public = false;
+builder_iso._is_pointer = false;
+builder_iso._is_ref = false;
+builder_iso._is_template = false;
+builder_iso._meta = meta_iso;
+builder_iso._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_iso._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_iso));
+Meta meta_focus_distance_m;
+meta_focus_distance_m.Set("Category","");
+meta_focus_distance_m.Set("IsColor",false);
+meta_focus_distance_m.Set("IsRange",false);
+meta_focus_distance_m.Set("IsFloatRange",true);
+meta_focus_distance_m.Set("RangeMin",(f32)0);
+meta_focus_distance_m.Set("RangeMax",(f32)1);
+MemberBuilder builder_focus_distance_m;
+builder_focus_distance_m._name = "_focus_distance_m";
+builder_focus_distance_m._type_name = "f32";
+builder_focus_distance_m._offset = offsetof(PhysicalCameraSettings,_focus_distance_m);
+builder_focus_distance_m._is_const = false;
+builder_focus_distance_m._is_static = false;
+builder_focus_distance_m._is_public = false;
+builder_focus_distance_m._is_pointer = false;
+builder_focus_distance_m._is_ref = false;
+builder_focus_distance_m._is_template = false;
+builder_focus_distance_m._meta = meta_focus_distance_m;
+builder_focus_distance_m._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_focus_distance_m._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_focus_distance_m));
+Meta meta_exposure_compensation_ev;
+meta_exposure_compensation_ev.Set("Category","");
+meta_exposure_compensation_ev.Set("IsColor",false);
+meta_exposure_compensation_ev.Set("IsRange",false);
+meta_exposure_compensation_ev.Set("IsFloatRange",true);
+meta_exposure_compensation_ev.Set("RangeMin",(f32)0);
+meta_exposure_compensation_ev.Set("RangeMax",(f32)1);
+MemberBuilder builder_exposure_compensation_ev;
+builder_exposure_compensation_ev._name = "_exposure_compensation_ev";
+builder_exposure_compensation_ev._type_name = "f32";
+builder_exposure_compensation_ev._offset = offsetof(PhysicalCameraSettings,_exposure_compensation_ev);
+builder_exposure_compensation_ev._is_const = false;
+builder_exposure_compensation_ev._is_static = false;
+builder_exposure_compensation_ev._is_public = false;
+builder_exposure_compensation_ev._is_pointer = false;
+builder_exposure_compensation_ev._is_ref = false;
+builder_exposure_compensation_ev._is_template = false;
+builder_exposure_compensation_ev._meta = meta_exposure_compensation_ev;
+builder_exposure_compensation_ev._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_exposure_compensation_ev._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_exposure_compensation_ev));
+Meta meta_lens_projection_mode;
+meta_lens_projection_mode.Set("Category","");
+meta_lens_projection_mode.Set("IsColor",false);
+meta_lens_projection_mode.Set("IsRange",false);
+meta_lens_projection_mode.Set("IsFloatRange",true);
+meta_lens_projection_mode.Set("RangeMin",(f32)0);
+meta_lens_projection_mode.Set("RangeMax",(f32)1);
+MemberBuilder builder_lens_projection_mode;
+builder_lens_projection_mode._name = "_lens_projection_mode";
+builder_lens_projection_mode._type_name = "Ailu::Render::ELensProjectionMode";
+builder_lens_projection_mode._offset = offsetof(PhysicalCameraSettings,_lens_projection_mode);
+builder_lens_projection_mode._is_const = false;
+builder_lens_projection_mode._is_static = false;
+builder_lens_projection_mode._is_public = false;
+builder_lens_projection_mode._is_pointer = false;
+builder_lens_projection_mode._is_ref = false;
+builder_lens_projection_mode._is_template = false;
+builder_lens_projection_mode._meta = meta_lens_projection_mode;
+builder_lens_projection_mode._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<ELensProjectionMode>);
+builder_lens_projection_mode._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<ELensProjectionMode>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_lens_projection_mode));
+Meta meta_exposure_mode;
+meta_exposure_mode.Set("Category","");
+meta_exposure_mode.Set("IsColor",false);
+meta_exposure_mode.Set("IsRange",false);
+meta_exposure_mode.Set("IsFloatRange",true);
+meta_exposure_mode.Set("RangeMin",(f32)0);
+meta_exposure_mode.Set("RangeMax",(f32)1);
+MemberBuilder builder_exposure_mode;
+builder_exposure_mode._name = "_exposure_mode";
+builder_exposure_mode._type_name = "Ailu::Render::EExposureMode";
+builder_exposure_mode._offset = offsetof(PhysicalCameraSettings,_exposure_mode);
+builder_exposure_mode._is_const = false;
+builder_exposure_mode._is_static = false;
+builder_exposure_mode._is_public = false;
+builder_exposure_mode._is_pointer = false;
+builder_exposure_mode._is_ref = false;
+builder_exposure_mode._is_template = false;
+builder_exposure_mode._meta = meta_exposure_mode;
+builder_exposure_mode._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<EExposureMode>);
+builder_exposure_mode._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<EExposureMode>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_exposure_mode));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+const Ailu::Type* Ailu::Render::PhysicalCameraSettings::GetPrivateStaticClass()
+{
+	static const Ailu::Type* type = Z_Construct_PhysicalCameraSettings_Type();
+	return type;
+}
+
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::Render::PhysicalCameraSettings>()
+{
+return Ailu::Render::PhysicalCameraSettings::StaticType();
+}
+    const Type *Ailu::Render::PhysicalCameraSettings::GetType()
+{
+return Ailu::Render::PhysicalCameraSettings::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_PhysicalCameraSettings(&Ailu::Render::PhysicalCameraSettings::StaticType, "Ailu::Render::PhysicalCameraSettings");
 static std::unique_ptr<Ailu::Enum> s_enum_type_EAntiAliasing = nullptr;
 //Enum EAntiAliasing begin...........................
 const Ailu::Enum* Z_Construct_Enum_Ailu_Render_EAntiAliasing_Type()
@@ -56,6 +301,60 @@ template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::ECameraType>()
 return s_enum_type_ECameraType.get();
 }
 //Enum ECameraType end...........................
+
+static std::unique_ptr<Ailu::Enum> s_enum_type_ELensProjectionMode = nullptr;
+//Enum ELensProjectionMode begin...........................
+const Ailu::Enum* Z_Construct_Enum_Ailu_Render_ELensProjectionMode_Type()
+{
+if(s_enum_type_ELensProjectionMode == nullptr)
+{
+EnumInitializer initializer;
+initializer._name = "ELensProjectionMode";
+initializer._namespace = "Ailu::Render";
+initializer._full_name = "Ailu::Render::ELensProjectionMode";
+initializer._size = sizeof(Ailu::Render::ELensProjectionMode);
+initializer._str_to_enum_lut["kLegacyFov"] = 0;
+initializer._str_to_enum_lut["kPhysicalFocalLength"] = 1;
+s_enum_type_ELensProjectionMode = std::make_unique<Ailu::Enum>(initializer);
+Ailu::Enum::RegisterEnum(s_enum_type_ELensProjectionMode.get());
+}
+return s_enum_type_ELensProjectionMode.get();
+}
+static Ailu::EnumTypeRegister g_register_ELensProjectionMode(Z_Construct_Enum_Ailu_Render_ELensProjectionMode_Type);
+template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::ELensProjectionMode>()
+{
+return s_enum_type_ELensProjectionMode.get();
+}
+//Enum ELensProjectionMode end...........................
+
+static std::unique_ptr<Ailu::Enum> s_enum_type_EExposureMode = nullptr;
+//Enum EExposureMode begin...........................
+const Ailu::Enum* Z_Construct_Enum_Ailu_Render_EExposureMode_Type()
+{
+if(s_enum_type_EExposureMode == nullptr)
+{
+EnumInitializer initializer;
+initializer._name = "EExposureMode";
+initializer._namespace = "Ailu::Render";
+initializer._full_name = "Ailu::Render::EExposureMode";
+initializer._size = sizeof(Ailu::Render::EExposureMode);
+initializer._str_to_enum_lut["kLegacyManual"] = 0;
+initializer._str_to_enum_lut["kManualPhysical"] = 1;
+initializer._str_to_enum_lut["kAuto"] = 2;
+initializer._str_to_enum_lut["kAperturePriority"] = 3;
+initializer._str_to_enum_lut["kShutterPriority"] = 4;
+initializer._str_to_enum_lut["kAutoISO"] = 5;
+s_enum_type_EExposureMode = std::make_unique<Ailu::Enum>(initializer);
+Ailu::Enum::RegisterEnum(s_enum_type_EExposureMode.get());
+}
+return s_enum_type_EExposureMode.get();
+}
+static Ailu::EnumTypeRegister g_register_EExposureMode(Z_Construct_Enum_Ailu_Render_EExposureMode_Type);
+template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::EExposureMode>()
+{
+return s_enum_type_EExposureMode.get();
+}
+//Enum EExposureMode end...........................
 
 static std::unique_ptr<Ailu::Enum> s_enum_type_EUpsamplingFilter = nullptr;
 //Enum EUpsamplingFilter begin...........................

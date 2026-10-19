@@ -579,10 +579,14 @@ namespace Ailu
                                          ? _drag_preview_mesh->GetIndexBuffer().get()
                                          : nullptr;
                 LOG_INFO("[SceneView] DragPreview type={} asset={} obj={} mesh={} submeshes={} vb={} vb_ready={} ib={} ib_ready={}",
-                         payload ? StaticEnum<EDragType>()->GetNameByEnum(payload->_type) : "<none>", asset,
-                         asset != nullptr ? asset->_p_obj.get() : nullptr, _drag_preview_mesh.get(),
-                         _drag_preview_mesh != nullptr ? _drag_preview_mesh->SubmeshCount() : 0u, vertex_buffer,
-                         vertex_buffer != nullptr && vertex_buffer->IsReady(), index_buffer,
+                         payload ? StaticEnum<EDragType>()->GetNameByEnum(payload->_type) : "<none>",
+                         asset != nullptr ? asset->Name() : "<null>",
+                         asset != nullptr && asset->_p_obj != nullptr ? asset->_p_obj->Name() : "<null>",
+                         _drag_preview_mesh != nullptr ? _drag_preview_mesh->Name() : "<null>",
+                         _drag_preview_mesh != nullptr ? _drag_preview_mesh->SubmeshCount() : 0u,
+                         reinterpret_cast<std::uintptr_t>(vertex_buffer),
+                         vertex_buffer != nullptr && vertex_buffer->IsReady(),
+                         reinterpret_cast<std::uintptr_t>(index_buffer),
                          index_buffer != nullptr && index_buffer->IsReady());
                 s_last_drag_asset = asset;
                 s_last_preview_mesh = _drag_preview_mesh.get();
@@ -621,8 +625,8 @@ namespace Ailu
             _drag_preview_pos = position;
             if (!s_logged_preview_position)
             {
-                LOG_INFO("[SceneView] DragPreview placement world={} screen={} camera={}", _drag_preview_pos,
-                         Camera::sCurrent->WorldToScreen(_drag_preview_pos), Camera::sCurrent->Position());
+                LOG_INFO("[SceneView] DragPreview placement world={} screen={} camera={}", _drag_preview_pos.ToString(),
+                         Camera::sCurrent->WorldToScreen(_drag_preview_pos).ToString(), Camera::sCurrent->Position().ToString());
                 s_logged_preview_position = true;
             }
         }
@@ -849,6 +853,110 @@ namespace Ailu
                     }
                 }
             };
+            _camera_vertical_fov_status = content->AddChild<UI::Text>("Vertical FOV: 60.00 deg");
+            _camera_vertical_fov_status->GetSlotAs<UI::LinearSlot>()
+                    .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed).Size({0.0f, 22.0f});
+
+            auto *lens_projection_row = content->AddChild<UI::HorizontalBox>();
+            lens_projection_row->GetSlotAs<UI::LinearSlot>()
+                    .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed).Size({0.0f, 28.0f});
+            lens_projection_row->AddChild<UI::Text>("Lens Projection")->GetSlotAs<UI::LinearSlot>()
+                    .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill).FillRate(1.0f);
+            _camera_lens_projection_dropdown = lens_projection_row->AddChild<UI::Dropdown>(
+                    Vector<String>{"Legacy FOV", "Physical Focal Length"});
+            _camera_lens_projection_dropdown->GetSlotAs<UI::LinearSlot>()
+                    .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill).FillRate(1.0f);
+            _camera_lens_projection_dropdown->_on_selected_changed += [this](i32 index)
+            {
+                Camera *camera = Camera::sCurrent;
+                if (camera == nullptr || index < 0 || index > 1)
+                    return;
+                camera->LensProjectionMode(static_cast<Render::ELensProjectionMode>(index));
+                UpdateSceneCameraSettings();
+            };
+
+            _camera_sensor_width_input = add_float_row("Sensor Width (mm)", "36.00", &_camera_sensor_width_row);
+            _camera_sensor_height_input = add_float_row("Sensor Height (mm)", "24.00", &_camera_sensor_height_row);
+            _camera_focal_length_input = add_float_row("Focal Length (mm)", "50.00", &_camera_focal_length_row);
+            auto bind_physical_input = [](UI::InputBlock *input, auto update)
+            {
+                input->_on_content_changed += [update](String value)
+                {
+                    Camera *camera = Camera::sCurrent;
+                    const auto parsed = StringUtils::ParseFloat(value);
+                    if (camera == nullptr || !parsed.has_value() || !std::isfinite(*parsed))
+                        return;
+                    Render::PhysicalCameraSettings settings = camera->PhysicalSettings();
+                    update(settings, *parsed);
+                    camera->PhysicalSettings(settings);
+                };
+            };
+            bind_physical_input(_camera_sensor_width_input, [](Render::PhysicalCameraSettings &settings, f32 value)
+            {
+                settings._sensor_width_mm = value;
+            });
+            bind_physical_input(_camera_sensor_height_input, [](Render::PhysicalCameraSettings &settings, f32 value)
+            {
+                settings._sensor_height_mm = value;
+            });
+            bind_physical_input(_camera_focal_length_input, [](Render::PhysicalCameraSettings &settings, f32 value)
+            {
+                settings._focal_length_mm = value;
+            });
+
+            auto *exposure_mode_row = content->AddChild<UI::HorizontalBox>();
+            exposure_mode_row->GetSlotAs<UI::LinearSlot>()
+                    .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed).Size({0.0f, 28.0f});
+            exposure_mode_row->AddChild<UI::Text>("Exposure Mode")->GetSlotAs<UI::LinearSlot>()
+                    .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill).FillRate(1.0f);
+            _camera_exposure_mode_dropdown = exposure_mode_row->AddChild<UI::Dropdown>(Vector<String>{
+                    "Legacy Manual", "Manual Physical", "Auto", "Aperture Priority", "Shutter Priority", "Auto ISO"});
+            _camera_exposure_mode_dropdown->GetSlotAs<UI::LinearSlot>()
+                    .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFill).FillRate(1.0f);
+            _camera_exposure_mode_dropdown->_on_selected_changed += [this](i32 index)
+            {
+                Camera *camera = Camera::sCurrent;
+                if (camera == nullptr || index < 0 || index > static_cast<i32>(Render::EExposureMode::kAutoISO))
+                    return;
+                camera->ExposureMode(static_cast<Render::EExposureMode>(index));
+                UpdateSceneCameraSettings();
+            };
+
+            _camera_aperture_input = add_float_row("Aperture (f/)", "4.00", &_camera_aperture_row);
+            _camera_shutter_input = add_float_row("Shutter (seconds)", "0.016667", &_camera_shutter_row);
+            _camera_iso_input = add_float_row("ISO", "100", &_camera_iso_row);
+            _camera_exposure_compensation_input = add_float_row("Exposure Compensation (EV)", "0.00",
+                    &_camera_exposure_compensation_row);
+            _camera_focus_distance_input = add_float_row(
+                    "Focus Distance (m; used by DOF)", "10.00", &_camera_focus_distance_row);
+            bind_physical_input(_camera_aperture_input, [](Render::PhysicalCameraSettings &settings, f32 value)
+            {
+                settings._aperture_f_number = value;
+            });
+            bind_physical_input(_camera_shutter_input, [](Render::PhysicalCameraSettings &settings, f32 value)
+            {
+                settings._shutter_seconds = value;
+            });
+            bind_physical_input(_camera_iso_input, [](Render::PhysicalCameraSettings &settings, f32 value)
+            {
+                settings._iso = value;
+            });
+            bind_physical_input(_camera_exposure_compensation_input,
+                    [](Render::PhysicalCameraSettings &settings, f32 value)
+            {
+                settings._exposure_compensation_ev = value;
+            });
+            bind_physical_input(_camera_focus_distance_input, [](Render::PhysicalCameraSettings &settings, f32 value)
+            {
+                settings._focus_distance_m = value;
+            });
+            _camera_ev100_status = content->AddChild<UI::Text>("Camera EV100 (settings): 0.00");
+            _camera_ev100_status->GetSlotAs<UI::LinearSlot>()
+                    .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed).Size({0.0f, 22.0f});
+            _camera_exposure_multiplier_status = content->AddChild<UI::Text>("Reference Exposure Multiplier: 1.00000");
+            _camera_exposure_multiplier_status->GetSlotAs<UI::LinearSlot>()
+                    .SizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kFixed).Size({0.0f, 22.0f});
+
             _camera_near_input = add_float_row("Near", "0.1", nullptr);
             _camera_near_input->_on_content_changed += [this](String value)
             {
@@ -1046,6 +1154,86 @@ namespace Ailu
             UpdateSceneCameraTransformSettings();
             if (_camera_fov_input != nullptr)
                 _camera_fov_input->SetContent(std::format("{:.2f}", camera->FovH()), false);
+            const Render::PhysicalCameraSettings physical_settings = camera->PhysicalSettings();
+            const bool is_perspective = camera->Type() == Render::ECameraType::kPerspective;
+            const bool is_physical_lens = is_perspective &&
+                    physical_settings._lens_projection_mode == Render::ELensProjectionMode::kPhysicalFocalLength;
+            if (_camera_fov_row != nullptr)
+            {
+                _camera_fov_row->SetVisible(is_perspective && !is_physical_lens);
+                const f32 fov_row_height = is_perspective && !is_physical_lens ? 28.0f : 0.0f;
+                _camera_fov_row->GetSlotAs<UI::LinearSlot>().Size({0.0f, fov_row_height});
+            }
+            if (_camera_lens_projection_dropdown != nullptr)
+            {
+                _camera_lens_projection_dropdown->SetSelectedIndex(
+                        static_cast<i32>(physical_settings._lens_projection_mode), false);
+                auto *lens_row = static_cast<UI::HorizontalBox *>(_camera_lens_projection_dropdown->GetParent());
+                lens_row->SetVisible(is_perspective);
+                lens_row->GetSlotAs<UI::LinearSlot>().Size({0.0f, is_perspective ? 28.0f : 0.0f});
+            }
+            const auto set_physical_row = [is_physical_lens](UI::HorizontalBox *row, bool condition)
+            {
+                if (row == nullptr)
+                    return;
+                row->SetVisible(condition);
+                row->GetSlotAs<UI::LinearSlot>().Size({0.0f, condition ? 28.0f : 0.0f});
+            };
+            set_physical_row(_camera_sensor_width_row, is_physical_lens);
+            set_physical_row(_camera_sensor_height_row, is_physical_lens);
+            set_physical_row(_camera_focal_length_row, is_physical_lens);
+            if (_camera_vertical_fov_status != nullptr)
+            {
+                _camera_vertical_fov_status->SetVisible(is_physical_lens);
+                _camera_vertical_fov_status->GetSlotAs<UI::LinearSlot>()
+                        .Size({0.0f, is_physical_lens ? 22.0f : 0.0f});
+                _camera_vertical_fov_status->SetText(std::format("Vertical FOV: {:.2f} deg", camera->FovH()));
+            }
+            if (_camera_lens_projection_dropdown != nullptr)
+            {
+                auto set_input = [](UI::InputBlock *input, f32 value, const char *format)
+                {
+                    if (input != nullptr)
+                        input->SetContent(std::vformat(format, std::make_format_args(value)), false);
+                };
+                set_input(_camera_sensor_width_input, physical_settings._sensor_width_mm, "{:.2f}");
+                set_input(_camera_sensor_height_input, physical_settings._sensor_height_mm, "{:.2f}");
+                set_input(_camera_focal_length_input, physical_settings._focal_length_mm, "{:.2f}");
+            }
+            if (_camera_exposure_mode_dropdown != nullptr)
+            {
+                _camera_exposure_mode_dropdown->SetSelectedIndex(
+                        static_cast<i32>(physical_settings._exposure_mode), false);
+            }
+            const bool is_physical_exposure = physical_settings._exposure_mode != Render::EExposureMode::kLegacyManual;
+            set_physical_row(_camera_shutter_row, is_physical_exposure);
+            set_physical_row(_camera_iso_row, is_physical_exposure);
+            set_physical_row(_camera_exposure_compensation_row, is_physical_exposure);
+            set_physical_row(_camera_focus_distance_row, true);
+            set_physical_row(_camera_aperture_row, true);
+            if (_camera_focus_distance_input != nullptr)
+                _camera_focus_distance_input->SetContent(std::format("{:.2f}", physical_settings._focus_distance_m),
+                                                         false);
+            if (_camera_aperture_input != nullptr)
+                _camera_aperture_input->SetContent(std::format("{:.2f}", physical_settings._aperture_f_number), false);
+            if (is_physical_exposure)
+            {
+                if (_camera_shutter_input != nullptr)
+                    _camera_shutter_input->SetContent(std::format("{:.6f}", physical_settings._shutter_seconds), false);
+                if (_camera_iso_input != nullptr)
+                    _camera_iso_input->SetContent(std::format("{:.0f}", physical_settings._iso), false);
+                if (_camera_exposure_compensation_input != nullptr)
+                    _camera_exposure_compensation_input->SetContent(
+                            std::format("{:.2f}", physical_settings._exposure_compensation_ev), false);
+                _camera_ev100_status->SetText(std::format("Camera EV100 (settings): {:.2f}", camera->ComputeEv100()));
+                _camera_exposure_multiplier_status->SetText(std::format("Reference Exposure Multiplier: {:.5f}",
+                        camera->ComputeExposureMultiplier()));
+            }
+            else
+            {
+                _camera_ev100_status->SetText("Legacy exposure: Controlled by Postprocess Volume");
+                _camera_exposure_multiplier_status->SetText("");
+            }
             if (_camera_near_input != nullptr)
                 _camera_near_input->SetContent(std::format("{:.3f}", camera->Near()), false);
             if (_camera_far_input != nullptr)
@@ -1055,8 +1243,9 @@ namespace Ailu
                 const bool is_orthographic = camera->Type() == Render::ECameraType::kOrthographic;
                 if (_camera_fov_row != nullptr)
                 {
-                    _camera_fov_row->SetVisible(!is_orthographic);
-                    _camera_fov_row->GetSlotAs<UI::LinearSlot>().Size({0.0f, is_orthographic ? 0.0f : 28.0f});
+                    const bool show_fov = !is_orthographic && !is_physical_lens;
+                    _camera_fov_row->SetVisible(show_fov);
+                    _camera_fov_row->GetSlotAs<UI::LinearSlot>().Size({0.0f, show_fov ? 28.0f : 0.0f});
                 }
                 if (_camera_size_row != nullptr)
                 {

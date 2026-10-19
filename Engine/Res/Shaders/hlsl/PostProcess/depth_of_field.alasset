@@ -1,0 +1,12 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "bbca52d8-cc28-4c83-b027-47969f81f712",
+        "_asset_type": "Ailu::Render::Shader",
+        "_asset_name": "depth_of_field",
+        "_dependencies": []
+    },
+    "_file": "depth_of_field.hlsl",
+    "_vs_entry": "FullscreenVSMain",
+    "_ps_entry": "DepthOfFieldPS"
+}

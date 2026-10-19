@@ -97,8 +97,8 @@ namespace Ailu
                 if (light_component->_type != ELightType::kArea)
                     continue;
                 memset(light_component->_light._area_points, 0, sizeof(light_component->_light._area_points));
-                const f32 half_width = light_component->_light._light_param.y * 0.5f;
-                const f32 half_height = light_component->_light._light_param.z * 0.5f;
+                const f32 half_width = light_component->_light._area_width * 0.5f;
+                const f32 half_height = light_component->_light._area_height * 0.5f;
                 light_component->_light._area_points[0].x = -half_width;
                 light_component->_light._area_points[0].z = half_height;
                 light_component->_light._area_points[1].x = half_width;

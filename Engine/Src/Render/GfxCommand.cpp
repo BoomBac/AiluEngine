@@ -36,6 +36,8 @@ namespace Ailu::Render
             return "kReadBackTexture";
         case EGpuCommandType::kPresent:
             return "kPresent";
+        case EGpuCommandType::kEndFrame:
+            return "kEndFrame";
         case EGpuCommandType::kScissorRect:
             return "kScissorRect";
         case EGpuCommandType::kDestroyGpuResource:
@@ -89,6 +91,9 @@ namespace Ailu::Render
             break;
         case EGpuCommandType::kPresent:
             static_cast<CommandPresent *>(cmd)->~CommandPresent();
+            break;
+        case EGpuCommandType::kEndFrame:
+            static_cast<CommandEndFrame *>(cmd)->~CommandEndFrame();
             break;
         case EGpuCommandType::kScissorRect:
             static_cast<CommandScissor *>(cmd)->~CommandScissor();

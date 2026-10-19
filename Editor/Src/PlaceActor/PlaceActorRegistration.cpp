@@ -39,10 +39,31 @@ namespace Ailu
                     const ECS::Entity entity = context._scene->AddObject(actor_name);
                     auto &light = context._scene->GetRegister().AddComponent<ECS::LightComponent>(entity);
                     light._type = type;
+                    light._light._intensity_unit = type == ECS::ELightType::kDirectional
+                        ? ECS::ELightIntensityUnit::kLux
+                        : type == ECS::ELightType::kArea ? ECS::ELightIntensityUnit::kLumen
+                                                         : ECS::ELightIntensityUnit::kCandela;
                     light._light._light_color = Color(1.0f, 1.0f, 1.0f, 1.0f);
                     light._light._light_pos = {context._position.x, context._position.y, context._position.z, 1.0f};
                     light._light._light_dir = Vector4f(0.0f, -1.0f, 0.0f, 0.0f);
-                    light._light._light_param = light_param;
+                    light._light._range = light_param.x;
+                    if (type == ECS::ELightType::kDirectional)
+                        light._light._angular_radius = light_param.w;
+                    else if (type == ECS::ELightType::kPoint)
+                        light._light._source_radius = light_param.y;
+                    else if (type == ECS::ELightType::kSpot)
+                    {
+                        light._light._spot_inner_angle = light_param.y;
+                        light._light._spot_outer_angle = light_param.z;
+                    }
+                    else
+                    {
+                        light._light._area_width = light_param.y;
+                        light._light._area_height = light_param.z;
+                        light._light._area_shape = light_param.w == 0.0f
+                            ? ECS::EAreaLightShape::kRectangle : ECS::EAreaLightShape::kDisc;
+                        light._light._area_disc_radius = light_param.x;
+                    }
                     light._light._is_two_side = false;
                     light._shadow._is_cast_shadow = true;
                     light._shadow._constant_bias = 0.01f;

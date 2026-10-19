@@ -1,6 +1,9 @@
 #include "Assets/TextureImporter.h"
 #include "pch.h"
 #include <DirectXTex.h>
+#include "Ext/tinyexr.h"
+#include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <filesystem>
 
@@ -8,6 +11,31 @@ namespace Ailu
 {
     namespace
     {
+        HRESULT LoadExr(const WString &source_path, DirectX::ScratchImage &decoded)
+        {
+            float *pixels = nullptr;
+            int width = 0, height = 0;
+            const char *error = nullptr;
+            const auto path = ToChar(source_path);
+            if (LoadEXR(&pixels, &width, &height, path.c_str(), &error) != TINYEXR_SUCCESS)
+            {
+                LOG_ERROR("EXR decode failed: {}", error != nullptr ? error : "unknown error");
+                if (error != nullptr)
+                    FreeEXRErrorMessage(error);
+                std::free(pixels);
+                return E_FAIL;
+            }
+            const HRESULT result = decoded.Initialize2D(DXGI_FORMAT_R32G32B32A32_FLOAT, width, height, 1, 1);
+            if (SUCCEEDED(result))
+            {
+                const auto *image = decoded.GetImage(0, 0, 0);
+                const size_t row_size = static_cast<size_t>(width) * sizeof(float) * 4;
+                for (int row = 0; row < height; ++row)
+                    std::memcpy(image->pixels + row * image->rowPitch, pixels + row * width * 4, row_size);
+            }
+            std::free(pixels);
+            return result;
+        }
         DXGI_FORMAT ResolveFormat(const TextureImportSetting &setting)
         {
             if (setting._compression == ETextureCompression::kNone)
@@ -79,7 +107,9 @@ namespace Ailu
     {
         const String extension = su::ToLower(ToChar(std::filesystem::path(source_path).extension().wstring()));
         DirectX::ScratchImage decoded;
-        const HRESULT load_result = su::EndWith(extension, ".dds") ? DirectX::LoadFromDDSFile(source_path.c_str(), DirectX::DDS_FLAGS_NONE, nullptr, decoded) :
+        const HRESULT load_result = su::EndWith(extension, ".exr") ? LoadExr(source_path, decoded) :
+            su::EndWith(extension, ".dds")
+                ? DirectX::LoadFromDDSFile(source_path.c_str(), DirectX::DDS_FLAGS_NONE, nullptr, decoded) :
             su::EndWith(extension, ".tga") ? DirectX::LoadFromTGAFile(source_path.c_str(), nullptr, decoded) :
             su::EndWith(extension, ".hdr") ? DirectX::LoadFromHDRFile(source_path.c_str(), nullptr, decoded) :
             DirectX::LoadFromWICFile(source_path.c_str(), DirectX::WIC_FLAGS_FORCE_RGB, nullptr, decoded);

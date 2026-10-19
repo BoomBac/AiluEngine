@@ -69,11 +69,15 @@ namespace Ailu::Render
             graph.AddPass(std::format("BloomUpsample_{}", i - 1u), RDG::PassDesc(), [current, output](RDG::RenderGraphBuilder &builder)
             {
                 builder.Read(current);
+                // Fixed-function blending reads the existing finer mip as an RTV, not an SRV.
+                builder.Read(output, EResourceUsage::kWriteRTV);
                 (void) builder.Write(output);
             }, [this, current, output, settings, i, source_width, source_height](RDG::RenderGraph &graph,
                                                                                  CommandBuffer *cmd, const RenderingData &)
             {
-                cmd->SetRenderTarget(graph.GetTexture(std::format("BloomMip_{}", i - 2u)));
+                const RDG::RGHandle target = graph.GetTexture(std::format("BloomMip_{}", i - 2u));
+                cmd->SetRenderTargetLoadAction(target, ELoadStoreAction::kLoad);
+                cmd->SetRenderTarget(target);
                 const f32 width = static_cast<f32>(std::max<u32>(1u, source_width >> (i - 1u)));
                 const f32 height = static_cast<f32>(std::max<u32>(1u, source_height >> (i - 1u)));
                 _bloom_mats[i - 1u]->SetVector("_SampleParams",

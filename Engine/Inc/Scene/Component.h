@@ -340,22 +340,52 @@ public:                                                                 \
             explicit ScriptComponent(Guid script_asset) : _script_asset(std::move(script_asset)) {}
         };
 
+        AENUM()
+        enum class ELightIntensityUnit
+        {
+            kCandela,
+            kLumen,
+            kLux,
+            kWatt,
+            kWattPerSquareMeter,
+            kUnitlessLegacy
+        };
+
+        AENUM()
+        enum class EAreaLightShape
+        {
+            kRectangle,
+            kDisc
+        };
+
         struct LightData
         {
-            Vector4f _light_pos;
-            Vector4f _light_dir;
-            Color _light_color; // Runtime linear; JSON serialization stores sRGB.
-            Vector4f _light_param;
-            Vector3f _area_points[4];
-            bool _is_two_side;
+            Vector4f _light_pos = Vector4f::kZero;
+            Vector4f _light_dir = Vector4f::kZero;
+            Color _light_color = Color(1.0f, 1.0f, 1.0f, 1.0f);
+            bool _use_color_temperature = false;
+            f32 _color_temperature_kelvin = 6500.0f;
+            f32 _intensity = 1.0f;
+            ELightIntensityUnit _intensity_unit = ELightIntensityUnit::kCandela;
+            f32 _range = 10.0f;
+            f32 _source_radius = 0.05f;
+            f32 _angular_radius = 0.265f;
+            f32 _spot_inner_angle = 30.0f;
+            f32 _spot_outer_angle = 45.0f;
+            f32 _area_width = 1.0f;
+            f32 _area_height = 1.0f;
+            f32 _area_disc_radius = 0.5f;
+            EAreaLightShape _area_shape = EAreaLightShape::kRectangle;
+            bool _is_two_side = false;
+            Vector3f _area_points[4] = {};
         };
 
         struct ShadowData
         {
-            bool _is_cast_shadow;
-            float _constant_bias;
-            float _slope_bias;
-            float _padding;
+            bool _is_cast_shadow = false;
+            float _constant_bias = 0.0f;
+            float _slope_bias = 0.0f;
+            float _padding = 0.0f;
         };
 
         AENUM()
@@ -373,7 +403,7 @@ public:                                                                 \
             inline const static Vector3f kDefaultDirectionalLightDir = Vector3f(0.0f, -1.0f, 0.0f);
             LightData _light;
             ShadowData _shadow;
-            ELightType _type;
+            ELightType _type = ELightType::kPoint;
         };
 
         struct AILU_API CCamera
@@ -413,6 +443,10 @@ public:                                                                 \
 
             APROPERTY()
             Guid _texture = Guid::EmptyGuid();
+
+            // Optional camera-only latlong; empty preserves the existing lighting-sky presentation.
+            APROPERTY()
+            Guid _background_texture = Guid::EmptyGuid();
 
             APROPERTY()
             ProceduralSkySettings _procedural_sky;

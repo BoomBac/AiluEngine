@@ -9,7 +9,7 @@ import bpy
 import numpy as np
 
 from . import identity, protocol
-from .mesh_sync import _temp_dir
+from .mesh_sync import IsMeshSource, _temp_dir
 
 _meshes = OrderedDict()
 _payloads = {}
@@ -20,6 +20,7 @@ _session_device = "CPU"
 _session_timings = None
 _png_encoder = None
 _session_depsgraph = None
+_session_evaluated_info = {}
 
 
 @contextmanager
@@ -41,6 +42,7 @@ def ExportSession():
         yield
         return
     _session_active = True
+    _session_evaluated_info.clear()
     _session_timings = {}
     started = time.perf_counter()
     preferences = None
@@ -106,6 +108,7 @@ def ExportSession():
                     print(f"[BlenderLiveLink] Bake session: total={total_ms:.2f}ms {phases}")
                     _session_timings = None
                     _session_depsgraph = None
+                    _session_evaluated_info.clear()
                     _session_device = "CPU"
                     _session_active = False
 
@@ -151,25 +154,7 @@ def requires_bake(material):
                    if node.type == "OUTPUT_MATERIAL" and node.is_active_output), None)
     if not output or not output.inputs["Surface"].is_linked:
         return False
-    visited = set()
-
-    def complex_branch(socket):
-        if not socket.is_linked:
-            return False
-        node = socket.links[0].from_node
-        if node.as_pointer() in visited:
-            return False
-        visited.add(node.as_pointer())
-        if node.type not in {"BSDF_PRINCIPLED", "BSDF_TRANSPARENT", "TEX_IMAGE", "NORMAL_MAP", "REROUTE"}:
-            return True
-        if node.type == "TEX_IMAGE" and node.inputs["Vector"].is_linked:
-            return True
-        if node.type == "NORMAL_MAP" and (node.space != "TANGENT" or node.uv_map
-                                         or node.inputs["Strength"].default_value != 1.0):
-            return True
-        return any(complex_branch(value) for value in node.inputs)
-
-    return complex_branch(output.inputs["Surface"])
+    return True
 
 
 def material_guid(material, obj):
@@ -178,8 +163,36 @@ def material_guid(material, obj):
     return identity.get_guid(material)
 
 
+def EvaluatedMeshInfo(obj, depsgraph=None):
+    """Own no mesh: snapshot the actual converted mesh's sparse table, then release Object.to_mesh storage."""
+    if not IsMeshSource(obj):
+        return {"materials": tuple(slot.material for slot in obj.material_slots), "has_source_uv": False}
+    key = obj.as_pointer()
+    if _session_active and key in _session_evaluated_info:
+        return _session_evaluated_info[key]
+    graph = depsgraph if depsgraph is not None and depsgraph is not _session_depsgraph else bpy.context.evaluated_depsgraph_get()
+    evaluated = obj.evaluated_get(graph)
+    mesh = evaluated.to_mesh(preserve_all_data_layers=True, depsgraph=graph)
+    try:
+        materials = [material.original if material else None for material in mesh.materials] if mesh else []
+        for index, slot in enumerate(evaluated.material_slots):
+            if index < len(materials) and slot.link == "OBJECT":
+                materials[index] = slot.material.original if slot.material else None
+        info = {"materials": tuple(materials),
+                "has_source_uv": bool(mesh and any(layer.active_render for layer in mesh.uv_layers))}
+    finally:
+        evaluated.to_mesh_clear()
+    if _session_active:
+        _session_evaluated_info[key] = info
+    return info
+
+
+def EvaluatedMaterials(obj, depsgraph=None):
+    return EvaluatedMeshInfo(obj, depsgraph)["materials"]
+
+
 def object_needs_bake(obj):
-    return obj.type == "MESH" and any(requires_bake(slot.material) for slot in obj.material_slots)
+    return IsMeshSource(obj) and any(requires_bake(material) for material in EvaluatedMaterials(obj))
 
 
 def requires_bake_for_object(material, obj):
@@ -189,9 +202,9 @@ def requires_bake_for_object(material, obj):
         return False
     if obj is None or not object_needs_bake(obj):
         return False
-    has_explicit_atlas = any(slot.material and str(slot.material.get("ailu_export_mode", "AUTO")).upper() == "BAKE"
-                             for slot in obj.material_slots)
-    has_source_uv = any(layer.active_render for layer in obj.data.uv_layers)
+    has_explicit_atlas = any(material and str(material.get("ailu_export_mode", "AUTO")).upper() == "BAKE"
+                             for material in EvaluatedMaterials(obj))
+    has_source_uv = EvaluatedMeshInfo(obj)["has_source_uv"]
     if not has_explicit_atlas and has_source_uv:
         return False
     visited = set()
@@ -228,11 +241,9 @@ def _uses_spatial_coordinates(material):
 
 def invalidate_object(obj):
     """Invalidate only object-specific baked payloads affected by a transform."""
-    spatial_materials = [slot.material for slot in obj.material_slots
-                         if slot.material and _uses_spatial_coordinates(slot.material)]
+    spatial_materials = [material for material in EvaluatedMaterials(obj) if material and _uses_spatial_coordinates(material)]
     should_resync = False
-    for slot in obj.material_slots:
-        material = slot.material
+    for material in EvaluatedMaterials(obj):
         if material and requires_bake_for_object(material, obj):
             guid = material_guid(material, obj)
             if material in spatial_materials:
@@ -265,9 +276,9 @@ def invalidate_materials(obj, previous_signature, current_signature):
 def _bake_identity(obj):
     # Unmodified UV-only mesh instances share both their atlas and channel textures. Coordinate-sensitive or
     # evaluated geometry keeps an object-specific identity; never reuse a world-space bake across instances.
-    if obj.modifiers or any(_uses_spatial_coordinates(slot.material) for slot in obj.material_slots):
+    if obj.modifiers or any(_uses_spatial_coordinates(material) for material in EvaluatedMaterials(obj)):
         return identity.get_guid(obj)
-    slots = ":".join(identity.get_guid(slot.material) if slot.material else "" for slot in obj.material_slots)
+    slots = ":".join(identity.get_guid(material) if material else "" for material in EvaluatedMaterials(obj))
     return identity.get_guid(obj.data) + ":" + obj.data.name_full + ":" + slots + ":" + str(tuple(obj.matrix_world.to_scale()))
 
 
@@ -322,6 +333,7 @@ def prepared_mesh(obj, depsgraph):
             return mesh
         del _meshes[key]
     with _Measure("atlas_evaluation"):
+        depsgraph = bpy.context.evaluated_depsgraph_get()
         mesh = bpy.data.meshes.new_from_object(obj.evaluated_get(depsgraph), preserve_all_data_layers=True,
                                               depsgraph=depsgraph)
     scene = _temporary_scene()
@@ -338,10 +350,11 @@ def prepared_mesh(obj, depsgraph):
         if source_uv:
             mesh.uv_layers[source_uv].active_render = True
         # Keep the source render UV available to texture nodes with an unconnected Vector input.
-        exact_atlas = any(str(slot.material.get("ailu_export_mode", "AUTO")).upper() == "BAKE"
-                          for slot in obj.material_slots if slot.material)
+        exact_atlas = any(str(material.get("ailu_export_mode", "AUTO")).upper() == "BAKE"
+                          or _uses_spatial_coordinates(material)
+                          for material in EvaluatedMaterials(obj) if material)
         if source_uv and not exact_atlas:
-            # AUTO retains existing UVs, avoiding million-face Edit Mode/BMesh conversion and island packing.
+            # UV-driven AUTO graphs retain existing UVs; spatial graphs require independent atlas islands.
             uv_values = np.empty(len(mesh.loops) * 2, dtype=np.float32)
             mesh.uv_layers[source_uv].data.foreach_get("uv", uv_values)
             atlas.data.foreach_set("uv", uv_values)
@@ -624,8 +637,7 @@ def opacity_mode(material, alpha, covered=None):
 
 
 def _resolution(material, resolution=None):
-    default = 1024 if str(material.get("ailu_export_mode", "AUTO")).upper() == "BAKE" else 256
-    value = int(material.get("ailu_bake_resolution", default)) if resolution is None else resolution
+    value = int(material.get("ailu_bake_resolution", 2048)) if resolution is None else resolution
     return max(16, min(value, 4096))
 
 
@@ -645,8 +657,7 @@ def prepare_object_materials(obj, sent_materials):
         return
     groups = {}
     seen = set(sent_materials) | _payloads.keys()
-    for slot in obj.material_slots:
-        material = slot.material
+    for material in EvaluatedMaterials(obj):
         if not material or not requires_bake_for_object(material, obj):
             continue
         guid = material_guid(material, obj)
@@ -811,7 +822,7 @@ def _uniform_channel(pixels, component_count, color=False):
 
 def _publish_material(material, guid, obj, surface, diffuse_only, channels, link, resolution,
                       normal_required=True, export_id=""):
-    from .material_sync import transmission_parameters
+    from .material_sync import ObjectBoxBumpSource, ObjectBoxBumpProvidesColor, _image_path, transmission_parameters
     packed = channels.pop("scalars")
     for index, scalar in enumerate(("alpha", "roughness", "metallic")):
         if diffuse_only and scalar != "alpha":
@@ -861,6 +872,18 @@ def _publish_material(material, guid, obj, surface, diffuse_only, channels, link
         value["metallic"] = float(metallic_constant[0])
     if diffuse_only:
         value.update(roughness=1.0, metallic=0.0, roughness_path="", metallic_path="")
+    runtime_bump = ObjectBoxBumpSource(material)
+    if runtime_bump is not None:
+        bump, texture = runtime_bump
+        path = _image_path(texture.image)
+        if not path:
+            raise RuntimeError(f"Native height image unavailable: {texture.image.name_full}")
+        value.update(normal_path=path, normal_mode="OBJECT_BOX_HEIGHT",
+                     normal_height_provides_color=ObjectBoxBumpProvidesColor(material, texture),
+                     normal_height_srgb=texture.image.colorspace_settings.name == "sRGB",
+                     normal_strength=float(bump.inputs["Strength"].default_value) * (-1.0 if bump.invert else 1.0),
+                     normal_distance=float(bump.inputs["Distance"].default_value),
+                     normal_box_blend=float(texture.projection_blend))
     value.update(transmission_parameters(surface))
     if value["transmission"] > 0.0:
         print(f"[BlenderLiveLink] Dielectric closure preserved: material={material.name_full!r}; "
@@ -917,9 +940,10 @@ def _export_materials(materials, obj, link, resolution):
                           if node.type == "OUTPUT_MATERIAL" and node.is_active_output)
             surface = output.inputs["Surface"]
             entries[guid] = (material, surface, is_diffuse_only(surface), {})
-        normal_required = {guid: _surface_requires_normal_bake(surface)
-                           for guid, (_, surface, _, _) in entries.items()}
-        slot_guids = [material_guid(slot.material, obj) if slot.material else "" for slot in obj.material_slots]
+        from .material_sync import ObjectBoxBumpSource
+        normal_required = {guid: _surface_requires_normal_bake(surface) and ObjectBoxBumpSource(material) is None
+                           for guid, (material, surface, _, _) in entries.items()}
+        slot_guids = [material_guid(material, obj) if material else "" for material in EvaluatedMaterials(obj, depsgraph)]
         material_indices = np.empty(len(mesh.polygons), dtype=np.int32)
         mesh.polygons.foreach_get("material_index", material_indices)
         timings["prepare"] = time.perf_counter() - started
@@ -961,7 +985,7 @@ def _export_materials(materials, obj, link, resolution):
                     targets[guid] = target
                     converted_by_guid[guid] = converted
                 mesh.materials.clear()
-                for index in range(max(1, len(obj.material_slots))):
+                for index in range(max(1, len(slot_guids))):
                     guid = slot_guids[index] if index < len(slot_guids) else ""
                     if guid in converted_by_guid:
                         mesh.materials.append(converted_by_guid[guid])

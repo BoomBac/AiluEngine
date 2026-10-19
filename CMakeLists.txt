@@ -23,7 +23,7 @@ set(AILU_FBXSDK_LINK_LIB
 option(AILU_ENABLE_TRACY "Enable Tracy profiler instrumentation" ON)
 option(AILU_WITH_OIDN_GPU "Enable optional OIDN 2.5.1 CUDA/DX12 dynamic runtime loading" OFF)
 set(AILU_OIDN_RUNTIME_DIRECTORY
-    "${CMAKE_SOURCE_DIR}/.artifacts/out/oidn-2.5.1/package/oidn-2.5.1.x64.windows/bin"
+    "${AILU_EXT_PACKAGES_DIR}/oidn-2.5.1/package/oidn-2.5.1.x64.windows/bin"
     CACHE PATH "Absolute directory containing OIDN 2.5.1 CUDA runtime DLLs")
 option(AILU_TRACY_ON_DEMAND "Tracy connects only when profiler is attached" ON)
 option(AILU_TRACY_PROFILE_CALLSITE_SOURCE_LOCATION "Use call-site source locations for CPU profile blocks" OFF)
@@ -48,6 +48,7 @@ if(WIN32)
 endif()
 
 add_compile_definitions(AILU_TRACY_PROFILE_CALLSITE_SOURCE_LOCATION=$<BOOL:${AILU_TRACY_PROFILE_CALLSITE_SOURCE_LOCATION}>)
+add_compile_definitions(AILU_SOURCE_ROOT="${CMAKE_SOURCE_DIR}")
 
 function(ailu_collect_reflection_outputs root_dir output_var)
 	file(GLOB_RECURSE candidate_headers CONFIGURE_DEPENDS "${root_dir}/*.h" "${root_dir}/*.hpp")

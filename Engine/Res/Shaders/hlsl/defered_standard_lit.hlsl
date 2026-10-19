@@ -93,6 +93,8 @@ struct GBuffer
 StandardPSInput GBufferVSMain(StandardVSInput v)
 {
 	StandardPSInput result;
+        result.object_pos = v.position;
+        result.object_normal = v.normal;
 	const PrimitiveData primitive = LoadPrimitive(v.instance_id);
 	result.position = TransformPrimitiveToClipSpace(primitive, v.position);
 	result.normal = v.normal;
@@ -135,6 +137,7 @@ GBuffer GBufferPSMain(StandardPSInput input, bool is_front_face : SV_IsFrontFace
 		InitSurfaceDataCheckboard(input, surface_data);
 		//surface_data.albedo.rgb = Checkerboard(input.uv0, 20);
 	}
+	OrientSurfaceToFace(surface_data, is_front_face);
 	const float3 view_dir = normalize(_CameraPos.xyz - input.world_pos);
 	const float shading_nv = dot(surface_data.wnormal, view_dir);
 	if (is_front_face && shading_nv < 0.05f)
@@ -167,7 +170,7 @@ GBuffer GBufferPSMain(StandardPSInput input, bool is_front_face : SV_IsFrontFace
         float3 irradiance = EvaluateEnvironmentIrradiance(surface_data.wnormal);
         if (HasPrimitiveStaticGI(primitive))
             irradiance = EvaluatePrimitiveStaticIrradiance(primitive, surface_data.wnormal);
-        output.irradiance = half4(irradiance, 1.0);
+        output.irradiance = half4(irradiance, ResolveDielectricSpecular(surface_data));
 	return output;
 }
 
@@ -179,6 +182,8 @@ float PSMain(PSInput input);
 #include "lighting.hlsli"
 struct VoxelGSInput
 {
+        float3 object_pos : TEXCOORD4;
+        float3 object_normal : TEXCOORD5;
 	float2 uv0 : TEXCOORD0;
 	float3 normal : TEXCOORD1;
 	float3 world_pos : TEXCOORD2;
@@ -194,6 +199,8 @@ struct VoxelPSInput
 VoxelGSInput VoxelVSMain(StandardVSInput v)
 {
 	VoxelGSInput result;
+        result.object_pos = v.position;
+        result.object_normal = v.normal;
 	const PrimitiveData primitive = LoadPrimitive(v.instance_id);
 	//result.position = TransformToClipSpace(v.position);
 	result.normal = v.normal;
@@ -221,6 +228,8 @@ void VoxelGSMain(triangle VoxelGSInput g[3],inout TriangleStream<StandardPSInput
 		result.position.xy /= g_VXGI_GridNum.xy * 0.5;
 		result.position.z = 1.0f;
 		result.normal = g[i].normal;
+                result.object_pos = g[i].object_pos;
+                result.object_normal = g[i].object_normal;
 		result.uv0 = g[i].uv0;
 		result.btn = float3x3(float3(1,0,0),float3(0,1,0),float3(0,0,3));
                 result.world_pos = g[i].world_pos;

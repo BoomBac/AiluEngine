@@ -382,8 +382,11 @@ Engine/Engine.zip
 Editor/Editor.zip
 AiluEngine_Source.zip
 Saved/
-Tools/Blender/tests/
+Tools/Blender/tests/*
+!Tools/Blender/tests/material_bake_smoke.py
 
 # Local AiluEditor profiling/build artifacts
 /.artifacts/build-debug/
 /.artifacts/diagnostics/editor-ui-cpu/
+/Temp
+/.tmp.*

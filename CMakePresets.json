@@ -55,6 +55,13 @@
       "configuration": "Debug"
     },
     {
+      "name": "build-debug-smoke",
+      "displayName": "Ailu Debug Smoke Targets",
+      "configurePreset": "debug",
+      "configuration": "Debug",
+      "targets": ["ailu_test_targets"]
+    },
+    {
       "name": "build-release",
       "configurePreset": "release",
       "configuration": "Release"

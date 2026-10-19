@@ -46,8 +46,10 @@ namespace Ailu::Render
         u64 _generation = 0u, _backend_instance = 0u, _frame_index = 0u;
         u32 _width = 0u, _height = 0u, _sample_count = 0u;
         bool _valid_radiance = false;
+        bool _use_guides = false;
         std::shared_ptr<const bool> _raw_executed;
         std::shared_ptr<Texture> _radiance_owner;
+        std::shared_ptr<Texture> _albedo_owner, _normal_owner;
         std::shared_ptr<std::atomic<bool>> _activation_owner;
         EPathTracingDenoiserQuality _quality = EPathTracingDenoiserQuality::kBalanced;
         u32 _sample_interval = 32u;

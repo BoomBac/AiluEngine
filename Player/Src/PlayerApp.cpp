@@ -15,6 +15,8 @@ namespace Ailu
 {
     int PlayerApp::Initialize()
     {
+        //modify testtttttttttttttttttttttttttttttt
+        // ChatGPT sync test 2026-10-19: cloud-to-local verification
         LogMgr::Init();
         _launch_config_path = GetWorkingPath() + L"player.json";
         if (!LoadLaunchConfig())

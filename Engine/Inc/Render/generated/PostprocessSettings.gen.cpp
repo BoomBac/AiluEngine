@@ -160,6 +160,27 @@ builder_exposure._meta = meta_exposure;
 builder_exposure._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
 builder_exposure._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
 initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_exposure));
+Meta meta_gamma;
+meta_gamma.Set("Category","");
+meta_gamma.Set("IsColor",false);
+meta_gamma.Set("IsRange",false);
+meta_gamma.Set("IsFloatRange",true);
+meta_gamma.Set("RangeMin",(f32)0);
+meta_gamma.Set("RangeMax",(f32)1);
+MemberBuilder builder_gamma;
+builder_gamma._name = "_gamma";
+builder_gamma._type_name = "f32";
+builder_gamma._offset = offsetof(ToneMappingSettings,_gamma);
+builder_gamma._is_const = false;
+builder_gamma._is_static = false;
+builder_gamma._is_public = false;
+builder_gamma._is_pointer = false;
+builder_gamma._is_ref = false;
+builder_gamma._is_template = false;
+builder_gamma._meta = meta_gamma;
+builder_gamma._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_gamma._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_gamma));
 cur_type = std::make_unique<Ailu::Type>(initializer);
 Ailu::Type::RegisterType(cur_type.get());
 }
@@ -181,6 +202,328 @@ return Ailu::Render::ToneMappingSettings::StaticType();
 return Ailu::Render::ToneMappingSettings::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_ToneMappingSettings(&Ailu::Render::ToneMappingSettings::StaticType, "Ailu::Render::ToneMappingSettings");
+const Ailu::Type* Ailu::Render::Z_Construct_AutoExposureSettings_Type()
+{
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "AutoExposureSettings";
+initializer._size = sizeof(Ailu::Render::AutoExposureSettings);
+initializer._full_name = "Ailu::Render::AutoExposureSettings";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu::Render";
+initializer._base_name = "";
+initializer._constructor = []()->Ailu::Render::AutoExposureSettings* {return new Ailu::Render::AutoExposureSettings;};
+Meta meta_scene_luminance_to_cd_m2;
+meta_scene_luminance_to_cd_m2.Set("Category","");
+meta_scene_luminance_to_cd_m2.Set("IsColor",false);
+meta_scene_luminance_to_cd_m2.Set("IsRange",false);
+meta_scene_luminance_to_cd_m2.Set("IsFloatRange",true);
+meta_scene_luminance_to_cd_m2.Set("RangeMin",(f32)0);
+meta_scene_luminance_to_cd_m2.Set("RangeMax",(f32)1);
+MemberBuilder builder_scene_luminance_to_cd_m2;
+builder_scene_luminance_to_cd_m2._name = "_scene_luminance_to_cd_m2";
+builder_scene_luminance_to_cd_m2._type_name = "f32";
+builder_scene_luminance_to_cd_m2._offset = offsetof(AutoExposureSettings,_scene_luminance_to_cd_m2);
+builder_scene_luminance_to_cd_m2._is_const = false;
+builder_scene_luminance_to_cd_m2._is_static = false;
+builder_scene_luminance_to_cd_m2._is_public = false;
+builder_scene_luminance_to_cd_m2._is_pointer = false;
+builder_scene_luminance_to_cd_m2._is_ref = false;
+builder_scene_luminance_to_cd_m2._is_template = false;
+builder_scene_luminance_to_cd_m2._meta = meta_scene_luminance_to_cd_m2;
+builder_scene_luminance_to_cd_m2._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_scene_luminance_to_cd_m2._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_scene_luminance_to_cd_m2));
+Meta meta_low_percentile;
+meta_low_percentile.Set("Category","");
+meta_low_percentile.Set("IsColor",false);
+meta_low_percentile.Set("IsRange",false);
+meta_low_percentile.Set("IsFloatRange",true);
+meta_low_percentile.Set("RangeMin",(f32)0);
+meta_low_percentile.Set("RangeMax",(f32)1);
+MemberBuilder builder_low_percentile;
+builder_low_percentile._name = "_low_percentile";
+builder_low_percentile._type_name = "f32";
+builder_low_percentile._offset = offsetof(AutoExposureSettings,_low_percentile);
+builder_low_percentile._is_const = false;
+builder_low_percentile._is_static = false;
+builder_low_percentile._is_public = false;
+builder_low_percentile._is_pointer = false;
+builder_low_percentile._is_ref = false;
+builder_low_percentile._is_template = false;
+builder_low_percentile._meta = meta_low_percentile;
+builder_low_percentile._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_low_percentile._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_low_percentile));
+Meta meta_high_percentile;
+meta_high_percentile.Set("Category","");
+meta_high_percentile.Set("IsColor",false);
+meta_high_percentile.Set("IsRange",false);
+meta_high_percentile.Set("IsFloatRange",true);
+meta_high_percentile.Set("RangeMin",(f32)0);
+meta_high_percentile.Set("RangeMax",(f32)1);
+MemberBuilder builder_high_percentile;
+builder_high_percentile._name = "_high_percentile";
+builder_high_percentile._type_name = "f32";
+builder_high_percentile._offset = offsetof(AutoExposureSettings,_high_percentile);
+builder_high_percentile._is_const = false;
+builder_high_percentile._is_static = false;
+builder_high_percentile._is_public = false;
+builder_high_percentile._is_pointer = false;
+builder_high_percentile._is_ref = false;
+builder_high_percentile._is_template = false;
+builder_high_percentile._meta = meta_high_percentile;
+builder_high_percentile._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_high_percentile._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_high_percentile));
+Meta meta_adaptation_speed;
+meta_adaptation_speed.Set("Category","");
+meta_adaptation_speed.Set("IsColor",false);
+meta_adaptation_speed.Set("IsRange",false);
+meta_adaptation_speed.Set("IsFloatRange",true);
+meta_adaptation_speed.Set("RangeMin",(f32)0);
+meta_adaptation_speed.Set("RangeMax",(f32)1);
+MemberBuilder builder_adaptation_speed;
+builder_adaptation_speed._name = "_adaptation_speed";
+builder_adaptation_speed._type_name = "f32";
+builder_adaptation_speed._offset = offsetof(AutoExposureSettings,_adaptation_speed);
+builder_adaptation_speed._is_const = false;
+builder_adaptation_speed._is_static = false;
+builder_adaptation_speed._is_public = false;
+builder_adaptation_speed._is_pointer = false;
+builder_adaptation_speed._is_ref = false;
+builder_adaptation_speed._is_template = false;
+builder_adaptation_speed._meta = meta_adaptation_speed;
+builder_adaptation_speed._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_adaptation_speed._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_adaptation_speed));
+Meta meta_adaptation_speed_brighten;
+meta_adaptation_speed_brighten.Set("Category","");
+meta_adaptation_speed_brighten.Set("IsColor",false);
+meta_adaptation_speed_brighten.Set("IsRange",false);
+meta_adaptation_speed_brighten.Set("IsFloatRange",true);
+meta_adaptation_speed_brighten.Set("RangeMin",(f32)0);
+meta_adaptation_speed_brighten.Set("RangeMax",(f32)1);
+MemberBuilder builder_adaptation_speed_brighten;
+builder_adaptation_speed_brighten._name = "_adaptation_speed_brighten";
+builder_adaptation_speed_brighten._type_name = "f32";
+builder_adaptation_speed_brighten._offset = offsetof(AutoExposureSettings,_adaptation_speed_brighten);
+builder_adaptation_speed_brighten._is_const = false;
+builder_adaptation_speed_brighten._is_static = false;
+builder_adaptation_speed_brighten._is_public = false;
+builder_adaptation_speed_brighten._is_pointer = false;
+builder_adaptation_speed_brighten._is_ref = false;
+builder_adaptation_speed_brighten._is_template = false;
+builder_adaptation_speed_brighten._meta = meta_adaptation_speed_brighten;
+builder_adaptation_speed_brighten._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_adaptation_speed_brighten._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_adaptation_speed_brighten));
+Meta meta_adaptation_speed_darken;
+meta_adaptation_speed_darken.Set("Category","");
+meta_adaptation_speed_darken.Set("IsColor",false);
+meta_adaptation_speed_darken.Set("IsRange",false);
+meta_adaptation_speed_darken.Set("IsFloatRange",true);
+meta_adaptation_speed_darken.Set("RangeMin",(f32)0);
+meta_adaptation_speed_darken.Set("RangeMax",(f32)1);
+MemberBuilder builder_adaptation_speed_darken;
+builder_adaptation_speed_darken._name = "_adaptation_speed_darken";
+builder_adaptation_speed_darken._type_name = "f32";
+builder_adaptation_speed_darken._offset = offsetof(AutoExposureSettings,_adaptation_speed_darken);
+builder_adaptation_speed_darken._is_const = false;
+builder_adaptation_speed_darken._is_static = false;
+builder_adaptation_speed_darken._is_public = false;
+builder_adaptation_speed_darken._is_pointer = false;
+builder_adaptation_speed_darken._is_ref = false;
+builder_adaptation_speed_darken._is_template = false;
+builder_adaptation_speed_darken._meta = meta_adaptation_speed_darken;
+builder_adaptation_speed_darken._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_adaptation_speed_darken._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_adaptation_speed_darken));
+Meta meta_minimum_ev;
+meta_minimum_ev.Set("Category","");
+meta_minimum_ev.Set("IsColor",false);
+meta_minimum_ev.Set("IsRange",false);
+meta_minimum_ev.Set("IsFloatRange",true);
+meta_minimum_ev.Set("RangeMin",(f32)0);
+meta_minimum_ev.Set("RangeMax",(f32)1);
+MemberBuilder builder_minimum_ev;
+builder_minimum_ev._name = "_minimum_ev";
+builder_minimum_ev._type_name = "f32";
+builder_minimum_ev._offset = offsetof(AutoExposureSettings,_minimum_ev);
+builder_minimum_ev._is_const = false;
+builder_minimum_ev._is_static = false;
+builder_minimum_ev._is_public = false;
+builder_minimum_ev._is_pointer = false;
+builder_minimum_ev._is_ref = false;
+builder_minimum_ev._is_template = false;
+builder_minimum_ev._meta = meta_minimum_ev;
+builder_minimum_ev._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_minimum_ev._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_minimum_ev));
+Meta meta_maximum_ev;
+meta_maximum_ev.Set("Category","");
+meta_maximum_ev.Set("IsColor",false);
+meta_maximum_ev.Set("IsRange",false);
+meta_maximum_ev.Set("IsFloatRange",true);
+meta_maximum_ev.Set("RangeMin",(f32)0);
+meta_maximum_ev.Set("RangeMax",(f32)1);
+MemberBuilder builder_maximum_ev;
+builder_maximum_ev._name = "_maximum_ev";
+builder_maximum_ev._type_name = "f32";
+builder_maximum_ev._offset = offsetof(AutoExposureSettings,_maximum_ev);
+builder_maximum_ev._is_const = false;
+builder_maximum_ev._is_static = false;
+builder_maximum_ev._is_public = false;
+builder_maximum_ev._is_pointer = false;
+builder_maximum_ev._is_ref = false;
+builder_maximum_ev._is_template = false;
+builder_maximum_ev._meta = meta_maximum_ev;
+builder_maximum_ev._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_maximum_ev._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_maximum_ev));
+Meta meta_metering_mode;
+meta_metering_mode.Set("Category","");
+meta_metering_mode.Set("IsColor",false);
+meta_metering_mode.Set("IsRange",false);
+meta_metering_mode.Set("IsFloatRange",true);
+meta_metering_mode.Set("RangeMin",(f32)0);
+meta_metering_mode.Set("RangeMax",(f32)1);
+MemberBuilder builder_metering_mode;
+builder_metering_mode._name = "_metering_mode";
+builder_metering_mode._type_name = "Ailu::Render::EExposureMeteringMode";
+builder_metering_mode._offset = offsetof(AutoExposureSettings,_metering_mode);
+builder_metering_mode._is_const = false;
+builder_metering_mode._is_static = false;
+builder_metering_mode._is_public = false;
+builder_metering_mode._is_pointer = false;
+builder_metering_mode._is_ref = false;
+builder_metering_mode._is_template = false;
+builder_metering_mode._meta = meta_metering_mode;
+builder_metering_mode._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<EExposureMeteringMode>);
+builder_metering_mode._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<EExposureMeteringMode>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_metering_mode));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+const Ailu::Type* Ailu::Render::AutoExposureSettings::GetPrivateStaticClass()
+{
+	static const Ailu::Type* type = Z_Construct_AutoExposureSettings_Type();
+	return type;
+}
+
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::Render::AutoExposureSettings>()
+{
+return Ailu::Render::AutoExposureSettings::StaticType();
+}
+    const Type *Ailu::Render::AutoExposureSettings::GetType()
+{
+return Ailu::Render::AutoExposureSettings::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_AutoExposureSettings(&Ailu::Render::AutoExposureSettings::StaticType, "Ailu::Render::AutoExposureSettings");
+const Ailu::Type* Ailu::Render::Z_Construct_DepthOfFieldSettings_Type()
+{
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "DepthOfFieldSettings";
+initializer._size = sizeof(Ailu::Render::DepthOfFieldSettings);
+initializer._full_name = "Ailu::Render::DepthOfFieldSettings";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu::Render";
+initializer._base_name = "";
+initializer._constructor = []()->Ailu::Render::DepthOfFieldSettings* {return new Ailu::Render::DepthOfFieldSettings;};
+Meta meta_enabled;
+meta_enabled.Set("Category","");
+meta_enabled.Set("IsColor",false);
+meta_enabled.Set("IsRange",false);
+meta_enabled.Set("IsFloatRange",true);
+meta_enabled.Set("RangeMin",(f32)0);
+meta_enabled.Set("RangeMax",(f32)1);
+MemberBuilder builder_enabled;
+builder_enabled._name = "_enabled";
+builder_enabled._type_name = "bool";
+builder_enabled._offset = offsetof(DepthOfFieldSettings,_enabled);
+builder_enabled._is_const = false;
+builder_enabled._is_static = false;
+builder_enabled._is_public = false;
+builder_enabled._is_pointer = false;
+builder_enabled._is_ref = false;
+builder_enabled._is_template = false;
+builder_enabled._meta = meta_enabled;
+builder_enabled._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_enabled._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_enabled));
+Meta meta_maximum_coc_diameter_px;
+meta_maximum_coc_diameter_px.Set("Category","");
+meta_maximum_coc_diameter_px.Set("IsColor",false);
+meta_maximum_coc_diameter_px.Set("IsRange",false);
+meta_maximum_coc_diameter_px.Set("IsFloatRange",true);
+meta_maximum_coc_diameter_px.Set("RangeMin",(f32)0);
+meta_maximum_coc_diameter_px.Set("RangeMax",(f32)1);
+MemberBuilder builder_maximum_coc_diameter_px;
+builder_maximum_coc_diameter_px._name = "_maximum_coc_diameter_px";
+builder_maximum_coc_diameter_px._type_name = "f32";
+builder_maximum_coc_diameter_px._offset = offsetof(DepthOfFieldSettings,_maximum_coc_diameter_px);
+builder_maximum_coc_diameter_px._is_const = false;
+builder_maximum_coc_diameter_px._is_static = false;
+builder_maximum_coc_diameter_px._is_public = false;
+builder_maximum_coc_diameter_px._is_pointer = false;
+builder_maximum_coc_diameter_px._is_ref = false;
+builder_maximum_coc_diameter_px._is_template = false;
+builder_maximum_coc_diameter_px._meta = meta_maximum_coc_diameter_px;
+builder_maximum_coc_diameter_px._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_maximum_coc_diameter_px._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_maximum_coc_diameter_px));
+Meta meta_aperture_blade_count;
+meta_aperture_blade_count.Set("Category","");
+meta_aperture_blade_count.Set("IsColor",false);
+meta_aperture_blade_count.Set("IsRange",false);
+meta_aperture_blade_count.Set("IsFloatRange",true);
+meta_aperture_blade_count.Set("RangeMin",(f32)0);
+meta_aperture_blade_count.Set("RangeMax",(f32)1);
+MemberBuilder builder_aperture_blade_count;
+builder_aperture_blade_count._name = "_aperture_blade_count";
+builder_aperture_blade_count._type_name = "i32";
+builder_aperture_blade_count._offset = offsetof(DepthOfFieldSettings,_aperture_blade_count);
+builder_aperture_blade_count._is_const = false;
+builder_aperture_blade_count._is_static = false;
+builder_aperture_blade_count._is_public = false;
+builder_aperture_blade_count._is_pointer = false;
+builder_aperture_blade_count._is_ref = false;
+builder_aperture_blade_count._is_template = false;
+builder_aperture_blade_count._meta = meta_aperture_blade_count;
+builder_aperture_blade_count._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<i32>);
+builder_aperture_blade_count._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<i32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_aperture_blade_count));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+const Ailu::Type* Ailu::Render::DepthOfFieldSettings::GetPrivateStaticClass()
+{
+	static const Ailu::Type* type = Z_Construct_DepthOfFieldSettings_Type();
+	return type;
+}
+
+template<> const Ailu::Type* Ailu::StaticClass<Ailu::Render::DepthOfFieldSettings>()
+{
+return Ailu::Render::DepthOfFieldSettings::StaticType();
+}
+    const Type *Ailu::Render::DepthOfFieldSettings::GetType()
+{
+return Ailu::Render::DepthOfFieldSettings::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_DepthOfFieldSettings(&Ailu::Render::DepthOfFieldSettings::StaticType, "Ailu::Render::DepthOfFieldSettings");
 const Ailu::Type* Ailu::Render::Z_Construct_PostprocessSettings_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
@@ -237,6 +580,48 @@ builder_tone_mapping._meta = meta_tone_mapping;
 builder_tone_mapping._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<ToneMappingSettings>);
 builder_tone_mapping._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<ToneMappingSettings>);
 initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_tone_mapping));
+Meta meta_auto_exposure;
+meta_auto_exposure.Set("Category","");
+meta_auto_exposure.Set("IsColor",false);
+meta_auto_exposure.Set("IsRange",false);
+meta_auto_exposure.Set("IsFloatRange",true);
+meta_auto_exposure.Set("RangeMin",(f32)0);
+meta_auto_exposure.Set("RangeMax",(f32)1);
+MemberBuilder builder_auto_exposure;
+builder_auto_exposure._name = "_auto_exposure";
+builder_auto_exposure._type_name = "Ailu::Render::AutoExposureSettings";
+builder_auto_exposure._offset = offsetof(PostprocessSettings,_auto_exposure);
+builder_auto_exposure._is_const = false;
+builder_auto_exposure._is_static = false;
+builder_auto_exposure._is_public = false;
+builder_auto_exposure._is_pointer = false;
+builder_auto_exposure._is_ref = false;
+builder_auto_exposure._is_template = false;
+builder_auto_exposure._meta = meta_auto_exposure;
+builder_auto_exposure._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<AutoExposureSettings>);
+builder_auto_exposure._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<AutoExposureSettings>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_auto_exposure));
+Meta meta_depth_of_field;
+meta_depth_of_field.Set("Category","");
+meta_depth_of_field.Set("IsColor",false);
+meta_depth_of_field.Set("IsRange",false);
+meta_depth_of_field.Set("IsFloatRange",true);
+meta_depth_of_field.Set("RangeMin",(f32)0);
+meta_depth_of_field.Set("RangeMax",(f32)1);
+MemberBuilder builder_depth_of_field;
+builder_depth_of_field._name = "_depth_of_field";
+builder_depth_of_field._type_name = "Ailu::Render::DepthOfFieldSettings";
+builder_depth_of_field._offset = offsetof(PostprocessSettings,_depth_of_field);
+builder_depth_of_field._is_const = false;
+builder_depth_of_field._is_static = false;
+builder_depth_of_field._is_public = false;
+builder_depth_of_field._is_pointer = false;
+builder_depth_of_field._is_ref = false;
+builder_depth_of_field._is_template = false;
+builder_depth_of_field._meta = meta_depth_of_field;
+builder_depth_of_field._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<DepthOfFieldSettings>);
+builder_depth_of_field._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<DepthOfFieldSettings>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_depth_of_field));
 cur_type = std::make_unique<Ailu::Type>(initializer);
 Ailu::Type::RegisterType(cur_type.get());
 }
@@ -271,6 +656,8 @@ initializer._full_name = "Ailu::Render::EToneMappingMode";
 initializer._size = sizeof(Ailu::Render::EToneMappingMode);
 initializer._str_to_enum_lut["kNone"] = 0;
 initializer._str_to_enum_lut["kAces"] = 1;
+initializer._str_to_enum_lut["kAgx"] = 2;
+initializer._str_to_enum_lut["kStandard"] = 3;
 s_enum_type_EToneMappingMode = std::make_unique<Ailu::Enum>(initializer);
 Ailu::Enum::RegisterEnum(s_enum_type_EToneMappingMode.get());
 }
@@ -308,4 +695,29 @@ template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::EDisplayOutput>()
 return s_enum_type_EDisplayOutput.get();
 }
 //Enum EDisplayOutput end...........................
+
+static std::unique_ptr<Ailu::Enum> s_enum_type_EExposureMeteringMode = nullptr;
+//Enum EExposureMeteringMode begin...........................
+const Ailu::Enum* Z_Construct_Enum_Ailu_Render_EExposureMeteringMode_Type()
+{
+if(s_enum_type_EExposureMeteringMode == nullptr)
+{
+EnumInitializer initializer;
+initializer._name = "EExposureMeteringMode";
+initializer._namespace = "Ailu::Render";
+initializer._full_name = "Ailu::Render::EExposureMeteringMode";
+initializer._size = sizeof(Ailu::Render::EExposureMeteringMode);
+initializer._str_to_enum_lut["kAverage"] = 0;
+initializer._str_to_enum_lut["kCenterWeighted"] = 1;
+s_enum_type_EExposureMeteringMode = std::make_unique<Ailu::Enum>(initializer);
+Ailu::Enum::RegisterEnum(s_enum_type_EExposureMeteringMode.get());
+}
+return s_enum_type_EExposureMeteringMode.get();
+}
+static Ailu::EnumTypeRegister g_register_EExposureMeteringMode(Z_Construct_Enum_Ailu_Render_EExposureMeteringMode_Type);
+template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::EExposureMeteringMode>()
+{
+return s_enum_type_EExposureMeteringMode.get();
+}
+//Enum EExposureMeteringMode end...........................
 

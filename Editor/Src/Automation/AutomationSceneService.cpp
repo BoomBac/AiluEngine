@@ -6,13 +6,18 @@
 #include "Common/Selection.h"
 #include "EditorApp.h"
 #include "Framework/Common/Application.h"
+#include "Framework/Common/ResourceMgr.h"
 #include "Framework/Common/Utils.h"
 #include "Project/ProjectManager.h"
 #include "Render/Camera.h"
 #include "Render/GraphicsContext.h"
+#include "Render/Material.h"
+#include "Render/Mesh.h"
 #include "Scene/Component.h"
 #include "Scene/Scene.h"
 
+#include <algorithm>
+#include <array>
 #include <cmath>
 #include <format>
 #include <tuple>
@@ -99,6 +104,99 @@ namespace Ailu
                 result = static_cast<f32>(it->second.AsFloat());
                 return std::isfinite(result);
             }
+
+            AutomationValue ToAutomationPhysicalSettings(const Render::PhysicalCameraSettings &settings)
+            {
+                return AutomationValue(AutomationObject{
+                    {"sensor_width_mm", AutomationValue(settings._sensor_width_mm)},
+                    {"sensor_height_mm", AutomationValue(settings._sensor_height_mm)},
+                    {"focal_length_mm", AutomationValue(settings._focal_length_mm)},
+                    {"aperture_f_number", AutomationValue(settings._aperture_f_number)},
+                    {"shutter_seconds", AutomationValue(settings._shutter_seconds)},
+                    {"iso", AutomationValue(settings._iso)},
+                    {"focus_distance_m", AutomationValue(settings._focus_distance_m)},
+                    {"exposure_compensation_ev", AutomationValue(settings._exposure_compensation_ev)},
+                    {"lens_projection_mode", AutomationValue(static_cast<i32>(settings._lens_projection_mode))},
+                    {"exposure_mode", AutomationValue(static_cast<i32>(settings._exposure_mode))}});
+            }
+
+            bool TryReadPhysicalSettings(const AutomationValue &value, Render::PhysicalCameraSettings &settings,
+                                         String &error)
+            {
+                if (!value.IsObject())
+                {
+                    error = "physical_settings must be an object";
+                    return false;
+                }
+
+                const AutomationObject &values = value.AsObject();
+                const auto read_float = [&values, &error](StringView name, f32 &destination)
+                {
+                    const auto it = values.find(String(name));
+                    if (it == values.end())
+                        return true;
+                    if (!it->second.IsNumber() || !std::isfinite(it->second.AsFloat()))
+                    {
+                        error = std::format("physical_settings.{} must be a finite number", name);
+                        return false;
+                    }
+                    const f32 parsed_value = static_cast<f32>(it->second.AsFloat());
+                    if (!std::isfinite(parsed_value))
+                    {
+                        error = std::format("physical_settings.{} is outside the supported range", name);
+                        return false;
+                    }
+                    destination = parsed_value;
+                    return true;
+                };
+                if (!read_float("sensor_width_mm", settings._sensor_width_mm) ||
+                    !read_float("sensor_height_mm", settings._sensor_height_mm) ||
+                    !read_float("focal_length_mm", settings._focal_length_mm) ||
+                    !read_float("aperture_f_number", settings._aperture_f_number) ||
+                    !read_float("shutter_seconds", settings._shutter_seconds) ||
+                    !read_float("iso", settings._iso) ||
+                    !read_float("focus_distance_m", settings._focus_distance_m) ||
+                    !read_float("exposure_compensation_ev", settings._exposure_compensation_ev))
+                    return false;
+
+                const auto read_enum = [&values, &error](StringView name, i64 maximum, u8 &destination)
+                {
+                    const auto it = values.find(String(name));
+                    if (it == values.end())
+                        return true;
+                    if (!it->second.IsInt() || it->second.AsInt() < 0 || it->second.AsInt() > maximum)
+                    {
+                        error = std::format("physical_settings.{} must be an integer from 0 to {}", name, maximum);
+                        return false;
+                    }
+                    destination = static_cast<u8>(it->second.AsInt());
+                    return true;
+                };
+                u8 lens_projection_mode = static_cast<u8>(settings._lens_projection_mode);
+                u8 exposure_mode = static_cast<u8>(settings._exposure_mode);
+                const i64 max_lens_projection_mode = static_cast<i64>(Render::ELensProjectionMode::kPhysicalFocalLength);
+                if (!read_enum("lens_projection_mode", max_lens_projection_mode, lens_projection_mode) ||
+                    !read_enum("exposure_mode", static_cast<i64>(Render::EExposureMode::kAutoISO), exposure_mode))
+                    return false;
+                settings._lens_projection_mode = static_cast<Render::ELensProjectionMode>(lens_projection_mode);
+                settings._exposure_mode = static_cast<Render::EExposureMode>(exposure_mode);
+
+                constexpr std::array<StringView, 10> kAllowedProperties = {
+                    "sensor_width_mm", "sensor_height_mm", "focal_length_mm", "aperture_f_number",
+                    "shutter_seconds", "iso", "focus_distance_m", "exposure_compensation_ev",
+                    "lens_projection_mode", "exposure_mode"};
+                for (const auto &[name, unused] : values)
+                {
+                    (void) unused;
+                    if (std::find(kAllowedProperties.begin(), kAllowedProperties.end(), name) ==
+                        kAllowedProperties.end())
+                    {
+                        error = std::format("unknown physical_settings property '{}'", name);
+                        return false;
+                    }
+                }
+                return true;
+            }
         }// namespace
 
         void AutomationSceneService::Register(EditorAutomationRegistry &registry)
@@ -113,7 +211,7 @@ namespace Ailu
             {
                 AutomationMethodDesc desc;
                 desc._name = "editor.get_scene_camera";
-                desc._description = "Read the current SceneView camera pose and its controller target.";
+                desc._description = "Read the current SceneView camera pose and physical camera settings.";
                 desc._permission = EAutomationPermission::kReadOnly;
                 desc._input_schema.AddParam("test_boxes", "Native frustum checks: [{min:[x,y,z],max:[x,y,z]}].",
                                             EAutomationValueType::kObject, false, true);
@@ -123,8 +221,8 @@ namespace Ailu
                 AutomationMethodDesc desc;
                 desc._name = "editor.set_scene_camera";
                 desc._description =
-                    "Set SceneView camera position, pitch/yaw in degrees and horizontal FOV. Set snap=false "
-                    "to move toward the target using the SceneView camera controller interpolation.";
+                    "Set SceneView pose, projection and partial physical camera settings. Set snap=false to move "
+                    "toward the target using the SceneView camera controller interpolation.";
                 desc._permission = EAutomationPermission::kSafeWrite;
                 desc._input_schema.AddParam("position", "World-space target position [x,y,z].", EAutomationValueType::kVector);
                 desc._input_schema.AddParam("pitch_degrees", "Target pitch in degrees.", EAutomationValueType::kFloat);
@@ -140,6 +238,10 @@ namespace Ailu
                                             EAutomationValueType::kInteger);
                 desc._input_schema.AddParam("orthographic_size", "Positive orthographic width in world units.",
                                             EAutomationValueType::kFloat);
+                desc._input_schema.AddParam("physical_settings",
+                    "Partial settings object; mode ordinals: lens 0=LegacyFov/1=PhysicalFocalLength, exposure "
+                    "0=LegacyManual/1=ManualPhysical/2=Auto/3=AperturePriority/4=ShutterPriority/5=AutoISO.",
+                    EAutomationValueType::kObject);
                 registry.Register("editor.set_scene_camera", std::move(desc), HandleSetSceneCamera);
             }
             {
@@ -163,8 +265,23 @@ namespace Ailu
                 desc._input_schema.AddParam("entity_guid", "Persistent guid of the entity.", EAutomationValueType::kGuid, true);
                 desc._input_schema.AddParam("include_components", "Include the component list.", EAutomationValueType::kBool);
                 desc._input_schema.AddParam("include_properties", "Read all readable component property values.", EAutomationValueType::kBool);
+                desc._input_schema.AddParam("include_mesh_data", "Include bounded CPU mesh arrays and resolved material slots.", EAutomationValueType::kBool);
+                desc._input_schema.AddParam("include_mesh_summary", "Include mesh counts and material bindings without vertex/index arrays.", EAutomationValueType::kBool);
                 desc._input_schema.AddParam("components", "Per-type property requests: [{type, property_paths}].", EAutomationValueType::kObject, false, true);
                 registry.Register("scene.inspect_entity", std::move(desc), HandleInspectEntity);
+            {
+                AutomationMethodDesc desc;
+                desc._name = "scene.inspect_entities";
+                desc._description = "Inspect a bounded list of entities in one read-only scene snapshot.";
+                desc._permission = EAutomationPermission::kReadOnly;
+                desc._input_schema.AddParam("entity_guids", "Persistent entity GUIDs; maximum 256.", EAutomationValueType::kGuid, true, true);
+                desc._input_schema.AddParam("include_components", "Include the component list.", EAutomationValueType::kBool);
+                desc._input_schema.AddParam("include_properties", "Read all readable component property values.", EAutomationValueType::kBool);
+                desc._input_schema.AddParam("include_mesh_data", "Include bounded CPU mesh arrays and resolved material slots.", EAutomationValueType::kBool);
+                desc._input_schema.AddParam("include_mesh_summary", "Include mesh counts and material bindings without vertex/index arrays.", EAutomationValueType::kBool);
+                desc._input_schema.AddParam("include_mesh_data_guids", "Only include mesh arrays for these entity GUIDs.", EAutomationValueType::kGuid, false, true);
+                registry.Register("scene.inspect_entities", std::move(desc), HandleInspectEntity);
+            }
             }
         }
 
@@ -245,6 +362,9 @@ namespace Ailu
             result.emplace("render_height", AutomationValue(camera.RenderSize().y));
             result.emplace("projection_type", AutomationValue(static_cast<i32>(camera.Type())));
             result.emplace("orthographic_size", AutomationValue(camera.Size()));
+            result.emplace("physical_settings", ToAutomationPhysicalSettings(camera.PhysicalSettings()));
+            result.emplace("camera_ev100_settings", AutomationValue(camera.ComputeEv100()));
+            result.emplace("reference_exposure_multiplier", AutomationValue(camera.ComputeExposureMultiplier()));
             result.emplace("frame", AutomationValue(Render::g_pGfxContext->GetFrameCount()));
             result.emplace("width", AutomationValue(camera.OutputSize().x));
             result.emplace("height", AutomationValue(camera.OutputSize().y));
@@ -315,6 +435,11 @@ namespace Ailu
             f32 orthographic_size = camera->Size();
             i64 aa_mode = static_cast<i32>(camera->_anti_aliasing);
             i64 projection_type = static_cast<i32>(camera->Type());
+            Render::PhysicalCameraSettings physical_settings = camera->PhysicalSettings();
+            String physical_settings_error;
+            if (const auto it = arguments.find("physical_settings"); it != arguments.end() &&
+                !TryReadPhysicalSettings(it->second, physical_settings, physical_settings_error))
+                return AutomationResult::Fail(AutomationErrors::kInvalidArgument, physical_settings_error);
             for (const auto &[name, maximum, value] :
                  {std::tuple{"aa_mode", 2, &aa_mode}, std::tuple{"projection_type", 1, &projection_type}})
             {
@@ -328,7 +453,8 @@ namespace Ailu
             }
             if (const auto it = arguments.find("fsr_enabled"); it != arguments.end() && !it->second.IsBool())
                 return AutomationResult::Fail(AutomationErrors::kInvalidArgument, "fsr_enabled must be a boolean");
-            bool has_update = arguments.contains("aa_mode") || arguments.contains("projection_type") || arguments.contains("fsr_enabled");
+            bool has_update = arguments.contains("aa_mode") || arguments.contains("projection_type") ||
+                              arguments.contains("fsr_enabled") || arguments.contains("physical_settings");
 
             if (const auto it = arguments.find("position"); it != arguments.end())
             {
@@ -387,6 +513,12 @@ namespace Ailu
             controller._camera_fov_h = fov;
             camera->FovH(fov);
             camera->_anti_aliasing = static_cast<Render::EAntiAliasing>(aa_mode);
+            if (arguments.contains("physical_settings"))
+            {
+                camera->PhysicalSettings(physical_settings);
+                if (!arguments.contains("fov_degrees"))
+                    fov = camera->FovH();
+            }
             if (arguments.contains("fsr_enabled"))
             {
                 if (arguments.at("fsr_enabled").AsBool())
@@ -520,8 +652,56 @@ namespace Ailu
             return AutomationResult::Ok(AutomationValue(std::move(result)));
         }
 
-        AutomationResult AutomationSceneService::HandleInspectEntity(EditorAutomationContext &, const AutomationObject &arguments)
+        AutomationResult AutomationSceneService::HandleInspectEntity(EditorAutomationContext &context, const AutomationObject &arguments)
         {
+            if (const auto bulk = arguments.find("entity_guids"); bulk != arguments.end())
+            {
+                if (!bulk->second.IsArray() || bulk->second.AsArray().empty() || bulk->second.AsArray().size() > 256u)
+                    return AutomationResult::Fail(AutomationErrors::kInvalidArgument,
+                                                  "entity_guids must contain between 1 and 256 GUIDs");
+                const bool include_all_mesh_data = arguments.contains("include_mesh_data")
+                    && arguments.at("include_mesh_data").AsBool();
+                const auto mesh_guids = arguments.find("include_mesh_data_guids");
+                if ((include_all_mesh_data && bulk->second.AsArray().size() > 4u)
+                    || (mesh_guids != arguments.end() && (!mesh_guids->second.IsArray()
+                        || mesh_guids->second.AsArray().size() > 4u)))
+                    return AutomationResult::Fail(AutomationErrors::kInvalidArgument,
+                                                  "a bulk snapshot may include mesh data for at most 4 entities");
+                AutomationArray items;
+                items.reserve(bulk->second.AsArray().size());
+                for (const AutomationValue &guid : bulk->second.AsArray())
+                {
+                    if (!guid.IsString())
+                        return AutomationResult::Fail(AutomationErrors::kInvalidArgument, "each entity GUID must be a string");
+                    AutomationObject single_arguments = arguments;
+                    single_arguments.erase("entity_guids");
+                    const auto mesh_guids = arguments.find("include_mesh_data_guids");
+                    single_arguments.erase("include_mesh_data_guids");
+                    bool include_mesh = single_arguments.contains("include_mesh_data")
+                        && single_arguments.at("include_mesh_data").AsBool();
+                    if (!include_mesh && mesh_guids != arguments.end() && mesh_guids->second.IsArray())
+                    {
+                        for (const AutomationValue &mesh_guid : mesh_guids->second.AsArray())
+                        {
+                            if (mesh_guid.IsString() && mesh_guid.AsString() == guid.AsString())
+                            {
+                                include_mesh = true;
+                                break;
+                            }
+                        }
+                    }
+                    single_arguments.insert_or_assign("include_mesh_data", AutomationValue(include_mesh));
+                    single_arguments.insert_or_assign("entity_guid", guid);
+                    AutomationResult inspected = HandleInspectEntity(context, single_arguments);
+                    if (!inspected._success)
+                        return inspected;
+                    items.emplace_back(std::move(inspected._data));
+                }
+                AutomationObject result;
+                result.emplace("items", AutomationValue(std::move(items)));
+                return AutomationResult::Ok(AutomationValue(std::move(result)));
+            }
+
             Scene *scene = ActiveScene();
             if (scene == nullptr)
                 return AutomationResult::Fail(AutomationErrors::kSceneNotOpen, "no scene is open");
@@ -536,6 +716,8 @@ namespace Ailu
                 return AutomationResult::Fail(AutomationErrors::kEntityNotFound, "entity not found in the active scene");
 
             const bool include_properties = arguments.contains("include_properties") && arguments.at("include_properties").AsBool();
+            const bool include_mesh_data = arguments.contains("include_mesh_data") && arguments.at("include_mesh_data").AsBool();
+            const bool include_mesh_summary = arguments.contains("include_mesh_summary") && arguments.at("include_mesh_summary").AsBool();
 
             // Optional per-type property path requests: components = [{type, property_paths}]
             HashMap<String, Vector<String>> requested_paths;
@@ -562,6 +744,34 @@ namespace Ailu
             result.emplace("scene_guid", AutomationValue(scene->AssetGuid().ToString()));
             result.emplace("name", AutomationValue(EntityName(scene, entity)));
             result.emplace("hierarchy_path", AutomationValue(BuildHierarchyPath(scene, entity)));
+            result.emplace("visible", AutomationValue(scene->IsEntityEnabled(entity)));
+
+            const ECS::TransformComponent *transform = reg.GetComponent<ECS::TransformComponent>(entity);
+            if (transform != nullptr && !transform->_world_dirty)
+            {
+                const Vector3f position = transform->GetPosition();
+                const Vector3f scale = transform->GetScale();
+                const Quaternion rotation = transform->GetRotation();
+                AutomationArray world_matrix;
+                const Matrix4x4f &matrix = transform->GetWorldMatrix();
+                for (u32 row = 0u; row < 4u; ++row)
+                {
+                    AutomationArray matrix_row;
+                    for (u32 column = 0u; column < 4u; ++column)
+                        matrix_row.emplace_back(AutomationValue(matrix[row][column]));
+                    world_matrix.emplace_back(AutomationValue(std::move(matrix_row)));
+                }
+                result.emplace("world_matrix", AutomationValue(std::move(world_matrix)));
+                AutomationObject world_transform;
+                world_transform.emplace("position", AutomationValue(AutomationArray{
+                    AutomationValue(position.x), AutomationValue(position.y), AutomationValue(position.z)}));
+                world_transform.emplace("rotation", AutomationValue(AutomationArray{
+                    AutomationValue(rotation.x), AutomationValue(rotation.y),
+                    AutomationValue(rotation.z), AutomationValue(rotation.w)}));
+                world_transform.emplace("scale", AutomationValue(AutomationArray{
+                    AutomationValue(scale.x), AutomationValue(scale.y), AutomationValue(scale.z)}));
+                result.emplace("world_transform", AutomationValue(std::move(world_transform)));
+            }
 
             const ECS::CHierarchy *hierarchy = reg.GetComponent<ECS::CHierarchy>(entity);
             if (hierarchy != nullptr && hierarchy->_parent != ECS::kInvalidEntity && !scene->IsSceneRoot(hierarchy->_parent))
@@ -621,6 +831,93 @@ namespace Ailu
                 components.emplace_back(AutomationValue(std::move(component)));
             }
             result.emplace("components", AutomationValue(std::move(components)));
+            if (include_mesh_data || include_mesh_summary)
+            {
+                const ECS::StaticMeshComponent *static_mesh = reg.GetComponent<ECS::StaticMeshComponent>(entity);
+                if (static_mesh == nullptr || !static_mesh->_p_mesh)
+                    return AutomationResult::Fail(AutomationErrors::kInvalidArgument,
+                                                  "entity has no readable static mesh");
+                const Render::Mesh &mesh = *static_mesh->_p_mesh;
+                constexpr size_t kMaxVertices = 4096u;
+                constexpr size_t kMaxIndices = 65536u;
+                if ((include_mesh_data && (mesh.GetVertices().size() > kMaxVertices || mesh.GetNormals().size() > kMaxVertices
+                    || mesh.GetTangents().size() > kMaxVertices || mesh.GetUVs().size() > kMaxVertices))
+                    || mesh.SubmeshCount() > 32u || static_mesh->_p_mats.size() > 32u)
+                    return AutomationResult::Fail(AutomationErrors::kInvalidArgument,
+                                                  "mesh exceeds the read-only inspection limits");
+                AutomationObject mesh_data;
+                AutomationArray vertices, normals, tangents, uvs, submeshes, material_slots;
+                const auto vector3_array = [](std::span<const Vector3f> values)
+                {
+                    AutomationArray output;
+                    output.reserve(values.size());
+                    for (const Vector3f &value : values)
+                        output.emplace_back(AutomationValue(AutomationArray{
+                            AutomationValue(value.x), AutomationValue(value.y), AutomationValue(value.z)}));
+                    return output;
+                };
+                if (include_mesh_data)
+                {
+                    vertices = vector3_array(mesh.GetVertices());
+                    normals = vector3_array(mesh.GetNormals());
+                }
+                for (const Vector4f &value : include_mesh_data ? mesh.GetTangents() : std::span<const Vector4f>{})
+                    tangents.emplace_back(AutomationValue(AutomationArray{
+                        AutomationValue(value.x), AutomationValue(value.y), AutomationValue(value.z), AutomationValue(value.w)}));
+                for (const Vector2f &value : include_mesh_data ? mesh.GetUVs() : std::span<const Vector2f>{})
+                    uvs.emplace_back(AutomationValue(AutomationArray{AutomationValue(value.x), AutomationValue(value.y)}));
+                size_t total_indices = 0u;
+                for (u16 submesh_index = 0u; submesh_index < mesh.SubmeshCount(); ++submesh_index)
+                {
+                    const std::span<const u32> indices = mesh.GetIndices(submesh_index);
+                    total_indices += indices.size();
+                    if (include_mesh_data && total_indices > kMaxIndices)
+                        return AutomationResult::Fail(AutomationErrors::kInvalidArgument,
+                                                      "mesh indices exceed the read-only inspection limit");
+                    AutomationArray index_values;
+                    index_values.reserve(include_mesh_data ? indices.size() : 0u);
+                    for (u32 index_value : include_mesh_data ? indices : std::span<const u32>{})
+                        index_values.emplace_back(AutomationValue(static_cast<i64>(index_value)));
+                    submeshes.emplace_back(AutomationValue(std::move(index_values)));
+                }
+                for (const Ref<Render::Material> &material : static_mesh->_p_mats)
+                {
+                    AutomationObject slot;
+                    if (material)
+                    {
+                        const Vector4f base_color = material->GetVector("_AlbedoValue");
+                        const String asset_path = ToChar(ResourceMgr::Get().GetAssetPath(material.get()));
+                        const size_t asset_name_start = asset_path.find_last_of("/\\");
+                        const size_t asset_extension = asset_path.rfind(".alasset");
+                        String source_guid;
+                        if (asset_extension != String::npos && asset_extension > asset_name_start)
+                        {
+                            const size_t source_start = asset_name_start == String::npos ? 0u : asset_name_start + 1u;
+                            source_guid = asset_path.substr(source_start, asset_extension - source_start);
+                        }
+                        slot.emplace("name", AutomationValue(material->Name()));
+                        slot.emplace("is_fallback", AutomationValue(material == Render::Material::s_checker.lock()));
+                        slot.emplace("source_guid", AutomationValue(std::move(source_guid)));
+                        slot.emplace("asset_guid", AutomationValue(ResourceMgr::Get().GetAssetGuid(material.get()).ToString()));
+                        slot.emplace("base_color", AutomationValue(AutomationArray{
+                            AutomationValue(base_color.x), AutomationValue(base_color.y),
+                            AutomationValue(base_color.z), AutomationValue(base_color.w)}));
+                        slot.emplace("roughness", AutomationValue(material->GetFloat("_RoughnessValue")));
+                        slot.emplace("metallic", AutomationValue(material->GetFloat("_MetallicValue")));
+                    }
+                    material_slots.emplace_back(AutomationValue(std::move(slot)));
+                }
+                mesh_data.emplace("mesh_guid", AutomationValue(static_mesh->_mesh_guid.ToString()));
+                mesh_data.emplace("vertex_count", AutomationValue(static_cast<i64>(mesh.GetVertexCount())));
+                mesh_data.emplace("triangle_count", AutomationValue(static_cast<i64>(mesh.GetTriangleCount())));
+                mesh_data.emplace("vertices", AutomationValue(std::move(vertices)));
+                mesh_data.emplace("normals", AutomationValue(std::move(normals)));
+                mesh_data.emplace("tangents", AutomationValue(std::move(tangents)));
+                mesh_data.emplace("uv0", AutomationValue(std::move(uvs)));
+                mesh_data.emplace("submeshes", AutomationValue(std::move(submeshes)));
+                mesh_data.emplace("material_slots", AutomationValue(std::move(material_slots)));
+                result.emplace("mesh_data", AutomationValue(std::move(mesh_data)));
+            }
             return AutomationResult::Ok(AutomationValue(std::move(result)));
         }
     }// namespace Editor

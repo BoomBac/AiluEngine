@@ -563,7 +563,7 @@ namespace Ailu
         instance._is_initialized = true;
         _loaded_script_files[instance._resolved_script_path] = *resolved;
         _instances.insert_or_assign(key, std::move(instance));
-        LOG_INFO("ScriptComponent instance created for entity '{}' with script '{}'", entity.GetName(), *resolved);
+        LOG_INFO("ScriptComponent instance created for entity '{}' with script '{}'", entity.GetName(), resolved->string());
         return true;
     }
 

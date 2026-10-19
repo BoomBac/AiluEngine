@@ -59,7 +59,7 @@ class RecordingLink(connection.LinkConnection):
     def send(self, kind, payload=b""):
         wire.write(protocol.packet(kind, self._sequence, payload))
         counts[kind] += 1
-        if kind == protocol.MESH_UPSERT:
+        if kind in (protocol.MESH_UPSERT, protocol.MESH_PROTOTYPE_UPSERT):
             geometry[hashlib.sha256(payload[44:]).hexdigest()] += 1
         return super().send(kind, payload)
 
@@ -93,6 +93,7 @@ with (output / "packets.bin").open("wb") as wire:
             "source_datablock_counts": source_counts,
             "counts": dict(counts), "unique_geometry": len(geometry), "mesh_packets": sum(geometry.values()),
             "geometry_multiplicities": sorted(geometry.values(), reverse=True), "source_restored": restored,
+            "static_merge": dict(object_sync._last_static_merge_summary),
             "addon_source": object_sync.__file__, "bake_source": material_bake.__file__,
             "bake_sha256": hashlib.sha256(Path(material_bake.__file__).read_bytes()).hexdigest(),
             "blender_version": bpy.app.version_string}
@@ -100,8 +101,19 @@ with (output / "packets.bin").open("wb") as wire:
             raise RuntimeError("Missing End or source state mismatch")
         (output / "export.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
         print("PERFORMANCE_EXPORT_PASS", json.dumps(result), flush=True)
+        if os.environ.get("AILU_BLENDER_VALIDATION_MATERIALS") == "1":
+            try:
+                driver_path = root / "Test/BlenderLinkValidation/material_incremental_driver.py"
+                spec = importlib.util.spec_from_file_location("material_incremental_validation", driver_path)
+                driver = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(driver)
+                result["incremental_validation"] = driver.Run(link, output, wire)
+                (output / "export.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
+            except Exception as error:
+                (output.parent / "material_mutation_failed.json").write_text(json.dumps({"error":str(error)}), encoding="utf-8")
+                raise
         # Keep the peer alive until Editor has applied End and the coordinator has captured the result.
-        deadline = time.monotonic() + 600
+        deadline = time.monotonic() + 3600
         while not (output / "release").exists() and time.monotonic() < deadline:
             link.poll()
             time.sleep(0.05)

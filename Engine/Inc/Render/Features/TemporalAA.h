@@ -44,6 +44,8 @@ namespace Ailu::Render
             EALGFormat _format = EALGFormat::kALGFormatUNKOWN;
             u64 _last_render_frame = 0u;
             u64 _camera_reset_revision = 0u;
+            f32 _previous_pre_exposure = 1.0f;
+            u8 _previous_exposure_mode = 0u;
             const Camera *_camera_identity = nullptr;
             bool _write_a = true;
             bool _history_valid = false;
@@ -59,6 +61,8 @@ namespace Ailu::Render
                    Vector4f params, Vector4f quality);
         void Setup(const Camera &camera, u64 frame_index, u32 width, u32 height, Vector2f current_uv_jitter,
                    const TextureDesc &color_desc, Vector4f params, Vector4f quality);
+        void Setup(const Camera &camera, u64 frame_index, u32 width, u32 height, Vector2f current_uv_jitter,
+                   const TextureDesc &color_desc, Vector4f params, Vector4f quality, f32 pre_exposure);
         void OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data) override;
         void InvalidateHistory(u64 camera_hash);
         void InvalidateAllHistory();
@@ -72,6 +76,8 @@ namespace Ailu::Render
         Vector2f _current_uv_jitter = Vector2f::kZero;
         Vector4f _params = Vector4f::kZero;
         Vector4f _quality = Vector4f::kZero;
+        f32 _current_pre_exposure = 1.0f;
+        u8 _current_exposure_mode = 0u;
         bool _resolve_executed = false;
         AssetRef<ComputeShader> _taa_gen;
         ComputeShaderKernelId _taa_kernel = kInvalidComputeShaderKernelId;

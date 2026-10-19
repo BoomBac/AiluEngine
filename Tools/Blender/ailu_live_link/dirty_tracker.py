@@ -1,11 +1,13 @@
 import math
 import time
+import uuid
 from contextlib import contextmanager
 
 import bpy
 
 from . import identity, material_sync, protocol
-from .object_sync import sync_instances, sync_object, _instance_states
+from .object_sync import (sync_instances, sync_object, _instance_states, _merged_source_states,
+                          _merged_batch_states, _object_affine_helpers)
 
 _dirty = {}
 _known_guids = set()
@@ -13,6 +15,8 @@ _observed_transforms = {}
 _observed_materials = {}
 _material_change_logged = set()
 _last_render_settings = ()
+_last_scene_settings = None
+_last_world_settings = None
 _last_full_sync = 0.0
 _quiet_seconds = 0.12
 _material_quiet_seconds = 0.45
@@ -142,6 +146,8 @@ def _depsgraph_update(scene, depsgraph):
         transform_only = value_type == "Object" and update.is_updated_transform and not geometry_changed
         if value_type == "Image" and not cache_invalidated:
             material_sync.invalidate_image_cache()
+            from . import world_sync
+            world_sync.invalidate_images()
             cache_invalidated = True
         elif geometry_changed and not bake_invalidated:
             material_bake.invalidate()
@@ -153,15 +159,19 @@ def _depsgraph_update(scene, depsgraph):
             update_materials = object_changed and update.is_updated_shading and not transform_only
             update_data = False
             if data_changed:
-                update_geometry |= obj.type == "MESH"
-                update_data |= obj.type != "MESH"
-            for slot in obj.material_slots:
-                if slot.material and _uses_data(slot.material, value):
+                update_geometry |= material_bake.IsMeshSource(obj)
+                update_data |= not material_bake.IsMeshSource(obj)
+            geometry_nodes = any(modifier.type == "NODES" for modifier in obj.modifiers)
+            materials = (material_bake.EvaluatedMaterials(obj, depsgraph) if geometry_nodes
+                         else [slot.material for slot in obj.material_slots])
+            for material in materials:
+                if material and _uses_data(material, value):
                     update_materials = True
-                    material_bake.invalidate_material(slot.material, obj)
+                    update_geometry |= geometry_nodes
+                    material_bake.invalidate_material(material, obj)
             if object_changed and update.is_updated_transform:
                 update_materials |= material_bake.invalidate_object(obj)
-            if update_geometry and obj.type == "MESH" and material_bake.object_needs_bake(obj):
+            if update_geometry and material_bake.IsMeshSource(obj) and material_bake.object_needs_bake(obj):
                 update_materials = True
             if object_changed or data_changed or update_materials:
                 _mark_dirty(obj, time.monotonic(), update_geometry, update_materials, update_data)
@@ -190,6 +200,9 @@ def remove_handler():
     _observed_materials.clear()
     _material_change_logged.clear()
     _instance_states.clear()
+    _merged_source_states.clear()
+    _merged_batch_states.clear()
+    _object_affine_helpers.clear()
     material_sync.invalidate_image_cache()
     material_bake.invalidate()
 
@@ -205,7 +218,11 @@ def _mark_dirty(obj, changed_at, update_geometry=False, update_materials=False, 
 
 
 def mark_synced(scene):
-    global _last_render_settings
+    global _last_render_settings, _last_scene_settings, _last_world_settings
+    from . import scene_sync
+    _last_scene_settings = scene_sync.scene_settings_signature(scene)
+    from . import world_sync
+    _last_world_settings = world_sync.world_signature(scene)
     render = scene.render
     _last_render_settings = (render.resolution_x, render.resolution_y, render.pixel_aspect_x, render.pixel_aspect_y)
     _known_guids.clear()
@@ -221,14 +238,25 @@ def mark_synced(scene):
 
 
 def _transform_signature(obj):
-    return tuple(round(value, 7) for row in obj.matrix_local for value in row)
+    matrix = obj.matrix_world if getattr(obj, "parent_type", "OBJECT") in {"BONE", "VERTEX", "VERTEX_3"} else obj.matrix_local
+    return tuple(round(value, 7) for row in matrix for value in row)
 
 
 def flush(context, link):
-    global _last_render_settings
+    global _last_render_settings, _last_scene_settings, _last_world_settings
     if not link.connected or context.mode != "OBJECT" or is_transforming(context):
         return
     now = time.monotonic()
+    from . import scene_sync
+    scene_settings = scene_sync.scene_settings_signature(context.scene)
+    if scene_settings != _last_scene_settings:
+        scene_sync.export_scene_settings(context.scene, link)
+        _last_scene_settings = scene_settings
+    from . import world_sync
+    world_settings = world_sync.world_signature(context.scene)
+    if world_settings != _last_world_settings:
+        world_sync.export_world(context, link)
+        _last_world_settings = world_sync.world_signature(context.scene)
     render = context.scene.render
     render_settings = (render.resolution_x, render.resolution_y, render.pixel_aspect_x, render.pixel_aspect_y)
     if render_settings != _last_render_settings:
@@ -267,6 +295,9 @@ def flush(context, link):
     removed = _known_guids - current.keys()
     for guid in removed:
         link.send_json(protocol.OBJECT_DELETE, {"guid": guid})
+        if guid in _object_affine_helpers:
+            link.send_json(protocol.OBJECT_DELETE, {"guid": str(uuid.uuid5(uuid.NAMESPACE_URL, guid + ":affine-parent"))})
+            _object_affine_helpers.discard(guid)
     _known_guids.intersection_update(current.keys())
     sent_materials = set()
     changed_objects = []

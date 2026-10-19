@@ -33,6 +33,7 @@ namespace Ailu::Render
         ConstantBuffer * GetCameraCB(u64 hash);
         ConstantBuffer * GetSceneCB(u64 hash);
         GPUBuffer *GetScenePrimitiveBuffer(u64 hash);
+        GPUBuffer *GetAreaLightBuffer(u64 scene_hash, u64 view_hash, u32 count);
         GPUBuffer *GetScenePrimitiveGIDataBuffer(u64 hash);
         GPUBuffer *GetStaticDiffuseProbeGroupBuffer(u64 hash);
         GPUBuffer *GetStaticDiffuseProbeDataBuffer(u64 hash);
@@ -56,6 +57,12 @@ namespace Ailu::Render
         Vector<Ref<GPUBuffer>> _static_diffuse_probe_data_buffers;
         Vector<u32> _primitive_indices;
         Ref<GPUBuffer> _primitive_index_buffer;
+        struct AreaLightBuffer
+        {
+            Ref<GPUBuffer> _buffer;
+            u32 _capacity = 0u;
+        };
+        Map<u64, Map<u64, AreaLightBuffer>> _area_light_buffers;
         Ref<GPUBuffer> _material_buffer;//for ray tracing material data
         Map<u64,u64> _camera_cb_lut;
         Map<u64,u64> _scene_cb_lut;

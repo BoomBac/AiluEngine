@@ -100,7 +100,7 @@ def transmission_parameters(surface):
     """Preserve the primary dielectric closure even when other channels need a native texture bake."""
     source = _principled_source(surface)
     if source is None:
-        return {"transmission": 0.0, "ior": 1.5}
+        return {"transmission": 0.0, "ior": 1.5, "specular_ior_level": 0.5}
     node, groups = source
     def scalar(names, default):
         socket = next((node.inputs.get(name) for name in names if node.inputs.get(name) is not None), None)
@@ -110,7 +110,8 @@ def transmission_parameters(surface):
         return float(value if value is not None else socket.default_value if socket else default)
     transmission = (1.0 if node.type in {"BSDF_GLASS", "BSDF_REFRACTION"}
                     else scalar(("Transmission Weight", "Transmission"), 0.0))
-    return {"transmission": max(0.0, min(1.0, transmission)), "ior": max(1.0, scalar(("IOR",), 1.5))}
+    return {"transmission": max(0.0, min(1.0, transmission)), "ior": max(1.0, scalar(("IOR",), 1.5)),
+            "specular_ior_level": max(0.0, min(1.0, scalar(("Specular IOR Level", "Specular"), 0.5)))}
 
 
 def _opacity_source(socket, groups=(), visited=None):
@@ -255,6 +256,8 @@ def _image_source(socket, normal_map=False, groups=(), visited=None, approximati
             return None
         if node.inputs["Vector"].is_linked and approximations is not None:
             approximations.add("texture coordinates: original mesh UV; use BAKE for native Mapping/object coordinates")
+        if node.projection != "FLAT" and approximations is not None:
+            approximations.add("image projection: original mesh UV; use BAKE for native projection")
         return node.image, 3 if output.name == "Alpha" else None
     if node.type == "REROUTE":
         return follow(node.inputs[0])
@@ -266,6 +269,10 @@ def _image_source(socket, normal_map=False, groups=(), visited=None, approximati
         return follow(matching_socket(groups[-1].inputs, output), groups[:-1])
     if normal_map:
         if node.type == "NORMAL_MAP":
+            strength = node.inputs.get("Strength")
+            if approximations is not None and (node.space != "TANGENT" or node.uv_map
+                                               or strength.is_linked or strength.default_value != 1.0):
+                approximations.add("normal map: space/UV/strength omitted")
             return follow(node.inputs.get("Color"), is_normal=False)
         if node.type == "BUMP":
             if approximations is not None:
@@ -344,6 +351,98 @@ def _constant_input(socket, groups=(), visited=None):
     return None
 
 
+def ObjectBoxBumpSource(material):
+    """Return only an exactly representable native Object/BOX image-height branch."""
+    if not material.use_nodes or str(material.get("ailu_export_mode", "AUTO")).upper() == "DIRECT":
+        return None
+    output = next((node for node in material.node_tree.nodes
+                   if node.type == "OUTPUT_MATERIAL" and node.is_active_output), None)
+    source = _principled_source(output.inputs["Surface"]) if output else None
+    if source is None or source[0].type != "BSDF_PRINCIPLED" or source[1]:
+        return None
+    normal = source[0].inputs.get("Normal")
+    if normal is None or not normal.is_linked:
+        return None
+    bump = normal.links[0].from_node
+    if bump.type != "BUMP" or bump.inputs["Normal"].is_linked:
+        return None
+    visited = set()
+
+    def competing_normal(socket):
+        shader = _shader_source(socket)
+        if shader is None or shader[1]:
+            return True
+        node = shader[0]
+        if node.as_pointer() in visited:
+            return False
+        visited.add(node.as_pointer())
+        if node.type in {"ADD_SHADER", "MIX_SHADER"}:
+            inputs = list(node.inputs) if node.type == "ADD_SHADER" else list(node.inputs)[1:]
+            return any(competing_normal(value) for value in inputs)
+        value = node.inputs.get("Normal")
+        return value is not None and value.is_linked and value.links[0].from_node != bump
+
+    if competing_normal(output.inputs["Surface"]):
+        return None
+    if any(bump.inputs[name].is_linked for name in ("Strength", "Distance")):
+        return None
+    strength = float(bump.inputs["Strength"].default_value)
+    distance = float(bump.inputs["Distance"].default_value)
+    if not (0.0 <= strength <= 1.0 and 0.0 <= distance and np.isfinite(distance)):
+        return None
+    filter_width = bump.inputs.get("Filter Width")
+    if filter_width and (filter_width.is_linked or filter_width.default_value != 1.0):
+        return None
+    height = bump.inputs["Height"]
+    if not height.is_linked or height.links[0].from_socket.name != "Color":
+        return None
+    texture = height.links[0].from_node
+    if (texture.type != "TEX_IMAGE" or texture.image is None or texture.projection != "BOX"
+            or texture.extension != "REPEAT" or texture.interpolation != "Linear"
+            or texture.image.colorspace_settings.name not in {"sRGB", "Non-Color"}):
+        return None
+    vector = texture.inputs["Vector"]
+    if not vector.is_linked:
+        return None
+    coordinates = vector.links[0].from_node
+    if (coordinates.type != "TEX_COORD" or coordinates.object is not None
+            or getattr(coordinates, "from_instancer", False)
+            or vector.links[0].from_socket.name != "Object"):
+        return None
+    return bump, texture
+
+
+def ObjectBoxBumpProvidesColor(material, texture):
+    """Recognize an opaque single closure whose base color is exactly the height image's RGB."""
+    output = next((node for node in material.node_tree.nodes
+                   if node.type == "OUTPUT_MATERIAL" and node.is_active_output), None)
+    source = _shader_source(output.inputs["Surface"]) if output else None
+    if source is None or source[1] or source[0].type != "BSDF_PRINCIPLED":
+        return False
+    shader = source[0]
+    alpha = shader.inputs["Alpha"]
+    if alpha.is_linked or alpha.default_value != 1.0:
+        return False
+    socket = shader.inputs["Base Color"]
+    visited = set()
+    while socket.is_linked:
+        link = socket.links[0]
+        node = link.from_node
+        if node == texture:
+            return link.from_socket.name == "Color"
+        if node.as_pointer() in visited:
+            return False
+        visited.add(node.as_pointer())
+        # All RGB Mix blend modes return A at factor zero. Do not discard nonzero color operations.
+        if node.type == "MIX" and node.data_type == "RGBA":
+            factor = node.inputs[0]
+            if not factor.is_linked and factor.default_value == 0.0 and not node.clamp_result:
+                socket = node.inputs[6]
+                continue
+        return False
+    return False
+
+
 def _can_export_direct(material):
     output = next((node for node in material.node_tree.nodes
                    if node.type == "OUTPUT_MATERIAL" and node.is_active_output), None)
@@ -362,24 +461,26 @@ def _can_export_direct(material):
         return False
     channels = ("Base Color", "Color", "Roughness", "Metallic", "Emission Color", "Emission Strength",
                 "Strength", "Alpha")
+    approximations = set()
     for name in channels:
         socket = node.inputs.get(name)
         linked = socket is not None and socket.is_linked
         constant = _constant_input(socket, groups)
         if name in {"Emission Strength", "Strength"} and linked and constant is None:
             return False
-        if linked and constant is None and _image_source(socket, groups=groups) is None:
+        if linked and constant is None and _image_source(socket, groups=groups, approximations=approximations) is None:
             return False
     normal = node.inputs.get("Normal")
-    if normal and normal.is_linked and _image_source(normal, normal_map=True, groups=groups) is None:
+    if (normal and normal.is_linked
+            and _image_source(normal, normal_map=True, groups=groups, approximations=approximations) is None):
         return False
     opacity = _opacity_source(surface)
     if opacity:
         socket, groups, _ = opacity
         if (socket.is_linked and _constant_input(socket, groups) is None
-                and _image_source(socket, groups=groups) is None):
+                and _image_source(socket, groups=groups, approximations=approximations) is None):
             return False
-    return True
+    return not approximations
 
 
 def _pack_base_alpha(material, base_source, alpha_source, base_color, invert_alpha=False):
@@ -671,8 +772,7 @@ def send_object_materials(obj, link, sent_materials=None):
         sent_materials = set()
     with temporary_image_buffers():
         material_bake.prepare_object_materials(obj, sent_materials)
-    for slot in obj.material_slots:
-        material = slot.material
+    for material in material_bake.EvaluatedMaterials(obj):
         if not material:
             continue
         material_guid = material_bake.material_guid(material, obj)

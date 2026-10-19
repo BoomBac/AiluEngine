@@ -81,6 +81,9 @@
         }, {
             "_name": "_Transmission",
             "_value": 0.0
+        }, {
+            "_name": "_UseSourceDielectric",
+            "_value": 0.0
         }],
     "_vector_properties": [{
             "_name": "_AlbedoValue",
@@ -91,6 +94,9 @@
         }, {
             "_name": "_EmissionValue",
             "_value": [0.0, 0.0, 0.0, -1.0]
+        }, {
+            "_name": "_NormalHeightParameters",
+            "_value": [0.0, 0.0, 0.0, 0.0]
         }, {
             "_name": "_SpecularValue",
             "_value": [0.0, 0.0, 0.0, 0.0]

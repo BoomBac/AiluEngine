@@ -38,6 +38,7 @@
 #pragma kernel BuildEnvironmentCDF
 #pragma multi_compile PrimaryRay _ PATH_TRACER_MNEE
 #pragma multi_compile PrimaryRay _ PATH_TRACER_POWER_LIGHT_SAMPLING
+#pragma multi_compile PrimaryRay _ PATH_TRACER_OIDN_GUIDES
 #pragma kernel Denoise
 
 #define MAX_ACCUMULATED_FRAMES 64
@@ -63,6 +64,7 @@ CBUFFER_START(ComputeCB)
     bool _enable_ris;
     bool _enable_resampling;
     bool _enable_environment_nee;
+    uint _PathGuideSampleCount;
     uint _prev_surface_buffer_idx;
     uint _curr_surface_buffer_idx;
     bool _temporal_history_valid;

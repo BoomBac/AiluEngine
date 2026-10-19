@@ -240,18 +240,7 @@ namespace Ailu::SceneManagement
             if (entity_doc._has_light_component)
             {
                 auto &component = registry.AddComponent<ECS::LightComponent>(entity);
-                if (const Enum *enum_type = StaticEnum<ECS::ELightType>(); enum_type != nullptr && !entity_doc._light_component._type.empty())
-                {
-                    const i32 index = enum_type->GetIndexByName(entity_doc._light_component._type);
-                    if (index != -1)
-                        component._type = static_cast<ECS::ELightType>(index);
-                }
-                component._light._light_color = entity_doc._light_component._light._light_color;
-                component._light._light_param = entity_doc._light_component._light._light_param;
-                component._light._is_two_side = entity_doc._light_component._light._is_two_side;
-                component._shadow._is_cast_shadow = entity_doc._light_component._shadow._is_cast_shadow;
-                component._shadow._constant_bias = entity_doc._light_component._shadow._constant_bias;
-                component._shadow._slope_bias = entity_doc._light_component._shadow._slope_bias;
+                entity_doc._light_component.ApplyTo(component);
                 registry.SetComponentEnabled<ECS::LightComponent>(entity, !is_component_disabled(entity_doc, "LightComponent"));
             }
             if (entity_doc._has_camera_component)
@@ -262,6 +251,7 @@ namespace Ailu::SceneManagement
                 component._camera.Far(entity_doc._camera_component._far_clip);
                 component._camera.Near(entity_doc._camera_component._near_clip);
                 component._camera.FovH(entity_doc._camera_component._fov_h);
+                component._camera.PhysicalSettings(entity_doc._camera_component._physical_camera_settings);
                 component._camera.Size(entity_doc._camera_component._size);
                 component._camera.SetLocalViewAxes(entity_doc._camera_component._local_forward, entity_doc._camera_component._local_up);
                 component._camera.ProjectionOffset(entity_doc._camera_component._projection_offset);
@@ -355,6 +345,8 @@ namespace Ailu::SceneManagement
                 const auto &document = entity_doc._environment_component;
                 component._source = document._source;
                 component._texture = document._texture_guid.empty() ? Guid::EmptyGuid() : Guid(document._texture_guid);
+                component._background_texture = document._background_texture_guid.empty()
+                    ? Guid::EmptyGuid() : Guid(document._background_texture_guid);
                 component._procedural_sky._sky_color = document._sky_color;
                 component._procedural_sky._ground_color = document._ground_color;
                 component._intensity = document._intensity;
@@ -593,9 +585,7 @@ namespace Ailu::SceneManagement
                 return false;
             if (property == "_light")
             {
-                light->_light._light_color = entity_doc._light_component._light._light_color;
-                light->_light._light_param = entity_doc._light_component._light._light_param;
-                light->_light._is_two_side = entity_doc._light_component._light._is_two_side;
+                entity_doc._light_component.ApplyLightTo(*light);
                 reverted = true;
             }
             else if (property == "_shadow")
@@ -817,12 +807,7 @@ namespace Ailu::SceneManagement
             if (entity_doc._has_light_component && registry.GetComponent<ECS::LightComponent>(entity) == nullptr)
             {
                 auto &component = registry.AddComponent<ECS::LightComponent>(entity);
-                component._light._light_color = entity_doc._light_component._light._light_color;
-                component._light._light_param = entity_doc._light_component._light._light_param;
-                component._light._is_two_side = entity_doc._light_component._light._is_two_side;
-                component._shadow._is_cast_shadow = entity_doc._light_component._shadow._is_cast_shadow;
-                component._shadow._constant_bias = entity_doc._light_component._shadow._constant_bias;
-                component._shadow._slope_bias = entity_doc._light_component._shadow._slope_bias;
+                entity_doc._light_component.ApplyTo(component);
                 registry.SetComponentEnabled<ECS::LightComponent>(entity, !IsComponentDisabled(entity_doc, "LightComponent"));
                 refreshed = true;
             }
@@ -834,6 +819,7 @@ namespace Ailu::SceneManagement
                 component._camera.Far(entity_doc._camera_component._far_clip);
                 component._camera.Near(entity_doc._camera_component._near_clip);
                 component._camera.FovH(entity_doc._camera_component._fov_h);
+                component._camera.PhysicalSettings(entity_doc._camera_component._physical_camera_settings);
                 component._camera.Size(entity_doc._camera_component._size);
                 component._camera.SetLocalViewAxes(entity_doc._camera_component._local_forward, entity_doc._camera_component._local_up);
                 component._camera.ProjectionOffset(entity_doc._camera_component._projection_offset);
@@ -941,6 +927,8 @@ namespace Ailu::SceneManagement
                 const auto &document = entity_doc._environment_component;
                 component->_source = document._source;
                 component->_texture = document._texture_guid.empty() ? Guid::EmptyGuid() : Guid(document._texture_guid);
+                component->_background_texture = document._background_texture_guid.empty()
+                    ? Guid::EmptyGuid() : Guid(document._background_texture_guid);
                 component->_procedural_sky._sky_color = document._sky_color;
                 component->_procedural_sky._ground_color = document._ground_color;
                 component->_intensity = document._intensity;
@@ -1064,11 +1052,7 @@ namespace Ailu::SceneManagement
                 if (auto *light = scene.GetRegister().GetComponent<ECS::LightComponent>(entity))
                 {
                     if (!has_override(ECS::LightComponent::StaticTypeName(), "_light"))
-                    {
-                        light->_light._light_color = entity_doc._light_component._light._light_color;
-                        light->_light._light_param = entity_doc._light_component._light._light_param;
-                        light->_light._is_two_side = entity_doc._light_component._light._is_two_side;
-                    }
+                        entity_doc._light_component.ApplyLightTo(*light);
                     if (!has_override(ECS::LightComponent::StaticTypeName(), "_shadow"))
                     {
                         light->_shadow._is_cast_shadow = entity_doc._light_component._shadow._is_cast_shadow;

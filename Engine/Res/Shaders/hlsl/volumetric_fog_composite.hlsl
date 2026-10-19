@@ -53,5 +53,5 @@ float4 FogCompositePSMain(FullScreenPSInput input) : SV_TARGET
         float3 fog_uvw = float3(input.uv.x, 1.0 - input.uv.y, sample_z);
         scattering_transmittance = _VolumetricFogAccum.SampleLevel(g_LinearClampSampler, fog_uvw, 0);
     }
-    return float4(scattering_transmittance.rgb, saturate(scattering_transmittance.a));
+    return float4(scattering_transmittance.rgb * GetPreExposure(), saturate(scattering_transmittance.a));
 }

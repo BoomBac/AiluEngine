@@ -41,7 +41,7 @@ namespace Ailu::Editor
             using T = ECS::LightComponent;
             ENUM_FIELD("Type", _type, "Directional", "Point", "Spot", "Area");
             fields.back()._rebuild = true;
-            RANGE("Intensity", _light._light_color.a, 0, 50);
+            RANGE("Intensity", _light._intensity, 0, 50000);
             fields.push_back(MakeInspectorField<T>("color", "Color", [](T &component)
                 { return Color(component._light._light_color.r, component._light._light_color.g,
                                component._light._light_color.b, 1); }, [](T &component, Color value)
@@ -61,31 +61,35 @@ namespace Ailu::Editor
                     return component && condition(*component) ? read(scene, entity) : std::nullopt;
                 };
             };
-            RANGE("Angular Radius", _light._light_param.w, .01, 5);
+            FIELD("Use Color Temperature", _light._use_color_temperature);
+            fields.back()._rebuild = true;
+            RANGE("Color Temperature (K)", _light._color_temperature_kelvin, 1000, 40000);
+            conditioned([](const T &c) { return c._light._use_color_temperature; });
+            RANGE("Angular Radius", _light._angular_radius, .01, 5);
             conditioned([](const T &c) { return c._type == ECS::ELightType::kDirectional; });
-            RANGE("Range", _light._light_param.x, 0, 500);
+            RANGE("Range", _light._range, 0, 500);
             conditioned([](const T &c) { return c._type != ECS::ELightType::kDirectional; });
-            RANGE("Point Radius", _light._light_param.y, 0, 1);
+            RANGE("Point Radius", _light._source_radius, 0, 1);
             conditioned([](const T &c) { return c._type == ECS::ELightType::kPoint; });
-            RANGE("Inner Angle", _light._light_param.y, 0, 180);
+            RANGE("Inner Angle", _light._spot_inner_angle, 0, 180);
             conditioned([](const T &c) { return c._type == ECS::ELightType::kSpot; });
-            RANGE("Outer Angle", _light._light_param.z, 0, 180);
+            RANGE("Outer Angle", _light._spot_outer_angle, 0, 180);
             conditioned([](const T &c) { return c._type == ECS::ELightType::kSpot; });
             fields.push_back(MakeInspectorField<T>("area_shape", "Shape", [](T &c)
-                { return static_cast<i32>(c._light._light_param.w); }, [](T &c, i32 v)
-                { c._light._light_param.w = static_cast<f32>(std::clamp(v, 0, 1)); }));
+                { return static_cast<i32>(c._light._area_shape); }, [](T &c, i32 v)
+                { c._light._area_shape = static_cast<ECS::EAreaLightShape>(std::clamp(v, 0, 1)); }));
             fields.back()._choices = {"Rectangle", "Disc"};
             fields.back()._rebuild = true;
             conditioned([](const T &c) { return c._type == ECS::ELightType::kArea; });
             FIELD("Two Side", _light._is_two_side);
             conditioned([](const T &c) { return c._type == ECS::ELightType::kArea; });
-            FIELD("Width", _light._light_param.y);
-            conditioned([](const T &c) { return c._type == ECS::ELightType::kArea && c._light._light_param.w == 0; });
-            FIELD("Height", _light._light_param.z);
-            conditioned([](const T &c) { return c._type == ECS::ELightType::kArea && c._light._light_param.w == 0; });
-            RANGE("Disc Radius", _light._light_param.x, 0, 10);
+            FIELD("Width", _light._area_width);
+            conditioned([](const T &c) { return c._type == ECS::ELightType::kArea && c._light._area_shape == ECS::EAreaLightShape::kRectangle; });
+            FIELD("Height", _light._area_height);
+            conditioned([](const T &c) { return c._type == ECS::ELightType::kArea && c._light._area_shape == ECS::EAreaLightShape::kRectangle; });
+            RANGE("Disc Radius", _light._area_disc_radius, 0, 10);
             fields.back()._key = "disc_radius";
-            conditioned([](const T &c) { return c._type == ECS::ELightType::kArea && c._light._light_param.w != 0; });
+            conditioned([](const T &c) { return c._type == ECS::ELightType::kArea && c._light._area_shape == ECS::EAreaLightShape::kDisc; });
         }
 
         void CameraFields(const ComponentEditorContext &, Vector<InspectorField> &fields)
@@ -210,7 +214,11 @@ namespace Ailu::Editor
             FIELD("Bloom Intensity", _settings._bloom._intensity);
             FIELD("Bloom Radius", _settings._bloom._radius);
             FIELD("Exposure", _settings._tone_mapping._exposure);
-            ENUM_FIELD("Tone Mapping", _settings._tone_mapping._mode, "None", "ACES");
+            FIELD("Gamma", _settings._tone_mapping._gamma);
+            ENUM_FIELD("Tone Mapping", _settings._tone_mapping._mode, "None", "ACES", "AgX", "Standard");
+            FIELD("Depth of Field Enabled", _settings._depth_of_field._enabled);
+            RANGE("Maximum CoC Diameter (px)", _settings._depth_of_field._maximum_coc_diameter_px, 0, 64);
+            RANGE("Aperture Blade Count", _settings._depth_of_field._aperture_blade_count, 3, 9);
         }
 
         void RigidBodyFields(const ComponentEditorContext &, Vector<InspectorField> &fields)
@@ -454,7 +462,7 @@ namespace Ailu::Editor
             if (type == ECS::component::StaticComponentTypeId()) \
                 if (const auto *c = registry.GetComponent<ECS::component>(entity)) { body; }
             SCHEMA(LightComponent, hash(static_cast<u64>(c->_type));
-                if (c->_type == ECS::ELightType::kArea) hash(c->_light._light_param.w != 0))
+                if (c->_type == ECS::ELightType::kArea) hash(static_cast<u64>(c->_light._area_shape)))
             SCHEMA(CCamera, hash(static_cast<u64>(c->_camera.Type())))
             SCHEMA(CCollider, hash(static_cast<u64>(c->_type)))
             SCHEMA(EnvironmentComponent, hash(static_cast<u64>(c->_source)))

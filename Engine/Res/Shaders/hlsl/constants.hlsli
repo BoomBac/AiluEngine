@@ -2,7 +2,7 @@
 #define __CONSTANTS_H__
 
 #define MAX_DIRECTIONAL_LIGHT	2
-#define MAX_POINT_LIGHT	4
+#define MAX_POINT_LIGHT kMaxPointLight
 #define MAX_SPOT_LIGHT	4
 #define MAX_AREA_LIGHT	4
 

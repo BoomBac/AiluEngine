@@ -29,6 +29,17 @@ namespace Ailu
         using Scene = SceneManagement::Scene;
         constexpr std::string_view kLiveLinkRootPrefix = "__BlenderLiveLink_";
 
+        std::string_view TextureAssetSuffix(const char *field_name) noexcept
+        {
+            const std::string_view name(field_name != nullptr ? field_name : "");
+            if (name == "base_color_path") return "albedo";
+            if (name == "normal_path") return "normal";
+            if (name == "emission_path") return "emission";
+            if (name == "roughness_path") return "roughness";
+            if (name == "metallic_path") return "metallic";
+            return "texture";
+        }
+
         bool IsSourceGuid(std::string_view value) noexcept
         {
             if (value.size() != 36u) return false;
@@ -213,6 +224,8 @@ namespace Ailu
                 _last_apply_succeeded = UpsertMesh(command._payload);
             else if (type == ELiveLinkMessageType::kMeshPrototypeUpsert)
                 _last_apply_succeeded = UpsertMesh(command._payload, true);
+            else if (type == ELiveLinkMessageType::kMeshStaticBatchUpsert)
+                _last_apply_succeeded = UpsertMesh(command._payload, true, false, true);
             else if (type == ELiveLinkMessageType::kInstanceBatchUpsert)
                 _last_apply_succeeded = UpsertInstanceBatch(std::string(
                     reinterpret_cast<const char*>(command._payload.data()), command._payload.size()));
@@ -225,6 +238,12 @@ namespace Ailu
             else if (type == ELiveLinkMessageType::kCameraUpsert)
                 _last_apply_succeeded = UpsertCamera(std::string(reinterpret_cast<const char*>(command._payload.data()),
                     command._payload.size()));
+            else if (type == ELiveLinkMessageType::kSceneSettingsUpsert)
+                _last_apply_succeeded = UpsertSceneSettings(std::string(
+                    reinterpret_cast<const char*>(command._payload.data()), command._payload.size()));
+            else if (type == ELiveLinkMessageType::kWorldUpsert)
+                _last_apply_succeeded = UpsertWorld(std::string(
+                    reinterpret_cast<const char*>(command._payload.data()), command._payload.size()));
             else if (type == ELiveLinkMessageType::kFullSyncEnd)
             {
                 _last_apply_succeeded = _full_sync_active && !_needs_full_resync;
@@ -236,8 +255,17 @@ namespace Ailu
             if (_full_sync_active && !_last_apply_succeeded) _full_sync_failed = true;
             if (_last_apply_succeeded && _scene) _scene->MarkEdited();
         }
+        catch (const std::exception &exception)
+        {
+            LOG_ERROR("[BlenderLiveLink] Apply exception: type={}, sequence={}: {}", command._message_type,
+                command._sequence, exception.what());
+            _last_apply_succeeded = false;
+            _needs_full_resync = true;
+        }
         catch (...)
         {
+            LOG_ERROR("[BlenderLiveLink] Apply exception: type={}, sequence={}: unknown exception",
+                command._message_type, command._sequence);
             _last_apply_succeeded = false;
             _needs_full_resync = true;
         }
@@ -452,7 +480,8 @@ namespace Ailu
         return true;
     }
 
-    bool LiveLinkSession::UpsertMesh(const std::vector<unsigned char>& payload, bool prototype_only)
+    bool LiveLinkSession::UpsertMesh(const std::vector<unsigned char>& payload, bool prototype_only,
+                                     bool build_derived_data, bool transient)
     {
         constexpr size_t kGuidSize = 36u;
         constexpr size_t kFixedHeaderSize = kGuidSize + sizeof(u64) + sizeof(u32) * 2u + sizeof(f32) * 6u;
@@ -494,6 +523,10 @@ namespace Ailu
                     _meshes[guid_text] = cached._mesh;
                     _mesh_material_slots[guid_text] = cached._material_slots;
                     _mesh_revisions[guid_text] = revision;
+                    if (transient)
+                        _transient_meshes.insert(cached._mesh.get());
+                    else
+                        _transient_meshes.erase(cached._mesh.get());
                 }
                 else
                     PublishMesh(guid_text, entity_iter->second, cached._mesh, cached._material_slots, revision);
@@ -600,10 +633,13 @@ namespace Ailu
         const AABB bounds(Vector3f(bounds_values[0], bounds_values[1], bounds_values[2]),
             Vector3f(bounds_values[3], bounds_values[4], bounds_values[5]));
         auto mesh = Render::Mesh::CreateFromData("BlenderLiveLink_" + guid_text, std::move(positions),
-            std::move(normals), std::move(tangents), std::move(uvs), std::move(submeshes), bounds);
+            std::move(normals), std::move(tangents), std::move(uvs), std::move(submeshes), bounds, build_derived_data);
         if (prototype_only)
         {
-            if (!PersistMesh(mesh)) throw std::runtime_error("Live Link prototype mesh persistence failed");
+            if (transient)
+                _transient_meshes.insert(mesh.get());
+            else if (!PersistMesh(mesh))
+                throw std::runtime_error("Live Link prototype mesh persistence failed");
             _meshes[guid_text] = mesh;
             _mesh_material_slots[guid_text] = material_slots;
             _mesh_revisions[guid_text] = revision;
@@ -628,7 +664,8 @@ namespace Ailu
                                      const std::vector<u32>& material_slots, u64 revision)
     {
         auto& resources = ResourceMgr::Get();
-        if (!PersistMesh(mesh)) throw std::runtime_error("Live Link mesh persistence failed");
+        if (!_transient_meshes.contains(mesh.get()) && !PersistMesh(mesh))
+            throw std::runtime_error("Live Link mesh persistence failed");
         auto& registry = _scene->GetRegister();
         auto* component = registry.GetComponent<ECS::StaticMeshComponent>(entity);
         if (component == nullptr)
@@ -725,6 +762,15 @@ namespace Ailu
         iter->second->SetFloat("_MetallicValue", std::clamp(metallic, 0.f, 1.f));
         iter->second->SetFloat("_Transmission", std::clamp(transmission, 0.f, 1.f));
         iter->second->SetFloat("_IOR", std::max(ior, 1.f));
+        f32 specular_level = 0.5f;
+        read_float("specular_ior_level", specular_level);
+        const bool has_source_specular = document.HasMember("specular_ior_level");
+        const f32 safe_ior = std::max(ior, 1.0f);
+        const f32 source_f0 = std::clamp(2.0f * specular_level *
+            std::pow((safe_ior - 1.0f) / (safe_ior + 1.0f), 2.0f), 0.0f, 1.0f);
+        iter->second->SetInt("_UseSourceDielectric", has_source_specular ? 1 : 0);
+        if (has_source_specular)
+            iter->second->SetVector("_SpecularValue", Vector4f(source_f0, source_f0, source_f0, 1.0f));
         Vector4f base_color(0.8f, 0.8f, 0.8f, 1.f);
         const auto color = document.FindMember("base_color");
         if (color != document.MemberEnd() && color->value.IsArray() && color->value.Size() == 4u)
@@ -751,7 +797,22 @@ namespace Ailu
             emission.w = 1.f;
         }
         iter->second->SetVector("_EmissionValue", emission);
-        auto load_texture = [this, &document, &material_guid, &iter](const char* field_name,
+        std::string normal_mode;
+        ReadString(document, "normal_mode", normal_mode);
+        const bool object_box_height = normal_mode == "OBJECT_BOX_HEIGHT";
+        const auto height_color = document.FindMember("normal_height_provides_color");
+        const bool height_provides_color = object_box_height && height_color != document.MemberEnd()
+            && height_color->value.IsBool() && height_color->value.GetBool();
+        f32 normal_strength = 0.f, normal_distance = 0.f, normal_box_blend = 0.f;
+        read_float("normal_strength", normal_strength);
+        read_float("normal_distance", normal_distance);
+        read_float("normal_box_blend", normal_box_blend);
+        if (!std::isfinite(normal_strength) || !std::isfinite(normal_distance) || !std::isfinite(normal_box_blend))
+            return false;
+        iter->second->SetVector("_NormalHeightParameters", Vector4f(std::clamp(normal_strength, -1.f, 1.f),
+            std::max(normal_distance, 0.f), std::clamp(normal_box_blend, 0.f, 1.f),
+            object_box_height ? (height_provides_color ? 2.f : 1.f) : 0.f));
+        auto load_texture = [this, &document, &material_guid, &iter, object_box_height](const char* field_name,
             Render::ETextureUsage usage)
         {
             const auto field = document.FindMember(field_name);
@@ -768,6 +829,14 @@ namespace Ailu
                 : (usage == Render::ETextureUsage::kAlbedo || usage == Render::ETextureUsage::kEmission
                     ? ETextureContent::kColor : ETextureContent::kData);
             settings._is_srgb = settings._content == ETextureContent::kColor;
+            if (usage == Render::ETextureUsage::kNormal && object_box_height)
+            {
+                const auto srgb_field = document.FindMember("normal_height_srgb");
+                settings._is_srgb = srgb_field != document.MemberEnd() && srgb_field->value.IsBool()
+                    && srgb_field->value.GetBool();
+                settings._content = settings._is_srgb ? ETextureContent::kColor : ETextureContent::kData;
+                settings._sampler_desc._filter = Render::EFilterMode::kAnisotropic;
+            }
             // TODO: Enable texture compression after Live Link validation; keep imports uncompressed for now.
             settings._compression = ETextureCompression::kNone;
 
@@ -800,16 +869,27 @@ namespace Ailu
                         std::chrono::steady_clock::now() - load_start).count();
                     LOG_ERROR(L"[BlenderLiveLink] Texture import exception: {} ({} bytes, {:.3f} ms): {}",
                         ToWChar(path), has_file_size ? file_size : 0ull, load_us / 1000.0, ToWChar(exception.what()));
-                    throw;
+                    iter->second->SetTexture(usage, nullptr);
+                    return;
                 }
                 const auto load_us = std::chrono::duration_cast<std::chrono::microseconds>(
                     std::chrono::steady_clock::now() - load_start).count();
                 LOG_INFO(L"[BlenderLiveLink] Texture import: {} ({} bytes, usage={}, cache=miss, result={}, {:.3f} ms)",
                     ToWChar(path), has_file_size ? file_size : 0ull, static_cast<unsigned int>(usage),
                     loaded ? L"ok" : L"failed", load_us / 1000.0);
-                if (!loaded) throw std::runtime_error("Live Link texture import failed");
+                if (!loaded)
+                {
+                    LOG_WARNING(L"[BlenderLiveLink] Texture unavailable; importing material without it: {}", ToWChar(path));
+                    iter->second->SetTexture(usage, nullptr);
+                    return;
+                }
+                if (usage == Render::ETextureUsage::kNormal && object_box_height)
+                {
+                    loaded->SetSamplerDesc(settings._sampler_desc);
+                }
                 auto& resources = ResourceMgr::Get();
-                const auto texture_path = AssetPath("Textures", material_guid + "_" + field_name);
+                const auto texture_path = AssetPath("Textures", material_guid + "_"
+                    + std::string(TextureAssetSuffix(field_name)));
                 const auto source_path = texture_path + std::filesystem::path(path).extension().wstring();
                 const auto source_system_path = resources.GetResSysPath(source_path);
                 std::filesystem::create_directories(std::filesystem::path(source_system_path).parent_path());
@@ -891,7 +971,15 @@ namespace Ailu
         read_float("radius", radius);
         read_float("inner_angle_degrees", inner_angle);
         read_float("outer_angle_degrees", outer_angle);
-        Vector4f color(1.f, 1.f, 1.f, energy);
+        bool use_temperature = false;
+        const auto temperature_enabled_field = document.FindMember("use_temperature");
+        if (temperature_enabled_field != document.MemberEnd() && temperature_enabled_field->value.IsBool())
+            use_temperature = temperature_enabled_field->value.GetBool();
+        f32 temperature_kelvin = 6500.0f;
+        read_float("temperature_kelvin", temperature_kelvin);
+        if (!std::isfinite(temperature_kelvin))
+            return false;
+        Vector4f color(1.f, 1.f, 1.f, 1.f);
         const auto color_field = document.FindMember("color");
         if (color_field != document.MemberEnd() && color_field->value.IsArray() && color_field->value.Size() >= 3u)
         {
@@ -902,21 +990,31 @@ namespace Ailu
                 color.data[index] = color_field->value[index].GetFloat();
             }
         }
-        light->_light._light_color = Color(color.x * energy, color.y * energy, color.z * energy, 1.f);
+        light->_light._light_color = Color(color.x, color.y, color.z, 1.f);
+        light->_light._use_color_temperature = use_temperature;
+        light->_light._color_temperature_kelvin = std::clamp(temperature_kelvin, 1000.0f, 40000.0f);
+        light->_light._intensity = energy;
         if (type == "SUN")
         {
             light->_type = ECS::ELightType::kDirectional;
-            light->_light._light_param = Vector4f(0.f, 0.f, 0.f, radius);
+            light->_light._intensity_unit = ECS::ELightIntensityUnit::kWattPerSquareMeter;
+            light->_light._range = 0.f;
+            light->_light._angular_radius = radius;
         }
         else if (type == "POINT")
         {
             light->_type = ECS::ELightType::kPoint;
-            light->_light._light_param = Vector4f(range, radius, 0.f, 0.f);
+            light->_light._intensity_unit = ECS::ELightIntensityUnit::kWatt;
+            light->_light._range = range;
+            light->_light._source_radius = radius;
         }
         else if (type == "SPOT")
         {
             light->_type = ECS::ELightType::kSpot;
-            light->_light._light_param = Vector4f(range, inner_angle, outer_angle, 0.f);
+            light->_light._intensity_unit = ECS::ELightIntensityUnit::kWatt;
+            light->_light._range = range;
+            light->_light._spot_inner_angle = inner_angle;
+            light->_light._spot_outer_angle = outer_angle;
         }
         else if (type == "AREA")
         {
@@ -924,10 +1022,121 @@ namespace Ailu
             f32 width = 1.f, height = 1.f;
             read_float("width", width);
             read_float("height", height);
-            light->_light._light_param = Vector4f(range, width, height, 0.f);
+            light->_light._intensity_unit = ECS::ELightIntensityUnit::kWatt;
+            light->_light._range = range;
+            light->_light._area_width = width;
+            light->_light._area_height = height;
         }
         else
             return false;
+        return true;
+    }
+
+    bool LiveLinkSession::UpsertWorld(const std::string& payload)
+    {
+        if (_scene == nullptr || !_scene->IsValidEntity(_root_entity))
+            return false;
+        rapidjson::Document document;
+        document.Parse(payload.data(), payload.size());
+        if (!document.IsObject() || !document.HasMember("enabled") || !document["enabled"].IsBool())
+            return false;
+        auto &registry = _scene->GetRegister();
+        auto *environment = registry.GetComponent<ECS::EnvironmentComponent>(_root_entity);
+        if (!document["enabled"].GetBool())
+        {
+            if (environment != nullptr)
+                registry.SetComponentEnabled<ECS::EnvironmentComponent>(_root_entity, false);
+            return true;
+        }
+        std::string lighting_path, background_path, revision;
+        if (!ReadString(document, "lighting_path", lighting_path)
+            || !ReadString(document, "background_path", background_path)
+            || !ReadString(document, "revision", revision) || lighting_path.empty() || background_path.empty())
+            return false;
+        const auto import_world_texture = [this, &revision](const std::string &path, const std::string &role) -> Guid
+        {
+            const std::string key = "World/" + role;
+            auto &resources = ResourceMgr::Get();
+            const auto asset_path = AssetPath("Textures", "World_" + role);
+            if (_world_revision == revision && _textures.contains(key))
+                return resources.GetAssetGuid(_textures.at(key).get());
+            TextureImportSetting settings;
+            settings._content = ETextureContent::kHdr;
+            settings._is_srgb = false;
+            settings._compression = ETextureCompression::kNone;
+            auto loaded = resources.LoadExternalTexture(std::filesystem::path(path).wstring(), settings);
+            if (loaded == nullptr)
+                throw std::runtime_error("Live Link World texture import failed");
+            const auto source_path = asset_path + L".exr";
+            const auto system_path = resources.GetResSysPath(source_path);
+            std::filesystem::create_directories(std::filesystem::path(system_path).parent_path());
+            std::filesystem::copy_file(path, system_path, std::filesystem::copy_options::overwrite_existing);
+            auto *asset = resources.CreateAsset(asset_path, loaded);
+            if (asset == nullptr)
+                throw std::runtime_error("Live Link World texture registration failed");
+            asset->_external_asset_path = source_path;
+            resources.SetImportSetting(asset_path, settings);
+            if (!resources.SaveAsset(asset))
+                throw std::runtime_error("Live Link World texture persistence failed");
+            _textures[key] = loaded;
+            return asset->GetGuid();
+        };
+        const Guid lighting = import_world_texture(lighting_path, "Lighting");
+        const Guid background = import_world_texture(background_path, "Background");
+        if (environment == nullptr)
+            environment = &registry.AddComponent<ECS::EnvironmentComponent>(_root_entity);
+        _world_revision = revision;
+        environment->_source = ECS::EEnvironmentSource::kTexture;
+        environment->_texture = lighting;
+        environment->_background_texture = background;
+        environment->_intensity = 1.0f;
+        environment->_rotation = 0.0f;
+        environment->_render_sky = true;
+        environment->_enable_ibl = true;
+        registry.SetComponentEnabled<ECS::EnvironmentComponent>(_root_entity, true);
+        return true;
+    }
+
+    bool LiveLinkSession::UpsertSceneSettings(const std::string& payload)
+    {
+        if (_scene == nullptr || !_scene->IsValidEntity(_root_entity))
+            return false;
+        rapidjson::Document document;
+        document.Parse(payload.data(), payload.size());
+        std::string view_transform, display_device, look;
+        if (!document.IsObject() || !ReadString(document, "view_transform", view_transform) ||
+            !ReadString(document, "display_device", display_device) || !ReadString(document, "look", look))
+            return false;
+        const auto exposure = document.FindMember("exposure_ev");
+        const auto gamma = document.FindMember("gamma");
+        if (exposure == document.MemberEnd() || !exposure->value.IsNumber() ||
+            gamma == document.MemberEnd() || !gamma->value.IsNumber())
+            return false;
+        const f32 exposure_ev = exposure->value.GetFloat(), display_gamma = gamma->value.GetFloat();
+        if (!std::isfinite(exposure_ev) || !std::isfinite(display_gamma) || display_gamma <= 0.0f ||
+            exposure_ev < -32.0f || exposure_ev > 32.0f)
+            return false;
+        auto &registry = _scene->GetRegister();
+        auto *volume = registry.GetComponent<ECS::PostprocessVolumeComponent>(_root_entity);
+        if (display_device != "sRGB" || look != "None" ||
+            (view_transform != "Standard" && view_transform != "AgX"))
+        {
+            if (volume != nullptr)
+                volume->_is_global = false;
+            LOG_WARNING("[BlenderLiveLink] Unsupported display settings: view={}, display={}, look={}",
+                        view_transform, display_device, look);
+            return true;
+        }
+        if (volume == nullptr)
+            volume = &registry.AddComponent<ECS::PostprocessVolumeComponent>(_root_entity);
+        constexpr i32 kSourceDisplayPriority = 100;
+        volume->_is_global = true;
+        volume->_priority = kSourceDisplayPriority;
+        volume->_settings._bloom._enabled = false;
+        volume->_settings._tone_mapping._mode = view_transform == "Standard"
+            ? Render::EToneMappingMode::kStandard : Render::EToneMappingMode::kAgx;
+        volume->_settings._tone_mapping._exposure = std::exp2(exposure_ev);
+        volume->_settings._tone_mapping._gamma = display_gamma;
         return true;
     }
 
@@ -1033,9 +1242,11 @@ namespace Ailu
         ResetSceneState();
         _needs_full_resync = true;
         _meshes.clear();
+        _transient_meshes.clear();
         _mesh_cache.Clear();
         _materials.clear();
         _textures.clear();
+        _world_revision.clear();
         _mesh_revisions.clear();
     }
 
@@ -1051,9 +1262,11 @@ namespace Ailu
         _entity_material_guids.clear();
         _mesh_material_slots.clear();
         _meshes.clear();
+        _transient_meshes.clear();
         _mesh_cache.Clear();
         _materials.clear();
         _textures.clear();
+        _world_revision.clear();
         _mesh_revisions.clear();
         _full_sync_active = false;
         _full_sync_failed = false;

@@ -2,7 +2,7 @@
 #define __COMMON_CBUFFER__
 
 #define kMaxDirectionalLight 2
-#define kMaxPointLight 4
+#define kMaxPointLight 32
 #define kMaxSpotLight 4
 #define kMaxAreaLight 4
 #define kMaxCascadeShadowMapSplit 4
@@ -330,7 +330,7 @@ namespace Ailu::Render
         float g_EnvironmentIntensity;
         float g_EnvironmentRotation;
         float g_EnvironmentEnabled;
-        float _cbs_paddings[40];
+        float _cbs_paddings[24];// Preserve 256-byte alignment with 32 point lights.
         //float4x4 _JointMatrix[80];
     } AL_SHADER_INTEROP_CBUFFER_END
 
@@ -377,7 +377,9 @@ namespace Ailu::Render
         float _volumetric_fog_enabled;
         float _TextureMipBias;
         float _TextureManualMipBias;
-        float3 _texture_bias_padding;
+        uint _pre_exposure_ev_texture_index;
+        float _pre_exposure;
+        float _texture_bias_padding;
         float4 _render_view_padding[8];
     } AL_SHADER_INTEROP_CBUFFER_END
 
@@ -404,6 +406,7 @@ namespace Ailu::Render
 #if !defined(AL_SCENE_PRIMITIVE)
     static_assert((sizeof(CBufferPerObjectData) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
 #endif
+    static_assert(sizeof(CBufferPerSceneData) <= 65536, "Scene constant buffer exceeds the DX12 CBV limit");
     static_assert((sizeof(CBufferPerSceneData) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
     //static_assert((sizeof(ScenePerMaterialData) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
     static_assert((sizeof(CBufferPerCameraData) % 256) == 0, "Constant Buffer size must be 256-byte aligned");

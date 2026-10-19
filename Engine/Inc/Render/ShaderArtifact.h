@@ -47,7 +47,7 @@ namespace Ailu::Render
     const char *ShaderArtifactInvalidReasonToString(EShaderArtifactInvalidReason reason);
 
     inline constexpr u32 kShaderArtifactVersion = 2u;
-    inline constexpr u32 kShaderAbiVersion = 2u;
+    inline constexpr u32 kShaderAbiVersion = 3u;
     inline constexpr u32 kDxcCompilerVersion = 1u;
 
     struct ShaderMacro

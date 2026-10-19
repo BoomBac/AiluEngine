@@ -122,7 +122,7 @@ namespace Ailu::SceneManagement
             BufferDesc buf_desc;
             buf_desc._is_random_write = false;
             buf_desc._target = EGPUBufferTarget::kStructured;
-            buf_desc._element_num = RenderConstants::kMaxScenePrimitiveCount * 2u;
+            buf_desc._element_num = RenderConstants::kMaxSoftwareRayTracingPrimitiveCount * 2u;
             buf_desc._element_size = sizeof(LBVHNode);
             buf_desc._size = buf_desc._element_size * buf_desc._element_num;
             _tlas_buffer = GPUBuffer::Create(buf_desc);
@@ -159,6 +159,7 @@ namespace Ailu::SceneManagement
         _tlas_renderables.clear();
         _last_tlas_renderable_count = 0u;
         _tlas_dirty = true;
+        _tlas_over_capacity_warning_active = false;
         _bvh_nodes_range.clear();
         _mesh_bvh_node_triangle_offset.clear();
         _triangle_count = 0u;
@@ -1162,12 +1163,28 @@ namespace Ailu::SceneManagement
         {
             _tlas_nodes.clear();
             _tlas_buffer->SetPersistentData(nullptr, 0u);
+            _tlas_over_capacity_warning_active = false;
             return true;
         }
+        if (aabbs.size() > RenderConstants::kMaxSoftwareRayTracingPrimitiveCount)
+        {
+            _tlas_nodes.clear();
+            s_temp_tlas_gpu_data.clear();
+            _tlas_buffer->SetPersistentData(nullptr, 0u);
+            if (!_tlas_over_capacity_warning_active)
+            {
+                LOG_WARNING("Scene '{}' has {} submesh bounds; software ray tracing supports at most {}. "
+                            "Skipping TLAS generation.",
+                            Name(), aabbs.size(), RenderConstants::kMaxSoftwareRayTracingPrimitiveCount);
+            }
+            _tlas_over_capacity_warning_active = true;
+            return true;
+        }
+        _tlas_over_capacity_warning_active = false;
         BVHBuilder builder(aabbs);
         auto ret = builder.Build(1);
         u64 node_size = ret._nodes.size();
-        AL_ASSERT(node_size <= RenderConstants::kMaxScenePrimitiveCount * 2u);
+        AL_ASSERT(node_size <= RenderConstants::kMaxSoftwareRayTracingPrimitiveCount * 2u);
         _tlas_nodes = std::move(ret._nodes);
         for (u64 i = 0; i < node_size; i++)
         {
@@ -1187,6 +1204,9 @@ namespace Ailu::SceneManagement
         _triangle_count = 0u;
         _bvh_nodes_range.clear();
         _mesh_bvh_node_triangle_offset.clear();
+        _scene_mesh_data.reset();
+        _blas_buffer.reset();
+        _blas_node_count = 0u;
         std::unordered_set<const Render::Mesh*> unique_meshes;
         u64 entity_idx = 0u;
         for (auto& c: _register.View<ECS::StaticMeshComponent>())
@@ -1194,7 +1214,7 @@ namespace Ailu::SceneManagement
             const ECS::Entity entity = _register.GetEntity<ECS::StaticMeshComponent>(entity_idx++);
             if (!IsEntityEnabled(entity) || !_register.IsComponentEnabled<ECS::StaticMeshComponent>(entity))
                 continue;
-            if (c._p_mesh == nullptr)
+            if (c._p_mesh == nullptr || !c._p_mesh->HasDerivedData())
                 continue;
             if (unique_meshes.insert(c._p_mesh.get()).second)
                 _triangle_count += c._p_mesh->GetTriangleCount();
@@ -1214,6 +1234,8 @@ namespace Ailu::SceneManagement
             u64 bvh_offset = 0u;
             for (const Render::Mesh* mesh_ptr : unique_meshes)
             {
+                if (!mesh_ptr->HasDerivedData())
+                    continue;
                 const auto& mesh_triangles = mesh_ptr->GetTriangleData();
                 const auto& mesh_bvh = mesh_ptr->GetBVHNodes();
                 auto& ranges = mesh_ranges[mesh_ptr];
@@ -1242,7 +1264,7 @@ namespace Ailu::SceneManagement
             {
                 const ECS::Entity entity = _register.GetEntity<ECS::StaticMeshComponent>(entity_idx++);
                 if (!IsEntityEnabled(entity) || !_register.IsComponentEnabled<ECS::StaticMeshComponent>(entity)
-                    || !component._p_mesh)
+                    || !component._p_mesh || !component._p_mesh->HasDerivedData())
                     continue;
                 const auto& ranges = mesh_ranges.at(component._p_mesh.get());
                 for (u16 submesh_index = 0u; submesh_index < component._p_mesh->SubmeshCount(); ++submesh_index)
@@ -1251,11 +1273,6 @@ namespace Ailu::SceneManagement
                     _bvh_nodes_range[key] = ranges._node_ranges[submesh_index];
                     _mesh_bvh_node_triangle_offset[key] = ranges._triangle_offsets[submesh_index];
                 }
-            }
-            if (_scene_mesh_data)
-            {
-                _scene_mesh_data.reset();
-                _blas_buffer.reset();
             }
             BufferDesc buf_desc;
             buf_desc._element_num = _triangle_count;
@@ -1386,7 +1403,11 @@ namespace Ailu::SceneManagement
 
     Ref<Scene> SceneMgr::OpenScene(const WString &scene_path)
     {
-        AL_ASSERT(!scene_path.empty());
+        if (scene_path.empty())
+        {
+            LOG_ERROR("SceneMgr::OpenScene: scene path is empty");
+            return nullptr;
+        }
         CloseTemporaryScene();
         if (auto it = _all_scene.find(scene_path); it != _all_scene.end())
         {

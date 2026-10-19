@@ -5,12 +5,23 @@
 #include "Render/CommandBuffer.h"
 #include "Render/RenderGraph/RenderGraph.h"
 #include "Render/Material.h"
+#include "Render/Camera.h"
 
 namespace Ailu::Render
 {
     PostprocessStack::PostprocessStack() : RenderPass("PostprocessStack")
     {
         _event = static_cast<ERenderPassEvent>(static_cast<u16>(ERenderPassEvent::kBeforePostprocess) + 25u);
+    }
+
+    RenderTexture *PostprocessStack::GetPreExposureTexture(const Camera &camera) const
+    {
+        return _auto_exposure.GetPreExposureTexture(camera);
+    }
+
+    RenderTexture *PostprocessStack::GetPreviousPreExposureTexture(const Camera &camera) const
+    {
+        return _auto_exposure.GetPreviousPreExposureTexture(camera);
     }
 
     void PostprocessStack::OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data)
@@ -23,10 +34,38 @@ namespace Ailu::Render
                 : rendering_data._rg_handles._color_tex.IsValid()
                     ? rendering_data._rg_handles._color_tex
                     : rendering_data._rg_handles._color_target;
+        RDG::RGHandle exposure_ev{};
+        f32 scalar_exposure = settings._tone_mapping._exposure;
+        const Camera *camera = rendering_data._camera;
+        if (camera != nullptr && camera->_postprocess_enabled)
+        {
+            const PhysicalCameraSettings &camera_settings = camera->PhysicalSettings();
+            switch (camera_settings._exposure_mode)
+            {
+            case EExposureMode::kManualPhysical:
+                scalar_exposure = camera->ComputeExposureMultiplier() *
+                                   ResolveSceneLuminanceToCdM2(settings._auto_exposure);
+                break;
+            case EExposureMode::kAuto:
+            case EExposureMode::kAperturePriority:
+            case EExposureMode::kShutterPriority:
+            case EExposureMode::kAutoISO:
+                exposure_ev = _auto_exposure.Record(graph, color, rendering_data, *camera, settings._auto_exposure);
+                break;
+            case EExposureMode::kLegacyManual:
+            default:
+                break;
+            }
+
+            if (settings._depth_of_field._enabled)
+                color = _depth_of_field.Record(graph, color, rendering_data._rg_handles._depth_tex, *camera,
+                                               settings._depth_of_field);
+        }
         if (settings._bloom._enabled)
             color = _bloom.Record(graph, color, rendering_data, settings._bloom);
-        if (settings._tone_mapping._mode != EToneMappingMode::kNone)
-            color = _tone_mapping.Record(graph, color, rendering_data, settings._tone_mapping);
+        // Exposure is shared by all view transforms, including the uncompressed None mode.
+        color = _tone_mapping.Record(graph, color, rendering_data, settings._tone_mapping, exposure_ev,
+                                     scalar_exposure);
         // 只登记后处理链的最终输出，不改写 _color_target：注册在 PostprocessStack 之前的 Pass 会在
         // 录制阶段读取 _color_target，改写它会让这些 Pass 绑定到后处理资源上。
         rendering_data._rg_handles._final_color = color;

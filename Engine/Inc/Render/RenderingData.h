@@ -34,6 +34,7 @@ namespace Ailu::Render
     {
         Texture *_source = nullptr;
         Ref<Texture> _sky_cubemap;
+        Ref<Texture> _background_latlong;
         Ref<Texture> _diffuse_irradiance;
         Ref<GPUBuffer> _diffuse_sh;
         Ref<Texture> _specular_prefilter;
@@ -274,6 +275,7 @@ namespace Ailu::Render
         RTHandle _motion_vector_tex_handle;
         RenderTexture* _postprocess_input;
         Rect _viewport, _scissor_rect;
+        GPUBuffer *_raster_area_light_buffer = nullptr;
         u32 _width, _height;
         u32 _pre_width, _pre_height;
         bool _is_res_changed = false;
@@ -285,6 +287,7 @@ namespace Ailu::Render
         Vector<RTHandle> _gbuffers;
         struct
         {
+            RDG::RGHandle _raster_area_lights;
             Vector<RDG::RGHandle> _gbuffers;
             // _color_target 始终是 _CameraColorAttachmentA：场景 Pass 在注册阶段对它 Write，在录制阶段直接绑定它。
             // 后处理链（Bloom/ToneMapping）的输出写入 _final_color，FinalBlit 使用 _final_color，
@@ -296,6 +299,8 @@ namespace Ailu::Render
             RDG::RGHandle         _taa_history_color; // Jittered accumulation; _taa_color is stable presentation.
             RDG::RGHandle         _taa_opaque_color;
             RDG::RGHandle         _taa_reactive;
+            RDG::RGHandle         _pre_exposure_ev;
+            RDG::RGHandle         _previous_pre_exposure_ev;
             RDG::RGHandle         _final_color;
             RDG::RGHandle         _final_depth;
             RDG::RGHandle         _depth_target;
@@ -310,6 +315,7 @@ namespace Ailu::Render
             RDG::RGHandle         _volumetric_fog_accum;
             RDG::RGHandle         _sky_view_lut;
             RDG::RGHandle         _environment_sky;
+            RDG::RGHandle         _environment_background;
             RDG::RGHandle         _environment_sh;
             RDG::RGHandle         _environment_diffuse;
             RDG::RGHandle         _environment_specular;
@@ -327,6 +333,7 @@ namespace Ailu::Render
         PostprocessSettings _postprocess_settings;
         const EnvironmentRuntimeData *_environment = nullptr;
         EDisplayOutput _display_output = EDisplayOutput::kHdrScRgb;
+        f32 _pre_exposure = 1.0f;
         bool _is_debug_voxel = false;
         u16 _vxgi_debug_mipmap = 0u;
         DDGILightingData _ddgi_lighting;
@@ -361,6 +368,8 @@ namespace Ailu::Render
             _rg_handles._taa_history_color = {};
             _rg_handles._taa_opaque_color = {};
             _rg_handles._taa_reactive = {};
+            _rg_handles._pre_exposure_ev = {};
+            _rg_handles._previous_pre_exposure_ev = {};
             _ddgi_lighting = {};
             _rg_handles._surfel_coverage = {};
         }

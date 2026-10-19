@@ -16,7 +16,8 @@ namespace Ailu::RHI::DX12
         OidnGpuInteropD3D12(const OidnGpuInteropD3D12 &) = delete;
         OidnGpuInteropD3D12 &operator=(const OidnGpuInteropD3D12 &) = delete;
         bool Initialize(ID3D12Device *device, ID3D12CommandQueue *exclusive_queue, uint32_t width, uint32_t height,
-                        const std::wstring &runtime_directory, bool external_queue = false, int quality = 5);
+                        const std::wstring &runtime_directory, bool external_queue = false, int quality = 5,
+                        bool use_guides = false);
         ID3D12Fence *ReadyFence() const;
         ID3D12Fence *DoneFence() const;
         bool QueueExternalFilter(uint64_t request);

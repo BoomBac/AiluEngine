@@ -224,7 +224,9 @@ namespace Ailu::Render
 #endif
     }
 
-    SuperResolutionFrameData SuperResolution::Snapshot(const Camera& camera, std::uint64_t frame_index)
+    SuperResolutionFrameData SuperResolution::Snapshot(const Camera& camera, std::uint64_t frame_index,
+                                                        float pre_exposure,
+                                                        ESuperResolutionColorDomain input_color_domain)
     {
         SuperResolutionFrameData data;
         const auto render_size = camera.RenderSize();
@@ -242,8 +244,11 @@ namespace Ailu::Render
         data._frame_time_ms = std::max(1.0f, ScriptSystem::Get().GetDeltaTime() * 1000.0f);
         data._camera_near = camera.Near();
         data._camera_far = camera.Far();
+        data._pre_exposure = std::isfinite(pre_exposure) && pre_exposure > 0.0f ? pre_exposure : 1.0f;
+        data._input_color_domain = input_color_domain;
         const float fov_horizontal = camera.FovH() * k2Radius;
-        data._camera_fov_vertical = 2.0f * std::atan(std::tan(fov_horizontal * 0.5f) / std::max(camera.Aspect(), 0.001f));
+        data._camera_fov_vertical =
+            2.0f * std::atan(std::tan(fov_horizontal * 0.5f) / std::max(camera.Aspect(), 0.001f));
         return data;
     }
 
@@ -259,6 +264,11 @@ namespace Ailu::Render
         (void) command_buffer;
         return false;
 #else
+        const bool scene_linear_input = frame_data._input_color_domain == ESuperResolutionColorDomain::kSceneLinear;
+        if (!std::isfinite(frame_data._pre_exposure) || frame_data._pre_exposure <= 0.0f ||
+            (scene_linear_input && std::abs(frame_data._pre_exposure - 1.0f) > 1.0e-6f))
+            return false;
+
         auto* context = dynamic_cast<RHI::DX12::D3DContext*>(g_pGfxContext);
         auto* dx_command_buffer = dynamic_cast<RHI::DX12::D3DCommandBuffer*>(command_buffer);
         if (context == nullptr || dx_command_buffer == nullptr || color == nullptr || depth == nullptr ||
@@ -276,7 +286,7 @@ namespace Ailu::Render
             get_native(output), frame_data._camera_id, frame_data._reset_revision, frame_data._render_width,
             frame_data._render_height, frame_data._output_width, frame_data._output_height, frame_data._jitter_x,
             frame_data._jitter_y, frame_data._frame_time_ms, frame_data._camera_near, frame_data._camera_far,
-            frame_data._camera_fov_vertical);
+            frame_data._camera_fov_vertical, frame_data._pre_exposure);
         if (!result)
         {
             std::lock_guard lock(s_fsr_failure_mutex);
@@ -288,8 +298,9 @@ namespace Ailu::Render
 #endif
     }
 
-    bool StreamlineSR::Evaluate(const Camera& camera, Texture* color, Texture* depth, Texture* motion_vectors,
-                                Texture* output, RHICommandBuffer* command_buffer, std::uint64_t frame_index)
+    bool StreamlineSR::Evaluate(const Camera& camera, const SuperResolutionFrameData& frame_data, Texture* color,
+                                Texture* depth, Texture* motion_vectors, Texture* output,
+                                RHICommandBuffer* command_buffer)
     {
 #if !AILU_WITH_STREAMLINE
         (void) camera;
@@ -298,7 +309,7 @@ namespace Ailu::Render
         (void) motion_vectors;
         (void) output;
         (void) command_buffer;
-        (void) frame_index;
+        (void) frame_data;
         return false;
 #else
         struct FailureMarker
@@ -318,6 +329,11 @@ namespace Ailu::Render
                             _camera_hash, _stage, _result);
             }
         } failure_marker{camera.HashCode(), camera.SuperResolutionQuality()};
+
+        const bool scene_linear_input = frame_data._input_color_domain == ESuperResolutionColorDomain::kSceneLinear;
+        if (!std::isfinite(frame_data._pre_exposure) || frame_data._pre_exposure <= 0.0f ||
+            (scene_linear_input && std::abs(frame_data._pre_exposure - 1.0f) > 1.0e-6f))
+            return false;
 
         auto* context = dynamic_cast<RHI::DX12::D3DContext*>(g_pGfxContext);
         auto* dx_command_buffer = dynamic_cast<RHI::DX12::D3DCommandBuffer*>(command_buffer);
@@ -378,6 +394,7 @@ namespace Ailu::Render
         options.mode = dlss_mode;
         options.outputWidth = output_size.x;
         options.outputHeight = output_size.y;
+        options.preExposure = frame_data._pre_exposure;
         options.colorBuffersHDR = sl::Boolean::eTrue;
         options.useAutoExposure = sl::Boolean::eTrue;
 
@@ -401,7 +418,7 @@ namespace Ailu::Render
         failure_marker._result = static_cast<i32>(option_result);
         if (option_result != sl::Result::eOk)
             return false;
-        const u32 streamline_frame_index = static_cast<u32>(frame_index);
+        const u32 streamline_frame_index = static_cast<u32>(frame_data._frame_index);
         sl::FrameToken* frame_token = nullptr;
         const auto token_result = (*get_token)(frame_token, &streamline_frame_index);
         failure_marker._stage = "slGetNewFrameToken";

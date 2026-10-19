@@ -34,6 +34,9 @@ namespace Ailu
             virtual u32 GetSamplerIndex(const SamplerDesc &desc) = 0;
             virtual void Init() = 0;
             virtual void Present() = 0;
+            virtual void EndFrame() = 0;
+            virtual u64 GetPresentCount() const = 0;
+            virtual u32 GetSwapchainCount() const = 0;
             virtual void SetMultiThreadRendering(bool enabled) = 0;
             virtual void RegisterWindow(Window* window) = 0;
             virtual void UnRegisterWindow(Window* window) = 0;

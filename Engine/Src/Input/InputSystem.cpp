@@ -506,17 +506,17 @@ namespace Ailu
     // ========================================================================
     void InputSystem::DebugPrint() const
     {
-        LOG_INFO("=== InputSystem Debug ===");
-        LOG_INFO("  Devices ({}) :", _devices.size());
+        LOG_DEBUG("=== InputSystem Debug ===");
+        LOG_DEBUG("  Devices ({}) :", _devices.size());
         for (const auto &device : _devices)
         {
-            LOG_INFO("    [{}] {} ({}) connected={}",
+                LOG_DEBUG("    [{}] {} ({}) connected={}",
                      device->GetDeviceId(), device->GetDeviceName(),
                      static_cast<int>(device->GetDeviceType()),
                      device->IsConnected());
         }
 
-        LOG_INFO("  Active Contexts ({}) :", _active_contexts.size());
+        LOG_DEBUG("  Active Contexts ({}) :", _active_contexts.size());
         for (const auto &ctx : _active_contexts)
         {
             LOG_INFO("    {} (priority={}, blocking={}, consuming={}, active={})",
@@ -526,12 +526,12 @@ namespace Ailu
             for (const auto &map : ctx->GetActionMaps())
             {
                 if (map)
-                    LOG_INFO("      ActionMap: {} (enabled={}, actions={})",
+                    LOG_DEBUG("      ActionMap: {} (enabled={}, actions={})",
                              map->GetName(), map->IsEnabled(), map->ActionCount());
             }
         }
 
-        LOG_INFO("  Consumed controls: {}", _consumption_state._consumed_control_ids.size());
+        LOG_DEBUG("  Consumed controls: {}", _consumption_state._consumed_control_ids.size());
     }
 
 } // namespace Ailu

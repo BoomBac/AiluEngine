@@ -92,6 +92,8 @@ namespace Ailu::Render
             builder.Read(rendering_data._rg_handles._gbuffers[2]);
             builder.Read(rendering_data._rg_handles._gbuffers[3]);
             builder.Read(rendering_data._rg_handles._depth_tex);
+            if (rendering_data._rg_handles._pre_exposure_ev.IsValid())
+                builder.Read(rendering_data._rg_handles._pre_exposure_ev, EResourceUsage::kReadSRV);
             builder.Read(builder.Import(light_data));
             if (prev_reservoir != nullptr)
                 builder.Read(builder.Import(prev_reservoir), EResourceUsage::kWriteUAV);

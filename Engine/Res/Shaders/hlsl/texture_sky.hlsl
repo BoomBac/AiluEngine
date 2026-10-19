@@ -4,6 +4,10 @@
 //vert: VSMain
 //pixel: PSMain
 //Cull: Front
+//ZTest: Equal
+//ZWrite: Off
+//ZTest: Equal
+//ZWrite: Off
 //Queue: Opaque
 //Stencil: {Ref:0,Comp:Equal,Pass:Keep}
 //pass end::
@@ -19,6 +23,7 @@
 #include "constants.hlsli"
 
 TextureCube _EnvironmentSky : register(t0);
+Texture2D _EnvironmentBackground : register(t1);
 
 struct VSInput
 {
@@ -35,6 +40,7 @@ struct PSInput
 PerMaterialCBufferBegin
     float _EnvironmentIntensity;
     float _EnvironmentRotation;
+    int _UseSeparateBackground;
 PerMaterialCBufferEnd
 
 PSInput VSMain(VSInput input)
@@ -56,5 +62,15 @@ float3 RotateEnvironment(float3 direction, float rotation)
 float4 PSMain(PSInput input) : SV_TARGET
 {
     float3 direction = RotateEnvironment(normalize(input.direction), _EnvironmentRotation);
-    return float4(_EnvironmentSky.SampleLevel(g_LinearClampSampler, direction, 0).rgb * _EnvironmentIntensity, 1.0);
+    if (_UseSeparateBackground != 0)
+    {
+        float2 uv = float2(atan2(direction.x, direction.z) / (2.0 * PI), asin(direction.y) / PI) + 0.5;
+        uint width, height;
+        _EnvironmentBackground.GetDimensions(width, height);
+        uv.y = clamp(uv.y, 0.5 / height, 1.0 - 0.5 / height);
+        return float4(_EnvironmentBackground.SampleLevel(g_LinearWrapSampler, uv, 0).rgb *
+                      (_EnvironmentIntensity * GetPreExposure()), 1.0);
+    }
+    return float4(_EnvironmentSky.SampleLevel(g_LinearClampSampler, direction, 0).rgb *
+                  (_EnvironmentIntensity * GetPreExposure()), 1.0);
 }

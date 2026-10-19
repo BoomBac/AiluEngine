@@ -206,6 +206,8 @@ namespace Ailu::Render
         _runtime._is_texture_source = _source == ECS::EEnvironmentSource::kTexture && _source_ref != nullptr;
         _initialized = true;
         _runtime._source_revision = _source_revision;
+        u64 background_revision = 0u;
+        _runtime._background_latlong = ResolveTexture(component._background_texture, background_revision);
         _runtime._sky_color = component._procedural_sky._sky_color;
         _runtime._ground_color = component._procedural_sky._ground_color;
         if (_runtime._is_texture_source)
@@ -235,6 +237,8 @@ namespace Ailu::Render
     void EnvironmentSystem::RecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data)
     {
         rendering_data._rg_handles._environment_sky = graph.Import(_runtime._sky_cubemap.get());
+        rendering_data._rg_handles._environment_background = graph.Import(_runtime._background_latlong != nullptr
+            ? _runtime._background_latlong.get() : Texture::s_p_default_black);
         rendering_data._rg_handles._environment_sh = graph.Import(_diffuse_projector.Output().get());
         rendering_data._rg_handles._environment_diffuse = graph.Import(_runtime._diffuse_irradiance.get());
         rendering_data._rg_handles._environment_specular = graph.Import(_runtime._specular_prefilter.get());

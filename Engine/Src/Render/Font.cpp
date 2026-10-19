@@ -269,7 +269,7 @@ namespace Ailu::Render
     {
         if (!fs::exists(bitmap_path) || !fs::exists(json_path))
         {
-            LOG_ERROR("Font::Create: bitmap_path({}) or json_path({}) does not exist!", bitmap_path, json_path)
+            LOG_ERROR("Font::Create: bitmap_path({}) or json_path({}) does not exist!", bitmap_path.string(), json_path.string())
             return nullptr;
         }
         auto font = MakeRef<Font>();

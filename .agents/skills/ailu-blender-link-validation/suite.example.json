@@ -1,0 +1,12 @@
+{
+  "suite_id": "blender_link_smoke",
+  "note": "SCHEMA PROPOSAL ONLY; unified runner has not yet been implemented",
+  "paths": {"repository": "${AILU_REPO_ROOT}", "blender": "${BLENDER_EXE}", "editor": "${AILU_EDITOR_EXE}", "project": "${AILU_TEST_PROJECT}"},
+  "execution": {"port": "auto", "fresh_process_each_case": true, "max_parallel_gpu_cases": 1, "save_source": false, "timeout_seconds": 600},
+  "cases": [
+    {"id": "tiny_transform", "mode": "native", "require": ["protocol", "structure"]},
+    {"id": "tiny_instance", "mode": "native", "require": ["protocol", "structure"]},
+    {"id": "tiny_material", "mode": "visual", "require": ["protocol", "structure", "render"]},
+    {"id": "bmw", "mode": "native", "scene_env": "BLENDER_BMW_BLEND", "require": ["protocol", "structure"]}
+  ]
+}

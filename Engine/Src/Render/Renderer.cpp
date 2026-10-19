@@ -28,6 +28,7 @@
 #include "Animation/AnimationSystem.h"
 #include "Animation/SkinningSystem.h"
 #include "Framework/Common/JobSystem.h"
+#include "Scene/LightUnits.h"
 
 #include "Render/RenderGraph/RenderGraph.h"
 
@@ -160,6 +161,15 @@ namespace Ailu::Render
             shadow_set_ptr = &shadow_set;
         }
         ApplyShadowSetToLightData(s, shadow_set_ptr);
+        // Shadow matrices are per view; keep uploads separate across frame slots, scenes and cameras.
+        auto *area_buffer = _cur_fs->GetAreaLightBuffer(s.HashCode(), cam.HashCode(),
+                                                       static_cast<u32>(_raster_area_lights.size()));
+        const ShaderArealLightData empty_area{};
+        if (_raster_area_lights.empty())
+            area_buffer->SetData(reinterpret_cast<const u8 *>(&empty_area), sizeof(empty_area));
+        else
+            area_buffer->SetData(_raster_area_lights);
+        _rendering_data._raster_area_light_buffer = area_buffer;
         bool is_output_to_camera_tex = cam.TargetTexture() != nullptr;
         for (auto &e: _events_before_tick)
         {
@@ -295,6 +305,8 @@ namespace Ailu::Render
             desc._format = ConvertRenderTextureFormatToPixelFormat(ERenderTargetFormat::kRFloat);
             _rendering_data._rg_handles._depth_tex = _rd_graph->CreateResource(desc, RenderResourceName::kCameraDepthTex);
 
+            _rendering_data._rg_handles._raster_area_lights =
+                _rd_graph->Import(_rendering_data._raster_area_light_buffer);
             if (_rendering_data._shadow_set != nullptr)
             {
                 const auto directional_mode = _rendering_data._shadow_set->_directional._mode;
@@ -352,6 +364,38 @@ namespace Ailu::Render
         _rendering_data._scene = &s;
         _rendering_data._environment = &_environment_system.Runtime();
         _rendering_data._postprocess_settings = ResolvePostprocessSettings(s);
+        _rendering_data._pre_exposure = 1.0f;
+        _rendering_data._rg_handles._pre_exposure_ev = {};
+        _rendering_data._rg_handles._previous_pre_exposure_ev = {};
+        if (_is_use_render_graph && !IsRenderingProbe() && cam._postprocess_enabled)
+        {
+            const PhysicalCameraSettings &physical_settings = cam.PhysicalSettings();
+            switch (physical_settings._exposure_mode)
+            {
+            case EExposureMode::kManualPhysical:
+                _rendering_data._pre_exposure = cam.ComputeExposureMultiplier() *
+                    ResolveSceneLuminanceToCdM2(_rendering_data._postprocess_settings._auto_exposure);
+                break;
+            case EExposureMode::kAuto:
+            case EExposureMode::kAperturePriority:
+            case EExposureMode::kShutterPriority:
+            case EExposureMode::kAutoISO:
+                if (_is_use_render_graph)
+                {
+                    RenderTexture *pre_exposure = _postprocess_stack->GetPreExposureTexture(cam);
+                    RenderTexture *previous_pre_exposure = _postprocess_stack->GetPreviousPreExposureTexture(cam);
+                    if (pre_exposure != nullptr)
+                        _rendering_data._rg_handles._pre_exposure_ev = _rd_graph->Import(pre_exposure);
+                    if (previous_pre_exposure != nullptr)
+                        _rendering_data._rg_handles._previous_pre_exposure_ev =
+                            _rd_graph->Import(previous_pre_exposure);
+                }
+                break;
+            case EExposureMode::kLegacyManual:
+            default:
+                break;
+            }
+        }
         if (!_scene_render_data_valid)
             PrepareSceneRenderData(s);
         PrepareViews(s, cam);
@@ -461,6 +505,8 @@ namespace Ailu::Render
         std::stable_sort(_render_passes.begin(), _render_passes.end(), [](RenderPass *a, RenderPass *b) -> bool
                          { return *a < *b; });
         _target_tex = g_pRenderTexturePool->Get(_rendering_data._camera_color_target_handle);
+        Shader::SetGlobalBuffer("_RasterAreaLights", _rendering_data._raster_area_light_buffer);
+        ComputeShader::SetGlobalBuffer("_RasterAreaLights", _rendering_data._raster_area_light_buffer);
         Shader::SetGlobalBuffer(RenderConstants::kCBufNamePerScene, _cur_fs->GetSceneCB(s.HashCode()));
         Shader::SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, _cur_fs->GetCameraCB(cam.HashCode()));
         Shader::SetGlobalTexture("_LTC_Lut1", ResourceMgr::Get().Get<Texture2D>(L"Runtime/ltc_lut1"));
@@ -818,19 +864,25 @@ namespace Ailu::Render
     void Renderer::PrepareLight(const Scene &s)
     {
         PROFILE_BLOCK_CPU("RenderPrepare.Light")
+        _raster_area_lights.clear();
         uint16_t updated_light_num = 0u;
-        uint16_t direction_light_index = 0, point_light_index = 0, spot_light_index = 0, area_light_index = 0;
+        u32 direction_light_index = 0u, point_light_index = 0u, spot_light_index = 0u, area_light_index = 0u;
         auto per_scene_cbuf_data = ConstantBuffer::As<CBufferPerSceneData>(_cur_fs->GetSceneCB(s.HashCode()));
         for (const auto &comp: s.GetRegister().View<ECS::LightComponent>())
         {
             auto &light_data = comp._light;
-            Color color = light_data._light_color;
-            color.r *= color.a;
-            color.g *= color.a;
-            color.b *= color.a;
+            const Vector3f light_radiometric_color = ECS::GetLightColor(comp) * ECS::GetLightRadiometricScale(comp);
             bool is_cur_light_comp_active = true;
             if (comp._type == ECS::ELightType::kDirectional)
             {
+                if (direction_light_index >= RenderConstants::kMaxDirectionalLightNum)
+                {
+                    if ((_fixed_light_warning_mask & 1u) == 0u)
+                        LOG_WARNING("Raster directional light capacity {} exceeded; extra lights are skipped.",
+                                    RenderConstants::kMaxDirectionalLightNum);
+                    _fixed_light_warning_mask |= 1u;
+                    continue;
+                }
                 per_scene_cbuf_data->_DirectionalLights[direction_light_index]._shadowmap_index = -1;
                 if (!is_cur_light_comp_active)
                 {
@@ -839,16 +891,24 @@ namespace Ailu::Render
                     per_scene_cbuf_data->_DirectionalLights[direction_light_index]._LightColor = Colors::kBlack.xyz;
                     continue;
                 }
-                per_scene_cbuf_data->_DirectionalLights[direction_light_index]._LightColor = color.xyz * kPi;
+                per_scene_cbuf_data->_DirectionalLights[direction_light_index]._LightColor = light_radiometric_color;
                 per_scene_cbuf_data->_DirectionalLights[direction_light_index]._LightDir = light_data._light_dir.xyz;
-                per_scene_cbuf_data->_DirectionalLights[direction_light_index]._LightParam0 = light_data._light_param.w;
+                per_scene_cbuf_data->_DirectionalLights[direction_light_index]._LightParam0 = light_data._angular_radius;
                 per_scene_cbuf_data->_MainlightWorldPosition = light_data._light_dir.xyz;
-                per_scene_cbuf_data->_MainlightColor = color.xyz * kPi;
+                per_scene_cbuf_data->_MainlightColor = light_radiometric_color;
                 _rendering_data._mainlight_world_position = per_scene_cbuf_data->_MainlightWorldPosition;
                 ++direction_light_index;
             }
             else if (comp._type == ECS::ELightType::kPoint)
             {
+                if (point_light_index >= RenderConstants::kMaxPointLightNum)
+                {
+                    if ((_fixed_light_warning_mask & 2u) == 0u)
+                        LOG_WARNING("Raster point light capacity {} exceeded; extra lights are skipped.",
+                                    RenderConstants::kMaxPointLightNum);
+                    _fixed_light_warning_mask |= 2u;
+                    continue;
+                }
                 per_scene_cbuf_data->_PointLights[point_light_index]._shadowmap_index = -1;
                 if (!is_cur_light_comp_active)
                 {
@@ -856,44 +916,47 @@ namespace Ailu::Render
                     per_scene_cbuf_data->_PointLights[point_light_index]._LightColor = Colors::kBlack.xyz;
                     continue;
                 }
-                per_scene_cbuf_data->_PointLights[point_light_index]._LightColor = color.xyz * kPi;
+                per_scene_cbuf_data->_PointLights[point_light_index]._LightColor = light_radiometric_color;
                 per_scene_cbuf_data->_PointLights[point_light_index]._LightPos = light_data._light_pos.xyz;
-                per_scene_cbuf_data->_PointLights[point_light_index]._LightParam0 = light_data._light_param.x;
-                per_scene_cbuf_data->_PointLights[point_light_index++]._LightParam1 = light_data._light_param.y;
+                per_scene_cbuf_data->_PointLights[point_light_index]._LightParam0 = light_data._range;
+                per_scene_cbuf_data->_PointLights[point_light_index++]._LightParam1 = light_data._source_radius;
             }
             else if (comp._type == ECS::ELightType::kSpot)
             {
+                if (spot_light_index >= RenderConstants::kMaxSpotLightNum)
+                {
+                    if ((_fixed_light_warning_mask & 4u) == 0u)
+                        LOG_WARNING("Raster spot light capacity {} exceeded; extra lights are skipped.",
+                                    RenderConstants::kMaxSpotLightNum);
+                    _fixed_light_warning_mask |= 4u;
+                    continue;
+                }
                 per_scene_cbuf_data->_SpotLights[spot_light_index]._shadowmap_index = -1;
                 if (!is_cur_light_comp_active)
                 {
                     per_scene_cbuf_data->_SpotLights[spot_light_index]._LightColor = Colors::kBlack.xyz;
                     continue;
                 }
-                per_scene_cbuf_data->_SpotLights[spot_light_index]._LightColor = color.xyz * kPi;
+                per_scene_cbuf_data->_SpotLights[spot_light_index]._LightColor = light_radiometric_color;
                 per_scene_cbuf_data->_SpotLights[spot_light_index]._LightPos = light_data._light_pos.xyz;
                 per_scene_cbuf_data->_SpotLights[spot_light_index]._LightDir = light_data._light_dir.xyz;
-                per_scene_cbuf_data->_SpotLights[spot_light_index]._Rdius = light_data._light_param.x;
-                float inner_cos = cos(light_data._light_param.y / 2 * k2Radius);
-                float outer_cos = cos(light_data._light_param.z / 2 * k2Radius);
+                per_scene_cbuf_data->_SpotLights[spot_light_index]._Rdius = light_data._range;
+                float inner_cos = cos(light_data._spot_inner_angle / 2 * k2Radius);
+                float outer_cos = cos(light_data._spot_outer_angle / 2 * k2Radius);
                 per_scene_cbuf_data->_SpotLights[spot_light_index]._LightAngleScale = 1.0f / std::max(0.001f, (inner_cos - outer_cos));
                 per_scene_cbuf_data->_SpotLights[spot_light_index]._LightAngleOffset = -outer_cos * per_scene_cbuf_data->_SpotLights[spot_light_index]._LightAngleScale;
                 ++spot_light_index;
             }
-            else//area_light
+            else if (comp._type == ECS::ELightType::kArea)
             {
-                per_scene_cbuf_data->_AreaLights[area_light_index]._shadowmap_index = -1;
-                if (!is_cur_light_comp_active)
-                {
-                    per_scene_cbuf_data->_AreaLights[area_light_index]._LightColor = Colors::kBlack.xyz;
-                    continue;
-                }
-                per_scene_cbuf_data->_AreaLights[area_light_index]._LightColor = color.xyz * kPi;
-                memset(per_scene_cbuf_data->_AreaLights[area_light_index]._points, 0, sizeof(per_scene_cbuf_data->_AreaLights[area_light_index]._points));
-                per_scene_cbuf_data->_AreaLights[area_light_index]._points[0].xyz = light_data._area_points[0];
-                per_scene_cbuf_data->_AreaLights[area_light_index]._points[1].xyz = light_data._area_points[1];
-                per_scene_cbuf_data->_AreaLights[area_light_index]._points[2].xyz = light_data._area_points[2];
-                per_scene_cbuf_data->_AreaLights[area_light_index]._points[3].xyz = light_data._area_points[3];
-                per_scene_cbuf_data->_AreaLights[area_light_index]._is_twosided = light_data._is_two_side;
+                ShaderArealLightData area{};
+                area._shadowmap_index = -1;
+                area._LightColor = light_radiometric_color;
+                area._ShadowDistance = light_data._range;
+                for (u32 index = 0u; index < 4u; ++index)
+                    area._points[index].xyz = light_data._area_points[index];
+                area._is_twosided = light_data._is_two_side;
+                _raster_area_lights.emplace_back(area);
                 ++area_light_index;
             }
             ++updated_light_num;
@@ -1089,6 +1152,20 @@ namespace Ailu::Render
         cam_cb_data->_TextureManualMipBias = GetTextureMipBias();
         cam_cb_data->_TextureMipBias = std::clamp(cam_cb_data->_TextureManualMipBias +
             (IsRenderingProbe() ? 0.0f : cam.GetAutoTextureMipBias()), -16.0f, 15.99f);
+        cam_cb_data->_pre_exposure = std::isfinite(_rendering_data._pre_exposure) &&
+                                     _rendering_data._pre_exposure > 0.0f
+            ? _rendering_data._pre_exposure : 1.0f;
+        cam_cb_data->_pre_exposure_ev_texture_index = RenderConstants::kInvalidBindlessHandle;
+        if (_rendering_data._rg_handles._pre_exposure_ev.IsValid())
+        {
+            RenderTexture *pre_exposure = _postprocess_stack->GetPreExposureTexture(cam);
+            if (pre_exposure != nullptr)
+            {
+                const i32 texture_index = pre_exposure->GetBindlessSRVIndex();
+                if (texture_index >= 0)
+                    cam_cb_data->_pre_exposure_ev_texture_index = static_cast<u32>(texture_index);
+            }
+        }
         cam_cb_data->_RenderFeatureFlags = _render_request._feature_flags;
         ApplyShadowSetToCameraData(*cam_cb_data, _rendering_data._shadow_set);
         _rendering_data._cull_results = _active_view_data != nullptr ? &_active_view_data->_cull_result : nullptr;
@@ -1161,7 +1238,8 @@ namespace Ailu::Render
             const auto *roughness_prop = src->MainProperty(ETextureUsage::kRoughness);
             if (roughness_prop != nullptr)
                 dst._roughness = std::max(0.0f, roughness_prop->GetValue<f32>());
-            if (auto normal_tex = src->MainTex(ETextureUsage::kNormal); normal_tex)
+            const auto normal_height = src->GetVector("_NormalHeightParameters");
+            if (auto normal_tex = src->MainTex(ETextureUsage::kNormal); normal_tex && normal_height.w <= 0.5f)
             {
                 dst._normal_tex = normal_tex->GetBindlessSRVIndex();
             }
@@ -1356,8 +1434,8 @@ namespace Ailu::Render
             scene_cb_data->_PointLights[i]._shadowmap_index = -1;
         for (u16 i = 0u; i < RenderConstants::kMaxSpotLightNum; ++i)
             scene_cb_data->_SpotLights[i]._shadowmap_index = -1;
-        for (u16 i = 0u; i < RenderConstants::kMaxAreaLightNum; ++i)
-            scene_cb_data->_AreaLights[i]._shadowmap_index = -1;
+        for (auto &light : _raster_area_lights)
+            light._shadowmap_index = -1;
         if (shadow_set == nullptr || !shadow_set->_valid)
             return;
 
@@ -1390,9 +1468,9 @@ namespace Ailu::Render
                 }
                 break;
             case EShadowViewType::kArea:
-                if (view._light_index < RenderConstants::kMaxAreaLightNum)
+                if (view._light_index < _raster_area_lights.size())
                 {
-                    auto &light = scene_cb_data->_AreaLights[view._light_index];
+                    auto &light = _raster_area_lights[view._light_index];
                     light._shadowmap_index = view._target_slice;
                     light._ShadowDistance = view._camera_far;
                     light._shadow_matrix = view._shadow_matrix;

@@ -1039,9 +1039,12 @@ namespace Ailu
             LOG_INFO("[AssetBrowser] BeginAssetDrag asset={} selected={} type={} data={} obj={} mesh={} vb={} ib={}",
                      asset != nullptr ? asset->Name() : "<null>", _asset_drag_data._assets.size(),
                      StaticEnum<UI::EDragType>()->GetNameByEnum(drag_type), drag_data,
-                     asset != nullptr ? asset->_p_obj.get() : nullptr, dragged_mesh,
-                     dragged_mesh != nullptr ? dragged_mesh->GetVertexBuffer().get() : nullptr,
-                     dragged_mesh != nullptr && dragged_mesh->SubmeshCount() > 0u ? dragged_mesh->GetIndexBuffer().get() : nullptr);
+                     asset != nullptr && asset->_p_obj != nullptr ? asset->_p_obj->Name() : "<null>",
+                     dragged_mesh != nullptr ? dragged_mesh->Name() : "<null>",
+                     dragged_mesh != nullptr ? reinterpret_cast<std::uintptr_t>(dragged_mesh->GetVertexBuffer().get()) : 0u,
+                     dragged_mesh != nullptr && dragged_mesh->SubmeshCount() > 0u
+                         ? reinterpret_cast<std::uintptr_t>(dragged_mesh->GetIndexBuffer().get())
+                         : 0u);
             UI::DragDropManager::Get().BeginDrag(payload, display_name);
         }
 

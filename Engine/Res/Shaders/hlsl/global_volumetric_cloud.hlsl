@@ -265,5 +265,7 @@ float4 BlitPSMain(FullScreenPSInput input) : SV_Target
     float d = SAMPLE_TEXTURE2D_DEPTH(_CameraDepthTexture,g_LinearWrapSampler,input.uv);
     if (d != 1.0)
         return float4(0,0,0,1);
-    return SAMPLE_TEXTURE2D_LOD(_CloudTex,g_LinearClampSampler,input.uv,0);
+    float4 cloud = SAMPLE_TEXTURE2D_LOD(_CloudTex,g_LinearClampSampler,input.uv,0);
+    cloud.rgb *= GetPreExposure();
+    return cloud;
 }

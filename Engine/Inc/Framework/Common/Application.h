@@ -21,6 +21,10 @@
 namespace Ailu
 {
     class EngineRuntime;
+    namespace Render
+    {
+        class RenderTexture;
+    }
     using Render::RenderPipeline;
 
     AENUM()
@@ -39,6 +43,14 @@ namespace Ailu
         u32 _window_flags = 0u;
     };
 
+    enum class EApplicationGraphicsMode
+    {
+        kWindowed,
+        kHiddenCompat,
+        kOffscreen,
+        kNone,
+    };
+
     struct AILU_API ApplicationInitContext
     {
         WString _project_file_path;
@@ -50,6 +62,12 @@ namespace Ailu
         u32 _audio_sample_rate = 48000u;
         u32 _audio_max_voices = 128u;
         u32 _audio_max_streaming_voices = 8u;
+        bool _batch = false;
+        EApplicationGraphicsMode _graphics_mode = EApplicationGraphicsMode::kWindowed;
+        WString _scene_path;
+        f32 _fixed_delta_seconds = 0.0f;
+        u32 _render_width = 0u;
+        u32 _render_height = 0u;
     };
 
     enum class ECursorType
@@ -174,6 +192,13 @@ namespace Ailu
 
         [[nodiscard]] Window &GetWindow() { return *_p_window; }
         Window *GetWindowPtr() { return _p_window.get(); }
+        Render::RenderTexture *GetOffscreenTarget() const;
+        bool ResizeOffscreenTarget(u32 width, u32 height);
+        EApplicationGraphicsMode GetGraphicsMode() const { return _graphics_mode; }
+        bool IsBatchMode() const { return _is_batch_mode; }
+        bool IsOffscreen() const { return _graphics_mode == EApplicationGraphicsMode::kOffscreen; }
+        bool IsCpuOnly() const { return _graphics_mode == EApplicationGraphicsMode::kNone; }
+        void RequestExit() { _state.store(EApplicationState::EApplicationState_Exit); }
         InputSystem &GetInputSystem() { return *_input_system; }
         InputSystem *GetInputSystemPtr() { return _input_system.get(); }
         /// @brief 返回逻辑帧
@@ -242,6 +267,9 @@ namespace Ailu
         ECursorType _cursor_type = ECursorType::kArrow;
         ECursorPriority _cursor_priority = ECursorPriority::kFallback;
         bool _is_client_cursor_context = true;
+        bool _is_batch_mode = false;
+        EApplicationGraphicsMode _graphics_mode = EApplicationGraphicsMode::kWindowed;
+        f32 _fixed_delta_seconds = 0.0f;
     private:
         std::mutex _mutex;
         std::condition_variable _main_wait;

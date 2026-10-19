@@ -279,6 +279,8 @@ namespace Ailu::Render
         graph.AddPass("VolumetricClouds_Compose", RDG::PassDesc(), [&, this](RDG::RenderGraphBuilder &builder)
         {
             builder.Read(_cloud_cur_handle);
+            if (rendering_data._rg_handles._pre_exposure_ev.IsValid())
+                builder.Read(rendering_data._rg_handles._pre_exposure_ev, EResourceUsage::kReadSRV);
             builder.Read(rendering_data._rg_handles._color_target, EResourceUsage::kWriteRTV);
             rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target);
         }, [this, camera_hash, frame_index, current_uv_jitter, current_position, current_forward, current_up,

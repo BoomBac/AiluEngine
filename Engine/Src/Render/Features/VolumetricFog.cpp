@@ -161,7 +161,8 @@ namespace Ailu
                 hash_bytes(&_max_local_lights, sizeof(_max_local_lights));
                 if (scene_data != nullptr)
                 {
-                    const u32 point_count = std::min(4u, u32(scene_data->_ActiveLightCount.y));
+                    const u32 point_count = std::min(u32(RenderConstants::kMaxPointLightNum),
+                                                     u32(scene_data->_ActiveLightCount.y));
                     const u32 spot_count = std::min(4u, u32(scene_data->_ActiveLightCount.z));
                     hash_bytes(&point_count, sizeof(point_count));
                     hash_bytes(&spot_count, sizeof(spot_count));
@@ -236,7 +237,9 @@ namespace Ailu
                 {
                     for (u32 light_type = 0u; light_type < 2u; ++light_type)
                     {
-                        const u32 count = std::min(4u, u32(scene_data->_ActiveLightCount[light_type + 1u]));
+                        const u32 capacity = light_type == 0u ? RenderConstants::kMaxPointLightNum
+                                                            : RenderConstants::kMaxSpotLightNum;
+                        const u32 count = std::min(capacity, u32(scene_data->_ActiveLightCount[light_type + 1u]));
                         for (u32 light_index = 0u; light_index < count && _local_light_count < _max_local_lights;
                              ++light_index)
                         {
@@ -365,6 +368,8 @@ namespace Ailu
             {
                 builder.Read(fog_handle);
                 builder.Read(depth_handle);
+                if (rendering_data._rg_handles._pre_exposure_ev.IsValid())
+                    builder.Read(rendering_data._rg_handles._pre_exposure_ev, EResourceUsage::kReadSRV);
                 // Keep the existing sky/opaque color as the blend destination without sampling it as an SRV.
                 rendering_data._rg_handles._color_target = builder.WriteAfter(rendering_data._rg_handles._color_target,
                                                                              EResourceUsage::kWriteRTV);
@@ -636,7 +641,9 @@ namespace Ailu
                 const auto *lights = ConstantBuffer::As<CBufferPerSceneData>(rendering_data._p_per_scene_cbuf);
                 for (u32 type = 0u; type < 2u; ++type)
                 {
-                    const u32 count = std::min(4u, u32(lights->_ActiveLightCount[type + 1u]));
+                    const u32 capacity = type == 0u ? RenderConstants::kMaxPointLightNum
+                                                    : RenderConstants::kMaxSpotLightNum;
+                    const u32 count = std::min(capacity, u32(lights->_ActiveLightCount[type + 1u]));
                     for (u32 index = 0u; index < count; ++index)
                     {
                         const Vector3f position = type == 0u ? lights->_PointLights[index]._LightPos

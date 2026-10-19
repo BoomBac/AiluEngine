@@ -17,6 +17,7 @@ namespace Ailu
 		kWindow_NoTitleBar = 1 << 0,
 		kWindow_NoResize = 1 << 1,
 		kWindow_NoMove = 1 << 2,
+		kWindow_Hidden = 1 << 3,
 	};
 	struct WindowProps
 	{

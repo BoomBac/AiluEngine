@@ -13,6 +13,7 @@
 
 #pragma multi_compile _ PATH_TRACER_MNEE
 #pragma multi_compile _ PATH_TRACER_POWER_LIGHT_SAMPLING
+#pragma multi_compile _ PATH_TRACER_OIDN_GUIDES
 
 #if defined(AL_PACKAGE_SHADER_INTEROP)
 #include "../../ShaderInterop.h"
@@ -39,6 +40,7 @@ ConstantBuffer<UnifiedLightBufferConfig> _UnifiedLightConfig : register(b2);
 cbuffer PathTracerSettings : register(b3)
 {
     uint _enable_environment_nee;
+    uint _PathGuideSampleCount;
 };
 
 RWTexture2D<float4> RenderTarget : register(u0);

@@ -154,7 +154,7 @@ namespace Ailu::Render
             "_AdditionalShadowMap", ERenderTargetFormat::kShadowMap);
         _point_shadow_map = RenderTexture::Create(
             additional_shadow_resolution, "_PointShadowMap", ERenderTargetFormat::kShadowMap,
-            RenderConstants::kMaxPointLightNum);
+            RenderConstants::kMaxPointShadowLightNum);
 
         if (_camera_directional_shadow_map != nullptr)
             _camera_directional_shadow_map->_store_action = ELoadStoreAction::kClear;
@@ -213,13 +213,16 @@ namespace Ailu::Render
         {
             if (light._type != ECS::ELightType::kSpot)
                 continue;
-            if (light._shadow._is_cast_shadow)
+            if (spot_light_index >= RenderConstants::kMaxSpotLightNum)
+                break;
+            if (light._shadow._is_cast_shadow && shadow_set._additional_shadow_num <
+                RenderConstants::kMaxSpotLightNum + RenderConstants::kMaxAreaLightNum)
             {
                 ShadowView view;
                 view._type = EShadowViewType::kSpot;
                 view._light_index = spot_light_index;
                 view._target_slice = shadow_set._additional_shadow_num++;
-                view._camera_far = light._light._light_param.x * 1.5f;
+                view._camera_far = light._light._range * 1.5f;
                 view._light_world_position = light._light._light_pos.xyz;
                 view._constant_bias = ShadowBias(light._shadow._constant_bias);
                 view._slope_bias = ShadowBias(light._shadow._slope_bias);
@@ -242,13 +245,14 @@ namespace Ailu::Render
         {
             if (light._type != ECS::ELightType::kArea)
                 continue;
-            if (light._shadow._is_cast_shadow)
+            if (light._shadow._is_cast_shadow && shadow_set._additional_shadow_num <
+                RenderConstants::kMaxSpotLightNum + RenderConstants::kMaxAreaLightNum)
             {
                 ShadowView view;
                 view._type = EShadowViewType::kArea;
                 view._light_index = area_light_index;
                 view._target_slice = shadow_set._additional_shadow_num++;
-                view._camera_far = light._light._light_param.x * 1.5f;
+                view._camera_far = light._light._range * 1.5f;
                 view._light_world_position = light._light._light_pos.xyz;
                 view._constant_bias = ShadowBias(light._shadow._constant_bias);
                 view._slope_bias = ShadowBias(light._shadow._slope_bias);
@@ -282,9 +286,11 @@ namespace Ailu::Render
         {
             if (light._type != ECS::ELightType::kPoint)
                 continue;
-            if (light._shadow._is_cast_shadow)
+            if (point_light_index >= RenderConstants::kMaxPointLightNum)
+                break;
+            if (light._shadow._is_cast_shadow && point_shadow_map_index < RenderConstants::kMaxPointShadowLightNum)
             {
-                const f32 camera_far = light._light._light_param.x * 1.5f;
+                const f32 camera_far = light._light._range * 1.5f;
                 for (u16 face = 0u; face < 6u; ++face)
                 {
                     ShadowView view;

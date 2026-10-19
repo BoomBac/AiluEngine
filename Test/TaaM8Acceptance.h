@@ -67,7 +67,8 @@ public:
         sun._type = ECS::ELightType::kDirectional;
         sun._light = {};
         sun._light._light_color = Color(1.f, 1.f, 1.f, 1.f);
-        sun._light._light_param = Vector4f(1.f, 0.f, 0.f, 0.f);
+        sun._light._intensity = 1.f;
+        sun._light._intensity_unit = ECS::ELightIntensityUnit::kLux;
         sun._shadow = {};
         registry.GetComponent<ECS::TransformComponent>(sun_entity)->SetLocalRotation(
             Quaternion::EulerAngles(25.f, 25.f, 0.f));

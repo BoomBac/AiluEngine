@@ -363,6 +363,27 @@ builder_texture._meta = meta_texture;
 builder_texture._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Guid>);
 builder_texture._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Guid>);
 initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_texture));
+Meta meta_background_texture;
+meta_background_texture.Set("Category","");
+meta_background_texture.Set("IsColor",false);
+meta_background_texture.Set("IsRange",false);
+meta_background_texture.Set("IsFloatRange",true);
+meta_background_texture.Set("RangeMin",(f32)0);
+meta_background_texture.Set("RangeMax",(f32)1);
+MemberBuilder builder_background_texture;
+builder_background_texture._name = "_background_texture";
+builder_background_texture._type_name = "Ailu::Guid";
+builder_background_texture._offset = offsetof(EnvironmentComponent,_background_texture);
+builder_background_texture._is_const = false;
+builder_background_texture._is_static = false;
+builder_background_texture._is_public = false;
+builder_background_texture._is_pointer = false;
+builder_background_texture._is_ref = false;
+builder_background_texture._is_template = false;
+builder_background_texture._meta = meta_background_texture;
+builder_background_texture._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Guid>);
+builder_background_texture._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Guid>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_background_texture));
 Meta meta_procedural_sky;
 meta_procedural_sky.Set("Category","");
 meta_procedural_sky.Set("IsColor",false);
@@ -1793,6 +1814,60 @@ template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::ECS::EScriptPropertyType>()
 return s_enum_type_EScriptPropertyType.get();
 }
 //Enum EScriptPropertyType end...........................
+
+static std::unique_ptr<Ailu::Enum> s_enum_type_ELightIntensityUnit = nullptr;
+//Enum ELightIntensityUnit begin...........................
+const Ailu::Enum* Z_Construct_Enum_Ailu_ECS_ELightIntensityUnit_Type()
+{
+if(s_enum_type_ELightIntensityUnit == nullptr)
+{
+EnumInitializer initializer;
+initializer._name = "ELightIntensityUnit";
+initializer._namespace = "Ailu::ECS";
+initializer._full_name = "Ailu::ECS::ELightIntensityUnit";
+initializer._size = sizeof(Ailu::ECS::ELightIntensityUnit);
+initializer._str_to_enum_lut["kCandela"] = 0;
+initializer._str_to_enum_lut["kLumen"] = 1;
+initializer._str_to_enum_lut["kLux"] = 2;
+initializer._str_to_enum_lut["kWatt"] = 3;
+initializer._str_to_enum_lut["kWattPerSquareMeter"] = 4;
+initializer._str_to_enum_lut["kUnitlessLegacy"] = 5;
+s_enum_type_ELightIntensityUnit = std::make_unique<Ailu::Enum>(initializer);
+Ailu::Enum::RegisterEnum(s_enum_type_ELightIntensityUnit.get());
+}
+return s_enum_type_ELightIntensityUnit.get();
+}
+static Ailu::EnumTypeRegister g_register_ELightIntensityUnit(Z_Construct_Enum_Ailu_ECS_ELightIntensityUnit_Type);
+template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::ECS::ELightIntensityUnit>()
+{
+return s_enum_type_ELightIntensityUnit.get();
+}
+//Enum ELightIntensityUnit end...........................
+
+static std::unique_ptr<Ailu::Enum> s_enum_type_EAreaLightShape = nullptr;
+//Enum EAreaLightShape begin...........................
+const Ailu::Enum* Z_Construct_Enum_Ailu_ECS_EAreaLightShape_Type()
+{
+if(s_enum_type_EAreaLightShape == nullptr)
+{
+EnumInitializer initializer;
+initializer._name = "EAreaLightShape";
+initializer._namespace = "Ailu::ECS";
+initializer._full_name = "Ailu::ECS::EAreaLightShape";
+initializer._size = sizeof(Ailu::ECS::EAreaLightShape);
+initializer._str_to_enum_lut["kRectangle"] = 0;
+initializer._str_to_enum_lut["kDisc"] = 1;
+s_enum_type_EAreaLightShape = std::make_unique<Ailu::Enum>(initializer);
+Ailu::Enum::RegisterEnum(s_enum_type_EAreaLightShape.get());
+}
+return s_enum_type_EAreaLightShape.get();
+}
+static Ailu::EnumTypeRegister g_register_EAreaLightShape(Z_Construct_Enum_Ailu_ECS_EAreaLightShape_Type);
+template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::ECS::EAreaLightShape>()
+{
+return s_enum_type_EAreaLightShape.get();
+}
+//Enum EAreaLightShape end...........................
 
 static std::unique_ptr<Ailu::Enum> s_enum_type_ELightType = nullptr;
 //Enum ELightType begin...........................

@@ -608,9 +608,35 @@ namespace Ailu
         APROPERTY()
         Vector4f _light_color = Vector4f::kZero;
         APROPERTY()
+        bool _use_color_temperature = false;
+        APROPERTY()
+        f32 _color_temperature_kelvin = 6500.0f;
+        APROPERTY()
         Vector4f _light_param = Vector4f::kZero;
         APROPERTY()
         bool _is_two_side = false;
+        APROPERTY()
+        f32 _intensity = 1.0f;
+        APROPERTY()
+        String _intensity_unit = "kCandela";
+        APROPERTY()
+        f32 _range = 10.0f;
+        APROPERTY()
+        f32 _source_radius = 0.05f;
+        APROPERTY()
+        f32 _angular_radius = 0.265f;
+        APROPERTY()
+        f32 _spot_inner_angle = 30.0f;
+        APROPERTY()
+        f32 _spot_outer_angle = 45.0f;
+        APROPERTY()
+        f32 _area_width = 1.0f;
+        APROPERTY()
+        f32 _area_height = 1.0f;
+        APROPERTY()
+        f32 _area_disc_radius = 0.5f;
+        APROPERTY()
+        String _area_shape = "kRectangle";
     };
 
     ASTRUCT()
@@ -636,7 +662,134 @@ namespace Ailu
         APROPERTY()
         SceneLightDataDocument _light;
         APROPERTY()
+        u32 _light_schema_version = 0u;
+        APROPERTY()
         SceneShadowDataDocument _shadow;
+
+        void ApplyTo(ECS::LightComponent &component) const
+        {
+            if (const Enum *enum_type = StaticEnum<ECS::ELightType>(); !_type.empty() && enum_type != nullptr)
+            {
+                const i32 index = enum_type->GetIndexByName(_type);
+                if (index >= 0)
+                    component._type = static_cast<ECS::ELightType>(index);
+            }
+
+            const f32 legacy_intensity = _light._light_color.w;
+            component._light._light_color = _light._light_color;
+            component._light._light_color.w = 1.0f;
+            component._light._is_two_side = _light._is_two_side;
+            if (_light_schema_version == 0u)
+            {
+                component._light._use_color_temperature = false;
+                component._light._color_temperature_kelvin = 6500.0f;
+                const Vector4f &legacy = _light._light_param;
+                component._light._intensity = legacy_intensity;
+                component._light._light_color.w = 1.0f;
+                component._light._intensity_unit = ECS::ELightIntensityUnit::kUnitlessLegacy;
+                component._light._range = legacy.x;
+                component._light._source_radius = 0.05f;
+                if (component._type == ECS::ELightType::kDirectional)
+                    component._light._angular_radius = legacy.w;
+                else if (component._type == ECS::ELightType::kPoint)
+                    component._light._source_radius = legacy.y;
+                else if (component._type == ECS::ELightType::kSpot)
+                {
+                    component._light._spot_inner_angle = legacy.y;
+                    component._light._spot_outer_angle = legacy.z;
+                }
+                else
+                {
+                    component._light._area_width = legacy.y;
+                    component._light._area_height = legacy.z;
+                    component._light._area_shape = legacy.w == 0.0f
+                        ? ECS::EAreaLightShape::kRectangle : ECS::EAreaLightShape::kDisc;
+                    component._light._area_disc_radius = legacy.x;
+                }
+            }
+            else
+            {
+                component._light._intensity = _light._intensity;
+                component._light._use_color_temperature = _light._use_color_temperature;
+                component._light._color_temperature_kelvin = std::clamp(_light._color_temperature_kelvin, 1000.0f, 40000.0f);
+                component._light._range = _light._range;
+                component._light._source_radius = _light._source_radius;
+                component._light._angular_radius = _light._angular_radius;
+                component._light._spot_inner_angle = _light._spot_inner_angle;
+                component._light._spot_outer_angle = _light._spot_outer_angle;
+                component._light._area_width = _light._area_width;
+                component._light._area_height = _light._area_height;
+                component._light._area_disc_radius = _light._area_disc_radius;
+
+                if (const Enum *enum_type = StaticEnum<ECS::ELightIntensityUnit>(); enum_type != nullptr)
+                {
+                    const i32 index = enum_type->GetIndexByName(_light._intensity_unit);
+                    if (index >= 0)
+                        component._light._intensity_unit = static_cast<ECS::ELightIntensityUnit>(index);
+                }
+                if (const Enum *enum_type = StaticEnum<ECS::EAreaLightShape>(); enum_type != nullptr)
+                {
+                    const i32 index = enum_type->GetIndexByName(_light._area_shape);
+                    if (index >= 0)
+                        component._light._area_shape = static_cast<ECS::EAreaLightShape>(index);
+                }
+            }
+
+            component._light._spot_inner_angle = std::min(component._light._spot_inner_angle,
+                                                          component._light._spot_outer_angle);
+            component._shadow._is_cast_shadow = _shadow._is_cast_shadow;
+            component._shadow._constant_bias = _shadow._constant_bias;
+            component._shadow._slope_bias = _shadow._slope_bias;
+        }
+
+        void ApplyLightTo(ECS::LightComponent &component) const
+        {
+            ECS::LightComponent migrated = component;
+            ApplyTo(migrated);
+            component._light = migrated._light;
+        }
+
+        void CaptureFrom(const ECS::LightComponent &component)
+        {
+            _light_schema_version = 1u;
+            if (const Enum *enum_type = StaticEnum<ECS::ELightType>())
+                _type = enum_type->GetNameByEnum(component._type);
+
+            const auto &light = component._light;
+            _light._light_color = light._light_color;
+            _light._light_color.w = 1.0f;
+            _light._use_color_temperature = light._use_color_temperature;
+            _light._color_temperature_kelvin = light._color_temperature_kelvin;
+            _light._is_two_side = light._is_two_side;
+            _light._intensity = light._intensity;
+            if (const Enum *enum_type = StaticEnum<ECS::ELightIntensityUnit>())
+                _light._intensity_unit = enum_type->GetNameByEnum(light._intensity_unit);
+            _light._range = light._range;
+            _light._source_radius = light._source_radius;
+            _light._angular_radius = light._angular_radius;
+            _light._spot_inner_angle = light._spot_inner_angle;
+            _light._spot_outer_angle = light._spot_outer_angle;
+            _light._area_width = light._area_width;
+            _light._area_height = light._area_height;
+            _light._area_disc_radius = light._area_disc_radius;
+            if (const Enum *enum_type = StaticEnum<ECS::EAreaLightShape>())
+                _light._area_shape = enum_type->GetNameByEnum(light._area_shape);
+
+            _light._light_param = Vector4f(light._range, light._source_radius, 0.0f, 0.0f);
+            if (component._type == ECS::ELightType::kDirectional)
+                _light._light_param = Vector4f(0.0f, 0.0f, 0.0f, light._angular_radius);
+            else if (component._type == ECS::ELightType::kSpot)
+                _light._light_param = Vector4f(light._range, light._spot_inner_angle, light._spot_outer_angle, 0.0f);
+            else if (component._type == ECS::ELightType::kArea)
+                _light._light_param = Vector4f(light._area_shape == ECS::EAreaLightShape::kDisc
+                        ? light._area_disc_radius : light._range,
+                    light._area_width, light._area_height,
+                    light._area_shape == ECS::EAreaLightShape::kDisc ? 1.0f : 0.0f);
+            _light._light_color.w = light._intensity;
+            _shadow._is_cast_shadow = component._shadow._is_cast_shadow;
+            _shadow._constant_bias = component._shadow._constant_bias;
+            _shadow._slope_bias = component._shadow._slope_bias;
+        }
     };
 
     ASTRUCT()
@@ -720,6 +873,8 @@ namespace Ailu
         f32 _near_clip = 0.1f;
         APROPERTY()
         f32 _fov_h = 60.0f;
+        APROPERTY()
+        Render::PhysicalCameraSettings _physical_camera_settings;
         APROPERTY()
         f32 _size = 1.0f;
         APROPERTY()
@@ -861,6 +1016,8 @@ namespace Ailu
         ECS::EEnvironmentSource _source = ECS::EEnvironmentSource::kProceduralSky;
         APROPERTY()
         String _texture_guid;
+        APROPERTY()
+        String _background_texture_guid;
         APROPERTY()
         Color _sky_color = Color(0.18f, 0.32f, 0.58f, 1.0f);
         APROPERTY()

@@ -74,6 +74,12 @@ namespace Ailu::Render
             item._command._pass_index = pass_index;
             item._render_queue = render_queue;
             item._view_depth = object._distance_to_cam;
+            const auto *shader = material != nullptr ? material->GetActiveShader() : nullptr;
+            if (shader == nullptr || pass_index >= shader->PassCount())
+            {
+                item._command._material = nullptr;
+                return item;
+            }
             item._command._variant_hash = variant_override_hash != UINT32_MAX
                 ? variant_override_hash : material->ActiveVariantHash(pass_index);
             item._command._stencil_ref = (object._flags & kPrimitivePerObjectMotion) ? 1u : 0u;
@@ -84,7 +90,7 @@ namespace Ailu::Render
                 item._command._flags |= kPreparedDrawForceAlphaTest;
             if (force_alpha_test && variant_override_hash == UINT32_MAX)
                 item._command._variant_hash = material->GetShadowVariantHash(pass_index, false, true);
-            if (const auto *shader = material->GetActiveShader(); shader != nullptr)
+            if (shader != nullptr)
             {
                 auto raster_state = shader->PipelineRasterizerState(pass_index);
                 raster_state._cull_mode = material->GetCullMode();
@@ -326,6 +332,8 @@ namespace Ailu::Render
             {
                 auto &item = items[batch._item_index];
                 PreparedDrawCommand &command = item._command;
+                if (command._material == nullptr)
+                    continue;
                 command._material->GetShader()->_stencil_ref = command._stencil_ref;
                 cmd->DrawSceneMesh(command._vertex_buffer, command._index_buffer, command._material,
                                    command._submesh_index, command._pass_index,
@@ -448,6 +456,8 @@ namespace Ailu::Render
                       { 
                           builder.Read(rendering_data._rg_handles._color_target, EResourceUsage::kWriteRTV);
                           builder.Read(rendering_data._rg_handles._depth_target, EResourceUsage::kDSV);
+                          if (rendering_data._rg_handles._pre_exposure_ev.IsValid())
+                              builder.Read(rendering_data._rg_handles._pre_exposure_ev, EResourceUsage::kReadSRV);
                           if (glass_color.IsValid())
                               builder.Read(glass_color);
                           if (use_volumetric_fog)
@@ -462,6 +472,7 @@ namespace Ailu::Render
                               builder.Read(rendering_data._rg_handles._ao_tex);
                           if (rendering_data._rg_handles._environment_sh.IsValid())
                           builder.Read(rendering_data._rg_handles._environment_sh);
+                          builder.Read(rendering_data._rg_handles._raster_area_lights, EResourceUsage::kReadSRV);
                           builder.Read(rendering_data._rg_handles._environment_diffuse);
                           builder.Read(rendering_data._rg_handles._environment_specular);
                           rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target);
@@ -1069,6 +1080,8 @@ namespace Ailu::Render
                           builder.Read(rendering_data._rg_handles._gbuffers[2]);
                           builder.Read(rendering_data._rg_handles._gbuffers[3]);
                           builder.Read(rendering_data._rg_handles._depth_target);
+                          if (rendering_data._rg_handles._pre_exposure_ev.IsValid())
+                              builder.Read(rendering_data._rg_handles._pre_exposure_ev, EResourceUsage::kReadSRV);
                           if (use_shadow_maps)
                           {
                               builder.Read(rendering_data._rg_handles._main_light_shadow_map);
@@ -1077,6 +1090,7 @@ namespace Ailu::Render
                           }
                           if (rendering_data._rg_handles._ao_tex.IsValid())
                               builder.Read(rendering_data._rg_handles._ao_tex);
+                          builder.Read(rendering_data._rg_handles._raster_area_lights, EResourceUsage::kReadSRV);
                           builder.Read(rendering_data._rg_handles._environment_diffuse);
                           builder.Read(rendering_data._rg_handles._environment_specular);
                           if (rendering_data._ddgi_lighting._irradiance_atlas_handle.IsValid())
@@ -1279,6 +1293,9 @@ namespace Ailu::Render
             graph.AddPass("DrawTextureSky", RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
             {
                 builder.Read(rendering_data._rg_handles._environment_sky);
+                builder.Read(rendering_data._rg_handles._environment_background);
+                if (rendering_data._rg_handles._pre_exposure_ev.IsValid())
+                    builder.Read(rendering_data._rg_handles._pre_exposure_ev, EResourceUsage::kReadSRV);
                 builder.Read(rendering_data._rg_handles._color_target, EResourceUsage::kWriteRTV);
                 builder.Read(rendering_data._rg_handles._depth_target, EResourceUsage::kDSV);
                 rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target);
@@ -1286,8 +1303,14 @@ namespace Ailu::Render
             }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
             {
                 _p_texture_material->SetTexture("_EnvironmentSky", graph.Resolve<Texture>(data._rg_handles._environment_sky));
+                _p_texture_material->SetTexture("_EnvironmentBackground",
+                    graph.Resolve<Texture>(data._rg_handles._environment_background));
+                _p_texture_material->SetInt("_UseSeparateBackground",
+                    data._environment->_background_latlong != nullptr);
                 _p_texture_material->SetFloat("_EnvironmentIntensity", data._environment->_intensity);
                 _p_texture_material->SetFloat("_EnvironmentRotation", data._environment->_rotation);
+                cmd->SetRenderTargetLoadAction(data._rg_handles._color_target, ELoadStoreAction::kNotCare);
+                cmd->SetRenderTargetLoadAction(data._rg_handles._depth_target, ELoadStoreAction::kNotCare);
                 cmd->SetRenderTarget(data._rg_handles._color_target, data._rg_handles._depth_target);
                 if (_is_clear)
                 {
@@ -1302,6 +1325,8 @@ namespace Ailu::Render
                       { 
                           builder.Read(rendering_data._rg_handles._sky_view_lut);
                           builder.Read(rendering_data._rg_handles._environment_transmittance_lut);
+                          if (rendering_data._rg_handles._pre_exposure_ev.IsValid())
+                              builder.Read(rendering_data._rg_handles._pre_exposure_ev, EResourceUsage::kReadSRV);
                           builder.Read(rendering_data._rg_handles._color_target, EResourceUsage::kWriteRTV);
                           builder.Read(rendering_data._rg_handles._depth_target, EResourceUsage::kDSV);
                           rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target);
@@ -1338,8 +1363,15 @@ namespace Ailu::Render
             if (rendering_data._environment != nullptr && rendering_data._environment->_is_texture_source)
             {
                 _p_texture_material->SetTexture("_EnvironmentSky", rendering_data._environment->_sky_cubemap.get());
+                _p_texture_material->SetTexture("_EnvironmentBackground",
+                    rendering_data._environment->_background_latlong != nullptr
+                        ? rendering_data._environment->_background_latlong.get() : Texture::s_p_default_black);
+                _p_texture_material->SetInt("_UseSeparateBackground",
+                    rendering_data._environment->_background_latlong != nullptr);
                 _p_texture_material->SetFloat("_EnvironmentIntensity", rendering_data._environment->_intensity);
                 _p_texture_material->SetFloat("_EnvironmentRotation", rendering_data._environment->_rotation);
+                cmd->SetRenderTargetLoadAction(rendering_data._camera_color_target_handle, ELoadStoreAction::kNotCare);
+                cmd->SetRenderTargetLoadAction(rendering_data._camera_depth_target_handle, ELoadStoreAction::kNotCare);
                 cmd->SetRenderTarget(rendering_data._camera_color_target_handle, rendering_data._camera_depth_target_handle);
                 if (_is_clear)
                 {

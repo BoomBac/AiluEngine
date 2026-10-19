@@ -694,3 +694,60 @@ namespace Ailu
     }
 #pragma warning(pop)
 }
+
+namespace std
+{
+    template<typename T>
+    struct formatter<Ailu::Math::Vector2D<T>, char>
+    {
+        constexpr auto parse(format_parse_context &context)
+        {
+            auto iterator = context.begin();
+            if (iterator != context.end() && *iterator != '}')
+                throw format_error("Vector2D formatter does not accept a format specifier");
+            return iterator;
+        }
+
+        template<typename FormatContext>
+        auto format(const Ailu::Math::Vector2D<T> &value, FormatContext &context) const
+        {
+            return format_to(context.out(), "{}", value.ToString());
+        }
+    };
+
+    template<typename T>
+    struct formatter<Ailu::Math::Vector3D<T>, char>
+    {
+        constexpr auto parse(format_parse_context &context)
+        {
+            auto iterator = context.begin();
+            if (iterator != context.end() && *iterator != '}')
+                throw format_error("Vector3D formatter does not accept a format specifier");
+            return iterator;
+        }
+
+        template<typename FormatContext>
+        auto format(const Ailu::Math::Vector3D<T> &value, FormatContext &context) const
+        {
+            return format_to(context.out(), "{}", value.ToString());
+        }
+    };
+
+    template<typename T>
+    struct formatter<Ailu::Math::Vector4D<T>, char>
+    {
+        constexpr auto parse(format_parse_context &context)
+        {
+            auto iterator = context.begin();
+            if (iterator != context.end() && *iterator != '}')
+                throw format_error("Vector4D formatter does not accept a format specifier");
+            return iterator;
+        }
+
+        template<typename FormatContext>
+        auto format(const Ailu::Math::Vector4D<T> &value, FormatContext &context) const
+        {
+            return format_to(context.out(), "{}", value.ToString());
+        }
+    };
+}

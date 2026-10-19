@@ -4,21 +4,24 @@
 #include "Framework/Common/TimeMgr.h"
 #include "Framework/Common/Utils.h"
 #include "pch.h"
-#include <sstream>
 
 namespace Ailu
 {
     std::wstring ANSIColorful(const LogMessage &log_msg)
     {
         //https://talyian.github.io/ansicolors/
-        // ANSI 控制码颜色：Info, Warning, Error, Fatal
-        static const std::wstring kFormatControlBlock[] = {
-            L"\u001b[1;37m",     // kInfo: 高亮白
-            L"\x1b[38;5;220m",   // kWarning: 黄色
-            L"\u001b[1;31m",     // kError: 高亮红
-            L"\u001b[1;41m"      // kFatal: 红底白字
-        };
-        std::wstring msg = kFormatControlBlock[log_msg._level];
+        const wchar_t *color = L"\u001b[1;37m";
+        switch (log_msg._level)
+        {
+            case ELogLevel::kWarning: color = L"\x1b[38;5;220m"; break;
+            case ELogLevel::kError: color = L"\u001b[1;31m"; break;
+            case ELogLevel::kFatal: color = L"\u001b[1;41m"; break;
+            case ELogLevel::kTrace:
+            case ELogLevel::kDebug:
+            case ELogLevel::kInfo:
+            default: break;
+        }
+        std::wstring msg = color;
         msg.append(log_msg.ToString());
         return msg;
     }
@@ -51,6 +54,7 @@ namespace Ailu
 
 #pragma region LogMgr
     static LogMgr* g_LogMgr = nullptr;
+    std::mutex FileAppender::s_output_mutex;
     void LogMgr::Init()
     {
         AL_ASSERT(g_LogMgr == nullptr);
@@ -85,12 +89,15 @@ namespace Ailu
             std::cerr << "Failed to open the file for clearing." << std::endl;
         return ret;
     }
-    LogMgr::LogMgr(std::string name, ELogLevel output_level, TraceLevle output_mark) : _name(name), _output_level(output_level), _output_mark(output_mark)
+    LogMgr::LogMgr(std::string name, ELogLevel output_level, TraceLevle output_mark)
+        : _output_level(output_level), _output_mark(output_mark), _name(std::move(name))
     {
     }
     void LogMgr::Finalize()
     {
-        for (auto &logger: _appenders)
+        std::lock_guard output_lock(_output_mutex);
+        std::lock_guard appender_lock(_appender_mutex);
+        for (auto *logger: _appenders)
         {
             delete logger;
         }
@@ -101,11 +108,11 @@ namespace Ailu
     {
         _name = "DefaultLogMgr";
         _output_level = kLogLevel;
-        _output_mark = _output_mark;
+        _output_mark = kTraceLevel;
     }
-
     void LogMgr::AddAppender(IAppender *appender)
     {
+        std::lock_guard lock(_appender_mutex);
         _appenders.push_back(appender);
     }
     const std::string &LogMgr::GetOutputPath() const
@@ -120,22 +127,46 @@ namespace Ailu
     {
         _output_mark = level;
     }
-    const ELogLevel &LogMgr::GetOutputLevel() const
+    bool LogMgr::IsEnabled(ELogLevel level) const
     {
-        return _output_level;
+        return level >= _output_level.load(std::memory_order_relaxed);
     }
-    const TraceLevle &LogMgr::GetTraceLevel() const
+    bool LogMgr::IsEnabled(ELogLevel level, ELogModule module) const
     {
-        return _output_mark;
+        if (IsEnabled(level))
+            return true;
+        if (level > ELogLevel::kDebug)
+            return false;
+        const u32 module_bit = 1u << static_cast<u32>(module);
+        return (_module_diagnostics_mask.load(std::memory_order_relaxed) & module_bit) != 0u;
+    }
+    void LogMgr::SetModuleDiagnostics(ELogModule module, bool enabled)
+    {
+        const u32 module_bit = 1u << static_cast<u32>(module);
+        if (enabled)
+            _module_diagnostics_mask.fetch_or(module_bit, std::memory_order_relaxed);
+        else
+            _module_diagnostics_mask.fetch_and(~module_bit, std::memory_order_relaxed);
+    }
+    ELogLevel LogMgr::GetOutputLevel() const
+    {
+        return _output_level.load(std::memory_order_relaxed);
+    }
+    TraceLevle LogMgr::GetTraceLevel() const
+    {
+        return _output_mark.load(std::memory_order_relaxed);
     }
     void LogMgr::LogMsgImpl(const LogMessage &msg)
     {
-        for (auto &appender: _appenders)
+        std::lock_guard output_lock(_output_mutex);
+        std::vector<IAppender *> appenders;
         {
-            if (msg._level >= _output_level)
-            {
-                appender->Print(msg);
-            }
+            std::lock_guard appender_lock(_appender_mutex);
+            appenders = _appenders;
+        }
+        for (auto *appender: appenders)
+        {
+            appender->Print(msg);
         }
         // Core::ThreadPool::Get().Enqueue([=](){
         //     for (auto &appender: _appenders)
@@ -146,6 +177,26 @@ namespace Ailu
         //         }
         //     }
         // });
+    }
+
+    FileAppender::FileAppender() : _output(s_out_path, std::ios_base::out | std::ios_base::app)
+    {
+    }
+    FileAppender::~FileAppender()
+    {
+        std::lock_guard lock(s_output_mutex);
+        if (_output.is_open())
+        {
+            _output.flush();
+            _output.close();
+        }
+    }
+    void FileAppender::Print(const LogMessage &log_msg)
+    {
+        std::lock_guard lock(s_output_mutex);
+        if (!_output.is_open()) { return; }
+        _output << log_msg.ToDetailString() << L'\n';
+        if (log_msg._level >= ELogLevel::kError) { _output.flush(); }
     }
 #pragma endregion
 }// namespace Ailu

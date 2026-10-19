@@ -68,6 +68,7 @@ namespace Ailu::Render
             u64 _request = 0u;
             u32 _width = 0u, _height = 0u;
             int _quality = 5;
+            bool _use_guides = false;
 
             void Initialize(const std::wstring &shader_path, const std::wstring &runtime_path)
             {
@@ -78,22 +79,24 @@ namespace Ailu::Render
                 }
                 try
                 {
-                    if (!_interop.Initialize(_device.Get(), nullptr, _width, _height, runtime_path, true, _quality))
+                    if (!_interop.Initialize(_device.Get(), nullptr, _width, _height, runtime_path, true, _quality,
+                                             _use_guides))
                         throw std::runtime_error(_interop.Reason());
-                    D3D12_DESCRIPTOR_RANGE ranges[2]{};
+                    D3D12_DESCRIPTOR_RANGE ranges[3]{};
                     ranges[0] = {D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1u, 0u, 0u, 0u};
-                    ranges[1] = {D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1u, 1u, 0u, 1u};
+                    ranges[1] = {D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2u, 2u, 0u, 2u};
+                    ranges[2] = {D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1u, 1u, 0u, 1u};
                     D3D12_ROOT_PARAMETER parameters[5]{};
                     parameters[0].ParameterType = parameters[3].ParameterType =
                             D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-                    parameters[0].DescriptorTable = {1u, &ranges[0]};
-                    parameters[3].DescriptorTable = {1u, &ranges[1]};
+                    parameters[0].DescriptorTable = {2u, &ranges[0]};
+                    parameters[3].DescriptorTable = {1u, &ranges[2]};
                     parameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_UAV;
                     parameters[1].Descriptor.ShaderRegister = 0u;
                     parameters[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
                     parameters[2].Descriptor.ShaderRegister = 1u;
                     parameters[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
-                    parameters[4].Constants = {0u, 0u, 2u};
+                    parameters[4].Constants = {0u, 0u, 3u};
                     D3D12_ROOT_SIGNATURE_DESC desc{5u, parameters, 0u, nullptr, D3D12_ROOT_SIGNATURE_FLAG_NONE};
                     ComPtr<ID3DBlob> signature, errors;
                     Check(D3D12SerializeRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &errors));
@@ -119,7 +122,7 @@ namespace Ailu::Render
                     }
                     D3D12_DESCRIPTOR_HEAP_DESC heap{};
                     heap.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-                    heap.NumDescriptors = 2u;
+                    heap.NumDescriptors = 4u;
                     heap.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
                     Check(_device->CreateDescriptorHeap(&heap, IID_PPV_ARGS(&_descriptors)));
                     _status.store(EDenoiserStatus::kIdle);
@@ -203,8 +206,8 @@ namespace Ailu::Render
             native->SetComputeRootDescriptorTable(3u, gpu);
             native->SetComputeRootUnorderedAccessView(1u, session._interop.Input()->GetGPUVirtualAddress());
             native->SetComputeRootShaderResourceView(2u, session._interop.Output()->GetGPUVirtualAddress());
-            const u32 dimensions[] = {session._width, session._height};
-            native->SetComputeRoot32BitConstants(4u, 2u, dimensions, 0u);
+            const u32 dimensions[] = {session._width, session._height, session._use_guides ? 1u : 0u};
+            native->SetComputeRoot32BitConstants(4u, 3u, dimensions, 0u);
         }
     }// namespace
     class OidnGpuDenoiser final : public IPathTracingDenoiser
@@ -268,19 +271,22 @@ namespace Ailu::Render
             if (!context) return {};
             const int quality = 4 + static_cast<int>(input._quality);
             if (_session && (_session->_stop.load() || _session->_width != input._width ||
-                             _session->_height != input._height || _session->_quality != quality))
+                             _session->_height != input._height || _session->_quality != quality ||
+                             _session->_use_guides != input._use_guides))
                 Retire();
             if (IsRetiring()) return {};
             _retiring.reset();
             if (!_session)
             {
-                if (uint64_t(input._width) * input._height * 16u + 16u > UINT32_MAX) return {};
+                if (uint64_t(input._width) * input._height * 16u * (input._use_guides ? 3u : 1u) + 16u > UINT32_MAX)
+                    return {};
                 auto session = std::make_shared<Session>();
                 session->_device = context->GetDevice();
                 session->_submission_fence = context->SubmissionFence();
                 session->_width = input._width;
                 session->_height = input._height;
                 session->_quality = quality;
+                session->_use_guides = input._use_guides;
                 session->_activation_owner = input._activation_owner;
                 session->_generation.store(_generation);
                 context->RegisterExternalGpuLifetime([session] { session->Stop(); },
@@ -308,7 +314,8 @@ namespace Ailu::Render
             if (!_input)
             {
                 _input = AdoptGpuResource(
-                        new SharedBuffer(session->_interop.Input(), input._width * input._height * 16u + 16u));
+                        new SharedBuffer(session->_interop.Input(),
+                                         input._width * input._height * 16u * (input._use_guides ? 3u : 1u) + 16u));
                 _output = AdoptGpuResource(
                         new SharedBuffer(session->_interop.Output(), input._width * input._height * 16u));
                 TextureDesc desc(input._width, input._height, ERenderTargetFormat::kRGBAFloat);
@@ -316,7 +323,8 @@ namespace Ailu::Render
                 desc._is_linear = true;
                 _previews[0] = RenderTexture::Create(desc, "OIDN HDR Preview A");
                 _previews[1] = RenderTexture::Create(desc, "OIDN HDR Preview B");
-                _diagnostics._shared_mb = float(session->_interop.Input()->GetDesc().Width * 2u) / (1024.0f * 1024.0f);
+                _diagnostics._shared_mb = float(session->_interop.Input()->GetDesc().Width +
+                                               session->_interop.Output()->GetDesc().Width) / (1024.0f * 1024.0f);
             }
             if (!_previews[0]->IsReady() || !_previews[1]->IsReady()) return {};
             if (phase == EDenoiserStatus::kFiltering)
@@ -415,6 +423,11 @@ namespace Ailu::Render
                     [input, shared](RDG::RenderGraphBuilder &builder)
                     {
                         builder.Read(input._radiance, EResourceUsage::kReadSRV);
+                        if (input._use_guides)
+                        {
+                            builder.Read(input._albedo, EResourceUsage::kReadSRV);
+                            builder.Read(input._normal, EResourceUsage::kReadSRV);
+                        }
                         (void) builder.Write(shared, EResourceUsage::kWriteUAV);
                     },
                     [input, session, ticket, buffer, request](RDG::RenderGraph &pass_graph, CommandBuffer *cmd,
@@ -436,9 +449,20 @@ namespace Ailu::Render
                                     srv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
                                     srv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
                                     srv.Texture2D.MipLevels = 1u;
-                                    session->_device->CreateShaderResourceView(
-                                            resource, &srv,
-                                            session->_descriptors->GetCPUDescriptorHandleForHeapStart());
+                                    auto cpu = session->_descriptors->GetCPUDescriptorHandleForHeapStart();
+                                    const auto stride = session->_device->GetDescriptorHandleIncrementSize(
+                                            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+                                    session->_device->CreateShaderResourceView(resource, &srv, cpu);
+                                    Texture *guides[] = {input._albedo_owner.get(), input._normal_owner.get()};
+                                    for (u32 index = 0u; index < 2u; ++index)
+                                    {
+                                        auto guide_cpu = cpu;
+                                        guide_cpu.ptr += (index + 2u) * stride;
+                                        auto *guide = input._use_guides
+                                            ? guides[index]->NativeResource().As<ID3D12Resource>() : resource;
+                                        srv.Format = guide->GetDesc().Format;
+                                        session->_device->CreateShaderResourceView(guide, &srv, guide_cpu);
+                                    }
                                     Bind(*session, *cmd);
                                     cmd->SetComputePipelineState(session->_clear.Get());
                                     cmd->NativeCmdList()->Dispatch(1u, 1u, 1u);

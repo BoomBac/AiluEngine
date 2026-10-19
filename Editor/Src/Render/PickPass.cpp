@@ -616,13 +616,13 @@ namespace Ailu
                 case Ailu::ECS::ELightType::kPoint:
                 {
                     //范围球
-                    Gizmo::DrawCircle(transf._position, comp._light._light_param.x, 24, comp._light._light_color, MatrixRotationX(ToRadius(90.0f)));
-                    Gizmo::DrawCircle(transf._position, comp._light._light_param.x, 24, comp._light._light_color, MatrixRotationZ(ToRadius(90.0f)));
-                    Gizmo::DrawCircle(transf._position, comp._light._light_param.x, 24, comp._light._light_color);
+                    Gizmo::DrawCircle(transf._position, comp._light._range, 24, comp._light._light_color, MatrixRotationX(ToRadius(90.0f)));
+                    Gizmo::DrawCircle(transf._position, comp._light._range, 24, comp._light._light_color, MatrixRotationZ(ToRadius(90.0f)));
+                    Gizmo::DrawCircle(transf._position, comp._light._range, 24, comp._light._light_color);
                     //光源大小
-                    Gizmo::DrawCircle(transf._position, comp._light._light_param.y, 24, comp._light._light_color, MatrixRotationX(ToRadius(90.0f)));
-                    Gizmo::DrawCircle(transf._position, comp._light._light_param.y, 24, comp._light._light_color, MatrixRotationZ(ToRadius(90.0f)));
-                    Gizmo::DrawCircle(transf._position, comp._light._light_param.y, 24, comp._light._light_color);
+                    Gizmo::DrawCircle(transf._position, comp._light._source_radius, 24, comp._light._light_color, MatrixRotationX(ToRadius(90.0f)));
+                    Gizmo::DrawCircle(transf._position, comp._light._source_radius, 24, comp._light._light_color, MatrixRotationZ(ToRadius(90.0f)));
+                    Gizmo::DrawCircle(transf._position, comp._light._source_radius, 24, comp._light._light_color);
                     return;
                 }
                 case Ailu::ECS::ELightType::kSpot:
@@ -630,10 +630,10 @@ namespace Ailu
                     float angleIncrement = 90.0;
                     auto rot_mat = Quaternion::ToMat4f(transf._rotation);
                     Vector3f light_to = comp._light._light_dir.xyz;
-                    light_to *= comp._light._light_param.x;
+                    light_to *= comp._light._range;
                     {
                         Vector3f inner_center = light_to + transf._position;
-                        float inner_radius = tan(ToRadius(comp._light._light_param.y / 2.0f)) * comp._light._light_param.x;
+                        float inner_radius = tan(ToRadius(comp._light._spot_inner_angle / 2.0f)) * comp._light._range;
                         Gizmo::DrawLine(transf._position, transf._position + light_to * 10.f, Colors::kYellow);
                         Gizmo::DrawCircle(inner_center, inner_radius, 24, comp._light._light_color, rot_mat);
                         for (int i = 0; i < 4; ++i)
@@ -656,7 +656,7 @@ namespace Ailu
                     light_to *= 0.9f;
                     {
                         Vector3f outer_center = light_to + transf._position;
-                        float outer_radius = tan(ToRadius(comp._light._light_param.z / 2.0f)) * comp._light._light_param.x;
+                        float outer_radius = tan(ToRadius(comp._light._spot_outer_angle / 2.0f)) * comp._light._range;
                         Gizmo::DrawCircle(outer_center, outer_radius, 24, comp._light._light_color, rot_mat);
                         for (int i = 0; i < 4; ++i)
                         {
@@ -678,14 +678,14 @@ namespace Ailu
                 case ECS::ELightType::kArea:
                 {
                     Vector3f light_to = comp._light._light_dir.xyz;
-                    light_to.x *= comp._light._light_param.x;
-                    light_to.y *= comp._light._light_param.x;
-                    light_to.z *= comp._light._light_param.x;
+                    light_to.x *= comp._light._range;
+                    light_to.y *= comp._light._range;
+                    light_to.z *= comp._light._range;
                     Gizmo::DrawLine(transf._position, transf._position + light_to, comp._light._light_color);
-                    if (comp._light._light_param.w == 0.0f)
+                    if (comp._light._area_shape == ECS::EAreaLightShape::kRectangle)
                     {
                         Vector3f points[4];
-                        f32 w = comp._light._light_param.y * 0.5f,h = comp._light._light_param.z * 0.5f;
+                        f32 w = comp._light._area_width * 0.5f,h = comp._light._area_height * 0.5f;
                         points[0].x = -w;
                         points[0].z = h;
                         points[1].x = w;
@@ -706,7 +706,7 @@ namespace Ailu
                     }
                     else
                     {
-                        Gizmo::DrawCircle(transf._position, comp._light._light_param.y, 24, comp._light._light_color, Quaternion::ToMat4f(transf._rotation));
+                        Gizmo::DrawCircle(transf._position, comp._light._area_disc_radius, 24, comp._light._light_color, Quaternion::ToMat4f(transf._rotation));
                     }
                 }
             }

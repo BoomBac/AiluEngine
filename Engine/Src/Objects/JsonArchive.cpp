@@ -866,7 +866,7 @@ namespace Ailu
         const bool saved = _impl->Save(sys_path.wstring(), std::get<JsonObject>(_root.value));
         if (!saved)
         {
-            LOG_ERROR("Failed to save JSON archive to {}", sys_path);
+            LOG_ERROR("Failed to save JSON archive to {}", sys_path.string());
         }
         Reset();
         return saved;
@@ -876,7 +876,7 @@ namespace Ailu
         Reset();
         if (!_impl->Load(sys_path.wstring()))
         {
-            LOG_ERROR("Failed to load JSON archive from {}", sys_path);
+            LOG_ERROR("Failed to load JSON archive from {}", sys_path.string());
         }
         else
         {

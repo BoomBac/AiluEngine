@@ -50,8 +50,8 @@ namespace Ailu
                 constexpr static int sub_task_block_size = 128;
                 constexpr static bool use_multithread = false;
                 int row_size = channels * width;
-                int new_width = width >> 1;
-                int new_height = height >> 1;
+                int new_width = std::max(1, width >> 1);
+                int new_height = std::max(1, height >> 1);
                 int new_img_size = new_width * new_height * channels;
                 u8 *new_image = AL_ALLOC_TAG(EMemoryTag::kTemporary, u8, new_img_size);
                 auto downsample_sub_task = [&](int xbegin, int xend, int ybegin, int yend, int new_width) -> bool
@@ -64,9 +64,11 @@ namespace Ailu
                             int a_i = i * 2;
                             int a_j = j * 2;
                             u8 *a = &image[a_i * row_size + a_j * channels];
-                            u8 *b = &image[a_i * row_size + (a_j + 1) * channels];
-                            u8 *c = &image[(a_i + 1) * row_size + a_j * channels];
-                            u8 *d = &image[(a_i + 1) * row_size + (a_j + 1) * channels];
+                            int next_i = std::min(a_i + 1, height - 1);
+                            int next_j = std::min(a_j + 1, width - 1);
+                            u8 *b = &image[a_i * row_size + next_j * channels];
+                            u8 *c = &image[next_i * row_size + a_j * channels];
+                            u8 *d = &image[next_i * row_size + next_j * channels];
                             for (int k = 0; k < channels; ++k)
                             {
                                 if (is_srgb && k < 3)

@@ -151,6 +151,9 @@ namespace Ailu::RHI::DX12
         void Init() final;
             u32 GetSamplerIndex(const Render::SamplerDesc &desc) override { return D3DDescriptorMgr::Get().GetSamplerIndex(desc); }
         void Present() final;
+        void EndFrame() final;
+        u64 GetPresentCount() const final { return _present_count; }
+        u32 GetSwapchainCount() const final;
         void SetMultiThreadRendering(bool enabled) final;
         u64 GetFenceValueGPU() final;
         u64 GetFenceValueCPU() const final;
@@ -218,6 +221,7 @@ namespace Ailu::RHI::DX12
         void TryOpenRenderDocCapture();
         void ResizeSwapChainImpl(const u32 width, const u32 height);
         void PresentImpl(D3DCommandBuffer* cmd);
+        void EndFrameImpl(D3DCommandBuffer* cmd);
 #ifdef _DIRECT_WRITE
         void InitDirectWriteContext();
 #endif
@@ -264,6 +268,7 @@ namespace Ailu::RHI::DX12
 #endif
 
         u64 _frame_count = 0u;
+        u64 _present_count = 0u;
         //CPUVisibleDescriptorAllocation _rtv_allocation;
         // Synchronization objects.
         //u8 m_frameIndex = 0u;

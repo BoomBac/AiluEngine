@@ -4,6 +4,7 @@
 #include "common.hlsli"
 #include "input.hlsli"
 #include "material_sampling.hlsli"
+#include "object_box_bump.hlsli"
 
 Texture2D _AlbedoTex : register(t0);
 Texture2D _NormalTex : register(t1);
@@ -33,6 +34,8 @@ PerMaterialCBufferBegin
     uint _SpecularTexSamplerIndex;
     uint _EmissionTexSamplerIndex;
     uint _TextureViewMipBiasMask;
+    uint _UseSourceDielectric;
+    float4 _NormalHeightParameters; // strength, distance, BOX blend, mode (0=tangent, 1=height, 2=height+RGB)
 PerMaterialCBufferEnd
 
 
@@ -41,17 +44,44 @@ float MaterialViewMipBias(uint slot)
     return ResolveMaterialMipBias(_TextureViewMipBiasMask, slot, _TextureManualMipBias, _TextureMipBias);
 }
 
+float ResolveDielectricSpecular(SurfaceData surface)
+{
+    if (_UseSourceDielectric != 0u)
+        return saturate(surface.specular.r);
+    const float ior = max(_IOR, 1.0);
+    return _Transmission > 0.0 ? pow((ior - 1.0) / (ior + 1.0), 2.0) : 0.04;
+}
+
+// Double-sided raster surfaces use the same shaded hemisphere in deferred and forward passes.
+void OrientSurfaceToFace(inout SurfaceData surface, bool is_front_face)
+{
+    const float face_sign = is_front_face ? 1.0 : -1.0;
+    surface.wnormal *= face_sign;
+    surface.bitangent *= face_sign;
+}
+
 void InitSurfaceData(StandardPSInput input,out SurfaceData surface)
 {
 	surface.albedo = _AlbedoValue;
-	if (_SamplerMask & 1)
+	if ((_SamplerMask & 2) && _NormalHeightParameters.w > 1.5)
+	{
+        surface.albedo = float4(EvaluateObjectBoxColor(_NormalTex, g_material_samplers[_NormalTexSamplerIndex],
+            input, _NormalHeightParameters.z, MaterialViewMipBias(0u)), 1.0);
+	}
+	else if (_SamplerMask & 1)
 	{
 		surface.albedo *= _AlbedoTex.SampleBias(g_material_samplers[_AlbedoTexSamplerIndex], input.uv0, MaterialViewMipBias(0u));
 	}
 	if(_SamplerMask & 2)
 	{
+		if (_NormalHeightParameters.w > 0.5)
+			surface.wnormal = EvaluateObjectBoxBump(_NormalTex, g_material_samplers[_NormalTexSamplerIndex],
+                                                       input, _NormalHeightParameters, MaterialViewMipBias(1u));
+		else
+		{
 		surface.wnormal = _NormalTex.SampleBias(g_material_samplers[_NormalTexSamplerIndex], input.uv0, MaterialViewMipBias(1u)).xyz * 2.0 - 1.0;
 		surface.wnormal = normalize(mul(surface.wnormal,input.btn));
+		}
 	}
 	else
 		surface.wnormal = normalize(input.normal);

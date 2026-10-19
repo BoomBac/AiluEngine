@@ -232,7 +232,7 @@ namespace Ailu::RHI::DX12
 			_page_free_space_lut[page.PageType()].emplace(std::make_pair(page.AvailableDescriptorNum(), page.PageID()));
             if (release_num > 0)
 			{
-				LOG_WARNING("Release CPUVisibleDescripto at page{} with num {}.", page.PageID(), release_num);
+				LOG_DEBUG("Release CPUVisibleDescripto at page{} with num {}.", page.PageID(), release_num);
 			}
 		}
 	}
@@ -340,7 +340,7 @@ namespace Ailu::RHI::DX12
 		// _descriptor_caches is read by render recording through GetOrCopy().  Page allocation may
 		// happen concurrently with that recording, so protect cache growth with the same mutex.
 		std::lock_guard lock(_mainheap_mutex);
-        LOG_WARNING("GPUVisibleDescriptorAllocator add new page to {}",_pages.size());
+        LOG_DEBUG("GPUVisibleDescriptorAllocator add new page to {}",_pages.size());
 		DescriptorPage new_page(static_cast<u16>(_pages.size()), type, num,D3D12_DESCRIPTOR_HEAP_FLAG_NONE);
 		_pages.emplace_back(std::move(new_page));
 		_descriptor_caches.emplace_back(Vector<CachedDescriptor>(num));

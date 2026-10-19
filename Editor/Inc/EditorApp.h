@@ -103,6 +103,9 @@ namespace Ailu
             Camera *GetSceneCamera() { return _p_scene_camera; }
             EditorAutomationService *GetAutomationService() { return _automation_service.get(); }
             EditorProgressService &GetProgressService() { return _progress_service; }
+            bool IsBatchMode() const { return _is_batch_mode; }
+            const String &InitializationErrorCode() const { return _initialization_error_code; }
+            const String &InitializationErrorMessage() const { return _initialization_error_message; }
             void StartProgressDemo();
             PluginManager *GetPluginManager() { return _plugin_manager.get(); }
         private:
@@ -132,7 +135,11 @@ namespace Ailu
             Scope<AutomationPipeServer> _pipe_server;
             Scope<PluginManager> _plugin_manager;
             Delegate<>::Handle _plugin_tick_handle = Delegate<>::kInvalidHandle;
+            Delegate<>::Handle _automation_tick_handle = Delegate<>::kInvalidHandle;
             bool _is_resource_reload_configured = false;
+            bool _is_batch_mode = false;
+            String _initialization_error_code;
+            String _initialization_error_message;
             EditorProgressService _progress_service;
             JobGroup _progress_demo_jobs;
         };// namespace Editor

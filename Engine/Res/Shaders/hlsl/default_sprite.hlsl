@@ -88,5 +88,6 @@ float4 PSMain(PSInput input) : SV_TARGET
     float4 tex_color = SAMPLE_TEXTURE2D_LOD(_MainTex, g_LinearClampSampler, input.uv, 0);
     float4 color = tex_color * input.color;
     color.rgb = ApplyVolumetricFogStraight(color.rgb, input.position.xy * _ScreenParams.xy, input.view_depth);
+    color.rgb *= GetPreExposure();
     return color;
 }

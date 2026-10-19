@@ -531,7 +531,7 @@ namespace Ailu::Render
                 {
                     variant._bind_res_infos = std::move(_bind_res_infos);
                     variant._binding_layout = _binding_layout;
-                    LOG_INFO("RayTracingShaderVariant READY shader={} variant={}", _name, variant_hash);
+                    LOG_MODULE_DEBUG(ELogModule::kShader, "RayTracingShaderVariant READY shader={} variant={}", _name, variant_hash);
                 }
                 is_succeed &= compiled;
             }

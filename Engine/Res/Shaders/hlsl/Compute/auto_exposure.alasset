@@ -1,0 +1,11 @@
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "27ef7068-6396-4aa2-9650-049bb13267e3",
+        "_asset_type": "Ailu::Render::ComputeShader",
+        "_asset_name": "auto_exposure",
+        "_dependencies": []
+    },
+    "_file": "auto_exposure.hlsl",
+    "_kernel": "ClearHistogram"
+}

@@ -33,6 +33,11 @@ CMake 也会扫描包含：
 
 ## Reflection markers
 
+Editor automation `render.feature_property` reads or writes existing reflected runtime feature properties by
+feature name and property name, without saving assets. It uses the generic reflection property bridge and only
+writes public non-const instance properties. Enum access in that bridge uses the reflected enum storage size
+(1, 2 or 4 bytes), so byte-sized enums do not read or overwrite adjacent fields.
+
 仓库当前使用的宏包括：
 
 ```text

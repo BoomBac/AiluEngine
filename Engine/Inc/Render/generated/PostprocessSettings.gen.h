@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __POSTPROCESSSETTINGS_GEN_H__
 //Struct BloomSettings begin...........................
-#define POSTPROCESSSETTINGS_GEN_H_39_GENERATED_BODY \
+#define POSTPROCESSSETTINGS_GEN_H_41_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_BloomSettings_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -21,7 +21,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::Render::BloomSet
 //Struct BloomSettings end...........................
 
 //Struct ToneMappingSettings begin...........................
-#define POSTPROCESSSETTINGS_GEN_H_54_GENERATED_BODY \
+#define POSTPROCESSSETTINGS_GEN_H_56_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_ToneMappingSettings_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -36,8 +36,40 @@ template<>
 AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::Render::ToneMappingSettings>();
 //Struct ToneMappingSettings end...........................
 
+//Struct AutoExposureSettings begin...........................
+#define POSTPROCESSSETTINGS_GEN_H_78_GENERATED_BODY \
+                            private: \
+                                friend const Type* Z_Construct_AutoExposureSettings_Type();\
+                                static const Type* GetPrivateStaticClass();\
+                            public:\
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                const Type  *GetType();
+                            namespace Ailu {class Type;}
+namespace Ailu::Render{
+struct AutoExposureSettings ;
+}
+template<>
+AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::Render::AutoExposureSettings>();
+//Struct AutoExposureSettings end...........................
+
+//Struct DepthOfFieldSettings begin...........................
+#define POSTPROCESSSETTINGS_GEN_H_113_GENERATED_BODY \
+                            private: \
+                                friend const Type* Z_Construct_DepthOfFieldSettings_Type();\
+                                static const Type* GetPrivateStaticClass();\
+                            public:\
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
+                                const Type  *GetType();
+                            namespace Ailu {class Type;}
+namespace Ailu::Render{
+struct DepthOfFieldSettings ;
+}
+template<>
+AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::Render::DepthOfFieldSettings>();
+//Struct DepthOfFieldSettings end...........................
+
 //Struct PostprocessSettings begin...........................
-#define POSTPROCESSSETTINGS_GEN_H_66_GENERATED_BODY \
+#define POSTPROCESSSETTINGS_GEN_H_130_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_PostprocessSettings_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -69,6 +101,15 @@ enum class EDisplayOutput : i32;
 template<>
 AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::EDisplayOutput>();
 //Enum EDisplayOutput end...........................
+
+//Enum EExposureMeteringMode begin...........................
+const Ailu::Enum* Z_Construct_Enum_Ailu_Render_EExposureMeteringMode_Type();
+namespace Ailu::Render {
+enum class EExposureMeteringMode : u8;
+}
+template<>
+AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::EExposureMeteringMode>();
+//Enum EExposureMeteringMode end...........................
 
 #undef CURRENT_FILE_ID
 #define CURRENT_FILE_ID POSTPROCESSSETTINGS_GEN_H

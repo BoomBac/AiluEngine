@@ -7,7 +7,7 @@ import bpy
 from mathutils import Vector
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "Tools" / "Blender"))
-from ailu_live_link import coordinate, identity, object_sync, protocol
+from ailu_live_link import coordinate, identity, mesh_sync, object_sync, protocol
 
 
 class Recorder:
@@ -42,10 +42,16 @@ for index in range(2):
     instancers.append(instancer)
 bpy.context.view_layer.update()
 link = Recorder()
+object_sync.sync_object(bpy.context, source, link, set(), True, True, True)
+meshes = {value[:36].decode(): value for kind, value in link.messages if kind == protocol.MESH_UPSERT}
+assert len(meshes) == 1
+link.messages.clear()
 object_sync.sync_instances(bpy.context, link, full=True)
 objects = {value['guid']: value for kind, value in link.messages if kind == protocol.OBJECT_UPSERT}
-meshes = {value[:36].decode(): value for kind, value in link.messages if kind == protocol.MESH_UPSERT}
-assert len(objects) == len(meshes) == 2
+instances = {instance['guid']: instance for kind, value in link.messages
+             if kind == protocol.INSTANCE_BATCH_UPSERT for instance in value['instances']}
+objects.update(instances)
+assert len(objects) == 2 and len(meshes) == 1
 for value in objects.values():
     assert value['parent_guid'] == '' and value['visible']
 expected = [coordinate.blender_to_ailu_position(instancer.matrix_world @ source.location) for instancer in instancers]
@@ -56,16 +62,18 @@ assert not link.messages, 'Idle instance snapshots must not resend'
 instancers[0].location.x += 2
 bpy.context.view_layer.update()
 object_sync.sync_instances(bpy.context, link, changed_objects=[instancers[0]])
-assert sum(kind == protocol.OBJECT_UPSERT for kind, _ in link.messages) == 1
+assert sum(kind == protocol.INSTANCE_BATCH_UPSERT for kind, _ in link.messages) == 1
 assert not any(kind == protocol.MESH_UPSERT for kind, _ in link.messages), 'Placement edits must reuse geometry'
 assert set(object_sync._instance_states) == set(objects), 'Moving an instance must preserve identity'
 link.messages.clear()
+mesh_revision_before_edit = mesh_sync._mesh_revision[identity.get_guid(source).encode()]
 source.data.vertices[0].co.x += 0.5
 source.data.update()
 bpy.context.view_layer.update()
 object_sync.sync_instances(bpy.context, link, changed_objects=[source])
-updates = [value for kind, value in link.messages if kind == protocol.MESH_UPSERT]
-assert len(updates) == 2 and all(struct.unpack_from('<Q', value, 36)[0] == 2 for value in updates)
+updates = [value for kind, value in link.messages
+           if kind in {protocol.MESH_UPSERT, protocol.MESH_PROTOTYPE_UPSERT}]
+assert len(updates) == 1 and struct.unpack_from('<Q', updates[0], 36)[0] == mesh_revision_before_edit + 1
 link.messages.clear()
 bpy.data.objects.remove(instancers[0], do_unlink=True)
 bpy.context.view_layer.update()
@@ -76,7 +84,8 @@ link.messages.clear()
 source.visible_camera = False
 bpy.context.view_layer.update()
 object_sync.sync_instances(bpy.context, link)
-assert any(kind == protocol.OBJECT_UPSERT and not value['visible'] for kind, value in link.messages)
+assert any(kind == protocol.INSTANCE_BATCH_UPSERT and
+           any(not instance['visible'] for instance in value['instances']) for kind, value in link.messages)
 source.visible_camera = True
 outer_collection = bpy.data.collections.new('NestedSource')
 nested = bpy.data.objects.new('NestedInstancer', None)
@@ -92,5 +101,7 @@ bpy.context.view_layer.update()
 link.messages.clear()
 object_sync.sync_instances(bpy.context, link)
 assert len(object_sync._instance_states) == 2
-assert any(kind == protocol.OBJECT_UPSERT and abs(value['position'][0] - 11) < 1e-5 for kind, value in link.messages)
+assert any(kind == protocol.INSTANCE_BATCH_UPSERT and
+           any(abs(instance['position'][0] - 11) < 1e-5 for instance in value['instances'])
+           for kind, value in link.messages)
 print('INSTANCE_SYNC PASS: stable IDs, world placement, idle, transform reuse, revisions, deletion, camera visibility and nesting')

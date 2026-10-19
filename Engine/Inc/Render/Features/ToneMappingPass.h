@@ -18,7 +18,7 @@ namespace Ailu::Render
         ToneMappingPass();
 
         RDG::RGHandle Record(RDG::RenderGraph &graph, RDG::RGHandle source, const RenderingData &rendering_data,
-                             const ToneMappingSettings &settings);
+                             const ToneMappingSettings &settings, RDG::RGHandle exposure_ev, f32 scalar_exposure);
 
     private:
         AssetRef<Shader> _shader;

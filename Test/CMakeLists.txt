@@ -145,6 +145,16 @@ add_custom_command(TARGET DynamicLibrarySmoke POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:Engine>" "$<TARGET_FILE_DIR:DynamicLibrarySmoke>"
     VERBATIM)
 
+add_executable(LogSmoke LogSmoke.cpp)
+target_link_libraries(LogSmoke PRIVATE Engine)
+target_compile_definitions(LogSmoke PRIVATE UNICODE _UNICODE)
+if (MSVC)
+    target_compile_options(LogSmoke PRIVATE /utf-8)
+endif()
+add_custom_command(TARGET LogSmoke POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:Engine>" "$<TARGET_FILE_DIR:LogSmoke>"
+    VERBATIM)
+
 add_library(AiluPluginSmoke SHARED Plugins/SmokePlugin/SmokePlugin.cpp)
 target_include_directories(AiluPluginSmoke PRIVATE "${ENGINE_ROOT_PATH}/Inc")
 target_compile_definitions(AiluPluginSmoke PRIVATE AILU_BUILD_PLUGIN)
@@ -347,6 +357,13 @@ add_custom_command(TARGET D3DDepthStencilSmoke POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:Engine>" "$<TARGET_FILE_DIR:D3DDepthStencilSmoke>"
     VERBATIM)
 
+add_executable(ObjectBoxBumpSmoke ObjectBoxBumpSmoke.cpp)
+target_include_directories(ObjectBoxBumpSmoke PRIVATE "${ENGINE_ROOT_PATH}")
+target_link_libraries(ObjectBoxBumpSmoke PRIVATE d3d12 dxgi)
+if(MSVC)
+    target_compile_options(ObjectBoxBumpSmoke PRIVATE /utf-8)
+endif()
+
 add_executable(SamplerSmoke SamplerSmoke.cpp)
 ailu_configure_test_target(SamplerSmoke)
 add_custom_command(TARGET SamplerSmoke POST_BUILD
@@ -357,3 +374,68 @@ add_custom_command(TARGET SamplerSmoke POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${AILU_EXT_PACKAGES_DIR}/fbxsdk/lib/vs2019/x64/$<IF:$<CONFIG:Debug>,debug,release>/libfbxsdk.dll" "$<TARGET_FILE_DIR:SamplerSmoke>"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${ENGINE_ROOT_PATH}/Ext/pix/WinPixEventRuntime.dll" "$<TARGET_FILE_DIR:SamplerSmoke>"
     VERBATIM)
+
+add_executable(ToneMappingSmoke ToneMappingSmoke.cpp)
+ailu_configure_test_target(ToneMappingSmoke)
+target_compile_definitions(ToneMappingSmoke PRIVATE AILU_REPO_ROOT="${CMAKE_SOURCE_DIR}")
+set(tone_mapping_fbxsdk_directory "${AILU_EXT_PACKAGES_DIR}/fbxsdk/lib/vs2019/x64")
+add_custom_command(TARGET ToneMappingSmoke POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:Engine>" "$<TARGET_FILE_DIR:ToneMappingSmoke>"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${tone_mapping_fbxsdk_directory}/$<IF:$<CONFIG:Debug>,debug,release>/libfbxsdk.dll"
+        "$<TARGET_FILE_DIR:ToneMappingSmoke>"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${ENGINE_ROOT_PATH}/Ext/pix/WinPixEventRuntime.dll" "$<TARGET_FILE_DIR:ToneMappingSmoke>"
+    VERBATIM)
+
+# Keep standalone regression/GPU smoke targets available, but out of the normal ALL build.
+set(AILU_TEST_TARGETS
+    ObjectBoxBumpSmoke
+    ToneMappingSmoke
+    Test
+    OidnGpuInteropSpike
+    CameraTemporalHistorySmoke
+    ScriptSmoke
+    ScriptRegression
+    DynamicLibrarySmoke
+    LogSmoke
+    AiluDynamicLibraryProbe
+    PluginSmoke
+    AiluPluginSmoke
+    AiluPluginBadVersion
+    AiluPluginLifecycle
+    AiluPluginSecond
+    AiluPluginInvalid
+    AiluPluginNullCreate
+    AiluPluginLoadFail
+    AiluPluginMissingDescriptor
+    AiluPluginMissingCreate
+    AiluPluginMissingDestroy
+    PluginManagerSmoke
+    PluginManifestSmoke
+    PluginRegistrationSmoke
+    JobGroupLifetimeSmoke
+    VolumetricFogSmoke
+    InspectorMultiEditSmoke
+    MotionVectorGpuAcceptance
+    DescriptorPageGrowthSmoke
+    TaaGpuAcceptance
+    UISliderHoverSmoke
+    EditorProgressSmoke
+    AssetImportQueueSmoke
+    BlenderMeshCacheSmoke
+    BlenderPersistenceSmoke
+    BlenderCameraSmoke
+    StreamlineDx12BridgeSmoke
+    D3DDepthStencilSmoke
+    PathTracingDenoiserSmoke
+    OidnGpuRenderGraphSmoke
+    SamplerSmoke)
+set(AILU_EXISTING_TEST_TARGETS)
+foreach(target_name IN LISTS AILU_TEST_TARGETS)
+    if(TARGET ${target_name})
+        set_property(TARGET ${target_name} PROPERTY EXCLUDE_FROM_ALL TRUE)
+        list(APPEND AILU_EXISTING_TEST_TARGETS ${target_name})
+    endif()
+endforeach()
+add_custom_target(ailu_test_targets DEPENDS ${AILU_EXISTING_TEST_TARGETS})

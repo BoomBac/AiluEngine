@@ -187,8 +187,11 @@ mesh loop preserves split attributes; triangles reference these vertices instead
 Wire layout, basis conversion, bounds and material grouping remain protocol v1. Missing/failed tangent generation
 uses a deterministic tangent default rather than reading uninitialized loop tangent data.
 
-Evaluated mesh instances are imported as root children using their depsgraph world transforms. Session, instancer,
-source GUID and persistent instance path determine stable UUIDs. The protocol-v1 handshake negotiates the
+Evaluated mesh instances are imported beneath the link root using their depsgraph world transforms. Session, instancer,
+source GUID and persistent instance path determine stable UUIDs. Local datablocks store their source GUID as a custom
+property. Linked-library datablocks cannot store custom properties; they derive a deterministic UUID from the normalized
+library file path, datablock type and name (`lib:` namespace), so entity, instance and material identities remain stable
+across sessions without saving the library. The protocol-v1 handshake negotiates the
 `instance_batch_v1` and `mesh_prototype_v1` capabilities. Instance-batch packets carry up to 128 object records
 and reference the source object's mesh/material slots. Scene objects send their mesh with the ordinary mesh
 packet. A mesh prototype outside `scene.objects` sends its material data and a prototype-only mesh packet before
@@ -201,7 +204,16 @@ support up to 65,536 entries with TLAS node storage for that many primitives; th
 remains 2,000.
 Original objects use view-layer visibility; mesh camera visibility is approximated by entity visibility, including
 camera-invisible emitter helpers. This also removes those meshes from GI/shadows; independent ray visibility and
-per-instance world-coordinate material rebaking are not implemented. Non-TRS shear remains outside transform transport.
+per-instance world-coordinate material rebaking are not implemented.
+
+Object export derives the ordinary object-relative matrix from parent-world inverse times child-world, so evaluated
+bone and vertex parenting retain their current pose without importing a skeleton or vertex-parent constraint into Engine.
+When that local matrix or a flattened instance world matrix contains shear, the add-on factors its linear part with SVD
+into two proper rotations and a signed diagonal scale. A deterministic `__AiluAffine_` helper parent carries the first
+TRS and the original object/instance carries the second. Existing protocol-v1 object records and Engine hierarchy
+composition preserve the complete affine transform; meshes and source GUIDs remain shared/stable. Helpers are updated,
+removed on TRS transitions/deletion, and reconciled by Full Sync. Bone/vertex-parented objects are also observed by their
+world matrices so parent-pose changes can invalidate placement even when Blender's `matrix_local` stays unchanged.
 
 Material messages optionally carry `alpha_blend`, `alpha_test`, `double_sided` and `emission_texture_factor`.
 The host uses existing Standard Lit surface/cull APIs. Explicit empty texture paths remove old bindings; absent
@@ -286,6 +298,23 @@ them. Only CUDA was measured in the pipeline task; it was slower and failed stri
 Session diagnostics separately record context restoration, source graph acquisition and atlas evaluation;
 parent process CPU time excludes the independent encoder and must not be reported as total pipeline CPU work.
 
+## Blender evaluated geometry and material binding
+
+Mesh triangle material indices use the sparse material table from the same evaluated `Object.to_mesh`, including
+empty positions. Explicit OBJECT-linked material overrides are applied at their corresponding indices. Evaluated
+material references resolve to original datablocks before GUID assignment. Original/evaluated object material slots
+alone are insufficient for Geometry Nodes and converted curves. Material publishing, object binding and bake slot
+assignment consume this same table; baked geometry and textures retain the existing prepared-mesh UV ownership.
+
+The existing Blender main-thread ExportSession owns a bounded metadata snapshot cache and clears it on exit,
+including failure. Each temporary `to_mesh` is released immediately after snapshotting. Outside a session the
+current depsgraph is queried without persistent metadata caching. MESH/CURVE/SURFACE/FONT/META sources can publish
+evaluated geometry. Converted non-Mesh sources exposed as depsgraph self-instances publish their mesh component
+through the prototype/instance path once; the original is not also submitted as duplicate geometry.
+
+Editor automation `include_mesh_summary` exposes mesh counts, compact submesh material bindings, source GUIDs and
+checker-fallback identity without vertex arrays. This is read-only diagnostic data, independent of asset serialization.
+
 ## Blender Live Link persistence and reconnect
 
 Imported entities are durable scene entities. Optional tag source scene/object GUIDs identify the Blender association;
@@ -307,7 +336,8 @@ overrides are not tracked in this version.
 Blender sends a full snapshot after reconnect, source scene switch or file load, then uses dirty incremental updates.
 New/duplicated objects repair GUID collisions before membership comparison. Protocol v1 is unchanged: reconnect still
 transmits full geometry/material payloads; hash negotiation and offline delta replay are not implemented. Save both the
-.blend file (source identities) and engine scene after completed sync. Switching the active engine scene while connected
+.blend file (local datablock source identities) and engine scene after completed sync; linked-library identities are
+path-derived and do not require saving the library files. Switching the active engine scene while connected
 requires a Full Sync to establish its new baseline.
 
 ## Blender Live Link camera projection

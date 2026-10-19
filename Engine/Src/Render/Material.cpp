@@ -635,6 +635,8 @@ namespace Ailu::Render
 
     void Material::SetInt(const String &name, i32 value)
     {
+        if (name == kCullModeKey)
+            SetCullMode(static_cast<ECullMode>(value));
         _common_uint_property[name] = value;
         SetInt(ShaderPropertyRegistry::Get().Intern(name), value);
     }
@@ -1209,7 +1211,11 @@ namespace Ailu::Render
     {
         if (_p_active_shader == nullptr)
             return;
-        AL_ASSERT(_p_active_shader->PassCount() != 0);
+        if (_p_active_shader->PassCount() == 0)
+        {
+            LOG_ERROR("Material {} construction skipped: shader={} has no valid passes", _name, _p_active_shader->Name());
+            return;
+        }
 
         Map<ShaderPropertyId, CachedPropertyValue> cached_values = _property_values;
         if (!first_time && !_properties.empty())
@@ -1242,8 +1248,9 @@ namespace Ailu::Render
             }
         }
 
-        _common_uint_property[kCullModeKey] = (u32) _p_active_shader->GetCullMode();
-        _cull_mode = _p_active_shader->GetCullMode();
+        if (first_time || !_common_uint_property.contains(kCullModeKey))
+            _common_uint_property[kCullModeKey] = static_cast<u32>(_p_active_shader->GetCullMode());
+        _cull_mode = static_cast<ECullMode>(_common_uint_property.at(kCullModeKey));
         ConstructKeywords(_p_active_shader);
         u16 pass_count = _p_active_shader->PassCount();
         //u16 cur_shader_cbuf_size = 0; //每个passcbuffer大小一致。

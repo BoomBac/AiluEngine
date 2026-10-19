@@ -6,6 +6,29 @@
 #include "path_tracer_material.hlsli"
 #include "path_tracer_manifold.hlsli"
 
+#if defined(PATH_TRACER_OIDN_GUIDES)
+#if defined(DXR)
+RWTexture2D<float4> _PathGuideAlbedo : register(u1);
+RWTexture2D<float4> _PathGuideNormal : register(u2);
+#else
+RWTexture2D<float4> _PathGuideAlbedo;
+RWTexture2D<float4> _PathGuideNormal;
+#endif
+
+void StorePathGuides(uint2 pixel, float4 albedo, float4 normal)
+{
+    // Match Reference's box reconstruction filter; average unit sample normals without renormalizing the mean.
+    const float weight = rcp(float(min(_PathGuideSampleCount, 16777215u)) + 1.0f);
+    if (_PathGuideSampleCount > 0u)
+    {
+        albedo = lerp(_PathGuideAlbedo[pixel], albedo, weight);
+        normal = lerp(_PathGuideNormal[pixel], normal, weight);
+    }
+    _PathGuideAlbedo[pixel] = albedo;
+    _PathGuideNormal[pixel] = normal;
+}
+#endif
+
 
 float3 EvaluatePathDirectLighting(PathHit hit, TraceContext trace_context, float3 wo, inout RandomCtx random_context)
 {
@@ -234,6 +257,11 @@ float3 TracePath(uint2 pixel, float3 ray_origin, float3 ray_direction, uint max_
                  inout RandomCtx random_context)
 {
     float3 radiance = 0.0.xxx;
+#if defined(PATH_TRACER_OIDN_GUIDES)
+    // Miss / analytic emitter: no surface guide. Alpha records accumulated surface coverage for diagnostics.
+    float4 guide_albedo = 0.0.xxxx;
+    float4 guide_normal = 0.0.xxxx;
+#endif
     float3 throughput = 1.0.xxx;
     float previous_bsdf_pdf = 0.0f;
     bool has_previous_bsdf_sample = false;
@@ -298,6 +326,18 @@ float3 TracePath(uint2 pixel, float3 ray_origin, float3 ray_direction, uint max_
         }
 
         float emission_mis_weight = 1.0f;
+#if defined(PATH_TRACER_OIDN_GUIDES)
+        if (depth == 0u)
+        {
+            // Capture after stochastic coverage acceptance and before any reflection/refraction event.
+            const float3 normal = dot(hit._shading_normal, -ray_direction) > 0.0f
+                ? hit._shading_normal : hit._geometric_normal;
+            guide_albedo = float4(hit._material._is_glass ? 1.0.xxx : saturate(hit._material._albedo), 1.0f);
+            const float normal_length_squared = dot(normal, normal);
+            guide_normal = float4(normal_length_squared > 1e-12f && all(isfinite(normal))
+                ? normal * rsqrt(normal_length_squared) : 0.0.xxx, 1.0f);
+        }
+#endif
         if (hit._light_index != 0xffffffffu)
         {
 #if defined(PATH_TRACER_MNEE)
@@ -373,6 +413,9 @@ float3 TracePath(uint2 pixel, float3 ray_origin, float3 ray_direction, uint max_
         ++depth;
     }
 
+#if defined(PATH_TRACER_OIDN_GUIDES)
+    StorePathGuides(pixel, guide_albedo, guide_normal);
+#endif
     return max(radiance, 0.0.xxx);
 }
 

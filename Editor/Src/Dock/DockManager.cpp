@@ -1309,6 +1309,8 @@ namespace Ailu
         
         DockManager::~DockManager()
         {
+            if (EditorApp::GetEditor()->IsBatchMode())
+                return;
             _node_data_array._node_data.clear();
             _next_serialize_node_id = DockNode::s_global_id;
             for (auto& it: _float_nodes)

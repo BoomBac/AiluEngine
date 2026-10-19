@@ -75,10 +75,10 @@ namespace Ailu
 			f32 cost = _timer.GetElapsedSinceLastMark();
             if (cost > 1000.0f)
             {
-                LOG_INFO("Time cost {}s : {}", cost * 0.001f, _msg);
+                LOG_TRACE("Time cost {}s : {}", cost * 0.001f, _msg);
             }
             else
-                LOG_INFO("Time cost {}ms : {}", cost, _msg);
+                LOG_TRACE("Time cost {}ms : {}", cost, _msg);
         }
     private:
 		TimeMgr &_timer;

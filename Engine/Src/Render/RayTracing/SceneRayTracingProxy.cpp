@@ -1,4 +1,5 @@
 #include "Render/RayTracing/SceneRayTracingProxy.h"
+#include "Scene/LightUnits.h"
 #include "Framework/Common/Profiler.h"
 #include "Framework/Math/MathHash.hpp"
 #include "Animation/SkinningSystem.h"
@@ -190,26 +191,22 @@ namespace Ailu::Render
             return s_emissive_triangle_cache.emplace(cache_key, std::move(triangle_indices)).first->second;
         }
 
-        Vector3f GetPremultipliedLightColor(const ECS::LightData &light_data)
+        Vector3f GetRadiometricLightColor(const ECS::LightComponent &component)
         {
-            Color color = light_data._light_color;
-            color.r *= color.a;
-            color.g *= color.a;
-            color.b *= color.a;
-            return color.xyz * kPi;
+            return ECS::GetLightColor(component) * ECS::GetLightRadiometricScale(component);
         }
 
-        float GetSpotAngleScale(const Vector4f &light_param)
+        float GetSpotAngleScale(float inner_angle, float outer_angle)
         {
-            const float inner_cos = cos(light_param.y * 0.5f * k2Radius);
-            const float outer_cos = cos(light_param.z * 0.5f * k2Radius);
+            const float inner_cos = cos(inner_angle * 0.5f * k2Radius);
+            const float outer_cos = cos(outer_angle * 0.5f * k2Radius);
             return 1.0f / std::max(0.001f, inner_cos - outer_cos);
         }
 
-        float GetSpotAngleOffset(const Vector4f &light_param)
+        float GetSpotAngleOffset(float inner_angle, float outer_angle)
         {
-            const float outer_cos = cos(light_param.z * 0.5f * k2Radius);
-            return -outer_cos * GetSpotAngleScale(light_param);
+            const float outer_cos = cos(outer_angle * 0.5f * k2Radius);
+            return -outer_cos * GetSpotAngleScale(inner_angle, outer_angle);
         }
 
         UnifiedLightData BuildUnifiedLight(const ECS::LightComponent &comp)
@@ -218,7 +215,7 @@ namespace Ailu::Render
             const auto &light_data = comp._light;
             light._flags = light_data._is_two_side ? AL_UNIFIED_LIGHT_FLAG_TWO_SIDED : 0u;
             light._shadow_index = comp._shadow._is_cast_shadow ? 0 : -1;
-            light._radiance = GetPremultipliedLightColor(light_data);
+            light._radiance = GetRadiometricLightColor(comp);
             light._shadow_params = float4(0.0f, comp._shadow._constant_bias, comp._shadow._slope_bias, 0.0f);
 
             switch (comp._type)
@@ -227,25 +224,25 @@ namespace Ailu::Render
                 light._type = AL_UNIFIED_LIGHT_TYPE_DIRECTIONAL;
                 light._position = Vector3f::kZero;
                 light._direction = -light_data._light_dir.xyz;
-                light._source_radius = light_data._light_param.w;
+                light._source_radius = light_data._angular_radius;
                 break;
             case ECS::ELightType::kPoint:
                 light._type = AL_UNIFIED_LIGHT_TYPE_POINT;
                 light._position = light_data._light_pos.xyz;
-                light._range = light_data._light_param.x;
-                light._source_radius = light_data._light_param.y;
+                light._range = light_data._range;
+                light._source_radius = light_data._source_radius;
                 light._shadow_index = comp._shadow._is_cast_shadow ? static_cast<int>(light._shadow_index) : -1;
-                light._shadow_params.x = light_data._light_param.x * 1.5f;
+                light._shadow_params.x = light_data._range * 1.5f;
                 break;
             case ECS::ELightType::kSpot:
                 light._type = AL_UNIFIED_LIGHT_TYPE_SPOT;
                 light._position = light_data._light_pos.xyz;
                 light._direction = light_data._light_dir.xyz;
-                light._range = light_data._light_param.x;
+                light._range = light_data._range;
                 light._source_radius = kDefaultSpotSourceRadius;
-                light._spot_angle_scale = GetSpotAngleScale(light_data._light_param);
-                light._spot_angle_offset = GetSpotAngleOffset(light_data._light_param);
-                light._shadow_params.x = light_data._light_param.x * 1.5f;
+                light._spot_angle_scale = GetSpotAngleScale(light_data._spot_inner_angle, light_data._spot_outer_angle);
+                light._spot_angle_offset = GetSpotAngleOffset(light_data._spot_inner_angle, light_data._spot_outer_angle);
+                light._shadow_params.x = light_data._range * 1.5f;
                 break;
             case ECS::ELightType::kArea:
             default:
@@ -253,9 +250,9 @@ namespace Ailu::Render
                 light._shape_u = light_data._area_points[1] - light_data._area_points[0];
                 light._shape_v = light_data._area_points[3] - light_data._area_points[0];
                 light._position = light_data._area_points[0] + 0.5f * (light._shape_u + light._shape_v);
-                light._range = light_data._light_param.x;
+                light._range = light_data._range;
                 light._direction = Vector3f::kZero;
-                light._shadow_params.x = light_data._light_param.x * 1.5f;
+                light._shadow_params.x = light_data._range * 1.5f;
                 break;
             }
 
@@ -327,7 +324,10 @@ namespace Ailu::Render
         _scene_primitive_data = primitive_data;
         _scene_primitive_buffer = primitive_buffer;
         _scene_primitives = scene_primitives;
-        SyncLightCache(scene, primitive_data, scene_primitives);
+        {
+            PROFILE_BLOCK_CPU("SyncLightCache")
+            SyncLightCache(scene, primitive_data, scene_primitives);
+        }
         if (scene == nullptr)
             return;
 
@@ -627,7 +627,7 @@ namespace Ailu::Render
     {
         if (slot._scene == nullptr || transforms.size() != slot._instances.size() || _scene_primitive_data == nullptr)
             return;
-
+        PROFILE_BLOCK_CPU("SceneRayTracingProxy::UpdateTransforms")
         bool any_transform_changed = false;
         for (u64 index = 0u; index < transforms.size(); ++index)
         {
@@ -992,7 +992,7 @@ namespace Ailu::Render
 
         for (const auto &light_comp : scene.GetRegister().View<ECS::LightComponent>())
         {
-            if (light_comp._light._light_color.a <= 0.0f || light_comp._light._light_color.xyz == Vector3f::kZero)
+            if (light_comp._light._intensity <= 0.0f || light_comp._light._light_color.xyz == Vector3f::kZero)
                 continue;
             const UnifiedLightData light = BuildUnifiedLight(light_comp);
             _unified_light_data_cache.push_back(light);

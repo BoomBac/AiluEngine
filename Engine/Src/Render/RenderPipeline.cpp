@@ -110,6 +110,14 @@ namespace Ailu::Render
         // JobSystem::Get().Dispatch(update_render_obj_job);
         _targets.clear();
         _cameras.clear();
+        if (Application::Get().IsOffscreen() && Camera::sCurrent != nullptr)
+        {
+            if (auto *target = Application::Get().GetOffscreenTarget(); target != nullptr)
+            {
+                Camera::sCurrent->OutputSize(target->Width(), target->Height());
+                Camera::sCurrent->TargetTexture(target);
+            }
+        }
         _cameras.emplace_back(Camera::sCurrent);
         if (_preview_camera != nullptr && _preview_target != nullptr)
         {
@@ -168,8 +176,10 @@ namespace Ailu::Render
         if (!has_cubemap_camera)
             _renderers[0]->PrepareFrameViews(scene, _cameras);
 
-        auto ui_cmd = CommandBufferPool::Get("UI");
-        UI::UIRenderer::Get()->Prepare();
+        const bool render_ui = !Application::Get().IsOffscreen();
+        auto ui_cmd = render_ui ? CommandBufferPool::Get("UI") : nullptr;
+        if (render_ui)
+            UI::UIRenderer::Get()->Prepare();
         auto record_ui = [ui_cmd]() mutable
         {
             PROFILE_BLOCK_CPU("UIRender")
@@ -182,7 +192,7 @@ namespace Ailu::Render
             UI::UIRenderer::Get()->Record(ui_cmd.get());
         };
         JobGroup ui_group;
-        const bool is_parallel_ui_record = _renderers[0]->_is_use_render_graph;
+        const bool is_parallel_ui_record = render_ui && _renderers[0]->_is_use_render_graph;
         if (is_parallel_ui_record)
             JobSystem::Get().Dispatch(ui_group, [record_ui]() mutable { record_ui(); });
 
@@ -207,10 +217,13 @@ namespace Ailu::Render
         }
         if (is_parallel_ui_record)
             JobSystem::Get().Wait(ui_group);
-        else
+        else if (render_ui)
             record_ui();
-        GraphicsContext::Get().ExecuteCommandBuffer(ui_cmd);
-        CommandBufferPool::Release(ui_cmd);
+        if (render_ui)
+        {
+            GraphicsContext::Get().ExecuteCommandBuffer(ui_cmd);
+            CommandBufferPool::Release(ui_cmd);
+        }
     }
     RenderTexture *RenderPipeline::GetTarget(u16 index)
     {

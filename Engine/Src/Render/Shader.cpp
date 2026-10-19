@@ -335,8 +335,8 @@ namespace Ailu::Render
             pass._variants[variant_hash]._shader_hash = ConstructHash(_id, pass_id, variant_hash);
             GraphicsPipelineStateMgr::Get().OnShaderCompiled(this, pass_id, variant_hash);
             _variant_state[pass_id][variant_hash] = EShaderVariantState::kReady;
-            LOG_INFO("ShaderVariant READY shader={} pass={} variant={} total={}ms", _name, pass_id, variant_hash,
-                     TimeMgr::Get().GetElapsedSinceLastMark());
+            LOG_MODULE_DEBUG(ELogModule::kShader, "ShaderVariant READY shader={} pass={} variant={} total={}ms", _name, pass_id, variant_hash,
+                      TimeMgr::Get().GetElapsedSinceLastMark());
         }
         else
         {
@@ -351,6 +351,11 @@ namespace Ailu::Render
 
     bool Shader::Compile(EShaderCompilePolicy policy)
     {
+        if (_passes.empty())
+        {
+            LOG_ERROR("Shader compile skipped: shader={} has no valid passes", _name);
+            return false;
+        }
         u16 pass_index = 0;
         u32 variant_index = 0;
         u32 error_variant_count = 0;
@@ -1015,8 +1020,10 @@ namespace Ailu::Render
         }
         else
         {
-            AL_ASSERT_MSG(_passes.size() > 0, "parser failed, no pass found!");
+            LOG_ERROR("Shader parser failed: shader={} has no valid passes", _name);
             _variant_state = std::move(previous_variant_state);
+            _is_pass_elements_init.store(true);
+            return false;
         }
         _is_pass_elements_init.store(!is_process_succeed);
         return is_process_succeed;

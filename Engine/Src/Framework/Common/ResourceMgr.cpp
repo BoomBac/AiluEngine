@@ -1,6 +1,7 @@
 #include "Framework/Common/ResourceMgr.h"
 #include "Assets/AssetRef.h"
 #include "Framework/Common/Allocator.hpp"
+#include "Framework/Common/Application.h"
 #include "Assets/AssetArtifact.h"
 #include "Assets/AssetDocument.h"
 #include "Assets/ScriptAsset.h"
@@ -33,6 +34,7 @@
 #include "Render/2D/Sprite.h"
 #include "Render/2D/SpriteAtlas.h"
 #include "Assets/AssetHandlers.h"
+#include <cstdlib>
 #include <unordered_set>
 
 using namespace Ailu::Render;
@@ -45,6 +47,18 @@ namespace Ailu
 		ResourceMgr *g_pResourceMgr = nullptr;
 		const WString kEmptyWString;
 		constexpr WStringView kWindowsInvalidFileNameChars = L"<>:\"/\\|?*";
+
+		bool ShouldInjectInitializationFailure(const char *stage)
+		{
+			const char *requested_stage = std::getenv("AILU_TEST_RESOURCE_INIT_FAILURE_STAGE");
+			return requested_stage != nullptr && String(requested_stage) == stage;
+		}
+
+		int InitializationFailure(const char *stage)
+		{
+			LOG_ERROR("ResourceMgr: test initialization failure injected at stage '{}'", stage);
+			return -1001;
+		}
 
 		WString SanitizeAssetFileName(const WString &file_name)
 		{
@@ -510,15 +524,17 @@ namespace Ailu
 		return Type::Find(name);
 	}
 
-	int ResourceMgr::Initialize()
+	int ResourceMgr::Initialize(bool cpu_only)
 	{
 		TimerBlock b("-----------------------------------------------------------ResourceMgr::Initialize");
+		_cpu_only = cpu_only;
 		AssetReferenceRuntime::SetHandleResolver([](const Guid &guid)
 		{
 			return ResourceMgr::Get().GetOrCreateAssetHandle<Object>(guid);
 		});
 		AL_ASSERT(!s_engine_res_root_path.empty());
-		_derived_data_cache = MakeScope<DerivedDataCache>(s_project_library_root_path);
+		if (!_cpu_only)
+			_derived_data_cache = MakeScope<DerivedDataCache>(s_project_library_root_path);
 		FileManager::SetCurPath(s_engine_res_root_path);
 		_lut_global_resources_by_type[Material::StaticType()] = {};
 		_lut_global_resources_by_type[Texture2D::StaticType()] = {};
@@ -562,11 +578,14 @@ namespace Ailu
 		LoadAssetDB(_asset_domains[0]);
 		LoadAssetDB(_asset_domains[1]);
 		LoadAssetDB(_asset_domains[2]);
+		if (ShouldInjectInitializationFailure("after_asset_database"))
+			return InitializationFailure("after_asset_database");
 		Vector<Guid> live_asset_guids;
 		live_asset_guids.reserve(_asset_db.size());
 		for (const auto &[guid, asset]: _asset_db)
 			live_asset_guids.emplace_back(guid);
-		_derived_data_cache->RemoveOrphanArtifacts(live_asset_guids);
+		if (_derived_data_cache != nullptr)
+			_derived_data_cache->RemoveOrphanArtifacts(live_asset_guids);
 		_asset_handler_registry.Register(MakeScope<SpriteAssetHandler>());
 		_asset_handler_registry.Register(MakeScope<SpriteAtlasAssetHandler>());
 		_asset_handler_registry.Register(MakeScope<ScriptAssetHandler>());
@@ -588,6 +607,19 @@ namespace Ailu
 		_asset_handler_registry.Register(MakeScope<GraphAssetHandler>());
                 _asset_handler_registry.Register(MakeScope<WidgetAssetHandler>());
                 _asset_handler_registry.Register(MakeScope<StaticDiffuseProbeDataAssetHandler>());
+		if (ShouldInjectInitializationFailure("after_handlers"))
+			return InitializationFailure("after_handlers");
+		if (_cpu_only)
+		{
+			Texture::s_p_default_white = nullptr;
+			Texture::s_p_default_black = nullptr;
+			Texture::s_p_default_gray = nullptr;
+			Texture::s_p_default_normal = nullptr;
+			LOG_INFO("ResourceMgr: CPU-only metadata initialization complete; GPU resources skipped");
+			if (ShouldInjectInitializationFailure("after_cpu_metadata"))
+				return InitializationFailure("after_cpu_metadata");
+			return 0;
+		}
 		
 		Vector<WString> shader_asset_pathes = {
 				L"Shaders/hlsl/deferred_lighting.alasset",
@@ -825,18 +857,23 @@ namespace Ailu
 			p._texture = LoadExternalTexture(p._file, setting);
 			RegisterResource(PathUtils::ExtractAssetPath(p._file), p._texture);
 		}
+		if (ShouldInjectInitializationFailure("after_gpu_runtime"))
+			return InitializationFailure("after_gpu_runtime");
 		return 0;
 	}
 
         void ResourceMgr::Finalize()
         {
 		_is_watching_directory = false;
-		for (auto &[guid, asset]: _asset_db)
+		if (Application::Instance() == nullptr || !Application::Get().IsBatchMode())
 		{
-			if (asset->_asset_type == Scene::StaticType() || asset->_asset_type == Material::StaticType())
-				SaveAsset(asset.get());
+			for (auto &[guid, asset]: _asset_db)
+			{
+				if (asset->_asset_type == Scene::StaticType() || asset->_asset_type == Material::StaticType())
+					SaveAsset(asset.get());
+			}
+			SaveAssetDB(EAssetDomain::kProject);
 		}
-                SaveAssetDB(EAssetDomain::kProject);
         }
 
         void ResourceMgr::BeginShutdown()
@@ -1502,6 +1539,14 @@ namespace Ailu
 
 	Ref<Object> ResourceMgr::Load(const WString& asset_path,const ImportSetting* settings,const Type* type)
 	{
+		if (_cpu_only && (type == Texture2D::StaticType() || type == Texture3D::StaticType() ||
+			type == Mesh::StaticType() || type == SkeletonMesh::StaticType() ||
+			type == Shader::StaticType() || type == ComputeShader::StaticType() ||
+			type == Material::StaticType() || type == Scene::StaticType()))
+		{
+			LOG_ERROR(L"ResourceMgr::Load: graphics_unavailable for {}", asset_path);
+			return nullptr;
+		}
         const WString normalized_asset_path = NormalizeAssetPath(asset_path);
         if (normalized_asset_path.empty())
         {
@@ -1564,7 +1609,7 @@ namespace Ailu
 				auto handle = _asset_registry.GetOrCreateHandle<Object>(registered_asset->GetGuid());
 				_asset_registry.SetDependencies(handle, header._dependencies);
 				RegisterEmbeddedMaterialSubAssets(registered_asset);
-                LOG_WARNING(L"Load asset {} succeed after {} ms", normalized_asset_path, timer.GetElapsedSinceLastMark());
+                LOG_MODULE_DEBUG(ELogModule::kAsset, L"Load asset {} succeed after {} ms", normalized_asset_path, timer.GetElapsedSinceLastMark());
             }
             else
             LOG_ERROR(L"Load asset {} failed after {} ms", normalized_asset_path, timer.GetElapsedSinceLastMark());
@@ -1574,7 +1619,7 @@ namespace Ailu
             if (settings->_is_reimport)
             {
                 asset_handler->Load(load_ctx);
-                LOG_WARNING(L"Reload asset {} after {} ms", normalized_asset_path, timer.GetElapsedSinceLastMark());
+                LOG_MODULE_DEBUG(ELogModule::kAsset, L"Reload asset {} after {} ms", normalized_asset_path, timer.GetElapsedSinceLastMark());
             }
         }
 

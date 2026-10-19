@@ -8,6 +8,112 @@
 
 namespace Ailu::Render
 {
+    namespace
+    {
+        const String kSensorWidthMm = "_sensor_width_mm";
+        const String kSensorHeightMm = "_sensor_height_mm";
+        const String kFocalLengthMm = "_focal_length_mm";
+        const String kApertureFNumber = "_aperture_f_number";
+        const String kShutterSeconds = "_shutter_seconds";
+        const String kIso = "_iso";
+        const String kFocusDistanceM = "_focus_distance_m";
+        const String kExposureCompensationEv = "_exposure_compensation_ev";
+        const String kLensProjectionMode = "_lens_projection_mode";
+        const String kExposureMode = "_exposure_mode";
+
+        constexpr f32 kMinimumSensorSizeMm = 0.1f;
+        constexpr f32 kMaximumSensorSizeMm = 1000.0f;
+        constexpr f32 kMinimumFocalLengthMm = 0.1f;
+        constexpr f32 kMaximumFocalLengthMm = 10000.0f;
+        constexpr f32 kMinimumFNumber = 0.1f;
+        constexpr f32 kMaximumFNumber = 128.0f;
+        constexpr f32 kMinimumShutterSeconds = 1.0e-6f;
+        constexpr f32 kMaximumShutterSeconds = 3600.0f;
+        constexpr f32 kMinimumIso = 1.0f;
+        constexpr f32 kMaximumIso = 1000000.0f;
+        constexpr f32 kMinimumFocusDistanceM = 0.001f;
+        constexpr f32 kMaximumFocusDistanceM = 1000000.0f;
+        constexpr f32 kMinimumFovDegrees = 0.01f;
+        constexpr f32 kMaximumFovDegrees = 179.0f;
+        constexpr f32 kMinimumExposureCompensationEv = -20.0f;
+        constexpr f32 kMaximumExposureCompensationEv = 20.0f;
+
+        f32 ClampFinite(f32 value, f32 fallback, f32 minimum, f32 maximum)
+        {
+            return std::clamp(std::isfinite(value) ? value : fallback, minimum, maximum);
+        }
+    }
+
+    void PhysicalCameraSettings::Serialize(FArchive &archive)
+    {
+        SerializerWrapper<f32>::Serialize(&_sensor_width_mm, archive, &kSensorWidthMm);
+        SerializerWrapper<f32>::Serialize(&_sensor_height_mm, archive, &kSensorHeightMm);
+        SerializerWrapper<f32>::Serialize(&_focal_length_mm, archive, &kFocalLengthMm);
+        SerializerWrapper<f32>::Serialize(&_aperture_f_number, archive, &kApertureFNumber);
+        SerializerWrapper<f32>::Serialize(&_shutter_seconds, archive, &kShutterSeconds);
+        SerializerWrapper<f32>::Serialize(&_iso, archive, &kIso);
+        SerializerWrapper<f32>::Serialize(&_focus_distance_m, archive, &kFocusDistanceM);
+        SerializerWrapper<f32>::Serialize(&_exposure_compensation_ev, archive, &kExposureCompensationEv);
+        u8 lens_projection_mode = static_cast<u8>(_lens_projection_mode);
+        u8 exposure_mode = static_cast<u8>(_exposure_mode);
+        SerializerWrapper<u8>::Serialize(&lens_projection_mode, archive, &kLensProjectionMode);
+        SerializerWrapper<u8>::Serialize(&exposure_mode, archive, &kExposureMode);
+    }
+
+    void PhysicalCameraSettings::Deserialize(FArchive &archive)
+    {
+        SerializerWrapper<f32>::Deserialize(&_sensor_width_mm, archive, &kSensorWidthMm);
+        SerializerWrapper<f32>::Deserialize(&_sensor_height_mm, archive, &kSensorHeightMm);
+        SerializerWrapper<f32>::Deserialize(&_focal_length_mm, archive, &kFocalLengthMm);
+        SerializerWrapper<f32>::Deserialize(&_aperture_f_number, archive, &kApertureFNumber);
+        SerializerWrapper<f32>::Deserialize(&_shutter_seconds, archive, &kShutterSeconds);
+        SerializerWrapper<f32>::Deserialize(&_iso, archive, &kIso);
+        SerializerWrapper<f32>::Deserialize(&_focus_distance_m, archive, &kFocusDistanceM);
+        SerializerWrapper<f32>::Deserialize(&_exposure_compensation_ev, archive, &kExposureCompensationEv);
+        u8 lens_projection_mode = static_cast<u8>(_lens_projection_mode);
+        u8 exposure_mode = static_cast<u8>(_exposure_mode);
+        SerializerWrapper<u8>::Deserialize(&lens_projection_mode, archive, &kLensProjectionMode);
+        SerializerWrapper<u8>::Deserialize(&exposure_mode, archive, &kExposureMode);
+        _lens_projection_mode = static_cast<ELensProjectionMode>(lens_projection_mode);
+        _exposure_mode = static_cast<EExposureMode>(exposure_mode);
+        Sanitize();
+    }
+
+    void PhysicalCameraSettings::Sanitize()
+    {
+        _sensor_width_mm = ClampFinite(_sensor_width_mm, 36.0f, kMinimumSensorSizeMm, kMaximumSensorSizeMm);
+        _sensor_height_mm = ClampFinite(_sensor_height_mm, 24.0f, kMinimumSensorSizeMm, kMaximumSensorSizeMm);
+        _focal_length_mm = ClampFinite(_focal_length_mm, 50.0f, kMinimumFocalLengthMm, kMaximumFocalLengthMm);
+        _aperture_f_number = ClampFinite(_aperture_f_number, 4.0f, kMinimumFNumber, kMaximumFNumber);
+        _shutter_seconds = ClampFinite(_shutter_seconds, 1.0f / 60.0f, kMinimumShutterSeconds,
+                                       kMaximumShutterSeconds);
+        _iso = ClampFinite(_iso, 100.0f, kMinimumIso, kMaximumIso);
+        _focus_distance_m = ClampFinite(_focus_distance_m, 10.0f, kMinimumFocusDistanceM,
+                                        kMaximumFocusDistanceM);
+        _exposure_compensation_ev = ClampFinite(_exposure_compensation_ev, 0.0f, kMinimumExposureCompensationEv,
+                                                kMaximumExposureCompensationEv);
+        if (static_cast<u8>(_lens_projection_mode) > static_cast<u8>(ELensProjectionMode::kPhysicalFocalLength))
+            _lens_projection_mode = ELensProjectionMode::kLegacyFov;
+        if (static_cast<u8>(_exposure_mode) > static_cast<u8>(EExposureMode::kAutoISO))
+            _exposure_mode = EExposureMode::kLegacyManual;
+    }
+
+    f32 Camera::ComputeVerticalFov(f32 sensor_height_mm, f32 focal_length_mm)
+    {
+        const f32 sensor_height = ClampFinite(sensor_height_mm, 24.0f, kMinimumSensorSizeMm, kMaximumSensorSizeMm);
+        const f32 focal_length = ClampFinite(focal_length_mm, 50.0f, kMinimumFocalLengthMm, kMaximumFocalLengthMm);
+        const f32 fov_degrees = 2.0f * std::atan(sensor_height / (2.0f * focal_length)) * Math::kRadToDeg;
+        return std::clamp(fov_degrees, kMinimumFovDegrees, kMaximumFovDegrees);
+    }
+
+    f32 Camera::ComputeFocalLength(f32 sensor_height_mm, f32 vertical_fov_degrees)
+    {
+        const f32 sensor_height = ClampFinite(sensor_height_mm, 24.0f, kMinimumSensorSizeMm, kMaximumSensorSizeMm);
+        const f32 fov_degrees = ClampFinite(vertical_fov_degrees, 60.0f, kMinimumFovDegrees, kMaximumFovDegrees);
+        const f32 focal_length = sensor_height / (2.0f * std::tan(fov_degrees * Math::kDegToRad * 0.5f));
+        return std::clamp(focal_length, kMinimumFocalLengthMm, kMaximumFocalLengthMm);
+    }
+
     const String &CameraTypeToString(ECameraType type)
     {
         static const String kOrthographic = "kOrthographic";
@@ -188,6 +294,82 @@ namespace Ailu::Render
         RebuildCameraMatrices();
     }
 
+    void Camera::PhysicalSettings(const PhysicalCameraSettings &settings)
+    {
+        const EExposureMode previous_exposure_mode = _physical_camera_settings._exposure_mode;
+        _physical_camera_settings = settings;
+        _physical_camera_settings.Sanitize();
+        if (previous_exposure_mode != _physical_camera_settings._exposure_mode)
+            MarkTemporalHistoryReset();
+        if (_camera_type == ECameraType::kPerspective &&
+            _physical_camera_settings._lens_projection_mode == ELensProjectionMode::kPhysicalFocalLength)
+        {
+            const f32 fov_degrees = ComputeVerticalFov(_physical_camera_settings._sensor_height_mm,
+                                                       _physical_camera_settings._focal_length_mm);
+            if (_fov_h != fov_degrees)
+            {
+                _fov_h = fov_degrees;
+                MarkDirty();
+                MarkTemporalHistoryReset();
+            }
+        }
+    }
+
+    void Camera::LensProjectionMode(ELensProjectionMode value)
+    {
+        PhysicalCameraSettings settings = _physical_camera_settings;
+        settings._lens_projection_mode = value;
+        PhysicalSettings(settings);
+    }
+
+    void Camera::ExposureMode(EExposureMode value)
+    {
+        PhysicalCameraSettings settings = _physical_camera_settings;
+        settings._exposure_mode = value;
+        PhysicalSettings(settings);
+    }
+
+    void Camera::SetFocalLengthMm(f32 value)
+    {
+        PhysicalCameraSettings settings = _physical_camera_settings;
+        settings._focal_length_mm = value;
+        PhysicalSettings(settings);
+    }
+
+    f32 Camera::ComputeEv100() const
+    {
+        PhysicalCameraSettings settings = _physical_camera_settings;
+        settings.Sanitize();
+        return std::log2((settings._aperture_f_number * settings._aperture_f_number / settings._shutter_seconds) *
+                         (100.0f / settings._iso));
+    }
+
+    f32 Camera::ComputeExposureMultiplier() const
+    {
+        if (_physical_camera_settings._exposure_mode == EExposureMode::kLegacyManual)
+            return 1.0f;
+        constexpr f32 kGrayPointCalibration = 1.44f;
+        return kGrayPointCalibration * std::exp2(-ComputeEv100() +
+                                                  _physical_camera_settings._exposure_compensation_ev);
+    }
+
+    void Camera::SetVerticalFov(f32 value)
+    {
+        const f32 fov_degrees = ClampFinite(value, 60.0f, kMinimumFovDegrees, kMaximumFovDegrees);
+        if (_physical_camera_settings._lens_projection_mode == ELensProjectionMode::kPhysicalFocalLength)
+        {
+            PhysicalCameraSettings settings = _physical_camera_settings;
+            settings._focal_length_mm = ComputeFocalLength(settings._sensor_height_mm, fov_degrees);
+            PhysicalSettings(settings);
+            return;
+        }
+        if (_fov_h == fov_degrees)
+            return;
+        _fov_h = fov_degrees;
+        MarkDirty();
+        MarkTemporalHistoryReset();
+    }
+
     f32 Camera::GetAutoTextureMipBias() const
     {
         if (!_auto_texture_mip_bias || !IsTemporalUpscalingActive()) return 0.0f;
@@ -253,10 +435,16 @@ namespace Ailu::Render
 
     void Camera::SetLens(float fovy, float aspect, float nz, float fz)
     {
-        _fov_h = fovy;
+        const bool projection_range_changed = _aspect != aspect || _near_clip != nz || _far_clip != fz;
+        SetVerticalFov(fovy);
         _aspect = aspect;
         _near_clip = nz;
         _far_clip = fz;
+        if (projection_range_changed)
+        {
+            MarkDirty();
+            MarkTemporalHistoryReset();
+        }
     }
 
     Vector3f Camera::ScreenToWorld(const Vector2f &screen_pos, f32 depth) const
@@ -577,6 +765,13 @@ namespace Ailu::Render
         ar << ar.GetIndent() << "_near:" << c.Near() << std::endl;
         ar << ar.GetIndent() << "_fovh:" << c.FovH() << std::endl;
         ar << ar.GetIndent() << "_size:" << c.Size() << std::endl;
+        const PhysicalCameraSettings &settings = c.PhysicalSettings();
+        ar << ar.GetIndent() << "_physical_camera_version:1" << std::endl;
+        ar << ar.GetIndent() << "_physical_camera_settings:" << settings._sensor_width_mm << ','
+           << settings._sensor_height_mm << ',' << settings._focal_length_mm << ',' << settings._aperture_f_number
+           << ',' << settings._shutter_seconds << ',' << settings._iso << ',' << settings._focus_distance_m << ','
+           << settings._exposure_compensation_ev << ',' << static_cast<u32>(settings._lens_projection_mode) << ','
+           << static_cast<u32>(settings._exposure_mode) << std::endl;
         ar.DecreaseIndent();
         return ar;
     }
@@ -596,6 +791,41 @@ namespace Ailu::Render
         c._fov_h = std::stof(su::Split(buf, ":")[1]);
         ar >> buf;
         c._size = std::stof(su::Split(buf, ":")[1]);
+        std::istream &stream = ar.GetIStream();
+        const std::streampos optional_section_position = stream.tellg();
+        if (stream >> buf && su::BeginWith(buf, "_physical_camera_version"))
+        {
+            const u32 version = static_cast<u32>(std::stoul(su::Split(buf, ":")[1]));
+            if (version == 1u && stream >> buf && su::BeginWith(buf, "_physical_camera_settings"))
+            {
+                const Vector<String> values = su::Split(su::Split(buf, ":")[1], ",");
+                if (values.size() == 10u)
+                {
+                    PhysicalCameraSettings settings;
+                    settings._sensor_width_mm = std::stof(values[0]);
+                    settings._sensor_height_mm = std::stof(values[1]);
+                    settings._focal_length_mm = std::stof(values[2]);
+                    settings._aperture_f_number = std::stof(values[3]);
+                    settings._shutter_seconds = std::stof(values[4]);
+                    settings._iso = std::stof(values[5]);
+                    settings._focus_distance_m = std::stof(values[6]);
+                    settings._exposure_compensation_ev = std::stof(values[7]);
+                    settings._lens_projection_mode = static_cast<ELensProjectionMode>(std::stoul(values[8]));
+                    settings._exposure_mode = static_cast<EExposureMode>(std::stoul(values[9]));
+                    c.PhysicalSettings(settings);
+                }
+            }
+            else if (version != 1u && optional_section_position != std::streampos(-1))
+            {
+                stream.clear();
+                stream.seekg(optional_section_position);
+            }
+        }
+        else if (optional_section_position != std::streampos(-1))
+        {
+            stream.clear();
+            stream.seekg(optional_section_position);
+        }
         return ar;
     }
     void Camera::SetPixelSize(u16 w, u16 h)

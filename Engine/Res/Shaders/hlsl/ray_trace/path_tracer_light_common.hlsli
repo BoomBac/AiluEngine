@@ -363,7 +363,7 @@ float PowerHeuristic(float pdfA, float pdfB)
 
 float3 PointLightRadiance(SampleLightData light, float3 x)
 {
-    float irradiance = PointLightDistanceAttenuation(light._position, light._range, x);
+    float irradiance = PointLightDistanceAttenuation(light._position, light._range, x, light._radius_or_sun_angle);
     float solid_angle = PointLightSolidAngle(light._position, light._radius_or_sun_angle, x);
     return light._color * irradiance / max(solid_angle, 1e-6);
 }
@@ -376,7 +376,7 @@ float SpotLightAngleAttenuationAtPoint(SampleLightData light, float3 x)
 float3 EvaluateFiniteLightRadiance(SampleLightData light, float3 x, float2 uv)
 {
     if (light._type == LIGHT_TYPE_RECT_AREA)
-        return light._color;
+        return light._color * LightRangeAttenuation(distance(light._position, x), light._range);
     if (light._type == LIGHT_TYPE_TRIANGLE_AREA)
         return EvaluateTriangleLightRadiance(light, uv);
     if (light._type == LIGHT_TYPE_SPOT)

@@ -37,7 +37,7 @@ const class Ailu::Type* Ailu::StaticClass<class Ailu::Editor::SceneView>();
 //Class SceneView end...........................
 
 //Class GameView begin...........................
-#define RENDERVIEW_GEN_H_162_GENERATED_BODY \
+#define RENDERVIEW_GEN_H_183_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_GameView_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -53,7 +53,7 @@ const class Ailu::Type* Ailu::StaticClass<class Ailu::Editor::GameView>();
 //Class GameView end...........................
 
 //Class Texture3DView begin...........................
-#define RENDERVIEW_GEN_H_174_GENERATED_BODY \
+#define RENDERVIEW_GEN_H_195_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_Texture3DView_Type();\
                                 static const Type* GetPrivateStaticClass();\

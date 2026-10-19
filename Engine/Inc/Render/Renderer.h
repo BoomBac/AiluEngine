@@ -209,6 +209,8 @@ namespace Ailu
             Ref<RenderTexture> _presentation_texture;
             Vector<Ref<RenderTexture>> _presentation_texture_cache;
             RenderTexture *_target_tex;
+            Vector<ShaderArealLightData> _raster_area_lights;
+            u32 _fixed_light_warning_mask = 0u;
             Vector<MaterialData> _material_data_cache;
             Map<u64, u32> _material_data_lut;
         };

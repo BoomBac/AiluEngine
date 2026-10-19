@@ -288,7 +288,7 @@ float4 PSMain(PSInput i) : SV_Target
     }
     float alpha = saturate(length(total_transmittance));
     //return float4(alpha,alpha,alpha,1);
-    return float4(accumulated_color * _Exposure, alpha); //
+    return float4(accumulated_color * (_Exposure * GetPreExposure()), alpha); //
     /*
     // float3 start = ray.origin + ray.dir * t0;
     float3 start = ray.origin;

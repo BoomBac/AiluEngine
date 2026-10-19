@@ -161,5 +161,5 @@ float4 PSMain(PSInput input) : SV_TARGET
     //lum /= (smoothstep(0.0, 0.2, clamp(sunDir.y, 0.0, 1.0))*2.0 + 0.15);
     //lum = jodieReinhardTonemap(lum);
     
-    return float4(lum,1.0);
+    return float4(lum * GetPreExposure(),1.0);
 }

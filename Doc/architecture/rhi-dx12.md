@@ -15,6 +15,10 @@ Normal requests poll completion without a CPU wait. Context-owned lifetime recor
 submission and background OIDN work. Retired sessions synchronize/release on the task pool; context shutdown drains
 them before descriptor/registry destruction. The lifetime list and native session state have separate mutexes.
 No context pointer is captured by an OIDN worker. DLL/device/buffer/semaphore teardown remains ordered.
+Optional first-hit guides use three independent RGBA32F planes (color, albedo, signed world normal) in the shared
+input allocation, each `width * height * 16` bytes, followed by the existing 16-byte invalid-counter area.
+The output allocation contains only color. All planes share the existing single in-flight request and ready/done
+fences; no extra queue or slot is added. Filter feature changes retire the previous allocation/filter asynchronously.
 
 本文档描述 AiluEngine rendering abstraction 与 DX12 backend 的基本边界。
 
@@ -203,6 +207,18 @@ DXR 使用 `D3DCommandBuffer::SetRayTracingPipelineState` 设置 native state ob
 Compute 与 DXR 都会替换 command list 的 native pipeline state；之后的 Draw 必须重新绑定 graphics PSO。
 
 ## Compute texture array SRVs
+
+DX12 2D RenderTextures publish a persistent bindless Texture2D SRV when uploaded, including R32_FLOAT exposure
+history textures. Re-upload refreshes the descriptor without allocating another index. The texture owns the index
+and releases it at destruction after the GPU resource registry's fence-based retirement. Array and cube render
+textures retain their explicitly bound views and are not published into the Texture2D bindless table.
+Graphics pipeline binding installs each reflected global bindless SRV/UAV table, matching Compute and DXR.
+The native root-slot cache handles root-signature/descriptor-heap changes; an allocated descriptor index alone
+does not make a bindless resource accessible to a draw.
+Graphics root signatures declare these arrays at their allocator capacity with volatile descriptors/data, rather
+than as individual static SRVs/UAVs. SRV/UAV heap regions contain heterogeneous resource dimensions; only the
+indices actually accessed by the shader must match its resource type. Shader ABI version 3 invalidates cached
+graphics root signatures that used the previous single-descriptor layout.
 
 `ComputeShader::CaptureDispatchState` selects the main SRV for a default `Texture2DArray` binding
 (`_sub_res == UINT32_MAX`), exposing all array layers to shader indexing such as directional CSM.

@@ -5,14 +5,16 @@
 
 //#include <Windows.h>
 #include <chrono>
+#include <atomic>
 #include <format>
-#include <sstream>
+#include <mutex>
 #include <string>
 
 #include <fstream>
 #include <iostream>
 #include <string>
 #include <type_traits>
+#include <vector>
 
 #include "Utils.h"
 #include <source_location>
@@ -38,41 +40,15 @@ namespace Ailu
         //return false;
     }
 
-    template<typename T>
-    static void format_helper(std::wostringstream &oss, std::wstring_view &str, const T &value)
-    {
-        std::size_t openBracket = str.find('{');
-        if (openBracket == std::wstring::npos) { return; }
-        std::size_t closeBracket = str.find('}', openBracket + 1);
-        if (closeBracket == std::wstring::npos) { return; }
-        oss << str.substr(0, openBracket) << value;
-        str = str.substr(closeBracket + 1);
-    }
     template<typename... Targs>
     static std::wstring format_str(std::wstring_view str, Targs... args)
     {
-        std::wostringstream oss;
-        (format_helper(oss, str, args), ...);
-        oss << str;
-        return oss.str();
-    }
-    template<typename T>
-    static void format_helper(std::ostringstream &oss, std::string_view &str, const T &value)
-    {
-        std::size_t openBracket = str.find('{');
-        if (openBracket == std::string::npos) { return; }
-        std::size_t closeBracket = str.find('}', openBracket + 1);
-        if (closeBracket == std::string::npos) { return; }
-        oss << str.substr(0, openBracket) << value;
-        str = str.substr(closeBracket + 1);
+        return std::vformat(str, std::make_wformat_args(args...));
     }
     template<typename... Targs>
     static std::string format_str(std::string_view str, Targs... args)
     {
-        std::ostringstream oss;
-        (format_helper(oss, str, args), ...);
-        oss << str;
-        return oss.str();
+        return std::vformat(str, std::make_format_args(args...));
     }
 
     using TraceLevle = uint8_t;
@@ -82,13 +58,24 @@ namespace Ailu
     constexpr TraceLevle TRACE_3 = 1 << 2;
     enum ELogLevel
     {
-        kInfo,
-        kWarning,
-        kError,
-        kFatal
+        kTrace = -2,
+        kDebug = -1,
+        kInfo = 0,
+        kWarning = 1,
+        kError = 2,
+        kFatal = 3
     };
     static constexpr ELogLevel kLogLevel = ELogLevel::kInfo;
     static constexpr TraceLevle kTraceLevel = TRACE_ALL;
+
+    enum class ELogModule : u8
+    {
+        kGeneral,
+        kAsset,
+        kShader,
+        kRHI,
+        kEditor
+    };
 
     class AILU_API LogMessage
     {
@@ -145,20 +132,16 @@ namespace Ailu
             std::wcout << ANSIColorful(log_msg) << std::endl;
         }
     };
-    class FileAppender : public IAppender
+    class AILU_API FileAppender : public IAppender
     {
     public:
-        //static const const String&& GetLogPath() { return s_out_path; }
         inline static const String &s_out_path = "FileAppender_log.txt";
-        void Print(const LogMessage &log_msg) override
-        {
-            std::wofstream out(s_out_path, std::ios_base::app);
-            if (out.is_open())
-            {
-                out << log_msg.ToDetailString() << std::endl;
-                out.close();
-            }
-        }
+        FileAppender();
+        ~FileAppender() override;
+        void Print(const LogMessage &log_msg) override;
+    private:
+        static std::mutex s_output_mutex;
+        std::wofstream _output;
     };
     class OutputAppender : public IAppender
     {
@@ -184,34 +167,93 @@ namespace Ailu
         void AddAppender(IAppender *appender);
         void SetOutputLevel(ELogLevel level);
         void SetTraceLevel(TraceLevle trace);
+        bool IsEnabled(ELogLevel level) const;
+        bool IsEnabled(ELogLevel level, ELogModule module) const;
+        void SetModuleDiagnostics(ELogModule module, bool enabled);
         const std::string &GetOutputPath() const;
-        const ELogLevel &GetOutputLevel() const;
-        const TraceLevle &GetTraceLevel() const;
+        ELogLevel GetOutputLevel() const;
+        TraceLevle GetTraceLevel() const;
         const std::vector<IAppender *> &GetAppenders() const { return _appenders; };
         template<typename... Args, std::enable_if_t<!ContainsWString<Args...>(), bool> = true>
         void LogMsg(ELogLevel level,const std::source_location &loc,const std::string& func_name,const std::string& msg, Args &&...args)
         {
-            LogMsgImpl(LogMessage(level,format_str(msg,args...),loc.file_name(),loc.line(),func_name));
+            if (!IsEnabled(level)) { return; }
+            try
+            {
+                LogMsgImpl(LogMessage(level, format_str(msg, args...), loc.file_name(), loc.line(), func_name));
+            }
+            catch (const std::format_error &error)
+            {
+                LogMsgImpl(LogMessage(level, std::string("[format error: ") + error.what() + "] " + msg,
+                                      loc.file_name(), loc.line(), func_name));
+            }
         }
         template<typename... Args, std::enable_if_t<!ContainsString<Args...>(), bool> = true>
         void LogMsg(ELogLevel level,const std::source_location &loc,const std::string& func_name,const std::wstring& msg, Args &&...args)
         {
-            LogMsgImpl(LogMessage(level,format_str(msg,args...),loc.file_name(),loc.line(),func_name));
+            if (!IsEnabled(level)) { return; }
+            try
+            {
+                LogMsgImpl(LogMessage(level, format_str(msg, args...), loc.file_name(), loc.line(), func_name));
+            }
+            catch (const std::format_error &error)
+            {
+                LogMsgImpl(LogMessage(level, L"[format error: " + ToWChar(error.what()) + L"] " + msg,
+                                      loc.file_name(), loc.line(), func_name));
+            }
+        }
+        template<typename... Args, std::enable_if_t<!ContainsWString<Args...>(), bool> = true>
+        void LogMsgModule(ELogModule module, ELogLevel level, const std::source_location &loc,
+                          const std::string &func_name, const std::string &msg, Args &&...args)
+        {
+            if (!IsEnabled(level, module)) { return; }
+            try
+            {
+                LogMsgImpl(LogMessage(level, format_str(msg, args...), loc.file_name(), loc.line(), func_name));
+            }
+            catch (const std::format_error &error)
+            {
+                LogMsgImpl(LogMessage(level, std::string("[format error: ") + error.what() + "] " + msg,
+                                      loc.file_name(), loc.line(), func_name));
+            }
+        }
+        template<typename... Args, std::enable_if_t<!ContainsString<Args...>(), bool> = true>
+        void LogMsgModule(ELogModule module, ELogLevel level, const std::source_location &loc,
+                          const std::string &func_name, const std::wstring &msg, Args &&...args)
+        {
+            if (!IsEnabled(level, module)) { return; }
+            try
+            {
+                LogMsgImpl(LogMessage(level, format_str(msg, args...), loc.file_name(), loc.line(), func_name));
+            }
+            catch (const std::format_error &error)
+            {
+                LogMsgImpl(LogMessage(level, L"[format error: " + ToWChar(error.what()) + L"] " + msg,
+                                      loc.file_name(), loc.line(), func_name));
+            }
         }
     private:
         void LogMsgImpl(const LogMessage& log_msg);
     private:
         std::vector<IAppender *> _appenders;
-        ELogLevel _output_level;
-        TraceLevle _output_mark;
+        std::atomic<ELogLevel> _output_level;
+        std::atomic<TraceLevle> _output_mark;
+        std::atomic<u32> _module_diagnostics_mask{0u};
         std::string _output_path;
         std::string _name;
+        mutable std::mutex _appender_mutex;
+        mutable std::mutex _output_mutex;
     };
-#define AE_LOG(maker, Level, msg, ...) LogMgr::Get().LogMsg(Level,std::source_location::current(),__FUNCTION__,msg, ##__VA_ARGS__);
-#define LOG_INFO(msg, ...)    LogMgr::Get().LogMsg(ELogLevel::kInfo,std::source_location::current(),__FUNCTION__,msg, ##__VA_ARGS__);
-#define LOG_WARNING(msg, ...) LogMgr::Get().LogMsg(ELogLevel::kWarning,std::source_location::current(),__FUNCTION__,msg, ##__VA_ARGS__);
-#define LOG_ERROR(msg, ...)   LogMgr::Get().LogMsg(ELogLevel::kError,std::source_location::current(),__FUNCTION__,msg, ##__VA_ARGS__);
-#define LOG_FATAL(msg,...)    LogMgr::Get().LogMsg(ELogLevel::kFatal,std::source_location::current(),__FUNCTION__,msg, ##__VA_ARGS__);
+#define AE_LOG(maker, Level, msg, ...) do { auto &log_mgr = LogMgr::Get(); if (log_mgr.IsEnabled(Level)) { log_mgr.LogMsg(Level, std::source_location::current(), __FUNCTION__, msg, ##__VA_ARGS__); } } while (false);
+#define LOG_TRACE(msg, ...)   do { auto &log_mgr = LogMgr::Get(); if (log_mgr.IsEnabled(ELogLevel::kTrace)) { log_mgr.LogMsg(ELogLevel::kTrace, std::source_location::current(), __FUNCTION__, msg, ##__VA_ARGS__); } } while (false);
+#define LOG_DEBUG(msg, ...)   do { auto &log_mgr = LogMgr::Get(); if (log_mgr.IsEnabled(ELogLevel::kDebug)) { log_mgr.LogMsg(ELogLevel::kDebug, std::source_location::current(), __FUNCTION__, msg, ##__VA_ARGS__); } } while (false);
+#define LOG_INFO(msg, ...)    do { auto &log_mgr = LogMgr::Get(); if (log_mgr.IsEnabled(ELogLevel::kInfo)) { log_mgr.LogMsg(ELogLevel::kInfo, std::source_location::current(), __FUNCTION__, msg, ##__VA_ARGS__); } } while (false);
+#define LOG_WARNING(msg, ...) do { auto &log_mgr = LogMgr::Get(); if (log_mgr.IsEnabled(ELogLevel::kWarning)) { log_mgr.LogMsg(ELogLevel::kWarning, std::source_location::current(), __FUNCTION__, msg, ##__VA_ARGS__); } } while (false);
+#define LOG_ERROR(msg, ...)   do { auto &log_mgr = LogMgr::Get(); if (log_mgr.IsEnabled(ELogLevel::kError)) { log_mgr.LogMsg(ELogLevel::kError, std::source_location::current(), __FUNCTION__, msg, ##__VA_ARGS__); } } while (false);
+#define LOG_FATAL(msg, ...)   do { auto &log_mgr = LogMgr::Get(); if (log_mgr.IsEnabled(ELogLevel::kFatal)) { log_mgr.LogMsg(ELogLevel::kFatal, std::source_location::current(), __FUNCTION__, msg, ##__VA_ARGS__); } } while (false);
+#define LOG_MODULE_TRACE(Module, msg, ...) do { auto &log_mgr = LogMgr::Get(); if (log_mgr.IsEnabled(ELogLevel::kTrace, Module)) { log_mgr.LogMsgModule(Module, ELogLevel::kTrace, std::source_location::current(), __FUNCTION__, msg, ##__VA_ARGS__); } } while (false);
+#define LOG_MODULE_DEBUG(Module, msg, ...) do { auto &log_mgr = LogMgr::Get(); if (log_mgr.IsEnabled(ELogLevel::kDebug, Module)) { log_mgr.LogMsgModule(Module, ELogLevel::kDebug, std::source_location::current(), __FUNCTION__, msg, ##__VA_ARGS__); } } while (false);
+// Keep the public logging macros stable for existing call sites.
 }// namespace Ailu
 
 #endif// !LOG_H__

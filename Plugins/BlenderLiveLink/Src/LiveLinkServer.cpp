@@ -278,7 +278,8 @@ namespace Ailu
             if (header._type == ELiveLinkMessageType::kHello)
             {
                 if (!SendPacket(client_socket, ELiveLinkMessageType::kHelloAck, header._sequence,
-                        "{\"accepted\":true,\"protocol_version\":1,\"features\":[\"instance_batch_v1\",\"mesh_prototype_v1\"]}"))
+                        "{\"accepted\":true,\"protocol_version\":1,\"features\":[\"instance_batch_v1\","
+                        "\"mesh_prototype_v1\",\"static_mesh_batch_v1\",\"scene_display_v1\",\"world_environment_v1\"]}"))
                     return;
                 hello_completed = true;
                 _commands.Push({ELiveLinkCommandType::kHelloAccepted, header._version});

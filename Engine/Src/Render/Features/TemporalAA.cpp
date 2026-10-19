@@ -49,7 +49,8 @@ namespace Ailu::Render
         const Vector4f params{_variance_clip_scale, _sharpness, _history_factor, 0.0f};
         const u64 frame_index = g_pGfxContext != nullptr ? g_pGfxContext->GetFrameCount() : 0u;
         _execute_pass.Setup(camera, frame_index, rendering_data._width, rendering_data._height, current_uv_jitter,
-                            rendering_data._camera_data._camera_color_target_desc, params, quality);
+                            rendering_data._camera_data._camera_color_target_desc, params, quality,
+                            rendering_data._pre_exposure);
         if (renderer._is_use_render_graph)
             renderer.EnqueuePass(&_prepare_pass);
         renderer.EnqueuePass(&_execute_pass);
@@ -116,6 +117,13 @@ namespace Ailu::Render
                                Vector2f current_uv_jitter, const TextureDesc &color_desc,
                                Vector4f params, Vector4f quality)
     {
+        Setup(camera, frame_index, width, height, current_uv_jitter, color_desc, params, quality, 1.0f);
+    }
+
+    void TAAExecutePass::Setup(const Camera &camera, u64 frame_index, u32 width, u32 height,
+                               Vector2f current_uv_jitter, const TextureDesc &color_desc,
+                               Vector4f params, Vector4f quality, f32 pre_exposure)
+    {
         AL_ASSERT_MSG(camera._anti_aliasing == EAntiAliasing::kTAA, "TAA history setup requires a TAA camera.");
         AL_ASSERT_MSG(std::isfinite(current_uv_jitter.x) && std::isfinite(current_uv_jitter.y),
                       "TAA camera jitter must be finite.");
@@ -125,6 +133,8 @@ namespace Ailu::Render
         _current_uv_jitter = current_uv_jitter;
         _params = params;
         _quality = quality;
+        _current_pre_exposure = std::isfinite(pre_exposure) && pre_exposure > 0.0f ? pre_exposure : 1.0f;
+        _current_exposure_mode = static_cast<u8>(camera.PhysicalSettings()._exposure_mode);
         _resolve_executed = false;
 
         TAAHistoryState &history = _infos[_cur_camera_hash];
@@ -132,6 +142,8 @@ namespace Ailu::Render
         const Vector3f current_forward = camera.Forward();
         const Vector3f current_up = camera.Up();
         const bool changed_camera_lifetime = history._has_rendered && history._camera_identity != &camera;
+        const bool changed_exposure_mode = history._has_rendered &&
+            history._previous_exposure_mode != _current_exposure_mode;
         const bool changed_dimensions = history._width != width || history._height != height;
         const bool skipped_frame = history._has_rendered && frame_index != history._last_render_frame + 1u;
         const bool explicit_reset = history._camera_reset_revision != camera.GetTemporalHistoryResetRevision();
@@ -149,7 +161,8 @@ namespace Ailu::Render
              Math::DotProduct(current_up, history._previous_up) < kCameraCutOrientationDot ||
              projection_discontinuity);
 
-        if (changed_camera_lifetime || changed_dimensions || skipped_frame || camera_cut || explicit_reset)
+        if (changed_camera_lifetime || changed_dimensions || skipped_frame || camera_cut || explicit_reset ||
+            changed_exposure_mode)
             history._history_valid = false;
 
         const bool texture_desc_mismatch = history._target_a &&
@@ -218,6 +231,13 @@ namespace Ailu::Render
         const bool can_reproject = history._history_valid;
         const Vector2f previous_uv_jitter = history._previous_uv_jitter;
         const Vector2f current_uv_jitter = _current_uv_jitter;
+        const f32 current_pre_exposure = _current_pre_exposure;
+        const f32 previous_pre_exposure = history._previous_pre_exposure;
+        const bool current_pre_exposure_texture_valid = rendering_data._rg_handles._pre_exposure_ev.IsValid();
+        const bool previous_pre_exposure_texture_valid =
+            rendering_data._rg_handles._previous_pre_exposure_ev.IsValid();
+        const RDG::RGHandle current_pre_exposure_ev = rendering_data._rg_handles._pre_exposure_ev;
+        const RDG::RGHandle previous_pre_exposure_ev = rendering_data._rg_handles._previous_pre_exposure_ev;
         const Vector4f jitter(previous_uv_jitter.x, previous_uv_jitter.y,
                               current_uv_jitter.x, current_uv_jitter.y);
         const u64 camera_hash = _cur_camera_hash;
@@ -255,13 +275,18 @@ namespace Ailu::Render
 
         graph.AddPass("TemporalAA", pass_desc,
             [current_color, depth, motion, history_read, history_write, taa_output, opaque_color,
-             reactive_read, reactive_write, reactive_output](RDG::RenderGraphBuilder &builder)
+             reactive_read, reactive_write, reactive_output, current_pre_exposure_ev, previous_pre_exposure_ev,
+             current_pre_exposure_texture_valid, previous_pre_exposure_texture_valid](RDG::RenderGraphBuilder &builder)
             {
                 builder.Read(current_color, EResourceUsage::kReadSRV);
                 builder.Read(depth, EResourceUsage::kReadSRV);
                 builder.Read(motion, EResourceUsage::kReadSRV);
                 builder.Read(history_read, EResourceUsage::kReadSRV);
                 builder.Read(reactive_read, EResourceUsage::kReadSRV);
+                if (current_pre_exposure_texture_valid)
+                    builder.Read(current_pre_exposure_ev, EResourceUsage::kReadSRV);
+                if (previous_pre_exposure_texture_valid)
+                    builder.Read(previous_pre_exposure_ev, EResourceUsage::kReadSRV);
                 if (opaque_color.IsValid())
                     builder.Read(opaque_color, EResourceUsage::kReadSRV);
                 *taa_output = builder.Write(history_write, EResourceUsage::kWriteUAV);
@@ -270,7 +295,9 @@ namespace Ailu::Render
             [this, current_color, depth, motion, history_read, taa_output, camera_hash, frame_index,
              current_uv_jitter, jitter, params, quality, width, height, can_reproject, camera_position,
              camera_forward, camera_up, camera_fov, camera_near, camera_far, camera_aspect, projection_type,
-             opaque_color, reactive_read, reactive_output]
+             opaque_color, reactive_read, reactive_output, current_pre_exposure_ev, previous_pre_exposure_ev,
+             current_pre_exposure_texture_valid, previous_pre_exposure_texture_valid,
+             current_pre_exposure, previous_pre_exposure, exposure_mode = _current_exposure_mode]
             (RDG::RenderGraph &pass_graph, CommandBuffer *cmd, const RenderingData &)
             {
                 Texture *current_color_texture = pass_graph.Resolve<Texture>(current_color);
@@ -305,6 +332,16 @@ namespace Ailu::Render
                 _taa_gen->SetFloat("_VarianceClampScale", params.x);
                 _taa_gen->SetFloat("_Sharpness", params.y);
                 _taa_gen->SetFloat("_HistoryFactor", params.z);
+                _taa_gen->SetFloat("_CurrentPreExposureTextureValid",
+                                   current_pre_exposure_texture_valid ? 1.0f : 0.0f);
+                _taa_gen->SetFloat("_PreviousPreExposureTextureValid",
+                                   previous_pre_exposure_texture_valid ? 1.0f : 0.0f);
+                _taa_gen->SetFloat("_CurrentPreExposure", current_pre_exposure);
+                _taa_gen->SetFloat("_PreviousPreExposure", previous_pre_exposure);
+                _taa_gen->SetTexture(_taa_kernel, "_CurrentPreExposureEV", current_pre_exposure_texture_valid
+                    ? pass_graph.Resolve<Texture>(current_pre_exposure_ev) : current_color_texture);
+                _taa_gen->SetTexture(_taa_kernel, "_PreviousPreExposureEV", previous_pre_exposure_texture_valid
+                    ? pass_graph.Resolve<Texture>(previous_pre_exposure_ev) : current_color_texture);
 
                 const auto [dispatch_x, dispatch_y, dispatch_z] =
                     _taa_gen->CalculateDispatchNum(_taa_kernel, width, height, 1u);
@@ -315,6 +352,8 @@ namespace Ailu::Render
                     return;
                 TAAHistoryState &state = state_it->second;
                 state._history_valid = true;
+                state._previous_pre_exposure = current_pre_exposure;
+                state._previous_exposure_mode = exposure_mode;
                 state._previous_uv_jitter = current_uv_jitter;
                 state._last_render_frame = frame_index;
                 state._write_a = !state._write_a;
@@ -410,6 +449,12 @@ namespace Ailu::Render
                                                               static_cast<f32>(rendering_data._height)));
         _taa_gen->SetVector("_Jitter", jitter);
         _taa_gen->SetFloat("_HistoryValid", can_reproject ? 1.0f : 0.0f);
+        _taa_gen->SetFloat("_CurrentPreExposureTextureValid", 0.0f);
+        _taa_gen->SetFloat("_PreviousPreExposureTextureValid", 0.0f);
+        _taa_gen->SetFloat("_CurrentPreExposure", _current_pre_exposure);
+        _taa_gen->SetFloat("_PreviousPreExposure", history._previous_pre_exposure);
+        _taa_gen->SetTexture(_taa_kernel, "_CurrentPreExposureEV", rendering_data._camera_opaque_tex_handle);
+        _taa_gen->SetTexture(_taa_kernel, "_PreviousPreExposureEV", rendering_data._camera_opaque_tex_handle);
         _taa_gen->SetTexture(_taa_kernel, "_CurrentColor", rendering_data._camera_opaque_tex_handle);
         _taa_gen->SetTexture(_taa_kernel, "_HistoryColor", history_texture);
         _taa_gen->SetTexture(_taa_kernel, "_CurrentTarget", output);
@@ -463,6 +508,8 @@ namespace Ailu::Render
         TAAHistoryState &history = history_it->second;
         history._history_valid = true;
         history._previous_uv_jitter = _current_uv_jitter;
+        history._previous_pre_exposure = _current_pre_exposure;
+        history._previous_exposure_mode = _current_exposure_mode;
         history._last_render_frame = _current_frame_index;
         history._write_a = !history._write_a;
         history._has_rendered = true;

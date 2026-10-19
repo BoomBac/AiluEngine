@@ -51,8 +51,6 @@ FullScreenPSInput FullscreenVSMain(FullScreenVSInput i);
 float4 PSMain(FullScreenPSInput input) : SV_TARGET
 {
 	float3 color = _SourceTex.Sample(g_LinearClampSampler, input.uv).rgb;
-	float brightness = dot(color, float3(0.2126, 0.7152, 0.0722));
-	color *= step(1.0, brightness);
 	return color.xyzz;
 }
 //texel_size: float2(1.0,1.0) / SrcTex.size
@@ -154,6 +152,7 @@ float4 UpSamplePS(FullScreenPSInput input) : SV_TARGET
 {
     float aspect = _SampleParams.x / _SampleParams.y;
 	float3 c = UpSample(input.uv,float2(_SampleParams.z * aspect,_SampleParams.z));
+    // SrcAlpha/InvSrcAlpha with alpha 0.5 keeps the pyramid's constant-color gain at one.
 	return float4(c,0.5);
 }
 

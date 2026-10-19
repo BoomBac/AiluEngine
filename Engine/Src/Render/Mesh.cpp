@@ -21,7 +21,7 @@ namespace Ailu::Render
 	}
 	Ref<Mesh> Mesh::CreateFromData(String name, Vector<Vector3f> &&vertices, Vector<Vector3f> &&normals,
 		Vector<Vector4f> &&tangents, Vector<Vector2f> &&uvs, Vector<Vector<u32>> &&submeshes,
-		const AABB &bounds)
+		const AABB &bounds, bool build_derived_data)
 	{
 		auto mesh = MakeRef<Mesh>(std::move(name));
 		mesh->SetVertices(std::move(vertices));
@@ -32,16 +32,25 @@ namespace Ailu::Render
 		Vector<AABB> mesh_bounds;
 		mesh_bounds.reserve(submeshes.size() + 1u);
 		mesh_bounds.push_back(bounds);
+		u32 triangle_count = 0u;
 		for (auto &indices : submeshes)
 		{
 			AABB submesh_bounds = AABB::Infinity();
 			for (u32 vertex_index : indices)
 				AABB::Encapsulate(submesh_bounds, mesh->GetVertices()[vertex_index]);
 			mesh_bounds.push_back(indices.empty() ? bounds : submesh_bounds);
+			triangle_count += static_cast<u32>(indices.size() / 3u);
 			mesh->AddSubmesh(std::move(indices));
 		}
 		mesh->SetBounds(std::span<const AABB>(mesh_bounds.data(), mesh_bounds.size()));
-		mesh->Apply();
+		if (build_derived_data)
+			mesh->Apply();
+		else
+		{
+			// Synthetic raster-only meshes intentionally do not build CPU triangle/BVH data.
+			mesh->_triangle_count = triangle_count;
+			mesh->UploadGpuResources();
+		}
 		return mesh;
 	}
 	Mesh::~Mesh()

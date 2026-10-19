@@ -16,6 +16,7 @@ namespace Ailu
 
         private:
             ECS::ELightType _cached_light_type = static_cast<ECS::ELightType>(-1);
+            bool _cached_use_color_temperature = false;
         };
     }// namespace Editor
 }// namespace Ailu

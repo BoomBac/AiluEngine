@@ -21,6 +21,7 @@ namespace Ailu
     namespace Render
     {
         class GraphicsContext;
+        class RenderTexture;
     }
 
     namespace SceneManagement
@@ -36,8 +37,11 @@ namespace Ailu
         EngineRuntime &operator=(const EngineRuntime &) = delete;
         ~EngineRuntime();
 
-        bool Initialize(const ApplicationInitContext &context, Window &window, const ApplicationDesc &desc);
+        bool Initialize(const ApplicationInitContext &context, Window *window, const ApplicationDesc &desc);
+        Render::RenderTexture *GetOffscreenTarget() const { return _offscreen_target.get(); }
+        bool ResizeOffscreenTarget(u32 width, u32 height);
         void BeginShutdown();
+        void WaitForGpu();
         void Drain();
         void Shutdown();
 
@@ -49,6 +53,7 @@ namespace Ailu
         Scope<SceneManagement::SceneMgr> _scenes;
         Render::GraphicsContext *_graphics = nullptr;
         Window *_window = nullptr;
+        Ref<Render::RenderTexture> _offscreen_target;
         bool _audio_initialized = false;
         bool _gizmo_initialized = false;
         bool _ui_initialized = false;

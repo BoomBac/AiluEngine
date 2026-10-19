@@ -254,8 +254,8 @@ namespace Ailu::Render
     {
         while (mip--)
         {
-            w >>= 1;
-            h >>= 1;
+            w = std::max<u16>(1u, w >> 1);
+            h = std::max<u16>(1u, h >> 1);
         }
         return std::make_tuple(w, h);
     }
@@ -1074,7 +1074,7 @@ namespace Ailu::Render
         auto it = _pool.emplace(std::make_pair(hash, std::move(info)));
         _lut_pool.emplace(std::make_pair(id, it));
         if (_pool.size() > 100)
-            LOG_WARNING("Expand rt pool to {} with texture {} at frame {}", _pool.size(), _lut_pool[id]->second._rt->Name(), Application::Application::Get().GetFrameCount());
+            LOG_DEBUG("Expand rt pool to {} with texture {} at frame {}", _pool.size(), _lut_pool[id]->second._rt->Name(), Application::Application::Get().GetFrameCount());
         return id;
     }
     std::optional<u32> RenderTexturePool::GetByIDHash(RTHash hash)
@@ -1142,7 +1142,7 @@ namespace Ailu::Render
         }
         if (released_rt_num > 0)
         {
-            LOG_INFO("RT pool release {} rt", released_rt_num);
+            LOG_DEBUG("RT pool release {} rt", released_rt_num);
         }
     }
     void RenderTexturePool::Register(RenderTexture *rt)

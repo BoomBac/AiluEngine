@@ -33,6 +33,7 @@ TextureCube PrefilterEnvTex : register(t7);
 Texture2D IBLLut : register(t8);
 Texture2D _OcclusionTex : register(t9);
 StructuredBuffer<float4> g_environment_sh : register(t18);
+StructuredBuffer<ShaderArealLightData> _RasterAreaLights : register(t0, space12);
 //TEXTURE2D(_OcclusionTex)
 
 
@@ -47,7 +48,7 @@ float3 GetPointLightIrridance(uint index,float3 world_pos)
 {
 	float dis = distance(_PointLights[index]._LightPosOrDir,world_pos);
 	float atten = 1;
-	atten *= GetDistanceAtt(dis,_PointLights[index]._LightParam0.x);
+	atten *= GetDistanceAtt(dis, _PointLights[index]._LightParam0.x, _PointLights[index]._LightParam1);
 	return _PointLights[index]._LightColor * atten;
 }
 
@@ -102,7 +103,9 @@ uint GetGlobalSpotLightCount()
 }
 uint GetGlobalAreaLightCount()
 {
-	return min((uint)(_ActiveLightCount.w),MAX_AREA_LIGHT);
+    uint capacity, stride;
+    _RasterAreaLights.GetDimensions(capacity, stride);
+    return min((uint)_ActiveLightCount.w, capacity);
 }
 LightData GetDirectionalLight(uint index)
 {
@@ -118,7 +121,7 @@ LightData GetPointLight(uint index,float3 world_pos)
 	LightData light = (LightData)0;
 	light.light_pos = _PointLights[index]._LightPosOrDir;
 	light.light_dir = -normalize(world_pos - _PointLights[index]._LightPosOrDir);
-	light.light_color = _PointLights[index]._LightColor * GetPointLightIrridance(index, world_pos);
+	light.light_color = GetPointLightIrridance(index, world_pos);
 	light.shadow_atten = 1.0;
 	return light;
 }
@@ -127,7 +130,7 @@ LightData GetSpotLight(uint index,float3 world_pos)
 	LightData light = (LightData)0;
 	light.light_pos = _SpotLights[index]._LightPos;
 	light.light_dir = -normalize(_SpotLights[index]._LightDir);
-	light.light_color = _SpotLights[index]._LightColor * GetSpotLightIrridance(index, world_pos);
+	light.light_color = GetSpotLightIrridance(index, world_pos);
 	light.shadow_atten = 1.0;
 	return light;
 }
@@ -226,23 +229,26 @@ float3 CalculateLightPBR(SurfaceData surface, float3 world_pos, float2 screen_uv
 			float3(t1.y,   0,   t1.w)
 		);
 		float3 rect[4];
-		rect[0] = _AreaLights[z]._points[0].xyz;
-		rect[1] = _AreaLights[z]._points[1].xyz;
-		rect[2] = _AreaLights[z]._points[2].xyz;
-		rect[3] = _AreaLights[z]._points[3].xyz;
-		float3 diffuse = LTC_Evaluate(surface.wnormal,  shading_data.view_dir, world_pos, Identity(), rect, _AreaLights[z]._is_twosided);
-		float3 specular = LTC_Evaluate(surface.wnormal, shading_data.view_dir, world_pos, Minv, rect, _AreaLights[z]._is_twosided);
-        float3 area_f0 = dielectric_specular.xxx;
+		rect[0] = _RasterAreaLights[z]._points[0].xyz;
+		rect[1] = _RasterAreaLights[z]._points[1].xyz;
+		rect[2] = _RasterAreaLights[z]._points[2].xyz;
+		rect[3] = _RasterAreaLights[z]._points[3].xyz;
+		float3 diffuse = LTC_Evaluate(surface.wnormal,  shading_data.view_dir, world_pos, Identity(), rect, _RasterAreaLights[z]._is_twosided);
+		float3 specular = LTC_Evaluate(surface.wnormal, shading_data.view_dir, world_pos, Minv, rect, _RasterAreaLights[z]._is_twosided);
+        float3 area_f0 = lerp(dielectric_specular.xxx, surface.albedo.rgb, surface.metallic);
         specular *= (area_f0 * t2.x + (1.0 - area_f0) * t2.y)
             * (dielectric_specular > 0.0 || surface.metallic > 0.0 ? 1.0 : 0.0);
         diffuse *= diffuse_scale * (1.0 - surface.metallic) * surface.albedo.rgb;
-		if(_AreaLights[z]._shadowmap_index != -1)
+		if(_RasterAreaLights[z]._shadowmap_index != -1)
 		{ 
-			float4 shadow_pos = mul(_AreaLights[z]._shadow_matrix,float4(world_pos,1.0));
-			shadow_factor = ApplyShadowAddLight(shadow_pos, nl, world_pos,_AreaLights[z]._shadowmap_index,
-				_AreaLights[z]._constant_bias,_AreaLights[z]._slope_bias);
+			float4 shadow_pos = mul(_RasterAreaLights[z]._shadow_matrix,float4(world_pos,1.0));
+			shadow_factor = ApplyShadowAddLight(shadow_pos, nl, world_pos,_RasterAreaLights[z]._shadowmap_index,
+				_RasterAreaLights[z]._constant_bias,_RasterAreaLights[z]._slope_bias);
 		}
-		light += (diffuse + specular) * _AreaLights[z]._LightColor * shadow_factor;
+		float3 area_center = 0.25 * (_RasterAreaLights[z]._points[0].xyz + _RasterAreaLights[z]._points[1].xyz +
+		                             _RasterAreaLights[z]._points[2].xyz + _RasterAreaLights[z]._points[3].xyz);
+		float range_attenuation = GetRangeAtt(distance(area_center, world_pos), _RasterAreaLights[z]._ShadowDistance);
+		light += (diffuse + specular) * _RasterAreaLights[z]._LightColor * shadow_factor * range_attenuation;
 	}
 	//indirect light
 
@@ -302,7 +308,7 @@ float3 CalculateLightSimple(SurfaceData surface,float3 world_pos,float2 screen_u
 				world_pos,light_data.light_pos,j);
 		}
 		light_data.shadow_atten = shadow_factor;
-		light += light_data.shadow_atten * surface.albedo.rgb * shading_data.nl * _PointLights[j]._LightColor * GetPointLightIrridance(j, world_pos);
+		light += light_data.shadow_atten * surface.albedo.rgb * shading_data.nl * light_data.light_color;
 	}
 	shadow_factor = 1.0;
 	for (uint k = 0; k < GetGlobalSpotLightCount(); k++)
@@ -316,7 +322,7 @@ float3 CalculateLightSimple(SurfaceData surface,float3 world_pos,float2 screen_u
 				_SpotLights[k]._constant_bias,_SpotLights[k]._slope_bias);
 		}
 		light_data.shadow_atten = shadow_factor;
-		light += (light_data.shadow_atten * surface.albedo.rgb * shading_data.nl * _SpotLights[k]._LightColor * GetSpotLightIrridance(k, world_pos));
+		light += (light_data.shadow_atten * surface.albedo.rgb * shading_data.nl * light_data.light_color);
 	}
 	shadow_factor = 1.0;
 	for (uint z = 0; z < GetGlobalAreaLightCount(); z++)
@@ -330,19 +336,22 @@ float3 CalculateLightSimple(SurfaceData surface,float3 world_pos,float2 screen_u
 			float3(t1.y,   0,   t1.w)
 		);
 		float3 rect[4];
-		rect[0] = _AreaLights[z]._points[0].xyz;
-		rect[1] = _AreaLights[z]._points[1].xyz;
-		rect[2] = _AreaLights[z]._points[2].xyz;
-		rect[3] = _AreaLights[z]._points[3].xyz;
-		float3 diffuse = LTC_Evaluate(surface.wnormal, view_dir, world_pos, Identity(), rect, _AreaLights[z]._is_twosided);
+		rect[0] = _RasterAreaLights[z]._points[0].xyz;
+		rect[1] = _RasterAreaLights[z]._points[1].xyz;
+		rect[2] = _RasterAreaLights[z]._points[2].xyz;
+		rect[3] = _RasterAreaLights[z]._points[3].xyz;
+		float3 diffuse = LTC_Evaluate(surface.wnormal, view_dir, world_pos, Identity(), rect, _RasterAreaLights[z]._is_twosided);
 		diffuse *= (1.0 - surface.metallic) * surface.albedo.rgb;
-		if(_AreaLights[z]._shadowmap_index != -1)
+		if(_RasterAreaLights[z]._shadowmap_index != -1)
 		{ 
-			float4 shadow_pos = mul(_AreaLights[z]._shadow_matrix,float4(world_pos,1.0));
-			shadow_factor = ApplyShadowAddLight(shadow_pos, nl, world_pos,_AreaLights[z]._shadowmap_index,
-				_AreaLights[z]._constant_bias,_AreaLights[z]._slope_bias);
+			float4 shadow_pos = mul(_RasterAreaLights[z]._shadow_matrix,float4(world_pos,1.0));
+			shadow_factor = ApplyShadowAddLight(shadow_pos, nl, world_pos,_RasterAreaLights[z]._shadowmap_index,
+				_RasterAreaLights[z]._constant_bias,_RasterAreaLights[z]._slope_bias);
 		}
-		light += shadow_factor * diffuse * _AreaLights[z]._LightColor;// + specular;
+		float3 area_center = 0.25 * (_RasterAreaLights[z]._points[0].xyz + _RasterAreaLights[z]._points[1].xyz +
+		                             _RasterAreaLights[z]._points[2].xyz + _RasterAreaLights[z]._points[3].xyz);
+		float range_attenuation = GetRangeAtt(distance(area_center, world_pos), _RasterAreaLights[z]._ShadowDistance);
+		light += shadow_factor * diffuse * _RasterAreaLights[z]._LightColor * range_attenuation;
 	}
 	//indirect light
 

@@ -28,6 +28,54 @@ namespace Ailu
             kPerspective
         };
         AENUM()
+        enum class ELensProjectionMode : u8
+        {
+            kLegacyFov,
+            kPhysicalFocalLength
+        };
+        AENUM()
+        enum class EExposureMode : u8
+        {
+            kLegacyManual,
+            kManualPhysical,
+            kAuto,
+            kAperturePriority,
+            kShutterPriority,
+            kAutoISO
+        };
+
+        ASTRUCT()
+        struct AILU_API PhysicalCameraSettings
+        {
+            GENERATED_BODY()
+
+            APROPERTY()
+            f32 _sensor_width_mm = 36.0f;
+            APROPERTY()
+            f32 _sensor_height_mm = 24.0f;
+            APROPERTY()
+            f32 _focal_length_mm = 50.0f;
+            APROPERTY()
+            f32 _aperture_f_number = 4.0f;
+            APROPERTY()
+            f32 _shutter_seconds = 1.0f / 60.0f;
+            APROPERTY()
+            f32 _iso = 100.0f;
+            APROPERTY()
+            f32 _focus_distance_m = 10.0f;
+            APROPERTY()
+            f32 _exposure_compensation_ev = 0.0f;
+            APROPERTY()
+            ELensProjectionMode _lens_projection_mode = ELensProjectionMode::kLegacyFov;
+            APROPERTY()
+            EExposureMode _exposure_mode = EExposureMode::kLegacyManual;
+
+            void Serialize(FArchive &archive);
+            void Deserialize(FArchive &archive);
+            void Sanitize();
+        };
+
+        AENUM()
         enum class EUpsamplingFilter : u8
         {
             kBilinear,
@@ -60,7 +108,17 @@ namespace Ailu
         {
             friend struct CCamera;
             public:
-                void Type(const ECameraType &value) { _camera_type = value; }
+                void Type(const ECameraType &value)
+                {
+                    if (_camera_type == value)
+                        return;
+                    _camera_type = value;
+                    if (_camera_type == ECameraType::kPerspective &&
+                        _physical_camera_settings._lens_projection_mode == ELensProjectionMode::kPhysicalFocalLength)
+                        PhysicalSettings(_physical_camera_settings);
+                    MarkDirty();
+                    MarkTemporalHistoryReset();
+                }
                 const ECameraType &Type() const { return _camera_type; }
 
             protected:
@@ -114,11 +172,24 @@ namespace Ailu
             protected:
                 Vector3f _up;
             public:
-                void FovH(const float &value) { _fov_h = value; }
+                void FovH(const float &value) { SetVerticalFov(value); }
                 const float &FovH() const { return _fov_h; }
+                void VerticalFov(f32 value) { SetVerticalFov(value); }
+                f32 VerticalFov() const { return _fov_h; }
+
+                const PhysicalCameraSettings &PhysicalSettings() const { return _physical_camera_settings; }
+                void PhysicalSettings(const PhysicalCameraSettings &settings);
+                void LensProjectionMode(ELensProjectionMode value);
+                void ExposureMode(EExposureMode value);
+                void SetFocalLengthMm(f32 value);
+                f32 ComputeEv100() const;
+                f32 ComputeExposureMultiplier() const;
+                static f32 ComputeVerticalFov(f32 sensor_height_mm, f32 focal_length_mm);
+                static f32 ComputeFocalLength(f32 sensor_height_mm, f32 vertical_fov_degrees);
 
             protected:
                 float _fov_h;
+                PhysicalCameraSettings _physical_camera_settings;
             //Orthographic only
             public:
                 void Size(const float &value) { _size = value; }
@@ -319,6 +390,7 @@ namespace Ailu
             void CalculateCullingFrustum();
             void CalculateRenderRayCorners();
             void ProcessJitter();
+            void SetVerticalFov(f32 value);
 
         private:
             bool _is_custom_vp = false;

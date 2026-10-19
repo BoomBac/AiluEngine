@@ -50,6 +50,28 @@ single mip/slice. This is necessary for mip bias and explicit LOD to work on ord
 
 The native sampler adds its own mip bias, including for `SampleLevel`; shaders must not add the texture bias again.
 Explicit shader LOD/bias remains additive. Hardware performs final LOD/resource clamping.
+
+## Original Object/BOX height normals
+
+Standard Lit's `_NormalHeightParameters` is an optional per-material float4: signed strength, world-space distance,
+BOX blend and mode (zero for existing tangent normals; one for source Object/BOX height; two for height plus RGB).
+Modes one and two reuse the
+Normal texture slot with explicit source sRGB/linear interpretation. The source coordinate frame is Z-up,
+recovered as `(object.x, -object.z, object.y)` from imported Ailu geometry. Normal mode is stored in the material's
+existing vector-property serialization; absent values remain zero. No new resource owner or texture slot exists.
+
+Forward, deferred and voxel vertex paths carry local position/normal. `object_box_bump.hlsli` evaluates repeating
+BOX projections with their source blend/orientation and derives the world-space surface gradient without using
+atlas UVs or tangents. Raster view bias adjusts the sampled footprint; source texture sampler bias remains additive.
+The Live Link importer selects anisotropic filtering for height maps. Unsupported height graphs retain baked normals.
+Mode two also samples base color from this same original image when an opaque single Principled closure's RGB input
+is exactly the height texture's Color output (including a zero-factor RGB Mix). It keeps the baked albedo as fallback
+for existing Compute/DXR material consumers. Color adjustments, layered closures and linked alpha retain baking.
+
+The transient 128-byte `MaterialData` retains its layout. It accepts only tangent normal handles, so Renderer omits
+the Normal handle when a raster material uses BOX height mode. Current Compute/DXR consumers do not apply normal
+textures; adding height evaluation there requires an explicit matching contract. This feature does not establish
+general Blender closure/lighting parity.
 Path tracing currently starts from LOD zero: negative bias cannot recover more detail without a ray-footprint baseline.
 
 Camera frame preparation resets temporal history when effective bias changes. Path-tracer history includes manual bias

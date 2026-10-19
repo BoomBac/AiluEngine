@@ -382,12 +382,12 @@ namespace Ailu::RHI::DX12
                               std::uint32_t render_width, std::uint32_t render_height,
                               std::uint32_t output_width, std::uint32_t output_height,
                               float jitter_x, float jitter_y, float frame_time_ms,
-                              float camera_near, float camera_far, float camera_fov_vertical)
+                              float camera_near, float camera_far, float camera_fov_vertical, float pre_exposure)
     {
 #if !AILU_WITH_FSR
         (void) command_list; (void) color; (void) depth; (void) motion_vectors; (void) output;
         (void) camera_id; (void) reset_revision; (void) render_width; (void) render_height;
-        (void) output_width; (void) output_height; (void) jitter_x; (void) jitter_y;
+        (void) output_width; (void) output_height; (void) jitter_x; (void) jitter_y; (void) pre_exposure;
         (void) frame_time_ms; (void) camera_near; (void) camera_far; (void) camera_fov_vertical;
         return false;
 #else
@@ -459,7 +459,7 @@ namespace Ailu::RHI::DX12
         dispatch.renderSize = {render_width, render_height};
         dispatch.upscaleSize = {output_width, output_height};
         dispatch.frameTimeDelta = std::clamp(frame_time_ms, 1.0f, 100.0f);
-        dispatch.preExposure = 1.0f;
+        dispatch.preExposure = std::isfinite(pre_exposure) && pre_exposure > 0.0f ? pre_exposure : 1.0f;
         dispatch.reset = !context._has_dispatched || context._reset_revision != reset_revision || resize;
         dispatch.cameraNear = camera_near;
         dispatch.cameraFar = camera_far;

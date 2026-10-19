@@ -23,7 +23,7 @@ float3 ApplySRGBCurve( float3 x )
     // Approximately pow(x, 1.0 / 2.2)
     //return x < 0.0031308 ? 12.92 * x : 1.055 * pow(x, 1.0 / 2.4) - 0.055;
     #if defined(SHADER_DXC)
-        return select(12.92 * x, 1.055 * pow(x, 1.0 / 2.4) - 0.055, x >= 0.0031308);
+        return select(x >= 0.0031308, 1.055 * pow(x, 1.0 / 2.4) - 0.055, 12.92 * x);
     #else
         return x < 0.0031308 ? 12.92 * x : 1.055 * pow(x, 1.0 / 2.4) - 0.055;
     #endif
@@ -34,7 +34,7 @@ float3 RemoveSRGBCurve( float3 x )
     // Approximately pow(x, 2.2)
     //return x < 0.04045 ? x / 12.92 : pow( (x + 0.055) / 1.055, 2.4 );
     #if defined(SHADER_DXC)
-        return select(x / 12.92, pow( (x + 0.055) / 1.055, 2.4 ), x >= 0.04045);
+        return select(x >= 0.04045, pow((x + 0.055) / 1.055, 2.4), x / 12.92);
     #else
         return x < 0.04045 ? x / 12.92 : pow( (x + 0.055) / 1.055, 2.4 );
     #endif

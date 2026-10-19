@@ -672,13 +672,21 @@ SampleBRDFResult SampleBRDF(TraceContext ctx, float3 n, float3 wo, float r_selec
     return SampleOpaqueBRDF(ctx, n, wo, r_select, r1, r2);
 }
 
-float PointLightDistanceAttenuation(float3 light_pos, float light_range, float3 x)
+float LightRangeAttenuation(float light_distance, float light_range)
 {
-    float atten_radius = max(light_range, 1e-6);
+    if (light_range <= 0.0)
+        return 1.0;
+    float normalized_distance = light_distance / light_range;
+    if (normalized_distance >= 1.0)
+        return 0.0;
+    return Pow2(saturate(1.0 - pow(normalized_distance, 4.0)));
+}
+
+float PointLightDistanceAttenuation(float3 light_pos, float light_range, float3 x, float source_radius = 0.01f)
+{
     float distance_to_center = distance(light_pos, x);
-    float inv_sqr_atten = atten_radius * atten_radius / (distance_to_center * distance_to_center + 1.0);
-    float window_func = Pow2(saturate(1.0 - pow(distance_to_center / atten_radius, 4.0)));
-    return inv_sqr_atten * window_func;
+    float distance_squared = max(distance_to_center * distance_to_center, max(source_radius, 1e-4) * max(source_radius, 1e-4));
+    return rcp(distance_squared) * LightRangeAttenuation(distance_to_center, light_range);
 }
 
 float PointLightSolidAngle(float3 light_pos, float light_radius, float3 x)
@@ -741,7 +749,7 @@ LightSample SamplePointLight(SampleLightData light, float3 x, float2 u)
         result._normal = light_normal;
         result._position = y;
         result._pdf_area = result._pdf * abs(dot(light_normal, -wi)) / max(t * t, 1e-6f);
-        float irradiance = PointLightDistanceAttenuation(light._position, light._range, x);
+        float irradiance = PointLightDistanceAttenuation(light._position, light._range, x, light._radius_or_sun_angle);
         float solid_angle = PointLightSolidAngle(light._position, light._radius_or_sun_angle, x);
         result._radiance = light._color * irradiance / max(solid_angle, 1e-6);
         return result;
@@ -783,7 +791,7 @@ LightSample SamplePointLight(SampleLightData light, float3 x, float2 u)
     result._normal = light_normal;
     result._position = y;
     result._pdf_area = result._pdf * cos_theta_l / max(t * t, 1e-6f);
-    float irradiance = PointLightDistanceAttenuation(light._position, light._range, x);
+    float irradiance = PointLightDistanceAttenuation(light._position, light._range, x, light._radius_or_sun_angle);
     float solid_angle = PointLightSolidAngle(light._position, light._radius_or_sun_angle, x);
     result._radiance = light._color * irradiance / max(solid_angle, 1e-6);
     return result;
@@ -868,7 +876,7 @@ LightSample SampleLight(SampleLightData light, float3 x, float3 n, inout RandomC
         result._pdf_area = rcp(max(area, 1e-6f));
         result._position = y;
         result._normal = light_normal;
-        result._radiance = light._color;
+        result._radiance = light._color * LightRangeAttenuation(r, light._range);
         if (light._is_double_sided)
             cos_theta_l = abs(cos_theta_l);
         if (cos_theta_l <= 0)

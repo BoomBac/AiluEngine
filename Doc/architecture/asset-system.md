@@ -255,3 +255,10 @@ The sidecar uses the existing versioned MeshArtifact container and a native key 
 source data, not disposable DDC. Load recognizes the .almesh source, restores CPU/derived geometry and uploads it through
 the normal Mesh path. Existing FBX/glTF import and DDC paths remain unchanged. Skeleton meshes still require their existing
 source pipeline. Keep the sidecar with the document when moving or distributing these assets.
+
+## HDR environment sources
+
+TextureImporter decodes EXR through the existing TinyEXR implementation into an RGBA32F ScratchImage before its normal
+resize/mipmap/artifact path. Scene-linear World sources use `kHdr`, linear sampling and no compression, preserving values
+above one across save/reload. Their EXR sidecars are durable source files beside the texture asset documents.
+The 2D mip-size helper clamps each dimension to one, including the final mips of rectangular HDR textures.

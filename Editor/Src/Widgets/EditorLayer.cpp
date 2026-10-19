@@ -2,7 +2,6 @@
 #include <cstdlib>
 #include "Widgets/EditorProgressPanel.h"
 #include "Framework/Common/Allocator.hpp"
-#include "Automation/AutomationService.h"
 #include "Widgets/AIAssistantWindow.h"
 #include "Common/Selection.h"
 #include "Common/EditorStyle.h"
@@ -1404,11 +1403,14 @@ namespace Ailu
             _status_left_text = nullptr;
             _status_right_text = nullptr;
             DockManager::Shutdown();
-            JsonArchive ar;
-            ar << *_main_widget;
-            auto p = ResourceMgr::GetResSysPath(EAssetDomain::kEditor,L"UI/main_widget.json");
-            LOG_INFO(L"Save widget to ", p);
-            ar.Save(p);
+            if (!EditorApp::GetEditor()->IsBatchMode())
+            {
+                JsonArchive ar;
+                ar << *_main_widget;
+                auto p = ResourceMgr::GetResSysPath(EAssetDomain::kEditor,L"UI/main_widget.json");
+                LOG_INFO(L"Save widget to ", p);
+                ar.Save(p);
+            }
         }
 
         void EditorLayer::StartRenderGraphCapture(const String &pass_name, const String &resource_name,
@@ -1681,9 +1683,6 @@ namespace Ailu
         void EditorLayer::OnUpdate(f32 dt)
         {
             PROFILE_BLOCK_CPU("EditorLayer::OnUpdate")
-            // Drain pending automation requests on the editor main thread.
-            if (auto *automation = EditorApp::GetEditor()->GetAutomationService())
-                automation->Tick();
             UpdateEditorChrome(dt);
             UpdateDeferredLightingCaptureStatus();
             UpdateAutoCapture();
