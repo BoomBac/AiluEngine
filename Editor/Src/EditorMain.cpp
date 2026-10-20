@@ -461,8 +461,6 @@ int WINAPI WinMain(
             graphics_mode = EApplicationGraphicsMode::kHiddenCompat;
         context._batch = true;
         context._graphics_mode = graphics_mode;
-        if (!scene_path.empty())
-            context._scene_path = scene_path;
         context._fixed_delta_seconds = fixed_delta_seconds;
         context._render_width = render_width;
         context._render_height = render_height;
@@ -470,6 +468,8 @@ int WINAPI WinMain(
         if (report_path.empty())
             report_path = startup_batch._report_path;
     }
+    if (!scene_path.empty())
+        context._scene_path = scene_path;
 
     if (profile_capture && !Profiler::IsEngineProfilerEnabled())
     {

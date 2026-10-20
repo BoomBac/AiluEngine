@@ -4,6 +4,7 @@
 
 #include "Framework/Core/CoreMinimal.h"
 #include "Framework/Core/String.h"
+#include "Platform/ProcessOutput.h"
 
 namespace Ailu
 {
@@ -20,6 +21,10 @@ namespace Ailu
 
         // When true, attempts to attach the process to a Job Object on Windows so Terminate() can kill the whole tree.
         bool UseJobObject = true;
+
+        // Child output capture is opt-in and leaves the legacy non-redirected path unchanged.
+        bool RedirectStdout = false;
+        bool RedirectStderr = false;
 
         ProcessStartInfo() = default;
         explicit ProcessStartInfo(const WString &command_line) : CommandLine(command_line) {}
@@ -65,6 +70,25 @@ namespace Ailu
 
         virtual bool Terminate(u32 exit_code = 1) = 0;
         virtual void Close() = 0;
+
+        // Returns false when the backend does not support redirected output.
+        virtual bool DrainOutput(Vector<ProcessOutputChunk> &out_chunks, u32 max_chunks = 0xFFFFFFFFu)
+        {
+            out_chunks.clear();
+            (void) max_chunks;
+            return false;
+        }
+
+        virtual ProcessOutputStats GetOutputStats() const { return {}; }
+
+        virtual bool StreamsDrained() const { return true; }
+
+        // Waits for redirected streams to reach EOF. This is separate from Wait(), which only waits for the child.
+        virtual bool WaitForOutputDrain(u32 timeout_ms = 0xFFFFFFFFu) const
+        {
+            (void) timeout_ms;
+            return true;
+        }
 
     protected:
         void SetPid(u32 pid) { _pid = pid; }

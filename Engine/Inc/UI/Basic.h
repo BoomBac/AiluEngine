@@ -65,6 +65,11 @@ namespace Ailu
             explicit Text(String text);
             void SetText(const String &text, bool trigger_event = true);
             const String &GetText() const { return _text; }
+            void SetSelectable(bool selectable);
+            bool IsSelectable() const { return _is_selectable; }
+            void SelectAllText();
+            bool HasTextSelection() const { return _select_start != _select_end; }
+            void CopySelectedTextToClipboard() const;
             Vector2f MeasureDesiredSize() override;
             f32 FontSize() const { return _font_size; }
             void FontSize(f32 size, bool record_dirty_reason = true);
@@ -79,6 +84,9 @@ namespace Ailu
             UIControlVisualOverride *GetPropertyVisualOverride() override { return &_style_override; }
             void UpdateTextLayout(bool record_dirty_reason = true);
             void MarkTextLayoutDirty(bool record_dirty_reason = true);
+            Vector2f GetAlignedTextPosition() const;
+            u32 IndexFromMouse(Vector2f mouse_position) const;
+            void DrawTextSelection(UIRenderer &r, Vector2f aligned_position);
             void RenderImpl(UIRenderer &r) override;
             void PostDeserialize() override;
         public:
@@ -99,6 +107,10 @@ namespace Ailu
             Render::Font *_text_layout_font = nullptr;
             f32 _text_layout_font_size = 0.0f;
             bool _is_text_layout_dirty = true;
+            bool _is_selectable = false;
+            bool _is_selecting = false;
+            u32 _select_start = 0u;
+            u32 _select_end = 0u;
             UIControlVisualOverride _style_override;
             mutable UIControlVisual _resolved_visual;
             UIStyleId _style_id;
@@ -229,12 +241,19 @@ namespace Ailu
         {
             GENERATED_BODY()
             DECLARE_DELEGATE(on_content_changed, String);
+            DECLARE_DELEGATE(on_submit, String);
         public:
             InputBlock();
             InputBlock(const String &content);
             void Update(f32 dt) final;
             void SetContent(const String& content, bool trigger_event = true);
+            const String &GetContent() const { return _content; }
+            void SelectAllText();
+            bool HasTextSelection() const { return _select_start != _select_end; }
+            void CopySelectedTextToClipboard() const;
+            void PasteFromClipboard();
             void SetCursorToEnd();
+            void SetCommitLogEnabled(bool enabled) { _log_committed_edits = enabled; }
             void SetIntegerMode(bool enabled = true)
             {
                 _is_integer_mode = enabled;
@@ -279,6 +298,7 @@ namespace Ailu
             f32 _drag_step = 0.01f;
             bool _is_integer_mode = false;
             bool _is_numeric = false;        // 当前文本是否为纯数值
+            bool _log_committed_edits = true;
             f32 _cursor_timer = 0.0f;   // 闪烁计时
             f32 _cursor_hold_timer = 0.0f;
             f32 _blink_interval = 0.5f; // 闪烁周期

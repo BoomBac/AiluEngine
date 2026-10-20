@@ -951,9 +951,26 @@ namespace Ailu
 
         void UIRenderer::PushScissor(Vector4f scissor)
         {
-            Clamp(scissor.x, 0.f, 65535.f);
-            Clamp(scissor.y, 0.f, 65535.f);
-            _scissor_stack.push_back(Rect((u16) scissor.x, (u16) scissor.y, (u16) (scissor.x + scissor.z), (u16) (scissor.y + scissor.w)));
+            const f32 left = std::clamp(scissor.x, 0.0f, 65535.0f);
+            const f32 top = std::clamp(scissor.y, 0.0f, 65535.0f);
+            f32 right = std::clamp(scissor.x + std::max(scissor.z, 0.0f), left, 65535.0f);
+            f32 bottom = std::clamp(scissor.y + std::max(scissor.w, 0.0f), top, 65535.0f);
+            if (!_scissor_stack.empty())
+            {
+                const Rect &parent = _scissor_stack.back();
+                const f32 parent_left = static_cast<f32>(parent.left);
+                const f32 parent_top = static_cast<f32>(parent.top);
+                const f32 parent_right = static_cast<f32>(parent.width);
+                const f32 parent_bottom = static_cast<f32>(parent.height);
+                const f32 clipped_left = std::max(left, parent_left);
+                const f32 clipped_top = std::max(top, parent_top);
+                right = std::max(clipped_left, std::min(right, parent_right));
+                bottom = std::max(clipped_top, std::min(bottom, parent_bottom));
+                _scissor_stack.push_back(Rect(static_cast<u16>(clipped_left), static_cast<u16>(clipped_top),
+                                               static_cast<u16>(right), static_cast<u16>(bottom)));
+                return;
+            }
+            _scissor_stack.push_back(Rect(static_cast<u16>(left), static_cast<u16>(top), static_cast<u16>(right), static_cast<u16>(bottom)));
         }
 
         void UIRenderer::PopScissor()

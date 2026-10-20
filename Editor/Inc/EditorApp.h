@@ -7,9 +7,13 @@
 #include "Framework/Core/CoreMinimal.h"
 #include "Framework/Core/String.h"
 #include "Framework/Core/Containers/Vector.h"
+#include "Framework/Math/Color.h"
 #include "Framework/Math/Vector.hpp"
 #include "Widgets/EditorLayer.h"
 #include "Common/EditorProgressService.h"
+#include "Common/EditorLogService.h"
+#include "Common/EditorTaskService.h"
+#include "Common/ConsoleCommandRegistry.h"
 #include "Framework/Common/JobSystem.h"
 #include <filesystem>
 #include "generated/EditorApp.gen.h"
@@ -54,6 +58,26 @@ namespace Ailu
             Vector2f _controller_rot;
             APROPERTY(Category = "Scene")
             String _scene_path;
+            APROPERTY(Category = "Output")
+            Color _output_info_color = Color(0.82f, 0.86f, 0.92f, 1.0f);
+            APROPERTY(Category = "Output")
+            Color _output_warning_color = Color(1.0f, 0.78f, 0.32f, 1.0f);
+            APROPERTY(Category = "Output")
+            Color _output_error_color = Color(1.0f, 0.36f, 0.36f, 1.0f);
+            APROPERTY(Category = "Output")
+            Color _output_debug_color = Color(0.62f, 0.78f, 1.0f, 1.0f);
+            APROPERTY(Category = "Output")
+            Color _output_trace_color = Color(0.65f, 0.68f, 0.74f, 1.0f);
+            APROPERTY(Category = "Output")
+            Color _output_general_color = Color(0.78f, 0.82f, 0.88f, 1.0f);
+            APROPERTY(Category = "Output")
+            Color _output_asset_color = Color(0.55f, 0.86f, 0.68f, 1.0f);
+            APROPERTY(Category = "Output")
+            Color _output_shader_color = Color(0.78f, 0.62f, 1.0f, 1.0f);
+            APROPERTY(Category = "Output")
+            Color _output_rhi_color = Color(0.98f, 0.64f, 0.42f, 1.0f);
+            APROPERTY(Category = "Output")
+            Color _output_editor_color = Color(0.40f, 0.82f, 1.0f, 1.0f);
         };
 
         ASTRUCT()
@@ -103,6 +127,12 @@ namespace Ailu
             Camera *GetSceneCamera() { return _p_scene_camera; }
             EditorAutomationService *GetAutomationService() { return _automation_service.get(); }
             EditorProgressService &GetProgressService() { return _progress_service; }
+            EditorLogService *GetLogService() { return _log_service.get(); }
+            ConsoleCommandRegistry *GetConsoleCommandRegistry() { return _console_registry.get(); }
+            EditorTaskService *GetTaskService() { return _task_service.get(); }
+            EditorConfig &GetEditorConfig() { return _editor_config; }
+            const EditorConfig &GetEditorConfig() const { return _editor_config; }
+            void SaveEditorConfig();
             bool IsBatchMode() const { return _is_batch_mode; }
             const String &InitializationErrorCode() const { return _initialization_error_code; }
             const String &InitializationErrorMessage() const { return _initialization_error_message; }
@@ -112,10 +142,10 @@ namespace Ailu
             bool OnGetFocus(WindowFocusEvent &e) final;
             bool OnLostFocus(WindowLostFocusEvent &e) final;
             void LoadEditorConfig(ApplicationDesc &desc);
-            void SaveEditorConfig();
             void LoadEditorResource();
             void ConfigureResourceReloading();
             void WatchDirectory();
+            void ShutdownLogService();
 
         private:
             inline static WString s_editor_config_path;
@@ -141,6 +171,9 @@ namespace Ailu
             String _initialization_error_code;
             String _initialization_error_message;
             EditorProgressService _progress_service;
+            Scope<EditorLogService> _log_service;
+            Scope<ConsoleCommandRegistry> _console_registry;
+            Scope<EditorTaskService> _task_service;
             JobGroup _progress_demo_jobs;
         };// namespace Editor
     }// namespace Editor

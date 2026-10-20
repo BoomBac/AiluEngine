@@ -3,9 +3,12 @@
 #include "UI/UIFramework.h"
 #include "UI/UIRenderer.h"
 #include "UI/TextRenderer.h"
+#include "UI/Menu.h"
 #include "Framework/Common/Application.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Framework/Common/Input.h"
+
+#include <imgui.h>
 
 namespace Ailu
 {
@@ -228,6 +231,80 @@ namespace Ailu
         Text::Text() : UIElement("Text")
         {
             SetText("text");
+            OnMouseDown() += [this](UIEvent &event)
+            {
+                if (!_is_selectable)
+                    return;
+                if (event._key_code == EKey::kRBUTTON)
+                {
+                    Vector<MenuEntry> entries;
+                    MenuEntry copy;
+                    copy._label = "Copy";
+                    copy._on_click = [this]() { CopySelectedTextToClipboard(); };
+                    copy._is_enabled = HasTextSelection();
+                    entries.push_back(std::move(copy));
+                    MenuEntry select_all;
+                    select_all._label = "Select All";
+                    select_all._on_click = [this]() { SelectAllText(); };
+                    entries.push_back(std::move(select_all));
+                    Menu::ShowAt(event._mouse_position, entries);
+                    event._is_handled = true;
+                    return;
+                }
+                if (event._key_code != EKey::kLBUTTON)
+                    return;
+                RequestFocus();
+                _is_selecting = true;
+                _select_start = _select_end = IndexFromMouse(event._mouse_position);
+                InvalidatePaint();
+                event._is_handled = true;
+            };
+            OnMouseMove() += [this](UIEvent &event)
+            {
+                if (!_is_selectable || !_is_selecting)
+                    return;
+                const u32 selection_end = IndexFromMouse(event._mouse_position);
+                if (_select_end != selection_end)
+                {
+                    _select_end = selection_end;
+                    InvalidatePaint();
+                }
+                event._is_handled = true;
+            };
+            OnMouseUp() += [this](UIEvent &event)
+            {
+                if (event._key_code != EKey::kLBUTTON || !_is_selectable)
+                    return;
+                _is_selecting = false;
+                event._is_handled = true;
+            };
+            OnMouseDoubleClick() += [this](UIEvent &event)
+            {
+                if (_is_selectable && event._key_code == EKey::kLBUTTON)
+                {
+                    SelectAllText();
+                    event._is_handled = true;
+                }
+            };
+            OnKeyDown() += [this](UIEvent &event)
+            {
+                if (!_is_selectable || !IsFocused())
+                    return;
+                const bool control_down = Input::IsKeyDown(EKey::kCONTROL) || Input::IsKeyDown(EKey::kLCONTROL) ||
+                                           Input::IsKeyDown(EKey::kRCONTROL);
+                if (!control_down)
+                    return;
+                if (event._key_code == EKey::kA)
+                {
+                    SelectAllText();
+                    event._is_handled = true;
+                }
+                else if (event._key_code == EKey::kC)
+                {
+                    CopySelectedTextToClipboard();
+                    event._is_handled = true;
+                }
+            };
         }
         Text::Text(String text) : Text()
         {
@@ -243,6 +320,135 @@ namespace Ailu
             InvalidatePaint();
             if (trigger_event)
                 _on_text_change_delegate.Invoke(_text);
+        }
+        void Text::SetSelectable(bool selectable)
+        {
+            if (_is_selectable == selectable)
+                return;
+            _is_selectable = selectable;
+            SetWantsMouseEvents(selectable);
+            _is_selecting = false;
+            _select_start = _select_end = 0u;
+            InvalidatePaint();
+        }
+        void Text::SelectAllText()
+        {
+            if (!_is_selectable)
+                return;
+            RequestFocus();
+            _select_start = 0u;
+            _select_end = static_cast<u32>(_text.size());
+            InvalidatePaint();
+        }
+        void Text::CopySelectedTextToClipboard() const
+        {
+            if (!_is_selectable || !HasTextSelection() || ImGui::GetCurrentContext() == nullptr)
+                return;
+            const u32 begin = std::min(_select_start, _select_end);
+            const u32 end = std::max(_select_start, _select_end);
+            ImGui::SetClipboardText(_text.substr(begin, end - begin).c_str());
+        }
+        Vector2f Text::GetAlignedTextPosition() const
+        {
+            Vector2f aligned_pos = _content_rect.xy;
+            switch (_horizontal_align)
+            {
+                case EAlignment::kCenter:
+                    aligned_pos.x = _content_rect.x + (_content_rect.z - _text_size.x) * 0.5f;
+                    break;
+                case EAlignment::kRight:
+                    aligned_pos.x = _content_rect.x + _content_rect.z - _text_size.x;
+                    break;
+                case EAlignment::kLeft:
+                case EAlignment::kFill:
+                default:
+                    break;
+            }
+            switch (_vertical_align)
+            {
+                case EAlignment::kTop:
+                    aligned_pos.y = _content_rect.y - _text_visual_bounds.y;
+                    break;
+                case EAlignment::kBottom:
+                    aligned_pos.y = _content_rect.y + _content_rect.w - _text_visual_bounds.w - _text_visual_bounds.y;
+                    break;
+                case EAlignment::kCenter:
+                case EAlignment::kFill:
+                default:
+                    aligned_pos.y = _content_rect.y + (_content_rect.w - _text_visual_bounds.w) * 0.5f - _text_visual_bounds.y;
+                    break;
+            }
+            return aligned_pos;
+        }
+        u32 Text::IndexFromMouse(Vector2f mouse_position) const
+        {
+            if (_text.empty())
+                return 0u;
+            mouse_position = TransformCoord(_inv_matrix, Vector3f{mouse_position, 0.0f}).xy;
+            const Vector2f aligned_pos = GetAlignedTextPosition();
+            const i32 line_count = static_cast<i32>(std::count(_text.begin(), _text.end(), '\n')) + 1;
+            const f32 line_height = std::max(_text_layout_cache._size.y / static_cast<f32>(line_count), 1.0f);
+            const f32 text_top = aligned_pos.y + _text_visual_bounds.y;
+            const i32 line = std::clamp(static_cast<i32>(std::floor((mouse_position.y - text_top) / line_height)), 0, line_count - 1);
+            u32 line_start = 0u;
+            for (i32 index = 0; index < line; ++index)
+            {
+                const size_t newline = _text.find('\n', line_start);
+                line_start = newline == String::npos ? static_cast<u32>(_text.size()) : static_cast<u32>(newline + 1u);
+            }
+            const size_t line_end_pos = _text.find('\n', line_start);
+            const u32 line_end = line_end_pos == String::npos ? static_cast<u32>(_text.size()) : static_cast<u32>(line_end_pos);
+            const String line_text = _text.substr(line_start, line_end - line_start);
+            const f32 local_x = mouse_position.x - aligned_pos.x;
+            if (local_x <= 0.0f)
+                return line_start;
+            const f32 line_width = TextRenderer::CalculateTextSize(line_text, _font_size).x;
+            if (local_x >= line_width)
+                return line_end;
+            u32 low = 0u;
+            u32 high = static_cast<u32>(line_text.size());
+            while (low < high)
+            {
+                const u32 middle = low + (high - low) / 2u;
+                if (TextRenderer::CalculateTextSize(line_text.substr(0u, middle), _font_size).x < local_x)
+                    low = middle + 1u;
+                else
+                    high = middle;
+            }
+            return line_start + low;
+        }
+        void Text::DrawTextSelection(UIRenderer &r, Vector2f aligned_position)
+        {
+            if (!_is_selectable || !HasTextSelection())
+                return;
+            const u32 begin = std::min(_select_start, _select_end);
+            const u32 end = std::max(_select_start, _select_end);
+            const i32 line_count = static_cast<i32>(std::count(_text.begin(), _text.end(), '\n')) + 1;
+            const f32 line_height = std::max(_text_layout_cache._size.y / static_cast<f32>(line_count), 1.0f);
+            const Vector2f text_top = {aligned_position.x, aligned_position.y + _text_visual_bounds.y};
+            UIBrush selection;
+            selection._tint = Color(0.18f, 0.52f, 0.86f, 0.45f);
+            u32 line_start = 0u;
+            while (line_start <= _text.size())
+            {
+                const size_t line_end_pos = _text.find('\n', line_start);
+                const u32 line_end = line_end_pos == String::npos ? static_cast<u32>(_text.size()) : static_cast<u32>(line_end_pos);
+                const u32 selected_start = std::max(begin, line_start);
+                const u32 selected_end = std::min(end, line_end);
+                if (selected_end > selected_start)
+                {
+                    const String line_text = _text.substr(line_start, line_end - line_start);
+                    const f32 start_x = aligned_position.x + TextRenderer::CalculateTextSize(
+                        line_text.substr(0u, selected_start - line_start), _font_size).x;
+                    const f32 end_x = aligned_position.x + TextRenderer::CalculateTextSize(
+                        line_text.substr(0u, selected_end - line_start), _font_size).x;
+                    const f32 line_index = static_cast<f32>(std::count(_text.begin(), _text.begin() + line_start, '\n'));
+                    r.DrawQuad({start_x, text_top.y + line_index * line_height, end_x - start_x, line_height}, _matrix, selection);
+                }
+                if (line_end_pos == String::npos)
+                    break;
+                line_start = line_end + 1u;
+            }
         }
         void Text::UpdateTextLayout(bool record_dirty_reason)
         {
@@ -352,6 +558,7 @@ namespace Ailu
 
             // 绘制文字
             UpdateTextLayout(false);
+            DrawTextSelection(r, aligned_pos);
             r.DrawTextLayout(_text_layout_cache, aligned_pos, _matrix, _font_size, _color);
         }
 
@@ -856,6 +1063,21 @@ namespace Ailu
                     _select_end = (u32) _content.size();
                     _cursor_pos = _select_end;
                     KeepCursorVisible();
+                    e._is_handled = true;
+                    return;
+                }
+
+                if (is_ctrl_down && e._key_code == EKey::kC)
+                {
+                    CopySelectedTextToClipboard();
+                    e._is_handled = true;
+                    return;
+                }
+
+                if (is_ctrl_down && e._key_code == EKey::kV)
+                {
+                    PasteFromClipboard();
+                    e._is_handled = true;
                     return;
                 }
 
@@ -948,6 +1170,7 @@ namespace Ailu
                 }
                 else if (e._key_code == EKey::kRETURN)
                 {
+                    _on_submit_delegate.Invoke(_content);
                     CommitEdit();
                     _is_selecting = false;
                     _is_drag_adjusting = false;
@@ -956,6 +1179,10 @@ namespace Ailu
                     UIManager::Get()->ClearFocus(this);
                     Application::Get().SetCursor(ECursorType::kArrow);
                     InvalidatePaint();
+                }
+                else if (e._key_code == EKey::kUP || e._key_code == EKey::kDOWN || e._key_code == EKey::kTAB)
+                {
+                    return;
                 }
                 else
                 {
@@ -984,6 +1211,26 @@ namespace Ailu
 
             OnMouseDown() += [this](UIEvent &e)
             {
+                if (e._key_code == EKey::kRBUTTON)
+                {
+                    Vector<MenuEntry> entries;
+                    MenuEntry copy;
+                    copy._label = "Copy";
+                    copy._on_click = [this]() { CopySelectedTextToClipboard(); };
+                    copy._is_enabled = HasTextSelection();
+                    entries.push_back(std::move(copy));
+                    MenuEntry paste;
+                    paste._label = "Paste";
+                    paste._on_click = [this]() { PasteFromClipboard(); };
+                    entries.push_back(std::move(paste));
+                    MenuEntry select_all;
+                    select_all._label = "Select All";
+                    select_all._on_click = [this]() { SelectAllText(); };
+                    entries.push_back(std::move(select_all));
+                    Menu::ShowAt(e._mouse_position, entries);
+                    e._is_handled = true;
+                    return;
+                }
                 if (e._key_code == EKey::kLBUTTON)
                 {
                     if (StringUtils::IsNumeric(_content))
@@ -1147,6 +1394,49 @@ namespace Ailu
                 _on_content_changed_delegate.Invoke(content);
         }
 
+        void InputBlock::SelectAllText()
+        {
+            _select_start = 0u;
+            _select_end = static_cast<u32>(_content.size());
+            _cursor_pos = _select_end;
+            _is_editing = true;
+            KeepCursorVisible();
+        }
+
+        void InputBlock::CopySelectedTextToClipboard() const
+        {
+            if (!HasTextSelection() || ImGui::GetCurrentContext() == nullptr)
+                return;
+            const u32 begin = std::min(_select_start, _select_end);
+            const u32 end = std::max(_select_start, _select_end);
+            ImGui::SetClipboardText(_content.substr(begin, end - begin).c_str());
+        }
+
+        void InputBlock::PasteFromClipboard()
+        {
+            if (ImGui::GetCurrentContext() == nullptr)
+                return;
+            const char *clipboard_text = ImGui::GetClipboardText();
+            if (clipboard_text == nullptr || clipboard_text[0] == '\0')
+                return;
+            String pasted;
+            for (const char *character = clipboard_text; *character != '\0'; ++character)
+                pasted += (*character == '\r' || *character == '\n') ? ' ' : *character;
+            const u32 begin = std::min(_select_start, _select_end);
+            const u32 end = std::max(_select_start, _select_end);
+            String new_content = _content;
+            if (HasTextSelection())
+            {
+                new_content.erase(begin, end - begin);
+                _cursor_pos = begin;
+            }
+            new_content.insert(_cursor_pos, pasted);
+            _cursor_pos += static_cast<u32>(pasted.size());
+            ClearSelection();
+            SetContent(new_content);
+            CommitEdit(false);
+        }
+
         void InputBlock::SetCursorToEnd()
         {
             _cursor_pos = static_cast<u32>(_content.size());
@@ -1254,7 +1544,8 @@ namespace Ailu
         void InputBlock::CommitEdit(bool is_finish_edit)
         {
             _is_editing = !is_finish_edit;
-            LOG_INFO("Committed edit({}): {}",_name, _content);
+            if (_log_committed_edits)
+                LOG_INFO("Committed edit({}): {}",_name, _content);
         }
 
         void InputBlock::KeepCursorVisible()

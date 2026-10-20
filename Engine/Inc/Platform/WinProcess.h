@@ -4,8 +4,12 @@
 
 #include "Platform/Process.h"
 
+#include <memory>
+
 namespace Ailu
 {
+    struct ProcessSessionState;
+
     class AILU_API WinProcess : public Process
     {
     public:
@@ -36,10 +40,16 @@ namespace Ailu
         // Closes owned handles (does not terminate the process).
         void Close() override;
 
+        bool DrainOutput(Vector<ProcessOutputChunk> &out_chunks, u32 max_chunks = 0xFFFFFFFFu) override;
+        ProcessOutputStats GetOutputStats() const override;
+        bool StreamsDrained() const override;
+        bool WaitForOutputDrain(u32 timeout_ms = 0xFFFFFFFFu) const override;
+
     private:
         void *_process = nullptr;
         void *_thread = nullptr;
         void *_job = nullptr;
+        std::shared_ptr<ProcessSessionState> _session;
     };
 }
 

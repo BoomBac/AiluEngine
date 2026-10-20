@@ -5,11 +5,15 @@
 #include "Framework/Common/Utils.h"
 #include "Framework/Math/Guid.h"
 
+#include <aclapi.h>
 #include <windows.h>
 
 #include <chrono>
 #include <cstdint>
 #include <future>
+#include <vector>
+
+#pragma comment(lib, "advapi32.lib")
 
 namespace Ailu
 {
@@ -20,6 +24,63 @@ namespace Ailu
             constexpr u32 kPipeBufferSize = 65536u;
             constexpr u32 kMaxMessageSize = 16u * 1024u * 1024u;
             constexpr i64 kRequestTimeoutSeconds = 30;
+
+            bool BuildCurrentLogonPipeSecurity(SECURITY_ATTRIBUTES &security_attributes,
+                                               SECURITY_DESCRIPTOR &security_descriptor,
+                                               PACL &security_acl,
+                                               std::vector<u8> &sid_buffer)
+            {
+                HANDLE token = nullptr;
+                if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token))
+                    return false;
+
+                DWORD token_size = 0u;
+                GetTokenInformation(token, TokenLogonSid, nullptr, 0u, &token_size);
+                if (token_size == 0u)
+                {
+                    CloseHandle(token);
+                    return false;
+                }
+                sid_buffer.resize(token_size);
+                if (!GetTokenInformation(token, TokenLogonSid, sid_buffer.data(), token_size, &token_size))
+                {
+                    CloseHandle(token);
+                    return false;
+                }
+
+                auto *token_groups = reinterpret_cast<TOKEN_GROUPS *>(sid_buffer.data());
+                if (token_groups->GroupCount == 0u)
+                {
+                    CloseHandle(token);
+                    return false;
+                }
+                if (!InitializeSecurityDescriptor(&security_descriptor, SECURITY_DESCRIPTOR_REVISION))
+                {
+                    CloseHandle(token);
+                    return false;
+                }
+
+                EXPLICIT_ACCESSW access = {};
+                access.grfAccessPermissions = GENERIC_ALL;
+                access.grfAccessMode = SET_ACCESS;
+                access.grfInheritance = NO_INHERITANCE;
+                access.Trustee.TrusteeForm = TRUSTEE_IS_SID;
+                access.Trustee.TrusteeType = TRUSTEE_IS_UNKNOWN;
+                access.Trustee.ptstrName = reinterpret_cast<LPWSTR>(token_groups->Groups[0].Sid);
+                const DWORD acl_result = SetEntriesInAclW(1u, &access, nullptr, &security_acl);
+                CloseHandle(token);
+                if (acl_result != ERROR_SUCCESS)
+                    return false;
+
+                if (!SetSecurityDescriptorDacl(&security_descriptor, TRUE, security_acl, FALSE))
+                {
+                    LocalFree(security_acl);
+                    security_acl = nullptr;
+                    return false;
+                }
+                security_attributes = {sizeof(SECURITY_ATTRIBUTES), &security_descriptor, FALSE};
+                return true;
+            }
         }// namespace
 
         AutomationPipeServer::~AutomationPipeServer()
@@ -55,6 +116,16 @@ namespace Ailu
         {
             while (_running.load())
             {
+                SECURITY_ATTRIBUTES security_attributes = {};
+                SECURITY_DESCRIPTOR security_descriptor = {};
+                PACL security_acl = nullptr;
+                std::vector<u8> sid_buffer;
+                const bool has_pipe_security = BuildCurrentLogonPipeSecurity(security_attributes,
+                                                                              security_descriptor,
+                                                                              security_acl,
+                                                                              sid_buffer);
+                if (!has_pipe_security)
+                    return;
                 HANDLE pipe = CreateNamedPipeW(ToWChar(_pipe_name).c_str(),
                                                PIPE_ACCESS_DUPLEX,
                                                PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
@@ -62,7 +133,9 @@ namespace Ailu
                                                kPipeBufferSize,
                                                kPipeBufferSize,
                                                0,
-                                               nullptr);
+                                               &security_attributes);
+                if (security_acl != nullptr)
+                    LocalFree(security_acl);
                 if (pipe == INVALID_HANDLE_VALUE)
                     break;
 

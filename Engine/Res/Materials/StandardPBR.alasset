@@ -50,7 +50,7 @@
             "_value": 0.0
         }, {
             "_name": "_MetallicValue",
-            "_value": 0.0
+            "_value": 1.0
         }, {
             "_name": "_NormalTexSamplerIndex",
             "_value": 0.0
@@ -59,7 +59,7 @@
             "_value": 0.0
         }, {
             "_name": "_RoughnessValue",
-            "_value": 0.0
+            "_value": 0.2532
         }, {
             "_name": "_SamplerMask",
             "_value": 0.0

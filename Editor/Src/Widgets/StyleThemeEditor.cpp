@@ -80,7 +80,7 @@ namespace Ailu
                 return std::filesystem::exists(path);
             }
 
-            bool LoadEditorStyleFromFile(const Path &path)
+            bool LoadEditorStyleFromFileImpl(const Path &path)
             {
                 JsonArchive ar;
                 ar.Load(path);
@@ -93,7 +93,7 @@ namespace Ailu
                 return true;
             }
 
-            bool SaveEditorStyleToFile(const Path &path)
+            bool SaveEditorStyleToFileImpl(const Path &path)
             {
                 JsonArchive ar;
                 const Type *type = EditorStyle::StaticType();
@@ -296,6 +296,41 @@ namespace Ailu
             }
         }
 
+        Path GetDefaultUIThemePath()
+        {
+            return DefaultThemePath();
+        }
+
+        Path GetDefaultEditorStylePath()
+        {
+            return Path(EditorApp::GetEditorRootPath()) / L"Res/UI/EditorStyle.json";
+        }
+
+        bool LoadUIThemeFromFile(const Path &path)
+        {
+            return LoadThemeFromFile(path);
+        }
+
+        bool SaveUIThemeToFile(const Path &path)
+        {
+            return SaveThemeToFile(path);
+        }
+
+        bool LoadEditorStyleFromFile(const Path &path)
+        {
+            return LoadEditorStyleFromFileImpl(path);
+        }
+
+        bool SaveEditorStyleToFile(const Path &path)
+        {
+            return SaveEditorStyleToFileImpl(path);
+        }
+
+        void ApplyUIThemeChanges()
+        {
+            ApplyThemeChange();
+        }
+
         void ShowStyleThemeEditorWindow(bool *is_show)
         {
             if (is_show == nullptr || !*is_show)
@@ -373,7 +408,7 @@ namespace Ailu
                 else
                 {
                     s_editor_style_path = load_path;
-                    s_status = LoadEditorStyleFromFile(s_editor_style_path) ? "loaded" : "load failed";
+                    s_status = LoadEditorStyleFromFileImpl(s_editor_style_path) ? "loaded" : "load failed";
                 }
             }
             ImGui::SameLine();
@@ -388,7 +423,7 @@ namespace Ailu
                 else
                 {
                     s_editor_style_path = save_path;
-                    s_status = SaveEditorStyleToFile(s_editor_style_path) ? "saved" : "save failed";
+                    s_status = SaveEditorStyleToFileImpl(s_editor_style_path) ? "saved" : "save failed";
                 }
             }
             ImGui::SameLine();

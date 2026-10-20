@@ -911,6 +911,32 @@ namespace Ailu
                 indices.push_back(index);
             SetSelectedIndices(indices);
         }
+        void ListView::ScrollItemIntoView(i32 index)
+        {
+            const auto &items = _content_box->GetChildren();
+            if (index < 0 || index >= static_cast<i32>(items.size()))
+                return;
+            const Vector4f item_rect = items[index]->GetArrangeRect();
+            const f32 item_top = TransformCoord(_inv_matrix, Vector3f{item_rect.x, item_rect.y, 0.0f}).y;
+            const f32 item_bottom = TransformCoord(
+                _inv_matrix, Vector3f{item_rect.x, item_rect.y + item_rect.w, 0.0f}).y;
+            const f32 viewport_height = GetScrollViewportSize().y;
+            if (viewport_height <= 0.0f)
+                return;
+            const f32 top = item_top - _current_offset.y + _target_offset.y;
+            const f32 bottom = item_bottom - _current_offset.y + _target_offset.y;
+            f32 offset = _target_offset.y;
+            if (top < _content_rect.y)
+                offset += _content_rect.y - top;
+            else if (bottom > _content_rect.y + viewport_height)
+                offset -= bottom - (_content_rect.y + viewport_height);
+            offset = std::clamp(offset, _max_offset.y, 0.0f);
+            if (!NearbyEqual(offset, _target_offset.y))
+            {
+                _target_offset.y = offset;
+                InvalidateLayout();
+            }
+        }
         void ListView::SetSelectedIndices(const Vector<i32> &indices)
         {
             _selected_indices.clear();

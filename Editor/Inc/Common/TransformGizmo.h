@@ -67,6 +67,7 @@ namespace Ailu
             bool IsDragging() const { return _is_dragging; }
             void SetSnapEnabled(bool enabled) { _snap_enabled = enabled; }
             bool IsSnapEnabled() const { return _snap_enabled; }
+            void SetSceneViewFocused(bool focused) { _is_scene_view_focused = focused; }
         private:
             ECS::TransformComponent *Target() const;
             u32 PickAxis(Vector3f start, Vector3f dir) const;
@@ -120,6 +121,7 @@ namespace Ailu
             Vector3f _drag_scale_factor = Vector3f::kOne;//scale模式下当前缩放，用于临时修改缩放模式下gizmo的轴长度
             f32 _dis_scale = 1.0f;
             bool _snap_enabled = false;
+            bool _is_scene_view_focused = false;
             f32 _translate_snap_step = 1.0f;
             f32 _rotate_snap_degrees = 15.0f;
             f32 _scale_snap_step = 0.1f;

@@ -187,7 +187,10 @@ Closing the Reflector disables dirty visualization. These debug flags are runtim
 
 ## Automation
 
-Editor 当前已有 automation service/pipe。
+Editor 当前已有 automation service/pipe。`EditorAutomationRegistry` 是 automation method 的唯一注册源；Editor Terminal
+通过 `AutomationConsoleBridge` 将这些 method 以同名 console command 暴露给本地交互调用，复用原 handler、schema、权限描述和
+Editor main-thread 执行边界。Terminal 参数使用 `name=value`，复杂值使用现有 automation JSON 表示；这条桥接不改变 pipe
+或远程 caller 的权限策略。
 
 新的外部工具、AI、Live Link 或 DCC integration 需要先判断：
 

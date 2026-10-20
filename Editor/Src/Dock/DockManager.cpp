@@ -2448,10 +2448,10 @@ namespace Ailu
                     DockNode *edge_hover_node = hover_edge_node;
                     _resizing_edge_dir = hover_resize_dir;
                     UpdateResizeMouseCursor(_resizing_edge_dir);
-                    if (edge_hover_node != s_last_edge_hover_node)
-                    {
-                        LOG_INFO("UpdateResizeMouseCursor: {}", _resizing_edge_dir);
-                    }
+                    // if (edge_hover_node != s_last_edge_hover_node)
+                    // {
+                    //     LOG_INFO("UpdateResizeMouseCursor: {}", _resizing_edge_dir);
+                    // }
                     s_last_edge_hover_node = edge_hover_node;
                 }
             }

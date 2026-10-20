@@ -911,7 +911,17 @@ namespace Ailu
         if (_is_loading)
         {
             const auto *node = static_cast<const rapidjson::Value *>(FindReadNode());
-            return node != nullptr && node->IsObject() && node->HasMember(name.c_str());
+            if (node == nullptr)
+                return false;
+            if (node->IsObject())
+                return node->HasMember(name.c_str());
+            if (node->IsArray())
+            {
+                u64 index = 0u;
+                const auto result = std::from_chars(name.data(), name.data() + name.size(), index);
+                return result.ec == std::errc{} && result.ptr == name.data() + name.size() && index < node->Size();
+            }
+            return false;
         }
         String key = _cur_key.empty() ? name : std::format("{}.{}", _cur_key, name);
         JsonValue *node = &_root;

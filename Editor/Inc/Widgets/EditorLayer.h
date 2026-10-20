@@ -81,6 +81,8 @@ namespace Ailu
             f32 _chrome_stats_refresh_elapsed = 0.25f;
             bool _has_chrome_status_snapshot = false;
             String _editor_status_message = "Ready";
+            u64 _package_player_task_id = 0u;
+            u64 _package_player_status_revision = 0u;
             i32 _deferred_lighting_capture_frame_count = 1;
             u64 _deferred_lighting_capture_session_id = 0u;
             String _deferred_lighting_capture_status = "Image Capture: Idle";

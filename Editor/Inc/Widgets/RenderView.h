@@ -86,6 +86,7 @@ namespace Ailu
             void UpdateSceneToolbarLayout();
             void UpdateSceneToolbarBackdrop();
             void UpdateSceneToolbarState();
+            bool IsSceneViewportFocused() const;
             void UpdateDragPreview();
             void UpdateCameraPreview();
             void SetSceneCamera2DOrthographic();

@@ -81,7 +81,7 @@
             "_window_state": ""
         }, {
             "_type_id": "Ailu::Editor::WorldOutline",
-            "_id": 1442,
+            "_id": 1480,
             "_parent_id": 101,
             "_type": 2,
             "_is_vertical_split": true,
@@ -97,7 +97,7 @@
             "_window_state": ""
         }, {
             "_type_id": "Ailu::Editor::PlaceActor",
-            "_id": 1443,
+            "_id": 1481,
             "_parent_id": 101,
             "_type": 2,
             "_is_vertical_split": true,
@@ -129,7 +129,7 @@
             "_window_state": ""
         }, {
             "_type_id": "Ailu::Editor::SceneView",
-            "_id": 1444,
+            "_id": 1482,
             "_parent_id": 5,
             "_type": 2,
             "_is_vertical_split": true,
@@ -145,7 +145,7 @@
             "_window_state": ""
         }, {
             "_type_id": "Ailu::Editor::GameView",
-            "_id": 1445,
+            "_id": 1483,
             "_parent_id": 5,
             "_type": 2,
             "_is_vertical_split": true,
@@ -160,9 +160,25 @@
             "_flags": 0,
             "_window_state": ""
         }, {
-            "_type_id": "Ailu::Editor::AssetBrowser",
+            "_type_id": "null",
             "_id": 3,
             "_parent_id": 4,
+            "_type": 1,
+            "_is_vertical_split": true,
+            "_split_ratio": 0.5,
+            "_title": "null",
+            "_window_id": 0,
+            "_tab_id": "0",
+            "_window_position": [-858993472.0, -858993472.0],
+            "_window_size": [1491.0, 902.0],
+            "_position": [2.0, 577.6486],
+            "_size": [1129.6739, 298.3513],
+            "_flags": 0,
+            "_window_state": ""
+        }, {
+            "_type_id": "Ailu::Editor::AssetBrowser",
+            "_id": 1484,
+            "_parent_id": 3,
             "_type": 2,
             "_is_vertical_split": true,
             "_split_ratio": 0.5,
@@ -175,6 +191,22 @@
             "_size": [1129.6739, 298.3513],
             "_flags": 0,
             "_window_state": "{\n    \"_split_ratio\": 0.2125\n}"
+        }, {
+            "_type_id": "Ailu::Editor::OutputWindow",
+            "_id": 1485,
+            "_parent_id": 3,
+            "_type": 2,
+            "_is_vertical_split": true,
+            "_split_ratio": 0.5,
+            "_title": "Output",
+            "_window_id": 0,
+            "_tab_id": "",
+            "_window_position": [-858993472.0, -858993472.0],
+            "_window_size": [1491.0, 902.0],
+            "_position": [2.0, 577.6486],
+            "_size": [1129.6739, 298.3513],
+            "_flags": 0,
+            "_window_state": "{\n    \"_show_info\": true,\n    \"_show_warning\": true,\n    \"_show_error\": true,\n    \"_show_debug\": false,\n    \"_show_trace\": false,\n    \"_collapse_duplicates\": false,\n    \"_follow_tail\": true,\n    \"_search_text\": \"\",\n    \"_module_index\": -1,\n    \"_split_ratio\": 0.8999\n}"
         }, {
             "_type_id": "Ailu::Editor::ObjectDetail",
             "_id": 2,
@@ -197,6 +229,13 @@
             "_position": [2.0, 55.0],
             "_size": [248.0764, 522.6486],
             "_native_window_position": [-858993472.0, -858993472.0],
+            "_native_window_size": [1491.0, 902.0],
+            "_is_external_window": false
+        }, {
+            "_dock_id": "Ailu::Editor::EditorPreferencesWindow",
+            "_position": [263.0, 166.0],
+            "_size": [560.0, 560.0],
+            "_native_window_position": [222.0, 43.0],
             "_native_window_size": [1491.0, 902.0],
             "_is_external_window": false
         }, {
@@ -232,6 +271,20 @@
             "_position": [2.0, 55.0],
             "_size": [248.0764, 522.6486],
             "_native_window_position": [-858993472.0, -858993472.0],
+            "_native_window_size": [1491.0, 902.0],
+            "_is_external_window": false
+        }, {
+            "_dock_id": "Ailu::Editor::OutputWindow",
+            "_position": [2.0, 577.6486],
+            "_size": [1129.6739, 298.3513],
+            "_native_window_position": [-858993472.0, -858993472.0],
+            "_native_window_size": [1491.0, 902.0],
+            "_is_external_window": false
+        }, {
+            "_dock_id": "Ailu::Editor::TerminalWindow",
+            "_position": [355.0, 204.0],
+            "_size": [900.0, 360.0],
+            "_native_window_position": [278.0, 89.0],
             "_native_window_size": [1491.0, 902.0],
             "_is_external_window": false
         }]

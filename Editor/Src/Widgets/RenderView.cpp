@@ -517,6 +517,7 @@ namespace Ailu
                 s_editor_layer->_viewport_size = Vector2f{rect.z, rect.w};
                 s_editor_layer->_scene_vp_rect = rect;
             }
+            _transform_gizmo->SetSceneViewFocused(IsSceneViewportFocused());
             UpdateSceneToolbarState();
             if (_transform_gizmo->IsDragging())
             {
@@ -1425,8 +1426,10 @@ namespace Ailu
         void SceneView::UpdateSceneToolbarState()
         {
             const bool is_ortho = Camera::sCurrent && Camera::sCurrent->Type() == Render::ECameraType::kOrthographic;
-            const bool snap_active = (_transform_gizmo && _transform_gizmo->IsSnapEnabled()) || Input::IsKeyDown(EKey::kLCONTROL) ||
-                                     Input::IsKeyDown(EKey::kRCONTROL) || Input::IsKeyDown(EKey::kCONTROL);
+            const bool control_down = Input::IsKeyDown(EKey::kLCONTROL) || Input::IsKeyDown(EKey::kRCONTROL) ||
+                                      Input::IsKeyDown(EKey::kCONTROL);
+            const bool snap_active = (_transform_gizmo && _transform_gizmo->IsSnapEnabled()) ||
+                                     (IsSceneViewportFocused() && control_down);
             if (!_is_scene_toolbar_state_dirty && _is_scene_toolbar_ortho_cached == is_ortho &&
                 _is_scene_toolbar_snap_cached == snap_active)
                 return;
@@ -1436,6 +1439,11 @@ namespace Ailu
             ApplySceneToolbarButtonStyle(_btn_2d, is_ortho);
             ApplySceneToolbarButtonStyle(_btn_perspective, !is_ortho);
             ApplySceneToolbarSmallButtonStyle(_btn_snap, snap_active);
+        }
+
+        bool SceneView::IsSceneViewportFocused() const
+        {
+            return _source != nullptr && _source->IsFocused();
         }
         void SceneView::SetSceneCamera2DOrthographic()
         {

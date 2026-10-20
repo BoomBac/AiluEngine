@@ -12,7 +12,7 @@ namespace Ailu
         /// <summary>
         /// 表格绘制器，Cell 不创建独立 UIElement，直接提交绘制指令
         /// </summary>
-        class TableRenderer
+        class AILU_API TableRenderer
         {
         public:
             /// <summary>
@@ -24,7 +24,12 @@ namespace Ailu
             static void DrawRow(UIRenderer &r, const UITableStyle &style, ETableRowState state, Vector4f row_rect, Matrix4x4f matrix);
             static void DrawColumnSeparators(UIRenderer &r, const UITableStyle &style, const Vector<f32> &widths, Vector4f rect,
                                              Matrix4x4f matrix, f32 content_offset_x = 0.0f);
-            static void DrawCellText(UIRenderer &r, const UITableStyle &style, const String &text, Vector4f cell_rect, Matrix4x4f matrix, ETableColumnAlignment alignment = ETableColumnAlignment::kLeft);
+            static void DrawCellText(UIRenderer &r, const UITableStyle &style, const String &text, Vector4f cell_rect,
+                                     Matrix4x4f matrix, ETableColumnAlignment alignment = ETableColumnAlignment::kLeft,
+                                     bool underline = false);
+            static void DrawCellTextColored(UIRenderer &r, const UITableStyle &style, const String &text, Vector4f cell_rect,
+                                            Matrix4x4f matrix, Color color, ETableColumnAlignment alignment = ETableColumnAlignment::kLeft,
+                                            bool underline = false);
             static void DrawCheckbox(UIRenderer &r, Vector2f pos, f32 size, bool checked, Color color, f32 border_width = 1.0f);
             static void DrawProgressBar(UIRenderer &r, Vector4f rect, Matrix4x4f matrix, f32 progress, const UIBrush &background, const UIBrush &fill);
 

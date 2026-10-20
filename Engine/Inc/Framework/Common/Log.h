@@ -9,6 +9,7 @@
 #include <format>
 #include <mutex>
 #include <string>
+#include <thread>
 
 #include <fstream>
 #include <iostream>
@@ -96,8 +97,10 @@ namespace Ailu
                     return L"UNKNOWN";
             }
         }
-        LogMessage(ELogLevel level, const std::string &message,const std::string &file, int line,const std::string &function);
-        LogMessage(ELogLevel level, const std::wstring &message,const std::string &file, int line,const std::string &function);
+        LogMessage(ELogLevel level, const std::string &message, const std::string &file, int line,
+                   const std::string &function, ELogModule module = ELogModule::kGeneral);
+        LogMessage(ELogLevel level, const std::wstring &message, const std::string &file, int line,
+                   const std::string &function, ELogModule module = ELogModule::kGeneral);
         /// @brief 只包含线程名称，日志级别和内容
         /// @return 
         std::wstring ToString() const;
@@ -109,9 +112,11 @@ namespace Ailu
         std::string _file;
         int _line;
         std::string _function;
+        ELogModule _module;
         std::thread::id _thread_id;
         std::string _time_str;
         std::string _thread_name;
+        const std::chrono::system_clock::time_point &Timestamp() const { return _timestamp; }
     private:
         std::chrono::system_clock::time_point _timestamp;
     };
@@ -180,12 +185,13 @@ namespace Ailu
             if (!IsEnabled(level)) { return; }
             try
             {
-                LogMsgImpl(LogMessage(level, format_str(msg, args...), loc.file_name(), loc.line(), func_name));
+                LogMsgImpl(LogMessage(level, format_str(msg, args...), loc.file_name(), loc.line(), func_name,
+                                      ELogModule::kGeneral));
             }
             catch (const std::format_error &error)
             {
                 LogMsgImpl(LogMessage(level, std::string("[format error: ") + error.what() + "] " + msg,
-                                      loc.file_name(), loc.line(), func_name));
+                                      loc.file_name(), loc.line(), func_name, ELogModule::kGeneral));
             }
         }
         template<typename... Args, std::enable_if_t<!ContainsString<Args...>(), bool> = true>
@@ -194,12 +200,13 @@ namespace Ailu
             if (!IsEnabled(level)) { return; }
             try
             {
-                LogMsgImpl(LogMessage(level, format_str(msg, args...), loc.file_name(), loc.line(), func_name));
+                LogMsgImpl(LogMessage(level, format_str(msg, args...), loc.file_name(), loc.line(), func_name,
+                                      ELogModule::kGeneral));
             }
             catch (const std::format_error &error)
             {
                 LogMsgImpl(LogMessage(level, L"[format error: " + ToWChar(error.what()) + L"] " + msg,
-                                      loc.file_name(), loc.line(), func_name));
+                                      loc.file_name(), loc.line(), func_name, ELogModule::kGeneral));
             }
         }
         template<typename... Args, std::enable_if_t<!ContainsWString<Args...>(), bool> = true>
@@ -209,12 +216,12 @@ namespace Ailu
             if (!IsEnabled(level, module)) { return; }
             try
             {
-                LogMsgImpl(LogMessage(level, format_str(msg, args...), loc.file_name(), loc.line(), func_name));
+                LogMsgImpl(LogMessage(level, format_str(msg, args...), loc.file_name(), loc.line(), func_name, module));
             }
             catch (const std::format_error &error)
             {
                 LogMsgImpl(LogMessage(level, std::string("[format error: ") + error.what() + "] " + msg,
-                                      loc.file_name(), loc.line(), func_name));
+                                      loc.file_name(), loc.line(), func_name, module));
             }
         }
         template<typename... Args, std::enable_if_t<!ContainsString<Args...>(), bool> = true>
@@ -224,12 +231,12 @@ namespace Ailu
             if (!IsEnabled(level, module)) { return; }
             try
             {
-                LogMsgImpl(LogMessage(level, format_str(msg, args...), loc.file_name(), loc.line(), func_name));
+                LogMsgImpl(LogMessage(level, format_str(msg, args...), loc.file_name(), loc.line(), func_name, module));
             }
             catch (const std::format_error &error)
             {
                 LogMsgImpl(LogMessage(level, L"[format error: " + ToWChar(error.what()) + L"] " + msg,
-                                      loc.file_name(), loc.line(), func_name));
+                                      loc.file_name(), loc.line(), func_name, module));
             }
         }
     private:

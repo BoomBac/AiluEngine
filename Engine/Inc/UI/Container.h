@@ -150,6 +150,7 @@ namespace Ailu
             void AddItem(Ref<UIElement> item);
             void ClearItems();
             void SetSelectedIndex(i32 index);
+            void ScrollItemIntoView(i32 index);
             void SetSelectedIndices(const Vector<i32> &indices);
             const Vector<i32> &GetSelectedIndices() const { return _selected_indices; }
             void SizeToContent(bool enable);

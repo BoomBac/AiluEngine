@@ -60,7 +60,8 @@ namespace Ailu
             /// <summary>
             /// 在单元格范围内绘制文本：按单元格绝对区域裁剪，超宽自动截断，可多行
             /// </summary>
-            void DrawClippedText(UIRenderer &r, const UITableStyle &style, const String &text, Vector4f cell_rect, Matrix4x4f matrix, Color color, ETableColumnAlignment alignment, u32 max_lines)
+            void DrawClippedText(UIRenderer &r, const UITableStyle &style, const String &text, Vector4f cell_rect, Matrix4x4f matrix,
+                                 Color color, ETableColumnAlignment alignment, u32 max_lines, bool underline)
             {
                 if (text.empty() || cell_rect.z <= 0.0f || cell_rect.w <= 0.0f)
                     return;
@@ -92,6 +93,11 @@ namespace Ailu
                             break;
                     }
                     r.DrawText(line, {tx, ty}, matrix, font_size, color);
+                    if (underline)
+                    {
+                        const f32 underline_y = std::min(ty + line_size.y - 1.0f, cell_rect.y + cell_rect.w - style._cell_padding._b);
+                        r.DrawLine({tx, underline_y}, {tx + line_size.x, underline_y}, matrix, 1.0f, color);
+                    }
                     ty += line_height;
                 }
                 r.PopScissor();
@@ -170,7 +176,8 @@ namespace Ailu
                 String title = columns[col]._name;
                 if (col == sort_column && columns[col]._sortable)
                     title += sort_ascending ? " ^" : " v";
-                DrawClippedText(r, style, title, {x, header_rect.y, w, header_rect.w}, matrix, style._header._content_color, ETableColumnAlignment::kCenter, kHeaderMaxLines);
+                DrawClippedText(r, style, title, {x, header_rect.y, w, header_rect.w}, matrix, style._header._content_color,
+                                ETableColumnAlignment::kCenter, kHeaderMaxLines, false);
                 x += w;
             }
             DrawColumnSeparators(r, style, widths, header_rect, matrix, content_offset_x);
@@ -204,9 +211,16 @@ namespace Ailu
             }
         }
 
-        void TableRenderer::DrawCellText(UIRenderer &r, const UITableStyle &style, const String &text, Vector4f cell_rect, Matrix4x4f matrix, ETableColumnAlignment alignment)
+        void TableRenderer::DrawCellText(UIRenderer &r, const UITableStyle &style, const String &text, Vector4f cell_rect,
+                                         Matrix4x4f matrix, ETableColumnAlignment alignment, bool underline)
         {
-            DrawClippedText(r, style, text, cell_rect, matrix, style._cell._content_color, alignment, 1u);
+            DrawClippedText(r, style, text, cell_rect, matrix, style._cell._content_color, alignment, 1u, underline);
+        }
+
+        void TableRenderer::DrawCellTextColored(UIRenderer &r, const UITableStyle &style, const String &text, Vector4f cell_rect,
+                                                 Matrix4x4f matrix, Color color, ETableColumnAlignment alignment, bool underline)
+        {
+            DrawClippedText(r, style, text, cell_rect, matrix, color, alignment, 1u, underline);
         }
 
         void TableRenderer::DrawCheckbox(UIRenderer &r, Vector2f pos, f32 size, bool checked, Color color, f32 border_width)

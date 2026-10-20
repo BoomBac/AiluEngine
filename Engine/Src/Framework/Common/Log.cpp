@@ -27,15 +27,19 @@ namespace Ailu
     }
 
 #pragma region LogMessage
-    LogMessage::LogMessage(ELogLevel level, const std::wstring &message, const std::string &file, int line, const std::string &function)
-        : _level(level), _message(message), _file(file), _line(line), _function(function)
+    LogMessage::LogMessage(ELogLevel level, const std::wstring &message, const std::string &file, int line,
+                           const std::string &function, ELogModule module)
+        : _level(level), _message(message), _file(file), _line(line), _function(function), _module(module),
+          _thread_id(std::this_thread::get_id())
     {
         _timestamp = std::chrono::system_clock::now();
         _time_str = TimeMgr::CurrentTime();
         _thread_name = GetThreadName();
     }
-    LogMessage::LogMessage(ELogLevel level, const std::string &message, const std::string &file, int line, const std::string &function)
-        : _level(level), _message(ToWChar(message)), _file(file), _line(line), _function(function)
+    LogMessage::LogMessage(ELogLevel level, const std::string &message, const std::string &file, int line,
+                           const std::string &function, ELogModule module)
+        : _level(level), _message(ToWChar(message)), _file(file), _line(line), _function(function), _module(module),
+          _thread_id(std::this_thread::get_id())
     {
         _timestamp = std::chrono::system_clock::now();
         _time_str = TimeMgr::CurrentTime();
@@ -47,7 +51,7 @@ namespace Ailu
     }
     std::wstring LogMessage::ToDetailString() const
     {
-        return std::format(L"[{}] [{}] [{}] [{}:{} ({})] {}", ToWChar(TimeMgr::CurrentTime()),
+        return std::format(L"[{}] [{}] [{}] [{}:{} ({})] {}", ToWChar(_time_str),
                            ToWChar(_thread_name), LogLevelToString(_level), ToWChar(_file), _line, ToWChar(_function), _message);
     }
 #pragma endregion

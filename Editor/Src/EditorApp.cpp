@@ -1,9 +1,11 @@
 #include <map>
+#include <limits>
 #include "EditorApp.h"
 #include "Automation/AIAssistant.h"
 #include "Automation/AutomationAdapter.h"
 #include "Automation/AutomationAssetService.h"
 #include "Automation/AutomationCaptureService.h"
+#include "Automation/AutomationConsoleBridge.h"
 #include "Automation/AutomationDestructiveService.h"
 #include "Automation/AutomationPipeServer.h"
 #include "Automation/AutomationReadModel.h"
@@ -106,7 +108,16 @@ namespace Ailu
             const bool is_offscreen = init_ctx._graphics_mode == EApplicationGraphicsMode::kOffscreen;
             const bool is_cpu_only = init_ctx._graphics_mode == EApplicationGraphicsMode::kNone;
             LogMgr::Init();
+            _log_service = MakeScope<EditorLogService>();
+            if (!_log_service->Initialize())
+            {
+                _log_service.reset();
+                LogMgr::Shutdown();
+                return 1;
+            }
             g_pCommandMgr = AL_NEW_TAG(EMemoryTag::kEditor, CommandManager);
+            _console_registry = MakeScope<ConsoleCommandRegistry>();
+            _task_service = MakeScope<EditorTaskService>();
             Enum::InitTypeInfo();
 
             const WString ailu_root = Application::GetAiluRoot();
@@ -130,12 +141,18 @@ namespace Ailu
                 _opened_scene_path = init_ctx._scene_path;
             auto ret = Application::Initialize(desc,init_ctx);
             if (ret != 0)
+            {
+                Finalize();
                 return ret;
+            }
             if (!is_cpu_only)
             {
                 _plugin_manager = MakeScope<PluginManager>();
                 if (!_plugin_manager->Initialize())
+                {
+                    Finalize();
                     return 1;
+                }
             }
             if (_plugin_manager != nullptr)
                 _plugin_manager->SetProgressCallback([this, tasks = std::map<String, EditorProgressHandle>{}]
@@ -264,6 +281,9 @@ namespace Ailu
                 AutomationWriteService::Register(_automation_service->Registry());
                 AutomationDestructiveService::Register(_automation_service->Registry());
                 AutomationCaptureService::Register(_automation_service->Registry());
+                const u32 automation_command_count =
+                    RegisterAutomationConsoleCommands(*_console_registry, _automation_service->Registry());
+                LOG_INFO("Registered {} automation commands in Terminal", automation_command_count);
             }
             {
                 // Built-in AI assistant: talks to the automation services in-process.
@@ -299,6 +319,12 @@ namespace Ailu
         }
         void EditorApp::Finalize()
         {
+            if (_task_service != nullptr)
+            {
+                _task_service->BeginShutdown();
+                _task_service->Finalize();
+                _task_service.reset();
+            }
             _progress_service.Shutdown();
             JobSystem::Get().Wait(_progress_demo_jobs);
             _before_update.Unsubscribe(_plugin_tick_handle);
@@ -324,6 +350,7 @@ namespace Ailu
             Camera::sScene = nullptr;
             Camera::sCurrent = nullptr;
             AL_DELETE(_p_scene_camera);
+            _console_registry.reset();
             AL_DELETE(g_pCommandMgr);
             AL_DELETE(_pipeline);
             _pipeline = nullptr;
@@ -342,8 +369,20 @@ namespace Ailu
                 for (auto &dp: deleted_wpix_files)
                     FileManager::DeleteDirectory(dp);
             }
+            ShutdownLogService();
             LogMgr::Shutdown();
         }
+
+        void EditorApp::ShutdownLogService()
+        {
+            if (_log_service == nullptr)
+                return;
+            _log_service->BeginShutdown();
+            _log_service->DrainPending(std::numeric_limits<u32>::max(), {});
+            _log_service->Finalize();
+            _log_service.reset();
+        }
+
         void EditorApp::StartProgressDemo()
         {
 #ifdef _DEBUG

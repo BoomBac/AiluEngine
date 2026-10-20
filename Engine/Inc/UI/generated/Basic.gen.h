@@ -37,7 +37,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::UI::Text>();
 //Class Text end...........................
 
 //Class Slider begin...........................
-#define BASIC_GEN_H_110_GENERATED_BODY \
+#define BASIC_GEN_H_122_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_Slider_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -53,7 +53,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::UI::Slider>();
 //Class Slider end...........................
 
 //Class CheckBox begin...........................
-#define BASIC_GEN_H_153_GENERATED_BODY \
+#define BASIC_GEN_H_165_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_CheckBox_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -69,7 +69,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::UI::CheckBox>();
 //Class CheckBox end...........................
 
 //Class Border begin...........................
-#define BASIC_GEN_H_186_GENERATED_BODY \
+#define BASIC_GEN_H_198_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_Border_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -85,7 +85,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::UI::Border>();
 //Class Border end...........................
 
 //Class InputBlock begin...........................
-#define BASIC_GEN_H_230_GENERATED_BODY \
+#define BASIC_GEN_H_242_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_InputBlock_Type();\
                                 static const Type* GetPrivateStaticClass();\
@@ -101,7 +101,7 @@ AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::UI::InputBlock>()
 //Class InputBlock end...........................
 
 //Class Image begin...........................
-#define BASIC_GEN_H_297_GENERATED_BODY \
+#define BASIC_GEN_H_317_GENERATED_BODY \
                             private: \
                                 friend const Type* Z_Construct_Image_Type();\
                                 static const Type* GetPrivateStaticClass();\

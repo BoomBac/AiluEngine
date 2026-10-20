@@ -155,6 +155,61 @@ add_custom_command(TARGET LogSmoke POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:Engine>" "$<TARGET_FILE_DIR:LogSmoke>"
     VERBATIM)
 
+add_executable(EditorLogServiceSmoke EditorLogServiceSmoke.cpp
+    "${CMAKE_SOURCE_DIR}/Editor/Src/Common/EditorLogService.cpp")
+target_include_directories(EditorLogServiceSmoke PRIVATE "${EDITOR_ROOT_PATH}/Inc" "${ENGINE_ROOT_PATH}/Inc")
+target_link_libraries(EditorLogServiceSmoke PRIVATE Engine)
+target_compile_definitions(EditorLogServiceSmoke PRIVATE UNICODE _UNICODE)
+if (MSVC)
+    target_compile_options(EditorLogServiceSmoke PRIVATE /utf-8)
+endif()
+add_custom_command(TARGET EditorLogServiceSmoke POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:Engine>" "$<TARGET_FILE_DIR:EditorLogServiceSmoke>"
+    VERBATIM)
+
+add_executable(ConsoleCommandRegistrySmoke ConsoleCommandRegistrySmoke.cpp
+    "${CMAKE_SOURCE_DIR}/Editor/Src/Common/ConsoleCommandRegistry.cpp"
+    "${CMAKE_SOURCE_DIR}/Editor/Src/Common/TerminalTranscript.cpp")
+target_include_directories(ConsoleCommandRegistrySmoke PRIVATE "${EDITOR_ROOT_PATH}/Inc" "${ENGINE_ROOT_PATH}/Inc")
+target_compile_features(ConsoleCommandRegistrySmoke PRIVATE cxx_std_20)
+if(MSVC)
+    target_compile_options(ConsoleCommandRegistrySmoke PRIVATE /utf-8)
+endif()
+
+add_executable(AutomationConsoleBridgeSmoke AutomationConsoleBridgeSmoke.cpp
+    "${CMAKE_SOURCE_DIR}/Editor/Src/Automation/AutomationConsoleBridge.cpp"
+    "${CMAKE_SOURCE_DIR}/Editor/Src/Automation/AutomationJson.cpp"
+    "${CMAKE_SOURCE_DIR}/Editor/Src/Automation/AutomationRegistry.cpp"
+    "${CMAKE_SOURCE_DIR}/Editor/Src/Automation/AutomationTypes.cpp"
+    "${CMAKE_SOURCE_DIR}/Editor/Src/Common/ConsoleCommandRegistry.cpp")
+target_include_directories(AutomationConsoleBridgeSmoke PRIVATE "${EDITOR_ROOT_PATH}/Inc" "${ENGINE_ROOT_PATH}/Inc")
+target_compile_features(AutomationConsoleBridgeSmoke PRIVATE cxx_std_20)
+if(MSVC)
+    target_compile_options(AutomationConsoleBridgeSmoke PRIVATE /utf-8)
+endif()
+
+add_executable(ProcessPipeChild ProcessPipeChild.cpp)
+target_compile_definitions(ProcessPipeChild PRIVATE UNICODE _UNICODE)
+if(MSVC)
+    target_compile_options(ProcessPipeChild PRIVATE /utf-8)
+endif()
+
+add_executable(ProcessPipeSmoke ProcessPipeSmoke.cpp)
+ailu_configure_test_target(ProcessPipeSmoke)
+add_dependencies(ProcessPipeSmoke ProcessPipeChild)
+add_custom_command(TARGET ProcessPipeSmoke POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:Engine>" "$<TARGET_FILE_DIR:ProcessPipeSmoke>"
+    VERBATIM)
+
+add_executable(EditorTaskServiceSmoke EditorTaskServiceSmoke.cpp
+    "${CMAKE_SOURCE_DIR}/Editor/Src/Common/EditorTaskService.cpp"
+    "${CMAKE_SOURCE_DIR}/Editor/Src/Common/TerminalTranscript.cpp")
+ailu_configure_test_target(EditorTaskServiceSmoke)
+add_dependencies(EditorTaskServiceSmoke ProcessPipeChild)
+add_custom_command(TARGET EditorTaskServiceSmoke POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:Engine>" "$<TARGET_FILE_DIR:EditorTaskServiceSmoke>"
+    VERBATIM)
+
 add_library(AiluPluginSmoke SHARED Plugins/SmokePlugin/SmokePlugin.cpp)
 target_include_directories(AiluPluginSmoke PRIVATE "${ENGINE_ROOT_PATH}/Inc")
 target_compile_definitions(AiluPluginSmoke PRIVATE AILU_BUILD_PLUGIN)
@@ -399,6 +454,12 @@ set(AILU_TEST_TARGETS
     ScriptRegression
     DynamicLibrarySmoke
     LogSmoke
+    EditorLogServiceSmoke
+    ConsoleCommandRegistrySmoke
+    AutomationConsoleBridgeSmoke
+    ProcessPipeChild
+    ProcessPipeSmoke
+    EditorTaskServiceSmoke
     AiluDynamicLibraryProbe
     PluginSmoke
     AiluPluginSmoke

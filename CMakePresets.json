@@ -43,6 +43,22 @@
       "inherits": "windows-base"
     },
     {
+      "name": "player-debug",
+      "displayName": "Ailu Player Debug",
+      "inherits": "debug",
+      "cacheVariables": {
+        "AILU_BUILD_PLAYER": "ON"
+      }
+    },
+    {
+      "name": "player-release",
+      "displayName": "Ailu Player Release",
+      "inherits": "release",
+      "cacheVariables": {
+        "AILU_BUILD_PLAYER": "ON"
+      }
+    },
+    {
       "name": "release",
       "displayName": "Ailu Release",
       "inherits": "windows-base"
@@ -62,6 +78,20 @@
       "targets": ["ailu_test_targets"]
     },
     {
+      "name": "build-player-debug",
+      "displayName": "Ailu Player Debug Package",
+      "configurePreset": "player-debug",
+      "configuration": "Debug",
+      "targets": ["package_player"]
+    },
+    {
+      "name": "build-player-release",
+      "displayName": "Ailu Player Release Package",
+      "configurePreset": "player-release",
+      "configuration": "Release",
+      "targets": ["package_player"]
+    },
+    {
       "name": "build-release",
       "configurePreset": "release",
       "configuration": "Release"
@@ -70,6 +100,36 @@
       "name": "build-develop",
       "configurePreset": "develop",
       "configuration": "RelWithDebInfo"
+    }
+  ],
+  "workflowPresets": [
+    {
+      "name": "package-player-debug",
+      "displayName": "Ailu Package Player Debug",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "player-debug"
+        },
+        {
+          "type": "build",
+          "name": "build-player-debug"
+        }
+      ]
+    },
+    {
+      "name": "package-player-release",
+      "displayName": "Ailu Package Player Release",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "player-release"
+        },
+        {
+          "type": "build",
+          "name": "build-player-release"
+        }
+      ]
     }
   ]
 }

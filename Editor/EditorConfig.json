@@ -1,13 +1,23 @@
 {
     "_window_size": [1491, 902],
     "_viewport_size": [0, 0],
-    "_position": [14.5789, 3.8003, -4.8101],
-    "_rotation": [0.1288, -0.4651, 0.0686, 0.873],
+    "_position": [-7.5452, 1.1494, -1.7858],
+    "_rotation": [-0.1055, -0.6665, 0.0961, -0.7316],
     "_fov": 60.0,
     "_aspect": 1.75,
     "_near": 0.1,
     "_far": 1000.0,
-    "_move_speed": 0.5982,
-    "_controller_rot": [16.7918, -56.0954],
-    "_scene_path": "project://scene/empty.almap"
+    "_move_speed": 0.3508,
+    "_controller_rot": [16.4144, -275.3264],
+    "_scene_path": "project://scene/empty.almap",
+    "_output_info_color": [0.9161, 0.9355, 0.9639, 1.0],
+    "_output_warning_color": [0.9998, 0.8962, 0.6011, 1.0],
+    "_output_error_color": [0.9998, 0.6341, 0.6341, 1.0],
+    "_output_debug_color": [0.8094, 0.8962, 0.9998, 1.0],
+    "_output_trace_color": [0.8266, 0.8432, 0.8755, 1.0],
+    "_output_general_color": [0.8962, 0.9161, 0.9452, 1.0],
+    "_output_asset_color": [0.7673, 0.9355, 0.8432, 1.0],
+    "_output_shader_color": [0.8962, 0.8094, 0.9998, 1.0],
+    "_output_rhi_color": [0.9911, 0.8209, 0.6797, 1.0],
+    "_output_editor_color": [0.665, 0.9161, 0.9998, 1.0]
 }

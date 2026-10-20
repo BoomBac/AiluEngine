@@ -21,6 +21,7 @@ set(AILU_FBXSDK_LINK_LIB
 	$<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>,$<CONFIG:MinSizeRel>>:${AILU_EXT_PACKAGES_DIR}/fbxsdk/lib/vs2019/x64/release/libfbxsdk.lib>)
 
 option(AILU_ENABLE_TRACY "Enable Tracy profiler instrumentation" ON)
+option(AILU_BUILD_PLAYER "Build the optional Player target" OFF)
 option(AILU_WITH_OIDN_GPU "Enable optional OIDN 2.5.1 CUDA/DX12 dynamic runtime loading" OFF)
 set(AILU_OIDN_RUNTIME_DIRECTORY
     "${AILU_EXT_PACKAGES_DIR}/oidn-2.5.1/package/oidn-2.5.1.x64.windows/bin"
@@ -130,5 +131,7 @@ add_subdirectory(Plugins/BlenderLiveLink)
 
 # 添加editor子目录
 add_subdirectory(Editor)
-# add_subdirectory(Player)
+if(AILU_BUILD_PLAYER)
+	add_subdirectory(Player)
+endif()
 add_subdirectory(Test)

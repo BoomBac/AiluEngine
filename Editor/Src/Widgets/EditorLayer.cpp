@@ -46,6 +46,9 @@
 #include "UI/Menu.h"
 #include "UI/Widget.h"
 #include "Widgets/FrameDebuggerWindow.h"
+#include "Widgets/OutputWindow.h"
+#include "Widgets/TerminalWindow.h"
+#include "Widgets/EditorPreferencesWindow.h"
 #include "Widgets/PlaceActor.h"
 
 #include "Objects/JsonArchive.h"
@@ -64,7 +67,6 @@
 #include "Widgets/AllocatorDebugPanel.h"
 #include "Widgets/RenderView.h"
 #include "Widgets/ResourceBrowser.h"
-#include "Widgets/StyleThemeEditor.h"
 
 #include "Framework/Parser/TextParser.h"
 #include "Platform/Process.h"
@@ -108,21 +110,49 @@ namespace Ailu
                 }
             }
 
-            const wchar_t *GetPackagePlayerPresetName()
+            const wchar_t *GetPackagePlayerWorkflowPresetName()
             {
 #ifdef _DEBUG
-                return L"build-debug";
+                return L"package-player-debug";
 #else
-                return L"build-release";
+                return L"package-player-release";
 #endif
             }
 
             WString BuildPackagePlayerCommandLine()
             {
-                WString command = L"cmd.exe /c \"cmake --build --preset ";
-                command += GetPackagePlayerPresetName();
-                command += L" --target package_player --parallel 6\"";
+                WString command = L"cmd.exe /d /s /c \"cmake --workflow --preset ";
+                command += GetPackagePlayerWorkflowPresetName();
+                command += L"\"";
                 return command;
+            }
+
+            bool IsTerminalTaskState(EEditorTaskState state)
+            {
+                return state == EEditorTaskState::kSucceeded || state == EEditorTaskState::kFailed ||
+                       state == EEditorTaskState::kCanceled || state == EEditorTaskState::kLaunchFailed;
+            }
+
+            String FormatPackagePlayerStatus(const EditorTaskStatus &status)
+            {
+                switch (status._state)
+                {
+                    case EEditorTaskState::kStarting: return "package_player starting";
+                    case EEditorTaskState::kRunning: return "package_player running";
+                    case EEditorTaskState::kExitedDraining: return "package_player draining";
+                    case EEditorTaskState::kCanceling: return "package_player canceling";
+                    case EEditorTaskState::kSucceeded: return "package_player finished";
+                    case EEditorTaskState::kCanceled: return "package_player canceled";
+                    case EEditorTaskState::kLaunchFailed: return "package_player failed to start";
+                    case EEditorTaskState::kFailed:
+                    {
+                        String result = "package_player failed";
+                        if (status._has_exit_code)
+                            result += " (exit=" + std::to_string(status._exit_code) + ")";
+                        return result;
+                    }
+                    default: return "package_player queued";
+                }
             }
 
             bool IsElementInSubtree(const UI::UIElement *root, const UI::UIElement *target)
@@ -1683,6 +1713,8 @@ namespace Ailu
         void EditorLayer::OnUpdate(f32 dt)
         {
             PROFILE_BLOCK_CPU("EditorLayer::OnUpdate")
+            if (auto *task_service = EditorApp::GetEditor()->GetTaskService(); task_service != nullptr)
+                task_service->Tick();
             UpdateEditorChrome(dt);
             UpdateDeferredLightingCaptureStatus();
             UpdateAutoCapture();
@@ -1819,6 +1851,26 @@ namespace Ailu
                 Vector<UI::MenuEntry> entries;
                 entries.push_back({"Scene", {}, false, std::move(scene_entries)});
                 entries.push_back({"Play Mode", {}, false, std::move(play_entries)});
+                Vector<UI::MenuEntry> window_entries;
+                window_entries.push_back({"Output", [this]()
+                {
+                    const auto type_name = OutputWindow::StaticType()->FullName();
+                    if (!DockManager::Get().ActivateDock(type_name) && !DockManager::Get().HasDock(type_name))
+                        DockManager::Get().AddDock(MakeRef<OutputWindow>());
+                }});
+                window_entries.push_back({"Terminal", [this]()
+                {
+                    const auto type_name = TerminalWindow::StaticType()->FullName();
+                    if (!DockManager::Get().ActivateDock(type_name) && !DockManager::Get().HasDock(type_name))
+                        DockManager::Get().AddDock(MakeRef<TerminalWindow>());
+                }});
+                window_entries.push_back({"Editor Preferences", [this]()
+                {
+                    const auto type_name = EditorPreferencesWindow::StaticType()->FullName();
+                    if (!DockManager::Get().ActivateDock(type_name) && !DockManager::Get().HasDock(type_name))
+                        DockManager::Get().AddDock(MakeRef<EditorPreferencesWindow>());
+                }});
+                entries.push_back({"Window", {}, false, std::move(window_entries)});
 #ifdef _DEBUG
                 entries.push_back({"Progress Demo", []() { EditorApp::GetEditor()->StartProgressDemo(); }});
 #endif
@@ -2054,7 +2106,6 @@ namespace Ailu
             static bool s_show_threadpool_view = false;
             static bool s_show_imguinode = false;
             static bool s_show_ui_reflector = false;
-            static bool s_show_style_theme_editor = false;
             static bool s_show_resource_browser = false;
             static bool s_show_allocator_debug_panel = false;
 
@@ -2093,30 +2144,31 @@ namespace Ailu
         void EditorLayer::OnImguiRender()
         {
             static bool s_show_undo_view = false;
-            static Scope<Process> s_package_player_process;
             static String s_package_player_status = "Idle";
             MemoryDebugService::Get().Tick(TimeMgr::s_delta_time);
 
-            if (s_package_player_process && s_package_player_process->IsValid() && !s_package_player_process->IsRunning())
+            auto *task_service = EditorApp::GetEditor()->GetTaskService();
+            EditorTaskStatus package_status;
+            bool is_packaging_player = false;
+            if (task_service != nullptr && _package_player_task_id != 0u)
             {
-                u32 exit_code = 0u;
-                if (s_package_player_process->TryGetExitCode(exit_code) && exit_code == 0u)
+                package_status = task_service->GetStatus(_package_player_task_id);
+                is_packaging_player = !IsTerminalTaskState(package_status._state);
+                if (_package_player_status_revision != package_status._revision)
                 {
-                    s_package_player_status = "package_player finished";
-                    LOG_INFO("package_player finished");
+                    s_package_player_status = FormatPackagePlayerStatus(package_status);
+                    if (package_status._state == EEditorTaskState::kSucceeded)
+                    {
+                        LOG_INFO("package_player finished");
+                    }
+                    else if (package_status._state == EEditorTaskState::kFailed ||
+                             package_status._state == EEditorTaskState::kLaunchFailed)
+                    {
+                        LOG_ERROR("{}", s_package_player_status);
+                    }
+                    _package_player_status_revision = package_status._revision;
                 }
-                else
-                {
-                    s_package_player_status = "package_player failed";
-                    if (s_package_player_process->TryGetExitCode(exit_code))
-                        s_package_player_status += " (exit=" + std::to_string(exit_code) + ")";
-                    LOG_ERROR("{}", s_package_player_status);
-                }
-                s_package_player_process->Close();
-                s_package_player_process.reset();
             }
-
-            const bool is_packaging_player = s_package_player_process && s_package_player_process->IsValid() && s_package_player_process->IsRunning();
             ImGui::Begin("Common");// Create a window called "Hello, world!" and append into it.
             const auto& ds = RenderingStates::DisplayData();
             ImGui::Text("FrameRate: %.2f", ds.FrameRate);
@@ -2314,7 +2366,6 @@ namespace Ailu
             ImGui::Checkbox("ShowThreadPoolView", &s_show_threadpool_view);
             ImGui::Checkbox("ShowNode", &s_show_imguinode);
             ImGui::Checkbox("ShowUIReflector", &s_show_ui_reflector);
-            ImGui::Checkbox("ShowStyleThemeEditor", &s_show_style_theme_editor);
             ImGui::Checkbox("ShowResourceBrowser", &s_show_resource_browser);
             ImGui::Checkbox("AllocatorDebug", &s_show_allocator_debug_panel);
             ImGui::Checkbox("Raytracing Pipeline", &RenderPipeline::Get().GetRenderer()->_is_use_raytracing);
@@ -2332,19 +2383,23 @@ namespace Ailu
                 ImGui::BeginDisabled();
             if (ImGui::Button(is_packaging_player ? "Packaging Player..." : "Build/Package Player"))
             {
-                ProcessStartInfo psi(BuildPackagePlayerCommandLine());
-                psi.WorkingDirectory = Application::GetProjectRootPath();
-                auto process = ProcessFactory::Create();
-                if (process && process->Start(psi))
+                String start_error;
+                const u64 task_id = task_service == nullptr
+                                        ? 0u
+                                        : task_service->StartTrustedCommandLine(BuildPackagePlayerCommandLine(),
+                                                                                 Application::GetProjectRootPath(),
+                                                                                 "Build/Package Player", start_error);
+                if (task_id != 0u)
                 {
+                    _package_player_task_id = task_id;
+                    _package_player_status_revision = 0u;
                     s_package_player_status = "package_player running";
-                    LOG_INFO(L"Start package_player in {}", psi.WorkingDirectory);
-                    s_package_player_process = std::move(process);
+                    LOG_INFO(L"Start package_player in {}", Application::GetProjectRootPath());
                 }
                 else
                 {
-                    s_package_player_status = "failed to start package_player";
-                    LOG_ERROR("failed to start package_player");
+                    s_package_player_status = start_error.empty() ? "failed to start package_player" : start_error;
+                    LOG_ERROR("{}", s_package_player_status);
                 }
             }
             if (is_packaging_player)
@@ -2564,8 +2619,6 @@ namespace Ailu
                 UI::UIManager::Get()->SetDebugHighlightTarget(nullptr);
                 UI::UIManager::Get()->SetDebugPaintDirtyVisible(false);
             }
-            if (s_show_style_theme_editor)
-                ShowStyleThemeEditorWindow(&s_show_style_theme_editor);
             if (s_show_resource_browser)
                 ShowResourceBrowserWindow(&s_show_resource_browser);
             if (s_show_allocator_debug_panel)

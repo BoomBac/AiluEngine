@@ -144,8 +144,9 @@ namespace Ailu
 
         bool TransformGizmo::IsSnapActive() const
         {
-            return _snap_enabled || Input::IsKeyDown(EKey::kLCONTROL) || Input::IsKeyDown(EKey::kRCONTROL) ||
-                   Input::IsKeyDown(EKey::kCONTROL);
+            return _snap_enabled || (_is_scene_view_focused &&
+                                     (Input::IsKeyDown(EKey::kLCONTROL) || Input::IsKeyDown(EKey::kRCONTROL) ||
+                                      Input::IsKeyDown(EKey::kCONTROL)));
         }
 
         f32 TransformGizmo::SnapFloat(f32 value, f32 step) const
